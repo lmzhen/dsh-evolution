@@ -38,6 +38,18 @@ function card(props: Record<string, unknown>): Parameters<typeof render>[0] {
   return h(RowConfigCard, { namespace: 'memory-files', fields, t, ...props })
 }
 
+/** Find one control by its rendered label (the reset pair changes label while it is in flight). */
+function findButton(container: HTMLElement, label: string): HTMLButtonElement | undefined {
+  return Array.from(container.querySelectorAll('button')).find(button => button.textContent === label)
+}
+
+/** The row's reset control, by the label it wears at rest. */
+function resetButton(container: HTMLElement): Element {
+  const button = findButton(container, t('reset'))
+  if (button === undefined) throw new Error('the row rendered no reset control')
+  return button
+}
+
 /** One page-side state, as `formFor()` builds it from the settings seat. */
 function state(user: Record<string, unknown>): Record<string, unknown> {
   return { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true, mode: 'host' }
@@ -66,6 +78,60 @@ describe('the per-row configuration entry', () => {
     // The page's own op list, fenced with the revision the entry read — not a bare set().
     expect(mutate.mock.calls[0]?.[0]).toEqual([{ op: 'set', path: [NUMBER_FIELD.id], value: 321 }])
     expect(mutate.mock.calls[0]?.[1]).toBe(7)
+    cleanup()
+  })
+
+  it('audit T5-05/A60: a refused reset says so instead of silently doing nothing', async () => {
+    // The host refuses the unset (a non-volatile path throws, a conflicting write answers false) and
+    // the page state therefore still holds the override. Before this verdict the click changed
+    // NOTHING on screen: the row kept its "edited by you" chip and the reader concluded the button
+    // was broken.
+    const mutate = vi.fn(async () => true)
+    const view = render(card({ view: 'page', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate } }))
+    fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
+    fireEvent.click(resetButton(view.container))
+    await vi.waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    // The page's own op list for a reset — one unset for that path, with the revision it read.
+    expect(mutate.mock.calls[0]?.[0]).toEqual([{ op: 'unset', path: [NUMBER_FIELD.id] }])
+    expect(mutate.mock.calls[0]?.[1]).toBe(7)
+    await vi.waitFor(() => { expect(view.container.textContent).toContain(t('resetRefused')) })
+    cleanup()
+  })
+
+  it('audit T5-05/A60: a reset that lands leaves no error line, and the row drops its override', async () => {
+    const mutate = vi.fn(async () => true)
+    const view = render(card({ view: 'page', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate } }))
+    fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
+    fireEvent.click(resetButton(view.container))
+    await vi.waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    // The page re-renders the entry from its own state — the override is gone, which is the evidence
+    // the verdict reads. Same op list, opposite verdict: the check is structural.
+    view.rerender(card({ view: 'page', form: { state: state({}), mutate } }))
+    await vi.waitFor(() => { expect(view.container.textContent).not.toContain(t('resetRefused')) })
+    expect(findButton(view.container, t('reset'))).toBeUndefined()
+    cleanup()
+  })
+
+  it('audit T5-05/A60: the reset control reports an in-flight reset and locks the card', async () => {
+    let release: (() => void) | null = null
+    const hold = new Promise<void>((resolve) => { release = resolve })
+    const mutate = vi.fn(async () => { await hold; return true })
+    const view = render(card({ view: 'page', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate } }))
+    fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
+    fireEvent.click(resetButton(view.container))
+    await vi.waitFor(() => { expect(findButton(view.container, t('resetting'))).toBeDefined() })
+    expect((view.container.querySelector('[data-primary="true"]') as HTMLButtonElement).disabled).toBe(true)
+    release?.()
+    await vi.waitFor(() => { expect(findButton(view.container, t('resetting'))).toBeUndefined() })
+    cleanup()
+  })
+
+  it('audit T5-05/A60: a throwing settings service reaches the reader instead of escaping', async () => {
+    const mutate = vi.fn(async () => { throw new Error('this path is not volatile') })
+    const view = render(card({ view: 'page', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate } }))
+    fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
+    fireEvent.click(resetButton(view.container))
+    await vi.waitFor(() => { expect(view.container.textContent).toContain('this path is not volatile') })
     cleanup()
   })
 

@@ -16,7 +16,7 @@
 import { createElement, useEffect, useState, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
-import { landedWrites, type PendingWrite } from './settle.ts'
+import { landedSettlements, type Settlement } from './settle.ts'
 import type { ParamSectionSnapshot, ParamSectionSource } from './seam.ts'
 
 /**
@@ -83,10 +83,14 @@ interface FieldBlockProps {
   field: ClientParamField
   text: string
   overridden: boolean
+  /** The card is busy (a save or another reset is in flight). */
   disabled: boolean
+  /** THIS field's reset is in flight (T5-05/A60) — the button says so. */
+  clearing: boolean
   t: (key: MessageKey) => string
   onChange: (id: string, text: string) => void
-  clear: (field: string) => Promise<void>
+  /** Ask for this field's deployment default back; the verdict is judged from the next snapshot. */
+  onClear: (field: string) => void
 }
 
 /** One field's control, typed from the registry. */
@@ -148,9 +152,9 @@ function FieldBlock(props: FieldBlockProps): ReactNode {
         createElement('button', {
           type: 'button',
           className: 'evolution-param-button',
-          disabled: props.disabled,
-          onClick: () => { void props.clear(field.id) },
-        }, t('reset')),
+          disabled: props.disabled || props.clearing,
+          onClick: () => { props.onClear(field.id) },
+        }, props.clearing ? t('resetting') : t('reset')),
       )
       : null,
   )
@@ -167,6 +171,7 @@ export interface ParamCardViewProps {
   fields: readonly ClientParamField[]
   t: (key: MessageKey) => string
   write: (field: string, value: unknown) => Promise<void>
+  /** Ask the scope to drop one override; resolves when the scope answered, not when it landed. */
   clear: (field: string) => Promise<void>
   /** The current row state, from whichever source owns it (the bound hook or the page). */
   snapshot: ParamSectionSnapshot
@@ -183,7 +188,10 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [pending, setPending] = useState<readonly PendingWrite[] | null>(null)
+  const [pending, setPending] = useState<readonly Settlement[] | null>(null)
+  // The field whose reset is in flight (T5-05/A60): the button says so and the controls lock, the
+  // same posture the save path takes while its write is outstanding.
+  const [clearing, setClearing] = useState<string | null>(null)
   if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('loading'))
   // Three different absences, told apart on screen because the operator's next move differs:
   // this UI has no settings seat (compose the settings surface), the seat serves no such row
@@ -199,8 +207,10 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const value = isSection(snapshot.value) ? snapshot.value : {}
   const disabled = !snapshot.writable
   // Controls lock while a write is in flight: the drafts this save staged are the ones
-  // the settling effect clears, so typing over them would lose the newer text.
-  const locked = disabled || busy
+  // the settling effect clears, so typing over them would lose the newer text. A reset in
+  // flight locks them too — there is ONE pending batch per card, so a second click would
+  // replace the batch the first click is still waiting on a verdict for (T5-05/A60).
+  const locked = disabled || busy || clearing !== null
   const titleKey = NAMESPACE_TITLES[namespace] as MessageKey | undefined
   const title = titleKey === undefined ? namespace : t(titleKey)
   const changed = fields.filter(field => Object.hasOwn(user, field.id)).length
@@ -224,16 +234,44 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     if (pending === null) return
     setPending(null)
     setBusy(false)
-    if (landedWrites(pending, snapshot.user)) setDraft({})
-    else setError(t('refused'))
+    setClearing(null)
+    if (!landedSettlements(pending, snapshot.user)) {
+      // A refused reset reads differently from a refused save: in the first the row still shows the
+      // operator's value, which is what a reader who clicked "restore default" needs to be told.
+      setError(t(pending.every(entry => entry.op === 'unset') ? 'resetRefused' : 'refused'))
+      return
+    }
+    if (pending.some(entry => entry.op === 'set')) setDraft({})
   }, [pending, snapshot.user, t])
+  /**
+   * Restore one field's deployment default (T5-05/A60).
+   *
+   * The scope's own boolean is NOT the verdict — same reason the save path judges the settled
+   * snapshot instead: a host refusal leaves the user layer untouched, which is precisely what a
+   * structural check sees and a dropped return value does not. A throw (the settings service
+   * rejecting a non-volatile path) used to escape as an unhandled rejection.
+   */
+  const reset = (field: string): void => {
+    setClearing(field)
+    setError('')
+    void (async () => {
+      try {
+        await clear(field)
+      } catch (caught) {
+        setClearing(null)
+        setError(caught instanceof Error && caught.message !== '' ? caught.message : t('resetRefused'))
+        return
+      }
+      setPending([{ op: 'unset', id: field }])
+    })()
+  }
   const save = (): void => {
     setBusy(true)
     setError('')
     void (async () => {
       try {
         for (const field of dirty) await write(field.id, parseFor(field.control, textOf(field)))
-        setPending(dirty.map(field => ({ id: field.id, want: parseFor(field.control, textOf(field)) })))
+        setPending(dirty.map(field => ({ op: 'set' as const, id: field.id, want: parseFor(field.control, textOf(field)) })))
       } catch (caught) {
         // Transport-level failures (and any future shell that rejects): keep the draft
         // so nothing the operator typed is lost.
@@ -264,9 +302,10 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
             text: textOf(field),
             overridden: Object.hasOwn(user, field.id),
             disabled: locked,
+            clearing: clearing === field.id,
             t,
             onChange: change,
-            clear,
+            onClear: reset,
           })),
         error === '' ? null : createElement('p', { className: 'evolution-param-error' }, error),
         fields.length === 0 ? null : createElement('div', { className: 'evolution-param-footer' },
@@ -280,7 +319,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
             type: 'button',
             className: 'evolution-param-button',
             'data-primary': 'true',
-            disabled: disabled || busy || dirty.length === 0,
+            disabled: locked || dirty.length === 0,
             onClick: save,
           }, busy ? t('saving') : t('apply')),
         ),

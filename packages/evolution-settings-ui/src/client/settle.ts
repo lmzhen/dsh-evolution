@@ -9,13 +9,18 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui
  */
 
-/** One staged write awaiting its verdict. */
-export interface PendingWrite {
-  /** Parameter id the write named. */
-  readonly id: string
-  /** The value handed to the scope's `set`. */
-  readonly want: unknown
-}
+/**
+ * One staged operation awaiting its verdict, in the platform's own two op kinds.
+ *
+ * `unset` is here because "restore the default" had NO verdict at all (T5-05/A60): the reset path
+ * called the scope and dropped its answer, so a host refusal changed nothing on screen — the row kept
+ * its "edited by you" chip and the reader concluded the button was broken. The two ops need different
+ * evidence (a set landed when the id holds the value; an unset landed when the id is GONE), which is
+ * exactly why they are one union judged by one function instead of two look-alike helpers.
+ */
+export type Settlement =
+  | { readonly op: 'set'; readonly id: string; readonly want: unknown }
+  | { readonly op: 'unset'; readonly id: string }
 
 /**
  * Structural equality for the values a parameter can hold.
@@ -45,12 +50,14 @@ function sameValue(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Whether every staged write is visible in the user layer.
- * @param pending - the writes awaiting a verdict.
+ * Whether every staged operation is visible in the user layer.
+ * @param pending - the operations awaiting a verdict.
  * @param user - the user layer of the post-write snapshot; a non-section reads as empty.
- * @returns true when each staged id now holds the value that was requested.
+ * @returns true when each staged id now holds the requested value, or is gone after an `unset`.
  */
-export function landedWrites(pending: readonly PendingWrite[], user: unknown): boolean {
+export function landedSettlements(pending: readonly Settlement[], user: unknown): boolean {
   const section = typeof user === 'object' && user !== null && !Array.isArray(user) ? (user as Record<string, unknown>) : {}
-  return pending.every(entry => sameValue(section[entry.id], entry.want))
+  return pending.every(entry => entry.op === 'unset'
+    ? !Object.hasOwn(section, entry.id)
+    : sameValue(section[entry.id], entry.want))
 }

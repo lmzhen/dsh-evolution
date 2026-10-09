@@ -47,10 +47,19 @@ export type ApprovalAnswer<T> =
   | { readonly ok: true; readonly data: T }
   | { readonly ok: false; readonly message: string }
 
+/**
+ * Which window the pending route is asked for. The host route has always taken `?status=` (the CLI
+ * asks for both); this half asked for neither, so a record stuck in `executing` — an approve that
+ * died between the claim and the decision, or another process running it — was invisible in the GUI
+ * while `/evolution pending` and doctor both listed it (T4-05/A47). `PendingRow.status` even declared
+ * the member, so the type face expected data the data face could not reach.
+ */
+export type PendingWindow = 'pending' | 'executing'
+
 /** How this bundle reaches the host. Injectable so a spec drives it without a server. */
 export interface ApprovalApi {
-  /** The staged writes waiting for a decision. */
-  pending: () => Promise<ApprovalAnswer<readonly PendingRow[]>>
+  /** The staged writes in one window; `pending` when the caller does not say. */
+  pending: (status?: PendingWindow) => Promise<ApprovalAnswer<readonly PendingRow[]>>
   /** Ask the host to replay one staged write. */
   approve: (id: string) => Promise<ApprovalAnswer<unknown>>
   /** Close one staged write without replaying it. */
@@ -81,7 +90,10 @@ export function createApprovalApi(doFetch: typeof fetch): ApprovalApi {
   const post = (path: string, id: string): Promise<ApprovalAnswer<unknown>> =>
     read(doFetch, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
   return {
-    pending: async () => await read<readonly PendingRow[]>(doFetch, APPROVAL_CLIENT_ROUTES.pending),
+    pending: async status => await read<readonly PendingRow[]>(
+      doFetch,
+      status === undefined ? APPROVAL_CLIENT_ROUTES.pending : APPROVAL_CLIENT_ROUTES.pending + '?status=' + status,
+    ),
     approve: async id => await post(APPROVAL_CLIENT_ROUTES.approve, id),
     reject: async id => await post(APPROVAL_CLIENT_ROUTES.reject, id),
     preview: async id => await read<PreviewAnswer>(doFetch, APPROVAL_CLIENT_ROUTES.preview + '?id=' + encodeURIComponent(id)),

@@ -42,8 +42,23 @@ Its states are deliberately distinct: **reading** ("正在读取待批项…"), 
 **failed** (the reason plus a retry). Merging the first two is what once made a slow answer read as lost data
 (E7), so the state machine lives in `pending-state.ts` and the three are asserted without a browser.
 
+It reads BOTH windows the route serves — `?status=pending` and `?status=executing` — and orders them the way
+the CLI does. A record stuck in `executing` (an approve that died between the claim and the decision, or
+another process running it) is NOT waiting for a decision: its row carries no approve/reject pair, says the
+write may already have landed, and the header counts it apart ("{n} 项执行中"). Reading only the pending window
+is what made such a record invisible here while `/evolution pending` and doctor both listed it.
+
+The card re-reads the window on demand: a **refresh** control in the body and a window `focus`. It reads once
+per mount otherwise — deliberately no timer, since the family has no polling precedent — because an agent can
+stage a write while the reader is looking at the card, and the empty sentence standing there afterwards is the
+"empty vs. actually something" lie.
+
 A decision re-reads the window instead of editing the list locally (the host owns the state) and shows the
-host's own sentence when it refuses. **Preview** opens one row at a time: the facts line (`n 行新增` /
+host's own sentence when it refuses. **Restore to default** (`unset`) is judged the same way as a save: the
+reset's verdict is the next snapshot — the id must be GONE from the user layer, the opposite evidence a `set`
+needs — so a host refusal prints "恢复默认值没有生效…" instead of leaving a chip that looks like a broken button,
+the control reports its in-flight state, and a throwing settings service reaches the reader rather than
+escaping as an unhandled rejection. `settle.ts` holds that one verdict function for both ops. **Preview** opens one row at a time: the facts line (`n 行新增` /
 `n 行删除` / truncated) and the source block with `-`/`+` lines, the same shape the history panel's diff
 uses; an unavailable preview prints the host's reason. A late answer for a row the reader already left is
 dropped rather than painted under another row's heading.

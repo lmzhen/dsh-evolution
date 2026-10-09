@@ -61,14 +61,39 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     setState(value)
   }
 
+  /**
+   * Read the window the card is about: the writes WAITING and the writes RUNNING.
+   *
+   * T4-05/A47: the route has always taken `?status=` — the CLI asks for both lists — but this card
+   * asked for neither, so a record whose approve died between the claim and the decision showed as
+   * "nothing is waiting for a decision" while `/evolution pending` and doctor listed it. The two
+   * answers are ordered the way the CLI orders them (waiting first); either one failing fails the
+   * read, because a half-list would read as a complete window.
+   */
   const load = async (): Promise<void> => {
     apply(loading)
-    const answer = await api.pending()
-    apply(current => answer.ok ? loaded(current, answer.data) : failed(current, answer.message))
+    const [waiting, running] = await Promise.all([api.pending(), api.pending('executing')])
+    if (!waiting.ok) {
+      apply(current => failed(current, waiting.message))
+      return
+    }
+    if (!running.ok) {
+      apply(current => failed(current, running.message))
+      return
+    }
+    apply(current => loaded(current, [...waiting.data, ...running.data]))
   }
 
   useEffect(() => {
     void load()
+    // T5-04/A59: the window is owned by the host and changes WHILE this card is mounted (an agent
+    // stages a write mid-session). Reading exactly once left the empty sentence standing after a
+    // write had been staged — "nothing is waiting" when something was — and the only way out was
+    // leaving the partition. Deliberately not a timer (the family has no polling precedent): a
+    // window focus re-read, plus the explicit refresh control in the header.
+    const onFocus = (): void => { void load() }
+    window.addEventListener('focus', onFocus)
+    return () => { window.removeEventListener('focus', onFocus) }
   }, [])
 
   const decide = (id: string, action: 'approve' | 'reject'): void => {
@@ -137,6 +162,18 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   }
 
   const row = (entry: PendingRow): ReactNode => {
+    // T4-05/A47: a running record is NOT waiting for a decision — its write effect may already have
+    // landed — so the two decisions are absent and the row says what to do instead (the CLI's own
+    // instruction). Offering "approve" here is the double-approve the CLI warns about.
+    if (entry.status === 'executing') {
+      return createElement('div', { className: 'evolution-param-field', key: entry.id },
+        createElement('div', { className: 'evolution-param-label' },
+          createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
+          createElement('span', { className: 'evolution-param-value' }, entry.summary)),
+        createElement('p', { className: 'evolution-param-hint' }, age(entry)),
+        createElement('p', { className: 'evolution-param-note' }, t('approvalExecuting')),
+        entry.claimedBy === undefined ? null : createElement('p', { className: 'evolution-param-hint' }, entry.claimedBy))
+    }
     const busy = state.busy.includes(entry.id)
     const button = (label: MessageKey, action: 'approve' | 'reject'): ReactNode =>
       createElement('button', {
@@ -174,7 +211,11 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       state.notice === null ? null : createElement('p', { className: 'evolution-param-error' }, state.notice))
   }
 
-  const count = state.view.kind === 'ready' ? state.view.rows.length : 0
+  // The two windows are counted apart: a running record is not "waiting", and one number over both
+  // would tell the reader the wrong thing about each.
+  const rows = state.view.kind === 'ready' ? state.view.rows : []
+  const waiting = rows.filter(entry => entry.status !== 'executing').length
+  const running = rows.length - waiting
   return createElement('section', { className: 'evolution-param-card' },
     createElement('button', {
       className: 'evolution-param-head',
@@ -183,7 +224,19 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       'aria-expanded': open,
     },
     createElement('span', { className: 'evolution-param-card-title' }, t('approvalTitle')),
-    count === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalCount').replace('{n}', String(count))),
+    waiting === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalCount').replace('{n}', String(waiting))),
+    running === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalRunningCount').replace('{n}', String(running))),
     createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼')),
-    open ? createElement('div', { className: 'evolution-param-body' }, body()) : null)
+    open
+      ? createElement('div', { className: 'evolution-param-body' },
+        // T5-04/A59: the explicit re-read. The reader who staged a write from the session can pull
+        // the window without leaving the partition.
+        createElement('div', { className: 'evolution-param-actions' },
+          createElement('button', {
+            className: 'evolution-param-button',
+            type: 'button',
+            onClick: () => { void load() },
+          }, t('approvalRefresh'))),
+        body())
+      : null)
 }
