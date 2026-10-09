@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { emptyRecord, nodeEvolutionIo, presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core'
 import * as Commands from '../src/index.ts'
@@ -1379,6 +1379,55 @@ describe('evolution-commands', () => {
     const overflow = await captured!.handler({ rawInput: 'maintain --timeout 2147483648' })
     expect(overflow.kind).toBe('error')
     expect(overflow.text).toContain('Invalid --timeout value')
+  })
+
+  it('T4-12/A54: a trigger arriving mid-attempt is QUEUED — one failed attempt no longer ends the automatic migration', async () => {
+    const dir = await tempRoot('evo-cmd-migration-race-')
+    const home = join(dir, 'profile')
+    await mkdir(home, { recursive: true })
+    // The document the migration exists to move (the name the platform import leaves behind).
+    const legacy = join(home, 'settings.yaml.imported')
+    await writeFile(legacy, 'evolution-memory:\n  memoryCharLimit: 2200\n', 'utf8')
+    const ctx = new Context()
+    ctx.provide('commands', captureCommands(() => {}))
+    const writes: Array<{ rowId: string; patch: Record<string, unknown> }> = []
+    ctx.provide('settings', {
+      describe: () => [{ ns: 'memory-files', user: {} }],
+      update: async (rowId: string, patch: Record<string, unknown>) => { writes.push({ rowId, patch }) },
+    })
+    ctx.provide('profileContext', { home })
+    // The FIRST read of the legacy document hangs and then fails (a slow or unreadable document is
+    // enough) — that is the attempt the guard used to make final. Later reads are the real ones.
+    const io = nodeEvolutionIo()
+    let attempts = 0
+    let released = false
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => { release = resolve })
+    ctx.provide('evolutionIo', {
+      provider: () => ({
+        ...io,
+        readText: async (path: string) => {
+          if (path !== legacy) return io.readText(path)
+          attempts += 1
+          if (released) return io.readText(path)
+          await held
+          throw new Error('EIO: the legacy document is unreadable right now')
+        },
+      }),
+    })
+    await ctx.plugin(Commands, { root: dir })
+    // Wait for the first attempt to reach its hanging read, then let the loader settle: both
+    // triggers have now fired, with the second arriving while the first is in flight.
+    await vi.waitFor(() => { expect(attempts).toBe(1) })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    released = true
+    release()
+    // The queued trigger runs. Without the queue this times out: one warning, no second attempt,
+    // and the legacy document is never migrated (the comment claimed a "next trigger" that does
+    // not exist — both lifecycle moments have already passed).
+    await vi.waitFor(() => { expect(writes).toEqual([{ rowId: 'memory-files', patch: { memoryChars: 2200 } }]) })
+    expect(attempts).toBe(2)
+    await ctx.fiber.dispose()
   })
 
   it('F-14/E-7 (v18) → V27 G2.4: both root keys stay declared, and the expired alias fails the load', () => {

@@ -1066,28 +1066,51 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // fires with the service mounted), or the loader settling (the boot composition, which is
   // where the settings document comes from). The measured reason for two: an attempt anchored
   // only to a boot-time moment found the seat missing and wrote nothing, while the same code
-  // run later migrated the same document — so the trigger, not the logic, was wrong. A failed
-  // attempt re-arms the guard for the next trigger; a successful one never runs again.
+  // run later migrated the same document — so the trigger, not the logic, was wrong.
   // Nothing here may fail a boot: a missing seat, an unresolvable home or an IO error warns once.
   let migrationRunning = false
+  /**
+   * A trigger that arrived while an attempt was in flight (T4-12/A54).
+   *
+   * The guard used to SWALLOW it, and the comment above claimed a failed attempt "re-arms the
+   * guard for the next trigger" — but both triggers are lifecycle moments that have already
+   * passed by then, so there was no next trigger: one failed attempt (a slow or unreadable legacy
+   * document is enough) ended the automatic migration for that boot, leaving only a warning that
+   * suggests running the command by hand. The trigger is queued here and consumed at the attempt's
+   * settle point instead.
+   */
+  let migrationQueued = false
+  /** The attempt failed: re-arm the guard, and run the queued trigger NOW (its only chance left). */
+  const settleFailure = (): void => {
+    migrationRunning = false
+    if (!migrationQueued) return
+    migrationQueued = false
+    runMigrationOnce()
+  }
   const runMigrationOnce = (): void => {
-    if (migrationRunning) return
+    if (migrationRunning) {
+      migrationQueued = true
+      return
+    }
     migrationRunning = true
     void (async () => {
       try {
         const attempt = await migrateFromContext(ctx)
         if (!attempt.ok) {
-          migrationRunning = false
           ctx.logger.warn('evolution-commands: the legacy settings migration cannot run here (no %s) — run /evolution migrate after that service is mounted', attempt.problem)
+          settleFailure()
           return
         }
         const { outcome } = attempt
         if (outcome.source !== undefined && outcome.report !== undefined && outcome.report.written.length > 0) {
           ctx.logger.info('evolution-commands: migrated the legacy settings document (%s)', renderNamespaceMigration(outcome))
         }
+        // A successful attempt keeps the guard closed and drops any queued trigger: the legacy
+        // document is dealt with, so a second pass would be pointless work.
+        migrationQueued = false
       } catch (error) {
-        migrationRunning = false
         ctx.logger.warn('evolution-commands: the legacy settings migration did not run — %s', error instanceof Error ? error.message : String(error))
+        settleFailure()
       }
     })()
   }
