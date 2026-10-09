@@ -931,6 +931,8 @@ const violations = []
  * must have a provider SOMEWHERE in the tree. doctor probed `evolutionReview`
  * for five releases with zero providers and the self-check silently lied;
  * this catches the next ghost key statically. */
+/** N20 reverse (v46 S1.12): every `transactIo(` call site seen during the walk. */
+const transactSites = []
 const probedEvolutionKeys = new Set()
 const providedEvolutionKeys = new Set()
 const PROBE_RE = /(?:\bhas|\.get|ctx\.get)\('(evolution[A-Z]\w+)'\)/g
@@ -1027,6 +1029,13 @@ function walk(dir) {
       checkedCount += 1
       const rel = relative(root, path).split('\\').join('/')
       const text = readFileSync(path, 'utf8')
+      // N20 reverse (v46 S1.12): remember transactional write call sites so the inventory can be
+      // judged in both directions once the walk is over.
+      if (rel.includes('/src/')) {
+        for (const match of text.matchAll(/transactIo\(/g)) {
+          transactSites.push({ rel, fragment: text.slice(match.index, match.index + 90) })
+        }
+      }
       // H2 (v11): collect probe/provider pairs for the ghost-key check.
       for (const match of text.matchAll(PROBE_RE)) probedEvolutionKeys.add(match[1])
       for (const match of text.matchAll(PROVIDE_RE)) providedEvolutionKeys.add(match[1])
@@ -1443,6 +1452,21 @@ let writeInventoryCount = 0
       const path = join(root, file)
       return existsSync(path) ? readFileSync(path, 'utf8') : null
     }))
+    // Reverse direction (v46 S1.12, finding 1-7 / fixture A10): the forward check proves every
+    // DECLARED site's marker still exists; nothing proved the converse, so a file that gained a
+    // second transactional write stayed green while the inventory vouched for one of them.
+    const markersByWriter = new Map()
+    for (const site of sites) {
+      if (typeof site?.writer !== 'string' || typeof site?.marker !== 'string') continue
+      markersByWriter.set(site.writer, [...(markersByWriter.get(site.writer) ?? []), site.marker])
+    }
+    for (const { rel, fragment } of transactSites) {
+      if (rel === `${CORE_SRC}/io.ts`) continue // the seam itself defines and wraps transactIo
+      if (/^\s*(?:async\s+)?function\s+transactIo|transactIo\s*[:=]/.test(fragment)) continue // a definition or an alias, not a write
+      const declared = markersByWriter.get(rel) ?? []
+      if (declared.some((marker) => fragment.startsWith(marker))) continue
+      violations.push(`${rel}: transactIo( call site not declared in ${WRITE_INVENTORY_PATH} — a persisted write that no inventory row vouches for (N20 reverse)`)
+    }
   }
 }
 

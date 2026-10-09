@@ -381,7 +381,11 @@ for (const dir of sourceDirs) {
     }
     try { walkLib(join(staged, 'lib')) } catch { /* lib absence handled above */ }
     if (newestSrc > oldestLib) {
-      console.warn(`prepare-release: warning — ${dir}: src/ has file(s) newer than every lib/ output; if sources were renamed or deleted, stale lib/ files may be packed. Re-run build-lib.mjs to be safe.`)
+      console.error(`prepare-release: FAIL — ${dir}: src/ has file(s) newer than every lib/ output; if sources were renamed or deleted, stale lib/ files may be packed. Re-run build-lib.mjs to be safe.`)
+      // v46 S1.12 (finding T5-12): this used to warn. A rebuild is not the operator's call any
+      // more — stale bytes under lib/types ship to users, and the warn fired twice in practice
+      // without anyone stopping the release. Fail before staging, like the lib-absence check above.
+      process.exit(1)
     }
   }
   if (!existsSync(join(staged, 'lib'))) {

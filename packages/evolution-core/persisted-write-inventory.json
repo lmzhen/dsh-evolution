@@ -74,5 +74,50 @@
     "marker": "LOCK_SUFFIX",
     "state": [],
     "note": "The skill tree itself. Per-target `<path>.lock` claims (pid:token body) guard every byte writer; destructive movers refuse a live lock."
+  },
+  {
+    "id": "activity-log",
+    "path": "<evolutionRoot>/activity.json",
+    "writer": "evolution-activity/src/index.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io, activityFile(root)",
+    "state": [],
+    "note": "The plan-applied activity sidecar. Declared by v46 S1.12: the file carried a transactional write that no inventory row vouched for, and the N20 reverse scan is what named it."
+  },
+  {
+    "id": "skill-history-index",
+    "path": "<historyRoot>/skills/<name>/index.json",
+    "writer": "evolution-core/src/skill-history.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io, file,",
+    "state": [],
+    "note": "One skill's recorded-version index (content chain + blob references). Declared by v46 S1.12: the replace path was already transactional but undeclared, so a regression to a plain write would have been invisible."
+  },
+  {
+    "id": "skill-store-transact-primitive",
+    "path": "<caller-supplied>",
+    "writer": "evolution-core/src/skill-store.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(ioLike, path, task)",
+    "state": [],
+    "note": "The store's transaction helper: it prefers the backend's own transact and falls back to the seam's transactIo. The target is the caller's path — each durable target has its own row above; this row vouches for the primitive itself."
+  },
+  {
+    "id": "feedback-events",
+    "path": "<dshHome>/evolution/events.json",
+    "writer": "evolution-feedback/src/index.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io, eventsPath,",
+    "state": [],
+    "note": "Feedback appends to the family event log under the cross-process lock. Declared by v46 S1.12 (N20 reverse)."
+  },
+  {
+    "id": "pending-archive",
+    "path": "<stateHome>/pending-state-archive.json",
+    "writer": "evolution-state-json/src/index.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io(), pathOf(PENDING_ARCHIVE_FILE)",
+    "state": [],
+    "note": "The resolved-pending archive (the legacy merge target). The store already declared its record map; v46 S1.12 declared the archive append as well — the second site in one file is exactly what the reverse scan exists to find."
   }
 ]
