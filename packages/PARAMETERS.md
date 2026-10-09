@@ -132,6 +132,7 @@
 | `evolution-threat.maxScanChars` | E2 | none | cordis | evolution-threat | — | Scan window size of the threat guard. |
 | `evolution-approval.enabled` | E2 | none | cordis | evolution-approval | — | Require approval before a staged write executes. |
 | `evolution-approval.stageForeground` | E2 | none | cordis | evolution-approval | — | Stage foreground agent writes for approval too. |
+| `evolution-approval.pendingTtlMs` | E3 | live | cordis | evolution-approval | — | How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires. |
 | `qualityWarnThreshold` | E2 | none | cordis | evolution-feedback | — | Feedback score below which a skill carries a warning. |
 | `replay.maxPlans` | E2 | none | cordis | evolution-replay | — | Plans compared in one replay report. |
 | `replay.weights` | E2 | none | cordis | evolution-replay | — | Scoring weights of the replay comparison. |

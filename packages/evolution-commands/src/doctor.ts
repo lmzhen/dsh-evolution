@@ -818,7 +818,18 @@ export async function diagnose(
 
   let pendingCount: number | null = null
   let executingCount: number | null = null
-  const approvalService = ctx.get('evolutionApproval') as { list?: (status: string) => Promise<unknown[]> } | undefined
+  // T4-09/A51: the staged window's expiry, so doctor can say WHICH of the three human-confirmation
+  // states is in force — 0 means "waits for ever", which is the shipped default and must be visible
+  // as such rather than implied by an absence. Reading it also runs the convergence: every count
+  // below therefore EXCLUDES records the TTL has already closed.
+  let pendingTtlMs: number | null = null
+  const approvalService = ctx.get('evolutionApproval') as {
+    list?: (status: string) => Promise<unknown[]>
+    ttlMs?: unknown
+  } | undefined
+  if (typeof approvalService?.ttlMs === 'number' && Number.isFinite(approvalService.ttlMs)) {
+    pendingTtlMs = approvalService.ttlMs
+  }
   const approvalList = approvalService?.list?.bind(approvalService)
   if (approvalList !== undefined) {
     try {
@@ -885,6 +896,12 @@ export async function diagnose(
   }
   if (services.review && !services.curator) actions.push('Curator service is not mounted — automatic curation is off; verify the host/all bundle row set is complete.')
   if (pendingCount === null && services.approval) actions.push('Approval service is mounted but pending listing failed — check the evolution state service.')
+  // T4-09/A51: the staged window's third state. Only the NON-default speaks: "waits for ever" is the
+  // shipped setting, and reporting a default as a finding is noise. Note the counts above were read
+  // THROUGH the service, so a record the TTL has already closed is not in them.
+  if (pendingTtlMs !== null && pendingTtlMs > 0) {
+    actions.push(`Staged writes expire after ${pendingTtlMs} ms (evolution-approval.pendingTtlMs): an expired write is closed as rejected and is never executed.`)
+  }
   // v23 (AP-2): a stuck EXECUTING record can only be cleared by an operator
   // reject (approve refuses to re-execute it) — surface it as a next step.
   // v29 DOC-02: EXECUTING is also the LIVE claim state of an approve still in

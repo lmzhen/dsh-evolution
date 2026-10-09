@@ -120,6 +120,10 @@ export type ApprovalLike = {
    * not pre-refuse on it. */
   stageForeground?: boolean
   registerRunner(kind: PendingKind, runner: WriteRunner, preview?: WritePreview): () => void
+  /** T4-09/A51: the staged window's effective expiry in ms, 0 = never. Optional for the same reason
+   * the other reads are: an older/partial implementation simply does not answer, and a caller must not
+   * read that absence as "expires immediately". */
+  ttlMs?: number
   list(status?: PendingStatus): Promise<PendingRecord[]>
   approve(id: string): Promise<{ ok: boolean; message: string }>
   reject(id: string): Promise<{ ok: boolean; message: string }>
@@ -169,6 +173,13 @@ export interface Config {
   enabled?: boolean
   /** Require approval for foreground writes as well. */
   stageForeground?: boolean
+  /**
+   * T4-09/A51: milliseconds after which a STAGED write expires. `0` (the default) means never —
+   * the window then behaves exactly as before. Expiry closes the record the same way a reject does
+   * (status `rejected`, `resolvedAt` stamped, runner NEVER invoked): an expiry is a cleanup of the
+   * window, never an approval, so nothing a human did not approve can execute.
+   */
+  pendingTtlMs?: number
 }
 
 export class EvolutionApproval extends Service {
@@ -176,10 +187,16 @@ export class EvolutionApproval extends Service {
   static Config: Schema<Config> = z.object({
     enabled: z.boolean().default(false),
     stageForeground: z.boolean().default(true),
+    // 0 = never expire (the shipped default: the window is unbounded until the operator decides).
+    // The schema floor keeps a negative TTL from meaning "everything is instantly stale".
+    pendingTtlMs: z.number().min(0).default(0),
   })
 
   private readonly enabled: boolean
   private readonly stageForegroundConfig: boolean
+  /** Effective TTL in ms; 0 = the window never expires (T4-09/A51). A non-finite or negative value
+   * is clamped here because the schema only guards the loader path. */
+  private readonly pendingTtlMs: number
   /** P3 (v16): public read for staging pre-checks (learning-graph refuses a
    * stage that no runner could replay only when foreground writes stage at
    * all). Mirrors `this.stageForeground`. */
@@ -194,6 +211,8 @@ export class EvolutionApproval extends Service {
     super(ctx, 'evolutionApproval')
     this.enabled = config.enabled ?? false
     this.stageForegroundConfig = config.stageForeground ?? true
+    const ttl = config.pendingTtlMs ?? 0
+    this.pendingTtlMs = Number.isFinite(ttl) && ttl > 0 ? Math.floor(ttl) : 0
     // The reading face for the pending window (the settings panel's card). `ctx.inject` and not
     // `ctx.get`: profile rows apply in file order, so the web server may not exist yet — waiting on the
     // service mounts the routes whenever it arrives, and a profile without one stays inert.
@@ -314,7 +333,50 @@ export class EvolutionApproval extends Service {
     return { action: 'allow', message: 'Foreground write allowed.' }
   }
 
+  /** T4-09/A51: the effective expiry of the staged window, 0 = never. Read by the command surface
+   * and the doctor so both can say which of the three human-confirmation states is in force. */
+  get ttlMs(): number {
+    return this.pendingTtlMs
+  }
+
+  /**
+   * Close every staged write that has been waiting longer than the TTL (T4-09/A51).
+   *
+   * The window had THREE terminal states only — approve, reject, release — all of them human, so an
+   * unattended deployment accumulated staged records for ever. Expiry is the missing third state of
+   * the human-confirmation triangle ("never pop up and just run" / "wait indefinitely" / "cancel on
+   * timeout"), and it is deliberately implemented as the reject side: the record converges through
+   * the seam's exactly-once transition to `rejected` with its `resolvedAt` stamped, and the runner
+   * is never invoked. NOTHING a human did not approve can execute; the cost of a wrong TTL is a
+   * staged write that must be staged again.
+   *
+   * A sweep, not a timer: every read of the window converges it (the CLI, the settings card and the
+   * doctor all read through {@link list}), so the family does not gain a background timer that would
+   * have to be unref'd, disposed and reasoned about for process liveness.
+   * @returns the ids that were closed by this sweep (empty when the TTL is off or nothing was stale).
+   */
+  async expireStale(): Promise<string[]> {
+    if (this.pendingTtlMs <= 0) return []
+    const cutoff = Date.now() - this.pendingTtlMs
+    const expired: string[] = []
+    for (const record of await this.state().listPending('pending')) {
+      const stagedAt = Date.parse(record.createdAt)
+      // An unparseable timestamp is NOT stale evidence: the record stays for the operator (the same
+      // posture the ordering helper takes — a missing timestamp must not decide anything).
+      if (!Number.isFinite(stagedAt) || stagedAt > cutoff) continue
+      const resolution = await this.state().tryResolvePending(record.id, 'rejected')
+      if (resolution.applied) expired.push(record.id)
+    }
+    if (expired.length > 0) {
+      this.ctx.logger.warn(`evolution-approval: ${expired.length} staged write(s) passed pendingTtlMs=${this.pendingTtlMs} and were closed as rejected WITHOUT executing: ${expired.join(', ')} — stage them again if they are still wanted`)
+    }
+    return expired
+  }
+
   async list(status: PendingStatus = 'pending'): Promise<PendingRecord[]> {
+    // The convergence runs before EVERY read of a window, so no reader can see a record the TTL has
+    // already passed (the CLI, the card and the doctor all go through here).
+    await this.expireStale()
     return await this.state().listPending(status)
   }
 

@@ -192,7 +192,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!approval) return err(errorText('e-301-approval-service-not-mounted'))
           const listed = [...await approval.list('pending'), ...await approval.list('executing')]
           const pending = [...new Map(listed.map(row => [row.id, row])).values()]
-          if (pending.length === 0) return ok('No pending evolution writes.')
+          // T4-09/A51: say which of the three human-confirmation states is in force. Reading through
+          // list() also converged the window, so anything past the TTL is already closed as rejected
+          // by the time these rows print — the note tells the operator that happened / can happen.
+          const ttlMs = typeof approval.ttlMs === 'number' && Number.isFinite(approval.ttlMs) ? approval.ttlMs : 0
+          const ttlNote = ttlMs > 0
+            ? `\n(staged writes expire after ${ttlMs} ms: an expired write is closed as REJECTED and is never executed — stage it again if it is still wanted)`
+            : '\n(staged writes never expire — the window waits for a decision; set the evolution-approval row pendingTtlMs to bound it)'
+          if (pending.length === 0) return ok('No pending evolution writes.' + ttlNote)
           // F-328: `--detail` renders each record's staged args so an operator
           // reviews what approve will actually replay (the summary alone is a
           // 120-char label). The default (collapsed) view is unchanged.
@@ -218,7 +225,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const hint = pending.some(p => p.status === 'executing')
             ? '\n(EXECUTING: a previous approve may have crashed after running; verify the write manually, then reject — approve will not re-run it)'
             : ''
-          return ok(body + hint)
+          return ok(body + hint + ttlNote)
         }
         if (input.startsWith('approve ')) {
           const id = input.slice(8).trim()
