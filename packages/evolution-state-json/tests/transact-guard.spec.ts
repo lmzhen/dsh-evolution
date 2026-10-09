@@ -134,3 +134,33 @@ describe('evolution-state-json transactCuratorState transact-task guard (PLAN S3
     await expect(provider.transactCuratorState(() => null)).resolves.toBeUndefined()
   })
 })
+
+describe('evolution-state-json pending-table write paths transact-task guard (v46 S1.12b / A12)', () => {
+  /** The pending-table writes that carried no probe: claim, release, resolve (finding 1-9). */
+  const WRITES: Array<{ name: string; run: (provider: EvolutionStateStorage) => Promise<unknown> }> = [
+    { name: 'claimPending', run: p => p.claimPending('p1', 'claim-1') },
+    { name: 'releasePendingClaim', run: p => p.releasePendingClaim('p1', 'claim-1') },
+    { name: 'tryResolvePending', run: p => p.tryResolvePending('p1', 'approved') },
+  ]
+
+  for (const { name, run } of WRITES) {
+    it(`${name}: a transaction that never runs the task fails loud and writes nothing`, async () => {
+      const root = await tempRoot('dsh-json-pending-guard-')
+      const { provider, io } = await mountOverViolatingTransact(root)
+      // Before v46 S1.12b these three resolved as ordinary results — `null`, `undefined`, and an
+      // `applied: true` resolution — over a write the backend never performed.
+      await expect(run(provider)).rejects.toThrow(/did not invoke the task; no write was performed/)
+      expect(await io.list(root)).toEqual([])
+    })
+  }
+
+  it('all three still land through a working transaction (no false positive)', async () => {
+    const root = await tempRoot('dsh-json-pending-guard-ok-')
+    const ctx = await mountStateStack(root)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    await provider.savePending(PENDING)
+    await expect(provider.claimPending('p1', 'claim-1')).resolves.toMatchObject({ id: 'p1', status: 'executing' })
+    await expect(provider.releasePendingClaim('p1', 'claim-1')).resolves.toBeUndefined()
+    await expect(provider.tryResolvePending('p1', 'approved')).resolves.toMatchObject({ applied: true })
+  })
+})

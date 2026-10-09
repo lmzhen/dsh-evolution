@@ -469,8 +469,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   const pendingTransact = (
     task: (current: Record<string, PendingRecord> | null) => Promise<Record<string, PendingRecord>>,
-  ): Promise<void> =>
-    jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, task, { onGateDrop: noteGateDrop })
+    what = 'the pending table',
+  ): Promise<void> => {
+    // v46 S1.12b (finding 1-9): every pending-table write funnels through here, so the probe lives
+    // at the choke point instead of in one caller. The seam's transact returns void, so a backend
+    // that implements `transact` and never invokes the task used to look like a successful write —
+    // savePending carried its own guard while claim / release / resolve carried none, and the
+    // resolve path even built an `applied` result object over a write that never happened.
+    const guard = transactTaskGuard(`pending table write for ${what}`)
+    return jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, guard.wrap(task), { onGateDrop: noteGateDrop })
+      .then(() => { guard.assertInvoked() })
+  }
   // OPT-13: one-shot latch for the pending-capacity warn; re-armed when the
   // live count falls back under the cap.
   let warnedPendingCapacity = false
@@ -820,9 +829,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * revive a ghost twin. A dedupe no-op counts as success — the records are
    * already in the archive. */
   async function appendArchive(records: PendingRecord[]): Promise<boolean> {
+    // v46 S1.12b (finding 1-9): `landed` used to start `true` and only flip in the catch paths, so a
+    // backend that never invokes the archive task reported a successful archive with nothing on
+    // disk — and the caller (tryResolvePending) then skipped its compensation. The probe answers
+    // "was the append given the chance to decide".
+    const guard = transactTaskGuard(`pending archive (${PENDING_ARCHIVE_FILE})`)
     let landed = true
     try {
-      await transactIo(io(), pathOf(PENDING_ARCHIVE_FILE), async (current) => {
+      await transactIo(io(), pathOf(PENDING_ARCHIVE_FILE), guard.wrap(async (current) => {
         // P2-25 (v11): the archive arrives from disk — keep the type honest as
         // (PendingRecord | null)[] so the non-object guard below is meaningful
         // (a null entry used to TypeError inside pendingArchiveKey).
@@ -912,7 +926,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         // V7-08 (0.3.44) + V11-B2: plain appends add ids—re-read covers them.
         return JSON.stringify(next)
-      })
+      }))
+      // v46 S1.12b: never resurrect a false set inside the task (the rescue-skip path) — the probe
+      // can only lower the verdict.
+      if (!guard.invoked()) landed = false
       return landed
     } catch (error) {
       // Audit aid only: never let an archive write failure surface as a
@@ -1080,9 +1097,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // the worst silent no-op of the three — the caller reports "staged",
         // the record is nowhere, and the later approve reports "not in the
         // pending window". Fail loud instead (the approval surface already
-        // propagates save failures to its caller).
-        const guard = transactTaskGuard(`pending record "${record.id}" (${PENDING_STATE_FILE})`)
-        await pendingTransact(guard.wrap(async (current) => {
+        // propagates save failures to its caller). v46 S1.12b: the probe itself
+        // moved into pendingTransact, the choke point every pending write shares.
+        await pendingTransact(async (current) => {
           const legacy = legacyMigrated ? null : await readLegacyPending()
           // V6-01 (0.3.34): same exclusion as the retirement read path.
           // P2-5: the merged basis is id-keyed (keyPendingById), so writing by
@@ -1095,8 +1112,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // mutation's full rewrite) with no observable trace.
           warnPendingGrowth(map, 'save')
           return map
-        }))
-        guard.assertInvoked()
+        }, `record "${record.id}" (${PENDING_STATE_FILE})`)
       })
     },
 
