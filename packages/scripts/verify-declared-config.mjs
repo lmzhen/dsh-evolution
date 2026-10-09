@@ -368,6 +368,10 @@ for (const { bundle, item, key, profile, verdict } of violations) {
   )
 }
 
+// v46 S1.6 (finding T7-12): an unknown row is a failure, but it must not cut the run
+// short — upstreamDrift() below is the upgrade decision list this script exists to print.
+// The failure is recorded here and applied at the single exit point at the end.
+let unknownRowFailure = false
 if (unknownRows.length > 0) {
   const listed = [...new Set(unknownRows.map(entry => `${entry.bundle}:${entry.item.id}`))]
   // v31 GUARD-01: a patch row the platform table does not know means the row
@@ -375,7 +379,7 @@ if (unknownRows.length > 0) {
   // and the old 'profile-root' verdict was a vacuous pass (even under
   // --strict). Fail loud; updating UPSTREAM_PLANES re-arms the guard.
   console.error(`verify-declared-config: ${strict ? 'FAIL' : 'WARN'} — overrides of row(s) this platform table does not know: ${listed.join(', ')} — the row was likely renamed/removed upstream, so the declared override reaches nothing. Re-check the upstream plane and add the row to UPSTREAM_PLANES.`)
-  if (strict) process.exit(1)
+  if (strict) unknownRowFailure = true
 }
 
 /**
@@ -444,4 +448,4 @@ console.log(
   + (upstream === null ? ' (platform table not recomputed)' : ` (recomputed from ${upstream})`)
   + ((violations.length > 0 || drift.length > 0) && !strict ? ' (warn-only mode: pass --strict to fail)' : ''),
 )
-process.exit((violations.length > 0 || drift.length > 0) && strict ? 1 : 0)
+process.exit((violations.length > 0 || drift.length > 0 || unknownRowFailure) && strict ? 1 : 0)
