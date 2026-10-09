@@ -225,8 +225,19 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
     return { available: false, reason: 'the target changed after this write was staged — approving it would be refused' }
   }
   const action = typeof operation.action === 'string' ? operation.action : ''
-  /** The bytes the write path commits for a body: frontmatter normalized, one trailing newline. */
+  /**
+   * The bytes the write path commits for a body.
+   *
+   * T2-04/A19: the library normalizes frontmatter ONLY for SKILL.md (skill-store's `target === skillMd`
+   * branch); a support-file write commits the bytes with the trailing-newline rule and nothing else. The
+   * preview used to run the SKILL.md pass on EVERY target, so a support file whose body opens with a
+   * `---` fence (routine in reference docs) was shown with quoted YAML values — or refused outright with
+   * "frontmatter cannot be auto-fixed" — while the approve path stored the untouched bytes: the operator
+   * decided on a diff the write path never produces. `filePath === null` is exactly "the target is
+   * SKILL.md", the same discrimination the library makes.
+   */
   const bodyOnDisk = (content: string): PreviewAnswer => {
+    if (filePath !== null) return { available: true, path, before, after: content.trimEnd() + '\n' }
     const norm = normalizeFrontmatter(content)
     if (norm.issues.length > 0) return { available: false, reason: 'frontmatter cannot be auto-fixed: ' + norm.issues.join('; ') }
     return { available: true, path, before, after: (norm.changed ? norm.content : content).trimEnd() + '\n' }
@@ -706,6 +717,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[] }> {
+    // T2-09/A24: re-materialize the write caps HERE, not only at the tool entry. The approve path
+    // (registerRunner) calls this function directly, so a deployment that TIGHTENED skillContentChars /
+    // maxSkillFileBytes while the record sat pending used to replay the write under the old, wider caps —
+    // the same "re-judge at the bytes" rule the protected-name gate already follows at this point
+    // (write-gates re-reads the protected-name list here; the caps were the half that stayed stale). One definition
+    // (applyLimits), two timings: the tool entry needs fresh caps for its admission pre-checks, the
+    // execution point needs them for whatever actually commits.
+    applyLimits()
     const action = args.action
     const name = args.name ?? ''
     if (action === 'review') {

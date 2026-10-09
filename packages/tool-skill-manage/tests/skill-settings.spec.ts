@@ -126,6 +126,32 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     await cleanup()
   })
 
+  it('T2-09/A24: the approved replay re-reads the caps — a record staged under a wider cap is refused after the user tightens it', async () => {
+    const contentCap = mutableVol(100_000)
+    const { ctx, execute, cleanup, root } = await setup({ skillContentChars: contentCap.ref })
+    // The approval seam must exist for the write to STAGE (this is the replay path, not the tool path).
+    const EvolutionApproval = (await import('@deepseek-ai/dsh-evolution-approval')).default
+    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state-storage')).default
+    const JsonState = await import('@deepseek-ai/dsh-evolution-state-json')
+    const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
+    await ctx.plugin(EvolutionStateStorage)
+    await ctx.plugin(JsonState, { root })
+    await ctx.plugin(EvolutionState)
+    await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+    const body = '---\nname: capped-skill\ndescription: Capped body.\n---\n\n' + 'x'.repeat(300) + '\n'
+    const staged = await execute({ action: 'create', name: 'capped-skill', content: body })
+    expect(valueOf(staged).ok).toBe(true)
+    const pendingId = (staged.value as { pending_id?: string } | undefined)?.pending_id
+    expect(pendingId).toBeTypeOf('string')
+    // The user tightens the cap WHILE the record sits in the window.
+    contentCap.set(120)
+    const approved = await ctx.evolutionApproval.approve(String(pendingId))
+    // The replay re-materializes the caps at the execution point: the old 100_000 cap must NOT be used.
+    expect(approved.ok).toBe(false)
+    expect(approved.message).toContain('exceeds 120 characters')
+    await cleanup()
+  })
+
   it('tightens a write cap at the next write, with no restart', async () => {
     const nameCap = mutableVol(64)
     const { execute, cleanup } = await setup({ maxSkillNameLength: nameCap.ref })

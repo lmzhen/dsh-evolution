@@ -109,6 +109,27 @@ describe('the staged skill write preview', () => {
     expect(missing.reason).toContain('would be refused')
   })
 
+  it('T2-04/A19: a SUPPORT-file patch is previewed byte-for-byte, with no SKILL.md frontmatter pass', async () => {
+    const { root, preview } = await mount()
+    await mkdir(join(root, 'skills', 'preview-skill', 'references'), { recursive: true })
+    // A reference doc that OPENS with a `---` fence and carries an unquoted YAML-ish value: the SKILL.md
+    // pass would quote it (or refuse outright), while the write path stores the bytes untouched.
+    const support = '---\ntitle: a: b\n---\n\nold body\n'
+    await writeFile(join(root, 'skills', 'preview-skill', 'references', 'note.md'), support)
+    const patched = await preview({
+      operation: { action: 'patch', name: 'preview-skill', file_path: 'references/note.md', old_string: 'old body', new_string: 'new body', staged_from_sha256: contentHash(support) },
+    }) as { available: boolean; after: string }
+    expect(patched.available).toBe(true)
+    // Identical to the write path's rule for a support file: no normalization, trimEnd + one newline.
+    expect(patched.after).toBe('---\ntitle: a: b\n---\n\nnew body\n')
+    // The SKILL.md path keeps the pass (the control): a quotable frontmatter value is normalized there.
+    const skill = await preview({
+      operation: { action: 'patch', name: 'preview-skill', old_string: 'Body.', new_string: 'Patched body.', staged_from_sha256: contentHash(BODY) },
+    }) as { available: boolean; after: string }
+    expect(skill.available).toBe(true)
+    expect(skill.after).toContain('Patched body.')
+  })
+
   it('shows a support file byte for byte, and a removal as an empty after', async () => {
     const { root, preview } = await mount()
     await mkdir(join(root, 'skills', 'preview-skill', 'references'), { recursive: true })
