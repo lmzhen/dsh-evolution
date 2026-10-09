@@ -121,5 +121,12 @@ console.log('verify-client-tokens: ok (' + GROUPS.length + ' groups, ' + flat.le
   + referenced.size + ' referenced, ' + copies.length + ' identical copies)')
 if (strict) {
   const unused = [...declaredNames].filter(name => !referenced.has(name))
-  console.log('verify-client-tokens: strict pass' + (unused.length === 0 ? '' : ' (' + unused.length + ' not referenced yet: ' + unused.join(', ') + ')'))
+  // The scale is a contract, not a wish list: a declared token nobody reads is either a
+  // leftover (delete it) or a promise the browser halves never took (use it). Warn mode
+  // reports it; --strict fails, the way every other guard in the family does.
+  if (unused.length > 0) {
+    console.error('verify-client-tokens: strict — ' + unused.length + ' declared token(s) nobody references: ' + unused.join(', '))
+    process.exit(1)
+  }
+  console.log('verify-client-tokens: strict pass')
 }
