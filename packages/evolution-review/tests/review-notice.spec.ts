@@ -8,7 +8,7 @@
  * outstanding, and an event about an OLDER message can never settle the current one.
  */
 import { describe, expect, it } from 'vitest'
-import { isReviewNotice, noticeAfter, REVIEW_NOTICE_KIND, REVIEW_NOTICE_LEGACY_KIND, type ReviewNotice } from '../src/review-notice.ts'
+import { isReviewNotice, noticeAfter, REVIEW_NOTICE_KIND, REVIEW_NOTICE_LEGACY_KIND, REVIEW_RESULT_SUMMARY, type ReviewNotice } from '../src/review-notice.ts'
 
 /** One notice of ours, in the shape the platform reports (durable source fields only). */
 const ours = (id: string) => ({
@@ -34,6 +34,18 @@ describe('one outstanding review notice per session (A)', () => {
     expect(isReviewNotice(foreign('m1', { kind: 'hooks-codex', form: 'notice' }))).toBe(false)
     expect(isReviewNotice(foreign('m1', { kind: REVIEW_NOTICE_KIND, form: 'relay' }))).toBe(false)
     expect(isReviewNotice({ id: 'm1' })).toBe(false)
+  })
+
+  it('T3-01/A29: a RESULT notice is not a review prompt, in either the new or the legacy shape', () => {
+    // New builds say form: result...
+    expect(isReviewNotice({ id: 'r1', source: { kind: REVIEW_NOTICE_KIND, form: 'result', summary: REVIEW_RESULT_SUMMARY } })).toBe(false)
+    // ...an older build said form: notice, and the summary is what still tells the two apart:
+    // adopting it as a prompt made the next cadence flush return false and slip a boundary.
+    expect(isReviewNotice({ id: 'r2', source: { kind: REVIEW_NOTICE_KIND, form: 'notice', summary: REVIEW_RESULT_SUMMARY } })).toBe(false)
+    expect(isReviewNotice({ id: 'r3', source: { kind: REVIEW_NOTICE_LEGACY_KIND, form: 'notice', summary: REVIEW_RESULT_SUMMARY } })).toBe(false)
+    // The prompts keep their own summaries and stay ours.
+    expect(isReviewNotice({ id: 'p1', source: { kind: REVIEW_NOTICE_KIND, form: 'notice', summary: 'cadence review' } })).toBe(true)
+    expect(isReviewNotice({ id: 'p2', source: { kind: REVIEW_NOTICE_KIND, form: 'notice', summary: 'completion review' } })).toBe(true)
   })
 
   it('adopts a notice the queue accepted, and follows the turn that claims it', () => {

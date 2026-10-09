@@ -288,3 +288,23 @@ it('C: the gate only guards review PROMPTS — a result notice still goes out wh
   }, { timeout: 15_000 })
   expect(fixture.logs.some(line => line.includes('(subagent-flush)'))).toBe(true)
 })
+
+it('C: a queued RESULT notice does not occupy the window — the next boundary still delivers its prompt (T3-01/A29)', { timeout: 30_000 }, async () => {
+  const fixture = await mountWindow()
+  // Boundary 1 runs the review through the subagent channel: what lands in the queue is the RESULT
+  // notice ('💾 Self-improvement review: …'), not a prompt. Its `inserted` event used to be adopted as
+  // an outstanding notice (both shapes shared form: notice), so the next cadence flush returned false
+  // — the review slipped a boundary behind a warning that was not true.
+  fixture.setMode('subagent')
+  fixture.emitEnd(1)
+  await vi.waitFor(() => {
+    expect(fixture.delivered.some(text => text.startsWith('💾 Self-improvement review:'))).toBe(true)
+  }, { timeout: 15_000 })
+  // The result notice is still unread in the queue; boundary 2 must deliver a review PROMPT anyway,
+  // and must not claim an outstanding notice it does not have.
+  const before = fixture.delivered.length
+  fixture.setMode('inject')
+  fixture.emitEnd(2)
+  await vi.waitFor(() => { expect(fixture.delivered.length).toBeGreaterThan(before) }, { timeout: 15_000 })
+  expect(fixture.logs.some(line => line.includes('already has an outstanding review notice'))).toBe(false)
+})

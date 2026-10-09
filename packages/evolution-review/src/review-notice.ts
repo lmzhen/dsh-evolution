@@ -34,12 +34,21 @@ export const REVIEW_NOTICE_KIND = 'evolution-review'
  */
 export const REVIEW_NOTICE_LEGACY_KIND = 'plugin:dsh-evolution-review'
 
+/** T3-01/A29: the summary every RESULT notification carries ("what the review did"). A result notice
+ * is NOT a review prompt: it occupies no window and must never refuse the next cadence flush — but it
+ * shares the kind AND the form (the platform types `form` as the literal 'notice'), so this summary is
+ * the only field that tells the two apart, for new notices and for the ones an older build persisted. */
+export const REVIEW_RESULT_SUMMARY = 'self-improvement review'
+
 /** The subset of a platform message this module reads. */
 export interface NoticeMessage {
   readonly id: string
   readonly source?: {
     readonly kind?: string
     readonly form?: string
+    /** Present on both shapes this plugin delivers (a prompt and a result notice); the result
+     * summary is what identifies a LEGACY result notice, see {@link REVIEW_RESULT_SUMMARY}. */
+    readonly summary?: string
   } | undefined
 }
 
@@ -73,7 +82,12 @@ export interface NoticeOutcome {
 export function isReviewNotice(message: NoticeMessage): boolean {
   const source = message.source
   if (source?.form !== 'notice') return false
-  return source.kind === REVIEW_NOTICE_KIND || source.kind === REVIEW_NOTICE_LEGACY_KIND
+  if (source.kind !== REVIEW_NOTICE_KIND && source.kind !== REVIEW_NOTICE_LEGACY_KIND) return false
+  // T3-01/A29: the RESULT notification shares this identity, so the platform's `inserted` event for
+  // one was adopted as an outstanding review prompt — the next cadence flush was then refused (with a
+  // warning that was not true) and the review silently slipped a boundary. The result summary is what
+  // says which shape this is; the review prompts carry their own (cadence / completion) summaries.
+  return source.summary !== REVIEW_RESULT_SUMMARY
 }
 
 /**

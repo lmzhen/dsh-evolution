@@ -1118,6 +1118,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     const message = createUserMessage({
       content: [{ type: 'text', text }],
+      // T3-01/A29: a RESULT notice is not a review prompt — its `inserted` event must not be adopted
+      // as an outstanding notice (that used to refuse the next cadence flush). The platform types this
+      // `form` as the literal 'notice' (it is the platform's own announcement slot), so the
+      // discriminator is the SUMMARY: review-notice.ts refuses the result summary by name.
       source: { kind: 'evolution-review', form: 'notice', summary },
     })
     // The wake primitive is called ON the agent: the platform Agent's
