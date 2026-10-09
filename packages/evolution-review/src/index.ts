@@ -1216,6 +1216,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       )
     })
 
+  /**
+   * T3-09/A37: the ONE abort channel for this fiber's long work.
+   *
+   * The review's two legs (the review subagent, and the write leg that executes its plan) were
+   * bounded only by their own timeouts, so an unloaded or HMR-replaced fiber kept running — and the
+   * write leg kept WRITING — while the replacement instance knew nothing about it (its single-flight
+   * flag and min-idle window do not cover a run that no longer belongs to any live fiber). The
+   * disposer below aborts this controller; the subagent leg merges it with its own deadline through
+   * `AbortSignal.any` (the shape evolution-maintenance's scan already uses) and the write leg checks
+   * it at every op boundary — before the first op, so an aborted fiber lands nothing.
+   */
+  const fiberAbort = new AbortController()
+
   const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => { reject(new Error(`dsh-evolution-review: ${label} timed out after ${ms}ms`)) }, ms)
@@ -1393,7 +1406,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         label: 'dsh-evolution-review',
         prompt: [{ type: 'text', text: reviewText }],
         parent: agent,
-        signal: AbortSignal.timeout(config.reviewTimeoutMs),
+        // T3-09/A37: the deadline AND this fiber's lifetime — an unloaded plugin must not keep a
+        // subagent running against a session nobody owns any more.
+        signal: AbortSignal.any([AbortSignal.timeout(config.reviewTimeoutMs), fiberAbort.signal]),
         maxDepth: config.reviewMaxDepth,
         agentOptions,
         // M-2 (v3 audit): the subagent channel mounts only the read-only
@@ -1536,7 +1551,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         let executed: { actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }
         try {
           executed = await withTimeout(
-            executePlan(validation.accepted, session, noteLanded, preRunHashes),
+            executePlan(validation.accepted, session, noteLanded, preRunHashes, fiberAbort.signal),
             config.reviewTimeoutMs,
             'review plan execution',
           )
@@ -1693,6 +1708,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
      * full-content writes are refused as stale (read->execute generation gap:
      * the subagent's read-time hash is not plumbed through the plan). */
     preRunHashes?: Map<string, string>,
+    /** T3-09/A37: the owning fiber's lifetime. An aborted signal stops the plan at the next op
+     * boundary — the posture curator's disposed gate takes before its writes. */
+    signal?: AbortSignal,
   ): Promise<{ actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }> {
     const sessionId = session?.id
     const memory = ctx.get('memory') as MemoryLike | undefined
@@ -1721,6 +1739,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // message; the failure dimension now surfaces on the event AND a warn.
     try {
       for (const op of plan.memoryOps ?? []) {
+        if (signal?.aborted === true) {
+          const reason = 'the review was unloaded mid-plan'
+          ctx.logger.warn(`dsh-evolution-review: executePlan stopped at an op boundary after ${actions.length} op(s): ${reason}`)
+          return { actions, ok: false, failedOps, aborted: reason }
+        }
         // C4 (v15): a validator-bypassed op is RECORDED, not silently dropped —
         // it lands in failedOps (warn + zero-landing notice) so a loosened
         // validator contract can never make an op evaporate without a trace.
@@ -1741,6 +1764,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
       }
       for (const op of plan.skillOps ?? []) {
+        // T3-09/A37: the same op-boundary stop as the memory loop — one check per op, no partial
+        // plan continuing to write after its owner is gone.
+        if (signal?.aborted === true) {
+          const reason = 'the review was unloaded mid-plan'
+          ctx.logger.warn(`dsh-evolution-review: executePlan stopped at an op boundary after ${actions.length} op(s): ${reason}`)
+          return { actions, ok: false, failedOps, aborted: reason }
+        }
         // C4 (v15): see the memory loop — recorded, never silently dropped.
         if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) {
           ok = false
@@ -2050,6 +2080,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   ctx.effect(() => () => {
+    // T3-09/A37: unload cancels this fiber's long work FIRST — the subagent leg sees an aborted
+    // signal, and the write leg stops at its next op boundary instead of landing writes for a
+    // plugin instance that no longer exists (the HMR-reload window the author already recorded for
+    // the deferred queue, now closed for the run that is actually in flight).
+    fiberAbort.abort()
     // V7-16 (0.3.44) hand-listed these clears because the 0.3.38-0.3.42
     // additions were missing from the list. S2-2 clears what registered at its
     // declaration instead: one collection, one registration, and

@@ -238,6 +238,77 @@ describe('evolution-review', () => {
     expect(injected).toHaveLength(1)
   })
 
+  it('T3-09/A37: the review subagent runs under the fiber abort channel — unloading aborts it', async () => {
+    const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
+    let captured: AbortSignal | undefined
+    ctx.provide('subagents', {
+      start: async (_kind: string, options: { signal?: AbortSignal }) => {
+        captured = options.signal
+        // Never resolves: the leg stays in flight so the abort can be observed on it.
+        return { result: new Promise(() => {}), dispose: async () => {} }
+      },
+    })
+    ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+    emitEnd(1, 'blocked')
+    emitEnd(2)
+    await vi.waitFor(() => { expect(captured).toBeDefined() })
+    // The leg deadline is its own; the fiber lifetime is the other half of the channel.
+    expect(captured?.aborted).toBe(false)
+    await ctx.fiber.dispose()
+    // Before T3-09 this signal did not exist (only AbortSignal.timeout), so an unloaded fiber kept
+    // its subagent running against a session nobody owned any more.
+    expect(captured?.aborted).toBe(true)
+  })
+
+  it('T3-09/A37: a plan whose fiber goes away MID-PLAN stops at the next op boundary', async () => {
+    // Two ops, so the difference is visible: the control lands both, the interrupted run lands only
+    // the op that was already in flight when the fiber went away.
+    const ops = [
+      { target: 'memory', action: 'add', facts: 'first-op', evidence: [{ event_seq: 0 }] },
+      { target: 'memory', action: 'add', facts: 'second-op', evidence: [{ event_seq: 0 }] },
+    ]
+    const unload: { current: (() => Promise<void>) | undefined } = { current: undefined }
+    /** One run; `during` fires inside the first op write, exactly as an unload would. */
+    const run = async (during: (() => void) | null): Promise<{ writes: string[]; logs: string[] }> => {
+      const fixture = await mountReviewFixture({ onInject: () => {} })
+      const writes: string[] = []
+      const logs: string[] = []
+      vi.spyOn(fixture.ctx.logger, 'warn').mockImplementation((...args: unknown[]) => { logs.push(args.map(value => String(value)).join(' ')) })
+      let release: (value: unknown) => void = () => {}
+      const held = new Promise((resolve) => { release = resolve })
+      fixture.ctx.provide('subagents', { start: async () => ({ result: held, dispose: async () => {} }) })
+      fixture.ctx.provide('memory', {
+        applyBatch: async () => {
+          writes.push('memory')
+          if (writes.length === 1 && during !== null) during()
+          return { ok: true, message: 'ok' }
+        },
+      })
+      fixture.ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+      await fixture.ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+      unload.current = async () => { await fixture.ctx.fiber.dispose() }
+      fixture.emitEnd(1, 'blocked')
+      fixture.emitEnd(2)
+      // The plan arrives while the fiber is still alive; the WRITE LEG is what the unload
+      // interrupts — the window the audit names (an HMR reload left the running plan writing while
+      // the replacement instance knew nothing about it).
+      release({ structured: { memoryOps: ops, skillOps: [], summary: 'two ops' } })
+      await vi.waitFor(() => { expect(writes.length).toBeGreaterThan(0) })
+      await new Promise(resolve => setTimeout(resolve, 150))
+      if (during === null) await fixture.ctx.fiber.dispose()
+      return { writes, logs }
+    }
+    const control = await run(null)
+    expect(control.writes).toEqual(['memory', 'memory'])
+    const interrupted = await run(() => { void unload.current?.() })
+    // The op boundary is the only judging point: the durable write that already happened stays
+    // recorded (late landings are reported, never erased) and the remaining ops never run.
+    expect(interrupted.writes).toEqual(['memory'])
+    expect(interrupted.logs.some(line => line.includes('stopped at an op boundary'))).toBe(true)
+  })
+
   it('G4.5: warns once when the evolution-state service is absent (stateless cadence)', async () => {
     const { ctx, emitEnd } = await mountReviewFixture({ noState: true })
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
