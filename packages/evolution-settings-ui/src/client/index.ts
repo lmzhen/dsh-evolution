@@ -123,12 +123,12 @@ export function apply(ctx: ClientContext): void {
   seam.slots.inject(CARD_SLOT, function* () {
     for (const section of CLIENT_PARAM_SECTIONS) {
       const source: ParamSectionSource = sources.sourceFor(section.namespace)
-      const { write, clear } = writeFaceFor(probe, section.namespace)
+      const { mutateOnce, clear } = writeFaceFor(probe, section.namespace)
       const face = (): ParamCardFace => ({
         namespace: section.namespace,
         fields: section.fields,
         t,
-        write,
+        mutateOnce,
         clear,
         hooks: { paramSection: source },
       })

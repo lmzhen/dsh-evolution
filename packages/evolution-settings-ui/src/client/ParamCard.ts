@@ -17,7 +17,7 @@ import { createElement, useEffect, useState, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
 import { landedSettlements, type Settlement } from './settle.ts'
-import type { ParamSectionSnapshot, ParamSectionSource } from './seam.ts'
+import type { ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike } from './seam.ts'
 
 /**
  * Injected face: plain data and callbacks, plus the hook seat.
@@ -31,7 +31,8 @@ export interface ParamCardFace {
   namespace: string
   fields: readonly ClientParamField[]
   t: (key: MessageKey) => string
-  write: (field: string, value: unknown) => Promise<void>
+  /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). */
+  mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<void>
   clear: (field: string) => Promise<void>
   hooks: { paramSection: ParamSectionSource }
 }
@@ -45,6 +46,9 @@ export type ParamCardProps = Omit<ParamCardFace, 'hooks'> & {
   /** Bound from \`hooks.paramSection\` by the renderer. */
   readonly useParamSection: <T>(selector: (state: ParamSectionSnapshot) => T) => T
 }
+
+/** The op list a save hands to the seat — the seam's own shape, never a second vocabulary. */
+export type SettingsParamOp = SettingsPathOpLike
 
 /** One cell's text: absent reads as an empty control, containers as JSON. */
 function format(value: unknown): string {
@@ -170,7 +174,8 @@ export interface ParamCardViewProps {
   namespace: string
   fields: readonly ClientParamField[]
   t: (key: MessageKey) => string
-  write: (field: string, value: unknown) => Promise<void>
+  /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). */
+  mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<void>
   /** Ask the scope to drop one override; resolves when the scope answered, not when it landed. */
   clear: (field: string) => Promise<void>
   /** The current row state, from whichever source owns it (the bound hook or the page). */
@@ -183,7 +188,7 @@ export interface ParamCardViewProps {
  * @returns the card.
  */
 export function ParamCardView(props: ParamCardViewProps): ReactNode {
-  const { t, fields, write, clear, namespace, snapshot } = props
+  const { t, fields, mutateOnce, clear, namespace, snapshot } = props
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -270,7 +275,11 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     setError('')
     void (async () => {
       try {
-        for (const field of dirty) await write(field.id, parseFor(field.control, textOf(field)))
+        // T5-01/A56: EVERY dirty field travels in ONE call. The old loop sent one write per field,
+        // which the Plugins page fenced with the render-time revision — the second field was then
+        // refused by the host and its change silently did not land.
+        const ops: SettingsParamOp[] = dirty.map(field => ({ op: 'set', path: [field.id], value: parseFor(field.control, textOf(field)) }))
+        await mutateOnce(ops)
         setPending(dirty.map(field => ({ op: 'set' as const, id: field.id, want: parseFor(field.control, textOf(field)) })))
       } catch (caught) {
         // Transport-level failures (and any future shell that rejects): keep the draft
@@ -340,7 +349,7 @@ export function ParamCard(props: ParamCardProps): ReactNode {
     namespace: props.namespace,
     fields: props.fields,
     t: props.t,
-    write: props.write,
+    mutateOnce: props.mutateOnce,
     clear: props.clear,
     snapshot: props.useParamSection((state: ParamSectionSnapshot) => state),
   })

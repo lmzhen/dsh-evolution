@@ -56,6 +56,29 @@ function state(user: Record<string, unknown>): Record<string, unknown> {
 }
 
 describe('the per-row configuration entry', () => {
+  it('T5-01/A56: a TWO-field save is ONE fenced write carrying both ops (the second field no longer vanishes)', async () => {
+    const mutate = vi.fn(async () => true)
+    const second = fields.filter(field => field.control === 'number')[1]
+    if (second === undefined) throw new Error('the memory-files row lost its second numeric field')
+    const view = render(card({ view: 'page', form: { state: state({}), mutate } }))
+    fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
+    for (const [field, value] of [[NUMBER_FIELD, '321'], [second, '654']] as const) {
+      const input = view.container.querySelector('#' + 'evolution-param-' + field.id) as HTMLInputElement
+      fireEvent.change(input, { target: { value } })
+    }
+    fireEvent.click(view.container.querySelector('[data-primary="true"]') as Element)
+    await vi.waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    // ONE call, both fields, the revision this render read. Before T5-01 the save looped per field and
+    // every call carried the SAME render-time revision, so the host refused the second one
+    // (SettingsConflictError → recovered to false) and that field's change silently did not land.
+    expect(mutate.mock.calls[0]?.[0]).toEqual([
+      { op: 'set', path: [NUMBER_FIELD.id], value: 321 },
+      { op: 'set', path: [second.id], value: 654 },
+    ])
+    expect(mutate.mock.calls[0]?.[1]).toBe(7)
+    cleanup()
+  })
+
   it('summarises the overridden count, and renders nothing for an untouched row', () => {
     const touched = render(card({ view: 'summary', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate: async () => true } }))
     expect(touched.container.textContent).toBe(t('changed').replace('{n}', '1'))

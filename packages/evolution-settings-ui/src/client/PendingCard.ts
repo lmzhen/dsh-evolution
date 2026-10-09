@@ -158,7 +158,10 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     }
     return createElement('div', null,
       createElement('p', { className: 'evolution-param-facts' }, ...facts),
-      createElement('pre', { className: 'evolution-param-source' }, ...lines.length === 0 ? ['±'] : lines))
+      // T5-02/A57: `.evolution-param-source` was TWO rules (the row's chip and this diff block) under
+      // one selector in one stylesheet, so the later rule won every shared property: the chip grew a
+      // 12/16px padding inside a 20px box, and these diff lines became flex items laid out in a ROW.
+      createElement('pre', { className: 'evolution-param-diff' }, ...lines.length === 0 ? ['±'] : lines))
   }
 
   const row = (entry: PendingRow): ReactNode => {

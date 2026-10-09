@@ -58,7 +58,10 @@ export function RowConfigCard(props: RowConfigCardProps): ReactNode {
     fields,
     t,
     snapshot: sectionSnapshotOf(form.state),
-    write: async (field, value) => { await form.mutate([{ op: 'set', path: [field], value }], form.state.revision) },
+    // T5-01/A56: ONE fenced write per SAVE. The fence stays (it is what keeps a concurrent editor
+    // from being overwritten) — it just covers the whole op list instead of one field at a time, and
+    // the revision is the one this render read, which is exactly what the platform's form model does.
+    mutateOnce: async (ops) => { await form.mutate(ops, form.state.revision) },
     clear: async (field) => { await form.mutate([{ op: 'unset', path: [field] }], form.state.revision) },
   })
 }

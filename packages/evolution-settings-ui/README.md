@@ -63,6 +63,23 @@ escaping as an unhandled rejection. `settle.ts` holds that one verdict function 
 uses; an unavailable preview prints the host's reason. A late answer for a row the reader already left is
 dropped rather than painted under another row's heading.
 
+## One save is one write, on both faces
+
+A save hands the seat ONE op list (`mutateOnce(ops)`) instead of one call per field. The Plugins page
+fences that list with the revision the render read, which is the platform's own form model ("apply
+ordered field edits in one revision-fenced write"); the section path passes no fence, exactly as before.
+Per-field calls with one shared render-time revision were the T5-01 bug: the host accepted the first
+field, the revision moved, and every later field of the SAME save was refused with a conflict — the
+change silently did not land while the card showed one generic refusal.
+
+The stylesheet carries two structural invariants, both pinned by `tests/styles.client.spec.ts`: one
+selector never carries two rules (the row chip and the preview's diff block were both
+`.evolution-param-source`, so the diff rule's padding/border/overflow landed on a 20px chip and the
+chip's `inline-flex` laid every diff line out in one row), and the family scale is declared on the
+CARD root as well as the section root (the Plugins page renders the same card outside
+`.evolution-params`, where a section-only declaration left every `--evo-*` undefined — no border, zero
+padding, square corners).
+
 ## The `hooks` compartment never reaches the component
 
 A card's inject face carries `hooks: { paramSection: source }` — that is the SHELL's seat, not a prop. The renderer binds each entry to a `use<Name>` seat and hands the component the face with `hooks` REMOVED (the slot contract is `PropsHooks<face['hooks']>` plus `Omit<face, 'hooks'>`). Reading `props.hooks` therefore reads a prop that never exists, and the failure only shows up at runtime, inside the save path.

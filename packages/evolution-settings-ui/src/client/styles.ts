@@ -25,8 +25,11 @@ export const CSS_TAG_ID = '@deepseek-ai/dsh-evolution-settings-ui/settings.css'
 
 /** The stylesheet the section injects once. */
 export const CSS = [
-  // The scale, declared on the section root so it never leaks into the host shell.
-  tokenVars('.evolution-params'),
+  // The scale, declared on the section root AND on the card root. T5-03/A58: the Plugins page renders
+  // the SAME card inside its own detail section, never under `.evolution-params`, so a section-only
+  // declaration left every `--evo-*` undefined there (no border, zero padding, square corners).
+  // Re-declaring on a nested root is harmless — the values are identical.
+  tokenVars('.evolution-params,.evolution-param-card'),
   '.evolution-params{display:flex;flex-direction:column}',
   '.evolution-params-title{margin:0 0 var(--evo-space-4);color:var(--dsw-alias-label-primary);font-size:var(--evo-type-lg);font-weight:600;line-height:var(--evo-leading-base)}',
   '.evolution-params-subtitle{margin:0 0 var(--evo-space-16);color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
@@ -69,7 +72,7 @@ export const CSS = [
   // colours) — the two faces describe the same kind of change, so they read the same way.
   '.evolution-param-facts{display:flex;flex-wrap:wrap;align-items:baseline;margin:0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   '.evolution-param-fact+.evolution-param-fact::before{content:"·";margin:0 var(--evo-space-6);color:var(--dsw-alias-label-tertiary)}',
-  '.evolution-param-source{margin:0;padding:var(--evo-space-12) var(--evo-space-16);max-height:var(--evo-cap-block);overflow:auto;border:var(--evo-hairline-width) solid var(--dsw-alias-border-l1);border-radius:var(--evo-radius-surface);background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',
+  '.evolution-param-diff{margin:0;padding:var(--evo-space-12) var(--evo-space-16);max-height:var(--evo-cap-block);overflow:auto;border:var(--evo-hairline-width) solid var(--dsw-alias-border-l1);border-radius:var(--evo-radius-surface);background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',
   '.evolution-param-line-add{color:var(--evo-tone-success)}',
   '.evolution-param-line-del{color:var(--evo-tone-danger)}',
 ].join('\n')

@@ -22,7 +22,7 @@
  * apply time would capture `undefined` for the whole life of the fiber.
  * @module @deepseek-ai/dsh-evolution-settings-ui/client
  */
-import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ParamSectionSnapshot, ParamSectionSource } from './seam.ts'
+import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike } from './seam.ts'
 
 /** What a card shows when this UI found no settings seat at all. */
 export const SEAT_MISSING: ParamSectionSnapshot = Object.freeze({
@@ -162,12 +162,18 @@ export function sourceFor(probe: SeatProbe, namespace: string): ParamSectionSour
  * @returns the two calls a card's save/reset path uses; without a seat they resolve without writing.
  */
 export function writeFaceFor(probe: SeatProbe, namespace: string): {
-  write: (field: string, value: unknown) => Promise<void>
+  mutateOnce: (ops: readonly SettingsPathOpLike[]) => Promise<void>
   clear: (field: string) => Promise<void>
 } {
   const form = (): ConfigFormLike | undefined => probe()?.get<Record<string, unknown>>(namespace)
   return {
-    write: async (field, value) => { await form()?.set(field, value) },
+    // T5-01/A56: ONE save = ONE atomic write, on BOTH faces. The Plugins page used to send one fenced
+    // `mutate` per field with the revision it read at RENDER time, so the second field of any
+    // multi-field save was refused (SettingsConflictError → recovered to false) and its change
+    // silently did not land while the card showed one generic refusal. Handing the whole op list to
+    // the seat is the platform's own form model ("apply ordered field edits in one revision-fenced
+    // write"); this path passes no fence, exactly as it did before.
+    mutateOnce: async (ops) => { await form()?.mutate(ops) },
     clear: async (field) => { await form()?.unset(field) },
   }
 }
