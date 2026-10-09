@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { Context } from '@deepseek-ai/cordis'
+import { ACTIVITY_FILE_VERSION } from '@deepseek-ai/dsh-evolution-activity'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import { comparePlans, clampReplayWeights, Config, DEFAULT_WEIGHTS, EvolutionReplayDriver } from '../src/index.ts'
+import * as ReplayPlugin from '../src/index.ts'
+import { tempHome } from '../../test-support/temp-home.ts'
 
 describe('evolution-replay', () => {
   it('groups recorded plans by policy fingerprint instead of the random plan id', () => {
@@ -47,8 +55,35 @@ describe('evolution-replay', () => {
     driver.markSourceUnreadable()
     const qualified = driver.compare()
     expect(qualified.sourceCorrupt).toBe(true)
-    expect(qualified.report.startsWith('The activity sidecar could not be read as the current format')).toBe(true)
+    expect(qualified.report.startsWith('The activity sidecar could not be read as an activity envelope')).toBe(true)
     expect(qualified.report).toContain('NOT the recorded history')
+    // T4-08/A50: a NEWER writer does not reach this sentence — its records are read, so the
+    // qualification would contradict the leaderboard it just backfilled.
+    expect(qualified.report).not.toContain('newer writer')
+  })
+
+  it('T4-08/A50: a NEWER-version sidecar is READ, not disowned — its records are the history and the report says so', async () => {
+    const root = await tempHome('dsh-replay-foreign-')
+    const home = join(root, 'evolution')
+    await mkdir(home, { recursive: true })
+    // The fixture from the audit: the envelope declares a version this build does not know, with one
+    // perfectly valid record inside.
+    await writeFile(join(home, 'activity.json'), JSON.stringify({
+      version: ACTIVITY_FILE_VERSION + 1,
+      items: [{ sessionId: 's1', planId: 'run-foreign', policyFingerprint: 'policy-a', memoryApplied: 2, skillApplied: 0, rejectedOps: 0, at: 1 }],
+    }), 'utf8')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(ReplayPlugin, {})
+    const driver = (ctx as unknown as { evolutionReplay: EvolutionReplayDriver }).evolutionReplay
+    // The backfill is deferred to the io injection: wait for it, then read the two answers the
+    // audit says used to contradict each other — the record IS in the leaderboard AND the report
+    // said "NOT the recorded history".
+    await vi.waitFor(() => { expect(driver.plansSnapshot()).toHaveLength(1) })
+    const result = driver.compare()
+    expect(result.sourceCorrupt).toBe(false)
+    expect(result.report).not.toContain('NOT the recorded history')
   })
 
   it('PLAN S5.1 (P2-18): the sourceCorrupt qualification follows the CURRENT read — a repaired sidecar plus io reload stops qualifying compare()', () => {

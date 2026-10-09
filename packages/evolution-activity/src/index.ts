@@ -151,30 +151,82 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
 }
 
 /**
- * FLOW6-6 (v43, the read side of H-3): the sidecar's records PLUS whether the
- * bytes could be read as THIS format. `parseActivityContent` answers `[]` for
- * a future-version or unparsable file, so a read-only consumer could not tell
- * "newer format" from "no history" and presented a partial/empty view as the
- * recorded truth. The write side already quarantines those bytes
- * ({@link isCorruptActivity}); this is the channel the readers were missing.
+ * FLOW6-6 (v43, the read side of H-3) + T4-08/A50: the sidecar's records PLUS two independent
+ * verdicts, because two different things were being folded into one word.
+ *
+ * `parseActivityContent` answers `[]` for UNPARSABLE bytes or a file with no `items` array — and it
+ * reads the items AS-IS when the envelope declares a version this build does not know (the historical
+ * behaviour, pinned by activity-version-gate.spec.ts). So "the records are missing" and "a newer
+ * writer wrote this" are different facts, and each field names exactly one: `corrupt` is the first,
+ * `foreignVersion` the second. (The write side still quarantines the bytes in BOTH cases —
+ * {@link isCorruptActivity} — because only a byte-level copy survives the next append.) Collapsing
+ * the two made replay backfill its leaderboard from those records AND declare the view "NOT the
+ * recorded history".
  */
 export interface ActivityLoad {
   records: EvolutionActivityRecord[]
-  /** Bytes exist but are not a readable current-version envelope. A MISSING
-   * file is not corruption — it is a first write. */
+  /** Bytes exist but are not a readable CURRENT-version envelope at all:
+   * unparsable JSON, or no `items` array. A MISSING file is not corruption —
+   * it is a first write, and `records` is empty in both cases. */
   corrupt: boolean
+  /** T4-08/A50: the envelope declared a `version` this reader does not know,
+   * AND its `items` were still read (the historical behaviour, pinned by
+   * activity-version-gate.spec.ts). This is NOT corruption: the records ARE the
+   * recorded history, just written by a newer writer whose unknown fields this
+   * build ignores. A consumer that qualifies such a read as "not the recorded
+   * history" contradicts the leaderboard it just backfilled from it. */
+  foreignVersion: boolean
 }
 
 /**
- * H-06: the read barrier over the sidecar, with the corruption verdict.
+ * What the sidecar bytes ARE — the single parse every verdict below is derived from (T4-08/A50).
+ *
+ * - `absent`: no file yet (a first write, never corruption);
+ * - `readable`: a current-version envelope, or the version-less legacy shape this reader has
+ *   always accepted;
+ * - `foreign`: a readable envelope declaring a version this build does not know — its `items`
+ *   ARE read as-is (the historical behaviour pinned by activity-version-gate.spec.ts), so the
+ *   records are the recorded history for every field this build understands;
+ * - `unreadable`: bytes that are not an activity envelope at all (unparsable JSON, or no `items`
+ *   array) — the only state in which the records are missing.
+ */
+type ActivityVerdict = 'absent' | 'readable' | 'foreign' | 'unreadable'
+
+/**
+ * One parse, one verdict — every reader-facing answer above is derived from this one call.
+ * @param raw - the sidecar bytes, or null when the file is absent.
+ * @returns the verdict.
+ */
+function activityVerdict(raw: string | null): ActivityVerdict {
+  if (raw === null) return 'absent'
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as { items?: unknown }).items)) return 'unreadable'
+    const version = (parsed as { version?: unknown }).version
+    return version !== undefined && version !== ACTIVITY_FILE_VERSION ? 'foreign' : 'readable'
+  } catch {
+    // Unparsable bytes are the one shape that is corruption on both sides: nothing readable, and
+    // nothing worth preserving beyond the quarantine copy.
+    return 'unreadable'
+  }
+}
+
+/**
+ * H-06: the read barrier over the sidecar, with the two verdicts it must not conflate.
  *
  * @param root - the evolution state root (the sidecar lives under it).
  * @param io - the IO provider to read through.
- * @returns the parsed records and whether the bytes were readable.
+ * @returns the parsed records, plus whether they are MISSING (`corrupt`) and whether a newer
+ * writer wrote the envelope (`foreignVersion`).
  */
 export async function loadActivityState(root: string, io: EvolutionIoLike): Promise<ActivityLoad> {
   const raw = await io.readText(activityFile(root))
-  return { records: parseActivityContent(raw), corrupt: isCorruptActivity(raw) }
+  const verdict = activityVerdict(raw)
+  return {
+    records: parseActivityContent(raw),
+    corrupt: verdict === 'unreadable',
+    foreignVersion: verdict === 'foreign',
+  }
 }
 
 /**
@@ -191,36 +243,23 @@ export async function loadActivity(root: string, io: EvolutionIoLike): Promise<E
   return (await loadActivityState(root, io)).records
 }
 
-/** True when bytes exist but are not a readable activity envelope: unparsable
- * JSON, or a missing `items` array (a scalar/array/other-shaped file). A missing
- * file (null) is NOT corruption — it is a first write. */
 /**
- * v43 audit (H-3 / J-6 / FLOW6-6): an UNSUPPORTED version is corrupt for this
- * writer. The read side has always ignored `version` and taken `items` as-is,
- * so a future-version sidecar used to fold fine and then be rewritten as
- * `version: ACTIVITY_FILE_VERSION` on the next append — a silent downgrade that
- * destroyed whatever the newer format carried. This guard is the write side's
- * half of the pair: unknown version ⇒ the original bytes are quarantined (the
- * existing `.corrupt` path) before a current-version file replaces them, which
- * is the posture `evolution-events` already takes for the same shape.
- * Residual, closed by FLOW6-6: `parseActivityContent` still answers `[]` for
- * such a file, but {@link loadActivityState} now carries the verdict beside the
- * records, so a read-only consumer can distinguish "newer format" from "no
- * history" instead of presenting a partial view as the recorded truth.
+ * The WRITE side's quarantine predicate: should these bytes be preserved under `.corrupt` before a
+ * current-version file replaces them?
+ *
+ * v43 audit (H-3 / J-6 / FLOW6-6): yes for an envelope declaring an UNSUPPORTED version. The read
+ * side has always ignored `version` and taken `items` as-is, so a future-version sidecar used to
+ * fold fine and then be rewritten as `version: ACTIVITY_FILE_VERSION` on the next append — a silent
+ * downgrade that destroyed whatever the newer format carried. This is the `foreign` verdict from
+ * {@link activityVerdict}, which is why this predicate is NOT the read side's `corrupt`: a foreign
+ * envelope's records ARE read (only the bytes are worth preserving), while `corrupt` means there
+ * were no readable records in the first place.
  * @internal Exported for this package's own tests (siblings `parseActivityContent`
  * and `serializeActivity` are exported for the same reason).
  */
 export function isCorruptActivity(raw: string | null): boolean {
-  if (raw === null) return false
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    if (typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as { items?: unknown }).items)) return true
-    const version = (parsed as { version?: unknown }).version
-    return version !== undefined && version !== ACTIVITY_FILE_VERSION
-  } catch {
-    // Unparsable bytes are exactly the corruption this guard exists for.
-    return true
-  }
+  const verdict = activityVerdict(raw)
+  return verdict === 'unreadable' || verdict === 'foreign'
 }
 
 export const name = 'evolution-activity'

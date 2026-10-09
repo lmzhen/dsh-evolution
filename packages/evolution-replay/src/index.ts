@@ -359,7 +359,9 @@ export class EvolutionReplayDriver {
     return {
       ...result,
       sourceCorrupt: true,
-      report: 'The activity sidecar could not be read as the current format (corrupt bytes or a newer writer) — this leaderboard is NOT the recorded history, and an empty list does not mean nothing happened.\n' + result.report,
+      // T4-08/A50: the parenthetical used to say "corrupt bytes or a newer writer" — a newer writer's
+      // envelope is READ (its records are the history), so only unreadable bytes reach this sentence.
+      report: 'The activity sidecar could not be read as an activity envelope (unparsable bytes, or no items array) — this leaderboard is NOT the recorded history, and an empty list does not mean nothing happened.\n' + result.report,
     }
   }
 }
@@ -392,9 +394,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // and qualify every comparison, instead of showing an empty leaderboard
         // that reads as "nothing was ever recorded".
         if (loaded.corrupt) {
-          ioCtx.logger.warn('evolution-replay: the activity sidecar could not be read as the current format (corrupt bytes or a newer writer) — the leaderboard backfilled from it is INCOMPLETE; the writer quarantines those bytes on its next append')
+          // T4-08/A50: ONLY this state means the records are missing — the bytes were not an activity
+          // envelope at all, so there is nothing to backfill and the comparison is qualified.
+          ioCtx.logger.warn('evolution-replay: the activity sidecar could not be read as an activity envelope (unparsable bytes, or no items array) — there is NO history to backfill; the writer quarantines those bytes on its next append')
           driver.markSourceUnreadable()
         } else {
+          // ...while a NEWER writer's envelope is NOT that: its items were read as-is (the pinned
+          // behaviour), so this is the recorded history for every field this build knows. Calling it
+          // "NOT the recorded history" while the leaderboard showed its records was the contradiction.
+          if (loaded.foreignVersion) {
+            ioCtx.logger.warn('evolution-replay: the activity sidecar was written by a NEWER activity format than this build reads — its records were read as-is and unknown fields ignored, so the leaderboard is complete for the fields this build knows; the writer quarantines those bytes on its next append')
+          }
           // PLAN S5.1 (2026-09-16, audit P2-18): a clean read is also a verdict —
           // clear a stale flag so the compare() qualification follows the current
           // read (a repaired sidecar reaching us through an io reload must stop
