@@ -1,6 +1,13 @@
 # Changelog
 
 
+## 0.17.0 (stable) — 平台单线 0.2.x 的首个正式版
+
+> **来历**：`0.17.0-rc.1` 在 npm `next` 上跑完生产安装路径复验后抬为正式版——**包内容与 rc.1 逐字节相同**，本版差异只在版本号与 dist-tag（stable ⇒ `latest`）。
+> **生产安装路径复验（2026-10-09 实测，registry 上的包）**：① **桌面面**——隔离 `DSH_HOME` ＋真机 Electron 0.2.0-rc.2，`dsh plugin --profile desktop add @lmzhen/dsh-evolution-all@0.17.0-rc.1` → 30 个 `@lmzhen` 包同版本零混装、`dsh.profile.bundles` 落家族行、冷启动 boot 日志**零** `did not activate`／零 Error、侧栏家族行与插件页「配置 @lmzhen/dsh-memory-files」行页可用；② **web 面**——0.2.0-rc.2 CLI ＋隔离 home 同一条 `plugin add` → 冷启动零失败项、3098 端口起服务正常。判据说明：`all` 形态是「无 agent-preset 步骤」的默认装法（`all`／`host`／one-click preset 三选一互斥），模式选择器里不出现 Evolution 预设属设计口径，不是缺陷。
+> **发布链修复（同批）**：`publish` 的产物来源改为**本 run 的 `-released` 集**（此前下 `evolution-dist-baseline`，而产出该产物的作业已随 0.1.5 线退役 ⇒ 人工批准后必红在 `Artifact not found`）；新增 `verify-release-artifacts` 守卫（一个 workflow 里每个 `download-artifact` 名必须由同 workflow 的 `upload-artifact` 产出，含复合 action 模板实例化与跨 run 判别），接进 CI 复合 action 与本地门禁；补齐发布前审字节所需的 `tar` 模块并删掉该脚本里写死的本机路径。门禁 25 → **26 步**。
+> **平台口径未变**：`PLATFORM_FLOOR=0.2.0-rc.1`、`PLATFORM_VERSION=0.2.0-rc.2`。
+
 ## 0.17.0-rc.1 (minor, prerelease) — 平台线跳到 0.2.0-rc.2：参数面、客户端座位、命名空间、诊断面、发布口径全量对齐
 
 > **由来**：0.2.x 一次改掉了四件家族赖以工作的机制——参数面（`z` 配置改成 `.volatile()` 活引用）、客户端设置座位（客户端插件从平台自带的表单读，行配置页按 `<bundle>#<rowId>` 挂）、设置命名空间（行 id 就是命名空间，旧的 `evolution-*` 字符串不再指向任何东西）、agent preset（目录式取消，改成 profile patch 里的一条 `dsh-agent-preset` 声明）。不做完这四件，家族在新线上是「装得上、点不动、配不了、迁不走」。
