@@ -62,11 +62,12 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 
 ## Installation
 
-**Validated platform line: DSH `0.1.5-rc.2`.** That single version is what
-`.github/workflows/release.yml` pins as `PLATFORM_VERSION`, what the CI
-`compat-check` job validates against (`dsh-v0.1.5-rc.2`), and what every
-published `@deepseek-ai/dsh-*` dependency range declares (`^0.1.5-rc.2`).
-`0.1.1-rc.2` and earlier are **outside the support window**: a `^0.1.5-rc.2`
+**Validated platform line: DSH `0.2.0-rc.2`.** That single version is what
+`.github/workflows/release.yml` pins as `PLATFORM_VERSION` and what the CI
+`compat-check` job validates against (`dsh-v0.2.0-rc.2`). The ranges this family
+publishes declare `^0.2.0-rc.1` — the **floor** (`PLATFORM_FLOOR`), which admits
+the whole 0.2.0-rc line including the version the gate tested.
+`0.1.5-rc.2` and earlier are **outside the support window**: a `^0.2.0-rc.1`
 range does not resolve them (node-semver rejects a prerelease from a different
 major.minor.patch), so installing this line on an older platform fails at
 resolution rather than misbehaving at runtime. See

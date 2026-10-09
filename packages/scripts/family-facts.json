@@ -41,6 +41,34 @@
   },
   "facts": [
     {
+      "id": "platform-line",
+      "title": "the validated platform line and the floor the published ranges declare",
+      "home": "README.md",
+      "machine": {
+        "kind": "platform-version",
+        "file": "../.github/workflows/release.yml"
+      },
+      "must": [
+        {
+          "text": "**Validated platform line: DSH `0.2.0-rc.2`.**"
+        },
+        {
+          "text": "`^0.2.0-rc.1`"
+        }
+      ],
+      "forbid": [
+        {
+          "re": "Validated platform line: DSH `0.1.5-rc.2`",
+          "why": "the 0.1.5-rc.2 sentence survived the 0.2.0-rc.2 jump in packages/README.md while release.yml pinned 0.2.0-rc.2 (finding T7-03): the support-window paragraph was never re-pointed"
+        },
+        {
+          "re": "`\\^0\\.1\\.5-rc\\.2`",
+          "why": "the pre-jump range claim: the published packages declare ^0.2.0-rc.1 (PLATFORM_FLOOR)"
+        }
+      ],
+      "cites": []
+    },
+    {
       "id": "install-form-semantics",
       "title": "① variant / ② attach - what each form does to a session",
       "home": "INSTALL.md",

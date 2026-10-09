@@ -142,6 +142,35 @@ function machineViolations(fact, root, docs, home) {
     }
     return out
   }
+  if (machine.kind === 'platform-version') {
+    // v46 S2.1 (finding T7-03): the platform line this family validates against has ONE home —
+    // the release workflow. The fact's home must state both pinned values, and no other tracked
+    // document may present a DIFFERENT line as the validated one. The claim idioms are PAIRED
+    // with the pinned version instead of forbidding a version string: a document may legitimately
+    // mention an older line while comparing lines or recording history (README.md:275 does).
+    const version = /^\s*PLATFORM_VERSION:\s*(\S+)\s*$/m.exec(text)?.[1]
+    const floor = /^\s*PLATFORM_FLOOR:\s*(\S+)\s*$/m.exec(text)?.[1]
+    if (version === undefined) {
+      out.push(`${machine.file}: no PLATFORM_VERSION line — the validated platform line cannot be re-derived`)
+      return out
+    }
+    if (!home.includes(version)) out.push(`${fact.home}: ${machine.file} pins PLATFORM_VERSION ${version}, but the home does not state that line`)
+    if (floor !== undefined && !home.includes('^' + floor)) out.push(`${fact.home}: ${machine.file} pins PLATFORM_FLOOR ${floor}, but the home does not state the ^${floor} range the published packages declare`)
+    const CLAIMS = [
+      /Validated platform line: DSH `([^`]+)`/g,
+      /已验证[^\n]*?平台线[^\n]*?`([^`]+)`/g,
+      /`dsh-v(\d[\w.-]*)`/g,
+    ]
+    for (const doc of docs) {
+      if (doc.rel === fact.home || doc.reasonLayer) continue
+      for (const claim of CLAIMS) {
+        for (const match of doc.text.matchAll(claim)) {
+          if (match[1] !== version) out.push(`${doc.label}: presents \`${match[1]}\` as the validated platform line while ${machine.file} pins ${version} — one line, one home`)
+        }
+      }
+    }
+    return out
+  }
   out.push(`${fact.id}: unknown machine kind "${String(machine.kind)}" — N19 cannot re-derive this fact`)
   return out
 }
