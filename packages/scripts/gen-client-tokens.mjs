@@ -14,13 +14,15 @@
  * Usage: node gen-client-tokens.mjs <evolution-root> [--check]
  */
 import { readFileSync, writeFileSync } from 'node:fs'
+import { clientHalfDirs } from './lib-family-packages.mjs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
-/** The browser halves that receive the generated scale. */
-export const TARGETS = ['evolution-skill-history', 'evolution-settings-ui']
+/** The browser halves that receive the generated scale come from the ONE rule in
+ * lib-family-packages.mjs (`clientHalfDirs`, v46 S2.3) — a hand-copied list here silently skipped a
+ * new browser half. */
 
 /** Where the generated copy lives inside one package. */
 const RELATIVE = 'src/client/tokens.ts'
@@ -108,25 +110,39 @@ function main(args) {
     console.error('gen-client-tokens: unknown flag ' + unknown.join(', ') + ' - usage: node gen-client-tokens.mjs <evolution-root> [--check]')
     return 2
   }
+  const discovered = clientHalfDirs(root)
+  if (discovered.unreadable.length > 0) {
+    console.error('gen-client-tokens: unreadable manifest(s) under ' + root + ' — a browser half may be hidden: ' + discovered.unreadable.join('; '))
+    return 1
+  }
+  const targets = discovered.dirs
+  if (targets.length === 0) {
+    console.error('gen-client-tokens: no package under ' + root + ' declares dsh.client — the browser halves cannot be discovered (an empty target list would write nothing and report success)')
+    return 1
+  }
   const wanted = renderModule()
   let drift = 0
-  for (const pkg of TARGETS) {
+  for (const pkg of targets) {
     const file = join(root, pkg, RELATIVE)
     if (!check) {
       writeFileSync(file, wanted)
       continue
     }
-    if (readFileSync(file, 'utf8') !== wanted) {
+    // A discovered browser half with NO generated copy is the shape the hand-copied target list
+    // used to hide: report it as drift instead of crashing on the missing read (v46 S2.3).
+    let current = null
+    try { current = readFileSync(file, 'utf8') } catch { current = null }
+    if (current !== wanted) {
       console.error('gen-client-tokens: DRIFT ' + file + ' - regenerate with node packages/scripts/gen-client-tokens.mjs ' + (rootArg ?? 'packages'))
       drift++
     }
   }
   if (!check) {
-    console.log('gen-client-tokens: wrote ' + TARGETS.length + ' copies of client-tokens.json')
+    console.log('gen-client-tokens: wrote ' + targets.length + ' copies of client-tokens.json')
     return 0
   }
   console.log(drift === 0
-    ? 'gen-client-tokens: ok (' + TARGETS.length + ' copies identical to client-tokens.json)'
+    ? 'gen-client-tokens: ok (' + targets.length + ' copies identical to client-tokens.json)'
     : 'gen-client-tokens: ' + drift + ' copy/copies drifted')
   return drift === 0 ? 0 : 1
 }

@@ -77,6 +77,33 @@ export function publishableDirs(packagesRoot) {
 }
 
 /**
+ * Directories whose manifest declares a browser half (`dsh.client`).
+ * v46 S2.3 (finding T7-08): this fact used to live in three places — a hand-copied set in
+ * audit-release-tarballs.mjs, a hand-copied TARGETS in gen-client-tokens.mjs, and a derivation in
+ * build-client.mjs / verify-client-seats.mjs. A third browser half was therefore BUILT and
+ * seat-checked while the tarball audit never looked for its loader artifact and the token
+ * generator never gave it the scale — published, and green. One rule, here.
+ * @param packagesRoot - absolute path of the `packages/` directory.
+ * @returns the directory names, sorted.
+ */
+export function clientHalfDirs(packagesRoot) {
+  const unreadable = []
+  const dirs = publishableDirs(packagesRoot).filter(dir => {
+    try {
+      const parsed = JSON.parse(readFileSync(join(packagesRoot, dir, 'package.json'), 'utf8'))
+      return parsed.dsh?.client !== undefined
+    } catch (error) {
+      // A manifest this rule cannot read is NOT a package without a browser half (read failure is
+      // not absence). Silently skipping it would let one unparsable manifest hide a browser half
+      // from the generator and the tarball audit at the same time.
+      unreadable.push(dir + ': ' + (error instanceof Error ? error.message : String(error)))
+      return false
+    }
+  })
+  return { dirs, unreadable }
+}
+
+/**
  * The installer's acceptance rule, as implemented at install-layered.mjs:479.
  * @param packageName - the manifest `name` (already rescoped by the caller).
  * @returns whether the installer would consider this package part of the family.

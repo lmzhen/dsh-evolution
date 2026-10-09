@@ -58,10 +58,10 @@ if (distDir === undefined) {
 const tarballs = readdirSync(distDir).filter((name) => name.endsWith('.tgz')).sort()
 if (tarballs.length === 0) { console.error('audit-release-tarballs: no .tgz under ' + distDir); process.exit(2) }
 
-/** The packages whose browser half must ship as lib/client.js plus a dsh.client declaration. */
-const CLIENT_PACKAGES = new Set(['dsh-evolution-settings-ui', 'dsh-evolution-skill-history'])
 const problems = []
 const notes = []
+/** How many tarballs declared a browser half (the vacuity check at the end reads this). */
+let clientTarballs = 0
 
 /**
  * Every file in one extracted payload, relative to the package root.
@@ -130,10 +130,14 @@ for (const tarball of tarballs) {
       if (text.includes('@deepseek-ai/dsh-evolution-')) problems.push(short + ': ' + file + ' still carries a @deepseek-ai/dsh-evolution- literal')
     }
 
-    const tail = short.replace('@lmzhen/', '')
-    if (CLIENT_PACKAGES.has(tail)) {
-      if (!files.includes('lib/client.js')) problems.push(short + ': browser half missing lib/client.js')
-      if (manifest.dsh?.client === undefined) problems.push(short + ': no dsh.client declaration')
+    // v46 S2.3 (finding T7-08): the tarball's OWN manifest decides whether it carries a browser
+    // half. The hand-copied package set meant a third half was never checked for its loader
+    // artifact — it could ship without lib/client.js and the audit would stay silent.
+    if (manifest.dsh?.client !== undefined) {
+      clientTarballs += 1
+      if (!files.includes('lib/client.js')) problems.push(short + ': declares dsh.client but the payload carries no lib/client.js')
+    } else if (files.includes('lib/client.js')) {
+      problems.push(short + ': ships lib/client.js without a dsh.client declaration — the loader the platform mounts is not the one the manifest promises')
     }
     notes.push(short + ' ' + String(manifest.version) + ' — ' + files.length + ' file(s), ' + shipped.length + ' shipped module(s)')
   } finally {
@@ -141,7 +145,12 @@ for (const tarball of tarballs) {
   }
 }
 
-console.log('audit-release-tarballs: ' + tarballs.length + ' tarball(s) under ' + distDir)
+// v46 S2.3: the browser halves are mandatory surfaces — a release that carries none is a silent
+// regression, not a clean audit (the family ships two).
+if (clientTarballs === 0) {
+  problems.push('no tarball declares dsh.client — the release carries no browser half at all')
+}
+console.log('audit-release-tarballs: ' + tarballs.length + ' tarball(s) under ' + distDir + ' (' + clientTarballs + ' with a browser half)')
 for (const note of notes) console.log('  ' + note)
 if (problems.length > 0) {
   console.error('audit-release-tarballs: FAIL — ' + problems.length + ' problem(s):')

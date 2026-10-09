@@ -13,9 +13,10 @@
  *
  * Usage: node verify-client-tokens.mjs <evolution-root> [--strict]
  */
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { TARGETS, readTokens, renderModule } from './gen-client-tokens.mjs'
+import { readTokens, renderModule } from './gen-client-tokens.mjs'
+import { clientHalfDirs } from './lib-family-packages.mjs'
 
 /** The nine groups the scale is made of, in the order the source declares them. */
 const GROUPS = ['type', 'space', 'radius', 'hairline', 'measure', 'leading', 'tone', 'focus', 'cap']
@@ -58,6 +59,22 @@ if (unknown.length > 0) {
 }
 
 const problems = []
+// v46 S2.3 (finding T7-08): the browser halves come from the ONE rule (manifest `dsh.client`),
+// not from a hand-copied list. A declaration without a client entry is a promise the build would
+// silently skip (build-client.mjs requires both halves of the pair), so the agreement between
+// the two is checked here, and an empty discovery is a failure rather than a quiet pass.
+const discovered = clientHalfDirs(root)
+for (const entry of discovered.unreadable) problems.push('manifest unreadable — a browser half may be hidden: ' + entry)
+const targets = discovered.dirs
+if (targets.length === 0) {
+  console.error('verify-client-tokens: no package under ' + root + ' declares dsh.client — the browser halves cannot be discovered')
+  process.exit(1)
+}
+for (const pkg of targets) {
+  if (!existsSync(join(root, pkg, 'src', 'client', 'index.ts'))) {
+    problems.push(pkg + ': declares dsh.client but carries no src/client/index.ts — the platform would mount a loader for a package with no browser half')
+  }
+}
 const { groups, flat } = readTokens()
 
 const declared = Object.keys(groups)
@@ -80,7 +97,7 @@ for (const [name, value] of flat) {
 
 const wanted = renderModule()
 const copies = []
-for (const pkg of TARGETS) {
+for (const pkg of targets) {
   const file = join(root, pkg, 'src/client/tokens.ts')
   let current = null
   try {
@@ -94,7 +111,7 @@ for (const pkg of TARGETS) {
     problems.push(file + ' does not match client-tokens.json - regenerate with node packages/scripts/gen-client-tokens.mjs ' + (rootArg ?? 'packages'))
   }
 }
-if (copies.length === TARGETS.length && copies[0][1] !== copies[1][1]) {
+if (copies.length === targets.length && copies[0][1] !== copies[1][1]) {
   problems.push('the two copies differ from each other: ' + copies.map(pair => pair[0]).join(' vs '))
 }
 
@@ -102,7 +119,7 @@ if (copies.length === TARGETS.length && copies[0][1] !== copies[1][1]) {
 // the rule falls back to its initial value, which is how the aside column lost its width once already.
 const declaredNames = new Set(flat.map(pair => pair[0]))
 const referenced = new Set()
-for (const pkg of TARGETS) {
+for (const pkg of targets) {
   for (const file of clientSources(join(root, pkg))) {
     const text = readFileSync(file, 'utf8')
     for (const match of text.matchAll(REFERENCE)) {
