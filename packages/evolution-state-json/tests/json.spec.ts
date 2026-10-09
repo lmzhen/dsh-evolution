@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { mountStateStack } from '../../test-support/state-stack.ts'
@@ -52,4 +53,21 @@ describe('evolution-state-json', () => {
     const after = JSON.parse(await io.readText(join(home, 'review-state.json')) ?? '{}') as Record<string, { updatedAt?: number }>
     expect(after['old-1']?.updatedAt).toBeGreaterThan(1001)
   }, 60_000)
+
+  it('audit 1-12: a failed legacy-file RENAME does not hide the records the merge already committed', async () => {
+    const home = await tempRoot('dsh-state-json-legacy-rename-')
+    // A legacy file to retire, and a DIRECTORY occupying the retired name: the transact commits the
+    // merge first, then the rename fails. That is the shape that used to discard the committed
+    // merge and rebuild the view from the PRE-transact snapshot, so this one read listed fewer
+    // records than the file already held (it self-healed on the next call, but a silent short read
+    // on an approval surface is the O1 class).
+    await mkdir(join(home, 'pending.json.migrated'), { recursive: true })
+    await writeFile(join(home, 'pending.json'), JSON.stringify({
+      'legacy-1': { id: 'legacy-1', kind: 'memory', summary: 'from legacy', args: {}, createdAt: 'now', status: 'pending' },
+    }))
+    const ctx = await mountStateStack(home)
+    const provider = ctx.evolutionStateStorage.provider('json')
+    // The merge is on disk and the failed rename only defers the retirement, so the record shows up.
+    expect((await provider.listPending()).map(record => record.id)).toEqual(['legacy-1'])
+  })
 })

@@ -35,4 +35,15 @@ describe('settings card save verdict', () => {
   it('accepts an empty batch', () => {
     expect(landedWrites([], {})).toBe(true)
   })
+
+  it('audit T5-10: object key ORDER is not part of the value; array order is', () => {
+    // The serialization comparison called { a: 1, b: 2 } and { b: 2, a: 1 } different values, so a
+    // save that HAD landed read as refused (draft kept, error line shown) the moment a container
+    // field appeared in the registry.
+    expect(landedWrites([{ id: 'x', want: { a: 1, b: 2 } }], { x: { b: 2, a: 1 } })).toBe(true)
+    expect(landedWrites([{ id: 'x', want: { a: 1, b: 2 } }], { x: { a: 1, b: 3 } })).toBe(false)
+    expect(landedWrites([{ id: 'x', want: { a: 1 } }], { x: { a: 1, b: 2 } })).toBe(false)
+    expect(landedWrites([{ id: 'x', want: [1, 2] }], { x: [2, 1] })).toBe(false)
+    expect(landedWrites([{ id: 'x', want: { a: [1, { b: 2 }] } }], { x: { a: [1, { b: 2 }] } })).toBe(true)
+  })
 })

@@ -23,6 +23,43 @@ async function mount(home: string) {
   return ctx
 }
 
+/** The same mount with a DECORATED backend — used where a case has to make one medium call fail.
+ * @param backend - the backend to register and provide as `test-json`.
+ * @returns the mounted context.
+ */
+async function mountWith(backend: JsonStorageBackend) {
+  const ctx = new Context()
+  await ctx.plugin(Storage)
+  ctx.storage.backend.register('test-json', backend)
+  ctx.provide(storageBackendServiceKey('test-json'), backend)
+  await ctx.plugin(DomainFacility, { backend: 'test-json' })
+  await ctx.plugin(EvolutionStateStorageRegistry)
+  await ctx.plugin(DomainState)
+  return ctx
+}
+
+/** PLAN S3.1 (audit 1-1): the backend shape a HALF-FAILED drift repair leaves behind — the pending
+ * table refuses DELETEs, so a canonical re-put lands while its drifted key survives.
+ * @param backend - the real backend to wrap.
+ * @returns the backend with a rejecting `deleteRecord` on the pending table.
+ */
+function withRefusingPendingDelete(backend: JsonStorageBackend): JsonStorageBackend {
+  return Object.assign(Object.create(Object.getPrototypeOf(backend) as object), backend, {
+    kv: {
+      ...backend.kv,
+      open: async (descriptor: Parameters<JsonStorageBackend['kv']['open']>[0]) => {
+        const unit = await backend.kv.open(descriptor)
+        return Object.assign(Object.create(Object.getPrototypeOf(unit) as object), unit, {
+          deleteRecord: async (table: string, key: string): Promise<void> => {
+            if (table === PENDING_TABLE) throw new Error('pending delete refused (S3.1 fixture)')
+            return await unit.deleteRecord(table, key)
+          },
+        })
+      },
+    },
+  }) as JsonStorageBackend
+}
+
 describe('evolution-state-domain transactCuratorState null semantics (G2.1, F-202)', () => {
   it('V27 S4: the task receives a COPY, so mutating it in place cannot reach the store', async () => {
     const home = await tempRoot('dsh-domain-s4-')
@@ -365,5 +402,30 @@ describe('PLAN S3.1 (2026-09-16): pending drift repair — canonical slot wins (
     expect(after.tables[PENDING_TABLE]?.['shared-id']).toMatchObject({ summary: 'canonical', status: 'approved' })
     await unit.close()
     await check.close()
+  })
+
+  it('audit 1-1: a pending twin whose delete half failed cannot consume the id of the approved record behind it', async () => {
+    const home = await tempRoot('dsh-domain-s31-twin-')
+    // The drifted `pending` twin is inserted FIRST and the medium refuses the delete the repair
+    // wants, so both rows coexist — the shape a half-failed repair leaves — and the twin is the
+    // first entry any filter over the table sees. Pre-fix the id dedupe ran before the status
+    // judgement: the twin consumed the id, its own status check failed, and the approved record
+    // behind it was listed NOWHERE (an approval surface silently dropping a row).
+    const inner = new JsonStorageBackend(home)
+    const seeding = await inner.kv.open(DomainFacility.descriptorOf(DomainState.EVOLUTION_DOMAIN))
+    await seeding.putRecord(PENDING_TABLE, 'zzz-odd-key', {
+      id: 'shared-id', kind: 'memory', summary: 'twin', args: {}, createdAt: 'now', status: 'pending',
+    })
+    await seeding.putRecord(PENDING_TABLE, 'shared-id', {
+      id: 'shared-id', kind: 'memory', summary: 'canonical', args: {}, createdAt: 'now', status: 'approved', resolvedAt: '2020-01-01T00:00:00.000Z',
+    })
+    await seeding.close()
+    await inner.close()
+    const ctx = await mountWith(withRefusingPendingDelete(new JsonStorageBackend(home)))
+    const provider = ctx.evolutionStateStorage.provider('domain')
+    const approved = await provider.listPending('approved')
+    expect(approved.map(record => record.summary)).toEqual(['canonical'])
+    // ...and the twin is still listed as what it is: nothing was hidden by the fix.
+    expect((await provider.listPending('pending')).map(record => record.summary)).toEqual(['twin'])
   })
 })

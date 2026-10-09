@@ -701,6 +701,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ): Promise<Record<string, PendingRecord>> {
     if (legacyMigrated) return {}
     const keyedLegacy = keyPendingById(legacy)
+    // PLAN S3.1 (audit 1-12): the merge the transact actually COMMITTED. The rename below can
+    // fail after that commit, and the old catch then returned {} — which made `loadPendingMap`
+    // rebuild the view from its PRE-transact snapshot, so that one `/evolution pending` listed
+    // fewer records than the file already held (it self-healed on the next call, but a silent
+    // short read on an approval surface is the O1 class). Null means the failure came from the
+    // transact itself: nothing was merged, and the current-only fallback stays right.
+    let committed: Record<string, PendingRecord> | null = null
     try {
       // v22 (LOCK-3): the archived-id filter now runs INSIDE the transact task
       // against a FRESH archive read, matching the four mutation paths (they
@@ -726,6 +733,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           merged[id] = record
           retired[id] = record
         }
+        committed = merged
         return merged
       }, { onGateDrop: noteGateDrop })
       await io().rename(pathOf(PENDING_LEGACY_FILE), `${pathOf(PENDING_LEGACY_FILE)}.migrated`)
@@ -750,8 +758,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // ghost twins escaped into the read view ("visible but never claimable"
       // zombies). A deferred retirement must NOT free the unfiltered legacy:
       // the view falls back to current-only (the legacy file stays on disk and
-      // the next safe point retries).
-      return {}
+      // the next safe point retries). PLAN S3.1 (1-12): but when the transact
+      // itself committed and only the RENAME failed, current-only is a short
+      // read — return exactly the ids this merge added on top of the caller's
+      // snapshot, so the caller's `{ ...retired, ...keyed }` shows what the
+      // file holds. The caller overlays its own snapshot on top
+      // (`{ ...retired, ...keyed }`), so returning the whole committed map leaves `keyed`
+      // authoritative for its own ids while the ids this merge ADDED survive the failed rename.
+      if (committed === null) return {}
+      return committed
     }
   }
   async function loadPendingMap(): Promise<Record<string, PendingRecord>> {

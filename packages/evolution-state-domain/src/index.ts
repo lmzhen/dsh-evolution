@@ -376,12 +376,19 @@ export function apply(ctx: Context): void {
       // failed, both rows (drifted key + canonical id) can coexist — dedupe by
       // record.id so the approval view never lists one record twice.
       const final = drifted.length > 0 ? [...table.entries()] : entries
+      // PLAN S3.1 (audit 1-1, P1): the STATUS filter runs FIRST, the id dedupe second. The old
+      // order consumed the id before judging the status, so when a repair's delete half had
+      // failed and a `pending` twin was listed before the canonical `approved` row, the twin ate
+      // the id and the approved record vanished from the approval view — listed nowhere, reported
+      // nowhere. (The json provider never had this shape: it converges by id into a map first and
+      // filters that map afterwards.)
       const seen = new Set<string>()
       return final
+        .filter(([, value]) => value.status === status)
         .filter(([, value]) => {
           if (seen.has(value.id)) return false
           seen.add(value.id)
-          return value.status === status
+          return true
         })
         .map(([, value]) => structuredClone(value))
     },

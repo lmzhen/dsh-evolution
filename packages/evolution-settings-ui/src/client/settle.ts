@@ -19,14 +19,29 @@ export interface PendingWrite {
 
 /**
  * Structural equality for the values a parameter can hold.
+ *
+ * T5-10: the comparison walks the value instead of comparing serializations, because key ORDER is
+ * not part of an object's value — `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` are the same value, but
+ * their `JSON.stringify` output differs, and the card then read a save that HAD landed as refused
+ * (draft kept, error line shown). Array order IS part of an array's value, so arrays compare
+ * element-wise. `NaN` equals itself through the `Object.is` fast path; other primitives use `===`,
+ * which keeps `0` and `-0` equal exactly as the serialization comparison did.
  * @param a - one side of the comparison.
  * @param b - the other side.
  * @returns true when the two are the same value.
  */
 function sameValue(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true
-  if (typeof a !== typeof b || a === null || b === null) return false
-  return JSON.stringify(a) === JSON.stringify(b)
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return a === b
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    return a.every((item, index) => sameValue(item, (b as readonly unknown[])[index]))
+  }
+  const left = a as Record<string, unknown>
+  const right = b as Record<string, unknown>
+  const keys = Object.keys(left)
+  return keys.length === Object.keys(right).length
+    && keys.every(key => Object.hasOwn(right, key) && sameValue(left[key], right[key]))
 }
 
 /**
