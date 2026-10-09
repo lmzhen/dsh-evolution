@@ -380,6 +380,22 @@ joins only when mounted (D-30):
    decisions out of policy code; media providers perform no node:fs IO of
    their own (commands' preset/doctor helpers are the explicit direct-fs exception).
 
+## Service keys
+
+Every service this family mounts carries a context key, and **every key is prefixed `evolution`**
+except two registered exceptions. The machine check (`machine.kind = service-key-prefix`) re-derives
+the set from the `super(ctx, '…')` / `ctx.provide('…')` mount sites in production sources, so a new
+unprefixed key fails N19, and an exception nobody mounts any more fails too.
+
+Prefixed keys: `evolutionIo` · `evolutionStateStorage` · `evolutionState` · `evolutionPolicy` ·
+`evolutionApproval` · `evolutionCurator` · `evolutionFeedback` · `evolutionReplay` ·
+`evolutionMemoryBudget`.
+
+| exception | owner | reason | expires |
+|---|---|---|---|
+| `memory` | `memory` | the key predates the prefix rule and family readers use `ctx.memory` | group 6 (O-3): rename behind an alias window, or keep the registration |
+| `skillUsage` | `skill-usage` | same: a historical generic key with in-family readers | group 6 (O-3): rename behind an alias window, or keep the registration |
+
 ## Extension points
 
 One change point per extension; a second edit anywhere else means the seam is

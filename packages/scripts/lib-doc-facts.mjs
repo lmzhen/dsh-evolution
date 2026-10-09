@@ -80,6 +80,25 @@ function collectEmittedEvents(dir, names) {
 }
 
 /**
+ * Collect the service keys a family package mounts on its context.
+ * @param dir - a package's `src` directory.
+ * @param keys - the accumulator set.
+ */
+function collectServiceKeys(dir, keys) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) { collectServiceKeys(full, keys); continue }
+    if (!entry.name.endsWith('.ts')) continue
+    const text = readText(full)
+    if (text === null) continue
+    for (const match of text.matchAll(/super\(ctx,\s*'([^']+)'\)|ctx\.provide\('([^']+)'\)/g)) {
+      const key = match[1] ?? match[2]
+      if (typeof key === 'string') keys.add(key)
+    }
+  }
+}
+
+/**
  * Read a machine owner, which may be a REPO-scope asset rather than a file under the packages
  * root: the release workflow lives at `<repo>/.github/workflows/`, so the same declaration must
  * resolve from the mirror (`packages` → `<repo>`) and from a build overlay that mirrors only
@@ -124,6 +143,40 @@ function machineViolations(fact, root, docs, home, repoScope) {
     const listed = new Set([...home.matchAll(/\| `(evolution\/[a-z-]+)` \|/g)].map(match => match[1]))
     for (const name of listed) {
       if (!names.has(name)) out.push(`${fact.home}: lists ${name}, which no production source emits — a stale row in the event set's home`)
+    }
+    return out
+  }
+  if (machine.kind === 'service-key-prefix') {
+    // v46 S2.6 (finding O-3 / fixture A100): every service key this family mounts carries the
+    // family prefix, and the two historical generic keys are REGISTERED exceptions — reason and
+    // expiry required — not silent ones. The set is re-derived from the mount sites, so a new
+    // unprefixed key (which a platform service of the same name could shadow) fails here.
+    const keys = new Set()
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const src = join(root, entry.name, 'src')
+      if (existsSync(src)) collectServiceKeys(src, keys)
+    }
+    if (keys.size === 0) {
+      out.push(`${fact.home}: no service mount site found under ${root} — the key set cannot be re-derived (a vacuum pass is not a pass)`)
+      return out
+    }
+    const exceptions = new Map()
+    for (const exception of machine.exceptions ?? []) {
+      for (const field of ['key', 'reason', 'expiry']) {
+        if (typeof exception?.[field] !== 'string' || exception[field].trim() === '') {
+          out.push(`${FACTS_ASSET}: fact ${fact.id} exception for "${String(exception?.key ?? '?')}" has no ${field} — an exception without a reason and an expiry is a silent one`)
+        }
+      }
+      if (typeof exception?.key === 'string') exceptions.set(exception.key, exception)
+    }
+    for (const key of [...keys].sort()) {
+      if (!home.includes(key)) out.push(`${fact.home}: the mount sites carry the key "${key}" but the home does not name it`)
+      if (key.startsWith(machine.prefix) || exceptions.has(key)) continue
+      out.push(`${fact.home}: "${key}" is mounted without the ${machine.prefix} prefix and no exception registers it — a generic key can be shadowed by a platform service of the same name`)
+    }
+    for (const key of exceptions.keys()) {
+      if (!keys.has(key)) out.push(`${FACTS_ASSET}: fact ${fact.id} registers "${key}" as an exception, but no mount site carries it any more — a stale exception`)
     }
     return out
   }

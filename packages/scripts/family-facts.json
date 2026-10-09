@@ -41,6 +41,40 @@
   },
   "facts": [
     {
+      "id": "service-key-prefix",
+      "title": "the family's own service keys: one prefix, two registered exceptions",
+      "home": "README.md",
+      "machine": {
+        "kind": "service-key-prefix",
+        "prefix": "evolution",
+        "exceptions": [
+          {
+            "key": "memory",
+            "reason": "the key predates the prefix rule and family readers reach it through ctx.memory",
+            "expiry": "group 6 (O-3): rename behind an alias window, or keep the registration"
+          },
+          {
+            "key": "skillUsage",
+            "reason": "same shape: a historical generic key with in-family readers",
+            "expiry": "group 6 (O-3): rename behind an alias window, or keep the registration"
+          }
+        ]
+      },
+      "must": [
+        {
+          "text": "**every key is prefixed `evolution`**"
+        },
+        {
+          "text": "`memory`"
+        },
+        {
+          "text": "`skillUsage`"
+        }
+      ],
+      "forbid": [],
+      "cites": []
+    },
+    {
       "id": "skill-name-home",
       "title": "which name a skill is published under: the directory name, and the open decision",
       "home": "evolution-skill-catalog/README.md",
