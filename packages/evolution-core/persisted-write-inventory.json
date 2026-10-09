@@ -50,12 +50,8 @@
     "writer": "evolution-state-json/src/index.ts",
     "serializedBy": "transact",
     "marker": "transactIo(io(), join(root, file)",
-    "state": [
-      "evolution-state-json/src/index.ts :: recordGateWarned",
-      "evolution-state-json/src/index.ts :: corruptWritten",
-      "evolution-state-json/src/index.ts :: corruptWriteWarned"
-    ],
-    "note": "The durable state stack (review/curator/pending). Its three warn sets are per-process de-duplication and are registered under N12."
+    "state": [],
+    "note": "The durable state stack (review/curator/pending). S4.4/O-6 moved its three warn/rewrite sets into the provider instance (QuarantineMemory), so no module-scope N12 store remains here."
   },
   {
     "id": "curator-reports",

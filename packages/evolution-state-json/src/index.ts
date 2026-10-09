@@ -147,7 +147,7 @@ async function quarantineTarget(io: () => EvolutionIoLike, base: string, content
   return { dest: `${base}.${Date.now()}`, needsWrite: true }
 }
 
-async function quarantine(io: () => EvolutionIoLike, root: string, file: string, raw: string, reason: string): Promise<never> {
+async function quarantine(io: () => EvolutionIoLike, root: string, file: string, raw: string, reason: string, memory: QuarantineMemory): Promise<never> {
   const base = `${join(root, file)}.corrupt`
   const { dest, needsWrite } = await quarantineTarget(io, base, raw)
   // P2-27 (v11): a failed rescue copy must not claim "original preserved" —
@@ -164,14 +164,14 @@ async function quarantine(io: () => EvolutionIoLike, root: string, file: string,
       // P2-1 (v13): the quarantine write replaces the caveat copy's CONTENT —
       // its key must go stale or the gate path's "key match + copy on disk"
       // skip would trust the old key and never rewrite the record-scoped copy.
-      corruptWritten.delete(file)
+      memory.written.delete(file)
     } catch (writeError) {
       preservedNote = `; the quarantine copy at ${dest} FAILED to write (${writeError instanceof Error ? writeError.message : String(writeError)}) — the original file is left in place.`
     }
   } else {
     // Same key-staleness discipline on the no-write path: the gate must
     // re-verify rather than trust a key minted for a previous payload.
-    corruptWritten.delete(file)
+    memory.written.delete(file)
   }
   throw Object.assign(
     new Error(`evolution state file "${file}" is not valid JSON (${reason})${preservedNote}`),
@@ -242,27 +242,32 @@ function gateScan(file: string, parsed: unknown): Array<[string, unknown]> {
  * @internal Exported only for this package's own tests — not public API
  * surface (audit v10 S-03); other packages must go through the provider seam.
  */
-// V10-04 (P2-19): the record-gate warn fires once per file per process — a
-// permanently bad record would otherwise warn on every turn's read. Module
-// scope: readJson (apply closure) and jsonTransact (module function) share it.
-const recordGateWarned = new Set<string>()
-// P2-24 (v11): the last `.corrupt` rewrite key per file (sorted failing id
-// set) — skip rewriting when nothing changed, so a permanently bad record
-// never re-atomic-writes the copy on every read.
-const corruptWritten = new Map<string, string>()
-// N2/N3/N12 (v12): shared quarantine machinery for the READ path and the
-// TRANSACT baseline — the bad-record warn fires once per file per process
-// whichever path hit it first; the rewrite key is set ONLY after a
-// successful write (a failed write is retried, not marked done); and the
-// key alone is not trusted — a copy swept by the 7-day stale cleanup (S-10)
-// is rebuilt on the next access instead of being skipped until restart.
-// P3-12 (v14): these three are MODULE scope on purpose (`jsonTransact` is a
-// module function that cannot reach the apply-scoped closure), which means they
-// outlive a plugin unload/re-mount and are shared by every provider instance in
-// the process. The observable consequence is warn/rewrite DEDUPLICATION across
-// instances and roots keyed by file NAME only — never a wrong write (the
-// `.corrupt` existence probe in ensureCorruptCopy re-checks the actual root).
-const corruptWriteWarned = new Set<string>()
+/**
+ * The quarantine bookkeeping ONE provider instance owns (N12/O-6, S4.4).
+ *
+ * These three used to be module-scope ("`jsonTransact` is a module function that cannot reach the
+ * apply-scoped closure"), which made warn/rewrite dedup span instances AND roots keyed by file NAME
+ * only: two providers on different roots deduped each other's quarantine writes. Threading the memory
+ * through the one module function that needs it removes that limit — the dedup is now exactly "this
+ * instance, this file", which is what the three fields always described.
+ */
+export interface QuarantineMemory {
+  /** V10-04 (P2-19): the record-gate warn fires once per file per instance — a permanently bad
+   * record would otherwise warn on every turn's read. */
+  readonly warned: Set<string>
+  /** P2-24 (v11): the last `.corrupt` rewrite key per file (sorted failing id set) — skip
+   * rewriting when nothing changed, so a permanently bad record never re-atomic-writes the copy on
+   * every read. */
+  readonly written: Map<string, string>
+  /** P3-12 (v14): the "could not write the quarantine copy" warn fires once per file; the key is set
+   * ONLY after a successful write (a failed write is retried, not marked done). */
+  readonly writeWarned: Set<string>
+}
+
+/** One provider instance's quarantine memory. */
+export function newQuarantineMemory(): QuarantineMemory {
+  return { warned: new Set(), written: new Map(), writeWarned: new Set() }
+}
 
 /** P3 (v15): name carried by the two fail-loud write gates in `jsonTransact`
  * (task-return shape, write-back field gate) so best-effort wrappers —
@@ -275,9 +280,9 @@ function writeGateError(message: string): Error {
   return error
 }
 
-function reportGateViolation(ctx: Context, file: string, failing: Array<[string, unknown]>): void {
-  if (recordGateWarned.has(file)) return
-  recordGateWarned.add(file)
+function reportGateViolation(ctx: Context, file: string, failing: Array<[string, unknown]>, memory: QuarantineMemory): void {
+  if (memory.warned.has(file)) return
+  memory.warned.add(file)
   ctx.logger.warn(`evolution-state-json: ${failing.length} record(s) in "${file}" failed the record schema gate and were quarantined to "${file}.corrupt": ${failing.map(([id]) => id).join(', ')}`)
 }
 
@@ -287,6 +292,7 @@ async function ensureCorruptCopy(
   root: string,
   file: string,
   bad: Record<string, unknown>,
+  memory: QuarantineMemory,
 ): Promise<boolean> {
   const base = `${join(root, file)}.corrupt`
   // P3 (v16, correcting the v15 first cut; refined v17): the dedupe key is a
@@ -303,7 +309,7 @@ async function ensureCorruptCopy(
       ? Object.entries(record as Record<string, unknown>).map(([field, value]) => `${field}:${Array.isArray(value) ? 'array' : typeof value}`).sort()
       : [typeof record],
   })).sort((a, b) => a.id.localeCompare(b.id)))
-  if (corruptWritten.get(file) === corruptKey && await io().exists(base)) return true
+  if (memory.written.get(file) === corruptKey && await io().exists(base)) return true
   const payload = JSON.stringify(bad, null, 2)
   // v29 STATE-05: quarantineTarget now returns `{dest, needsWrite}` — a copy
   // (base or a stamped sibling) that already holds EXACTLY these bytes is
@@ -314,10 +320,10 @@ async function ensureCorruptCopy(
     ? await io().writeText(dest, payload).then(() => true).catch(() => false)
     : true
   if (wrote) {
-    corruptWritten.set(file, corruptKey)
-    corruptWriteWarned.delete(file)
-  } else if (!corruptWriteWarned.has(file)) {
-    corruptWriteWarned.add(file)
+    memory.written.set(file, corruptKey)
+    memory.writeWarned.delete(file)
+  } else if (!memory.writeWarned.has(file)) {
+    memory.writeWarned.add(file)
     ctx.logger.warn(`evolution-state-json: could not write quarantine copy "${dest}" for ${Object.keys(bad).length} failed record(s) — the main file keeps them; the copy is retried on the next access`)
   }
   return wrote
@@ -335,7 +341,12 @@ export async function jsonTransact<T>(
   // resolved twin cannot be "revived" by its still-valid legacy
   // `status:'pending'` copy (V5-02 ghost-twin replay). An empty id list means
   // "the latest gate run of this file dropped nothing" (a clear signal).
-  options?: { onGateDrop?: (file: string, ids: string[]) => void },
+  options: {
+    onGateDrop?: (file: string, ids: string[]) => void
+    /** N12/O-6 (S4.4): the calling INSTANCE's quarantine memory — one per provider, never module
+     * scope (that keyed the dedup by bare file name across every root in the process). */
+    memory: QuarantineMemory
+  },
 ): Promise<void> {
   await transactIo(io(), join(root, file), async (current) => {
     let parsed: T | null = null
@@ -343,13 +354,13 @@ export async function jsonTransact<T>(
       try {
         parsed = JSON.parse(current) as T
       } catch (error) {
-        return await quarantine(io, root, file, current, error instanceof Error ? error.message : String(error))
+        return await quarantine(io, root, file, current, error instanceof Error ? error.message : String(error), options.memory)
       }
       // 0.3.27 (V4-06): outside the parse try — a wrong-shape quarantine must
       // not fall into the catch and quarantine a second time.
       if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
         const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
-        return await quarantine(io, root, file, current, `expected a plain JSON object (map of records), got ${kind}`)
+        return await quarantine(io, root, file, current, `expected a plain JSON object (map of records), got ${kind}`, options.memory)
       }
       // V8-16 (0.3.46): the top-level shape gate let VALUE-level malformations
       // (`{"a": null}`) through — listPending/enforceResolvedCap then hit a
@@ -359,7 +370,7 @@ export async function jsonTransact<T>(
       // S-05: the gate now lives in ONE helper shared with the read
       // path (it was ~15 lines duplicated verbatim in this file).
       const malformed = firstNonRecordValue(parsed)
-      if (malformed !== null) return await quarantine(io, root, file, current, malformed)
+      if (malformed !== null) return await quarantine(io, root, file, current, malformed, options.memory)
       // V11-B1 (P2-23): the transaction baseline must pass the SAME per-record
       // field gate as the read path — a bad primary (string runCount etc.)
       // used to reach the task and pollute the write-back ("x1"). Bad records
@@ -375,13 +386,13 @@ export async function jsonTransact<T>(
         // N3 (v12): the transact baseline previously dropped bad records and
         // wrote .corrupt with zero observable trace — same warn/rewrite
         // discipline as the read path now applies (deduped per file).
-        reportGateViolation(ctx, file, failing)
+        reportGateViolation(ctx, file, failing, options.memory)
         // P2-17 (v19): only drop the malformed records from the write-back when
         // the rescue copy actually landed. The v18 shape warned "the main file
         // keeps them" but rewrote the file without them regardless — a failed
         // copy (disk full / permissions) plus any later mutation destroyed the
         // only recoverable bytes in BOTH places.
-        const preserved = await ensureCorruptCopy(ctx, io, root, file, bad)
+        const preserved = await ensureCorruptCopy(ctx, io, root, file, bad, options.memory)
         if (preserved) {
           parsed = good as T
           options?.onGateDrop?.(file, failing.map(([id]) => id))
@@ -437,6 +448,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   const io = () => ctx.evolutionIo.provider()
   const pathOf = (file: string) => join(root, file)
+  // N12/O-6 (S4.4): this PROVIDER INSTANCE owns the quarantine bookkeeping (warn-once sets and the
+  // last `.corrupt` rewrite key). It used to be module scope, which the file itself documented as
+  // dedup "across instances and roots keyed by file NAME only" — two providers on different roots
+  // deduped each other's quarantine writes. One memory per instance removes that, and the read path
+  // and the transact baseline share THIS one.
+  const quarantineMemory = newQuarantineMemory()
   // OPT-12 (2026-09): ids the per-record field gate DROPPED from the most
   // recent clean read/transact of the pending state file. `filterLegacy` and
   // the legacy retirement merge consult this set in addition to `id in
@@ -477,7 +494,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // savePending carried its own guard while claim / release / resolve carried none, and the
     // resolve path even built an `applied` result object over a write that never happened.
     const guard = transactTaskGuard(`pending table write for ${what}`)
-    return jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, guard.wrap(task), { onGateDrop: noteGateDrop })
+    return jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, guard.wrap(task), { onGateDrop: noteGateDrop, memory: quarantineMemory })
       .then(() => { guard.assertInvoked() })
   }
   // OPT-13: one-shot latch for the pending-capacity warn; re-armed when the
@@ -496,7 +513,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     try {
       parsed = JSON.parse(raw) as T
     } catch (error) {
-      return await quarantine(io, root, file, raw, error instanceof Error ? error.message : String(error))
+      return await quarantine(io, root, file, raw, error instanceof Error ? error.message : String(error), quarantineMemory)
     }
     // 0.3.22 (F-215): a valid JSON that is the wrong top-level shape is a
     // corrupt record map, not "empty" — fail loud so the operator notices
@@ -506,14 +523,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // quarantine the file a SECOND time (two `.corrupt-*` copies per read).
     if (RECORD_MAP_FILES.has(file) && !isPlainRecord(parsed)) {
       const kind = Array.isArray(parsed) ? 'an array' : parsed === null ? 'null' : typeof parsed
-      return await quarantine(io, root, file, raw, `expected a plain JSON object (map of records), got ${kind}`)
+      return await quarantine(io, root, file, raw, `expected a plain JSON object (map of records), got ${kind}`, quarantineMemory)
     }
     // V8-16 (0.3.46): same value-level gate as jsonTransact — the read path
     // (listPending / loadPendingMap) used to pass `{"a": null}` through and
     // then hit a bare `.status` TypeError with no quarantine context.
     // S-05: single-sourced via firstNonRecordValue.
     const malformed = firstNonRecordValue(parsed)
-    if (malformed !== null) return await quarantine(io, root, file, raw, malformed)
+    if (malformed !== null) return await quarantine(io, root, file, raw, malformed, quarantineMemory)
     // V11-B1: single-sourced via gateScan (readJson + jsonTransact share it).
     const failing = gateScan(file, parsed)
     if (failing.length > 0) {
@@ -529,8 +546,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // long-running process). N2/N12 (v12): the shared helper additionally
       // rebuilds a copy the sweep already removed and does not mark a failed
       // write as done.
-      reportGateViolation(ctx, file, failing)
-      await ensureCorruptCopy(ctx, io, root, file, bad)
+      reportGateViolation(ctx, file, failing, quarantineMemory)
+      await ensureCorruptCopy(ctx, io, root, file, bad, quarantineMemory)
       if (file === PENDING_STATE_FILE) {
         gateDroppedCurrent.clear()
         for (const id of Object.keys(bad)) gateDroppedCurrent.add(id)
@@ -735,7 +752,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         committed = merged
         return merged
-      }, { onGateDrop: noteGateDrop })
+      }, { onGateDrop: noteGateDrop, memory: quarantineMemory })
       await io().rename(pathOf(PENDING_LEGACY_FILE), `${pathOf(PENDING_LEGACY_FILE)}.migrated`)
       legacyMigrated = true
       return retired
@@ -1040,6 +1057,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             }
             return pruned
           }),
+          { memory: quarantineMemory },
         )
         guard.assertInvoked()
       })
@@ -1062,6 +1080,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         await jsonTransact<Record<string, CuratorStateRecord>>(
           ctx, io, root, CURATOR_STATE_FILE,
           guard.wrap(current => ({ ...(current ?? {}), [CURATOR_STATE_KEY]: record })),
+          { memory: quarantineMemory },
         )
         guard.assertInvoked()
       })
@@ -1094,7 +1113,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const next = task(stored === null ? null : cloneRecord(stored))
           if (next === null) return current
           return { ...(current ?? {}), [CURATOR_STATE_KEY]: next }
-        }))
+        }), { memory: quarantineMemory })
         guard.assertInvoked()
       })
     },

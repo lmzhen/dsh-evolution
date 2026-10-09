@@ -8,7 +8,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
 import type { EvolutionStateStorage, PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'
 import * as JsonState from '@deepseek-ai/dsh-evolution-state-json'
-import { jsonTransact } from '../src/index.ts'
+import { jsonTransact, newQuarantineMemory } from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { mountStateStack } from '../../test-support/state-stack.ts'
 
@@ -18,7 +18,7 @@ describe('evolution-state-json jsonTransact record-map task-return guard (V4-08)
     const root = await tempRoot('dsh-json-guard-arr-')
     const ctx = await mountStateStack(root)
     const io = () => ctx.evolutionIo.provider('node')
-    await expect(jsonTransact(ctx, io, root, 'pending-state.json', () => [])).rejects.toThrow(/task returned an array/)
+    await expect(jsonTransact(ctx, io, root, 'pending-state.json', () => [], { memory: newQuarantineMemory() })).rejects.toThrow(/task returned an array/)
     expect(await io().exists(join(root, 'pending-state.json'))).toBe(false)
   })
 
@@ -29,7 +29,7 @@ describe('evolution-state-json jsonTransact record-map task-return guard (V4-08)
     const provider = ctx.evolutionStateStorage.provider('json')
     await provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 })
     const before = await io().readText(join(root, 'review-state.json'))
-    await expect(jsonTransact(ctx, io, root, 'review-state.json', () => 42)).rejects.toThrow(/task returned number/)
+    await expect(jsonTransact(ctx, io, root, 'review-state.json', () => 42, { memory: newQuarantineMemory() })).rejects.toThrow(/task returned number/)
     expect(await io().readText(join(root, 'review-state.json'))).toBe(before)
   })
 
@@ -37,7 +37,7 @@ describe('evolution-state-json jsonTransact record-map task-return guard (V4-08)
     const root = await tempRoot('dsh-json-guard-null-')
     const ctx = await mountStateStack(root)
     const io = () => ctx.evolutionIo.provider('node')
-    await expect(jsonTransact(ctx, io, root, 'pending-state.json', () => null)).resolves.toBeUndefined()
+    await expect(jsonTransact(ctx, io, root, 'pending-state.json', () => null, { memory: newQuarantineMemory() })).resolves.toBeUndefined()
     expect(await io().exists(join(root, 'pending-state.json'))).toBe(false)
   })
 })

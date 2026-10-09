@@ -31,6 +31,34 @@ describe('V10-04 (P2-19): json provider per-record field gates', () => {
     expect(await io.readText(join(root, 'review-state.json'))).toBe(content)
   })
 
+  it('S4.4/O-6: the quarantine bookkeeping belongs to the provider INSTANCE, not the module', async () => {
+    // Before S4.4 the warn-once sets lived at module scope, keyed by bare file NAME, so a second
+    // provider in the same process inherited the first one's "already warned/handled" verdict. Two
+    // instances over the same root now each report their OWN quarantine: the bookkeeping is the
+    // instance's, and a re-mounted provider starts from its own state instead of another's.
+    const root = await tempRoot('dsh-json-gate-instance-')
+    const warnings: string[][] = [[], []]
+    const first = await mountStateStack(root)
+    const second = await mountStateStack(root)
+    const content = JSON.stringify({ s1: { foo: 1 }, s2: { turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 } })
+    const io = first.evolutionIo.provider('node')
+    await io.writeText(join(root, 'review-state.json'), content)
+    const spies = [
+      { ctx: first, seen: warnings[0] as string[] },
+      { ctx: second, seen: warnings[1] as string[] },
+    ]
+    for (const { ctx, seen } of spies) {
+      const spy = (await import('vitest')).vi.spyOn(ctx.logger, 'warn')
+      spy.mockImplementation((...args: unknown[]) => { seen.push(args.map(value => String(value)).join(' ')) })
+      await ctx.evolutionStateStorage.provider('json').loadReviewState('s2')
+    }
+    for (const { seen } of spies) {
+      expect(seen.some(line => line.includes('failed the record schema gate'))).toBe(true)
+    }
+    // One rescue copy per root, holding only the failing record — unchanged by the move.
+    expect(JSON.parse((await io.readText(join(root, 'review-state.json.corrupt'))) ?? 'null')).toEqual({ s1: { foo: 1 } })
+  })
+
   it('isolates a non-enum `status:"Pending"` record instead of leaving a permanent zombie', async () => {
     const root = await tempRoot('dsh-json-gate-status-')
     const ctx = await mountStateStack(root)
