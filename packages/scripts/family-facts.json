@@ -41,6 +41,67 @@
   },
   "facts": [
     {
+      "id": "gate-set",
+      "title": "the gate's step set: what runs where, plus the two exception registers",
+      "home": "repo:CONTRIBUTING.md",
+      "machine": {
+        "kind": "gate-set",
+        "file": ".github/actions/evolution-validate/action.yml",
+        "registers": {
+          "localOnly": [
+            {
+              "script": "smoke-built-entries.mjs",
+              "reason": "needs an installed platform scope; the local runner executes it, the publish job does not",
+              "expiry": "release-phase wiring: add the step to the action or mark the row local-only"
+            },
+            {
+              "script": "verify-gate-manifest.mjs",
+              "reason": "the table manifest is checked by the local runner; the publish job pins the same facts through its own steps",
+              "expiry": "release-phase wiring: add the step to the action"
+            },
+            {
+              "script": "verify-regression-set.mjs",
+              "reason": "the merge-time regression set (guards + specs + audit self-checks); the publish job runs its own subset",
+              "expiry": "release-phase wiring: decide whether the job adopts this runner"
+            }
+          ],
+          "machineLocal": [
+            {
+              "script": "check-tsconfigs.cjs",
+              "reason": "tsconfig registration for the overlay layout",
+              "expiry": "S1.8 follow-up: port into packages/scripts"
+            },
+            {
+              "script": "check-manifests.cjs",
+              "reason": "manifest version uniformity across the two trees",
+              "expiry": "S1.8 follow-up: port into packages/scripts"
+            },
+            {
+              "script": "mirror-sync.mjs",
+              "reason": "mirror <-> overlay parity check",
+              "expiry": "S1.8 follow-up: port into packages/scripts"
+            },
+            {
+              "script": "run-baseline.mjs",
+              "reason": "the canonical local runner that executes this table",
+              "expiry": "S1.8 follow-up: port into packages/scripts"
+            }
+          ]
+        }
+      },
+      "must": [
+        {
+          "text": "| # | Command | Working tree |"
+        },
+        {
+          "text": "all 23 steps",
+          "unique": true
+        }
+      ],
+      "forbid": [],
+      "cites": []
+    },
+    {
       "id": "platform-line",
       "title": "the validated platform line and the floor the published ranges declare",
       "home": "README.md",

@@ -19,27 +19,26 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-
-/** Gate rows that live OUTSIDE the repository by construction (each names why, and when it ports). */
-const MACHINE_LOCAL = [
-  { script: 'check-tsconfigs.cjs', reason: 'tsconfig registration for the overlay layout', expiry: 'S1.8 follow-up: port into packages/scripts' },
-  { script: 'check-manifests.cjs', reason: 'manifest version uniformity across the two trees', expiry: 'S1.8 follow-up: port into packages/scripts' },
-  { script: 'mirror-sync.mjs', reason: 'mirror <-> overlay parity check', expiry: 'S1.8 follow-up: port into packages/scripts' },
-  { script: 'run-baseline.mjs', reason: 'the canonical local runner that executes this table', expiry: 'S1.8 follow-up: port into packages/scripts' },
-]
-
-/** Declared in-repo checks the CI action does NOT execute (local runner only). */
-const CI_NOT_EXECUTED = [
-  { script: 'verify-regression-set.mjs', reason: 'the merge-time regression set (guards + specs + audit self-checks); the publish job runs its own subset', expiry: 'release-phase wiring: decide whether the job adopts this runner' },
-  { script: 'verify-gate-manifest.mjs', reason: 'the table manifest is checked by the local runner; the publish job pins the same facts through its own steps', expiry: 'release-phase wiring: add the step to the action' },
-  { script: 'smoke-built-entries.mjs', reason: 'needs an installed platform scope; the local runner executes it, the publish job does not', expiry: 'release-phase wiring: add the step to the action or mark the row local-only' },
-]
+import { familyGateRegisters } from './lib-doc-facts.mjs'
 
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
 const repo = resolve(root, '..')
 const problems = []
 const notes = []
+
+// v46 S2.4 (finding T7-05): both exception registers have ONE home — the `gate-set` fact in
+// scripts/family-facts.json — and this guard is one of its two check points (the other is the
+// fact-table re-derivation in lib-doc-facts). An unreadable table is a hard failure: treating it
+// as 「no exceptions」 would make every declared-but-unexecuted step look like a violation and hide
+// the real reason the registers exist.
+const registers = familyGateRegisters(root)
+if (registers === null) {
+  console.error('verify-gate-manifest: the gate-set fact (or its machine registers) is missing from scripts/family-facts.json — the exception registers have no home')
+  process.exit(2)
+}
+const MACHINE_LOCAL = registers.machineLocal
+const CI_NOT_EXECUTED = registers.localOnly
 
 const contributingPath = join(repo, 'CONTRIBUTING.md')
 const actionPath = join(repo, '.github', 'actions', 'evolution-validate', 'action.yml')

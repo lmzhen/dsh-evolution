@@ -81,13 +81,21 @@ function readMachineText(root, machine) {
 }
 
 /** Machine owners: re-derive the value a fact states so a changed value fails. */
-function machineViolations(fact, root, docs, home) {
+function machineViolations(fact, root, docs, home, repoScope) {
   const out = []
   const machine = fact.machine
   if (machine === undefined) return out
   const owner = readMachineText(root, machine)
   const text = owner === null ? null : owner.text
   if (text === null) {
+    // A repo-scope owner (the release workflow, the CI action) cannot exist in a layout that
+    // mirrors only packages/evolution. When the repository root is absent by construction, the
+    // fact is NOT ARMED and says so; when the repository root IS there (the mirror, CI), a missing
+    // owner is the violation below — a deleted workflow must not silently disarm the fact.
+    if (repoScope) {
+      console.log(`doc-facts: fact "${fact.id}" not armed in this layout — no ${machine.file} up to three levels above ${root}`)
+      return out
+    }
     out.push(`${machine.file}: fact ${fact.id} names a machine owner that does not exist under ${root} — the fact cannot be re-derived (a missing owner is not a pass)`)
     return out
   }
@@ -194,6 +202,44 @@ function machineViolations(fact, root, docs, home) {
     }
     return out
   }
+  if (machine.kind === 'gate-set') {
+    // v46 S2.4 (finding T7-05, facts half): the gate's executed set has ONE home — the registers
+    // below — and two consumers: this re-derivation and verify-gate-manifest.mjs, which used to
+    // carry its own copies. The registers are configuration, so every entry must be complete.
+    const registers = machine.registers ?? {}
+    for (const kind of ['localOnly', 'machineLocal']) {
+      for (const entry of registers[kind] ?? []) {
+        for (const field of ['script', 'reason', 'expiry']) {
+          if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') {
+            out.push(`${FACTS_ASSET}: fact ${fact.id} register ${kind} has an entry without ${field} — name the script, the reason and the expiry`)
+          }
+        }
+      }
+    }
+    const executed = new Set([...text.matchAll(/scripts\/([A-Za-z0-9._-]+\.mjs)/g)].map(match => match[1]))
+    if (executed.size === 0) {
+      out.push(`${machine.file}: the gate machine reads no script at all — the executed set cannot be derived (a vacuum pass is not a pass)`)
+      return out
+    }
+    const declared = new Set([...home.matchAll(/(?:packages\/(?:evolution\/)?scripts\/)([A-Za-z0-9._-]+\.mjs)/g)].map(match => match[1]))
+    if (declared.size === 0) {
+      out.push(`${fact.home}: the gate table names no family script — the executed set cannot be compared`)
+      return out
+    }
+    const localOnly = new Set((registers.localOnly ?? []).map(entry => entry.script))
+    const machineLocal = new Set((registers.machineLocal ?? []).map(entry => entry.script))
+    for (const script of declared) {
+      if (executed.has(script) || localOnly.has(script)) continue
+      out.push(`${fact.home}: declares ${script}, which neither ${machine.file} executes nor the localOnly register covers — a declared check nobody runs`)
+    }
+    for (const entry of registers.localOnly ?? []) {
+      if (executed.has(entry.script)) out.push(`${FACTS_ASSET}: fact ${fact.id} registers ${entry.script} as localOnly, but ${machine.file} executes it — the entry is stale (${entry.expiry})`)
+    }
+    for (const entry of registers.machineLocal ?? []) {
+      if (!home.includes(entry.script)) out.push(`${FACTS_ASSET}: fact ${fact.id} registers ${entry.script} as machine-local, but ${fact.home} never names it — a register entry for a step the table dropped`)
+    }
+    return out
+  }
   out.push(`${fact.id}: unknown machine kind "${String(machine.kind)}" — N19 cannot re-derive this fact`)
   return out
 }
@@ -236,6 +282,26 @@ function checklistViolations(root, repoRoot, asset, violations) {
     }
   }
   return docs.length
+}
+
+/**
+ * The gate-set fact's registers, read from the ONE table that declares them (v46 S2.4).
+ * The gate guard used to carry its own copies; two homes for one register is the drift this
+ * table exists to remove.
+ * @param root - the packages root.
+ * @returns `{ localOnly, machineLocal }`, or null when the fact/table cannot be read (the caller
+ * must fail loud rather than treat an unreadable table as 「no exceptions」).
+ */
+export function familyGateRegisters(root) {
+  try {
+    const asset = JSON.parse(readFileSync(join(root, FACTS_ASSET), 'utf8'))
+    const fact = (asset.facts ?? []).find(entry => entry?.machine?.kind === 'gate-set')
+    if (fact === undefined) return null
+    const registers = fact.machine.registers ?? {}
+    return { localOnly: registers.localOnly ?? [], machineLocal: registers.machineLocal ?? [] }
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -287,8 +353,17 @@ export function docFactViolations(root, options = {}) {
   if (all.length === 0) result.violations.push(`${root}: no Markdown document scanned — the fact homes cannot be verified (a vacuum pass is not a pass)`)
 
   for (const fact of facts) {
-    const homeDoc = docs.find(doc => doc.rel === fact.home)
+    // v46 S2.4: some facts have their ONE home at the repository root (the gate table lives in
+  // CONTRIBUTING.md), so a home may be declared as `repo:<path>` and resolves against the
+  // repo-scope documents the scan already reads.
+  const homeDoc = fact.home.startsWith('repo:')
+    ? repoDocs.find(doc => doc.rel === fact.home.slice('repo:'.length))
+    : docs.find(doc => doc.rel === fact.home)
     if (homeDoc === undefined) {
+      if (fact.home.startsWith('repo:') && repoDocs.length === 0) {
+        console.log(`doc-facts: fact "${fact.id}" not armed in this layout — its home ${fact.home} lives at the repository root, which this tree does not carry`)
+        continue
+      }
       result.violations.push(`${fact.home}: fact "${fact.id}" names a home document that is not in the scanned tree — every fact needs ONE existing home`)
       continue
     }
@@ -326,7 +401,7 @@ export function docFactViolations(root, options = {}) {
         result.violations.push(`${doc.label}: fact "${fact.id}" is stated in ${fact.home} — this document must cite it (expected the text "${cite.text}")`)
       }
     }
-    result.violations.push(...machineViolations(fact, root, all, homeDoc.text))
+    result.violations.push(...machineViolations(fact, root, all, homeDoc.text, repoRoot !== null))
   }
   const checklistDocs = checklistViolations(root, repoRoot, asset, result.violations)
   result.counts.checklists = checklistDocs
