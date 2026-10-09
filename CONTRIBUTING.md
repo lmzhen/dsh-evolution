@@ -20,7 +20,7 @@ stale side must never be copied back over this one.
    `D:/dsh/deepseek-harness` checkout is the stale former dev tree and is never
    a source to copy from.
 3. **Run the gate**. `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` executes
-   all eighteen steps and writes one log per step plus a summary (§The gate has
+   all 22 steps and writes one log per step plus a summary (§The gate has
    the table and says which step runs in which tree).
 4. **Decide where your words live**. §Where a fact is allowed to live is the
    rule that fails a conclusion stated in two documents (N19).
@@ -53,7 +53,7 @@ cite the home (`cites`), and the machine owner that re-derives the value
 
 - Run it: `node packages/scripts/verify-doc-facts.mjs packages --strict`
 - It is also architecture rule **N19** inside `verify-arch-guards.mjs`, so the
-  21-step gate runs it on every batch; a second copy fails and names both files.
+  22-step gate runs it on every batch; a second copy fails and names both files.
 - `packages/docs/**` is gitignored: it is a source of material, never a home.
   Move the conclusion into a tracked document before citing it.
 
@@ -100,17 +100,20 @@ Run from the two trees (never reorder or rename these steps):
 | 15 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | `D:/dsh` (machine-local) |
 | 16 | `node packages/scripts/verify-profile-bundles.mjs` | mirror |
 | 17 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
-| 18 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.1.5-rc.2` | mirror |
+| 18 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.2.0-rc.2` | mirror |
 | 19 | `node packages/scripts/verify-package-discovery.mjs packages --strict` | mirror |
 | 20 | `node packages/scripts/verify-family-tool-names.mjs packages --strict` | mirror |
 | 21 | `node packages/scripts/verify-skill-roots.mjs packages --strict` | mirror |
+| 22 | `node packages/scripts/verify-gate-manifest.mjs packages` | mirror |
 
 The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
 writes one log per step plus a summary, and prints the step names it ran, so a
 drift between this table and the executed set is visible in every gate log).
 
-Steps 13-15 live **outside this repository** and are machine-local: tsconfig
-registration, manifest version uniformity and mirror↔overlay parity. Each row
+The three machine-local rows below (13-15) are registered in
+`verify-gate-manifest.mjs`'s `MACHINE_LOCAL` table with the step that ports them —
+the table may not cite an absolute path that no register covers:
+steps 13-15 check tsconfig registration, manifest version uniformity and mirror↔overlay parity. Each row
 names its absolute path precisely because these three are NOT shipped guards
 (citing a bare script name here would claim a guard the repository does not
 have). They are part of the executed gate because no in-repo script covers those
