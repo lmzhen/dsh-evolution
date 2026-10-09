@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import { composePresetEntry, mergePresetRow, presetRowId, removePresetRow, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
+import { composePresetEntry, mergePresetRow, PLATFORM_SERVICE_PROBES, presetRowId, removePresetRow, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from '../src/doctor.ts'
 
 const stub = { get: () => undefined }
@@ -739,6 +739,29 @@ describe('doctor (WB2, 0.3.55)', () => {
       const failedRow = (await diagnose(deployed, { home })).presetFreshness.find(entry => entry.base === 'standard')
       expect(failedRow?.status).toBe('unknown')
       expect(failedRow?.detail).toContain('carries no `plugins:` list')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('S3.4/A99: the capability-absence section lists the host probes that do not resolve, and stays away when they all do', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-capability-'))
+    try {
+      await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
+      // The plain stub resolves NOTHING, so every host-side probe the family can use is absent here:
+      // the section must name them (with the feature that goes quiet) instead of leaving a silent
+      // downgrade, and the action ladder must carry the next step.
+      const absent = await diagnose(stub, { home })
+      expect(absent.capabilityAbsence.length).toBeGreaterThan(0)
+      expect(absent.capabilityAbsence.every(entry => entry.side === 'host')).toBe(true)
+      expect(renderDoctorText(absent)).toContain('capability absence (')
+      expect(absent.actions.some(action => action.includes('Capabilities the family probes') || action.includes('platform capability/ies this deployment does not mount'))).toBe(true)
+      // A deployment that mounts every host-side capability renders NO section — an all-present
+      // runtime must not carry a line about a gap it does not have.
+      const hostServices = PLATFORM_SERVICE_PROBES.filter(entry => entry.side === 'host').map(entry => entry.service)
+      const present = await diagnose(serviceStub(...hostServices), { home })
+      expect(present.capabilityAbsence).toEqual([])
+      expect(renderDoctorText(present)).not.toContain('capability absence')
     } finally {
       await rm(home, { recursive: true, force: true })
     }

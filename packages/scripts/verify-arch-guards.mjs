@@ -34,7 +34,12 @@
  *       mentioning \p{Cf} must be built from that constant.
  *   N10. a NEW `ctx.get('<platform service>')` probe must come with a
  *       platform-declaration anchor in the same file (the pre-v39 counts are
- *       the baseline map; files already mentioning the platform pass).
+ *       the baseline map; files already mentioning the platform pass). And
+ *       (N10b, S3.4/A99) every probed service must be DECLARED in core's
+ *       `PLATFORM_SERVICE_PROBES` — the table `/evolution doctor` judges capability
+ *       absence from — with every declared entry still probed. The O-2 gap was
+ *       doctor covering 6 of 26 probes: an absent capability was a silent
+ *       downgrade nobody could see, and a new probe would have stayed invisible.
  *   N11. the platform's dispatch event types (`tool/call`, `tool/result`,
  *       `tool/ptc-dispatch-start`, `tool/ptc-dispatch`) are matched in exactly
  *       ONE module — `evolution-core/src/tool-dispatch.ts`. The platform writes
@@ -689,7 +694,7 @@ const RULES = [
   { id: 'N7', title: 'new SkillLibrary() only through the core helper', incident: 'a package constructing SkillLibrary directly: a second construction path', canonicalForm: 'construction goes through the helper exported by evolution-core', vacuity: 'no construction site ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N8', title: 'no unpublished ./invariant companion', incident: 'an ./invariant subpath that the published manifest does not declare', canonicalForm: 'every exported subpath is declared and published', vacuity: 'zero manifests read is a VIOLATION (a vacuum pass is not a pass); the sample carries the decision proof', sample: 'detector' },
   { id: 'N9', title: 'format-control classes built from FORMAT_CONTROL_CLASS', incident: 'a literal format-control class string', canonicalForm: 'classes come from FORMAT_CONTROL_CLASS', vacuity: 'the threats file is absent ⇒ pass; the sample carries the proof', sample: 'detector' },
-  { id: 'N10', title: 'new platform-service probe carries a declaration anchor', incident: 'a new ctx.get(<platform service>) with no CONTRACT_ANCHORS entry', canonicalForm: 'each platform probe carries an anchor in the contract probe table', vacuity: 'no platform probe in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N10', title: 'new platform-service probe carries a declaration anchor and a probe-table entry', incident: 'a new ctx.get(<platform service>) with no CONTRACT_ANCHORS entry, or a probe the capability-absence table does not declare', canonicalForm: 'each platform probe carries an anchor in the contract probe table AND is declared in core PLATFORM_SERVICE_PROBES (the O-2 capability-absence home)', vacuity: 'no platform probe in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N11', title: 'ONE reader for the platform dispatch vocabulary', incident: 'a second reader of the dispatch kind vocabulary', canonicalForm: 'one module owns the vocabulary and everyone else imports it', vacuity: 'no dispatch literal outside the guard module ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N12', title: 'module-scope mutable process state is registered', incident: 'module-scope mutable state with no registration', canonicalForm: 'registered with owner, lifetime and evidence', vacuity: 'an empty registration table is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N13a', title: 'must-execute payload not on the non-waking primitive', incident: 'a must-execute payload sent through the non-waking primitive', canonicalForm: 'must-execute payloads use the waking primitive (followup)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
@@ -1056,6 +1061,8 @@ const violations = []
 const transactSites = []
 const probedEvolutionKeys = new Set()
 const providedEvolutionKeys = new Set()
+/** N10b (S3.4/A99): every service key the tree probes with `ctx.get(<name>)`, family or platform. */
+const probedServiceKeys = new Set()
 const PROBE_RE = /(?:\bhas|\.get|ctx\.get)\('(evolution[A-Z]\w+)'\)/g
 const PROVIDE_RE = /(?:super\([^)]*,\s*'|\.provide\('|provide\(')(evolution[A-Z]\w+)'/g
 
@@ -1081,6 +1088,27 @@ const FAMILY_ANCHOR_RE = /([A-Za-z0-9_./-]*[A-Za-z0-9_-]\.(?:ts|mjs|cjs|json|ya?
 /** N15 (v46 S2.7): the bare `<name>.mjs:42` form, judged only for unique basenames. */
 const BARE_ANCHOR_RE = /\b([A-Za-z0-9_-]+\.(?:ts|mjs|cjs))[:：](\d+)/g
 const SELF_REL = 'scripts/verify-arch-guards.mjs'
+
+/** N10b (S3.4/A99): the service keys one source probes with `ctx.get(<name>)` (both quote forms).
+ * @param text - one file's source.
+ * @returns the probed keys.
+ */
+function probedServiceKeysIn(text) {
+  const out = []
+  for (const match of text.matchAll(/ctx\.get\(\s*'([A-Za-z][\w.]*)'\s*\)/g)) out.push(match[1])
+  for (const match of text.matchAll(/ctx\.get\(\s*"([A-Za-z][\w.]*)"\s*\)/g)) out.push(match[1])
+  return out
+}
+
+/** N10b: the service keys core's probe table declares (`{ service: ... }` entries).
+ * @param text - `platform-services.ts`.
+ * @returns the declared keys, in file order.
+ */
+function declaredServiceKeysIn(text) {
+  const out = []
+  for (const match of text.matchAll(/\{\s*service:\s*'([^']+)'/g)) out.push(match[1])
+  return out
+}
 
 function staleAnchor(anchor, lineCount) {
   return anchor.line > lineCount
@@ -1183,6 +1211,11 @@ function walk(dir) {
       }
       // H2 (v11): collect probe/provider pairs for the ghost-key check.
       for (const match of text.matchAll(PROBE_RE)) probedEvolutionKeys.add(match[1])
+      // Production probes only: the shipped table describes what the PLUGIN reaches for (a spec that
+      // fakes `ctx.get('commands')` is not a capability the family uses).
+      if (!rel.includes('/tests/')) {
+        for (const key of probedServiceKeysIn(text)) probedServiceKeys.add(key)
+      }
       for (const match of text.matchAll(PROVIDE_RE)) providedEvolutionKeys.add(match[1])
       // N1: production routing — only files under a package's src/ are
       // checked, so test fixtures that set DSH_HOME for an isolated home are
@@ -1444,7 +1477,12 @@ if (process.argv.includes('--list-rules')) {
     ['N10', () => unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 0) === 1
       && unanchoredPlatformProbes('// platform-declaration anchor: tools\nctx.get(\'tools\')', 'pkg/src/a.ts', 0) === 0
       && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 1) === 0
-      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/tests/a.ts', 0) === 0],
+      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/tests/a.ts', 0) === 0
+      && probedServiceKeysIn("const t = ctx.get('tools')").join() === 'tools'
+      && probedServiceKeysIn('const w = ctx.get("webServer")').join() === 'webServer'
+      && probedServiceKeysIn('// prose: ctx.get(\'tools\') is named but not called').length === 1
+      && declaredServiceKeysIn("{ service: 'tools', feature: 'x', side: 'host' },").join() === 'tools'
+      && declaredServiceKeysIn('const services = new Set()').length === 0],
     ['N11', () => dispatchVocabularySites('if (event.type === \'tool/call\') return').length === 1
       && dispatchVocabularySites('// prose: tool/call is the dispatch type').length === 0
       && dispatchVocabularySites('const label = \'a long prose string that happens to mention tool/call inside it\'').length === 0
@@ -1707,6 +1745,28 @@ let writeInventoryCount = 0
 // H2 (v11): a probed evolution service key without ANY provider is the
 // P0-1 class (doctor's evolutionReview ghost) — fail the gate.
 const orphanKeys = ghostServiceKeys(probedEvolutionKeys, providedEvolutionKeys)
+  // N10b (S3.4/A99): the probe set has a SHIPPED home — core's PLATFORM_SERVICE_PROBES, the table
+  // /evolution doctor judges capability absence from (O-2). Every probe in the tree must be
+  // declared there and every declared entry must still be probed; without this cross-check a new
+  // `ctx.get` would be invisible to the doctor section (the "6 of 26" gap, one release later).
+  {
+    const tablePath = join(root, CORE_SRC, 'platform-services.ts')
+    if (!existsSync(tablePath)) {
+      // NOT ARMED, never a violation: a tree without the shipped table is not the family tree
+      // (the guard runs against fixture trees in its own sentry spec), exactly like N20 when the
+      // write inventory is absent. The real tree carries both sides, and there the check bites.
+      console.log(`verify-arch-guards: N10b not armed: no ${CORE_SRC}/platform-services.ts under ${root}`)
+    } else {
+      const declared = declaredServiceKeysIn(readFileSync(tablePath, 'utf8'))
+      const declaredSet = new Set(declared)
+      for (const key of [...probedServiceKeys].sort()) {
+        if (!declaredSet.has(key)) violations.push(`${CORE_SRC}: ctx.get('${key}') is probed in the tree but not declared in platform-services.ts — declare it (service, feature, side) so capability absence stays reportable (rule N10b)`)
+      }
+      for (const key of declared) {
+        if (!probedServiceKeys.has(key)) violations.push(`${CORE_SRC}/platform-services.ts: declares '${key}' but no source probes it — drop the entry (rule N10b)`)
+      }
+    }
+  }
 if (orphanKeys.length > 0) {
   violations.push(`ghost service key(s) probed but never provided: ${orphanKeys.join(', ')} (an evolution service key with zero providers makes a diagnosis silently lie)` )
 }

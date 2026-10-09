@@ -12,7 +12,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { composePresetEntry, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, presetRowBlock, presetRowBody, presetRowId, resolveParamId, scopedProbeReport, type EvolutionIoLike, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
+import { composePresetEntry, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, presetRowBlock, presetRowBody, presetRowId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import { readLegacyDocumentState } from './migration.ts'
 import { readPlatformView } from './platform-view.ts'
 import type { PlatformPlugin, PlatformPreset, PlatformView } from './platform-view.ts'
@@ -247,6 +247,10 @@ export interface DoctorReport {
    * still written, and E3 rows whose owner publishes no user layer here. Empty
    * when the settings service is absent (nothing to compare). */
   paramIssues: string[]
+  /** O-2 (S3.4/A99): the family probes 26 platform services optionally — the platform has no
+   * formalized optional dependency, so an ABSENT one is a silent downgrade and this section is the
+   * only place a reader learns about it. Empty (and therefore not rendered) is the healthy answer. */
+  capabilityAbsence: readonly PlatformServiceProbe[]
   services: { review: boolean; curator: boolean; approval: boolean; skillUsage: boolean; io: boolean }
   pendingCount: number | null
   /** v23 (AP-2): claimed-but-crashed records — the only state that needs an
@@ -732,6 +736,11 @@ export async function diagnose(
       : `a profile manifest could not be read or parsed (${detail}) — this profile's bundle rows are UNKNOWN, so the install-form and conflict checks are DEGRADED and may miss installed bundles`)
   })
   const has = (name: string) => ctx.get(name) !== undefined
+  // O-2 (S3.4/A99): capability absence — the HOST-side platform probes this runtime does not
+  // resolve. Only the ones that are actually missing reach the report (an all-present deployment
+  // renders no section at all), and the table lives in evolution-core so the set is declared once
+  // and cross-checked by the arch guard.
+  const capabilityAbsence = absentHostServices(has)
   // G3-② (B2): the variant half of the report. Computed before the action
   // ladder so a stale snapshot contributes its own regeneration step. The
   // comparison reads the profile patches and the platform base patches — the
@@ -868,6 +877,12 @@ export async function diagnose(
   else if (installForm === 'layered') actions.push('Variant form (session opt-in): model tools follow the Evolution preset, and a session on a platform original preset carries no family rows; add @lmzhen/dsh-evolution-all instead if every session should have them.')
   const env = envIssues()
   if (env.length > 0) actions.push('Fix the DSH_EVOLUTION_* variable listed above.')
+  // O-2 (S3.4/A99): absent capabilities get their own next step BESIDE the ladder (the ladder
+  // answers "which install form do I have"; this answers "what can I not use"). The finding and its
+  // step ship together, like every other row of this report.
+  if (capabilityAbsence.length > 0) {
+    actions.push(`The family probes ${capabilityAbsence.length} platform capability/ies this deployment does not mount (${capabilityAbsence.map(entry => entry.service).join(', ')}) — mount the rows that carry the ones you need; the features they gate are listed above.`)
+  }
   if (services.review && !services.curator) actions.push('Curator service is not mounted — automatic curation is off; verify the host/all bundle row set is complete.')
   if (pendingCount === null && services.approval) actions.push('Approval service is mounted but pending listing failed — check the evolution state service.')
   // v23 (AP-2): a stuck EXECUTING record can only be cleared by an operator
@@ -909,7 +924,7 @@ export async function diagnose(
   }
 
   return {
-    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, paramIssues, queryIssues, services,
+    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, paramIssues, queryIssues, services, capabilityAbsence,
     pendingCount, executingCount, presetFreshness, scopedProbe, legacy,
     runtimeBundles: runtimeBundles ?? null,
     formSource: runtimeFlags === undefined ? 'aggregate' : 'platform',
@@ -1084,6 +1099,12 @@ export function renderDoctorText(report: DoctorReport): string {
     `services: review=${report.services.review} (${report.serviceSource === 'platform' ? 'the live row, this runtime' : 'inferred from bundles, all profiles'}) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
     // S0-4 (v43 G-1 / J-1): appended beside the service line it qualifies; the
     // existing lines keep their order and wording.
+    // O-2 (S3.4/A99): one line, only when a capability the family uses is missing. Each entry names
+    // the feature that goes quiet, because "service X is absent" alone does not tell a reader what
+    // they are losing.
+    report.capabilityAbsence.length === 0
+      ? null
+      : `capability absence (${report.capabilityAbsence.length}): ${report.capabilityAbsence.map(entry => `${entry.service} — ${entry.feature}`).join('; ')}`,
     scopedProbeLine(report.scopedProbe),
     legacyLine(report.legacy),
     `pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`,
