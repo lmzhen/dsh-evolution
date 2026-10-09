@@ -105,12 +105,28 @@ else {
 }
 
 // (4) execution containment: declared in-repo scripts are executed by the CI action or registered.
+// Comments are inert: a prose mention of an input or a script is not a reference (the N11
+// precedent). Block-scalar comments inside `run: |` are line comments too, so one filter covers both.
 const actionText = readFileSync(actionPath, 'utf8')
+  .split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n')
 for (const script of declaredScripts) {
   if (actionText.includes(script)) continue
   if (CI_NOT_EXECUTED.some((entry) => entry.script === script)) { notes.push(script + ' is local-runner only (registered)'); continue }
   problems.push('the table declares ' + script + ' but the CI action never runs it and no register entry covers it — a declared check nobody executes is not a gate')
 }
+
+// (6) composite-action input references must be declared (v46 S1.9, finding T7-01).
+// A composite action reads only the inputs its `inputs:` block declares; any other name
+// evaluates to the empty string, so an `if:` built on it is false forever and the step is
+// dead while the workflow still lists it — the T7-01 failure mode.
+const inputsBlock = /^inputs:\n([\s\S]*?)^runs:/m.exec(actionText)
+const declaredInputs = new Set([...(inputsBlock === null ? '' : inputsBlock[1]).matchAll(/^ {2}([a-z_]+):/gm)].map((match) => match[1]))
+if (declaredInputs.size === 0) problems.push(actionPath + ': the inputs: block parsed empty — the reference check cannot decide (a vacuum pass is not a pass)')
+const referencedInputs = new Set([...actionText.matchAll(/\binputs\.([a-z_]+)/g)].map((match) => match[1]))
+for (const name of referencedInputs) {
+  if (!declaredInputs.has(name)) problems.push(actionPath + ': references inputs.' + name + ', which the inputs: block does not declare — the expression is empty-string false, so that step never runs')
+}
+notes.push('composite action: ' + declaredInputs.size + ' declared input(s), ' + referencedInputs.size + ' referenced')
 
 // (4b) CI-only scripts are allowed; report them so the table can be completed deliberately.
 const ciOnly = [...new Set([...actionText.matchAll(/scripts\/([A-Za-z0-9._-]+\.mjs)/g)].map((match) => match[1]))]

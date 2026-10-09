@@ -278,15 +278,15 @@ runs:
         node packages/evolution/scripts/verify-declared-config.mjs packages/evolution --strict
 
     - name: Verify the platform contract against the checked-out upstream ref (v33 G4.1/G4.2)
-      if: inputs.copy_host_tsconfig == 'false'
       shell: bash
       working-directory: upstream
       run: |
-        # v33 G4.1/G4.2: the two probes that turn hand-copied platform facts into
-        # a red light. They run ONLY in this job: the baseline job's tree is the
-        # dev anchor (UPSTREAM_SHA), not the platform line the family targets, so
-        # its plane classification, Config keys and anchor text are EXPECTED to
-        # differ and the probes would report exactly that as drift.
+        # v33 G4.1/G4.2: the two probes that turn hand-copied platform facts into a red
+        # light. v46 S1.9: the step used to carry `if: inputs.copy_host_tsconfig == 'false'`
+        # — an input this action never declared, so the expression was empty-string false
+        # and the probes never ran (finding T7-01). Every job that uses this action now
+        # checks out the released upstream ref, so the guard has one tree to judge and the
+        # condition is gone rather than declared.
         #
         # verify-declared-config --upstream: recomputes each plane's disabled set
         # and each overridden row's Config key set from the platform's own
