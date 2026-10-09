@@ -22,6 +22,32 @@ interface MemoryToolResult {
   pending_id?: string
 }
 
+describe('tool-memory mount-time timers (T2-06/A21)', () => {
+  /** How many REFERENCED timers currently keep this process alive. */
+  const liveTimers = (): number => process.getActiveResourcesInfo().filter(type => type === 'Timeout').length
+
+  it('the snapshot retry does not hold the process open when the memory provider is absent', async () => {
+    // The P2-07 shape the retry exists for: the memory SERVICE is mounted (the real registry), its
+    // PROVIDER is not, so every renderContext() throws and the retry runs until the 60s bound. A
+    // one-shot CLI must not be kept alive by it — before T2-06 the interval was referenced and the
+    // process waited that bound out.
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    // The testkit already mounts the real systemPrompt service — the plugin only needs it PRESENT.
+    const before = liveTimers()
+    await ctx.plugin(ToolMemory, {})
+    // The mount created BOTH timers (the retry interval and the 60s give-up). The give-up timer was
+    // always unref'd, so with the interval referenced this count is exactly before + 1: the delta IS
+    // the T2-06 signal, read on the same tick the timers were created.
+    expect(liveTimers()).toBe(before)
+    // ...and it stays off the loop while it retries (one tick plus slack).
+    await new Promise(resolve => setTimeout(resolve, 700))
+    expect(liveTimers()).toBeLessThanOrEqual(before)
+    await ctx.fiber.dispose()
+  })
+})
+
 describe('tool-memory', () => {
   it('registers the memory tool', async () => {
     const ctx = new Context()

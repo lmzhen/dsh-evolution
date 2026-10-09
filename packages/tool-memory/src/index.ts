@@ -215,6 +215,12 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
           }
         })()
       }, 500)
+      // T2-06/A21: a MOUNT-TIME retry is not a service — it must never be a reason for the process
+      // to stay alive. Without this, a deployment whose memory provider is simply absent (the very
+      // shape P2-07 added the retry for) held the event loop for the whole 60s bound, so a one-shot
+      // CLI (dsh headless, /evolution …) lived up to a minute past its work. The give-up timer was
+      // already unref'd; the interval was the one holding the loop.
+      retryTimer.unref()
       ctx.effect(() => () => { clearInterval(retryTimer) }, 'tool-memory.snapshot-retry')
       setTimeout(() => { clearInterval(retryTimer) }, 60_000).unref()
     }
