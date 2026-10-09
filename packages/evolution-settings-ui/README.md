@@ -63,6 +63,16 @@ escaping as an unhandled rejection. `settle.ts` holds that one verdict function 
 uses; an unavailable preview prints the host's reason. A late answer for a row the reader already left is
 dropped rather than painted under another row's heading.
 
+## A seat that arrives late revives the card
+
+The seat is probed lazily (never captured at apply time), but probing alone only answers the NEXT read —
+a card that already painted 「本部署没有这个座位」 never asks again, and its row subscription was never
+attached at all. `apply()` therefore subscribes to the platform's own arrival channel
+(`ctx.inject(['configForms'], () => sources.revive())`): `revive` force-re-binds the form (a REPLACED
+seat is picked up too), attaches the subscription and wakes every listener, so the card turns into a form
+without a re-render and without a timer. The mechanism sentence this replaced — "the platform has no
+service arrival signal" — was wrong: `ctx.inject` is exactly that signal (v46 S5.2 / T5-11).
+
 ## One save is one write, on both faces
 
 A save hands the seat ONE op list (`mutateOnce(ops)`) instead of one call per field. The Plugins page

@@ -66,9 +66,18 @@ function fakeSeat(): { get: (id: string) => unknown } {
   }
 }
 
-function fakeShell(options: { seat?: boolean; refuseLocale?: boolean } = {}): { ctx: Parameters<typeof apply>[0]; registrations: Registration[]; warnings: string[] } {
+function fakeShell(options: { seat?: boolean; refuseLocale?: boolean; seatArrivesLater?: boolean } = {}): {
+  ctx: Parameters<typeof apply>[0]
+  registrations: Registration[]
+  warnings: string[]
+  /** Fire the recorded `ctx.inject` callbacks — what cordis does when the service appears. */
+  arrive: () => void
+} {
   const registrations: Registration[] = []
   const warnings: string[] = []
+  const injections: Array<() => void> = []
+  /** Whether the settings seat is composed yet (T5-11/A66: it may arrive after this bundle). */
+  let arrived = options.seatArrivesLater !== true
   const seat = fakeSeat()
   const ctx = {
     effect: (fn: () => unknown): (() => void) => {
@@ -86,7 +95,10 @@ function fakeShell(options: { seat?: boolean; refuseLocale?: boolean } = {}): { 
     },
     // One seat INSTANCE per shell, the way the platform's service registry answers it: the probe
     // runs on every read, so a fresh seat per call would hide a binding bug.
-    get: (name: string) => name === 'configForms' && options.seat !== false ? seat : undefined,
+    // T5-11/A66: the seat can be absent at apply time and composed later, which is the shape the
+    // arrival channel exists for.
+    get: (name: string) => name === 'configForms' && options.seat !== false && arrived ? seat : undefined,
+    inject: (_names: readonly string[], callback: () => void) => { injections.push(callback) },
     slots: {
       inject: (_name: string, callback: () => Generator<unknown, void, unknown>): void => {
         for (const registration of callback()) void registration
@@ -105,7 +117,15 @@ function fakeShell(options: { seat?: boolean; refuseLocale?: boolean } = {}): { 
       },
     },
   }
-  return { ctx: ctx as unknown as Parameters<typeof apply>[0], registrations, warnings }
+  return {
+    ctx: ctx as unknown as Parameters<typeof apply>[0],
+    registrations,
+    warnings,
+    arrive: () => {
+      arrived = true
+      for (const callback of injections.splice(0)) callback()
+    },
+  }
 }
 
 describe('the evolution settings section', () => {
@@ -288,6 +308,27 @@ describe('the row source the renderer binds', () => {
     tell()
     expect(heard).toBe(1)
     off()
+  })
+
+  it('T5-11/A66: a seat that arrives AFTER apply revives the card without a re-render', () => {
+    const shell = fakeShell({ seatArrivesLater: true })
+    apply(shell.ctx)
+    const card = shell.registrations.find(entry => entry.name === CARD_SLOT && entry.key !== undefined)
+    if (card === undefined) throw new Error("the section registered no card")
+    const face = card.inject() as { hooks?: { paramSection?: { getSnapshot: () => { status: string; reason?: string }; subscribe: (listener: () => void) => () => void } } }
+    const source = face.hooks?.paramSection
+    if (source === undefined) throw new Error("the card face carried no section source")
+    // Before the shell composes: the stated seat-missing state, and a subscription that is waiting.
+    expect(source.getSnapshot().status).toBe('unavailable')
+    expect(source.getSnapshot().reason).toBe('seat-missing')
+    let woke = 0
+    source.subscribe(() => { woke += 1 })
+    // The shell mounts LATER. The lazy probe alone would only answer on the next natural read — a card
+    // that already painted its empty state never asked again, and its row subscription was never
+    // attached. The arrival callback binds, attaches and notifies.
+    shell.arrive()
+    expect(source.getSnapshot().status).toBe('ready')
+    expect(woke).toBeGreaterThan(0)
   })
 
   it('T5-06/A61: a refused dictionary registration is REPORTED and the section still registers', () => {

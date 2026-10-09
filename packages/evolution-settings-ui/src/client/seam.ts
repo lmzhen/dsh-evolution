@@ -62,6 +62,16 @@ export interface ParamSectionSnapshot {
 export interface ParamSectionSource {
   getSnapshot(): ParamSectionSnapshot
   subscribe(listener: () => void): () => void
+  /**
+   * T5-11/A66: the seat ARRIVED (or was replaced) — bind it and wake every listener.
+   *
+   * The source re-probes on every READ, which covers a card that has not rendered yet; it does not
+   * cover a card that already rendered its "no settings surface" state, because nothing tells React to
+   * read again. `ctx.inject` is the platform's own arrival channel (it runs the callback when the
+   * service appears and re-runs it when the service changes), so the bundle subscribes there instead of
+   * inventing a timer.
+   */
+  revive(): void
 }
 
 /** One ordered field operation, as the client settings seat takes them. */

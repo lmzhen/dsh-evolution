@@ -124,11 +124,21 @@ export function sourceFor(probe: SeatProbe, namespace: string): ParamSectionSour
   let form: ConfigFormLike | undefined
   let projected: (() => ParamSectionSnapshot) | undefined
   let offForm: (() => void) | undefined
-  const bind = (): void => {
-    if (form !== undefined) return
+  /**
+   * Bind the seat's form for this row.
+   * @param force - re-read the seat even when one is already bound, so a REPLACED seat (the shell
+   *   re-composed, a different form object for the same row) is picked up instead of kept stale.
+   */
+  const bind = (force = false): void => {
+    if (form !== undefined && !force) return
     const seat = probe()
     if (seat === undefined) return
-    form = seat.get<Record<string, unknown>>(namespace)
+    const next = seat.get<Record<string, unknown>>(namespace)
+    if (next === form) return
+    // A replaced form means the old subscription belongs to a dead seat.
+    offForm?.()
+    offForm = undefined
+    form = next
     projected = stableProjection(form)
   }
   const attach = (): void => {
@@ -139,6 +149,15 @@ export function sourceFor(probe: SeatProbe, namespace: string): ParamSectionSour
     getSnapshot: (): ParamSectionSnapshot => {
       bind()
       return projected === undefined ? SEAT_MISSING : projected()
+    },
+    revive: (): void => {
+      // T5-11/A66: without this a seat that appears AFTER this bundle activated only reached bind()
+      // on the next natural read — the card stayed in its stated "no settings surface" state until
+      // something else re-rendered it, and attach() (which only ran inside subscribe) had never been
+      // called, so a late seat could not even notify the row.
+      bind(true)
+      attach()
+      for (const listener of listeners) listener()
     },
     subscribe: (listener: () => void): (() => void) => {
       listeners.add(listener)
@@ -189,6 +208,9 @@ export function writeFaceFor(probe: SeatProbe, namespace: string): {
  */
 export function createSourceCache(probe: SeatProbe): {
   sourceFor: (namespace: string) => ParamSectionSource
+  /** T5-11/A66: the seat arrived — wake every source this cache built (the cached ones are exactly the
+   * ones whose cards are already mounted and waiting). */
+  revive: () => void
   dispose: () => void
 } {
   const sources = new Map<string, ParamSectionSource>()
@@ -200,6 +222,7 @@ export function createSourceCache(probe: SeatProbe): {
       sources.set(namespace, source)
       return source
     },
+    revive: (): void => { for (const source of sources.values()) source.revive() },
     dispose: (): void => { sources.clear() },
   }
 }

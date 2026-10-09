@@ -108,6 +108,14 @@ export function apply(ctx: ClientContext): void {
   const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined
   const sources = createSourceCache(probe)
   ctx.effect(() => () => { sources.dispose() }, 'evolution-settings: sources')
+  // T5-11/A66: the platform's own "this service arrived" channel. The lazy probe alone left a card
+  // that had already rendered its "no settings surface" state stuck there when the shell mounted
+  // LATER (nothing tells React to read again), and the row's subscription was never attached. The
+  // callback re-runs whenever the service CHANGES, so a re-composed shell is picked up too. Cordis
+  // exposes this as `inject`; the seat is an optional one (a deployment may compose the family with
+  // no settings surface), so it goes through a narrow structural view rather than a declared edge.
+  const seatInjection = ctx as unknown as { inject?: (names: readonly string[], callback: () => void) => unknown }
+  seatInjection.inject?.(['configForms'], () => { sources.revive() })
 
   seam.slots.inject('settings.section', function* () {
     yield seam.slots.register({
