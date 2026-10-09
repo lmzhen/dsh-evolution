@@ -26,13 +26,13 @@ The icon draws at the edge the sidebar asks for. The seat hands every occupant `
 | POST | `/api/dsh-evolution/skill-history/undo` | `curator.undo(name, v?)` — the only write |
 | GET | `/api/dsh-evolution/skill-history/versions/diff?name=&v=` | one body version against its recorded predecessor, as line counts plus the windowed changed region |
 | GET | `/api/dsh-evolution/skill-history/versions/body?name=&v=` | one version's whole text, for the panel's preview; bounded by `MAX_BODY_CHARS` and flagged `truncated` |
-| GET | `/api/dsh-evolution/skill-history/health` | liveness probe for the client |
+| GET | `/api/dsh-evolution/skill-history/health` | answers `{ surface: 'skill-history' }` — a host-side liveness/identity probe. The browser half declares only the five routes it uses and never calls this one (it is what the client's route-parity spec means by "fewer routes than the host publishes") |
 
 Every route sits behind the platform's own /api fence, kept local because the canonical implementation is not part of that package's published surface: the **socket** must be loopback (authoritative; `X-Forwarded-For` is never trusted), the **Host** header must name a loopback authority, an explicit `sec-fetch-site: cross-site` marker is refused, and an attached **Origin** must be exactly this authority.
 
 Transport refusals stay transport refusals (`403` fence, `405` method, `400` missing name / malformed or oversized body). A **business** refusal is a `200` with `{ ok: false, code, message }`, and that message is the curator's own sentence — the same one `/evolution skill undo` prints, so the two faces cannot drift.
 
-The row is **inert without a web server** (`ctx.get('webServer')`, not a declared inject): a headless profile keeps the slash commands as its entry point, and no fiber waits forever on a service that will never arrive. The curator is resolved **per request**, so a profile that mounts the routes before it answers the family's `E-302` sentence instead of throwing.
+The row declares **no service** and **waits** for the web server: `inject` is empty and `apply` mounts the routes inside `ctx.inject(['webServer'], scope => scope.effect(…))`, so a headless profile keeps the slash commands as its entry point and never runs the callback at all — inert, and no row left pending on a service that will never arrive. Reading the service at apply time instead (`ctx.get('webServer')`) is a TIMING fact, not a verdict: 0.11.1 shipped that way and left the routes permanently unregistered while the panel rendered and every call answered HTTP 404. The curator is resolved **per request**, so a profile that mounts the routes before it answers the family's `E-302` sentence instead of throwing.
 
 ## What the panel shows
 

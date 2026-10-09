@@ -113,14 +113,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // 0.3.18 (S4.5, X-7): process-internal summaries cache — every `get()` used
   // to run a full tree scan (read + parse every SKILL.md). Dropped on
   // `evolution/skill-mutated` (in-band writes) and on `evolution/skills-refresh`.
-  // P3 (v15, A1 correction; refined v16 after upstream re-read): the
-  // root-mtime probe is a best-effort SECOND signal that only fires when this
-  // provider is CONSULTED — it is not the reason an out-of-band write stays
+  // P3 (v15, A1 correction; refined v16 after upstream re-read): the root
+  // STAMP probe (S3-P2-10: the non-dot entry-name set, not an mtime) is a
+  // best-effort SECOND signal that only fires when this provider is CONSULTED — it is not the reason an out-of-band write stays
   // invisible from `ctx.skills.list()`. E-71's pinned invisibility comes from
   // the UPSTREAM skill registry: `snapshot()`/`list()` resolve against the
   // collectCache and never call providers until a `control.invalidate()`
   // bumps the revision (the refresh event / `evolution/skill-mutated` do
-  // that; a new root-level directory DOES touch the root's mtime, so the
+  // that; a new root-level directory DOES change that name set, so the
   // probe itself would catch it — if it were ever asked). `ctx.skills.get()`
   // of an ALREADY-INDEXED name still calls `provider.get()` per invocation,
   // so an out-of-band CONTENT edit becomes visible there immediately (with a
@@ -136,7 +136,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // it. Without this, an in-flight `library.list()` (a full tree scan that
   // can interleave a concurrent skill_manage/curator write in multi-session
   // hosts) repopulated the cache with the PRE-mutation list after the drop,
-  // and — because a content-only edit does not change the root's mtime —
+  // and — because a content-only edit does not change the root's entry-name set —
   // every later consult then hit `summariesStamp === stamp` and served the
   // stale descriptions until the next structural change.
   let summariesEpoch = 0

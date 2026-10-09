@@ -69,7 +69,8 @@ export interface Config {
    * registry id (G1). */
   supportFileCharPolicy?: Volatile<SupportFileCharPolicy | undefined>
   /** Deprecated alias of `skillContentChars` (G0/S0.3): still readable, refused
-   * by writes; removed in 0.7.0. */
+   * by writes; removal was planned for 0.7.0 and is deferred (the alias still
+   * ships — see the package README). */
   maxSkillContentChars?: number
   maxSkillFileBytes?: Volatile<number>
   /** When true, create/update refuse a description over the 60-char authoring bar (default: advisory feedback only). */
@@ -112,7 +113,8 @@ export const Config = z.object({
   citationPolicy: z.union([z.const('verify'), z.const('refuse')]).volatile(),
   supportFileCharPolicy: z.union([z.const('report'), z.const('enforce')]).volatile(),
   // Deprecated alias of skillContentChars (PARAM_ALIASES): the fallback spelling,
-  // refused by writes, removed 0.7.0. Deployment-only (no `.volatile()`).
+  // refused by writes; removal was planned for 0.7.0 and is deferred (the alias
+  // still ships). Deployment-only (no `.volatile()`).
   maxSkillContentChars: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
   maxSkillFileBytes: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes).volatile(),
   descriptionStrict: z.boolean().default(false).volatile(),
@@ -346,9 +348,9 @@ function reasonOfError(error: unknown): string {
 /**
  * The registry's live ROOT agent for this call's session, or `undefined`.
  *
- * The registry keys agents by their shared agent/session id (platform `agent/src/index.ts:567`), and
- * the platform's `ask()` accepts only an agent that is BOTH its exact live instance and a root
- * (platform `user-questions/src/index.ts:96-106`). An id that resolves to an agent owned by another
+ * The registry keys agents by their shared agent/session id (platform `agent`), and the
+ * platform's `ask()` accepts only an agent that is BOTH its exact live instance and a root —
+ * that check is `user-questions`'s own private `assertLiveRoot`. An id that resolves to an agent owned by another
  * agent is not a root: the caller then proceeds unconfirmed rather than blocking a human question on
  * an agent no human is watching.
  * @param probe - the context, read through the optional-service probe.
@@ -412,9 +414,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (systemPrompt) {
     // B4 (design §4.3): the protected-skill list is deployment state that changes without a reload,
     // so it rides a prompt VARIABLE instead of baked section text. ONE effect registers the variable
-    // and the section together: the platform throws on a section that references an unregistered
-    // variable (system-prompt/src/index.ts:344), so a window holding only one of the two would fail
-    // every request assembled during it. The section is disposed first, the variable last.
+    // and the section together: the platform throws on a section that references a prompt variable
+    // that was never registered (system-prompt's own `{{name}}` validation), so a window holding only
+    // one of the two would fail every request assembled during it. The section is disposed first,
+    // the variable last.
     ctx.effect(() => {
       const disposeVariable = systemPrompt.variable(PROTECTED_SKILLS_VARIABLE, () => protectedSkillsLine())
       const disposeSection = systemPrompt.section({
@@ -477,8 +480,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     return true
   }
   // A DISMISSED prompt is not consent: the platform answers `ASK_ABORTED` when the question was
-  // aborted before anyone answered (user-questions/src/index.ts:41-47), and the operator closing
-  // the card or cancelling the turn means the human did not say yes. That one code refuses the
+  // aborted before anyone answered (that is the `user-questions` error CODE, cited by name so it
+  // cannot rot into a line range), and the operator closing the card or cancelling the turn means
+  // the human did not say yes. That one code refuses the
   // write like a declined prompt (E-317); every other failure stays fail-open, because those mean
   // "no prompt could be shown", not "the human walked away".
   const isDismissed = (error: unknown): boolean => questionErrorCode(error) === 'ASK_ABORTED'

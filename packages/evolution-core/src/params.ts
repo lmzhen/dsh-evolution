@@ -5,8 +5,9 @@
  * the SAME name in two carriers (reviewMode, staleAfterDays, archiveAfterDays —
  * resolved by the existing policy-shadows-row rule) and six use DIFFERENT names.
  * This module owns the six: the policy/snapshot name is the canonical id, the
- * plugin-row name is a deprecated alias kept readable for one minor version
- * (0.6.x) and removable in 0.7.0.
+ * plugin-row name is a deprecated alias kept readable since 0.6.x. Removal was
+ * planned for 0.7.0 and is deferred: the aliases still ship, so no later version
+ * is claimed here.
  *
  * Reading stays compatible (a carrier still spelling the legacy name resolves),
  * writing is strict (the write path accepts canonical ids only, so no new

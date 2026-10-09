@@ -140,7 +140,7 @@ function paramDivergences(platform: PlatformView): string[] {
     issues.push(`user override: ${entryId} sets ${keys.length} parameter(s) — ${shown.join(', ')}${more}`)
     for (const key of keys) {
       if (!isDeprecatedParamId(key)) continue
-      issues.push(`deprecated name: ${entryId} still writes "${key}" — write "${resolveParamId(key)}" instead (writes refuse the alias; it is removed in 0.7.0)`)
+      issues.push(`deprecated name: ${entryId} still writes "${key}" — write "${resolveParamId(key)}" instead (writes refuse the alias; removal was planned for 0.7.0 and is deferred — the alias still ships)`)
     }
   }
   // The reachability half needs the platform's live rows: a declared E3 parameter whose owning

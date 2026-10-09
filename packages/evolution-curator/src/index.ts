@@ -62,7 +62,7 @@ export interface Config {
   /** The due-ness interval. The policy snapshot shadows it in every shipped
    * composition — configure `curatorIntervalHours` there; that name is the
    * canonical id. Deprecated alias (G0/S0.3): still readable, refused by
-   * writes; removed 0.7.0. */
+   * writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
   intervalHours?: number
   staleAfterDays?: Volatile<number>
   archiveAfterDays?: Volatile<number>
@@ -225,7 +225,7 @@ export class EvolutionCurator extends Service {
     // (DEFAULT_CURATOR_INTERVAL_HOURS) after the alias fallback.
     curatorIntervalHours: z.number().min(1).volatile(),
     // Deprecated row alias (PARAM_ALIASES): still readable by readParam, refused by
-    // writes, removed 0.7.0. Deployment-only (no `.volatile()`).
+    // writes; removal was planned for 0.7.0 and is deferred (the alias still ships). Deployment-only (no `.volatile()`).
     intervalHours: z.number().min(1),
     staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS).volatile(),
     archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS).volatile(),

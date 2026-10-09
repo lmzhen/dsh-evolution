@@ -90,10 +90,10 @@ export interface Config {
    * the policy snapshot like the memory cadence. */
   reviewSkillInterval?: Volatile<number | undefined>
   /** Deprecated alias of `reviewMemoryInterval` (G0/S0.3): still readable,
-   * refused by writes; removed 0.7.0. */
+   * refused by writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
   memoryInterval?: number
   /** Deprecated alias of `reviewSkillInterval` (G0/S0.3): still readable,
-   * refused by writes; removed 0.7.0. */
+   * refused by writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
   skillInterval?: number
   /**
    * Tools the one-shot review subagent may use. Only actually-existing tools
@@ -162,7 +162,7 @@ export const Config = z.object({
   reviewMemoryInterval: z.number().min(1).volatile(),
   reviewSkillInterval: z.number().min(1).volatile(),
   // Deprecated row aliases (PARAM_ALIASES): still read as the fallback spelling,
-  // refused by writes, removed 0.7.0. Deployment-only (no `.volatile()`).
+  // refused by writes; removal was planned for 0.7.0 and is deferred (the alias still ships). Deployment-only (no `.volatile()`).
   memoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
   skillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewToolAllow: z.array(z.string()).default(['skill']),

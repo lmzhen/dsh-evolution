@@ -30,10 +30,10 @@ export interface Config {
    * a live row field on the same terms as `memoryChars`. */
   userChars?: Volatile<number | undefined>
   /** Deprecated alias of `memoryChars` (G0/S0.3): still readable, refused by
-   * writes; removed in 0.7.0. */
+   * writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
   memoryCharLimit?: number
   /** Deprecated alias of `userChars` (G0/S0.3): still readable, refused by
-   * writes; removed in 0.7.0. */
+   * writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
   userCharLimit?: number
   addDatePrefix?: Volatile<boolean>
   root?: string
