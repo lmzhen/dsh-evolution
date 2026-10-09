@@ -44,6 +44,10 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const [skillsLoaded, setSkillsLoaded] = useState(false)
   const [selected, setSelected] = useState<string | undefined>(undefined)
   const [payload, setPayload] = useState<VersionsPayload | undefined>(undefined)
+  // T5-09 (S3.4): the version read needs a FAILED state of its own. `payload === undefined` covered
+  // both "still reading" and "the read failed", so a failed read left the pane saying 读取中… — the
+  // pane lied while the notice above it told the truth. The sentence is kept for the placeholder.
+  const [versionsFailed, setVersionsFailed] = useState<string | undefined>(undefined)
   const [noteText, setNoteText] = useState<string | undefined>(undefined)
   const [noteError, setNoteError] = useState(false)
   const [pending, setPending] = useState<number | undefined>(undefined)
@@ -67,6 +71,9 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     setNoteText(message)
   }
 
+  /** The sentence one failed read carries, in ONE place: every reader below reports the same way. */
+  const failedMessage = (error: unknown): string => face.t('error') + ': ' + (error instanceof Error ? error.message : String(error))
+
   /** Read the skills again, keeping the sentence: a re-read is not an answer to anything. */
   const reloadSkills = (): void => {
     // `finally`, not `then`: a FAILED read is an answer too — the reader gets the empty list plus the
@@ -85,6 +92,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     readTicket.current = ticket
     setSelected(name)
     setPayload(undefined)
+    setVersionsFailed(undefined)
     setPending(undefined)
     setExpanded(undefined)
     setDiffs(new Map())
@@ -92,7 +100,10 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     void face.loadVersions(name).then((next) => {
       if (readTicket.current === ticket) setPayload(next)
     }).catch((error: unknown) => {
-      if (readTicket.current === ticket) onFailure(error)
+      if (readTicket.current !== ticket) return
+      // T5-09: the pane needs its own answer, not only the notice.
+      setVersionsFailed(failedMessage(error))
+      onFailure(error)
     })
   }
 
@@ -151,7 +162,6 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     // different body (or a different file).
     const ticket = readTicket.current + 1
     readTicket.current = ticket
-    const failedMessage = (error: unknown): string => face.t('error') + ': ' + (error instanceof Error ? error.message : String(error))
     if (kind === 'diff') {
       setDiffs(current => new Map(current).set(v, { kind: 'loading' }))
       void face.loadDiff(name, v).then((diff) => {
@@ -235,7 +245,8 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
         ]
         : loaded
           ? null
-          : emptyState(face.t('loading')),
+          // T5-09: three states, three sentences — a failed read must not render as "still reading".
+          : emptyState(versionsFailed === undefined ? face.t('loading') : `${face.t('empty.versions.failed')} — ${versionsFailed}`),
       loaded
         ? createElement('div', null,
           group(face.t('group.content'), payload.content, undefined),

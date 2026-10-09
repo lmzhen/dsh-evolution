@@ -149,7 +149,7 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     expect(screen.queryByText('late')).toBeNull()
   })
 
-  it('points at the left column while nothing is selected, and reports a refusal', async () => {
+  it('points at the left column while nothing is selected, and reports a refusal instead of still reading (T5-09)', async () => {
     const view = render(createElement(SkillHistoryPanel, makeFace({
       loadVersions: async () => { throw new Error('boom') },
     })))
@@ -157,7 +157,13 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     await screen.findByText('alpha')
     expect(screen.getByText('empty.pick')).toBeTruthy()
     fireEvent.click(screen.getByText('alpha'))
-    await screen.findByText(/boom/)
+    // The sentence now appears TWICE on purpose — the notice and the pane both say it (see below).
+    await screen.findAllByText(/boom/)
     await waitFor(() => { expect(view.queryByText('empty.pick')).toBeNull() })
+    // S3.4/T5-09: the notice above told the truth, the BODY said 读取中… forever — a pane that
+    // keeps claiming a read is in flight after it failed is the same lie as an empty list before
+    // the first answer (E7). It now answers its own state, with the reason the host gave.
+    expect(view.queryByText('loading')).toBeNull()
+    expect(view.getByText(/empty.versions.failed/)).toBeTruthy()
   })
 })
