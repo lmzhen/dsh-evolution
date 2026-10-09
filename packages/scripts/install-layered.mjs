@@ -1736,7 +1736,7 @@ export async function install(options = {}) {
 /** Flag table for `--help` and for the INSTALL.md parity fixture (G2/S2.3).
  * Every flag the parser accepts appears here exactly once, with its value kind. */
 export const INSTALL_FLAGS = [
-  { flag: '--mode', value: '<layered|profile-root>', summary: 'install target plane (default layered)' },
+  { flag: '--mode', value: '<host|agent|layered|oneclick>', summary: 'install target plane (default layered; aliases variant / attach)' },
   { flag: '--profile', value: '<name>', summary: 'profile directory under $DSH_HOME/profiles (default web)' },
   { flag: '--base', value: '<name>[,<name>...]', summary: 'platform agent-preset base the family preset follows (repeatable)' },
   { flag: '--home', value: '<dir>', summary: 'harness home to write into (default $DSH_HOME)' },

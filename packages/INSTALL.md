@@ -160,7 +160,7 @@ prints this same table; `guard-scripts.spec.ts` fails when the two drift):
 
 | Flag | Value | Meaning |
 |---|---|---|
-| `--mode` | `layered` \| `profile-root` | Install target plane (default `layered`). |
+| `--mode` | `host` \| `agent` \| `layered` \| `oneclick` (aliases `variant` / `attach`) | Install target plane (default `layered`). |
 | `--profile` | `<name>` | Profile directory under `$DSH_HOME/profiles` (default `web`). |
 | `--base` | `<name>[,<name>...]` | Platform agent-preset base the family preset follows (repeatable). |
 | `--home` | `<dir>` | Harness home to write into (default `$DSH_HOME`). |

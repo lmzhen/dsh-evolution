@@ -138,7 +138,7 @@
 | `evolution-commands.maintainCooldownMs` | E2 | none | cordis | evolution-commands | — | Cooldown between maintenance runs from the command surface. |
 | `evolution-commands.maintainTimeoutMs` | E2 | none | cordis | evolution-commands | — | Timeout of one maintenance run started from the command surface. |
 | `skill-usage.supportReadToolNames` | E2 | none | cordis | skill-usage | — | Tool names whose file reads are attributed to support files. |
-| `install.mode` | E4 | restart | install | scripts | — | Install target plane (layered preset vs profile-root bundle). |
+| `install.mode` | E4 | restart | install | scripts | — | Install target plane (values host / agent / layered / oneclick; the `layered` form uses the generated preset, the others mount the bundle at profile root). |
 | `install.basePreset` | E4 | restart | install | scripts | — | Agent-preset base the layered install composes from (--base). |
 | `install.home` | E4 | restart | install | scripts | — | Harness home the installer writes into (--home). |
 | `install.presetRowOverrides` | E4 | restart | install | scripts | — | Preset row overrides the installer injects (row-overrides.json). |

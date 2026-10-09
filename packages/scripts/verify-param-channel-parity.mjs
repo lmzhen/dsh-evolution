@@ -220,6 +220,64 @@ if (existsSync(docFile)) {
   notes.push(documented.size + ' documented row(s)')
 }
 
+// 4. The installer's --mode surface (v46 S2.8, fixture A76): every value the documentation names
+// must exist in the installer's MODES (or be one of its aliases). The old parity fixture only
+// checked that the flag NAME appeared in INSTALL.md, so `--mode profile-root` — a value the parser
+// rejects — sat in three documents (the installer's own help table, INSTALL.md and the registry
+// summary that PARAMETERS.md renders) while every gate stayed green.
+const installerFile = join(root, 'scripts', 'install-layered.mjs')
+if (existsSync(installerFile)) {
+  const installer = readFileSync(installerFile, 'utf8')
+  const modes = new Set([...( /const MODES = new Set\(\[([^\]]*)\]\)/.exec(installer)?.[1] ?? '').matchAll(/'([^']+)'/g)].map(match => match[1]))
+  // Only the KEYS of the alias map are accepted values (`['variant', 'layered']` — variant is a
+  // name a caller may pass; layered is the canonical target it normalizes to).
+  const aliases = new Set([...( /const MODE_ALIASES = new Map\(\[([\s\S]*?)\]\)/.exec(installer)?.[1] ?? '').matchAll(/\['([^']+)'/g)].map(match => match[1]))
+  if (modes.size === 0) {
+    problems.push('installer: no MODES set found in ' + installerFile + ' — the --mode surface cannot be re-derived')
+  } else {
+    const docSources = [join(root, 'INSTALL.md'), docFile, join(root, 'evolution-core', 'src', 'params.ts')]
+    // Three value contexts, and nothing else: `<a|b|c>` after the flag, an inline `--mode value`,
+    // and a table cell whose content is a backticked list. Judging every word after the flag
+    // matched prose instead of values and would have made the check a false-positive machine.
+    /**
+     * The values one line names for the flag, from the three shapes the docs actually use:
+     * `<a|b|c>` after the flag, an inline `--mode value`, and a table cell listing them in
+     * backticks. Anything else on the line is prose — a word-boundary sweep over the whole line
+     * matched `Install` as `nstall` and would have made this check a false-positive machine.
+     * @param text - the document.
+     * @returns the value tokens.
+     */
+    const modeValues = (text) => {
+      const out = []
+      for (const match of text.matchAll(/--mode\s*<([^>]*)>/g)) {
+        for (const token of match[1].split('|')) if (/^[a-z][a-z-]+$/.test(token.trim())) out.push(token.trim())
+      }
+      for (const match of text.matchAll(/--mode\s+`([a-z][a-z-]+)`/g)) out.push(match[1])
+      for (const match of text.matchAll(/--mode\s+([a-z][a-z-]+)\b/g)) out.push(match[1])
+      for (const match of text.matchAll(/`--mode`\s*\|([^\n]*)/g)) {
+        for (const inner of match[1].matchAll(/`([a-z][a-z-]+)`/g)) out.push(inner[1])
+      }
+      return out
+    }
+    let mentions = 0
+    const seenValues = new Set()
+    for (const file of docSources) {
+      if (!existsSync(file)) continue
+      for (const token of modeValues(readFileSync(file, 'utf8'))) {
+        mentions += 1
+        if (modes.has(token) || aliases.has(token)) continue
+        const key = file + ' :: ' + token
+        if (seenValues.has(key)) continue
+        seenValues.add(key)
+        problems.push(file + ': names `--mode ' + token + '`, which the installer does not accept (MODES: ' + [...modes].join(', ') + '; aliases: ' + [...aliases].join(', ') + ')')
+      }
+    }
+    // One note, not one per document (the loop above aggregates the mentions).
+    if (mentions === 0) problems.push('no --mode value mention found in the installer docs — the flag surface is documented nowhere (a vacuum pass is not a pass)')
+    else notes.push('--mode surface: ' + modes.size + ' mode(s) + ' + aliases.size + ' alias(es) checked against ' + mentions + ' mention(s)')
+  }
+}
+
 const summary = ids.size + ' id(s), ' + CHANNELS.length + ' channel(s), ' + Object.keys(namespaces).length + ' owner schema(s), ' + notes.join(', ')
 if (problems.length === 0) {
   console.log('verify-param-channel-parity: OK — ' + summary)
