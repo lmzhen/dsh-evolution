@@ -28,7 +28,7 @@
  * reconciliation is skipped, the staging is unpublishable, and the release path
  * (tags) never passes it.
  */
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -368,29 +368,54 @@ for (const dir of sourceDirs) {
   // rename/delete followed by pack-without-rebuild used to ship stale files
   // under lib/types. Warn (not fail): a rebuild is the operator's call.
   {
-    let newestSrc = 0
+    // v46 S1.12 (finding T5-12) turned this from a warn into a FAIL: stale bytes under lib/types
+    // ship to users and the warn fired twice without stopping a release. v46 review (CI-caught): the
+    // first form read MTIMES on the staged copy, and the cpSync above does not preserve timestamps —
+    // every staged file carries the copy instant, so `max(src) > min(lib)` (a max against a MIN)
+    // was decided by traversal order and flipped red in CI for evolution-activity while the same
+    // tree passed on NTFS. The risk is a rename or delete followed by a pack without a rebuild,
+    // which leaves lib/ outputs whose source is gone: that is a NAME-SET question, answered the
+    // same way on every platform and independent of how the copy walked the tree.
+    const sourceModules = new Set()
     const walkSrc = (dirPath) => {
       for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
         const full = join(dirPath, entry.name)
-        if (entry.isDirectory()) walkSrc(full)
-        else newestSrc = Math.max(newestSrc, statSync(full).mtimeMs)
+        if (entry.isDirectory()) { walkSrc(full); continue }
+        const match = /\.(?:ts|tsx|mts|cts|js|mjs|cjs|json|ya?ml)$/.exec(entry.name)
+        if (match === null) continue
+        const module = relative(join(staged, 'src'), full).split(/[\\/]/).join('/').slice(0, -match[0].length)
+        sourceModules.add(module)
+        // `src/client/index.ts` also answers for a bundled `lib/client.js`.
+        if (module.endsWith('/index')) sourceModules.add(module.slice(0, -'/index'.length))
       }
     }
     try { walkSrc(join(staged, 'src')) } catch { /* no src — skip the check */ }
-    let oldestLib = Number.POSITIVE_INFINITY
+    const orphans = []
     const walkLib = (dirPath) => {
       for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
         const full = join(dirPath, entry.name)
-        if (entry.isDirectory()) walkLib(full)
-        else oldestLib = Math.min(oldestLib, statSync(full).mtimeMs)
+        if (entry.isDirectory()) { walkLib(full); continue }
+        const match = /\.(?:js|mjs|cjs|d\.ts)(?:\.map)?$/.exec(entry.name)
+        if (match === null) continue
+        const raw = relative(join(staged, 'lib'), full).split(/[\\/]/).join('/').slice(0, -match[0].length)
+        // `tsc` writes the declaration tree under lib/types, so that prefix is not a module segment.
+        const module = raw.startsWith('types/') ? raw.slice('types/'.length) : raw
+        if (sourceModules.has(module)) continue
+        // tsdown code-splits shared modules into `<name>-<hash>.js` (`enrichment-CjZmhRI9`), so a
+        // trailing hash segment is not a source name: retry with it stripped before calling it stale.
+        const stem = module.replace(/-[A-Za-z0-9_]{6,}$/, '')
+        if (stem !== module && sourceModules.has(stem)) continue
+        orphans.push(`lib/${raw}`)
       }
     }
-    try { walkLib(join(staged, 'lib')) } catch { /* lib absence handled above */ }
-    if (newestSrc > oldestLib) {
-      console.error(`prepare-release: FAIL — ${dir}: src/ has file(s) newer than every lib/ output; if sources were renamed or deleted, stale lib/ files may be packed. Re-run build-lib.mjs to be safe.`)
-      // v46 S1.12 (finding T5-12): this used to warn. A rebuild is not the operator's call any
-      // more — stale bytes under lib/types ship to users, and the warn fired twice in practice
-      // without anyone stopping the release. Fail before staging, like the lib-absence check above.
+    try { walkLib(join(staged, 'lib')) } catch { /* lib absence handled below */ }
+    if (sourceModules.size > 0 && orphans.length > 0) {
+      const shown = `${orphans.slice(0, 5).join(', ')}${orphans.length > 5 ? ', …' : ''}`
+      console.error(
+        `prepare-release: FAIL — ${dir}: lib/ carries ${orphans.length} output(s) whose source is gone (${shown})`
+        + ' — a rename or delete was packed without a rebuild (build-lib.mjs never removes orphaned'
+        + " outputs, and tsc -b keeps deleted modules' declarations).",
+      )
       process.exit(1)
     }
   }
