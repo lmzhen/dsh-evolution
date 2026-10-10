@@ -382,6 +382,8 @@ joins only when mounted (D-30):
 
 ## Service keys
 
+**How a row reaches a service (rule N32).** A plugin declares what it consumes — `export const inject = [...]` for a function plugin, `static inject = [...]` on a Service class — and reads it as `ctx.<name>`; a service a deployment may not mount is read with `ctx.get('<name>')` instead, which answers `undefined`. The arch guard **N32** checks the first half mechanically: every `ctx.<service>` property read in production must be declared in that file (or be a `ctx.get`), and the service names it judges come from `evolution-core`'s `PLATFORM_SERVICE_PROBES` table — the same list `/evolution doctor` reports capability absence from. An undeclared read is a dependency the Loader cannot order or refuse, and it throws where `ctx.get` would have degraded.
+
 Every service this family mounts carries a context key, and **every key is prefixed `evolution`**
 except two registered exceptions. The rule is **N31** and its implementation is the machine check
 (`machine.kind = service-key-prefix`): it re-derives the set from the `super(ctx, '…')` /

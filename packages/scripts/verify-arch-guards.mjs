@@ -237,6 +237,10 @@
  *       a new citation fails, and the register burns down as files are touched — the fix is the one
  *       S2.7 applied to the family's own comments, a symbol citation instead of a line number.
  *       `packages/docs/**` (the machine-local archive) is fenced by name.
+ *   N32. a `ctx.<service>` PROPERTY read must be declared — the plugin's `inject` (module export or
+ *        `static inject` on a Service class) or the sanctioned optional form `ctx.get(<service>)`.
+ *        `ctx.<name>` is topology-sensitive (it resolves through the declaring fiber), so an
+ *        undeclared read is a dependency nobody can see (A105 / 6-6).
  *   N33. every `evolution/*` event DECLARES its cordis dispatch mode (`@mode emit|waterfall|serial|parallel|bail`)
  *        in the docblock above the declaration, and the declaration agrees with the dispatch site. The
  *        list is not restated: it comes from the fact's home (`evolution-core/README.md`,
@@ -449,6 +453,65 @@ const ABSENT_CATCH_RE = /\.catch\s*\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*(
  * when T2-07/A22 deleted the invocation map's second read), and an empty table is the class closed:
  * any NEW expression-form swallow of a durable read is a violation, not a debt. */
 const SWALLOWED_READ_BASELINE = new Map()
+
+/**
+ * N32's pure half: `ctx.<service>` property reads vs the declarations in the same file.
+ *
+ * The service NAMES come from core's `PLATFORM_SERVICE_PROBES` table (the same list the doctor
+ * judges capability absence from) — never restated here. Both declaration forms count: the module
+ * export (`export const inject = [...]`) and a Service class's `static inject`. A read on a
+ * comment-only line is prose, not a read.
+ * @param serviceTableText - the text of core's `platform-services.ts`.
+ * @param sources - production sources as `{ rel, text }`.
+ * @returns violation messages, one per undeclared read.
+ */
+function serviceReadViolationsFrom(serviceTableText, sources) {
+  const services = new Set()
+  for (const match of serviceTableText.matchAll(/\{\s*service:\s*'([A-Za-z][\w-]*)'/g)) services.add(match[1])
+  if (services.size === 0) return ['the platform-service table names no service — N32 reads its list from that table, and an empty one is not a pass (vacuity)']
+  const out = []
+  for (const { rel, text } of sources) {
+    if (!rel.includes('/src/')) continue
+    const deps = new Set()
+    for (const re of [/export const inject\s*=\s*\[([^\]]*)\]/g, /static inject\s*=\s*\[([^\]]*)\]/g]) {
+      for (const match of text.matchAll(re)) {
+        for (const name of match[1].matchAll(/'([^']+)'/g)) deps.add(name[1])
+      }
+    }
+    for (const [index, line] of text.split(/\r?\n/).entries()) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue
+      for (const match of line.matchAll(/\bctx\.([A-Za-z_$][\w$]*)/g)) {
+        if (!services.has(match[1])) continue
+        if (deps.has(match[1])) continue
+        out.push(`${rel}:${index + 1}: reads ctx.${match[1]} but the file declares no such dependency — declare it in \`inject\` (module export or \`static inject\`), or read it optionally with ctx.get('${match[1]}') (rule N32)`)
+      }
+    }
+  }
+  return out
+}
+
+/** N32's tree-walking half: core's service table plus every production source under `root`. */
+function serviceReadViolations(root) {
+  const table = join(root, 'evolution-core', 'src', 'platform-services.ts')
+  // A SUB-SCOPE (the guard's synthetic trees, a package-local run) has no service table: judge
+  // nothing there. The empty-TABLE case below stays a violation for the real tree.
+  if (!existsSync(table)) return []
+  const sources = []
+  const collect = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!SKIP.has(entry.name)) collect(join(dir, entry.name))
+        continue
+      }
+      if (!entry.name.endsWith('.ts')) continue
+      const path = join(dir, entry.name)
+      sources.push({ rel: relative(root, path).split('\\').join('/'), text: readFileSync(path, 'utf8') })
+    }
+  }
+  collect(root)
+  return serviceReadViolationsFrom(readFileSync(table, 'utf8'), sources)
+}
 
 /**
  * N33's pure half: judge one (fact table, production sources) pair.
@@ -797,6 +860,7 @@ const RULES = [
   { id: 'N13a', title: 'must-execute payload not on the non-waking primitive', incident: 'a must-execute payload sent through the non-waking primitive', canonicalForm: 'must-execute payloads use the waking primitive (followup)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N13b', title: 'wake primitive called on its receiver', incident: 'the wake primitive detached (destructured or aliased) and then called', canonicalForm: 'the wake primitive is called on its receiver: agent.followup(message)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N14', title: 'durable-read failure not served as absent', incident: 'catch { return [] }: a read failure served as absent', canonicalForm: 'Probe<T> three states; a failure keeps its reason', vacuity: 'an empty swallow register is clean by design; the sample carries the proof', sample: 'detector' },
+  { id: 'N32', title: 'service property reads are declared', incident: 'a `ctx.<service>` read with no `inject` entry: the dependency is invisible to the Loader (it cannot order or refuse the mount), and the read throws where `ctx.get` would have degraded', canonicalForm: 'every `ctx.<service>` read is declared in the plugin\'s `inject` (module export or `static inject`); an optional service is read with `ctx.get(<service>)`', vacuity: 'the service table is the list; an unreadable table judges nothing (a sub-scope), an EMPTY one is a violation', sample: 'detector' },
   { id: 'N33', title: 'every family event declares its dispatch mode', incident: 'an `evolution/*` event with no `@mode` (and no dispatch site to disagree with): a reader cannot tell an announcement from a decision point, and the declaration can drift from `ctx.emit`', canonicalForm: 'each event declaration carries `@mode <mode>` matching the fact table, and production dispatches it with the same `ctx.<mode>`', vacuity: 'an empty fact table is a violation, not a pass; the sample carries the proof', sample: 'detector' },
   { id: 'N37', title: 'no deprecated platform session-log accessor in production', incident: 'skill-reads.ts folded session.snapshotEvents() — the deprecated synchronous log read — so the family kept the deprecated surface alive in every composition', canonicalForm: 'the read-before-write fallback takes the family structural view (readEvents) or the platform projection; a deprecated accessor appears only as a registered capability probe', vacuity: 'no production line names an accessor ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N15', title: 'family code anchors resolve (Markdown, scripts and source comments)', incident: 'an anchor naming a line that no longer exists, in a document, a script or a source comment', canonicalForm: 'anchors resolve in every citation surface; symbolic references are preferred over line numbers', vacuity: 'no Markdown anchor in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
@@ -1629,6 +1693,11 @@ if (process.argv.includes('--list-rules')) {
       && wakeLocalKeys("const woke = typeof (invocation.agent as { followup?: unknown }).followup === 'function'").length === 0
       && wakeLocalKeys("const bad = typeof agent.followup === 'function' ? agent.followup : null").length > 0],
     ['N14', () => swallowCatchKeys('try {\n  const x = await readFile(p)\n} catch {\n  return []\n}\n').length > 0],
+    ['N32', () => serviceReadViolationsFrom("{ service: 'tools', feature: 'x', side: 'host' }", [{ rel: 'a/src/x.ts', text: "const t = ctx.tools" }]).some(message => message.includes('ctx.tools'))
+      && serviceReadViolationsFrom("{ service: 'tools', feature: 'x', side: 'host' }", [{ rel: 'a/src/x.ts', text: "export const inject = ['tools']\nconst t = ctx.tools" }]).length === 0
+      && serviceReadViolationsFrom("{ service: 'tools', feature: 'x', side: 'host' }", [{ rel: 'a/src/x.ts', text: "static inject = ['tools']\nconst t = ctx.tools" }]).length === 0
+      && serviceReadViolationsFrom("{ service: 'tools', feature: 'x', side: 'host' }", [{ rel: 'a/src/x.ts', text: "const seat = ctx.get('tools')\n// ctx.tools in prose only" }]).length === 0
+      && serviceReadViolationsFrom('// no table rows', []).length === 1],
     ['N33', () => eventModeViolationsFrom('| `evolution/x` | emit (notification) | p |', [{ rel: 'a/src/x.ts', text: "'evolution/x'(event: E): void" }]).some(message => message.includes('carries no @mode'))
       && eventModeViolationsFrom('| `evolution/x` | emit (notification) | p |', [{ rel: 'a/src/x.ts', text: "/**\n * @mode emit\n */\n'evolution/x'(event: E): void" }, { rel: 'b/src/y.ts', text: "ctx.emit('evolution/x', e)" }]).length === 0
       && eventModeViolationsFrom('| `evolution/x` | emit (notification) | p |', [{ rel: 'a/src/x.ts', text: "/**\n * @mode waterfall\n */\n'evolution/x'(event: E): void" }, { rel: 'b/src/y.ts', text: "ctx.emit('evolution/x', e)" }]).some(message => message.includes('declares @mode waterfall'))
@@ -1763,6 +1832,7 @@ violations.push(...docAnchorViolations(root, new Set(readdirSync(root, { withFil
   .map(entry => entry.name))))
 
 // N19 runs as a whole-tree pass as well (Markdown + the single-source table).
+violations.push(...serviceReadViolations(root).map(message => `rule N32: ${message}`))
 violations.push(...eventModeViolations(root).map(message => `rule N33: ${message}`))
 const docFacts = docFactViolations(root)
 violations.push(...docFacts.violations)
