@@ -130,7 +130,9 @@ export function apply(ctx: ClientContext): void {
 
   seam.slots.inject(CARD_SLOT, function* () {
     for (const section of CLIENT_PARAM_SECTIONS) {
-      const source: ParamSectionSource = sources.sourceFor(section.namespace)
+      // A73: the SEAT is looked up by its own key — the settings namespace below is the WRITE target
+      // (and the slot key), and a Host may key the two differently.
+      const source: ParamSectionSource = sources.sourceFor(section.seatKey)
       const { mutateOnce, clear } = writeFaceFor(probe, section.namespace)
       const face = (): ParamCardFace => ({
         namespace: section.namespace,

@@ -25,15 +25,22 @@ export interface ClientParamField {
   valueLabels: readonly string[]
 }
 
-/** One card: the settings namespace plus the fields it exposes. */
+/** One card: the settings namespace it writes through, the SEAT key its source is looked up by,
+ * and the fields it exposes. A73 (`ClientParamSection.namespace` 一名字两义): the two roles are
+ * spelled separately so a Host may key them differently — `namespace` is what a save writes into
+ * (`update(namespace, patch)`) and what the card title is looked up by; `seatKey` is what the
+ * shell's `sources.sourceFor(...)` probes. Both are the LOADER ROW ID today. */
 export interface ClientParamSection {
   namespace: string
+  /** The settings-card seat key the shell probes for this section's source. */
+  seatKey: string
   fields: readonly ClientParamField[]
 }
 
 export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
   {
     namespace: 'evolution-curator',
+    seatKey: 'evolution-curator',
     fields: [
       { id: 'curatorIntervalHours', group: 'curator', doc: 'Minimum hours between deterministic curation passes.', label: '自动整理间隔', hint: '两次自动整理之间至少间隔多少小时。', control: 'number', unit: '小时', values: [], valueLabels: [] },
       { id: 'staleAfterDays', group: 'curator', doc: 'Inactive days before a skill counts as stale.', label: '多久没用算过时', hint: '技能连续多少天没被用到就算过时。', control: 'number', unit: '天', values: [], valueLabels: [] },
@@ -51,6 +58,7 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
   },
   {
     namespace: 'evolution-review',
+    seatKey: 'evolution-review',
     fields: [
       { id: 'reviewSkillInterval', group: 'review', doc: 'Tool calls between skill-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself used a skill.', label: '技能检查间隔', hint: '每累计多少次工具调用检查一次技能：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到技能则只算 1 次。', control: 'number', unit: '次', values: [], valueLabels: [] },
       { id: 'reviewMemoryInterval', group: 'review', doc: 'Tool calls between memory-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself touched memory.', label: '记忆检查间隔', hint: '每累计多少次工具调用检查一次记忆：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到记忆则只算 1 次。', control: 'number', unit: '次', values: [], valueLabels: [] },
@@ -63,6 +71,7 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
   },
   {
     namespace: 'memory-files',
+    seatKey: 'memory-files',
     fields: [
       { id: 'memoryChars', group: 'memory', doc: 'Character budget the memory store enforces for MEMORY.md.', label: '记忆库上限', hint: '长期记忆文件（MEMORY.md）最多多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
       { id: 'userChars', group: 'memory', doc: 'Character budget the memory store enforces for USER.md.', label: '用户画像上限', hint: '用户画像文件（USER.md）最多多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
@@ -72,12 +81,14 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
   },
   {
     namespace: 'tool-memory',
+    seatKey: 'tool-memory',
     fields: [
       { id: 'entryPreviewChars', group: 'memory', doc: 'Characters of one memory entry shown in a tool result preview.', label: '记忆预览长度', hint: '列表里每条记忆最多显示多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [] },
     ],
   },
   {
     namespace: 'tool-skill-manage',
+    seatKey: 'tool-skill-manage',
     fields: [
       { id: 'skillContentChars', group: 'write-caps', doc: 'Character cap on a SKILL.md body (tighten-only).', label: '技能文件正文上限', hint: '技能 Markdown 正文最多多少字符（只能调小）。', control: 'number', unit: '字符', values: [], valueLabels: [] },
       { id: 'maxSkillFileBytes', group: 'write-caps', doc: 'Byte cap on one support file (tighten-only).', label: '附带文件大小上限', hint: '技能附带文件单个最大多少字节（只能调小）。', control: 'number', unit: '字节', values: [], valueLabels: [] },

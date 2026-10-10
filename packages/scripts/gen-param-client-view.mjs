@@ -122,9 +122,15 @@ const lines = [
   "  valueLabels: readonly string[]",
   "}",
   "",
-  "/** One card: the settings namespace plus the fields it exposes. */",
+  "/** One card: the settings namespace it writes through, the SEAT key its source is looked up by,",
+  " * and the fields it exposes. A73 (`ClientParamSection.namespace` 一名字两义): the two roles are",
+  " * spelled separately so a Host may key them differently — `namespace` is what a save writes into",
+  " * (`update(namespace, patch)`) and what the card title is looked up by; `seatKey` is what the",
+  " * shell's `sources.sourceFor(...)` probes. Both are the LOADER ROW ID today. */",
   "export interface ClientParamSection {",
   "  namespace: string",
+  "  /** The settings-card seat key the shell probes for this section's source. */",
+  "  seatKey: string",
   "  fields: readonly ClientParamField[]",
   "}",
   "",
@@ -133,6 +139,8 @@ const lines = [
 for (const [namespace, fields] of ordered) {
   lines.push('  {')
   lines.push('    namespace: ' + single(namespace) + ',')
+  // A73: the seat key is emitted as its own field, from the same registry value today.
+  lines.push('    seatKey: ' + single(namespace) + ',')
   lines.push('    fields: [')
   for (const field of fields) {
     const values = '[' + field.values.map(single).join(', ') + ']'
