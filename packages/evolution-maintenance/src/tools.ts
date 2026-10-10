@@ -86,6 +86,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // probe must observe the CURRENT tree, and the family ships no
           // runId-scoped snapshot store. Revisit only with a measured need
           // (a large library where probe latency becomes visible).
+          //
+          // 0.18.1 (S1, measured 2026-10-10): that revisit condition was
+          // evaluated and is NOT met. One probe costs 188/220/225 ms on the
+          // deployed library (28 skills / 418 KB) and scales linearly at
+          // ~5.5 ms per skill (100 skills 0.4-0.6 s, 400 skills 1.9-2.5 s).
+          // The interaction wall measured on the desktop plane is ~305 s, so
+          // roughly 5e4 skills would be needed to reach it. This tool therefore
+          // declares no budget: a `timeoutMs` here could never fire, and it
+          // would sit beside the family's ONE real long-run budget (the
+          // maintain command's config-derived `maintainTimeoutMs`, applied at
+          // orchestrate.ts:335-352 and handed to the platform spawn's signal).
+          // Reopen this note when the library approaches ~1e4 skills, when the
+          // `evolutionIo` provider stops being local, or when a model leg
+          // enters a tool's execute.
           const enrichment = await buildEnrichment(ctx, library)
           // T3-02/A30: through the SHARED mapping — this call used to spell the option
           // list out itself and had silently lost `liveness`, so every probe answered
