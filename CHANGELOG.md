@@ -1,6 +1,14 @@
 # Changelog
 
 
+## 0.19.2 (patch) — 跨面 run 状态的**写侧**规则：已结算的别面 run 不再被本面写回 running
+
+> **由来**：0.19.1 修的是**读**侧（已知 id 按索引刷新）；同一条缺陷还有**写**侧的另一半，被独立复核的 A/B 实测抓出（它拿 0.19.1 源码对**已发布的 0.19.0 安装字节**做同 home 对照，五格：主缺陷／单调／自拥有为准／write-through 全过，H1 红）。本版补写侧，并把复核点名的两处债一并收掉。
+> **H1（写侧没有所有权规则）**：`persist()` 的合并是「内存里每一条都覆盖磁盘」，而采纳只发生在**读**时；`begin()`／`settle()`／`cancel()` 都**不**先读 ⇒ 触发路径：观察面采纳别面在飞的 run（此刻它没有 `endedAt`／`resultRef`）→ 别面结算（磁盘 `succeeded` ＋ `resultRef`）→ 观察面因自己的 run `begin()`＋`settle()` 落一次盘 ⇒ **已结算的行被写回 `running`**：终态与 `resultRef` 从索引里消失，而那条幽灵 run 的 `pid` 还活着 ⇒ 别的面把它当**在飞**，守卫被占。修法：`persist()` 合并时对**本进程不拥有**的行加一条规则——磁盘已终态而内存还在 `running` ⇒ **不写**（所有权判据就是 `controllers`：`begin()` 登记、`settle()` 释放）。
+> **两处债（复核点名）**：① 孤儿判定原在**两处**各写一遍（同一文案、同一构造）⇒ 抽成 `orphanOf(record)` ＋ `ORPHAN_FAILURE` 常量（家族口径「近义重复按缺陷处理」）；② 采纳原本 `records[i] = record` **换对象身份** ⇒ 改**原地** `Object.assign`（并清掉已结算行不再携带的 `endedAt`／`resultRef`／`failure`），跨 `load()` 持有引用的读者看到的是同一个对象。
+> **文档**：`packages/docs/known-limitations.md` 第 13 条补两条边界——**必须同机**（`isProcessAlive(pid)` 只在同机成立；跨机共享同一 home 会把活主判成 orphan，而单调规则让这个错判**不可自愈**）与**单调保证**（终态永不退回 `running`，也不再被别面的写回覆盖）；`evolution-commands/README.md` 同段补写侧保证。
+> **验收**：`run-registry.spec.ts` **14 例**（+1：别面 run 已结算而本进程不读就写，索引里仍是 `succeeded` 且 `resultRef` 保留；既有 P1-2 例加一条「持有的引用随采纳一起 heal」）；受影响三文件 **142 例全绿**（registry 14 ＋ commands 53 ＋ curator 75）。
+
 ## 0.19.1 (patch) — 跨面 run 状态修正：观察面不再永久谎报 running；起 run 先落盘再答「started」
 
 > **由来**：0.19.0 的复核 P1 修复（活的别面 run 读作**在飞**）在真机上带出一条**新的 P1**；本版修它，并把复核报的 P2（起 run 的行与那句「started」之间的窗口）一并收掉——一次补丁不连发。

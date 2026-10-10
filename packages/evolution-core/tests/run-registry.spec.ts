@@ -214,6 +214,9 @@ describe('core run registry (S2)', () => {
     const registry = newRunRegistry({ io, home: dir })
     await registry.load()
     expect(registry.inFlight()?.id).toBe('other-plane')
+    // A reader that held the record across the load must see the SAME object heal (the
+    // adoption is in place, not a replacement).
+    const held = registry.find('other-plane')
     // Its OWNER then settles it in the shared index — a record this process never owned.
     await writeFile(runsFile(dir), JSON.stringify({
       schemaVersion: RUNS_SCHEMA_VERSION,
@@ -222,6 +225,7 @@ describe('core run registry (S2)', () => {
     const reloaded = await registry.load()
     expect(reloaded.note, 'the adoption is reported, not silent').toContain('settled by their owner')
     expect(registry.find('other-plane')).toMatchObject({ state: 'cancelled', failure: 'cancelled by operator' })
+    expect(held, 'the held reference healed with it').toMatchObject({ state: 'cancelled' })
     // The guard and the cooldown read this same in-memory record: a run that already
     // settled must not refuse the next scan here.
     expect(registry.inFlight()).toBeUndefined()
@@ -265,5 +269,30 @@ describe('core run registry (S2)', () => {
     expect(registry.find('owner-died')?.state).toBe('failed')
     expect(registry.find('owner-died')?.failure).toContain('no live owner')
     expect(registry.inFlight(), 'a dead owner cannot hold the guard').toBeUndefined()
+  })
+
+  it('never writes a foreign run back to running over the terminal row its owner wrote (review H1)', async () => {
+    const dir = await home()
+    const io = nodeEvolutionIo()
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'foreign-h1', kind: 'maintain', state: 'running', startedAt: 21, pid: process.pid }],
+    }), 'utf8')
+    const registry = newRunRegistry({ io, home: dir })
+    await registry.load()
+    expect(registry.inFlight()?.id).toBe('foreign-h1')
+    // Its owner settles it, and THEN this process writes for its own reasons without a
+    // read in between (begin()/settle() do not load): the settled row must survive.
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'foreign-h1', kind: 'maintain', state: 'succeeded', startedAt: 21, pid: process.pid, endedAt: 22, resultRef: join(dir, 'reports', 'maintain-foreign-h1.json') }],
+    }), 'utf8')
+    const mine = await registry.begin('maintain')
+    await registry.settle(mine.id, { state: 'succeeded' })
+    const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ id: string; state: string; resultRef?: string }> }
+    const row = persisted.runs.find(record => record.id === 'foreign-h1')
+    expect(row, 'the foreign row is still in the index').toBeDefined()
+    expect(row?.state, 'a settled foreign run is not resurrected as running').toBe('succeeded')
+    expect(row?.resultRef).toBe(join(dir, 'reports', 'maintain-foreign-h1.json'))
   })
 })

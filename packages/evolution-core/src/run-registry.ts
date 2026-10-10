@@ -196,6 +196,11 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
 
   const ordered = (): RunRecord[] => [...records].sort((a, b) => b.startedAt - a.startedAt)
 
+  /** The ONE wording of the orphan verdict — read-time convergence says it in two places. */
+  const ORPHAN_FAILURE = 'no live owner process — the run was interrupted before it settled (orphan)'
+  /** A `running` record whose owner is gone, as the index must show it. */
+  const orphanOf = (record: RunRecord): RunRecord => ({ ...record, state: 'failed', endedAt: now(), failure: ORPHAN_FAILURE })
+
   /** Keep every RUNNING record plus the newest terminal ones: memory and the
    * index share one cap, so the two can never disagree about the history. */
   const trim = (): void => {
@@ -220,8 +225,16 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         const onDisk = parseIndex(current)
         const merged = new Map<string, RunRecord>()
         for (const record of onDisk.records) merged.set(record.id, record)
-        // This process's own records win: it knows their state better than a file.
-        for (const record of records) merged.set(record.id, record)
+        // This process's own records win: it knows their state better than a file — but a
+        // row this process does NOT own must never be written back as `running` over the
+        // terminal state its owner already wrote (0.19.2, review H1). Adoption happens at
+        // read time, while begin()/settle()/cancel() persist WITHOUT a read in between, so
+        // the write side needs the same rule or a settled foreign run is resurrected.
+        for (const record of records) {
+          const onDiskRow = merged.get(record.id)
+          if (!controllers.has(record.id) && onDiskRow !== undefined && TERMINAL.has(onDiskRow.state) && !TERMINAL.has(record.state)) continue
+          merged.set(record.id, record)
+        }
         const view = [...merged.values()].sort((a, b) => b.startedAt - a.startedAt)
         const live = view.filter(record => record.state === 'running')
         const done = view.filter(record => TERMINAL.has(record.state)).slice(0, maxRecords)
@@ -267,10 +280,15 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
           // memory as the truth: this process is what ends it.
           if (!controllers.has(record.id) && !TERMINAL.has(known.state)) {
             if (TERMINAL.has(record.state)) {
-              records[knownIndex] = record
+              // Adopt IN PLACE: a reader that held this record across the load keeps a live
+              // view, and the fields the settled row dropped are cleared, not inherited.
+              delete known.endedAt
+              delete known.resultRef
+              delete known.failure
+              Object.assign(known, record)
               healed++
             } else if (record.pid === undefined || !isProcessAlive(record.pid)) {
-              records[knownIndex] = { ...record, state: 'failed', endedAt: now(), failure: 'no live owner process — the run was interrupted before it settled (orphan)' }
+              records[knownIndex] = orphanOf(record)
               converged++
             }
           }
@@ -290,7 +308,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
           continue
         }
         converged++
-        records.push({ ...record, state: 'failed', endedAt: now(), failure: 'no live owner process — the run was interrupted before it settled (orphan)' })
+        records.push(orphanOf(record))
       }
       if (converged > 0 || healed > 0) await persist()
       const notes = [
