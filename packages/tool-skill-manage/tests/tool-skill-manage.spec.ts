@@ -764,7 +764,7 @@ it('P1-13: a staged update of a missing skill is refused when the skill appears 
     saveReviewState: async () => {},
   })
   await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
-  const session = { id: 'p113', header: { origin: undefined }, snapshotEvents: () => [] }
+  const session = { id: 'p113', header: { origin: undefined }, readEvents: () => [] }
   const staged = await ctx.tools.execute({
     callId: ToolCallId(`p113-${Math.random()}`),
     name: 'skill_manage',
@@ -812,7 +812,7 @@ it('P1-13: approving the staged update is refused once the skill exists', async 
   await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
   // Same staging route as the sibling test (the TOOL), so the anchor under test is the
   // one the product writes, not a hand-built payload.
-  const session = { id: 'p113b', header: { origin: undefined }, snapshotEvents: () => [] }
+  const session = { id: 'p113b', header: { origin: undefined }, readEvents: () => [] }
   const toolStaged = await ctx.tools.execute({
     callId: ToolCallId(`p113b-${Math.random()}`),
     name: 'skill_manage',
@@ -944,7 +944,7 @@ it('P2-7: a patch missing new_string is refused before the approval seam — app
     requests += 1
     return realRequest(input)
   }
-  const session = { id: 'p27', header: { origin: undefined }, snapshotEvents: () => [] }
+  const session = { id: 'p27', header: { origin: undefined }, readEvents: () => [] }
   const execute = (args: Record<string, unknown>) => ctx.tools.execute({
     callId: ToolCallId(`p27-${Math.random()}`),
     name: 'skill_manage',

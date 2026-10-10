@@ -13,7 +13,8 @@
  * path's gate, whose exec view may be a bare stub): it answers "which accessor, and what does an
  * unreadable session mean" — `undefined`, so the gate keeps its previous behavior instead of
  * refusing every write. The review path reads a real platform `Session` and calls the reader
- * directly; a fallback there would be dead code for an impossible case.
+ * directly; a fallback there would be dead code for an impossible case. The structural accessor is
+ * the family's OWN `readEvents` (A69): production reads no deprecated platform log accessor.
  *
  * v32 REV-06(a) is preserved by the dispatch normalizer: a skill counts as READ only when its read
  * did not fail, so a failed/timeout read cannot pass the gate and let a writer blind-overwrite
@@ -27,10 +28,18 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { collectReadSkillNames } from './tool-dispatch.ts'
 import { sessionReadNames } from './session-projection.ts'
 
-/** The session-log accessor the platform exposes (0.1.5 on; `session.events` before it). */
+/**
+ * The family's OWN structural view of a session log, for a caller that holds no platform `Session`
+ * (the tool path's exec view may be a bare stub). The CALLER supplies it — the family reads no
+ * deprecated platform accessor (`snapshotEvents`/`eventAt`/`ownEvents`): those are the platform's own
+ * migration debt, and a family that reads them keeps the deprecated surface alive in every
+ * composition (A69 / 6-2). A platform `Session` does not carry this member and therefore takes the
+ * projection path below; this view exists so the fallback still has a basis instead of being deleted
+ * (deleting it would leave a stub session's read-before-write gate with nothing to fold).
+ */
 export interface EvolutionSessionLogView {
-  /** @returns the session's events, oldest first. */
-  snapshotEvents?: () => Iterable<{ type: string; data?: unknown }>
+  /** @returns the events this view can see, oldest first; absent when the caller has no log. */
+  readEvents?: () => Iterable<{ type: string; data?: unknown }>
 }
 
 /**
@@ -52,7 +61,7 @@ export function sessionReadSkillNames(ctx: Context, session: EvolutionSessionLog
   if (session === undefined) return undefined
   const projected = sessionReadNames(ctx, session as Session)
   if (projected !== undefined) return projected
-  const events = session.snapshotEvents?.()
+  const events = session.readEvents?.()
   return events === undefined ? undefined : collectReadSkillNames(events)
 }
 

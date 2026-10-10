@@ -20,7 +20,7 @@ import { tempHome } from '../../test-support/temp-home.ts'
 
 /** A session stub: the exec path reads the id, the origin header and the event log. */
 function sessionOf(origin: string | undefined, events: readonly unknown[] = []) {
-  return { id: `gate-${Math.random()}`, header: { origin }, snapshotEvents: () => events }
+  return { id: `gate-${Math.random()}`, header: { origin }, readEvents: () => events }
 }
 
 /**
@@ -415,13 +415,13 @@ describe('write gates: the foreground confirmation (E-317)', () => {
   it('re-resolves the registry live root when the forwarded agent is not the live instance', async () => {
     const { ctx } = await setup()
     const sessionId = 'wg-confirm-live'
-    const session = { id: sessionId, header: {}, snapshotEvents: () => [] }
+    const session = { id: sessionId, header: {}, readEvents: () => [] }
     const live = { id: sessionId, session, ctx, inject: () => {} } as unknown as Agent
     await ctx.agents.register(live)
     const { asked, routing } = mountQuestions(ctx, () => ['Create'], agent => agent === live)
     // A structural copy carrying the same session id: the platform rejects it as CALLER_NOT_LIVE,
     // so the gate has to route through the registry's live root instead.
-    const forwarded = { id: sessionId, header: { origin: undefined }, snapshotEvents: () => [] }
+    const forwarded = { id: sessionId, header: { origin: undefined }, readEvents: () => [] }
     const created = await callTool(ctx, { action: 'create', name: 'confirm-live', content: skillBody('confirm-live') }, forwarded)
     expect(valueOf(created).ok, valueOf(created).message).toBe(true)
     expect(asked).toHaveLength(1)

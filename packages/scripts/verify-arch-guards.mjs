@@ -237,6 +237,10 @@
  *       a new citation fails, and the register burns down as files are touched — the fix is the one
  *       S2.7 applied to the family's own comments, a symbol citation instead of a line number.
  *       `packages/docs/**` (the machine-local archive) is fenced by name.
+ *   N37. family production code reads no DEPRECATED platform session-log accessor
+ *        (`snapshotEvents`/`eventAt`/`ownEvents`): the read-before-write fallback takes the family
+ *        structural view (`readEvents`), and the projection registry's capability probe is the one
+ *        registered exception (A69 / audit 6-2).
  *   N36. the EXPRESSION form of the N14 swallow is a FROZEN BASELINE. N14's regex requires the
  *       `catch` to be followed by `{`, so `await io.readText(p).catch(() => null)` — a read
  *       FAILURE served as ABSENT — was structurally invisible while the family's own register
@@ -441,6 +445,27 @@ const ABSENT_CATCH_RE = /\.catch\s*\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*(
  * when T2-07/A22 deleted the invocation map's second read), and an empty table is the class closed:
  * any NEW expression-form swallow of a durable read is a violation, not a debt. */
 const SWALLOWED_READ_BASELINE = new Map()
+
+/** N37: a READ of a deprecated platform session-log accessor. Comment-only lines are skipped — the
+ * family documents the migration in prose (`*`/`//` lines name the accessors on purpose) — and the
+ * register excuses the capability probes, whose grain is ONE code line per file. */
+function deprecatedLogAccessorLines(text) {
+  const out = []
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    const trimmed = line.trim()
+    if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue
+    if (DEPRECATED_LOG_ACCESSOR_RE.test(line)) out.push(index + 1)
+  }
+  return out
+}
+/** The deprecated synchronous log reads the platform keeps for older logic (0.2.x deprecation). */
+const DEPRECATED_LOG_ACCESSOR_RE = /\.(snapshotEvents|eventAt|ownEvents)\b/
+/** Registered capability probes: `isProjectableSession` asks whether an object carries the accessors
+ * at all before the registry folds it (it reads no history; oxlint's no-deprecated is disabled on
+ * those two lines for the same reason). Grain = one code line. */
+const DEPRECATED_LOG_ACCESSOR_REGISTER = new Map([
+  ['evolution-core/src/session-projection.ts', 2],
+])
 
 const APPROVAL_SRC = 'evolution-approval/src'
 const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
@@ -697,6 +722,7 @@ const RULES = [
   { id: 'N13a', title: 'must-execute payload not on the non-waking primitive', incident: 'a must-execute payload sent through the non-waking primitive', canonicalForm: 'must-execute payloads use the waking primitive (followup)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N13b', title: 'wake primitive called on its receiver', incident: 'the wake primitive detached (destructured or aliased) and then called', canonicalForm: 'the wake primitive is called on its receiver: agent.followup(message)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N14', title: 'durable-read failure not served as absent', incident: 'catch { return [] }: a read failure served as absent', canonicalForm: 'Probe<T> three states; a failure keeps its reason', vacuity: 'an empty swallow register is clean by design; the sample carries the proof', sample: 'detector' },
+  { id: 'N37', title: 'no deprecated platform session-log accessor in production', incident: 'skill-reads.ts folded session.snapshotEvents() — the deprecated synchronous log read — so the family kept the deprecated surface alive in every composition', canonicalForm: 'the read-before-write fallback takes the family structural view (readEvents) or the platform projection; a deprecated accessor appears only as a registered capability probe', vacuity: 'no production line names an accessor ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N15', title: 'family code anchors resolve (Markdown, scripts and source comments)', incident: 'an anchor naming a line that no longer exists, in a document, a script or a source comment', canonicalForm: 'anchors resolve in every citation surface; symbolic references are preferred over line numbers', vacuity: 'no Markdown anchor in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N16', title: 'platform registry read asks in the calling scope', incident: 'ctx.get(<registry>) followed by r.get(name) without a scope', canonicalForm: 'the read asks in the calling scope: r.get(name, scope)', vacuity: 'no registry read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N17', title: 'dispatch modality is read in registered sites only', incident: 'branching on dispatch.kind outside the registered sites', canonicalForm: 'the single vocabulary reader is consulted only where registered', vacuity: 'no modality branch in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
@@ -1383,6 +1409,16 @@ function walk(dir) {
           violations.push(`${rel}: ${swallowed.length - allowedSwallows} NEW read failure(s) served as absent (line ${swallowed.join(', ')}) — a durable read's failure is not "absent" (rule N36); read it with probeText/probeList/probeMtime. Frozen baseline for this file: ${allowedSwallows}`)
         }
       }
+      // N37 (6-2/A69): deprecated platform session-log accessors — see the docblock. PRODUCTION only:
+      // the specs build Session-shaped stubs on purpose (they exercise the projection the platform
+      // registry drives), so a test file naming the accessors is a fixture, not a family read.
+      if (rel.includes('/src/')) {
+        const accessors = deprecatedLogAccessorLines(text)
+        const allowedAccessors = DEPRECATED_LOG_ACCESSOR_REGISTER.get(rel) ?? 0
+        if (accessors.length > allowedAccessors) {
+          violations.push(`${rel}: ${accessors.length - allowedAccessors} deprecated session-log accessor read(s) (line ${accessors.join(', ')}) — the platform deprecates the synchronous log reads; take the family structural view (readEvents) or the projection instead (rule N37). Registered capability probes for this file: ${allowedAccessors}`)
+        }
+      }
       // N23 (C5/B13, 0.8.0): raw durable-file writes live in the IO seam — see docblock.
       if (rel.includes('/src/') && !IO_SEAM_WRITERS.has(rel) && !RAW_WRITE_REGISTER.has(rel)) {
         for (const api of fsWriteImports(text)) {
@@ -1517,6 +1553,13 @@ if (process.argv.includes('--list-rules')) {
       && wakeLocalKeys("const woke = typeof (invocation.agent as { followup?: unknown }).followup === 'function'").length === 0
       && wakeLocalKeys("const bad = typeof agent.followup === 'function' ? agent.followup : null").length > 0],
     ['N14', () => swallowCatchKeys('try {\n  const x = await readFile(p)\n} catch {\n  return []\n}\n').length > 0],
+    ['N37', () => deprecatedLogAccessorLines('const events = session.snapshotEvents?.()').length === 1
+      && deprecatedLogAccessorLines('  const at = session.eventAt(seq)').length === 1
+      && deprecatedLogAccessorLines('const own = candidate.ownEvents()').length === 1
+      && deprecatedLogAccessorLines('const events = session.readEvents?.()').length === 0
+      && deprecatedLogAccessorLines(' * 0.2.x deprecates the synchronous `Session.snapshotEvents` reads').length === 0
+      && deprecatedLogAccessorLines("  // (`snapshotEvents()` from 0.1.5 on), so the SESSION rides the request.").length === 0],
+
     // Each sample is the incident shape the rule exists for: an empty table, an
     // unnamed fact, a fact with no home, a fact with nothing to check.
     ['N19', () => factTableProblems({ facts: [] }).length > 0

@@ -288,16 +288,17 @@ interface SkillWriteArgs {
  * The execution context this tool reads, as a minimal structural view of the platform's
  * `ToolRunContext` (extra fields are ignored).
  *
- * `snapshotEvents()` is the 0.1.5-onward accessor for a session's log (plain `session.events`
- * before it) and is what the read-before-write gate folds; a session object that does not expose it
- * is "not readable", never "nothing was read".
+ * `readEvents()` is the FAMILY's structural log view (core `EvolutionSessionLogView`, A69) and is
+ * what the read-before-write gate folds; a platform `Session` does not carry it and takes the
+ * projection path instead, while a session object that exposes neither is "not readable", never
+ * "nothing was read".
  */
 interface SkillToolExec {
   agent?: {
     session?: {
       id: string
       header: { origin?: string }
-      snapshotEvents?: () => Iterable<{ type: string; data?: unknown }>
+      readEvents?: () => Iterable<{ type: string; data?: unknown }>
     }
   }
   /** The call's cancellation, forwarded to the confirmation prompt so a cancelled call cannot leave
