@@ -232,7 +232,9 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         // the write side needs the same rule or a settled foreign run is resurrected.
         for (const record of records) {
           const onDiskRow = merged.get(record.id)
-          if (!controllers.has(record.id) && onDiskRow !== undefined && TERMINAL.has(onDiskRow.state) && !TERMINAL.has(record.state)) continue
+          const settledElsewhere = onDiskRow !== undefined && TERMINAL.has(onDiskRow.state) && !TERMINAL.has(record.state)
+          // Skip exactly that one case; everything else this process knows still wins.
+          if (!controllers.has(record.id) && settledElsewhere) continue
           merged.set(record.id, record)
         }
         const view = [...merged.values()].sort((a, b) => b.startedAt - a.startedAt)
