@@ -11,6 +11,7 @@ section, and importing the package root is its only entry.
 
 ## Known limitations
 
+- **The family tree IS the platform's USER skill root.** `skillsRoot()` resolves to `<dshHome>/skills` — the root the platform's `skill-filesystem` serves at rank 400 — so "the same tree" holds while that root is enabled. Two divergences stay documented rather than mirrored: a platform row with `includeDefaultRoots:false` (or a composition without this family's catalog row) removes the only providers that serve the tree while family writes still succeed, and the platform's CWD-derived PROJECT roots (`<cwd>/.dsh/skills`, `<cwd>/.agents/skills`) are not read by the family at all, so `ctx.skills.get(name).path` and `SkillLibrary.read(name)` can name different files. Mirroring project roots is `U-3`, deliberately not started; point `customSkillDirs` (platform side) or `root` (family side) at a shared directory when the project tree has to be visible to both.
 - This package is a library, not a Cordis row; do not mount it as a plugin.
 - 数值配置已在消费方 Config 面钳制（`min 1`/各字段域）；`MemoryStore` 内部对 `limit <= 0` 仍按 unbounded 防御处理——那是库内部防御，不构成"0 = 禁用"的配置语义。
 - **Content-history storage grows with the number of DISTINCT bodies a skill has ever been written
