@@ -250,7 +250,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (isAbsent(probe)) return ''
     return probe.value.filter(name => !name.startsWith('.')).sort().join('\n')
   }
-  async function summaries(): Promise<{ summaries: SkillSummary[]; complete: boolean }> {
+  /**
+   * ONE observation: the summaries AND the invocation map derived from the SAME bytes.
+   *
+   * T2-V1/A26: the two caches are committed and cleared together, so handing them out together is what
+   * keeps a consumer from pairing one scan's listing with another generation's policies. Reading the
+   * module cache again after the scan (`invocationFor` used to do exactly that) meant a scan whose commit
+   * was skipped by a mid-flight drop published the FRESH summaries with the row default for every skill —
+   * a half-state that, for a `disable-model-invocation` opt-out, reads as model-invocable.
+   * `invocation === null` = no map was ever observed (a degraded scan with no cache): the row default
+   * applies, which is the same value an absent map entry gets.
+   */
+  async function summaries(): Promise<{ summaries: SkillSummary[]; invocation: ReadonlyMap<string, SkillInvocationPolicy> | null; complete: boolean }> {
     const stamp = await libraryStamp()
     if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) {
       // A9 (audit P2 low): `stamp === null` means the root LISTING failed, not
@@ -260,7 +271,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // reported (`complete: false`), so the registry re-consults instead of
       // caching; serving the stale names themselves keeps the catalog
       // available through the transient failure.
-      return { summaries: summariesCache, complete: stamp !== null }
+      return { summaries: summariesCache, invocation: invocationCache, complete: stamp !== null }
     }
     if (summariesCache !== null && stamp !== null) control?.invalidate()
     const epochAtScanStart = summariesEpoch
@@ -282,7 +293,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         lastScanWarn = message
         ctx.logger.warn(`evolution-skill-catalog: ${message}`)
       }
-      return { summaries: summariesCache ?? [], complete: false }
+      return { summaries: summariesCache ?? [], invocation: invocationCache, complete: false }
     }
     if (lastScanWarn !== '') {
       // v31 CAT-02: recovery after a degraded consult — the registry cached
@@ -314,8 +325,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     // A drop during the scan returns the scanned list to THIS caller (it is
     // a coherent snapshot) but leaves the cache empty — the next consult
-    // rescans and observes the mutation.
-    return { summaries: scanned, complete: true }
+    // rescans and observes the mutation. The map handed back is the one built
+    // from THESE bytes (A26), whether or not the commit ran.
+    return { summaries: scanned, invocation: invocationMap, complete: true }
   }
   const dropSummariesCache = (): void => {
     summariesEpoch += 1
@@ -325,7 +337,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   // OPT-10: the row-level policy is the FALLBACK — a per-skill frontmatter
   // policy wins for that skill (absent entry = unparseable/unreadable file).
-  const invocationFor = (name: string): SkillInvocationPolicy => invocationCache?.get(name) ?? invocation
+  // T2-V1/A26: `observed` is REQUIRED and comes from the caller's own `summaries()` observation, so a
+  // publish cannot read a cache generation other than the one its listing came from.
+  const invocationFor = (
+    name: string,
+    observed: ReadonlyMap<string, SkillInvocationPolicy> | null,
+  ): SkillInvocationPolicy => observed?.get(name) ?? invocation
 
   const provider: SkillProvider = {
     name: 'dsh-evolution',
@@ -350,7 +367,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // frontmatter; this shadowing provider must too, or the host/UI routing
         // hint disappears while it shadows `skill-filesystem`.
         ...summary.whenToUse !== undefined ? { whenToUse: summary.whenToUse } : {},
-        invocation: invocationFor(summary.name),
+        invocation: invocationFor(summary.name, scan.invocation),
         source: 'user-dsh' as const,
         provider: 'dsh-evolution',
         rank: EVOLUTION_SKILL_RANK,
@@ -368,8 +385,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       options?.signal?.throwIfAborted()
       const name = candidate.name
       if (!visible(name)) return undefined
-      const all = (await summaries()).summaries
-      const summary = all.find(item => item.name === name)
+      const scan = await summaries()
+      const summary = scan.summaries.find(item => item.name === name)
       if (!summary) return undefined
       // P1-1 (v18): get() is the second publish path — an invalid candidate
       // must not reach the upstream registry here either.
@@ -392,7 +409,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         name,
         description: summary.description,
         ...summary.whenToUse !== undefined ? { whenToUse: summary.whenToUse } : {},
-        invocation: invocationFor(name),
+        invocation: invocationFor(name, scan.invocation),
         source: 'user-dsh',
         provider: 'dsh-evolution',
         resourceBase: { kind: 'directory', path: summary.path },

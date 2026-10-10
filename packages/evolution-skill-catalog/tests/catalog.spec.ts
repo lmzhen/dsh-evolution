@@ -353,6 +353,62 @@ describe('evolution-skill-catalog', () => {
     expect(loaded?.invocation).toEqual(listed?.invocation)
   })
 
+  it('T2-V1/A26: a consumer never pairs a scan with another generation policies (two drops mid-scan)', async () => {
+    const root = await tempRoot('dsh-skill-catalog-a26-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    const base = nodeEvolutionIo()
+    const target = join(root, 'zeta-skill', 'SKILL.md')
+    const make = (description: string) => `---\nname: zeta-skill\ndescription: ${description}\ndisable-model-invocation: true\n---\n\n# Zeta\n`
+    await base.writeText(target, make('Pre mutation.'))
+    // The registry is the provider's ONLY production consumer, and it re-collects after every
+    // invalidation — so this fixture drives the provider itself, the seam where the pair is handed out.
+    type ProviderShape = {
+      list(options: unknown): Promise<unknown>
+      get(candidate: { name: string }, options?: unknown): Promise<{ invocation?: { modelInvocable: boolean } } | undefined>
+    }
+    let provider: ProviderShape | undefined
+    let armed = false
+    let targetReads = 0
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let reached: () => void = () => {}
+    const atGate = new Promise<void>((resolve) => { reached = resolve })
+    ctx.evolutionIo.registerProvider({
+      name: 'gated',
+      ...base,
+      readText: async (path) => {
+        const text = await base.readText(path)
+        if (armed && path === target && (targetReads += 1) === 1) { reached(); await gate }
+        return text
+      },
+    })
+    ctx.provide('skills', {
+      registerProvider: (factory: (control: { invalidate(): void }) => ProviderShape) => {
+        provider = factory({ invalidate: () => {} })
+        return () => {}
+      },
+    })
+    await ctx.plugin(Catalog, { root })
+    armed = true
+    const pending = provider!.get({ name: 'zeta-skill' })
+    await atGate
+    // The edit keeps the opt-out and only rewrites the description; TWO drops land while this scan is
+    // paused, so its commit is skipped and nothing of this observation reaches the cache.
+    await base.writeText(target, make('Post mutation.'))
+    ctx.emit('evolution/skill-mutated', { action: 'update', name: 'zeta-skill' })
+    ctx.emit('evolution/skill-mutated', { action: 'update', name: 'zeta-skill' })
+    release()
+    const definition = await pending
+    // ① THE PAIR: the definition's summary and its policy come from the SAME bytes this observation
+    //    read. Reading the cache again instead published the row default — model-invocable, i.e. the
+    //    frontmatter opt-out silently ignored.
+    expect(definition?.invocation?.modelInvocable).toBe(false)
+    // ② ...and the settled state agrees: the drops emptied the cache, so this observation rescans and
+    //    reads the post-mutation bytes, where the opt-out is intact too.
+    expect((await provider!.get({ name: 'zeta-skill' }))?.invocation?.modelInvocable).toBe(false)
+  })
+
   it('T2-07/A22: one listing reads each SKILL.md ONCE — the invocation map shares the scan read', async () => {
     const root = await tempRoot('dsh-skill-catalog-one-read-')
     const ctx = new Context()
