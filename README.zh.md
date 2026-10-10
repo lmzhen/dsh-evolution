@@ -69,7 +69,7 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 |---|---|
 | 已验证的 DSH 平台线 | **`0.2.0-rc.2`**（`PLATFORM_VERSION`；钉住的开发基线是 `UPSTREAM_SHA=fb2c4b9e…`） |
 | 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` 依赖/peer 上都是 `^0.2.0-rc.1`（`PLATFORM_FLOOR`） |
-| 家族版本 | `0.17.1`（本树版本；npm 上的 tag 由发布 tag 决定——各形态状态见 `packages/INSTALL.md`） |
+| 家族版本 | `0.18.0`（本树版本；npm 上的 tag 由发布 tag 决定——各形态状态见 `packages/INSTALL.md`） |
 | Node | 22.19+ 或 24+（`engines`） |
 
 两个值回答两个问题：`PLATFORM_FLOOR` 是发布出去的 range 声明的口径，`PLATFORM_VERSION` 是门禁实际验证的那条线。floor 必须收得住整条线——`^0.2.0-rc.1` 收得住 `0.2.0-rc.2`，而 `^0.2.0-rc.2` 会拒绝它自己验证过的那个 rc。预发布 range 仍然不跨线：更早的预发布线在依赖解析阶段就失败，这是支持窗口，不是 bug。
