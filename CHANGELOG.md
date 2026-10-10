@@ -1,6 +1,15 @@
 # Changelog
 
 
+## 0.19.0 (minor) — 长跑生命周期归位：run registry、唯一结果家、maintain 异步化（长跑生命周期方案 · 批次 B）
+
+> **由来**：0.18.1 证明「墙在交互面」；本版把长跑的寿命从请求挪到插件，并给它一个终态与一个结果家。**唯一的行为契约变更**：`/evolution maintain` 由同步改异步。
+> **S2（core `RunRegistry` ＝唯一所有者）**：`{id,kind,state:running|succeeded|failed|cancelled,startedAt,endedAt,resultRef,failure}`；**不引入任何定时器**——上一进程留下的 `running` 在**读时**收敛为 `failed(orphan)`；**终态一次性**（`settle` 不覆盖已终态，取消与失败的竞态不会翻盘）；`cancel` 只对本进程拥有的 run 生效（别面正在跑的 run 不会被本进程标成 cancelled）；索引写是**事务式合并**（桌面与 web 共用 `DSH_HOME` ⇒ 两面互相看得见各自的 run，而不是互相覆盖）。`evolution-commands` 的三处模块级全局（`lastMaintainAt`／`lastMaintainRunId`／`maintainInFlightSince`）**删除**，并发守卫只剩注册表一套。
+> **S2（命令面与唯一结果家）**：`/evolution maintain` 起 run 后**立刻**回指针；新增 `maintain status [<id>]`／`report <id>`／`cancel <id>`；结果写一次到 `<evolutionHome>/reports/maintain-<runId>.{json,md}`（保留窗口由 core 的共享 sweep 管，与 curator 报告**共用同一把** `reports/.retention` 锁）；`report` 对「没有结果」与「读不了」分别明说，不渲染空计划。`--facts` 0-token 预览保持同步。
+> **S4（长跑清单与文档面）**：core `long-runs.ts` 是**唯一**的长跑事实点（id／kind／所有者／寿命／实测／预算／结果家），渲染成 `packages/README.md` 的 "Long-running work" 并被 `tests/long-runs.spec.ts` **逐字钉住**（T-WD2 同款）；`known-limitations` 第 11/12 条与 commands／maintenance／core 三份 README 写明用户可见后果；`upstream-contract-checklist` 补第 21 条「交互面单条请求寿命」（不在平台树内 ⇒ 记行为 ＋ 判定法 ＋ 触发，不硬塞成源码锚点）。
+> **验收**：轴 A 四条判定法（人为 abort 后可区分／dispose 收敛／重启后孤儿收敛／报告缺失明说）由 `evolution-core/tests/run-registry.spec.ts`（8 例）与 commands 的异步面夹具（+2）覆盖；家族预检 8 文件 **169** 例全绿；架构守卫 37 条 0 违规（N20 15 个写点，两个新写点均已声明）；参数通道校验 exit 0；桌面面命令秒回（起 run 即答）。
+> **独立复核与修复**：发布前做了对抗式只读复核（复核方自建 16 项断言探针 ＋ 逐条证伪），抓到 **1 个 P1** 与 6 个 P2。**P1**：core 的读时收敛会把**另一面正在跑**的 run 改写成 `failed(orphan)` 并落盘（桌面与 web 共用一个 `DSH_HOME`），反向也看不见对方的在飞 run、命令面还会答「No run <id> in this home」这种假话。修法三件：① 记录带 owner `pid`，**只收敛没有活主**的记录（无 pid 视为已死；活主保留为**在飞** ⇒ 并发守卫与冷却**跨面**生效）；② `cancel`／`cancelAll` 只对**本进程拥有**的 run 生效；③ 命令面**每次作答前刷新索引**，挂载之后才出现的 run 下一条命令就能看见。**P2 修 5 条**：索引不可读不再渲染成「还没有 run」；报告写失败**告警**且照样跑保留窗口；**未知 state 的记录不再被下一次写抹掉**（`schemaVersion` 不一致会被报出）；replay 的读失败只归因于**读本身**的拒绝；reports 的重用例补上它需要的超时。**记 1 条**：探针声明预算但不消费 `exec.signal`（平台到点替换结果而工具继续读完树——只读且 `isConcurrencySafe`，无写入危害）。
+
 ## 0.18.1 (patch) — 长跑预算与失败终态可区分（长跑生命周期方案 · 批次 A）
 
 > **由来**：`audit-v46-0.17.1/08` 的「长跑生命周期」方案先落**零行为变更**的一批：给唯一会长跑的家族工具补平台形状的预算、把「模型通道没跑完」从日志搬进持久报告、把这一类的审计口径补进规则。三条都不改任何正常路径的结果。
