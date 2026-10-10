@@ -443,9 +443,12 @@ const SWALLOWED_READ_BASELINE = new Map([
   ['evolution-core/src/skill-store.ts', 9],
   ['evolution-curator/src/index.ts', 1],
   ['evolution-feedback/src/index.ts', 1],
-  ['evolution-skill-catalog/src/index.ts', 1],
   ['evolution-state-json/src/index.ts', 3],
 ])
+// S5.6f (group 5, 2026): measured 17 sites in 5 files. The skill-catalog row is GONE — the site it
+// covered was the invocation map's second read, deleted by T2-07/A22 (the scan's own read carries the
+// frontmatter now), so the burn-down the docblock invites applies. The remaining 17 are the group-5
+// three-state sweep's worklist; the guard's debt line names the count every run.
 
 const APPROVAL_SRC = 'evolution-approval/src'
 const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
