@@ -2349,7 +2349,12 @@ export function buildReviewRequest(
 ): string {
   const messages: string[] = []
   const surface = session.deriveMessages()
-  for (const message of surface.slice(-maxMessages)) {
+  // T3-08/A36: the window is maxMessages of the data the review MUST see, not maxMessages of the raw
+  // surface. Slicing first and filtering after meant a long tool-heavy stretch filled the whole window
+  // with `tool` entries and the digest carried ZERO user/assistant turns — the review then judged the
+  // session without the conversation that produced it. Filter first, then take the tail (order kept).
+  const eligible = surface.filter((message) => message.role === 'user' || message.role === 'assistant').slice(-maxMessages)
+  for (const message of eligible) {
     if (message.role === 'user' || message.role === 'assistant') {
       // PLAN S4.1 (2026-09-16, audit P2-12): textOfPersistedBlock — a
       // persisted `content: [null]` must skip, not break the review leg.
