@@ -990,7 +990,7 @@ describe('evolution-commands', () => {
     let release: (() => void) | undefined
     const plan = { text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }
     ctx.provide('subagents', {
-      async start() { return { result: new Promise(resolve => { release = () => { resolve(plan) } }) } },
+      async start() { return { result: new Promise((resolve) => { release = () => { resolve(plan) } }) } },
     })
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const started = await handler!.handler({ rawInput: 'maintain' })
@@ -1030,7 +1030,7 @@ describe('evolution-commands', () => {
     ctx.provide('subagents', {
       async start(_kind: string, options: unknown) {
         capturedSignal = (options as { signal?: AbortSignal }).signal
-        return { result: new Promise(resolve => { release = () => { resolve(plan) } }) }
+        return { result: new Promise((resolve) => { release = () => { resolve(plan) } }) }
       },
     })
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
@@ -1215,8 +1215,10 @@ describe('evolution-commands', () => {
       }
       expect(raw).not.toBeNull()
       const parsed = JSON.parse(raw ?? '{}') as { events: Array<{ type?: string; recommendations?: number; verdict?: string }> }
-      const maintainEvents = parsed.events.filter(event => event.type === 'maintain')
-      expect(maintainEvents).toHaveLength(1)
+      const maintainEvents = parsed.events.filter(event => event.type === 'maintain') as Array<{ runId?: string; recommendations?: number; verdict?: string }>
+      // One event per RUN (the assertion names the ids, so a duplicate of the same run
+      // and a second run are told apart by the failure message itself).
+      expect(maintainEvents.map(event => event.runId), 'event runIds: ' + JSON.stringify(maintainEvents.map(event => event.runId))).toHaveLength(1)
       expect(maintainEvents[0]?.recommendations).toBe(1)
       expect(maintainEvents[0]?.verdict).toBe('issues')
     } finally {

@@ -129,8 +129,15 @@ async function syncRuns(registry: RunRegistry): Promise<{ ok: boolean; note?: st
   }
 }
 
-async function writeMaintainReport(io: EvolutionIoLike, record: MaintainReportRecord, warn: (message: string) => void): Promise<string | undefined> {
-  const dir = join(evolutionHome(), 'reports')
+async function writeMaintainReport(
+  io: EvolutionIoLike,
+  record: MaintainReportRecord,
+  warn: (message: string) => void,
+  evolutionHomePath: string,
+): Promise<string | undefined> {
+  // The home is bound when the RUN starts (passed in, not read here): a run belongs to
+  // the home it was started in, and a later home change must not misfile its report.
+  const dir = join(evolutionHomePath, 'reports')
   const path = join(dir, `maintain-${record.runId}.json`)
   let written = true
   try {
@@ -158,6 +165,8 @@ async function writeMaintainReport(io: EvolutionIoLike, record: MaintainReportRe
 
 /** Three-state read of a run's result: present, missing, or unreadable (never collapsed). */
 async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ kind: 'present'; text: string } | { kind: 'missing' } | { kind: 'unknown'; reason: string }> {
+  // A report is read from the home it was WRITTEN in (the registry record was created
+  // in this process's home); the fallback path exists for a record without resultRef.
   const path = record.resultRef ?? join(evolutionHome(), 'reports', `maintain-${record.id}.json`)
   const probed = await probeText(io, path)
   if (isUnknown(probed)) return { kind: 'unknown', reason: probed.reason }
@@ -191,7 +200,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const registry = newRunRegistry({
       io: ioRegistry.provider(),
       home: evolutionHome(),
-      warn: message => { ctx.logger.warn(message) },
+      warn: (message) => { ctx.logger.warn(message) },
     })
     runs = registry
     void registry.load().then((loaded) => {
@@ -748,9 +757,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // V10-08 (F-04): same contract as the in-flight refusal above.
             // P3-21 (v14): the newest TERMINAL run is named from the registry, so a
             // failed first scan no longer prints an empty id.
-            const latest = registry.runs().find(record => record.kind === 'maintain' && record.state !== 'running')
+            // The registry tracks ONE kind today (RunKind = 'maintain'), so the kind
+            // filter would be a comparison the type system already knows is true;
+            // re-add it when a second kind arrives.
+            const latest = registry.runs().find(record => record.state !== 'running')
             return err(`Maintenance cooldown active (${remaining}s)${latest === undefined ? '' : ` — latest run ${latest.id}`}; re-running now would spend another model call.`)
           }
+          // Bind the run's home ONCE, here: the report and the event are written
+          // after the scan settles, and they must land in the home this run started
+          // in (a DSH_HOME change in between used to misfile them — found by stressing
+          // the event-count fixture, where the two events carried different runIds).
+          const runHome = evolutionHome()
+          const runRoot = evolutionRoot()
           const handle = registry.begin('maintain')
           // Detached on purpose. The command answers with a POINTER while the scan
           // keeps working: its lifetime is the handle's, and what stops it is
@@ -806,7 +824,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 startedAt: handle.startedAt,
                 endedAt,
                 text: outcome.text ?? '',
-              }, message => { ctx.logger.warn(message) })
+              }, (message) => { ctx.logger.warn(message) }, runHome)
               const state = outcome.ok ? 'succeeded' : (handle.signal.aborted ? 'cancelled' : 'failed')
               await registry.settle(handle.id, {
                 state,
@@ -814,8 +832,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 ...(outcome.ok ? {} : { failure: handle.signal.aborted ? 'cancelled: the scan was stopped before it settled' : (outcome.error ?? 'Maintenance scan failed.') }),
               })
               if (outcome.ok) {
-                const home = evolutionRoot()
-                void appendEvolutionEvent(ioRegistry.provider(), eventsFile(home), {
+                void appendEvolutionEvent(ioRegistry.provider(), eventsFile(runRoot), {
                   type: 'maintain',
                   source: 'manual',
                   runId: handle.id,
@@ -869,7 +886,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // P2-1: "the history is unknown" and "there is no run" must not look alike.
             return err(`The run history of this home is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "no runs". Fix or remove <evolutionHome>/runs.json to start a clean history.`)
           }
-          const all = registry.runs().filter(record => record.kind === 'maintain')
+          const all = registry.runs()
           if (all.length === 0) return ok('No maintenance run recorded in this home yet — /evolution maintain starts one.')
           const live = all.filter(record => record.state === 'running')
           const recent = all.filter(record => record.state !== 'running').slice(0, 5)

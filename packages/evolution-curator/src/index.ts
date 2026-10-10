@@ -1808,7 +1808,7 @@ export class EvolutionCurator extends Service {
       io: this.io,
       dir: join(evolutionHome(), 'reports'),
       buckets: [{ prefix: 'curator-error-', keep: errorKeep }, { prefix: 'curator-', keep }],
-      warn: message => { this.ctx.logger.warn(message) },
+      warn: (message) => { this.ctx.logger.warn(message) },
       owner: 'evolution-curator',
     })
   }
