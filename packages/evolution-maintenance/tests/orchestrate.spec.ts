@@ -299,6 +299,22 @@ describe('runMaintain', () => {
     expect(capturedOptions?.prompt?.[0]?.text ?? '').toContain('MECHANICAL_FACTS')
   })
 
+  // G1 (0.20.0): the plan travels as a ledger — same array and order as the rendered [n]
+  // ids, with the confirmation count derived by the producer instead of by each reader.
+  it('carries the validated plan as a ledger with stable [n] ids (G1/0.20.0)', async () => {
+    const outcome = await runMaintain(runtime(validResult))
+    expect(outcome.ok).toBe(true)
+    const items = outcome.items ?? []
+    expect(items).toHaveLength(outcome.recommendationCount)
+    expect(items[0]?.names).toEqual(['fix-alignment-bad'])
+    expect(outcome.needsHumanCount).toBe(items.filter(item => item.needs_human).length)
+    expect(outcome.notes).toEqual([])
+    // The rendered entries carry the same order as the ids, and Notes lines stay unnumbered.
+    const entries = (outcome.text ?? '').split('\n').filter(line => /^- \[\d+\] \[/.test(line))
+    expect(entries).toHaveLength(items.length)
+    expect(entries[0]).toContain('[1] [skill-level] fix-alignment-bad')
+    expect((outcome.text ?? '').split('\n').filter(line => /^- \[\d+\] \[/.test(line) && line.includes('Notes:'))).toHaveLength(0)
+  })
   it('quality_low gate: unknown quality forces needs_human on all items (no usage data in Phase 2)', async () => {
     const outcome = await runMaintain(runtime(validResult))
     expect(outcome.ok).toBe(true)

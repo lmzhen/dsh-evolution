@@ -1221,6 +1221,21 @@ describe('evolution-commands', () => {
       expect(maintainEvents.map(event => event.runId), 'event runIds: ' + JSON.stringify(maintainEvents.map(event => event.runId))).toHaveLength(1)
       expect(maintainEvents[0]?.recommendations).toBe(1)
       expect(maintainEvents[0]?.verdict).toBe('issues')
+      // G1 (0.20.0): the report JSON is the ledger behind the rendered text — the plan
+      // entries ride along with the count the PRODUCER derived (no reader re-derives it).
+      const reportPath = join(home, 'evolution', 'reports', `maintain-${maintainEvents[0]?.runId}.json`)
+      const report = JSON.parse((await nodeEvolutionIo().readText(reportPath)) ?? '{}') as {
+        items?: Array<{ names: string[]; needs_human: boolean }>
+        needsHumanCount?: number
+        recommendationCount?: number
+        notes?: string[]
+        text?: string
+      }
+      expect(report.items).toHaveLength(report.recommendationCount ?? -1)
+      expect(report.items?.[0]?.names).toEqual(['demo-skill'])
+      expect(report.needsHumanCount).toBe((report.items ?? []).filter(item => item.needs_human).length)
+      expect(report.notes).toEqual(['a plain note'])
+      expect(report.text ?? '').toContain('[1] [skill-level] demo-skill')
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome

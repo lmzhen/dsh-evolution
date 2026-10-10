@@ -29,7 +29,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
 import { enrichmentSnapshotOptions, type Enrichment } from './enrichment.ts'
 import { renderFacts } from './render-facts.ts'
-import { validateAndNormalizeMaintainPlan, type ValidationResult } from './validate-plan.ts'
+import { validateAndNormalizeMaintainPlan, type MaintainPlanItem, type ValidationResult } from './validate-plan.ts'
 
 /** I-5 (v37): the platform's `SubagentStartRequest` fields this orchestrator sends.
  * Typed locally (not imported) because the platform type lives behind the subagent row this
@@ -124,6 +124,14 @@ export interface MaintainOutcome {
   verdict?: 'issues' | 'no_issues' | undefined
   text?: string | undefined
   forcedHuman?: string[] | undefined
+  /** G1 (0.20.0): the VALIDATED plan entries in render order — the report's machine-readable
+   * ledger. `formatPlan` numbers this same array with stable `[n]` ids, and
+   * `needsHumanCount` below is derived from it here, so no reader re-derives either. */
+  items?: MaintainPlanItem[] | undefined
+  /** The validated plan's notes, carried beside `items` so a reader never infers them. */
+  notes?: string[] | undefined
+  /** How many entries need the operator's confirmation (`needs_human`, gate included). */
+  needsHumanCount?: number | undefined
   /** V10-09 (F-05): structured count of recommendations in the VALIDATED plan
    * (plan entries, never notes). Consumers must read this field instead of
    * parsing the rendered `text` — the text is display-only. 0 on every
@@ -236,14 +244,17 @@ function formatPlan(validated: ValidationResult, runId: string): string {
     lines.push(...noteLines)
     return lines.join('\n')
   }
-  for (const item of plan.plan) {
+  // G1 (0.20.0): an entry's stable [n] id is its 1-based index in `plan.plan` — the SAME
+  // array the outcome carries as `items`, so "do 1, 3" maps to entries without parsing.
+  // Notes stay unnumbered on purpose: they are not actionable entries.
+  for (const [index, item] of plan.plan.entries()) {
     const flags = [
       item.impact,
       `rev=${item.reversibility}`,
       `conf=${item.confidence.toFixed(2)}`,
       item.needs_human ? 'HUMAN' : '',
     ].filter(Boolean)
-    lines.push(`- [${item.kind}] ${item.names.join(', ')} · rule=${item.rule} · ${flags.join(' ')}`)
+    lines.push(`- [${index + 1}] [${item.kind}] ${item.names.join(', ')} · rule=${item.rule} · ${flags.join(' ')}`)
     lines.push(`  finding: ${sanitizeField(item.finding)}`)
     lines.push(`  action: ${sanitizeField(item.recommendation)}`)
     if (item.undo_path && item.undo_path !== 'n/a') lines.push(`  undo: ${sanitizeField(item.undo_path)}`)
@@ -473,6 +484,10 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
         runId,
         verdict: validated.plan.verdict,
         forcedHuman: validated.forcedHuman,
+        // The ledger: literally the array the rendered [n] ids were numbered from.
+        items: validated.plan.plan,
+        notes: validated.plan.notes,
+        needsHumanCount: validated.plan.plan.filter(item => item.needs_human).length,
         // V10-09 (F-05): the structured plan length IS the recommendation
         // count — consumers read this instead of parsing the rendered text.
         recommendationCount: validated.plan.plan.length,

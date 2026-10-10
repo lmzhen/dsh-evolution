@@ -78,13 +78,22 @@ export const Config = z.object({
 })
 
 /** Enrichment maps shared by the full scan and the `--facts` preview (v12). */
-import { buildEnrichment, enrichmentSnapshotOptions } from '@deepseek-ai/dsh-evolution-maintenance'
+import { buildEnrichment, enrichmentSnapshotOptions, type MaintainPlanItem } from '@deepseek-ai/dsh-evolution-maintenance'
 
 /** One maintenance run's durable record — the body of its report JSON (0.19.0 / S2). */
 interface MaintainReportRecord {
   runId: string
   verdict?: 'issues' | 'no_issues' | undefined
   recommendationCount?: number | undefined
+  /** G1 (0.20.0): the validated plan entries — the machine-readable ledger behind the
+   * rendered `text`. Optional: every report written before 0.20.0 lacks them. */
+  items?: MaintainPlanItem[] | undefined
+  /** Of `items`, how many need the operator's confirmation (derived by the producer). */
+  needsHumanCount?: number | undefined
+  /** Skill names the quality_low gate force-marked as needs_human. */
+  forcedHuman?: string[] | undefined
+  /** The plan's notes, carried alongside `items` so no reader infers them from entries. */
+  notes?: string[] | undefined
   failure?: string | undefined
   startedAt: number
   endedAt: number
@@ -819,7 +828,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               const endedAt = Date.now()
               const resultRef = await writeMaintainReport(ioRegistry.provider(), {
                 runId: handle.id,
-                ...(outcome.ok ? { verdict: outcome.verdict, recommendationCount: outcome.recommendationCount } : {}),
+                ...(outcome.ok
+                  ? {
+                    verdict: outcome.verdict,
+                    recommendationCount: outcome.recommendationCount,
+                    // G1 (0.20.0): the ledger rides into the report verbatim; the count comes
+                    // from the producer so no reader re-derives "which need confirmation".
+                    items: outcome.items,
+                    notes: outcome.notes,
+                    forcedHuman: outcome.forcedHuman,
+                    needsHumanCount: outcome.needsHumanCount,
+                  }
+                  : {}),
                 ...(outcome.ok ? {} : { failure: handle.signal.aborted ? 'cancelled: the scan was stopped before it settled' : (outcome.error ?? 'Maintenance scan failed.') }),
                 startedAt: handle.startedAt,
                 endedAt,
