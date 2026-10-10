@@ -55,6 +55,10 @@ export interface Config {
    * 4-8 min — the 13:38 successful run used --timeout 600000; the old 120s
    * default deadlined bare runs mid-analysis (14:37 run aborted at 119.94s). */
   maintainTimeoutMs?: number | undefined
+  /** G2 (0.20.0): when a scan settles successfully, hand its report to the model
+   * automatically (the same pointer+protocol injection `maintain handoff` performs).
+   * Default false: the injection wakes a turn, which costs a model call. */
+  maintainHandoffOnSettle?: boolean | undefined
   /** Threat-scan exemption labels for WRITE-path skill mutations (P2-18).
    * Threaded into the SkillLibrary this package constructs for `restructure`
    * (its only write path); the core-side constructor option carries the same
@@ -74,6 +78,7 @@ export const Config = z.object({
   skillsRoot: z.string().default(''),
   maintainCooldownMs: z.number().min(0).default(30_000),
   maintainTimeoutMs: z.number().min(1).default(600_000),
+  maintainHandoffOnSettle: z.boolean().default(false),
   threatExemptLabels: z.array(z.string()).default([]),
 })
 
@@ -107,6 +112,65 @@ function renderRunRecord(record: RunRecord): string {
   if (record.failure !== undefined) parts.push(`— ${record.failure}`)
   if (record.resultRef !== undefined) parts.push(`→ ${record.resultRef}`)
   return parts.join(' ')
+}
+
+/** The newest run this home knows — the default when a subcommand omits its id (G2/0.20.0).
+ * The registry view is newest-first and already carry the cross-plane rows. */
+function newestRun(registry: RunRegistry): RunRecord | undefined {
+  return registry.runs()[0]
+}
+
+/** The reader-facing report path: the `.md` digest beside the run's `.json` result. */
+function reportDigestPath(record: { id: string; resultRef?: string | undefined }): string {
+  const base = record.resultRef ?? join(evolutionHome(), 'reports', `maintain-${record.id}.json`)
+  return base.replace(/\.json$/, '.md')
+}
+
+/** Deliver one handoff message through the waking primitive, called ON the receiver
+ * (family checklist new-consumer: N13b fails a wake primitive read into a local — the
+ * 0.3.73 incident ate review prompts for six days). Falls back to the non-waking
+ * `inject`, exactly like `/evolution learn`. @returns true when the receiver woke,
+ * false when the message was only queued, `undefined` when neither primitive exists. */
+function deliverHandoff(agent: { followup?: unknown; inject?: unknown }, message: unknown): boolean | undefined {
+  if (typeof agent.followup === 'function') {
+    (agent as unknown as { followup: (value: unknown) => void }).followup(message)
+    return true
+  }
+  if (typeof agent.inject === 'function') {
+    (agent as unknown as { inject: (value: unknown) => void }).inject(message)
+    return false
+  }
+  return undefined
+}
+
+/** The model-facing handoff message (G2/0.20.0): a POINTER to the report plus the
+ * report-only protocol. ONE builder shared by `maintain handoff` and the settle-time
+ * automatic handoff, so the two cannot drift. Missing counts are omitted, never guessed. */
+function handoffPrompt(input: {
+  runId: string
+  reportPath: string
+  verdict?: 'issues' | 'no_issues' | undefined
+  recommendationCount?: number | undefined
+  needsHumanCount?: number | undefined
+}): string {
+  const counts = [
+    input.verdict === undefined ? undefined : `verdict=${input.verdict}`,
+    input.recommendationCount === undefined ? undefined : `${input.recommendationCount} recommendations`,
+    input.needsHumanCount === undefined ? undefined : `${input.needsHumanCount} of them need your user's confirmation`,
+  ].filter((part): part is string => part !== undefined)
+  const head = `[evolution maintain] The maintenance report for run ${input.runId} is ready: ${input.reportPath}`
+  return [
+    `${head}${counts.length === 0 ? '' : ` (${counts.join(', ')}; each item has a stable [n] id)`}.`,
+    '',
+    'This turn is REPORT-ONLY. Read the file, then tell your user what it found and what it proposes — one line',
+    'per item: [n] | what would change | which skills | why (the finding) | undo | needs-your-confirmation?',
+    'Lead with the items that need confirmation. Do NOT edit, restructure, archive or rename anything in this',
+    'turn, and start no other skill work: your user must approve which items to carry out. When they reply by [n]',
+    "ids, carry out ONLY the approved items, one at a time, and read each item's undo line before you touch",
+    'anything; if an item has no undo line, treat it as irreversible and ask first. Apply every change through',
+    'the skill-writing tool (skill_manage) — never edit SKILL.md or its support files with generic file tools:',
+    'an out-of-band edit leaves no version in skill history and no audit record.',
+  ].join('\n')
 }
 
 /**
@@ -173,7 +237,7 @@ async function writeMaintainReport(
 }
 
 /** Three-state read of a run's result: present, missing, or unreadable (never collapsed). */
-async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ kind: 'present'; text: string } | { kind: 'missing' } | { kind: 'unknown'; reason: string }> {
+async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ kind: 'present'; text: string; report: Partial<MaintainReportRecord> } | { kind: 'missing' } | { kind: 'unknown'; reason: string }> {
   // A report is read from the home it was WRITTEN in (the registry record was created
   // in this process's home); the fallback path exists for a record without resultRef.
   const path = record.resultRef ?? join(evolutionHome(), 'reports', `maintain-${record.id}.json`)
@@ -184,7 +248,9 @@ async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ 
     const parsed = JSON.parse(probed.value) as Partial<MaintainReportRecord>
     const header = `Maintenance run ${record.id} — ${record.state}${record.failure === undefined ? '' : ` (${record.failure})`}`
     const body = typeof parsed.text === 'string' && parsed.text.trim() !== '' ? parsed.text : renderRunRecord(record)
-    return { kind: 'present', text: `${header}\n${body}` }
+    // The parsed record rides along so a caller that needs the ledger's counts (handoff)
+    // never re-reads the same file — the read stays single-sourced (G2/0.20.0).
+    return { kind: 'present', text: `${header}\n${body}`, report: parsed }
   } catch (error) {
     return { kind: 'unknown', reason: `the report is not JSON (${error instanceof Error ? error.message : String(error)})` }
   }
@@ -778,6 +844,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // the event-count fixture, where the two events carried different runIds).
           const runHome = evolutionHome()
           const runRoot = evolutionRoot()
+          // Captured when the run STARTS, like the home above: the automatic handoff (G2)
+          // fires long after this command returned, and it must wake the session that
+          // started the scan — not whatever the environment looks like by then.
+          const runAgent = invocationAgent
           const handle = await registry.begin('maintain')
           // Detached on purpose. The command answers with a POINTER while the scan
           // keeps working: its lifetime is the handle's, and what stops it is
@@ -863,6 +933,31 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 }).catch((error: unknown) => {
                   ctx.logger.warn(`evolution-commands: failed to record maintain event: ${String(error)}`)
                 })
+                // G2 (0.20.0): the automatic handoff is opt-in (maintainHandoffOnSettle,
+                // default false) and reuses the SAME prompt builder as `maintain handoff`
+                // so the two can never drift. The receiver was captured when the run
+                // STARTED; a delivery failure only warns — the run's terminal state and
+                // its report are already committed above.
+                if (config.maintainHandoffOnSettle === true && resultRef !== undefined && runAgent !== undefined) {
+                  try {
+                    const autoMessage = createUserMessage({
+                      content: [{
+                        type: 'text',
+                        text: handoffPrompt({
+                          runId: handle.id,
+                          reportPath: reportDigestPath({ id: handle.id, resultRef }),
+                          verdict: outcome.verdict,
+                          recommendationCount: outcome.recommendationCount,
+                          needsHumanCount: outcome.needsHumanCount,
+                        }),
+                      }],
+                      source: { kind: 'evolution-commands', form: 'notice', summary: 'maintenance report handoff (auto)' },
+                    })
+                    deliverHandoff(runAgent as { followup?: unknown; inject?: unknown }, autoMessage)
+                  } catch (error) {
+                    ctx.logger.warn(`evolution-commands: automatic report handoff failed (${String(error)})`)
+                  }
+                }
               } else {
                 ctx.logger.warn(`evolution-commands: maintenance run ${handle.id} produced no plan (${outcome.error ?? 'unknown reason'})`)
               }
@@ -915,15 +1010,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             recent.length === 0 ? '' : `Recent:\n${recent.map(renderRunRecord).join('\n')}`,
           ].filter(part => part !== '').join('\n'))
         }
-        const maintainReport = /^maintain\s+report\s+(\S+)\s*$/.exec(input)
+        const maintainReport = /^maintain\s+report(?:\s+(\S+))?\s*$/.exec(input)
         if (maintainReport) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run results unavailable.')
-          await syncRuns(registry)
+          const synced = await syncRuns(registry)
           const wanted = maintainReport[1]
-          if (wanted === undefined) return err('maintain report needs a run id: /evolution maintain report <id>.')
-          const record = registry.find(wanted)
-          if (!record) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
+          if (!record) {
+            // Three states, three sentences: a bad id, an unreadable index, and an empty
+            // home must never look alike (G2/0.20.0).
+            if (wanted !== undefined) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+            if (!synced.ok) return err(`The home's run index is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "there is no recent run".`)
+            return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
+          }
+          if (wanted === undefined && record.state === 'running') {
+            return err(`The newest run ${record.id} is still running — its report appears when it settles; /evolution maintain status ${record.id} shows where it is.`)
+          }
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — run results unavailable.')
           const probed = await readRunReport(ioRegistry.provider(), record)
@@ -935,25 +1038,80 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (probed.kind === 'unknown') return err(`Run ${record.id} has a report that could not be read (${probed.reason}) — this is not "no result".`)
           return ok(probed.text)
         }
-        const maintainCancel = /^maintain\s+cancel\s+(\S+)\s*$/.exec(input)
+        const maintainCancel = /^maintain\s+cancel(?:\s+(\S+))?\s*$/.exec(input)
         if (maintainCancel) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run cancellation unavailable.')
-          await syncRuns(registry)
+          const synced = await syncRuns(registry)
           const wanted = maintainCancel[1]
-          if (wanted === undefined) return err('maintain cancel needs a run id: /evolution maintain cancel <id>.')
-          const record = registry.find(wanted)
-          if (!record) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
+          if (!record) {
+            if (wanted !== undefined) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+            if (!synced.ok) return err(`The home's run index is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "there is no recent run".`)
+            return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
+          }
+          // Omitting the id only ever cancels the ONE run this process is running: the
+          // registry's owned-only cancel below refuses anything else, and the refusal is
+          // worded for the id-less case with a pointer to the explicit form (G2/0.20.0).
+          const idlessHint = wanted === undefined ? ' Pass an id to cancel a specific run: /evolution maintain status lists them.' : ''
           // ONE cancel call (review P1-1): a run another process owns cannot be stopped
           // from here, and a terminal one has nothing to cancel — the two answers differ.
           if (!registry.cancel(record.id)) {
             if (record.state === 'running') {
-              return err(`Run ${record.id} is running in ANOTHER process sharing this home — it can only be cancelled there.`)
+              return err(`Run ${record.id} is running in ANOTHER process sharing this home — it can only be cancelled there.${idlessHint}`)
             }
-            return err(`Run ${record.id} is already ${record.state} — nothing to cancel.`)
+            return err(`Run ${record.id} is already ${record.state} — nothing to cancel.${idlessHint}`)
           }
           return ok(`Maintenance run ${record.id} cancelled — the scan stops at its next checkpoint. /evolution maintain status ${record.id} shows the terminal state.`)
         }
+        const maintainHandoff = /^maintain\s+handoff(?:\s+(\S+))?\s*$/.exec(input)
+        if (maintainHandoff) {
+          const registry = runs
+          if (!registry) return err('Evolution IO registry not mounted — the report cannot be handed over.')
+          const synced = await syncRuns(registry)
+          const wanted = maintainHandoff[1]
+          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
+          if (!record) {
+            if (wanted !== undefined) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+            if (!synced.ok) return err(`The home's run index is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "there is no recent run".`)
+            return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
+          }
+          if (wanted === undefined && record.state === 'running') {
+            return err(`The newest run ${record.id} is still running — its report appears when it settles; /evolution maintain status ${record.id} shows where it is.`)
+          }
+          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('Evolution IO registry not mounted — the report cannot be handed over.')
+          const probed = await readRunReport(ioRegistry.provider(), record)
+          if (probed.kind === 'missing') {
+            return err(`Run ${record.id} (${record.state}) has NO result: no report was written${record.failure === undefined ? '' : ` (${record.failure})`}.`)
+          }
+          if (probed.kind === 'unknown') return err(`Run ${record.id} has a report that could not be read (${probed.reason}) — this is not "no result".`)
+          // Deliver ONLY a pointer plus the report-only protocol: the report file stays
+          // the one result home, and the injected text stays small (G2/0.20.0).
+          const missingAgent = agentMissing('handoff')
+          if (missingAgent) return missingAgent
+          const message = createUserMessage({
+            content: [{
+              type: 'text',
+              text: handoffPrompt({
+                runId: record.id,
+                reportPath: reportDigestPath(record),
+                verdict: probed.report.verdict,
+                recommendationCount: probed.report.recommendationCount,
+                needsHumanCount: probed.report.needsHumanCount,
+              }),
+            }],
+            source: { kind: 'evolution-commands', form: 'notice', summary: 'maintenance report handoff' },
+          })
+          // N13b: deliverHandoff calls the waking primitive ON the receiver; a host that
+          // exposes neither primitive is a documented E-305, never a silent no-op.
+          const woke = deliverHandoff(invocationAgent as { followup?: unknown; inject?: unknown }, message)
+          if (woke === undefined) return err(errorText('e-305-the-invocation-agent-exposes'))
+          return ok(woke
+            ? `Handed run ${record.id} to the model — report: ${reportDigestPath(record)}. It will read the file and follow the action lines.`
+            : `Handed run ${record.id} to the model, queued — this host exposes no wake-up channel, so it is read on your next message.`)
+        }
+
         if (/^maintain\b/.test(input)) {
           // 0.3.14 (P3-2): an input that STARTS with maintain but did not
           // match the grammar (unknown flags, stray args) was silently falling

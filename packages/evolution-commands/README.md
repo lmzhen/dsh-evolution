@@ -6,7 +6,7 @@ background behaviour of its own.
 
 ## Model surface
 
-- **Model-visible:** one direct token — the `/evolution learn` injection — the full learning guidance is injected as a user message in this session; everything else adds no tokens.
+- **Model-visible:** two direct tokens, both injected as user messages in this session — the `/evolution learn` injection (the full learning guidance) and the `maintain handoff` injection (a one-line POINTER to a finished maintenance report plus a report-only protocol: read the file, report per item, change nothing until the operator approves). **Command output never reaches model history**: `/evolution maintain` and every other subcommand answer in the client only. Everything else adds no tokens.
 - **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
 - **Mount it?** yes — the `evolution-commands` row, carried by the `evolution-host`, `evolution-all` and `evolution-preset` bundles.
 
