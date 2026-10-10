@@ -16,6 +16,7 @@ chain behind `/evolution maintain` (`evolution-core` `drift-signals`).
 ## Known limitations
 
 - Phase 1-2 expose no service beyond the command surface: the chain (scan → render → subagent → validate) is wired through `/evolution maintain`.
+- **The scan's lifetime is the RUN's, not the request's (0.19.0).** `/evolution maintain` starts a run through `evolution-core`'s run registry and answers with a pointer; `evolution-commands` writes the resulting plan to `<evolutionHome>/reports/maintain-<runId>.{json,md}` — this package persists no report of its own. Measured: 949.7 s end to end on the web plane, ~305 s of REQUEST lifetime on the desktop shell (which used to abort the scan; it no longer does). `maintainTimeoutMs` (default 600000) bounds the run, and a run that produced nothing is recorded as such rather than as an empty plan. The published inventory of long runs is `packages/README.md` §"Long-running work", rendered from `evolution-core/src/long-runs.ts`.
 - **Plan validation is instance-granular (§3 completeness).** Notes stay id-level: one mention explains away every instance of that id.
 - **A budget-capped dedup scan is reported, never silently shortened.**
 - `maintenance_probe` is readable by every session; maintenance subagents reach it through the orchestrate `toolFilter` allow-list.

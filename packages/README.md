@@ -383,6 +383,27 @@ joins only when mounted (D-30):
    decisions out of policy code; media providers perform no node:fs IO of
    their own (commands' preset/doctor helpers are the explicit direct-fs exception).
 
+## Long-running work
+
+A long run is work whose duration is not bounded by the interaction that asked for
+it. The measured fact behind this table: a **client** can end a request long before
+the work is done — the desktop shell ends a request at ~305 s while the same
+maintenance command finishes in 949.7 s on the web plane. **A run's lifetime comes
+from its owner, never from the request that started it**, so `lifetime=plugin`
+entries must name an owner and a result home, and `lifetime=request` entries say
+why their cost cannot reach a client wall. The table is rendered from
+`evolution-core/src/long-runs.ts` and pinned byte-for-byte by
+`evolution-core/tests/long-runs.spec.ts` (the same T-WD2 pin the command table uses).
+
+| entry | kind | owner | lifetime | measured | result home |
+|---|---|---|---|---|---|
+| `/evolution maintain` | command | evolution-commands | plugin | the same scan measured 949.7 s end to end on the web plane (no Electron); the desktop shell ends the REQUEST at ~305 s (four runs: 305.6/307.0/306.0/305.7 s) | <evolutionHome>/reports/maintain-<runId>.{json,md}, indexed in <evolutionHome>/runs.json |
+| `maintenance_probe` | tool | evolution-maintenance | request | 188/220/225 ms on the deployed library (28 skills / 418 KB); ~5.5 ms per skill and linear (100 skills 0.4-0.6 s, 400 skills 1.9-2.5 s) | the tool result (JSON detail), answered in-turn |
+| `skill_manage` | tool | tool-skill-manage | request | not measured as a duration: single-file IO plus a library listing the cross-source gate already reads; the only unbounded wait is a HUMAN answer | the tool result, plus the mutation audit records |
+| `memory` | tool | tool-memory | request | single-file IO on the memory store | the tool result |
+| `curator pass` | pass | evolution-curator | plugin | not measured end to end; the LLM nomination leg is bounded separately | <evolutionHome>/reports/curator-<runId>.{json,md} |
+| `review pass` | pass | evolution-review | plugin | not measured end to end; the subagent leg carries its own deadline | the review inbox plus evolution/plan-applied |
+
 ## Service keys
 
 **How a row reaches a service (rule N32).** A plugin declares what it consumes — `export const inject = [...]` for a function plugin, `static inject = [...]` on a Service class — and reads it as `ctx.<name>`; a service a deployment may not mount is read with `ctx.get('<name>')` instead, which answers `undefined`. The arch guard **N32** checks the first half mechanically: every `ctx.<service>` property read in production must be declared in that file (or be a `ctx.get`), and the service names it judges come from `evolution-core`'s `PLATFORM_SERVICE_PROBES` table — the same list `/evolution doctor` reports capability absence from. An undeclared read is a dependency the Loader cannot order or refuse, and it throws where `ctx.get` would have degraded.
