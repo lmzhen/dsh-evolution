@@ -1,6 +1,14 @@
 # Changelog
 
 
+## 0.20.0 (minor) — 维护报告的人机交接：`maintain handoff`（指针＋汇报协议）＋ `report`／`cancel` 省略 id
+
+> **由来**：维护扫描的结果此前只在框里回一段正文，用户看不到「改什么、为什么、能不能撤、要不要我确认」；本版把**报告变成不可变账本**，并把「谁来读、按什么规矩动手」交给一次注入完成。方案经七角色评审与平台覆盖差集（`todo`／`deliverables`／`spill` 全部复用，净工作量下降），并由用户裁定：**不新建命令、不接审批闸**，走提示词路线。
+> **账本（G1）**：报告 json 在既有 `{runId, verdict, recommendationCount, startedAt, endedAt, text}` 上增 `items[]`（＝校验后的 `MaintainPlanItem`）、`needsHumanCount`、`forcedHuman[]`、`notes[]`；md 每条加**稳定 `[n]` 前缀**（与 `items` 索引同序，`needs_human` 条目仍带 `HUMAN`），`text` 与既有字段一字不变。两条自洽由夹具钉住：`items.length == recommendationCount`、`needsHumanCount == items.filter(needs_human).length`。
+> **命令面（G2）**：新增 `maintain handoff [<id>]`——只注入**指针＋汇报协议**（报告绝对路径＋`verdict`／条目数／需确认数＋`REPORT-ONLY`／「逐条一行汇报」／「只做批准的条目」／「必须走 `skill_manage`，out-of-band 写不留版本不留审计」），正文仍由模型按需 `read`（注入 ≈70 token；正文 8 KB 不常驻上下文）。`maintain report`／`cancel` 可**省略 id** ＝ 本 home **最新一条**，三态措辞互不混同（本 home 还没有 run／仍在跑／终态无报告／索引读不了——最后一种绝不答成「没有 run」）；`cancel` 省略 id 时**只有**「最新一条、本进程拥有、且在跑」才真取消，别面在飞的 run 只拒、不产生任何终态。配置项 `maintainHandoffOnSettle`（默认 **false**；登记 group `deployment`／tier E2／authority cordis）在扫描**成功结算且报告可读**后自动交接：用**起 run 时捕获**的 agent 引用调用一次唤醒原语，失败只 warn、不改 run 终态与报告——成本默认不开，无人值守不会自己动手。
+> **为什么不接硬闸**：提示词路线是**软闸**（「批准了什么」只在对话里，没有平台级批准留痕）。出现「无人值守批量改技能／多人协作要审批留痕／要求不可抵赖」时，再走既有 `evolution-approval` 通道立项；触发条件与代价写进 `packages/docs/known-limitations.md` 第 13 条。
+> **验收**：新增 `maintain-handoff.spec.ts` **3 块 13 格**（三空态／坏 id／索引不可读／指针与协议逐字／在跑与无报告**不注入**／省略 id 的 `report` 与 `cancel`／仅注入态／`E-305`／接收者原型方法）；受影响夹具 **17 文件 221 例全绿**；**家族套件 A/B：修后失败集 ≡ 基线**（两侧同为 25 文件红，零新增、零修复）；合并门禁组（13 守卫＋2 平台守卫＋3 规格）中仅平台两条红（`verify-declared-config` 3 条 upstream-drift、`verify-platform-contract` 87 条 host-surface difference），二者在基线同样红；`packages/README.md` 命令钉表 25→26 行、`PARAMETERS.md` 101 条、参数通道 exit 0。**只读验收四格 22/22**（`handoff` 后不回复 ⇒ 技能树逐字节不变、注入不夹带正文；回复批准子集 ⇒ 仅该子集 `names` 命中文件变化且账本 `beforeVersion→afterVersion` 连续、`beforeHash` ＝改前哈希；out-of-band 写不落账本而检查器以 `live-file` 指认被旁路的那一个技能；平台座位在役）。
+> **不做**：不做 `maintain apply`、不注入报告正文、不做扫描进度帧／心跳、不按「会话」取最新（记录无会话字段）。
 ## 0.19.3 (patch) — run registry 结构收口：**一行一个写者**（owned／foreign 两 Map ＋ 单调不变量）
 
 > **由来**：0.19.0 → 0.19.1 → 0.19.2 修的是**同一个病根的投影**——`records` 一个数组里混了两种权威（本进程起的行＝内存权威；索引读来的行＝文件权威），而读写两侧对两者用同一条「内存胜过磁盘」。0.19.0 的 stale-running（读侧漏刷新）、0.19.1→0.19.2 的写侧复活，都是它。本版按复核方设计把两种权威拆开，删掉为绕病根而加的特例。
