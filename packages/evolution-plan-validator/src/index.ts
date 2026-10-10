@@ -19,7 +19,7 @@
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
-import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, SKILL_ACTION_REQUIRED_FIELDS, validateRestructureTarget, type EvidenceIndex } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, SKILL_ACTION_REQUIRED_FIELDS, payloadText, validateRestructureTarget, type EvidenceIndex } from '@deepseek-ai/dsh-evolution-core'
 
 export interface MemoryOp {
   target?: string
@@ -221,11 +221,13 @@ const MEMORY_PLAN_RULES: readonly PlanRule<MemoryOp>[] = [
     },
   },
   {
+    // T3-06/A34: the payload is core's `payloadText` — the first NON-BLANK of
+    // facts/content. With `facts ?? content` a blank `facts` shadowed a body the
+    // op did carry, and the plan was refused as empty.
     id: 'PAYLOAD',
     run: ({ op, index }) => {
       const action = op.action ?? 'add'
-      const text = (op.facts ?? op.content ?? '').trim()
-      return action !== 'remove' && text.length === 0 ? `memory op ${index}: ${action} requires facts/content` : null
+      return action !== 'remove' && payloadText(op).length === 0 ? `memory op ${index}: ${action} requires facts/content` : null
     },
   },
   {
@@ -238,7 +240,7 @@ const MEMORY_PLAN_RULES: readonly PlanRule<MemoryOp>[] = [
   {
     id: 'BUDGET',
     run: ({ op, index, context }) => {
-      const text = (op.facts ?? op.content ?? '').trim()
+      const text = payloadText(op)
       const budget = op.target === 'user' ? (context.maxUserChars ?? DEFAULT_USER_CHAR_LIMIT) : (context.maxMemoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT)
       return text.length > budget
         ? `memory op ${index}: content exceeds ${op.target === 'user' ? 'user' : 'memory'} budget`

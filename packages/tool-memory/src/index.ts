@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
-import { clampedNumber, MEMORY_GUIDANCE_SECTION_ORDER, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
@@ -295,8 +295,9 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
 
   // PLAN-R2 P2-7 (2026-09-16): the store's per-action required-field contract,
   // mirrored field-for-field so this pre-check and the store's own rejection
-  // cannot diverge. The effective judgment (memory-files normalizes
-  // `facts ?? content`, then evolution-core's applyBatchCore enforces):
+  // cannot diverge. The effective judgment (memory-files and this file both
+  // resolve the pair through core's `payloadText`, T3-06/A34, then
+  // evolution-core's applyBatchCore enforces):
   // add needs non-blank facts; remove/replace need non-blank old_text;
   // replace additionally needs non-blank facts; an out-of-enum action is
   // rejected loud (V6-25). Rejections below reuse the store's exact message
@@ -305,7 +306,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     op: { action?: MemoryAction | undefined; facts?: string | undefined; content?: string | undefined; old_text?: string | undefined },
     position: number,
   ): string | null => {
-    const body = (op.facts ?? op.content ?? '').trim()
+    const body = payloadText(op)
     if (op.action === 'add') {
       return body ? null : `Operation ${position} (add): facts is required. No operations were applied.`
     }
@@ -368,9 +369,17 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
       async execute(args, exec: { agent?: { session?: { id: string; header: { origin?: string }; events?: readonly unknown[] } } }) {
         // facts and content are the same field under two names; a differing pair
         // is ambiguous input, so fail loud instead of silently dropping one.
-        const conflict = (a: { facts?: string; content?: string }): boolean => {
-          if (a.facts === undefined || a.content === undefined) return false
-          return a.facts !== a.content
+        // T3-06/A34: only TWO non-blank bodies can differ. A blank member
+        // carries no payload, so `{facts: '', content: 'x'}` is one payload
+        // (core's `payloadText`), not an ambiguous pair — refusing it here while
+        // every other channel lands 'x' was the half-changed form of the same
+        // rule. Read through `payloadText` so a non-string member is skipped
+        // rather than trimmed (the replay channel passes stored args with no
+        // schema, and the field gate below owns that refusal).
+        const conflict = (a: { facts?: unknown; content?: unknown }): boolean => {
+          const facts = payloadText({ facts: a.facts })
+          const content = payloadText({ content: a.content })
+          return facts !== '' && content !== '' && facts !== content
         }
         // V24-20a (v24): element-level shape guard — `operations: [null]` used
         // to reach `conflict` and throw a bare TypeError (`a.facts` on null).
@@ -407,7 +416,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
         const target = args.target === 'user' ? 'user' : 'memory'
         const normalized: MemoryWriteArgs = Array.isArray(args.operations)
           ? { target, operations: args.operations }
-          : { target, action: args.action ?? 'add', facts: args.facts ?? args.content, old_text: args.old_text }
+          : { target, action: args.action ?? 'add', facts: payloadText(args), old_text: args.old_text }
         // PLAN-R2 P2-7 (2026-09-16): existence pre-check of the per-action
         // required fields BEFORE the approval gate, on BOTH paths — each
         // operations[] element (store position = index + 1) and the normalized

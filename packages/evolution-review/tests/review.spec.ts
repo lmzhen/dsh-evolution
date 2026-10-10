@@ -356,6 +356,54 @@ describe('evolution-review', () => {
     expect(errors).toEqual([])
   })
 
+  /**
+   * T3-06/A34: drive ONE plan op through the review's write leg and return whatever the
+   * memory service received. `approvalStub` selects the branch: `null` = no approval
+   * service (the plan path's direct applyBatch), an object = the mounted-but-DISABLED
+   * service (runApproved → runnerDirect, the second normalization site).
+   */
+  const landOnePlanOp = async (approvalStub: { request: () => Promise<{ action: string; message: string }>; isEnabled: boolean } | null): Promise<Array<Record<string, unknown>>> => {
+    const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
+    const applied: Array<Record<string, unknown>> = []
+    ctx.provide('subagents', {
+      start: async () => ({
+        result: Promise.resolve({
+          structured: {
+            memoryOps: [{ target: 'memory', action: 'add', facts: '', content: '正文', evidence: [{ event_seq: 0 }] }],
+            skillOps: [],
+            summary: 'land a content-only op',
+          },
+        }),
+        dispose: async () => {},
+      }),
+    })
+    ctx.provide('memory', {
+      applyBatch: async (_target: unknown, ops: Array<Record<string, unknown>>) => {
+        applied.push(...ops)
+        return { ok: true, message: 'ok' }
+      },
+    })
+    if (approvalStub) ctx.provide('evolutionApproval', approvalStub)
+    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
+    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
+    emitEnd(1, 'blocked')
+    emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
+    await vi.waitFor(() => { expect(applied).toHaveLength(1) })
+    return applied
+  }
+
+  it('T3-06/A34: the plan path lands the content body of an op whose facts is blank', async () => {
+    // Before A34 the validator refused this op as empty AND the write leg wrote '' —
+    // the two halves are pinned by the payload the store finally receives.
+    const applied = await landOnePlanOp(null)
+    expect(applied[0]).toEqual({ target: 'memory', action: 'add', facts: '正文', old_text: undefined })
+  })
+
+  it('T3-06/A34: the approval-disabled replay branch normalizes the same payload', async () => {
+    const applied = await landOnePlanOp({ request: async () => ({ action: 'execute', message: 'ok' }), isEnabled: false })
+    expect(applied[0]).toEqual({ action: 'add', facts: '正文', old_text: undefined })
+  })
+
   it('V27 G4.3: a write leg that TIMES OUT still records the ops that landed', async () => {
     const applied: Array<{ memoryApplied: number; skillApplied: number; executionError?: string; executionFailures?: number }> = []
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })

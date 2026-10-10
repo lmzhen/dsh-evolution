@@ -22,6 +22,22 @@ describe('memory-files', () => {
     expect(await ctx.memory.read('memory')).toContain('user prefers terse')
   })
 
+  it('T3-06/A34: the provider normalization takes the first NON-BLANK payload field', async () => {
+    // The provider's own normalization is the site a caller mounting ctx.memory
+    // directly (no family tool, no review) goes through.
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
+    const added = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: '', content: '正文' }])
+    expect(added.ok).toBe(true)
+    expect(await ctx.memory.read('memory')).toContain('正文')
+    // Both blank is still the empty payload the store refuses.
+    const empty = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: '   ', content: '' }])
+    expect(empty.ok).toBe(false)
+  })
+
   it('snapshot reads memory and user in one serialized step — no mixed generation (V4-12)', async () => {
     const root = await tempRoot('dsh-evolution-tmp-')
     // Seed a single user fact directly so the snapshot's first USER.md read is

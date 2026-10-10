@@ -43,6 +43,24 @@ it('PLAN-R2 P2-6 (2026-09-16): the core store honors the schema `content` alias 
   expect(await store.read('memory')).toEqual(['Project uses npm workspaces.', 'Facts wins.'])
 })
 
+it('T3-06/A34: a blank facts does not shadow the content body on the landing path', async () => {
+  // The store is the LAST fallback: the validator may accept an op that the
+  // landing path then writes as an empty string ("校验放行、落地丢正文").
+  const root = await tempRoot('dsh-evo-memory-payload-')
+  const store = new MemoryStore({ root })
+  const add = await store.applyBatch('memory', [{ action: 'add', facts: '', content: '正文落盘' }])
+  expect(add.ok).toBe(true)
+  expect(await store.read('memory')).toEqual(['正文落盘'])
+  await store.add('memory', 'anchor entry')
+  const replace = await store.applyBatch('memory', [{ action: 'replace', old_text: 'anchor', facts: '', content: '替换后的正文' }])
+  expect(replace.ok).toBe(true)
+  expect(await store.read('memory')).toEqual(['正文落盘', '替换后的正文'])
+  // Both blank stays the empty payload the store refuses, with its own message.
+  const empty = await store.applyBatch('memory', [{ action: 'add', facts: '', content: '   ' }])
+  expect(empty.ok).toBe(false)
+  expect(empty.message).toContain('facts is required')
+})
+
 it('V6-25: an enum-outside action fails loud instead of silently executing a replace (0.3.37)', async () => {
   const root = await tempRoot('dsh-evo-memory-enum-')
   const store = new MemoryStore({ root })

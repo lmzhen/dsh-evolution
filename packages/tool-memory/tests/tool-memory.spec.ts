@@ -219,6 +219,28 @@ describe('tool-memory', () => {
     expect(summaries[1]).not.toMatch(/memory memory/)
   })
 
+  // T3-06/A34: `facts ?? content` counted a BLANK `facts` as a payload, so the
+  // ambiguous-pair guard refused `{facts: '', content: 'x'}` — the one shape every
+  // other channel now lands, and the shape the plan validator used to false-refuse.
+  it('T3-06/A34: a blank facts is not a second payload — the content body lands', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-') })
+    await ctx.plugin(ToolMemory, {})
+    const tool = ctx.tools.get('memory')!
+    const execArg = { agent: undefined } as unknown as Parameters<typeof tool.execute>[1]
+    const landed = await tool.execute({ target: 'memory', action: 'add', facts: '', content: '正文' }, execArg) as MemoryToolResult
+    expect(landed.ok).toBe(true)
+    expect(await ctx.memory.read('memory')).toContain('正文')
+    // Two DIFFERENT non-blank bodies stay the ambiguous pair the guard refuses.
+    const ambiguous = await tool.execute({ target: 'memory', action: 'add', facts: 'a', content: 'b' }, execArg) as MemoryToolResult
+    expect(ambiguous.ok).toBe(false)
+    expect(ambiguous.message).toContain('only one of facts or content')
+  })
+
   // P2-23 (v37): the tool's declared output contract — validated by the platform with
   // Number.isInteger for `integer` fields — is the invariant the fix has to satisfy.
   it('P2-23: a fractional configured char limit still satisfies the declared integer output', async () => {

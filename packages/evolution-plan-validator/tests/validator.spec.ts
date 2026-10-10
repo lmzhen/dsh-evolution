@@ -273,6 +273,28 @@ describe('evolution-plan-validator', () => {
     expect(emptyIndex.reports).toHaveLength(1)
   })
 
+  // T3-06/A34: `facts ?? content` treated a BLANK `facts` as a payload, so an op
+  // carrying its body in `content` was refused as empty — a false refusal of a
+  // body that is right there.
+  it('T3-06/A34: a blank facts yields to a real content (a payload, not a refusal)', () => {
+    const op = { action: 'add', target: 'memory', facts: '', content: '正文', evidence: [{ event_seq: 1 }] }
+    const result = validateEvolutionPlan({ memoryOps: [op] }, { sessionSeq: 10 })
+    expect(result.rejected).toEqual([])
+    expect(result.accepted.memoryOps).toHaveLength(1)
+    // Both blank is still the empty payload the rule refuses.
+    const empty = validateEvolutionPlan({ memoryOps: [{ ...op, content: '   ' }] }, { sessionSeq: 10 })
+    expect(empty.ok).toBe(false)
+    expect(empty.rejected[0]?.reason).toContain('requires facts/content')
+  })
+
+  it('T3-06/A34: the budget measures the SAME payload the payload rule accepted', () => {
+    const result = validateEvolutionPlan({
+      memoryOps: [{ action: 'add', target: 'memory', facts: '', content: 'x'.repeat(20), evidence: [{ event_seq: 1 }] }],
+    }, { sessionSeq: 10, maxMemoryChars: 5 })
+    expect(result.ok).toBe(false)
+    expect(result.rejected[0]?.reason).toContain('exceeds memory budget')
+  })
+
   it('D: one verdict per op — a refusal is never also a report', () => {
     const result = validateEvolutionPlan({
       memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 99 }] }],

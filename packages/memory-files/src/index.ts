@@ -7,7 +7,7 @@ import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, paramRowId, userSetKeys, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, paramRowId, payloadText, userSetKeys, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { MemoryStoreOptions } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '@deepseek-ai/dsh-memory'
@@ -247,7 +247,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     name: rawConfig.providerName ?? 'files',
     read: (target: MemoryTarget) => currentStore().read(target),
     applyBatch: async (target: MemoryTarget, operations: MemoryOperation[]) => {
-      const normalized = operations.map(op => ({ action: op.action, facts: op.facts ?? op.content, old_text: op.old_text }))
+      // T3-06/A34: the payload alias is resolved by core's ONE rule, so this
+      // provider cannot disagree with the validator or the store about a blank
+      // `facts` sitting next to a real `content`.
+      const normalized = operations.map(op => ({ action: op.action, facts: payloadText(op), old_text: op.old_text }))
       return await serializedWrite(() => currentStore().applyBatch(target, normalized))
     },
     snapshot: async (): Promise<MemorySnapshot> => {

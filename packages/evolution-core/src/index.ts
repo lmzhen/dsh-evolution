@@ -14,9 +14,11 @@
  *
  * - **Cross-cutting basics** — `state-store.ts` (env roots — the single
  *   source of DSH-home semantics), `serial.ts`, `numeric.ts`, `constants.ts`,
- *   `mutations.ts`, `events.ts`, `gates.ts`, `errors.ts` (the error-code table).
+ *   `mutations.ts`, `events.ts`, `gates.ts`, `errors.ts` (the error-code table),
+ *   `payload.ts` (which of `facts`/`content` is the payload — one rule for the whole family).
  * - **Security primitives** — `threats.ts` (content threat scanner),
- *   `redact.ts` (credential masking at model boundaries). Consumers:
+ *   `redact.ts` (credential masking at model boundaries),
+ *   `fold-untrusted.ts` (untrusted text must not become prompt structure). Consumers:
  *   evolution-policy/threat, both stores, review, maintenance.
  * - **Core domain stores/logic** — `skill-store.ts` (skill tree engine +
  *   IO-seam consumer), `memory-store.ts`, `usage.ts`, `curator.ts`,
@@ -75,3 +77,5 @@ export * from './params.ts'
 export * from './namespace-migration.ts'
 export * from './numeric.ts'
 export * from './opt-in.ts'
+export * from './payload.ts'
+export * from './fold-untrusted.ts'

@@ -7,6 +7,7 @@ import { basename, join } from 'node:path'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
+import { payloadText } from './payload.ts'
 import { scanMemoryThreats, type ScanOptions } from './threats.ts'
 import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
 
@@ -56,8 +57,9 @@ export interface MemoryOperation {
   action: 'add' | 'replace' | 'remove'
   facts?: string | undefined
   /** PLAN-R2 P2-6 (2026-09-16): the dsh-memory contract's alias. applyBatchCore
-   * reads `facts ?? content`, so a provider reusing this store directly can
-   * write the tool-memory schema shape without a normalization shim. */
+   * resolves the pair through core's `payloadText` (T3-06/A34), so a provider
+   * reusing this store directly can write the tool-memory schema shape without
+   * a normalization shim. */
   content?: string | undefined
   old_text?: string | undefined
 }
@@ -554,8 +556,10 @@ export class MemoryStore {
       const position = index + 1
       if (op.action === 'add') {
         // PLAN-R2 P2-6 (2026-09-16): `content` is the schema alias for the new
-        // body; `facts` keeps precedence when both are present.
-        const body = ((op.facts ?? op.content) ?? '').trim()
+        // body. T3-06/A34: precedence goes to the first NON-BLANK of the two
+        // (core's `payloadText`), not to a blank `facts` that shadows a body the
+        // op does carry.
+        const body = payloadText(op)
         if (!body) return { result: { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = this.memoryThreatBlock(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
@@ -593,7 +597,7 @@ export class MemoryStore {
       } else {
         // PLAN-R2 P2-6 (2026-09-16): same `content` alias as the add branch —
         // this is the replacement body slot, not a facts-only field.
-        const body = ((op.facts ?? op.content) ?? '').trim()
+        const body = payloadText(op)
         if (!body) return { result: { ok: false, message: `Operation ${position} (replace): facts is required.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = this.memoryThreatBlock(body)
         if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }

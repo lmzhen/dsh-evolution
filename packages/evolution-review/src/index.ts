@@ -31,7 +31,7 @@ import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-
 import { paramRowId, readDispatchSignal, sessionAudited, sessionEvidenceIndex, sessionReadNames, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
-import { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
+import { filterUnreadSkillOps, foldUntrustedLines, payloadText } from '@deepseek-ai/dsh-evolution-core'
 import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
 // The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
@@ -1753,7 +1753,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           continue
         }
         const target: 'memory' | 'user' = op.target === 'user' ? 'user' : 'memory'
-        const normalized = { target, action: op.action ?? 'add', facts: op.facts ?? op.content, old_text: op.old_text }
+        const normalized = { target, action: op.action ?? 'add', facts: payloadText(op), old_text: op.old_text }
         const result = approval
           ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized, session)
           : await memory?.applyBatch(normalized.target, [normalized])
@@ -1928,7 +1928,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const op = args as { target?: string; action?: string; facts?: string; content?: string; old_text?: string }
         if (!memory?.applyBatch) return undefined
         return await memory.applyBatch(op.target === 'user' ? 'user' : 'memory', [
-          { action: op.action ?? 'add', facts: op.facts ?? op.content, old_text: op.old_text },
+          { action: op.action ?? 'add', facts: payloadText(op), old_text: op.old_text },
         ])
       }
       const wrapped = (args ?? {}) as { operation?: SkillOp }
@@ -2299,9 +2299,13 @@ export function renderToolResultLine(data: unknown, identity?: { name: string; a
     output = ''
     failed = false
   }
-  const head = identity === undefined ? '' : `${identity.name} ${identity.argsRaw.slice(0, 200)} → `
+  // T3-03/A31: the tool NAME, its arguments and its output are all
+  // session-ingested text; only this line's own `[result]` tag is ours.
+  const head = identity === undefined
+    ? ''
+    : `${foldUntrustedLines(identity.name, 0)} ${foldUntrustedLines(identity.argsRaw, 200)} → `
   const failure = failed ? ' [ERROR]' : ''
-  return `[result]${failure} ${head}${output.slice(0, 500)}`
+  return `[result]${failure} ${head}${foldUntrustedLines(output, 500)}`
 }
 
 /** Text of a PTC settle `content` payload (the logged ContentBlock list):
@@ -2359,7 +2363,11 @@ export function buildReviewRequest(
       // PLAN S4.1 (2026-09-16, audit P2-12): textOfPersistedBlock — a
       // persisted `content: [null]` must skip, not break the review leg.
       const text = message.content.map(textOfPersistedBlock).join(' ').trim()
-      if (text) messages.push(`${message.role.toUpperCase()}: ${text.slice(0, maxMessageChars)}`)
+      // T3-03/A31: the digest is a plain-text prompt whose PRODUCT is a
+      // write-permission plan, so ingested text must not be able to become
+      // structure — a newline plus `SYSTEM:`/the closing instruction used to
+      // forge a header or a second instruction. Fold (never delete) at ingest.
+      if (text) messages.push(`${message.role.toUpperCase()}: ${foldUntrustedLines(text, maxMessageChars)}`)
     }
   }
   // Tool evidence — the review subagent cannot verify a plan against command
@@ -2419,7 +2427,9 @@ export function buildReviewRequest(
     if (opened === null || openedCallIds.has(opened.callId)) continue
     openedCallIds.add(opened.callId)
     const argsRaw = typeof opened.arguments === 'string' ? opened.arguments : JSON.stringify(opened.arguments ?? {})
-    toolLines.push(`[call] ${opened.name} ${argsRaw.slice(0, 500)}`)
+    // T3-03/A31: same fold as the [result] line — the name and the raw
+    // arguments are model-authored data, not this digest's structure.
+    toolLines.push(`[call] ${foldUntrustedLines(opened.name, 0)} ${foldUntrustedLines(argsRaw, 500)}`)
   }
   toolLines.reverse()
   return [
