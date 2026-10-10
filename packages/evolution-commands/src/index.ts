@@ -883,8 +883,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run results unavailable.')
           await syncRuns(registry)
-          const record = registry.find(maintainReport[1])
-          if (!record) return err(`No run ${maintainReport[1]} in this home — /evolution maintain status lists the recent ones.`)
+          const wanted = maintainReport[1]
+          if (wanted === undefined) return err('maintain report needs a run id: /evolution maintain report <id>.')
+          const record = registry.find(wanted)
+          if (!record) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — run results unavailable.')
           const probed = await readRunReport(ioRegistry.provider(), record)
@@ -901,8 +903,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run cancellation unavailable.')
           await syncRuns(registry)
-          const record = registry.find(maintainCancel[1])
-          if (!record) return err(`No run ${maintainCancel[1]} in this home — /evolution maintain status lists the recent ones.`)
+          const wanted = maintainCancel[1]
+          if (wanted === undefined) return err('maintain cancel needs a run id: /evolution maintain cancel <id>.')
+          const record = registry.find(wanted)
+          if (!record) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
           // ONE cancel call (review P1-1): a run another process owns cannot be stopped
           // from here, and a terminal one has nothing to cancel — the two answers differ.
           if (!registry.cancel(record.id)) {
