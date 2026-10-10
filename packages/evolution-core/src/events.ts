@@ -92,14 +92,39 @@ interface EvolutionReviewErrorEvent {
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
+    /**
+     * A review was scheduled and delivered on some channel. An ANNOUNCEMENT: consumers observe
+     * that the cadence fired, they do not decide anything (A98 / O-1).
+     * @param event - the scheduled review: owning session, kind, the turn's counts, delivery channel.
+     * @mode emit
+     */
     'evolution/review-scheduled'(event: EvolutionReviewScheduledEvent): void
+    /**
+     * A reviewed plan finished its write leg, with the counts that describe what landed. An
+     * ANNOUNCEMENT: the family's own ledger of plan outcomes (A98 / O-1).
+     * @param event - the outcome counts, the first failure message, and the policy fingerprint.
+     * @mode emit
+     */
     'evolution/plan-applied'(event: EvolutionPlanAppliedEvent): void
+    /**
+     * One skill mutation landed (the cache-invalidation signal every catalog consumer reads). An
+     * ANNOUNCEMENT: it names what changed, it decides nothing (A98 / O-1).
+     * @param event - the action, the skill name, and the file for support-file operations.
+     * @mode emit
+     */
     'evolution/skill-mutated'(event: EvolutionSkillMutatedEvent): void
     /** 0.3.18 (E-71): explicit catalog refresh request (`/evolution skills
      * refresh`). Out-of-band tree edits (manual, git) may bypass the mutation
      * event; listeners drop caches and invalidate downstream catalogs. No
-     * payload — it is a bare "re-read" signal, never a mutation record. */
+     * payload — it is a bare "re-read" signal, never a mutation record.
+     * @mode emit */
     'evolution/skills-refresh'(): void
+    /**
+     * A review pipeline failure was caught (never an unhandled rejection). An ANNOUNCEMENT for
+     * operators and observability — the reason is already logged by the emitter (A98 / O-1).
+     * @param event - the session whose review pipeline failed.
+     * @mode emit
+     */
     'evolution/review-error'(event: EvolutionReviewErrorEvent): void
   }
 }

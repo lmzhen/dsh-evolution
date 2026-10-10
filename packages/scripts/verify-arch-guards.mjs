@@ -237,6 +237,10 @@
  *       a new citation fails, and the register burns down as files are touched — the fix is the one
  *       S2.7 applied to the family's own comments, a symbol citation instead of a line number.
  *       `packages/docs/**` (the machine-local archive) is fenced by name.
+ *   N33. every `evolution/*` event DECLARES its cordis dispatch mode (`@mode emit|waterfall|serial|parallel|bail`)
+ *        in the docblock above the declaration, and the declaration agrees with the dispatch site. The
+ *        list is not restated: it comes from the fact's home (`evolution-core/README.md`,
+ *        `machine.kind = event-mode`), whose table is the set's ONE home (A98 / finding O-1).
  *   N37. family production code reads no DEPRECATED platform session-log accessor
  *        (`snapshotEvents`/`eventAt`/`ownEvents`): the read-before-write fallback takes the family
  *        structural view (`readEvents`), and the projection registry's capability probe is the one
@@ -445,6 +449,77 @@ const ABSENT_CATCH_RE = /\.catch\s*\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*(
  * when T2-07/A22 deleted the invocation map's second read), and an empty table is the class closed:
  * any NEW expression-form swallow of a durable read is a violation, not a debt. */
 const SWALLOWED_READ_BASELINE = new Map()
+
+/**
+ * N33's pure half: judge one (fact table, production sources) pair.
+ *
+ * The table's rows are the SET (its home re-derives it, `machine.kind = event-mode`), so this rule
+ * never restates the list. Per row: the declaration exists, carries `@mode <mode>`, and some
+ * production site dispatches it with `ctx.<mode>('<name>'` — declaration and dispatch must agree.
+ * @param tableText - the fact home's text (the event table).
+ * @param sources - production sources as `{ rel, text }`.
+ * @returns violation messages, one per drifted row.
+ */
+function eventModeViolationsFrom(tableText, sources) {
+  const rows = new Map()
+  for (const line of tableText.split(/\r?\n/)) {
+    const row = /^\|\s*`(evolution\/[a-z0-9-]+)`\s*\|\s*([a-z]+)\s*\(/.exec(line)
+    if (row) rows.set(row[1], row[2])
+  }
+  if (rows.size === 0) return ['the event table names no event — N33 reads its list from the fact home, and an empty table is not a pass (vacuity)']
+  const out = []
+  const declared = new Map()
+  const dispatched = new Set()
+  for (const { rel, text } of sources) {
+    if (!rel.includes('/src/')) continue
+    for (const match of text.matchAll(/'(evolution\/[a-z0-9-]+)'\s*\(/g)) {
+      const before = text.slice(0, match.index)
+      const open = before.lastIndexOf('/**')
+      const close = before.lastIndexOf('*/')
+      const block = open !== -1 && close !== -1 && open < close ? before.slice(open, close) : ''
+      const mode = /@mode\s+([a-z]+)/.exec(block)?.[1] ?? null
+      if (!declared.has(match[1]) || mode !== null) declared.set(match[1], mode)
+    }
+    for (const match of text.matchAll(/ctx\.(emit|waterfall|serial|parallel|bail)\(\s*'(evolution\/[a-z0-9-]+)'/g)) {
+      dispatched.add(`${match[2]} :: ${match[1]}`)
+    }
+  }
+  for (const [name, mode] of rows) {
+    if (!declared.has(name)) {
+      out.push(`${name}: the fact table lists it but no production declaration carries it (rule N33)`)
+      continue
+    }
+    const declaredMode = declared.get(name)
+    if (declaredMode === null) out.push(`${name}: the declaration carries no @mode — add \`@mode ${mode}\` to the docblock above it (rule N33)`)
+    else if (declaredMode !== mode) out.push(`${name}: declares @mode ${declaredMode} while the fact table's mode today is ${mode} — declaration and table disagree (rule N33)`)
+    if (!dispatched.has(`${name} :: ${mode}`)) out.push(`${name}: the declaration says @mode ${mode} but no \`ctx.${mode}('${name}'\` dispatch site exists in production — declaration and dispatch point disagree (rule N33)`)
+  }
+  return out
+}
+
+/** N33's tree-walking half: the fact home plus every production source under `root`. */
+function eventModeViolations(root) {
+  const home = join(root, 'evolution-core', 'README.md')
+  // A SUB-SCOPE (the guard's own synthetic trees, a package-local run) has no fact home: N33 judges
+  // nothing there instead of reporting a vacuum — a vacuity check on a subtree is not a pass, it is a
+  // false alarm the sentry's fixtures would have to carry. The rule arms where the fact lives; the
+  // empty-TABLE case below stays a violation for the real tree.
+  if (!existsSync(home)) return []
+  const sources = []
+  const collect = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!SKIP.has(entry.name)) collect(join(dir, entry.name))
+        continue
+      }
+      if (!entry.name.endsWith('.ts')) continue
+      const path = join(dir, entry.name)
+      sources.push({ rel: relative(root, path).split('\\').join('/'), text: readFileSync(path, 'utf8') })
+    }
+  }
+  collect(root)
+  return eventModeViolationsFrom(readFileSync(home, 'utf8'), sources)
+}
 
 /** N37: a READ of a deprecated platform session-log accessor. Comment-only lines are skipped — the
  * family documents the migration in prose (`*`/`//` lines name the accessors on purpose) — and the
@@ -722,6 +797,7 @@ const RULES = [
   { id: 'N13a', title: 'must-execute payload not on the non-waking primitive', incident: 'a must-execute payload sent through the non-waking primitive', canonicalForm: 'must-execute payloads use the waking primitive (followup)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N13b', title: 'wake primitive called on its receiver', incident: 'the wake primitive detached (destructured or aliased) and then called', canonicalForm: 'the wake primitive is called on its receiver: agent.followup(message)', vacuity: 'an empty debt register is clean by design; the sample carries the proof', sample: 'detector' },
   { id: 'N14', title: 'durable-read failure not served as absent', incident: 'catch { return [] }: a read failure served as absent', canonicalForm: 'Probe<T> three states; a failure keeps its reason', vacuity: 'an empty swallow register is clean by design; the sample carries the proof', sample: 'detector' },
+  { id: 'N33', title: 'every family event declares its dispatch mode', incident: 'an `evolution/*` event with no `@mode` (and no dispatch site to disagree with): a reader cannot tell an announcement from a decision point, and the declaration can drift from `ctx.emit`', canonicalForm: 'each event declaration carries `@mode <mode>` matching the fact table, and production dispatches it with the same `ctx.<mode>`', vacuity: 'an empty fact table is a violation, not a pass; the sample carries the proof', sample: 'detector' },
   { id: 'N37', title: 'no deprecated platform session-log accessor in production', incident: 'skill-reads.ts folded session.snapshotEvents() — the deprecated synchronous log read — so the family kept the deprecated surface alive in every composition', canonicalForm: 'the read-before-write fallback takes the family structural view (readEvents) or the platform projection; a deprecated accessor appears only as a registered capability probe', vacuity: 'no production line names an accessor ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N15', title: 'family code anchors resolve (Markdown, scripts and source comments)', incident: 'an anchor naming a line that no longer exists, in a document, a script or a source comment', canonicalForm: 'anchors resolve in every citation surface; symbolic references are preferred over line numbers', vacuity: 'no Markdown anchor in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N16', title: 'platform registry read asks in the calling scope', incident: 'ctx.get(<registry>) followed by r.get(name) without a scope', canonicalForm: 'the read asks in the calling scope: r.get(name, scope)', vacuity: 'no registry read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
@@ -1553,6 +1629,11 @@ if (process.argv.includes('--list-rules')) {
       && wakeLocalKeys("const woke = typeof (invocation.agent as { followup?: unknown }).followup === 'function'").length === 0
       && wakeLocalKeys("const bad = typeof agent.followup === 'function' ? agent.followup : null").length > 0],
     ['N14', () => swallowCatchKeys('try {\n  const x = await readFile(p)\n} catch {\n  return []\n}\n').length > 0],
+    ['N33', () => eventModeViolationsFrom('| `evolution/x` | emit (notification) | p |', [{ rel: 'a/src/x.ts', text: "'evolution/x'(event: E): void" }]).some(message => message.includes('carries no @mode'))
+      && eventModeViolationsFrom('| `evolution/x` | emit (notification) | p |', [{ rel: 'a/src/x.ts', text: "/**\n * @mode emit\n */\n'evolution/x'(event: E): void" }, { rel: 'b/src/y.ts', text: "ctx.emit('evolution/x', e)" }]).length === 0
+      && eventModeViolationsFrom('| `evolution/x` | emit (notification) | p |', [{ rel: 'a/src/x.ts', text: "/**\n * @mode waterfall\n */\n'evolution/x'(event: E): void" }, { rel: 'b/src/y.ts', text: "ctx.emit('evolution/x', e)" }]).some(message => message.includes('declares @mode waterfall'))
+      && eventModeViolationsFrom('| `evolution/x` | emit (notification) | p |', [{ rel: 'a/src/x.ts', text: "/**\n * @mode emit\n */\n'evolution/x'(event: E): void" }]).length === 1
+      && eventModeViolationsFrom('| event | mode today | by |', []).length === 1],
     ['N37', () => deprecatedLogAccessorLines('const events = session.snapshotEvents?.()').length === 1
       && deprecatedLogAccessorLines('  const at = session.eventAt(seq)').length === 1
       && deprecatedLogAccessorLines('const own = candidate.ownEvents()').length === 1
@@ -1682,6 +1763,7 @@ violations.push(...docAnchorViolations(root, new Set(readdirSync(root, { withFil
   .map(entry => entry.name))))
 
 // N19 runs as a whole-tree pass as well (Markdown + the single-source table).
+violations.push(...eventModeViolations(root).map(message => `rule N33: ${message}`))
 const docFacts = docFactViolations(root)
 violations.push(...docFacts.violations)
 const docFactSummary = formatDocFacts(docFacts, root)

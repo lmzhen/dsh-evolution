@@ -47,6 +47,12 @@ export interface EvolutionMemoryAppliedEvent {
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
+    /**
+     * A memory write succeeded, on the registry's single sink (so bypass paths are covered). An
+     * ANNOUNCEMENT: it reports the resulting size, it decides nothing (A98 / O-1).
+     * @param event - the target that was written and its resulting char/entry counts.
+     * @mode emit
+     */
     'evolution/memory-applied'(event: EvolutionMemoryAppliedEvent): void
   }
 }

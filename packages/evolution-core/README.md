@@ -62,7 +62,15 @@ session log made the session unresumable (A-line P0-1), which is why the payload
 | `evolution/plan-applied` | emit (notification) | `evolution-review` after a plan lands |
 | `evolution/memory-applied` | emit (notification) | `memory` after a memory write |
 
-The mode column is what the code does today: every one of them is an announcement, and the `@mode`
-declarations land with finding O-1 — the machine check here (`machine.kind = event-mode`) re-derives
-the SET from the emit sites, so an event added or renamed in code without this table fails N19.
+The mode column is what the code does today: every one of them is an announcement, and each
+declaration carries it as a `@mode` tag (finding O-1, landed) — `verify-arch-guards`' rule **N33** checks that
+tag against THIS table and against the dispatch site (`ctx.emit('…'`), so a declaration that drifts from
+the table, or an event with no `@mode`, fails. This table stays the set's ONE home: the machine check here
+(`machine.kind = event-mode`) re-derives the SET from the emit sites, so an event added or renamed in
+code without this table fails N19.
+
+The last two rows have no in-family consumer: `evolution/review-scheduled` and `evolution/review-error`
+are emitted for operators and observability (5 and 3 dispatch sites, 0 `ctx.on` subscribers here). They are
+**kept deliberately** — the observation surface is the point, and a deployment's own listener is the intended
+consumer — so the `@mode` target stays at six (decision 10, provisional: keep).
 
