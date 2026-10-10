@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { evolutionHome, makeSerialQueue, transactIo, transactTaskGuard, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
   assertCloneable,
   canClaimPending,
@@ -118,9 +118,14 @@ const QUARANTINE_ERROR_NAME = 'EvolutionStateCorruptFile'
  * DIFFERENT payload gets a stamped sibling so the earlier rescue copy is never
  * overwritten. The node backend's 7-day `.corrupt` sweep bounds the set. */
 async function quarantineTarget(io: () => EvolutionIoLike, base: string, content: string): Promise<{ dest: string; needsWrite: boolean }> {
-  if (!(await io().exists(base).catch(() => false))) return { dest: base, needsWrite: true }
-  const existing = await io().readText(base).catch(() => null)
-  if (existing === content) return { dest: base, needsWrite: false }
+  // N36: ONE three-state read replaces the exists+read PAIR. The two-state pair answered "no copy yet"
+  // for a failed stat and "the same bytes" for a failed read — the first overwrites a rescue copy this
+  // process never saw, the second skips the copy entirely. An unreadable destination is therefore
+  // NEITHER: mint a stamped sibling (the bounded-growth path below) so the preserved payload survives.
+  const baseProbe = await probeText(io(), base)
+  if (isUnknown(baseProbe)) return { dest: `${base}.${Date.now()}`, needsWrite: true }
+  if (isAbsent(baseProbe)) return { dest: base, needsWrite: true }
+  if (baseProbe.value === content) return { dest: base, needsWrite: false }
   // v29 STATE-05: probe the stamped siblings earlier reads minted BEFORE
   // minting another. A still-corrupt file on a hot path (review-state is read
   // every turn) used to create one `${base}.${Date.now()}` copy PER READ when
@@ -138,8 +143,10 @@ async function quarantineTarget(io: () => EvolutionIoLike, base: string, content
       // then name as the "preserved" copy while no quarantine copy exists.
       if (!/^\d+$/.test(name.slice(stem.length))) continue
       const sibling = join(dir, name)
-      const siblingBytes = await io().readText(sibling).catch(() => null)
-      if (siblingBytes === content) return { dest: sibling, needsWrite: false }
+      // N36: a sibling whose bytes cannot be READ is never reused as "the same bytes" — skipping it
+      // falls through to the mint below, which preserves the payload in a fresh copy.
+      const siblingProbe = await probeText(io(), sibling)
+      if (isPresent(siblingProbe) && siblingProbe.value === content) return { dest: sibling, needsWrite: false }
     }
   } catch {
     // Listing failure falls through to minting — the quarantine itself still fires.

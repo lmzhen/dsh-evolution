@@ -24,7 +24,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
-import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionIoAdapter, evolutionRoot, listEventArchives, parseEvolutionEvents, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionIoAdapter, evolutionRoot, isPresent, isUnknown, listEventArchives, parseEvolutionEvents, probeText, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 declare module '@deepseek-ai/cordis' {
@@ -469,7 +469,16 @@ export class EvolutionFeedback {
       // below would advance past records this read never saw — the cache
       // then seals the loss until the next full refold. Withhold the write
       // for that window; the next tick refolds with the band back in place.
-      if (events.length > 0 && await recordIo.readText(eventsPath).catch(() => null) === null) return
+      // N36: three-state. Withholding the write is the SAFE answer for an unreadable ACTIVE log too
+      // (the next tick refolds), so both non-present states withhold — and the unknown one says why
+      // instead of reporting as the transient-absence window this guard exists for.
+      if (events.length > 0) {
+        const activeProbe = await probeText(recordIo, eventsPath)
+        if (!isPresent(activeProbe)) {
+          if (isUnknown(activeProbe)) this.warnOnce(`evolution-feedback: the active event log ${eventsPath} could not be read (${activeProbe.reason}); withholding the cache write until it can be read`)
+          return
+        }
+      }
       // C-events-dispatch-1 (v43): this is the SECOND cache writer (cadence
       // snapshot + the unload `persistCache`), and a truncated read here advanced
       // `lastSeq` to the surviving max exactly like the restore write did — the

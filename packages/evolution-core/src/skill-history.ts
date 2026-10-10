@@ -492,8 +492,17 @@ export function contentRetentionFeedback(input: RetentionFeedbackInput): string 
  * @returns the versions; an absent or unreadable index reads as empty (never a throw).
  */
 export async function loadVersions(root: string, io: EvolutionIoLike, name: string): Promise<SkillVersion[]> {
-  const raw = await io.readText(historyIndexFile(root, name)).catch(() => null)
-  return parseHistoryIndex(raw)
+  const file = historyIndexFile(root, name)
+  // N36 (group-5 sweep): three-state. A failed read is not "this skill has no history" — the bytes may
+  // be there and unreadable, and serving that as empty is what made a broken store look empty. This read
+  // surface has no unknown state (its consumers are the panel and the diff), so the degradation is NAMED
+  // and the answer stays empty; the WRITE path (recordVersions below) refuses outright.
+  const probe = await probeText(io, file)
+  if (isUnknown(probe)) {
+    console.warn(`skill-store: ${file} could not be read (${probe.reason}); reporting no versions for "${name}" — the bytes are untouched`)
+    return []
+  }
+  return parseHistoryIndex(isPresent(probe) ? probe.value : null)
 }
 
 /**
@@ -508,7 +517,14 @@ export async function loadVersionContent(root: string, io: EvolutionIoLike, name
   const versions = await loadVersions(root, io, name)
   const entry = versions.find(candidate => candidate.v === v)
   if (entry === undefined) return null
-  return await io.readText(blobPath(root, entry.hash)).catch(() => null)
+  // N36: a blob that cannot be READ is not a blob that is not there — the answer is `null` either way
+  // (this face has no unknown state), but the reason is named instead of swallowed.
+  const probe = await probeText(io, blobPath(root, entry.hash))
+  if (isUnknown(probe)) {
+    console.warn(`skill-store: version ${v} of "${name}" could not be read (${probe.reason}); reporting no content`)
+    return null
+  }
+  return isPresent(probe) ? probe.value : null
 }
 
 /**
@@ -534,8 +550,17 @@ export async function recordVersions(
     const hash = contentHash(side)
     const path = blobPath(root, hash)
     // Immutable + content-addressed: a second write of the same bytes is the same file, so the
-    // existence probe is an optimisation, not a correctness requirement.
-    if (!await io.exists(path).catch(() => false)) await io.writeText(path, side)
+    // existence probe is an optimisation, not a correctness requirement. N36: a probe that FAILS is not
+    // "not there" — both answers lead to the same write here, so the degradation is named rather than
+    // swallowed (a backend whose stat fails will fail the write too, which the caller reports).
+    let blobPresent: boolean
+    try {
+      blobPresent = await io.exists(path)
+    } catch (error) {
+      blobPresent = false
+      console.warn(`skill-store: could not check whether the history blob ${path} exists (${error instanceof Error ? error.message : String(error)}); writing it — content-addressed bytes are the same file`)
+    }
+    if (!blobPresent) await io.writeText(path, side)
   }
   const file = historyIndexFile(root, input.skillName)
   // Bytes this reader cannot understand are PRESERVED before a fresh index replaces them (the same

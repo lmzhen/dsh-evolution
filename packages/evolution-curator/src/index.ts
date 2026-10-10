@@ -25,7 +25,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, readNumberParam, isUnknown, paramRowId, probeList, releaseInstance, reportTime, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, readNumberParam, isUnknown, paramRowId, probeList, probeText, releaseInstance, reportTime, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -1557,8 +1557,15 @@ export class EvolutionCurator extends Service {
               // READABLE: a crashed archive without a body keeps the marker as
               // the signal (a missing body must not under-suppress).
               if (wasBundled) {
-                const archivedBody = await this.io.readText(join(this.skills.root, '.archive', entry, 'SKILL.md')).catch(() => null)
-                if (archivedBody !== null && parseFrontmatter(archivedBody)?.frontmatter.name !== name) wasBundled = false
+                // N36: three-state. An unreadable body is not "no body": BOTH keep the marker as the
+                // signal (a missing body must not under-suppress), and the failed read names itself
+                // instead of being swallowed into the same answer as absence.
+                const archivedProbe = await probeText(this.io, join(this.skills.root, '.archive', entry, 'SKILL.md'))
+                if (isUnknown(archivedProbe)) {
+                  this.ctx.logger.warn(`evolution-curator: the archived body of "${entry}" could not be read (${archivedProbe.reason}); keeping the bundled marker as the signal`)
+                } else if (isPresent(archivedProbe) && parseFrontmatter(archivedProbe.value)?.frontmatter.name !== name) {
+                  wasBundled = false
+                }
               }
               if (wasBundled) break
             }

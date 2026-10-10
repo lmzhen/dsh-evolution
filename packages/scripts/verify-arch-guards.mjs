@@ -435,20 +435,12 @@ const READ_METHOD_RE = /\.(readText|readJson|readFile|size|list|mtime|exists|loa
 /** The absent literals a swallowed read may answer with. */
 const ABSENT_CATCH_RE = /\.catch\s*\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*(?:null|undefined|false|\[\s*\]|''|"")\s*\)/
 
-/** N36's frozen baseline: reviewed expression-form swallows per file, measured after the S3.2
- * migrations (S3.2, 2026-10). Burn-down only: migrating a site to probeText/probeList/probeMtime
- * lowers its number here; the class itself is scheduled for the group-5 three-state sweep. */
-const SWALLOWED_READ_BASELINE = new Map([
-  ['evolution-core/src/skill-history.ts', 3],
-  ['evolution-core/src/skill-store.ts', 9],
-  ['evolution-curator/src/index.ts', 1],
-  ['evolution-feedback/src/index.ts', 1],
-  ['evolution-state-json/src/index.ts', 3],
-])
-// S5.6f (group 5, 2026): measured 17 sites in 5 files. The skill-catalog row is GONE — the site it
-// covered was the invocation map's second read, deleted by T2-07/A22 (the scan's own read carries the
-// frontmatter now), so the burn-down the docblock invites applies. The remaining 17 are the group-5
-// three-state sweep's worklist; the guard's debt line names the count every run.
+/** N36's frozen baseline: reviewed expression-form swallows per file. EMPTY since the group-5
+ * three-state sweep (S5.6g, 2026) migrated every measured site to probeText/probeList/probeMtime — the
+ * table is burn-down only (a site migrated by any step lowers its number, and the skill-catalog row went
+ * when T2-07/A22 deleted the invocation map's second read), and an empty table is the class closed:
+ * any NEW expression-form swallow of a durable read is a violation, not a debt. */
+const SWALLOWED_READ_BASELINE = new Map()
 
 const APPROVAL_SRC = 'evolution-approval/src'
 const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])

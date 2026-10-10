@@ -38,7 +38,7 @@ import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
 import { ALIVE_LOCK_TAKEOVER_MS, LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
-import { isPresent, isUnknown, probeAbsent, probeList, probePresent, probeText, type Probe } from './probe.ts'
+import { isAbsent, isPresent, isUnknown, probeAbsent, probeList, probeMtime, probePresent, probeText, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
 import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
@@ -1216,6 +1216,21 @@ export class SkillLibrary {
    * @returns path -> character count (possibly empty), or null when the listing or
    *   a size probe cannot answer — unknown is never an empty map.
    */
+  /** A plan-time read whose bytes become a tree change's CAS baseline (`expected`). A failed read is
+   * NAMED and answers `null`, which is FAIL-CLOSED at commit: the baseline is then "absent", so an
+   * existing file counts as drift and the commit refuses instead of overwriting bytes nobody read
+   * (N36: the failure is not silently "the file is not there").
+   * @param target - the file a tree change is about to write.
+   * @returns its bytes, or `null` for both "absent" and "could not read". */
+  private async readForCas(target: string): Promise<string | null> {
+    const probe = await probeText(this.io, target)
+    if (isUnknown(probe)) {
+      console.warn(`skill-store: could not read ${target} for the tree change's baseline (${probe.reason}); treating it as absent — an existing file then counts as drift and the commit refuses`)
+      return null
+    }
+    return isPresent(probe) ? probe.value : null
+  }
+
   async supportFileChars(rawName: string): Promise<Record<string, number> | null> {
     const name = rawName.trim()
     if (this.badName(name) !== null) return null
@@ -1225,11 +1240,25 @@ export class SkillLibrary {
     const chars: Record<string, number> = {}
     for (const path of listed.value) {
       const full = join(dir, ...path.split('/').filter(Boolean))
-      const bytes = this.io.size === undefined ? null : await this.io.size(full).catch(() => null)
+      // N36: "cannot answer" stays the answer (the contract above), but a backend without the size
+      // probe and a size probe that FAILED are told apart in the log instead of collapsed silently.
+      let bytes: number | null = null
+      if (this.io.size !== undefined) {
+        try {
+          bytes = await this.io.size(full)
+        } catch (error) {
+          console.warn(`skill-store: size of ${full} could not be read (${error instanceof Error ? error.message : String(error)}); reporting no support-file char counts`)
+          return null
+        }
+      }
       if (bytes === null) return null
       if (bytes <= this.limits.maxSkillContentChars) continue
-      const content = await this.io.readText(full).catch(() => null)
-      if (content === null) return null
+      const contentProbe = await probeText(this.io, full)
+      if (!isPresent(contentProbe)) {
+        if (isUnknown(contentProbe)) console.warn(`skill-store: ${full} could not be read (${contentProbe.reason}); reporting no support-file char counts`)
+        return null
+      }
+      const content = contentProbe.value
       chars[path] = content.length
     }
     return chars
@@ -1609,7 +1638,12 @@ export class SkillLibrary {
     if (protection) return { ok: false, message: `Skill "${name}" is protected (${protection}).` }
     // S1.2: a lock-free read feeds only the shrink exemption below; the commit
     // still runs inside the write transaction with its own locked read.
-    const currentForLimit = await this.io.readText(path).catch(() => null)
+    // N36: three-state. "Could not read" answers `null` like "no file yet", which is the CONSERVATIVE
+    // direction here (an already-over-limit body loses the repair exemption and is refused, never
+    // accepted), and the reason is named.
+    const limitProbe = await probeText(this.io, path)
+    if (isUnknown(limitProbe)) console.warn(`skill-store: could not re-read ${path} for the shrink exemption (${limitProbe.reason}); validating without it — an over-limit repair is refused, not accepted`)
+    const currentForLimit = isPresent(limitProbe) ? limitProbe.value : null
     const validation = validateFrontmatter(content, name, this.limits, currentForLimit)
     if (validation) return { ok: false, message: validation }
     // 0.3.11: normalize at the write point (see create) — same reasoning.
@@ -1930,8 +1964,15 @@ export class SkillLibrary {
    * R2 follow-up); anything else (a user support file or a live writer's
    * lock) is left untouched. */
   private async sweepLockIfStranded(lockPath: string): Promise<void> {
-    const body = await this.io.readText(lockPath).catch(() => null)
-    if (body === null) return
+    // N36: a lock whose body cannot be READ is not a lock that is not there — leave it in place (a
+    // live writer may hold it) and name the reason instead of swallowing it.
+    const lockProbe = await probeText(this.io, lockPath)
+    if (isUnknown(lockProbe)) {
+      console.warn(`skill-store: could not read ${lockPath} to check whether its holder is alive (${lockProbe.reason}); leaving the lock in place`)
+      return
+    }
+    if (!isPresent(lockProbe)) return
+    const body = lockProbe.value
     // v20 (A-1): consume the shared `parseLockBody` instead of the previously
     // inlined third copy of the lock-body regex (F-17 single-source contract).
     const pid = parseLockBody(body)
@@ -2320,7 +2361,7 @@ export class SkillLibrary {
         // re-reads at commit for the rollback bytes.
         const writes: TreeChangeWrite[] = []
         for (const reference of referenceWrites) {
-          const previous = await this.io.readText(reference.target).catch(() => null)
+          const previous = await this.readForCas(reference.target)
           const base = previous?.trimEnd() ?? ''
           // V24-01: carry the plan-time bytes as the CAS baseline — a read
           // error here reads as null and stays fail-closed at commit (an
@@ -2332,7 +2373,7 @@ export class SkillLibrary {
         // rewritten references can never be committed without their targets.
         for (const file of rehomed) {
           const target = join(targetDir, ...file.to.split('/'))
-          const previous = await this.io.readText(target).catch(() => null)
+          const previous = await this.readForCas(target)
           writes.push({ target, content: file.content, expected: previous })
         }
         if (mode === 'append') {
@@ -2486,7 +2527,7 @@ export class SkillLibrary {
     const writes: TreeChangeWrite[] = []
     for (const entry of byRel.values()) {
       const target = join(dir, ...entry.rel.split('/'))
-      const previous = await this.io.readText(target).catch(() => null)
+      const previous = await this.readForCas(target)
       const base = previous?.trimEnd() ?? ''
       writes.push({
         target,
@@ -2888,8 +2929,14 @@ export class SkillLibrary {
     // A regular file always reads as a string here; exists+unreadable means
     // directory (EISDIR) or an unreadable file — refuse both (fail-closed;
     // directories must be removed file by file).
-    const before = await this.io.readText(target).catch(() => null)
-    if (before === null) return { ok: false, message: `"${filePath}" is not a readable regular file — remove the files inside it one by one.` }
+    // N36: three-state. Both non-present answers REFUSE below (the pre-read decides whether the target
+    // is a readable regular file — EISDIR lands here too); the unknown one names its reason.
+    const beforeProbe = await probeText(this.io, target)
+    if (!isPresent(beforeProbe)) {
+      if (isUnknown(beforeProbe)) console.warn(`skill-store: could not read ${target} before removing it (${beforeProbe.reason}); refusing the removal`)
+      return { ok: false, message: `"${filePath}" is not a readable regular file — remove the files inside it one by one.` }
+    }
+    const before = beforeProbe.value
     // A1-5 (v18): a bare `io.remove` does not participate in the write-lock
     // protocol, so a cross-instance/process writer could land its rename after
     // our read and have the bytes deleted while it reports success. Route the
@@ -2957,11 +3004,19 @@ export class SkillLibrary {
     if (!this.io.mtime) return null
     const cutoff = Date.now() - ARCHIVE_RETENTION_DAYS * 86_400_000
     const expired: string[] = []
+    let undated = 0
     for (const entry of listed.value) {
-      const mtime = await this.io.mtime(join(archiveRoot, entry)).catch(() => null)
-      if (mtime === null || mtime > cutoff) continue
+      // N36: a failed mtime probe is not "not expired" — the entry is RETAINED (the safe direction)
+      // and the count is reported, so a broken archive cannot look like a fully swept one.
+      const probe = await probeMtime(this.io, join(archiveRoot, entry))
+      if (isUnknown(probe)) {
+        undated += 1
+        continue
+      }
+      if (isAbsent(probe) || probe.value > cutoff) continue
       expired.push(entry)
     }
+    if (undated > 0) console.warn(`skill-store: ${undated} archived entr(ies) could not be dated (mtime probe failed); they are retained — a failed probe never expires an entry`)
     return expired
   }
 
