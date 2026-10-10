@@ -116,10 +116,11 @@ function renderRunRecord(record: RunRecord): string {
 
 /** The newest MAINTENANCE run this home knows — the default when a subcommand omits its id
  * (G2/0.20.0). The registry view is newest-first and already carries the cross-plane rows. The
- * index is a file a user can hand-edit, so a row with a blank id or another kind is skipped
- * rather than answered from (review P2-7: it produced text like `Run  (succeeded) …`). */
+ * index is a file a user can hand-edit, so a row with a blank id is skipped rather than answered
+ * from (review P2-7: it produced text like `Run  (succeeded) …`). `RunKind` has one member today,
+ * so kind needs no filter — a second kind must add one here when it lands. */
 function newestRun(registry: RunRegistry): RunRecord | undefined {
-  return registry.runs().find(record => record.kind === 'maintain' && record.id.trim() !== '')
+  return registry.runs().find(record => record.id.trim() !== '')
 }
 
 /** Sentence F, ONE wording for the three id-less forms (design `10` cell 13): an index that could
@@ -967,7 +968,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                       }],
                       source: { kind: 'evolution-commands', form: 'notice', summary: 'maintenance report handoff (auto)' },
                     })
-                    const woke = deliverHandoff(runAgent as { followup?: unknown; inject?: unknown }, autoMessage)
+                    const woke = deliverHandoff(runAgent, autoMessage)
                     // Review P2-2: a receiver with neither primitive is NOT a silent case — the
                     // run and its report are committed, but nobody was told the model was never
                     // handed the pointer, so the operator has to see it.

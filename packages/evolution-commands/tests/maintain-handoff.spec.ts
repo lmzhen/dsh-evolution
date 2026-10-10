@@ -35,9 +35,11 @@ function receiver(mode: 'followup' | 'inject' | 'proto' | 'none'): Receiver {
       calls.push('inject')
     },
   }
-  const agent: Record<string, unknown> = mode === 'proto' ? Object.create(proto) : {}
-  if (mode === 'followup') agent['followup'] = proto.followup
-  if (mode === 'inject') agent['inject'] = proto.inject
+  // 'proto' keeps the methods on the PROTOTYPE (a detached call loses `this` — the 0.3.73 shape);
+  // the other modes install an explicitly bound arrow, which is what an ordinary host exposes.
+  const agent: Record<string, unknown> = mode === 'proto' ? Object.create(proto) as Record<string, unknown> : {}
+  if (mode === 'followup') agent['followup'] = (message: unknown): void => { proto.followup.call(agent, message) }
+  if (mode === 'inject') agent['inject'] = (message: unknown): void => { proto.inject.call(agent, message) }
   const sent = (): string => {
     const message = agent['sent'] as { content?: Array<{ text?: string }> } | undefined
     return message?.content?.[0]?.text ?? ''
@@ -106,7 +108,7 @@ async function waitSettled(handler: Handler, id: string): Promise<void> {
   for (let attempt = 0; attempt < 500; attempt++) {
     const status = await handler.handler({ rawInput: 'maintain status ' + id })
     if (!/\srunning\s/.test(status.text)) return
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await new Promise(resolve => setTimeout(resolve, 10))
   }
   throw new Error('maintenance run never settled')
 }
@@ -187,7 +189,7 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     expect(running.kind).toBe('error')
     expect(running.text).toContain('is still running')
     expect(early.calls).toEqual([])
-    for (let attempt = 0; attempt < 500 && !bed.releaseReady(); attempt++) await new Promise((resolve) => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 500 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     bed.release()
     await waitSettled(bed.handler, id)
     expect(auto.calls, 'the switch is OFF by default: settling injects nothing').toEqual([])
@@ -231,9 +233,9 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     const started = await bed.handler.handler({ rawInput: 'maintain', agent: auto.agent })
     expect(started.kind).toBe('success')
     // The scan settles only when the stub's outcome is released; the handoff rides on that settle.
-    for (let attempt = 0; attempt < 500 && !bed.releaseReady(); attempt++) await new Promise((resolve) => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 500 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     bed.release()
-    for (let attempt = 0; attempt < 500 && auto.calls.length === 0; attempt++) await new Promise((resolve) => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 500 && auto.calls.length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     expect(auto.calls).toEqual(['followup'])
     expect(auto.sent()).toContain('REPORT-ONLY')
   })
