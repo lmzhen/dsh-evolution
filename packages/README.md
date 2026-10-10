@@ -383,9 +383,11 @@ joins only when mounted (D-30):
 ## Service keys
 
 Every service this family mounts carries a context key, and **every key is prefixed `evolution`**
-except two registered exceptions. The machine check (`machine.kind = service-key-prefix`) re-derives
-the set from the `super(ctx, '…')` / `ctx.provide('…')` mount sites in production sources, so a new
-unprefixed key fails N19, and an exception nobody mounts any more fails too.
+except two registered exceptions. The rule is **N31** and its implementation is the machine check
+(`machine.kind = service-key-prefix`): it re-derives the set from the `super(ctx, '…')` /
+`ctx.provide('…')` mount sites in production sources, so a new unprefixed key fails N19, and an
+exception nobody mounts any more fails too. The two exception rows below ARE the register — a third
+unprefixed key cannot be added without a row here, and a row without a mount fails.
 
 Prefixed keys: `evolutionIo` · `evolutionStateStorage` · `evolutionState` · `evolutionPolicy` ·
 `evolutionApproval` · `evolutionCurator` · `evolutionFeedback` · `evolutionReplay` ·
@@ -393,8 +395,8 @@ Prefixed keys: `evolutionIo` · `evolutionStateStorage` · `evolutionState` · `
 
 | exception | owner | reason | expires |
 |---|---|---|---|
-| `memory` | `memory` | the key predates the prefix rule and family readers use `ctx.memory` | group 6 (O-3): rename behind an alias window, or keep the registration |
-| `skillUsage` | `skill-usage` | same: a historical generic key with in-family readers | group 6 (O-3): rename behind an alias window, or keep the registration |
+| `memory` | `memory` | the key predates the prefix rule and family readers use `ctx.memory` | **待裁**（`决策 1` 口径＝先按现行为写实）：改名要走别名窗口并同步全部 `ctx.memory` 读点，或维持登记 |
+| `skillUsage` | `skill-usage` | same: a historical generic key with in-family readers | **待裁**（同上）：改名同步读点，或维持登记 |
 
 ## Why the judgment layer has no Cordis extension points (decision 4, provisional)
 
