@@ -2617,7 +2617,12 @@ export class SkillLibrary {
       if (stuck.length === 0) return { ok: false, message: `Tree change failed and was rolled back: ${reason}` }
       return { ok: false, message: `Tree change failed: ${reason}. The rollback could not restore ${stuck.join(', ')} — recover those targets from the .backups snapshot (or re-apply the change).` }
     }
-    await this.audit(name, plan.auditAction, md, landing.find(entry => entry.target.split(/[\\/]/).pop() === 'SKILL.md')?.content ?? md, plan.auditSummary)
+    // A7: both sides come from the KERNEL's own pre-read of the SKILL.md target — the baseline the
+    // CAS write compared against and the bytes the rollback restores — instead of the earlier `md`
+    // read, which names a state the commit did not necessarily replace. (In every current caller the
+    // CAS refuses a drift between the two reads, so this is the same value on every committing run.)
+    const skillMdWrite = landing.find(entry => entry.target.split(/[\\/]/).pop() === 'SKILL.md')
+    await this.audit(name, plan.auditAction, skillMdWrite === undefined ? md : skillMdWrite.previous, skillMdWrite === undefined ? md : skillMdWrite.content, plan.auditSummary)
     this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
     return {
       ok: true,
@@ -2875,6 +2880,11 @@ export class SkillLibrary {
     // mismatch returns `current` unchanged — "no change" in the transact
     // contract — so nothing is deleted and nothing is audited.
     let verdict = anchorVerdict(anchor, before)
+    // A7: the audit's `before` is the bytes the LOCKED read saw. The pre-read above
+    // only decides the fast path and supplies a baseline when the target is already
+    // gone at commit time; a concurrent writer between the two reads would otherwise
+    // leave the ledger naming bytes this operation never removed.
+    let lockedBefore = before
     if (verdict === 'match' && this.transact) {
       // S1.4 (v37 P2-7): a violating transact backend would leave `verdict` at
       // its pre-read value, so the "removed" claim (and the audit record and the
@@ -2885,6 +2895,9 @@ export class SkillLibrary {
       await this.transact(this.io, target, (current) => {
         ran.done = true
         verdict = anchorVerdict(anchor, current)
+        // An unanchored caller accepts ANY current, so the locked bytes are the ones the
+        // delete replaces — `null` (the file vanished before the lock) keeps the pre-read.
+        if (verdict === 'match' && current !== null) lockedBefore = current
         return verdict === 'match' ? null : current
       })
       if (!ran.done) return { ok: false, message: 'internal error: the delete transaction did not invoke the task; nothing was removed' }
@@ -2892,7 +2905,7 @@ export class SkillLibrary {
       await this.io.remove(target)
     }
     if (verdict !== 'match') return anchorRefusalFile(name, filePath, verdict)
-    await this.audit(name, 'remove_file', before, null, `removed ${filePath}`, filePath)
+    await this.audit(name, 'remove_file', lockedBefore, null, `removed ${filePath}`, filePath)
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
     return { ok: true, message: `Support file "${filePath}" removed from "${name}".`, path: target }
   }
