@@ -204,6 +204,13 @@ const CONTRACT_ANCHORS = [
     finding: '1-3 (A6)',
   },
   {
+    id: 'agent-inbox-surface',
+    file: 'packages/core/agent/src/runtime-types.ts',
+    anchor: 'export interface Inbox {',
+    consumer: 'evolution-review\'s soft inbox probe (InboxLike) — the pending-message queue its notice state machine tracks; the view is deliberately minimal/optional (A72)',
+    finding: '6-5 (A72)',
+  },
+  {
     id: 'app-boot-manifest-type',
     file: 'packages/util/package-manifest/src/types.ts',
     anchor: 'export interface DshProfileManifest {',

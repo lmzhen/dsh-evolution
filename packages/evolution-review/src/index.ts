@@ -302,10 +302,17 @@ interface MemoryLike {
 /**
  * S2-8 (FLOW1-3): the platform `Inbox` surface (public `Agent.inbox`,
  * `core/agent/src/runtime-types.ts`) read by the delivery path to see whether
- * HUMAN input is already queued ahead of the review prompt. A structural view
- * like the `*Like` family above: the pinned tree's own type is not importable
- * here, and every member stays optional so a host that lacks the surface
- * degrades to the historical behavior instead of throwing.
+ * HUMAN input is already queued ahead of the review prompt.
+ *
+ * T2-04/A72: this is a MINIMAL VIEW on purpose, not a stale copy. The platform's `Inbox` is
+ * importable from `@deepseek-ai/dsh-agent` (its index re-exports `runtime-types.ts`), so the earlier
+ * claim that the type is "not importable here" was wrong; what the family actually needs is the
+ * OPPOSITE typing — a SOFT probe. `Agent.inbox` may be absent on a host that mounts no queue, and
+ * every member here stays optional so the delivery path degrades to the historical behavior instead
+ * of throwing on a surface a partial composition does not carry. Using the platform's own (all-
+ * required) interface would move that optionality onto the wrong side of the seam. The coupling is
+ * kept honest by a contract anchor (`agent-inbox-surface` in verify-platform-contract.mjs), so a
+ * rename of `Inbox`/`nextTurn`/`nextStep` turns the gate red instead of silently degrading.
  */
 interface InboxLike {
   readonly nextTurn?: readonly PendingMessageLike[]
