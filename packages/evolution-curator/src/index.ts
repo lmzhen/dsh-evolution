@@ -25,7 +25,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeMtime, probeText, readNumberParam, releaseInstance, reportTime, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -209,13 +209,6 @@ export function gateConsolidations(
   return consolidations.filter(n => !gateSet.isBlocked(n.from) && !gateSet.isBlocked(n.into))
 }
 
-/** One report the retention sweep can order: its file name, the instant it declares, and the
- * mtime that breaks a tie (two reports may declare the same millisecond). */
-interface DatedReport {
-  readonly name: string
-  readonly startedAt: number
-  readonly mtime: number | null
-}
 
 export class EvolutionCurator extends Service {
   static inject = ['evolutionIo']
@@ -1805,73 +1798,19 @@ export class EvolutionCurator extends Service {
   }
 
   /** The sweep `retainReports` holds the per-home lock for. A caller MUST hold
-   * that lock: the listing and the deletions are not atomic on their own. */
+   * that lock: the listing and the deletions are not atomic on their own.
+   * 0.19.0 (S2): the sweep itself now lives in core (`sweepReports`) — the
+   * maintenance run reports added in 0.19.0 need the same window, and a second
+   * copy of "list, order, delete beyond the window" is the near-duplicate class
+   * this family treats as a defect. The lock and the two windows stay here. */
   private async sweepReports(keep: number, errorKeep: number): Promise<void> {
-    const reportsRoot = join(evolutionHome(), 'reports')
-    const listed = await probeList(this.io, reportsRoot)
-    // N14: nothing to recycle when the directory is missing; an UNREADABLE one
-    // is not "no reports" — never delete what we cannot enumerate, and say so.
-    if (isUnknown(listed)) {
-      this.ctx.logger.warn(`evolution-curator: report retention skipped — the reports directory could not be listed (${listed.reason})`)
-      return
-    }
-    const entries = isPresent(listed) ? listed.value : []
-    const real: DatedReport[] = []
-    const errors: DatedReport[] = []
-    let unorderableWarned = false
-    for (const name of entries.filter(entry => entry.startsWith('curator-') && entry.endsWith('.json'))) {
-      try {
-        const raw = await this.io.readText(join(reportsRoot, name))
-        if (raw === null) continue
-        // S2.9 (T3-12): the ordering time comes from ONE place (`reportTime` in core) — the
-        // declared `startedAt`, then the declared `at` (F-327/P2-4: error reports carry no
-        // `startedAt`, and the writer stamps `at` on every report), then the optional mtime probe.
-        // `latestReport` used the mtime ALONE, so the sweep's "newest" and the panel's "newest"
-        // could name different files.
-        const startedAt = await reportTime(this.io, join(reportsRoot, name), JSON.parse(raw))
-        // The mtime is the tie-break (a report's file age), not a second ordering home: it is read
-        // only to keep the order total when two reports declare the same instant.
-        const probed = await probeMtime(this.io, join(reportsRoot, name))
-        const mtime = isPresent(probed) ? probed.value : null
-        if (startedAt !== null) (name.startsWith('curator-error-') ? errors : real).push({ name, startedAt, mtime })
-        else if (!unorderableWarned) {
-          // No usable timestamp at all: KEPT (never delete what we cannot
-          // order), and said out loud once - this file escapes the window.
-          unorderableWarned = true
-          this.ctx.logger.warn(`evolution-curator: report "${name}" carries no usable timestamp and this backend has no mtime probe - it is kept outside the retention window`)
-        }
-      } catch {
-        // Unclassifiable report: keep it — never delete what we cannot order.
-      }
-    }
-    // v46 review (CI-caught): the ordering time is ONE place, but a TIE used to fall through to the
-    // filesystem's readdir order — alphabetical on NTFS, a directory hash on ext4 — so the same tree
-    // evicted a different set on Linux and the suite went red there while passing on Windows. Two
-    // reports written in the same millisecond are ordered by their mtime, then by name: the order is
-    // TOTAL, so the sweep deletes the same files on every platform and backend.
-    const newestFirst = (a: DatedReport, b: DatedReport): number =>
-      b.startedAt - a.startedAt || (b.mtime ?? 0) - (a.mtime ?? 0) || b.name.localeCompare(a.name)
-    real.sort(newestFirst)
-    errors.sort(newestFirst)
-    await this.pruneReportList(reportsRoot, real, keep)
-    await this.pruneReportList(reportsRoot, errors, errorKeep)
-  }
-
-  /** Remove the oldest reports beyond `keep` (each with its `.md` digest, best-effort). */
-  private async pruneReportList(reportsRoot: string, dated: Array<{ name: string; startedAt: number }>, keep: number): Promise<void> {
-    for (const oldReport of dated.slice(keep)) {
-      const stem = oldReport.name.replace(/\.json$/, '')
-      try {
-        await this.io.remove(join(reportsRoot, oldReport.name))
-      } catch {
-        // Best-effort pruning.
-      }
-      try {
-        await this.io.remove(join(reportsRoot, `${stem}.md`))
-      } catch {
-        // The digest may already be gone (or never existed); keep going.
-      }
-    }
+    await sweepRunReports({
+      io: this.io,
+      dir: join(evolutionHome(), 'reports'),
+      buckets: [{ prefix: 'curator-error-', keep: errorKeep }, { prefix: 'curator-', keep }],
+      warn: message => { this.ctx.logger.warn(message) },
+      owner: 'evolution-curator',
+    })
   }
 
   async latestReport(): Promise<CuratorRunReport | null> {

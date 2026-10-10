@@ -100,6 +100,10 @@ export interface MaintainRuntime {
 
 export interface MaintainOptions {
   timeoutMs?: number
+  /** 0.19.0 (S2): the run id chosen by the run registry, so the registry record,
+   * the persisted event and the report file all name ONE run. Absent under the
+   * legacy synchronous call sites, which keep generating their own. */
+  runId?: string | undefined
   /** E-6 (v18): external cancel signal (session/UI); combined with timeoutMs. */
   signal?: AbortSignal | undefined
   maxDepth?: number
@@ -304,7 +308,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
         }
       }
       // Genuinely empty: no facts to review — do not spend a model call.
-      return { ok: true, recommendationCount: 0, runId: randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
+      return { ok: true, recommendationCount: 0, runId: options.runId ?? randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
     }
     const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, enrichment?.usageObservedValue, options.redact)
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
@@ -463,7 +467,7 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
           error: `Maintain plan rejected by validator: ${validated.errors.slice(0, 5).join('; ')}`,
         }
       }
-      const runId = randomUUID()
+      const runId = options.runId ?? randomUUID()
       return {
         ok: true,
         runId,
