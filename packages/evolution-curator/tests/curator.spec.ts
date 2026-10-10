@@ -1770,10 +1770,13 @@ Body of ${name}.
     const previous = process.env.DSH_HOME
     process.env.DSH_HOME = home
     try {
-      // Seed 25 error reports (no startedAt — they age by mtime) and 5 real
-      // reports, simulating a host that has been failing repeatedly. mtimes
-      // are spread so the OLDEST eviction is deterministic (V5-22: same-second
-      // mtimes used to leave the eviction target undefined).
+      // Seed 25 error reports (no startedAt; the writer's `at` stamp is IDENTICAL
+      // on all of them) and 5 real reports, simulating a host that has been
+      // failing repeatedly. mtimes are spread so the OLDEST eviction is
+      // deterministic: the declared instants tie, the mtime breaks the tie, and
+      // the order is total — V5-22 (same-second mtimes left the target undefined)
+      // and the v46 CI run (the tie fell through to readdir order, alphabetical on
+      // NTFS and a directory hash on ext4) are the two shapes this pins.
       const reports = join(home, 'evolution', 'reports')
       await mkdir(reports, { recursive: true })
       for (let i = 0; i < 25; i += 1) {

@@ -25,7 +25,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, readNumberParam, isUnknown, paramRowId, probeList, probeText, releaseInstance, reportTime, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeMtime, probeText, readNumberParam, releaseInstance, reportTime, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -207,6 +207,14 @@ export function gateConsolidations(
   // where a `into` marker pre-filter must be added.
   const gateSet = gates instanceof EvolutionGateSet ? gates : new EvolutionGateSet(gates)
   return consolidations.filter(n => !gateSet.isBlocked(n.from) && !gateSet.isBlocked(n.into))
+}
+
+/** One report the retention sweep can order: its file name, the instant it declares, and the
+ * mtime that breaks a tie (two reports may declare the same millisecond). */
+interface DatedReport {
+  readonly name: string
+  readonly startedAt: number
+  readonly mtime: number | null
 }
 
 export class EvolutionCurator extends Service {
@@ -1789,8 +1797,8 @@ export class EvolutionCurator extends Service {
       return
     }
     const entries = isPresent(listed) ? listed.value : []
-    const real: Array<{ name: string; startedAt: number }> = []
-    const errors: Array<{ name: string; startedAt: number }> = []
+    const real: DatedReport[] = []
+    const errors: DatedReport[] = []
     let unorderableWarned = false
     for (const name of entries.filter(entry => entry.startsWith('curator-') && entry.endsWith('.json'))) {
       try {
@@ -1802,7 +1810,11 @@ export class EvolutionCurator extends Service {
         // `latestReport` used the mtime ALONE, so the sweep's "newest" and the panel's "newest"
         // could name different files.
         const startedAt = await reportTime(this.io, join(reportsRoot, name), JSON.parse(raw))
-        if (startedAt !== null) (name.startsWith('curator-error-') ? errors : real).push({ name, startedAt })
+        // The mtime is the tie-break (a report's file age), not a second ordering home: it is read
+        // only to keep the order total when two reports declare the same instant.
+        const probed = await probeMtime(this.io, join(reportsRoot, name))
+        const mtime = isPresent(probed) ? probed.value : null
+        if (startedAt !== null) (name.startsWith('curator-error-') ? errors : real).push({ name, startedAt, mtime })
         else if (!unorderableWarned) {
           // No usable timestamp at all: KEPT (never delete what we cannot
           // order), and said out loud once - this file escapes the window.
@@ -1813,8 +1825,15 @@ export class EvolutionCurator extends Service {
         // Unclassifiable report: keep it — never delete what we cannot order.
       }
     }
-    real.sort((a, b) => b.startedAt - a.startedAt)
-    errors.sort((a, b) => b.startedAt - a.startedAt)
+    // v46 review (CI-caught): the ordering time is ONE place, but a TIE used to fall through to the
+    // filesystem's readdir order — alphabetical on NTFS, a directory hash on ext4 — so the same tree
+    // evicted a different set on Linux and the suite went red there while passing on Windows. Two
+    // reports written in the same millisecond are ordered by their mtime, then by name: the order is
+    // TOTAL, so the sweep deletes the same files on every platform and backend.
+    const newestFirst = (a: DatedReport, b: DatedReport): number =>
+      b.startedAt - a.startedAt || (b.mtime ?? 0) - (a.mtime ?? 0) || b.name.localeCompare(a.name)
+    real.sort(newestFirst)
+    errors.sort(newestFirst)
     await this.pruneReportList(reportsRoot, real, keep)
     await this.pruneReportList(reportsRoot, errors, errorKeep)
   }
