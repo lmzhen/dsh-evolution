@@ -903,11 +903,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           await syncRuns(registry)
           const record = registry.find(maintainCancel[1])
           if (!record) return err(`No run ${maintainCancel[1]} in this home — /evolution maintain status lists the recent ones.`)
-          // A run another process owns cannot be stopped from here (review P1-1).
-          if (record.state === 'running' && registry.cancel(record.id) === false) {
-            return err(`Run ${record.id} is running in ANOTHER process sharing this home — it can only be cancelled there.`)
+          // ONE cancel call (review P1-1): a run another process owns cannot be stopped
+          // from here, and a terminal one has nothing to cancel — the two answers differ.
+          if (!registry.cancel(record.id)) {
+            if (record.state === 'running') {
+              return err(`Run ${record.id} is running in ANOTHER process sharing this home — it can only be cancelled there.`)
+            }
+            return err(`Run ${record.id} is already ${record.state} — nothing to cancel.`)
           }
-          if (!registry.cancel(record.id)) return err(`Run ${record.id} is already ${record.state} — nothing to cancel.`)
           return ok(`Maintenance run ${record.id} cancelled — the scan stops at its next checkpoint. /evolution maintain status ${record.id} shows the terminal state.`)
         }
         if (/^maintain\b/.test(input)) {
