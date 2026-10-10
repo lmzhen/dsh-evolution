@@ -23,12 +23,12 @@ describe('core run registry (S2)', () => {
     expect(handle.kind).toBe('maintain')
     expect(handle.startedAt).toBeGreaterThan(0)
     expect(handle.signal.aborted).toBe(false)
-    expect(registry.inFlight('maintain')?.id).toBe(handle.id)
-    expect(registry.lastSettledAt('maintain')).toBeUndefined()
+    expect(registry.inFlight()?.id).toBe(handle.id)
+    expect(registry.lastSettledAt()).toBeUndefined()
     await registry.settle(handle.id, { state: 'succeeded', resultRef: join(dir, 'reports', 'maintain-x.json') })
-    expect(registry.inFlight('maintain')).toBeUndefined()
+    expect(registry.inFlight()).toBeUndefined()
     expect(registry.find(handle.id)).toMatchObject({ state: 'succeeded', resultRef: join(dir, 'reports', 'maintain-x.json') })
-    expect(typeof registry.lastSettledAt('maintain')).toBe('number')
+    expect(typeof registry.lastSettledAt()).toBe('number')
   })
 
   it('one terminal state: a settle after a cancel cannot flip the answer the operator read', async () => {
@@ -161,7 +161,7 @@ describe('core run registry (S2)', () => {
     expect(loaded.ok).toBe(true)
     expect(loaded.note, 'the other plane in flight is reported').toContain('in flight in another process')
     expect(registry.find('live-elsewhere')?.state).toBe('running')
-    expect(registry.inFlight('maintain')?.id).toBe('live-elsewhere')
+    expect(registry.inFlight()?.id).toBe('live-elsewhere')
     expect(registry.cancel('live-elsewhere'), 'this process does not own it').toBe(false)
     // A second load is idempotent — the merge must not duplicate records.
     await registry.load()

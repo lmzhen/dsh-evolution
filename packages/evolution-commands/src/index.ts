@@ -737,7 +737,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // 0.19.0 (S2): the registry IS the concurrency guard — one owner for
           // "is a scan running" and "when did the last one settle", instead of the
           // three module globals that also lost the answer on a restart.
-          const running = registry.inFlight('maintain')
+          const running = registry.inFlight()
           if (running) {
             const elapsed = Math.max(1, Math.round((Date.now() - running.startedAt) / 1000))
             // V10-08 (F-04): a refused scan is NOT a successful scan — the
@@ -750,7 +750,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // exactly the repeated-model-call case this guards) and ±Infinity
           // made every resubmission cooldown-blocked forever.
           const cooldownMs = clampedNumber(config.maintainCooldownMs, 30_000, { min: 0 })
-          const lastSettled = registry.lastSettledAt('maintain')
+          const lastSettled = registry.lastSettledAt()
           const sinceLast = lastSettled === undefined ? Number.POSITIVE_INFINITY : Date.now() - lastSettled
           if (cooldownMs > 0 && sinceLast < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - sinceLast) / 1000)

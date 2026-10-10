@@ -82,10 +82,10 @@ export interface RunRegistry {
   begin(kind: RunKind): RunHandle
   /** Record a run's terminal state (first writer wins). */
   settle(id: string, outcome: RunOutcome): Promise<void>
-  /** The live run of one kind, when there is one. */
-  inFlight(kind: RunKind): RunRecord | undefined
-  /** When the newest terminal run of one kind ended (`undefined` when none). */
-  lastSettledAt(kind: RunKind): number | undefined
+  /** The live run, when there is one (one kind today — see the implementation note). */
+  inFlight(): RunRecord | undefined
+  /** When the newest terminal run ended (`undefined` when none). */
+  lastSettledAt(): number | undefined
   /** Every tracked run, newest first. */
   runs(): readonly RunRecord[]
   /** One run by id, converged view included. */
@@ -151,7 +151,7 @@ function parseIndex(raw: string | null): { ok: boolean; records: RunRecord[]; fo
     const record = row as Partial<RunRecord>
     if (typeof record.id !== 'string' || typeof record.startedAt !== 'number') { foreign.push(row); continue }
     if (typeof record.kind !== 'string' || typeof record.state !== 'string') { foreign.push(row); continue }
-    if (record.state !== 'running' && !TERMINAL.has(record.state as RunState)) {
+    if (record.state !== 'running' && !TERMINAL.has(record.state)) {
       // A state this build does not know (a newer writer, or a hand-edited file):
       // it is KEPT as it is — dropping it would silently erase another writer's record.
       foreign.push(row)
@@ -159,8 +159,8 @@ function parseIndex(raw: string | null): { ok: boolean; records: RunRecord[]; fo
     }
     records.push({
       id: record.id,
-      kind: record.kind as RunKind,
-      state: record.state as RunState,
+      kind: record.kind,
+      state: record.state,
       startedAt: record.startedAt,
       ...(typeof record.pid === 'number' ? { pid: record.pid } : {}),
       ...(typeof record.endedAt === 'number' ? { endedAt: record.endedAt } : {}),
@@ -206,7 +206,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       // two hosts each know their own runs and the index is their shared view.
       // (trim() already bounded the terminal history and kept every running
       // record — a second slice here could drop the LIVE run out of the index.)
-      await transactIo(options.io, path, async (current) => {
+      await transactIo(options.io, path, (current) => {
         const onDisk = parseIndex(current)
         const merged = new Map<string, RunRecord>()
         for (const record of onDisk.records) merged.set(record.id, record)
@@ -294,12 +294,15 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       await persist()
     },
 
-    inFlight(kind) {
-      return ordered().find(record => record.kind === kind && record.state === 'running')
+    // The registry tracks ONE kind today (`RunKind` = 'maintain'), so these reads take no
+    // kind filter — a comparison the type system already knows is true. Re-add the
+    // parameter (and the filter) together with the second `RunKind` member.
+    inFlight() {
+      return ordered().find(record => record.state === 'running')
     },
 
-    lastSettledAt(kind) {
-      return ordered().find(record => record.kind === kind && TERMINAL.has(record.state))?.endedAt
+    lastSettledAt() {
+      return ordered().find(record => TERMINAL.has(record.state))?.endedAt
     },
 
     runs() {
