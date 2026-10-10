@@ -87,7 +87,11 @@ export function isReviewNotice(message: NoticeMessage): boolean {
   // one was adopted as an outstanding review prompt — the next cadence flush was then refused (with a
   // warning that was not true) and the review silently slipped a boundary. The result summary is what
   // says which shape this is; the review prompts carry their own (cadence / completion) summaries.
-  return source.summary !== REVIEW_RESULT_SUMMARY
+  // v46 review follow-up: the summary is a PREFIX family — the late-landing notice appends
+  // "late landing" to the same stem, and the equality test read it as a review PROMPT (the window
+  // then refused the next cadence flush and logged a warning that was not true). Any summary that
+  // starts with the result stem is a result notice; the prompts carry unrelated summaries.
+  return source.summary === undefined || !source.summary.startsWith(REVIEW_RESULT_SUMMARY)
 }
 
 /**

@@ -51,7 +51,9 @@ const AUDIT = ['_coverage-check.mjs', '_syscheck.mjs', '_syscheck2.mjs']
 
 const argv = process.argv.slice(2)
 const flag = (name) => { const index = argv.indexOf(name); return index < 0 ? null : (argv[index + 1] ?? null) }
-const root = resolve(argv.find((arg) => !arg.startsWith('--') && !argv.includes(arg) === false ? false : !arg.startsWith('--')) ?? 'packages')
+// v46 review follow-up: the old predicate was constant-false (operator precedence), so the
+// documented <evolution-root> positional argument was silently ignored and the root was always cwd.
+const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
 const repo = resolve(root, '..')
 const upstream = flag('--upstream')
 const auditDir = flag('--audit-dir')
@@ -69,6 +71,29 @@ for (const [script, ...args] of GUARDS) {
     const stderr = error !== null && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : String(error)
     const first = stderr.split('\n').map((line) => line.trim()).filter((line) => line !== '')[0] ?? 'exit ' + String(error.status)
     failures.push('guard ' + script + ': ' + first)
+  }
+}
+
+// v46 review follow-up: the gate table and CI ran two guards this set never did, so the merge-time
+// list was a THIRD list. They need the platform tree: with --upstream they run here, without it
+// they are reported as NOT executed (a printed state, never a silent pass — same posture as group 3).
+const UPSTREAM_GUARDS = [
+  ['verify-declared-config.mjs', 'packages', '--strict'],
+  ['verify-platform-contract.mjs', 'packages', '--strict'],
+]
+if (upstream === null) {
+  console.log('verify-regression-set: ' + UPSTREAM_GUARDS.length + ' guard(s) NOT executed (they judge the platform tree; pass --upstream): ' + UPSTREAM_GUARDS.map(([script]) => script).join(', '))
+} else {
+  for (const [script, ...args] of UPSTREAM_GUARDS) {
+    const file = join(scriptsDir, script)
+    if (!existsSync(file)) { failures.push(script + ': missing under ' + scriptsDir); continue }
+    try {
+      execFileSync(process.execPath, [file, ...args, '--upstream', resolve(upstream)], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (error) {
+      const stderr = error !== null && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : String(error)
+      const first = stderr.split('\n').map((line) => line.trim()).filter((line) => line !== '')[0] ?? 'exit ' + String(error.status)
+      failures.push('guard ' + script + ': ' + first)
+    }
   }
 }
 

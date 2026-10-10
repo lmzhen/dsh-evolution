@@ -91,7 +91,9 @@ function collectServiceKeys(dir, keys) {
     if (!entry.name.endsWith('.ts')) continue
     const text = readText(full)
     if (text === null) continue
-    for (const match of text.matchAll(/super\(ctx,\s*'([^']+)'\)|ctx\.provide\('([^']+)'\)/g)) {
+    // v46 review follow-up: `ctx.provide(name, value)` is the two-arg form (three real mount
+    // sites used it and were invisible, so the derived set was 8 of the 11 keys the home names).
+    for (const match of text.matchAll(/super\(ctx,\s*'([^']+)'\)|ctx\.provide\(\s*'([^']+)'/g)) {
       const key = match[1] ?? match[2]
       if (typeof key === 'string') keys.add(key)
     }

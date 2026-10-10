@@ -80,7 +80,7 @@ if (yaml === null) {
   }
 }
 if (yaml === null) {
-  console.log('verify-bundle-rows: form checks ran; YAML semantics NOT executed (no "yaml" parser resolvable from ' + resolve(root) + ')')
+  console.log('verify-bundle-rows: form checks ran; the YAML half did NOT run — this layout resolves no "yaml" parser from ' + resolve(root) + '. The gate runs that half in the CI overlay (the upstream tree carries one); this run is the weaker of the two and says so.')
 } else {
   for (const form_ of FORMS) {
     const file = join(root, 'evolution-' + form_, 'cordis.patch.yml')
@@ -116,4 +116,5 @@ if (problems.length > 0) {
   process.exit(1)
 }
 
-console.log('verify-bundle-rows: OK — the three bundle patches match scripts/bundle-rows.json')
+console.log('verify-bundle-rows: OK — the three bundle patches match scripts/bundle-rows.json'
+  + (yaml === null ? ' (form checks only — no YAML parser resolvable in this layout)' : ''))

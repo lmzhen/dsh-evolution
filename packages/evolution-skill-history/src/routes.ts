@@ -43,7 +43,7 @@ export interface RouteServices {
 }
 
 /**
- * Build the four routes over the curator seam.
+ * Build the six routes over the curator seam.
  * @param services - the host services the handlers read.
  * @returns the route list for ctx.webServer.register.
  */

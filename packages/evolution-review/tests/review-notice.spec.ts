@@ -43,6 +43,10 @@ describe('one outstanding review notice per session (A)', () => {
     // adopting it as a prompt made the next cadence flush return false and slip a boundary.
     expect(isReviewNotice({ id: 'r2', source: { kind: REVIEW_NOTICE_KIND, form: 'notice', summary: REVIEW_RESULT_SUMMARY } })).toBe(false)
     expect(isReviewNotice({ id: 'r3', source: { kind: REVIEW_NOTICE_LEGACY_KIND, form: 'notice', summary: REVIEW_RESULT_SUMMARY } })).toBe(false)
+    // v46 review follow-up: the late-landing variant APPENDS to the same stem. An equality test read
+    // it as a prompt, so the window refused the next cadence flush and logged a warning that was not
+    // true — the review slipped a boundary. The stem is a prefix, and this case pins that.
+    expect(isReviewNotice({ id: 'r4', source: { kind: REVIEW_NOTICE_KIND, form: 'notice', summary: `${REVIEW_RESULT_SUMMARY} late landing` } })).toBe(false)
     // The prompts keep their own summaries and stay ours.
     expect(isReviewNotice({ id: 'p1', source: { kind: REVIEW_NOTICE_KIND, form: 'notice', summary: 'cadence review' } })).toBe(true)
     expect(isReviewNotice({ id: 'p2', source: { kind: REVIEW_NOTICE_KIND, form: 'notice', summary: 'completion review' } })).toBe(true)

@@ -368,7 +368,14 @@ function namespaceSplits(text) {
  */
 function settingsUserLayerReads(text) {
   const out = []
-  for (const match of text.matchAll(/Object\.keys\([A-Za-z_$][\w$]*\?\.user \?\? \{\}\)/g)) out.push(match[0])
+  for (const match of text.matchAll(/Object\.keys\([A-Za-z_$][\w$]*\?\.user \?\? \{\}\)/g)) {
+    // v46 review follow-up: prose is not a read — a comment or docblock line that names the banned
+    // pattern (the family's own READMEs do, to explain the rule) used to redden the guard.
+    const lineStart = text.lastIndexOf('\n', match.index) + 1
+    const prefix = text.slice(lineStart, match.index).trimStart()
+    if (prefix.startsWith('//') || prefix.startsWith('*') || prefix.startsWith('/*')) continue
+    out.push(match[0])
+  }
   return out
 }
 /**
@@ -394,10 +401,11 @@ function platformCiteSites(root, text) {
  * (S2.9, after A23 surfaced the class). Burn-down only: as a file is touched, convert its cites to
  * symbol citations and lower its number here. A file absent from this map may carry none.
  *
- * The map must cover EXACTLY the files the scan below reaches: this guard skips its own file
- * (`SELF_REL`, the same exemption N15 uses), so an entry for it could never fire and would only
- * make the register disagree with a recount (`scripts/count-platform-cites.mjs`, which applies the
- * same exemption). */
+ * The map must cover EXACTLY the files the scan reaches, and the scan has TWO halves: every `.ts`
+ * file (the main walk below) and every `.mjs`/`.cjs` file (the script half, added by the v46 review —
+ * the register already carried four `.mjs` rows that a `.ts`-only walk could never reach, so those
+ * entries were dead). Both halves skip this guard's own file (`SELF_REL`, the same exemption N15
+ * uses); an entry for it would make the register disagree with the scan. */
 const PLATFORM_CITE_BASELINE = new Map([
   ['evolution-commands/src/index.ts', 3],
   ['evolution-core/src/constants.ts', 1],
@@ -525,12 +533,24 @@ function serviceReadViolations(root) {
  */
 function eventModeViolationsFrom(tableText, sources) {
   const rows = new Map()
+  const unreadable = []
   for (const line of tableText.split(/\r?\n/)) {
-    const row = /^\|\s*`(evolution\/[a-z0-9-]+)`\s*\|\s*([a-z]+)\s*\(/.exec(line)
-    if (row) rows.set(row[1], row[2])
+    if (!line.startsWith('|')) continue
+    const cells = line.split('|').map((cell) => cell.trim())
+    const name = /^`(evolution\/[a-z0-9-]+)`$/.exec(cells[1] ?? '')?.[1]
+    if (name === undefined) continue
+    const mode = /^([a-z]+)\s*\(/.exec(cells[2] ?? '')?.[1]
+    // v46 review follow-up: a mode cell this rule cannot read used to drop the row, which disarmed
+    // the @mode check for that event silently (rewriting `emit (notification)` as `emit — …` was
+    // enough). The list lives in the fact home, so an unreadable row is a violation, not an absence.
+    if (mode === undefined) { unreadable.push(name); continue }
+    rows.set(name, mode)
   }
-  if (rows.size === 0) return ['the event table names no event — N33 reads its list from the fact home, and an empty table is not a pass (vacuity)']
   const out = []
+  for (const name of unreadable) {
+    out.push(`${name}: the fact table's mode cell is unreadable (expected \`<mode> (<word>)\`) — an unreadable row must not disarm the @mode check (rule N33)`)
+  }
+  if (rows.size === 0 && unreadable.length === 0) return ['the event table names no event — N33 reads its list from the fact home, and an empty table is not a pass (vacuity)']
   const declared = new Map()
   const dispatched = new Set()
   for (const { rel, text } of sources) {
@@ -1826,6 +1846,27 @@ if (process.argv.includes('--list-rules')) {
 }
 
 walk(root)
+// N35's script half (v46 review follow-up): the walk above only enters `.ts` files, yet scripts are
+// where family prose cites the platform most. Same baseline, same message, one more extension set.
+{
+  const scanScripts = (dir) => {
+    let entries = []
+    try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
+    for (const entry of entries) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) { if (!SKIP.has(entry.name)) scanScripts(path); continue }
+      if (!/\.(mjs|cjs)$/.test(entry.name)) continue
+      const rel = relative(root, path).split('\\').join('/')
+      if (rel === SELF_REL || rel.startsWith('docs/')) continue
+      const cites = platformCiteSites(root, readFileSync(path, 'utf8'))
+      const allowed = PLATFORM_CITE_BASELINE.get(rel) ?? 0
+      if (cites.length > allowed) {
+        violations.push(`${rel}: ${cites.length - allowed} NEW platform file:line citation(s) (${cites.slice(0, 3).join(', ')}) — another repository's line numbers rot at every bump and nothing here can re-derive them (rule N35, script half); cite the symbol instead. Frozen baseline for this file: ${allowed}`)
+      }
+    }
+  }
+  scanScripts(root)
+}
 // N15 runs as a whole-tree pass (Markdown, not the per-.ts detectors above).
 violations.push(...docAnchorViolations(root, new Set(readdirSync(root, { withFileTypes: true })
   .filter(entry => entry.isDirectory() && existsSync(join(root, entry.name, 'package.json')))

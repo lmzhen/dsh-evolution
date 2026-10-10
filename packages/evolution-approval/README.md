@@ -59,6 +59,8 @@ preview, or a resolver that cannot answer (a stale anchor, an operation with no 
 - `approve()` dedupes inside one process and providers resolve the record atomically, but the replay runner executes BEFORE that resolution: two OS processes approving one id can both write while one wins the audit transition. Run approvals from one writer process, or make runners idempotent.
 - **Approve + reject on one id** are not serialized inside a process: a reject can resolve a still-executing record while the runner completes and the write still lands: verify the write state, or reject only when no approve is in flight.
 
+- **The HTTP face is loopback-only by design.** The fence is the family's shared loopback check, authoritative on the socket (`X-Forwarded-For` is never trusted), so a deployment that opens the host to a LAN — where the platform's own `/api` answers normally — gets **403** on all four routes from any non-loopback client. Reach the host over loopback (a local browser, or an SSH tunnel). Whether the family should follow the platform's `trustedHosts` instead is an open decision (v46 `决策 3`; the mechanism lives in `evolution-core`'s `http-routes.ts`).
+
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
 
 ## Notes and history
