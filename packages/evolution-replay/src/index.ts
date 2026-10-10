@@ -455,12 +455,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // survives, so a plain record loop here would double the entries.
         driver.backfill(loaded.records)
       })
+      .then(
+        undefined,
+        (error: unknown) => {
+          // 0.18.1 (S3): a THROWN read is a state, not a silence — the leaderboard
+          // must stop presenting as an answered read. Review P2-4: ONLY the read's
+          // own rejection reaches this handler (two-argument then), so a failure in
+          // the body above can no longer be misattributed as "the read failed".
+          const reason = error instanceof Error ? error.message : String(error)
+          driver.markSourceReadFailed(reason)
+          ioCtx.logger.warn(`evolution-replay: activity sidecar backfill skipped (${reason}) — this leaderboard carries no history from the sidecar, and a failed read is not "nothing was recorded"`)
+        },
+      )
       .catch((error: unknown) => {
-        // 0.18.1 (S3): a THROWN read is a state, not a silence — the leaderboard
-        // must stop presenting as an answered read.
-        const reason = error instanceof Error ? error.message : String(error)
-        driver.markSourceReadFailed(reason)
-        ioCtx.logger.warn(`evolution-replay: activity sidecar backfill skipped (${reason}) — this leaderboard carries no history from the sidecar, and a failed read is not "nothing was recorded"`)
+        // The read ANSWERED; something in the body failed. The source verdict is
+        // unaffected — only the log says so (no fabricated read-failure state).
+        ioCtx.logger.warn(`evolution-replay: activity sidecar backfill failed after a successful read (${error instanceof Error ? error.message : String(error)}) — the source verdict is unaffected`)
       })
   })
 }

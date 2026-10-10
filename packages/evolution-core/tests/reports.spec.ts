@@ -17,7 +17,10 @@ afterEach(async () => {
 const report = (startedAt: number): string => JSON.stringify({ startedAt: new Date(startedAt).toISOString(), verdict: 'ok' })
 
 describe('core report retention sweep (S2: one sweep for every kind)', () => {
-  it('keeps each bucket window independently and prunes the paired .md digest', async () => {
+  // P2-7 (review): this case writes ~120 files through the real node io; under a
+  // concurrent 7-spec run it sat on the 5s default and went red while passing in 930ms
+  // alone. Give it the headroom the work actually needs.
+  it('keeps each bucket window independently and prunes the paired .md digest', { timeout: 20_000 }, async () => {
     const root = await dir()
     const io = nodeEvolutionIo()
     const base = Date.now() - 1_000_000

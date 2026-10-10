@@ -111,14 +111,36 @@ function renderRunRecord(record: RunRecord): string {
  * @param warn - warn channel for retention notes.
  * @returns the report path, or `undefined` when nothing could be written.
  */
+/**
+ * Re-read the run index before answering a command (review P1-1).
+ *
+ * One DSH_HOME is shared by both planes, so a scan the OTHER process started is
+ * only visible after a refresh — without it the in-flight guard, the cooldown and
+ * `status <id>` would all describe this process's memory alone. A read FAILURE is
+ * not "no runs": the caller decides what to say.
+ * @param registry - this row's registry.
+ * @returns whether the history could be read, and the note to surface when there is one.
+ */
+async function syncRuns(registry: RunRegistry): Promise<{ ok: boolean; note?: string }> {
+  try {
+    return await registry.load()
+  } catch (error) {
+    return { ok: false, note: `the run index could not be read (${error instanceof Error ? error.message : String(error)})` }
+  }
+}
+
 async function writeMaintainReport(io: EvolutionIoLike, record: MaintainReportRecord, warn: (message: string) => void): Promise<string | undefined> {
   const dir = join(evolutionHome(), 'reports')
   const path = join(dir, `maintain-${record.runId}.json`)
+  let written = true
   try {
     await io.writeText(path, JSON.stringify(record, null, 2))
     await io.writeText(join(dir, `maintain-${record.runId}.md`), record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text)
-  } catch {
-    return undefined
+  } catch (error) {
+    // The report is the run's ONE result home: a write failure is WARNED about and
+    // the run then answers "no result" — it must not disappear silently (P2-3).
+    written = false
+    warn(`evolution-commands: could not write the report for run ${record.runId} (${error instanceof Error ? error.message : String(error)}) — that run will answer "no result"`)
   }
   // One sweep for every kind (core/reports.ts): the maintenance window reuses the
   // implementation the curator's reports already had, instead of a second copy.
@@ -131,7 +153,7 @@ async function writeMaintainReport(io: EvolutionIoLike, record: MaintainReportRe
     // The lock target itself is never written — the task exists to hold the lock.
     return null
   })
-  return path
+  return written ? path : undefined
 }
 
 /** Three-state read of a run's result: present, missing, or unreadable (never collapsed). */
@@ -690,6 +712,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
+          // Review P1-1: one DSH_HOME, two planes — re-read the index so the in-flight
+          // guard and the cooldown cover a scan the OTHER plane started. A read failure
+          // is not "no runs": the guard proceeds fail-open and says so out loud.
+          const synced = await syncRuns(registry)
+          if (!synced.ok) ctx.logger.warn(`evolution-commands: ${synced.note ?? 'run index unreadable'} — the in-flight guard cannot see other processes' runs`)
+          else if (synced.note !== undefined) ctx.logger.warn(`evolution-commands: ${synced.note}`)
           // I-5 (v37): the LOCAL view must match MaintainRuntime's tightened subagents
           // contract ('spawn' + a platform-shaped request); a wider local type made the
           // real service assignable while hiding a future miss from `tsc`.
@@ -823,11 +851,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (maintainStatus) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run status unavailable.')
+          const synced = await syncRuns(registry)
           const wanted = maintainStatus[1]
           if (wanted !== undefined) {
+            // A specific run this process knows is answerable even when the shared
+            // index is unreadable — only the claim "this is the whole history" needs it.
             const record = registry.find(wanted)
-            if (!record) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
-            return ok(renderRunRecord(record))
+            if (!record) {
+              if (!synced.ok) {
+                return err(`Run ${wanted} is not in this process's history, and the home's run index is not readable (${synced.note ?? 'unknown reason'}) — that is NOT proof the run never happened.`)
+              }
+              return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+            }
+            return ok(synced.ok ? renderRunRecord(record) : `${renderRunRecord(record)}\n(index not readable: ${synced.note ?? 'unknown reason'} — only this process's view is shown)`)
+          }
+          if (!synced.ok) {
+            // P2-1: "the history is unknown" and "there is no run" must not look alike.
+            return err(`The run history of this home is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "no runs". Fix or remove <evolutionHome>/runs.json to start a clean history.`)
           }
           const all = registry.runs().filter(record => record.kind === 'maintain')
           if (all.length === 0) return ok('No maintenance run recorded in this home yet — /evolution maintain starts one.')
@@ -842,6 +882,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (maintainReport) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run results unavailable.')
+          await syncRuns(registry)
           const record = registry.find(maintainReport[1])
           if (!record) return err(`No run ${maintainReport[1]} in this home — /evolution maintain status lists the recent ones.`)
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
@@ -859,8 +900,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (maintainCancel) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run cancellation unavailable.')
+          await syncRuns(registry)
           const record = registry.find(maintainCancel[1])
           if (!record) return err(`No run ${maintainCancel[1]} in this home — /evolution maintain status lists the recent ones.`)
+          // A run another process owns cannot be stopped from here (review P1-1).
+          if (record.state === 'running' && registry.cancel(record.id) === false) {
+            return err(`Run ${record.id} is running in ANOTHER process sharing this home — it can only be cancelled there.`)
+          }
           if (!registry.cancel(record.id)) return err(`Run ${record.id} is already ${record.state} — nothing to cancel.`)
           return ok(`Maintenance run ${record.id} cancelled — the scan stops at its next checkpoint. /evolution maintain status ${record.id} shows the terminal state.`)
         }

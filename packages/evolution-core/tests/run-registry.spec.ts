@@ -145,4 +145,60 @@ describe('core run registry (S2)', () => {
     expect(ids).toContain(mine.id)
     expect(ids).toContain(theirs.id)
   })
+
+  it('keeps a run another process is still running, and converges only a dead owner (review P1-1)', async () => {
+    const dir = await home()
+    const io = nodeEvolutionIo()
+    // A live owner (this very process stands in for the other plane): the run is
+    // genuinely in flight, so it must NOT be rewritten as failed(orphan) — and it is
+    // the ONE in-flight scan of this home, which is what makes the guard cross-plane.
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'live-elsewhere', kind: 'maintain', state: 'running', startedAt: 5, pid: process.pid }],
+    }), 'utf8')
+    const registry = newRunRegistry({ io, home: dir })
+    const loaded = await registry.load()
+    expect(loaded.ok).toBe(true)
+    expect(loaded.note, 'the other plane in flight is reported').toContain('in flight in another process')
+    expect(registry.find('live-elsewhere')?.state).toBe('running')
+    expect(registry.inFlight('maintain')?.id).toBe('live-elsewhere')
+    expect(registry.cancel('live-elsewhere'), 'this process does not own it').toBe(false)
+    // A second load is idempotent — the merge must not duplicate records.
+    await registry.load()
+    expect(registry.runs().filter(record => record.id === 'live-elsewhere')).toHaveLength(1)
+    // A dead owner is an orphan: converged, with the reason spelled out.
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'dead-elsewhere', kind: 'maintain', state: 'running', startedAt: 6, pid: 999_999 }],
+    }), 'utf8')
+    const other = newRunRegistry({ io, home: dir })
+    const second = await other.load()
+    expect(second.note).toContain('failed(orphan)')
+    expect(other.find('dead-elsewhere')?.state).toBe('failed')
+    expect(other.find('dead-elsewhere')?.failure).toContain('no live owner')
+  })
+
+  it('preserves records this build does not understand instead of erasing them (review P2-5)', async () => {
+    const dir = await home()
+    const io = nodeEvolutionIo()
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: 99,
+      runs: [
+        { id: 'from-the-future', kind: 'maintain', state: 'quantum', startedAt: 7, extra: 'keep me' },
+        { id: 'normal', kind: 'maintain', state: 'succeeded', startedAt: 8, endedAt: 9 },
+      ],
+    }), 'utf8')
+    const registry = newRunRegistry({ io, home: dir })
+    const loaded = await registry.load()
+    expect(loaded.ok).toBe(true)
+    expect(loaded.note, 'a newer index schema is said out loud').toContain('schemaVersion 99')
+    // This process's own write must not drop the row it cannot judge.
+    const handle = registry.begin('maintain')
+    await registry.settle(handle.id, { state: 'succeeded' })
+    const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ id: string }> }
+    const ids = persisted.runs.map(record => record.id)
+    expect(ids).toContain('from-the-future')
+    expect(ids).toContain('normal')
+    expect(ids).toContain(handle.id)
+  })
 })

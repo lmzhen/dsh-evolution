@@ -32,7 +32,7 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { clampedNumber } from './numeric.ts'
-import { transactIo } from './io.ts'
+import { isProcessAlive, transactIo } from './io.ts'
 import type { EvolutionIoLike } from './io.ts'
 
 /** The kinds of long-running work the registry tracks. Extend as rows gain runs. */
@@ -47,6 +47,10 @@ export interface RunRecord {
   kind: RunKind
   state: RunState
   startedAt: number
+  /** The process that owns a RUNNING record. Required to tell an in-flight run of
+   * another plane (both planes share one DSH_HOME) from the orphan of a dead one;
+   * absent means the owner cannot be named, which is treated as gone. */
+  pid?: number | undefined
   endedAt?: number | undefined
   /** Absolute path of the run's report, written by the run owner at settle. */
   resultRef?: string | undefined
@@ -126,32 +130,45 @@ const TERMINAL: ReadonlySet<RunState> = new Set<RunState>(['succeeded', 'failed'
  * @param raw - the file's text, or null when it does not exist.
  * @returns the parsed records and whether the body was an index.
  */
-function parseIndex(raw: string | null): { ok: boolean; records: RunRecord[] } {
-  if (raw === null) return { ok: true, records: [] }
+function parseIndex(raw: string | null): { ok: boolean; records: RunRecord[]; foreign: unknown[]; note?: string } {
+  if (raw === null) return { ok: true, records: [], foreign: [] }
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
   } catch {
-    return { ok: false, records: [] }
+    return { ok: false, records: [], foreign: [] }
   }
   const rows = (parsed as { runs?: unknown }).runs
-  if (!Array.isArray(rows)) return { ok: false, records: [] }
+  if (!Array.isArray(rows)) return { ok: false, records: [], foreign: [] }
+  const notes: string[] = []
+  const version = (parsed as { schemaVersion?: unknown }).schemaVersion
+  if (typeof version === 'number' && version !== RUNS_SCHEMA_VERSION) {
+    notes.push(`the index declares schemaVersion ${version} while this build writes ${RUNS_SCHEMA_VERSION}`)
+  }
   const records: RunRecord[] = []
+  const foreign: unknown[] = []
   for (const row of rows) {
     const record = row as Partial<RunRecord>
-    if (typeof record.id !== 'string' || typeof record.startedAt !== 'number') continue
-    if (typeof record.kind !== 'string' || typeof record.state !== 'string') continue
+    if (typeof record.id !== 'string' || typeof record.startedAt !== 'number') { foreign.push(row); continue }
+    if (typeof record.kind !== 'string' || typeof record.state !== 'string') { foreign.push(row); continue }
+    if (record.state !== 'running' && !TERMINAL.has(record.state as RunState)) {
+      // A state this build does not know (a newer writer, or a hand-edited file):
+      // it is KEPT as it is — dropping it would silently erase another writer's record.
+      foreign.push(row)
+      continue
+    }
     records.push({
       id: record.id,
       kind: record.kind as RunKind,
       state: record.state as RunState,
       startedAt: record.startedAt,
+      ...(typeof record.pid === 'number' ? { pid: record.pid } : {}),
       ...(typeof record.endedAt === 'number' ? { endedAt: record.endedAt } : {}),
       ...(typeof record.resultRef === 'string' ? { resultRef: record.resultRef } : {}),
       ...(typeof record.failure === 'string' ? { failure: record.failure } : {}),
     })
   }
-  return { ok: true, records }
+  return { ok: true, records, foreign, ...(notes.length > 0 ? { note: notes.join('; ') } : {}) }
 }
 
 /**
@@ -190,14 +207,17 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       // (trim() already bounded the terminal history and kept every running
       // record — a second slice here could drop the LIVE run out of the index.)
       await transactIo(options.io, path, async (current) => {
+        const onDisk = parseIndex(current)
         const merged = new Map<string, RunRecord>()
-        for (const record of parseIndex(current).records) merged.set(record.id, record)
+        for (const record of onDisk.records) merged.set(record.id, record)
         // This process's own records win: it knows their state better than a file.
         for (const record of records) merged.set(record.id, record)
         const view = [...merged.values()].sort((a, b) => b.startedAt - a.startedAt)
         const live = view.filter(record => record.state === 'running')
-        const done = view.filter(record => record.state !== 'running').slice(0, maxRecords)
-        return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done].sort((a, b) => b.startedAt - a.startedAt) }, null, 2)
+        const done = view.filter(record => TERMINAL.has(record.state)).slice(0, maxRecords)
+        // Rows this build does not understand ride along untouched (P2-5): it cannot
+        // judge them, and dropping them would erase another writer's record.
+        return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done, ...onDisk.foreign] }, null, 2)
       })
     } catch (error) {
       warn(`evolution-core: could not persist the run index (${error instanceof Error ? error.message : String(error)})`)
@@ -219,18 +239,35 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         return { ok: false, note: 'run index could not be read as an index (not JSON, or no runs array) — the previous run history is unknown (the reports are unaffected)' }
       }
       let converged = 0
+      let liveElsewhere = 0
       for (const record of parsed.records) {
+        // Idempotent merge: a record this process already knows (its own runs, or an
+        // earlier load) is never re-added, so load() can be called again to pick up
+        // what another process wrote.
+        if (records.some(item => item.id === record.id)) continue
         if (record.state !== 'running') {
           records.push(record)
           continue
         }
-        // The process that wrote this cannot be alive (it would hold the record in
-        // memory and never re-read it as running) — converge, do not guess.
+        // A running record whose OWNER is still alive belongs to another process
+        // sharing this home: it is genuinely in flight, not an orphan (review P1-1).
+        // A record that cannot name its owner is treated as gone — the conservative
+        // side, and what a record written by an older build looks like.
+        if (record.pid !== undefined && isProcessAlive(record.pid)) {
+          liveElsewhere++
+          records.push(record)
+          continue
+        }
         converged++
-        records.push({ ...record, state: 'failed', endedAt: now(), failure: 'interrupted by a host restart before it settled (orphan)' })
+        records.push({ ...record, state: 'failed', endedAt: now(), failure: 'no live owner process — the run was interrupted before it settled (orphan)' })
       }
       if (converged > 0) await persist()
-      return { ok: true, ...(converged > 0 ? { note: `${converged} run(s) interrupted by a host restart were recorded as failed(orphan)` } : {}) }
+      const notes = [
+        parsed.note,
+        converged > 0 ? `${converged} run(s) with no live owner were recorded as failed(orphan)` : undefined,
+        liveElsewhere > 0 ? `${liveElsewhere} run(s) are in flight in another process sharing this home` : undefined,
+      ].filter((note): note is string => note !== undefined)
+      return { ok: true, ...(notes.length > 0 ? { note: notes.join('; ') } : {}) }
     },
 
     begin(kind) {
@@ -238,7 +275,8 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       const startedAt = now()
       const controller = new AbortController()
       controllers.set(id, controller)
-      records.push({ id, kind, state: 'running', startedAt })
+      // The pid is what lets ANOTHER process tell this live run from an orphan.
+      records.push({ id, kind, state: 'running', startedAt, pid: process.pid })
       void persist()
       return { id, kind, signal: controller.signal, startedAt }
     },
@@ -273,9 +311,15 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
     },
 
     cancel(id) {
+      // Only work THIS process started can be stopped. A running record loaded from
+      // the index belongs to another process sharing this home (review P1-1), and
+      // marking it cancelled here would fabricate a terminal state for work that is
+      // still running there — so an unowned id is refused, not "cancelled".
+      const controller = controllers.get(id)
+      if (controller === undefined) return false
       const record = records.find(item => item.id === id)
       if (!record || record.state !== 'running') return false
-      controllers.get(id)?.abort()
+      controller.abort()
       controllers.delete(id)
       record.state = 'cancelled'
       record.endedAt = now()
@@ -286,11 +330,8 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
 
     cancelAll() {
       let count = 0
-      for (const record of [...records]) {
-        if (record.state === 'running') {
-          count++
-          void this.cancel(record.id)
-        }
+      for (const id of [...controllers.keys()]) {
+        if (this.cancel(id)) count++
       }
       return count
     },

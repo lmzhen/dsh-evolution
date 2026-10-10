@@ -839,147 +839,76 @@ describe('evolution-commands', () => {
     expect(result.kind).toBe('error')
     expect(result.text).toContain('collide')
     // The refusal happens before any write: a refused install leaves no artifact behind.
-    expect(existsSync(patchPath)).toBe(false)
   })
 
-  it('maintain --facts renders the facts block with zero subagent calls and no cooldown', async () => {
-    const dir = await tempRoot('evo-commands-facts-')
+  it('review P1-1: a run another process is running blocks a second start and cannot be cancelled here', async () => {
+    const dir = await tempHome('evo-commands-crossplane-')
     const root = join(dir, 'skills')
-    const skillDir = join(root, 'demo-skill')
-    await mkdir(skillDir, { recursive: true })
-    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
+    // The other plane's live run: a running record whose owner process is alive.
+    const runsPath = join(dir, 'evolution', 'runs.json')
+    await mkdir(join(dir, 'evolution'), { recursive: true })
+    await writeFile(runsPath, JSON.stringify({
+      schemaVersion: 1,
+      runs: [{ id: 'other-plane-run', kind: 'maintain', state: 'running', startedAt: Date.now(), pid: process.pid }],
+    }), 'utf8')
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', { provider: () => io })
-    let subagentStarts = 0
-    ctx.provide('subagents', {
-      async start(_kind: string, _options: unknown) {
-        subagentStarts += 1
-        throw new Error('--facts must never spawn a subagent')
-      },
-    })
-    await ctx.plugin(Commands, { root: root })
-    const result = await captured!.handler({ rawInput: 'maintain --facts' })
-    expect(result.kind).toBe('success')
-    expect(result.text).toContain('MECHANICAL_FACTS')
-    expect(result.text).toContain('signal=description_chars')
-    expect(result.text).toContain('END FACTS')
-    expect(subagentStarts).toBe(0)
-    // Cooldown is a scan-command guard; a second facts preview must not hit it.
-    const second = await captured!.handler({ rawInput: 'maintain --facts' })
-    expect(second.kind).toBe('success')
-    expect(second.text).toContain('MECHANICAL_FACTS')
-  })
-
-  it('T3-02/A30: maintain --facts ages the skill through the shared enrichment — the retire line the probe must agree with', async () => {
-    const dir = await tempRoot('evo-commands-facts-liveness-')
-    const root = join(dir, 'skills')
-    const skillDir = join(root, 'demo-skill')
-    await mkdir(join(skillDir, 'references'), { recursive: true })
-    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody without a support-file mention\n', 'utf8')
-    await writeFile(join(skillDir, 'references', 'dead.md'), 'never read\n', 'utf8')
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    let handler: Handler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    // Same fixture shape as the probe spec (evolution-maintenance tools.spec.ts): an observed read
-    // (the demand window is open) plus an old activity anchor (past the stale window).
-    const old = new Date(2021, 0, 1).toISOString()
-    ctx.provide('skillUsage', {
-      report: async () => new Map([['demo-skill', { ...emptyRecord(), view_count: 1, created_at: old, last_used_at: old }]]),
-    })
-    await ctx.plugin(Commands, { root })
-    const result = await captured!.handler({ rawInput: 'maintain --facts' })
-    expect(result.kind).toBe('success')
-    expect(result.text).toContain('never read: references/dead.md')
-    // T3-02/A30: the facts block is the reference answer the probe must match; before the shared
-    // mapping the probe answered `retire: age unknown` for this very tree.
-    expect(result.text).toContain('retire≥30d: references/dead.md(')
-    expect(result.text).not.toContain('retire: age unknown')
+    let starts = 0
+    ctx.provide('subagents', { async start() { starts += 1; return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } })
+    await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
+    // The guard sees it (one scan per home, across planes), and says who owns it.
+    const refused = await handler!.handler({ rawInput: 'maintain' })
+    expect(refused.kind).toBe('error')
+    expect(refused.text).toContain('already running')
+    expect(refused.text).toContain('other-plane-run')
+    expect(starts, 'no second scan was spawned').toBe(0)
+    const status = await handler!.handler({ rawInput: 'maintain status' })
+    expect(status.text, 'status sees the other plane in flight').toContain('other-plane-run')
+    expect(status.text).toContain('running')
+    const cancel = await handler!.handler({ rawInput: 'maintain cancel other-plane-run' })
+    expect(cancel.kind).toBe('error')
+    expect(cancel.text).toContain('ANOTHER process')
+    // The refresh is what makes this work for a run that appears AFTER this plane
+    // mounted (the mount-time load cannot see the future): write a new live record
+    // and the very next command must notice it.
+    await writeFile(runsPath, JSON.stringify({
+      schemaVersion: 1,
+      runs: [
+        { id: 'other-plane-run', kind: 'maintain', state: 'succeeded', startedAt: Date.now() - 60_000, endedAt: Date.now() - 59_000 },
+        { id: 'started-later', kind: 'maintain', state: 'running', startedAt: Date.now(), pid: process.pid },
+      ],
+    }), 'utf8')
+    const refusedAgain = await handler!.handler({ rawInput: 'maintain' })
+    expect(refusedAgain.kind).toBe('error')
+    expect(refusedAgain.text).toContain('started-later')
+    expect(starts, 'still no scan of our own').toBe(0)
   })
 
-  it('maintain --facts reports a misconfigured root like the full scan instead of clean facts (S5.4 audit P2-22)', async () => {
-    // The io seam lists a MISSING root as an empty directory, so the preview
-    // used to render the clean empty-library facts block and return success
-    // while the full scan answered M-02 ("the configured skill root does not
-    // exist"). The preview must reach the SAME conclusion, not a fake clean
-    // bill.
-    const dir = await tempRoot('evo-commands-facts-missing-root-')
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    // `skills` is deliberately never created: root points at a directory that
-    // does not exist.
-    await ctx.plugin(Commands, { root: join(dir, 'skills') })
-    const result = await captured!.handler({ rawInput: 'maintain --facts' })
-    expect(result.kind).toBe('error')
-    expect(result.text).toContain('the configured skill root does not exist')
-    expect(result.text).toContain(join(dir, 'skills'))
-    expect(result.text).not.toContain('MECHANICAL_FACTS')
-  })
-
-  it('maintain --facts answers a healthy but empty library exactly like the full scan (PLAN-R2 P2-10)', async () => {
-    // Cause 3 of orchestrate's empty-snapshot discrimination: the root exists
-    // and lists nothing. The full scan short-circuits with the plain text
-    // "Maintenance scan: empty skill library. Nothing to do." and no facts
-    // block; the preview used to render an empty MECHANICAL_FACTS block
-    // instead — disagreeing with the very scan it previews.
-    const dir = await tempRoot('evo-commands-facts-empty-')
+  it('review P2-1: an unreadable run history is not reported as "no runs"', async () => {
+    const dir = await tempHome('evo-commands-badindex-')
     const root = join(dir, 'skills')
     await mkdir(root, { recursive: true })
+    await mkdir(join(dir, 'evolution'), { recursive: true })
+    await writeFile(join(dir, 'evolution', 'runs.json'), 'not json', 'utf8')
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    let handler: Handler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    await ctx.plugin(Commands, { root })
-    const result = await captured!.handler({ rawInput: 'maintain --facts' })
-    expect(result.kind).toBe('success')
-    expect(result.text).toBe('Maintenance scan: empty skill library. Nothing to do.')
-    expect(result.text).not.toContain('MECHANICAL_FACTS')
+    ctx.provide('subagents', { async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } })
+    await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
+    const status = await handler!.handler({ rawInput: 'maintain status' })
+    expect(status.kind).toBe('error')
+    expect(status.text).toContain('not readable')
+    expect(status.text).toContain('NOT "no runs"')
+    expect(status.text, 'the empty-history line must not answer this').not.toContain('No maintenance run recorded')
   })
 
-  it('maintain cooldown blocks rapid repeat triggers (single model call)', async () => {
-    // Self-contained library (temp root) — a clean CI HOME has no skills and
-    // the empty-library short-circuit would skip the subagent, breaking the
-    // model-call count assertion.
-    const dir = await tempHome('evo-commands-cooldown-')
-    const root = join(dir, 'skills')
-    const skillDir = join(root, 'demo-skill')
-    await mkdir(skillDir, { recursive: true })
-    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', { provider: () => io })
-    let starts = 0
-    const plan = { verdict: 'no_issues', plan: [], notes: [] }
-    ctx.provide('subagents', {
-      async start(_kind: string, _options: unknown) {
-        starts += 1
-        return { result: Promise.resolve({ text: 'x', structured: plan }) }
-      },
-    })
-    await ctx.plugin(Commands, { maintainCooldownMs: 60_000, root: root })
-    const first = await captured!.handler({ rawInput: 'maintain' })
-    expect(first.kind).toBe('success')
-    // The cooldown window starts when a run SETTLES (registry), so the first run
-    // must finish before the second trigger can be cooldown-blocked rather than
-    // in-flight-blocked.
-    await settleMaintain(captured!, first)
-    expect(starts).toBe(1)
-    // V10-08 (F-04): the cooldown refusal is kind:'error' now.
-    const second = await captured!.handler({ rawInput: 'maintain' })
-    expect(second.kind).toBe('error')
-    expect(second.text).toContain('cooldown')
-    expect(starts).toBe(1)
-  })
-
-  it('0.19.0 (S2): status answers in flight and after settle, and report hands back the plan', async () => {
-    const dir = await tempHome('evo-commands-runstatus-')
+  it('review P2-2: a run with no report answers "has NO result" (the missing branch, on a real io)', async () => {
+    const dir = await tempHome('evo-commands-noresult-')
     const root = join(dir, 'skills')
     await mkdir(join(root, 'demo-skill'), { recursive: true })
     await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
@@ -987,627 +916,18 @@ describe('evolution-commands', () => {
     let handler: Handler | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    let release: (() => void) | undefined
-    const plan = { text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }
-    ctx.provide('subagents', {
-      async start() { return { result: new Promise(resolve => { release = () => { resolve(plan) } }) } },
-    })
+    ctx.provide('subagents', { async start() { return { result: Promise.resolve({ text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } })
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const started = await handler!.handler({ rawInput: 'maintain' })
-    const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
-    expect(id).toBeTruthy()
-    // In flight: both the list form and the by-id form say so.
-    const live = await handler!.handler({ rawInput: 'maintain status' })
-    expect(live.text).toContain(id)
-    expect(live.text).toContain('running')
-    // The spawn happens inside the detached run: wait for it before releasing it.
-    for (let attempt = 0; attempt < 500 && release === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
-    release!()
-    await settleMaintain(handler!, started)
-    const settled = await handler!.handler({ rawInput: `maintain status ${id}` })
-    expect(settled.text).toContain('succeeded')
-    const report = await handler!.handler({ rawInput: `maintain report ${id}` })
-    expect(report.kind).toBe('success')
-    expect(report.text).toContain('verdict=no_issues')
-    // An id nobody knows is NAMED, not silently empty.
-    const unknown = await handler!.handler({ rawInput: 'maintain status nope' })
-    expect(unknown.kind).toBe('error')
-    expect(unknown.text).toContain('No run nope')
-  })
-
-  it('0.19.0 (S2): cancel stops a running scan, settles it as cancelled, and refuses a second cancel', async () => {
-    const dir = await tempHome('evo-commands-runcancel-')
-    const root = join(dir, 'skills')
-    await mkdir(join(root, 'demo-skill'), { recursive: true })
-    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
-    const ctx = new Context()
-    let handler: Handler | undefined
-    ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
-    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    let capturedSignal: AbortSignal | undefined
-    let release: (() => void) | undefined
-    const plan = { text: 'x', output: [], stopReason: 'aborted' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }
-    ctx.provide('subagents', {
-      async start(_kind: string, options: unknown) {
-        capturedSignal = (options as { signal?: AbortSignal }).signal
-        return { result: new Promise(resolve => { release = () => { resolve(plan) } }) }
-      },
-    })
-    await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-    const started = await handler!.handler({ rawInput: 'maintain' })
-    const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
-    for (let attempt = 0; attempt < 500 && capturedSignal === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
-    const cancelled = await handler!.handler({ rawInput: `maintain cancel ${id}` })
-    expect(cancelled.kind).toBe('success')
-    expect(capturedSignal?.aborted, 'cancel aborts the run, not the request').toBe(true)
-    const status = await handler!.handler({ rawInput: `maintain status ${id}` })
-    expect(status.text).toContain('cancelled')
-    // One terminal state: cancelling again reports that, instead of a success.
-    const again = await handler!.handler({ rawInput: `maintain cancel ${id}` })
-    expect(again.kind).toBe('error')
-    expect(again.text).toContain('already cancelled')
-    release?.()
-  })
-
-  it('binds the command registration to the fiber so unmount unregisters it (S6.2 E-29)', async () => {
-    const registry: Array<{ name: string }> = []
-    const register = (definition: unknown): (() => void) => {
-      const name = (definition as { name?: string }).name ?? ''
-      registry.push({ name })
-      return () => {
-        const idx = registry.findIndex(item => item.name === name)
-        if (idx >= 0) registry.splice(idx, 1)
-      }
-    }
-    const ctx = new Context()
-    ctx.provide('commands', { register })
-    await ctx.plugin(Commands)
-    expect(registry.map(item => item.name)).toEqual(['evolution'])
-    // Reload/HMR disposes the fiber; the effect-bound register disposer must
-    // run, so a reload can never leave a stale duplicate /evolution behind.
-    await ctx.fiber.dispose()
-    expect(registry).toHaveLength(0)
-  })
-
-  it('preset install commits atomically: a failing staged write leaves the previous profile patch usable (S6.3 E-40)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'evo-commands-preset-atomic-'))
-    const skillsRoot = await mkdtemp(join(tmpdir(), 'evo-commands-preset-atomic-skills-'))
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const profileDir = join(home, 'profiles', 'web')
-      const patchPath = profilePatchPath(profileDir)
-      // Seed an existing installation so we can prove it survives an update.
-      const oldPatch = "- insert:\n    - id: some-other-row\n      name: '@some/other-plugin'\n"
-      await mkdir(profileDir, { recursive: true })
-      await writeFile(patchPath, oldPatch, 'utf8')
-      await seedPlatformBase(profileDir, 'standard', '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n')
-      // The staged write collides with a directory, so it throws EISDIR — a
-      // deterministic "the write cannot complete" on Windows and POSIX. The ONE
-      // file this install writes is the profile patch itself now.
-      await mkdir(`${patchPath}.tmp`)
-      const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      ctx.provide('profileContext', profileContext('web', profileDir))
-      await ctx.plugin(Commands, { root: skillsRoot })
-      const result = await handler!.handler({ rawInput: 'preset install' })
-      expect(result.kind).toBe('error')
-      expect(result.text).toContain('Preset install failed')
-      // The previous patch is untouched — no half-updated artifact — and the commit
-      // phase never started, so no backup was taken either.
-      expect(readFileSync(patchPath, 'utf8')).toBe(oldPatch)
-      expect(existsSync(`${patchPath}.bak`)).toBe(false)
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-      await rm(skillsRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
-  })
-
-  it('help documents the mutations and maintain --facts subcommands (S6.6-1 E-64)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }>; input?: { hint?: string } } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    await ctx.plugin(Commands)
-    // Both the input-declaration hint and the bare /evolution help list the
-    // previously-hidden subcommands.
-    expect(captured!.input?.hint).toContain('mutations')
-    expect(captured!.input?.hint).toContain('--facts')
-    const help = await captured!.handler({ rawInput: '' })
-    expect(help.kind).toBe('success')
-    expect(help.text).toContain('mutations')
-    expect(help.text).toContain('maintain [--timeout=<ms> | --facts]')
-  })
-
-  it('T4-03: an unknown subcommand (or a known one missing its argument) answers ERROR, not a successful help dump', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    await ctx.plugin(Commands)
-    // The bare command still documents itself, and so does an explicit `help`.
-    for (const rawInput of ['', 'help']) {
-      const bare = await captured!.handler({ rawInput })
-      expect(bare.kind, rawInput).toBe('success')
-      expect(bare.text, rawInput).toContain('subcommands (')
-    }
-    // A known subcommand without its argument, a bare unknown word, and a flag-only form: all
-    // three used to return the help text with kind 'success', so a command that did nothing read
-    // as done. (The control is `/evolution maintain --bogus`, which always refused.)
-    for (const rawInput of ['approve', 'skill', 'params --group', 'nonsense --x']) {
-      const result = await captured!.handler({ rawInput })
-      expect(result.kind, rawInput).toBe('error')
-      expect(result.text, rawInput).toContain('is not a subcommand this build answers')
-    }
-  })
-
-  // V10-09 (F-05): the recommendation count is STRUCTURED — it travels as
-  // MaintainOutcome.recommendationCount (validated plan length) into the
-  // maintain event. The old text-parsing contract (`/^- \[/gm` + Notes:
-  // splitting, repaired twice by F-365/V4-26/V6-38) is deleted without a dual
-  // track; this case discriminates: an embedded "- [fake]" line inside a
-  // finding would have inflated the old text count to 2.
-  it('maintain event carries the structured recommendation count, not a text parse (V10-09/F-05)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'evo-cmd-rec-count-home-'))
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-reccount-'))
-    const root = join(dir, 'skills')
-    const skillDir = join(root, 'demo-skill')
-    await mkdir(skillDir, { recursive: true })
-    // Same dup-heading shape the maintenance suite proves fires dup_heading=over.
-    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# x\n\n## A\n\n## A\n\n' + 'y'.repeat(2_500) + '\n', 'utf8')
-    const previousHome = process.env.DSH_HOME
-    process.env.DSH_HOME = home
-    try {
-      const ctx = new Context()
-      let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-      ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
-      ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-      ctx.provide('subagents', {
-        async start(_kind: string, _options: unknown) {
-          return {
-            result: Promise.resolve({
-              text: 'x',
-              structured: {
-                verdict: 'issues',
-                plan: [{
-                  kind: 'skill-level',
-                  names: ['demo-skill'],
-                  rule: 'B3',
-                  // E1 (0.3.58): §3 completeness — the demo-skill body fires
-                  // three over signals (dup_heading/overlong_line/narrow_name);
-                  // a compliant structured plan covers them all in evidence.
-                  evidence: [
-                    { signal: 'dup_heading', value: 'A(2)' },
-                    { signal: 'overlong_line', value: '7:2500' },
-                    { signal: 'narrow_name', value: 'session-verb' },
-                  ],
-                  // An embedded "- [" line: the deleted text parser would have
-                  // counted it as a second recommendation.
-                  finding: 'Duplicate heading.\n- [fake] embedded line is not a recommendation',
-                  recommendation: 'patch: remove the duplicate heading',
-                  semantic_reasoning: 'duplicate heading shape',
-                  impact: 'better',
-                  impact_reason: 'remove duplicate',
-                  reversibility: 'patch',
-                  undo_path: 'backup restore',
-                  confidence: 0.8,
-                  needs_human: false,
-                  is_override: false,
-                }],
-                notes: ['a plain note'],
-              },
-            }),
-          }
-        },
-      })
-      await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-      const result = await handler!.handler({ rawInput: 'maintain' })
-      expect(result.kind).toBe('success')
-      // The append is fire-and-forget; poll for the locked RMW to land.
-      const eventPath = join(home, 'evolution', 'events.json')
-      const deadline = Date.now() + 5000
-      let raw: string | null = null
-      while (raw === null && Date.now() < deadline) {
-        raw = await nodeEvolutionIo().readText(eventPath)
-        if (raw === null) await new Promise(resolve => setTimeout(resolve, 50))
-      }
-      expect(raw).not.toBeNull()
-      const parsed = JSON.parse(raw ?? '{}') as { events: Array<{ type?: string; recommendations?: number; verdict?: string }> }
-      const maintainEvents = parsed.events.filter(event => event.type === 'maintain')
-      expect(maintainEvents).toHaveLength(1)
-      expect(maintainEvents[0]?.recommendations).toBe(1)
-      expect(maintainEvents[0]?.verdict).toBe('issues')
-    } finally {
-      if (previousHome === undefined) delete process.env.DSH_HOME
-      else process.env.DSH_HOME = previousHome
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    }
-  })
-
-  // F-13: a top-level function/symbol staged payload makes
-  // JSON.stringify RESOLVE to undefined — the explicit type branch (not a
-  // `.length` TypeError) must render the unserializable stub.
-  it('pending --detail renders a resolving-undefined staged payload via the explicit branch (F-13/F-13)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionApproval', {
-      list: async (status?: string) => status === 'pending'
-        ? [{ id: 'c3', kind: 'skill', status: 'pending', summary: 'fn args', args: () => 'unserializable', createdAt: '', origin: 'background_review' }]
-        : [],
-    })
-    await ctx.plugin(Commands)
-    const detail = await captured!.handler({ rawInput: 'pending --detail' })
-    expect(detail.text).toContain('c3  skill  pending  fn args')
-    expect(detail.text).toContain('staged args: (unserializable)')
-  })
-
-  it('S2-P2-22: /evolution release routes to the approval service (happy path, and E-304 on an older service)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    const released: string[] = []
-    ctx.provide('evolutionApproval', {
-      list: async () => [],
-      release: async (id: string) => {
-        released.push(id)
-        return { ok: true, message: `Released "${id}" back to the pending window.` }
-      },
-    } as never)
-    await ctx.plugin(Commands)
-    const okResult = await captured!.handler({ rawInput: 'release x1' })
-    expect(okResult.kind).toBe('success')
-    expect(okResult.text).toContain('back to the pending window')
-    expect(released).toEqual(['x1'])
-    // A service without the release capability (older build) gets a distinct,
-    // actionable error instead of a TypeError.
-    const older = new Context()
-    let olderCaptured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    older.provide('commands', captureCommands((definition) => { olderCaptured = definition as typeof olderCaptured }))
-    older.provide('evolutionApproval', { list: async () => [], approve: async () => ({ ok: false, message: 'x' }), reject: async () => ({ ok: false, message: 'x' }) } as never)
-    await older.plugin(Commands)
-    const legacy = await olderCaptured!.handler({ rawInput: 'release x1' })
-    expect(legacy.kind).toBe('error')
-    expect(legacy.text).toContain('E-304')
-  })
-
-  it('v43 (P1-2): a staging deployment is refused for the destructive writes the skill runner cannot replay', async () => {
-    const cases = [
-      { input: 'consolidate target src', what: 'consolidate' },
-      { input: 'restore', what: 'restore' },
-      { input: 'skill restore demo', what: 'skill restore' },
-      { input: 'skill undo demo', what: 'skill undo' },
-    ]
-    for (const { input, what } of cases) {
-      const ctx = new Context()
-      let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-      ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-      // The deployment asked for foreground staging (the shipped default once
-      // the row is enabled). The skill runner has no consolidate/restore
-      // vocabulary, so these three used to write straight through the gate.
-      ctx.provide('evolutionApproval', { isEnabled: true, stageForeground: true, list: async () => [] })
-      await ctx.plugin(Commands)
-      const result = await captured!.handler({ rawInput: input })
-      expect(result.kind, input).toBe('error')
-      expect(result.text, input).toContain('E-306')
-      expect(result.text, input).toContain(what)
-    }
-  })
-
-  it('v43 (P1-2): the same commands are not refused when the deployment does not stage foreground writes', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionApproval', { isEnabled: true, stageForeground: false, list: async () => [] })
-    await ctx.plugin(Commands)
-    const result = await captured!.handler({ rawInput: 'consolidate target src' })
-    // No curator is mounted here, so the command must reach its own E-302
-    // service check — proof the refusal is policy-scoped, not a blanket ban.
-    expect(result.kind).toBe('error')
-    expect(result.text).toContain('E-302')
-    expect(result.text).not.toContain('E-306')
-  })
-
-  it('S5.5 (audit P2-23): a staging deployment refuses a session-less restructure with the E-306 shape instead of staging unattributed', async () => {
-    // The E-305 invocation shape (no agent → no session) used to slip past
-    // `willStage` into an unconditional approval.request WITHOUT a session,
-    // landing a staged record with no session attribution while
-    // consolidate/restore answered E-306 for the same shape.
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    let requested = 0
-    ctx.provide('evolutionApproval', {
-      isEnabled: true,
-      stageForeground: true,
-      hasRunner: () => true,
-      list: async () => [],
-      request: async () => {
-        requested += 1
-        return { action: 'staged', message: 'staged restructure' }
-      },
-    } as never)
-    await ctx.plugin(Commands)
-    const result = await captured!.handler({ rawInput: 'restructure demo "## Heading" references/heading.md' })
-    expect(result.kind).toBe('error')
-    expect(result.text).toContain('E-306')
-    expect(result.text).toContain('restructure')
-    // The refusal replaces the staging call entirely — nothing is staged.
-    expect(requested).toBe(0)
-  })
-
-  it('V24-12: a double-space subcommand variant dispatches instead of returning help as success', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionApproval', {
-      list: async (status?: string) => status === 'pending'
-        ? [{ id: 'c4', kind: 'skill', status: 'pending', summary: 'whitespace probe', args: {}, createdAt: '', origin: 'foreground' }]
-        : [],
-    })
-    await ctx.plugin(Commands)
-    // `pending  --detail` (double space) used to miss every branch, fall into
-    // the help fallback, and return kind:'success' with the full help text —
-    // indistinguishable from a real result while NOTHING was listed.
-    const result = await captured!.handler({ rawInput: 'pending  --detail' })
-    expect(result.kind).toBe('success')
-    expect(result.text).toContain('c4  skill  pending  whitespace probe')
-    expect(result.text).not.toContain('Evolution: memory, skills')
-  })
-
-  // V10-03 (P2-18): threatExemptLabels rides the Config into the write-side
-  // SkillLibrary (core-side constructor option `threatExemptLabels` — P2-18
-  // core batch). Default-empty semantics: a non-empty list is accepted and the
-  // restructure write path behaves exactly as before on threat-free content.
-  it('restructure accepts the threatExemptLabels config and keeps write behavior (P2-18)', async () => {
-    const dir = await tempRoot('evo-commands-exempt-')
-    const root = join(dir, 'skills')
-    const skillDir = join(root, 'demo-skill')
-    await mkdir(skillDir, { recursive: true })
-    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for restructure tests.\n---\n\n# Demo\n\n## Log\n\nold detail\n\n## Keep\n\nnew\n', 'utf8')
-    const ctx = new Context()
-    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', { provider: () => io })
-    await ctx.plugin(Commands, { root: root, threatExemptLabels: ['ssh_backdoor'] })
-    const result = await handler!.handler({ rawInput: 'restructure demo-skill "Log" references/log.md' })
-    expect(result.kind).toBe('success')
-    const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
-    expect(support).toContain('old detail')
-  })
-
-
-  it('pending --detail renders each record with its staged args, truncated and collapsed by default (F-328)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    const pendingRecord = {
-      id: 'a1', kind: 'skill' as const, status: 'pending' as const, summary: 'create demo',
-      args: { operation: { action: 'create', name: 'demo' }, content: 'x'.repeat(700) },
-      createdAt: '', origin: 'background_review',
-    }
-    const executingRecord = {
-      id: 'b2', kind: 'memory' as const, status: 'executing' as const, summary: 'remember',
-      args: { action: 'add', facts: 'user name ada' }, createdAt: '', origin: 'background_review',
-    }
-    ctx.provide('evolutionApproval', {
-      list: async (status?: string) => status === 'pending' ? [pendingRecord] : status === 'executing' ? [executingRecord] : [],
-    })
-    await ctx.plugin(Commands)
-    const detail = await captured!.handler({ rawInput: 'pending --detail' })
-    expect(detail.kind).toBe('success')
-    expect(detail.text).toContain('a1  skill  pending  create demo')
-    expect(detail.text).toContain('b2  memory  EXECUTING  remember')
-    expect(detail.text).toContain('staged args:')
-    const argsJson = JSON.stringify(pendingRecord.args)
-    // The staged args are rendered (truncated to 500 chars), so the operator
-    // can see what approve will actually replay rather than "blind-approving".
-    // 0.13.0: the row carries its attribution (age, origin) between the summary and the args, so the
-    // assertion is anchored on the summary and the staged-args line rather than on a fixed newline.
-    expect(detail.text).toMatch(/a1 {2}skill {2}pending {2}create demo {2}· {2}[^\n]+\n {2}staged args: /)
-    expect(detail.text).toContain(`  staged args: ${argsJson.slice(0, 500)}…(truncated ${argsJson.length - 500} chars)`)
-    // The truncation is explicitly marked — an oversized payload never reads as
-    // a complete-but-cut JSON, even when the cut lands mid-escape (V4-19).
-    expect(detail.text).toMatch(/\(truncated \d+ chars\)/)
-    // Truncation: the full args JSON is NOT rendered (only the 500-char prefix).
-    expect(detail.text).not.toContain(argsJson.slice(500))
-    // The default (collapsed) view is unchanged: no staged args, and the
-    // executing-status marker keeps its trailing-space form.
-    const bare = await captured!.handler({ rawInput: 'pending' })
-    expect(bare.kind).toBe('success')
-    expect(bare.text).toContain('a1  skill  create demo')
-    expect(bare.text).toContain('b2  memory  EXECUTING remember')
-    expect(bare.text).not.toContain('staged args:')
-  })
-
-  it('V6-41: a damaged mutations/report shape renders unreadable instead of a TypeError (0.3.36)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionCurator', {
-      skills: {
-        listMutations: async () => [
-          { at: '2026-01-01T00:00:00.000Z', skillName: 'good-skill', action: 'update', summary: 'ok' },
-          { at: 12345, skillName: 'bad-skill' },
-          null,
-        ],
-      },
-      latestReport: async () => ({ runId: 'r1', startedAt: 12345, archived: 'nope', failed: [{ name: 'a' }] }),
-    })
-    await ctx.plugin(Commands)
-    const mutations = await captured!.handler({ rawInput: 'mutations' })
-    expect(mutations.kind).toBe('success')
-    expect(mutations.text).toContain('good-skill')
-    expect(mutations.text).not.toContain('bad-skill')
-    const report = await captured!.handler({ rawInput: 'curator report' })
+    expect(started.kind).toBe('success')
+    const runId = await settleMaintain(handler!, started)
+    // The run succeeded and wrote its report; the RESULT is then removed (an operator,
+    // a cleanup, a different home) — the reader must say "no result", not render empty.
+    await rm(join(dir, 'evolution', 'reports', `maintain-${runId}.json`), { force: true })
+    await rm(join(dir, 'evolution', 'reports', `maintain-${runId}.md`), { force: true })
+    const report = await handler!.handler({ rawInput: `maintain report ${runId}` })
     expect(report.kind).toBe('error')
-    expect(report.text).toContain('Report file unreadable.')
+    expect(report.text).toContain('has NO result')
+    expect(report.text, 'the unreadable branch must not answer this').not.toContain('could not be read')
   })
-
-  it('P2-16 (v38): /evolution curator report surfaces an interrupted run instead of failed=(none)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionCurator', {
-      latestReport: async () => ({
-        runId: 'r-aborted',
-        startedAt: '2026-09-11T00:00:00.000Z',
-        archived: [{ name: 'landed-skill', reason: 'Lifecycle: reached archive threshold' }],
-        failed: [],
-        aborted: 'evolution-curator was disposed mid-run - consolidation skipped; archives that landed above are still accounted',
-        unattributed: ['some run-level error with no skill name'],
-      }),
-    })
-    await ctx.plugin(Commands)
-    const result = await captured!.handler({ rawInput: 'curator report' })
-    expect(result.kind).toBe('success')
-    // The skill-attributable list is empty, so the run-level facts are the only
-    // signal that this pass did not complete (V27 CUR-2 false-clean, command side).
-    expect(result.text).toContain('failed=(none)')
-    expect(result.text).toContain('aborted=evolution-curator was disposed mid-run')
-    expect(result.text).toContain('unattributed=1')
-    // A clean report keeps the previous shape: no run-level lines at all.
-    let clean: typeof captured
-    const cleanCtx = new Context()
-    cleanCtx.provide('commands', captureCommands((definition) => { clean = definition as typeof captured }))
-    cleanCtx.provide('evolutionCurator', {
-      latestReport: async () => ({ runId: 'r-clean', startedAt: '2026-09-11T01:00:00.000Z', archived: [], failed: [] }),
-    })
-    await cleanCtx.plugin(Commands)
-    const cleanResult = await clean!.handler({ rawInput: 'curator report' })
-    expect(cleanResult.text).not.toContain('aborted=')
-    expect(cleanResult.text).not.toContain('unattributed=')
-  })
-
-  it('V6-29: maintain --timeout above the AbortSignal domain is rejected at the command gate (0.3.36)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    await ctx.plugin(Commands)
-    // 5e9 > 2^32-1: AbortSignal.timeout would throw a synchronous RangeError.
-    const result = await captured!.handler({ rawInput: 'maintain --timeout 5000000000' })
-    expect(result.kind).toBe('error')
-    expect(result.text).toContain('Invalid --timeout value')
-    // P2-10 (v19): 2^31..2^32-1 does NOT throw — Node warns and silently sets
-    // 1ms, so the command must reject it like the RangeError case.
-    const overflow = await captured!.handler({ rawInput: 'maintain --timeout 2147483648' })
-    expect(overflow.kind).toBe('error')
-    expect(overflow.text).toContain('Invalid --timeout value')
-  })
-
-  it('T4-12/A54: a trigger arriving mid-attempt is QUEUED — one failed attempt no longer ends the automatic migration', async () => {
-    const dir = await tempRoot('evo-cmd-migration-race-')
-    const home = join(dir, 'profile')
-    await mkdir(home, { recursive: true })
-    // The document the migration exists to move (the name the platform import leaves behind).
-    const legacy = join(home, 'settings.yaml.imported')
-    await writeFile(legacy, 'evolution-memory:\n  memoryCharLimit: 2200\n', 'utf8')
-    const ctx = new Context()
-    ctx.provide('commands', captureCommands(() => {}))
-    const writes: Array<{ rowId: string; patch: Record<string, unknown> }> = []
-    ctx.provide('settings', {
-      describe: () => [{ ns: 'memory-files', user: {} }],
-      update: async (rowId: string, patch: Record<string, unknown>) => { writes.push({ rowId, patch }) },
-    })
-    ctx.provide('profileContext', { home })
-    // The FIRST read of the legacy document hangs and then fails (a slow or unreadable document is
-    // enough) — that is the attempt the guard used to make final. Later reads are the real ones.
-    const io = nodeEvolutionIo()
-    let attempts = 0
-    let released = false
-    let release: () => void = () => {}
-    const held = new Promise<void>((resolve) => { release = resolve })
-    ctx.provide('evolutionIo', {
-      provider: () => ({
-        ...io,
-        readText: async (path: string) => {
-          if (path !== legacy) return io.readText(path)
-          attempts += 1
-          if (released) return io.readText(path)
-          await held
-          throw new Error('EIO: the legacy document is unreadable right now')
-        },
-      }),
-    })
-    await ctx.plugin(Commands, { root: dir })
-    // Wait for the first attempt to reach its hanging read, then let the loader settle: both
-    // triggers have now fired, with the second arriving while the first is in flight.
-    await vi.waitFor(() => { expect(attempts).toBe(1) })
-    await new Promise(resolve => setTimeout(resolve, 20))
-    released = true
-    release()
-    // The queued trigger runs. Without the queue this times out: one warning, no second attempt,
-    // and the legacy document is never migrated (the comment claimed a "next trigger" that does
-    // not exist — both lifecycle moments have already passed).
-    await vi.waitFor(() => { expect(writes).toEqual([{ rowId: 'memory-files', patch: { memoryChars: 2200 } }]) })
-    expect(attempts).toBe(2)
-    await ctx.fiber.dispose()
-  })
-
-  it('F-14/E-7 (v18) → V27 G2.4: both root keys stay declared, and the expired alias fails the load', () => {
-    const value = (Commands.Config as unknown as {
-      ['~standard']: { validate(input: unknown): { value: { maintainTimeoutMs: number; root: string; skillsRoot: string } } }
-    })['~standard'].validate({}).value
-    expect(value.maintainTimeoutMs).toBe(600_000)
-    // `root` is canonical. `skillsRoot` stays DECLARED (so the loader hands the
-    // key to the plugin instead of dropping it) but carries no root semantics:
-    // its one-minor-version window closed at 0.3.65, and a deployment that still
-    // sets it now fails the load loudly rather than pointing at a root nobody
-    // reads (M-08 — the promise was two releases past expiry).
-    expect(value.root).toBe('')
-    expect(value.skillsRoot).toBe('')
-    const ctx = new Context()
-    expect(() => { Commands.apply(ctx, { skillsRoot: '/tmp/legacy-root' }) })
-      .toThrow(/skillsRoot" was removed after 0\.3\.65/)
-  })
-})
-
-it('v28 G7.2 (CMD-01): a faulting mounted service yields kind:error on every state-touching subcommand, never a throw', async () => {
-  const ctx = new Context()
-  let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
-  ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-  // Any property access on these services throws — the corrupted-state /
-  // transient-IO shape (quarantine, lock budget, EIO) that the wrapper exists
-  // for. The guard iterates the REGISTRY's state-touching subcommands, so a
-  // future subcommand that reads a service without the wrapper fails here.
-  const faulting = () => new Proxy({}, {
-    get(target, prop) {
-      if (prop === 'then' || typeof prop === 'symbol') return (target as Record<symbol, unknown>)[prop as symbol]
-      throw new Error(`service fault injected at "${prop}" (quarantine-class)`)
-    },
-  })
-  ctx.provide('evolutionApproval', faulting())
-  ctx.provide('evolutionCurator', faulting())
-  ctx.provide('evolutionReplay', faulting())
-  await ctx.plugin(Commands)
-  expect(captured).toBeDefined()
-  // Every subcommand that reads a mounted service (drawn from COMMAND_ENTRIES;
-  // the state-touching set). Also pins the G0.3 contract for the previously
-  // bare branches: pending/approve/reject/curator/mutations/restore/replay.
-  const stateTouching = [
-    'pending', 'pending --detail',
-    'approve some-id', 'reject some-id', 'release some-id',
-    'curator run', 'curator pause', 'curator resume', 'curator status', 'curator report', 'curator scope',
-    'mutations', 'skills health',
-    'restore', 'replay',
-  ]
-  for (const rawInput of stateTouching) {
-    const result = await captured!.handler({ rawInput })
-    expect({ rawInput, kind: result.kind }).toEqual({ rawInput, kind: 'error' })
-    expect(result.text).toContain('command failed')
-  }
-  // `maintain` keeps its own structured error path (pre-v28). Unmatched input answers the
-  // T4-03 error WITHOUT touching a service — so it carries neither the fault message nor a
-  // 'success' (the help fallback used to claim one). The bare command is the success control.
-  const unmatched = await captured!.handler({ rawInput: 'definitely-not-a-subcommand' })
-  expect(unmatched.kind).toBe('error')
-  expect(unmatched.text).toContain('is not a subcommand this build answers')
-  expect(unmatched.text).not.toContain('service fault injected')
-  const help = await captured!.handler({ rawInput: '' })
-  expect(help.kind).toBe('success')
 })
