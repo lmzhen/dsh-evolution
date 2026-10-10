@@ -295,4 +295,29 @@ describe('core run registry (S2)', () => {
     expect(row?.state, 'a settled foreign run is not resurrected as running').toBe('succeeded')
     expect(row?.resultRef).toBe(join(dir, 'reports', 'maintain-foreign-h1.json'))
   })
+
+  it('keeps a settled row settled when a stale writer puts it back to running (monotone, 0.19.3)', async () => {
+    const dir = await home()
+    const io = nodeEvolutionIo()
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'settled-row', kind: 'maintain', state: 'succeeded', startedAt: 31, pid: process.pid, endedAt: 32, resultRef: join(dir, 'reports', 'maintain-settled-row.json') }],
+    }), 'utf8')
+    const registry = newRunRegistry({ io, home: dir })
+    await registry.load()
+    expect(registry.find('settled-row')?.state).toBe('succeeded')
+    // A stale writer (an older plane holding an outdated view) puts `running` back: only
+    // the owner could have made the row running again, and settle() is terminal-once.
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'settled-row', kind: 'maintain', state: 'running', startedAt: 31, pid: process.pid }],
+    }), 'utf8')
+    const again = await registry.load()
+    expect(again.note, 'the refused regression is said out loud').toContain('stayed settled')
+    expect(registry.find('settled-row')).toMatchObject({ state: 'succeeded' })
+    expect(registry.inFlight(), 'a settled row cannot hold the in-flight guard').toBeUndefined()
+    // …and the index itself is repaired, so a FRESH plane cannot be fooled by that row.
+    const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ id: string; state: string }> }
+    expect(persisted.runs.find(row => row.id === 'settled-row')?.state).toBe('succeeded')
+  })
 })

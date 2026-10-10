@@ -1,5 +1,5 @@
 /**
- * 0.19.0 (S2): the family's run-lifecycle owner.
+ * 0.19.0 (S2) / 0.19.3 (restructure): the family's run-lifecycle owner.
  *
  * A "run" is work that can outlive one interaction — today the maintenance scan.
  * Before this module the only record of such work was the requesting invocation:
@@ -12,16 +12,25 @@
  * ended, and (c) WHERE its result lives (`resultRef` is a path, never the result
  * itself — the report file is the one result home).
  *
- * Two disciplines are structural, not stylistic:
+ * Three disciplines are structural, not stylistic:
  *
- *   - **No timer.** A run whose process died is converged at READ time: the index
- *     file can only carry `running` records written by a PREVIOUS process life,
- *     because the live ones are in memory. `load()` therefore rewrites every
- *     `running` record as `failed(orphan)` once — the same "converge when read"
- *     posture the approval window uses for its TTL.
- *   - **One terminal state.** `settle()` refuses to overwrite a record that is
- *     already terminal, so a cancel that raced a failure cannot flip the answer
- *     the operator already read.
+ *   - **One writer per row** (0.19.3). A run's row is authoritative in the memory of
+ *     the process that STARTED it (`owned`) and in the shared index for everyone else
+ *     (`foreign`, rebuilt from the file on every `load()`). The only write a non-owner
+ *     may make is the orphan verdict for a row whose owner is gone, judged inside the
+ *     very transaction that read the row. The two cross-plane bugs this family shipped
+ *     were projections of that one missing rule: 0.19.0 froze a foreign run as
+ *     `running` forever (a "known id" was never re-read), and 0.19.1 wrote a settled
+ *     foreign row back as `running` (memory overwrote every row it knew).
+ *   - **No timer.** A run whose process died is converged at READ time: the live rows
+ *     are in memory, so a `running` row in the file whose owner is not alive is an
+ *     orphan — the same "converge when read" posture the approval window uses.
+ *   - **One terminal state, and it is monotone.** `settle()` refuses to overwrite a row
+ *     that is already terminal (so a cancel that raced a failure cannot flip the answer
+ *     the operator already read), and a row that reached a terminal state never reads as
+ *     `running` again: only the owner that started it could make it running and
+ *     `settle()` is terminal-once, so a `running` claim for a settled row can only be a
+ *     stale writer's — refused on read, repaired on the next write.
  *
  * The store is PER INSTANCE (a factory, not module scope): one registry per
  * mounted row, disposed with its fiber. There is no module-scope mutable state
@@ -77,9 +86,9 @@ export interface RunOutcome {
 /** The registry surface the commands row drives. */
 export interface RunRegistry {
   /**
-   * Converge the persisted index; the commands row calls it before answering any read
-   * (0.19.1: it also re-reads a terminal state written by the run's OWNER — see the
-   * implementation note below).
+   * Converge the persisted index; the commands row calls it before answering any read.
+   * The foreign view is rebuilt wholesale (0.19.3), so a row another plane settled is
+   * re-read here instead of being frozen at whatever this process first saw.
    */
   load(): Promise<{ ok: boolean; note?: string }>
   /**
@@ -96,7 +105,7 @@ export interface RunRegistry {
   inFlight(): RunRecord | undefined
   /** When the newest terminal run ended (`undefined` when none). */
   lastSettledAt(): number | undefined
-  /** Every tracked run, newest first. */
+  /** Every tracked run, newest first (retained history: cap applied). */
   runs(): readonly RunRecord[]
   /** One run by id, converged view included. */
   find(id: string): RunRecord | undefined
@@ -191,55 +200,85 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
   const maxRecords = clampedNumber(options.maxRecords ?? DEFAULT_RUN_RECORDS, DEFAULT_RUN_RECORDS, { min: 1 })
   const warn = options.warn ?? (() => {})
   const path = runsFile(options.home)
-  const records: RunRecord[] = []
+
+  /** Rows THIS process started: its memory is the only truth for them. */
+  const owned = new Map<string, RunRecord>()
+  /** Rows read from the shared index: the file is the only truth for them. */
+  const foreign = new Map<string, RunRecord>()
+  /** Cancellation handles — "can this still be stopped", NOT ownership (`settle` drops one). */
   const controllers = new Map<string, AbortController>()
 
-  const ordered = (): RunRecord[] => [...records].sort((a, b) => b.startedAt - a.startedAt)
-
-  /** The ONE wording of the orphan verdict — read-time convergence says it in two places. */
+  /** The ONE wording of the orphan verdict. */
   const ORPHAN_FAILURE = 'no live owner process — the run was interrupted before it settled (orphan)'
-  /** A `running` record whose owner is gone, as the index must show it. */
-  const orphanOf = (record: RunRecord): RunRecord => ({ ...record, state: 'failed', endedAt: now(), failure: ORPHAN_FAILURE })
+  /** A row whose owner cannot be reached: `pid` absent (an older build) or not alive. */
+  const ownerIsGone = (row: RunRecord): boolean => row.pid === undefined || !isProcessAlive(row.pid)
+  /** The verdict is materialized ONCE, so its `endedAt` (and the duration a reader sees) is stable. */
+  const orphanOf = (row: RunRecord): RunRecord => ({ ...row, state: 'failed', endedAt: now(), failure: ORPHAN_FAILURE })
 
-  /** Keep every RUNNING record plus the newest terminal ones: memory and the
-   * index share one cap, so the two can never disagree about the history. */
-  const trim = (): void => {
-    const terminal = records
-      .filter(record => TERMINAL.has(record.state))
+  /** Every row this process knows, newest first. ALL reads go through here. */
+  const view = (): RunRecord[] => [...owned.values(), ...foreign.values()].sort((a, b) => b.startedAt - a.startedAt)
+
+  /** Retained history: every running row plus the newest terminal ones (one cap, both planes). */
+  const capped = (rows: readonly RunRecord[]): RunRecord[] => {
+    const live = rows.filter(row => row.state === 'running')
+    const done = rows
+      .filter(row => TERMINAL.has(row.state))
       .sort((a, b) => (b.endedAt ?? b.startedAt) - (a.endedAt ?? a.startedAt))
-    for (const stale of terminal.slice(maxRecords)) {
-      const index = records.indexOf(stale)
-      if (index >= 0) records.splice(index, 1)
+      .slice(0, maxRecords)
+    return [...live, ...done].sort((a, b) => b.startedAt - a.startedAt)
+  }
+
+  /**
+   * Update a surviving foreign row in place (identity stable), or add it.
+   *
+   * Monotone states (0.19.3): a row already known TERMINAL is never shown as `running`
+   * again. Only the owner that started a run could make it running, and `settle()` is
+   * terminal-once — so a `running` claim for a settled row can only come from a stale
+   * writer (an older plane holding an outdated view), and adopting it would propagate the
+   * resurrection to every other plane.
+   * @returns true when the row was refused as exactly that regression.
+   */
+  const adopt = (row: RunRecord): boolean => {
+    const existing = foreign.get(row.id)
+    if (existing === undefined) {
+      foreign.set(row.id, row)
+      return false
     }
+    if (TERMINAL.has(existing.state) && !TERMINAL.has(row.state)) return true
+    // Clear what the new row dropped, so nothing is inherited from the previous view.
+    delete existing.endedAt
+    delete existing.resultRef
+    delete existing.failure
+    Object.assign(existing, row)
+    return false
   }
 
   const persist = async (): Promise<void> => {
-    trim()
     try {
-      // Read-modify-write under the io backend's cross-process lock, and MERGE
-      // rather than overwrite: the desktop and web planes share one DSH_HOME, so
-      // two hosts each know their own runs and the index is their shared view.
-      // (trim() already bounded the terminal history and kept every running
-      // record — a second slice here could drop the LIVE run out of the index.)
+      // Read-modify-write under the io backend's cross-process lock. The file is the
+      // BASE and only THIS process's rows are laid over it ("one writer per row"); the
+      // single write a non-owner may make is the orphan verdict for a row whose owner is
+      // gone. The row read inside this transaction IS the compare-and-swap: if its owner
+      // settled it in between, it no longer reads as `running` and is left alone.
       await transactIo(options.io, path, (current) => {
         const onDisk = parseIndex(current)
         const merged = new Map<string, RunRecord>()
-        for (const record of onDisk.records) merged.set(record.id, record)
-        // This process's own records win: it knows their state better than a file — but a
-        // row this process does NOT own must never be written back as `running` over the
-        // terminal state its owner already wrote (0.19.2, review H1). Adoption happens at
-        // read time, while begin()/settle()/cancel() persist WITHOUT a read in between, so
-        // the write side needs the same rule or a settled foreign run is resurrected.
-        for (const record of records) {
-          const onDiskRow = merged.get(record.id)
-          const settledElsewhere = onDiskRow !== undefined && TERMINAL.has(onDiskRow.state) && !TERMINAL.has(record.state)
-          // Skip exactly that one case; everything else this process knows still wins.
-          if (!controllers.has(record.id) && settledElsewhere) continue
-          merged.set(record.id, record)
+        for (const row of onDisk.records) merged.set(row.id, row)
+        for (const [id, row] of owned) merged.set(id, row)
+        // Repair a stale writer's regression: this process READ the owner's terminal
+        // verdict, so re-asserting it is not authoring state — it refuses to propagate a
+        // stale overwrite. Without this, a fresh plane would see the resurrected `running`
+        // row and hold its in-flight guard (the 0.19.0 symptom, one plane later).
+        for (const [id, row] of foreign) {
+          const onDiskRow = merged.get(id)
+          if (TERMINAL.has(row.state) && onDiskRow !== undefined && !TERMINAL.has(onDiskRow.state)) merged.set(id, row)
         }
-        const view = [...merged.values()].sort((a, b) => b.startedAt - a.startedAt)
-        const live = view.filter(record => record.state === 'running')
-        const done = view.filter(record => TERMINAL.has(record.state)).slice(0, maxRecords)
+        for (const [id, row] of merged) {
+          if (row.state === 'running' && !owned.has(id) && ownerIsGone(row)) merged.set(id, orphanOf(row))
+        }
+        const kept = capped([...merged.values()])
+        const live = kept.filter(row => row.state === 'running')
+        const done = kept.filter(row => TERMINAL.has(row.state))
         // Rows this build does not understand ride along untouched (P2-5): it cannot
         // judge them, and dropping them would erase another writer's record.
         return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done, ...onDisk.foreign] }, null, 2)
@@ -263,61 +302,47 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       if (!parsed.ok) {
         return { ok: false, note: 'run index could not be read as an index (not JSON, or no runs array) — the previous run history is unknown (the reports are unaffected)' }
       }
+      // The foreign view is REBUILT wholesale: a row this process does not own is whatever
+      // the index says it is, every time. (0.19.0 kept "known" ids frozen, which is how a
+      // settled foreign run answered `running` until the observing process restarted.)
+      // Surviving rows are updated in place so a reader that held one across the load
+      // keeps a live view; rows that vanished from the index are dropped.
+      const wasRunning = new Set([...foreign.values()].filter(row => row.state === 'running').map(row => row.id))
+      const seen = new Set<string>()
       let converged = 0
       let liveElsewhere = 0
-      let healed = 0
-      for (const record of parsed.records) {
-        // Idempotent merge: a record this process already knows (its own runs, or an
-        // earlier load) is never re-added, so load() can be called again to pick up
-        // what another process wrote.
-        const knownIndex = records.findIndex(item => item.id === record.id)
-        if (knownIndex >= 0) {
-          const known = records[knownIndex] as RunRecord
-          // …but a record this process does NOT own still follows the index (0.19.1,
-          // review P1-2): adopting a foreign run while it was in flight must not freeze
-          // it as `running` after its owner settled it, or `status` would lie for as long
-          // as this process lives and `inFlight()` would refuse every later scan here.
-          // A foreign run stops being live in exactly the two ways the new-row path
-          // below handles — its owner settled it, or its owner died. An OWNED run keeps
-          // memory as the truth: this process is what ends it.
-          if (!controllers.has(record.id) && !TERMINAL.has(known.state)) {
-            if (TERMINAL.has(record.state)) {
-              // Adopt IN PLACE: a reader that held this record across the load keeps a live
-              // view, and the fields the settled row dropped are cleared, not inherited.
-              delete known.endedAt
-              delete known.resultRef
-              delete known.failure
-              Object.assign(known, record)
-              healed++
-            } else if (record.pid === undefined || !isProcessAlive(record.pid)) {
-              records[knownIndex] = orphanOf(record)
-              converged++
-            }
-          }
+      let followed = 0
+      let regressed = 0
+      for (const row of parsed.records) {
+        if (owned.has(row.id)) continue
+        seen.add(row.id)
+        if (row.state !== 'running') {
+          if (wasRunning.has(row.id)) followed++
+          if (adopt(row)) regressed++
           continue
         }
-        if (record.state !== 'running') {
-          records.push(record)
+        // A running row whose OWNER is alive belongs to another process sharing this home:
+        // genuinely in flight, never rewritten here (review P1-1). A row that cannot name
+        // its owner is treated as gone — the conservative side, and what a row written by
+        // an older build looks like.
+        if (ownerIsGone(row)) {
+          converged++
+          adopt(orphanOf(row))
           continue
         }
-        // A running record whose OWNER is still alive belongs to another process
-        // sharing this home: it is genuinely in flight, not an orphan (review P1-1).
-        // A record that cannot name its owner is treated as gone — the conservative
-        // side, and what a record written by an older build looks like.
-        if (record.pid !== undefined && isProcessAlive(record.pid)) {
-          liveElsewhere++
-          records.push(record)
-          continue
-        }
-        converged++
-        records.push(orphanOf(record))
+        liveElsewhere++
+        if (adopt(row)) regressed++
       }
-      if (converged > 0 || healed > 0) await persist()
+      for (const id of [...foreign.keys()]) {
+        if (!seen.has(id)) foreign.delete(id)
+      }
+      if (converged > 0 || regressed > 0) await persist()
       const notes = [
         parsed.note,
         converged > 0 ? `${converged} run(s) with no live owner were recorded as failed(orphan)` : undefined,
         liveElsewhere > 0 ? `${liveElsewhere} run(s) are in flight in another process sharing this home` : undefined,
-        healed > 0 ? `${healed} run(s) settled by their owner were re-read from the index` : undefined,
+        followed > 0 ? `${followed} run(s) settled by their owner were re-read from the index` : undefined,
+        regressed > 0 ? `${regressed} settled run(s) stayed settled although the index claimed they were running` : undefined,
       ].filter((note): note is string => note !== undefined)
       return { ok: true, ...(notes.length > 0 ? { note: notes.join('; ') } : {}) }
     },
@@ -328,7 +353,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       const controller = new AbortController()
       controllers.set(id, controller)
       // The pid is what lets ANOTHER process tell this live run from an orphan.
-      records.push({ id, kind, state: 'running', startedAt, pid: process.pid })
+      owned.set(id, { id, kind, state: 'running', startedAt, pid: process.pid })
       // Write-through (0.19.1, review P2): answering "started" promises a run another
       // plane can read, so the row reaches the index before this resolves. `persist()`
       // warns instead of throwing, so an unwritable home cannot withhold the handle.
@@ -337,14 +362,14 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
     },
 
     async settle(id, outcome) {
-      const record = records.find(item => item.id === id)
+      const row = owned.get(id)
       // Terminal-once: a cancel that raced the run's own failure must not flip the
       // answer the operator already read.
-      if (!record || TERMINAL.has(record.state)) return
-      record.state = outcome.state
-      record.endedAt = now()
-      if (outcome.resultRef !== undefined) record.resultRef = outcome.resultRef
-      if (outcome.failure !== undefined) record.failure = outcome.failure
+      if (row === undefined || TERMINAL.has(row.state)) return
+      row.state = outcome.state
+      row.endedAt = now()
+      if (outcome.resultRef !== undefined) row.resultRef = outcome.resultRef
+      if (outcome.failure !== undefined) row.failure = outcome.failure
       controllers.delete(id)
       await persist()
     },
@@ -353,35 +378,36 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
     // kind filter — a comparison the type system already knows is true. Re-add the
     // parameter (and the filter) together with the second `RunKind` member.
     inFlight() {
-      return ordered().find(record => record.state === 'running')
+      return view().find(row => row.state === 'running')
     },
 
     lastSettledAt() {
-      return ordered().find(record => TERMINAL.has(record.state))?.endedAt
+      return view().find(row => TERMINAL.has(row.state))?.endedAt
     },
 
     runs() {
-      return ordered()
+      return capped(view())
     },
 
     find(id) {
-      return records.find(record => record.id === id)
+      return owned.get(id) ?? foreign.get(id)
     },
 
     cancel(id) {
-      // Only work THIS process started can be stopped. A running record loaded from
-      // the index belongs to another process sharing this home (review P1-1), and
-      // marking it cancelled here would fabricate a terminal state for work that is
-      // still running there — so an unowned id is refused, not "cancelled".
+      // Only work THIS process started can be stopped. A running row loaded from the
+      // index belongs to another process sharing this home (review P1-1), and marking it
+      // cancelled here would fabricate a terminal state for work that is still running
+      // there — so an unowned id is refused, not "cancelled". (`controllers` is the
+      // right test here precisely because it is about stopping, not about authority.)
       const controller = controllers.get(id)
       if (controller === undefined) return false
-      const record = records.find(item => item.id === id)
-      if (!record || record.state !== 'running') return false
+      const row = owned.get(id)
+      if (row === undefined || row.state !== 'running') return false
       controller.abort()
       controllers.delete(id)
-      record.state = 'cancelled'
-      record.endedAt = now()
-      record.failure = 'cancelled by operator'
+      row.state = 'cancelled'
+      row.endedAt = now()
+      row.failure = 'cancelled by operator'
       void persist()
       return true
     },
