@@ -19,7 +19,7 @@ describe('core run registry (S2)', () => {
     const dir = await home()
     const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
     await registry.load()
-    const handle = registry.begin('maintain')
+    const handle = await registry.begin('maintain')
     expect(handle.kind).toBe('maintain')
     expect(handle.startedAt).toBeGreaterThan(0)
     expect(handle.signal.aborted).toBe(false)
@@ -35,7 +35,7 @@ describe('core run registry (S2)', () => {
     const dir = await home()
     const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
     await registry.load()
-    const handle = registry.begin('maintain')
+    const handle = await registry.begin('maintain')
     expect(registry.cancel(handle.id)).toBe(true)
     expect(handle.signal.aborted, 'cancel aborts the work').toBe(true)
     expect(registry.find(handle.id)).toMatchObject({ state: 'cancelled', failure: 'cancelled by operator' })
@@ -50,8 +50,8 @@ describe('core run registry (S2)', () => {
     const dir = await home()
     const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
     await registry.load()
-    const first = registry.begin('maintain')
-    const second = registry.begin('maintain')
+    const first = await registry.begin('maintain')
+    const second = await registry.begin('maintain')
     expect(registry.cancelAll()).toBe(2)
     expect([first.signal.aborted, second.signal.aborted]).toEqual([true, true])
     expect(registry.runs().every(record => record.state === 'cancelled')).toBe(true)
@@ -115,9 +115,9 @@ describe('core run registry (S2)', () => {
     const io = nodeEvolutionIo()
     const registry = newRunRegistry({ io, home: dir, maxRecords: 2 })
     await registry.load()
-    const live = registry.begin('maintain')
+    const live = await registry.begin('maintain')
     for (let i = 0; i < 4; i++) {
-      const handle = registry.begin('maintain')
+      const handle = await registry.begin('maintain')
       await registry.settle(handle.id, { state: 'succeeded' })
     }
     expect(registry.runs().length).toBe(3)
@@ -133,12 +133,12 @@ describe('core run registry (S2)', () => {
     const io = nodeEvolutionIo()
     const first = newRunRegistry({ io, home: dir })
     await first.load()
-    const mine = first.begin('maintain')
+    const mine = await first.begin('maintain')
     await first.settle(mine.id, { state: 'succeeded' })
     // A second host over the SAME home has its own record; its write must keep mine.
     const second = newRunRegistry({ io, home: dir })
     await second.load()
-    const theirs = second.begin('maintain')
+    const theirs = await second.begin('maintain')
     await second.settle(theirs.id, { state: 'failed', failure: 'elsewhere' })
     const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ id: string }> }
     const ids = persisted.runs.map(record => record.id)
@@ -193,12 +193,77 @@ describe('core run registry (S2)', () => {
     expect(loaded.ok).toBe(true)
     expect(loaded.note, 'a newer index schema is said out loud').toContain('schemaVersion 99')
     // This process's own write must not drop the row it cannot judge.
-    const handle = registry.begin('maintain')
+    const handle = await registry.begin('maintain')
     await registry.settle(handle.id, { state: 'succeeded' })
     const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ id: string }> }
     const ids = persisted.runs.map(record => record.id)
     expect(ids).toContain('from-the-future')
     expect(ids).toContain('normal')
     expect(ids).toContain(handle.id)
+  })
+
+  it('re-reads a foreign run whose owner settled it after we adopted it (review P1-2)', async () => {
+    const dir = await home()
+    const io = nodeEvolutionIo()
+    // The other plane is in flight (its pid is alive — this process stands in for it):
+    // adopting the row is what makes the guard and `status` cross-plane.
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'other-plane', kind: 'maintain', state: 'running', startedAt: 11, pid: process.pid }],
+    }), 'utf8')
+    const registry = newRunRegistry({ io, home: dir })
+    await registry.load()
+    expect(registry.inFlight()?.id).toBe('other-plane')
+    // Its OWNER then settles it in the shared index — a record this process never owned.
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'other-plane', kind: 'maintain', state: 'cancelled', startedAt: 11, pid: process.pid, endedAt: 12, failure: 'cancelled by operator' }],
+    }), 'utf8')
+    const reloaded = await registry.load()
+    expect(reloaded.note, 'the adoption is reported, not silent').toContain('settled by their owner')
+    expect(registry.find('other-plane')).toMatchObject({ state: 'cancelled', failure: 'cancelled by operator' })
+    // The guard and the cooldown read this same in-memory record: a run that already
+    // settled must not refuse the next scan here.
+    expect(registry.inFlight()).toBeUndefined()
+    expect(registry.lastSettledAt()).toBe(12)
+    // …and this process's own later write must not resurrect it as running.
+    const mine = await registry.begin('maintain')
+    await registry.settle(mine.id, { state: 'succeeded' })
+    const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ id: string; state: string }> }
+    expect(persisted.runs.find(record => record.id === 'other-plane')?.state).toBe('cancelled')
+  })
+
+  it('has the row in the shared index before begin() resolves (review P2)', async () => {
+    const dir = await home()
+    const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
+    await registry.load()
+    const handle = await registry.begin('maintain')
+    // No sleep and no polling: the promise resolving IS the proof that another plane
+    // reading this home right now finds the run (this write used to be fire-and-forget).
+    const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ id: string; state: string }> }
+    expect(persisted.runs.find(record => record.id === handle.id)).toMatchObject({ state: 'running' })
+  })
+
+  it('converges a foreign run we adopted once its owner dies (the same read-time rule as for new rows)', async () => {
+    const dir = await home()
+    const io = nodeEvolutionIo()
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'owner-died', kind: 'maintain', state: 'running', startedAt: 13, pid: process.pid }],
+    }), 'utf8')
+    const registry = newRunRegistry({ io, home: dir })
+    await registry.load()
+    expect(registry.inFlight()?.id).toBe('owner-died')
+    // The owner is gone now and the index still says running: without the same
+    // convergence the new-row path uses, this record would hold the guard forever.
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'owner-died', kind: 'maintain', state: 'running', startedAt: 13, pid: 999_999 }],
+    }), 'utf8')
+    const again = await registry.load()
+    expect(again.note).toContain('failed(orphan)')
+    expect(registry.find('owner-died')?.state).toBe('failed')
+    expect(registry.find('owner-died')?.failure).toContain('no live owner')
+    expect(registry.inFlight(), 'a dead owner cannot hold the guard').toBeUndefined()
   })
 })

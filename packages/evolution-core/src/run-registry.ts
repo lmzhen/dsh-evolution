@@ -76,10 +76,20 @@ export interface RunOutcome {
 
 /** The registry surface the commands row drives. */
 export interface RunRegistry {
-  /** Converge the persisted index once at mount; see the module doc. */
+  /**
+   * Converge the persisted index; the commands row calls it before answering any read
+   * (0.19.1: it also re-reads a terminal state written by the run's OWNER — see the
+   * implementation note below).
+   */
   load(): Promise<{ ok: boolean; note?: string }>
-  /** Register a new run, arm its cancellation, and return its handle. */
-  begin(kind: RunKind): RunHandle
+  /**
+   * Register a new run, arm its cancellation, and return its handle.
+   *
+   * Resolves only once the row is in the shared index (0.19.1, review P2): the detached
+   * lifetime starts when the caller answers "started", so a plane that reads that answer
+   * must find the run. The cost is one local index write on the ack path (milliseconds).
+   */
+  begin(kind: RunKind): Promise<RunHandle>
   /** Record a run's terminal state (first writer wins). */
   settle(id: string, outcome: RunOutcome): Promise<void>
   /** The live run, when there is one (one kind today — see the implementation note). */
@@ -240,11 +250,32 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       }
       let converged = 0
       let liveElsewhere = 0
+      let healed = 0
       for (const record of parsed.records) {
         // Idempotent merge: a record this process already knows (its own runs, or an
         // earlier load) is never re-added, so load() can be called again to pick up
         // what another process wrote.
-        if (records.some(item => item.id === record.id)) continue
+        const knownIndex = records.findIndex(item => item.id === record.id)
+        if (knownIndex >= 0) {
+          const known = records[knownIndex] as RunRecord
+          // …but a record this process does NOT own still follows the index (0.19.1,
+          // review P1-2): adopting a foreign run while it was in flight must not freeze
+          // it as `running` after its owner settled it, or `status` would lie for as long
+          // as this process lives and `inFlight()` would refuse every later scan here.
+          // A foreign run stops being live in exactly the two ways the new-row path
+          // below handles — its owner settled it, or its owner died. An OWNED run keeps
+          // memory as the truth: this process is what ends it.
+          if (!controllers.has(record.id) && !TERMINAL.has(known.state)) {
+            if (TERMINAL.has(record.state)) {
+              records[knownIndex] = record
+              healed++
+            } else if (record.pid === undefined || !isProcessAlive(record.pid)) {
+              records[knownIndex] = { ...record, state: 'failed', endedAt: now(), failure: 'no live owner process — the run was interrupted before it settled (orphan)' }
+              converged++
+            }
+          }
+          continue
+        }
         if (record.state !== 'running') {
           records.push(record)
           continue
@@ -261,23 +292,27 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         converged++
         records.push({ ...record, state: 'failed', endedAt: now(), failure: 'no live owner process — the run was interrupted before it settled (orphan)' })
       }
-      if (converged > 0) await persist()
+      if (converged > 0 || healed > 0) await persist()
       const notes = [
         parsed.note,
         converged > 0 ? `${converged} run(s) with no live owner were recorded as failed(orphan)` : undefined,
         liveElsewhere > 0 ? `${liveElsewhere} run(s) are in flight in another process sharing this home` : undefined,
+        healed > 0 ? `${healed} run(s) settled by their owner were re-read from the index` : undefined,
       ].filter((note): note is string => note !== undefined)
       return { ok: true, ...(notes.length > 0 ? { note: notes.join('; ') } : {}) }
     },
 
-    begin(kind) {
+    async begin(kind) {
       const id = randomUUID()
       const startedAt = now()
       const controller = new AbortController()
       controllers.set(id, controller)
       // The pid is what lets ANOTHER process tell this live run from an orphan.
       records.push({ id, kind, state: 'running', startedAt, pid: process.pid })
-      void persist()
+      // Write-through (0.19.1, review P2): answering "started" promises a run another
+      // plane can read, so the row reaches the index before this resolves. `persist()`
+      // warns instead of throwing, so an unwritable home cannot withhold the handle.
+      await persist()
       return { id, kind, signal: controller.signal, startedAt }
     },
 

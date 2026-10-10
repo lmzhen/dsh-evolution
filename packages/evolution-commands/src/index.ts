@@ -769,7 +769,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // the event-count fixture, where the two events carried different runIds).
           const runHome = evolutionHome()
           const runRoot = evolutionRoot()
-          const handle = registry.begin('maintain')
+          const handle = await registry.begin('maintain')
           // Detached on purpose. The command answers with a POINTER while the scan
           // keeps working: its lifetime is the handle's, and what stops it is
           // `cancel <id>` or this plugin's dispose — NOT the requesting invocation.

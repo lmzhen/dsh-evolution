@@ -1,6 +1,15 @@
 # Changelog
 
 
+## 0.19.1 (patch) — 跨面 run 状态修正：观察面不再永久谎报 running；起 run 先落盘再答「started」
+
+> **由来**：0.19.0 的复核 P1 修复（活的别面 run 读作**在飞**）在真机上带出一条**新的 P1**；本版修它，并把复核报的 P2（起 run 的行与那句「started」之间的窗口）一并收掉——一次补丁不连发。
+> **P1（review P1-2，永久谎报 ＋ 卡死）**：`RunRegistry.load()` 的幂等合并对**已知 id 直接跳过**、从不按磁盘刷新 ⇒「先挂载、后看到别面在飞 run」的进程，在别面结算后**永远**把那条记成 `running`：`status <id>` 一直答 `running`（时长一直涨）、列表一直挂在 `In flight:`，且**裸 `maintain` 被自己的在飞守卫拒绝**（`Maintenance run <id> is already running (started ~Ns ago)`）⇒ 该面**重启前无法再起维护扫描**；`persist()` 的「内存胜磁盘」合并还有把已结算记录**复活成 running** 的风险。真机复现（安装字节 ＋ 真实 `~/.dsh/evolution`，独立脚本三次一致）：在飞时 `running 1s` → owner 结算 `cancelled` → 观察面 `status` 仍 `running 25s`、裸 `maintain` 被拒。
+> **修法**：`load()` 里对**本进程不拥有**的已知记录，走与新增记录**相同**的两条收敛规则——索引里是终态 ⇒ **采纳**磁盘（`state`／`endedAt`／`resultRef`／`failure`，notes 报出 `N run(s) settled by their owner were re-read from the index`）；主人已死（无 pid 或 pid 不活）⇒ 收敛为 `failed(orphan)`。**本进程拥有的 run 仍以内存为准**（终态一次性不变）。**不引入定时器**：一致性发生在**读时**。
+> **P2（review P2，窗口）**：`begin()` 原是 `void persist()`（fire-and-forget）⇒ 另一面在 ack 后 ~44–142 ms 内读共享索引会得到假否定 `No run <id> in this home`。`begin()` 改为 **async 且在 resolve 前 `await persist()`**：ack 从 ~5 ms 变 ~10–30 ms（仍秒回）；`persist()` 内部吞异常 ⇒ 家不可写也不会扣住句柄。
+> **验收**：`evolution-core/tests/run-registry.spec.ts` **13 例**（+3：已知别面 run 在 owner 结算后被重读、且本进程后续写入不复活它；`begin()` resolve 时行已在索引里；已知 run 的主死后随读收敛）；`begin` 变 async 的调用点（commands 1 处 ＋ 夹具）同步更新；本机受影响三文件 **141 例全绿**（registry 13 ＋ commands 53 ＋ curator 75）；家族套件 **A/B**：修后失败集 **⊆** 基线失败集（基线 26 文件红／修后 25，差集只有基线独有一次 curator 并行负载抖动），**零新增红**。
+> **依据**：`packages/docs/known-limitations.md` 第 13 条（跨面最终一致）与 `evolution-commands/README.md` 的 Known limitations（发布面）。
+
 ## 0.19.0 (minor) — 长跑生命周期归位：run registry、唯一结果家、maintain 异步化（长跑生命周期方案 · 批次 B）
 
 > **由来**：0.18.1 证明「墙在交互面」；本版把长跑的寿命从请求挪到插件，并给它一个终态与一个结果家。**唯一的行为契约变更**：`/evolution maintain` 由同步改异步。
