@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-skill-history",
   "description": "Web surface for skill content history: loopback host routes plus the sidebar panel",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "publishConfig": {
     "access": "public"
   },
