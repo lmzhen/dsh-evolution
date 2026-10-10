@@ -668,37 +668,47 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // S2-O1: the refusal tail is phase-aware — staging advice speaks to the
   // writer (fix the view / drop the flag), replay advice speaks to the
   // approver (reject the record; the family copy must not take the write).
-  const crossSourceRefusal = async (rawName: unknown, phase: 'stage' | 'replay' = 'stage'): Promise<string | null> => {
+  const crossSourceRefusal = async (rawName: unknown, phase: 'stage' | 'replay' = 'stage'): Promise<{ refusal: string | null; view: readonly SkillSummary[] | null }> => {
     const replay = phase === 'replay'
-    if (typeof rawName !== 'string' || rawName === '') return null
+    if (typeof rawName !== 'string' || rawName === '') return { refusal: null, view: null }
     const probe = await catalogWinner(rawName)
     if (isUnknown(probe)) {
       // v39: the check could not run — say so instead of pretending it passed.
       if (settings().strictCrossSource) {
-        return replay
-          ? `Refused: the cross-source check could not be performed — ${probe.reason}. Reject this staged write, fix the catalog view, and re-stage "${rawName}".`
-          : `Refused: the cross-source check could not be performed — ${probe.reason}. Fix the catalog view (or drop strictCrossSource) before writing "${rawName}".`
+        return {
+          refusal: replay
+            ? `Refused: the cross-source check could not be performed — ${probe.reason}. Reject this staged write, fix the catalog view, and re-stage "${rawName}".`
+            : `Refused: the cross-source check could not be performed — ${probe.reason}. Fix the catalog view (or drop strictCrossSource) before writing "${rawName}".`,
+          // An unreadable view is NOT an empty one: no observation to reuse either.
+          view: null,
+        }
       }
       if (!crossSourceViewWarned) {
         crossSourceViewWarned = true
         ctx.logger.warn(`skill_manage: cross-source check skipped for this session — ${probe.reason}`)
       }
-      return null
+      return { refusal: null, view: null }
     }
-    if (isPresent(probe) && probe.value !== undefined && probe.value.provider !== 'dsh-evolution') {
-      const winner = probe.value
+    // The gate only ever answers `present` or `unknown`; an `absent` probe carries no observation,
+    // so it takes the same branch as an unreadable view.
+    if (!isPresent(probe)) return { refusal: null, view: null }
+    const { view, winner } = probe.value
+    if (winner !== undefined && winner.provider !== 'dsh-evolution') {
       const message = `skill "${rawName}" resolves to a higher-priority "${winner.source}" skill (provider "${winner.provider}"); this write lands on the family copy, which the catalog does NOT serve — edit the "${winner.source}" copy or rename.`
-      if (settings().strictCrossSource) return `Refused: ${message}`
+      if (settings().strictCrossSource) return { refusal: `Refused: ${message}`, view }
       ctx.logger.warn(`skill_manage: ${message}`)
     }
-    return null
+    // T2-05/A20: the same listing that answered the cross-source question is handed back to the caller,
+    // so an operation that needs "what exists right now" (the create-time duplicate hint) does not pay a
+    // second whole-tree pass.
+    return { refusal: null, view }
   }
   // `Probe` (v41 phase-1 follow-up) replaces the { winner, unverifiable } PAIR:
   // that shape allowed the illegal combination (a winner AND an unverifiable
   // reason), so "the check could not run" and "there is no winner" were only
   // told apart by convention. The union makes the third state representable
   // and the illegal one unrepresentable.
-  const catalogWinner = async (name: string): Promise<Probe<SkillSummary | undefined>> => {
+  const catalogWinner = async (name: string): Promise<Probe<{ winner: SkillSummary | undefined; view: readonly SkillSummary[] }>> => {
     const catalog = ctx.get('skills')
     if (catalog === undefined) return probeUnknown('the skills service is not mounted')
     // V41 scope alignment: the family's own catalog provider is a PRESET row, so
@@ -710,13 +720,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     try {
       const summaries = await catalog.list(scope === undefined ? undefined : { scope })
       if (summaries.length === 0) return probeUnknown(`the catalog view is empty in the ${scope === undefined ? 'global' : 'calling'} scope`)
-      return probePresent(summaries.find(summary => summary.name === name))
+      return probePresent({ winner: summaries.find(summary => summary.name === name), view: summaries })
     } catch (error) {
       return probeUnknown(`the catalog lookup failed (${error instanceof Error ? error.message : String(error)})`)
     }
   }
 
-  async function executeCore(args: SkillWriteArgs, origin: WriteOrigin = 'foreground'): Promise<{ ok: boolean; message: string; skills: string[] }> {
+  async function executeCore(
+    args: SkillWriteArgs,
+    origin: WriteOrigin = 'foreground',
+    /** T2-05/A20: the whole-tree observation the cross-source gate already made for THIS operation
+     * (undefined when the gate did not run or its view was empty/unreadable). */
+    crossSourceView?: readonly SkillSummary[],
+  ): Promise<{ ok: boolean; message: string; skills: string[] }> {
     // T2-09/A24: re-materialize the write caps HERE, not only at the tool entry. The approve path
     // (registerRunner) calls this function directly, so a deployment that TIGHTENED skillContentChars /
     // maxSkillFileBytes while the record sat pending used to replay the write under the old, wider caps —
@@ -798,7 +814,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // family's feedback surface, and a structured field would have no
       // consumer). Computed BEFORE the create, because afterwards the candidate
       // is in the listing it was compared against.
-      feedbackLines.push(...await duplicateHintLines(name, candidateDescription))
+      feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
       result = await library.create(name, args.content ?? '', origin)
     }
     else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '', origin, stagedAnchor)
@@ -892,10 +908,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * core's `summary` projection (name + description). Three properties are the
    * design's, not stylistic choices:
    *
-   *   - It adds NO read of its own. `library.list()` reads each SKILL.md to parse its
-   *     frontmatter — that listing is what publishes `description` — and the hint never
-   *     calls `library.read`, never holds a body and never compares content, so a create
-   *     pays no SECOND whole-tree pass for it.
+   *   - It adds NO whole-tree pass of its own. `existing` is the listing the cross-source gate ALREADY
+   *     read for this operation (T2-05/A20); only when there is none (the gate did not run, or its view
+   *     was empty/unreadable) does the hint list the tree itself. The earlier wording claimed the listing
+   *     "reads each SKILL.md anyway", which held only when nothing else in the operation had read the
+   *     tree — on the create path the gate reads it first, so the hint WAS the second pass.
    *   - It is a HINT: the write proceeds either way (G4 — create's foreground
    *     behavior is unchanged). The model gets the news, not a refusal.
    *   - A failed listing degrades to a NAMED line, never to silence: "nothing
@@ -904,10 +921,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    *
    * The level and the math live in core (`nearDuplicateSummaries`,
    * `SUMMARY_DUPLICATE_HINT_THRESHOLD`) — this function owns the wording only. */
-  async function duplicateHintLines(name: string, description: string): Promise<string[]> {
+  async function duplicateHintLines(name: string, description: string, existing?: readonly SkillSummary[]): Promise<string[]> {
     let matches: ReturnType<typeof nearDuplicateSummaries>
     try {
-      matches = nearDuplicateSummaries({ candidate: { name, description }, existing: await library.list() })
+      matches = nearDuplicateSummaries({ candidate: { name, description }, existing: existing ?? await library.list() })
     } catch (error) {
       return [`Duplicate check skipped: the skill listing failed (${error instanceof Error ? error.message : String(error)}).`]
     }
@@ -1086,10 +1103,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // is soft-probed: a host without ctx.skills, a missing name (family
       // skill not yet published) or a discovery failure writes family-local
       // exactly as before.
+      // T2-05/A20: per-CALL (never closure state — a view from an earlier call must not be reused).
+      let crossSourceView: readonly SkillSummary[] | null = null
       if (typeof args.name === 'string' && args.name !== '' && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
         // S1-B2: the shared gate (same body the replay runner runs).
-        const refusal = await crossSourceRefusal(args.name)
-        if (refusal !== null) return { ok: false, message: refusal, skills: [] }
+        const gate = await crossSourceRefusal(args.name)
+        if (gate.refusal !== null) return { ok: false, message: gate.refusal, skills: [] }
+        crossSourceView = gate.view
       }
       // The write-admission sequence, ADMISSION point (design §3). It runs BEFORE the approval
       // seam, so a write that is refused is never staged: on an approval-enabled deployment a
@@ -1205,7 +1225,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
         }
       }
-      return await executeCore(operation, libraryOrigin)
+      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined)
     },
   }))
 
@@ -1220,9 +1240,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // sat pending. Same action exemptions as the tool path.
       const replayAction = operation.action
       if (replayAction !== 'list' && replayAction !== 'review' && replayAction !== 'pin' && replayAction !== 'unpin') {
-        return crossSourceRefusal(operation.name, 'replay').then((refusal) => {
-          if (refusal !== null) return { ok: false, message: `${refusal} (re-checked at approve time: the catalog ranking changed while the write was staged)`, skills: [] }
-          return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review')
+        return crossSourceRefusal(operation.name, 'replay').then((gate) => {
+          if (gate.refusal !== null) return { ok: false, message: `${gate.refusal} (re-checked at approve time: the catalog ranking changed while the write was staged)`, skills: [] }
+          // The replay reuses the gate's own observation too (A20): the re-checked write pays one pass.
+          return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review', gate.view ?? undefined)
         })
       }
       return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review')
