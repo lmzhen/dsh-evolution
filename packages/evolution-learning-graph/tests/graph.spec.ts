@@ -85,6 +85,39 @@ describe('learning graph', () => {
     expect(warnings.some(message => message.includes('could not be read'))).toBe(true)
   })
 
+  it('T2-V2/A27: `/graph` and `graph delete` see the SAME set — the tree decides membership', async () => {
+    const root = await tempHome('dsh-graph-a27-')
+    const skillsRoot = join(root, 'skills')
+    // A skill directory created BY HAND (no family API call): the usage sidecar has never heard of it.
+    const handMade = '---\nname: hand-made\ndescription: written by hand\n---\n\nBody.\n'
+    await mkdir(join(skillsRoot, 'hand-made'), { recursive: true })
+    await writeFile(join(skillsRoot, 'hand-made', 'SKILL.md'), handMade, 'utf8')
+    const ctx = new Context()
+    let handler: GraphHandler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    // ...and the reverse: a sidecar record whose skill is NOT in the tree.
+    ctx.provide('skillUsage', {
+      report: async () => new Map([['ghost-skill', {}]]),
+      markArchived: async () => {},
+    })
+    ctx.provide('memory', { read: async () => [], applyBatch: async () => ({ ok: true, message: 'ok' }) })
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await ctx.plugin(Graph, { root: skillsRoot })
+    const rendered = await handler!.handler(invocationOf(''))
+    expect(rendered.kind).toBe('success')
+    // ① the tree is the member set: the hand-made skill IS a node...
+    expect(rendered.text).toContain('hand-made')
+    // ② ...and a sidecar-only name is NOT (what the graph shows is what it can act on).
+    expect(rendered.text).not.toContain('ghost-skill')
+    // ③ the name the graph showed is the name `graph delete` archives.
+    const archived = await handler!.handler(invocationOf('delete hand-made'))
+    expect(archived.kind).toBe('success')
+    expect(archived.text).toContain('archived')
+    // ④ ...and a name it never showed cannot be deleted.
+    const ghost = await handler!.handler(invocationOf('delete ghost-skill'))
+    expect(ghost.kind).toBe('error')
+    expect(ghost.text).toContain('not found')
+  })
   it('memory nodes embed a snapshot token so edit/delete detect index drift (F15 parity + E-21)', () => {
     const usage = new Map([['python-testing', {}]])
     const graph = buildLearningGraph(usage, ['memory fact A'], ['user fact B'])
@@ -259,9 +292,15 @@ describe('learning graph', () => {
   })
 
   it('F-10: the /graph directory caps its node block on a large usage set', async () => {
-    await tempHome('evo-graph-cap-')
+    const root = await tempHome('evo-graph-cap-')
+    const skillsRoot = join(root, 'skills')
     const ctx = new Context()
     const names = Array.from({ length: 250 }, (_, i) => `cap-skill-${String(i).padStart(3, '0')}`)
+    // T2-V2/A27: the node set comes from the TREE, so a large-set fixture has to put the skills on disk.
+    for (const name of names) {
+      await mkdir(join(skillsRoot, name), { recursive: true })
+      await writeFile(join(skillsRoot, name, 'SKILL.md'), `---\nname: ${name}\ndescription: ${name}\n---\n\nBody.\n`, 'utf8')
+    }
     let handler: GraphHandler | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
     ctx.provide('skillUsage', {
@@ -272,7 +311,7 @@ describe('learning graph', () => {
       applyBatch: async () => ({ ok: true, message: 'ok' }),
     })
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    await ctx.plugin(Graph)
+    await ctx.plugin(Graph, { root: skillsRoot })
     const result = await handler!.handler(invocationOf(''))
     expect(result.kind).toBe('success')
     expect(result.text).toContain('● cap-skill-000')

@@ -922,6 +922,15 @@ export class SkillLibrary {
    * cost again, so a caller pays no second pass over the tree.
    * @returns one summary per readable skill directory.
    */
+  /** T2-V2/A27: the skill names the TREE holds — the same listing rule {@link list} applies (dot
+   * entries skipped, a SKILL.md must exist), WITHOUT reading any SKILL.md. A consumer that needs the
+   * member set rather than the summaries (the learning graph's node set) pays one directory listing
+   * instead of a whole-tree read pass.
+   * @returns the sorted skill directory names. */
+  async treeNames(): Promise<string[]> {
+    return await listNames(this.root, this.io)
+  }
+
   async list(options: { withContent?: boolean; withFrontmatter?: boolean } = {}): Promise<SkillSummary[]> {
     const summaries: SkillSummary[] = []
     for (const name of await listNames(this.root, this.io)) {

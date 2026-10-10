@@ -410,15 +410,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
         async function renderGraph(): Promise<string> {
           const usageReport = await usage.report()
-          // v29 GRAPH-02: archived skills must not render as live nodes.
-          // `graph delete` archives the skill and marks the record
-          // (`state:'archived'`), but usage records are never pruned — the
-          // graph used to keep listing the dead node identically to live
-          // skills while `graph detail` reported "Skill not found". The
-          // memory-node side has had the E-21 staleness guard; the skill side
-          // now filters on the same signal the curator lifecycle writes.
+          // T2-V2/A27: membership comes from the TREE — the same set `graph delete` resolves against —
+          // never from the usage sidecar. Deciding it from the sidecar made a skill directory created
+          // outside the family INVISIBLE to `/graph` while `graph delete` could still archive it, and
+          // rendered a record left behind by a skill deleted outside the family as a node nothing could
+          // act on. The sidecar now only supplies metadata for the nodes it knows.
+          //
+          // The name-only listing is deliberate: the bodies are read once below (for related_skills),
+          // so membership must not cost a second whole-tree pass.
+          //
+          // v29 GRAPH-02 is answered by the same predicate: an archived skill has left the tree (.archive
+          // is dot-prefixed and skipped), so no `state==='archived'` filter is needed — and keeping one
+          // would put the sidecar back in charge of membership.
           const usageMap = new Map(
-            [...usageReport].filter(([, record]) => (record as { state?: string }).state !== 'archived'),
+            (await withSkills().treeNames()).map(name => [name, usageReport.get(name)]),
           )
           const memoryEntries = await memory.read('memory')
           const userEntries = await memory.read('user')
