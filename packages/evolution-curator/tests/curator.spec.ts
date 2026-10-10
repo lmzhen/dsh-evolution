@@ -1433,6 +1433,80 @@ Body of ${name}.
     expect(result.archive).toContain('dirty-skill')
   })
 
+  it('0.18.1 (S3): a TIMED-OUT LLM pass is not an empty nomination set — the report says which', { timeout: 30_000 }, async () => {
+    await tempHome('dsh-curator-llm-timeout-')
+    const ctx = new Context()
+    // The provider hangs and — like the platform's own stream, which is why the
+    // family passes it a signal at all — rejects when that signal aborts.
+    ctx.provide('llm', {
+      stream: async function* (options: { signal?: AbortSignal }) {
+        await new Promise((_resolve, reject) => {
+          options.signal?.addEventListener('abort', () => { reject(new Error('This operation was aborted')) })
+        })
+      },
+    })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    // Plain values through the mount: the schema normalizes the volatile fields
+    // into the live references the loader would hand out (a `vol()` reference
+    // reaching the schema is rejected — see the sibling curator-settings spec for
+    // that idiom, which constructs the instance directly instead).
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true, curatorReviewTimeoutMs: 25 })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('stale-src', basicBody('stale-src'), 'foreground')
+    // Idle past the STALE window (default 30 days) but below the ARCHIVE window
+    // (90): the deterministic scanner marks it stale, which is also what puts it
+    // in the LLM candidate pool — a skill the scanner archives outright is no
+    // longer a candidate (curator index.ts:1144) and `recommend` would return
+    // before ever calling the provider (index.ts:687).
+    const longAgo = new Date(Date.now() - 45 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([
+      ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: longAgo, use_count: 1, last_used_at: longAgo }],
+    ]), nodeEvolutionIo())
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    // The advisory leg failed LOUDLY: the run report carries the failure, names
+    // the timeout (read off the signal, never off the error's text) and says the
+    // pass did not complete. A bare empty nomination set used to be the whole
+    // durable record — identical to "looked and found nothing".
+    const warnings = (result.report.nominationsWarnings ?? []).join('\n')
+    expect(warnings).toContain('timed out after 25 ms')
+    expect(warnings).toContain('NOT "nothing to nominate"')
+    // ...and the deterministic scanner still owned the decision: the skill was
+    // marked stale on its own verdict, not on a nomination.
+    expect(result.stale).toContain('stale-src')
+    expect(result.archived).not.toContain('stale-src')
+  })
+
+  it('0.18.1 (S3): a THROWING provider names itself in the report instead of reading as "nothing to nominate"', { timeout: 30_000 }, async () => {
+    await tempHome('dsh-curator-llm-error-')
+    const ctx = new Context()
+    ctx.provide('llm', {
+      stream: async function* () { throw new Error('provider exploded') },
+    })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    ctx.provide('evolutionState', {
+      loadCuratorState: async () => ({ lastRunAt: Date.now() - 30 * 86_400_000, runCount: 1, lastSummary: 'seed', paused: false }),
+      saveCuratorState: async () => {},
+      transactCuratorState: async () => {},
+    })
+    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('stale-src', basicBody('stale-src'), 'foreground')
+    const longAgo = new Date(Date.now() - 45 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([
+      ['stale-src', { ...emptyRecord(), created_by: 'agent', created_at: longAgo, use_count: 1, last_used_at: longAgo }],
+    ]), nodeEvolutionIo())
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    expect((result.report.nominationsWarnings ?? []).join('\n')).toContain('LLM nomination pass failed: provider exploded')
+    expect(result.stale).toContain('stale-src')
+  })
+
   it('runs the reference-mode demote chain: nomination → reference file + pointer → archive (009-II)', { timeout: 20_000 }, async () => {
     await tempHome('dsh-curator-demote-chain-')
     const yaml = '## Structured summary (required)\n```yaml\n'
@@ -1845,7 +1919,7 @@ Body of ${name}.
     warnSpy.mockRestore()
   })
 
-  it('F-364: a throwing LLM stream is contained by recommend (E-52 warn, empty nomination set)', async () => {
+  it('F-364 / S3 (0.18.1): a throwing LLM stream is contained by recommend AND names itself in the warnings', async () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
@@ -1856,8 +1930,15 @@ Body of ${name}.
     await ctx.plugin(EvolutionCurator, { enabled: true, llmReview: true, intervalHours: 24 })
     const spy = vi.spyOn(ctx.logger, 'warn')
     const nominations = await (ctx.evolutionCurator as unknown as { recommend(names: string[]): Promise<{ prunings: string[]; consolidations: unknown[]; warnings: string[] }> }).recommend(['sql-backup', 'SQL-restore'])
-    // E-52: the swallow must be observable — warn + empty nomination set, no throw.
-    expect(nominations).toEqual({ prunings: [], consolidations: [], warnings: [] })
+    // E-52: the swallow must be observable — warn, and no nominations, no throw.
+    // 0.18.1 (S3): the warning is the DURABLE record, not just a log line. A bare
+    // `warnings: []` made "the pass threw" and "the pass looked and found nothing"
+    // the same fact, because the run report only carries `nominationsWarnings` when
+    // it is non-empty (evolution-core/src/curator.ts:138,170).
+    expect(nominations.prunings).toEqual([])
+    expect(nominations.consolidations).toEqual([])
+    expect(nominations.warnings.join('\n')).toContain('LLM nomination pass failed: llm provider down')
+    expect(nominations.warnings.join('\n')).toContain('NOT "nothing to nominate"')
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('LLM nomination pass failed'))
     spy.mockRestore()
   })

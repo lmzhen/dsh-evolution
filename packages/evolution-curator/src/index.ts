@@ -724,6 +724,17 @@ export class EvolutionCurator extends Service {
       'Return a YAML summary with consolidations and prunings lists. Nominate only actions whose archival/merge is clearly safe.',
     ].join('\n')
     const settings = this.settings()
+    // B-10 (v18): a hung provider must not hold the control-plane mutex
+    // forever; the abort lands in the catch below, and the
+    // run/restore/consolidate chain continues.
+    // 0.18.1 (S3): hoisted OUT of the `try` so the catch can read the abort
+    // evidence off the signal object itself — the family discipline for a
+    // timeout (orchestrate.ts:345-352) instead of matching error text — and so
+    // "the pass timed out" is told apart from "the provider threw". Hoisting
+    // cannot introduce a synchronous throw here: `curatorReviewTimeoutMs` is
+    // clamped to [1, MAX_TIMER_DELAY_MS] at the schema (:260) AND the live
+    // accessor (:476/:524).
+    const llmSignal = AbortSignal.timeout(settings.curatorReviewTimeoutMs)
     try {
       const assembler = new BlockAssembler()
       for await (const chunk of llm.stream({
@@ -731,10 +742,7 @@ export class EvolutionCurator extends Service {
         model,
         messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'evolution-curator', form: 'notice', summary: 'curator review' } })],
         maxTokens: settings.curatorReviewMaxTokens,
-        // B-10 (v18): a hung provider must not hold the control-plane mutex
-        // forever; the abort lands in the existing catch (advisory empty
-        // nominations), and the run/restore/consolidate chain continues.
-        signal: AbortSignal.timeout(settings.curatorReviewTimeoutMs),
+        signal: llmSignal,
       })) assembler.push(chunk)
       const text = assembler.blocks().filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text').map(block => block.text).join('\n')
       const parsed = parseCuratorNominations(text)
@@ -752,8 +760,19 @@ export class EvolutionCurator extends Service {
       // LLM curation is advisory. The deterministic scanner still owns the
       // decision — but the swallow must be observable (E-52): a silent catch
       // once hid a whole-channel failure behind an empty nomination set.
-      this.ctx.logger.warn(`evolution-curator: LLM nomination pass failed: ${error instanceof Error ? error.message : String(error)}`)
-      return empty
+      // 0.18.1 (S3): "the pass did not complete" is now a DISTINGUISHABLE state
+      // rather than an empty nomination set. A bare `return empty` wrote no
+      // `nominationsWarnings` — the run report only carries that field when it
+      // is non-empty (curator.ts:138/170) — so a timed-out pass and a pass that
+      // looked and nominated nothing were the SAME durable record. The failure
+      // now rides the channel the report already renders; the deterministic
+      // scan and the run/restore/consolidate chain are untouched. The signal is
+      // the authority for "timed out" (never the error's text).
+      const failure = llmSignal.aborted
+        ? `LLM nomination pass timed out after ${settings.curatorReviewTimeoutMs} ms — no nominations this run (NOT "nothing to nominate": the pass did not complete)`
+        : `LLM nomination pass failed: ${error instanceof Error ? error.message : String(error)} — no nominations this run (NOT "nothing to nominate": the pass did not complete)`
+      this.ctx.logger.warn(`evolution-curator: ${failure}`)
+      return { ...empty, warnings: [failure] }
     }
   }
 

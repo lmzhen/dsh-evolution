@@ -113,6 +113,38 @@ describe('evolution-replay', () => {
     expect(requalified.report).toContain('NOT the recorded history')
   })
 
+  it('0.18.1 (S3): a READ that THREW is a state of its own — never presented as an answered read', () => {
+    const driver = new EvolutionReplayDriver()
+    const item = { sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: 1 }
+    driver.backfill([item])
+    // The io itself failed: no verdict was reached, so neither "corrupt" nor
+    // "clean" may be claimed. Before this the throw skipped both markers and
+    // compare() handed back an unqualified leaderboard.
+    driver.markSourceReadFailed('EACCES: permission denied')
+    const failed = driver.compare()
+    expect(failed.sourceReadFailure).toBe('EACCES: permission denied')
+    expect(failed.sourceCorrupt, 'a failed read is NOT evidence that the bytes are corrupt').toBe(false)
+    expect(failed.report).toContain('read FAILED (EACCES: permission denied)')
+    expect(failed.report).not.toContain('NOT the recorded history')
+    // An ANSWERED read retires the failure — the qualification follows the
+    // CURRENT read, exactly as sourceCorrupt already does.
+    driver.markSourceReadable()
+    const answered = driver.compare()
+    expect(answered.sourceReadFailure).toBeUndefined()
+    expect(answered.report).not.toContain('read FAILED')
+  })
+
+  it('0.18.1 (S3): an ANSWERED corrupt read retires a previous read FAILURE (one verdict per read)', () => {
+    const driver = new EvolutionReplayDriver()
+    driver.markSourceReadFailed('boom')
+    driver.markSourceUnreadable()
+    const result = driver.compare()
+    expect(result.sourceReadFailure).toBeUndefined()
+    expect(result.sourceCorrupt).toBe(true)
+    expect(result.report).toContain('NOT the recorded history')
+    expect(result.report).not.toContain('read FAILED')
+  })
+
   it('clamps an invalid maxPlans to the default so the leaderboard still bounds (G3.1)', () => {
     const recordMany = (driver: EvolutionReplayDriver, count: number): void => {
       for (let i = 0; i < count; i += 1) {

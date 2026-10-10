@@ -56,6 +56,12 @@ export interface ReplayResult {
    * was repaired and an io reload re-read it) clears the qualification —
    * it never outlives the condition it describes. */
   sourceCorrupt?: boolean | undefined
+  /** 0.18.1 (S3): the most recent backfill READ threw (io error, or a state the
+   * reader could not produce at all) — no verdict was reached, which is a
+   * different fact from `sourceCorrupt` (the bytes WERE read and are not an
+   * activity envelope). Carries the failure's message; a later ANSWERED read
+   * clears it (see {@link EvolutionReplayDriver.markSourceReadFailed}). */
+  sourceReadFailure?: string | undefined
 }
 
 export interface ReplayWeights {
@@ -150,6 +156,12 @@ export class EvolutionReplayDriver {
    * clears it on a later clean read, so the qualification reflects the present
    * instead of latching for the driver lifetime. */
   private sourceCorrupt = false
+  /** 0.18.1 (S3): the backfill READ itself failed — held as its message. A
+   * thrown read used to skip both markers, so `sourceCorrupt` kept whatever
+   * the previous read said and a failed read presented as a clean one. Cleared
+   * by any ANSWERED read; never sets `sourceCorrupt` (a failed read is not
+   * evidence that the bytes are corrupt). */
+  private sourceReadFailure: string | null = null
   /** V26-05 (v25): plan ids recorded live BEFORE the backfill settled. A
    * plan-applied landing inside the one-shot `loadActivityState` read window is
    * recorded live AND persisted into the sidecar the backfill is reading —
@@ -328,6 +340,9 @@ export class EvolutionReplayDriver {
    */
   markSourceUnreadable(): void {
     this.sourceCorrupt = true
+    // 0.18.1 (S3): an ANSWERED read — even a corrupt verdict — retires a
+    // previous read FAILURE; only the current read's state may qualify.
+    this.sourceReadFailure = null
   }
 
   /**
@@ -344,6 +359,18 @@ export class EvolutionReplayDriver {
    */
   markSourceReadable(): void {
     this.sourceCorrupt = false
+    this.sourceReadFailure = null
+  }
+
+  /**
+   * 0.18.1 (S3): the backfill read THREW (io error, or a state the reader could
+   * not produce at all). Neither verdict applies — the bytes were never judged.
+   * Before this the throw skipped both markers and `compare()` returned an
+   * unqualified leaderboard, presenting a failed read as an answered one.
+   * @param reason - the failure's message, as thrown.
+   */
+  markSourceReadFailed(reason: string): void {
+    this.sourceReadFailure = reason
   }
 
   compare(weights: ReplayWeights = this.weights): ReplayResult {
@@ -355,13 +382,22 @@ export class EvolutionReplayDriver {
     // but a caller-supplied weights object must be clamped here too (NaN/negative
     // weights would produce NaN scores/margins).
     const result = comparePlans([...this.plans], clampReplayWeights(weights, this.weights))
-    if (!this.sourceCorrupt) return { ...result, sourceCorrupt: false }
+    // 0.18.1 (S3): a read FAILURE carries its own qualification. The two are
+    // composed rather than folded together because they are different facts
+    // (never judged vs judged corrupt).
+    const failure = this.sourceReadFailure === null
+      ? ''
+      : `The activity sidecar read FAILED (${this.sourceReadFailure}) — this leaderboard carries no history from the sidecar, and a failed read is NOT "nothing was recorded".\n`
+    if (!this.sourceCorrupt && this.sourceReadFailure === null) return { ...result, sourceCorrupt: false }
     return {
       ...result,
-      sourceCorrupt: true,
-      // T4-08/A50: the parenthetical used to say "corrupt bytes or a newer writer" — a newer writer's
-      // envelope is READ (its records are the history), so only unreadable bytes reach this sentence.
-      report: 'The activity sidecar could not be read as an activity envelope (unparsable bytes, or no items array) — this leaderboard is NOT the recorded history, and an empty list does not mean nothing happened.\n' + result.report,
+      sourceCorrupt: this.sourceCorrupt,
+      ...this.sourceReadFailure === null ? {} : { sourceReadFailure: this.sourceReadFailure },
+      report: failure + (this.sourceCorrupt
+        // T4-08/A50: the parenthetical used to say "corrupt bytes or a newer writer" — a newer writer's
+        // envelope is READ (its records are the history), so only unreadable bytes reach this sentence.
+        ? 'The activity sidecar could not be read as an activity envelope (unparsable bytes, or no items array) — this leaderboard is NOT the recorded history, and an empty list does not mean nothing happened.\n'
+        : '') + result.report,
     }
   }
 }
@@ -409,7 +445,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // clear a stale flag so the compare() qualification follows the current
           // read (a repaired sidecar reaching us through an io reload must stop
           // qualifying the report as "NOT the recorded history"). A read that
-          // THREW skips both branches: no verdict, no state change.
+          // THREW no longer skips both branches silently: the chain's own
+          // `.catch` below marks the failure (0.18.1 / S3), so `compare()`
+          // qualifies the result instead of presenting it as an answered read.
           driver.markSourceReadable()
         }
         // V25-01 (v25): backfill() is once-per-driver — this callback re-runs
@@ -418,7 +456,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         driver.backfill(loaded.records)
       })
       .catch((error: unknown) => {
-        ioCtx.logger.warn(`evolution-replay: activity sidecar backfill skipped (${error instanceof Error ? error.message : String(error)})`)
+        // 0.18.1 (S3): a THROWN read is a state, not a silence — the leaderboard
+        // must stop presenting as an answered read.
+        const reason = error instanceof Error ? error.message : String(error)
+        driver.markSourceReadFailed(reason)
+        ioCtx.logger.warn(`evolution-replay: activity sidecar backfill skipped (${reason}) — this leaderboard carries no history from the sidecar, and a failed read is not "nothing was recorded"`)
       })
   })
 }
