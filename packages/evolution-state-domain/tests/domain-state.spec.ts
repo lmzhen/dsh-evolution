@@ -49,12 +49,13 @@ function withRefusingPendingDelete(backend: JsonStorageBackend): JsonStorageBack
       ...backend.kv,
       open: async (descriptor: Parameters<JsonStorageBackend['kv']['open']>[0]) => {
         const unit = await backend.kv.open(descriptor)
-        return Object.assign(Object.create(Object.getPrototypeOf(unit) as object), unit, {
+        const patched = Object.assign(Object.create(Object.getPrototypeOf(unit) as object), unit, {
           deleteRecord: async (table: string, key: string): Promise<void> => {
             if (table === PENDING_TABLE) throw new Error('pending delete refused (S3.1 fixture)')
-            return await unit.deleteRecord(table, key)
+            await unit.deleteRecord(table, key)
           },
-        })
+        }) as typeof unit
+        return patched
       },
     },
   }) as JsonStorageBackend

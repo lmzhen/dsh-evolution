@@ -154,7 +154,9 @@ async function quarantineTarget(io: () => EvolutionIoLike, base: string, content
   return { dest: `${base}.${Date.now()}`, needsWrite: true }
 }
 
-async function quarantine(io: () => EvolutionIoLike, root: string, file: string, raw: string, reason: string, memory: QuarantineMemory): Promise<never> {
+async function quarantine(
+  io: () => EvolutionIoLike, root: string, file: string, raw: string, reason: string, memory: QuarantineMemory,
+): Promise<never> {
   const base = `${join(root, file)}.corrupt`
   const { dest, needsWrite } = await quarantineTarget(io, base, raw)
   // P2-27 (v11): a failed rescue copy must not claim "original preserved" —
@@ -402,15 +404,15 @@ export async function jsonTransact<T>(
         const preserved = await ensureCorruptCopy(ctx, io, root, file, bad, options.memory)
         if (preserved) {
           parsed = good as T
-          options?.onGateDrop?.(file, failing.map(([id]) => id))
+          options.onGateDrop?.(file, failing.map(([id]) => id))
         } else {
           // The records stay in the live map (nothing was dropped), so the
           // consumer's dropped-id set is cleared rather than left stale.
-          options?.onGateDrop?.(file, [])
+          options.onGateDrop?.(file, [])
           ctx.logger.warn(`evolution-state-json: keeping ${failing.length} malformed record(s) in ${file} — the quarantine copy could not be written, so rewriting the file without them would destroy the only copy`)
         }
       } else {
-        options?.onGateDrop?.(file, [])
+        options.onGateDrop?.(file, [])
       }
     }
     const next = await task(parsed)
@@ -501,7 +503,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // savePending carried its own guard while claim / release / resolve carried none, and the
     // resolve path even built an `applied` result object over a write that never happened.
     const guard = transactTaskGuard(`pending table write for ${what}`)
-    return jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, guard.wrap(task), { onGateDrop: noteGateDrop, memory: quarantineMemory })
+    const pendingWrite = { onGateDrop: noteGateDrop, memory: quarantineMemory }
+    return jsonTransact<Record<string, PendingRecord>>(ctx, io, root, PENDING_STATE_FILE, guard.wrap(task), pendingWrite)
       .then(() => { guard.assertInvoked() })
   }
   // OPT-13: one-shot latch for the pending-capacity warn; re-armed when the
@@ -789,6 +792,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // file holds. The caller overlays its own snapshot on top
       // (`{ ...retired, ...keyed }`), so returning the whole committed map leaves `keyed`
       // authoritative for its own ids while the ids this merge ADDED survive the failed rename.
+      // v46 lint: `committed` is assigned INSIDE the transact task above, so a backend whose
+      // `transact` never invokes the task (the shape the guard was added for) leaves it null — the
+      // analyzer reads that closure assignment as unreachable and calls the comparison unnecessary.
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- set inside the transact task
       if (committed === null) return {}
       return committed
     }

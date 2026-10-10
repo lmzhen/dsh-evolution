@@ -58,7 +58,7 @@ function fakeSeams(options: { refuseLocale?: boolean } = {}): {
   const ctx = {
     slots,
     locale,
-    logger: { warn: (message: string) => { warnings.push(String(message)) } },
+    logger: { warn: (message: string) => { warnings.push(message) } },
     // Eager: the effect body runs inside apply(), exactly like cordis — which is why a throw in it
     // used to take the rest of the registrations with it.
     effect(effect: () => unknown): unknown { const dispose = effect(); if (typeof dispose === 'function') disposers.push(dispose as () => void); return dispose },

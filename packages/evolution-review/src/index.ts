@@ -2364,18 +2364,17 @@ export function buildReviewRequest(
   // surface. Slicing first and filtering after meant a long tool-heavy stretch filled the whole window
   // with `tool` entries and the digest carried ZERO user/assistant turns — the review then judged the
   // session without the conversation that produced it. Filter first, then take the tail (order kept).
-  const eligible = surface.filter((message) => message.role === 'user' || message.role === 'assistant').slice(-maxMessages)
+  const eligible = surface.filter(message => message.role === 'user' || message.role === 'assistant').slice(-maxMessages)
+  // `eligible` is already the role filter above, so the loop body needs no second one (v46 lint).
   for (const message of eligible) {
-    if (message.role === 'user' || message.role === 'assistant') {
-      // PLAN S4.1 (2026-09-16, audit P2-12): textOfPersistedBlock — a
-      // persisted `content: [null]` must skip, not break the review leg.
-      const text = message.content.map(textOfPersistedBlock).join(' ').trim()
-      // T3-03/A31: the digest is a plain-text prompt whose PRODUCT is a
-      // write-permission plan, so ingested text must not be able to become
-      // structure — a newline plus `SYSTEM:`/the closing instruction used to
-      // forge a header or a second instruction. Fold (never delete) at ingest.
-      if (text) messages.push(`${message.role.toUpperCase()}: ${foldUntrustedLines(text, maxMessageChars)}`)
-    }
+    // PLAN S4.1 (2026-09-16, audit P2-12): textOfPersistedBlock — a
+    // persisted `content: [null]` must skip, not break the review leg.
+    const text = message.content.map(textOfPersistedBlock).join(' ').trim()
+    // T3-03/A31: the digest is a plain-text prompt whose PRODUCT is a
+    // write-permission plan, so ingested text must not be able to become
+    // structure — a newline plus `SYSTEM:`/the closing instruction used to
+    // forge a header or a second instruction. Fold (never delete) at ingest.
+    if (text) messages.push(`${message.role.toUpperCase()}: ${foldUntrustedLines(text, maxMessageChars)}`)
   }
   // Tool evidence — the review subagent cannot verify a plan against command
   // output it never saw, so append recent tool calls and results as structured

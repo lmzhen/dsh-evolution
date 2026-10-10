@@ -534,7 +534,7 @@ function profilePatchText(profileDir: string): string {
 function userPatchTexts(home: string): string[] {
   const texts = profileDirectories(home).map(({ dir }) => profilePatchText(dir))
   texts.push(readTextOrEmpty(join(home, PROFILE_PATCH_FILENAME)))
-  return texts.filter((text) => text !== '')
+  return texts.filter(text => text !== '')
 }
 
 /** Whether a base's `requires.service` precondition is met HERE — the SAME function and the SAME
@@ -941,7 +941,8 @@ export async function diagnose(
   }
 
   return {
-    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues, paramIssues, queryIssues, services, capabilityAbsence,
+    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues,
+    paramIssues, queryIssues, services, capabilityAbsence,
     pendingCount, executingCount, presetFreshness, scopedProbe, legacy,
     runtimeBundles: runtimeBundles ?? null,
     formSource: runtimeFlags === undefined ? 'aggregate' : 'platform',

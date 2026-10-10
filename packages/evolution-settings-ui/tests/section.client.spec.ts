@@ -84,7 +84,7 @@ function fakeShell(options: { seat?: boolean; refuseLocale?: boolean; seatArrive
       const dispose = fn()
       return typeof dispose === 'function' ? dispose as () => void : () => {}
     },
-    logger: { warn: (message: string) => { warnings.push(String(message)) } },
+    logger: { warn: (message: string) => { warnings.push(message) } },
     locale: {
       // The platform throws on a second registration of one namespace+locale; this replays it.
       register: () => {
@@ -314,10 +314,12 @@ describe('the row source the renderer binds', () => {
     const shell = fakeShell({ seatArrivesLater: true })
     apply(shell.ctx)
     const card = shell.registrations.find(entry => entry.name === CARD_SLOT && entry.key !== undefined)
-    if (card === undefined) throw new Error("the section registered no card")
-    const face = card.inject() as { hooks?: { paramSection?: { getSnapshot: () => { status: string; reason?: string }; subscribe: (listener: () => void) => () => void } } }
+    if (card === undefined) throw new Error('the section registered no card')
+    const face = card.inject() as {
+      hooks?: { paramSection?: { getSnapshot: () => { status: string; reason?: string }; subscribe: (listener: () => void) => () => void } }
+    }
     const source = face.hooks?.paramSection
-    if (source === undefined) throw new Error("the card face carried no section source")
+    if (source === undefined) throw new Error('the card face carried no section source')
     // Before the shell composes: the stated seat-missing state, and a subscription that is waiting.
     expect(source.getSnapshot().status).toBe('unavailable')
     expect(source.getSnapshot().reason).toBe('seat-missing')

@@ -362,7 +362,9 @@ describe('evolution-review', () => {
    * service (the plan path's direct applyBatch), an object = the mounted-but-DISABLED
    * service (runApproved → runnerDirect, the second normalization site).
    */
-  const landOnePlanOp = async (approvalStub: { request: () => Promise<{ action: string; message: string }>; isEnabled: boolean } | null): Promise<Array<Record<string, unknown>>> => {
+  const landOnePlanOp = async (
+    approvalStub: { request: () => Promise<{ action: string; message: string }>; isEnabled: boolean } | null,
+  ): Promise<Array<Record<string, unknown>>> => {
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
     const applied: Array<Record<string, unknown>> = []
     ctx.provide('subagents', {

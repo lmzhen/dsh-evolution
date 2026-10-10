@@ -2681,7 +2681,9 @@ export class SkillLibrary {
     // read, which names a state the commit did not necessarily replace. (In every current caller the
     // CAS refuses a drift between the two reads, so this is the same value on every committing run.)
     const skillMdWrite = landing.find(entry => entry.target.split(/[\\/]/).pop() === 'SKILL.md')
-    await this.audit(name, plan.auditAction, skillMdWrite === undefined ? md : skillMdWrite.previous, skillMdWrite === undefined ? md : skillMdWrite.content, plan.auditSummary)
+    const auditedBefore = skillMdWrite === undefined ? md : skillMdWrite.previous
+    const auditedAfter = skillMdWrite === undefined ? md : skillMdWrite.content
+    await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary)
     this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
     return {
       ok: true,

@@ -590,7 +590,7 @@ export async function recordVersions(
     console.warn(`skill-store: ${file} could not be understood (malformed, foreign, or written by a newer reader); its bytes were copied to ${quarantine} and a fresh index starts from this write`)
   }
   const recorded: RecordedVersions = {}
-  let raceRefused = false
+  let raceRefused: boolean = false
   await transactIo(io, file, (current) => {
     const state = readHistoryIndex(current)
     // The old comment here claimed the probe's copy covered a race. It only did when the probe had
@@ -608,6 +608,9 @@ export async function recordVersions(
     recorded.afterVersion = numbers.afterVersion
     return JSON.stringify({ version: HISTORY_INDEX_VERSION, versions }, null, 2)
   })
+  // v46 lint: `raceRefused` is set inside the transact task (the analyzer sees only the literal
+  // initializer), and the refusal is the S3.1 case this branch exists for.
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- set inside the transact task
   if (raceRefused) {
     const quarantine = `${file}.corrupt`
     try {

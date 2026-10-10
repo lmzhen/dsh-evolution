@@ -794,7 +794,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // reason a later mount would refuse. The source-checkout installer asks
               // the target profile's bundle rows instead, because it runs outside the
               // host.
-              const refusal = baseRefusalReason(base, (name) => ctx.get(name) !== undefined)
+              const refusal = baseRefusalReason(base, name => ctx.get(name) !== undefined)
               if (refusal !== undefined) return err(refusal)
               const basePatch = resolvePresetBasePatch(base.name, profile)
               const rowId = presetRowId(base.id)

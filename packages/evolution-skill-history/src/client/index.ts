@@ -78,7 +78,7 @@ export function apply(ctx: ClientContext): void {
   // guards the same seat; this one now matches it AND reports the failure instead of hiding it: the
   // reader is told the label is running on the bundle's own copy, the state is not silently
   // "registered", and every other registration continues.
-  let registered = false
+  let registered: boolean = false
   ctx.effect(() => {
     try {
       const dispose = seam.locale.register(NS, { zh, en })
@@ -92,6 +92,9 @@ export function apply(ctx: ClientContext): void {
   // The translator follows the same verdict: a refused registration means the seat does not know this
   // namespace, so every key would come back as the raw key name — the bundle's own dictionary reads
   // better and is what the panel showed before the seat existed.
+  // v46 lint: `registered` is set inside the seat's try/catch above (the analyzer sees only the
+  // literal initializer), and the refusal is exactly what this branch answers for.
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- set inside the registration try
   const seatTranslator = registered ? seam.locale.bind(NS) : null
   const t = (key: string): string => seatTranslator === null ? message('zh', key) : seatTranslator(key)
   // The panel's own stylesheet, injected once behind its tag. The bundle is built outside the

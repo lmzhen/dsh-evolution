@@ -261,7 +261,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * `invocation === null` = no map was ever observed (a degraded scan with no cache): the row default
    * applies, which is the same value an absent map entry gets.
    */
-  async function summaries(): Promise<{ summaries: SkillSummary[]; invocation: ReadonlyMap<string, SkillInvocationPolicy> | null; complete: boolean }> {
+  async function summaries(): Promise<{
+    summaries: SkillSummary[]
+    invocation: ReadonlyMap<string, SkillInvocationPolicy> | null
+    complete: boolean
+  }> {
     const stamp = await libraryStamp()
     if (summariesCache !== null && (stamp === null || summariesStamp === stamp)) {
       // A9 (audit P2 low): `stamp === null` means the root LISTING failed, not
