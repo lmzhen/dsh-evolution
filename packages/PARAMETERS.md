@@ -137,7 +137,7 @@
 | `replay.maxPlans` | E2 | none | cordis | evolution-replay | — | Plans compared in one replay report. |
 | `replay.weights` | E2 | none | cordis | evolution-replay | — | Scoring weights of the replay comparison. |
 | `evolution-commands.maintainCooldownMs` | E2 | none | cordis | evolution-commands | — | Cooldown between maintenance runs from the command surface. |
-| `evolution-commands.maintainHandoffOnSettle` | E2 | none | cordis | evolution-commands | — | 维护扫描成功结算后自动把报告交给模型（同 maintain handoff 的注入）；默认关，开启即每轮多一次模型调用 |
+| `evolution-commands.maintainHandoffOnSettle` | E2 | none | cordis | evolution-commands | — | Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run. |
 | `evolution-commands.maintainTimeoutMs` | E2 | none | cordis | evolution-commands | — | Timeout of one maintenance run started from the command surface. |
 | `evolution-maintenance.probeTimeoutMs` | E2 | none | cordis | evolution-maintenance | — | Model-facing budget of one maintenance_probe call — a hang guard, not a latency budget. |
 | `skill-usage.supportReadToolNames` | E2 | none | cordis | skill-usage | — | Tool names whose file reads are attributed to support files. |

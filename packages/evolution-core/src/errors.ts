@@ -25,7 +25,7 @@ export const EVOLUTION_ERRORS = Object.freeze({
   'e-302-curator-service-not-mounted':
     'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.',
   'e-305-the-invocation-agent-exposes':
-    'E-305: the invocation agent exposes neither `followup` nor `inject` — this learn request has no delivery channel.',
+    'E-305: the invocation agent exposes neither `followup` nor `inject` — %a1% has no delivery channel.',
   'e-306-this-deployment-stages-foreground-2':
     'E-306: this deployment stages foreground writes, but this invocation carries no agent session — `/evolution restructure` would stage a record with no session attribution. Run it from a session in the GUI or the CLI, or set `stageForeground: false` on the evolution-approval row, then repeat the command.',
   'e-303-replay-service-not-mounted':

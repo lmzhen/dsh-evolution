@@ -45,8 +45,11 @@ function receiver(mode: 'followup' | 'inject' | 'proto' | 'none'): Receiver {
   return { agent, calls, sent }
 }
 
-/** The demo-skill body fires dup_heading/overlong_line/narrow_name, which the plan below covers. */
-const SKILL_BODY = '---\\nname: demo-skill\\ndescription: Demo skill.\\n---\\n\\n# x\\n\\n## A\\n\\n## A\\n\\n' + 'y'.repeat(2_500) + '\\n'
+/** The demo-skill this bed scans. It is a REAL multi-line body: the earlier form joined everything
+ * with a literal `\\n`, so it was one 2.5 kchar line and the signals the structured plan names were
+ * never the ones this file produces (review P2-10). The plan below stays hand-written fixture data —
+ * the validator accepts any known signal id — so this body only has to be a valid skill on disk. */
+const SKILL_BODY = ['---', 'name: demo-skill', 'description: Demo skill.', '---', '', '# x', '', '## A', '', '## A', '', 'y'.repeat(2_500), ''].join('\n')
 
 /** A structured plan the validator accepts in this bed (copy of the report fixture). */
 const STRUCTURED_PLAN = {
@@ -127,6 +130,52 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     expect(unreadable.text).toContain('NOT')
   })
 
+  it('answers sentence F for the id-less forms when a stale in-memory view meets an unreadable index (review P1-1)', async () => {
+    const bed = await mount()
+    const home = join(bed.dir, 'evolution')
+    await mkdir(home, { recursive: true })
+    // Deterministic on purpose: a settled row the process learns about FIRST (no scan, no timer),
+    // so its in-memory view is non-empty when the home's index goes bad.
+    await writeFile(join(home, 'runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      runs: [{
+        id: 'stale-1', kind: 'maintain', state: 'succeeded', startedAt: 1, endedAt: 2,
+        resultRef: join(home, 'reports', 'maintain-stale-1.json'),
+      }],
+    }), 'utf8')
+    const listed = await bed.handler.handler({ rawInput: 'maintain status' })
+    expect(listed.kind).toBe('success')
+    expect(listed.text).toContain('stale-1')
+    // …and THEN the index becomes unreadable. Every id-less form must say so instead of answering
+    // from the stale view (the posture `maintain status` already takes for its list branch).
+    const corrupt = (): Promise<void> => writeFile(join(home, 'runs.json'), 'not an index', 'utf8')
+    await corrupt()
+    const report = await bed.handler.handler({ rawInput: 'maintain report' })
+    expect(report.kind).toBe('error')
+    expect(report.text).toContain('is not readable')
+    expect(report.text).not.toContain('has NO result')
+    await corrupt()
+    const handoff = receiver('followup')
+    const refused = await bed.handler.handler({ rawInput: 'maintain handoff', agent: handoff.agent })
+    expect(refused.kind).toBe('error')
+    expect(refused.text).toContain('is not readable')
+    expect(handoff.calls).toEqual([])
+    await corrupt()
+    const cancel = await bed.handler.handler({ rawInput: 'maintain cancel' })
+    expect(cancel.kind).toBe('error')
+    expect(cancel.text).toContain('is not readable')
+    // An explicit id still answers from this process's own history (no report file => "no result",
+    // NOT the index sentence), while an unknown id says the unreadable index proves nothing.
+    const known = await bed.handler.handler({ rawInput: 'maintain report stale-1' })
+    expect(known.kind).toBe('error')
+    expect(known.text).toContain('has NO result')
+    await corrupt()
+    const unknown = await bed.handler.handler({ rawInput: 'maintain report nope' })
+    expect(unknown.kind).toBe('error')
+    expect(unknown.text).toContain('NOT proof the run never happened')
+  })
+
+
   it('hands a settled report over as a pointer plus protocol, and refuses while running', async () => {
     const bed = await mount()
     const auto = receiver('followup')
@@ -188,4 +237,4 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     expect(auto.calls).toEqual(['followup'])
     expect(auto.sent()).toContain('REPORT-ONLY')
   })
-})
+}, 20_000) // every cell here polls a stub on a 10 ms tick; the 5 s default is a load flake waiting to happen.

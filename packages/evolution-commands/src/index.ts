@@ -114,10 +114,24 @@ function renderRunRecord(record: RunRecord): string {
   return parts.join(' ')
 }
 
-/** The newest run this home knows — the default when a subcommand omits its id (G2/0.20.0).
- * The registry view is newest-first and already carry the cross-plane rows. */
+/** The newest MAINTENANCE run this home knows — the default when a subcommand omits its id
+ * (G2/0.20.0). The registry view is newest-first and already carries the cross-plane rows. The
+ * index is a file a user can hand-edit, so a row with a blank id or another kind is skipped
+ * rather than answered from (review P2-7: it produced text like `Run  (succeeded) …`). */
 function newestRun(registry: RunRegistry): RunRecord | undefined {
-  return registry.runs()[0]
+  return registry.runs().find(record => record.kind === 'maintain' && record.id.trim() !== '')
+}
+
+/** Sentence F, ONE wording for the three id-less forms (design `10` cell 13): an index that could
+ * not be read must never answer as "there is no recent run" (G2/0.20.0). */
+function unreadableIndex(note: string | undefined): string {
+  return `The home's run index is not readable (${note ?? 'unknown reason'}) — this is NOT "there is no recent run".`
+}
+
+/** The explicit-id twin of {@link unreadableIndex}, worded like `maintain status` so the four
+ * readers cannot drift (review P1-1). */
+function unreadableForId(id: string, note: string | undefined): string {
+  return `Run ${id} is not in this process's history, and the home's run index is not readable (${note ?? 'unknown reason'}) — that is NOT proof the run never happened.`
 }
 
 /** The reader-facing report path: the `.md` digest beside the run's `.json` result. */
@@ -698,7 +712,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           } else if (typeof agent.inject === 'function') {
             (agent as unknown as { inject: (message: unknown) => void }).inject(message)
           } else {
-            return err(errorText('e-305-the-invocation-agent-exposes'))
+            return err(errorText('e-305-the-invocation-agent-exposes', { a1: 'this learn request' }))
           }
           // rc.68: the learn action joins the event timeline (the loop
           // substrate). Soft probe: without the io registry the log is
@@ -953,7 +967,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                       }],
                       source: { kind: 'evolution-commands', form: 'notice', summary: 'maintenance report handoff (auto)' },
                     })
-                    deliverHandoff(runAgent as { followup?: unknown; inject?: unknown }, autoMessage)
+                    const woke = deliverHandoff(runAgent as { followup?: unknown; inject?: unknown }, autoMessage)
+                    // Review P2-2: a receiver with neither primitive is NOT a silent case — the
+                    // run and its report are committed, but nobody was told the model was never
+                    // handed the pointer, so the operator has to see it.
+                    if (woke === undefined) {
+                      ctx.logger.warn(`evolution-commands: the automatic report handoff for run ${handle.id} could not be delivered — this host exposes neither followup nor inject; the report is at ${reportDigestPath({ id: handle.id, resultRef })}`)
+                    }
                   } catch (error) {
                     ctx.logger.warn(`evolution-commands: automatic report handoff failed (${String(error)})`)
                   }
@@ -1016,12 +1036,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!registry) return err('Evolution IO registry not mounted — run results unavailable.')
           const synced = await syncRuns(registry)
           const wanted = maintainReport[1]
+          // Review P1-1: for the id-less form an unreadable index WINS over the in-memory view —
+          // a stale record the process still holds must not answer as if the home were readable
+          // (the posture `maintain status` already takes at its list branch).
+          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
           const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
           if (!record) {
             // Three states, three sentences: a bad id, an unreadable index, and an empty
             // home must never look alike (G2/0.20.0).
-            if (wanted !== undefined) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
-            if (!synced.ok) return err(`The home's run index is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "there is no recent run".`)
+            if (wanted !== undefined) {
+              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
+              return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+            }
             return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
           }
           if (wanted === undefined && record.state === 'running') {
@@ -1044,10 +1070,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!registry) return err('Evolution IO registry not mounted — run cancellation unavailable.')
           const synced = await syncRuns(registry)
           const wanted = maintainCancel[1]
+          // Review P1-1: the id-less form answers sentence F when the index could not be read,
+          // instead of acting on a stale in-memory view (same posture as `report`/`handoff`).
+          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
           const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
           if (!record) {
-            if (wanted !== undefined) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
-            if (!synced.ok) return err(`The home's run index is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "there is no recent run".`)
+            if (wanted !== undefined) {
+              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
+              return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+            }
             return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
           }
           // Omitting the id only ever cancels the ONE run this process is running: the
@@ -1058,7 +1089,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // from here, and a terminal one has nothing to cancel — the two answers differ.
           if (!registry.cancel(record.id)) {
             if (record.state === 'running') {
-              return err(`Run ${record.id} is running in ANOTHER process sharing this home — it can only be cancelled there.${idlessHint}`)
+              // Review P2-4: an explicit id cannot cancel a foreign run either, so the id-less
+              // hint pointed at a dead end here; the terminal branch below keeps it.
+              return err(`Run ${record.id} is running in ANOTHER process sharing this home — it can only be cancelled there.`)
             }
             return err(`Run ${record.id} is already ${record.state} — nothing to cancel.${idlessHint}`)
           }
@@ -1070,10 +1103,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!registry) return err('Evolution IO registry not mounted — the report cannot be handed over.')
           const synced = await syncRuns(registry)
           const wanted = maintainHandoff[1]
+          // Review P1-1: never inject from a stale view when the home's index is unreadable.
+          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
           const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
           if (!record) {
-            if (wanted !== undefined) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
-            if (!synced.ok) return err(`The home's run index is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "there is no recent run".`)
+            if (wanted !== undefined) {
+              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
+              return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+            }
             return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
           }
           if (wanted === undefined && record.state === 'running') {
@@ -1106,7 +1143,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // N13b: deliverHandoff calls the waking primitive ON the receiver; a host that
           // exposes neither primitive is a documented E-305, never a silent no-op.
           const woke = deliverHandoff(invocationAgent as { followup?: unknown; inject?: unknown }, message)
-          if (woke === undefined) return err(errorText('e-305-the-invocation-agent-exposes'))
+          if (woke === undefined) return err(errorText('e-305-the-invocation-agent-exposes', { a1: 'this maintenance handoff' }))
           return ok(woke
             ? `Handed run ${record.id} to the model — report: ${reportDigestPath(record)}. It will read the file and follow the action lines.`
             : `Handed run ${record.id} to the model, queued — this host exposes no wake-up channel, so it is read on your next message.`)
@@ -1117,7 +1154,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // match the grammar (unknown flags, stray args) was silently falling
           // into the help branch despite the branch comment claiming explicit
           // rejection. Reject it here.
-          return err('Unknown maintain arguments: expected `maintain`, `maintain --timeout <ms>` / `maintain --timeout=<ms>`, `maintain status [<id>]`, `maintain report <id>` or `maintain cancel <id>`. Got: ' + input)
+          // Review P2-5: the hint still demanded an id from `report`/`cancel` and never named
+          // `handoff`, so it described a grammar two releases behind the one it guards.
+          return err('Unknown maintain arguments: expected `maintain`, `maintain --timeout <ms>` / `maintain --timeout=<ms>`, `maintain status [<id>]`, `maintain report [<id>]`, `maintain handoff [<id>]` or `maintain cancel [<id>]`. Got: ' + input)
         }
         const presetInstall = /^preset install(?: --base (\S+))?$/.exec(input)
         if (presetInstall !== null || /^preset\b/.test(input)) {
