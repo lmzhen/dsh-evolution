@@ -22,7 +22,9 @@ export * from './constants.ts'
 export * from './record-contract.ts'
 // S3-2 (J-5): the published conformance suite — a provider (in-tree or third
 // party) runs `runStateProviderConsistency(provider, expect)` to check the whole
-// seam contract. It imports no test runner; the assert surface is injected.
+// seam contract. It imports no test runner; the assert surface is injected, and
+// U-2 added an optional options bag (namespace, stamp, session ids) for a medium
+// that cannot use the in-tree literals.
 export * from './conformance.ts'
 
 /** 0.3.17 (S3.3): the claim lifecycle as ONE transition table — BOTH

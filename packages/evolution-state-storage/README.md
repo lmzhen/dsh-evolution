@@ -20,7 +20,9 @@ import { expect } from 'vitest' // or any runner wrapped into `ConformanceAssert
 await runStateProviderConsistency(myProvider, expect)
 ```
 
-The assertion surface is INJECTED rather than imported, which is what lets this module ship: it carries no test-runner dependency, so loading the package never loads vitest. Both shipped providers run the same suite (`evolution-state-json` / `evolution-state-domain` `tests/provider-consistency.spec.ts`), and `consistency-forge.spec.ts` proves the suite fails when a single field is forged.
+Every value the vectors use is PARAMETERIZABLE (U-2): `runStateProviderConsistency(provider, assert, options)` takes `idPrefix` / `claimPrefix` / `createdAt` / `sessionId` / `attributionSessionId` / `reviewSessionPrefix`, so a medium that already holds records in the default `c-…` namespace — or whose schema insists on a parseable stamp — runs the very same vectors under its own values. Every field defaults to the in-tree literals, so a two-argument call is unchanged. Each vector carries a `since <version>` note saying which release it became binding in.
+
+The assertion surface is INJECTED rather than imported, which is what lets this module ship: it carries no test-runner dependency, so loading the package never loads vitest. Both shipped providers run the same suite (`evolution-state-json` / `evolution-state-domain` `tests/provider-consistency.spec.ts`) — the json one also runs it under a caller-supplied namespace — and `consistency-forge.spec.ts` proves the suite fails when a single field is forged.
 
 
 ## Known limitations

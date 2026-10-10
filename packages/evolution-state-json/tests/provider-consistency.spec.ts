@@ -20,4 +20,23 @@ describe('evolution-state-json cross-provider consistency (G7.4)', () => {
     await ctx.plugin(JsonState, { root })
     await runStateProviderConsistency(ctx.evolutionStateStorage.provider('json'), expect)
   })
+
+  // U-2: the suite is PARAMETERIZABLE — a provider whose medium already holds records in the default
+  // namespace (or whose schema insists on a parseable stamp) runs the same vectors under its own.
+  it('runs the same vectors under a caller-supplied namespace and stamp', { timeout: 300_000 }, async () => {
+    const root = await tempRoot('dsh-json-consistent-u2-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionStateStorageRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(JsonState, { root })
+    await runStateProviderConsistency(ctx.evolutionStateStorage.provider('json'), expect, {
+      idPrefix: 'u2-',
+      claimPrefix: 'u2-claim-',
+      createdAt: new Date().toISOString(),
+      sessionId: 'u2-session',
+      attributionSessionId: 'u2-attrib-session',
+      reviewSessionPrefix: 'u2-cap-',
+    })
+  })
 })

@@ -57,8 +57,9 @@ export interface ConformanceAssert {
   }
 }
 
-/** Build a fixture pending record, optionally carrying origin/sessionId. */
-const pendingOf = (
+/** Build a fixture pending record, optionally carrying origin/sessionId. The suite's own stamp and
+ * namespace come from {@link ConformanceOptions} — see `basePendingOf`'s call sites. */
+const basePendingOf = (
   id: string,
   kind: PendingRecord['kind'] = 'memory',
   attribution: Pick<PendingRecord, 'origin' | 'sessionId'> = {},
@@ -92,12 +93,49 @@ const findRecord = (records: readonly PendingRecord[], id: string): PendingRecor
   return found
 }
 
-export async function runStateProviderConsistency(provider: EvolutionStateStorage, assert: ConformanceAssert): Promise<void> {
-  // --- review-state round-trip ---
-  await provider.saveReviewState('s-consistent', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
-  assert(await provider.loadReviewState('s-consistent')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+/**
+ * The values a PROVIDER UNDER TEST may need to vary (U-2): a third-party medium can already hold
+ * records in the `c-…` namespace, and a strict schema may insist on a parseable `createdAt`. Every
+ * field defaults to the in-tree literals, so an existing caller's two-argument call is unchanged.
+ */
+export interface ConformanceOptions {
+  /** Namespace for every pending record this run creates (default `'c-'`). */
+  idPrefix?: string
+  /** Namespace for every claim id (default `'claim-'`). */
+  claimPrefix?: string
+  /** The `createdAt` stamp every fixture record carries (default `'now'`). A provider whose
+   * schema requires a parseable time passes a real stamp here. */
+  createdAt?: string
+  /** The review-state session the round-trip vector writes (default `'s-consistent'`). */
+  sessionId?: string
+  /** The review-state session the ATTRIBUTION vector pins (default `attributionSessionId`). */
+  attributionSessionId?: string
+  /** Namespace for the per-session cap vector's sessions (default `'s-cap-'`). */
+  reviewSessionPrefix?: string
+}
 
-  // --- curator-state: missing seed creates; null = keep; overwrite replaces ---
+export async function runStateProviderConsistency(
+  provider: EvolutionStateStorage,
+  assert: ConformanceAssert,
+  options: ConformanceOptions = {},
+): Promise<void> {
+  const idPrefix = options.idPrefix ?? 'c-'
+  const claimPrefix = options.claimPrefix ?? 'claim-'
+  const stamp = options.createdAt ?? 'now'
+  const sessionId = options.sessionId ?? 's-consistent'
+  const attributionSessionId = options.attributionSessionId ?? 'sess-attrib'
+  const reviewSessionPrefix = options.reviewSessionPrefix ?? 's-cap-'
+  /** This run's fixture record: the module helper's fields under THIS run's namespace and stamp. */
+  const pending = (
+    id: string,
+    kind: PendingRecord['kind'] = 'memory',
+    attribution: Pick<PendingRecord, 'origin' | 'sessionId'> = {},
+  ): PendingRecord => ({ ...basePendingOf(id, kind, attribution), createdAt: stamp })
+  // --- since 0.3.22 (G7.4): review-state round-trip ---
+  await provider.saveReviewState(sessionId, { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+  assert(await provider.loadReviewState(sessionId)).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+
+  // --- since 0.3.22 (G7.4): curator-state — missing seed creates; null = keep; overwrite replaces ---
   assert(await provider.loadCuratorState()).toBeNull()
   await provider.transactCuratorState(() => ({ lastRunAt: 10, runCount: 0, lastSummary: 'seed', paused: false }))
   assert(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'seed', paused: false })
@@ -120,42 +158,42 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   })
   assert(await provider.loadCuratorState()).toEqual({ lastRunAt: 10, runCount: 0, lastSummary: 'updated', paused: false })
 
-  // --- claim → resolve (pending → executing → approved) ---
-  const live = pendingOf('c-live')
+  // --- since 0.3.22 (G7.4): claim → resolve (pending → executing → approved) ---
+  const live = pending(`${idPrefix}live`)
   await provider.savePending(live)
-  assert((await provider.listPending('pending')).map(record => record.id)).toContain('c-live')
-  const claimed = await provider.claimPending('c-live', 'claim-a')
+  assert((await provider.listPending('pending')).map(record => record.id)).toContain(`${idPrefix}live`)
+  const claimed = await provider.claimPending(`${idPrefix}live`, `${claimPrefix}a`)
   assert(claimed?.status).toBe('executing')
-  assert(claimed?.claimedBy).toBe('claim-a')
+  assert(claimed?.claimedBy).toBe(`${claimPrefix}a`)
   expectPendingCarried(assert, claimed, live)
   assert(typeof claimed?.claimedAt).toBe('string')
-  const resolved = await provider.tryResolvePending('c-live', 'approved')
+  const resolved = await provider.tryResolvePending(`${idPrefix}live`, 'approved')
   assert(resolved.applied).toBe(true)
-  assert(resolved.record?.id).toBe('c-live')
+  assert(resolved.record?.id).toBe(`${idPrefix}live`)
   assert(resolved.record?.status).toBe('approved')
   expectPendingCarried(assert, resolved.record, live)
-  assert(resolved.record?.claimedBy).toBe('claim-a')
+  assert(resolved.record?.claimedBy).toBe(`${claimPrefix}a`)
   assert(typeof resolved.record?.claimedAt).toBe('string')
   assert(typeof resolved.record?.resolvedAt).toBe('string')
-  assert((await provider.listPending('approved')).map(record => record.id)).toContain('c-live')
-  assert((await provider.listPending('pending')).map(record => record.id)).not.toContain('c-live')
+  assert((await provider.listPending('approved')).map(record => record.id)).toContain(`${idPrefix}live`)
+  assert((await provider.listPending('pending')).map(record => record.id)).not.toContain(`${idPrefix}live`)
 
-  // --- attribution (origin/sessionId) survives claim → resolve ---
-  const attrib = pendingOf('c-attrib', 'memory', { origin: 'background_review', sessionId: 'sess-attrib' })
+  // --- since 0.3.22 (G7.4): attribution (origin/sessionId) survives claim → resolve ---
+  const attrib = pending(`${idPrefix}attrib`, 'memory', { origin: 'background_review', sessionId: attributionSessionId })
   await provider.savePending(attrib)
-  expectPendingCarried(assert, await provider.claimPending('c-attrib', 'claim-a'), attrib)
-  const attribResolved = await provider.tryResolvePending('c-attrib', 'approved')
+  expectPendingCarried(assert, await provider.claimPending(`${idPrefix}attrib`, `${claimPrefix}a`), attrib)
+  const attribResolved = await provider.tryResolvePending(`${idPrefix}attrib`, 'approved')
   expectPendingCarried(assert, attribResolved.record, attrib)
   assert(attribResolved.record?.origin).toBe('background_review')
-  assert(attribResolved.record?.sessionId).toBe('sess-attrib')
+  assert(attribResolved.record?.sessionId).toBe(attributionSessionId)
   assert(typeof attribResolved.record?.resolvedAt).toBe('string')
 
-  // --- claim → release rolls executing back to pending (failure path) ---
-  const rel = pendingOf('c-release', 'skill')
+  // --- since 0.3.22 (G7.4): claim → release rolls executing back to pending (failure path) ---
+  const rel = pending(`${idPrefix}release`, 'skill')
   await provider.savePending(rel)
-  assert((await provider.claimPending('c-release', 'claim-b'))?.status).toBe('executing')
-  await provider.releasePendingClaim('c-release', 'claim-b')
-  const released = (await provider.listPending('pending')).find(record => record.id === 'c-release')
+  assert((await provider.claimPending(`${idPrefix}release`, `${claimPrefix}b`))?.status).toBe('executing')
+  await provider.releasePendingClaim(`${idPrefix}release`, `${claimPrefix}b`)
+  const released = (await provider.listPending('pending')).find(record => record.id === `${idPrefix}release`)
   assert(released?.status).toBe('pending')
   expectPendingCarried(assert, released, rel)
   assert(released?.claimedBy).toBeUndefined()
@@ -164,34 +202,34 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   // --- E1 (v15): claim-scoped resolve (expectedClaimId) is provider-wide
   // contract — a foreign claimId refuses; the owner succeeds; the unscoped
   // form still works. (v14 shipped this on json with zero domain coverage.) ---
-  const scoped = pendingOf('c-scoped')
+  const scoped = pending(`${idPrefix}scoped`)
   await provider.savePending(scoped)
-  await provider.claimPending('c-scoped', 'claim-owner')
-  const foreignScope = await provider.tryResolvePending('c-scoped', 'approved', 'claim-foreign')
+  await provider.claimPending(`${idPrefix}scoped`, `${claimPrefix}owner`)
+  const foreignScope = await provider.tryResolvePending(`${idPrefix}scoped`, 'approved', `${claimPrefix}foreign`)
   assert(foreignScope.applied).toBe(false)
-  assert((await provider.listPending('executing')).map(record => record.id)).toContain('c-scoped')
-  const ownerScope = await provider.tryResolvePending('c-scoped', 'approved', 'claim-owner')
+  assert((await provider.listPending('executing')).map(record => record.id)).toContain(`${idPrefix}scoped`)
+  const ownerScope = await provider.tryResolvePending(`${idPrefix}scoped`, 'approved', `${claimPrefix}owner`)
   assert(ownerScope.applied).toBe(true)
   assert(ownerScope.record?.status).toBe('approved')
 
-  // --- status filtering is consistent (a pending record is not 'approved') ---
-  const filt = pendingOf('c-filter')
+  // --- since 0.3.22 (G7.4): status filtering is consistent (a pending record is not 'approved') ---
+  const filt = pending(`${idPrefix}filter`)
   await provider.savePending(filt)
-  assert((await provider.listPending('pending')).map(record => record.id)).toContain('c-filter')
-  assert((await provider.listPending('approved')).map(record => record.id)).not.toContain('c-filter')
+  assert((await provider.listPending('pending')).map(record => record.id)).toContain(`${idPrefix}filter`)
+  assert((await provider.listPending('approved')).map(record => record.id)).not.toContain(`${idPrefix}filter`)
 
   // --- V8-15 (0.3.46): release AFTER resolve is a no-op on BOTH providers —
   // the resolved record keeps its audit attribution (the domain provider had
   // the status guard; json now matches — G7.4 previously covered only the
   // executing→release path) ---
-  const post = pendingOf('c-post-resolve', 'memory')
+  const post = pending(`${idPrefix}post-resolve`, 'memory')
   await provider.savePending(post)
-  await provider.claimPending('c-post-resolve', 'claim-c')
-  await provider.tryResolvePending('c-post-resolve', 'rejected')
-  await provider.releasePendingClaim('c-post-resolve', 'claim-c')
-  const postResolved = (await provider.listPending('rejected')).find(record => record.id === 'c-post-resolve')
+  await provider.claimPending(`${idPrefix}post-resolve`, `${claimPrefix}c`)
+  await provider.tryResolvePending(`${idPrefix}post-resolve`, 'rejected')
+  await provider.releasePendingClaim(`${idPrefix}post-resolve`, `${claimPrefix}c`)
+  const postResolved = (await provider.listPending('rejected')).find(record => record.id === `${idPrefix}post-resolve`)
   assert(postResolved?.status).toBe('rejected')
-  assert(postResolved?.claimedBy).toBe('claim-c')
+  assert(postResolved?.claimedBy).toBe(`${claimPrefix}c`)
   assert(typeof postResolved?.claimedAt).toBe('string')
   assert(typeof postResolved?.resolvedAt).toBe('string')
 
@@ -200,36 +238,36 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   // C-3 aligned them on the required `args` key — a JS caller or a hand-edited
   // file must not persist a record the other provider would refuse to open. ---
   await assert(provider.savePending({
-    id: 'c-bad', kind: 'memory', summary: 'bad', createdAt: 'now', status: 'pending',
+    id: `${idPrefix}bad`, kind: 'memory', summary: 'bad', createdAt: stamp, status: 'pending',
   } as PendingRecord)).rejects.toThrow()
 
   // --- I-4 (v18): mutating a returned record — top level AND nested `args` —
   // must not poison the medium. The domain provider used to hand back live
   // objects, so a caller's edit rewrote the in-memory record before any save
   // (and survived a rejected save). ---
-  const poison = pendingOf('c-poison')
+  const poison = pending(`${idPrefix}poison`)
   poison.args = { nested: { value: 1 } }
   await provider.savePending(poison)
-  const returned = findRecord(await provider.listPending('pending'), 'c-poison')
+  const returned = findRecord(await provider.listPending('pending'), `${idPrefix}poison`)
   returned.summary = 'poisoned'
   ;(returned.args as { nested: { value: number } }).nested.value = 99
-  const reread = findRecord(await provider.listPending('pending'), 'c-poison')
-  assert(reread.summary).toBe('memory:c-poison')
+  const reread = findRecord(await provider.listPending('pending'), `${idPrefix}poison`)
+  assert(reread.summary).toBe(`memory:${idPrefix}poison`)
   assert((reread.args as { nested: { value: number } }).nested.value).toBe(1)
 
   // --- P2-15 (v19): a non-cloneable payload is refused by BOTH providers at
   // the write boundary. The domain read path deep-clones every record, so a
   // single poisoned record would break every later read for every status. ---
-  const uncloneable: unknown = { ...pendingOf('c-uncloneable'), args: { fn: () => {} } }
+  const uncloneable: unknown = { ...pending(`${idPrefix}uncloneable`), args: { fn: () => {} } }
   await assert(provider.savePending(uncloneable as PendingRecord)).rejects.toThrow()
 
   // --- P2-14 (v19): mutating the CALLER's args after save must not change the
   // stored record (the domain provider used to store the reference). ---
-  const aliased = pendingOf('c-alias')
+  const aliased = pending(`${idPrefix}alias`)
   aliased.args = { nested: { value: 1 } }
   await provider.savePending(aliased)
   ;(aliased.args as { nested: { value: number } }).nested.value = 99
-  const aliasedBack = findRecord(await provider.listPending('pending'), 'c-alias')
+  const aliasedBack = findRecord(await provider.listPending('pending'), `${idPrefix}alias`)
   assert((aliasedBack.args as { nested: { value: number } }).nested.value).toBe(1)
 
   // --- P2-16 (v19): a malformed schemaVersion is refused by both providers
@@ -240,8 +278,8 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
 
   // --- P2-18 (v19): unknown fields are PRESERVED by both providers (zod's
   // default strip used to delete them on the domain side only). ---
-  await provider.savePending({ ...pendingOf('c-extra'), extraField: 'kept' } as unknown as PendingRecord)
-  const extraBack = (await provider.listPending('pending')).find(record => record.id === 'c-extra') as unknown as { extraField?: string }
+  await provider.savePending({ ...pending(`${idPrefix}extra`), extraField: 'kept' } as unknown as PendingRecord)
+  const extraBack = (await provider.listPending('pending')).find(record => record.id === `${idPrefix}extra`) as unknown as { extraField?: string }
   assert(extraBack.extraField).toBe('kept')
 
   // --- P2-4 (v15) / C-6 (v18): the RESOLVED pending tail is bounded by the
@@ -249,12 +287,12 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   // through the public seam (save then claim then resolve) because json's own
   // cap spec reads its file and the domain medium has no file at all: a
   // medium-specific seed would stop being a shared vector. ---
-  const capPrefix = 'c-cap-'
-  await provider.savePending(pendingOf('c-cap-live', 'skill'))
+  const capPrefix = `${idPrefix}cap-`
+  await provider.savePending(pending(`${idPrefix}cap-live`, 'skill'))
   for (let index = 0; index <= PENDING_RESOLVED_CAP + 1; index += 1) {
     const id = capPrefix + String(index).padStart(3, '0')
-    await provider.savePending(pendingOf(id))
-    await provider.claimPending(id, 'claim-cap')
+    await provider.savePending(pending(id))
+    await provider.claimPending(id, `${claimPrefix}cap`)
     await provider.tryResolvePending(id, 'approved')
   }
   const resolvedNow = (await provider.listPending('approved')).concat(await provider.listPending('rejected'))
@@ -264,12 +302,12 @@ export async function runStateProviderConsistency(provider: EvolutionStateStorag
   assert(resolvedIds).not.toContain(capPrefix + '000')
   assert(resolvedIds).not.toContain(capPrefix + '001')
   assert(resolvedIds).toContain(capPrefix + String(PENDING_RESOLVED_CAP + 1).padStart(3, '0'))
-  assert((await provider.listPending('pending')).map(record => record.id)).toContain('c-cap-live')
+  assert((await provider.listPending('pending')).map(record => record.id)).toContain(`${idPrefix}cap-live`)
 
   // --- V24-08 (v24): review-state rows are bounded per session table, and the
   // SAVING session is never the victim — one row is dropped per over-cap save,
   // so re-saving the oldest session re-enters it and evicts the next oldest. ---
-  const sessionPrefix = 's-cap-'
+  const sessionPrefix = reviewSessionPrefix
   const reviewStateOf = (turns: number) => ({ turnsSinceMemory: turns, turnsSinceSkill: 0, lastTurn: turns })
   for (let index = 0; index <= REVIEW_STATE_SESSION_CAP; index += 1) {
     await provider.saveReviewState(sessionPrefix + String(index), reviewStateOf(index))
