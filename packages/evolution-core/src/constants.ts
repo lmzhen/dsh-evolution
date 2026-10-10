@@ -194,6 +194,26 @@ export const CONTENT_SPLIT_HINT = 'Consider splitting into a smaller SKILL.md wi
  * (v19 P2-10 corrected the value from 2^32-1 to Node's real 2^31-1 ceiling.) */
 export const MAX_TIMER_DELAY_MS = 2_147_483_647
 
+/**
+ * Model-facing budget of one `maintenance_probe` call (ms) — a HANG GUARD, not a
+ * performance knob.
+ *
+ * Measured (2026-10-10): one probe costs 188/220/225 ms on the deployed library
+ * (28 skills / 418 KB) and scales linearly at ~5.5 ms per skill (100 skills
+ * 0.4-0.6 s, 400 skills 1.9-2.5 s), so this default is ~50x the worst measured
+ * case and ~600x the deployed one — it will not fire in normal use, and the
+ * ~305 s desktop interaction wall is ~5e4 skills away.
+ *
+ * It exists for the state the probe cannot report itself: a provider that never
+ * answers. The platform's tool-timeout guard reads this budget off the tool
+ * definition and turns the hang into a diagnosable `tool call timed out after
+ * <ms>ms` error result, instead of a request that ends with nothing to read.
+ * Reopen the default when the library approaches ~1e4 skills, when the
+ * `evolutionIo` provider stops being local, or when a model leg enters a tool's
+ * execute (the same conditions the probe's own note lists).
+ */
+export const DEFAULT_PROBE_TIMEOUT_MS = 120_000
+
 /** V27 G2.4: the model each review/curation leg defaults to. The policy schema,
  * the policy resolver and the curator's LLM nomination pass each carried their
  * own copy of these strings — a deployment that changed the policy default used

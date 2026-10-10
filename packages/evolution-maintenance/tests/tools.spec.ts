@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { emptyRecord, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_PROBE_TIMEOUT_MS, emptyRecord, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import * as MaintenanceTools from '../src/tools.ts'
@@ -102,5 +102,45 @@ describe('evolution-maintenance tools registration', () => {
     expect(probe.detail).toContain('never read: references/dead.md')
     expect(probe.detail.some(line => line.includes('retire candidate: references/dead.md'))).toBe(true)
     expect(probe.detail).not.toContain('retire: no-age')
+  })
+
+  it('S1 (0.18.1): the tool carries a hang-guard budget wired from config (what the platform reads)', async () => {
+    const mount = async (config: MaintenanceTools.Config): Promise<{ name?: string; timeoutMs?: number }> => {
+      const ctx = new Context()
+      const registered: Array<{ name?: string; timeoutMs?: number }> = []
+      ctx.provide('tools', {
+        register: (definition: unknown) => {
+          registered.push(definition as { name?: string; timeoutMs?: number })
+          return () => {}
+        },
+        get: () => undefined,
+      } as never)
+      await ctx.plugin(MaintenanceTools, config)
+      const tool = registered.find(item => item.name === 'maintenance_probe')
+      if (tool === undefined) throw new Error('maintenance_probe was not registered')
+      return tool
+    }
+    // The default comes from the measurement (188/220/225 ms on the deployed
+    // library, ~5.5 ms per skill, linear): it is a HANG GUARD for a provider that
+    // never answers, not a latency budget — hence the ~50x headroom over the
+    // worst measured case.
+    expect((await mount({})).timeoutMs).toBe(DEFAULT_PROBE_TIMEOUT_MS)
+    // The row value wins, exactly like dsh-tool-web's fetchTimeoutMs, so the
+    // platform's tool-timeout guard uses the deployment's own number.
+    expect((await mount({ probeTimeoutMs: 5_000 })).timeoutMs).toBe(5_000)
+    // A direct construction bypasses the schema; the N3 clamp still holds.
+    const ctx = new Context()
+    const registered: Array<{ name?: string; timeoutMs?: number }> = []
+    ctx.provide('tools', {
+      register: (definition: unknown) => {
+        registered.push(definition as { name?: string; timeoutMs?: number })
+        return () => {}
+      },
+      get: () => undefined,
+    } as never)
+    MaintenanceTools.apply(ctx, { probeTimeoutMs: Number.NaN })
+    // A direct apply() leaves the tools injection pending until the fiber runs it.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(registered.find(item => item.name === 'maintenance_probe')?.timeoutMs).toBe(DEFAULT_PROBE_TIMEOUT_MS)
   })
 })

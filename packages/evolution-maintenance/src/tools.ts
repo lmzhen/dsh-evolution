@@ -12,7 +12,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { assertSkillsRootAliasRetired, newSkillLibrary, redactSecrets, resolveRootConfig, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { assertSkillsRootAliasRetired, clampedNumber, DEFAULT_PROBE_TIMEOUT_MS, MAX_TIMER_DELAY_MS, newSkillLibrary, redactSecrets, resolveRootConfig, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
 import { buildEnrichment, enrichmentSnapshotOptions } from './enrichment.ts'
 import { snapshotFromLibrary } from './drift-scan.ts'
@@ -26,12 +26,19 @@ export interface Config {
   /** V27 G2.4 (M-08): RETIRED alias of `root`. Declared so the loader passes it
    * to the load-time gate (which rejects it loudly) instead of dropping it. */
   skillsRoot?: string | undefined
+  /** Model-facing budget of one probe call (ms). A hang guard: see
+   * `DEFAULT_PROBE_TIMEOUT_MS` for the measurement behind the default and for
+   * the conditions that would reopen it. */
+  probeTimeoutMs?: number | undefined
 }
 
 // F1 (P2-18, v11): family Config-schema convention (same as commands).
 export const Config = z.object({
   root: z.string().default(''),
   skillsRoot: z.string().default(''),
+  // N3: bounded at both ends like every other numeric family field, and clamped
+  // again below for a direct construction that bypasses the schema.
+  probeTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_PROBE_TIMEOUT_MS),
 })
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -39,6 +46,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // `skillsRoot` alias fails the load instead of being silently ignored.
   assertSkillsRootAliasRetired(rawConfig)
   const rootConfig = resolveRootConfig(rawConfig)
+  // The row value, clamped (N3) — the schema already bounds the load-time value.
+  const probeTimeoutMs = clampedNumber(rawConfig.probeTimeoutMs, DEFAULT_PROBE_TIMEOUT_MS, { min: 1 })
   ctx.inject(['tools'], (toolCtx) => {
     // Single budget-cast on the injected `tools` service (X-6): the previous
     // `toolCtx as unknown as {...}` double-cast was a gratuitous widening —
@@ -51,6 +60,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     toolCtx.effect(() => tools.register(
       defineTool({
         name: 'maintenance_probe',
+        // 0.18.1 (S1): the budget the platform's tool-timeout guard reads off the
+        // definition, wired from config exactly like `dsh-tool-web`'s
+        // `fetchTimeoutMs` → `ToolDefinition.timeoutMs`. A hang guard whose default
+        // comes from the measurement (DEFAULT_PROBE_TIMEOUT_MS).
+        timeoutMs: probeTimeoutMs,
         description:
           'Read-only deep-dive into maintenance scan signals: library-level group/cluster membership or per-skill detail (line numbers, pointer gaps, narrow shapes, stamp samples). Machine-derived from the same calculators as the facts block — never introduces new evidence ids. Output is JSON detail.',
         parameters: {
@@ -87,19 +101,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // runId-scoped snapshot store. Revisit only with a measured need
           // (a large library where probe latency becomes visible).
           //
-          // 0.18.1 (S1, measured 2026-10-10): that revisit condition was
-          // evaluated and is NOT met. One probe costs 188/220/225 ms on the
-          // deployed library (28 skills / 418 KB) and scales linearly at
-          // ~5.5 ms per skill (100 skills 0.4-0.6 s, 400 skills 1.9-2.5 s).
-          // The interaction wall measured on the desktop plane is ~305 s, so
-          // roughly 5e4 skills would be needed to reach it. This tool therefore
-          // declares no budget: a `timeoutMs` here could never fire, and it
-          // would sit beside the family's ONE real long-run budget (the
-          // maintain command's config-derived `maintainTimeoutMs`, applied at
-          // orchestrate.ts:335-352 and handed to the platform spawn's signal).
-          // Reopen this note when the library approaches ~1e4 skills, when the
-          // `evolutionIo` provider stops being local, or when a model leg
-          // enters a tool's execute.
+          // 0.18.1 (S1, measured 2026-10-10): the revisit condition above was
+          // evaluated. One probe costs 188/220/225 ms on the deployed library
+          // (28 skills / 418 KB) and scales linearly at ~5.5 ms per skill (100
+          // skills 0.4-0.6 s, 400 skills 1.9-2.5 s); the measured desktop
+          // interaction wall is ~305 s, so ~5e4 skills would be needed to reach
+          // it. The budget this tool declares is therefore NOT a latency budget —
+          // it is a HANG GUARD for the one state the probe cannot report itself:
+          // a provider that never answers. See DEFAULT_PROBE_TIMEOUT_MS for the
+          // measurement, the ~50x headroom it gives the worst measured case, and
+          // the conditions that would reopen both numbers.
           const enrichment = await buildEnrichment(ctx, library)
           // T3-02/A30: through the SHARED mapping — this call used to spell the option
           // list out itself and had silently lost `liveness`, so every probe answered
