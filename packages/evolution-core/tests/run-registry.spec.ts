@@ -21,6 +21,7 @@ describe('core run registry (S2)', () => {
     await registry.load()
     const handle = registry.begin('maintain')
     expect(handle.kind).toBe('maintain')
+    expect(handle.startedAt).toBeGreaterThan(0)
     expect(handle.signal.aborted).toBe(false)
     expect(registry.inFlight('maintain')?.id).toBe(handle.id)
     expect(registry.lastSettledAt('maintain')).toBeUndefined()
@@ -45,7 +46,7 @@ describe('core run registry (S2)', () => {
     expect(registry.cancel(handle.id), 'a settled run is not cancellable').toBe(false)
   })
 
-  it('cancelAll stops every running run and reports how many there were', async () => {
+  it('cancelAll stops every run THIS process owns and reports how many', async () => {
     const dir = await home()
     const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
     await registry.load()
@@ -54,6 +55,22 @@ describe('core run registry (S2)', () => {
     expect(registry.cancelAll()).toBe(2)
     expect([first.signal.aborted, second.signal.aborted]).toEqual([true, true])
     expect(registry.runs().every(record => record.state === 'cancelled')).toBe(true)
+    expect(registry.cancelAll()).toBe(0)
+  })
+
+  it('refuses to cancel a run it does not own (no fabricated terminal state for a foreign run)', async () => {
+    const dir = await home()
+    const io = nodeEvolutionIo()
+    await writeFile(runsFile(dir), JSON.stringify({
+      schemaVersion: RUNS_SCHEMA_VERSION,
+      runs: [{ id: 'foreign', kind: 'maintain', state: 'running', startedAt: 1 }],
+    }), 'utf8')
+    const registry = newRunRegistry({ io, home: dir })
+    await registry.load()
+    // load() already converged it: a previous process life cannot be running.
+    expect(registry.find('foreign')?.state).toBe('failed')
+    // And an id this process never began is not cancellable, whatever it says.
+    expect(registry.cancel('foreign')).toBe(false)
     expect(registry.cancelAll()).toBe(0)
   })
 
@@ -109,5 +126,23 @@ describe('core run registry (S2)', () => {
     expect(persisted.runs.length).toBe(3)
     expect(persisted.runs.some(record => record.state === 'running'), 'the live run stays in the index').toBe(true)
     expect(DEFAULT_RUN_RECORDS).toBe(50)
+  })
+
+  it('merges the index across hosts instead of overwriting it (the planes share one home)', async () => {
+    const dir = await home()
+    const io = nodeEvolutionIo()
+    const first = newRunRegistry({ io, home: dir })
+    await first.load()
+    const mine = first.begin('maintain')
+    await first.settle(mine.id, { state: 'succeeded' })
+    // A second host over the SAME home has its own record; its write must keep mine.
+    const second = newRunRegistry({ io, home: dir })
+    await second.load()
+    const theirs = second.begin('maintain')
+    await second.settle(theirs.id, { state: 'failed', failure: 'elsewhere' })
+    const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ id: string }> }
+    const ids = persisted.runs.map(record => record.id)
+    expect(ids).toContain(mine.id)
+    expect(ids).toContain(theirs.id)
   })
 })

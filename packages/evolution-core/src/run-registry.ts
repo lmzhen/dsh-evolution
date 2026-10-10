@@ -32,6 +32,7 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { clampedNumber } from './numeric.ts'
+import { transactIo } from './io.ts'
 import type { EvolutionIoLike } from './io.ts'
 
 /** The kinds of long-running work the registry tracks. Extend as rows gain runs. */
@@ -118,6 +119,42 @@ export function runsFile(home: string): string {
 const TERMINAL: ReadonlySet<RunState> = new Set<RunState>(['succeeded', 'failed', 'cancelled'])
 
 /**
+ * Parse an index body into records.
+ *
+ * `ok: false` means the body could not be read as an index at all — the caller
+ * decides what to say (`load()` reports it; `persist()` merges with what it can).
+ * @param raw - the file's text, or null when it does not exist.
+ * @returns the parsed records and whether the body was an index.
+ */
+function parseIndex(raw: string | null): { ok: boolean; records: RunRecord[] } {
+  if (raw === null) return { ok: true, records: [] }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return { ok: false, records: [] }
+  }
+  const rows = (parsed as { runs?: unknown }).runs
+  if (!Array.isArray(rows)) return { ok: false, records: [] }
+  const records: RunRecord[] = []
+  for (const row of rows) {
+    const record = row as Partial<RunRecord>
+    if (typeof record.id !== 'string' || typeof record.startedAt !== 'number') continue
+    if (typeof record.kind !== 'string' || typeof record.state !== 'string') continue
+    records.push({
+      id: record.id,
+      kind: record.kind as RunKind,
+      state: record.state as RunState,
+      startedAt: record.startedAt,
+      ...(typeof record.endedAt === 'number' ? { endedAt: record.endedAt } : {}),
+      ...(typeof record.resultRef === 'string' ? { resultRef: record.resultRef } : {}),
+      ...(typeof record.failure === 'string' ? { failure: record.failure } : {}),
+    })
+  }
+  return { ok: true, records }
+}
+
+/**
  * Create the run registry for one mounted row.
  * @param options - io seam, evolution home, warn channel, clock and record cap.
  * @returns the registry; call {@link RunRegistry.load} once before answering reads.
@@ -147,10 +184,21 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
   const persist = async (): Promise<void> => {
     trim()
     try {
-      // trim() already bounded the terminal history and kept every running record:
-      // a second slice here could drop the LIVE run out of the index.
-      const body = JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: ordered() }, null, 2)
-      await options.io.writeText(path, body)
+      // Read-modify-write under the io backend's cross-process lock, and MERGE
+      // rather than overwrite: the desktop and web planes share one DSH_HOME, so
+      // two hosts each know their own runs and the index is their shared view.
+      // (trim() already bounded the terminal history and kept every running
+      // record — a second slice here could drop the LIVE run out of the index.)
+      await transactIo(options.io, path, async (current) => {
+        const merged = new Map<string, RunRecord>()
+        for (const record of parseIndex(current).records) merged.set(record.id, record)
+        // This process's own records win: it knows their state better than a file.
+        for (const record of records) merged.set(record.id, record)
+        const view = [...merged.values()].sort((a, b) => b.startedAt - a.startedAt)
+        const live = view.filter(record => record.state === 'running')
+        const done = view.filter(record => record.state !== 'running').slice(0, maxRecords)
+        return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done].sort((a, b) => b.startedAt - a.startedAt) }, null, 2)
+      })
     } catch (error) {
       warn(`evolution-core: could not persist the run index (${error instanceof Error ? error.message : String(error)})`)
     }
@@ -166,28 +214,20 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         // registry as a clean history (the same three-state rule the probe files use).
         return { ok: false, note: `run index unreadable: ${error instanceof Error ? error.message : String(error)}` }
       }
-      if (raw === null) return { ok: true }
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(raw)
-      } catch {
-        return { ok: false, note: 'run index is not JSON — the previous run history is unknown (the reports are unaffected)' }
+      const parsed = parseIndex(raw)
+      if (!parsed.ok) {
+        return { ok: false, note: 'run index could not be read as an index (not JSON, or no runs array) — the previous run history is unknown (the reports are unaffected)' }
       }
-      const rows = (parsed as { runs?: unknown }).runs
-      if (!Array.isArray(rows)) return { ok: false, note: 'run index carries no runs array — the previous run history is unknown' }
       let converged = 0
-      for (const row of rows) {
-        const record = row as Partial<RunRecord>
-        if (typeof record.id !== 'string' || typeof record.startedAt !== 'number') continue
-        if (typeof record.kind !== 'string' || typeof record.state !== 'string') continue
-        if (record.state === 'running') {
-          // The process that wrote this cannot be alive (it would hold the record
-          // in memory and never re-read it as running) — converge, do not guess.
-          converged++
-          records.push({ id: record.id, kind: record.kind as RunKind, state: 'failed', startedAt: record.startedAt, endedAt: now(), failure: 'interrupted by a host restart before it settled (orphan)' })
+      for (const record of parsed.records) {
+        if (record.state !== 'running') {
+          records.push(record)
           continue
         }
-        records.push({ id: record.id, kind: record.kind as RunKind, state: record.state as RunState, startedAt: record.startedAt, ...(typeof record.endedAt === 'number' ? { endedAt: record.endedAt } : {}), ...(typeof record.resultRef === 'string' ? { resultRef: record.resultRef } : {}), ...(typeof record.failure === 'string' ? { failure: record.failure } : {}) })
+        // The process that wrote this cannot be alive (it would hold the record in
+        // memory and never re-read it as running) — converge, do not guess.
+        converged++
+        records.push({ ...record, state: 'failed', endedAt: now(), failure: 'interrupted by a host restart before it settled (orphan)' })
       }
       if (converged > 0) await persist()
       return { ok: true, ...(converged > 0 ? { note: `${converged} run(s) interrupted by a host restart were recorded as failed(orphan)` } : {}) }

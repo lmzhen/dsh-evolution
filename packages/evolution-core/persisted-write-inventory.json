@@ -63,6 +63,24 @@
     "note": "Curator run reports + their retention sweep. The sweep is a multi-step list + delete-beyond-the-window over a DIRECTORY, so it has no per-file lock: v43 FLOW2-1 put it inside the IO backend's cross-process write lock (transactIo) on a per-home lock target, <evolutionHome>/reports/.retention (lock file <target>.lock, pid:token body). The former declaration here was instance-claim, which is in-process ONLY (instance-scope.ts is a module-scope Map). Two curator ROWS in one process still cannot sweep at once (the loser yields on that claim), and report writes are name-unique per runId. Trigger for the remaining gap: a second PROCESS sharing DSH_HOME now WAITS on the lock instead of sweeping concurrently, and on a backend without transact there is no lock at all, so the sweep degrades to best-effort idempotent deletes."
   },
   {
+    "id": "runs-index",
+    "path": "<evolutionHome>/runs.json",
+    "writer": "evolution-core/src/run-registry.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(options.io, path",
+    "state": [],
+    "note": "The run registry's index (0.19.0/S2): what is in flight, how each run ended, where its report lives. Read-modify-write under the IO backend's cross-process lock, and it MERGES instead of overwriting — the desktop and the web plane share one DSH_HOME, so two hosts each know their own runs and this file is their shared view. resultRef only POINTS at the report; results never live here."
+  },
+  {
+    "id": "maintain-reports",
+    "path": "<evolutionHome>/reports/maintain-*.json",
+    "writer": "evolution-commands/src/index.ts",
+    "serializedBy": "transact",
+    "marker": "transactIo(io, reportsSweepLockTarget()",
+    "state": [],
+    "note": "One report per maintenance run (0.19.0/S2), written once at settle by that run's owner under a name unique to the run, so the write itself needs no per-file lock. The retention sweep is multi-step (list the directory, then delete beyond the window) and takes the SAME per-home <evolutionHome>/reports/.retention lock the curator's sweep holds — one lock for one directory. On a backend without transact it degrades to idempotent best-effort deletes."
+  },
+  {
     "id": "skill-tree",
     "path": "<skillsRoot>/**",
     "writer": "evolution-core/src/skill-store.ts",
