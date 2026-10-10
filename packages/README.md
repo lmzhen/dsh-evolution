@@ -396,6 +396,27 @@ Prefixed keys: `evolutionIo` · `evolutionStateStorage` · `evolutionState` · `
 | `memory` | `memory` | the key predates the prefix rule and family readers use `ctx.memory` | group 6 (O-3): rename behind an alias window, or keep the registration |
 | `skillUsage` | `skill-usage` | same: a historical generic key with in-family readers | group 6 (O-3): rename behind an alias window, or keep the registration |
 
+## Why the judgment layer has no Cordis extension points (decision 4, provisional)
+
+The seams above are service definitions: a deployment swaps a medium and the family's rows keep working. The
+JUDGMENT layer is deliberately not opened the same way, and this is the measured state, not an omission:
+`evolution-policy` registers no policy provider (`registerProvider` / `policyFingerprint` — 0 sites), and no
+production file calls `ctx.bail(` / `ctx.waterfall(` / `ctx.parallel(` / `ctx.serial(` (0 of each), so nothing
+outside the family can currently stand in the path of "what gets remembered", "what is refused as a threat" or
+"what the reviewer is asked".
+
+The reason is ownership, not effort. Those three questions are the OPERATOR's, and today every one of them is
+answered by a named parameter with a documented default: the value has an owner column in `PARAMETERS.md`, a card
+in the settings page, and a doctor answer for "where did this value come from". A listener seat would let a third
+plugin change the answer *silently*, at a point where the family's own audit trail (`plan-applied`, the mutation
+ledger) can no longer name who decided — the family would keep reporting an outcome whose cause moved outside its
+records.
+
+If decision 4 is later settled as OPEN, the seat is not a bare `ctx.bail(...)`: it must ship with the two answers
+the audit names — who `policyFingerprint` covers (the provider's content, or the final snapshot — it feeds the
+`plan-applied` ledger and the KV-cache account) and how doctor names the provider a value came from — plus one case
+proving a second provider can win. Until then this section IS the open/close point, and it is the one place to edit
+when the answer changes.
 ## Extension points
 
 One change point per extension; a second edit anywhere else means the seam is
