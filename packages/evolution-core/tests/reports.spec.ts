@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -39,11 +39,34 @@ describe('core report retention sweep (S2: one sweep for every kind)', () => {
     expect(names.filter(name => /^curator-error-/.test(name))).toHaveLength(10)
     expect(names.filter(name => /^maintain-/.test(name))).toHaveLength(20)
     expect(names, 'an unrelated file is never touched').toContain('unrelated.txt')
-    // The window is the NEWEST n by declared time: 0..4 are gone, 24 survived.
     expect(names).not.toContain('curator-4.json')
     expect(names).toContain('curator-24.json')
     expect(names, 'the pruned report digest goes with it').not.toContain('curator-4.md')
     expect(names).toContain('curator-24.md')
+  })
+
+  it('prunes a curator-shaped fixture exactly like the curator own sweep did (S2 parity)', async () => {
+    const root = await dir()
+    const io = nodeEvolutionIo()
+    for (let i = 0; i < 25; i++) {
+      const startedAt = new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString()
+      await writeFile(join(root, `curator-seed-${i}.json`), JSON.stringify({ schemaVersion: 1, runId: `seed-${i}`, startedAt, finishedAt: startedAt }), 'utf8')
+    }
+    await writeFile(join(root, 'curator-corrupt.json'), '{not json', 'utf8')
+    const newest = new Date(Date.UTC(2026, 0, 2)).toISOString()
+    await writeFile(join(root, 'curator-real.json'), JSON.stringify({ runId: 'real', startedAt: newest }), 'utf8')
+    await sweepReports({
+      io,
+      dir: root,
+      buckets: [{ prefix: 'curator-error-', keep: 10 }, { prefix: 'curator-', keep: 20 }],
+      owner: 'evolution-curator',
+    })
+    const names = (await readdir(root)).filter(name => name.endsWith('.json')).sort()
+    // 20 kept + the corrupt one retention refuses to classify.
+    expect(names).toHaveLength(21)
+    expect(names).toContain('curator-corrupt.json')
+    expect(names).toContain('curator-real.json')
+    expect(names).not.toContain('curator-seed-0.json')
   })
 
   it('an UNLISTABLE directory deletes nothing and says so', async () => {
@@ -78,5 +101,13 @@ describe('core report retention sweep (S2: one sweep for every kind)', () => {
     await sweepReports({ io, dir: '/reports', buckets: [{ prefix: 'curator-', keep: 1 }], owner: 'test', warn: message => messages.push(message) })
     expect(removed, 'nothing orderable → nothing deleted').toEqual([])
     expect(messages.filter(message => message.includes('no usable timestamp'))).toHaveLength(1)
+  })
+
+  it('reads a report it cannot parse as unorderable, not as the oldest', async () => {
+    const root = await dir()
+    const io = nodeEvolutionIo()
+    await writeFile(join(root, 'curator-broken.json'), '{not json', 'utf8')
+    await sweepReports({ io, dir: root, buckets: [{ prefix: 'curator-', keep: 0 }], owner: 'test' })
+    expect(await readdir(root)).toContain('curator-broken.json')
   })
 })

@@ -25,7 +25,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -2169,19 +2169,6 @@ export class EvolutionCurator extends Service {
     }
     return undefined
   }
-}
-
-/**
- * v43 FLOW2-1: the per-home lock target for the report retention sweep.
- * `transactIo` takes the IO write lock on THIS path (minting `<path>.lock` with
- * the io protocol's `pid:token` body) and holds it for the whole task; nothing
- * ever writes the target, because the sweep's exclusion is the point. It lives
- * inside `<home>/reports` next to the directory it protects: the sweep's own
- * name filter (`curator-*.json`) ignores it, and the lock file is removed on
- * release.
- */
-function reportsSweepLockTarget(): string {
-  return join(evolutionHome(), 'reports', '.retention')
 }
 
 export default EvolutionCurator

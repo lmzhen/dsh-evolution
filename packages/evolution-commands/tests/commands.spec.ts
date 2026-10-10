@@ -445,8 +445,27 @@ describe('evolution-commands', () => {
     expect(support).toContain('old detail')
   })
 
+  /** A captured command handler, as these fixtures build it. */
+  type Handler = { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> }
+
+  /** 0.19.0 (S2): `/evolution maintain` answers with a POINTER — a test reads the
+   * outcome from the new surface instead of the command's text. Extracts the run id
+   * from the reply, then polls `maintain status <id>` until the run is terminal. */
+  async function settleMaintain(handler: Handler, started: { text: string }): Promise<string> {
+    const id = /Maintenance run (\S+) started/.exec(started.text)?.[1]
+    expect(id, `the command names its run: ${started.text}`).toBeTruthy()
+    for (let attempt = 0; attempt < 500; attempt++) {
+      const status = await handler.handler({ rawInput: `maintain status ${id}` })
+      if (!/\srunning\s/.test(status.text)) return id as string
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    throw new Error(`maintenance run ${id} never settled`)
+  }
+
   it('maintain enriches support files and reports pointer_missing truthfully (v11 P1-1)', async () => {
-    const dir = await tempRoot('evo-commands-enrich-')
+    // tempHome, not tempRoot: the run registry and the report live under the
+    // evolution home now, and a test must not write into the real one.
+    const dir = await tempHome('evo-commands-enrich-')
     const root = join(dir, 'skills')
     const skillDir = join(root, 'demo-skill')
     await mkdir(join(skillDir, 'references'), { recursive: true })
@@ -471,8 +490,13 @@ describe('evolution-commands', () => {
       },
     })
     await ctx.plugin(Commands, { root: root })
-    const result = await captured!.handler({ rawInput: 'maintain' })
-    expect(result.kind).toBe('success')
+    const started = await captured!.handler({ rawInput: 'maintain' })
+    expect(started.kind).toBe('success')
+    expect(started.text).toContain('keeps running after this reply')
+    const runId = await settleMaintain(captured!, started)
+    // The plan lives in the run's REPORT (the command only points at it).
+    const report = await captured!.handler({ rawInput: `maintain report ${runId}` })
+    expect(report.kind).toBe('success')
     // Enriched facts: the unlinked support file is reported as a real over,
     // never a fabricated pass/unknown.
     expect(capturedPrompt).toContain('signal=pointer_missing')
@@ -482,7 +506,7 @@ describe('evolution-commands', () => {
   })
 
   it('maintain --timeout overrides the subagent deadline for this run (0.3.4)', async () => {
-    const dir = await tempRoot('evo-commands-timeout-')
+    const dir = await tempHome('evo-commands-timeout-')
     const root = join(dir, 'skills')
     // A non-empty library: runMaintain short-circuits an EMPTY library before
     // the subagent start (so the signal capture below would stay undefined).
@@ -511,11 +535,14 @@ describe('evolution-commands', () => {
     expect(bad.text).toContain('Invalid --timeout')
     const good = await captured!.handler({ rawInput: 'maintain --timeout 600000' })
     expect(good.kind).toBe('success')
+    // The spawn happens inside the detached run: wait for it instead of assuming
+    // the command awaited it.
+    for (let attempt = 0; attempt < 500 && capturedSignal === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     expect(capturedSignal).toBeTruthy()
   })
 
   it('single-flight: a re-trigger during a running scan returns already-running and does not spawn (0.3.11)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'evo-commands-singleflight-'))
+    const dir = await tempHome('evo-commands-singleflight-')
     const root = join(dir, 'skills')
     await mkdir(join(root, 'demo-skill'), { recursive: true })
     await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
@@ -546,7 +573,7 @@ describe('evolution-commands', () => {
         },
       })
       await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-      const first = handler!.handler({ rawInput: 'maintain' }) // pends on the deferred run
+      const started = await handler!.handler({ rawInput: 'maintain' }) // answers immediately now; the scan stays in flight
       // 0.3.14 (P2-1): the flag is set BEFORE the first await, so a second
       // trigger racing inside the enrich window must already see "running" —
       // the old code exposed two spawns in this window.
@@ -563,11 +590,11 @@ describe('evolution-commands', () => {
       expect(second.text).toContain('already running')
       expect(starts).toBe(1) // no second spawn
       resolveRun!()
-      const settled = await first
-      expect(settled.kind).toBe('success')
-      // After settle the same invocation may run again.
+      await settleMaintain(handler!, started)
+      // After the run settles the same invocation may run again.
       const third = await handler!.handler({ rawInput: 'maintain' })
       expect(third.kind).toBe('success')
+      for (let attempt = 0; attempt < 500 && starts < 2; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
       expect(starts).toBe(2)
     } finally {
       if (resolveRun) resolveRun()
@@ -576,7 +603,7 @@ describe('evolution-commands', () => {
   })
 
   it('maintain survives a throwing enrichment: flag resets, cooldown updates, no naked reject (0.3.16 S6.1, E-5/E-39)', async () => {
-    const dir = await tempRoot('evo-commands-enrichfail-')
+    const dir = await tempHome('evo-commands-enrichfail-')
     const root = join(dir, 'skills')
     await mkdir(root, { recursive: true })
     const ctx = new Context()
@@ -592,9 +619,23 @@ describe('evolution-commands', () => {
     })
     ctx.provide('subagents', { async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } })
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 60_000 })
-    const first = await handler!.handler({ rawInput: 'maintain' })
-    expect(first.kind).toBe('error')
-    expect(first.text).toContain('Maintenance scan failed')
+    // 0.19.0 (S2): the command answers before the scan runs, so the failure is in
+    // the RUN (readable later), not in the command's result — the shape that left
+    // the single-flight flag stuck in 0.3.14 is structurally gone.
+    const started = await handler!.handler({ rawInput: 'maintain' })
+    expect(started.kind).toBe('success')
+    const runId = await settleMaintain(handler!, started)
+    const status = await handler!.handler({ rawInput: `maintain status ${runId}` })
+    expect(status.text).toContain('failed')
+    expect(status.text).toContain('Maintenance scan failed')
+    // No report was written (the run died before the plan): the reader says
+    // "no result" instead of rendering an empty plan (three-state honesty).
+    const report = await handler!.handler({ rawInput: `maintain report ${runId}` })
+    expect(report.kind).toBe('error')
+    // The fixture's io cannot even answer a read, so the reader lands on the
+    // "unreadable" branch rather than "no result" — what matters is that NEITHER
+    // of them renders as an empty plan.
+    expect(report.text).toMatch(/has NO result|could not be read/)
     // The flag was reset (no "already running") AND the failure updated the
     // cooldown (E-39) — the second trigger is cooldown-blocked, not
     // in-flight-blocked. V10-08 (F-04): cooldown-blocked is kind:'error'.
@@ -604,7 +645,7 @@ describe('evolution-commands', () => {
   })
 
   it('maintain grammar: unknown args rejected explicitly; = and multi-space timeout forms accepted (P3-2, F-03)', async () => {
-    const dir = await tempRoot('evo-commands-reject-')
+    const dir = await tempHome('evo-commands-reject-')
     const root = join(dir, 'skills')
     await mkdir(join(root, 'demo-skill'), { recursive: true })
     await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
@@ -625,6 +666,9 @@ describe('evolution-commands', () => {
     // grammar now (previously "Unknown maintain arguments" rejections).
     const equals = await handler!.handler({ rawInput: 'maintain --timeout=600000' })
     expect(equals.kind).toBe('success')
+    // Each trigger now starts a RUN: let it settle before the next one, or the
+    // next call is refused as "already running" (which is its own test).
+    await settleMaintain(handler!, equals)
     const spaced = await handler!.handler({ rawInput: 'maintain   --timeout 600000' })
     expect(spaced.kind).toBe('success')
   })
@@ -901,7 +945,7 @@ describe('evolution-commands', () => {
     // Self-contained library (temp root) — a clean CI HOME has no skills and
     // the empty-library short-circuit would skip the subagent, breaking the
     // model-call count assertion.
-    const dir = await tempRoot('evo-commands-cooldown-')
+    const dir = await tempHome('evo-commands-cooldown-')
     const root = join(dir, 'skills')
     const skillDir = join(root, 'demo-skill')
     await mkdir(skillDir, { recursive: true })
@@ -922,12 +966,87 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { maintainCooldownMs: 60_000, root: root })
     const first = await captured!.handler({ rawInput: 'maintain' })
     expect(first.kind).toBe('success')
+    // The cooldown window starts when a run SETTLES (registry), so the first run
+    // must finish before the second trigger can be cooldown-blocked rather than
+    // in-flight-blocked.
+    await settleMaintain(captured!, first)
     expect(starts).toBe(1)
     // V10-08 (F-04): the cooldown refusal is kind:'error' now.
     const second = await captured!.handler({ rawInput: 'maintain' })
     expect(second.kind).toBe('error')
     expect(second.text).toContain('cooldown')
     expect(starts).toBe(1)
+  })
+
+  it('0.19.0 (S2): status answers in flight and after settle, and report hands back the plan', async () => {
+    const dir = await tempHome('evo-commands-runstatus-')
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
+    const ctx = new Context()
+    let handler: Handler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    let release: (() => void) | undefined
+    const plan = { text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }
+    ctx.provide('subagents', {
+      async start() { return { result: new Promise(resolve => { release = () => { resolve(plan) } }) } },
+    })
+    await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
+    const started = await handler!.handler({ rawInput: 'maintain' })
+    const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
+    expect(id).toBeTruthy()
+    // In flight: both the list form and the by-id form say so.
+    const live = await handler!.handler({ rawInput: 'maintain status' })
+    expect(live.text).toContain(id)
+    expect(live.text).toContain('running')
+    // The spawn happens inside the detached run: wait for it before releasing it.
+    for (let attempt = 0; attempt < 500 && release === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    release!()
+    await settleMaintain(handler!, started)
+    const settled = await handler!.handler({ rawInput: `maintain status ${id}` })
+    expect(settled.text).toContain('succeeded')
+    const report = await handler!.handler({ rawInput: `maintain report ${id}` })
+    expect(report.kind).toBe('success')
+    expect(report.text).toContain('verdict=no_issues')
+    // An id nobody knows is NAMED, not silently empty.
+    const unknown = await handler!.handler({ rawInput: 'maintain status nope' })
+    expect(unknown.kind).toBe('error')
+    expect(unknown.text).toContain('No run nope')
+  })
+
+  it('0.19.0 (S2): cancel stops a running scan, settles it as cancelled, and refuses a second cancel', async () => {
+    const dir = await tempHome('evo-commands-runcancel-')
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody\n', 'utf8')
+    const ctx = new Context()
+    let handler: Handler | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    let capturedSignal: AbortSignal | undefined
+    let release: (() => void) | undefined
+    const plan = { text: 'x', output: [], stopReason: 'aborted' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }
+    ctx.provide('subagents', {
+      async start(_kind: string, options: unknown) {
+        capturedSignal = (options as { signal?: AbortSignal }).signal
+        return { result: new Promise(resolve => { release = () => { resolve(plan) } }) }
+      },
+    })
+    await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
+    const started = await handler!.handler({ rawInput: 'maintain' })
+    const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
+    for (let attempt = 0; attempt < 500 && capturedSignal === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    const cancelled = await handler!.handler({ rawInput: `maintain cancel ${id}` })
+    expect(cancelled.kind).toBe('success')
+    expect(capturedSignal?.aborted, 'cancel aborts the run, not the request').toBe(true)
+    const status = await handler!.handler({ rawInput: `maintain status ${id}` })
+    expect(status.text).toContain('cancelled')
+    // One terminal state: cancelling again reports that, instead of a success.
+    const again = await handler!.handler({ rawInput: `maintain cancel ${id}` })
+    expect(again.kind).toBe('error')
+    expect(again.text).toContain('already cancelled')
+    release?.()
   })
 
   it('binds the command registration to the fiber so unmount unregisters it (S6.2 E-29)', async () => {

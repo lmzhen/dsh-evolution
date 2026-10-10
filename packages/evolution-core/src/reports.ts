@@ -21,7 +21,27 @@
 
 import { join } from 'node:path'
 import { isPresent, isUnknown, probeList, probeMtime, reportTime } from './probe.ts'
+// `evolutionHome` is owned by state-store.ts (its ONLY definition) — importing it
+// from env.ts yields an undefined binding that only throws at call time.
+import { evolutionHome } from './state-store.ts'
 import type { EvolutionIoLike } from './io.ts'
+
+/**
+ * The lock target a reports sweep holds for one home.
+ *
+ * `transactIo` takes the IO write lock on THIS path (minting `<path>.lock` with
+ * the io protocol's `pid:token` body) and holds it for the whole task; nothing
+ * ever writes the target, because the sweep's exclusion is the point. It lives
+ * inside `<home>/reports` next to the directory it protects (the sweeps' own name
+ * filters ignore it, and the lock file is removed on release).
+ *
+ * Moved here from evolution-curator in 0.19.0 (S2): the maintenance reports'
+ * sweep needs the SAME exclusion, and a second lock would protect nothing.
+ * @returns the lock target path.
+ */
+export function reportsSweepLockTarget(): string {
+  return join(evolutionHome(), 'reports', '.retention')
+}
 
 /** One retention window: files whose name starts with `prefix`, newest `keep` survive. */
 export interface ReportBucket {

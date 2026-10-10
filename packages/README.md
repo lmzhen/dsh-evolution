@@ -147,7 +147,10 @@ pins the equality).
 | `/evolution skills health` | 技能库结构体检 |
 | `/evolution skills refresh` | 丢弃目录缓存并重新读取技能树 |
 | `/evolution learn [request]` | 向本会话发一条学习请求 |
-| `/evolution maintain [--timeout=<ms> \| --facts]` | 运行一次维护扫描（--facts 为 0 token 预览） |
+| `/evolution maintain [--timeout=<ms> \| --facts]` | 起一次维护扫描并立即回 run id（后台跑；--facts 为 0 token 预览） |
+| `/evolution maintain status [<id>]` | 看维护扫描：在飞的那次（含已跑多久）或某个 run 的终态 |
+| `/evolution maintain report <id>` | 读某个 run 的结果正文（没有结果就明说，不装成空结果） |
+| `/evolution maintain cancel <id>` | 停掉在飞的那次维护扫描 |
 | `/evolution migrate` | 把旧设置文档里家族的旧分区迁进现在的行（幂等；已迁移过就报「已一致」） |
 | `/evolution policy set <id> <value> [--expect <revision>]` | 通过设置服务写入一个你可改的参数 (E3 only; E1/E2 stay in cordis.yml) |
 | `/evolution params [--group <name>] [--json]` | 列出全部参数：分组、档位、生效时机、来源与当前值（--json feeds scripts) |

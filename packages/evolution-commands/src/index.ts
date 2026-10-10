@@ -18,7 +18,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import {
-  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionRoot, MAX_TIMER_DELAY_MS, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, type EvolutionIoLike, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
@@ -43,10 +43,11 @@ export interface Config {
    * of dropping it silently; the plugin never reads it as a root. */
   skillsRoot?: string | undefined
   /** Cooldown window for scan commands (ms) — misclick/rapid-trigger guard;
-   * secondary calls inside the window return the previous runId instead of
-   * spending another model call. Default 30s (0.3.5). NOTE: the window starts
-   * AFTER a run settles (lastMaintainAt updates post-run) — it does NOT dedupe
-   * in-flight runs, so the old 130s ">= timeout" rationale was a comment bug.
+   * secondary calls inside the window are refused instead of spending another
+   * model call. Default 30s (0.3.5). NOTE: the window starts AFTER a run settles
+   * (0.19.0/S2: the run registry's newest terminal time) — it does NOT dedupe
+   * in-flight runs; that refusal belongs to the registry's in-flight query, not
+   * to this window (the old 130s ">= timeout" rationale was a comment bug).
    * Transient (per-process). */
   maintainCooldownMs?: number | undefined
   /** Subagent deadline for one maintenance scan (ms). Default 600s (0.3.10):
@@ -79,6 +80,76 @@ export const Config = z.object({
 /** Enrichment maps shared by the full scan and the `--facts` preview (v12). */
 import { buildEnrichment, enrichmentSnapshotOptions } from '@deepseek-ai/dsh-evolution-maintenance'
 
+/** One maintenance run's durable record — the body of its report JSON (0.19.0 / S2). */
+interface MaintainReportRecord {
+  runId: string
+  verdict?: 'issues' | 'no_issues' | undefined
+  recommendationCount?: number | undefined
+  failure?: string | undefined
+  startedAt: number
+  endedAt: number
+  text: string
+}
+
+/** How one run reads in `maintain status` output. */
+function renderRunRecord(record: RunRecord): string {
+  const seconds = Math.max(1, Math.round(((record.endedAt ?? Date.now()) - record.startedAt) / 1000))
+  const parts = [`${record.id}  ${record.state}  ${seconds}s`]
+  if (record.failure !== undefined) parts.push(`— ${record.failure}`)
+  if (record.resultRef !== undefined) parts.push(`→ ${record.resultRef}`)
+  return parts.join(' ')
+}
+
+/**
+ * Write one run's result to its ONE home: `<evolutionHome>/reports/maintain-<id>.json`
+ * plus the `.md` digest, then sweep that window.
+ *
+ * A write failure does not fail the run — because the run has no result then, and
+ * `maintain report <id>` says exactly that instead of pretending otherwise.
+ * @param io - the evolution io seam.
+ * @param record - the run's outcome, as persisted.
+ * @param warn - warn channel for retention notes.
+ * @returns the report path, or `undefined` when nothing could be written.
+ */
+async function writeMaintainReport(io: EvolutionIoLike, record: MaintainReportRecord, warn: (message: string) => void): Promise<string | undefined> {
+  const dir = join(evolutionHome(), 'reports')
+  const path = join(dir, `maintain-${record.runId}.json`)
+  try {
+    await io.writeText(path, JSON.stringify(record, null, 2))
+    await io.writeText(join(dir, `maintain-${record.runId}.md`), record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text)
+  } catch {
+    return undefined
+  }
+  // One sweep for every kind (core/reports.ts): the maintenance window reuses the
+  // implementation the curator's reports already had, instead of a second copy.
+  // The SAME per-home reports lock the curator's sweep holds (v43 FLOW2-1 / N20):
+  // "list the directory, then delete beyond the window" is multi-step, and a
+  // second host over one home (the desktop and web planes share DSH_HOME) must
+  // not interleave with it.
+  await transactIo(io, reportsSweepLockTarget(), async () => {
+    await sweepReports({ io, dir, buckets: [{ prefix: 'maintain-', keep: 20 }], owner: 'evolution-commands', warn })
+    // The lock target itself is never written — the task exists to hold the lock.
+    return null
+  })
+  return path
+}
+
+/** Three-state read of a run's result: present, missing, or unreadable (never collapsed). */
+async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ kind: 'present'; text: string } | { kind: 'missing' } | { kind: 'unknown'; reason: string }> {
+  const path = record.resultRef ?? join(evolutionHome(), 'reports', `maintain-${record.id}.json`)
+  const probed = await probeText(io, path)
+  if (isUnknown(probed)) return { kind: 'unknown', reason: probed.reason }
+  if (!isPresent(probed)) return { kind: 'missing' }
+  try {
+    const parsed = JSON.parse(probed.value) as Partial<MaintainReportRecord>
+    const header = `Maintenance run ${record.id} — ${record.state}${record.failure === undefined ? '' : ` (${record.failure})`}`
+    const body = typeof parsed.text === 'string' && parsed.text.trim() !== '' ? parsed.text : renderRunRecord(record)
+    return { kind: 'present', text: `${header}\n${body}` }
+  } catch (error) {
+    return { kind: 'unknown', reason: `the report is not JSON (${error instanceof Error ? error.message : String(error)})` }
+  }
+}
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
   // E-7 (v18) → V27 G2.4 (M-08): one root key for the whole family. The
@@ -86,13 +157,33 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // load here instead of pointing at a root nobody reads.
   assertSkillsRootAliasRetired(rawConfig)
   const skillsRootValue = resolveRootConfig(rawConfig).root
-  let lastMaintainAt = 0
-  let lastMaintainRunId = ''
-  // 0.3.11 single-flight: 0.3.5 discovered the cooldown never covers in-flight
-  // runs (lastMaintainAt updates AFTER settle) — a re-submit during a run
-  // cancels it at the platform level. This flag answers re-triggers with
-  // "already running" instead of spawning a second scan.
-  let maintainInFlightSince = 0
+  // 0.19.0 (S2): what is in flight, how a run ended and where its result lives
+  // belong to core's run registry — ONE owner instead of three module globals
+  // (lastMaintainAt / lastMaintainRunId / maintainInFlightSince), which also lost
+  // every answer on a host restart. The registry is created with the io seam below
+  // and cancelled with it: work this plugin started must not outlive the plugin.
+  let runs: RunRegistry | undefined
+  ctx.inject(['evolutionIo'], (ioCtx) => {
+    const ioRegistry = ioCtx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+    if (!ioRegistry) return
+    const registry = newRunRegistry({
+      io: ioRegistry.provider(),
+      home: evolutionHome(),
+      warn: message => { ctx.logger.warn(message) },
+    })
+    runs = registry
+    void registry.load().then((loaded) => {
+      // A run the previous process life left behind is reported, not hidden.
+      if (!loaded.ok) ctx.logger.warn(`evolution-commands: the run index is not usable — ${loaded.note ?? 'unknown reason'}`)
+      else if (loaded.note !== undefined) ctx.logger.warn(`evolution-commands: ${loaded.note}`)
+    }).catch((error: unknown) => {
+      ctx.logger.warn(`evolution-commands: could not read the run index (${error instanceof Error ? error.message : String(error)})`)
+    })
+    ioCtx.effect(() => () => {
+      registry.cancelAll()
+      runs = undefined
+    }, 'evolution-commands.run-registry')
+  })
   ctx.inject(['commands'], (commandCtx) => {
     // V27 G5.2: the platform's own `Context.commands` augmentation + its
     // `CommandDefinition` type are the contract here (previously a local
@@ -575,12 +666,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // already tolerated and stays tolerated.
         const maintainArgs = /^maintain(?:\s+--timeout[ =](\d+))?\s*$/.exec(input)
         if (maintainArgs) {
-          // User-command maintenance scan (design 011): deterministic facts +
-          // one-shot subagent → validated plan display. No writes, no auto
-          // execution; fail-closed when either dependency is missing. Scope
-          // filtering is reserved (011 §3) — reject unknown args explicitly
-          // instead of silently swallowing them. `--timeout <ms>` (0.3.4)
-          // overrides the deadline for THIS run — no file edit, no restart.
+          // User-command maintenance RUN (design 011; async since 0.19.0 / S2).
+          // Deterministic facts + one-shot subagent → a validated plan that is
+          // PERSISTED as this run's report; the command only points at it. No
+          // writes to the skill tree, no auto execution, fail-closed when a
+          // dependency is missing. `--timeout <ms>` overrides the deadline for
+          // THIS run — no file edit, no restart.
           const runTimeoutMs = maintainArgs[1] ? Number(maintainArgs[1]) : (config.maintainTimeoutMs ?? 600_000)
           // V6-29 (0.3.36): AbortSignal.timeout throws a RangeError above 2^32-1
           // — reject the domain explicitly instead of surfacing the platform
@@ -597,120 +688,188 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               ? `Invalid --timeout value: expected a positive integer number of milliseconds up to ${MAX_TIMER_DELAY_MS} (e.g. /evolution maintain --timeout 600000).`
               : `The maintainTimeoutMs config is invalid: expected a positive integer number of milliseconds up to ${MAX_TIMER_DELAY_MS}. Fix the evolution-commands row config (maintainTimeoutMs), then retry.`)
           }
-          if (maintainInFlightSince > 0) {
-            const running = Math.max(1, Math.round((Date.now() - maintainInFlightSince) / 1000))
+          const registry = runs
+          if (!registry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
+          // I-5 (v37): the LOCAL view must match MaintainRuntime's tightened subagents
+          // contract ('spawn' + a platform-shaped request); a wider local type made the
+          // real service assignable while hiding a future miss from `tsc`.
+          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const subagents = ctx.get('subagents') as MaintainRuntime['subagents'] | undefined
+          if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
+          if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
+          // 0.19.0 (S2): the registry IS the concurrency guard — one owner for
+          // "is a scan running" and "when did the last one settle", instead of the
+          // three module globals that also lost the answer on a restart.
+          const running = registry.inFlight('maintain')
+          if (running) {
+            const elapsed = Math.max(1, Math.round((Date.now() - running.startedAt) / 1000))
             // V10-08 (F-04): a refused scan is NOT a successful scan — the
             // rejection returns kind:'error' so a consumer can distinguish
-            // "ran" from "refused" by the result type instead of matching
-            // prose. Behavior contract change (CHANGELOG-declared V10-08).
-            return err(`Maintenance scan is already running (since ~${running}s ago) — re-submitting now would cancel it. Wait for it to settle; the result appears when it finishes.`)
+            // "ran" from "refused" by the result type instead of matching prose.
+            return err(`Maintenance run ${running.id} is already running (started ~${elapsed}s ago) — re-submitting now would start a second scan. Status: /evolution maintain status ${running.id}; stop it: /evolution maintain cancel ${running.id}.`)
           }
           // V8-07 (0.3.47): the cooldown joins the clampedNumber family — a
           // NaN used to disable the cooldown silently (`NaN > 0` is false,
           // exactly the repeated-model-call case this guards) and ±Infinity
           // made every resubmission cooldown-blocked forever.
           const cooldownMs = clampedNumber(config.maintainCooldownMs, 30_000, { min: 0 })
-          const sinceLast = Date.now() - lastMaintainAt
+          const lastSettled = registry.lastSettledAt('maintain')
+          const sinceLast = lastSettled === undefined ? Number.POSITIVE_INFINITY : Date.now() - lastSettled
           if (cooldownMs > 0 && sinceLast < cooldownMs) {
             const remaining = Math.ceil((cooldownMs - sinceLast) / 1000)
-            // V10-08 (F-04): same contract as the in-flight refusal above —
-            // cooldown-blocked returns kind:'error' (behavior contract change).
-            // P3-21 (v14): a FAILED first scan also arms the cooldown but never
-            // records a runId, so the old wording printed "latest scan ;".
-            const latest = lastMaintainRunId === '' ? '' : ` — latest scan ${lastMaintainRunId}`
-            return err(`Maintenance cooldown active (${remaining}s)${latest}; re-running now would spend another model call.`)
+            // V10-08 (F-04): same contract as the in-flight refusal above.
+            // P3-21 (v14): the newest TERMINAL run is named from the registry, so a
+            // failed first scan no longer prints an empty id.
+            const latest = registry.runs().find(record => record.kind === 'maintain' && record.state !== 'running')
+            return err(`Maintenance cooldown active (${remaining}s)${latest === undefined ? '' : ` — latest run ${latest.id}`}; re-running now would spend another model call.`)
           }
+          const handle = registry.begin('maintain')
+          // Detached on purpose. The command answers with a POINTER while the scan
+          // keeps working: its lifetime is the handle's, and what stops it is
+          // `cancel <id>` or this plugin's dispose — NOT the requesting invocation.
+          // Measured: the desktop shell ends a request at ~305 s, which used to
+          // abort a scan that was still working (and the family's own 600 s budget
+          // could never fire first).
+          void (async (): Promise<void> => {
+            try {
+              const library = newSkillLibrary({ config: { root: skillsRootValue }, io: ioRegistry.provider() })
+              const enrichment = await buildEnrichment(ctx, library)
+              const outcome = await runMaintain(
+                {
+                  library,
+                  subagents,
+                  parent: invocation.agent,
+                  // E-55 (0.3.18): same-source model routing — the maintain subagent
+                  // reads evolutionPolicy.get().curatorModel exactly like the curator.
+                  // F-02: the tools registry rides along as a soft probe so
+                  // the orchestrator can degrade the subagent toolFilter when the
+                  // host bundle's maintenance_probe row is not mounted.
+                  evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() },
+                  tools: { get: (name: string) => (ctx.get('tools') as { get(name: string): unknown } | undefined)?.get(name) },
+                  logger: { warn: (message: string) => { ctx.logger.warn(message) } },
+                  // V27 M-02: the io seam lists a missing directory as empty, so
+                  // the orchestrator needs this probe to tell a misconfigured root
+                  // (an unexpanded `~`, a typo) from a genuinely empty library.
+                  // v30 LIST-02: the probe runs ONLY when the operator CONFIGURED
+                  // a root — `exists('')` is ENOENT, which would report every default
+                  // deployment's empty library as "the root does not exist".
+                  rootExists: skillsRootValue === '' ? undefined : () => ioRegistry.provider().exists(skillsRootValue),
+                  skillRoot: skillsRootValue,
+                },
+                {
+                  timeoutMs: runTimeoutMs,
+                  // 0.19.0 (S2): the run's OWN cancellation replaces
+                  // `invocation.signal` (E-6/v18) — a request that ends must not
+                  // end work that was started to outlive it.
+                  signal: handle.signal,
+                  // ONE id: the registry record, the persisted event and the
+                  // report file all name this run.
+                  runId: handle.id,
+                  // T3-02/A30: one object instead of a closure per field — the scan,
+                  // the preview and the probe read the SAME enrichment.
+                  enrichment: () => enrichment,
+                },
+              )
+              const endedAt = Date.now()
+              const resultRef = await writeMaintainReport(ioRegistry.provider(), {
+                runId: handle.id,
+                ...(outcome.ok ? { verdict: outcome.verdict, recommendationCount: outcome.recommendationCount } : {}),
+                ...(outcome.ok ? {} : { failure: handle.signal.aborted ? 'cancelled: the scan was stopped before it settled' : (outcome.error ?? 'Maintenance scan failed.') }),
+                startedAt: handle.startedAt,
+                endedAt,
+                text: outcome.text ?? '',
+              }, message => { ctx.logger.warn(message) })
+              const state = outcome.ok ? 'succeeded' : (handle.signal.aborted ? 'cancelled' : 'failed')
+              await registry.settle(handle.id, {
+                state,
+                ...(resultRef === undefined ? {} : { resultRef }),
+                ...(outcome.ok ? {} : { failure: handle.signal.aborted ? 'cancelled: the scan was stopped before it settled' : (outcome.error ?? 'Maintenance scan failed.') }),
+              })
+              if (outcome.ok) {
+                const home = evolutionRoot()
+                void appendEvolutionEvent(ioRegistry.provider(), eventsFile(home), {
+                  type: 'maintain',
+                  source: 'manual',
+                  runId: handle.id,
+                  verdict: outcome.verdict,
+                  // V10-09 (F-05): the count comes from the structured outcome
+                  // field (validated plan length) — the rendered text is display-only.
+                  recommendations: outcome.recommendationCount,
+                }).catch((error: unknown) => {
+                  ctx.logger.warn(`evolution-commands: failed to record maintain event: ${String(error)}`)
+                })
+              } else {
+                ctx.logger.warn(`evolution-commands: maintenance run ${handle.id} produced no plan (${outcome.error ?? 'unknown reason'})`)
+              }
+            } catch (error) {
+              // A throw is a settled run, not a stuck one: the registry gets the
+              // failure and the operator can read it back after a restart.
+              const aborted = handle.signal.aborted
+              const failure = aborted
+                ? 'cancelled: the scan was stopped before it settled'
+                : `Maintenance scan failed: ${error instanceof Error ? error.message : String(error)}`
+              await registry.settle(handle.id, { state: aborted ? 'cancelled' : 'failed', failure })
+              ctx.logger.warn(`evolution-commands: maintenance run ${handle.id} threw (${failure})`)
+            }
+          })()
+          return ok([
+            `Maintenance run ${handle.id} started — the scan keeps running after this reply.`,
+            `- status: /evolution maintain status ${handle.id}`,
+            `- result: /evolution maintain report ${handle.id}`,
+            `- stop:   /evolution maintain cancel ${handle.id}`,
+          ].join('\n'))
+        }
+        const maintainStatus = /^maintain\s+status(?:\s+(\S+))?\s*$/.exec(input)
+        if (maintainStatus) {
+          const registry = runs
+          if (!registry) return err('Evolution IO registry not mounted — run status unavailable.')
+          const wanted = maintainStatus[1]
+          if (wanted !== undefined) {
+            const record = registry.find(wanted)
+            if (!record) return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+            return ok(renderRunRecord(record))
+          }
+          const all = registry.runs().filter(record => record.kind === 'maintain')
+          if (all.length === 0) return ok('No maintenance run recorded in this home yet — /evolution maintain starts one.')
+          const live = all.filter(record => record.state === 'running')
+          const recent = all.filter(record => record.state !== 'running').slice(0, 5)
+          return ok([
+            live.length === 0 ? 'No maintenance run in flight.' : `In flight:\n${live.map(renderRunRecord).join('\n')}`,
+            recent.length === 0 ? '' : `Recent:\n${recent.map(renderRunRecord).join('\n')}`,
+          ].filter(part => part !== '').join('\n'))
+        }
+        const maintainReport = /^maintain\s+report\s+(\S+)\s*$/.exec(input)
+        if (maintainReport) {
+          const registry = runs
+          if (!registry) return err('Evolution IO registry not mounted — run results unavailable.')
+          const record = registry.find(maintainReport[1])
+          if (!record) return err(`No run ${maintainReport[1]} in this home — /evolution maintain status lists the recent ones.`)
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-          // I-5 (v37): the LOCAL view must match MaintainRuntime's tightened subagents
-          // contract ('spawn' + a platform-shaped request); a wider local type made the
-          // real service assignable while hiding a future miss from `tsc`.
-          const subagents = ctx.get('subagents') as MaintainRuntime['subagents'] | undefined
-          if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
-          if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
-          // 0.3.14 (P2-1): set the in-flight flag BEFORE the first await
-          // (enrichment is the slowest segment) so two re-triggers cannot both
-          // pass the guard. 0.3.16 (S6.1, E-5/E-39): the flag set, the
-          // enrichment and the scan are all INSIDE one try/finally — a thrown
-          // enrichment (IO error, unreadable root) previously left the flag
-          // non-zero forever (every later call: "already running", no log) and
-          // skipped the cooldown update. A throw is translated to a structured
-          // command error; finally resets the flag and the cooldown on success
-          // AND failure.
-          try {
-            maintainInFlightSince = Date.now()
-            const library = newSkillLibrary({ config: { root: skillsRootValue }, io: ioRegistry.provider() })
-            const enrichment = await buildEnrichment(ctx, library)
-            const outcome = await runMaintain(
-              // E-55 (0.3.18): same-source model routing — the maintain subagent
-              // reads evolutionPolicy.get().curatorModel exactly like the curator.
-              // F-02: the tools registry rides along as a soft probe so
-              // the orchestrator can degrade the subagent toolFilter when the
-              // host bundle's maintenance_probe row is not mounted (same
-              // `get(name)` accessor shape the platform registry exposes).
-              {
-                library,
-                subagents,
-                parent: invocation.agent,
-                evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() },
-                tools: { get: (name: string) => (ctx.get('tools') as { get(name: string): unknown } | undefined)?.get(name) },
-                logger: { warn: (message: string) => { ctx.logger.warn(message) } },
-                // V27 M-02: the io seam lists a missing directory as empty, so
-                // the orchestrator needs this probe to tell a misconfigured root
-                // (an unexpanded `~`, a typo) from a genuinely empty library.
-                // v30 LIST-02: the probe runs ONLY when the operator CONFIGURED
-                // a root — the previous wiring probed the RAW value, which is
-                // `''` under the default config, and `exists('')` is ENOENT →
-                // permanently false, so every default-deployment empty library
-                // was hard-reported as "the configured skill root does not
-                // exist" instead of the intended "nothing to do". A default
-                // (resolved) root that does not exist yet IS the genuinely
-                // empty state, so there is nothing to probe for it.
-                rootExists: skillsRootValue === '' ? undefined : () => ioRegistry.provider().exists(skillsRootValue),
-                skillRoot: skillsRootValue,
-              },
-              {
-                timeoutMs: runTimeoutMs,
-                // E-6 (v18): UI/session cancellation must stop the scan, not
-                // just wait for the 600s timeout.
-                signal: invocation.signal,
-                // T3-02/A30: one object instead of a closure per field — the scan, the
-                // preview and the probe now read the SAME enrichment through the same mapping.
-                enrichment: () => enrichment,
-              },
-            )
-            // P2-21 (F3, v11): a FAILED scan must keep the previous successful
-            // runId (the `?? ''` used to blank it, so the cooldown refusal
-            // rendered "latest scan ;").
-            if (outcome.ok) lastMaintainRunId = outcome.runId ?? ''
-            if (!outcome.ok) return err(outcome.error ?? 'Maintenance scan failed.')
-            const eventIo = ioRegistry.provider()
-            const home = evolutionRoot()
-            void appendEvolutionEvent(eventIo, eventsFile(home), {
-              type: 'maintain',
-              source: 'manual',
-              runId: outcome.runId,
-              verdict: outcome.verdict,
-              // V10-09 (F-05): the count comes from the structured outcome
-              // field (validated plan length) — the rendered text is
-              // display-only and is no longer parsed.
-              recommendations: outcome.recommendationCount,
-            }).catch((error: unknown) => {
-              ctx.logger.warn(`evolution-commands: failed to record maintain event: ${String(error)}`)
-            })
-            return ok(`Maintenance scan ${outcome.runId}:\n${outcome.text ?? ''}`)
-          } catch (error) {
-            return err(`Maintenance scan failed: ${error instanceof Error ? error.message : String(error)}`)
-          } finally {
-            maintainInFlightSince = 0
-            lastMaintainAt = Date.now()
+          if (!ioRegistry) return err('Evolution IO registry not mounted — run results unavailable.')
+          const probed = await readRunReport(ioRegistry.provider(), record)
+          // "no result" and "an unreadable result" must not look alike (the
+          // three-state rule the rest of the family follows).
+          if (probed.kind === 'missing') {
+            return err(`Run ${record.id} (${record.state}) has NO result: no report was written${record.failure === undefined ? '' : ` (${record.failure})`}.`)
           }
+          if (probed.kind === 'unknown') return err(`Run ${record.id} has a report that could not be read (${probed.reason}) — this is not "no result".`)
+          return ok(probed.text)
+        }
+        const maintainCancel = /^maintain\s+cancel\s+(\S+)\s*$/.exec(input)
+        if (maintainCancel) {
+          const registry = runs
+          if (!registry) return err('Evolution IO registry not mounted — run cancellation unavailable.')
+          const record = registry.find(maintainCancel[1])
+          if (!record) return err(`No run ${maintainCancel[1]} in this home — /evolution maintain status lists the recent ones.`)
+          if (!registry.cancel(record.id)) return err(`Run ${record.id} is already ${record.state} — nothing to cancel.`)
+          return ok(`Maintenance run ${record.id} cancelled — the scan stops at its next checkpoint. /evolution maintain status ${record.id} shows the terminal state.`)
         }
         if (/^maintain\b/.test(input)) {
           // 0.3.14 (P3-2): an input that STARTS with maintain but did not
           // match the grammar (unknown flags, stray args) was silently falling
           // into the help branch despite the branch comment claiming explicit
           // rejection. Reject it here.
-          return err('Unknown maintain arguments: expected bare `maintain`, `maintain --timeout <ms>` or `maintain --timeout=<ms>` (a positive integer). Got: ' + input)
+          return err('Unknown maintain arguments: expected `maintain`, `maintain --timeout <ms>` / `maintain --timeout=<ms>`, `maintain status [<id>]`, `maintain report <id>` or `maintain cancel <id>`. Got: ' + input)
         }
         const presetInstall = /^preset install(?: --base (\S+))?$/.exec(input)
         if (presetInstall !== null || /^preset\b/.test(input)) {

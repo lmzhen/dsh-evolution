@@ -58,6 +58,8 @@ export interface RunHandle {
   readonly id: string
   readonly kind: RunKind
   readonly signal: AbortSignal
+  /** When the run was registered — the same instant the record carries. */
+  readonly startedAt: number
 }
 
 /** How a run ended, as reported by its owner. */
@@ -193,11 +195,12 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
 
     begin(kind) {
       const id = randomUUID()
+      const startedAt = now()
       const controller = new AbortController()
       controllers.set(id, controller)
-      records.push({ id, kind, state: 'running', startedAt: now() })
+      records.push({ id, kind, state: 'running', startedAt })
       void persist()
-      return { id, kind, signal: controller.signal }
+      return { id, kind, signal: controller.signal, startedAt }
     },
 
     async settle(id, outcome) {
