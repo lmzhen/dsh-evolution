@@ -322,11 +322,11 @@ describe('evolution-skill-catalog', () => {
       name: 'gated',
       ...base,
       // Read BEFORE pausing, so scan A's invocation map holds the pre-mutation
-      // bytes; hold only its SECOND read of the target (the invocation-map pass
-      // that runs after `SkillLibrary.list()`).
+      // bytes. A22 folded the invocation pass into the scan's own read, so this is
+      // the scan's FIRST — and now only — read of the target.
       readText: async (path) => {
         const text = await base.readText(path)
-        if (path === target && (targetReads += 1) === 2) {
+        if (path === target && (targetReads += 1) === 1) {
           reached()
           await gate
         }
@@ -353,4 +353,34 @@ describe('evolution-skill-catalog', () => {
     expect(loaded?.invocation).toEqual(listed?.invocation)
   })
 
+  it('T2-07/A22: one listing reads each SKILL.md ONCE — the invocation map shares the scan read', async () => {
+    const root = await tempRoot('dsh-skill-catalog-one-read-')
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    const base = nodeEvolutionIo()
+    const names = ['alpha-skill', 'beta-skill', 'gamma-skill', 'delta-skill']
+    for (const name of names) {
+      const extra = name === 'beta-skill' ? 'disable-model-invocation: true\n' : ''
+      await base.writeText(join(root, name, 'SKILL.md'), `---\nname: ${name}\ndescription: ${name} summary.\n${extra}---\n\n# ${name}\n`)
+    }
+    let skillMdReads = 0
+    ctx.evolutionIo.registerProvider({
+      name: 'counting',
+      ...base,
+      readText: async (path) => {
+        if (path.endsWith('SKILL.md')) skillMdReads += 1
+        return await base.readText(path)
+      },
+    })
+    await ctx.plugin(Catalog, { root })
+    const listed = await ctx.skills.list({ cwd: root })
+    expect(listed.map(skill => skill.name).sort()).toEqual([...names].sort())
+    // ONE read per skill: the scan's read IS the invocation map's read. Before A22 the scan paid a
+    // second pass over every SKILL.md, so one refresh walked the whole tree twice.
+    expect(skillMdReads).toBe(names.length)
+    // ...and the per-skill frontmatter policy still wins over the row default.
+    expect(listed.find(skill => skill.name === 'beta-skill')?.invocation.modelInvocable).toBe(false)
+    expect(listed.find(skill => skill.name === 'alpha-skill')?.invocation.modelInvocable).toBe(true)
+  })
 })

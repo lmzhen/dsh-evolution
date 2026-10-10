@@ -120,6 +120,13 @@ export interface SkillSummary {
    * drift scans) saves the second per-skill read; the default stays body-free so
    * the common listing does not hold a whole tree in memory. */
   content?: string
+  /** T2-07/A22: the parsed frontmatter record, present only for
+   * {@link SkillLibrary.list} calls that pass `{ withFrontmatter: true }`. The
+   * listing parses the file it already read, so a consumer that derives a policy
+   * from frontmatter (the catalog’s invocation map) shares that ONE read instead
+   * of paying a second per-skill read. Absent when the file carries no parseable
+   * frontmatter — the same posture as its description. */
+  frontmatter?: Record<string, unknown>
 }
 
 /**
@@ -910,11 +917,12 @@ export class SkillLibrary {
   /**
    * Summarize the skill tree.
    * @param options - `withContent` attaches each skill's whole SKILL.md body to
-   * its summary (v35 C11): the read this listing already performs is the one the
-   * body would cost again, so a content-consuming caller pays no second pass.
+   * its summary (v35 C11), `withFrontmatter` its parsed frontmatter record
+   * (T2-07/A22): the read this listing already performs is the one either would
+   * cost again, so a caller pays no second pass over the tree.
    * @returns one summary per readable skill directory.
    */
-  async list(options: { withContent?: boolean } = {}): Promise<SkillSummary[]> {
+  async list(options: { withContent?: boolean; withFrontmatter?: boolean } = {}): Promise<SkillSummary[]> {
     const summaries: SkillSummary[] = []
     for (const name of await listNames(this.root, this.io)) {
       const dir = this.dirOf(name)
@@ -984,6 +992,7 @@ export class SkillLibrary {
         managed: hermesManaged === true,
         ...typeof parsedWhenToUse === 'string' && parsedWhenToUse.trim() !== '' ? { whenToUse: parsedWhenToUse } : {},
         ...options.withContent === true ? { content: md } : {},
+        ...options.withFrontmatter === true && parsed !== null ? { frontmatter: parsed.frontmatter } : {},
       })
     }
     return summaries

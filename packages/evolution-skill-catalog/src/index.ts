@@ -272,7 +272,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // successful scan repopulates normally.
     let scanned: SkillSummary[]
     try {
-      scanned = await library.list()
+      // T2-07/A22: ONE read per SKILL.md — the listing parses the frontmatter it already read,
+      // so the invocation map below derives from THAT record instead of a second pass over every
+      // file in the tree (the extra loop cost 2N reads per scan, so a refresh paid the tree twice).
+      scanned = await library.list({ withFrontmatter: true })
     } catch (error) {
       const message = `skill tree scan failed (${error instanceof Error ? error.message : String(error)}) — serving ${summariesCache?.length ?? 0} cached summaries`
       if (lastScanWarn !== message) {
@@ -289,21 +292,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       control?.invalidate()
       lastScanWarn = ''
     }
-    // OPT-10: rebuild the per-skill invocation map alongside the scan — one
-    // extra SKILL.md read per skill. A file whose frontmatter cannot be parsed
-    // keeps the row default (absent from the map), same posture as its
-    // description.
+    // OPT-10: the per-skill invocation map is built from the scan’s OWN read (A22). A file whose
+    // frontmatter cannot be parsed keeps the row default (absent from the map), same posture as
+    // its description.
     // S3-P2-10: with the names-based stamp (see `libraryStamp`) the scan runs
     // on real tree changes (name-set changes, event-driven invalidation) and
     // NO LONGER on every usage-counter flush — the sidecars still live in the
     // root, but their renames no longer move a stamp this provider reads.
     const invocationMap = new Map<string, SkillInvocationPolicy>()
     for (const summary of scanned) {
-      const raw = await io.readText(join(summary.path, 'SKILL.md')).catch(() => null)
-      if (raw === null) continue
-      const parsed = parseFrontmatter(raw)
-      if (!parsed) continue
-      invocationMap.set(summary.name, invocationFromFrontmatter(summary.name, parsed.frontmatter))
+      if (summary.frontmatter === undefined) continue
+      invocationMap.set(summary.name, invocationFromFrontmatter(summary.name, summary.frontmatter))
     }
     // P1-12: BOTH caches live under the guard — an unguarded invocationCache
     // write let a scan that started before a drop republish pre-mutation
