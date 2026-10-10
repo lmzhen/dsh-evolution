@@ -13,6 +13,7 @@ own, and the delivery mode lives on the `evolution-policy` row, not here.
 
 ## Known limitations
 
+- **The autonomous write leg does not pass `tools.guard`.** `executePlan` calls the service seam directly (`memory.applyBatch`, `library.*`), so the guard `evolution-threat` installs on the TOOL channel never sees these writes (`grep "tools.execute(" src` = 0 by design). The scan still happens one layer down: `MemoryStore` and `SkillLibrary` refuse threat-shaped payloads at the write point through core's own pattern table, which is the same table the guard consumes. A deployment that wants the tool channel's guard wording on a plan write should route it through a tool — nothing in the plan path claims that coverage.
 - The review's model/context routing below applies to `reviewMode: 'subagent'` (opt-in since 0.3.74); in the default `'inject'` mode the review runs on the parent agent's model inside the parent thread.
 - Review subagents are spawned with the plain `skill` tool only (`reviewToolAllow` default and the host/preset config both = `[skill]`: the DSH tool catalog has no `skill_search`/`skill_load` discovery pair, so the Hermes-lineage Anchored Standard `skill_search`/`skill_load` allow-list does not exist here).
 - Review subagents run as `spawn` children on the deployment default preset rather than inheriting the parent agent's composition (`fork`): a fork child is always promoted by the Anchored Standard bootstrap and its narrowed resident catalog would drop the plain `skill` tool from the review allow-list.

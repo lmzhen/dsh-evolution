@@ -22,7 +22,7 @@ async function mount(rawInput: string, options: FakeOptions = {}): Promise<{ kin
   const ctx = new Context()
   const writes: Write[] = []
   let captured: Handler | undefined
-  ctx.provide('commands', captureCommands((definition) => { captured = (definition as { run: Handler }).run }))
+  ctx.provide('commands', captureCommands((definition) => { captured = (definition as { handler: Handler }).handler }))
   ctx.provide('settings', {
     describe: () => [
       { ns: 'evolution-review', revision: options.revision ?? 4, user: options.user ?? {}, value: { reviewSkillInterval: 10, reviewEnabled: true, reviewMode: 'inject' } },
@@ -108,7 +108,7 @@ describe('policy set (G4/S4.2)', () => {
   it('refuses to write anything without the settings service', async () => {
     const ctx = new Context()
     let captured: Handler | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = (definition as { run: Handler }).run }))
+    ctx.provide('commands', captureCommands((definition) => { captured = (definition as { handler: Handler }).handler }))
     await ctx.plugin(Commands)
     const result = await captured!({ rawInput: 'policy set reviewSkillInterval 30' })
     expect(result.kind).toBe('error')

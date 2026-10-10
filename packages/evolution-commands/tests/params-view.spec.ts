@@ -18,7 +18,7 @@ function provideSettings(ctx: Context, descriptors: unknown[] | (() => unknown[]
 async function mount(rawInput: string, descriptors?: unknown[] | (() => unknown[])): Promise<{ kind: string; text: string }> {
   const ctx = new Context()
   let captured: Handler | undefined
-  ctx.provide('commands', captureCommands((definition) => { captured = (definition as { run: Handler }).run }))
+  ctx.provide('commands', captureCommands((definition) => { captured = (definition as { handler: Handler }).handler }))
   if (descriptors !== undefined) provideSettings(ctx, descriptors)
   await ctx.plugin(Commands)
   return await captured!({ rawInput })

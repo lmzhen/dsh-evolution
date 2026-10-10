@@ -114,21 +114,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // and rethrows; this surface's contract is a structured `{kind:'error'}`
     // with next-step guidance instead (doctor.ts already wraps the identical
     // `approval.list()` calls for the same reason).
-    const evolutionCommand = {
-      name: 'evolution',
-      description: '自进化：状态与待批准写入',
-      recordInput: false,
-      // input declaration: the frontend treats a declared-input command as
-      // args-tolerant (leading claim keeps the whole rest, spaces included) —
-      // without it, multi-word subcommands (skills health, curator run, …)
-      // submit as the bare `/evolution` and the handler only ever sees the
-      // help branch (field report 2026-08-31; /goal is the working precedent).
-      input: {
-        // F-03 + WD1 (0.3.55): the hint renders FROM the subcommand registry
-        // (single source with the help output and the README command table —
-        // T-WD2 pins the equality).
-        hint: renderHint(),
-      },
+    // T4-04 (A46): the body is NOT a member of the platform definition. `CommandDefinition`
+    // declares `name`/`description`/`recordInput`/`input`/`handler` and no `run`, so the extra key
+    // only travelled because the dispatcher ignores unknown keys — a shape a stricter platform
+    // (or a definition diff) would flag. The body keeps its own object so the ONE throw wrapper
+    // below (v28 G0.3) still nets every branch.
+    const commandBody = {
       run: async (invocation: CommandInvocation): Promise<CommandResult> => {
         // V24-12 (v24): collapse internal whitespace for DISPATCH. The grammar
         // matches are single-space exact forms (`pending --detail`, `skills
@@ -1059,8 +1050,25 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         return err(`/evolution ${input} is not a subcommand this build answers (a known subcommand whose argument is missing lands here too).\n${renderHint()}`)
       },
+    }
+    /** The registered definition: declared members only (A46). */
+    const evolutionCommand = {
+      name: 'evolution',
+      description: '自进化：状态与待批准写入',
+      recordInput: false,
+      input: {
+        // input declaration: the frontend treats a declared-input command as
+        // args-tolerant (leading claim keeps the whole rest, spaces included) —
+        // without it, multi-word subcommands (skills health, curator run, …)
+        // submit as the bare `/evolution` and the handler only ever sees the
+        // help branch (field report 2026-08-31; /goal is the working precedent).
+        // F-03 + WD1 (0.3.55): the hint renders FROM the subcommand registry
+        // (single source with the help output and the README command table —
+        // T-WD2 pins the equality).
+        hint: renderHint(),
+      },
       handler: (invocation: CommandInvocation): Promise<CommandResult> =>
-        evolutionCommand.run(invocation).catch((error: unknown): CommandResult => ({
+        commandBody.run(invocation).catch((error: unknown): CommandResult => ({
           kind: 'error',
           text: `evolution: command failed: ${error instanceof Error ? error.message : String(error)}\nRun /evolution doctor to inspect services and state files; a corrupted state file is quarantined as <file>.corrupt for inspection.`,
         })),

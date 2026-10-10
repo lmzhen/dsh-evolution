@@ -10,7 +10,10 @@ import type { ScanOptions } from '@deepseek-ai/dsh-evolution-core'
 import type { ToolGuard } from '@deepseek-ai/dsh-tools'
 
 export const name = 'evolution-threat'
-export const inject = ['tools']
+// T3-13 (A41): NO module-level `inject` export. The `tools` dependency is
+// declared once, by the reactive `ctx.inject(['tools'], …)` seat in `apply` below — the
+// Loader-level export and the seat were the same fact written twice, and only the seat
+// re-registers the guard when the row is remounted.
 
 export interface Config {
   enabled?: boolean
