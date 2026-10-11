@@ -22,6 +22,9 @@ Skeleton: `templates/command/registry-row.ts.tmpl`.
       second table or the stale row.*
 - [ ] Read-only commands say so and take no approval path; a command that writes
       goes through the same staged/approval surface as every other mutation.
+      Exception (E-70, `tool-skill-manage`): a lifecycle-flag flip (pin/unpin) stays
+      outside the seam whatever surface invokes it — staging it would let a request
+      that expires hold the library pinned invisibly. Say so in the row's summary.
 - [ ] Session-scoped behaviour of the command face: under the ① variant form the
       command stays visible in every session by design. — *stated once in
       `INSTALL.md` ("Known difference"); N19 fails a second copy.*
