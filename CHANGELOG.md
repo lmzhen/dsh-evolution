@@ -1,6 +1,17 @@
 # Changelog
 
 
+## 0.21.0 (minor) — 参数暴露面收口：每个旋钮都有档位与「为什么」，三个缺口补上用户层
+
+> **由来**：家族参数的「谁能改、改了何时生效、为什么没有设置项」此前只存在于人的记忆与文档里——注册表能声明档位，但「E3 却没有卡」在语法上完全合法（`evolution-approval.pendingTtlMs` 就是这么出门的）；`maintainHandoffOnSettle` 只能改 cordis.yml；`pin` 只有模型能调。本版把这三件事变成**数据与门禁能表达的事实**，按 `17`／`18` 的五组计划落地（G1 可达性收口 → G2 暴露声明 → G3 补卡 → G4 pin 用户面 → G5 归位），发布是唯一串行点。
+> **G1 可达性收口**：`verify-param-channel-parity` 的两处「按已登记命名空间取子集」去掉（「E3 行而 owner 无命名空间」这一类此前对门禁**不可见**）；限定名 id 与行 Config 裸键对齐（`evolution-approval.pendingTtlMs` 不再误报）；`pendingTtlMs` 补上用户层（`.volatile()` ＋ USE 时 `clampOnce` ＋ 自己的卡 ＋ `settings.configure({ auto: false })`）；doctor 把「owner 没有命名空间」与「行没挂载」拆成两句。
+> **G2 暴露声明**：注册表每行**恰好一个第四段暴露键**——E3 行写 `, card: '<本行 id>'`，非 E3 行写 `, why: '<六值枚举>'`；「E3 却没有卡」在语法上不可表达。101 行一次写全（35 `card` ＋ 66 `why`），三面从同一份数据派生：`PARAMETERS.md` 第 8 列「设置面」、客户端按 `card` 出卡并拒绝「没有 bundle 挂载的卡」、「`card` 必须等于本行 id」与「有卡的 namespace 必有 seat」进 `verify-param-registry`／`verify-client-seats`。夹具四格钉死「两键同现」「缺该档必填键」「生成器遇到未挂载卡」；两个文本解析器（.mjs 与 spec）改成**尾先循环剥键**，两键同现报出点名的契约违规而不是「读不懂」。
+> **G3 补卡**：`maintainHandoffOnSettle` 从 E2 升 E3（`applies: live`）并上 `evolution-commands` 卡（标题「维护扫描」）；字段 `.volatile()`、平台自建页关掉、读取改成两形（裸布尔与活引用都认——活引用下 `=== true` 恒假，开关会静默失效）；新增一格「同一实例两次扫描之间经写符号写活引用，行为随之改变」证明 `applies: live` 名副其实。
+> **G4 pin 用户面**：`/evolution skill pin <name>`／`unpin <name>`，复用 `skill_manage` 的同一个库方法（`setPinned`）与 E-70 的既定语义（在审批缝之外、不 bump usage、不发 mutation 事件、重复执行幂等）；README 命令钉表同步。
+> **G5 归位**：`qualityWarnStaleAfterDays` 降到部署面（`why: internal`），与它的另一半 `qualityWarnThreshold` 同档（同一功能的旋钮不许劈档，跨 owner 又不能并卡）；`autoStart` 保持部署面，并在行摘要与 curator README 写明「启动默认 vs 运行期 `curator pause`／`resume` 覆盖」；超时族与保留窗口族给出**不动**的判据（同 owner 功能组不许拆半）。收口读数：`audit-param-exposure.mjs` 三读数全 0。
+> **验收**：家族全量低并发 A/B（2 worker，204 文件）**修后失败集 ≡ 基线**（两侧同为 25 文件红，NEW=∅／FIXED=∅；首轮高并发跑多出的 3 个红在单跑下 140/140 全绿，属负载抖动，两轮读数都留档）。受影响夹具：`guard-scripts` 35/35（含新增四格）、`param-registry` 6/6、`maintain-handoff` 5/5（含新增「活写」一格）、`commands` 55/55（含 pin／unpin 两格）。参数面门禁：`verify-param-registry --strict` OK 101 行、`verify-param-channel-parity --strict` OK（7 E3 owner／7 namespace，curator 行 22 键 11 volatile）、两份生成物 `--check` 一致（7 namespace／35 field／3 bundle seat／19 row）、`verify-client-seats --strict` OK（7 行／7 卡／7 seat）、`verify-doc-facts` 0 violation、`audit-param-exposure.mjs` 三读数 0。**门禁牙口在真树逐条实测 11/11**（改坏即红且点名、随后逐字节还原）：E3 行缺键／两键同现／`card` 指别人／`why` 取值非法／E3 行字段没 `.volatile()`／owner 没 `settings.configure({ auto: false }, <fiber>)`／owner 行 Config 缺该键／多出一个没有 E3 行的 `.volatile()`／手改文档或客户端视图（STALE）／`card` 指向没有 bundle 挂载的行。**组可单独 revert 实测**：摘掉 G4 ⇒ 同批夹具 172/172 绿；摘掉 G5 ⇒ 139/139 绿（G1–G4 不依赖它）。`oxlint` 本批改动文件 0 error（唯一告警在 `curator:1685`，批次 hunk 之外）。
+> **切 tag 前的独立只读复核**：<复核结论>
+> **不做**：不做「未写决定的行按缺省解释＋到期」（长期解是声明必填、每行恰好一个键）；不给 `qualityWarnThreshold`／`autoStart` 建卡；不新开 pin 的设置卡；不把 pin 纳入审批缝；不为收口去改读侧门禁的判据。
 ## 0.20.0 (minor) — 维护报告的人机交接：`maintain handoff`（指针＋汇报协议）＋ `report`／`cancel` 省略 id
 
 > **由来**：维护扫描的结果此前只在框里回一段正文，用户看不到「改什么、为什么、能不能撤、要不要我确认」；本版把**报告变成不可变账本**，并把「谁来读、按什么规矩动手」交给一次注入完成。方案经七角色评审与平台覆盖差集（`todo`／`deliverables`／`spill` 全部复用，净工作量下降），并由用户裁定：**不新建命令、不接审批闸**，走提示词路线。
