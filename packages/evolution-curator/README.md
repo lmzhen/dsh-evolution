@@ -28,6 +28,7 @@ Deterministic skill lifecycle and recovery
 
 - `autoStart` (default true) arms an HOURLY tick that only asks whether the due-ness interval (`curatorIntervalHours`, default 168 h) has elapsed — the tick is not the interval — plus a deferred catch-up check `bootGraceSeconds` (default 10) after host boot. Both decide due-ness from the **persisted** `lastRunAt`, so a restart with an overdue schedule runs the first pass within the boot grace instead of waiting a full interval. `bootGraceSeconds: 0` disables the deferral (not recommended: the check may run against a half-mounted host). All scheduling gates — interval, idle, first-run deferral, and the reentrancy guard — remain inside `run()`.
 - `autoStart: false` disables both automatic checks; `/evolution curator run` (manual, gate-skipping) still works.
+- `autoStart` is the STARTUP default. The runtime switch is `/evolution curator pause` / `resume`: the pause is persisted in curation state, survives restarts, and wins over `autoStart` until it is cleared — turning `autoStart` off keeps curation manual, it does not freeze a schedule that is already paused or running.
 - Deprecated name (G0/S0.3): `intervalHours` is the legacy spelling of the policy
   row's `curatorIntervalHours`, whose value the snapshot shadows. Reading it still
   works; writing it is refused. Removal was planned for 0.7.0 and is deferred: the alias still ships, so no later version is claimed here.

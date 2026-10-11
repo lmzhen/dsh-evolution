@@ -96,7 +96,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `curatorIntervalHours` | E3 | live | cordis | evolution-curator | intervalHours | 卡：evolution-curator | Minimum hours between deterministic curation passes. |
 | `staleAfterDays` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Inactive days before a skill counts as stale. |
 | `archiveAfterDays` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Inactive days before a stale skill is archived (must be >= staleAfterDays). |
-| `qualityWarnStaleAfterDays` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Age at which a low quality score starts warning. |
+| `qualityWarnStaleAfterDays` | E2 | none | cordis | evolution-curator | — | 无（internal） | Age at which a low quality score starts warning (the pair of evolution-feedback.qualityWarnThreshold; both live on the deployment face so one bar is not half user-set). |
 | `minIdleHours` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Idle hours required before an automatic curation pass runs. |
 | `minIdleFailOpen` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Let the idle gate open when the activity probe is unavailable. |
 | `llmReview` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Enable the LLM nomination pass on top of the deterministic lifecycle. |
@@ -106,7 +106,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `healthStampDensityPerKb` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Stamp density per KB that flags log-like content in a body. |
 | `healthChurnMinPatches` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Patches without a read that flag a write-ghost skill. |
 | `evolution-curator.enabled` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Mount the curator plugin at all. |
-| `autoStart` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Arm the hourly due-ness tick with the plugin. |
+| `autoStart` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Arm the hourly due-ness tick with the plugin — the STARTUP default only; at runtime /evolution curator pause or resume overrides it (the override is persisted in curation state and wins until cleared). Off keeps curation manual. |
 | `bootGraceSeconds` | E2 | none | cordis | evolution-curator | — | 无（internal） | Grace period before the first automatic pass after a restart. |
 | `curatorProvider` | E2 | none | cordis | evolution-curator | — | 无（identity） | LLM provider for curator reviews (deployment identity). |
 | `curatorModel` | E2 | none | cordis | evolution-curator | — | 无（identity） | Model for curator reviews (deployment identity). |

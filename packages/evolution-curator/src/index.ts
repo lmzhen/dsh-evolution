@@ -75,7 +75,10 @@ export interface Config {
   llmReview?: Volatile<boolean>
   curatorProvider?: string
   /** Quality-warned skills may turn stale after this many idle days. */
-  qualityWarnStaleAfterDays?: Volatile<number>
+  /** Deployment face since 0.21.0/G5: the quality-warning pair (this window and feedback's
+   * threshold) moved to the deployment rows together, so the field is a plain number — no
+   * `.volatile()`, no user layer, and the reader must not unwrap a reference that never arrives. */
+  qualityWarnStaleAfterDays?: number | undefined
   /** Skip automatic runs while any session was active within this many hours (0 disables). */
   minIdleHours?: Volatile<number>
   /** When true (default), a missing `agents` service is treated as "no active
@@ -145,7 +148,7 @@ interface CuratorPolicyFields {
 
 /** The section's numeric fields — the ones a malformed (NaN/Infinity) user value
  * must not reach a comparison as-is. */
-type CuratorLiveNumberKey = 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays' | 'qualityWarnStaleAfterDays' | 'minIdleHours' | 'curatorReviewMaxTokens' | 'curatorReviewTimeoutMs' | 'healthSoftBodyChars' | 'healthStampDensityPerKb' | 'healthChurnMinPatches'
+type CuratorLiveNumberKey = 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays' | 'minIdleHours' | 'curatorReviewMaxTokens' | 'curatorReviewTimeoutMs' | 'healthSoftBodyChars' | 'healthStampDensityPerKb' | 'healthChurnMinPatches'
 
 type CuratorNumericKey = 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays'
   | 'qualityWarnStaleAfterDays' | 'minIdleHours' | 'curatorReviewMaxTokens'
@@ -232,7 +235,7 @@ export class EvolutionCurator extends Service {
     archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS).volatile(),
     llmReview: z.boolean().default(false).volatile(),
     curatorProvider: z.string().default('deepseek-official'),
-    qualityWarnStaleAfterDays: z.number().min(1).default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS).volatile(),
+    qualityWarnStaleAfterDays: z.number().min(1).default(DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS),
     // minIdleHours 0 is a legitimate "no idle gate" (the gate guard is `> 0`),
     // so its min is 0; negative values are rejected.
     minIdleHours: z.number().min(0).default(DEFAULT_MIN_IDLE_HOURS).volatile(),
@@ -440,6 +443,23 @@ export class EvolutionCurator extends Service {
   }
 
   /**
+   * One DEPLOYMENT numeric row field, clamped and warned once.
+   *
+   * The sibling of {@link rowNumber} for a field with no user layer (no `.volatile()`): it reads
+   * the config directly, because unwrapping a reference that never arrives would answer undefined
+   * and quietly fall back to the default. The clamp rule is the same one — a malformed value must
+   * not reach a comparison or a timer.
+   * @param key - the registry id of the field.
+   * @param fallback - the package default a corrected value falls back to.
+   * @param min - the smallest value the engine can act on.
+   * @param max - the largest value the carrier can hold, when bounded.
+   * @returns the value the engine may use.
+   */
+  private plainNumber(key: 'qualityWarnStaleAfterDays', fallback: number, min: number, max?: number): number {
+    return clampOnce(this.clampedKeys, this.clampWarn, key, this.config[key], fallback, min, max)
+  }
+
+  /**
    * One live boolean row field at USE time.
    * @param key - the canonical registry id of the field.
    * @param fallback - the value used when the deployment supplied none.
@@ -461,7 +481,7 @@ export class EvolutionCurator extends Service {
       curatorIntervalHours: number('curatorIntervalHours', DEFAULT_CURATOR_INTERVAL_HOURS, 1),
       staleAfterDays: number('staleAfterDays', DEFAULT_STALE_AFTER_DAYS, 1),
       archiveAfterDays: number('archiveAfterDays', DEFAULT_ARCHIVE_AFTER_DAYS, 1),
-      qualityWarnStaleAfterDays: number('qualityWarnStaleAfterDays', DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS, 1),
+      qualityWarnStaleAfterDays: this.plainNumber('qualityWarnStaleAfterDays', DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS, 1),
       minIdleHours: number('minIdleHours', DEFAULT_MIN_IDLE_HOURS, 0),
       minIdleFailOpen: this.rowBoolean('minIdleFailOpen', true),
       llmReview: this.rowBoolean('llmReview', false),
