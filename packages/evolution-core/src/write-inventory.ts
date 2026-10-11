@@ -45,12 +45,55 @@ export interface PersistedWriteSite {
 const SITES_URL = new URL('../persisted-write-inventory.json', import.meta.url)
 const SERIALIZATIONS: readonly string[] = ['transact', 'write-lock', 'instance-claim']
 
+/** One root symbol of the inventory's own legend. `segments` is the path tail the symbol appends to
+ * its base (empty for the home itself), and `basedOn` names the symbol it extends. The gate
+ * `verify-write-inventory.mjs` checks those segments against the resolver's SOURCE, so the legend
+ * cannot drift from the code that resolves it. */
+export interface WritePathSymbol {
+  /** Name of the core resolver that produces this root (or 'caller' for a caller-supplied path). */
+  readonly resolver: string
+  /** Path segments appended to the base root, in order. */
+  readonly segments: readonly string[]
+  /** The symbol this one extends, when it is not rooted at the DSH home itself. */
+  readonly basedOn?: string
+}
+
+/** The table's shape: a symbol legend plus the declared sites. */
+interface WriteInventoryTable {
+  symbols: Record<string, WritePathSymbol>
+  readonly sites: readonly PersistedWriteSite[]
+}
+
 /** Parse + validate the table. A malformed table throws at import: a table the
  * gate cannot read must never degrade into "no declared write sites". */
-function parseSites(raw: unknown): PersistedWriteSite[] {
-  if (!Array.isArray(raw)) throw new Error('evolution-core: persisted-write-inventory.json must be an array of sites')
+function parseTable(raw: unknown): WriteInventoryTable {
+  // The input is UNKNOWN JSON, so each narrowing below is a real runtime check (and each later check
+  // is written so the previous one already excluded its negation — the linter rejects tautologies).
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error('evolution-core: persisted-write-inventory.json must be an object with { symbols, sites }')
+  }
+  const table = raw as { symbols?: unknown; sites?: unknown }
+  // typeof null === 'object', so the explicit test stays: the field is UNKNOWN, not a typed record.
+  if (typeof table.symbols !== 'object' || table.symbols === null || Array.isArray(table.symbols)) {
+    throw new Error('evolution-core: persisted-write-inventory.json needs a symbols legend (the roots every path is written against)')
+  }
+  for (const [symbol, entry] of Object.entries(table.symbols)) {
+    const problems: string[] = []
+    if (!symbol.startsWith('<') || !symbol.endsWith('>')) problems.push('symbol name (must be <name>)')
+    if (typeof entry !== 'object' || entry === null) problems.push('entry')
+    else {
+      const symbolEntry = entry as { resolver?: unknown; segments?: unknown }
+      if (typeof symbolEntry.resolver !== 'string' || symbolEntry.resolver === '') problems.push('resolver')
+      if (symbolEntry.segments !== undefined
+        && (!Array.isArray(symbolEntry.segments) || symbolEntry.segments.some(segment => typeof segment !== 'string'))) problems.push('segments')
+    }
+    if (problems.length > 0) {
+      throw new Error(`evolution-core: persisted-write-inventory.json symbol ${symbol} is malformed (missing/invalid: ${problems.join(', ')})`)
+    }
+  }
+  if (!Array.isArray(table.sites)) throw new Error('evolution-core: persisted-write-inventory.json needs a sites array')
   const sites: PersistedWriteSite[] = []
-  for (const [index, entry] of raw.entries()) {
+  for (const [index, entry] of table.sites.entries()) {
     const site = entry as Partial<PersistedWriteSite>
     const problems: string[] = []
     if (typeof site.id !== 'string' || site.id === '') problems.push('id')
@@ -76,7 +119,8 @@ function parseSites(raw: unknown): PersistedWriteSite[] {
   }
   const ids = new Set(sites.map(site => site.id))
   if (ids.size !== sites.length) throw new Error('evolution-core: persisted-write-inventory.json declares duplicate site ids')
-  return sites
+  // Every entry was validated above, so the unknown JSON is now the table's own shape.
+  return { symbols: table.symbols as Record<string, WritePathSymbol>, sites }
 }
 
 /** Instance keys held by writer services — the single source shared by the
@@ -87,7 +131,10 @@ export const INSTANCE_KEYS = {
   curator: 'evolution-curator',
 } as const
 
-let cachedSites: PersistedWriteSite[] | undefined
+// Both caches are READONLY on purpose: the table's own shape is readonly, and copying it into a
+// mutable array would be a second source of truth for the same rows.
+let cachedSites: readonly PersistedWriteSite[] | undefined
+let cachedSymbols: Readonly<Record<string, WritePathSymbol>> | undefined
 
 /**
  * The declared persisted write sites, in file order.
@@ -112,8 +159,18 @@ export function persistedWriteSites(): readonly PersistedWriteSite[] {
     const cause = error instanceof Error ? error.message : String(error)
     throw new Error(`evolution-core: persisted-write-inventory.json is unreadable (${cause}) — the package asset is missing or was not shipped; the write-inventory rules cannot be evaluated without it`)
   }
-  cachedSites = parseSites(JSON.parse(raw) as unknown)
-  return cachedSites
+  const table = parseTable(JSON.parse(raw) as unknown)
+  cachedSites = table.sites
+  cachedSymbols = table.symbols
+  return table.sites
+}
+
+/** The inventory's symbol legend — the roots every declared path is written against, with the
+ * segments the gate checks against the resolver's source.
+ * @internal no production caller — the gates read the JSON asset directly. */
+export function writePathSymbols(): Readonly<Record<string, WritePathSymbol>> {
+  persistedWriteSites()
+  return cachedSymbols ?? {}
 }
 
 /** Sites serialized by the per-home instance claim, with their instance keys.

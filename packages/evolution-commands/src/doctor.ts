@@ -8,15 +8,17 @@
  * services are actually mounted in this runtime. Always ends with suggested
  * actions so any finding carries its next step.
  */
-import { readdirSync, readFileSync, existsSync } from 'node:fs'
-import type { Dirent } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { composePresetEntry, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, presetRowBlock, presetRowBody, presetRowId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import { readLegacyDocumentState } from './migration.ts'
 import { readPlatformView } from './platform-view.ts'
 import type { PlatformPlugin, PlatformPreset, PlatformView } from './platform-view.ts'
-import { FAMILY_PRESET_ID_STEM, PROFILE_PATCH_FILENAME, baseRefusalReason, resolvePresetBasePatch, type PresetProfileTarget } from './preset-source.ts'
+import { FAMILY_PRESET_ID_STEM, baseRefusalReason, resolvePresetBasePatch, type PresetProfileTarget } from './preset-source.ts'
+// G3: the ONE owner of <home>/profiles reads (scanProfiles is its only readdirSync).
+import { PROFILE_PATCH_FILENAME, homeProfiles, profileBundles, profilePatchText, readTextOrEmpty, scanProfiles } from './profiles.ts'
+import type { MountedProfile } from './profiles.ts'
 
 /** D-6 (v18): exact-segment tail match (the loose substring form matched a
  * hypothetical `dsh-evolution-allowlist`). */
@@ -243,6 +245,11 @@ export interface DoctorReport {
    * counterpart (inferred from the install form, P0-1) and may disagree on a
    * multi-profile machine; the render marks the aggregation explicitly. */
   bundles: string[]
+  /** G3 (0.22): profile directories under this home that are NOT the profile this process runs in.
+   * On a one-home-two-planes machine (or after a home clone) they are leftovers from the other
+   * plane: the write-path exclusion ignores them, while {@link bundles} still counts them — this
+   * list is what makes that difference visible instead of mysterious. */
+  foreignProfiles: string[]
   conflicts: string[]
   envIssues: string[]
   /** S0.2 (v37 P0-1): memory files carrying the platform's `{{` prompt-variable
@@ -308,50 +315,22 @@ export interface DoctorReport {
  * list alone, and treating it as "no bundles" is exactly the fail-open state
  * the double-mount exclusion exists to prevent. */
 export function collectEvolutionBundles(home: string, onReadError?: (error: unknown, scope: 'profiles-dir' | 'profile-manifest') => void): string[] {
-  const profilesDir = join(home, 'profiles')
-  if (!existsSync(profilesDir)) return []
-  const bundles: string[] = []
-  // v29 CMD-04: the directory enumeration itself is guarded — a `profiles`
-  // entry that is a FILE (ENOTDIR on readdir) or an unreadable home (EACCES)
-  // used to throw out of every caller (doctor, the preset-install refusal
-  // gate) instead of degrading to "no bundles seen". Per-profile manifest
-  // failures used to be swallowed entirely; they are now reported through the
-  // SAME channel (see `onReadError` and the per-profile catch below).
-  let profileEntries: Dirent[]
-  try {
-    profileEntries = readdirSync(profilesDir, { withFileTypes: true })
-  } catch (error) {
-    // v30 CMD-06: the enumeration failure is now REPORTABLE. The silent `[]`
-    // made the preset-install mutual-exclusion gate fail OPEN (an unreadable
-    // profiles dir looked like "no bundles" and the double-mounted install
-    // proceeded) and doctor rendered a confident `bundles: (none)`.
-    onReadError?.(error, 'profiles-dir')
-    return bundles
+  // G3: the directory is read by its ONE owner (profiles.ts). An unreadable profiles dir keeps its
+  // reportable failure (v30 CMD-06) — a silent [] would make the callers fail OPEN.
+  const scan = scanProfiles(home)
+  if (scan.kind === 'unreadable') {
+    onReadError?.(scan.error, 'profiles-dir')
+    return []
   }
-  for (const profile of profileEntries) {
-    if (!profile.isDirectory()) continue
-    // v34 INST-01: the per-profile manifest failure is fail-closed on the same
-    // channel as the enumeration failure. A torn/truncated `package.json`
-    // (INST-01's exact corruption) parsed as "no bundles in this profile", so
-    // a home whose ONE profile declared `dsh-evolution-all` reported
-    // `bundles: (none)` and the preset-install mutual-exclusion gate let the
-    // double-mounted install through. A manifest that cannot be read is not
-    // evidence of absence — report it and let each caller decide.
-    // S2.1 (v37 P1-3): `profiles/node_modules` is a PLATFORM-created directory
-    // (`app-boot` heals the profile module fallback there on every launch) and
-    // never carries a manifest. Reading it as a torn profile made every healthy
-    // install fail the preset-install exclusion gate and print a fake DEGRADED
-    // conflict. Dot-entries are not profiles either.
-    if (profile.name === 'node_modules' || profile.name.startsWith('.')) continue
+  const bundles: string[] = []
+  for (const { dir } of scan.profiles) {
     let raw: string
     try {
-      raw = readFileSync(join(profilesDir, profile.name, 'package.json'), 'utf8')
+      raw = readFileSync(join(dir, 'package.json'), 'utf8')
     } catch (error) {
-      // ENOENT means "this directory is not a profile", not "a profile manifest
-      // is torn" — only a REAL read failure (EACCES/EIO) is fail-closed.
-      // v43 S1-4: deliberately NARROWER than core/probe.ts's isMissingPath — in
-    // this walk ENOENT means "this directory is not a profile", not "the file I
-    // asked for is absent"; ENOTDIR/EACCES must keep failing loud. Do not merge.
+      // ENOENT means the directory stopped being a profile between the scan and this read; only a
+      // REAL read failure (EACCES/EIO) is fail-closed (v43 S1-4 keeps this narrower than core's
+      // isMissingPath on purpose).
       if ((error as { code?: string } | undefined)?.code === 'ENOENT') continue
       onReadError?.(error, 'profile-manifest')
       continue
@@ -478,67 +457,6 @@ interface BaseRow {
   unsupported?: string
 }
 
-/** The bundle rows one profile manifest mounts (scope-agnostic, as written) — the target a preset
- * recompute resolves its platform base patch through.
- * @param profileDir - the profile directory.
- * @returns the bundle names; empty when the manifest is missing or torn.
- */
-function profileBundles(profileDir: string): string[] {
-  try {
-    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: unknown } } }
-    const bundles = manifest.dsh?.profile?.bundles
-    return Array.isArray(bundles) ? bundles.filter((name): name is string => typeof name === 'string') : []
-  } catch {
-    return []
-  }
-}
-
-/** Every profile directory under one DSH_HOME, by name.
- * @param home - resolved DSH_HOME.
- * @returns `{ profile, dir }` per directory under `profiles/` that carries a manifest.
- */
-function profileDirectories(home: string): Array<{ profile: string; dir: string }> {
-  const out: Array<{ profile: string; dir: string }> = []
-  const root = join(home, 'profiles')
-  let entries: Dirent[]
-  try {
-    entries = readdirSync(root, { withFileTypes: true })
-  } catch {
-    // No profiles yet: nothing is installed, which is the caller's `none` form.
-    return out
-  }
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) continue
-    // `profiles/node_modules` is created by app-boot on every launch and never
-    // holds a manifest (S2.1): it is not a profile.
-    if (entry.name === 'node_modules') continue
-    const dir = join(root, entry.name)
-    if (!existsSync(join(dir, 'package.json'))) continue
-    out.push({ profile: entry.name, dir })
-  }
-  return out
-}
-
-/** One optional file's text, or `''` when it is absent or unreadable.
- * @param path - the file to read.
- * @returns the text.
- */
-function readTextOrEmpty(path: string): string {
-  try {
-    return readFileSync(path, 'utf8')
-  } catch {
-    return ''
-  }
-}
-
-/** The profile patch text, or `''` when the profile has none.
- * @param profileDir - the profile directory.
- * @returns the patch text.
- */
-function profilePatchText(profileDir: string): string {
-  return readTextOrEmpty(join(profileDir, PROFILE_PATCH_FILENAME))
-}
-
 /** Every USER-layer patch text that can carry a family preset row: each profile's own patch, then
  * the home layer (`<home>/cordis.patch.yml`), which the platform composes AFTER the profile layer
  * (`readProfilePatches` in `packages/boot/app-boot/src/profile-context.ts`). A row written there
@@ -548,7 +466,7 @@ function profilePatchText(profileDir: string): string {
  * @returns the patch texts that exist, in profile-then-home order.
  */
 function userPatchTexts(home: string): string[] {
-  const texts = profileDirectories(home).map(({ dir }) => profilePatchText(dir))
+  const texts = homeProfiles(home).map(({ dir }) => profilePatchText(dir))
   texts.push(readTextOrEmpty(join(home, PROFILE_PATCH_FILENAME)))
   return texts.filter(text => text !== '')
 }
@@ -636,7 +554,7 @@ function probePresetFreshness(home: string, servicePresent: (name: string) => bo
       deltaFailure = `${deltaPath} could not be read (${error instanceof Error ? error.message : String(error)})`
     }
   }
-  const profiles = profileDirectories(home)
+  const profiles = homeProfiles(home)
   if (bases === null) {
     // No table means no base can be NAMED, but an installed row is still
     // visible in the patch — report it as unknown instead of silently clean.
@@ -735,9 +653,10 @@ async function legacyMigrationRow(ctx: { get(name: string): unknown }, home: str
 
 export async function diagnose(
   ctx: { get(name: string): unknown },
-  options: { home?: string } = {},
+  options: { home?: string; mounted?: MountedProfile } = {},
 ): Promise<DoctorReport> {
   const home = options.home ?? evolutionRoot()
+  const mounted = options.mounted
   const conflicts: string[] = []
   const bundles = collectEvolutionBundles(home, (error, scope) => {
     // v30 CMD-06: the degraded enumeration must be visible — a silent `[]`
@@ -956,8 +875,14 @@ export async function diagnose(
     actions.push(`Preset row for base "${row.base}" in ${row.destination} DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
   }
 
+  // G3: which profiles under this home are NOT this plane. Read from the same owner module as the
+  // rest of the profile surface; the mounted identity is handed in by the caller (one probe for it
+  // exists in preset-source.ts — doctor must not add a second).
+  const foreignProfiles = homeProfiles(home)
+    .filter(({ profile, dir }) => mounted === undefined || (profile !== mounted.profile && dir !== mounted.dir))
+    .map(({ profile }) => profile)
   return {
-    installForm, deploymentForm, bundles, conflicts, envIssues: env, memoryIssues, budgetIssues,
+    installForm, deploymentForm, bundles, foreignProfiles, conflicts, envIssues: env, memoryIssues, budgetIssues,
     paramIssues, queryIssues, services, capabilityAbsence,
     pendingCount, executingCount, presetFreshness, scopedProbe, legacy,
     runtimeBundles: runtimeBundles ?? null,
@@ -1157,6 +1082,9 @@ export function renderDoctorText(report: DoctorReport): string {
     lines.push(`preset:   ${row.base} → ${row.destination}  ${verdict}`)
   }
   if (report.presetIssues.length > 0) lines.push('agent presets:', ...report.presetIssues.map(line => `  ! ${line}`))
+  if (report.foreignProfiles.length > 0) {
+    lines.push('profiles-foreign: ' + report.foreignProfiles.join(', ') + ' — not part of this plane: /evolution preset install ignores them, while the bundles (all profiles) line above counts them')
+  }
   if (report.conflicts.length > 0) lines.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
   if (report.memoryIssues.length > 0) lines.push('memory:', ...report.memoryIssues.map(line => `  ! ${line}`))

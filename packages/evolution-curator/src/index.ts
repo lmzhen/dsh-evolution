@@ -24,7 +24,7 @@ import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deeps
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
@@ -423,11 +423,11 @@ export class EvolutionCurator extends Service {
    * @param key - the canonical registry id of the field.
    * @returns the current plain value, or undefined when nothing supplied one.
    */
-  private liveNumber(key: CuratorLiveNumberKey): number | undefined {
+  private rowValue(key: CuratorLiveNumberKey): number | undefined {
     // G0/S0.4: the legacy spelling stays readable (PARAM_ALIASES) — the canonical
     // volatile field wins, its plain alias field answers when nothing set the canonical one.
-    if (key === 'curatorIntervalHours') return this.config.curatorIntervalHours?.get() ?? this.config.intervalHours
-    return this.config[key]?.get()
+    if (key === 'curatorIntervalHours') return unwrapLive(this.config.curatorIntervalHours) ?? this.config.intervalHours
+    return unwrapLive(this.config[key])
   }
 
   /**
@@ -439,7 +439,7 @@ export class EvolutionCurator extends Service {
    * @returns the value the engine may use.
    */
   private rowNumber(key: CuratorLiveNumberKey, fallback: number, min: number, max?: number): number {
-    return clampOnce(this.clampedKeys, this.clampWarn, key, this.liveNumber(key), fallback, min, max)
+    return clampOnce(this.clampedKeys, this.clampWarn, key, this.rowValue(key), fallback, min, max)
   }
 
   /**
@@ -466,7 +466,7 @@ export class EvolutionCurator extends Service {
    * @returns the current value.
    */
   private rowBoolean(key: 'minIdleFailOpen' | 'llmReview', fallback: boolean): boolean {
-    return this.config[key]?.get() ?? fallback
+    return liveBool(this.config[key], fallback)
   }
 
   /**

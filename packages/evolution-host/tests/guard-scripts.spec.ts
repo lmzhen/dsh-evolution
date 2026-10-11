@@ -355,10 +355,15 @@ describe('guard scripts (V4-30 sentry)', () => {
     await writeFile(writer, 'export const plain = 1\n', 'utf8')
     await mkdir(join(root, 'evolution-core'), { recursive: true })
     const inventory = join(root, 'evolution-core', 'persisted-write-inventory.json')
-    const table = (over: Record<string, unknown>) => JSON.stringify([{
-      id: 'demo', path: '<home>/demo.json', writer: 'demo-pkg/src/index.ts',
-      serializedBy: 'transact', marker: 'transactIo(', state: [], note: 'fixture', ...over,
-    }])
+    // The asset is an envelope: a symbol legend plus the sites (G2). The fixture declares its own
+    // symbol so the "path symbols must come from the legend" half of N20 is satisfied here.
+    const table = (over: Record<string, unknown>, symbols: Record<string, unknown> = { '<home>': { resolver: 'evolutionRoot', segments: [] } }) => JSON.stringify({
+      symbols,
+      sites: [{
+        id: 'demo', path: '<home>/demo.json', writer: 'demo-pkg/src/index.ts',
+        serializedBy: 'transact', marker: 'transactIo(', state: [], note: 'fixture', ...over,
+      }],
+    })
     const runGuards = () => run(process.execPath, [archGuards, root, '--strict'], { encoding: 'utf8' })
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string; stdout?: string })
     // The incident shape: the row CLAIMS a cross-process lock no writer takes —
@@ -390,10 +395,20 @@ describe('guard scripts (V4-30 sentry)', () => {
     expect(gone?.code).toBe(1)
     expect(gone?.stderr).toContain('which does not exist')
     // Vacuity sentry: an empty table is not a pass either.
-    await writeFile(inventory, '[]', 'utf8')
+    await writeFile(inventory, '{"symbols":{},"sites":[]}', 'utf8')
     const empty = await runGuards()
     expect(empty?.code).toBe(1)
     expect(empty?.stderr).toContain('declares no write site')
+    // G2 drill: a path naming a root the legend does not declare (the symbol half of N20).
+    await writeFile(inventory, table({ path: '<ghost>/x.json' }), 'utf8')
+    const unregistered = await runGuards()
+    expect(unregistered?.code).toBe(1)
+    expect(unregistered?.stderr).toContain('the legend declares no <ghost> root')
+    // G2 drill: a path with no leading symbol is unauditable.
+    await writeFile(inventory, table({ path: 'logs/x.json' }), 'utf8')
+    const unsymbolized = await runGuards()
+    expect(unsymbolized?.code).toBe(1)
+    expect(unsymbolized?.stderr).toContain('without a leading <root> symbol')
   })
 
   it('S3-3: no runtime source cites the gitignored docs path', () => {

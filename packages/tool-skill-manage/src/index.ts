@@ -24,9 +24,9 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampedNumber, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
-import type { CitationPolicy, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
+import type { CitationPolicy, LiveValue, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from './write-gates.ts'
@@ -539,15 +539,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // this clamp also covers NaN/±Infinity. G1 §8.3: the read happens at USE time, so the
   // correction warns once per KEY per mount instead of once at assembly.
   const clampedKeys = new Set<string>()
-  const limit = (name: string, value: number | Volatile<number | undefined> | undefined, fallback: number): number => {
-    const current = typeof value === 'object' ? value.get() : value
-    const result = clampedNumber(current, fallback, { min: 1 })
-    if (current !== undefined && result !== current && !clampedKeys.has(name)) {
-      clampedKeys.add(name)
-      ctx.logger.warn(`tool-skill-manage: ${name} provided an invalid value; falling back to the default`)
-    }
-    return result
-  }
+  const limit = (name: string, value: LiveValue<number>, fallback: number): number =>
+    clampOnce(clampedKeys, (message) => ctx.logger.warn(message), `tool-skill-manage: ${name}`, value, fallback, 1)
   /**
    * This row's write knobs as they stand RIGHT NOW (G1 §8.3) — the base layer of the
    * precedence chain. The ten E3 keys are live references the platform updates in
@@ -556,15 +549,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * @returns the row layer of the write settings.
    */
   const rowSettings = (): SkillSettings => ({
-    skillContentChars: limit('maxSkillContentChars', rawConfig.skillContentChars?.get() ?? rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
+    skillContentChars: limit('maxSkillContentChars', unwrapLive(rawConfig.skillContentChars) ?? rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
     maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
     maxSkillNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
     maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),
-    descriptionStrict: rawConfig.descriptionStrict?.get() ?? false,
-    strictCrossSource: rawConfig.strictCrossSource?.get() ?? false,
-    citationPolicy: rawConfig.citationPolicy?.get() ?? DEFAULT_CITATION_POLICY,
-    supportFileCharPolicy: rawConfig.supportFileCharPolicy?.get() ?? DEFAULT_SUPPORT_FILE_CHAR_POLICY,
-    skillWriteConfirm: rawConfig.skillWriteConfirm?.get() ?? DEFAULT_WRITE_CONFIRM_MODE,
+    descriptionStrict: liveBool(rawConfig.descriptionStrict),
+    strictCrossSource: liveBool(rawConfig.strictCrossSource),
+    citationPolicy: unwrapLive(rawConfig.citationPolicy) ?? DEFAULT_CITATION_POLICY,
+    supportFileCharPolicy: unwrapLive(rawConfig.supportFileCharPolicy) ?? DEFAULT_SUPPORT_FILE_CHAR_POLICY,
+    skillWriteConfirm: unwrapLive(rawConfig.skillWriteConfirm) ?? DEFAULT_WRITE_CONFIRM_MODE,
     skillWriteConfirmTimeoutSeconds: limit('skillWriteConfirmTimeoutSeconds', rawConfig.skillWriteConfirmTimeoutSeconds, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS),
   })
   // S2.9 (T3-10): the settings user-layer KEY read is ONE core function (`userSetKeys`); this row

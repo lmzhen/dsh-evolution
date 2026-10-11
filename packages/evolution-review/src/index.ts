@@ -22,8 +22,8 @@ import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, evolutionIoAdapter, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampOnce, pickWithPolicy, userSetKeys, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
-import type { SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
+import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampOnce, pickWithPolicy, userSetKeys, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import type { LiveValue, SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 // v37 P7a: the platform dispatch vocabulary is read in ONE place —
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
@@ -425,13 +425,13 @@ export interface ReviewSettings {
 export function resolveReviewRowSettings(rawConfig: Config, warn: (message: string) => void): ReviewSettings {
   const warned = new Set<string>()
   return {
-    reviewSkillInterval: clampOnce(warned, warn, 'reviewSkillInterval', rawConfig.reviewSkillInterval?.get() ?? rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
-    reviewMemoryInterval: clampOnce(warned, warn, 'reviewMemoryInterval', rawConfig.reviewMemoryInterval?.get() ?? rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
-    skillReviewTrigger: rawConfig.skillReviewTrigger?.get() ?? DEFAULT_SKILL_REVIEW_TRIGGER,
+    reviewSkillInterval: clampOnce(warned, warn, 'reviewSkillInterval', unwrapLive(rawConfig.reviewSkillInterval) ?? rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
+    reviewMemoryInterval: clampOnce(warned, warn, 'reviewMemoryInterval', unwrapLive(rawConfig.reviewMemoryInterval) ?? rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
+    skillReviewTrigger: unwrapLive(rawConfig.skillReviewTrigger) ?? DEFAULT_SKILL_REVIEW_TRIGGER,
     skillReviewCompletionMinToolCalls: clampOnce(warned, warn, 'skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
-    reviewEnabled: rawConfig.reviewEnabled?.get() ?? true,
-    reviewMode: rawConfig.reviewMode?.get() ?? 'inject',
-    reviewWakeInject: rawConfig.reviewWakeInject?.get() ?? true,
+    reviewEnabled: liveBool(rawConfig.reviewEnabled, true),
+    reviewMode: unwrapLive(rawConfig.reviewMode) ?? 'inject',
+    reviewWakeInject: liveBool(rawConfig.reviewWakeInject, true),
   }
 }
 
@@ -574,7 +574,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * reference is always present, so this is what "the row set nothing" resolves to. */
   const SHADOW_DEFAULTS = { reviewMode: 'inject', reviewMemoryInterval: DEFAULT_REVIEW_MEMORY_INTERVAL, reviewSkillInterval: DEFAULT_REVIEW_SKILL_INTERVAL } as const
   const rowSupplied = (id: keyof typeof SHADOW_DEFAULTS, alias?: 'memoryInterval' | 'skillInterval'): boolean => {
-    const canonical: unknown = rawConfig[id]?.get()
+    // The key is a union of differently-typed volatile fields, so the read is asked as unknown:
+    // unwrapLive cannot unify a union of payload types, and this site only compares against defaults.
+    const canonical: unknown = unwrapLive(rawConfig[id] as LiveValue<unknown>)
     if (canonical !== undefined && canonical !== SHADOW_DEFAULTS[id]) return true
     return alias !== undefined && rawConfig[alias] !== undefined && rawConfig[alias] !== schemaDefaults[alias]
   }

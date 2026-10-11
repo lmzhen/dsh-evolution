@@ -1045,5 +1045,27 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
       await rm(home, { recursive: true, force: true })
     }
   })
+
+  it('G3: names the profiles under this home that are NOT this plane, and explains the difference', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-foreign-'))
+    try {
+      for (const [name, bundles] of [['desktop', []], ['web', ['@lmzhen/dsh-evolution-all']]] as const) {
+        await mkdir(join(home, 'profiles', name), { recursive: true })
+        await writeFile(join(home, 'profiles', name, 'package.json'), JSON.stringify({ name: `@deepseek-ai/dsh-${name}`, version: '0.0.0', dsh: { profile: { bundles } } }), 'utf8')
+      }
+      const mounted = { profile: 'desktop', dir: join(home, 'profiles', 'desktop'), bundles: [] as string[] }
+      const report = await diagnose(stub, { home, mounted })
+      expect(report.foreignProfiles).toEqual(['web'])
+      // The aggregation keeps counting the foreign bundle — that is exactly why the line exists.
+      expect(report.bundles).toContain('@lmzhen/dsh-evolution-all')
+      expect(renderDoctorText(report)).toContain('profiles-foreign: web')
+      // With no mounted identity every profile is foreign by definition; the diagnostic answer
+      // stays the same (this is the question doctor has always answered).
+      const anonymous = await diagnose(stub, { home })
+      expect(anonymous.foreignProfiles).toEqual(['desktop', 'web'])
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
 })
 

@@ -132,9 +132,18 @@
  *       write site with neither a cross-process lock nor an instance claim is
  *       the "two instances, one file" class: it looks serialized, is not, and
  *       is invisible until it corrupts a file. Read with
- *       evolution-core/persisted-write-inventory.json. The rule arms on that
- *       table: malformed or empty fails, absent is noted here (its presence is
+ *       evolution-core/persisted-write-inventory.json. G2 (0.22) put the paths on the same
+ *       footing: the asset is an `{ symbols, sites }` envelope, and every site path must open
+ *       with a `<root>` the table's own legend declares (brackets later in a path are filename
+ *       placeholders, not roots). The legend's segments are checked against the resolver's source
+ *       by `verify-write-inventory.mjs`, which also proves each path still lands inside the home.
+ *       The rule arms on that table: malformed or empty fails, absent is noted here (its presence is
  *       enforced by core's import-time read and write-inventory.spec.ts).
+ *   N39. the `<home>/profiles` surface has ONE owner (`evolution-commands/src/profiles.ts`): a second
+ *       reader of that directory is how the diagnostic question ("every profile here") and the
+ *       write-path question ("does THIS plane double-mount") got the same answer, which the
+ *       two-plane split turned into a false refusal. Predicate: readdirSync on it, a
+ *       `join(..., 'profiles')` segment, or a `'profiles/…'` literal, comments stripped.
  *
  * Rule ids are APPEND-ONLY labels: docs, probes and register keys reference them,
  * so a landed id is never reused or renumbered. A new rule takes the next free
@@ -256,10 +265,16 @@
  *       (the skill-history rescue path and the archive restore's three reads); the rest are
  *       reviewed and listed per file. A new one fails; the register only burns down, and the whole
  *       class is scheduled for the three-state sweep (O-7).
+ *   N38. a config field read goes through the core ONE live reader (`evolution-core/src/live.ts`):
+ *       a raw `?.get()` on a config member elsewhere is the silent-failure class (`=== true` is never true
+ *       for a live reference, and `?.get()` throws on a plain object field). Anchored on the RECEIVER
+ *       (`rawConfig.` / `config.` / `this.config[...]`), so platform SERVICE accessors
+ *       (`ctx.get('x')`, `policy?.get()`) never match: they read a snapshot, not a volatile field.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { docFactViolations, factTableProblems, formatDocFacts } from './lib-doc-facts.mjs'
+import { stripComments } from './lib-source-text.mjs'
 
 const root = process.argv[2] ?? 'packages/evolution'
 // R-03: a missing root used to surface as a raw ENOENT from readdirSync —
@@ -888,11 +903,13 @@ const RULES = [
   { id: 'N17', title: 'dispatch modality is read in registered sites only', incident: 'branching on dispatch.kind outside the registered sites', canonicalForm: 'the single vocabulary reader is consulted only where registered', vacuity: 'no modality branch in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N18', title: 'session/event consumers consult the opt-in gate', incident: 'a session/event consumer that never consults the audited gate', canonicalForm: 'the consumer consults sessionAudited before reading the stream', vacuity: 'no session/event consumer in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N19', title: 'one home per family fact (docs cite, never copy)', incident: 'a fact with no home, no must entry, or an empty table', canonicalForm: 'every fact carries id, home, must, and cites its machine owner', vacuity: 'an empty fact table is a VIOLATION and a fact without a home is too; the sample asserts both', sample: 'detector' },
+  { id: 'N39', title: 'one owner for the <home>/profiles surface', incident: 'a second reader of <home>/profiles outside evolution-commands/src/profiles.ts (diagnostics and the write-path exclusion then share one answer)', canonicalForm: 'every profile-directory read lives in profiles.ts (scanProfiles is its only readdirSync)', vacuity: 'no package source scanned ⇒ the rule is NOT ARMED (printed, never silent); the design archive records a drill that injects a join(home, \'profiles\') and expects the file named', sample: 'detector' },
   { id: 'N20', title: 'declared persisted write sites match their writers', incident: 'a writer with the wrong serialization, or a claim nobody makes', canonicalForm: 'persisted-write-inventory.json matches the writers in the tree', vacuity: 'no write inventory under the root ⇒ the rule is NOT ARMED (printed, never silent); the sample carries the proof', sample: 'detector' },
   { id: 'N21', title: 'error codes are spelled once, in evolution-core/src/errors.ts', incident: 'a literal E-3xx string outside errors.ts', canonicalForm: 'codes come from errors.ts (errorText or the code table)', vacuity: 'no error-code literal outside errors.ts ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N22', title: 'settings namespaces are spelled once, in the registry', incident: 'a namespace literal spelled outside PARAM_NAMESPACES', canonicalForm: 'namespaces come from the registry', vacuity: 'no namespace literal outside the registry ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N23', title: 'durable-file writes live in the IO seam', incident: 'a durable-file write outside the IO seam', canonicalForm: 'writes go through the seam (transactIo and friends)', vacuity: 'no raw write import ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N24', title: 'client halves carry no literal type or colour', incident: 'font-size: 13px or #ff0000 inside a client half', canonicalForm: 'type and colour come from tokens', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N38', title: 'config reads go through the ONE live reader', incident: 'a raw ?.get() on a config member outside evolution-core/src/live.ts: a live reference read as a value (silent), a plain object field read as a reference (throws)', canonicalForm: 'config fields are read with the core live* helpers or unwrapLive', vacuity: 'no package source scanned under the root ⇒ the rule is NOT ARMED (printed, never silent); the design archive records a drill that injects a raw read and expects the file named', sample: 'detector' },
   { id: 'N25', title: 'client halves take radii and hairlines from the scale', incident: 'a literal border-radius or hairline width', canonicalForm: 'radii and hairlines come from the scale', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N26', title: 'interaction colour only on an element an interaction reaches', incident: 'an interaction colour on a static, unreachable element', canonicalForm: 'interaction colour sits only on an element an interaction reaches', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N27', title: 'client halves take geometry from the scale', incident: 'a literal padding, gap or size inside a client half', canonicalForm: 'geometry comes from the scale', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
@@ -1190,18 +1207,32 @@ const WRITE_INVENTORY_PATH = 'evolution-core/persisted-write-inventory.json'
 
 /** N20 (B3 / G4): the declared persisted write sites vs the code they describe.
  * Pure over (sites, source reader) so the startup self-test can prove it bites.
- * `readSource(file)` returns the writer's text, or null when the file is gone. */
-function inventoryViolations(sites, readSource) {
+ * `readSource(file)` returns the writer's text, or null when the file is gone.
+ * `symbols` (G2) is the table's own legend: every `<…>` a path uses must be declared there, so a
+ * path can never name a root the legend does not define. Omit it only in self-test probes. */
+function inventoryViolations(sites, readSource, symbols) {
   const out = []
   if (sites.length === 0) {
     out.push(`${WRITE_INVENTORY_PATH}: declares no write site — the inventory vouches for nothing (a vacuum pass is not a pass)`)
     return out
   }
+  const legend = symbols !== undefined && symbols !== null && typeof symbols === 'object' ? symbols : null
   const ids = new Set()
   for (const site of sites) {
     const id = typeof site?.id === 'string' ? site.id : '<missing id>'
     if (ids.has(id)) out.push(`${WRITE_INVENTORY_PATH}: duplicate site id "${id}"`)
     ids.add(id)
+    if (legend !== null) {
+      // Only the LEADING symbol is a root: brackets later in a path are filename placeholders
+      // (`<name>`, `<review|curator|pending>`), not roots to resolve.
+      const path = String(site?.path ?? '')
+      const root = /^<[^<>]+>/.exec(path)
+      if (root === null) {
+        out.push(`${WRITE_INVENTORY_PATH}: ${id} writes ${path} without a leading <root> symbol — the path cannot be resolved against any home (G2)`)
+      } else if (!Object.hasOwn(legend, root[0])) {
+        out.push(`${WRITE_INVENTORY_PATH}: ${id} writes ${path} but the legend declares no ${root[0]} root (G2: a path symbol must come from the table's own symbols)`)
+      }
+    }
     const source = readSource(site?.writer)
     if (source === null) {
       out.push(`${WRITE_INVENTORY_PATH}: ${id} names writer ${String(site?.writer)}, which does not exist under ${root}`)
@@ -1598,19 +1629,19 @@ function walk(dir) {
   }
 }
 
+// N38 / N39 predicates live HERE (top level) so the rule, its detector and its probe all read the
+// same pattern — a detector that re-spells the regex witnesses nothing (review P1-1, 0.22.0).
+const CONFIG_READ_PATTERN = /(?<![A-Za-z0-9_$.])(?:rawConfig|this\.config|config)\s*(?:\[\s*[^\]]{1,80}\s*\]|\.[A-Za-z_$][\w$]*)\s*\??\.\s*get\s*\(/
+const PROFILES_READDIR_RE = /readdirSync\s*\(/
+const PROFILES_JOIN_RE = /join\s*\([^)]*['"]profiles['"]/
+/** The whole N39 predicate: the line has to mention the surface AND read it one of three ways. */
+const profilesLineOffends = (line) => line.includes('profiles') && (PROFILES_READDIR_RE.test(line) || PROFILES_JOIN_RE.test(line) || PROFILES_LITERAL_RE.test(line))
+const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
+
 /** Startup self-checks (P5): the registry, its docblock inventory, and every
  * detector must prove themselves before the tree is judged. A rule whose
  * detector silently matches nothing is worse than no rule: it reports a pass
  * (the F-103 vacant-guard class, one level up). */
-if (process.argv.includes('--list-rules')) {
-  for (const rule of RULES) {
-    const sample = rule.sample === 'detector' ? 'sample' : `PENDING ${rule.sampleExpiry}`
-    console.log(`${rule.id}: [${sample}] ${rule.title}`)
-  }
-  const pending = RULES.filter(rule => rule.sample !== 'detector').map(rule => rule.id)
-  console.log(`verify-arch-guards: ${RULES.length - pending.length}/${RULES.length} rule(s) carry a detector sample` + (pending.length > 0 ? ` — pending: [${pending.join(', ')}]` : ''))
-  process.exit(0)
-}
 {
   const incomplete = []
   for (const rule of RULES) {
@@ -1747,7 +1778,12 @@ if (process.argv.includes('--list-rules')) {
       && inventoryViolations([{ id: 'c', writer: 'a.ts', serializedBy: 'instance-claim', instance: 'k' }], () => 'no claim here').length === 1
       && inventoryViolations([{ id: 'c', writer: 'a.ts', serializedBy: 'instance-claim' }], () => 'claimInstance(').length === 1
       && inventoryViolations([{ id: 's', writer: 'a.ts', serializedBy: 'transact', marker: 'transactIo(', state: ['a.ts :: ghost'] }], () => 'transactIo(').length === 1
-      && inventoryViolations([{ id: 's', writer: 'gone.ts', serializedBy: 'transact', marker: 'x' }], () => null).length === 1],
+      && inventoryViolations([{ id: 's', writer: 'gone.ts', serializedBy: 'transact', marker: 'x' }], () => null).length === 1
+// G2: a path naming a root the legend does not declare is the one violation.
+&& inventoryViolations([{ id: 'p', path: '<ghost>/x.json', writer: 'a.ts', serializedBy: 'transact', marker: 'transactIo(' }], () => 'await transactIo(io, p, task)', { '<dshHome>': { resolver: 'evolutionRoot' } }).length === 1
+&& inventoryViolations([{ id: 'p', path: '<dshHome>/x.json', writer: 'a.ts', serializedBy: 'transact', marker: 'transactIo(' }], () => 'await transactIo(io, p, task)', { '<dshHome>': { resolver: 'evolutionRoot' } }).length === 0
+// G2: a path with no leading symbol is unauditable (the second fixture).
+&& inventoryViolations([{ id: 'p', path: 'logs/x.json', writer: 'a.ts', serializedBy: 'transact', marker: 'transactIo(' }], () => 'await transactIo(io, p, task)', { '<dshHome>': { resolver: 'evolutionRoot' } }).length === 1],
     ['N21', () => errorCodeLiterals("return err('E-305: nope')").length === 1
       && errorCodeLiterals("throw new Error(\"E-301: approval service not mounted\")").length === 1
       && errorCodeLiterals('// prose: this branch answers E-305 the same way').length === 0
@@ -1837,14 +1873,48 @@ if (process.argv.includes('--list-rules')) {
       && handRolledSources("hooks: { paramSection: sources.sourceFor('memory-files') }").length > 0
       && handRolledSources('hooks: { ...spread }').length > 0
       && handRolledSources('// hooks: { paramSection: buildOne() } in prose only').length === 0],
+    // N38: the INCIDENT shape (a raw ?.get() on a config member) plus the clean shapes that must pass —
+    // a platform SERVICE accessor and a plain field read with no .get(). The predicate is the top-level
+    // CONFIG_READ_PATTERN, i.e. the same one the probe runs (review P1-1: a re-spelled regex witnesses nothing).
+    ['N38', () => CONFIG_READ_PATTERN.test('rawConfig.entryPreviewChars?.get()')
+      && CONFIG_READ_PATTERN.test('this.config[key]?.get()')
+      && CONFIG_READ_PATTERN.test('config.reviewSkillInterval?.get()')
+      && !CONFIG_READ_PATTERN.test("ctx.get('configForms')")
+      && !CONFIG_READ_PATTERN.test('const rows = config.values')
+      && !CONFIG_READ_PATTERN.test('policy?.get()')],
+    // N39: the three shapes the rule exists for (a direct readdirSync, a join(..., 'profiles') segment, a
+    // 'profiles/...' literal) plus two clean shapes it must not bite.
+    ['N39', () => profilesLineOffends("const names = readdirSync(join(home, 'profiles'))")
+      && profilesLineOffends("const text = readFileSync(join(home, 'profiles/x/package.json'))")
+      && !profilesLineOffends('const files = readdirSync(skillsRoot)')
+      && !profilesLineOffends("const root = join(home, 'agents')")
+      && !profilesLineOffends("console.log('profiles-foreign: ' + name)")],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {
     console.error(`verify-arch-guards: detector self-test failed for [${broken.join(', ')}] — the rule would pass vacuously; fix the detector before trusting this run`)
     process.exit(1)
   }
+  // A rule that CLAIMS a detector must HAVE one: the completeness count used to read the declaration
+  // field only, so a rule could claim `sample: 'detector'` with no row in the table and the summary
+  // still printed a full count (review P1-1). Count the intersection, and print the list from here.
+  const detectorIds = new Set(detectors.map(([id]) => id))
+  const undetected = RULES.filter(rule => rule.sample === 'detector' && !detectorIds.has(rule.id)).map(rule => rule.id)
+  if (undetected.length > 0) {
+    console.error(`verify-arch-guards: rule(s) declare a detector sample with no detector in the table — [${undetected.join(', ')}]`)
+    process.exit(1)
+  }
+  if (process.argv.includes('--list-rules')) {
+    for (const rule of RULES) {
+      const sample = rule.sample === 'detector' ? 'sample' : `PENDING ${rule.sampleExpiry}`
+      console.log(`${rule.id}: [${sample}] ${rule.title}`)
+    }
+    const pending = RULES.filter(rule => rule.sample !== 'detector').map(rule => rule.id)
+    const armed = RULES.length - pending.length
+    console.log(`verify-arch-guards: ${armed}/${RULES.length} rule(s) carry a detector sample, and every one of them has an entry in the detector table` + (pending.length > 0 ? ` — pending: [${pending.join(', ')}]` : ''))
+    process.exit(0)
+  }
 }
-
 walk(root)
 // N35's script half (v46 review follow-up): the walk above only enters `.ts` files, yet scripts are
 // where family prose cites the platform most. Same baseline, same message, one more extension set.
@@ -1891,10 +1961,16 @@ let writeInventoryCount = 0
 {
   const inventoryFile = join(root, WRITE_INVENTORY_PATH)
   let sites = null
+  let symbols = null
   try {
     const parsed = JSON.parse(readFileSync(inventoryFile, 'utf8'))
-    if (Array.isArray(parsed)) sites = parsed
-    else violations.push(`${WRITE_INVENTORY_PATH}: the table is not an array of write sites`)
+    // G2: the asset is an envelope { symbols, sites }; the legend is what makes a path auditable.
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.sites)) {
+      sites = parsed.sites
+      symbols = parsed.symbols ?? null
+    } else {
+      violations.push(`${WRITE_INVENTORY_PATH}: the table is not an { symbols, sites } envelope (G2: sites alone cannot be audited against a root)`)
+    }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     if (existsSync(inventoryFile)) violations.push(`${WRITE_INVENTORY_PATH}: unreadable (${reason}) — N20 cannot decide for this tree`)
@@ -1906,7 +1982,7 @@ let writeInventoryCount = 0
       if (typeof file !== 'string') return null
       const path = join(root, file)
       return existsSync(path) ? readFileSync(path, 'utf8') : null
-    }))
+    }, symbols))
     // Reverse direction (v46 S1.12, finding 1-7 / fixture A10): the forward check proves every
     // DECLARED site's marker still exists; nothing proved the converse, so a file that gained a
     // second transactional write stayed green while the inventory vouched for one of them.
@@ -2082,6 +2158,84 @@ if (orphanKeys.length > 0) {
       }
     }
     walk(clientRoot)
+  }
+}
+
+// N38 (0.22 G1): a config field can arrive as a live reference ({ get() }) or a plain value, and the
+// ONE place allowed to decide which is core's `unwrapLive` (evolution-core/src/live.ts). A raw
+// `?.get()` on a config member elsewhere is the silent-failure class: `=== true` is never true for a
+// reference, and `?.get()` throws on a plain object field. Anchored on the RECEIVER
+// (rawConfig. / config. / this.config[...]) so platform SERVICE accessors (ctx.get('x'), policy?.get())
+// never match — they read a snapshot, not a volatile field.
+{
+  const LIVE_OWNER = CORE_SRC + '/live.ts'
+  const CONFIG_READ_RE = new RegExp(CONFIG_READ_PATTERN.source, 'g')
+  const offenders = []
+  let liveScanFiles = 0
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || SKIP.has(entry.name)) continue
+    const srcDir = join(root, entry.name, 'src')
+    if (!existsSync(srcDir)) continue
+    const walk = (dir) => {
+      for (const child of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, child.name)
+        if (child.isDirectory()) { walk(full); continue }
+        if (!child.name.endsWith('.ts')) continue
+        const rel = relative(root, full).split('\\').join('/')
+        if (rel === LIVE_OWNER) continue
+        liveScanFiles += 1
+        const code = stripComments(readFileSync(full, 'utf8'))
+        for (const match of code.matchAll(CONFIG_READ_RE)) {
+          offenders.push(rel + ' — ' + match[0].replace(/\s+/g, ' '))
+        }
+      }
+    }
+    walk(srcDir)
+  }
+  if (liveScanFiles === 0) {
+    violations.push('no package source scanned under ' + root + ' — the N38 config-read scan cannot decide (a vacuum pass is not a pass)')
+  }
+  if (offenders.length > 0) {
+    violations.push('config field read with a raw .get() outside ' + LIVE_OWNER + ' (N38: read it with core live*/unwrapLive): ' + offenders.slice(0, 6).join(' | ') + (offenders.length > 6 ? ' (+' + (offenders.length - 6) + ' more)' : ''))
+  }
+}
+
+// N39 (0.22 G3): ONE owner for the `<home>/profiles` surface. Two questions used to share one bare
+// helper — "every profile under this home" (diagnostics) and "is THIS plane double-mounting" (the
+// preset-install exclusion) — and the two-plane split made the difference load-bearing: a leftover
+// profile from the other plane's home made the exclusion refuse a legitimate install. The directory
+// is read in `evolution-commands/src/profiles.ts` and nowhere else. Comment-stripped; the predicate is the
+// direct readdirSync, a `join(..., 'profiles')` segment, or a `'profiles/...'` literal.
+{
+  const PROFILES_OWNER = 'evolution-commands/src/profiles.ts'
+  // The three predicates are the top-level PROFILES_* consts (shared with the N39 detector).
+  const offenders = []
+  let profilesScanFiles = 0
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || SKIP.has(entry.name)) continue
+    const srcDir = join(root, entry.name, 'src')
+    if (!existsSync(srcDir)) continue
+    const walk = (dir) => {
+      for (const child of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, child.name)
+        if (child.isDirectory()) { walk(full); continue }
+        if (!child.name.endsWith('.ts')) continue
+        const rel = relative(root, full).split('\\').join('/')
+        if (rel === PROFILES_OWNER) continue
+        profilesScanFiles += 1
+        const code = stripComments(readFileSync(full, 'utf8'))
+        for (const line of code.split('\n')) {
+          if (profilesLineOffends(line)) offenders.push(rel + ' — ' + line.trim())
+        }
+      }
+    }
+    walk(srcDir)
+  }
+  if (profilesScanFiles === 0) {
+    violations.push('no package source scanned under ' + root + ' — the N39 profile-surface scan cannot decide (a vacuum pass is not a pass)')
+  }
+  if (offenders.length > 0) {
+    violations.push('<home>/profiles is read outside ' + PROFILES_OWNER + ' (N39: the profile surface has ONE owner — ask profiles.ts): ' + offenders.slice(0, 5).join(' | ') + (offenders.length > 5 ? ' (+' + (offenders.length - 5) + ' more)' : ''))
   }
 }
 

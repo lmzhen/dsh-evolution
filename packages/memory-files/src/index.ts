@@ -7,8 +7,8 @@ import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, paramRowId, payloadText, userSetKeys, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
-import type { MemoryStoreOptions } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, paramRowId, payloadText, userSetKeys, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampOnce, liveBool, unwrapLive } from '@deepseek-ai/dsh-evolution-core'
+import type { LiveValue, MemoryStoreOptions } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '@deepseek-ai/dsh-memory'
 
@@ -89,28 +89,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // per mount instead of once at assembly.
   const clampedKeys = new Set<string>()
   /**
-   * One live numeric row field as the platform resolved it.
-   * @param value - the field, or its volatile reference.
-   * @returns the current plain value, or undefined when nothing supplied one.
-   */
-  const liveNumber = (value: number | Volatile<number | undefined> | undefined): number | undefined =>
-    typeof value === 'object' ? value.get() : value
-  /**
    * Clamp one supplied numeric value, warning once per key.
    * @param name - the config key, for the warning.
    * @param value - the value as supplied by the deployment or the user.
    * @param fallback - the package default a corrected value falls back to.
    * @returns the value the store may use.
    */
-  const field = (name: string, value: number | Volatile<number | undefined> | undefined, fallback: number): number => {
-    const current = liveNumber(value)
-    const result = clampedNumber(current, fallback, { min: 1 })
-    if (current !== undefined && result !== current && !clampedKeys.has(name)) {
-      clampedKeys.add(name)
-      ctx.logger.warn(`memory-files: ${name} provided an invalid value; falling back to the default`)
-    }
-    return result
-  }
+  const field = (name: string, value: LiveValue<number>, fallback: number): number =>
+    clampOnce(clampedKeys, (message) => ctx.logger.warn(message), `memory-files: ${name}`, value, fallback, 1)
   // P2-23 (v37): a fractional char limit reached the store unchanged, and the
   // tool surface declares `limit` as an integer — every memory call then failed
   // platform output validation AFTER the write had landed. The char limit is a
@@ -146,7 +132,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * @returns the value the platform resolved (user layer included), or undefined.
    */
   const canonicalBudget = (id: 'memoryChars' | 'userChars'): number | undefined =>
-    liveNumber(id === 'memoryChars' ? rawConfig.memoryChars : rawConfig.userChars)
+    unwrapLive(id === 'memoryChars' ? rawConfig.memoryChars : rawConfig.userChars)
   /**
    * Whether the OPERATOR set this budget on THIS ROW (G0/S0.4 + G1).
    *
@@ -179,7 +165,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const memoryChars = (): number => floorLimit(field('memoryCharLimit', budget('memoryChars'), DEFAULT_MEMORY_CHAR_LIMIT))
   const userChars = (): number => floorLimit(field('userCharLimit', budget('userChars'), DEFAULT_USER_CHAR_LIMIT))
   const consolidationFailures = (): number => field('maxConsolidationFailures', rawConfig.maxConsolidationFailures, DEFAULT_CONSOLIDATION_FAILURES)
-  const addDatePrefix = (): boolean => rawConfig.addDatePrefix?.get() ?? false
+  const addDatePrefix = (): boolean => liveBool(rawConfig.addDatePrefix)
   // The one disagreement this plugin can see at load: an EXPLICIT row value that
   // contradicts the mounted policy. Doctor re-checks the same pair at run time (it
   // can see the policy mount that happened after this row).

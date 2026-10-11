@@ -787,6 +787,58 @@ describe('evolution-commands', () => {
     expect(existsSync(join(home, '.agent-presets'))).toBe(false)
   })
 
+/** G3 cells: the platform base rows the preset-composition path reads (the same literal the
+ * 0.3.15 cell uses, hoisted so the three G3 cells do not depend on another describe block's scope). */
+const G3_STANDARD_FIXTURE = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
+
+  it('G3: a FOREIGN profile carrying evolution-all no longer blocks this plane preset install', async () => {
+    const home = await tempHome('evo-commands-preset-foreign-')
+    const profileDir = join(home, 'profiles', 'web')
+    // The leftover of the other plane's home (the split clone): full family bundle, not this plane.
+    const foreignDir = join(home, 'profiles', 'desktop')
+    await mkdir(foreignDir, { recursive: true })
+    await writeFile(join(foreignDir, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-desktop', version: '0.0.0', dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } } }), 'utf8')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await seedPlatformBase(profileDir, 'standard', G3_STANDARD_FIXTURE)
+    ctx.provide('profileContext', profileContext('web', profileDir))
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install' })
+    expect(result.kind).toBe('success')
+  })
+
+  it('G3: THIS plane carrying evolution-all still refuses (the real double-mount is kept)', async () => {
+    const home = await tempHome('evo-commands-preset-mounted-all-')
+    const profileDir = join(home, 'profiles', 'web')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await seedPlatformBase(profileDir, 'standard', G3_STANDARD_FIXTURE)
+    // The platform's startedBundles say this plane really runs the all bundle.
+    ctx.provide('profileContext', { ...profileContext('web', profileDir), startedBundles: ['@lmzhen/dsh-evolution-all'] })
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install' })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('is installed in this profile')
+  })
+
+  it('G3: no mounted profile still refuses — the double-mount question must not fail open', async () => {
+    const home = await tempHome('evo-commands-preset-no-profile-')
+    const profileDir = join(home, 'profiles', 'web')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await seedPlatformBase(profileDir, 'standard', G3_STANDARD_FIXTURE)
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install' })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('no profile is mounted in this process')
+  })
+
   it('preset install --base ptc writes the ptc variant from the shared base table (0.3.75)', async () => {
     const home = await tempHome('evo-commands-preset-ptc-')
     const profileDir = join(home, 'profiles', 'web')
@@ -834,7 +886,7 @@ describe('evolution-commands', () => {
       standard: '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n',
       ptc: '- id: tools\n  name: "@deepseek-ai/dsh-tools"\n  config:\n    mode: ptc\n',
     }
-    await seedPlatformBase(profileDir, 'standard', fixtures.standard as string)
+    await seedPlatformBase(profileDir, 'standard', G3_STANDARD_FIXTURE)
     await seedPlatformBase(profileDir, 'ptc', fixtures.ptc as string)
     const patchPath = profilePatchPath(profileDir)
     ctx.provide('profileContext', profileContext('web', profileDir))

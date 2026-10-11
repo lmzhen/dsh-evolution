@@ -1,137 +1,176 @@
-[
-  {
-    "id": "usage",
-    "path": "<skillsRoot>/.usage.json",
-    "writer": "evolution-core/src/usage.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io, usageFile(root)",
-    "state": [],
-    "note": "Skill usage counters. RMW under the IO backend's cross-process lock; the reader side rebuilds from the events log."
+{
+  "symbols": {
+    "<dshHome>": {
+      "resolver": "evolutionRoot",
+      "segments": []
+    },
+    "<evolutionHome>": {
+      "resolver": "evolutionHome",
+      "segments": [
+        "evolution"
+      ],
+      "basedOn": "<dshHome>"
+    },
+    "<skillsRoot>": {
+      "resolver": "skillsRoot",
+      "segments": [
+        "skills"
+      ],
+      "basedOn": "<dshHome>"
+    },
+    "<memoryRoot>": {
+      "resolver": "memoryRoot",
+      "segments": [
+        "memories"
+      ],
+      "basedOn": "<dshHome>"
+    },
+    "<historyRoot>": {
+      "resolver": "historyRoot",
+      "segments": [
+        ".history"
+      ],
+      "basedOn": "<skillsRoot>"
+    },
+    "<callerSupplied>": {
+      "resolver": "caller"
+    }
   },
-  {
-    "id": "suppressed",
-    "path": "<skillsRoot>/.curator-suppressed.json",
-    "writer": "evolution-core/src/usage.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io, suppressedFile(root)",
-    "state": [],
-    "note": "Curator suppression list (archived bundled skills that must not re-seed)."
-  },
-  {
-    "id": "mutations",
-    "path": "<skillsRoot>/.mutations.json",
-    "writer": "evolution-core/src/mutations.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io, mutationsFile(root)",
-    "state": [],
-    "note": "Skill mutation audit records (bounded ring)."
-  },
-  {
-    "id": "events",
-    "path": "<evolutionHome>/evolution/events.json",
-    "writer": "evolution-core/src/evolution-events.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io, path",
-    "state": [],
-    "note": "The rc.68 evolution event log; feedback/skill-usage stats fold it."
-  },
-  {
-    "id": "memory",
-    "path": "<memoryRoot>/<target>.md",
-    "writer": "evolution-core/src/memory-store.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(this.io, fileFor(this.root, target)",
-    "state": [],
-    "note": "Durable memory documents written by the memory tool."
-  },
-  {
-    "id": "state",
-    "path": "<evolutionHome>/<review|curator|pending>-state.json",
-    "writer": "evolution-state-json/src/index.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io(), join(root, file)",
-    "state": [],
-    "note": "The durable state stack (review/curator/pending). S4.4/O-6 moved its three warn/rewrite sets into the provider instance (QuarantineMemory), so no module-scope N12 store remains here."
-  },
-  {
-    "id": "curator-reports",
-    "path": "<evolutionHome>/reports/curator-*.json",
-    "writer": "evolution-curator/src/index.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(this.io, reportsSweepLockTarget()",
-    "state": [],
-    "note": "Curator run reports + their retention sweep. The sweep is a multi-step list + delete-beyond-the-window over a DIRECTORY, so it has no per-file lock: v43 FLOW2-1 put it inside the IO backend's cross-process write lock (transactIo) on a per-home lock target, <evolutionHome>/reports/.retention (lock file <target>.lock, pid:token body). The former declaration here was instance-claim, which is in-process ONLY (instance-scope.ts is a module-scope Map). Two curator ROWS in one process still cannot sweep at once (the loser yields on that claim), and report writes are name-unique per runId. Trigger for the remaining gap: a second PROCESS sharing DSH_HOME now WAITS on the lock instead of sweeping concurrently, and on a backend without transact there is no lock at all, so the sweep degrades to best-effort idempotent deletes."
-  },
-  {
-    "id": "runs-index",
-    "path": "<evolutionHome>/runs.json",
-    "writer": "evolution-core/src/run-registry.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(options.io, path",
-    "state": [],
-    "note": "The run registry's index (0.19.0/S2): what is in flight, how each run ended, where its report lives. Read-modify-write under the IO backend's cross-process lock, and it MERGES instead of overwriting — the desktop and the web plane share one DSH_HOME, so two hosts each know their own runs and this file is their shared view. resultRef only POINTS at the report; results never live here."
-  },
-  {
-    "id": "maintain-reports",
-    "path": "<evolutionHome>/reports/maintain-*.json",
-    "writer": "evolution-commands/src/index.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io, reportsSweepLockTarget()",
-    "state": [],
-    "note": "One report per maintenance run (0.19.0/S2), written once at settle by that run's owner under a name unique to the run, so the write itself needs no per-file lock. The retention sweep is multi-step (list the directory, then delete beyond the window) and takes the SAME per-home <evolutionHome>/reports/.retention lock the curator's sweep holds — one lock for one directory. On a backend without transact it degrades to idempotent best-effort deletes."
-  },
-  {
-    "id": "skill-tree",
-    "path": "<skillsRoot>/**",
-    "writer": "evolution-core/src/skill-store.ts",
-    "serializedBy": "write-lock",
-    "marker": "LOCK_SUFFIX",
-    "state": [],
-    "note": "The skill tree itself. Per-target `<path>.lock` claims (pid:token body) guard every byte writer; destructive movers refuse a live lock."
-  },
-  {
-    "id": "activity-log",
-    "path": "<evolutionRoot>/activity.json",
-    "writer": "evolution-activity/src/index.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io, activityFile(root)",
-    "state": [],
-    "note": "The plan-applied activity sidecar. Declared by v46 S1.12: the file carried a transactional write that no inventory row vouched for, and the N20 reverse scan is what named it."
-  },
-  {
-    "id": "skill-history-index",
-    "path": "<historyRoot>/skills/<name>/index.json",
-    "writer": "evolution-core/src/skill-history.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io, file,",
-    "state": [],
-    "note": "One skill's recorded-version index (content chain + blob references). Declared by v46 S1.12: the replace path was already transactional but undeclared, so a regression to a plain write would have been invisible."
-  },
-  {
-    "id": "skill-store-transact-primitive",
-    "path": "<caller-supplied>",
-    "writer": "evolution-core/src/skill-store.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(ioLike, path, task)",
-    "state": [],
-    "note": "The store's transaction helper: it prefers the backend's own transact and falls back to the seam's transactIo. The target is the caller's path — each durable target has its own row above; this row vouches for the primitive itself."
-  },
-  {
-    "id": "feedback-events",
-    "path": "<dshHome>/evolution/events.json",
-    "writer": "evolution-feedback/src/index.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io, eventsPath,",
-    "state": [],
-    "note": "Feedback appends to the family event log under the cross-process lock. Declared by v46 S1.12 (N20 reverse)."
-  },
-  {
-    "id": "pending-archive",
-    "path": "<stateHome>/pending-state-archive.json",
-    "writer": "evolution-state-json/src/index.ts",
-    "serializedBy": "transact",
-    "marker": "transactIo(io(), pathOf(PENDING_ARCHIVE_FILE)",
-    "state": [],
-    "note": "The resolved-pending archive (the legacy merge target). The store already declared its record map; v46 S1.12 declared the archive append as well — the second site in one file is exactly what the reverse scan exists to find."
-  }
-]
+  "sites": [
+    {
+      "id": "usage",
+      "path": "<skillsRoot>/.usage.json",
+      "writer": "evolution-core/src/usage.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, usageFile(root)",
+      "state": [],
+      "note": "Skill usage counters. RMW under the IO backend's cross-process lock; the reader side rebuilds from the events log."
+    },
+    {
+      "id": "suppressed",
+      "path": "<skillsRoot>/.curator-suppressed.json",
+      "writer": "evolution-core/src/usage.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, suppressedFile(root)",
+      "state": [],
+      "note": "Curator suppression list (archived bundled skills that must not re-seed)."
+    },
+    {
+      "id": "mutations",
+      "path": "<skillsRoot>/.mutations.json",
+      "writer": "evolution-core/src/mutations.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, mutationsFile(root)",
+      "state": [],
+      "note": "Skill mutation audit records (bounded ring)."
+    },
+    {
+      "id": "events",
+      "path": "<evolutionHome>/events.json",
+      "writer": "evolution-core/src/evolution-events.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, path",
+      "state": [],
+      "note": "The rc.68 evolution event log; feedback/skill-usage stats fold it. Shares ONE file with the \"feedback-events\" site (two writers, one log under the IO lock)."
+    },
+    {
+      "id": "memory",
+      "path": "<memoryRoot>/<target>.md",
+      "writer": "evolution-core/src/memory-store.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(this.io, fileFor(this.root, target)",
+      "state": [],
+      "note": "Durable memory documents written by the memory tool."
+    },
+    {
+      "id": "state",
+      "path": "<evolutionHome>/<review|curator|pending>-state.json",
+      "writer": "evolution-state-json/src/index.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io(), join(root, file)",
+      "state": [],
+      "note": "The durable state stack (review/curator/pending). S4.4/O-6 moved its three warn/rewrite sets into the provider instance (QuarantineMemory), so no module-scope N12 store remains here."
+    },
+    {
+      "id": "curator-reports",
+      "path": "<evolutionHome>/reports/curator-*.json",
+      "writer": "evolution-curator/src/index.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(this.io, reportsSweepLockTarget()",
+      "state": [],
+      "note": "Curator run reports + their retention sweep. The sweep is a multi-step list + delete-beyond-the-window over a DIRECTORY, so it has no per-file lock: v43 FLOW2-1 put it inside the IO backend's cross-process write lock (transactIo) on a per-home lock target, <evolutionHome>/reports/.retention (lock file <target>.lock, pid:token body). The former declaration here was instance-claim, which is in-process ONLY (instance-scope.ts is a module-scope Map). Two curator ROWS in one process still cannot sweep at once (the loser yields on that claim), and report writes are name-unique per runId. Trigger for the remaining gap: a second PROCESS sharing DSH_HOME now WAITS on the lock instead of sweeping concurrently, and on a backend without transact there is no lock at all, so the sweep degrades to best-effort idempotent deletes."
+    },
+    {
+      "id": "runs-index",
+      "path": "<evolutionHome>/runs.json",
+      "writer": "evolution-core/src/run-registry.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(options.io, path",
+      "state": [],
+      "note": "The run registry's index (0.19.0/S2): what is in flight, how each run ended, where its report lives. Read-modify-write under the IO backend's cross-process lock, and it MERGES instead of overwriting — the desktop and the web plane share one DSH_HOME, so two hosts each know their own runs and this file is their shared view. resultRef only POINTS at the report; results never live here."
+    },
+    {
+      "id": "maintain-reports",
+      "path": "<evolutionHome>/reports/maintain-*.json",
+      "writer": "evolution-commands/src/index.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, reportsSweepLockTarget()",
+      "state": [],
+      "note": "One report per maintenance run (0.19.0/S2), written once at settle by that run's owner under a name unique to the run, so the write itself needs no per-file lock. The retention sweep is multi-step (list the directory, then delete beyond the window) and takes the SAME per-home <evolutionHome>/reports/.retention lock the curator's sweep holds — one lock for one directory. On a backend without transact it degrades to idempotent best-effort deletes."
+    },
+    {
+      "id": "skill-tree",
+      "path": "<skillsRoot>/**",
+      "writer": "evolution-core/src/skill-store.ts",
+      "serializedBy": "write-lock",
+      "marker": "LOCK_SUFFIX",
+      "state": [],
+      "note": "The skill tree itself. Per-target `<path>.lock` claims (pid:token body) guard every byte writer; destructive movers refuse a live lock."
+    },
+    {
+      "id": "activity-log",
+      "path": "<evolutionHome>/activity.json",
+      "writer": "evolution-activity/src/index.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, activityFile(root)",
+      "state": [],
+      "note": "The plan-applied activity sidecar. Declared by v46 S1.12: the file carried a transactional write that no inventory row vouched for, and the N20 reverse scan is what named it."
+    },
+    {
+      "id": "skill-history-index",
+      "path": "<historyRoot>/skills/<name>/index.json",
+      "writer": "evolution-core/src/skill-history.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, file,",
+      "state": [],
+      "note": "One skill's recorded-version index (content chain + blob references). Declared by v46 S1.12: the replace path was already transactional but undeclared, so a regression to a plain write would have been invisible."
+    },
+    {
+      "id": "skill-store-transact-primitive",
+      "path": "<callerSupplied>",
+      "writer": "evolution-core/src/skill-store.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(ioLike, path, task)",
+      "state": [],
+      "note": "The store's transaction helper: it prefers the backend's own transact and falls back to the seam's transactIo. The target is the caller's path — each durable target has its own row above; this row vouches for the primitive itself."
+    },
+    {
+      "id": "feedback-events",
+      "path": "<evolutionHome>/events.json",
+      "writer": "evolution-feedback/src/index.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, eventsPath,",
+      "state": [],
+      "note": "Feedback appends to the family event log under the cross-process lock. Declared by v46 S1.12 (N20 reverse). Shares ONE file with the \"events\" site (two writers, one log under the IO lock)."
+    },
+    {
+      "id": "pending-archive",
+      "path": "<evolutionHome>/pending-state-archive.json",
+      "writer": "evolution-state-json/src/index.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io(), pathOf(PENDING_ARCHIVE_FILE)",
+      "state": [],
+      "note": "The resolved-pending archive (the legacy merge target). The store already declared its record map; v46 S1.12 declared the archive append as well — the second site in one file is exactly what the reverse scan exists to find."
+    }
+  ]
+}

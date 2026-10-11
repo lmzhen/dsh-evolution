@@ -18,11 +18,13 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import {
-  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
-import { collectEvolutionBundles, diagnose, renderDoctorText } from './doctor.ts'
+import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { PROFILE_PATCH_FILENAME, baseRefusalReason, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
+// G3: the write-path exclusion asks the ONE owner of <home>/profiles about THIS plane only.
+import { installExclusionTarget } from './profiles.ts'
 import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
 import { renderHelpText, renderHint } from './registry.ts'
 import { copyFileSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -278,19 +280,6 @@ async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ 
   }
 }
 
-/**
- * Read a switch that may be a live settings reference.
- *
- * The loader hands a `.volatile()` field as `{ get() }` and the value is read at USE time; a
- * directly constructed plugin passes a plain boolean (the schema is the loader's face — the same
- * split the numeric knobs document as their second clamp layer). A single-form read is wrong
- * either way: `=== true` is never true for a reference, and `?.get()` ignores the plain value.
- * @param value - the configured switch, in either form, or undefined.
- * @returns the switch; undefined reads as off.
- */
-function liveFlag(value: boolean | Volatile<boolean> | undefined): boolean {
-  return typeof value === 'boolean' ? value : value?.get() ?? false
-}
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
@@ -1010,7 +999,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 // so the two can never drift. The receiver was captured when the run
                 // STARTED; a delivery failure only warns — the run's terminal state and
                 // its report are already committed above.
-                if (liveFlag(config.maintainHandoffOnSettle) && resultRef !== undefined && runAgent !== undefined) {
+                if (liveBool(config.maintainHandoffOnSettle) && resultRef !== undefined && runAgent !== undefined) {
                   try {
                     const autoMessage = createUserMessage({
                       content: [{
@@ -1242,16 +1231,25 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // v34 INST-01: a per-profile manifest that cannot be read or
             // parsed is the same fail-open (its bundle rows become "unknown",
             // not "absent") — both scopes refuse.
-            let installedBundles: string[]
-            try {
-              installedBundles = collectEvolutionBundles(evolutionRoot(), (error) => { throw error })
-            } catch (enumerationError) {
-              return err(`Refusing to install the layered Evolution preset: the home profile directory or one of its profile manifests could not be read (${enumerationError instanceof Error ? enumerationError.message : String(enumerationError)}) — the all/preset double-mount check could not run. Resolve access to the profiles directory and retry, or install via the layered installer, which enforces the same exclusion up front.`)
+            // G3: the exclusion asks about THIS PLANE, not about every profile under the home. A
+            // leftover profile from the other plane (the two-plane split leaves e.g.
+            // ~/.dsh/profiles/web next to profiles/desktop) used to make this gate refuse an
+            // install that could not double-mount anything HERE. The mounted profile's started
+            // bundles plus its declared ones are the whole question — and an unanswerable question
+            // still REFUSES (no profileContext, unreadable home, a profile this home does not know):
+            // fail-closed, exactly as before.
+            const mounted = presetProfileTarget(ctx)
+            const exclusion = installExclusionTarget(mounted === undefined
+              ? undefined
+              : { profile: mounted.profile, dir: mounted.profileDir, bundles: mounted.bundles })
+            if (exclusion.kind === 'undecidable') {
+              return err(`Refusing to install the layered Evolution preset: ${exclusion.reason} — the all/preset double-mount check could not run. Resolve access to this profile and retry, or install via the layered installer, which enforces the same exclusion up front.`)
             }
+            const installedBundles = exclusion.bundles
             const allBundle = installedBundles.find(name => name === 'dsh-evolution-all' || name.endsWith('/dsh-evolution-all'))
             const presetBundle = installedBundles.find(name => name === 'dsh-evolution-preset' || name.endsWith('/dsh-evolution-preset'))
             if (allBundle || presetBundle) {
-              return err(`Refusing to install the layered Evolution preset: "${allBundle ?? presetBundle}" is installed in this home — its model rows (tool-memory / tool-skill-manage / tool-session-query / skill-catalog) would double-mount with the preset's and the profile fails loud at startup. Keep ONE: remove the ${allBundle ? 'evolution-all bundle' : 'evolution-preset bundle'} before installing the layered preset (see /evolution doctor).`)
+              return err(`Refusing to install the layered Evolution preset: "${allBundle ?? presetBundle}" is installed in this profile — its model rows (tool-memory / tool-skill-manage / tool-session-query / skill-catalog) would double-mount with the preset's and the profile fails loud at startup. Keep ONE: remove the ${allBundle ? 'evolution-all bundle' : 'evolution-preset bundle'} before installing the layered preset (see /evolution doctor).`)
             }
           }
           // The deliverable is one ROW in the target profile's own patch layer
@@ -1540,7 +1538,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input === 'doctor' || input === 'doctor --json') {
           // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
           // mounted services, pending count. `--json` feeds scripts.
-          const report = await diagnose(ctx, { home: evolutionRoot() })
+          // G3: the mounted identity rides in from here (the ONE profileContext probe lives in
+    // preset-source.ts) so doctor can name the profiles that are NOT this plane.
+    const mountedForDoctor = presetProfileTarget(ctx)
+    const report = await diagnose(ctx, {
+      home: evolutionRoot(),
+      ...(mountedForDoctor === undefined ? {} : { mounted: { profile: mountedForDoctor.profile, dir: mountedForDoctor.profileDir, bundles: mountedForDoctor.bundles } }),
+    })
           if (input === 'doctor --json') return ok(JSON.stringify(report, null, 2))
           return ok(renderDoctorText(report))
         }

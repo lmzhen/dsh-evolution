@@ -254,6 +254,15 @@ runs:
         # (78/78 false positives), so the gate is N1/N2/N3 + H2 ghost keys.
         node packages/evolution/scripts/verify-arch-guards.mjs packages/evolution --strict
 
+    - name: Verify the write inventory lands inside the plane (G2)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # 0.22.0: the legend<->resolver check plus the landing check (every declared path must resolve
+        # INSIDE the given home). A synthetic home is enough here: the question CI can answer is
+        # "does any path escape the plane it claims", not "what is on this machine".
+        node packages/evolution/scripts/verify-write-inventory.mjs packages/evolution --strict --home "$RUNNER_TEMP/plane-home"
+
     - name: Verify event pairing (G7.3)
       shell: bash
       working-directory: upstream

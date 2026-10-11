@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
-import { clampedNumber, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
@@ -141,7 +141,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   // the entry TAIL — the 0.3.18 inversion).
   let previewClampWarned = false
   const previewChars = (): number => {
-    const value = rawConfig.entryPreviewChars?.get()
+    const value = unwrapLive(rawConfig.entryPreviewChars)
     const clamped = clampedNumber(value, DEFAULT_ENTRY_PREVIEW_CHARS, { min: 1 })
     if (!previewClampWarned && value !== undefined && clamped !== value) {
       previewClampWarned = true
