@@ -3,7 +3,7 @@
  * @module @deepseek-ai/dsh-evolution-commands
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
@@ -57,8 +57,13 @@ export interface Config {
   maintainTimeoutMs?: number | undefined
   /** G2 (0.20.0): when a scan settles successfully, hand its report to the model
    * automatically (the same pointer+protocol injection `maintain handoff` performs).
-   * Default false: the injection wakes a turn, which costs a model call. */
-  maintainHandoffOnSettle?: boolean | undefined
+   * Default false: the injection wakes a turn, which costs a model call.
+   *
+   * `.volatile()` (0.21.0, G3): the field carries a USER LAYER, so the loader hands the live
+   * reference and the switch is read at every settle — a settings write turns it on or off without
+   * a reload. A directly constructed plugin still passes a plain boolean (the schema's default is
+   * the loader's face), so the reader accepts both. */
+  maintainHandoffOnSettle?: boolean | Volatile<boolean> | undefined
   /** Threat-scan exemption labels for WRITE-path skill mutations (P2-18).
    * Threaded into the SkillLibrary this package constructs for `restructure`
    * (its only write path); the core-side constructor option carries the same
@@ -78,7 +83,9 @@ export const Config = z.object({
   skillsRoot: z.string().default(''),
   maintainCooldownMs: z.number().min(0).default(30_000),
   maintainTimeoutMs: z.number().min(1).default(600_000),
-  maintainHandoffOnSettle: z.boolean().default(false),
+  // `.volatile()` is what gives this field a USER LAYER (the platform's `volatileForm` projection
+  // renders only volatile fields), so the registry's E3 row is a knob the operator can reach.
+  maintainHandoffOnSettle: z.boolean().default(false).volatile(),
   threatExemptLabels: z.array(z.string()).default([]),
 })
 
@@ -271,6 +278,20 @@ async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ 
   }
 }
 
+/**
+ * Read a switch that may be a live settings reference.
+ *
+ * The loader hands a `.volatile()` field as `{ get() }` and the value is read at USE time; a
+ * directly constructed plugin passes a plain boolean (the schema is the loader's face — the same
+ * split the numeric knobs document as their second clamp layer). A single-form read is wrong
+ * either way: `=== true` is never true for a reference, and `?.get()` ignores the plain value.
+ * @param value - the configured switch, in either form, or undefined.
+ * @returns the switch; undefined reads as off.
+ */
+function liveFlag(value: boolean | Volatile<boolean> | undefined): boolean {
+  return typeof value === 'boolean' ? value : value?.get() ?? false
+}
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   const config = rawConfig
   // E-7 (v18) → V27 G2.4 (M-08): one root key for the whole family. The
@@ -283,6 +304,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // (lastMaintainAt / lastMaintainRunId / maintainInFlightSince), which also lost
   // every answer on a host restart. The registry is created with the io seam below
   // and cancelled with it: work this plugin started must not outlive the plugin.
+  // G3 (0.21.0): this row now carries a user-writable field, so suppress the platform's own
+  // auto-generated page for it — the family renders the card from the registry instead, and two
+  // pages editing one row make a write on the wrong one look ignored. Probed, not assumed: a host
+  // without the capability still loads.
+  ctx.inject(['settings'], (scope) => {
+    const settings = (scope as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
+    if (typeof settings?.configure !== 'function') return
+    const disposer = settings.configure({ auto: false }, ctx.fiber)
+    if (typeof disposer === 'function') scope.effect(() => disposer as () => void, 'evolution-commands: settings presentation')
+  })
   let runs: RunRegistry | undefined
   ctx.inject(['evolutionIo'], (ioCtx) => {
     const ioRegistry = ioCtx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
@@ -953,7 +984,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 // so the two can never drift. The receiver was captured when the run
                 // STARTED; a delivery failure only warns — the run's terminal state and
                 // its report are already committed above.
-                if (config.maintainHandoffOnSettle === true && resultRef !== undefined && runAgent !== undefined) {
+                if (liveFlag(config.maintainHandoffOnSettle) && resultRef !== undefined && runAgent !== undefined) {
                   try {
                     const autoMessage = createUserMessage({
                       content: [{

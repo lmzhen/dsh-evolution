@@ -79,7 +79,11 @@ const STRUCTURED_PLAN = {
   notes: ['a plain note'],
 }
 
-async function mount(options: { handoff?: boolean } = {}) {
+/** The write half of the volatile-config protocol (cosmokit). The settings service updates a live
+ * field through this symbol, which is what makes an `applies: live` row change without a remount. */
+const VOLATILE_WRITE = Symbol.for('cosmokit.volatile.write')
+
+async function mount(options: { handoff?: boolean; live?: boolean } = {}) {
   const dir = await tempHome('evo-g2-handoff-')
   const root = join(dir, 'skills')
   const skillDir = join(root, 'demo-skill')
@@ -90,16 +94,35 @@ async function mount(options: { handoff?: boolean } = {}) {
   ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
   ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
   let releaseOutcome: (() => void) | undefined
+  let starts = 0
   ctx.provide('subagents', {
     async start() {
+      starts += 1
       return { result: new Promise((resolve) => { releaseOutcome = () => { resolve({ text: 'x', structured: STRUCTURED_PLAN }) } }) }
     },
   })
-  await ctx.plugin(Commands, { root, maintainCooldownMs: 0, ...(options.handoff === true ? { maintainHandoffOnSettle: true } : {}) })
+  const plain = { root, maintainCooldownMs: 0, ...(options.handoff === undefined ? {} : { maintainHandoffOnSettle: options.handoff }) }
+  // `ctx.plugin` validates the INPUT config, and a live reference is not a boolean, so the "live" bed
+  // parses the config with the plugin's own schema — the same object cordis hands `apply` — and calls
+  // `apply` directly. Every other bed goes through the loader path.
+  const parsed = Commands.Config(plain)
+  if (options.live === true) {
+    // A one-plugin wrapper, not `Commands.apply` on the root context: cordis runs a plugin's
+    // injections inside a fiber, and an `apply` called directly registers nothing at all.
+    await ctx.plugin({ name: 'live-switch-bed', apply: (inner: Context) => { Commands.apply(inner, parsed) } })
+  } else await ctx.plugin(Commands, plain)
+  // The reference the parse created for the `.volatile()` field: the platform writes a settings change
+  // through THIS object (it collects the mounted row's references), so writing it here is what a
+  // settings write does. See the live-write case.
+  const switchRef = (parsed as unknown as Record<string, { [key: symbol]: (value: boolean) => void }>)['maintainHandoffOnSettle']
   return {
     dir,
+    writeSwitch: (value: boolean): void => { switchRef[VOLATILE_WRITE](value) },
     handler: handler as Handler,
     releaseReady: () => releaseOutcome !== undefined,
+    // `release` always releases the LATEST run's outcome, so a bed that runs twice waits for the
+    // second start before releasing again.
+    startedRuns: () => starts,
     release: () => releaseOutcome?.(),
   }
 }
@@ -238,5 +261,32 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     for (let attempt = 0; attempt < 500 && auto.calls.length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     expect(auto.calls).toEqual(['followup'])
     expect(auto.sent()).toContain('REPORT-ONLY')
+  })
+
+  // G3 (0.21.0): the switch carries a user layer now, so cordis hands the plugin a LIVE reference
+  // for it and the plugin reads that reference at every settle. This cell is the read's teeth — the
+  // reference is written between two runs of the SAME plugin instance and the second run's delivery
+  // follows, with no remount. A read cached at mount time (and the plain `=== true` test it
+  // replaced: a reference is never `true`) passes no cell here but would silently drop the switch.
+  it('follows a live settings write across runs instead of the value it mounted with', async () => {
+    const bed = await mount({ handoff: false, live: true })
+    const first = receiver('followup')
+    const started = await bed.handler.handler({ rawInput: 'maintain', agent: first.agent })
+    const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
+    expect(id).toBeTruthy()
+    for (let attempt = 0; attempt < 500 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    bed.release()
+    await waitSettled(bed.handler, id)
+    expect(first.calls, 'the mounted value is OFF: settling injects nothing').toEqual([])
+    // What a settings write does to this row's volatile field: the mounted reference, written.
+    bed.writeSwitch(true)
+    const second = receiver('followup')
+    const again = await bed.handler.handler({ rawInput: 'maintain', agent: second.agent })
+    expect(again.kind).toBe('success')
+    for (let attempt = 0; attempt < 500 && bed.startedRuns() < 2; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    bed.release()
+    for (let attempt = 0; attempt < 500 && second.calls.length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    expect(second.calls).toEqual(['followup'])
+    expect(second.sent()).toContain('REPORT-ONLY')
   })
 }, 20_000) // every cell here polls a stub on a 10 ms tick; the 5 s default is a load flake waiting to happen.

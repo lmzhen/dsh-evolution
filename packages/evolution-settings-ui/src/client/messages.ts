@@ -38,6 +38,7 @@ export const zh = {
   cardCurator: '技能整理',
   cardSkills: '技能写入规则',
   cardApproval: '写入审批',
+  cardCommands: '维护扫描',
   approvalTitle: '待批写入',
   approvalLoading: '正在读取待批项…',
   approvalEmpty: '没有待批的写入',
@@ -92,6 +93,7 @@ export const en: Record<keyof typeof zh, string> = {
   cardCurator: 'Skill tidy-up',
   cardSkills: 'Skill write rules',
   cardApproval: 'Write approval',
+  cardCommands: 'Maintenance scans',
   approvalTitle: 'Writes awaiting approval',
   approvalLoading: 'reading the pending window…',
   approvalEmpty: 'nothing is waiting for a decision',
@@ -134,6 +136,7 @@ export const NAMESPACE_TITLES: Readonly<Record<string, string>> = Object.freeze(
   'evolution-curator': 'cardCurator',
   'tool-skill-manage': 'cardSkills',
   'evolution-approval': 'cardApproval',
+  'evolution-commands': 'cardCommands',
 })
 
 /** One message key. */

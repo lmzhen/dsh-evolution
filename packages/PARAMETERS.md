@@ -148,7 +148,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `replay.maxPlans` | E2 | none | cordis | evolution-replay | — | 无（internal） | Plans compared in one replay report. |
 | `replay.weights` | E2 | none | cordis | evolution-replay | — | 无（internal） | Scoring weights of the replay comparison. |
 | `evolution-commands.maintainCooldownMs` | E2 | none | cordis | evolution-commands | — | 无（internal） | Cooldown between maintenance runs from the command surface. |
-| `evolution-commands.maintainHandoffOnSettle` | E2 | none | cordis | evolution-commands | — | 无（deployment） | Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run. |
+| `evolution-commands.maintainHandoffOnSettle` | E3 | live | cordis | evolution-commands | — | 卡：evolution-commands | Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run. |
 | `evolution-commands.maintainTimeoutMs` | E2 | none | cordis | evolution-commands | — | 无（internal） | Timeout of one maintenance run started from the command surface. |
 | `evolution-maintenance.probeTimeoutMs` | E2 | none | cordis | evolution-maintenance | — | 无（internal） | Model-facing budget of one maintenance_probe call — a hang guard, not a latency budget. |
 | `skill-usage.supportReadToolNames` | E2 | none | cordis | skill-usage | — | 无（internal） | Tool names whose file reads are attributed to support files. |

@@ -46,6 +46,13 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
     ],
   },
   {
+    namespace: 'evolution-commands',
+    seatKey: 'evolution-commands',
+    fields: [
+      { id: 'evolution-commands.maintainHandoffOnSettle', group: 'deployment', doc: 'Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run.', label: '扫描完成后自动交接', hint: '维护扫描成功结束后，自动把报告交给模型（等同 maintain handoff）；默认关闭，每次成功扫描会多花一次模型调用。', control: 'switch', unit: '', values: [], valueLabels: [] },
+    ],
+  },
+  {
     namespace: 'evolution-curator',
     seatKey: 'evolution-curator',
     fields: [
@@ -124,7 +131,7 @@ export interface ClientRowSeat {
 
 /** Every (bundle, row) pair the Plugins page can open a configuration page for. */
 export const CLIENT_ROW_SEATS: readonly ClientRowSeat[] = [
-  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
-  { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-approval', 'evolution-curator', 'evolution-review', 'memory-files'] },
-  { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-approval', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
+  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
+  { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files'] },
+  { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
 ]

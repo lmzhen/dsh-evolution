@@ -269,7 +269,7 @@ export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
   { id: 'replay.maxPlans', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-replay', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Plans compared in one replay report.', why: 'internal' },
   { id: 'replay.weights', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-replay', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Scoring weights of the replay comparison.', why: 'internal' },
   { id: 'evolution-commands.maintainCooldownMs', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-commands', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Cooldown between maintenance runs from the command surface.', why: 'internal' },
-  { id: 'evolution-commands.maintainHandoffOnSettle', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-commands', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run.', why: 'deployment' },
+  { id: 'evolution-commands.maintainHandoffOnSettle', group: 'deployment', tier: 'E3', authority: 'cordis', owner: 'evolution-commands', applies: 'live', docAnchor: 'PARAMETERS.md#deployment', summary: 'Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run.', label: '扫描完成后自动交接', hint: '维护扫描成功结束后，自动把报告交给模型（等同 maintain handoff）；默认关闭，每次成功扫描会多花一次模型调用。', control: 'switch', unit: '', values: '', card: 'evolution-commands' },
   { id: 'evolution-commands.maintainTimeoutMs', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-commands', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Timeout of one maintenance run started from the command surface.', why: 'internal' },
   { id: 'evolution-maintenance.probeTimeoutMs', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-maintenance', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Model-facing budget of one maintenance_probe call — a hang guard, not a latency budget.', why: 'internal' },
   { id: 'skill-usage.supportReadToolNames', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'skill-usage', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Tool names whose file reads are attributed to support files.', why: 'internal' },
@@ -295,6 +295,9 @@ export const PARAM_NAMESPACES: Readonly<Record<string, string>> = Object.freeze(
   // 0.21.0 (G1): the approval row's `pendingTtlMs` is E3, so its owner must publish a user layer —
   // without this entry the row's card could not exist and `/evolution policy set` answered E-315.
   'evolution-approval': 'evolution-approval',
+  // 0.21.0 (G3): the commands row's handoff switch is E3 — same reason as the entry above: the card
+  // and `/evolution params set` both resolve their settings namespace through this map.
+  'evolution-commands': 'evolution-commands',
 })
 
 /**
