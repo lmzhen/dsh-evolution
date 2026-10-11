@@ -115,7 +115,10 @@ describe('evolution-maintenance tools registration', () => {
         },
         get: () => undefined,
       } as never)
-      await ctx.plugin(MaintenanceTools, config)
+      // The row's `Config` interface spells absent fields as `| undefined` while the schema's INPUT
+      // type spells them `| null`; the loader path accepts the raw config, so the fixture states the
+      // mismatch at the call instead of reshaping the interface.
+      await ctx.plugin(MaintenanceTools, config as unknown as Parameters<typeof MaintenanceTools.Config>[0])
       const tool = registered.find(item => item.name === 'maintenance_probe')
       if (tool === undefined) throw new Error('maintenance_probe was not registered')
       return tool

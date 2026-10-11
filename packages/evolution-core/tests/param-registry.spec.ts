@@ -70,7 +70,10 @@ function parseRegistryText(text: string): ParamExposure[] {
         label: ui[1]!, hint: ui[2]!, control: ui[3] as NonNullable<ParamExposure['control']>,
         unit: ui[4]!, values: ui[5]!,
         ...(ui[6] === undefined ? {} : { valueLabels: ui[6] }),
-        ...exposure,
+        // Spelled out rather than spread: under exactOptionalPropertyTypes an explicit `undefined`
+        // is not an absent optional property, and the parser's holder carries both keys always.
+        ...(exposure.card === undefined ? {} : { card: exposure.card }),
+        ...(exposure.why === undefined ? {} : { why: exposure.why }),
       })
       continue
     }
@@ -79,7 +82,8 @@ function parseRegistryText(text: string): ParamExposure[] {
       id: match[1]!, group: match[2] as ParamExposure['group'], tier: match[3] as ParamExposure['tier'],
       authority: match[4] as ParamExposure['authority'], owner: match[5]!,
       applies: match[6] as ParamExposure['applies'], docAnchor: match[7]!, summary: match[8]!,
-      ...exposure,
+      ...(exposure.card === undefined ? {} : { card: exposure.card }),
+      ...(exposure.why === undefined ? {} : { why: exposure.why }),
     })
   }
   return out

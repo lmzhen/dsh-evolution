@@ -90,7 +90,7 @@ describe('core run registry (S2)', () => {
     // The convergence is durable: the next process reads a terminal record, not a
     // stale "running" one.
     const persisted = JSON.parse(await readFile(runsFile(dir), 'utf8')) as { runs: Array<{ state: string }> }
-    expect(persisted.runs[0].state).toBe('failed')
+    expect(persisted.runs[0]?.state).toBe('failed')
   })
 
   it('an unreadable or unparsable index answers UNKNOWN instead of an empty history', async () => {

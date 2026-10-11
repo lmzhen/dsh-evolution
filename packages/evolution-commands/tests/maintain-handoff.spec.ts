@@ -98,7 +98,10 @@ async function mount(options: { handoff?: boolean; live?: boolean } = {}) {
   ctx.provide('subagents', {
     async start() {
       starts += 1
-      return { result: new Promise((resolve) => { releaseOutcome = () => { resolve({ text: 'x', structured: STRUCTURED_PLAN }) } }) }
+      // The stub answers the FAMILY's consumer, which reads `outcome.text`; the platform's
+      // `SubagentResult` declares `output`/`structured` instead — the drift verify-platform-contract
+      // tracks. The cast states the mismatch here rather than bending the fixture's runtime shape.
+      return { result: new Promise((resolve) => { releaseOutcome = () => { resolve({ text: 'x', structured: STRUCTURED_PLAN } as unknown as Parameters<typeof resolve>[0]) } }) }
     },
   })
   const plain = { root, maintainCooldownMs: 0, ...(options.handoff === undefined ? {} : { maintainHandoffOnSettle: options.handoff }) }
@@ -114,10 +117,15 @@ async function mount(options: { handoff?: boolean; live?: boolean } = {}) {
   // The reference the parse created for the `.volatile()` field: the platform writes a settings change
   // through THIS object (it collects the mounted row's references), so writing it here is what a
   // settings write does. See the live-write case.
-  const switchRef = (parsed as unknown as Record<string, { [key: symbol]: (value: boolean) => void }>)['maintainHandoffOnSettle']
+  const parsedSwitch = (parsed as unknown as Record<string, unknown>)['maintainHandoffOnSettle']
+  if (parsedSwitch === undefined) throw new Error('the schema parse produced no volatile reference for maintainHandoffOnSettle')
+  // The write half of the protocol, looked up once: the symbol is not a `unique symbol`, so it
+  // cannot be a computed member in a type, and an indexed lookup is optional under
+  // noUncheckedIndexedAccess. A missing write would surface as the live-write case failing.
+  const writeSwitchValue = (parsedSwitch as { [key: symbol]: ((value: boolean) => void) | undefined })[VOLATILE_WRITE]
   return {
     dir,
-    writeSwitch: (value: boolean): void => { switchRef[VOLATILE_WRITE](value) },
+    writeSwitch: (value: boolean): void => { writeSwitchValue?.(value) },
     handler: handler as Handler,
     releaseReady: () => releaseOutcome !== undefined,
     // `release` always releases the LATEST run's outcome, so a bed that runs twice waits for the
