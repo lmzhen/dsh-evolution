@@ -25,6 +25,11 @@ const ENTRY_TAIL = /, label: '([^']*)', hint: '([^']*)', control: '([^']*)', uni
 // label) also ends that way, and accepting it would drop the tail silently while
 // the "non-E3 rows must not carry UI metadata" rule never fired.
 const ENTRY_PLAIN = /^ \},$/
+// The exposure key (0.21.0 / G2), the FOURTH segment: exactly one of `card` (the settings card this
+// row appears on) or `why` (the registered reason it has none). It sits after the UI tail when
+// there is one, and directly after the head otherwise, so both endings have two shapes.
+const EXPOSURE_CARD = /, card: '([^']+)' \},$/
+const EXPOSURE_WHY = /, why: '([^']+)' \},$/
 const ALIAS = /^\s*([A-Za-z][A-Za-z0-9]*): '([A-Za-z][A-Za-z0-9]*)',$/
 
 /** The UI tail, in its fixed order (see the contract in params.ts). */
@@ -37,6 +42,11 @@ export const TIERS = ['E0', 'E1', 'E2', 'E3', 'E4']
 export const AUTHORITIES = ['code', 'cordis', 'install']
 export const APPLIES = ['live', 'restart', 'none']
 export const CONTROLS = ['number', 'switch', 'select', 'text']
+/** Why a parameter has no settings card. `internal` covers timeouts, retries, cooldowns, weights,
+ * caps and windows; `deployment` the mount switches and library-scope policy; `security` the safety
+ * surfaces (never user-writable); `identity` providers/models; `path` per-row directories;
+ * `install` what the installer freezes. */
+export const WHY = ['deployment', 'security', 'identity', 'path', 'install', 'internal']
 
 /** Chinese text is required for the card's label/hint (they are user-facing copy). */
 const CJK = /[\u4e00-\u9fa5]/
@@ -119,13 +129,22 @@ export function readRegistry(root) {
     }
     const head = ENTRY_HEAD.exec(line)
     if (head) {
-      const rest = line.slice(head[0].length)
+      let rest = line.slice(head[0].length)
+      // Peel the exposure segment first: it terminates the line, so what remains is the ending the
+      // head/tail rules already know. A row carrying BOTH keys leaves `, card: …` in front of the
+      // plain close, which neither ending accepts — that is the `malformed` path, by construction.
+      const exposure = {}
+      const card = EXPOSURE_CARD.exec(rest)
+      const why = EXPOSURE_WHY.exec(rest)
+      if (card !== null) { exposure.card = card[1]; rest = rest.slice(0, card.index) + ' },' }
+      else if (why !== null) { exposure.why = why[1]; rest = rest.slice(0, why.index) + ' },' }
       const tail = ENTRY_TAIL.exec(rest)
       if (tail) {
         const entry = {
           id: head[1], group: head[2], tier: head[3], authority: head[4],
           owner: head[5], applies: head[6], docAnchor: head[7], summary: head[8],
           label: tail[1], hint: tail[2], control: tail[3], unit: tail[4], values: tail[5],
+          ...exposure,
         }
         // Absent stays absent: the validator distinguishes 'row did not opt in' from
         // 'row opted in with an empty list'.
@@ -135,9 +154,10 @@ export function readRegistry(root) {
         entries.push({
           id: head[1], group: head[2], tier: head[3], authority: head[4],
           owner: head[5], applies: head[6], docAnchor: head[7], summary: head[8],
+          ...exposure,
         })
       } else {
-        malformed.push(head[1] + ' (bad UI tail — expected `, label: …, hint: …, control: …, unit: …, values: …[, valueLabels: …] },`)')
+        malformed.push(head[1] + ' (bad ending — expected the UI tail `, label: …, hint: …, control: …, unit: …, values: …[, valueLabels: …]` where the tier requires it, then exactly one of `, card: \'<row-id>\'` / `, why: \'<reason>\'`, then ` },`)')
       }
     }
   }
@@ -176,6 +196,22 @@ export function registryViolations(registry, root) {
     // UI metadata (0.7.0): the settings cards render E3 rows only, so the tail is
     // required there and forbidden everywhere else — a non-E3 row carrying a label
     // would describe a control that no surface renders.
+    // The exposure key: exactly one per row, and the TIER decides which. `card` answers "which card
+    // renders this row" (E3 only: the platform projects only a row's own volatile fields into its
+    // card); `why` answers "why no card" (every other tier). Together they make "an E3 row that no
+    // card renders" unspellable — the state that shipped as evolution-approval.pendingTtlMs.
+    if (entry.tier === 'E3') {
+      if (entry.card === undefined) violations.push(where + ': E3 row must carry `card` (the card that renders it)')
+      else if (entry.why !== undefined) violations.push(where + ': card and why are mutually exclusive')
+      else if (entry.card !== entry.owner) violations.push(where + ': card "' + entry.card + '" is not this row\'s own id (' + entry.owner + ')')
+    } else if (entry.why === undefined) {
+      violations.push(where + ': non-E3 row must carry `why` — name the reason it has no settings card (' + WHY.join('/') + ')')
+    } else if (entry.card !== undefined) {
+      violations.push(where + ': ' + entry.tier + ' row must not carry `card` — a card may only render its own row\'s E3 fields')
+    }
+    if (entry.why !== undefined && !WHY.includes(entry.why)) {
+      violations.push(where + ': unknown why "' + entry.why + '" — one of ' + WHY.join('/'))
+    }
     const carried = [...UI_KEYS, ...OPTIONAL_UI_KEYS].filter(key => entry[key] !== undefined)
     if (entry.tier === 'E3') {
       const missing = UI_KEYS.filter(key => entry[key] === undefined)

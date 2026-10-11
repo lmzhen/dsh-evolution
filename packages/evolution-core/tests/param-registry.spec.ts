@@ -14,6 +14,8 @@ const GROUPS = ['library', 'write-caps', 'review', 'memory', 'curator', 'deploym
 const TIERS = ['E0', 'E1', 'E2', 'E3', 'E4']
 const AUTHORITIES = ['code', 'cordis', 'install']
 const APPLIES = ['live', 'restart', 'none']
+/** The `why` half of the exposure key (mirrors lib-param-registry.mjs). */
+const WHY = ['deployment', 'security', 'identity', 'path', 'install', 'internal']
 
 /** The review group's seed set (design §7.2 G-C, tier split recorded in S1.1). */
 const REVIEW_E3 = [
@@ -40,10 +42,19 @@ function parseRegistryText(text: string): ParamExposure[] {
   const tail = new RegExp(
     ", label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)'(?:, valueLabels: '([^']*)')? \\},$",
   )
+  // The exposure key (0.21.0 / G2): exactly one of `card`/`why`, and it terminates the line —
+  // peel it before matching the ending, exactly like the .mjs parser does.
+  const cardKey = /, card: '([^']+)' \},$/
+  const whyKey = /, why: '([^']+)' \},$/
   for (const line of text.split(/\r?\n/)) {
     const match = head.exec(line)
     if (!match) continue
-    const rest = line.slice(match[0].length)
+    let rest = line.slice(match[0].length)
+    const exposure: { card?: string; why?: ParamExposure['why'] } = {}
+    const cardMatch = cardKey.exec(rest)
+    const whyMatch = whyKey.exec(rest)
+    if (cardMatch) { exposure.card = cardMatch[1]!; rest = rest.slice(0, cardMatch.index) + ' },' }
+    else if (whyMatch) { exposure.why = whyMatch[1] as ParamExposure['why']; rest = rest.slice(0, whyMatch.index) + ' },' }
     const ui = tail.exec(rest)
     if (ui) {
       out.push({
@@ -53,6 +64,7 @@ function parseRegistryText(text: string): ParamExposure[] {
         label: ui[1]!, hint: ui[2]!, control: ui[3] as NonNullable<ParamExposure['control']>,
         unit: ui[4]!, values: ui[5]!,
         ...(ui[6] === undefined ? {} : { valueLabels: ui[6] }),
+        ...exposure,
       })
       continue
     }
@@ -61,6 +73,7 @@ function parseRegistryText(text: string): ParamExposure[] {
       id: match[1]!, group: match[2] as ParamExposure['group'], tier: match[3] as ParamExposure['tier'],
       authority: match[4] as ParamExposure['authority'], owner: match[5]!,
       applies: match[6] as ParamExposure['applies'], docAnchor: match[7]!, summary: match[8]!,
+      ...exposure,
     })
   }
   return out
@@ -88,6 +101,17 @@ describe('parameter registry (G1/S1.1)', () => {
       expect(entry.summary.length, entry.id + ' summary').toBeGreaterThan(10)
       // The registry names canonical ids; a deprecated alias is never an id.
       expect(PARAM_ALIASES[entry.id], entry.id + ' is canonical').toBeUndefined()
+      // The exposure key (0.21.0 / G2): exactly one per row, and the TIER decides which — the same
+      // judgement registryViolations makes for the .mjs gates, asserted here against the runtime
+      // array so the registry text and the module cannot disagree about it.
+      if (entry.tier === 'E3') {
+        expect(entry.card, entry.id + ' E3 row carries card').toBe(entry.owner)
+        expect(entry.why, entry.id + ' card and why are mutually exclusive').toBeUndefined()
+      } else {
+        expect(entry.why, entry.id + ' non-E3 row carries why').toBeDefined()
+        expect(WHY, entry.id + ' why').toContain(entry.why)
+        expect(entry.card, entry.id + ' non-E3 row carries no card').toBeUndefined()
+      }
     }
   })
 
