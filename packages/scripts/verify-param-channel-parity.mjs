@@ -43,6 +43,30 @@ const ALLOWED = new Set([
   'overridden', 'deployment', 'unregistered', 'user', 'hooks', 'paramSection', 'apply',
 ])
 
+/** The consumer batch this guard runs in. A registered debt below expires when this passes its
+ * `expires`: an expired entry FAILS the run instead of silently exempting a row forever. */
+const CURRENT_GROUP = 1
+
+/** Exposure debt (the 0.21.0 migration): owners whose E3 rows cannot satisfy the full rule YET.
+ * Every entry names the reason, the step that closes it and the group it expires in — an entry
+ * missing any of them is a bug in this register, not a note. The register is printed on every run
+ * (verify-arch-guards' N35 / guard-vacuity posture) so a debt cannot be forgotten silently, and the
+ * step that fixes the row deletes the entry in the same batch. */
+const EXPOSURE_DEBT = new Map([
+  ['evolution-approval', {
+    reason: 'evolution-approval.pendingTtlMs is an E3 row whose owner publishes no settings namespace: the field is not .volatile(), the row never calls settings.configure({ auto: false }, ctx.fiber), and the generated field list omits it (the registry row already carries label/hint/control/unit)',
+    closes: '0.21.0 step 1.2 — add .volatile(), the PARAM_NAMESPACES entry, the auto-form suppression and the client title, then delete this entry',
+    expires: 1,
+  }],
+])
+/** Owners this register still covers; an entry past its expiry is NOT silent (see `expiredDebt`). */
+const exemptOwners = new Set([...EXPOSURE_DEBT]
+  .filter(([, entry]) => CURRENT_GROUP <= entry.expires)
+  .map(([owner]) => owner))
+const expiredDebt = [...EXPOSURE_DEBT]
+  .filter(([, entry]) => CURRENT_GROUP > entry.expires)
+  .map(([owner, entry]) => owner + ' (expired at group ' + entry.expires + ')')
+
 const argv = process.argv.slice(2)
 const rootArg = argv.find(arg => !arg.startsWith('--'))
 const root = resolve(rootArg ?? 'packages')
@@ -80,7 +104,14 @@ function schemaKeys(path, anchor = 'Config') {
 const registry = readRegistry(root)
 const namespaces = readNamespaces(root)
 const ids = new Set(registry.entries.map(entry => entry.id))
-const e3 = registry.entries.filter(entry => entry.tier === 'E3' && namespaces[entry.owner] !== undefined).map(entry => entry.id)
+// Every E3 row, WITHOUT the namespace scope: the rule this guard states in its own docblock is
+// about the TIER, not about an owner that happens to have registered a settings namespace.
+// Scoping here is how evolution-approval.pendingTtlMs shipped as an E3 row that no card renders,
+// no write can reach, and the generated field list silently omits.
+const e3Entries = registry.entries.filter(entry => entry.tier === 'E3')
+const e3 = e3Entries.map(entry => entry.id)
+const e3Owners = [...new Set(e3Entries.map(entry => entry.owner))].sort()
+const ownerOf = new Map(e3Entries.map(entry => [entry.id, entry.owner]))
 const aliases = new Set(Object.keys(registry.aliases))
 
 /** The channels that spell parameter names, and what each one owes the registry. */
@@ -93,6 +124,14 @@ const CHANNELS = [
 
 const problems = []
 const notes = []
+// A debt that outlived its batch is a lie: the register expires loudly, never silently.
+for (const expired of expiredDebt) problems.push('exposure-debt: ' + expired + ' — fix the row and delete the register entry')
+// An E3 row whose owner publishes no settings namespace has NO user layer at all: the command face
+// answers E-315 for it and no card can render it (the platform keys a card by the row's entry id).
+for (const owner of e3Owners) {
+  if (exemptOwners.has(owner) || namespaces[owner] !== undefined) continue
+  problems.push('namespace: ' + owner + ' owns E3 row(s) but publishes no settings namespace — those parameters have NO user layer (the command face answers E-315); register the owner in PARAM_NAMESPACES or move its rows to E2')
+}
 // 1. No channel may spell a DEPRECATED alias: writes refuse it and the generated
 // artifacts would teach a name the reader cannot use.
 for (const channel of CHANNELS) {
@@ -149,9 +188,18 @@ function configFields(body) {
   for (const match of body.matchAll(field)) fields.set(match[1], match[2].replace(/^\s*\/\/.*$/gm, ''))
   return fields
 }
-for (const owner of Object.keys(namespaces)) {
+for (const owner of e3Owners) {
+  if (exemptOwners.has(owner)) {
+    notes.push(owner + ' row Config: SKIPPED — registered exposure debt (' + String(EXPOSURE_DEBT.get(owner).closes) + ')')
+    continue
+  }
   const ownedIds = registry.entries.filter(entry => entry.owner === owner && entry.tier === 'E3').map(entry => entry.id)
   if (ownedIds.length === 0) continue
+  // A registry id may be OWNER-QUALIFIED (`evolution-approval.pendingTtlMs`) while the row's Config
+  // declares the BARE key (`pendingTtlMs`) — the same convention as `skill-catalog.excludeSkillNames`.
+  // Looking the qualified id up in the schema block reported a false "declares no such key" for every
+  // qualified E3 row; the scope removal is what finally walked into one.
+  const configKey = id => id.includes('.') ? id.slice(id.lastIndexOf('.') + 1) : id
   const file = join(root, owner, 'src', 'index.ts')
   if (!existsSync(file)) {
     problems.push('owner-config: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but has no src/index.ts')
@@ -167,8 +215,9 @@ for (const owner of Object.keys(namespaces)) {
   const body = text.slice(anchor.index, end < 0 ? undefined : end + 2)
   const fields = configFields(body)
   const volatile = [...fields].filter(([, declaration]) => declaration.includes('.volatile()'))
+  const ownedKeys = ownedIds.map(configKey)
   for (const id of ownedIds) {
-    const declaration = fields.get(id)
+    const declaration = fields.get(configKey(id))
     if (declaration === undefined) {
       problems.push('owner-config: ' + owner + ' registers "' + id + '" as E3 but its row Config declares no such key — after the seam removal the settings write would have nowhere to land')
     } else if (!declaration.includes('.volatile()')) {
@@ -176,7 +225,7 @@ for (const owner of Object.keys(namespaces)) {
     }
   }
   for (const [key] of volatile) {
-    if (!ownedIds.includes(key)) {
+    if (!ownedKeys.includes(key)) {
       problems.push('owner-config: ' + owner + ' marks "' + key + '" .volatile(), which the registry does not carry as an E3 row of this owner — add the row or drop the marker')
     }
   }
@@ -206,8 +255,14 @@ const clientFile = join(root, 'evolution-settings-ui', 'src', 'client', 'generat
 if (existsSync(clientFile)) {
   const text = readFileSync(clientFile, 'utf8')
   const listed = new Set([...text.matchAll(/\{ id: '([^']+)'/g)].map(match => match[1]))
-  for (const id of e3) if (!listed.has(id)) problems.push(`client-field-list: the generated field list is missing "${id}" — rerun gen-param-client-view.mjs`)
-  for (const id of listed) if (!e3.includes(id)) problems.push(`client-field-list: the generated field list carries "${id}", which is not an E3 row of a registered namespace`)
+  // Owners under a registered debt are excluded from the MISSING half only: a listed id the
+  // registry does not carry stays a problem (an extra card field is never a debt).
+  for (const id of e3) {
+    const owner = ownerOf.get(id)
+    if (owner !== undefined && exemptOwners.has(owner)) continue
+    if (!listed.has(id)) problems.push(`client-field-list: the generated field list is missing "${id}" — rerun gen-param-client-view.mjs`)
+  }
+  for (const id of listed) if (!e3.includes(id)) problems.push(`client-field-list: the generated field list carries "${id}", which is not an E3 row`)
   notes.push(listed.size + ' generated field(s)')
 }
 
@@ -278,7 +333,10 @@ if (existsSync(installerFile)) {
   }
 }
 
-const summary = ids.size + ' id(s), ' + CHANNELS.length + ' channel(s), ' + Object.keys(namespaces).length + ' owner schema(s), ' + notes.join(', ')
+if (EXPOSURE_DEBT.size > 0) {
+  notes.push(EXPOSURE_DEBT.size + ' registered exposure debt(s): ' + [...EXPOSURE_DEBT].map(([owner, entry]) => owner + ' (expires at group ' + entry.expires + ')').join(', '))
+}
+const summary = ids.size + ' id(s), ' + CHANNELS.length + ' channel(s), ' + e3Owners.length + ' E3 owner(s), ' + Object.keys(namespaces).length + ' namespace(s), ' + notes.join(', ')
 if (problems.length === 0) {
   console.log('verify-param-channel-parity: OK — ' + summary)
   process.exit(0)

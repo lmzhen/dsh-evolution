@@ -699,6 +699,19 @@ describe('parameter channel parity guard (G5/S5.1 sentry)', () => {
     const clean = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
     expect(clean.stdout).toContain('verify-param-channel-parity: OK')
   })
+// G1 step 1.1 (0.21.0): an E3 row whose owner publishes no settings namespace has NO user layer
+  // at all — the platform keys a card by the ROW id, so no card can render it and `/evolution policy
+  // set` answers E-315. Before the scope removal the owner loop only walked owners that already had
+  // a namespace, so this state was invisible to every gate (it is how `pendingTtlMs` shipped).
+  it('fails when an E3 row has no settings namespace', async () => {
+    const root = await tempRoot('guard-exposure-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval')]), 'utf8')
+    const result = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(result?.code).toBe(1)
+    expect(result?.stderr).toContain('owns E3 row(s) but publishes no settings namespace')
+  })
 })
 // G2 sentry: the client-seat guard is the machine-checkable half of "this browser half
 // activates". A required cordis inject has no timeout, so the four failures it names are all
