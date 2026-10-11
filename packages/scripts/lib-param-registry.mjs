@@ -130,14 +130,20 @@ export function readRegistry(root) {
     const head = ENTRY_HEAD.exec(line)
     if (head) {
       let rest = line.slice(head[0].length)
-      // Peel the exposure segment first: it terminates the line, so what remains is the ending the
-      // head/tail rules already know. A row carrying BOTH keys leaves `, card: …` in front of the
-      // plain close, which neither ending accepts — that is the `malformed` path, by construction.
+      // Peel the exposure keys first: they terminate the line, so what remains is the ending the
+      // head/tail rules already know. Strip them tail-first in a loop rather than taking the first
+      // match: a row carrying BOTH keys then reaches the tier check as a contract violation with a
+      // precise message, instead of falling out as an unparseable ending with no named cause.
       const exposure = {}
-      const card = EXPOSURE_CARD.exec(rest)
-      const why = EXPOSURE_WHY.exec(rest)
-      if (card !== null) { exposure.card = card[1]; rest = rest.slice(0, card.index) + ' },' }
-      else if (why !== null) { exposure.why = why[1]; rest = rest.slice(0, why.index) + ' },' }
+      for (;;) {
+        const card = EXPOSURE_CARD.exec(rest)
+        const why = EXPOSURE_WHY.exec(rest)
+        const hit = card ?? why
+        if (hit === null) break
+        if (card !== null) exposure.card = card[1]
+        else exposure.why = why[1]
+        rest = rest.slice(0, hit.index) + ' },'
+      }
       const tail = ENTRY_TAIL.exec(rest)
       if (tail) {
         const entry = {
@@ -275,15 +281,29 @@ export function renderParamDocs(registry, check) {
     '| E3 | 本机用户 | `settings.yaml`／GUI 卡／`/evolution policy set` | 见 applies 列 |',
     '| E4 | 安装者 | 安装器开关／`row-overrides.json` | 装完固化 |',
     '',
+    '## 设置面（第八列怎么读）',
+    '',
+    'E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行的字段**（平台按 Loader 行 id 取卡，一张卡只渲染自己那行的 volatile 字段）。其余档写 `无（<why>）`，`why` 取值（**用列表不用表格**：门禁把 `| \`id\` |` 形状的行当作参数行，表格会把它读成 6 个不存在的参数）：',
+    '',
+    '- `deployment` —— 挂载开关与库级范围策略（部署方的决定）',
+    '- `security` —— 安全面（工具授权、威胁豁免、审批闸；永不给用户）',
+    '- `identity` —— provider／模型／注册名',
+    '- `path` —— 每行各自的目录（技能根、事件目录、状态目录）',
+    '- `install` —— 安装期固化',
+    '- `internal` —— 超时／重试／冷却／权重／上限／窗口／阈值',
+    '',
   ]
   for (const group of GROUPS) {
     const rows = registry.entries.filter(entry => entry.group === group)
     if (rows.length === 0) continue
     const label = registry.groupLabels?.[group]
-    lines.push('## ' + group + (label === undefined ? '' : '（' + label + '）'), '', '| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 说明 |', '|---|---|---|---|---|---|---|')
+    lines.push('## ' + group + (label === undefined ? '' : '（' + label + '）'), '', '| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |', '|---|---|---|---|---|---|---|---|')
     for (const entry of rows) {
       const legacy = (aliasOf[entry.id] ?? []).join(', ') || '—'
-      lines.push('| `' + entry.id + '` | ' + entry.tier + ' | ' + entry.applies + ' | ' + entry.authority + ' | ' + entry.owner + ' | ' + legacy + ' | ' + entry.summary + ' |')
+      // The exposure column answers the reader's actual question about a knob they cannot find on
+      // any card: it names the card, or the registered reason there is none.
+      const exposure = entry.card === undefined ? '无（' + entry.why + '）' : '卡：' + entry.card
+      lines.push('| `' + entry.id + '` | ' + entry.tier + ' | ' + entry.applies + ' | ' + entry.authority + ' | ' + entry.owner + ' | ' + legacy + ' | ' + exposure + ' | ' + entry.summary + ' |')
     }
     lines.push('')
   }

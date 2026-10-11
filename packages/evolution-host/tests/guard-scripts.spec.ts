@@ -431,9 +431,19 @@ const bundleGuard = join(scripts, 'verify-bundle-rows.mjs')
 const bundleGen = join(scripts, 'gen-bundle-patches.mjs')
 const builtSmoke = join(scripts, 'smoke-built-entries.mjs')
 
-/** One registry entry line in the shape the machine-read contract declares. */
-function entryLine(id: string): string {
-  return '  { id: ' + "'" + id + "'" + ', group: ' + "'review'" + ', tier: ' + "'E3'" + ', authority: ' + "'cordis'" + ', owner: ' + "'evolution-review'" + ', applies: ' + "'live'" + ', docAnchor: ' + "'PARAMETERS.md#review'" + ', summary: ' + "'A summary long enough to pass.'" + ', label: ' + "'审查间隔'" + ', hint: ' + "'夹具行用的说明文字。'" + ', control: ' + "'number'" + ', unit: ' + "'次'" + ', values: ' + "''" + ' },'
+/**
+ * One registry entry line in the shape the machine-read contract declares.
+ * @param id - the parameter id.
+ * @param exposure - the fourth segment (0.21.0/G2): the default is the E3 row's own `card`; pass an
+ *   empty string for a row that declares none, or any other text to build an invalid one.
+ * @param tier - the tier the row claims, which decides which exposure key it must carry.
+ */
+function entryLine(id: string, exposure = "card: 'evolution-review'", tier = 'E3'): string {
+  const ui = tier === 'E3'
+    ? ', label: ' + "'审查间隔'" + ', hint: ' + "'夹具行用的说明文字。'" + ', control: ' + "'number'" + ', unit: ' + "'次'" + ', values: ' + "''"
+    : ''
+  const applies = tier === 'E3' ? "'live'" : "'none'"
+  return '  { id: ' + "'" + id + "'" + ', group: ' + "'review'" + ', tier: ' + "'" + tier + "'" + ', authority: ' + "'cordis'" + ', owner: ' + "'evolution-review'" + ', applies: ' + applies + ', docAnchor: ' + "'PARAMETERS.md#review'" + ', summary: ' + "'A summary long enough to pass.'" + ui + (exposure === '' ? '' : ', ' + exposure) + ' },'
 }
 
 /** A minimal registry source; `Object.freeze({ ... })` mirrors the real file. */
@@ -487,6 +497,44 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
     expect(vacuum?.stderr).toContain('no registry under')
   })
 
+  // The exposure key (0.21.0/G2) is the FOURTH segment of every line: exactly one of `card` (the
+  // settings card that renders the row) or `why` (the registered reason it has none), and the TIER
+  // decides which. The two cases below pin the teeth of that requirement: a hand edit that adds a
+  // second key, and one that drops the key its tier requires, must both fail the gate BY NAME — the
+  // state they describe (an E3 row no card renders) is the one that shipped as a silent defect.
+  it('fails when a row declares both exposure keys', async () => {
+    const root = await tempRoot('guard-registry-exposure-both-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await mkdir(join(root, 'evolution-review'), { recursive: true })
+    const both = "card: 'evolution-review', why: 'deployment'"
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval'), entryLine('reviewEnabled', both)]), 'utf8')
+    const e3 = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(e3?.code).toBe(1)
+    expect(e3?.stderr).toContain('card and why are mutually exclusive')
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval'), entryLine('reviewEnabled', both, 'E2')]), 'utf8')
+    const e2 = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(e2?.code).toBe(1)
+    expect(e2?.stderr).toContain('E2 row must not carry `card`')
+  })
+
+  it('fails when a row omits the exposure key its tier requires', async () => {
+    const root = await tempRoot('guard-registry-exposure-missing-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await mkdir(join(root, 'evolution-review'), { recursive: true })
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval', ''), entryLine('reviewEnabled')]), 'utf8')
+    const e3 = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(e3?.code).toBe(1)
+    expect(e3?.stderr).toContain('E3 row must carry `card`')
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval'), entryLine('reviewEnabled', '', 'E2')]), 'utf8')
+    const e2 = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(e2?.code).toBe(1)
+    expect(e2?.stderr).toContain('non-E3 row must carry `why`')
+  })
+
   it('fails when the generated document is stale or missing', async () => {
     const root = await tempRoot('guard-registry-doc-')
     await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
@@ -532,6 +580,24 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     expect(stale?.code).toBe(1)
     expect(stale?.stderr).toContain('stale generated client view')
+  })
+
+  // The client view is GENERATED, so the derivation refuses the state the seat guard would
+  // otherwise only find in the committed artifact: a card whose row no bundle mounts can never
+  // render (the Plugins page keys a configuration page by '<bundle>#<row id>'). The roster is what
+  // arms this check — a fixture root without one keeps its "no seat" degradation.
+  it('refuses to generate a card for a row no bundle mounts', async () => {
+    const root = await tempRoot('guard-client-view-unseated-')
+    await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
+    await mkdir(join(root, 'evolution-host'), { recursive: true })
+    await mkdir(join(root, 'scripts'), { recursive: true })
+    await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval')]), 'utf8')
+    await writeFile(join(root, 'evolution-host', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-evolution-host' }), 'utf8')
+    await writeFile(join(root, 'scripts', 'bundle-rows.json'), JSON.stringify({ version: 1, forms: { host: { header: [], tail: [] } }, rows: [{ id: 'some-other-row', forms: ['host'] }] }), 'utf8')
+    const failed = await run(process.execPath, [paramViewGen, root], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(failed?.code).toBe(1)
+    expect(failed?.stderr).toContain('has cards but no bundle mounts that row')
   })
 
   // C1 (0.8.0): the three bundle patches are GENERATED from scripts/bundle-rows.json.
@@ -782,6 +848,19 @@ describe('client-seat guard (G2 sentry)', () => {
     expect(failed?.stderr).toContain('inject requires "ghostService" but no client source reads it')
     expect(failed?.stderr).toContain('dsh.client.inject names "@deepseek-ai/dsh-client-ui-gone"')
     expect(failed?.stderr).toContain('evolution-review: has registry rows but no card in the generated client view')
+  })
+
+  // E5 (0.21.0/G2): a card exists only for a row a bundle mounts, and the Plugins page keys a
+  // row's configuration page by '<bundle>#<row id>'. A card whose row sits in no seat is a card the
+  // operator can never open, so the guard refuses it even when every source agrees with itself.
+  it('E5: rejects a card whose row no bundle mounts', async () => {
+    const root = await fixture()
+    await writeFile(join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts'),
+      "export const CLIENT_PARAM_SECTIONS = [\n  { namespace: 'evolution-review', fields: [] },\n]\n\nexport const CLIENT_ROW_SEATS = []\n", 'utf8')
+    const failed = await run(process.execPath, [clientSeats, root, '--upstream', join(root, 'upstream'), '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(failed?.code).toBe(1)
+    expect(failed?.stderr).toContain('client view: card namespace "evolution-review" is mounted by no bundle row')
   })
 
   it('E: the seat guard rejects an occupant that draws at a box of its own', async () => {

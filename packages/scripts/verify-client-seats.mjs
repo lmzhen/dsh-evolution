@@ -373,6 +373,11 @@ if (!existsSync(generated)) {
   for (const match of view.matchAll(/\{ bundle: '([^']+)'/g)) {
     if (!patchOwners.has(match[1])) problems.push('client view: seat bundle "' + match[1] + '" is not a family bundle package')
   }
+  // E5 (0.21.0 / G2): a card exists only for a row a bundle mounts. The row's `card` names its own
+  // id, so a carded namespace missing from every seat is a card that can never render.
+  for (const card of cards) {
+    if (!seats.has(card)) problems.push('client view: card namespace "' + card + '" is mounted by no bundle row — that card can never render (see scripts/bundle-rows.json)')
+  }
   notes.push(owners.size + ' registered row(s), ' + cards.size + ' card(s), ' + seats.size + ' seat row(s)')
 }
 

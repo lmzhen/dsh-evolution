@@ -43,7 +43,8 @@ function parseRegistryText(text: string): ParamExposure[] {
     ", label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)'(?:, valueLabels: '([^']*)')? \\},$",
   )
   // The exposure key (0.21.0 / G2): exactly one of `card`/`why`, and it terminates the line —
-  // peel it before matching the ending, exactly like the .mjs parser does.
+  // peel it before matching the ending, exactly like the .mjs parser does, including the tail-first
+  // loop that reports a row carrying both keys as the contract violation it is.
   const cardKey = /, card: '([^']+)' \},$/
   const whyKey = /, why: '([^']+)' \},$/
   for (const line of text.split(/\r?\n/)) {
@@ -51,10 +52,15 @@ function parseRegistryText(text: string): ParamExposure[] {
     if (!match) continue
     let rest = line.slice(match[0].length)
     const exposure: { card?: string; why?: ParamExposure['why'] } = {}
-    const cardMatch = cardKey.exec(rest)
-    const whyMatch = whyKey.exec(rest)
-    if (cardMatch) { exposure.card = cardMatch[1]!; rest = rest.slice(0, cardMatch.index) + ' },' }
-    else if (whyMatch) { exposure.why = whyMatch[1] as ParamExposure['why']; rest = rest.slice(0, whyMatch.index) + ' },' }
+    for (;;) {
+      const cardMatch = cardKey.exec(rest)
+      const whyMatch = whyKey.exec(rest)
+      const hit = cardMatch ?? whyMatch
+      if (hit === null) break
+      if (cardMatch) exposure.card = cardMatch[1]!
+      else exposure.why = whyMatch![1] as ParamExposure['why']
+      rest = rest.slice(0, hit.index) + ' },'
+    }
     const ui = tail.exec(rest)
     if (ui) {
       out.push({
