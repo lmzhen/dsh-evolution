@@ -37,6 +37,9 @@ const UI_KEYS = ['label', 'hint', 'control', 'unit', 'values']
 /** Trailing UI keys a select row MAY add; never required, never allowed elsewhere. */
 const OPTIONAL_UI_KEYS = ['valueLabels']
 
+// GROUPS is the doc-section axis (the unit a developer changes together); WHY is the reason axis for
+// a row with no card. 'internal' appears on both axes and means different things there — see the
+// ParamGroup contract in params.ts.
 export const GROUPS = ['library', 'write-caps', 'review', 'memory', 'curator', 'deployment', 'internal']
 export const TIERS = ['E0', 'E1', 'E2', 'E3', 'E4']
 export const AUTHORITIES = ['code', 'cordis', 'install']

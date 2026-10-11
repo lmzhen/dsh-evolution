@@ -81,7 +81,12 @@ export function readParam(carrier: object | undefined, id: string): unknown {
   return undefined
 }
 
-/** Exposure group (design §7.2): the unit a developer changes together. */
+/** Exposure group (design §7.2): the unit a developer changes together.
+ *
+ * A DOC-SECTION axis, not the exposure decision: the group says which family of knobs a value
+ * belongs to, the tier says who may change it. `internal` here is a group id with no rows today;
+ * the `why: 'internal'` a non-E3 row carries is a different value on the other axis (the reason it
+ * has no settings card) — the shared spelling is a coincidence, not a routing rule. */
 export type ParamGroup = 'library' | 'write-caps' | 'review' | 'memory' | 'curator' | 'deployment' | 'internal'
 
 /**

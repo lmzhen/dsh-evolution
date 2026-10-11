@@ -62,18 +62,49 @@ function aliasLiterals(path, aliases) {
   return found
 }
 
+/** The declaration a schema block hangs off: a module-level `export const Config` or a class
+ * `static Config`, either way a `z.object({` on the same line. */
+const SCHEMA_ANCHOR = /(?:export const Config|static Config)\b[^\n]*= z\.object\(\{/
+
+/**
+ * Source text with comments blanked out.
+ *
+ * Every text probe in this guard reads CODE, and a whole-line `//` strip is not enough: a trailing
+ * `// .volatile()` or a block comment states the same text a real call does, so a probe that
+ * accepts it can be satisfied by prose — which is how a gate meant to keep the platform's own form
+ * off a row could have been defeated by a comment. `://` survives, so a URL cannot truncate a line
+ * before it. String literals are not parsed: a ` // ` inside one truncates its line, which can only
+ * make a probe stricter.
+ * @param text - the source text.
+ * @returns the same text without comments.
+ */
+function stripComments(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map(line => {
+      const at = line.indexOf('//')
+      return at < 0 || line.slice(0, at).endsWith(':') ? line : line.slice(0, at)
+    })
+    .join('\n')
+}
+
 /**
  * The keys a schemastery `z.object({ … })` block declares (unquoted identifiers).
+ *
+ * The block is located by its DECLARATION, not by the first mention of the word: an interface, a
+ * doc comment or a prose line above the schema also says `Config`, and slicing from there folded
+ * interface members into the key set (and could have emptied the check while the summary still
+ * printed a count).
  * @param path - the file carrying the block.
- * @param anchor - the declaration the block belongs to (an owner's `Config`).
- * @returns the declared keys.
+ * @returns the declared keys, or `null` when the file declares no such block.
  */
-function schemaKeys(path, anchor = 'Config') {
-  const text = readFileSync(path, 'utf8')
-  const start = text.indexOf(anchor)
-  const body = start < 0 ? '' : text.slice(start, text.indexOf('})', start))
+function schemaKeys(path) {
+  const text = stripComments(readFileSync(path, 'utf8'))
+  const anchor = SCHEMA_ANCHOR.exec(text)
+  if (anchor === null) return null
   const keys = new Set()
-  for (const match of body.matchAll(/^\s{2,}([a-z][A-Za-z0-9]*):/gm)) keys.add(match[1])
+  for (const match of text.slice(anchor.index, text.indexOf('})', anchor.index)).matchAll(/^\s{2,}([a-z][A-Za-z0-9]*):/gm)) keys.add(match[1])
   return keys
 }
 
@@ -119,7 +150,9 @@ for (const channel of CHANNELS) {
 // for one fact).
 const policySchema = join(root, 'evolution-policy', 'src', 'index.ts')
 if (existsSync(policySchema)) {
-  const declared = [...schemaKeys(policySchema)].filter(key => key !== 'default' && !(key in registry.aliases))
+  const keys = schemaKeys(policySchema)
+  if (keys === null) problems.push('deployment-carriers: ' + policySchema + ' declares no Config schema — the policy carrier check cannot run')
+  const declared = [...keys ?? []].filter(key => key !== 'default' && !(key in registry.aliases))
   // The judgement is two-sided on purpose: a declared key is legal when the registry
   // owns it OR when ALLOWED registers it as a non-parameter literal. The length
   // heuristic that used to stand here accepted every short synonym in silence.
@@ -156,9 +189,10 @@ function configFields(body) {
   const indent = first[0].length - first[0].trimStart().length
   const field = new RegExp('^ {' + indent + '}([a-z][A-Za-z0-9]*):([\\s\\S]*?)(?=^ {0,' + indent + '}[a-z]|^\\s*\\})', 'gm')
   const fields = new Map()
-  // A comment is not a declaration: strip line comments before the volatile test, or a
-  // field documented by a comment that MENTIONS the marker would read as marked.
-  for (const match of body.matchAll(field)) fields.set(match[1], match[2].replace(/^\s*\/\/.*$/gm, ''))
+  // A comment is not a declaration: strip comments before the volatile test, or a field whose
+  // comment (whole-line OR trailing) mentions the marker would read as marked, and the platform
+  // would refuse the write the card offers.
+  for (const match of body.matchAll(field)) fields.set(match[1], stripComments(match[2]))
   return fields
 }
 for (const owner of e3Owners) {
@@ -208,8 +242,11 @@ for (const owner of e3Owners) {
   // presentation up by the fiber it was registered on (settings/src/index.ts:266), so omitting the
   // owner registers the suppression on the settings service's own fiber and a re-mounted row keeps
   // a dead key while the auto form returns.
-  const autoOff = /settings\.configure\(\{\s*auto:\s*false\s*\},\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.fiber\s*\)/.test(text)
-  const autoOffWithoutOwner = /settings\.configure\(\{\s*auto:\s*false\s*\}\)/.test(text)
+  // The CODE, not the prose: six of the seven rows document this exact call in a comment, so
+  // testing the raw file text let a row pass with the real call deleted (review P0, 0.21.0).
+  const code = stripComments(text)
+  const autoOff = /settings\.configure\(\{\s*auto:\s*false\s*\},\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.fiber\s*\)/.test(code)
+  const autoOffWithoutOwner = /settings\.configure\(\{\s*auto:\s*false\s*\}\)/.test(code)
   if (autoOffWithoutOwner) {
     problems.push('owner-config: ' + owner + ' calls settings.configure({ auto: false }) WITHOUT an owner — pass the plugin fiber: settings.configure({ auto: false }, ctx.fiber). The presentation is looked up by the registering fiber, so without it a re-mounted row keeps a dead key')
   }

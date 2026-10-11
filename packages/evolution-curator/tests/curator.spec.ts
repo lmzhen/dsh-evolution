@@ -946,6 +946,49 @@ Aging body.
     expect(usage.get('aging-skill')?.state).toBe('stale')
   })
 
+  /**
+   * One quality-warn run: a low-scoring skill idle for 5 days, mounted with the given row config.
+   * @param configured - the row's `qualityWarnStaleAfterDays`, or undefined for the schema default.
+   * @returns whether the run left the skill stale.
+   */
+  const agingRun = async (configured?: number): Promise<boolean> => {
+    await tempHome('dsh-curator-quality-window-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, configured === undefined
+      ? { enabled: true, autoStart: false }
+      : { enabled: true, autoStart: false, qualityWarnStaleAfterDays: configured })
+    const skills = ctx.evolutionCurator.skills
+    await skills.create('aging-skill', `---
+name: aging-skill
+description: Aging body.
+---
+Aging body.
+`, 'background_review')
+    const created = new Date(Date.now() - 300 * 86_400_000).toISOString()
+    const lastUsed = new Date(Date.now() - 5 * 86_400_000).toISOString()
+    await saveUsage(skills.root, new Map([['aging-skill', {
+      created_by: 'agent', created_at: created, use_count: 1, view_count: 0, patch_count: 1,
+      last_used_at: lastUsed, last_viewed_at: null, last_patched_at: lastUsed,
+      state: 'active', pinned: false, archived_at: null,
+    }]]), nodeEvolutionIo())
+    const result = await ctx.evolutionCurator.run({ ignoreGates: true })
+    const usage = await loadUsage(skills.root, nodeEvolutionIo())
+    ctx.evolutionCurator.stop()
+    return result.stale.includes('aging-skill') && usage.get('aging-skill')?.state === 'stale'
+  }
+
+  // G5 (0.21.0): the window moved to the deployment face, so the ROW CONFIG is the only source (no
+  // user layer, no policy key). This pair is the read's tooth in both directions: at 5 days idle the
+  // default 7 keeps the skill live, while a row config of 3 makes the same skill stale in the same
+  // run. A reader that degraded to the schema default passes the first case and fails the second —
+  // the earlier single case could not tell the two apart, because it never left the default.
+  it('reads the quality-warn window from the row config, not the schema default (G5)', async () => {
+    expect(await agingRun(), 'idle 5 days stays inside the default 7-day window').toBe(false)
+    expect(await agingRun(3), 'the row config shortens the window to 3 days').toBe(true)
+  })
+
   it('paused gate skips automatic passes; manual run and resume still work (G2)', async () => {
     await tempHome('dsh-curator-paused-')
     const ctx = new Context()
