@@ -203,7 +203,7 @@ export class EvolutionApproval extends Service {
   private readonly stageForegroundConfig: boolean
   /** The TTL carrier as configured: a plain number, or the live reference `.volatile()` hands a
    * user-layer field. Read through {@link ttl} at every use, never cached (registry row: live). */
-  private readonly pendingTtlMsConfig: Volatile<number> | undefined
+  private readonly pendingTtlMsConfig?: Volatile<number | undefined>
   /** Keys this instance already warned about (clampOnce's once-per-key sink). */
   private readonly clampedKeys = new Set<string>()
   /** P3 (v16): public read for staging pre-checks (learning-graph refuses a
@@ -371,7 +371,7 @@ export class EvolutionApproval extends Service {
    * @returns the TTL the sweep may use.
    */
   private ttl(): number {
-    return Math.floor(clampOnce(this.clampedKeys, message => this.ctx.logger.warn(message), 'pendingTtlMs', this.pendingTtlMsConfig, 0, 0))
+    return Math.floor(clampOnce(this.clampedKeys, (message) => { this.ctx.logger.warn(message) }, 'pendingTtlMs', this.pendingTtlMsConfig, 0, 0))
   }
 
   /**

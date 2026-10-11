@@ -114,8 +114,10 @@ function presetIssues(presets: readonly PlatformPreset[] | undefined): string[] 
  * build-time guards cannot. Three classes, each with its own move:
  *  - a user override (the effective value is no longer the deployment's),
  *  - a deprecated alias still written in a user section (writes refuse it),
- *  - a declared user-writable parameter whose owner publishes no user layer in
- *    this composition (the registry promises a face this deployment never mounts).
+ *  - a declared user-writable parameter whose owner publishes no settings namespace AT ALL
+ *    (a registry fact: writes answer E-315), and
+ *  - a declared user-writable parameter whose owning row this runtime does not mount
+ *    (the registry promises a face this composition never carries).
  * G5: the two layers and the live rows come from the platform (`configEditor.configuration()`,
  * `pluginManager.listPlugins()`); the registry side (which spellings are deprecated, which rows
  * declare an E3 parameter) stays the family's own table. A surface that is not mounted is
@@ -149,17 +151,31 @@ function paramDivergences(platform: PlatformView): string[] {
     issues.push('the platform plugin-row surface (pluginManager.listPlugins) is not mounted here — declared-but-unreachable parameters were NOT checked')
     return issues
   }
+  // TWO different causes, two sentences (0.21.0 / G1.3). `paramSettingsId` answers undefined for
+  // both, and the old single line blamed the mounting for both — so a row that WAS mounted but
+  // published no settings namespace (evolution-approval until 0.21.0) read as "not mounted here"
+  // and sent the operator looking in the wrong place. The first cause is a registry fact (the same
+  // state the build-time parity gate now refuses); the second is this runtime's composition.
   const live = liveRowTails(platform.plugins)
-  const unreachable = PARAM_EXPOSURE.filter(entry => entry.tier === 'E3')
-    .filter((entry) => {
-      const namespace = paramSettingsId(entry.owner)
-      return namespace === undefined || !live.has(namespace)
-    })
-    .map(entry => entry.id)
-  if (unreachable.length > 0) {
-    const shown = unreachable.slice(0, 6).join(', ')
-    const more = unreachable.length > 6 ? ` (+${unreachable.length - 6} more)` : ''
-    issues.push(`declared user-writable but unreachable here: ${shown}${more} — the owning row is not mounted in this runtime`)
+  const noUserLayer: string[] = []
+  const unmounted: string[] = []
+  for (const entry of PARAM_EXPOSURE) {
+    if (entry.tier !== 'E3') continue
+    const namespace = paramSettingsId(entry.owner)
+    if (namespace === undefined) noUserLayer.push(entry.id)
+    else if (!live.has(namespace)) unmounted.push(entry.id)
+  }
+  for (const [ids, sentence] of [
+    [noUserLayer, 'declared user-writable but the owner publishes no settings namespace'],
+    [unmounted, 'declared user-writable but unreachable here'],
+  ] as const) {
+    if (ids.length === 0) continue
+    const shown = ids.slice(0, 6).join(', ')
+    const more = ids.length > 6 ? ` (+${ids.length - 6} more)` : ''
+    const why = sentence.includes('no settings namespace')
+      ? 'those parameters have no user layer at all (writes answer E-315) — register the owner in PARAM_NAMESPACES or move its rows to E2'
+      : 'the owning row is not mounted in this runtime'
+    issues.push(`${sentence}: ${shown}${more} — ${why}`)
   }
   return issues
 }

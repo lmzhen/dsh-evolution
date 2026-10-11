@@ -699,7 +699,7 @@ describe('parameter channel parity guard (G5/S5.1 sentry)', () => {
     const clean = await run(process.execPath, [paramParity, root, '--strict'], { encoding: 'utf8' })
     expect(clean.stdout).toContain('verify-param-channel-parity: OK')
   })
-// G1 step 1.1 (0.21.0): an E3 row whose owner publishes no settings namespace has NO user layer
+  // G1 step 1.1 (0.21.0): an E3 row whose owner publishes no settings namespace has NO user layer
   // at all — the platform keys a card by the ROW id, so no card can render it and `/evolution policy
   // set` answers E-315. Before the scope removal the owner loop only walked owners that already had
   // a namespace, so this state was invisible to every gate (it is how `pendingTtlMs` shipped).
