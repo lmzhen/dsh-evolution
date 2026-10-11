@@ -39,6 +39,13 @@ export interface ClientParamSection {
 
 export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
   {
+    namespace: 'evolution-approval',
+    seatKey: 'evolution-approval',
+    fields: [
+      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'number', unit: '毫秒', values: [], valueLabels: [] },
+    ],
+  },
+  {
     namespace: 'evolution-curator',
     seatKey: 'evolution-curator',
     fields: [
@@ -117,7 +124,7 @@ export interface ClientRowSeat {
 
 /** Every (bundle, row) pair the Plugins page can open a configuration page for. */
 export const CLIENT_ROW_SEATS: readonly ClientRowSeat[] = [
-  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
-  { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-curator', 'evolution-review', 'memory-files'] },
-  { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
+  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
+  { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-approval', 'evolution-curator', 'evolution-review', 'memory-files'] },
+  { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-approval', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
 ]

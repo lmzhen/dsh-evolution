@@ -18,11 +18,12 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 // v43 FLOW2-1: the orphan criterion reuses core's SINGLE liveness source
 // (`isProcessAlive`) and the io write-lock body parser (`parseLockBody`), so the
 // approval claim and the io lock cannot drift into two liveness rules.
-import { isProcessAlive, parseLockBody } from '@deepseek-ai/dsh-evolution-core'
+import { clampOnce, isProcessAlive, parseLockBody } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
@@ -178,8 +179,11 @@ export interface Config {
    * the window then behaves exactly as before. Expiry closes the record the same way a reject does
    * (status `rejected`, `resolvedAt` stamped, runner NEVER invoked): an expiry is a cleanup of the
    * window, never an approval, so nothing a human did not approve can execute.
+   *
+   * `.volatile()` (0.21.0, G1): the field carries a USER LAYER, so the value arrives as a live
+   * reference and is read at USE time — a settings write changes the window without a reload.
    */
-  pendingTtlMs?: number
+  pendingTtlMs?: Volatile<number>
 }
 
 export class EvolutionApproval extends Service {
@@ -189,14 +193,19 @@ export class EvolutionApproval extends Service {
     stageForeground: z.boolean().default(true),
     // 0 = never expire (the shipped default: the window is unbounded until the operator decides).
     // The schema floor keeps a negative TTL from meaning "everything is instantly stale".
-    pendingTtlMs: z.number().min(0).default(0),
+    // `.volatile()` is what gives this field a USER LAYER (the platform projects only volatile
+    // fields into a row's settings form — its `volatileForm` projection): without it the registry's
+    // E3 row would document a knob no write can reach (G1, 0.21.0).
+    pendingTtlMs: z.number().min(0).default(0).volatile(),
   })
 
   private readonly enabled: boolean
   private readonly stageForegroundConfig: boolean
-  /** Effective TTL in ms; 0 = the window never expires (T4-09/A51). A non-finite or negative value
-   * is clamped here because the schema only guards the loader path. */
-  private readonly pendingTtlMs: number
+  /** The TTL carrier as configured: a plain number, or the live reference `.volatile()` hands a
+   * user-layer field. Read through {@link ttl} at every use, never cached (registry row: live). */
+  private readonly pendingTtlMsConfig: Volatile<number> | undefined
+  /** Keys this instance already warned about (clampOnce's once-per-key sink). */
+  private readonly clampedKeys = new Set<string>()
   /** P3 (v16): public read for staging pre-checks (learning-graph refuses a
    * stage that no runner could replay only when foreground writes stage at
    * all). Mirrors `this.stageForeground`. */
@@ -211,11 +220,23 @@ export class EvolutionApproval extends Service {
     super(ctx, 'evolutionApproval')
     this.enabled = config.enabled ?? false
     this.stageForegroundConfig = config.stageForeground ?? true
-    const ttl = config.pendingTtlMs ?? 0
-    this.pendingTtlMs = Number.isFinite(ttl) && ttl > 0 ? Math.floor(ttl) : 0
+    this.pendingTtlMsConfig = config.pendingTtlMs
     // The reading face for the pending window (the settings panel's card). `ctx.inject` and not
     // `ctx.get`: profile rows apply in file order, so the web server may not exist yet — waiting on the
     // service mounts the routes whenever it arrives, and a profile without one stays inert.
+    // G1 (0.21.0): this row now carries a user-writable field, so suppress the platform's own
+    // auto-generated page for it — the family renders the card from the registry instead, and two
+    // pages editing one row makes a write on the wrong one look ignored. Probed, not assumed: a
+    // host without the capability still loads.
+    this.ctx.inject(['settings'], (injected) => {
+      const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
+      if (typeof settings?.configure !== 'function') return
+      // The owner argument is what the platform looks the presentation up by; omitting it registers
+      // the suppression on the settings service's own fiber and the auto form returns after a
+      // re-mount (v46 S1.12b; platform precedent: settings.configure({ auto: false }, plugin.fiber)).
+      const disposer = settings.configure({ auto: false }, this.ctx.fiber)
+      if (typeof disposer === 'function') this.ctx.effect(() => disposer as () => void, 'evolution-approval: settings presentation')
+    })
     this.ctx.inject(['webServer'], (scope) => {
       scope.effect(() => {
         const disposers = makeApprovalRoutes(this).map(route => scope.webServer.register(route))
@@ -336,7 +357,21 @@ export class EvolutionApproval extends Service {
   /** T4-09/A51: the effective expiry of the staged window, 0 = never. Read by the command surface
    * and the doctor so both can say which of the three human-confirmation states is in force. */
   get ttlMs(): number {
-    return this.pendingTtlMs
+    return this.ttl()
+  }
+
+  /**
+   * The effective TTL in ms (0 = never expire), read at USE time.
+   *
+   * `clampOnce` is the family's ONE clamp-and-warn helper for a numeric knob that may be a live
+   * settings reference (S2.9/T3-10): a plain number, a `{ get() }` reference, or nothing all land
+   * on the same floor, and an invalid value warns once per instance instead of silently disabling
+   * the window. The old inline `Number.isFinite` read stopped working the moment the field became
+   * `.volatile()` — a reference is not a finite number, so the TTL silently read as 0.
+   * @returns the TTL the sweep may use.
+   */
+  private ttl(): number {
+    return Math.floor(clampOnce(this.clampedKeys, message => this.ctx.logger.warn(message), 'pendingTtlMs', this.pendingTtlMsConfig, 0, 0))
   }
 
   /**
@@ -356,8 +391,11 @@ export class EvolutionApproval extends Service {
    * @returns the ids that were closed by this sweep (empty when the TTL is off or nothing was stale).
    */
   async expireStale(): Promise<string[]> {
-    if (this.pendingTtlMs <= 0) return []
-    const cutoff = Date.now() - this.pendingTtlMs
+    // Read ONCE per sweep: the value is live (a settings write may land between two sweeps), and a
+    // single read keeps the cut-off and the warning line describing the same number.
+    const ttl = this.ttl()
+    if (ttl <= 0) return []
+    const cutoff = Date.now() - ttl
     const expired: string[] = []
     for (const record of await this.state().listPending('pending')) {
       const stagedAt = Date.parse(record.createdAt)
@@ -368,7 +406,7 @@ export class EvolutionApproval extends Service {
       if (resolution.applied) expired.push(record.id)
     }
     if (expired.length > 0) {
-      this.ctx.logger.warn(`evolution-approval: ${expired.length} staged write(s) passed pendingTtlMs=${this.pendingTtlMs} and were closed as rejected WITHOUT executing: ${expired.join(', ')} — stage them again if they are still wanted`)
+      this.ctx.logger.warn(`evolution-approval: ${expired.length} staged write(s) passed pendingTtlMs=${ttl} and were closed as rejected WITHOUT executing: ${expired.join(', ')} — stage them again if they are still wanted`)
     }
     return expired
   }

@@ -37,6 +37,7 @@ export const zh = {
   cardToolMemory: '记忆写入',
   cardCurator: '技能整理',
   cardSkills: '技能写入规则',
+  cardApproval: '写入审批',
   approvalTitle: '待批写入',
   approvalLoading: '正在读取待批项…',
   approvalEmpty: '没有待批的写入',
@@ -90,6 +91,7 @@ export const en: Record<keyof typeof zh, string> = {
   cardToolMemory: 'Writing memory',
   cardCurator: 'Skill tidy-up',
   cardSkills: 'Skill write rules',
+  cardApproval: 'Write approval',
   approvalTitle: 'Writes awaiting approval',
   approvalLoading: 'reading the pending window…',
   approvalEmpty: 'nothing is waiting for a decision',
@@ -131,6 +133,7 @@ export const NAMESPACE_TITLES: Readonly<Record<string, string>> = Object.freeze(
   'tool-memory': 'cardToolMemory',
   'evolution-curator': 'cardCurator',
   'tool-skill-manage': 'cardSkills',
+  'evolution-approval': 'cardApproval',
 })
 
 /** One message key. */

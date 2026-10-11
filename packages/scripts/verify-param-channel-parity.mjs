@@ -53,11 +53,10 @@ const CURRENT_GROUP = 1
  * (verify-arch-guards' N35 / guard-vacuity posture) so a debt cannot be forgotten silently, and the
  * step that fixes the row deletes the entry in the same batch. */
 const EXPOSURE_DEBT = new Map([
-  ['evolution-approval', {
-    reason: 'evolution-approval.pendingTtlMs is an E3 row whose owner publishes no settings namespace: the field is not .volatile(), the row never calls settings.configure({ auto: false }, ctx.fiber), and the generated field list omits it (the registry row already carries label/hint/control/unit)',
-    closes: '0.21.0 step 1.2 — add .volatile(), the PARAM_NAMESPACES entry, the auto-form suppression and the client title, then delete this entry',
-    expires: 1,
-  }],
+  // 0.21.0 step 1.2 closed the only entry this register has carried so far
+  // (evolution-approval: .volatile() + PARAM_NAMESPACES + the auto-form suppression + the card
+  // title). Add an entry here — owner, reason, closing step, expiry group — when a gate has to
+  // land before the data it judges; an entry without all four is a bug in this register.
 ])
 /** Owners this register still covers; an entry past its expiry is NOT silent (see `expiredDebt`). */
 const exemptOwners = new Set([...EXPOSURE_DEBT]

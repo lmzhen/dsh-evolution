@@ -279,6 +279,9 @@ export const PARAM_NAMESPACES: Readonly<Record<string, string>> = Object.freeze(
   'tool-memory': 'evolution-tool-memory',
   'evolution-curator': 'evolution-curator',
   'tool-skill-manage': 'evolution-skills',
+  // 0.21.0 (G1): the approval row's `pendingTtlMs` is E3, so its owner must publish a user layer —
+  // without this entry the row's card could not exist and `/evolution policy set` answered E-315.
+  'evolution-approval': 'evolution-approval',
 })
 
 /**
