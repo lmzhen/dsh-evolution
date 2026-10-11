@@ -25,7 +25,6 @@ import { randomUUID } from 'node:crypto'
 // approval claim and the io lock cannot drift into two liveness rules.
 import { clampOnce, isProcessAlive, parseLockBody } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
-import type Schema from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
 import { makeApprovalRoutes } from './routes.ts'
@@ -188,7 +187,10 @@ export interface Config {
 
 export class EvolutionApproval extends Service {
   static inject = ['evolutionState']
-  static Config: Schema<Config> = z.object({
+  // No `Schema<Config>` annotation: a row carrying a `.volatile()` field does not satisfy it under
+  // exactOptionalPropertyTypes (the schema's output type is required and the interface's property is
+  // optional) — every other volatile-bearing row in the family declares the schema unannotated.
+  static Config = z.object({
     enabled: z.boolean().default(false),
     stageForeground: z.boolean().default(true),
     // 0 = never expire (the shipped default: the window is unbounded until the operator decides).
@@ -203,7 +205,7 @@ export class EvolutionApproval extends Service {
   private readonly stageForegroundConfig: boolean
   /** The TTL carrier as configured: a plain number, or the live reference `.volatile()` hands a
    * user-layer field. Read through {@link ttl} at every use, never cached (registry row: live). */
-  private readonly pendingTtlMsConfig?: Volatile<number | undefined>
+  private readonly pendingTtlMsConfig?: Volatile<number> | undefined
   /** Keys this instance already warned about (clampOnce's once-per-key sink). */
   private readonly clampedKeys = new Set<string>()
   /** P3 (v16): public read for staging pre-checks (learning-graph refuses a
