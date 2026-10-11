@@ -11,7 +11,7 @@
  * Correctness of this .mjs is proven by evolution-host/tests/guard-scripts.spec.ts
  * (scripts sit outside oxlint, like every other family guard).
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Entry head (the 8 keys every row carries) plus the two legal endings: a plain
@@ -286,7 +286,7 @@ export function renderParamDocs(registry, check) {
     '',
     '## 设置面（第八列怎么读）',
     '',
-    'E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行的字段**（平台按 Loader 行 id 取卡，一张卡只渲染自己那行的 volatile 字段）。其余档写 `无（<why>）`，`why` 取值（**用列表不用表格**：门禁把 `| \`id\` |` 形状的行当作参数行，表格会把它读成 6 个不存在的参数）：',
+    'E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行的字段**（平台按 Loader 行 id 取卡，一张卡只渲染自己那行的 volatile 字段）。其余档写 `无（<why>）`，`why` 取值（**用列表不用表格**：门禁把 `| `id` |` 形状的行当作参数行，表格会把它读成 6 个不存在的参数）：',
     '',
     '- `deployment` —— 挂载开关与库级范围策略（部署方的决定）',
     '- `security` —— 安全面（工具授权、威胁豁免、审批闸；永不给用户）',
