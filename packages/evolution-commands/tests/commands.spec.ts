@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { emptyRecord, nodeEvolutionIo, presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core'
+import { emptyRecord, markerEntryName, newSkillLibrary, nodeEvolutionIo, presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core'
 import * as Commands from '../src/index.ts'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
@@ -443,6 +443,73 @@ describe('evolution-commands', () => {
     expect(body).toContain('references/log.md')
     const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
     expect(support).toContain('old detail')
+  })
+
+  // G4 (0.21.0): the /evolution pin face — the user gesture the tool action never had. A REAL library
+  // over a temp root, so these cells read the marker on disk and the library's own isPinned() instead
+  // of an echoed stub: the round trip (freeze -> release) is the contract, and the marker file is the
+  // fact both the curator's Protected list and skill_manage's pin guard read.
+  it('pins and unpins a skill through the real library: marker on disk, isPinned round trip', async () => {
+    const dir = await tempRoot('evo-commands-pin-')
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for pin tests.\n---\n\n# Demo\n', 'utf8')
+    const ctx = new Context()
+    let captured: Handler | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as Handler }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    await ctx.plugin(Commands, { root })
+    const marker = join(skillDir, markerEntryName('pinned'))
+    const library = newSkillLibrary({ config: { root }, io })
+    expect(await library.isPinned('demo-skill'), 'a fresh skill is not pinned').toBe(false)
+    const pinned = await captured!.handler({ rawInput: 'skill pin demo-skill' })
+    expect(pinned.kind).toBe('success')
+    expect(pinned.text).toContain('pinned')
+    expect(existsSync(marker), 'the marker lands in the skill directory').toBe(true)
+    expect(await library.isPinned('demo-skill')).toBe(true)
+    const unpinned = await captured!.handler({ rawInput: 'skill unpin demo-skill' })
+    expect(unpinned.kind).toBe('success')
+    expect(unpinned.text).toContain('unpinned')
+    expect(existsSync(marker)).toBe(false)
+    expect(await library.isPinned('demo-skill')).toBe(false)
+    const usage = await captured!.handler({ rawInput: 'skill pin' })
+    expect(usage.kind).toBe('error')
+    expect(usage.text).toContain('Usage: /evolution skill pin <name>')
+  })
+
+  // E-70's decision, pinned on the command side too: the flip is NOT staged, does NOT bump usage and
+  // does NOT emit the mutation event (it is a lifecycle flag, not content) — and repeating it is an
+  // idempotent success rather than an error, so a user who is unsure can just run it again.
+  it('keeps pin outside the mutation surface and makes repeats idempotent (E-70, same as the tool)', async () => {
+    const dir = await tempRoot('evo-commands-pin-semantics-')
+    const root = join(dir, 'skills')
+    const skillDir = join(root, 'demo-skill')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for pin tests.\n---\n\n# Demo\n', 'utf8')
+    const ctx = new Context()
+    let captured: Handler | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as Handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    // Both observation faces of the write-sink discipline: a content write must move them, pin must not.
+    const mutations: unknown[] = []
+    ctx.on('evolution/skill-mutated', (event) => { mutations.push(event) })
+    const usageRecords: Array<[string, string]> = []
+    ctx.provide('skillUsage', { record: async (name: string, kind: string) => { usageRecords.push([name, kind]) } })
+    await ctx.plugin(Commands, { root })
+    const first = await captured!.handler({ rawInput: 'skill pin demo-skill' })
+    expect(first.kind).toBe('success')
+    const again = await captured!.handler({ rawInput: 'skill pin demo-skill' })
+    expect(again.kind).toBe('success')
+    expect(again.text).toContain('already pinned')
+    const twiceOff = await captured!.handler({ rawInput: 'skill unpin demo-skill' })
+    expect(twiceOff.kind).toBe('success')
+    const loose = await captured!.handler({ rawInput: 'skill unpin demo-skill' })
+    expect(loose.kind).toBe('success')
+    expect(loose.text).toContain('not pinned')
+    expect(mutations, 'a lifecycle flag is not a content mutation').toEqual([])
+    expect(usageRecords, 'and it does not enter the usage ledger').toEqual([])
   })
 
   /** A captured command handler, as these fixtures build it. */

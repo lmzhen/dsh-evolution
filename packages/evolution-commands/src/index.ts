@@ -686,6 +686,32 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
+        // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
+        // method (setPinned), the same repository-worded answer, and the same E-70 decision that a
+        // lifecycle-flag flip stays OUTSIDE the approval seam: staging it would let a request that
+        // expires hold the library pinned invisibly, and the flip is reversible by the same command.
+        // Like the tool, this is not a content write: no usage bump and no mutation event.
+        if (input === 'skill pin' || input.startsWith('skill pin ') || input === 'skill unpin' || input.startsWith('skill unpin ')) {
+          const pinned = !input.startsWith('skill unpin')
+          const name = input.slice(pinned ? 10 : 12).trim()
+          if (!name) return err(`Usage: /evolution skill ${pinned ? 'pin' : 'unpin'} <name>`)
+          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('Evolution IO registry not mounted — skill pinning unavailable.')
+          // The write-side library is built exactly like restructure's: one construction recipe. The
+          // limits ride along because the name guard reads them, so a deployment that raised the
+          // name cap can still pin such a skill.
+          const library = newSkillLibrary({
+            config: { root: skillsRootValue },
+            io: ioRegistry.provider(),
+            ctx,
+            limits: {
+              ...DEFAULT_SKILL_LIMITS,
+              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+            },
+          })
+          const result = await library.setPinned(name, pinned)
+          return result.ok ? ok(result.message) : err(result.message)
+        }
         if (input === 'skills health') {
           const curator = ctx.get('evolutionCurator') as { healthView(): Promise<Array<{ name: string; verdict: string; reasons: string[] }>>; usageObserved(): Promise<boolean> } | undefined
           if (!curator) return err(errorText('e-302-curator-service-not-mounted'))

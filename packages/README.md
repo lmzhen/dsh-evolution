@@ -144,6 +144,8 @@ pins the equality).
 | `/evolution skill restore <name>` | 按名字恢复一个已归档的技能 |
 | `/evolution skill history <name>` | 列出某个技能的内容版本（含时间、动作、字符数、哈希前缀） |
 | `/evolution skill undo <name> [--to v<N>]` | 把某个技能的内容回退到某一版（默认上一版；只动内容，撤销本身也记为一版） |
+| `/evolution skill pin <name>` | 钉住一个技能：免于删除、后台审查与生命周期整理（立即生效、随时可解钉；与 skill_manage 的 pin 动作同一语义，不走审批） |
+| `/evolution skill unpin <name>` | 解钉一个技能：撤销上面的冻结（立即生效、不走审批） |
 | `/evolution skills health` | 技能库结构体检 |
 | `/evolution skills refresh` | 丢弃目录缓存并重新读取技能树 |
 | `/evolution learn [request]` | 向本会话发一条学习请求 |
