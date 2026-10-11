@@ -1539,12 +1539,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
           // mounted services, pending count. `--json` feeds scripts.
           // G3: the mounted identity rides in from here (the ONE profileContext probe lives in
-    // preset-source.ts) so doctor can name the profiles that are NOT this plane.
-    const mountedForDoctor = presetProfileTarget(ctx)
-    const report = await diagnose(ctx, {
-      home: evolutionRoot(),
-      ...(mountedForDoctor === undefined ? {} : { mounted: { profile: mountedForDoctor.profile, dir: mountedForDoctor.profileDir, bundles: mountedForDoctor.bundles } }),
-    })
+          // preset-source.ts) so doctor can name the profiles that are NOT this plane.
+          const mountedForDoctor = presetProfileTarget(ctx)
+          const mounted = mountedForDoctor === undefined
+            ? {}
+            : { mounted: { profile: mountedForDoctor.profile, dir: mountedForDoctor.profileDir, bundles: mountedForDoctor.bundles } }
+          const report = await diagnose(ctx, { home: evolutionRoot(), ...mounted })
           if (input === 'doctor --json') return ok(JSON.stringify(report, null, 2))
           return ok(renderDoctorText(report))
         }

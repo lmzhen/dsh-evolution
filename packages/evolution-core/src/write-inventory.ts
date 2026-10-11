@@ -69,18 +69,19 @@ interface WriteInventoryTable {
 function parseTable(raw: unknown): WriteInventoryTable {
   // The input is UNKNOWN JSON, so each narrowing below is a real runtime check (and each later check
   // is written so the previous one already excluded its negation — the linter rejects tautologies).
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('evolution-core: persisted-write-inventory.json must be an object with { symbols, sites }')
   }
   const table = raw as { symbols?: unknown; sites?: unknown }
-  // typeof null === 'object', so the explicit test stays: the field is UNKNOWN, not a typed record.
-  if (typeof table.symbols !== 'object' || table.symbols === null || Array.isArray(table.symbols)) {
+  // typeof null === 'object', so the null test stays — and it comes FIRST: after `typeof !== 'object'`
+  // TypeScript has already dropped null, and the linter is right to call that test a tautology.
+  if (table.symbols === null || typeof table.symbols !== 'object' || Array.isArray(table.symbols)) {
     throw new Error('evolution-core: persisted-write-inventory.json needs a symbols legend (the roots every path is written against)')
   }
   for (const [symbol, entry] of Object.entries(table.symbols)) {
     const problems: string[] = []
     if (!symbol.startsWith('<') || !symbol.endsWith('>')) problems.push('symbol name (must be <name>)')
-    if (typeof entry !== 'object' || entry === null) problems.push('entry')
+    if (entry === null || typeof entry !== 'object') problems.push('entry')
     else {
       const symbolEntry = entry as { resolver?: unknown; segments?: unknown }
       if (typeof symbolEntry.resolver !== 'string' || symbolEntry.resolver === '') problems.push('resolver')

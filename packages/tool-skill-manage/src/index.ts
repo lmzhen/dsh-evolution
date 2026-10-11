@@ -540,7 +540,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // correction warns once per KEY per mount instead of once at assembly.
   const clampedKeys = new Set<string>()
   const limit = (name: string, value: LiveValue<number>, fallback: number): number =>
-    clampOnce(clampedKeys, (message) => ctx.logger.warn(message), `tool-skill-manage: ${name}`, value, fallback, 1)
+    clampOnce(clampedKeys, (message) => { ctx.logger.warn(message) }, `tool-skill-manage: ${name}`, value, fallback, 1)
   /**
    * This row's write knobs as they stand RIGHT NOW (G1 §8.3) — the base layer of the
    * precedence chain. The ten E3 keys are live references the platform updates in

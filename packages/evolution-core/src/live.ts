@@ -40,7 +40,7 @@ export function unwrapLive<T>(value: LiveValue<T>): T | undefined {
   // Read as unknown: the discriminant is a RUNTIME shape check, so every narrowing below is real
   // (a null test against the declared union would be a tautology the linter rejects).
   const raw: unknown = value
-  if (typeof raw !== 'object' || raw === null) return raw as T | undefined
+  if (typeof raw !== 'object' || raw === null) return raw === undefined ? undefined : (raw as T)
   const candidate = raw as { get?: unknown }
   return typeof candidate.get === 'function' ? (candidate.get as () => T | undefined).call(raw) : (raw as T)
 }

@@ -96,7 +96,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * @returns the value the store may use.
    */
   const field = (name: string, value: LiveValue<number>, fallback: number): number =>
-    clampOnce(clampedKeys, (message) => ctx.logger.warn(message), `memory-files: ${name}`, value, fallback, 1)
+    clampOnce(clampedKeys, (message) => { ctx.logger.warn(message) }, `memory-files: ${name}`, value, fallback, 1)
   // P2-23 (v37): a fractional char limit reached the store unchanged, and the
   // tool surface declares `limit` as an integer — every memory call then failed
   // platform output validation AFTER the write had landed. The char limit is a

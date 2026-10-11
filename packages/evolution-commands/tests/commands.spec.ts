@@ -787,9 +787,9 @@ describe('evolution-commands', () => {
     expect(existsSync(join(home, '.agent-presets'))).toBe(false)
   })
 
-/** G3 cells: the platform base rows the preset-composition path reads (the same literal the
- * 0.3.15 cell uses, hoisted so the three G3 cells do not depend on another describe block's scope). */
-const G3_STANDARD_FIXTURE = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
+  /** G3 cells: the platform base rows the preset-composition path reads (the same literal the
+   * 0.3.15 cell uses, hoisted so the three G3 cells do not depend on another describe block's scope). */
+  const G3_STANDARD_FIXTURE = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
 
   it('G3: a FOREIGN profile carrying evolution-all no longer blocks this plane preset install', async () => {
     const home = await tempHome('evo-commands-preset-foreign-')

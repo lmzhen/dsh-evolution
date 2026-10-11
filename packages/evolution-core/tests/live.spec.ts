@@ -59,11 +59,11 @@ describe('clampOnce — the pre-0.22 adapter keeps its signature and behaviour',
     const warned = new Set<string>()
     const messages: string[] = []
     const value = { get: () => 0 as number | undefined }
-    expect(clampOnce(warned, (m) => messages.push(m), 'pendingTtlMs', value, 120, 1)).toBe(120)
-    expect(clampOnce(warned, (m) => messages.push(m), 'pendingTtlMs', value, 120, 1)).toBe(120)
+    expect(clampOnce(warned, m => messages.push(m), 'pendingTtlMs', value, 120, 1)).toBe(120)
+    expect(clampOnce(warned, m => messages.push(m), 'pendingTtlMs', value, 120, 1)).toBe(120)
     expect(messages).toEqual(['pendingTtlMs provided an invalid value; falling back to the default'])
-    expect(clampOnce(warned, (m) => messages.push(m), 'pendingTtlMs', undefined, 120, 1)).toBe(120)
-    expect(clampOnce(warned, (m) => messages.push(m), 'pendingTtlMs', 30, 120, 1, 600)).toBe(30)
+    expect(clampOnce(warned, m => messages.push(m), 'pendingTtlMs', undefined, 120, 1)).toBe(120)
+    expect(clampOnce(warned, m => messages.push(m), 'pendingTtlMs', 30, 120, 1, 600)).toBe(30)
   })
 })
 
