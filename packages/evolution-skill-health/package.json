@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-skill-health",
   "description": "Web surface for skill health: the sidebar panel that shows what the linter found",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "publishConfig": {
     "access": "public"
   },
