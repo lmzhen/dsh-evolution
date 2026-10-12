@@ -441,7 +441,9 @@ runs:
         path: upstream/packages/evolution/scripts
         retention-days: 14
 
-    - name: Verify the gate manifest (G0-5: table ∪ CI ↔ reality)
+    # The name is quoted on purpose: an unquoted colon-space inside a flow scalar makes YAML read
+    # this step as a MAPPING, and the runner then refuses the whole action with "Unexpected type".
+    - name: 'Verify the gate manifest (G0-5: table union CI <-> reality)'
       shell: bash
       run: |
         # The four-way reconciliation runs in CI too — it used to be local-only while being the
