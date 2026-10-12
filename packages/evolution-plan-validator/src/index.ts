@@ -444,7 +444,7 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
   if (!isRecord(root)) {
     return {
       accepted: { memoryOps: [], skillOps: [] },
-      rejected: [{ index: 0, kind: 'memory', reason: 'plan root: must be an object' }],
+      rejected: [{ index: 0, kind: 'memory', reason: 'plan 根节点：必须是对象' }],
       reports,
       ok: false,
     }
@@ -464,13 +464,13 @@ export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationCo
   const rawSkillOps = Array.isArray(plan.skillOps) ? plan.skillOps : undefined
   const allOps = (rawMemoryOps?.length ?? 0) + (rawSkillOps?.length ?? 0)
   if (plan.memoryOps !== undefined && !Array.isArray(plan.memoryOps)) {
-    rejected.push({ index: 0, kind: 'memory', reason: 'memoryOps: must be an array' })
+    rejected.push({ index: 0, kind: 'memory', reason: 'memoryOps：必须是数组' })
   }
   if (plan.skillOps !== undefined && !Array.isArray(plan.skillOps)) {
-    rejected.push({ index: 0, kind: 'skill', reason: 'skillOps: must be an array' })
+    rejected.push({ index: 0, kind: 'skill', reason: 'skillOps：必须是数组' })
   }
   if (allOps === 0 && rejected.length === 0) {
-    rejected.push({ index: 0, kind: 'memory', reason: 'plan contains no operations' })
+    rejected.push({ index: 0, kind: 'memory', reason: 'plan 不含任何操作' })
     return { accepted, rejected, reports, ok: false }
   }
   if (allOps > maxOps) {

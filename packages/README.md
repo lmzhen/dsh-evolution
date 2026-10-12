@@ -135,7 +135,7 @@ pins the equality).
 | `/evolution pending [--detail]` | 列出暂存的写入（--detail 显示参数） |
 | `/evolution approve <id>` | 执行一条已批准的写入 |
 | `/evolution reject <id>` | 丢弃一条暂存写入，不执行 |
-| `/evolution release <id>` | 把卡在执行中的写入放回待批窗口（先确认效果再批准 or reject) |
+| `/evolution release <id>` | 把卡在执行中的写入放回待批窗口（先确认效果再批准或驳回） |
 | `/evolution doctor [--json]` | 只读自检：安装形态、冲突、环境、服务（--json 供脚本用） |
 | `/evolution curator run\|pause\|resume\|status\|report\|scope` | 立即运行一次自动整理，或暂停／恢复／查看状态 |
 | `/evolution mutations` | 列出技能改动记录 |
@@ -155,8 +155,8 @@ pins the equality).
 | `/evolution maintain handoff [<id>]` | 把某次维护报告交给模型：注入指针与汇报协议，模型只汇报、等你确认后再动手 |
 | `/evolution maintain cancel [<id>]` | 停掉在飞的那次维护扫描（省略 id 仅当最新一条是本进程在跑的那次） |
 | `/evolution migrate` | 把旧设置文档里家族的旧分区迁进现在的行（幂等；已迁移过就报「已一致」） |
-| `/evolution policy set <id> <value> [--expect <revision>]` | 通过设置服务写入一个你可改的参数 (E3 only; E1/E2 stay in cordis.yml) |
-| `/evolution params [--group <name>] [--json]` | 列出全部参数：分组、档位、生效时机、来源与当前值（--json feeds scripts) |
+| `/evolution policy set <id> <value> [--expect <revision>]` | 通过设置服务写入一个你可改的参数 （仅 E3；E1/E2 仍留在 cordis.yml） |
+| `/evolution params [--group <name>] [--json]` | 列出全部参数：分组、档位、生效时机、来源与当前值（--json 便于脚本处理） |
 | `/evolution preset install [--base <name>[,<name>...]]` | 把自进化 Agent 预设**行**写进当前 profile 的 patch 层（`profiles/<p>/cordis.patch.yml`；bases 来自 agent 包的 bases.json） |
 | `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | 把技能正文的一节移到 references 文件 |
 | `/evolution replay` | 比较不同会话与重启之间的计划结果（从活动记录回填） |

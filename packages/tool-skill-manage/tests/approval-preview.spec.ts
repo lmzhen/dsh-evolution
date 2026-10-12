@@ -92,7 +92,7 @@ describe('the staged skill write preview', () => {
       operation: { action: 'update', name: 'preview-skill', content: BODY, staged_from_sha256: contentHash('something else') },
     }) as { available: boolean; reason: string }
     expect(answer.available).toBe(false)
-    expect(answer.reason).toContain('changed after this write was staged')
+    expect(answer.reason).toContain('在这次写入暂存之后发生了变化')
   })
 
   it('resolves a patch with the library matcher, and says so when the old text is gone', async () => {
@@ -106,7 +106,7 @@ describe('the staged skill write preview', () => {
       operation: { action: 'patch', name: 'preview-skill', old_string: 'not in the body', new_string: 'x', staged_from_sha256: contentHash(BODY) },
     }) as { available: boolean; reason: string }
     expect(missing.available).toBe(false)
-    expect(missing.reason).toContain('would be refused')
+    expect(missing.reason).toContain('会被拒绝')
   })
 
   it('T2-04/A19: a SUPPORT-file patch is previewed byte-for-byte, with no SKILL.md frontmatter pass', async () => {
@@ -146,7 +146,7 @@ describe('the staged skill write preview', () => {
       operation: { action: 'remove_file', name: 'preview-skill', file_path: 'references/gone.md', staged_from_sha256: 'absent' },
     }) as { available: boolean; reason: string }
     expect(absent.available).toBe(false)
-    expect(absent.reason).toContain('not there to remove')
+    expect(absent.reason).toContain('不存在，无法移除')
   })
 
   it('answers without bytes for operations that have none, and for an unnamed skill', async () => {
@@ -155,6 +155,6 @@ describe('the staged skill write preview', () => {
     expect(pinned.available).toBe(false)
     expect(pinned.reason).toContain('no byte-level preview')
     const unnamed = await preview({ operation: { action: 'update' } }) as { available: boolean; reason: string }
-    expect(unnamed.reason).toContain('names no skill')
+    expect(unnamed.reason).toContain('没有指明技能')
   })
 })

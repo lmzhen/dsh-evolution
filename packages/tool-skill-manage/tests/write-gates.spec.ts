@@ -296,13 +296,13 @@ describe('write gates: the foreground confirmation (E-317)', () => {
 
   it('asks exactly once before a foreground create, and writes when confirmed', async () => {
     const { ctx, root } = await setup()
-    const { asked, routing } = mountQuestions(ctx, () => ['Create'])
+    const { asked, routing } = mountQuestions(ctx, () => ['创建'])
     const session = sessionOf(undefined)
     const created = await callTool(ctx, { action: 'create', name: 'confirm-yes', content: skillBody('confirm-yes') }, session)
     expect(valueOf(created).ok, valueOf(created).message).toBe(true)
     expect(asked).toHaveLength(1)
     expect(asked[0]?.id).toBe('evolution-skill-write')
-    expect(asked[0]?.options?.map(option => option.label)).toEqual(['Create', 'Cancel'])
+    expect(asked[0]?.options?.map(option => option.label)).toEqual(['创建', '取消'])
     expect(asked[0]?.question).toContain('confirm-yes')
     // The prompt is routed through the CALLING agent (the platform's ask() takes an agent, not a
     // session), so assert the routing target is the one the call came from.
@@ -312,7 +312,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
 
   it('declines the write when the operator picks anything but the confirm label', async () => {
     const { ctx, root } = await setup()
-    const { asked } = mountQuestions(ctx, () => ['Cancel'])
+    const { asked } = mountQuestions(ctx, () => ['取消'])
     const refused = await callTool(ctx, { action: 'create', name: 'confirm-no', content: skillBody('confirm-no') }, sessionOf(undefined))
     expect(valueOf(refused).ok).toBe(false)
     expect(valueOf(refused).message).toContain('E-317')
@@ -335,12 +335,12 @@ describe('write gates: the foreground confirmation (E-317)', () => {
     const bare = await callTool(ctx, { action: 'delete', name: 'confirm-bare' }, sessionOf(undefined))
     expect(valueOf(bare).ok, valueOf(bare).message).toBe(true)
     expect(asked).toHaveLength(4)
-    expect(asked[3]?.options?.map(option => option.label)).toEqual(['Delete', 'Cancel'])
+    expect(asked[3]?.options?.map(option => option.label)).toEqual(['删除', '取消'])
   })
 
   it('does not ask a subagent, and does not ask on the replay path', async () => {
     const { ctx } = await setup()
-    const { asked } = mountQuestions(ctx, () => ['Create'])
+    const { asked } = mountQuestions(ctx, () => ['创建'])
     const subagentCreate = await callTool(ctx, { action: 'create', name: 'confirm-subagent', content: skillBody('confirm-subagent') }, sessionOf('subagent'))
     expect(valueOf(subagentCreate).ok, valueOf(subagentCreate).message).toBe(true)
     expect(asked).toHaveLength(0)
@@ -366,7 +366,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
 
   it('refuses a malformed call before asking anything', async () => {
     const { ctx } = await setup()
-    const { asked } = mountQuestions(ctx, () => ['Create'])
+    const { asked } = mountQuestions(ctx, () => ['创建'])
     const refused = await callTool(ctx, { action: 'create', name: 'confirm-missing' }, sessionOf(undefined))
     expect(valueOf(refused).ok).toBe(false)
     expect(valueOf(refused).message).toContain('skill_manage create requires content')
@@ -395,7 +395,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
     await ctx.plugin(JsonState, { root: home })
     await ctx.plugin(EvolutionState)
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
-    const { asked } = mountQuestions(ctx, () => ['Create'])
+    const { asked } = mountQuestions(ctx, () => ['创建'])
     const created = await callTool(ctx, { action: 'create', name: 'one-gate', content: skillBody('one-gate') }, sessionOf(undefined))
     expect(valueOf(created).ok, valueOf(created).message).toBe(true)
     // The seam staged it (the card the operator actually needs)…
@@ -406,7 +406,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
 
   it('T2-10/A25 control: WITHOUT the seam the confirmation still fires exactly once', async () => {
     const { ctx } = await setup({ skillWriteConfirm: 'ask' })
-    const { asked } = mountQuestions(ctx, () => ['Create'])
+    const { asked } = mountQuestions(ctx, () => ['创建'])
     const created = await callTool(ctx, { action: 'create', name: 'one-gate-control', content: skillBody('one-gate-control') }, sessionOf(undefined))
     expect(valueOf(created).ok, valueOf(created).message).toBe(true)
     expect(asked).toHaveLength(1)
@@ -418,7 +418,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
     const session = { id: sessionId, header: {}, readEvents: () => [] }
     const live = { id: sessionId, session, ctx, inject: () => {} } as unknown as Agent
     await ctx.agents.register(live)
-    const { asked, routing } = mountQuestions(ctx, () => ['Create'], agent => agent === live)
+    const { asked, routing } = mountQuestions(ctx, () => ['创建'], agent => agent === live)
     // A structural copy carrying the same session id: the platform rejects it as CALLER_NOT_LIVE,
     // so the gate has to route through the registry's live root instead.
     const forwarded = { id: sessionId, header: { origin: undefined }, readEvents: () => [] }
@@ -432,7 +432,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
     const { ctx } = await setup()
     const warns: string[] = []
     ctx.logger.warn = ((message: string) => { warns.push(message) }) as typeof ctx.logger.warn
-    const { asked } = mountQuestions(ctx, () => ['Create'], () => false)
+    const { asked } = mountQuestions(ctx, () => ['创建'], () => false)
     const created = await callTool(ctx, { action: 'create', name: 'confirm-noroot', content: skillBody('confirm-noroot') }, sessionOf(undefined))
     expect(valueOf(created).ok, valueOf(created).message).toBe(true)
     expect(asked).toHaveLength(0)
@@ -494,7 +494,7 @@ describe('write gates: the confirmation MODE (0.12.0)', () => {
     ctx.provide('userQuestions', {
       ask: async (request: { questions: Array<{ id: string }>; signal?: AbortSignal }) => {
         signals.push(request.signal)
-        return { answers: [{ id: request.questions[0]?.id ?? '', selected: ['Create'] }] }
+        return { answers: [{ id: request.questions[0]?.id ?? '', selected: ['创建'] }] }
       },
     })
     const created = await callTool(ctx, { action: 'create', name: 'mode-timeout-yes', content: skillBody('mode-timeout-yes') }, sessionOf(undefined))
@@ -524,7 +524,7 @@ describe('write gates: the confirmation MODE (0.12.0)', () => {
   it('leaves no live timer behind once the prompt is answered', async () => {
     const { ctx } = await setup({ skillWriteConfirm: 'timeout', skillWriteConfirmTimeoutSeconds: 30 })
     ctx.provide('userQuestions', {
-      ask: async (request: { questions: Array<{ id: string }> }) => ({ answers: [{ id: request.questions[0]?.id ?? '', selected: ['Create'] }] }),
+      ask: async (request: { questions: Array<{ id: string }> }) => ({ answers: [{ id: request.questions[0]?.id ?? '', selected: ['创建'] }] }),
     })
     // A referenced timer would keep a one-shot CLI process alive for the whole window after the write
     // returned; the gate unrefs and clears it, so the armed-timer count must not grow.
@@ -583,11 +583,11 @@ describe('write gates: review-fix sentinels (2026-09-26 independent review)', ()
       sessionOf(undefined),
     )
     expect(asked).toHaveLength(3)
-    expect(asked[2]?.options?.map(option => option.label)).toEqual(['Delete', 'Cancel'])
+    expect(asked[2]?.options?.map(option => option.label)).toEqual(['删除', '取消'])
     // The confirmation ran and was accepted; the LIBRARY still refuses the blank umbrella name,
     // which is the outcome the gate's exemption would have hidden.
     expect(valueOf(blank).ok).toBe(false)
-    expect(valueOf(blank).message).toContain('Invalid skill name')
+    expect(valueOf(blank).message).toContain('技能名')
   })
 
   it('refuses a DISMISSED prompt instead of writing unconfirmed (ASK_ABORTED)', async () => {

@@ -128,7 +128,7 @@ export function installExclusionTarget(
   mounted: MountedProfile | undefined,
 ): { readonly kind: 'mounted'; readonly profile: HomeProfile; readonly bundles: readonly string[] } | { readonly kind: 'undecidable'; readonly reason: string } {
   if (mounted === undefined || mounted.dir === '') {
-    return { kind: 'undecidable', reason: 'no profile is mounted in this process, so the double-mount question cannot be answered here' }
+    return { kind: 'undecidable', reason: '本进程没有挂载 profile，因此无法在这里回答双挂载问题' }
   }
   let manifestFailure: unknown
   const declared = profileBundles(mounted.dir, (error) => { manifestFailure = error })
@@ -136,7 +136,7 @@ export function installExclusionTarget(
   // anything else — EACCES/EIO, or a torn JSON body — is the v34 INST-01 direction and refuses.
   const manifestCode = (manifestFailure as { code?: string } | undefined)?.code
   if (manifestFailure !== undefined && manifestCode !== 'ENOENT') {
-    return { kind: 'undecidable', reason: 'the mounted profile manifest could not be read' }
+    return { kind: 'undecidable', reason: '读不出已挂载 profile 的清单' }
   }
   return {
     kind: 'mounted',

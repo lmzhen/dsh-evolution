@@ -139,7 +139,7 @@ describe('the words a cell may not carry (G1)', () => {
     expect(skillStateKey(skill())).toBe('state.managed')
     expect(skillStateKey(skill({ managed: false }))).toBe('state.foreign')
     expect(skillStateKey(skill({ protectedBy: 'guard' }))).toBe('state.protected')
-    // An unreadable marker outranks both: claiming 'managed' or 'protected' would be a guess.
+    // An unreadable marker outranks both: claiming 'managed' or '受保护' would be a guess.
     expect(skillStateKey(skill({ protectionUnknown: true, protectedBy: 'guard' }))).toBe('state.unknown')
   })
 

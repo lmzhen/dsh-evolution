@@ -29,7 +29,7 @@ it('S1.2: the limit counts the bytes that land on disk, not the raw argument', a
   expect(atLimit.length).toBe(LIMIT)
   const refused = await lib.create('lim-skill', atLimit, 'foreground')
   expect(refused.ok).toBe(false)
-  expect(refused.message).toContain('exceeds')
+  expect(refused.message).toContain('超过')
   // One character shorter lands exactly AT the limit.
   const underLimit = documentOf(LIMIT - 1)
   const created = await lib.create('lim-skill', underLimit, 'foreground')
@@ -54,7 +54,7 @@ it('S1.2: shrinking an over-limit file is allowed; growing it is not', async () 
   // Growing it back over the limit is still refused.
   const grown = await lib.update('big-skill', documentOf(LIMIT + 100, 'big-skill'), 'foreground')
   expect(grown.ok).toBe(false)
-  expect(grown.message).toContain('exceeds')
+  expect(grown.message).toContain('超过')
 })
 
 // 0.5.0 V1 (design §16.2 ①): the two refusals shared a copied sentence that never

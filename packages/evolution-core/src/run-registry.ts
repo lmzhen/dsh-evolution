@@ -300,7 +300,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       }
       const parsed = parseIndex(raw)
       if (!parsed.ok) {
-        return { ok: false, note: 'run index could not be read as an index (not JSON, or no runs array) — the previous run history is unknown (the reports are unaffected)' }
+        return { ok: false, note: '运行索引读不出来（不是 JSON，或没有 runs 数组）—— 上一次的运行历史未知（报告不受影响）' }
       }
       // The foreign view is REBUILT wholesale: a row this process does not own is whatever
       // the index says it is, every time. (0.19.0 kept "known" ids frozen, which is how a

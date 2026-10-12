@@ -59,7 +59,7 @@ describe('skill-store read three-state (B3 / N14)', () => {
     // there" is present-but-empty HERE and never reaches the unknown branch.
     expect(await lib.listSupportFiles('no-such-skill')).toEqual({ kind: 'present', value: [] })
     expect(await lib.listSnapshots()).toEqual({ kind: 'present', value: [] })
-    expect(await lib.restoreLatestSnapshot()).toEqual({ ok: false, message: 'No skill snapshot available.' })
+    expect(await lib.restoreLatestSnapshot()).toEqual({ ok: false, message: '没有可用的技能快照。' })
   })
 
   it('listSupportFiles / listSnapshots: a backend that throws ENOENT reads as absent', async () => {
@@ -89,10 +89,10 @@ describe('skill-store read three-state (B3 / N14)', () => {
     expect(probe.kind).toBe('unknown')
     const restored = await lib.restoreLatestSnapshot()
     expect(restored.ok).toBe(false)
-    expect(restored.message).toContain('could not be read')
+    expect(restored.message).toContain('读不出来')
     expect(restored.message).toContain('EACCES')
     // A failed listing never reaches the destructive clear.
-    expect(restored.message).toContain('nothing was changed')
+    expect(restored.message).toContain('未做任何改动')
     expect(await io.exists('/skills/three-state/SKILL.md')).toBe(true)
   })
 })

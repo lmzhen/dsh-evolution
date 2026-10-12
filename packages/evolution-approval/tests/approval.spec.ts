@@ -108,12 +108,12 @@ describe('evolution-approval', () => {
     await ctx.evolutionState.claimPending(staged.id, 'crash-claim')
     const retry = await ctx.evolutionApproval.approve(staged.id)
     expect(retry.ok).toBe(false)
-    expect(retry.message).toContain('executing')
+    expect(retry.message).toContain('正在执行')
     // V5-18 (0.3.31): the message attributes the execution to a CONCURRENT
     // in-flight approve as well and steers away from rejecting it — the old
     // crash-only wording could misdirect the operator into rejecting a live
     // approve another writer is running.
-    expect(retry.message).toContain('do not reject')
+    expect(retry.message).toContain('不要拒绝')
     expect(executions).toBe(0) // ALWAYS zero duplication
     // Operator cleanup: reject resolves the executing record without a runner.
     const cleanup = await ctx.evolutionApproval.reject(staged.id)
@@ -173,7 +173,7 @@ describe('evolution-approval', () => {
     const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
     expect(failed.ok).toBe(false)
     expect(failed.message).toContain('Path traversal is not allowed.')
-    expect(failed.message).toContain('Reject this record')
+    expect(failed.message).toContain('请驳回该记录')
     // The record stays pending, so the guided reject can actually act on it.
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
   })
@@ -185,7 +185,7 @@ describe('evolution-approval', () => {
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'stale', args: {}, origin: 'background_review' })
     const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
     expect(failed.ok).toBe(false)
-    expect(failed.message).toContain('Reject this record')
+    expect(failed.message).toContain('请驳回该记录')
   })
 
   it('PLAN S4.4 (2026-09-16): a non-deterministic replay failure stays verbatim without reject guidance', async () => {
@@ -211,12 +211,12 @@ describe('evolution-approval', () => {
     expect(claimed?.status).toBe('executing')
     const released = await ctx.evolutionApproval.release(id)
     expect(released.ok).toBe(true)
-    expect(released.message).toContain('pending window')
+    expect(released.message).toContain('待批准窗口')
     // v43 FLOW2-1: 'dead-claim' carries no pid, so liveness CANNOT be probed.
     // The release is then an explicitly destructive operator action, and the
     // message has to name the replay cost instead of implying a verified orphan.
     expect(released.message).toContain('liveness could NOT be verified')
-    expect(released.message).toContain('non-idempotent replay')
+    expect(released.message).toContain('非幂等的重放')
     const pendingAgain = await ctx.evolutionApproval.list('pending')
     expect(pendingAgain.find(item => item.id === id)).toBeDefined()
     expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
@@ -234,7 +234,7 @@ describe('evolution-approval', () => {
     await new Promise(resolve => setTimeout(resolve, 25)) // let the claim land
     const refused = await ctx.evolutionApproval.release(id)
     expect(refused.ok).toBe(false)
-    expect(refused.message).toContain('RUNNING')
+    expect(refused.message).toContain('正在运行的批准或拒绝')
     releaseHang({ ok: true, message: 'memory applied' })
     expect((await running).ok).toBe(true)
   })
@@ -245,7 +245,7 @@ describe('evolution-approval', () => {
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'plain', args: {}, origin: 'background_review' })
     const released = await ctx.evolutionApproval.release(decision.pendingId!)
     expect(released.ok).toBe(false)
-    expect(released.message).toContain('already in the pending window')
+    expect(released.message).toContain('已经在待批准窗口里')
   })
 
   it('v43 FLOW2-1: release REFUSES a claim held by another LIVE process', async () => {
@@ -265,7 +265,7 @@ describe('evolution-approval', () => {
     const refused = await ctx.evolutionApproval.release(id)
     expect(refused.ok).toBe(false)
     expect(refused.message).toContain(`pid ${foreignPid}`)
-    expect(refused.message).toContain('ALIVE')
+    expect(refused.message).toContain('该进程仍存活')
     // Untouched: still executing with its claim, and NOT back in the window.
     expect((await ctx.evolutionApproval.list('executing')).map(row => row.id)).toContain(id)
     expect((await ctx.evolutionApproval.list('pending')).map(row => row.id)).not.toContain(id)
@@ -283,11 +283,11 @@ describe('evolution-approval', () => {
     await ctx.evolutionState.claimPending(id, `${deadPid}:cafebabe`)
     const released = await ctx.evolutionApproval.release(id)
     expect(released.ok).toBe(true)
-    expect(released.message).toContain('pending window')
+    expect(released.message).toContain('待批准窗口')
     // The pid WAS parsed, so this is a verified crash rather than the
     // unverifiable-degradation branch.
     expect(released.message).not.toContain('could NOT be verified')
-    expect(released.message).toContain('non-idempotent replay')
+    expect(released.message).toContain('非幂等的重放')
     expect((await ctx.evolutionApproval.list('pending')).map(row => row.id)).toContain(id)
   })
 
@@ -304,7 +304,7 @@ describe('evolution-approval', () => {
     const failed = await ctx.evolutionApproval.release(id)
     spy.mockRestore()
     expect(failed.ok).toBe(false)
-    expect(failed.message).toContain('did not take effect')
+    expect(failed.message).toContain('没有生效')
     expect(failed.message).toContain('EXECUTING')
     expect(failed.message).toContain('lock budget exhausted')
     // The trace requirement: the failure is logged, not only returned.
@@ -375,16 +375,16 @@ describe('evolution-approval', () => {
     const rejected = await ctx.evolutionApproval.reject(id)
     expect(rejected.ok).toBe(true)
     // The message is honest about the race window, not "crashed approve cleaned up".
-    expect(rejected.message).toContain('no claim held')
-    expect(rejected.message).toMatch(/verify the write state manually/i)
+    expect(rejected.message).toContain('未持有占用声明')
+    expect(rejected.message).toMatch(/手动核验写入状态/)
     // Release the runner: the write completes AFTER reject already resolved it.
     releaseRunner!()
     const approved = await approve
     expect(approved.ok).toBe(false) // the claim-scoped resolve refuses — the record is no longer ours
     // P2-2 (v14): the message now names the DIVERGENCE (write landed, audit
     // reads rejected) instead of the generic "already resolved".
-    expect(approved.message).toContain('resolved to "rejected" concurrently')
-    expect(approved.message).toContain('do NOT replay it')
+    expect(approved.message).toContain('被并发地了结为「rejected」')
+    expect(approved.message).toContain('不要重放它')
     // The write ran exactly once (it did land even though the audit reads rejected).
     expect(executions).toBe(1)
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
@@ -454,17 +454,17 @@ describe('evolution-approval', () => {
     const missing = '00000000-0000-4000-8000-000000000000'
     const approve = await ctx.evolutionApproval.approve(missing)
     expect(approve.ok).toBe(false)
-    expect(approve.message).toContain('not in the pending window')
+    expect(approve.message).toContain('不在待批准窗口里')
     const reject = await ctx.evolutionApproval.reject(missing)
     expect(reject.ok).toBe(false)
-    expect(reject.message).toContain('not in the pending window')
+    expect(reject.message).toContain('不在待批准窗口里')
     // The executing branch stays intact (the crashed-approve cleanup path).
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'x', args: {}, origin: 'background_review' })
     const id = decision.pendingId!
     await ctx.evolutionState.claimPending(id, 'crash-claim')
     const executing = await ctx.evolutionApproval.approve(id)
     expect(executing.ok).toBe(false)
-    expect(executing.message).toContain('executing')
+    expect(executing.message).toContain('正在执行')
   })
 
   it('V9-12: a replay runner that THROWS keeps the record pending with its claim released (distinct from {ok:false})', async () => {
@@ -477,7 +477,7 @@ describe('evolution-approval', () => {
     expect(failed.ok).toBe(false)
     // The throw shape (not the runner {ok:false} shape): record stays pending
     // AND the claim is released — a retry or reject can still act on it.
-    expect(failed.message).toContain('remains pending')
+    expect(failed.message).toContain('仍处于待批准状态')
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
     expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
     const retry = await ctx.evolutionApproval.approve(id)
@@ -495,7 +495,7 @@ describe('evolution-approval', () => {
     const id = decision.pendingId!
     const approve = await ctx.evolutionApproval.approve(id)
     expect(approve.ok).toBe(false)
-    expect(approve.message).toContain('No replay runner registered')
+    expect(approve.message).toContain('注册回放运行器')
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
     expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
     const rejected = await ctx.evolutionApproval.reject(id)
@@ -514,7 +514,7 @@ describe('evolution-approval', () => {
     expect(decision.action).toBe('staged')
     const approved = await ctx.evolutionApproval.approve(decision.pendingId!)
     expect(approved.ok).toBe(true)
-    expect(approved.message).toContain('no code was executed')
+    expect(approved.message).toContain('未执行任何代码')
     expect(await ctx.evolutionApproval.list('approved')).toHaveLength(1)
   })
 
@@ -578,7 +578,7 @@ it('v28 G1.3 (APPR-01): a failed resolve after a successful runner reports the l
   try {
     const result = await ctx.evolutionApproval.approve(pendingId)
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('LANDED')
+    expect(result.message).toContain('已经落地')
     expect(result.message).toContain('corrupt pending-state.json')
   } finally {
     state.tryResolvePending = original

@@ -184,7 +184,7 @@ export const PLATFORM_CATALOG_DESCRIPTION_DEFAULT = 500
  * be copied into validateFrontmatter AND the patch path, and neither copy named
  * where the content should go — the upstream cap message names the destination
  * directories, and that is the part a model actually acts on. */
-export const CONTENT_SPLIT_HINT = 'Consider splitting into a smaller SKILL.md with supporting files in references/ or templates.'
+export const CONTENT_SPLIT_HINT = '建议拆成更小的 SKILL.md，把支撑文件放进 references/ 或 templates/。'
 
 /** V27 G2.4: the largest millisecond delay a timer accepts. `AbortSignal.timeout`
  * (and `setTimeout`) coerce anything larger to 1ms after a Node warning, so a

@@ -45,7 +45,7 @@ it('setPinned writes the marker, audits it, and refuses the background review', 
   // The autonomous pipeline may never pin/unpin (self-freezing would escape the lifecycle).
   expect((await lib.setPinned('pin-target', false, 'background_review')).ok).toBe(false)
   // Idempotency + audit trail + clean unpin.
-  expect((await lib.setPinned('pin-target', true, 'foreground')).message).toContain('already pinned')
+  expect((await lib.setPinned('pin-target', true, 'foreground')).message).toContain('已被固定')
   const mutations = await lib.listMutations()
   expect(mutations.some(m => m.action === 'pin' && m.skillName === 'pin-target')).toBe(true)
   const unpinned = await lib.setPinned('pin-target', false, 'foreground')
@@ -170,7 +170,7 @@ it('archive fallback rolls back the copied archive when the source cannot be rem
   await lib.create('swap-skill', USABLE('swap-skill'), 'foreground')
   const result = await lib.archive('swap-skill')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('rolled back')
+  expect(result.message).toContain('已回滚')
   expect(await lib.list().then(rows => rows.map(s => s.name))).toContain('swap-skill') // active kept
   expect(await io.exists(join(root, '.archive', 'swap-skill'))).toBe(false) // archive copy cleaned
 })
@@ -186,7 +186,7 @@ it('snapshot restore rolls back to the pre-rollback snapshot when the restore fa
   await lib.create('other-skill', USABLE('other-skill'), 'foreground')
   const result = await lib.restoreLatestSnapshot()
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('rolled back')
+  expect(result.message).toContain('已回滚')
   const names = (await lib.list()).map(s => s.name)
   // The active root is the PRE-rollback state (both skills were present when
   // the restore ran and failed) — never a cleared tree.
@@ -228,7 +228,7 @@ it('consolidate rollback reports sources it could not restore instead of silentl
   failTargetWrite = true
   const result = await lib.consolidate('target-skill', ['src-a'])
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('EXCEPT')
+  expect(result.message).toContain('未回滚')
   expect(result.message).toContain('src-a')
   // The failed-to-restore source is still archived — and the message says so.
   expect(await io.exists(join(root, '.archive', 'src-a'))).toBe(true)
@@ -308,7 +308,7 @@ it('skill consolidate rolls back earlier sources when a mid-loop archive fails (
   await lib.create('src-b', USABLE('src-b'), 'foreground')
   const result = await lib.consolidate('target-skill', ['src-a', 'src-b'])
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('rolled back')
+  expect(result.message).toContain('已回滚')
   // src-a was archived by the loop and MUST be back in the active tree.
   expect((await lib.list()).map(s => s.name)).toEqual(['src-a', 'src-b', 'target-skill'])
   // The target never received the merged body.
@@ -465,7 +465,7 @@ it('V27 G0.1 (core-a-10): an INCOMPLETE snapshot is refused before the destructi
   expect(restored.ok).toBe(false)
   expect(restored.message).toContain('incomplete')
   expect(restored.message).toContain('locked-skill')
-  expect(restored.message).toContain('rolled back')
+  expect(restored.message).toContain('已回滚')
   expect((await lib.list()).map(s => s.name).sort()).toEqual(beforeNames)
   expect(await readFile(join(root, 'locked-skill', 'SKILL.md'), 'utf8')).toBe(beforeBytes)
 })
@@ -594,7 +594,7 @@ description: A skill for the cumulative fuzzy budget test.
   // the whitespace run, so every section is a fuzzy match → replaceAll.
   const result = await lib.patch('fuzzy-budget', '## Section  title', '## Renamed section', undefined, true)
   expect(result.ok).toBe(false)
-  expect(result.message).toMatch(/fuzzy budget was exceeded/)
+  expect(result.message).toMatch(/模糊匹配预算已用尽/)
 })
 
 it('V9-04: consolidate of a MISSING target refuses BEFORE archiving any source (0.3.50)', async () => {
@@ -607,7 +607,7 @@ it('V9-04: consolidate of a MISSING target refuses BEFORE archiving any source (
   // failure path non-destructive again.
   const result = await lib.consolidate('no-such-target', ['src-a'])
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('not found')
+  expect(result.message).toContain('不存在')
   expect((await lib.list()).some(s => s.name === 'src-a')).toBe(true) // not archived
 })
 
@@ -685,11 +685,11 @@ it('authoringFeedback reports the 60-char bar and colon rule without changing va
   // Over the bar: advisory line names the count and the Hermes standard.
   const long = authoringFeedback({ description: 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories.' })
   expect(long.over60).toBe(true)
-  expect(long.lines[0]).toContain('exceeds the 60-char authoring bar')
+  expect(long.lines[0]).toContain('超过 60 字符的作者规范上限')
   // Colon rule: flagged for double-quote wrapping.
   const colon = authoringFeedback({ description: 'Search: arXiv papers by keyword.' })
   expect(colon.hasColon).toBe(true)
-  expect(colon.lines.some(line => line.includes('double quotes'))).toBe(true)
+  expect(colon.lines.some(line => line.includes('双引号'))).toBe(true)
   // Absent description: zero chars, no crash.
   const missing = authoringFeedback({})
   expect(missing.descriptionChars).toBe(0)
@@ -766,20 +766,20 @@ it('F-318 (②): update with a byte-equivalent content is a noop — no write, n
   const result = await lib.update('python-testing', SKILL)
   expect(result.ok).toBe(true)
   expect(result.noop).toBe(true)
-  expect(result.message).toContain('unchanged')
+  expect(result.message).toContain('未变更')
   expect(await lib.read('python-testing')).toBe(before)
   // No audit record was appended (mutation-maturity is not inflated).
   expect((await lib.listMutations()).length).toBe(mutationsBefore)
 })
 
-it('E-69: an archived skill cannot absorb into itself (0.3.18)', async () => {
+it('E-69: an archived skill 不能吸收到自己 (0.3.18)', async () => {
   const root = await tempRoot('dsh-evo-skills-selfabs-')
   const lib = new SkillLibrary(root)
   const created = await lib.create('python-testing', SKILL, 'background_review')
   expect(created.ok).toBe(true)
   const result = await lib.archive('python-testing', { absorbedInto: 'python-testing' })
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('cannot absorb into itself')
+  expect(result.message).toContain('不能吸收到自己')
   expect((await lib.list()).some(s => s.name === 'python-testing')).toBe(true)
 })
 
@@ -846,7 +846,7 @@ it('v43 (FLOW3-1): a lock-loss retry re-observes the file — the create does no
   const lib = new SkillLibrary(root, io as never)
   const result = await lib.create('retry-skill', SKILL.replace('python-testing', 'retry-skill'), 'foreground')
   expect(result.ok).toBe(true)
-  expect(result.message).not.toContain('already exists')
+  expect(result.message).not.toContain('已存在')
 })
 
 it('V6-19: a transact contract violation returns a structured error, not a TypeError (0.3.37)', async () => {
@@ -865,7 +865,7 @@ it('V6-19: a transact contract violation returns a structured error, not a TypeE
   const lib = new SkillLibrary(root, io)
   const result = await lib.update('python-testing', SKILL.replace('Run tests with pytest.', 'Updated.'))
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('did not invoke the task')
+  expect(result.message).toContain('没有调用任务')
 })
 
 it('A1-17 (v18): a failed marker probe reports protectionUnknown, never "unprotected"', async () => {
@@ -904,7 +904,7 @@ it('A1-20 (v18): restoring onto a directory without SKILL.md names the real obst
   await mkdir(join(root, 'restore-target'), { recursive: true })
   const result = await lib.restoreFromArchive('restore-target')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('carries no SKILL.md')
+  expect(result.message).toContain('没有 SKILL.md')
 })
 
 it('计划 B-4 (v18): SKILL_NAME_RE matches the upstream shape', async () => {
@@ -1018,7 +1018,7 @@ it('A1-15 (v18): a post-commit dir-fsync failure still audits and reports a dura
   const lib = new SkillLibrary(root, io)
   const updated = await lib.update('durable-skill', SKILL.replace('python-testing', 'durable-skill').replace('Run tests with pytest.', 'Updated after the fsync failure.'), 'foreground')
   expect(updated.ok).toBe(true)
-  expect(updated.message).toContain('durability unconfirmed')
+  expect(updated.message).toContain('持久性未确认')
   // The bytes ARE on disk and the audit trail recorded the write.
   expect(await lib.read('durable-skill')).toContain('Updated after the fsync failure.')
   expect((await lib.listMutations()).some(m => m.skillName === 'durable-skill' && m.action === 'update')).toBe(true)
@@ -1039,13 +1039,13 @@ it('P2-2 (v19): create and setPinned tolerate a post-commit fsync failure too', 
   const lib = new SkillLibrary(root, io)
   const created = await lib.create('durable-create', SKILL.replace('python-testing', 'durable-create'), 'foreground')
   expect(created.ok).toBe(true)
-  expect(created.message).toContain('durability unconfirmed')
+  expect(created.message).toContain('持久性未确认')
   expect(await lib.read('durable-create')).toContain('durable-create')
   // The marker write has the same semantics: reporting a failure would make
   // the retry answer "already pinned" for a marker that landed.
   const pinned = await lib.setPinned('durable-create', true, 'foreground')
   expect(pinned.ok).toBe(true)
-  expect(pinned.message).toContain('durability unconfirmed')
+  expect(pinned.message).toContain('持久性未确认')
 })
 
 it('P1-2 (v19): a healthy empty-tree snapshot WITH sidecars restores (guard reads manifest.sidecars)', async () => {
@@ -1106,7 +1106,7 @@ it('v28 G1.1 (EVO-IO-02): update on a ghost directory removes it instead of bloc
   await rmDir(join(root, 'ghost-skill', 'SKILL.md'))
   const result = await lib.update('ghost-skill', SKILL.replace('python-testing', 'ghost-skill'), 'foreground')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('not found')
+  expect(result.message).toContain('不存在')
   // The ghost is gone: a later restoreFromArchive is not blocked by the
   // "already exists … carries no SKILL.md" refusal.
   const { stat } = await import('node:fs/promises')
@@ -1143,7 +1143,7 @@ it('v28 G2.5 (CORE-SK-03): both refusals pre-clear report an UNCHANGED tree, not
   // The target restore refuses on the unlistable tree; the pre-rollback snapshot is incomplete
   // (second-skill was skipped) and refuses on completeness — both pre-clear, so nothing was ever
   // touched.
-  expect(result.message).toContain('UNCHANGED')
+  expect(result.message).toContain('未改变')
   expect(result.message).not.toContain('Rescue manually')
   // The library is intact.
   const { stat } = await import('node:fs/promises')
@@ -1230,7 +1230,7 @@ it('v35 C9: a vanished target reports the anchor verdict, and unanchored callers
   const plain = await lib.update('never-created', content, 'foreground')
   expect(plain.ok).toBe(false)
   expect(plain.stale).toBeUndefined()
-  expect(plain.message).toBe('Skill "never-created" not found.')
+  expect(plain.message).toBe('技能「never-created」不存在。')
 })
 
 it('v35 C9: an absent anchor creates a support file and refuses one that already exists', async () => {

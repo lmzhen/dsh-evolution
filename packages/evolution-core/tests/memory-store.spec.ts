@@ -58,7 +58,7 @@ it('T3-06/A34: a blank facts does not shadow the content body on the landing pat
   // Both blank stays the empty payload the store refuses, with its own message.
   const empty = await store.applyBatch('memory', [{ action: 'add', facts: '', content: '   ' }])
   expect(empty.ok).toBe(false)
-  expect(empty.message).toContain('facts is required')
+  expect(empty.message).toContain('必须提供 facts')
 })
 
 it('V6-25: an enum-outside action fails loud instead of silently executing a replace (0.3.37)', async () => {
@@ -69,7 +69,7 @@ it('V6-25: an enum-outside action fails loud instead of silently executing a rep
   // present — a semantic drift that passed as ok:true.
   const bad = await store.applyBatch('memory', [{ action: 'Add' as never, old_text: 'Original', facts: 'Silently replaced.' }])
   expect(bad.ok).toBe(false)
-  expect(bad.message).toContain('unknown action "Add"')
+  expect(bad.message).toContain('未知动作「Add」')
   expect(await store.read('memory')).toEqual(['Original fact.'])
 })
 
@@ -80,14 +80,14 @@ it('memory enforces char limits with consolidation failure backoff', async () =>
   expect(first.ok).toBe(true)
   const over = await store.add('memory', 'x')
   expect(over.ok).toBe(false)
-  expect(over.message).toContain('exceed')
+  expect(over.message).toContain('超过')
   // Each failed consolidation is counted; after the cap the message changes
   // and the model is told to stop retrying.
   await store.add('memory', 'x')
   await store.add('memory', 'x')
   const capped = await store.add('memory', 'x')
   expect(capped.ok).toBe(false)
-  expect(capped.message).toContain('Stop retrying memory calls')
+  expect(capped.message).toContain('请停止重试记忆调用')
 })
 
 it('memory detects external file drift before mutation', async () => {
@@ -98,10 +98,10 @@ it('memory detects external file drift before mutation', async () => {
   expect(await store.detectDrift('memory')).toBe(true)
   const result = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('drift')
+  expect(result.message).toContain('漂移')
   // F9: the drifted on-disk content is preserved as a .bak sidecar before the
   // refusal, so an external edit stays recoverable.
-  expect(result.message).toMatch(/backup was saved/)
+  expect(result.message).toMatch(/已把备份保存/)
   const { readdir, readFile } = await import('node:fs/promises')
   const backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
   expect(backups.length).toBe(1)
@@ -169,7 +169,7 @@ it('G2.3: the write path and detectDrift reach the same conclusion about the sam
     const store = new MemoryStore({ root, ...(testCase.limit === undefined ? {} : { memoryCharLimit: testCase.limit }) })
     await writeFile(join(root, 'MEMORY.md'), testCase.body, 'utf8')
     const readSide = await store.detectDrift('memory')
-    const writeSide = (await store.add('memory', 'new fact')).message.includes('External drift detected')
+    const writeSide = (await store.add('memory', 'new fact')).message.includes('检测到记忆文件被外部改动')
     expect({ case: testCase.name, drifted: readSide }).toEqual({ case: testCase.name, drifted: writeSide })
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
@@ -196,9 +196,9 @@ it('memory read guard skips oversized files and refuses writes with a byte-exact
   // Write side: refused with a clear message and the file backed up by raw copy.
   const refused = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
   expect(refused.ok).toBe(false)
-  expect(refused.message).toContain('5000 bytes (limit 4000)')
-  expect(refused.message).toContain('skipping read')
-  expect(refused.message).toMatch(/backup was saved/)
+  expect(refused.message).toContain('5000 字节（上限 4000）')
+  expect(refused.message).toContain('跳过读取')
+  expect(refused.message).toMatch(/已把备份保存/)
   const backups = (await readdir(root)).filter(name => name === 'MEMORY.md.bak')
   expect(backups.length).toBe(1)
   expect((await readFile(join(root, backups[0]!), 'utf8')).length).toBe(5000)
@@ -209,7 +209,7 @@ it('memory read guard skips oversized files and refuses writes with a byte-exact
   // stays the fix-it instruction rather than the stop-retrying backoff.
   const refusedAgain = await store.add('memory', 'gamma')
   expect(refusedAgain.ok).toBe(false)
-  expect(refusedAgain.message).toContain('Fix the file manually')
+  expect(refusedAgain.message).toContain('请手动修复该文件')
 })
 
 it('memory read guard is off when the IO backend has no size probe', async () => {
@@ -228,9 +228,9 @@ it('memory read guard is off when the IO backend has no size probe', async () =>
   expect(await store.detectDrift('memory')).toBe(false)
   const result = await store.add('memory', 'gamma')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('memoryCharLimit (400)')
+  expect(result.message).toContain('memoryCharLimit（400）')
   expect(result.message).not.toContain('External drift')
-  expect(result.message).not.toMatch(/backup was saved/)
+  expect(result.message).not.toMatch(/已把备份保存/)
 })
 
 it('v28 MEM-01: a canonical single entry above the store limit is a config conflict — shrink stays available', async () => {
@@ -244,8 +244,8 @@ it('v28 MEM-01: a canonical single entry above the store limit is a config confl
   expect(await store.detectDrift('memory')).toBe(false)
   const denied = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
   expect(denied.ok).toBe(false)
-  expect(denied.message).toContain('memoryCharLimit (100)')
-  expect(denied.message).not.toContain('drift')
+  expect(denied.message).toContain('memoryCharLimit（100）')
+  expect(denied.message).not.toContain('漂移')
   expect((await readdir(root)).filter(name => name === 'MEMORY.md.bak').length).toBe(0)
   // Shrink-only batches remain the recovery path.
   expect((await store.applyBatch('memory', [{ action: 'remove', old_text: 'xxx' }])).ok).toBe(true)
@@ -294,13 +294,13 @@ it('failure backoff decays after the window so a later turn retries normally (P2
     await store.add('memory', 'x')
     await store.add('memory', 'x')
     const capped = await store.add('memory', 'x')
-    expect(capped.message).toContain('Stop retrying memory calls')
+    expect(capped.message).toContain('请停止重试记忆调用')
     // Beyond the window the counter restarts: the plain budget message is
     // back instead of the sticky "stop retrying" steering.
     vi.setSystemTime(Date.now() + 11 * 60_000)
     const later = await store.add('memory', 'x')
-    expect(later.message).not.toContain('Stop retrying memory calls')
-    expect(later.message).toContain('exceed')
+    expect(later.message).not.toContain('请停止重试记忆调用')
+    expect(later.message).toContain('超过')
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   } finally {
     vi.useRealTimers()
@@ -327,7 +327,7 @@ it('memory recoverable errors carry a bounded current-entries preview (G5)', asy
   // Missing old_text in a batch: same recovery affordance.
   const batch = await store.applyBatch('memory', [{ action: 'remove', old_text: '' }])
   expect(batch.ok).toBe(false)
-  expect(batch.message).toContain('old_text is required')
+  expect(batch.message).toContain('必须提供 old_text')
   expect(batch.message).toContain('Current entries (preview):')
 })
 
@@ -417,7 +417,7 @@ it('V8-02: with addDatePrefix a leading-§ fact is refused on the FINAL entry (0
   const store = new MemoryStore({ root, addDatePrefix: true })
   const result = await store.add('memory', '§\nfoo') // ``## <date>\n§\nfoo`` would synthesize the delimiter at the seam
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('delimiter')
+  expect(result.message).toContain('分隔符')
   // Without the prefix the same fact is a legal entry (unchanged behavior).
   const plain = new MemoryStore({ root, addDatePrefix: false })
   expect((await plain.add('memory', '§\nfoo')).ok).toBe(true)
@@ -432,7 +432,7 @@ it('V9-09: a duplicate add is tolerated with an explicit no-duplicate message (e
   expect(dup.ok).toBe(true)
   // The tolerance must be VISIBLE to the model (silently claiming "Entry
   // added." would double-count a fact it reuses).
-  expect(dup.message).toContain('no duplicate added')
+  expect(dup.message).toContain('未重复添加')
   expect(await store.read('memory')).toHaveLength(1)
   // Batch add path keeps the same tolerance (silent skip, still ok).
   const batch = await store.applyBatch('memory', [{ action: 'add', facts: 'User prefers concise replies.' }])
@@ -479,10 +479,10 @@ it('V9-08: a failing backup copy does not change the refusal — no backup suffi
   await writeFile(join(root, 'MEMORY.md'), 'alpha\n§\n\n§\nbeta\n', 'utf8')
   const denied = await store.applyBatch('memory', [{ action: 'add', facts: 'gamma' }])
   expect(denied.ok).toBe(false)
-  expect(denied.message).toContain('drift')
+  expect(denied.message).toContain('漂移')
   // Failure shape (2): the backup silently no-ops — the refusal message
   // carries no backup suffix and the drift semantics are untouched.
-  expect(denied.message).not.toMatch(/backup was saved/)
+  expect(denied.message).not.toMatch(/已把备份保存/)
 })
 
 // ── v10 audit batch 3 regressions (C-01 / C-02 / C-04) ──────────────────────
@@ -494,10 +494,10 @@ it('C-01: a transact backend that never invokes the task yields a structured ref
   const store = new MemoryStore({ root: 'root', io })
   const add = await store.add('memory', 'alpha record')
   expect(add.ok).toBe(false)
-  expect(add.message).toContain('did not invoke the task')
+  expect(add.message).toContain('没有调用任务')
   const batch = await store.applyBatch('memory', [{ action: 'add', facts: 'beta record' }])
   expect(batch.ok).toBe(false)
-  expect(batch.message).toContain('did not invoke the task')
+  expect(batch.message).toContain('没有调用任务')
 })
 
 it('C-02: replace keeps the date prefix and passes the post-prefix delimiter seam guard', async () => {
@@ -512,13 +512,13 @@ it('C-02: replace keeps the date prefix and passes the post-prefix delimiter sea
   // Prefix parity keeps the dedup working: re-adding the body is a no-op.
   const dup = await store.add('memory', 'updated fact')
   expect(dup.ok).toBe(true)
-  expect(dup.message).toContain('already exists')
+  expect(dup.message).toContain('已存在')
   // V8-02 seam rule now covers replace too: a leading-§-then-newline body is
   // refused on the FINAL on-disk entry (the prefix+§ seam synthesizes `§\n`).
   await store.add('user', 'anchor')
   const seam = await store.applyBatch('user', [{ action: 'replace', old_text: 'anchor', facts: '§\nevil' }])
   expect(seam.ok).toBe(false)
-  expect(seam.message).toContain('delimiter')
+  expect(seam.message).toContain('分隔符')
 })
 
 it('C-04: renderContext omits the usage segment when the limit is disabled (no "N/0 chars")', async () => {
@@ -570,12 +570,12 @@ it('v28 MEM-01: lowering the limit flags a config conflict, not external drift �
   // Growth refuses with the config-naming text (not "External drift").
   const grow = await store.add('memory', 'new fact')
   expect(grow.ok).toBe(false)
-  expect(grow.message).toContain('memoryCharLimit (100)')
+  expect(grow.message).toContain('memoryCharLimit（100）')
   expect(grow.message).not.toContain('External drift')
   // A grow via batch replace refuses the same way.
   const replace = await store.applyBatch('memory', [{ action: 'replace', old_text: 'legacy', facts: 'short' }])
   expect(replace.ok).toBe(false)
-  expect(replace.message).toContain('memoryCharLimit (100)')
+  expect(replace.message).toContain('memoryCharLimit（100）')
   expect(replace.message).not.toContain('External drift')
   // The recovery path stays open: remove-only batches pass the drift gate
   // (the batch's own final limit check still applies), and afterwards the
@@ -593,7 +593,7 @@ it('v28 MEM-01: the user target names userCharLimit in the config-conflict refus
   const store = new MemoryStore({ root, userCharLimit: 100 })
   const grow = await store.add('user', 'new fact')
   expect(grow.ok).toBe(false)
-  expect(grow.message).toContain('userCharLimit (100)')
+  expect(grow.message).toContain('userCharLimit（100）')
   expect(grow.message).not.toContain('External drift')
 })
 
@@ -607,8 +607,8 @@ it('v28 MEM-01: a non-canonical oversized body is still external drift (Hermes p
   expect(await store.detectDrift('memory')).toBe(true)
   const result = await store.add('memory', 'new fact')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('External drift detected')
-  expect(result.message).toMatch(/backup was saved/)
+  expect(result.message).toContain('检测到记忆文件被外部改动')
+  expect(result.message).toMatch(/已把备份保存/)
 })
 
 it('v29 MEM-02: a remove-only batch passes the oversized read guard for a ≥10× lowered limit', async () => {
@@ -627,8 +627,8 @@ it('v29 MEM-02: a remove-only batch passes the oversized read guard for a ≥10�
   // refusal must be the BATCH-LIMIT text, not the read-guard text.
   const partial = await store.applyBatch('memory', [{ action: 'remove', old_text: 'fact-0' }])
   expect(partial.ok).toBe(false)
-  expect(partial.message).toContain('exceeds the 100 limit')
-  expect(partial.message).not.toContain('Fix the file manually')
+  expect(partial.message).toContain('超过 100 上限')
+  expect(partial.message).not.toContain('请手动修复该文件')
   // Removing everything in ONE remove-only batch succeeds (the advertised
   // recovery), and the store is writable again afterwards. The needles are
   // constructed from the known seeds — `read()` itself runs the same read

@@ -60,11 +60,11 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
   /** Guard: trust fence, then method. Every refusal is a JSON body, never an empty response. */
   const guard = (req: IncomingMessage, res: ServerResponse, method: string): boolean => {
     if (!isLoopbackRequest(req)) {
-      writeJson(res, 403, { ok: false, code: 'forbidden', message: 'forbidden: loopback-only' })
+      writeJson(res, 403, { ok: false, code: 'forbidden', message: '禁止访问：仅限回环地址' })
       return false
     }
     if (req.method !== method) {
-      writeJson(res, 405, { ok: false, code: 'method-not-allowed', message: 'method not allowed: ' + (req.method ?? '') })
+      writeJson(res, 405, { ok: false, code: 'method-not-allowed', message: '方法不允许：' + (req.method ?? '') })
       return false
     }
     return true
@@ -128,7 +128,7 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
         if (!guard(req, res, 'GET')) return
         const name = new URL(req.url ?? '/', 'http://loopback').searchParams.get('name')?.trim() ?? ''
         if (name === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'name is required' })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 name' })
           return
         }
         await withCurator(res, async (curator) => {
@@ -179,14 +179,14 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
         const rawV = params.get('v')?.trim() ?? ''
         const v = Number.parseInt(rawV, 10)
         if (name === '' || !/^\d+$/.test(rawV) || !Number.isInteger(v) || v < 1) {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'name and a positive integer v are required' })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: '需要 name 与正整数 v' })
           return
         }
         await withCurator(res, async (curator) => {
           const groups = partitionVersions(await curator.history(name))
           const index = groups.content.findIndex(entry => entry.v === v)
           if (index === -1) {
-            writeJson(res, 404, { ok: false, code: 'not-found', message: 'that version is not in the recorded history of "' + name + '"' })
+            writeJson(res, 404, { ok: false, code: 'not-found', message: '该版本不在「' + name + '」的记录历史里' })
             return
           }
           const entry = groups.content[index]
@@ -203,7 +203,7 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
           const after = entry === undefined ? null : await curator.skills.readVersion(name, v)
           const before = previous === undefined ? '' : await curator.skills.readVersion(name, previous.v)
           if (after === null || before === null) {
-            writeJson(res, 404, { ok: false, code: 'not-found', message: 'the stored content of that version could not be read' })
+            writeJson(res, 404, { ok: false, code: 'not-found', message: '该版本的存储内容读不出来' })
             return
           }
           const facts = textDiffFacts(before, after, 'SKILL.md')
@@ -221,14 +221,14 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
         const rawV = params.get('v')?.trim() ?? ''
         const v = Number.parseInt(rawV, 10)
         if (name === '' || !/^\d+$/.test(rawV) || !Number.isInteger(v) || v < 1) {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'name and a positive integer v are required' })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: '需要 name 与正整数 v' })
           return
         }
         await withCurator(res, async (curator) => {
           // The same read the undo path and the diff route use, so a version has ONE reader.
           const text = await curator.skills.readVersion(name, v)
           if (text === null) {
-            writeJson(res, 404, { ok: false, code: 'not-found', message: 'the stored content of that version could not be read' })
+            writeJson(res, 404, { ok: false, code: 'not-found', message: '该版本的存储内容读不出来' })
             return
           }
           const truncated = text.length > MAX_BODY_CHARS
@@ -253,12 +253,12 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
         const payload = await readJsonObject(req)
         const name = typeof payload?.name === 'string' ? payload.name.trim() : ''
         if (name === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'name is required' })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 name' })
           return
         }
         const raw = payload?.v
         if (raw !== undefined && (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1)) {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'v must be a positive integer' })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'v 必须是正整数' })
           return
         }
         await withCurator(res, async (curator) => {

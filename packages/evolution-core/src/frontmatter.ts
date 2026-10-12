@@ -573,29 +573,29 @@ export function validateFrontmatter(
   // V27 G2.1: name the exact rule (the one the upstream catalog applies) —
   // "start and end with YAML frontmatter" left a ` --- ` fence, or a block with
   // no body, to be discovered by trial and error.
-  if (!parsed) return 'SKILL.md must start with a `---` line, close the frontmatter with another exact `---` line (only a trailing `\\r` is tolerated), and include a body below it.'
+  if (!parsed) return 'SKILL.md 必须以 `---` 行开头，用另一个完全相同的 `---` 行结束 frontmatter（只容忍结尾的 `\\r`），并在其下包含正文。'
   // P2-9 (v37): a SEQUENCE/MAPPING under a platform string field is refused —
   // the catalog drops the whole file while the family publishes synthesized
   // text. Number/boolean stay repairable (E-47 auto-quotes them).
   const unreadable = parsed.platformStringSplit.filter(entry => entry.kind === 'sequence' || entry.kind === 'mapping')
   if (unreadable.length > 0) {
     const named = unreadable.map(entry => `"${entry.key}" (a YAML ${entry.kind})`).join(', ')
-    return `Frontmatter field ${named} must be a string: the platform skill catalog reads such a field as absent and ignores the whole file. ` +
-      'Write plain text, or wrap the value in double quotes to keep it literally.'
+      return `Frontmatter 字段 ${named} 必须是字符串：平台技能目录会把这种字段当作缺失，并忽略整个文件。` +
+      '请写成纯文本，或用双引号包住取值以保持字面内容。'
   }
-  if (!parsed.frontmatter.name) return 'Frontmatter must include a name field.'
+  if (!parsed.frontmatter.name) return 'Frontmatter 必须包含 name 字段。'
   // C-12 (v10 audit): single-source the name shape — the inline copy of
   // SKILL_NAME_RE could silently drift from constants.ts.
-  if (!SKILL_NAME_RE.test(parsed.frontmatter.name)) return `Invalid skill name "${parsed.frontmatter.name}" — use lowercase letters, digits, and hyphens.`
-  if (parsed.frontmatter.name.length > limits.maxNameLength) return `Skill name exceeds ${limits.maxNameLength} characters.`
-  if (expectedName && parsed.frontmatter.name !== expectedName) return `Frontmatter name "${parsed.frontmatter.name}" does not match target skill "${expectedName}".`
-  if (!parsed.frontmatter.description) return 'Frontmatter must include a description field.'
+  if (!SKILL_NAME_RE.test(parsed.frontmatter.name)) return `技能名「${parsed.frontmatter.name}」不合法：请只用小写字母、数字和连字符。`
+  if (parsed.frontmatter.name.length > limits.maxNameLength) return `技能名超过 ${limits.maxNameLength} 个字符。`
+  if (expectedName && parsed.frontmatter.name !== expectedName) return `Frontmatter 里的 name「${parsed.frontmatter.name}」与目标技能「${expectedName}」不一致。`
+  if (!parsed.frontmatter.description) return 'Frontmatter 必须包含 description 字段。'
   const description = parsed.frontmatter.description
-  if (description.length > limits.maxDescriptionLength) return `Description exceeds ${limits.maxDescriptionLength} characters.`
+  if (description.length > limits.maxDescriptionLength) return `description 超过 ${limits.maxDescriptionLength} 个字符。`
   // S1.2: the limit is judged on the bytes that will land on disk, and a NET
   // SHRINK of an already-over-limit file is allowed (the repair path).
   if (exceedsContentLimit(content, limits.maxSkillContentChars) && !shrinksOverLimit(content, current, limits.maxSkillContentChars)) {
-    return `SKILL.md content exceeds ${limits.maxSkillContentChars} characters. ${CONTENT_SPLIT_HINT}`
+    return `SKILL.md 内容超过 ${limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}`
   }
   return null
 }
@@ -628,9 +628,9 @@ export function authoringFeedback(frontmatter: Frontmatter): AuthoringFeedback {
   const hasColon = description.includes(':')
   const lines: string[] = []
   lines.push(over60
-    ? `Description is ${description.length}/60 characters — exceeds the 60-char authoring bar (Hermes standard; the catalog truncates at the configured platform cap).`
-    : `Description ${description.length}/60 characters — within the authoring bar.`)
-  if (hasColon) lines.push('Description contains a colon — wrap the whole value in double quotes.')
+    ? `描述为 ${description.length}/60 个字符 —— 超过 60 字符的作者规范上限（Hermes 标准；技能目录会按平台配置的上限截断）。`
+    : `描述为 ${description.length}/60 个字符 —— 在作者规范上限之内。`)
+  if (hasColon) lines.push('描述里含冒号 —— 请用双引号把整个取值包起来。')
   return { descriptionChars: description.length, over60, hasColon, lines }
 }
 

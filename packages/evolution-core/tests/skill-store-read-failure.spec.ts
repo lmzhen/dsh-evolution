@@ -55,19 +55,19 @@ const ROWS: Row[] = [
     label: 'update',
     park: root => parkDirectory(join(root, 'readable-target', 'SKILL.md')),
     invoke: lib => lib.update('readable-target', SKILL.replace('Body text.', 'Body v2.'), 'foreground'),
-    expect: /Could not read "readable-target".*DIRECTORY/,
+    expect: /读不出「readable-target」.*DIRECTORY/,
   },
   {
     label: 'patch',
     park: root => parkDirectory(join(root, 'readable-target', 'SKILL.md')),
     invoke: lib => lib.patch('readable-target', 'Body text.', 'Body v2.', ''),
-    expect: /Could not read "readable-target\/SKILL\.md".*DIRECTORY/,
+    expect: /读不出「readable-target\/SKILL\.md」.*DIRECTORY/,
   },
   {
     label: 'write_file',
     park: root => parkDirectory(join(root, 'readable-target', 'references', 'notes.md')),
     invoke: lib => lib.writeSupportFile('readable-target', 'references/notes.md', 'notes', 'foreground'),
-    expect: /Could not read "readable-target\/references\/notes\.md".*DIRECTORY/,
+    expect: /读不出「readable-target\/references\/notes\.md」.*DIRECTORY/,
   },
   {
     label: 'remove_file (the A-5 control)',

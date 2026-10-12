@@ -141,13 +141,13 @@ function newestRun(registry: RunRegistry): RunRecord | undefined {
 /** Sentence F, ONE wording for the three id-less forms (design `10` cell 13): an index that could
  * not be read must never answer as "there is no recent run" (G2/0.20.0). */
 function unreadableIndex(note: string | undefined): string {
-  return `The home's run index is not readable (${note ?? 'unknown reason'}) — this is NOT "there is no recent run".`
+  return `本 home 的运行索引读不出来（${note ?? '原因未知'}）：这不等于「最近没有运行」。`
 }
 
 /** The explicit-id twin of {@link unreadableIndex}, worded like `maintain status` so the four
  * readers cannot drift (review P1-1). */
 function unreadableForId(id: string, note: string | undefined): string {
-  return `Run ${id} is not in this process's history, and the home's run index is not readable (${note ?? 'unknown reason'}) — that is NOT proof the run never happened.`
+  return `运行 ${id} 不在本进程的历史里，且本 home 的运行索引读不出来（${note ?? '原因未知'}）：但这不能证明那次运行没发生过。`
 }
 
 /** The reader-facing report path: the `.md` digest beside the run's `.json` result. */
@@ -321,7 +321,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     runs = registry
     void registry.load().then((loaded) => {
       // A run the previous process life left behind is reported, not hidden.
-      if (!loaded.ok) ctx.logger.warn(`evolution-commands: the run index is not usable — ${loaded.note ?? 'unknown reason'}`)
+      if (!loaded.ok) ctx.logger.warn(`evolution-commands: the run index is not usable — ${loaded.note ?? '原因未知'}`)
       else if (loaded.note !== undefined) ctx.logger.warn(`evolution-commands: ${loaded.note}`)
     }).catch((error: unknown) => {
       ctx.logger.warn(`evolution-commands: could not read the run index (${error instanceof Error ? error.message : String(error)})`)
@@ -427,9 +427,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // by the time these rows print — the note tells the operator that happened / can happen.
           const ttlMs = typeof approval.ttlMs === 'number' && Number.isFinite(approval.ttlMs) ? approval.ttlMs : 0
           const ttlNote = ttlMs > 0
-            ? `\n(staged writes expire after ${ttlMs} ms: an expired write is closed as REJECTED and is never executed — stage it again if it is still wanted)`
+            ? `\n（暂存写入 ${ttlMs} 毫秒后过期：过期即关闭为 REJECTED，且永不执行。若仍需要，请重新暂存。）`
             : '\n(staged writes never expire — the window waits for a decision; set the evolution-approval row pendingTtlMs to bound it)'
-          if (pending.length === 0) return ok('No pending evolution writes.' + ttlNote)
+          if (pending.length === 0) return ok('没有待批准的自进化写入。' + ttlNote)
           // F-328: `--detail` renders each record's staged args so an operator
           // reviews what approve will actually replay (the summary alone is a
           // 120-char label). The default (collapsed) view is unchanged.
@@ -493,9 +493,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // D-12 (v18): a reentrant run that was skipped must not be reported
           // as a completed 0/0/0 pass.
           if (result.skipped !== undefined) {
-            return ok(`Curator run skipped (${result.skipped}): no curation pass was executed.\nrunId=${result.report.runId}`)
+            return ok(`策展轮已跳过（${result.skipped}）：未执行策展过程。\nrunId=${result.report.runId}`)
           }
-          return ok(`Curator run complete: ${result.stale.length} stale, ${result.archived.length} archived, ${result.errors.length} failed.\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}`)
+          return ok(`策展轮完成：${result.stale.length} 项过期，${result.archived.length} 项已归档，${result.errors.length} 项失败。\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}`)
         }
         if (input === 'curator pause' || input === 'curator resume') {
           const curator = ctx.get('evolutionCurator') as { setPaused(paused: boolean): Promise<void> } | undefined
@@ -507,16 +507,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // travel through the return). Surface it on the command result so
           // the operator can tell a persisted pause from an ephemeral one.
           const stateMounted = ctx.get('evolutionState') !== undefined
-          const notPersisted = stateMounted ? '' : '\nNOTE: no evolution state service is mounted — this setting is NOT persisted and will not survive this process.'
+          const notPersisted = stateMounted ? '' : '\n注意：没有挂载 evolution 状态服务 —— 该设置不会被持久化，也不会在此进程之后保留。'
           return ok((paused
-            ? 'Curator automatic curation paused. Manual /evolution curator run is unaffected; resume with /evolution curator resume.'
-            : 'Curator automatic curation resumed. The next scheduled pass waits one interval (first-run defer semantics).') + notPersisted)
+            ? '策展自动轮已暂停。手动 /evolution curator run 不受影响；用 /evolution curator resume 恢复。'
+            : '策展自动轮已恢复。下一次定时轮要等一个间隔（首轮延后语义）。') + notPersisted)
         }
         if (input === 'curator status') {
           const curator = ctx.get('evolutionCurator') as { status(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null> } | undefined
           if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const state = await curator.status()
-          if (!state) return ok('No curator state yet: the first automatic pass is deferred until the interval elapses.')
+          if (!state) return ok('还没有策展状态：首个自动轮次要等间隔到达后才会执行。')
           // A corrupt state record must not crash the command surface with a
           // RangeError from `Invalid Date`.toISOString().
           const lastRun = typeof state.lastRunAt === 'number' && Number.isFinite(state.lastRunAt) && state.lastRunAt > 0
@@ -544,9 +544,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               && typeof (row as { action?: unknown }).action === 'string'
               && typeof (row as { summary?: unknown }).summary === 'string')
             : []
-          if (usable.length === 0) return ok('No mutation records yet.')
+          if (usable.length === 0) return ok('还没有写入记录。')
           const recent = usable.slice(-5).reverse().map(record => `${record.at.slice(0, 19)}  ${record.skillName}  ${record.action}  ${record.summary}`)
-          return ok(`Mutations: ${usable.length} recorded (recent 5):\n${recent.join('\n')}`)
+          return ok(`写入记录：已记录 ${usable.length} 条（最近 5 条）：\n${recent.join('\n')}`)
         }
         if (input === 'curator scope') {
           const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; qualityWarned: string[]; exempted: string[]; protected: string[] }> } | undefined
@@ -566,7 +566,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }>; aborted?: string; unattributed?: string[] } | null> } | undefined
           if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const report: unknown = await curator.latestReport()
-          if (!report) return ok('No curator report available.')
+          if (!report) return ok('暂无策展报告。')
           // V6-41 (0.3.36): the report file is out-of-band editable — a damaged
           // shape must render "report unreadable" instead of an uncaught
           // TypeError (the `curator status` command already has this posture).
@@ -575,7 +575,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             || typeof (report as { startedAt?: unknown }).startedAt !== 'string'
             || !Array.isArray((report as { archived?: unknown }).archived)
             || !Array.isArray((report as { failed?: unknown }).failed)) {
-            return err('Report file unreadable.')
+            return err('报告文件读不出来。')
           }
           const reportAny = report as {
             runId: string
@@ -619,7 +619,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // triggered the destructive path by accident.
           const tail = input.slice('restore'.length).trim()
           if (tail !== '') {
-            return err(`\`restore\` takes no arguments (got "${tail}"). Use \`restore\` for a whole-tree rollback, or \`skill restore <name>\` for one skill.`)
+            return err(`\`restore\` 不接受参数（收到 "${tail}"）。\`restore\` 做整树回滚，\`skill restore <name>\` 恢复单个技能。`)
           }
           const restoreRefusal = unreplayableWriteRefusal('restore')
           if (restoreRefusal) return restoreRefusal
@@ -635,7 +635,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const rest = planTail ? input.slice(0, planTail.index) : input
           const names = rest.slice(12).trim().split(/\s+/).filter(Boolean)
           const [target, ...sources] = names
-          if (!target || sources.length === 0) return err('Usage: /evolution consolidate <target> <source...>')
+          if (!target || sources.length === 0) return err('用法：/evolution consolidate <target> <source...>')
           const curator = ctx.get('evolutionCurator') as { consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }> } | undefined
           const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
           if (!result.ok) return err(result.message)
@@ -643,7 +643,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input.startsWith('skill restore ')) {
           const name = input.slice(14).trim()
-          if (!name) return err('Usage: /evolution skill restore <name>')
+          if (!name) return err('用法：/evolution skill restore <name>')
           const skillRestoreRefusal = unreplayableWriteRefusal('skill restore')
           if (skillRestoreRefusal) return skillRestoreRefusal
           const curator = ctx.get('evolutionCurator') as { restore(name: string): Promise<{ ok: boolean; message: string }> } | undefined
@@ -652,22 +652,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input.startsWith('skill history ')) {
           const name = input.slice(14).trim()
-          if (!name) return err('Usage: /evolution skill history <name>')
+          if (!name) return err('用法：/evolution skill history <name>')
           const curator = ctx.get('evolutionCurator') as {
             history(name: string): Promise<SkillVersion[]>
           } | undefined
           if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const versions = await curator.history(name)
-          if (versions.length === 0) return ok(`No content versions are recorded for "${name}" yet — they appear after the next write through skill_manage.`)
+          if (versions.length === 0) return ok(`技能 "${name}" 还没有内容版本：下一次经 skill_manage 写入后才会出现。`)
           // Content order, not append order: two writers of one skill can interleave their index
           // appends, and every entry written from 0.10.0 on links the version it replaced.
           const groups = partitionVersions(versions)
           const row = (entry: SkillVersion): string => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}`
-          const lines = [`Content versions for "${name}" (oldest first, ${groups.content.length} of at most the retained count):`, ...groups.content.map(row)]
+          const lines = [`技能 "${name}" 的内容版本（由旧到新，${groups.content.length} 条，最多保留这么多）：`, ...groups.content.map(row)]
           // Support files share this index; their bytes are history, but undo restores SKILL.md only,
           // so they are listed apart instead of being passed off as versions of the body.
           if (groups.support.length > 0) {
-            lines.push('Support-file versions (history only — undo restores SKILL.md, not these bytes):', ...groups.support.map(row))
+            lines.push('支撑文件版本（仅在历史里 —— 撤销恢复的是 SKILL.md，不是这些字节）：', ...groups.support.map(row))
           }
           return ok(lines.join('\n'))
         }
@@ -675,7 +675,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const rest = input.slice(11).trim()
           const toMatch = /--to\s+v?(\d+)\s*$/.exec(rest)
           const name = (toMatch?.index === undefined ? rest : rest.slice(0, toMatch.index)).trim()
-          if (!name) return err('Usage: /evolution skill undo <name> [--to v<N>]')
+          if (!name) return err('用法：/evolution skill undo <name> [--to v<N>]')
           const skillUndoRefusal = unreplayableWriteRefusal('skill undo')
           if (skillUndoRefusal) return skillUndoRefusal
           const curator = ctx.get('evolutionCurator') as { undo(name: string, v?: number): Promise<{ ok: boolean; message: string }> } | undefined
@@ -693,9 +693,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input === 'skill pin' || input.startsWith('skill pin ') || input === 'skill unpin' || input.startsWith('skill unpin ')) {
           const pinned = !input.startsWith('skill unpin')
           const name = input.slice(pinned ? 10 : 12).trim()
-          if (!name) return err(`Usage: /evolution skill ${pinned ? 'pin' : 'unpin'} <name>`)
+          if (!name) return err(`用法：/evolution skill ${pinned ? 'pin' : 'unpin'} <name>`)
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('Evolution IO registry not mounted — skill pinning unavailable.')
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法固定或取消固定技能。')
           // The write-side library is built exactly like restructure's: one construction recipe. The
           // limits ride along because the name guard reads them, so a deployment that raised the
           // name cap can still pin such a skill.
@@ -718,7 +718,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // C observation window: before ANY observed read exists, view_count
           // zero is not evidence — say so instead of silently showing a clean
           // (or churn-skewed) verdict.
-          const banner = observed ? '' : 'Usage observation not yet established — churn (write-ghost) rows are suppressed.'
+          const banner = observed ? '' : '使用观测尚未建立 —— 频繁变动（写入幽灵）行已被抑制。'
           const line = (row: { verdict: string; name: string; reasons: string[] }): string => `${row.verdict.padEnd(18)} ${row.name}${row.reasons.length > 0 ? ` — ${row.reasons.join('; ')}` : ''}`
           if (rows.length === 0) return ok(banner ? `Structure health: all skills healthy. ${banner}` : 'Structure health: all skills healthy.')
           return ok([banner ? `Structure health (${rows.length} degraded): ${banner}` : `Structure health (${rows.length} degraded):`, ...rows.map(line)].join('\n'))
@@ -728,7 +728,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // bypass evolution/skill-mutated; this command drops the catalog's
           // summaries cache and invalidates the published skill catalog.
           ctx.emit('evolution/skills-refresh')
-          return ok('Skill catalog refresh requested: caches dropped, catalog re-read on next lookup.')
+          return ok('已请求重读技能目录：缓存已丢弃，下次查询时重新读取。')
         }
         if (input === 'learn' || input.startsWith('learn ')) {
           // V25-08 (v25): the free-text request keeps the user's original
@@ -783,8 +783,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             })
           }
           return woke
-            ? ok('Learning request sent to this session. Follow it now.')
-            : ok('Learning request queued for this session — this host exposes no wake-up channel, so it is read on your next message.')
+            ? ok('已向本会话发送学习请求，请现在执行。')
+            : ok('学习请求已排入本会话队列：本宿主没有唤醒通道，会在你下一条消息时读取。')
         }
         const factsParsed = parseSubcommand(input)
         if (!isParseFailure(factsParsed) && factsParsed.name === 'maintain' && factsParsed.flags.get('facts') === true && factsParsed.positionals.length === 0) {
@@ -800,7 +800,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // orchestrate's three-cause conclusion — the preview must never
           // disagree with the scan it previews.
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance facts unavailable.')
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：维护事实不可用。')
           const library = newSkillLibrary({ config: { root: skillsRootValue }, io: preferProvider(ioRegistry, ['fs']) })
           const enrichment = await buildEnrichment(ctx, library)
           const readFailures: string[] = []
@@ -818,11 +818,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // set, inlined (not exported there); messages kept verbatim so both
           // surfaces read identically.
           if (snapshots.length === 0 && readFailures.length > 0) {
-            return err(`maintenance scan could not read ${readFailures.length} listed skill(s) (${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}) and read no skill at all — the library was NOT audited; fix the unreadable skills (or their directory names) and run the scan again`)
+            return err(`维护扫描读不出 ${readFailures.length} 个已登记技能（${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}），且一个技能都没读到：技能库未被审计。请修好读不出的技能（或它们的目录名）后重新扫描`)
           }
           if (snapshots.length === 0 && skillsRootValue !== ''
             && !(await preferProvider(ioRegistry, ['fs']).exists(skillsRootValue))) {
-            return err(`maintenance scan found an empty skill library, but the configured skill root does not exist (${skillsRootValue}) — point the skillsRoot config at a real directory (a literal \`~\` is not expanded) and run the scan again`)
+            return err(`维护扫描发现技能库为空，但配置的技能根目录不存在（${skillsRootValue}）：请把 skillsRoot 指向真实目录（字面量 \`~\` 不会被展开），然后重新扫描`)
           }
           // PLAN-R2 P2-10 (2026-09-16): cause 3 — no read failures and the
           // root probe confirmed the root exists, so the library is genuinely
@@ -832,10 +832,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // message instead of rendering an empty facts block that would
           // disagree with the scan it previews.
           if (snapshots.length === 0) {
-            return ok('Maintenance scan: empty skill library. Nothing to do.')
+            return ok('维护扫描：技能库为空，无需处理。')
           }
           const { facts } = buildMaintainFacts(snapshots, enrichment.usageObservedValue, undefined)
-          return ok(`Maintenance facts (0-token preview):\n${facts}`)
+          return ok(`维护事实（零 token 预览）：\n${facts}`)
         }
         // F-03: the grammar was a fragile single-space match —
         // `maintain  --timeout 600000` (multi-space) and `--timeout=600000`
@@ -869,11 +869,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // to be reported as a `--timeout` CLI typo and permanently
             // deadlock maintain (the user had no CLI flag to fix).
             return err(timeoutFlag !== undefined
-              ? `Invalid --timeout value: expected a positive integer number of milliseconds up to ${MAX_TIMER_DELAY_MS} (e.g. /evolution maintain --timeout 600000).`
-              : `The maintainTimeoutMs config is invalid: expected a positive integer number of milliseconds up to ${MAX_TIMER_DELAY_MS}. Fix the evolution-commands row config (maintainTimeoutMs), then retry.`)
+              ? `--timeout 值不合法：应为不超过 ${MAX_TIMER_DELAY_MS} 的正整数毫秒（例如 /evolution maintain --timeout 600000）。`
+              : `maintainTimeoutMs 配置不合法：应为不超过 ${MAX_TIMER_DELAY_MS} 的正整数毫秒。请修正 evolution-commands 行的配置（maintainTimeoutMs）后重试。`)
           }
           const registry = runs
-          if (!registry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
+          if (!registry) return err('未挂载 evolution-io 注册表：维护扫描不可用。')
           // Review P1-1: one DSH_HOME, two planes — re-read the index so the in-flight
           // guard and the cooldown cover a scan the OTHER plane started. A read failure
           // is not "no runs": the guard proceeds fail-open and says so out loud.
@@ -887,8 +887,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // platform-declaration anchor: the platform’s `subagents`, `tools`, `skillUsage` and `settings` services
           //(all optional; undefined ⇒ the feature is off)
           const subagents = ctx.get('subagents') as MaintainRuntime['subagents'] | undefined
-          if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
-          if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：维护扫描不可用。')
+          if (!subagents) return err('未挂载子智能体服务：维护扫描不可用。')
           // 0.19.0 (S2): the registry IS the concurrency guard — one owner for
           // "is a scan running" and "when did the last one settle", instead of the
           // three module globals that also lost the answer on a restart.
@@ -898,7 +898,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // V10-08 (F-04): a refused scan is NOT a successful scan — the
             // rejection returns kind:'error' so a consumer can distinguish
             // "ran" from "refused" by the result type instead of matching prose.
-            return err(`Maintenance run ${running.id} is already running (started ~${elapsed}s ago) — re-submitting now would start a second scan. Status: /evolution maintain status ${running.id}; stop it: /evolution maintain cancel ${running.id}.`)
+            return err(`维护运行 ${running.id} 已经在进行中（约 ${elapsed}s 前启动）：现在重交会再开一次扫描。查看状态：/evolution maintain status ${running.id}；停止它：/evolution maintain cancel ${running.id}。`)
           }
           // V8-07 (0.3.47): the cooldown joins the clampedNumber family — a
           // NaN used to disable the cooldown silently (`NaN > 0` is false,
@@ -916,7 +916,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // filter would be a comparison the type system already knows is true;
             // re-add it when a second kind arrives.
             const latest = registry.runs().find(record => record.state !== 'running')
-            return err(`Maintenance cooldown active (${remaining}s)${latest === undefined ? '' : ` — latest run ${latest.id}`}; re-running now would spend another model call.`)
+            return err(`维护冷却中（${remaining}s）${latest === undefined ? '' : `，最近一次运行 ${latest.id}`}：现在重跑会再消耗一次模型调用。`)
           }
           // Bind the run's home ONCE, here: the report and the event are written
           // after the scan settles, and they must land in the home this run started
@@ -1045,7 +1045,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                   }
                 }
               } else {
-                ctx.logger.warn(`evolution-commands: maintenance run ${handle.id} produced no plan (${outcome.error ?? 'unknown reason'})`)
+                ctx.logger.warn(`evolution-commands: maintenance run ${handle.id} produced no plan (${outcome.error ?? '原因未知'})`)
               }
             } catch (error) {
               // A throw is a settled run, not a stuck one: the registry gets the
@@ -1069,7 +1069,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const maintainStatus = subcommandOf(input, 'maintain', 'status', flagsOf('maintain'))
         if (maintainStatus !== null) {
           const registry = runs
-          if (!registry) return err('Evolution IO registry not mounted — run status unavailable.')
+          if (!registry) return err('未挂载 evolution-io 注册表：无法查看运行状态。')
           const synced = await syncRuns(registry)
           const wanted = maintainStatus.positionals[1]
           if (wanted !== undefined) {
@@ -1078,18 +1078,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const record = registry.find(wanted)
             if (!record) {
               if (!synced.ok) {
-                return err(`Run ${wanted} is not in this process's history, and the home's run index is not readable (${synced.note ?? 'unknown reason'}) — that is NOT proof the run never happened.`)
+                return err(`运行 ${wanted} 不在本进程的历史里，且本 home 的运行索引读不出来（${synced.note ?? '原因未知'}）：但这不能证明那次运行没发生过。`)
               }
-              return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
             }
-            return ok(synced.ok ? renderRunRecord(record) : `${renderRunRecord(record)}\n(index not readable: ${synced.note ?? 'unknown reason'} — only this process's view is shown)`)
+            return ok(synced.ok ? renderRunRecord(record) : `${renderRunRecord(record)}\n(运行索引读不出来：${synced.note ?? '原因未知'} — only this process's view is shown)`)
           }
           if (!synced.ok) {
             // P2-1: "the history is unknown" and "there is no run" must not look alike.
-            return err(`The run history of this home is not readable (${synced.note ?? 'unknown reason'}) — this is NOT "no runs". Fix or remove <evolutionHome>/runs.json to start a clean history.`)
+            return err(`本 home 的运行历史读不出来（${synced.note ?? '原因未知'}）：这「不是」没有运行。要开始干净的历史，请修好或删除 <evolutionHome>/runs.json。`)
           }
           const all = registry.runs()
-          if (all.length === 0) return ok('No maintenance run recorded in this home yet — /evolution maintain starts one.')
+          if (all.length === 0) return ok('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
           const live = all.filter(record => record.state === 'running')
           const recent = all.filter(record => record.state !== 'running').slice(0, 5)
           return ok([
@@ -1101,7 +1101,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const maintainReport = subcommandOf(input, 'maintain', 'report', flagsOf('maintain'))
         if (maintainReport !== null) {
           const registry = runs
-          if (!registry) return err('Evolution IO registry not mounted — run results unavailable.')
+          if (!registry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
           const synced = await syncRuns(registry)
           const wanted = maintainReport.positionals[1]
           // Review P1-1: for the id-less form an unreadable index WINS over the in-memory view —
@@ -1114,29 +1114,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // home must never look alike (G2/0.20.0).
             if (wanted !== undefined) {
               if (!synced.ok) return err(unreadableForId(wanted, synced.note))
-              return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
             }
-            return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
+            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
           }
           if (wanted === undefined && record.state === 'running') {
-            return err(`The newest run ${record.id} is still running — its report appears when it settles; /evolution maintain status ${record.id} shows where it is.`)
+return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('Evolution IO registry not mounted — run results unavailable.')
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
           const probed = await readRunReport(preferProvider(ioRegistry, ['fs']), record)
           // "no result" and "an unreadable result" must not look alike (the
           // three-state rule the rest of the family follows).
           if (probed.kind === 'missing') {
-            return err(`Run ${record.id} (${record.state}) has NO result: no report was written${record.failure === undefined ? '' : ` (${record.failure})`}.`)
+return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
           }
-          if (probed.kind === 'unknown') return err(`Run ${record.id} has a report that could not be read (${probed.reason}) — this is not "no result".`)
+if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
           return ok(probed.text)
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
         const maintainCancel = subcommandOf(input, 'maintain', 'cancel', flagsOf('maintain'))
         if (maintainCancel !== null) {
           const registry = runs
-          if (!registry) return err('Evolution IO registry not mounted — run cancellation unavailable.')
+          if (!registry) return err('未挂载 evolution-io 注册表：无法取消运行。')
           const synced = await syncRuns(registry)
           const wanted = maintainCancel.positionals[1]
           // Review P1-1: the id-less form answers sentence F when the index could not be read,
@@ -1146,31 +1146,31 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!record) {
             if (wanted !== undefined) {
               if (!synced.ok) return err(unreadableForId(wanted, synced.note))
-              return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
             }
-            return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
+            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
           }
           // Omitting the id only ever cancels the ONE run this process is running: the
           // registry's owned-only cancel below refuses anything else, and the refusal is
           // worded for the id-less case with a pointer to the explicit form (G2/0.20.0).
-          const idlessHint = wanted === undefined ? ' Pass an id to cancel a specific run: /evolution maintain status lists them.' : ''
+          const idlessHint = wanted === undefined ? ' 要取消某次运行请带上 id：/evolution maintain status 会列出它们。' : ''
           // ONE cancel call (review P1-1): a run another process owns cannot be stopped
           // from here, and a terminal one has nothing to cancel — the two answers differ.
           if (!registry.cancel(record.id)) {
             if (record.state === 'running') {
               // Review P2-4: an explicit id cannot cancel a foreign run either, so the id-less
               // hint pointed at a dead end here; the terminal branch below keeps it.
-              return err(`Run ${record.id} is running in ANOTHER process sharing this home — it can only be cancelled there.`)
+              return err(`运行 ${record.id} 正在共享本 home 的另一个进程里运行：只能在那里取消。`)
             }
-            return err(`Run ${record.id} is already ${record.state} — nothing to cancel.${idlessHint}`)
+            return err(`运行 ${record.id} 已经是 ${record.state}：没有可取消的东西。${idlessHint}`)
           }
-          return ok(`Maintenance run ${record.id} cancelled — the scan stops at its next checkpoint. /evolution maintain status ${record.id} shows the terminal state.`)
+          return ok(`维护运行 ${record.id} 已取消：扫描会在下一个检查点停止。用 /evolution maintain status ${record.id} 查看终态。`)
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
         const maintainHandoff = subcommandOf(input, 'maintain', 'handoff', flagsOf('maintain'))
         if (maintainHandoff !== null) {
           const registry = runs
-          if (!registry) return err('Evolution IO registry not mounted — the report cannot be handed over.')
+          if (!registry) return err('未挂载 evolution-io 注册表：无法交付报告。')
           const synced = await syncRuns(registry)
           const wanted = maintainHandoff.positionals[1]
           // Review P1-1: never inject from a stale view when the home's index is unreadable.
@@ -1179,20 +1179,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!record) {
             if (wanted !== undefined) {
               if (!synced.ok) return err(unreadableForId(wanted, synced.note))
-              return err(`No run ${wanted} in this home — /evolution maintain status lists the recent ones.`)
+              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
             }
-            return err('No maintenance run recorded in this home yet — /evolution maintain starts one.')
+            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
           }
           if (wanted === undefined && record.state === 'running') {
-            return err(`The newest run ${record.id} is still running — its report appears when it settles; /evolution maintain status ${record.id} shows where it is.`)
+return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('Evolution IO registry not mounted — the report cannot be handed over.')
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法交付报告。')
           const probed = await readRunReport(preferProvider(ioRegistry, ['fs']), record)
           if (probed.kind === 'missing') {
-            return err(`Run ${record.id} (${record.state}) has NO result: no report was written${record.failure === undefined ? '' : ` (${record.failure})`}.`)
+return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
           }
-          if (probed.kind === 'unknown') return err(`Run ${record.id} has a report that could not be read (${probed.reason}) — this is not "no result".`)
+if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
           // Deliver ONLY a pointer plus the report-only protocol: the report file stays
           // the one result home, and the injected text stays small (G2/0.20.0).
           const missingAgent = agentMissing('handoff')
@@ -1215,8 +1215,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const woke = deliverHandoff(invocationAgent as { followup?: unknown; inject?: unknown }, message)
           if (woke === undefined) return err(errorText('e-305-the-invocation-agent-exposes', { a1: 'this maintenance handoff' }))
           return ok(woke
-            ? `Handed run ${record.id} to the model — report: ${reportDigestPath(record)}. It will read the file and follow the action lines.`
-            : `Handed run ${record.id} to the model, queued — this host exposes no wake-up channel, so it is read on your next message.`)
+            ? `已把运行 ${record.id} 交给模型 —— 报告：${reportDigestPath(record)}。它会读取该文件并执行其中的行动项。`
+            : `已把运行 ${record.id} 交给模型并排队 —— 本宿主没有唤醒通道，因此会在你下一条消息时被读取。`)
         }
 
         if (/^maintain\b/.test(input)) {
@@ -1226,7 +1226,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // rejection. Reject it here.
           // Review P2-5: the hint still demanded an id from `report`/`cancel` and never named
           // `handoff`, so it described a grammar two releases behind the one it guards.
-          return err('Unknown maintain arguments: expected `maintain`, `maintain --timeout <ms>` / `maintain --timeout=<ms>`, `maintain status [<id>]`, `maintain report [<id>]`, `maintain handoff [<id>]` or `maintain cancel [<id>]`. Got: ' + input)
+          return err('未知的 maintain 参数：应为 `maintain`、`maintain --timeout <ms>` / `maintain --timeout=<ms>`、`maintain status [<id>]`、`maintain report [<id>]`、`maintain handoff [<id>]` 或 `maintain cancel [<id>]`。实际收到：' + input)
         }
         // G7.4/C7: the install shape, the base flag and the refusal for any other preset line all
         // come from the ONE parser.
@@ -1269,13 +1269,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               ? undefined
               : { profile: mounted.profile, dir: mounted.profileDir, bundles: mounted.bundles })
             if (exclusion.kind === 'undecidable') {
-              return err(`Refusing to install the layered Evolution preset: ${exclusion.reason} — the all/preset double-mount check could not run. Resolve access to this profile and retry, or install via the layered installer, which enforces the same exclusion up front.`)
+              return err(`拒绝安装分层 Evolution 预设：${exclusion.reason}：all/preset 双重挂载检查无法执行。请解决该 profile 的访问权限后重试，或改用分层安装器——它会在安装前就执行同一套排除检查。`)
             }
             const installedBundles = exclusion.bundles
             const allBundle = installedBundles.find(name => name === 'dsh-evolution-all' || name.endsWith('/dsh-evolution-all'))
             const presetBundle = installedBundles.find(name => name === 'dsh-evolution-preset' || name.endsWith('/dsh-evolution-preset'))
             if (allBundle || presetBundle) {
-              return err(`Refusing to install the layered Evolution preset: "${allBundle ?? presetBundle}" is installed in this profile — its model rows (tool-memory / tool-skill-manage / tool-session-query / skill-catalog) would double-mount with the preset's and the profile fails loud at startup. Keep ONE: remove the ${allBundle ? 'evolution-all bundle' : 'evolution-preset bundle'} before installing the layered preset (see /evolution doctor).`)
+              return err(`拒绝安装分层 Evolution 预设：本 profile 里已安装「${allBundle ?? presetBundle}」：它的模型行（tool-memory / tool-skill-manage / tool-session-query / skill-catalog）会与预设的重复挂载，profile 启动时会直接报错。只保留一个：安装分层预设前先移除 ${allBundle ? 'evolution-all bundle' : 'evolution-preset bundle'}（见 /evolution doctor）。`)
             }
           }
           // The deliverable is one ROW in the target profile's own patch layer
@@ -1301,20 +1301,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const requestedRaw = typeof baseFlag === 'string' ? baseFlag : table.defaultBase
             const requested = [...new Set(requestedRaw.split(',').map(part => part.trim()).filter(part => part !== ''))]
             if (requested.length === 0) {
-              return err(`No agent-preset base named — ${join(source, 'bases.json')} lists ${table.entries.map(entry => entry.name).join(', ')}`)
+              return err(`没有指定 agent-preset 基名：${join(source, 'bases.json')} 里列出的是 ${table.entries.map(entry => entry.name).join(', ')}`)
             }
             const selected: (typeof table.entries)[number][] = []
             for (const name of requested) {
               const entry = table.entries.find(candidate => candidate.name === name)
               if (entry === undefined) {
-                return err(`Unknown agent-preset base "${name}" — ${join(source, 'bases.json')} lists ${table.entries.map(candidate => candidate.name).join(', ')}`)
+                return err(`未知的 agent-preset 基名「${name}」：${join(source, 'bases.json')} 里列出的是 ${table.entries.map(candidate => candidate.name).join(', ')}`)
               }
               selected.push(entry)
             }
             const deltaPath = join(source, 'agent.cordis.yml')
-            if (!existsSync(deltaPath)) return err(`Preset file missing from ${source} — is the dsh-evolution-agent-preset package installed?`)
+            if (!existsSync(deltaPath)) return err(`预设文件在 ${source} 里缺失：是否装了 dsh-evolution-agent-preset 包？`)
             const profile = presetProfileTarget(ctx)
-            if (profile === undefined) return err('No profile is mounted in this process, so there is no profile patch to write the preset row into — run the command in a session started by `dsh --profile <name>`.')
+            if (profile === undefined) return err('本进程没有挂载任何 profile，因此没有可写入预设行的 profile 补丁：请在由 `dsh --profile <name>` 启动的会话里执行该命令。')
             const delta = readFileSync(deltaPath, 'utf8')
             // P2 (v46 G6-②): the read-merge-write below is a read-modify-write on the profile patch.
             // The platform serializes exactly this kind of change through its HMR lock (see
@@ -1358,7 +1358,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                   { name: PROFILE_PATCH_FILENAME, content: presetPatchText(merged) },
                 ], undefined, (message) => { ctx.logger.warn(message) })
               }
-              return ok(`Evolution agent preset row installed (${written.join('; ')}). Restart the session switcher to select it.`)
+              return ok(`已写入 evolution agent preset 行（${written.join('; ')}）。重启会话切换器后即可选中它。`)
             }
             const runExclusive = hmr?.runExclusive
             // The host call's own type is `unknown` (it is a generic seam), so the accepted shape is
@@ -1368,7 +1368,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // contract requires here (the sync branch above must NOT await).
             return await runExclusive.call(hmr, commit) as CommandResult
           } catch (error) {
-            return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
+            return err(`预设安装失败：${error instanceof Error ? error.message : String(error)}`)
           }
         }
         if (input.startsWith('restructure ')) {
@@ -1382,19 +1382,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
           const restParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(restParsed) || restParsed.name !== 'restructure') {
-            return err('Usage: /evolution restructure <name> "<## heading>" <to_file>')
+return err('用法：/evolution restructure <name> "<## heading>" <to_file>')
           }
           const name = restParsed.positionals[0] ?? ''
           const heading = restParsed.positionals[1] ?? ''
           const toFile = restParsed.positionals[2] ?? ''
           if (name === '' || heading === '' || toFile === '') {
-            return err('Usage: /evolution restructure <name> "<## heading>" <to_file>')
+return err('用法：/evolution restructure <name> "<## heading>" <to_file>')
           }
           const planFlag = restParsed.flags.get('plan')
           const planRunId = typeof planFlag === 'string' ? planFlag : undefined
-          if (!toFile.startsWith('references/')) return err('to_file must live under references/ (log/detail destination).')
+          if (!toFile.startsWith('references/')) return err('to_file 必须位于 references/ 之下（日志或明细的落地位置）。')
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('Evolution IO registry not mounted — restructure unavailable.')
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法重构。')
           // v20 (D-2 / P2-8): the write joins the approval seam like every
           // other user-facing skill write — an approval-enabled deployment
           // must not have a command path that lands the same kind of write
@@ -1429,7 +1429,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             }
             const willStage = stagesForeground
             if (willStage && !approval.hasRunner('skill')) {
-              return err('Restructure cannot be staged: no skill replay runner is registered — mount the tool-skill-manage row (evolution-agent preset, or evolution-all) or disable evolution-approval.')
+              return err('无法暂存重构：没有注册技能回放运行器：请挂载 tool-skill-manage 行（evolution-agent 预设或 evolution-all），或禁用 evolution-approval。')
             }
             const decision = await approval.request({
               kind: 'skill',
@@ -1517,7 +1517,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // slot, and a missing value is a SYNTAX answer instead of a schema-layer failure.
         const policyParsed = parseSubcommand(input)
         if (isParseFailure(policyParsed) && policyParsed.name === 'policy' && policyParsed.kind === 'missing-value') {
-          return err('/evolution policy set needs a value after --' + (policyParsed.flag ?? '') + '; usage: policy set <id> <value> [--expect <revision>]')
+          return err('/evolution policy set 需要在 --' + (policyParsed.flag ?? '') + '；用法：policy set <id> <value> [--expect <revision>]')
         }
         if (!isParseFailure(policyParsed) && policyParsed.name === 'policy' && policyParsed.positionals[0] === 'set') {
           // S4.2: the WRITE face. One path only — the settings service. There is
@@ -1630,7 +1630,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input === '' || input === 'help') {
           return ok(`自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。\n${renderHelpText()}`)
         }
-        return err(`/evolution ${input} is not a subcommand this build answers (a known subcommand whose argument is missing lands here too).\n${renderHint()}`)
+        return err(`/evolution ${input} 不是本构建能应答的子命令（已知子命令但缺参数也会落到这里）。\n${renderHint()}`)
       },
     }
     /** The registered definition: declared members only (A46). */
@@ -1655,7 +1655,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       handler: (invocation: CommandInvocation): Promise<CommandResult> =>
         commandBody.run(invocation).catch((error: unknown): CommandResult => ({
           kind: 'error',
-          text: `evolution: command failed: ${error instanceof Error ? error.message : String(error)}\nRun /evolution doctor to inspect services and state files; a corrupted state file is quarantined as <file>.corrupt for inspection.`,
+          text: `evolution：命令失败：${error instanceof Error ? error.message : String(error)}\n请运行 /evolution doctor 检查服务与状态文件；损坏的状态文件会被隔离为 <file> 以便检查。`,
         })),
     }
     commandCtx.effect(() => commands.register(evolutionCommand))

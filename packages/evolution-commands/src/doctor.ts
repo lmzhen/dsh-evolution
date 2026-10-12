@@ -130,7 +130,7 @@ function presetIssues(presets: readonly PlatformPreset[] | undefined): string[] 
  */
 function paramDivergences(platform: PlatformView): string[] {
   if (platform.configuration === undefined) {
-    return ['the platform configuration surface (configEditor.configuration) is not mounted here — parameter divergences were NOT checked']
+    return ['平台上没有挂载配置面（configEditor.configuration）：参数差异没有被检查']
   }
   const issues: string[] = []
   for (const row of platform.configuration) {
@@ -151,7 +151,7 @@ function paramDivergences(platform: PlatformView): string[] {
   // The reachability half needs the platform's live rows: a declared E3 parameter whose owning
   // row this runtime does not carry is a promise the deployment never mounts.
   if (platform.plugins === undefined) {
-    issues.push('the platform plugin-row surface (pluginManager.listPlugins) is not mounted here — declared-but-unreachable parameters were NOT checked')
+    issues.push('平台上没有挂载插件行面（pluginManager.listPlugins）：已声明但不可达的参数没有被检查')
     return issues
   }
   // TWO different causes, two sentences (0.21.0 / G1.3). `paramSettingsId` answers undefined for
@@ -671,8 +671,8 @@ export async function diagnose(
     // bundles", the identical fail-open direction.
     const detail = error instanceof Error ? error.message : String(error)
     conflicts.push(scope === 'profiles-dir'
-      ? `the home profiles directory could not be enumerated (${detail}) — bundle-based install-form and conflict checks are DEGRADED and may miss installed bundles`
-      : `a profile manifest could not be read or parsed (${detail}) — this profile's bundle rows are UNKNOWN, so the install-form and conflict checks are DEGRADED and may miss installed bundles`)
+      ? `本 home 的 profiles 目录无法枚举（${detail}）：基于 bundle 的安装形态与冲突检查已降级（DEGRADED），可能漏掉已安装的 bundle`
+      : `本 profile 清单读不出来或无法解析（${detail}）：本 profile 的 bundle 行为未知，因此安装形态与冲突检查已降级（DEGRADED），可能漏掉已安装的 bundle`)
   })
   const has = (name: string) => ctx.get(name) !== undefined
   // O-2 (S3.4/A99): capability absence — the HOST-side platform probes this runtime does not
@@ -938,7 +938,7 @@ async function probeBounded<T>(work: () => Promise<T>, label: string): Promise<{
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<{ ok: false; message: string }>((resolve) => {
     timer = setTimeout(() => {
-      resolve({ ok: false, message: `${label} did not answer within ${PROBE_TIMEOUT_MS}ms — the corpus is blocked (a concurrent writer can stall the observation) or the service is wedged; isolate the most recently written session and re-run` })
+      resolve({ ok: false, message: `${label} 在 ${PROBE_TIMEOUT_MS}ms 内没有应答：语料被阻塞（并发写入方可能拖住观测），或服务卡死。请隔离最近写入的会话后重试。` })
     }, PROBE_TIMEOUT_MS)
   })
   const settled = started.then(

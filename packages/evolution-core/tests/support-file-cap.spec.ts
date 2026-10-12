@@ -32,7 +32,7 @@ it('V4: enforce mode refuses the same write and names the split hint', async () 
   const { lib } = await make({ ...DEFAULT_SKILL_LIMITS, supportFileCharPolicy: 'enforce' })
   const written = await lib.writeSupportFile('cap-skill', 'references/big.md', over(20_000), 'foreground')
   expect(written.ok).toBe(false)
-  expect(written.message).toContain('exceeds')
+  expect(written.message).toContain('超过')
   expect(written.message).toContain(CONTENT_SPLIT_HINT)
 })
 

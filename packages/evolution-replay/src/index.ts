@@ -120,10 +120,10 @@ function scorePlan(plan: ReplayPlan, weights: ReplayWeights = DEFAULT_WEIGHTS): 
 }
 
 export function comparePlans(plans: ReplayPlan[], weights: ReplayWeights = DEFAULT_WEIGHTS): ReplayResult {
-  if (plans.length === 0) return { winner: null, margin: null, plans, report: 'No plans to compare.' }
+  if (plans.length === 0) return { winner: null, margin: null, plans, report: '没有可比较的计划。' }
   const scored = plans.map(plan => ({ plan, score: scorePlan(plan, weights) })).sort((a, b) => b.score - a.score)
   const winner = scored[0]
-  if (!winner) return { winner: null, margin: null, plans, report: 'No plans to compare.' }
+  if (!winner) return { winner: null, margin: null, plans, report: '没有可比较的计划。' }
   const runnerUp = scored[1]
   // v28 G4.4 (RPL-01): one plan recorded → no comparison happened; the old
   // `margin = winner.score` published the absolute score in a field whose

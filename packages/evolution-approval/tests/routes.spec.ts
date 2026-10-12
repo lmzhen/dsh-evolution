@@ -236,7 +236,7 @@ describe('approval routes: the preview', () => {
     const bareBody = await (await fetch(bareOrigin + APPROVAL_ROUTES.preview + '?id=p-1')).json() as { ok?: unknown; data?: { available?: unknown; reason?: unknown } }
     expect(bareBody.ok).toBe(true)
     expect(bareBody.data?.available).toBe(false)
-    expect(String(bareBody.data?.reason)).toContain('no preview')
+    expect(String(bareBody.data?.reason)).toContain('没有可预览内容')
   })
 
   it('answers an unknown id as a business miss, and a missing id as a bad request', async () => {

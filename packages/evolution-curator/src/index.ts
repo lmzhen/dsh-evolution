@@ -998,7 +998,7 @@ export class EvolutionCurator extends Service {
   private instanceHeldRefusal(operation: string): SkillActionResult {
     return {
       ok: false,
-      message: `instance-held: this curator row yielded the per-home claim to another curator row of this process — ${operation} is refused alongside run() so the holder row stays the only control-plane writer (run it on the holder row)`,
+      message: `instance-held：本 curator 行已把每 home 的占用权让给本进程的另一 curator 行。为保证持有行是唯一的控制面写入方，${operation} 与 run() 一并被拒绝（请在持有它的那一行上运行）。`,
     }
   }
 
@@ -1629,7 +1629,7 @@ export class EvolutionCurator extends Service {
         }
         continue
       }
-      const archived = await this.skills.archive(name, { reason: 'Lifecycle: reached archive threshold', allowBundled: this.pruneBuiltins })
+      const archived = await this.skills.archive(name, { reason: '生命周期：已达归档阈值', allowBundled: this.pruneBuiltins })
       if (!archived.ok) {
         // A failed archive must roll back to the pre-transition state: a
         // stale->archived failure that left state='archived' would silently
@@ -1656,7 +1656,7 @@ export class EvolutionCurator extends Service {
           record.archived_at = new Date().toISOString()
           stateOwned.add(name)
         }
-        archivedSkills.push({ name, path: archived.path ?? '', reason: 'Lifecycle: reached archive threshold' })
+        archivedSkills.push({ name, path: archived.path ?? '', reason: '生命周期：已达归档阈值' })
         alreadyArchived.add(name)
         if (bundledNames.has(name)) {
           suppressedNames.add(name)
@@ -1716,7 +1716,7 @@ export class EvolutionCurator extends Service {
       // SkillLibrary.archive() with a stamp suffix on collision, so the
       // nominal `.archive/<name>` used to name a directory that may not
       // exist. Omit the field and point at the event that carries the truth.
-      archivedSkills.push({ name: nomination.from, reason: `Consolidated into ${nomination.into} (exact archive path: the evolution/skill-mutated event, archivedPath)` })
+      archivedSkills.push({ name: nomination.from, reason: `已合并进 ${nomination.into}（精确归档路径见 evolution/skill-mutated 事件里的 archivedPath）` })
     }
     if (suppressedChanged) {
       try {
@@ -2000,7 +2000,7 @@ export class EvolutionCurator extends Service {
     })
     const blocked = [...new Set([target, ...sources])].filter(name => gates.isBlocked(name))
     if (blocked.length > 0) {
-      return { ok: false, message: `Skill(s) protected from consolidation (excluded / referenced / suppressed / protected builtin): ${blocked.join(', ')}` }
+      return { ok: false, message: `以下技能受保护、无法合并（被排除／被引用／被抑制／受保护的内置）：${blocked.join(', ')}` }
     }
     await this.snapshotFull('pre-consolidate')
     const result = await this.skills.consolidate(target, sources)
@@ -2116,26 +2116,26 @@ export class EvolutionCurator extends Service {
   private async undoMutate(name: string, v?: number): Promise<SkillActionResult> {
     const versions = await this.skills.listVersions(name)
     if (versions.length === 0) {
-      return { ok: false, message: `No content versions are recorded for "${name}" yet — nothing to undo.` }
+      return { ok: false, message: `技能「${name}」还没有记录内容版本 —— 没有可撤销的。` }
     }
     const live = await this.skills.read(name)
     if (live === null) {
       return {
         ok: false,
-        message: `"${name}" is not in the active tree — undo restores CONTENT of a live skill; use '/evolution skill restore ${name}' for an archived one.`,
+        message: `「${name}」不在活动目录树里 —— 撤销恢复的是存活技能的正文；若它已归档，请用 '/evolution skill restore ${name}'。`,
       }
     }
     const liveHash = contentHash(live)
     const target = v ?? this.previousVersionOf(versions, liveHash)
     if (target === undefined) {
-      return { ok: false, message: `"${name}" is already at its recorded content — no earlier version to undo to.` }
+      return { ok: false, message: `「${name}」已处于其记录的内容 —— 没有更早的版本可撤销。` }
     }
     // An explicit --to can name a version the index no longer carries (retention trimmed it, or the
     // number never existed). Say THAT: the read cannot tell it apart from a lost blob, and the old
     // wording asserted the blob cause for both.
     if (!versions.some(candidate => candidate.v === target)) {
       const listed = versions.map(candidate => `v${candidate.v}`).join(', ')
-      return { ok: false, message: `Version v${target} of "${name}" is not in the recorded history (recorded: ${listed === '' ? 'none' : listed}).` }
+      return { ok: false, message: `技能「${name}」的版本 v${target} 不在已记录的历史里（已记录：${listed === '' ? '无' : listed}）。` }
     }
     // One index carries two chains: the body's versions and the bytes of support files the skill
     // wrote. Naming a support version used to send those bytes at the frontmatter gate, which refused
@@ -2147,16 +2147,16 @@ export class EvolutionCurator extends Service {
       // Name the file when the index recorded it — for a legacy entry it is the only place the
       // operator can see which file those bytes came from.
       const written = entry.path === undefined
-        ? `was written by '${entry.action}' and`
-        : `was written by '${entry.action}' to '${entry.path}' and`
+        ? `由 ${entry.action} 写入，并且`
+        : `由 ${entry.action} 写入到 ${entry.path}，并且`
       return {
         ok: false,
-        message: `Version v${target} of "${name}" ${written} holds a SUPPORT FILE's bytes, not this skill's SKILL.md — undo restores the body only. The recorded bytes stay in the history store; copy the blob back over that file to restore them.`,
+        message: `技能「${name}」的版本 v${target} ${written} 存的是支撑文件的字节，而不是该技能的 SKILL.md —— 撤销只会恢复正文。 已记录的字节仍留在历史存储里；要恢复它们，请把该 blob 复制回那个文件。`,
       }
     }
     const content = await this.skills.readVersion(name, target)
     if (content === null) {
-      return { ok: false, message: `Version v${target} of "${name}" is listed in the index but its stored content could not be read — refusing rather than writing a guess.` }
+      return { ok: false, message: `技能「${name}」的版本 v${target} 虽在索引里，但它的存储内容读不出来 —— 拒绝瞎猜、不做写入。` }
     }
     // The anchor is the bytes we just read: a concurrent change between the read and the write is
     // refused by the library, which is the same protection every other staged write gets.
@@ -2167,11 +2167,11 @@ export class EvolutionCurator extends Service {
     // the live version is the ordinary way there): reporting "this undo is itself a new version" for a
     // write that never happened would be false.
     if (result.noop === true) {
-      return { ok: true, message: `"${name}" already holds the content of v${target} — nothing was written and no new version was recorded.` }
+      return { ok: true, message: `「${name}」已持有 v${target} 的内容 —— 未写入任何内容，也没有记录新版本。` }
     }
     return {
       ok: true,
-      message: `${result.message} (undone to v${target} — content only: markers, usage counts and curation state are unchanged, and this undo is itself a new version.)`,
+      message: `${result.message} （已撤销到 v${target} —— 仅内容：标记、使用计数与策展状态不变，且这次撤销本身就是一个新版本。）`,
     }
   }
 

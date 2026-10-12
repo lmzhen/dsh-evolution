@@ -369,8 +369,8 @@ describe('skill-history: the retention line (design §4 item 3)', () => {
   it('speaks only for a significant whole-body replacement', () => {
     // A 4x shrink of a body above the floor: the line names the share kept, in characters.
     const line = contentRetentionFeedback({ name: 's', action: 'update', before: big, after: 'x'.repeat(50) })
-    expect(line).toContain('Content kept 25% of the previous body (50 of 200 characters)')
-    expect(line).toContain('the replaced version is preserved')
+    expect(line).toContain('新内容保留了上一版正文的 25%（50／200 字符）')
+    expect(line).toContain('被替换的版本已保留')
     // Growth, an equal size and a small shrink are edits, not news.
     expect(contentRetentionFeedback({ name: 's', action: 'update', before: big, after: big + big })).toBeNull()
     expect(contentRetentionFeedback({ name: 's', action: 'update', before: big, after: big })).toBeNull()
@@ -397,12 +397,12 @@ describe('skill-history: the retention line (design §4 item 3)', () => {
       await lib.create('shrink-skill', skill('shrink-skill', body))
       const rewritten = await lib.update('shrink-skill', skill('shrink-skill', '## Section 0\nsummary only'))
       expect(rewritten.ok).toBe(true)
-      expect(rewritten.message).toContain('Content kept')
-      expect(rewritten.message).toContain('the replaced version is preserved')
+      expect(rewritten.message).toContain('新内容保留了')
+      expect(rewritten.message).toContain('被替换的版本已保留')
       // The line is FEEDBACK: a huge shrink still writes, and the growth direction stays quiet.
       const grown = await lib.update('shrink-skill', skill('shrink-skill', body))
       expect(grown.ok).toBe(true)
-      expect(grown.message).not.toContain('Content kept')
+      expect(grown.message).not.toContain('新内容保留了')
     } finally {
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }

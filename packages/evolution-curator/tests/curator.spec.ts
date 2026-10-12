@@ -65,7 +65,7 @@ describe('evolution-curator', () => {
     expect((await ctx.evolutionCurator.history('undo-skill')).map(entry => entry.action)).toEqual(['create', 'update'])
     const undone = await ctx.evolutionCurator.undo('undo-skill')
     expect(undone.ok, undone.message).toBe(true)
-    expect(undone.message).toContain('undone to v1')
+    expect(undone.message).toContain('已撤销到 v1')
     expect(await library.read('undo-skill')).toContain('One.')
     // The undo is itself a version (history only appends), and it is anchored: a second undo now
     // goes back to v2 — the state the first undo replaced.
@@ -88,7 +88,7 @@ describe('evolution-curator', () => {
     // No history at all.
     const empty = await ctx.evolutionCurator.undo('never-written')
     expect(empty.ok).toBe(false)
-    expect(empty.message).toContain('No content versions are recorded')
+    expect(empty.message).toContain('还没有记录内容版本')
     // History exists but the skill is not live (archived): point at the command that handles it.
     await library.create('undo-refuse', body('One.'))
     await library.update('undo-refuse', body('Two.'))
@@ -104,7 +104,7 @@ describe('evolution-curator', () => {
     if (first !== undefined) await rm(blobPath(root, first.hash), { force: true })
     const missingBlob = await ctx.evolutionCurator.undo('undo-refuse', first?.v)
     expect(missingBlob.ok).toBe(false)
-    expect(missingBlob.message).toContain('could not be read')
+    expect(missingBlob.message).toContain('读不出来')
   })
 
   it('names a support-file version as such instead of letting the frontmatter gate explain it (0.10.1)', async () => {
@@ -125,7 +125,7 @@ describe('evolution-curator', () => {
     expect(file).toBeDefined()
     const refused = await ctx.evolutionCurator.undo('support-skill', file?.v)
     expect(refused.ok).toBe(false)
-    expect(refused.message).toContain("holds a SUPPORT FILE's bytes, not this skill's SKILL.md")
+    expect(refused.message).toContain("存的是支撑文件的字节，而不是该技能的 SKILL.md")
     expect(refused.message).toContain('write_file')
     // Nothing was written: the refusal happens before the bytes are read.
     expect(await library.read('support-skill')).toContain('Two.')
@@ -154,7 +154,7 @@ describe('evolution-curator', () => {
     expect(baseline?.path).toBe('references/notes.md')
     const refused = await ctx.evolutionCurator.undo('baseline-skill', baseline?.v)
     expect(refused.ok).toBe(false)
-    expect(refused.message).toContain("holds a SUPPORT FILE's bytes")
+    expect(refused.message).toContain("存的是支撑文件的字节")
     expect(refused.message).toContain('references/notes.md')
     // The live body still holds its own content, not the support file's bytes.
     expect(await library.read('baseline-skill')).toContain('One.')
@@ -175,7 +175,7 @@ describe('evolution-curator', () => {
     // The newest entry is the file write; the body undo must go to v1, not attempt the file bytes.
     const undone = await ctx.evolutionCurator.undo('skip-skill')
     expect(undone.ok, undone.message).toBe(true)
-    expect(undone.message).toContain('undone to v1')
+    expect(undone.message).toContain('已撤销到 v1')
     expect(await library.read('skip-skill')).toContain('One.')
   })
 
@@ -203,7 +203,7 @@ describe('evolution-curator', () => {
     // of the stored array happens to be.
     const undone = await ctx.evolutionCurator.undo('chain-skill')
     expect(undone.ok, undone.message).toBe(true)
-    expect(undone.message).toContain('undone to v2')
+    expect(undone.message).toContain('已撤销到 v2')
     expect(await library.read('chain-skill')).toContain('Two.')
   })
 
@@ -222,7 +222,7 @@ describe('evolution-curator', () => {
     const before = await ctx.evolutionCurator.history('noop-skill')
     const noop = await ctx.evolutionCurator.undo('noop-skill', 2)
     expect(noop.ok, noop.message).toBe(true)
-    expect(noop.message).toContain('already holds the content of v2')
+    expect(noop.message).toContain('已持有 v2')
     expect(noop.message).not.toContain('itself a new version')
     expect(await ctx.evolutionCurator.history('noop-skill')).toHaveLength(before.length)
   })
@@ -243,8 +243,8 @@ describe('evolution-curator', () => {
     expect((await ctx.evolutionCurator.history('range-skill')).map(entry => entry.v)).toEqual([3])
     const missing = await ctx.evolutionCurator.undo('range-skill', 1)
     expect(missing.ok).toBe(false)
-    expect(missing.message).toContain('is not in the recorded history')
-    expect(missing.message).not.toContain('could not be read')
+    expect(missing.message).toContain('不在已记录的历史里')
+    expect(missing.message).not.toContain('读不出来')
   })
 
   it('undo refuses and changes nothing when the skill moved under it (anchor, design §3B)', async () => {
@@ -291,7 +291,7 @@ describe('evolution-curator', () => {
     expect(raced.ok).toBe(false)
     // The library's own stale verdict (the curator returns it unchanged: its wording belongs to the
     // write path, not to this service).
-    expect(raced.message).toContain('changed since it was read')
+    expect(raced.message).toContain('在读取之后被改动过')
     // The racing writer's content is what is on disk: undo did NOT overwrite it.
     expect(await library.read('anchor-skill')).toContain('Raced.')
     expect(await library.read('anchor-skill')).not.toContain('One.')
@@ -644,7 +644,7 @@ describe('evolution-curator', () => {
     await ctx.plugin(EvolutionCurator)
     const result = await ctx.evolutionCurator.consolidate('ghost-target', ['ghost-source'])
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('not found')
+    expect(result.message).toContain('不存在')
   })
 
   it('archives a skill that reached the archive threshold (F1 regression)', async () => {
@@ -658,7 +658,7 @@ describe('evolution-curator', () => {
     await skills.create('ancient-skill', body('ancient-skill', 'Ancient body.'), 'background_review')
     // Seed an agent-created usage record that is far past the archive
     // threshold. Under the rc.12 bug every such candidate failed because
-    // 'Lifecycle: reached archive threshold' was validated as an absorbed-into
+    // '生命周期：已达归档阈值' was validated as an absorbed-into
     // skill name; this run must archive it cleanly.
     const old = new Date(Date.now() - 200 * 86_400_000).toISOString()
     await saveUsage(skills.root, new Map([['ancient-skill', {
@@ -1283,7 +1283,7 @@ Body of ${name}.
 
     expect(viaExclude.ok).toBe(false)
 
-    expect(viaExclude.message).toContain('protected from consolidation')
+    expect(viaExclude.message).toContain('无法合并')
 
     const viaReferenced = await ctx.evolutionCurator.consolidate('target-skill', ['referenced-source'])
 

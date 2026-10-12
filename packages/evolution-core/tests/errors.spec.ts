@@ -21,6 +21,6 @@ describe('the evolution error table', () => {
 
   it('fills every %aN% slot from the call site', () => {
     expect(errorText('e-305-this-invocation-carries-no', { a1: 'learn' }))
-      .toContain('E-305: this invocation carries no agent — `learn` needs a session-backed call')
+      .toContain('E-305: 本次调用没有携带 agent —— `learn` 需要由会话支撑的调用')
   })
 })

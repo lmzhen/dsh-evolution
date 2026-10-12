@@ -134,8 +134,8 @@ describe('tool-memory', () => {
     // stayed pending forever. The refusal must name the field and say how to dispose of the record.
     const refused = await runner!({ target: 'memory', operations: [{ action: 'add', content: 5 }] })
     expect(refused.ok).toBe(false)
-    expect(refused.message).toContain('operations[0].content must be a string')
-    expect(refused.message).toContain('reject the record')
+    expect(refused.message).toContain('operations[0].content 必须是字符串')
+    expect(refused.message).toContain('请驳回该记录')
   })
 
   it('S1-B1: the review-channel session mark resolves memory writes to background_review', async () => {
@@ -238,7 +238,7 @@ describe('tool-memory', () => {
     // Two DIFFERENT non-blank bodies stay the ambiguous pair the guard refuses.
     const ambiguous = await tool.execute({ target: 'memory', action: 'add', facts: 'a', content: 'b' }, execArg) as MemoryToolResult
     expect(ambiguous.ok).toBe(false)
-    expect(ambiguous.message).toContain('only one of facts or content')
+    expect(ambiguous.message).toContain('只能提供 facts 或 content 之一')
   })
 
   // P2-23 (v37): the tool's declared output contract — validated by the platform with
@@ -292,7 +292,7 @@ describe('tool-memory', () => {
     expect(ctx.evolutionApproval.hasRunner('memory')).toBe(true)
     const nullElement = await ctx.evolutionApproval.run('memory', { target: 'memory', operations: [null] }, { interface: 'background_review' })
     expect(nullElement.ok).toBe(false)
-    expect(nullElement.message).toContain('must be an object')
+    expect(nullElement.message).toContain('必须是对象')
     expect(nullElement.message).not.toContain('TypeError')
   })
 
@@ -446,7 +446,7 @@ describe('tool-memory', () => {
     const execArg = { agent: { session: { header: { version: 0, id: 's8', createdAt: 0 }, snapshotEvents: () => [] } } } as unknown as Parameters<typeof tool.execute>[1]
     const result = await tool.execute({ target: 'memory', operations: [] as never }, execArg) as MemoryToolResult
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('No operations provided')
+    expect(result.message).toContain('没有提供任何操作')
     expect(approvals).toBe(0)
   })
 
@@ -475,17 +475,17 @@ describe('tool-memory', () => {
     // Batch path: an add element with neither facts nor content.
     const batch = await tool.execute({ target: 'memory', operations: [{ action: 'add' }] }, execArg) as MemoryToolResult
     expect(batch.ok).toBe(false)
-    expect(batch.message).toContain('Operation 1 (add): facts is required')
+    expect(batch.message).toContain('第 1 个操作（add）：必须提供 facts')
     expect(approvals).toBe(0)
     // Single path: a replace carrying the new text but no old_text.
     const single = await tool.execute({ target: 'memory', action: 'replace', facts: 'new text' }, execArg) as MemoryToolResult
     expect(single.ok).toBe(false)
-    expect(single.message).toContain('Operation 1 (replace): old_text is required')
+    expect(single.message).toContain('第 1 个操作（replace）：必须提供 old_text')
     expect(approvals).toBe(0)
     // A blank (whitespace-only) body is the store's "required" too.
     const blank = await tool.execute({ target: 'memory', action: 'add', content: '   ' }, execArg) as MemoryToolResult
     expect(blank.ok).toBe(false)
-    expect(blank.message).toContain('facts is required')
+    expect(blank.message).toContain('必须提供 facts')
     expect(approvals).toBe(0)
     // No over-rejection: a well-formed batch still reaches the gate and stages.
     const valid = await tool.execute({ target: 'memory', operations: [{ action: 'add', facts: 'valid fact' }] }, execArg) as MemoryToolResult

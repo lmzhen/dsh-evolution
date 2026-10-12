@@ -67,7 +67,7 @@ it('A3: a section citing a MISSING support file is refused, with the target name
   const result = await lib.restructure('demo-skill', [{ heading: 'Usage', toFile: 'references/usage.md' }], 'background_review')
   expect(result.ok).toBe(false)
   const message = (result as { message?: string }).message ?? ''
-  expect(message).toContain('do not exist')
+  expect(message).toContain('不存在')
   expect(message).toContain('references/absent.md')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
@@ -79,7 +79,7 @@ it('A3: citationPolicy refuse restores the conservative refusal', async () => {
   await lib.writeSupportFile('demo-skill', 'references/guide.md', '# guide', 'foreground')
   const result = await lib.restructure('demo-skill', [{ heading: 'Usage', toFile: 'references/usage.md' }], 'background_review')
   expect(result.ok).toBe(false)
-  expect(((result as { message?: string }).message ?? '')).toContain('that stay behind')
+  expect(((result as { message?: string }).message ?? '')).toContain('会留在原地')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
@@ -191,7 +191,7 @@ it('refuses pinned skills from the background review (origin gate)', async () =>
   await lib.setPinned('demo-skill', true, 'foreground')
   const result = await lib.restructure('demo-skill', [{ heading: 'Details log', toFile: 'references/x.md' }], 'background_review')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('protected')
+  expect(result.message).toContain('受保护')
   expect(await lib.read('demo-skill')).toBe(BODY)
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })

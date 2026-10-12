@@ -75,7 +75,7 @@ describe('policy set (G4/S4.2)', () => {
     const result = await mount('policy set reviewProvider deepseek-official')
     expect(result.kind).toBe('error')
     expect(result.text).toContain('E-314')
-    expect(result.text).toContain('deployment parameter (tier E2')
+    expect(result.text).toContain('是部署参数（层级 E2')
     expect(result.text).toContain('cordis.yml')
     expect(result.writes).toEqual([])
     // The E-315 branch is defensive: it fires only if an E3 owner ever loses its
@@ -95,14 +95,14 @@ describe('policy set (G4/S4.2)', () => {
     expect(unknown.writes).toEqual([])
   })
 
-  it('reports a revision conflict instead of overwriting a moved document', async () => {
+  it('reports a 修订冲突 instead of overwriting a moved document', async () => {
     const pin = await mount('policy set reviewSkillInterval 30 --expect 2')
     expect(pin.kind).toBe('error')
-    expect(pin.text).toContain('E-309: revision conflict — you sent 2')
+    expect(pin.text).toContain('E-309: 修订冲突 —— 你提交的是 2')
     expect(pin.writes).toEqual([])
     const raced = await mount('policy set reviewSkillInterval 30', { conflict: true })
     expect(raced.kind).toBe('error')
-    expect(raced.text).toContain('E-309: revision conflict')
+    expect(raced.text).toContain('E-309: 修订冲突')
     expect(raced.text).toContain('now 5')
   })
 
@@ -135,6 +135,6 @@ describe('policy set (G4/S4.2)', () => {
     const result = await captured!({ rawInput: 'policy set reviewSkillInterval 30' })
     expect(result.kind).toBe('error')
     expect(result.text).toContain('E-311')
-    expect(result.text).toContain('never edits cordis.yml')
+    expect(result.text).toContain('从不修改 cordis.yml')
   })
 })

@@ -148,7 +148,7 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     const approved = await ctx.evolutionApproval.approve(String(pendingId))
     // The replay re-materializes the caps at the execution point: the old 100_000 cap must NOT be used.
     expect(approved.ok).toBe(false)
-    expect(approved.message).toContain('exceeds 120 characters')
+    expect(approved.message).toContain('超过 120 个字符')
     await cleanup()
   })
 
@@ -162,7 +162,7 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     nameCap.set(3)
     const refused = await execute({ action: 'create', name: 'another-name', content: '---\nname: another-name\ndescription: Another name.\n---\n\nBody.\n' })
     expect(valueOf(refused).ok).toBe(false)
-    expect(valueOf(refused).message).toContain('<= 3')
+    expect(valueOf(refused).message).toContain('不超过 3 个')
     await cleanup()
   })
 
@@ -180,7 +180,7 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     contentCap.set(200)
     const enforced = await execute({ action: 'write_file', name: 'caps-skill', file_path: 'references/big2.md', file_content: long })
     expect(valueOf(enforced).ok).toBe(false)
-    expect(valueOf(enforced).message).toContain('exceeds 200 characters')
+    expect(valueOf(enforced).message).toContain('超过 200 个字符')
     await cleanup()
   })
 
@@ -199,7 +199,7 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     await execute({ action: 'create', name: 'veto-skill', content: '---\nname: veto-skill\ndescription: Veto body.\n---\n\nBody.\n' })
     const refused = await execute({ action: 'write_file', name: 'veto-skill', file_path: 'references/big.md', file_content: 'x'.repeat(300) })
     expect(valueOf(refused).ok).toBe(false)
-    expect(valueOf(refused).message).toContain('exceeds 200 characters')
+    expect(valueOf(refused).message).toContain('超过 200 个字符')
     await cleanup()
   })
 
@@ -213,7 +213,7 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     strict.set(true)
     const refused = await execute({ action: 'create', name: 'strict-skill', content: over('strict-skill') })
     expect(valueOf(refused).ok).toBe(false)
-    expect(valueOf(refused).message).toContain('strict bar')
+    expect(valueOf(refused).message).toContain('严格上限')
     await cleanup()
   })
 
@@ -232,7 +232,7 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     citation.set('refuse')
     const refused = await execute({ action: 'restructure', name: 'refused-skill', restructure: [{ heading: 'Log', to_file: 'references/log.md' }] })
     expect(valueOf(refused).ok).toBe(false)
-    expect(valueOf(refused).message).toContain('references support files')
+    expect(valueOf(refused).message).toContain('引用了会留在原地的支撑文件')
     await cleanup()
   }, 30_000)
 })

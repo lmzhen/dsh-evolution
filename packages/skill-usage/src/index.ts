@@ -221,7 +221,7 @@ export class SkillUsageRegistry extends Service {
         type: 'usage',
         kind: 'skill',
         source: 'observation',
-        note: 'observation window opened',
+        note: '观测窗口已开启',
         counts: usageTotals(map),
         window: { opened: at },
       })

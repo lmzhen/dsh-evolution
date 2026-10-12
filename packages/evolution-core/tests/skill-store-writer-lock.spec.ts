@@ -50,7 +50,7 @@ it('S4: an unlistable support directory REFUSES the archive (fail-closed, the su
   await mkdir(join(root, 'unlistable-skill', 'references'), { recursive: true })
   const archived = await lib.archive('unlistable-skill')
   expect(archived.ok).toBe(false)
-  expect(archived.message).toContain('could not be listed')
+  expect(archived.message).toContain('列不出来')
   // Nothing moved: the tree is still in the live root.
   expect(await readFile(join(root, 'unlistable-skill', 'SKILL.md'), 'utf8')).toContain('# unlistable-skill')
 })

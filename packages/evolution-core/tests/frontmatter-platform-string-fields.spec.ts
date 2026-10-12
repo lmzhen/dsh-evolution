@@ -78,8 +78,8 @@ describe('platform string fields in SKILL.md frontmatter (S2.2, v37 P2-9)', () =
     const lib = new SkillLibrary('/skills', io)
     const created = await lib.create('flow-skill', FLOW)
     expect(created.ok).toBe(false)
-    expect(created.message).toContain('must be a string')
-    expect(created.message).toContain('ignores the whole file')
+    expect(created.message).toContain('必须是字符串')
+    expect(created.message).toContain('忽略整个文件')
     expect(created.message).toContain('description')
     // Nothing was written: the refusal precedes the commit point.
     expect(await io.exists('/skills/flow-skill/SKILL.md')).toBe(false)
@@ -91,7 +91,7 @@ describe('platform string fields in SKILL.md frontmatter (S2.2, v37 P2-9)', () =
     expect((await lib.create('safe-skill', SAFE)).ok).toBe(true)
     const updated = await lib.update('safe-skill', FLOW.replace('flow-skill', 'safe-skill'))
     expect(updated.ok).toBe(false)
-    expect(updated.message).toContain('must be a string')
+    expect(updated.message).toContain('必须是字符串')
     const patched = await lib.patch('safe-skill', 'Safe text.', 'Patched text.')
     expect(patched.ok).toBe(true)
     // A legacy file on disk keeps its bytes and is refused a body patch until
@@ -99,7 +99,7 @@ describe('platform string fields in SKILL.md frontmatter (S2.2, v37 P2-9)', () =
     await io.writeText('/skills/flow-skill/SKILL.md', FLOW)
     const legacyPatch = await lib.patch('flow-skill', 'Body', 'Body (patched)')
     expect(legacyPatch.ok).toBe(false)
-    expect(legacyPatch.message).toContain('must be a string')
+    expect(legacyPatch.message).toContain('必须是字符串')
     const repaired = await lib.update('flow-skill', '---\nname: flow-skill\ndescription: "[alpha, beta]"\n---\n\n# Body\n')
     expect(repaired.ok, repaired.message).toBe(true)
     const onDisk = await io.readText('/skills/flow-skill/SKILL.md')

@@ -105,7 +105,7 @@ describe('runMaintain', () => {
     }
     const outcome = await runMaintain(empty)
     expect(outcome.ok).toBe(false)
-    expect(outcome.error ?? '').toContain('no structured plan')
+    expect(outcome.error ?? '').toContain('没有返回结构化计划')
   })
 
   it('short-circuits an empty library without spending a model call', async () => {
@@ -117,7 +117,7 @@ describe('runMaintain', () => {
     const outcome = await runMaintain(emptyLibrary)
     expect(outcome.ok).toBe(true)
     expect(outcome.verdict).toBe('no_issues')
-    expect(outcome.text ?? '').toContain('empty skill library')
+    expect(outcome.text ?? '').toContain('技能库为空')
   })
 
   it('fails closed when the validator rejects the plan', async () => {
@@ -128,7 +128,7 @@ describe('runMaintain', () => {
     }
     const outcome = await runMaintain(runtime(bad))
     expect(outcome.ok).toBe(false)
-    expect(outcome.error ?? '').toContain('rejected')
+    expect(outcome.error ?? '').toContain('被校验器拒绝')
   })
 
   it('reports subagent failure without throwing', async () => {
@@ -160,7 +160,7 @@ describe('runMaintain', () => {
     }
     const outcome = await runMaintain(aborting)
     expect(outcome.ok).toBe(false)
-    expect(outcome.error ?? '').toContain('aborted')
+    expect(outcome.error ?? '').toContain('已中止')
     expect(outcome.error ?? '').not.toContain('This operation was aborted')
   })
 
@@ -176,7 +176,7 @@ describe('runMaintain', () => {
     }
     const outcome = await runMaintain(aborting)
     expect(outcome.ok).toBe(false)
-    expect(outcome.error ?? '').toContain('aborted')
+    expect(outcome.error ?? '').toContain('已中止')
     expect(outcome.error ?? '').not.toContain('This operation was aborted')
   })
 
@@ -192,7 +192,7 @@ describe('runMaintain', () => {
     }
     const outcome = await runMaintain(cancelled)
     expect(outcome.ok).toBe(false)
-    expect(outcome.error ?? '').toContain('aborted')
+    expect(outcome.error ?? '').toContain('已中止')
   })
 
   it('passes the caller-specified timeout to the subagent start (0.3.3)', async () => {
@@ -229,7 +229,7 @@ describe('runMaintain', () => {
     // does not throw, it warns and silently becomes 1ms.
     const outcome = await runMaintain(never, { timeoutMs: 5_000_000_000 })
     expect(outcome.ok).toBe(false)
-    expect(outcome.error ?? '').toContain('--timeout must be a positive integer')
+    expect(outcome.error ?? '').toContain('--timeout 必须是以毫秒为单位的正整数')
     expect(outcome.error ?? '').toContain('2147483647')
     const overflow = await runMaintain(never, { timeoutMs: 2_147_483_648 })
     expect(overflow.ok).toBe(false)
@@ -627,7 +627,7 @@ describe('runMaintain', () => {
     expect(outcome.ok).toBe(true)
     // The completeness gate forces one note per over-signal for no_issues; the
     // renderer used to return "Nothing to do." and drop every one of them.
-    expect(outcome.text ?? '').toContain('Nothing to do.')
+    expect(outcome.text ?? '').toContain('无需处理')
     expect(outcome.text ?? '').toContain('Notes:')
     expect(outcome.text ?? '').toContain('dup_heading / overlong_line / narrow_name')
   })
@@ -645,7 +645,7 @@ describe('runMaintain', () => {
       parent: maintAgent(),
     })
     expect(outcome.ok).toBe(false)
-    expect(outcome.error ?? '').toContain('could not read 2 listed skill(s)')
+    expect(outcome.error ?? '').toContain('无法读取列出的 2 个技能')
     expect(outcome.error ?? '').toContain('NOT audited')
   })
 
@@ -658,7 +658,7 @@ describe('runMaintain', () => {
       skillRoot: '~/my-skills',
     })
     expect(outcome.ok).toBe(false)
-    expect(outcome.error ?? '').toContain('does not exist')
+    expect(outcome.error ?? '').toContain('不存在')
     expect(outcome.error ?? '').toContain('~/my-skills')
     expect(outcome.error ?? '').toContain('~')
     // The probe answering "it exists" keeps the genuine empty-library path.
@@ -669,7 +669,7 @@ describe('runMaintain', () => {
       rootExists: async () => true,
     })
     expect(empty.ok).toBe(true)
-    expect(empty.text ?? '').toContain('empty skill library')
+    expect(empty.text ?? '').toContain('技能库为空')
   })
 
   // F-16: the subagent output instruction is the `maintainOutput`

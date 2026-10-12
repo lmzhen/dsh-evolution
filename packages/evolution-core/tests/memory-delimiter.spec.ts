@@ -21,8 +21,8 @@ describe('memory entry-delimiter defense (F-201)', () => {
     expect(result.ok).toBe(false)
     // V4-49: a single add is prefix-free (no batch-style `Operation N` label).
     expect(result.message).not.toContain('Operation')
-    expect(result.message).toContain('entry delimiter (§)')
-    expect(result.message).toContain('rewrite it as separate facts')
+    expect(result.message).toContain('分隔符（§）')
+    expect(result.message).toContain('改写为多条独立的事实')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)
   })
 
@@ -32,7 +32,7 @@ describe('memory entry-delimiter defense (F-201)', () => {
     const result = await store.add('memory', `first${ENTRY_DELIMITER}second`)
     expect(result.ok).toBe(false)
     expect(result.message).not.toContain('Operation')
-    expect(result.message).toContain('entry delimiter (§)')
+    expect(result.message).toContain('分隔符（§）')
   })
 
   it('applyBatch add refuses a delimiter fact, names its position, and keeps the file unchanged', async () => {
@@ -45,8 +45,8 @@ describe('memory entry-delimiter defense (F-201)', () => {
       { action: 'add', facts: `x${ENTRY_DELIMITER}` },
     ])
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('Operation 2 (add)')
-    expect(result.message).toContain('entry delimiter (§)')
+    expect(result.message).toContain('第 2 个操作（add）')
+    expect(result.message).toContain('分隔符（§）')
     // V4-49: batch delimiter failures carry the current-entries preview that
     // sibling batch failures already present.
     expect(result.message).toContain('Current entries (preview):')
@@ -63,8 +63,8 @@ describe('memory entry-delimiter defense (F-201)', () => {
       { action: 'replace', old_text: 'alpha', facts: `bad${ENTRY_DELIMITER}value` },
     ])
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('Operation 1 (replace)')
-    expect(result.message).toContain('entry delimiter (§)')
+    expect(result.message).toContain('第 1 个操作（replace）')
+    expect(result.message).toContain('分隔符（§）')
     expect(result.message).toContain('Current entries (preview):')
     expect(result.message).toContain('- alpha fact')
     expect(await readFile(join(root, 'MEMORY.md'), 'utf8')).toBe(before)

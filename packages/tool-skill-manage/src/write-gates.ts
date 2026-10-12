@@ -32,7 +32,7 @@ export type WriteGatePoint = 'admission' | 'execution'
 const CONFIRM_QUESTION_ID = 'evolution-skill-write'
 
 /** The cancel label every confirm question offers. */
-const CANCEL_LABEL = 'Cancel'
+const CANCEL_LABEL = '取消'
 
 /** What a `timeout`-mode deadline settles with: comparable by identity against the seam's
  * boolean, so the two outcomes stay distinguishable without a mutable flag (which a linter
@@ -324,7 +324,7 @@ const HUMAN_CONFIRM: WriteGate = {
       warn('skill_manage: no confirmation channel is mounted, so the write proceeds unconfirmed.')
       return null
     }
-    const confirmLabel = action === 'create' ? 'Create' : 'Delete'
+    const confirmLabel = action === 'create' ? '创建' : '删除'
     const seconds = timeoutSecondsOf(confirmTimeoutSeconds)
     const cancel = new AbortController()
     // The deadline is enforced HERE, not only carried by the signal: the signal lets the client
@@ -348,19 +348,19 @@ const HUMAN_CONFIRM: WriteGate = {
     // Asking for a decision by name alone is asking someone to authorize an unknown artifact.
     const context = await describeTarget?.()
     const details = [
-      context?.description === undefined || context.description === '' ? null : 'What it does: ' + context.description,
-      context?.versions === undefined ? null : 'Content versions recorded: ' + String(context.versions),
+      context?.description === undefined || context.description === '' ? null : '功能：' + context.description,
+      context?.versions === undefined ? null : '已记录的内容版本数：' + String(context.versions),
     ].filter((line): line is string => line !== null)
     const consequence = action === 'create'
-      ? `Create skill "${view.name}"? A new skill directory is written into the family tree.`
-      : `Delete skill "${view.name}"? It is archived under .archive and leaves the catalog.`
+      ? `创建技能 "${view.name}"？会在家族目录树里新建一个技能目录。`
+      : `删除技能 "${view.name}"？它会被归档到 .archive 并离开目录。`
     const asked = confirm({
       action,
       name: view.name,
       confirmLabel,
       question: {
         id: CONFIRM_QUESTION_ID,
-        header: 'Confirm',
+        header: '确认',
         // ONE line: the platform's question composer does not preserve newlines, so a multi-line
         // question arrives as a run-on sentence. The facts are separated instead.
         question: details.length === 0 ? consequence : consequence + ' ' + details.join(' · '),
@@ -383,13 +383,13 @@ const HUMAN_CONFIRM: WriteGate = {
     if (outcome === CONFIRM_TIMED_OUT || cancel.signal.aborted) {
       return errorText('e-319-skill-write-confirm-timed-out', {
         a1: view.name,
-        a2: action === 'create' ? 'created' : 'deleted',
+        a2: action === 'create' ? '创建' : '删除',
         a3: String(seconds),
       })
     }
     return errorText('e-317-skill-write-not-confirmed', {
       a1: view.name,
-      a2: action === 'create' ? 'created' : 'deleted',
+      a2: action === 'create' ? '创建' : '删除',
     })
   },
 }

@@ -135,7 +135,7 @@ describe('evolution-plan-validator', () => {
   it('F-319: a non-array ops container with a length is rejected per-container, never thrown', () => {
     const result = validateEvolutionPlan({ memoryOps: { length: 2 } } as never, { sessionSeq: 10 })
     expect(result.ok).toBe(false)
-    expect(result.rejected.some(r => r.kind === 'memory' && r.reason.includes('memoryOps: must be an array'))).toBe(true)
+    expect(result.rejected.some(r => r.kind === 'memory' && r.reason.includes('memoryOps：必须是数组'))).toBe(true)
     expect(result.accepted.memoryOps).toEqual([])
     // A malformed skill container alongside valid memory ops: the valid memory
     // ops still get per-item treatment and the malformed container is rejected.
@@ -144,14 +144,14 @@ describe('evolution-plan-validator', () => {
       skillOps: { length: 2 },
     } as never, { sessionSeq: 10 })
     expect(mixed.ok).toBe(false)
-    expect(mixed.rejected.some(r => r.kind === 'skill' && r.reason.includes('skillOps: must be an array'))).toBe(true)
+    expect(mixed.rejected.some(r => r.kind === 'skill' && r.reason.includes('skillOps：必须是数组'))).toBe(true)
   })
 
   it('V4-23: a null/array/primitive plan root is rejected explicitly, never a TypeError', () => {
     for (const bad of [null, undefined, [], 'string', 0]) {
       const result = validateEvolutionPlan(bad as never, { sessionSeq: 10 })
       expect(result.ok, `root=${String(bad)}`).toBe(false)
-      expect(result.rejected.some(r => r.kind === 'memory' && r.reason === 'plan root: must be an object')).toBe(true)
+      expect(result.rejected.some(r => r.kind === 'memory' && r.reason === 'plan 根节点：必须是对象')).toBe(true)
     }
     // A well-formed plan still validates after the guard.
     const ok = validateEvolutionPlan({ memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 1 }] }] }, { sessionSeq: 10 })

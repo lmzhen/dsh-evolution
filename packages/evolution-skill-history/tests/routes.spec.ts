@@ -224,7 +224,7 @@ describe('skill-history routes: over a real socket', () => {
       const refusedBody = await refused.json() as { ok: boolean; code: string; message: string }
       expect(refusedBody.ok).toBe(false)
       expect(refusedBody.code).toBe('undo-refused')
-      expect(refusedBody.message).toContain("holds a SUPPORT FILE's bytes")
+      expect(refusedBody.message).toContain("存的是支撑文件的字节")
       // The undo itself: an empty body means "the state before the last body change".
       const undone = await fetch(host.origin + SKILL_HISTORY_ROUTES.undo, {
         method: 'POST',
@@ -234,7 +234,7 @@ describe('skill-history routes: over a real socket', () => {
       expect(undone.status).toBe(200)
       const undoneBody = await undone.json() as { ok: boolean; data: { message: string } }
       expect(undoneBody.ok).toBe(true)
-      expect(undoneBody.data.message).toContain('undone to v1')
+      expect(undoneBody.data.message).toContain('已撤销到 v1')
       expect(await library.read('panel-skill')).toContain('One.')
       // Transport refusals stay transport refusals: method, missing name, bad body, unknown path.
       // G7.5/F-8: they carry the SAME envelope as every other refusal. The client parses
@@ -245,7 +245,7 @@ describe('skill-history routes: over a real socket', () => {
       const notAllowedBody = await notAllowed.json() as { ok: boolean; code: string; message: string }
       expect(notAllowedBody.ok).toBe(false)
       expect(notAllowedBody.code).toBe('method-not-allowed')
-      expect(notAllowedBody.message).toContain('method not allowed')
+      expect(notAllowedBody.message).toContain('方法不允许')
       // The 403 branch is unreachable from a loopback test server, so its shape is pinned at the source:
       // no route may answer with the old {error} envelope.
       const routesSource = readFileSync(fileURLToPath(new URL('../src/routes.ts', import.meta.url)), 'utf8')

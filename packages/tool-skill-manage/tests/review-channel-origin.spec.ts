@@ -84,7 +84,7 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
       markReviewChannel(MARKED_SESSION)
       const review = await run(MARKED_SESSION, { action: 'update', name: 'pinned-skill', content: skill('pinned-skill', 'Body v3.') })
       expect(okOf(review)).toBe(false)
-      expect(messageOf(review)).toContain('protected (pinned)')
+      expect(messageOf(review)).toContain('受保护（pinned）')
       expect(await readFile(join(root, 'skills', 'pinned-skill', 'SKILL.md'), 'utf8')).toContain('Body v2.')
       // A different, unmarked session is unaffected by the mark.
       const other = await run(PLAIN_SESSION, { action: 'update', name: 'pinned-skill', content: skill('pinned-skill', 'Body v4.') })
@@ -103,14 +103,14 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
       // Pin/unpin is a protection mutation the autonomous channel may never make.
       const pin = await run(MARKED_SESSION, { action: 'pin', name: 'frozen-skill' })
       expect(okOf(pin)).toBe(false)
-      expect(messageOf(pin)).toContain('Only the foreground')
+      expect(messageOf(pin)).toContain('只有前台')
       const unpin = await run(MARKED_SESSION, { action: 'unpin', name: 'frozen-skill' })
       expect(okOf(unpin)).toBe(false)
-      expect(messageOf(unpin)).toContain('Only the foreground')
+      expect(messageOf(unpin)).toContain('只有前台')
       // Support-file writes carry the same pinned guard as the body.
       const support = await run(MARKED_SESSION, { action: 'write_file', name: 'frozen-skill', file_path: 'references/a.md', file_content: 'draft' })
       expect(okOf(support)).toBe(false)
-      expect(messageOf(support)).toContain('protected (pinned)')
+      expect(messageOf(support)).toContain('受保护（pinned）')
     } finally {
       await cleanup()
     }
@@ -124,12 +124,12 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
       markReviewChannel(MARKED_SESSION)
       const review = await run(MARKED_SESSION, { action: 'update', name: 'window-skill', content: skill('window-skill', 'Body v2.') })
       expect(okOf(review)).toBe(false)
-      expect(messageOf(review)).toContain('protected (pinned)')
+      expect(messageOf(review)).toContain('受保护（pinned）')
       // The review plugin clears the mark on the next `{ kind: 'user' }` message.
       clearReviewChannel(MARKED_SESSION)
       const afterUser = await run(MARKED_SESSION, { action: 'update', name: 'window-skill', content: skill('window-skill', 'Body v3.') })
       expect(okOf(afterUser), messageOf(afterUser)).toBe(true)
-      expect(messageOf(afterUser)).not.toContain('protected')
+      expect(messageOf(afterUser)).not.toContain('受保护')
     } finally {
       await cleanup()
     }

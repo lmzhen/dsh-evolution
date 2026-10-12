@@ -66,11 +66,11 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
   /** Guard: trust fence, then method. Every refusal is a JSON body, never an empty response. */
   const guard = (req: IncomingMessage, res: ServerResponse, method: string): boolean => {
     if (!isLoopbackRequest(req)) {
-      writeJson(res, 403, { error: 'forbidden: loopback-only' })
+      writeJson(res, 403, { error: '禁止访问：仅限回环地址' })
       return false
     }
     if (req.method !== method) {
-      writeJson(res, 405, { error: 'method not allowed: ' + method })
+      writeJson(res, 405, { error: '方法不允许：' + method })
       return false
     }
     return true
@@ -114,7 +114,7 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
         const raw = params.get('status')?.trim() ?? ''
         const status = raw === '' ? 'pending' : raw
         if (!(PENDING_STATUSES as readonly string[]).includes(status)) {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'status must be one of ' + PENDING_STATUSES.join(', ') })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'status 必须是以下之一：' + PENDING_STATUSES.join(', ') })
           return
         }
         try {
@@ -146,7 +146,7 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
         const params = new URL(req.url ?? '/', 'http://loopback').searchParams
         const id = params.get('id')?.trim() ?? ''
         if (id === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'id is required' })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 id' })
           return
         }
         try {
@@ -154,14 +154,14 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
           const staged = [...await approval.list('pending'), ...await approval.list('executing')]
           const record = staged.find(candidate => candidate.id === id)
           if (record === undefined) {
-            writeJson(res, 200, { ok: false, code: 'not-found', message: 'no staged write with id "' + id + '"' })
+            writeJson(res, 200, { ok: false, code: 'not-found', message: '没有 id 为「' + id + '」的待批准写入' })
             return
           }
           const preview = approval.previewOf(record.kind)
           if (preview === undefined) {
             // Not an error: plenty of staged writes have no bytes worth showing, and the reader is owed
             // the reason rather than an empty diff.
-            writeJson(res, 200, { ok: true, data: { available: false, reason: 'a "' + record.kind + '" write has no preview' } })
+            writeJson(res, 200, { ok: true, data: { available: false, reason: '类型 "' + record.kind + '" 的写入没有可预览内容' } })
             return
           }
           const answer = await preview(record.args)
@@ -189,7 +189,7 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
         if (!guard(req, res, 'POST')) return
         const id = idOf(await readJsonObject(req))
         if (id === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'id is required' })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 id' })
           return
         }
         await decide(res, current => approval.approve(current), id)
@@ -202,7 +202,7 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
         if (!guard(req, res, 'POST')) return
         const id = idOf(await readJsonObject(req))
         if (id === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'id is required' })
+          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 id' })
           return
         }
         await decide(res, current => approval.reject(current), id)

@@ -247,7 +247,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
       const raw: unknown = op
       return raw === null || typeof raw !== 'object'
     })) {
-      return { ok: false, message: 'Every entry of operations must be an object.', entries: [], chars: 0, limit: 0 }
+      return { ok: false, message: 'operations 的每一项都必须是对象。', entries: [], chars: 0, limit: 0 }
     }
     // v30 TSM-03: field-level guards mirroring tool-skill-manage's scalar
     // guard. The approval replay runner executes STORED args with no schema:
@@ -260,12 +260,12 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     // the comparison below must stay a REAL guard.
     const target: unknown = normalized.target
     if (target !== 'memory' && target !== 'user') {
-      return { ok: false, message: `memory: "target" must be "memory" or "user" (got ${String(target)}); refusing the write.`, entries: [], chars: 0, limit: 0 }
+      return { ok: false, message: `memory："target" 必须是 "memory" 或 "user"（收到 ${String(target)}）；拒绝写入。`, entries: [], chars: 0, limit: 0 }
     }
     for (const field of ['facts', 'old_text', 'content'] as const) {
       const value = (normalized as unknown as Record<string, unknown>)[field]
       if (value !== undefined && value !== null && typeof value !== 'string') {
-        return { ok: false, message: `memory: "${field}" must be a string (got ${typeof value}); refusing the write.`, entries: [], chars: 0, limit: 0 }
+        return { ok: false, message: `memory："${field}" 必须是字符串（收到 ${typeof value}）；拒绝写入。`, entries: [], chars: 0, limit: 0 }
       }
     }
     // PLAN S3.6 (T2-03/A18): the OPERATION payload gets the same field gate, by INDEX and by FIELD.
@@ -277,7 +277,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
       for (const field of ['facts', 'content', 'old_text'] as const) {
         const value = (operation as unknown as Record<string, unknown>)[field]
         if (value === undefined || value === null || typeof value === 'string') continue
-        return { ok: false, message: `memory: operations[${index}].${field} must be a string (got ${typeof value}); refusing the write — re-approving cannot fix a payload defect, so reject the record.`, entries: [], chars: 0, limit: 0 }
+        return { ok: false, message: `memory：operations[${index}].${field} 必须是字符串（收到 ${typeof value}）；拒绝写入 —— 重新批准无法修复载荷缺陷，请驳回该记录。`, entries: [], chars: 0, limit: 0 }
       }
     }
     const result = normalized.operations
@@ -311,16 +311,16 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   ): string | null => {
     const body = payloadText(op)
     if (op.action === 'add') {
-      return body ? null : `Operation ${position} (add): facts is required. No operations were applied.`
+      return body ? null : `第 ${position} 个操作（add）：必须提供 facts。未应用任何操作。`
     }
     if (op.action !== 'remove' && op.action !== 'replace') {
-      return `Operation ${position}: unknown action "${String(op.action)}" (expected add/remove/replace). No operations were applied.`
+      return `第 ${position} 个操作：未知动作「${String(op.action)}」（应为 add/remove/replace）。未应用任何操作。`
     }
     if (!(op.old_text ?? '').trim()) {
-      return `Operation ${position} (${op.action}): old_text is required. No operations were applied.`
+      return `第 ${position} 个操作（${op.action}）：必须提供 old_text。未应用任何操作。`
     }
     if (op.action === 'replace' && !body) {
-      return `Operation ${position} (replace): facts is required.`
+      return `第 ${position} 个操作（replace）：必须提供 facts。`
     }
     return null
   }
@@ -393,19 +393,19 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
           for (const op of args.operations) {
             const raw: unknown = op
             if (raw === null || typeof raw !== 'object') {
-              return { ok: false, message: 'Every entry of operations must be an object.', entries: [], chars: 0, limit: 0 }
+              return { ok: false, message: 'operations 的每一项都必须是对象。', entries: [], chars: 0, limit: 0 }
             }
-            if (conflict(op)) return { ok: false, message: 'Provide only one of facts or content per operation (same field); different values were given.', entries: [], chars: 0, limit: 0 }
+            if (conflict(op)) return { ok: false, message: '每个操作只能提供 facts 或 content 之一（同一字段）：两者给了不同的值。', entries: [], chars: 0, limit: 0 }
           }
         } else if (conflict(args)) {
-          return { ok: false, message: 'Provide only one of facts or content (same field); different values were given.', entries: [], chars: 0, limit: 0 }
+          return { ok: false, message: '只能提供 facts 或 content 之一（同一字段）：两者给了不同的值。', entries: [], chars: 0, limit: 0 }
         }
         // V7-07 (0.3.43): an EMPTY operations array is a no-op input — reject it
         // BEFORE the approval gate (a "memory 0 ops" approval record would be
         // staged and is meaningless to replay; the 0.3.37 V6-25 declaration
         // assumed this check existed).
         if (Array.isArray(args.operations) && args.operations.length === 0) {
-          return { ok: false, message: 'No operations provided (the operations array is empty).', entries: [], chars: 0, limit: 0 }
+          return { ok: false, message: '没有提供任何操作（operations 数组为空）。', entries: [], chars: 0, limit: 0 }
         }
         // F-07: a NON-ARRAY `operations` payload (garbage that slipped
         // past the schema) used to fall into the single-operation branch, so the
@@ -414,7 +414,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
         // normalization/approval; an ABSENT operations field keeps the single-op
         // path (the documented bare action/content/old_text form).
         if (args.operations !== undefined && !Array.isArray(args.operations)) {
-          return { ok: false, message: 'Invalid shape: operations must be an array of {action, content?, old_text?} objects (or omit operations for a single operation).', entries: [], chars: 0, limit: 0 }
+          return { ok: false, message: '形状不合法：operations 必须是 {action, content?, old_text?} 对象的数组（单个操作时可省略 operations）。', entries: [], chars: 0, limit: 0 }
         }
         const target = args.target === 'user' ? 'user' : 'memory'
         const normalized: MemoryWriteArgs = Array.isArray(args.operations)
@@ -498,7 +498,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     const dispose = memoryDisabled
       ? approval.registerRunner('memory', () => Promise.resolve({
         ok: false,
-        message: 'Refused: the memory tool is disabled (tool-memory memoryEnabled:false) — its replay runner cannot execute this staged write. Reject the record; re-stage after re-enabling the tool if the write is still wanted.',
+        message: '拒绝：记忆工具已禁用（tool-memory memoryEnabled:false）—— 它的回放运行器无法执行这条暂存写入。请驳回该记录；若仍需要该写入，请在重新启用该工具后再暂存。',
       }))
       : approval.registerRunner('memory', args => executeCore(args as MemoryWriteArgs))
     approvalCtx.effect(() => dispose, memoryDisabled ? 'tool-memory.approval-runner-disabled' : 'tool-memory.approval-runner')

@@ -336,17 +336,17 @@ export class EvolutionApproval extends Service {
    */
   async run(kind: PendingKind, args: unknown, intent?: { interface: 'background_review' }): Promise<{ ok: boolean; message: string }> {
     if (intent?.interface !== 'background_review') {
-      return { ok: false, message: 'approval.run is the background-review replay channel; direct execution must use the tool path (staging is the only gate bypass for foreground).' }
+      return { ok: false, message: 'approval.run 是后台复核的回放通道；直接执行必须走工具路径（对前台而言，暂存是唯一的门禁旁路）。' }
     }
     const runner = this.runners.get(kind)
-    if (!runner) return { ok: false, message: `No replay runner registered for kind "${kind}".` }
+    if (!runner) return { ok: false, message: `没有为类型「${kind}」注册回放运行器。` }
     return await runner(args)
   }
 
   /** Evaluate one mutation. Returns allow, or stores the write and returns staged. */
   async request(input: ApprovalRequest): Promise<ApprovalDecision> {
     const summary = normalizeSummary(input)
-    if (!this.enabled) return { action: 'allow', message: 'Approval disabled.' }
+    if (!this.enabled) return { action: 'allow', message: '批准已禁用。' }
     // 0.3.17 (S3.1, E-22): the session policy is DERIVED server-side from the
     // platform approval service when it is mounted (overrideOf is the platform
     // authority). The caller's self-reported sessionPolicy is honored ONLY in
@@ -357,7 +357,7 @@ export class EvolutionApproval extends Service {
     const derived = this.deriveSessionPolicy(input.sessionId, input.session)
     const policy = derived ?? (this.ctx.get('approval') ? undefined : input.sessionPolicy)
     if (policy === 'never') {
-      return { action: 'allow', message: 'Session approval policy is "never"; write allowed without staging.' }
+      return { action: 'allow', message: '会话批准策略是「never」：写入无需暂存，直接放行。' }
     }
     if (input.origin === 'background_review' || this.stageForeground) {
       // Observability for the P1-9 trap (rc.42 audit): staging a memory/skill
@@ -391,10 +391,10 @@ export class EvolutionApproval extends Service {
       return {
         action: 'staged',
         pendingId: record.id,
-        message: `Write staged for approval. Review with /evolution pending and approve ${record.id}.`,
+        message: `写入已暂存待批准。用 /evolution pending 查看，并批准 ${record.id}。`,
       }
     }
-    return { action: 'allow', message: 'Foreground write allowed.' }
+    return { action: 'allow', message: '前台写入已放行。' }
   }
 
   /** T4-09/A51: the effective expiry of the staged window, 0 = never. Read by the command surface
@@ -489,18 +489,18 @@ export class EvolutionApproval extends Service {
     const executing = (await this.state().listPending('executing')).find(item => item.id === id)
     if (!executing) {
       const pending = (await this.state().listPending('pending')).find(item => item.id === id)
-      if (pending) return { ok: false, message: `Pending write "${id}" is already in the pending window — approve or reject it.` }
-      return { ok: false, message: `Pending write "${id}" is not in the executing window — nothing to release.` }
+      if (pending) return { ok: false, message: `待批准写入「${id}」已经在待批准窗口里：直接批准或拒绝它。` }
+      return { ok: false, message: `待批准写入「${id}」不在执行窗口中：没有可释放的。` }
     }
     // The dedupe map keys in-flight work as `approve:${id}` / `reject:${id}`;
     // either running means the record is NOT an orphan in THIS process. It says
     // nothing about another process (v43 FLOW2-1) — the pid check below does.
     if (this.inFlight.has(`approve:${id}`) || this.inFlight.has(`reject:${id}`)) {
-      return { ok: false, message: `Pending write "${id}" has an approve/reject RUNNING in this process — do not release it. Verify the effect instead; a completed approve resolves its own record.` }
+      return { ok: false, message: `待批准写入「${id}」在本进程里有正在运行的批准或拒绝：不要释放它。改为核验效果；已完成的批准会自行了结该记录。` }
     }
     const claimId = typeof (executing as { claimedBy?: unknown }).claimedBy === 'string' ? (executing as { claimedBy: string }).claimedBy : ''
     if (claimId === '') {
-      return { ok: false, message: `Pending write "${id}" carries no claim to release (unexpected record shape) — reject it instead.` }
+      return { ok: false, message: `待批准写入「${id}」没有可释放的占用声明（记录形状异常）：请改为拒绝它。` }
     }
     // v43 FLOW2-1: a claim naming a LIVE pid that is not ours means another
     // process may be mid-approve right now — never roll that record back under
@@ -510,7 +510,7 @@ export class EvolutionApproval extends Service {
     // caller's own process group on POSIX and would report a corrupt `0:<hex>`
     // claim as a live foreign holder forever. Treat pid 0 as no holder.
     if (holderPid !== null && holderPid > 0 && holderPid !== process.pid && isProcessAlive(holderPid)) {
-      return { ok: false, message: `Pending write "${id}" is claimed by pid ${holderPid}, which is ALIVE — another process may be running this approve. Do not release it: verify the write effect instead and let that run finish (a completed approve resolves its own record).` }
+      return { ok: false, message: `待批准写入「${id}」被 pid ${holderPid} 占用且该进程仍存活：可能有另一个进程正在执行这次批准。不要释放它：改为核验写入效果，并让那次运行跑完（已完成的批准会自行了结该记录）。` }
     }
     let released = false
     let failure = ''
@@ -526,7 +526,7 @@ export class EvolutionApproval extends Service {
     }
     if (!released) {
       const cause = failure === '' ? 'the claim no longer matches the record — a concurrent writer moved it' : failure
-      return { ok: false, message: `Release of "${id}" did not take effect (${cause}) — it stays EXECUTING with its claim unless it resolved, and the write effect is still unverified. Retry, or reject it to close the record without replaying.` }
+      return { ok: false, message: `释放「${id}」没有生效（${cause}）：除非它已了结，否则仍处于 EXECUTING 且保留占用声明，写入效果也仍未核验。请重试，或拒绝它以在不重放的情况下关闭记录。` }
     }
     // The unverifiable branch is the honest degradation: the message is the
     // operator's confirmation surface, and it must name the replay risk.
@@ -535,7 +535,7 @@ export class EvolutionApproval extends Service {
       : ''
     return {
       ok: true,
-      message: `Released "${id}" back to the pending window.${unverifiable} VERIFY the effect before approving: approve re-runs the write, and a non-idempotent replay duplicates an effect that already landed; reject closes the record instead.`,
+      message: `已把「${id}」放回待批准窗口。${unverifiable} 批准前请先核验效果：批准会重跑该写入，非幂等的重放会造成效果重复；改为拒绝则可关闭该记录。`,
     }
   }
 
@@ -561,8 +561,8 @@ export class EvolutionApproval extends Service {
         if (stuck) {
           const resolution = await this.state().tryResolvePending(id, 'rejected')
           return resolution.applied
-            ? { ok: true, message: `Rejected executing write "${id}" (no claim held — this may race an in-flight approve runner; if the write already landed its effect stands as-is. Verify the write state manually).` }
-            : { ok: false, message: `Pending write "${id}" could not be rejected: it resolved concurrently.` }
+            ? { ok: true, message: `已拒绝执行中的写入「${id}」（未持有占用声明：这可能与在途的批准运行器抢跑；如果写入已落地，其效果按现状保留。请手动核验写入状态）。` }
+            : { ok: false, message: `待批准写入「${id}」无法拒绝：它并发地了结了。` }
         }
         // 0.3.28 (V4-18): the record was NOT found AND is not 'executing', so it
         // is no longer in the active window — either it was already resolved
@@ -570,7 +570,7 @@ export class EvolutionApproval extends Service {
         // never existed. The old "already being resolved by another writer"
         // message mis-attributed a rotated/archived id to a live concurrent
         // writer (the cap rotation magnified it into a misleading claim).
-        return { ok: false, message: `Pending write "${id}" is not in the pending window (rotated or resolved).` }
+        return { ok: false, message: `待批准写入「${id}」不在待批准窗口里（已轮转或已了结）。` }
       }
       // P3 (v15): the claim is HELD here — pass it so a concurrent unscoped
       // writer cannot be stomped (same scoping the approve main path uses
@@ -581,9 +581,9 @@ export class EvolutionApproval extends Service {
         // 0.3.17 (E-61): the claim stays HELD otherwise — the reject path was
         // asymmetric with approve (which releases on every failure branch).
         await this.state().releasePendingClaim(id, claimId)
-        return { ok: false, message: `Pending write "${id}" is not pending (already resolved or missing).` }
+        return { ok: false, message: `待批准写入「${id}」已不在待批准状态（已了结或不存在）。` }
       }
-      return { ok: true, message: `Rejected ${resolution.record.kind} write "${id}".` }
+      return { ok: true, message: `已拒绝 ${resolution.record.kind} 写入「${id}」。` }
     })
   }
 
@@ -647,11 +647,11 @@ export class EvolutionApproval extends Service {
         // executing state is also a CONCURRENT in-flight approve, and rejecting
         // that would kill a live run. Keep the honest attribution (the reject
         // side already had it) so a late approve is not steered into sabotage.
-        return { ok: false, message: `Pending write "${id}" is executing — either another writer is resolving it right now, or a previous approve ran then crashed. If you did not start this approve, do not reject it (the in-flight run completes on its own); verify the effect instead. A genuinely stuck record (no runner activity) can still be rejected — /evolution pending shows it as EXECUTING.` }
+        return { ok: false, message: `待批准写入「${id}」正在执行：可能有另一个写入方正在了结它，或此前一次批准跑过之后崩了。如果不是你发起的这次批准，就不要拒绝它（在途的运行会自行完成）；改为核验效果。确实卡住的记录（运行器没有任何动静）仍然可以拒绝 —— /evolution pending 会把它显示为 EXECUTING。` }
       }
       // 0.3.28 (V4-18): as in reject, a non-executing miss is a rotated/archived
       // id, not a live concurrent writer — keep the attribution honest.
-      return { ok: false, message: `Pending write "${id}" is not in the pending window (rotated or resolved).` }
+      return { ok: false, message: `待批准写入「${id}」不在待批准窗口里（已轮转或已了结）。` }
     }
     const runner = this.runners.get(record.kind)
     if (!runner) {
@@ -665,13 +665,13 @@ export class EvolutionApproval extends Service {
         const resolution = await this.state().tryResolvePending(id, 'approved', claimId)
         if (!resolution.applied) {
           const rejected = (await this.state().listPending('rejected')).find(item => item.id === id)
-          if (rejected) return { ok: false, message: `Capability "${id}" was approved, but the record was resolved to "rejected" concurrently — no code ran and nothing needs replaying; verify before re-submitting.` }
-          return { ok: false, message: `Pending write "${id}" was already resolved by another writer.` }
+          if (rejected) return { ok: false, message: `能力「${id}」已获批准，但记录被并发地了结为「rejected」：没有代码运行，也无需重放；重新提交前请先核验。` }
+          return { ok: false, message: `待批准写入「${id}」已被另一个写入方了结。` }
         }
-        return { ok: true, message: 'Capability approved for manual activation in Creator mode (no code was executed).' }
+        return { ok: true, message: '能力已批准，可在 Creator 模式下手动激活（未执行任何代码）。' }
       }
       await this.state().releasePendingClaim(id, claimId)
-      return { ok: false, message: `No replay runner registered for kind "${record.kind}".` }
+      return { ok: false, message: `没有为类型「${record.kind}」注册回放运行器。` }
     }
     try {
       const result = await runner(record.args)
@@ -682,24 +682,28 @@ export class EvolutionApproval extends Service {
         // changed the target) — the record would deterministically fail every
         // retry. Name that, and point at reject as the way out, instead of
         // leaving a permanently un-approvable pending row.
-        // PLAN S4.4 (2026-09-16): the vocabulary also covers the skill-store's
+        // F-7 (2026-10-12): the vocabulary is bilingual (English stubs in the specs, Chinese
+        // producers in the tree) and also covers the skill-store's anchor-drift refusal.
         // deterministic "Path traversal is not allowed." refusal — a staged
         // record with a traversal target fails every approve the same way.
         // Long-term option: the store layer could surface structured errors
         // with a machine-readable code (deferred this cycle; see the plan's
         // non-goals list).
-        const deterministic = /changed since this plan|no entry matching|not found|no longer exists|path traversal/i.test(result.message)
+        // F-7 (2026-10-12): the vocabulary is language-agnostic now — the user-visible refusals
+        // are Chinese, so the Chinese phrasings of the same five cases are matched too. The
+        // structured-code option above remains the long-term fix.
+        const deterministic = /changed since this plan|no entry matching|not found|no longer exists|path traversal|在图渲染之后被改动过|匹配到多条不同条目|已不存在|不存在|路径穿越|不在技能|找不到|被改动过|已改动|不匹配|已过期|changed since it was read/i.test(result.message)
         return {
           ok: false,
           message: deterministic
-            ? `${result.message} — a sibling write from the same plan may have already changed this target, so repeated approves will keep failing. Reject this record unless the target changed again.`
+            ? `${result.message} 同一计划里的兄弟写入可能已改动该目标，反复批准会一直失败；除非目标再次变更，请驳回该记录。`
             : result.message,
         }
       }
     } catch (error) {
       await this.state().releasePendingClaim(id, claimId)
       this.ctx.logger.warn(error)
-      return { ok: false, message: 'Replay runner failed; the pending write remains pending.' }
+      return { ok: false, message: '回放运行器失败：该待批准写入仍处于待批准状态。' }
     }
     // v28 G1.3 (APPR-01): the resolve sits inside the same protection the
     // runner has — a thrown resolve (state-file quarantine, lock budget,
@@ -715,7 +719,7 @@ export class EvolutionApproval extends Service {
     if (typeof resolution === 'string') {
       return {
         ok: false,
-        message: `Approved write "${id}" was replayed, but resolving the record failed (${resolution.slice('failed: '.length)}) — the effect has LANDED while the audit row stays "executing". Verify the write manually; approve will not re-run it.`,
+        message: `已批准写入「${id}」已重放，但了结记录失败（${resolution.slice('failed: '.length)}）：效果已经落地，而审计行仍停在「executing」。请手动核验该写入；批准不会再次重跑它。`,
       }
     }
     if (!resolution.applied) {
@@ -728,14 +732,14 @@ export class EvolutionApproval extends Service {
       if (rejected) {
         return {
           ok: false,
-          message: `Approved write "${id}" was replayed, but the record was resolved to "rejected" concurrently — the effect has landed while the audit reads rejected. Verify the write and do NOT replay it.`,
+          message: `已批准写入「${id}」已重放，但记录被并发地了结为「rejected」：效果已落地，而审计显示为 rejected。请核验该写入，且不要重放它。`,
         }
       }
-      return { ok: false, message: `Pending write "${id}" was already resolved by another writer.` }
+      return { ok: false, message: `待批准写入「${id}」已被另一个写入方了结。` }
     }
     // 0.3.17 (E-61): the success message names what was approved, not just
     // the kind — a reviewer acting on several batches can tell them apart.
-    return { ok: true, message: `Approved ${record.kind} write "${id}" (${record.summary}).` }
+    return { ok: true, message: `已批准 ${record.kind} 写入「${id}」（${record.summary}）。` }
   }
 }
 

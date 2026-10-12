@@ -142,8 +142,8 @@ it('S1-E1: a merge that fails validation AFTER the sources were archived rolls e
   await lib.update('narrow-b', fat('narrow-b'), 'foreground')
   const result = await lib.consolidate('umbrella', ['narrow-a', 'narrow-b'], 'background_review')
   expect(result.ok).toBe(false)
-  expect(result.message).toContain('exceeds')
-  expect(result.message).toContain('rolled back')
+  expect(result.message).toContain('超过')
+  expect(result.message).toContain('已回滚')
   // Both sources are back in the live tree and OUT of .archive.
   expect(await lib.read('narrow-a')).not.toBeNull()
   expect(await lib.read('narrow-b')).not.toBeNull()

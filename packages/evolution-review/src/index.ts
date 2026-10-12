@@ -1912,7 +1912,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // answerable again as soon as a tool that registers the runner mounts.
       if (approval.isEnabled === true && !approval.hasRunner(kind)) {
         ctx.logger.warn(`dsh-evolution-review: approval enabled but no replay runner registered for kind "${kind}" - skipping write (${summary})`)
-        return { ok: false, message: `Approval is enabled but no replay runner is registered for kind "${kind}"; write skipped (mount the tool that provides it, or disable approval).` }
+        return { ok: false, message: `已启用批准，但没有为类型「${kind}」注册回放运行器；已跳过写入（请挂载提供该能力的工具，或禁用批准）。` }
       }
       const decision = await approval.request({
         kind, summary, args: stored, origin: origins.approval,
@@ -1954,7 +1954,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
      */
     async function executeSkillDirect(skillArgs: SkillOp): Promise<{ ok: boolean; message: string }> {
       const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-      if (!io) return { ok: false, message: 'evolution-io service not mounted' }
+      if (!io) return { ok: false, message: 'evolution-io 服务未挂载' }
       // V10-11 (P2-7): the review's background writes previously constructed
       // the library on the hardcoded default root, so a custom-root deployment
       // wrote skills into a tree the catalog/tools never read. Route through
@@ -1986,7 +1986,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // deliberately not gated by this list.
       const protectedNames = policySnapshot?.protectedSkillNames
       if (origin !== 'foreground' && protectedNames?.includes(name) && op.action !== 'create') {
-        return { ok: false, message: `Skill "${name}" is protected by the current policy (protectedSkillNames); autonomous writes are refused.` }
+        return { ok: false, message: `技能「${name}」受当前策略保护（protectedSkillNames）：拒绝自主写入。` }
       }
       if (op.action === 'create') {
         // The direct path (approval-disabled deployments) must keep the same
@@ -2040,7 +2040,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (op.action === 'delete') {
         const into = (op.absorbed_into ?? '').trim()
         if (!into || !(await library.read(into))) {
-          return { ok: false, message: 'delete requires an existing absorbed_into target' }
+          return { ok: false, message: '删除需要一个已存在的 absorbed_into 目标' }
         }
         const archived = await library.archive(name, { absorbedInto: into })
         if (archived.ok) {
@@ -2084,7 +2084,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           .map(move => ({ heading: move.heading ?? '', toFile: move.to_file ?? '' }))
         return await library.restructure(name, moves, origin)
       }
-      return { ok: false, message: `Unknown skill action "${op.action ?? ''}"` }
+      return { ok: false, message: `未知的技能动作「${op.action ?? ''}」` }
     }
   }
 
@@ -2144,7 +2144,7 @@ function anchorOf(op: unknown): WriteAnchor | undefined {
  */
 function staleRefusal(result: SkillActionResult, name: string, filePath?: string): SkillActionResult {
   if (filePath === undefined && result.anchor === 'missing') {
-    return { ok: false, message: `Skill "${name}" not found.` }
+    return { ok: false, message: `技能「${name}」不存在。` }
   }
   return {
     ok: false,

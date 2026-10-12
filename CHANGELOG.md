@@ -1,6 +1,16 @@
 # Changelog
 
 
+## 0.24.0 (minor) — F-7 家族文案中文化：把「用户可见」输出统一为中文
+
+> **由来**：32 号计划 F-7 项，按所有者口径——界面/CLI 输出以中文为准；提示词与 skill 正文保持英文。
+> **范围**：命令结果行、错误句、界面文案；按包分批，每批先出清单（字段式／构造器／常量三种形状扫描，带 CJK 过滤），白名单替换并同批追平夹具。
+> **已覆盖（仅用户可见输出）**：命令结果行、错误句、CLI 提示、界面文案、确认弹窗与按钮；覆盖 evolution-commands／evolution-approval／evolution-learning-graph／tool-memory／evolution-curator／tool-skill-manage／evolution-core／evolution-review／evolution-maintenance／evolution-replay。
+> **不在范围（保持英文）**：面向模型的提示词与宿主日志、skill 正文、客户端双语表的 en 半边、参数元数据（params.ts）与威胁检测正则（threats.ts）；两处刻意保留原文：maintenance 的 `Maintenance run <id> started`（测试用正则解析）与 `HTTP <status>`（语言中立）。标识符类 token（instance-held、DEGRADED）、long-runs 的 note 元数据与 host 日志里的英文短语同样保持原文。
+> **文风**：中文按严肃技术文档规范（去翻译腔与 AI 味）；量化自查用 `scripts/audit-chinese-style.mjs`，本轮据《35-文案风格审查-0.24.0》整改了破折号与被动句的头部问题。
+> **跳过并留档**：params 参数元数据、prompts 提示词、threats 检测正则、client/messages 表的 en 半边。
+> **验证**：各包车道全绿（evolution-core 77 文件/868 格等）＋ 全量门禁 `green=23 red=0`。
+
 ## 0.23.0 (minor) — 审计 v46 批次：把「面—声明—清单—门禁」四层里剩下的**漂移面**逐条收口（含一条新的批准前确认门）
 
 > **由来**：30 号全量审计（00–08 面）＋ 31 号六角色评审指出的失效面，本批按「先读文档 → 定性（不变式 I-1..I-5／失效模式 M1–M5）→ 读全部相关代码与引用 → 详细设计 → 才动代码」逐条落地，共 **87 个文件、+1668/−2427 行**（净减代码）。

@@ -35,7 +35,7 @@ it('S1.4 (a): a failed root listing refuses the restore instead of merging', asy
   }) as unknown as EvolutionIoLike
   const restore = await new SkillLibrary('/skills', failing).restoreLatestSnapshot()
   expect(restore.ok).toBe(false)
-  expect(restore.message).toContain('refused')
+  expect(restore.message).toContain('拒绝')
   // Nothing was cleared: all three skills are still on disk.
   expect(await io.exists('/skills/gamma/SKILL.md')).toBe(true)
   expect(await io.exists('/skills/alpha/SKILL.md')).toBe(true)

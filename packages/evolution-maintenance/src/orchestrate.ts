@@ -240,7 +240,7 @@ function formatPlan(validated: ValidationResult, runId: string): string {
     ? []
     : ['Notes:', ...plan.notes.map(note => `- ${sanitizeField(note)}`)]
   if (plan.verdict === 'no_issues') {
-    lines.push('No drift issues detected. Nothing to do.')
+    lines.push('未检测到漂移问题，无需处理。')
     lines.push(...noteLines)
     return lines.join('\n')
   }
@@ -276,7 +276,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     // the bundle digest covers the FULL template; the joint signature adds
     // the signal vocabulary + thresholds agreement.
     if (!verifyPromptBundle(PROMPT_BUNDLE)) {
-      return { ok: false, recommendationCount: 0, error: 'dsh-evolution prompt bundle integrity check failed; refusing to run maintain' }
+      return { ok: false, recommendationCount: 0, error: 'dsh-evolution 提示词包完整性检查失败；拒绝运行 maintain' }
     }
     // 0.3.11: usageObserved is threaded straight into the snapshot assembly so
     // the probe (which reads it off the snapshot) and the facts block (which
@@ -306,7 +306,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
         return {
           ok: false,
           recommendationCount: 0,
-          error: `maintenance scan could not read ${readFailures.length} listed skill(s) (${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}) and read no skill at all — `
+          error: `维护扫描无法读取列出的 ${readFailures.length} 个技能（${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}），且一个技能都没读到 —— `
             + 'the library was NOT audited; fix the unreadable skills (or their directory names) and run the scan again',
         }
       }
@@ -314,12 +314,12 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
         return {
           ok: false,
           recommendationCount: 0,
-          error: `maintenance scan found an empty skill library, but the configured skill root does not exist${runtime.skillRoot ? ` (${runtime.skillRoot})` : ''} — `
+          error: `维护扫描发现技能库为空，但配置的技能根目录不存在${runtime.skillRoot ? ` (${runtime.skillRoot})` : ''} —— `
             + 'point the skillsRoot config at a real directory (a literal `~` is not expanded) and run the scan again',
         }
       }
       // Genuinely empty: no facts to review — do not spend a model call.
-      return { ok: true, recommendationCount: 0, runId: options.runId ?? randomUUID(), verdict: 'no_issues', text: 'Maintenance scan: empty skill library. Nothing to do.' }
+      return { ok: true, recommendationCount: 0, runId: options.runId ?? randomUUID(), verdict: 'no_issues', text: '维护扫描：技能库为空，无需处理。' }
     }
     const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, enrichment?.usageObservedValue, options.redact)
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
@@ -355,7 +355,7 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // it warns and silently becomes 1ms. V27 G2.4: the message interpolates
     // MAX_TIMER_DELAY_MS, so the number has ONE definition (constants.ts).
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMER_DELAY_MS) {
-      return { ok: false, recommendationCount: 0, error: `maintain: --timeout must be a positive integer in ms, at most ${MAX_TIMER_DELAY_MS}; got ${String(timeoutMs)}` }
+      return { ok: false, recommendationCount: 0, error: `maintain：--timeout 必须是以毫秒为单位的正整数，最大 ${MAX_TIMER_DELAY_MS}；收到 ${String(timeoutMs)}` }
     }
     // 0.3.14 (P3-6): the signal object is the authoritative abort evidence —
     // hoisted so the catch can consult `signal.aborted` (our own timeout)
@@ -464,18 +464,18 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
         // error (evidence: command retry cancels the previous invocation, which
         // surfaced as both "This operation was aborted" and the no-plan text).
         if (runResult.stopReason === 'aborted') {
-          return { ok: false, recommendationCount: 0, error: 'Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan.' }
+          return { ok: false, recommendationCount: 0, error: '维护扫描已中止（在子智能体产出计划之前运行被取消）：请在会话空闲时重试；并发重交会取消上一次扫描。' }
         }
         // Platform contract: the subagent channel wraps its output as
         // `{ structured }` — a missing structured payload means no usable plan.
-        return { ok: false, recommendationCount: 0, error: 'Maintain subagent returned no structured plan (the model did not emit the structured plan, or the run ended without one) — retry; if it repeats, raise --timeout or check the model output shape.' }
+        return { ok: false, recommendationCount: 0, error: '维护子智能体没有返回结构化计划（模型没有产出结构化计划，或运行在产出前结束）：请重试；若反复出现，请提高 --timeout 或检查模型的输出结构。' }
       }
       const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
       if (!validated.ok) {
         return {
           ok: false,
           recommendationCount: 0,
-          error: `Maintain plan rejected by validator: ${validated.errors.slice(0, 5).join('; ')}`,
+          error: `维护计划被校验器拒绝：${validated.errors.slice(0, 5).join('; ')}`,
         }
       }
       const runId = options.runId ?? randomUUID()
@@ -514,7 +514,7 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
       ok: false,
       recommendationCount: 0,
       error: aborted
-        ? 'Maintenance scan was aborted (cancellation or timeout) before a plan was produced — retry, or raise the timeout (evolution-commands maintainTimeoutMs) on a slow/large library.'
+        ? '维护扫描已中止（取消或超时），计划尚未产出 —— 在技能多、库大的场景下，请重试或提高超时（evolution-commands maintainTimeoutMs）。'
         : `Maintenance scan failed: ${message}`,
     }
   }

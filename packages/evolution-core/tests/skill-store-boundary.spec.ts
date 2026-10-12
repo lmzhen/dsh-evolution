@@ -39,7 +39,7 @@ describe('SkillLibrary IO boundaries', () => {
     await io.writeText('/skills/linky-skill.symlink', 'true')
     const result = await lib.archive('linky-skill')
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('symlink')
+    expect(result.message).toContain('符号链接')
     // The tree is untouched.
     expect(await io.readText('/skills/linky-skill/SKILL.md')).toBeTruthy()
   })
@@ -88,13 +88,13 @@ describe('V10 boundary hardening', () => {
     io.files.set('/skills/guarded/.bundled', '')
     const bundled = await lib.create('guarded', SKILL.replace('boundary-skill', 'guarded'), 'foreground')
     expect(bundled.ok).toBe(false)
-    expect(bundled.message).toContain('protected (bundled)')
+    expect(bundled.message).toContain('受保护（bundled）')
     expect(io.files.has('/skills/guarded/SKILL.md')).toBe(false)
     // Review channel: a pinned marker refuses the same way update/patch do.
     io.files.set('/skills/review-target/.pinned', '')
     const review = await lib.create('review-target', SKILL.replace('boundary-skill', 'review-target'), 'background_review')
     expect(review.ok).toBe(false)
-    expect(review.message).toContain('protected (pinned)')
+    expect(review.message).toContain('受保护（pinned）')
     // Foreground keeps update/patch parity: pin blocks the review fork only.
     const fg = await lib.create('review-target', SKILL.replace('boundary-skill', 'review-target'), 'foreground')
     expect(fg.ok).toBe(true)
@@ -106,8 +106,8 @@ describe('V10 boundary hardening', () => {
     const long = 'a'.repeat(65)
     const result = await lib.consolidate('target', [long], 'foreground')
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('Invalid skill name')
-    expect(result.message).toContain('<= 64')
+    expect(result.message).toContain('技能名')
+    expect(result.message).toContain('不超过 64 个')
   })
 
   it('C-18: support file names are closed to [a-z0-9._-] plus the win32 reserved stems', async () => {
@@ -121,7 +121,7 @@ describe('V10 boundary hardening', () => {
     // Reserved device stems are charset-conformant — refused by the stem set.
     const nul = await lib.writeSupportFile('named', 'references/nul.md', 'x')
     expect(nul.ok).toBe(false)
-    expect(nul.message).toContain('reserved device name')
+    expect(nul.message).toContain('保留设备名')
     expect((await lib.writeSupportFile('named', 'references/com1.md', 'x')).ok).toBe(false)
     // Nested dirs and ordinary names stay allowed.
     expect((await lib.writeSupportFile('named', 'references/sub/ok-name.md', 'x')).ok).toBe(true)
@@ -143,12 +143,12 @@ describe('V14 name-guard unification and archive metadata', () => {
     io.files.set('/outside/references/detail.md', 'ORIGINAL')
     const patched = await lib.patch('../outside', 'ORIGINAL', 'PWNED', 'references/detail.md')
     expect(patched.ok).toBe(false)
-    expect(patched.message).toContain('Invalid skill name')
+    expect(patched.message).toContain('技能名')
     expect(io.files.get('/outside/references/detail.md')).toBe('ORIGINAL')
     // The same guard now covers the SKILL.md branch and the protection probes.
     expect((await lib.patch('../outside', 'ORIGINAL', 'PWNED')).ok).toBe(false)
-    expect(await lib.writeProtection('../outside')).toContain('Invalid skill name')
-    expect(await lib.deleteProtection('../outside')).toContain('Invalid skill name')
+    expect(await lib.writeProtection('../outside')).toContain('技能名')
+    expect(await lib.deleteProtection('../outside')).toContain('技能名')
     expect(await lib.isManaged('../outside')).toBe(false)
     // B3 / N14: the rejected name is ABSENT, not "an empty support list".
     expect(await lib.listSupportFiles('../outside')).toEqual({ kind: 'absent' })
@@ -167,7 +167,7 @@ describe('V14 name-guard unification and archive metadata', () => {
     // A genuine miss keeps the original wording.
     const miss = await lib.patch('boundary-skill', 'NOT-IN-THE-FILE', 'x')
     expect(miss.ok).toBe(false)
-    expect(miss.message).toContain('Could not find old_string')
+    expect(miss.message).toContain('找不到 old_string')
   })
 
   it('P2-9: a failed .archive-reason write does not abort the archive or skip its audit', async () => {
@@ -367,7 +367,7 @@ describe('V17 lock-probe and lock-sweep precision', () => {
     const lib = new SkillLibrary('/skills', io)
     const created = await lib.create('raced', SKILL.replace('boundary-skill', 'raced'), 'foreground')
     expect(created.ok).toBe(false)
-    expect(created.message).toContain('already exists')
+    expect(created.message).toContain('已存在')
     // The concurrent creator's bytes were NOT overwritten by the loser.
     expect(io.files.get('/skills/raced/SKILL.md')).toContain('WINNER description')
   })

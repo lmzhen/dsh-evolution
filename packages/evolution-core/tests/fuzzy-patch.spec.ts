@@ -143,7 +143,7 @@ describe('fuzzy patch P0-5 guards', () => {
     const result = await lib.patch('fuzz-skill', '    foo bar\n', 'foo bar', file, false, 'background_review')
     expect(result.ok).toBe(true)
     expect(result.noop).toBe(true)
-    expect(result.message).toContain('unchanged')
+    expect(result.message).toContain('未变更')
     expect(await io.readText(`/skills/fuzz-skill/${file}`)).toBe(before)
   })
 
@@ -153,7 +153,7 @@ describe('fuzzy patch P0-5 guards', () => {
     const file = await setupSkill(lib, 'header\n  foo bar\nfooter\n')
     const result = await lib.patch('fuzz-skill', '    totally absent text\n', 'x', file, false, 'background_review')
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('Could not find old_string')
+    expect(result.message).toContain('找不到 old_string')
   })
 
   it('F-318 (①): an identical patch on a file without a trailing newline keeps its bytes', async () => {

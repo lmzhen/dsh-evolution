@@ -99,13 +99,13 @@ export interface BaseAbilityRow {
  */
 export function baseRefusalReason(entry: BaseAbilityRow, servicePresent: (name: string) => boolean): string | undefined {
   if (typeof entry.unsupported === 'string' && entry.unsupported !== '') {
-    return `Base "${entry.name}" is registered as UNSUPPORTED: ${entry.unsupported}`
+    return `基底「${entry.name}」被登记为 UNSUPPORTED（不受支持）：${entry.unsupported}`
   }
   const service = entry.requires?.service
   if (typeof service !== 'string' || service === '') return undefined
   return servicePresent(service)
     ? undefined
-    : `Base "${entry.name}" requires the "${service}" service, which this deployment does not provide — the generated preset would refuse to mount.`
+    : `基底 "${entry.name}" 需要 "${service}" 服务，而本部署没有提供它 —— 生成的预设会拒绝挂载。`
 }
 
 /**

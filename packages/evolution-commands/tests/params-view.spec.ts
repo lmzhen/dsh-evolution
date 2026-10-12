@@ -95,7 +95,7 @@ describe('params view (G4/S4.1)', () => {
     expect(parsed.params.every(row => row.group === 'review')).toBe(true)
     const unknown = await mount('params --group nope')
     expect(unknown.kind).toBe('error')
-    expect(unknown.text).toContain('E-308: unknown parameter group "nope"')
+    expect(unknown.text).toContain('E-308: 未知的参数分组「nope」')
     expect(unknown.text).toContain('review')
   })
 

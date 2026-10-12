@@ -105,7 +105,7 @@ export function planNamespaceMigration(documentText: string): NamespaceMigration
     for (const [key, value] of Object.entries(section)) {
       const canonical = resolveParamId(key)
       if (!allowed.has(canonical)) {
-        skipped.push({ namespace, key, reason: 'row `' + rowId + '` has no such parameter' })
+        skipped.push({ namespace, key, reason: 'row `' + rowId + '` 没有这个参数' })
         continue
       }
       values.push({ source: key, key: canonical, value })
@@ -217,7 +217,7 @@ export function classifyNamespaceMigration(
     const view = read(entry.rowId)
     if (view === undefined) {
       for (const value of entry.values) {
-        skipped.push({ namespace: entry.namespace, key: value.source, reason: 'row `' + entry.rowId + '` is not served in this composition' })
+        skipped.push({ namespace: entry.namespace, key: value.source, reason: 'row `' + entry.rowId + '` 在本组合中不提供服务' })
       }
       continue
     }

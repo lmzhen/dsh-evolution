@@ -75,7 +75,7 @@ async function read<T>(doFetch: typeof fetch, path: string, init?: RequestInit):
     if (!response.ok) return { ok: false, message: 'HTTP ' + String(response.status) }
     const body = await response.json() as { ok?: unknown; data?: unknown; message?: unknown }
     if (body.ok === true) return { ok: true, data: body.data as T }
-    return { ok: false, message: typeof body.message === 'string' && body.message !== '' ? body.message : 'the host refused the request' }
+    return { ok: false, message: typeof body.message === 'string' && body.message !== '' ? body.message : '宿主拒绝了该请求' }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : String(error) }
   }

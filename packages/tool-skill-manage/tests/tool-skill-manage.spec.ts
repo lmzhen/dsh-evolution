@@ -149,7 +149,7 @@ describe('tool-skill-manage', () => {
     expect(created.isError).toBe(false)
     const message = (created.value as { message?: string } | undefined)?.message ?? ''
     expect(message).toContain('Authoring check:')
-    expect(message).toContain('exceeds the 60-char authoring bar')
+    expect(message).toContain('超过 60 字符的作者规范上限')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -280,7 +280,7 @@ describe('tool-skill-manage', () => {
       libraryOrigin: 'foreground',
     }, { interface: 'background_review' })
     expect(nullElement.ok).toBe(false)
-    expect(nullElement.message).toContain('must be an object')
+    expect(nullElement.message).toContain('必须是带 heading 与 to_file 的对象')
     expect(nullElement.message).not.toContain('TypeError')
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
@@ -323,7 +323,7 @@ describe('tool-skill-manage', () => {
     })
     expect(result.isError).toBe(false)
     expect((result.value as { ok?: boolean; message?: string } | undefined)?.ok).toBe(false)
-    expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
+    expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('超过严格上限')
     await ctx.fiber.dispose()
   })
 
@@ -453,7 +453,7 @@ describe('tool-skill-manage', () => {
       signal: new AbortController().signal,
     })
     expect((result.value as { ok?: boolean } | undefined)?.ok).toBe(false)
-    expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('exceeds the strict bar')
+    expect((result.value as { message?: string } | undefined)?.message ?? '').toContain('超过严格上限')
     await ctx.fiber.dispose()
   })
 
@@ -534,12 +534,12 @@ Use it.
     const onDisk = await readFile(join(root, 'skills', 'noop-skill', 'SKILL.md'), 'utf8')
     const updated = await execute({ action: 'update', name: 'noop-skill', content: onDisk })
     expect((updated.value as { ok?: boolean } | undefined)?.ok).toBe(true)
-    expect((updated.value as { message?: string } | undefined)?.message ?? '').toContain('unchanged')
+    expect((updated.value as { message?: string } | undefined)?.message ?? '').toContain('未变更')
     expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(0)
     // A patch whose old_string already equals the replacement is also noop.
     const patched = await execute({ action: 'patch', name: 'noop-skill', old_string: 'Body.', new_string: 'Body.' })
     expect((patched.value as { ok?: boolean } | undefined)?.ok).toBe(true)
-    expect((patched.value as { message?: string } | undefined)?.message ?? '').toContain('unchanged')
+    expect((patched.value as { message?: string } | undefined)?.message ?? '').toContain('未变更')
     expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(0)
     // A real patch still counts exactly once (the gate is noop-only, not
     // suppression of all patches).
@@ -597,7 +597,7 @@ Use it.
     // only). The noop must keep the counter — the sum is real modification.
     const second = await execute({ action: 'write_file', name: 'wf-skill', file_path: 'references/notes.md', file_content: 'line one\n' })
     expect((second.value as { ok?: boolean } | undefined)?.ok).toBe(true)
-    expect((second.value as { message?: string } | undefined)?.message ?? '').toContain('unchanged')
+    expect((second.value as { message?: string } | undefined)?.message ?? '').toContain('未变更')
     expect((await ctx.skillUsage.report()).get('wf-skill')?.patch_count).toBe(1)
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
@@ -673,7 +673,7 @@ it('v29 TSM-01: an inherited-name action (`constructor`) yields the structured r
   for (const hostile of ['constructor', 'toString', 'hasOwnProperty']) {
     const result = await replayRun(ctx, { action: hostile })
     expect(result.ok).toBe(false)
-    expect(result.message).toContain(`Unknown action "${hostile}"`)
+    expect(result.message).toContain(`未知动作「${hostile}」`)
     expect(result.message).not.toContain('TypeError')
   }
   if (previousHome === undefined) delete process.env.DSH_HOME
@@ -794,7 +794,7 @@ it('P1-13: a staged update of a missing skill is refused when the skill appears 
   // the freshly created content was replaced by the staged bytes.
   const replayed = await replayRun(ctx, operation as Record<string, unknown>, 'foreground')
   expect(replayed.ok).toBe(false)
-  expect(replayed.message).toContain('changed after this write was staged')
+  expect(replayed.message).toContain('在这次写入暂存之后发生了变化')
   const onDisk = await readFile(join(root, 'skills', 'late-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('lifecycle boundary test')
   if (previousHome === undefined) delete process.env.DSH_HOME
@@ -836,7 +836,7 @@ it('P1-13: approving the staged update is refused once the skill exists', async 
   const approved = await ctx.evolutionApproval.approve(decision.pending_id as string)
   // Pre-fix this returned ok:true and the created content was replaced.
   expect(approved.ok).toBe(false)
-  expect(approved.message).toContain('changed after this write was staged')
+  expect(approved.message).toContain('在这次写入暂存之后发生了变化')
   const onDisk = await readFile(join(root, 'skills', 'no-anchor-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('lifecycle boundary test')
   if (previousHome === undefined) delete process.env.DSH_HOME
@@ -874,7 +874,7 @@ it('v30 REV-03: a staged support-file write refuses to replay when the file chan
     file_content: 'v2\n', staged_from_sha256: 'absent',
   })
   expect(staleAbsent.ok).toBe(false)
-  expect(staleAbsent.message).toContain('changed after this write was staged')
+  expect(staleAbsent.message).toContain('在这次写入暂存之后发生了变化')
   // An anchor matching the CURRENT bytes (v1) still authorizes the overwrite.
   const freshV2 = await replayRun(ctx, {
     action: 'write_file', name: 'anchor-skill', file_path: 'references/api.md',
@@ -914,7 +914,7 @@ it('v32 TEST-05: the tool channel refuses autonomous (subagent-origin) writes on
   })
   const created = await execute({ action: 'create', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill') })
   expect(created.isError).toBe(false)
-  const updated = await execute({ action: 'update', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill').replace('lifecycle boundary test', 'updated') })
+  const updated = await execute({ action: 'update', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill').replace('lifecycle boundary test', '已更新') })
   // The refusal rides the structured payload (isError stays false by the
   // family's tool contract; the model reads the refusal from the message).
   const updatedMessage = (updated.value as { message?: string } | undefined)?.message ?? JSON.stringify(updated.value)

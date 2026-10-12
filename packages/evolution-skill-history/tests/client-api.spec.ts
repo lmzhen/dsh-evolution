@@ -46,9 +46,9 @@ describe('skill-history client api', () => {
   })
 
   it('posts the undo with and without a version number', async () => {
-    const stub = stubFetch({ ok: true, body: { ok: true, data: { message: 'undone to v1' } } })
+    const stub = stubFetch({ ok: true, body: { ok: true, data: { message: '已撤销到 v1' } } })
     const api = createSkillHistoryApi(stub.fetch)
-    expect(await api.undo('a')).toBe('undone to v1')
+    expect(await api.undo('a')).toBe('已撤销到 v1')
     expect(stub.calls[0]?.path).toBe(HOST_ROUTES.undo)
     expect(stub.calls[0]?.init?.method).toBe('POST')
     expect(stub.calls[0]?.init?.body).toBe(JSON.stringify({ name: 'a' }))
@@ -57,10 +57,10 @@ describe('skill-history client api', () => {
   })
 
   it('surfaces a business refusal verbatim and never as a silent empty result', async () => {
-    const stub = stubFetch({ ok: true, body: { ok: false, code: 'undo-refused', message: 'Version v3 of "a" holds a SUPPORT FILE\'s bytes' } })
+    const stub = stubFetch({ ok: true, body: { ok: false, code: 'undo-refused', message: 'Version v3 of "a" 存的是支撑文件的字节\'s bytes' } })
     const api = createSkillHistoryApi(stub.fetch)
     await expect(api.undo('a', 3)).rejects.toBeInstanceOf(SkillHistoryRefusal)
-    await expect(api.undo('a', 3)).rejects.toThrow("holds a SUPPORT FILE's bytes")
+    await expect(api.undo('a', 3)).rejects.toThrow("存的是支撑文件的字节")
     const http = stubFetch({ ok: false, status: 403, body: {} })
     const api2 = createSkillHistoryApi(http.fetch)
     await expect(api2.skills()).rejects.toThrow('HTTP 403')

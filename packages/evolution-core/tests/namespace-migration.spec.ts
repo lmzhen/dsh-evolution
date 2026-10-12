@@ -49,7 +49,7 @@ describe('namespace migration (G3)', () => {
 
   it('refuses a key no row declares instead of writing it', () => {
     const plan = planNamespaceMigration('evolution-skills:\n  skillContentChars: 40000\n  notAParameter: 7\n')
-    expect(plan.skipped).toEqual([{ namespace: 'evolution-skills', key: 'notAParameter', reason: 'row `tool-skill-manage` has no such parameter' }])
+    expect(plan.skipped).toEqual([{ namespace: 'evolution-skills', key: 'notAParameter', reason: 'row `tool-skill-manage` 没有这个参数' }])
     // The key the row DOES declare still travels: one stray key costs only itself.
     expect(plan.entries).toEqual([
       { namespace: 'evolution-skills', rowId: 'tool-skill-manage', values: [{ source: 'skillContentChars', key: 'skillContentChars', value: 40000 }] },
@@ -74,7 +74,7 @@ describe('namespace migration (G3)', () => {
       { rowId: 'tool-memory', key: 'entryPreviewChars' },
     ])
     expect(decided.conflicts).toEqual([{ rowId: 'memory-files', key: 'addDatePrefix', current: false, legacy: true }])
-    expect(decided.skipped).toEqual([{ namespace: 'evolution-skills', key: 'descriptionStrict', reason: 'row `tool-skill-manage` is not served in this composition' }])
+    expect(decided.skipped).toEqual([{ namespace: 'evolution-skills', key: 'descriptionStrict', reason: 'row `tool-skill-manage` 在本组合中不提供服务' }])
   })
 
   it('classifies every row a fresh document would write', () => {
@@ -161,7 +161,7 @@ describe('namespace migration (G3)', () => {
       'evolution-skills:descriptionStrict',
       'evolution-tool-memory:entryPreviewChars',
     ])
-    expect(String(report.skipped[0]?.reason)).toContain('is not served in this composition')
+    expect(String(report.skipped[0]?.reason)).toContain('在本组合中不提供服务')
   })
 
   it('treats a document with no family section as nothing to do', () => {

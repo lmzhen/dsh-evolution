@@ -13,63 +13,63 @@
  */
 export const EVOLUTION_ERRORS = Object.freeze({
   'e-305-this-invocation-carries-no':
-    'E-305: this invocation carries no agent — `%a1%` needs a session-backed call (run it from a session in the GUI or the CLI).',
+    'E-305: 本次调用没有携带 agent —— `%a1%` 需要由会话支撑的调用（请在 GUI 或 CLI 的会话里运行）。',
   'e-306-this-deployment-stages-foreground':
-    'E-306: this deployment stages foreground writes, but `/evolution %a1%` is not replayable through the skill runner — there is nothing to stage. Run it from a session whose approval policy is \'never\', or set `stageForeground: false` on the evolution-approval row, then repeat the command.',
+    'E-306: 本部署会暂存前台写入，但 `/evolution %a1%` 无法通过技能运行器回放 —— 没有可暂存的内容。请在批准策略为 \'never\' 的会话里运行，或在 evolution-approval 行上设置 `stageForeground: false`，然后重试该命令。',
   'e-301-approval-service-not-mounted':
-    'E-301: approval service not mounted — pending writes cannot be listed or replayed. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.',
+    'E-301: 批准服务未挂载：待批准写入无法列出或回放。挂载 evolution-approval 行（随 evolution-host/evolution-all 提供）后，运行 /evolution doctor 可查看已挂载的服务。',
   'e-301-approval-service-not-mounted-2':
-    'E-301: approval service not mounted. Next: the evolution-approval row ships with evolution-host/evolution-all — run /evolution doctor to see which services are mounted.',
+    'E-301: 批准服务未挂载。下一步：evolution-approval 行随 evolution-host/evolution-all 一起提供 —— 运行 /evolution doctor 查看已挂载的服务。',
   'e-304-the-mounted-approval-service':
-    'E-304: the mounted approval service predates the release capability — reject the record instead.',
+    'E-304: 已挂载的批准服务早于本能力发布 —— 请改为驳回该记录。',
   'e-302-curator-service-not-mounted':
-    'E-302: curator service not mounted. Next: mount the evolution-curator row (evolution-host/evolution-all) and run /evolution doctor.',
+    'E-302: 策展服务未挂载。下一步：挂载 evolution-curator 行（evolution-host/evolution-all），并运行 /evolution doctor。',
   'e-305-the-invocation-agent-exposes':
-    'E-305: the invocation agent exposes neither `followup` nor `inject` — %a1% has no delivery channel.',
+    'E-305: 调用 agent 既没有暴露 `followup` 也没有 `inject` —— %a1% 没有投递通道。',
   'e-306-this-deployment-stages-foreground-2':
-    'E-306: this deployment stages foreground writes, but this invocation carries no agent session — `/evolution restructure` would stage a record with no session attribution. Run it from a session in the GUI or the CLI, or set `stageForeground: false` on the evolution-approval row, then repeat the command.',
+    'E-306: 本部署会暂存前台写入，但本次调用没有 agent 会话 —— `/evolution restructure` 会暂存一条没有会话归属的记录。请在 GUI 或 CLI 的会话里运行，或在 `stageForeground: false` 行上设置，然后重试该命令。',
   'e-303-replay-service-not-mounted':
-    'E-303: replay service not mounted. Next: mount the evolution-replay row (evolution-host/evolution-all) and run /evolution doctor.',
+    'E-303: 回放服务未挂载。下一步：挂载 evolution-replay 行（evolution-host/evolution-all），并运行 /evolution doctor。',
   'e-307-the-settings-service-could':
-    'E-307: the settings service could not report its sections (%a1%). /evolution params needs the user layer to tell an override from a deployment value; run /evolution doctor to see which services are mounted.',
+    'E-307: 设置服务无法报告它的分区（%a1%）。/evolution params 需要用户层来区分覆盖值与部署值；运行 /evolution doctor 查看已挂载的服务。',
   'e-308-unknown-parameter-group-group':
-    'E-308: unknown parameter group "%a1%" — known groups: %a2%.',
+    'E-308: 未知的参数分组「%a1%」—— 已知分组：%a2%。',
   'e-311-no-settings-service-is':
-    'E-311: no settings service is mounted, so there is no user layer to write. Mount the settings row (packages/settings/settings-file) and retry; this command never edits cordis.yml — a deployment value belongs to the deployment. /evolution doctor lists the mounted services.',
+    'E-311: 没有挂载设置服务，因此没有可写入的用户层。请挂载 settings 行（packages/settings/settings-file）后重试；本命令从不修改 cordis.yml —— 部署值属于部署。/evolution doctor 会列出已挂载的服务。',
   'e-312-error-instanceof-Error-error':
-    'E-312: %a1% — /evolution params lists the canonical ids.',
+    'E-312: %a1% —— /evolution params 会列出规范 id。',
   'e-313-unknown-parameter-id-evolution':
-    'E-313: unknown parameter "%a1%" — /evolution params lists every registered id with its tier and user layer.',
+    'E-313: 未知参数「%a1%」—— /evolution params 会列出每个已注册 id 及其层级与用户层。',
   'e-314-id-is-a-deployment':
-    'E-314: "%a1%" is a deployment parameter (tier %a2%, owner %a3%) — it is written in cordis.yml on its plugin or policy row, not from a session. /evolution params shows who may write each row.',
+    'E-314: 「%a1%」是部署参数（层级 %a2%，归属 %a3%）—— 它写在 cordis.yml 的插件行或策略行上，而不是从会话写入。/evolution params 会显示每一行由谁可写。',
   'e-315-id-has-no-user':
-    'E-315: "%a1%" has no user layer — owner %a2% publishes no settings namespace, so the value stays with the deployment.',
+    'E-315: 「%a1%」没有用户层 —— 归属 %a2% 没有发布设置命名空间，因此该值留在部署层。',
   'e-307-the-settings-service-could-2':
-    'E-307: the settings service could not report its sections (%a1%). /evolution policy set needs the current revision to write safely; run /evolution doctor to see which services are mounted.',
+    'E-307: 设置服务无法报告它的分区（%a1%）。/evolution policy set 需要当前修订号才能安全写入；运行 /evolution doctor 查看已挂载的服务。',
   'e-316-namespace-namespace-is-not':
-    'E-316: namespace "%a1%" is not registered — owner %a2% is not mounted in this composition, so its parameters cannot be written from here. /evolution params marks those rows \'unregistered\'.',
+    'E-316: namespace "%a1%" 未注册 —— 归属 %a2% 在本组合中未挂载，因此无法从这里写入它的参数。 /evolution params 会把那些行标为 \'unregistered\'.',
   'e-309-revision-conflict-you-sent':
-    'E-309: revision conflict — you sent %a1%, the document stands at %a2%. Re-read with /evolution params --json and retry.',
+    'E-309: 修订冲突 —— 你提交的是 %a1%，文档当前为 %a2%。请用 /evolution params --json 重新读取后重试。',
   'e-309-revision-conflict-message-Re':
-    'E-309: revision conflict — %a1%. Re-read with /evolution params --json and retry.',
+    'E-309: 修订冲突 —— %a1%。请用 /evolution params --json 重新读取后重试。',
   'e-310-the-settings-service-refused':
-    'E-310: the settings service refused the write: %a1% — the owning plugin\'s rule stands (a cross-field pair, or a cap that may only be tightened). /evolution params shows the current value.',
+    'E-310: 设置服务拒绝了这次写入：%a1% —— 归属插件的规则优先（跨字段成对约束，或只能收紧的上限）。/evolution params 会显示当前值。',
   // 0.9.0: the write-admission sequence's own refusals (tool-skill-manage/src/write-gates.ts).
   'e-317-skill-write-not-confirmed':
-    'E-317: skill "%a1%" was not %a2% — the confirmation prompt was declined or dismissed, so nothing was written. The prompt appears on every create and bare delete; repeat the call only if the operator asks for it.',
+    'E-317: 技能 "%a1%" 未被%a2% —— 确认提示被拒绝或关闭，因此没有写入任何内容。每次创建与裸删除都会出现该提示；只有操作者要求时才重复调用。',
   'e-318-skill-write-without-a-read':
-    'E-318: skill "%a1%" was not read in this session, so this write is refused. Read it with the `skill` tool first (a read that failed does not count), then repeat the write.',
+    'E-318: 本会话没有读取技能 "%a1%"，因此拒绝这次写入。请先用 `skill` 工具读取它（失败的读取不算），然后重复该写入。',
   // 0.12.0: the confirmation's own deadline (`skillWriteConfirm: 'timeout'`).
   'e-320-the-profile-home-is-not':
-    'E-320: the profile home is not reported by this host, so the legacy settings document cannot be located. /evolution migrate reads `<profile home>/settings.yaml.imported`; run it from a profile-launched session.',
+    'E-320: 本宿主没有报告 profile home，因此无法定位旧设置文档。/evolution migrate 读取 `<profile home>/settings.yaml.imported`；请在由 profile 启动的会话里运行。',
   // G5.12/U-4: the cross-field constraint the registry declares (params.ts) has one enforcement
   // point, and this is its message. The card shows the same relation before a save is attempted.
   'e-322-a-parameter-would-break-a':
-    'E-322: %a1% must be at least %a2%, but this write sets it to %a3%. Nothing was written.',
+    'E-322: %a1% 至少应为 %a2%，但这次写入把它设成 %a3%。未写入任何内容。',
   'e-321-no-io-provider-is':
-    'E-321: no evolution-io provider is mounted, so the legacy settings document cannot be read. Mount the evolution-io row (evolution-host/evolution-all) and retry.',
+    'E-321: 没有挂载 evolution-io 提供方，因此无法读取旧设置文档。请挂载 evolution-io 行（evolution-host/evolution-all）后重试。',
   'e-319-skill-write-confirm-timed-out':
-    'E-319: skill "%a1%" was not %a2% — the confirmation prompt went unanswered for %a3% second(s), so the write was cancelled. Nobody was there to decide: set `skillWriteConfirm` to `auto` to write without a prompt, keep `ask` to wait until someone answers, or raise `skillWriteConfirmTimeoutSeconds`.',
+    'E-319: 技能 "%a1%" 未被%a2% —— 确认提示在 %a3% 秒内无人应答，因此该写入被取消。没有人在场决定：把 `skillWriteConfirm` 设为 `auto` 可免提示直接写入，保留 `ask` 则一直等到有人应答，或提高 `skillWriteConfirmTimeoutSeconds`。',
 } as const)
 
 /** One table key. */

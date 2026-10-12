@@ -521,7 +521,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(bundles).toEqual([])
       expect(seen).toHaveLength(1)
       const report = await diagnose(stub, { home })
-      expect(report.conflicts.some(conflict => conflict.includes('a profile manifest could not be read or parsed'))).toBe(true)
+      expect(report.conflicts.some(conflict => conflict.includes('本 profile 清单读不出来或无法解析'))).toBe(true)
       // OPT-22: the DEGRADED detail alone must NOT trigger the uninstall
       // advice — there is no bundle conflict here, and "keep exactly one of
       // …" sent operators to uninstall bundles they may not have. The advice
@@ -926,7 +926,7 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
       for (let step = 0; step < 3; step += 1) await vi.advanceTimersByTimeAsync(2_000)
       const report = await reportPromise
       expect(report.queryIssues).toHaveLength(2)
-      expect(report.queryIssues[0]).toContain('did not answer within 5000ms')
+      expect(report.queryIssues[0]).toContain('在 5000ms 内没有应答')
       expect(report.queryIssues[1]).toContain('isolate the offending session')
       expect(renderDoctorText(report)).toContain('session search:')
     } finally {
@@ -1034,13 +1034,13 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
       const absent = await diagnose(stub, { home })
       expect(absent.paramIssues).toHaveLength(1)
       expect(absent.paramIssues[0]).toContain('configEditor.configuration')
-      expect(absent.paramIssues[0]).toContain('NOT checked')
+      expect(absent.paramIssues[0]).toContain('没有被检查')
       expect(renderDoctorText(absent)).toContain('parameters:')
       // The row surface is a second, separate fact: the reachability half cannot run without it.
       const noRows = await diagnose({ get: (name: string) => name === 'configEditor' ? { configuration: (): unknown[] => [] } : undefined }, { home })
       expect(noRows.paramIssues).toHaveLength(1)
       expect(noRows.paramIssues[0]).toContain('listPlugins')
-      expect(noRows.paramIssues[0]).toContain('NOT checked')
+      expect(noRows.paramIssues[0]).toContain('没有被检查')
     } finally {
       await rm(home, { recursive: true, force: true })
     }

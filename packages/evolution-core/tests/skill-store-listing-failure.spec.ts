@@ -20,7 +20,7 @@ describe('create refuses when the case-variant probe cannot list (FLOW3-2)', () 
     const library = new SkillLibrary(undefined, io)
     const result = await library.create('my-tool', '---\nname: my-tool\ndescription: d.\n---\nBody.\n', 'foreground')
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('could not be checked for a case-variant collision')
+    expect(result.message).toContain('是否与大小写变体冲突')
     expect(result.message).toContain('EACCES: injected listing failure')
     // Nothing was written: the refusal happens before any body lands.
     expect(writes).toEqual([])
@@ -64,7 +64,7 @@ describe('restore refuses to guess when an archived candidate cannot be read', (
     const result = await library.restoreFromArchive('my-tool')
     expect(result.ok).toBe(false)
     expect(result.message).toContain('my-tool')
-    expect(result.message).toContain('no readable SKILL.md')
+    expect(result.message).toContain('没有可读的 SKILL.md')
     // Nothing was moved or written: the refusal happens before any byte lands in the active tree.
     expect(writes).toEqual([])
   })

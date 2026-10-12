@@ -112,11 +112,11 @@ describe('learning graph', () => {
     // ③ the name the graph showed is the name `graph delete` archives.
     const archived = await handler!.handler(invocationOf('delete hand-made'))
     expect(archived.kind).toBe('success')
-    expect(archived.text).toContain('archived')
+    expect(archived.text).toContain('已归档')
     // ④ ...and a name it never showed cannot be deleted.
     const ghost = await handler!.handler(invocationOf('delete ghost-skill'))
     expect(ghost.kind).toBe('error')
-    expect(ghost.text).toContain('not found')
+    expect(ghost.text).toContain('不存在')
   })
   it('memory nodes embed a snapshot token so edit/delete detect index drift (F15 parity + E-21)', () => {
     const usage = new Map([['python-testing', {}]])
@@ -157,7 +157,7 @@ describe('learning graph', () => {
     // ...but a memory write that shifted the index changes what's at the slot.
     const leaked = readMemoryIndex(parsed, [drifted])
     expect(leaked.ok).toBe(false)
-    expect(leaked.message).toContain('changed since the graph was rendered')
+    expect(leaked.message).toContain('在图渲染之后被改动过')
     // Out-of-range index still refuses, and a bare id (no snapshot) skips drift.
     expect(readMemoryIndex(parsed, []).ok).toBe(false)
     expect(readMemoryIndex({ kind: 'memory', source: 'memory', index: 0 }, [drifted]).ok).toBe(true)
@@ -349,7 +349,7 @@ describe('learning graph', () => {
       expect(found.kind).toBe('success')
       expect(found.text).toContain('Configured-root body.')
       // The default tree is genuinely empty, proving the read used the config.
-      expect(found.text).not.toContain('not found')
+      expect(found.text).not.toContain('不存在')
 
       const ctxDefault = new Context()
       let defaultHandler: typeof handler
@@ -365,7 +365,7 @@ describe('learning graph', () => {
       await ctxDefault.plugin(Graph)
       const missing = await defaultHandler!.handler(invocationOf('detail demo-skill'))
       expect(missing.kind).toBe('error')
-      expect(missing.text).toContain('not found')
+      expect(missing.text).toContain('不存在')
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
@@ -398,13 +398,13 @@ describe('learning graph', () => {
     // graph branch must NOT count it (V4-13 — previously it counted on result.ok).
     const noop = await handler!.handler(invocationOf(`edit demo-skill ${content}`))
     expect(noop.kind).toBe('success')
-    expect(noop.text).toContain('unchanged')
+    expect(noop.text).toContain('未变更')
     expect(recordCalls).toBe(0)
     // A real content edit still counts exactly once.
     const changed = '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\nbody changed\n'
     const real = await handler!.handler(invocationOf(`edit demo-skill ${changed}`))
     expect(real.kind).toBe('success')
-    expect(real.text).toContain('updated')
+    expect(real.text).toContain('已更新')
     expect(recordCalls).toBe(1)
   })
 
@@ -580,7 +580,7 @@ describe('learning graph', () => {
     await ctx.plugin(Graph)
     const result = await handler!.handler(invocationOf('edit memory:user:0 replacement body', { id: 'sess-mem2', header: { origin: 'foreground' } }))
     expect(result.kind).toBe('error')
-    expect(result.text).toContain('cannot be staged')
+    expect(result.text).toContain('无法暂存')
     expect(result.text).toContain('tool-memory')
   })
 
@@ -607,7 +607,7 @@ describe('learning graph', () => {
     await ctx.plugin(Graph)
     const result = await handler!.handler(invocationOf('edit fresh-skill new body', { id: 'sess-absent', header: { origin: 'subagent' } }))
     expect(result.kind).toBe('error')
-    expect(result.text).toContain('not found in the live skill library')
+    expect(result.text).toContain('实时技能库里没有技能')
     // Nothing was staged: the request must not have been reached.
     expect(captured).toBeUndefined()
   })

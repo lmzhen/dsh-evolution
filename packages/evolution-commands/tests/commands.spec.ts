@@ -113,9 +113,9 @@ describe('evolution-commands', () => {
     // skill history renders the recorded versions (one line each, oldest first).
     const historyResult = await captured!.handler({ rawInput: 'skill history source-b' })
     expect(historyResult.kind).toBe('success')
-    expect(historyResult.text).toContain('Content versions for "source-b" (oldest first, 2 of at most the retained count):')
+    expect(historyResult.text).toContain('技能 "source-b" 的内容版本（由旧到新，2 条，最多保留这么多）：')
     expect(historyResult.text).toContain('v1	2026-09-27T00:00:00.000Z	create	42 chars	aaaaaaaaaaaa')
-    expect(historyResult.text).toContain('Support-file versions (history only')
+    expect(historyResult.text).toContain('支撑文件版本（仅在历史里')
     expect(historyResult.text).toContain('v3	2026-09-27T00:02:00.000Z	write_file	9 chars	cccccccccccc')
     // skill undo parses the optional --to (with or without the v prefix) and defaults to "previous".
     const undoTo = await captured!.handler({ rawInput: 'skill undo source-b --to v1' })
@@ -146,7 +146,7 @@ describe('evolution-commands', () => {
     // optional now, so it must not dereference the missing agent either).
     const restructure = await captured!.handler({ rawInput: 'restructure demo "## Heading" references/heading.md' })
     expect(restructure.kind).toBe('error')
-    expect(restructure.text).toContain('Evolution IO registry not mounted')
+    expect(restructure.text).toContain('未挂载 evolution-io 注册表')
   })
 
   it('V27 G0.5 (U-1): learn delivers through the WAKING channel (followup-first, inject fallback)', async () => {
@@ -162,7 +162,7 @@ describe('evolution-commands', () => {
     // while the command reported success.
     const wakingAgent = { inject: (message: unknown) => injected.push(message), followup: (message: unknown) => followed.push(message) }
     const withRequest = await captured!.handler({ rawInput: 'learn distill the auth flow from <url>', agent: wakingAgent })
-    expect(withRequest.text).toContain('Follow it now')
+    expect(withRequest.text).toContain('请现在执行')
     expect(injected).toHaveLength(0)
     expect(followed).toHaveLength(1)
     const message = followed[0] as { content: Array<{ text?: string }>; source?: { kind?: string }; role?: string }
@@ -174,14 +174,14 @@ describe('evolution-commands', () => {
     expect(message.content?.[0]?.text).toContain('skill_manage')
     // Empty argument falls back to the "what we just did" guidance.
     const empty = await captured!.handler({ rawInput: 'learn', agent: wakingAgent })
-    expect(empty.text).toContain('Follow it now')
+    expect(empty.text).toContain('请现在执行')
     expect((followed[1] as { content: Array<{ text?: string }> }).content?.[0]?.text).toContain('the workflow we just went through')
     // A host without `followup` degrades to inject AND says so honestly —
     // claiming "Follow it now" over a non-waking queue is what the audit
     // flagged as a silent no-op.
     const fallback = await captured!.handler({ rawInput: 'learn check the retry budget', agent: { inject: (message: unknown) => injected.push(message) } })
-    expect(fallback.text).toContain('no wake-up channel')
-    expect(fallback.text).not.toContain('Follow it now')
+    expect(fallback.text).toContain('没有唤醒通道')
+    expect(fallback.text).not.toContain('请现在执行')
     expect(injected).toHaveLength(1)
   })
 
@@ -204,7 +204,7 @@ describe('evolution-commands', () => {
     }
     const agent = new PlatformLikeAgent()
     const result = await captured!.handler({ rawInput: 'learn capture the wake-path lesson', agent })
-    expect(result.text).toContain('Follow it now')
+    expect(result.text).toContain('请现在执行')
     expect(followed).toHaveLength(1)
     expect(agent.injected).toHaveLength(0)
     const message = followed[0] as { role?: string; content?: Array<{ text?: string }> }
@@ -241,7 +241,7 @@ describe('evolution-commands', () => {
     // C observation window: before any observed read, the verdict says so.
     observed = false
     const windowed = await captured!.handler({ rawInput: 'skills health' })
-    expect(windowed.text).toContain('Usage observation not yet established')
+    expect(windowed.text).toContain('使用观测尚未建立')
     expect(windowed.text).toContain('all skills healthy')
   })
 
@@ -305,7 +305,7 @@ describe('evolution-commands', () => {
     // prefix) triggered the destructive path by accident.
     const rejected = await captured!.handler({ rawInput: 'restore snap' })
     expect(rejected.kind).toBe('error')
-    expect(rejected.text).toContain('takes no arguments')
+    expect(rejected.text).toContain('不接受参数')
     expect(calls).toEqual([])
     const result = await captured!.handler({ rawInput: 'restore' })
     expect(result.kind).toBe('success')
@@ -334,19 +334,19 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands)
     const pause = await captured!.handler({ rawInput: 'curator pause' })
     expect(pause.kind).toBe('success')
-    expect(pause.text).toContain('paused')
+    expect(pause.text).toContain('已暂停')
     expect(calls).toEqual([{ paused: true }])
     const status = await captured!.handler({ rawInput: 'curator status' })
     expect(status.kind).toBe('success')
     expect(status.text).toContain('paused=true')
     expect(status.text).toContain('runs=2')
     const resume = await captured!.handler({ rawInput: 'curator resume' })
-    expect(resume.text).toContain('resumed')
+    expect(resume.text).toContain('已恢复')
     expect(calls).toEqual([{ paused: true }, { paused: false }])
     // Without persisted state the status command degrades gracefully.
     state = null
     const empty = await captured!.handler({ rawInput: 'curator status' })
-    expect(empty.text).toContain('No curator state yet')
+      expect(empty.text).toContain('还没有策展状态')
   })
 
   it('G7.4/C7: the ONE parser answers F-3 and F-4 (order, = spelling, syntax)', async () => {
@@ -363,14 +363,14 @@ describe('evolution-commands', () => {
     // is: a domain error, never the generic "is not a subcommand this build answers".
     for (const line of ['params --json --group review', 'params --group=review', 'params --group review --json']) {
       const result = await run(line)
-      expect(result.text, line).not.toContain('is not a subcommand this build answers')
+      expect(result.text, line).not.toContain('不是本构建能应答的子命令')
     }
 
     // F-3: a value flag left without its value is a SYNTAX answer, not a swallowed value that fails
     // later at the settings schema.
     const missing = await run('policy set a.b --expect')
     expect(missing.kind).toBe('error')
-    expect(missing.text).toContain('needs a value after --expect')
+    expect(missing.text).toContain('需要在 --expect')
 
     // ...and the well-formed line still reaches the domain layer (E-311 here, not the syntax answer).
     const wellFormed = await run('policy set a.b 5 --expect 3')
@@ -411,10 +411,10 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands)
     const noIo = await captured!.handler({ rawInput: 'maintain' })
     expect(noIo.kind).toBe('error')
-    expect(noIo.text).toContain('IO registry')
+    expect(noIo.text).toContain('未挂载 evolution-io 注册表')
     const badRestructure = await captured!.handler({ rawInput: 'restructure bad-syntax' })
     expect(badRestructure.kind).toBe('error')
-    expect(badRestructure.text).toContain('Usage:')
+    expect(badRestructure.text).toContain('用法：')
     const badToFile = await captured!.handler({ rawInput: 'restructure demo "Log" scripts/log.sh' })
     expect(badToFile.kind).toBe('error')
     expect(badToFile.text).toContain('references/')
@@ -495,17 +495,17 @@ describe('evolution-commands', () => {
     expect(await library.isPinned('demo-skill'), 'a fresh skill is not pinned').toBe(false)
     const pinned = await captured!.handler({ rawInput: 'skill pin demo-skill' })
     expect(pinned.kind).toBe('success')
-    expect(pinned.text).toContain('pinned')
+    expect(pinned.text).toContain('已固定')
     expect(existsSync(marker), 'the marker lands in the skill directory').toBe(true)
     expect(await library.isPinned('demo-skill')).toBe(true)
     const unpinned = await captured!.handler({ rawInput: 'skill unpin demo-skill' })
     expect(unpinned.kind).toBe('success')
-    expect(unpinned.text).toContain('unpinned')
+    expect(unpinned.text).toContain('已取消固定')
     expect(existsSync(marker)).toBe(false)
     expect(await library.isPinned('demo-skill')).toBe(false)
     const usage = await captured!.handler({ rawInput: 'skill pin' })
     expect(usage.kind).toBe('error')
-    expect(usage.text).toContain('Usage: /evolution skill pin <name>')
+      expect(usage.text).toContain('用法：/evolution skill pin <name>')
   })
 
   // E-70's decision, pinned on the command side too: the flip is NOT staged, does NOT bump usage and
@@ -531,12 +531,12 @@ describe('evolution-commands', () => {
     expect(first.kind).toBe('success')
     const again = await captured!.handler({ rawInput: 'skill pin demo-skill' })
     expect(again.kind).toBe('success')
-    expect(again.text).toContain('already pinned')
+    expect(again.text).toContain('已被固定')
     const twiceOff = await captured!.handler({ rawInput: 'skill unpin demo-skill' })
     expect(twiceOff.kind).toBe('success')
     const loose = await captured!.handler({ rawInput: 'skill unpin demo-skill' })
     expect(loose.kind).toBe('success')
-    expect(loose.text).toContain('not pinned')
+    expect(loose.text).toContain('未被固定')
     expect(mutations, 'a lifecycle flag is not a content mutation').toEqual([])
     expect(usageRecords, 'and it does not enter the usage ledger').toEqual([])
   })
@@ -628,7 +628,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const bad = await captured!.handler({ rawInput: 'maintain --timeout 0' })
     expect(bad.kind).toBe('error')
-    expect(bad.text).toContain('Invalid --timeout')
+    expect(bad.text).toContain('--timeout 值不合法')
     const good = await captured!.handler({ rawInput: 'maintain --timeout 600000' })
     expect(good.kind).toBe('success')
     // The spawn happens inside the detached run: wait for it instead of assuming
@@ -677,13 +677,13 @@ describe('evolution-commands', () => {
       // a successful scan).
       const concurrent = await handler!.handler({ rawInput: 'maintain' })
       expect(concurrent.kind).toBe('error')
-      expect(concurrent.text).toContain('already running')
+      expect(concurrent.text).toContain('已经在进行中')
       expect(starts).toBe(0) // first has NOT spawned yet — the window stayed closed
       await spawned // deterministic: wait for the spawn instead of a fixed sleep
       expect(starts).toBe(1)
       const second = await handler!.handler({ rawInput: 'maintain' })
       expect(second.kind).toBe('error')
-      expect(second.text).toContain('already running')
+      expect(second.text).toContain('已经在进行中')
       expect(starts).toBe(1) // no second spawn
       resolveRun!()
       await settleMaintain(handler!, started)
@@ -731,13 +731,13 @@ describe('evolution-commands', () => {
     // The fixture's io cannot even answer a read, so the reader lands on the
     // "unreadable" branch rather than "no result" — what matters is that NEITHER
     // of them renders as an empty plan.
-    expect(report.text).toMatch(/has NO result|could not be read/)
+    expect(report.text).toMatch(/没有结果|读不出来/)
     // The flag was reset (no "already running") AND the failure updated the
     // cooldown (E-39) — the second trigger is cooldown-blocked, not
     // in-flight-blocked. V10-08 (F-04): cooldown-blocked is kind:'error'.
     const second = await handler!.handler({ rawInput: 'maintain' })
     expect(second.kind).toBe('error')
-    expect(second.text).toContain('cooldown active')
+    expect(second.text).toContain('冷却中')
   })
 
   it('maintain grammar: unknown args rejected explicitly; = and multi-space timeout forms accepted (P3-2, F-03)', async () => {
@@ -757,7 +757,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const unknown = await handler!.handler({ rawInput: 'maintain --foo' })
     expect(unknown.kind).toBe('error')
-    expect(unknown.text).toContain('Unknown maintain arguments')
+    expect(unknown.text).toContain('未知的 maintain 参数')
     // F-03: the `=` spelling and multi-space separators pass the
     // grammar now (previously "Unknown maintain arguments" rejections).
     const equals = await handler!.handler({ rawInput: 'maintain --timeout=600000' })
@@ -895,7 +895,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
     const result = await handler!.handler({ rawInput: 'preset install' })
     expect(result.kind).toBe('error')
-    expect(result.text).toContain('is installed in this profile')
+    expect(result.text).toContain('本 profile 里已安装')
   })
 
   it('G3: no mounted profile still refuses — the double-mount question must not fail open', async () => {
@@ -909,7 +909,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
     const result = await handler!.handler({ rawInput: 'preset install' })
     expect(result.kind).toBe('error')
-    expect(result.text).toContain('no profile is mounted in this process')
+    expect(result.text).toContain('本进程没有挂载 profile')
   })
 
   it('preset install --base ptc writes the ptc variant from the shared base table (0.3.75)', async () => {
@@ -1108,7 +1108,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: join(dir, 'skills') })
     const result = await captured!.handler({ rawInput: 'maintain --facts' })
     expect(result.kind).toBe('error')
-    expect(result.text).toContain('the configured skill root does not exist')
+    expect(result.text).toContain('配置的技能根目录不存在')
     expect(result.text).toContain(join(dir, 'skills'))
     expect(result.text).not.toContain('MECHANICAL_FACTS')
   })
@@ -1116,7 +1116,7 @@ describe('evolution-commands', () => {
   it('maintain --facts answers a healthy but empty library exactly like the full scan (PLAN-R2 P2-10)', async () => {
     // Cause 3 of orchestrate's empty-snapshot discrimination: the root exists
     // and lists nothing. The full scan short-circuits with the plain text
-    // "Maintenance scan: empty skill library. Nothing to do." and no facts
+    // "维护扫描：技能库为空，无需处理。" and no facts
     // block; the preview used to render an empty MECHANICAL_FACTS block
     // instead — disagreeing with the very scan it previews.
     const dir = await tempRoot('evo-commands-facts-empty-')
@@ -1129,7 +1129,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root })
     const result = await captured!.handler({ rawInput: 'maintain --facts' })
     expect(result.kind).toBe('success')
-    expect(result.text).toBe('Maintenance scan: empty skill library. Nothing to do.')
+    expect(result.text).toBe('维护扫描：技能库为空，无需处理。')
     expect(result.text).not.toContain('MECHANICAL_FACTS')
   })
 
@@ -1166,7 +1166,7 @@ describe('evolution-commands', () => {
     // V10-08 (F-04): the cooldown refusal is kind:'error' now.
     const second = await captured!.handler({ rawInput: 'maintain' })
     expect(second.kind).toBe('error')
-    expect(second.text).toContain('cooldown')
+    expect(second.text).toContain('冷却')
     expect(starts).toBe(1)
   })
 
@@ -1204,7 +1204,7 @@ describe('evolution-commands', () => {
     // An id nobody knows is NAMED, not silently empty.
     const unknown = await handler!.handler({ rawInput: 'maintain status nope' })
     expect(unknown.kind).toBe('error')
-    expect(unknown.text).toContain('No run nope')
+    expect(unknown.text).toContain('本 home 里没有 nope')
   })
 
   it('0.19.0 (S2): cancel stops a running scan, settles it as cancelled, and refuses a second cancel', async () => {
@@ -1237,7 +1237,7 @@ describe('evolution-commands', () => {
     // One terminal state: cancelling again reports that, instead of a success.
     const again = await handler!.handler({ rawInput: `maintain cancel ${id}` })
     expect(again.kind).toBe('error')
-    expect(again.text).toContain('already cancelled')
+    expect(again.text).toContain('已经是 cancelled')
     release?.()
   })
 
@@ -1286,7 +1286,7 @@ describe('evolution-commands', () => {
       await ctx.plugin(Commands, { root: skillsRoot })
       const result = await handler!.handler({ rawInput: 'preset install' })
       expect(result.kind).toBe('error')
-      expect(result.text).toContain('Preset install failed')
+      expect(result.text).toContain('预设安装失败')
       // The previous patch is untouched — no half-updated artifact — and the commit
       // phase never started, so no backup was taken either.
       expect(readFileSync(patchPath, 'utf8')).toBe(oldPatch)
@@ -1331,7 +1331,7 @@ describe('evolution-commands', () => {
     for (const rawInput of ['approve', 'skill', 'params --group', 'nonsense --x']) {
       const result = await captured!.handler({ rawInput })
       expect(result.kind, rawInput).toBe('error')
-      expect(result.text, rawInput).toContain('is not a subcommand this build answers')
+      expect(result.text, rawInput).toContain('不是本构建能应答的子命令')
     }
   })
 
@@ -1655,7 +1655,7 @@ describe('evolution-commands', () => {
     expect(mutations.text).not.toContain('bad-skill')
     const report = await captured!.handler({ rawInput: 'curator report' })
     expect(report.kind).toBe('error')
-    expect(report.text).toContain('Report file unreadable.')
+      expect(report.text).toContain('报告文件读不出来。')
   })
 
   it('P2-16 (v38): /evolution curator report surfaces an interrupted run instead of failed=(none)', async () => {
@@ -1701,12 +1701,12 @@ describe('evolution-commands', () => {
     // 5e9 > 2^32-1: AbortSignal.timeout would throw a synchronous RangeError.
     const result = await captured!.handler({ rawInput: 'maintain --timeout 5000000000' })
     expect(result.kind).toBe('error')
-    expect(result.text).toContain('Invalid --timeout value')
+    expect(result.text).toContain('--timeout 值不合法')
     // P2-10 (v19): 2^31..2^32-1 does NOT throw — Node warns and silently sets
     // 1ms, so the command must reject it like the RangeError case.
     const overflow = await captured!.handler({ rawInput: 'maintain --timeout 2147483648' })
     expect(overflow.kind).toBe('error')
-    expect(overflow.text).toContain('Invalid --timeout value')
+    expect(overflow.text).toContain('--timeout 值不合法')
   })
 
   it('T4-12/A54: a trigger arriving mid-attempt is QUEUED — one failed attempt no longer ends the automatic migration', async () => {
@@ -1795,7 +1795,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const refused = await handler!.handler({ rawInput: 'maintain' })
     expect(refused.kind).toBe('error')
-    expect(refused.text).toContain('already running')
+    expect(refused.text).toContain('已经在进行中')
     expect(refused.text).toContain('other-plane-run')
     expect(starts, 'no second scan was spawned').toBe(0)
     const status = await handler!.handler({ rawInput: 'maintain status' })
@@ -1803,7 +1803,7 @@ describe('evolution-commands', () => {
     expect(status.text).toContain('running')
     const cancel = await handler!.handler({ rawInput: 'maintain cancel other-plane-run' })
     expect(cancel.kind).toBe('error')
-    expect(cancel.text).toContain('ANOTHER process')
+    expect(cancel.text).toContain('另一个进程')
     // The refresh is what makes this work for a run that appears AFTER this plane mounted.
     await writeFile(runsPath, JSON.stringify({
       schemaVersion: 1,
@@ -1832,12 +1832,12 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const status = await handler!.handler({ rawInput: 'maintain status' })
     expect(status.kind).toBe('error')
-    expect(status.text).toContain('not readable')
-    expect(status.text).toContain('NOT "no runs"')
+    expect(status.text).toContain('读不出来')
+    expect(status.text).toContain('「不是」没有运行')
     expect(status.text, 'the empty-history line must not answer this').not.toContain('No maintenance run recorded')
   })
 
-  it('review P2-2: a run whose report is gone answers "has NO result" (the missing branch, on a real io)', async () => {
+  it('review P2-2: a run whose report is gone answers "没有结果" (the missing branch, on a real io)', async () => {
     const dir = await tempHome('evo-commands-noresult-')
     const root = join(dir, 'skills')
     await mkdir(join(root, 'demo-skill'), { recursive: true })
@@ -1855,8 +1855,8 @@ describe('evolution-commands', () => {
     await rm(join(dir, 'evolution', 'reports', `maintain-${runId}.md`), { force: true })
     const report = await handler!.handler({ rawInput: `maintain report ${runId}` })
     expect(report.kind).toBe('error')
-    expect(report.text).toContain('has NO result')
-    expect(report.text, 'the unreadable branch must not answer this').not.toContain('could not be read')
+    expect(report.text).toContain('没有结果')
+    expect(report.text, 'the unreadable branch must not answer this').not.toContain('读不出来')
   })
 })
 
@@ -1892,14 +1892,14 @@ it('v28 G7.2 (CMD-01): a faulting mounted service yields kind:error on every sta
   for (const rawInput of stateTouching) {
     const result = await captured!.handler({ rawInput })
     expect({ rawInput, kind: result.kind }).toEqual({ rawInput, kind: 'error' })
-    expect(result.text).toContain('command failed')
+    expect(result.text).toContain('命令失败')
   }
   // `maintain` keeps its own structured error path (pre-v28). Unmatched input answers the
   // T4-03 error WITHOUT touching a service — so it carries neither the fault message nor a
   // 'success' (the help fallback used to claim one). The bare command is the success control.
   const unmatched = await captured!.handler({ rawInput: 'definitely-not-a-subcommand' })
   expect(unmatched.kind).toBe('error')
-  expect(unmatched.text).toContain('is not a subcommand this build answers')
+  expect(unmatched.text).toContain('不是本构建能应答的子命令')
   expect(unmatched.text).not.toContain('service fault injected')
   const help = await captured!.handler({ rawInput: '' })
   expect(help.kind).toBe('success')

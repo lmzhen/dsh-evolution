@@ -237,7 +237,7 @@ export class MemoryStore {
     if (this.failureCount > this.maxFailures) {
       return {
         ok: false,
-        message: `Memory consolidation failed ${this.failureCount} times this turn. Stop retrying memory calls and continue with the user's task.${previewEntries(entries)}`,
+        message: `本轮记忆整理已失败 ${this.failureCount} 次。请停止重试记忆调用，继续处理用户的任务。${previewEntries(entries)}`,
         entries, chars, limit: this.limitFor(target),
       }
     }
@@ -299,10 +299,10 @@ export class MemoryStore {
     const oversized = await this.oversizedFile(target)
     if (!oversized) return null
     const backup = await this.backupFile(target)
-    const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
+    const suffix = backup ? ` 已把备份保存到 ${basename(backup)}。` : ''
     return {
       ok: false,
-      message: `Memory file is ${oversized.size} bytes (limit ${oversized.limit * READ_GUARD_FACTOR}) — skipping read.${suffix} Fix the file manually, then retry.`,
+      message: `记忆文件为 ${oversized.size} 字节（上限 ${oversized.limit * READ_GUARD_FACTOR}）—— 跳过读取。${suffix} 请手动修复该文件后重试。`,
       entries: [], chars: 0, limit: this.limitFor(target),
     }
   }
@@ -345,7 +345,7 @@ export class MemoryStore {
       if (typeof size === 'number' && size > SHRINK_LOAD_CEILING) {
         return {
           ok: false,
-          message: `Memory file is ${size} bytes - too large to load even for a remove-only batch. Fix the file manually, then retry.`,
+          message: `记忆文件为 ${size} 字节 —— 即使只做删除批处理也过大、无法加载。请手动修复该文件后重试。`,
           entries: [], chars: 0, limit: this.limitFor(target),
         }
       }
@@ -366,7 +366,7 @@ export class MemoryStore {
     // skill-store's V6-19 guard.
     return outcome ?? {
       ok: false,
-      message: 'internal error: the memory transaction did not invoke the task; no write was performed',
+      message: '内部错误：记忆写事务没有调用任务；未执行任何写入',
       entries: [], chars: 0, limit: this.limitFor(target),
     }
   }
@@ -376,7 +376,7 @@ export class MemoryStore {
   }
 
   private async addChained(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
-    if (!facts.trim()) return { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }
+    if (!facts.trim()) return { ok: false, message: '内容不能为空。', entries: [], chars: 0, limit: this.limitFor(target) }
     return await this.chainedWrite(target, async raw => await this.addCore(target, facts, raw))
   }
 
@@ -392,7 +392,7 @@ export class MemoryStore {
     // error is not a write failure (same discipline as applyBatchCore's
     // inline empty-facts rejection). Unreachable via the public entries
     // (addChained pre-trims), kept as a defence against future callers.
-    if (!content) return { result: { ok: false, message: 'Content cannot be empty.', entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
+    if (!content) return { result: { ok: false, message: '内容不能为空。', entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     // The oversized guard runs pre-transact in add(); drift is derived from
     // the locked view below.
     const refusal = await this.driftRefusal(target, raw)
@@ -413,7 +413,7 @@ export class MemoryStore {
       // rewrite it as separate facts. V4-49: no batch-style `Operation N`
       // prefix here — this is a single add, and addCore's other rejections
       // (drift/threat/limit) are likewise prefix-free.
-      return { result: { ok: false, message: 'Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.', entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
+      return { result: { ok: false, message: '该条目含有分隔符（§），会被拆成多条；请改写为多条独立的事实。', entries: [], chars: 0, limit: this.limitFor(target) }, write: null }
     }
 
     const entries = [...new Set(normalizeEntries(raw))]
@@ -423,16 +423,16 @@ export class MemoryStore {
     // `add('alpha')` a false duplicate of a stored `## 2020-01-01\nalpha`.
     if (entries.some(entry => this.dedupeKey(entry) === content)) {
       this.resetFailures()
-      return { result: { ok: true, message: `Entry already exists (no duplicate added).${this.storageHint(target, entries.join(ENTRY_DELIMITER).length)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+      return { result: { ok: true, message: `该条目已存在（未重复添加）。${this.storageHint(target, entries.join(ENTRY_DELIMITER).length)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
     }
     const next = [...entries, prefixed]
     const total = next.join(ENTRY_DELIMITER).length
     const addLimit = this.limitFor(target)
     if (addLimit > 0 && total > addLimit) {
-      return { result: this.failure(target, `Adding this entry would exceed the ${addLimit} char limit. Consolidate or remove stale entries, then retry.`, entries), write: null }
+      return { result: this.failure(target, `添加该条目会超过 ${addLimit} 字符上限。请先合并或删除过期条目，再重试。`, entries), write: null }
     }
     this.resetFailures()
-    return { result: { ok: true, message: `Entry added.${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }, write: render(next) }
+    return { result: { ok: true, message: `已添加条目。${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }, write: render(next) }
   }
 
   /**
@@ -510,15 +510,15 @@ export class MemoryStore {
       const over = entries.filter(entry => entry.length > limit).length
       return {
         ok: false,
-        message: `${over} memory ${over === 1 ? 'entry exceeds' : 'entries exceed'} the configured ${target}CharLimit (${limit}); they were written under a higher limit. Raise the limit or remove entries — remove operations stay available.`,
+        message: `${over} 条记忆超过了配置的 ${target}CharLimit（${limit}）；它们是在更高上限下写入的。请提高上限或删除条目 —— 删除类操作仍然可用。`,
         entries,
         chars: entries.join(ENTRY_DELIMITER).length,
         limit,
       }
     }
     const backup = await this.backupFile(target)
-    const suffix = backup ? ` A backup was saved to ${basename(backup)}.` : ''
-    return { ok: false, message: `External drift detected in memory file.${suffix} Resolve the drift before retrying.`, entries: [], chars: 0, limit: this.limitFor(target) }
+    const suffix = backup ? ` 已把备份保存到 ${basename(backup)}。` : ''
+    return { ok: false, message: `检测到记忆文件被外部改动。${suffix} 请先处理该漂移再重试。`, entries: [], chars: 0, limit: this.limitFor(target) }
   }
 
   async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
@@ -526,7 +526,7 @@ export class MemoryStore {
   }
 
   private async applyBatchChained(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
-    if (operations.length === 0) return { ok: false, message: 'operations list is empty.', entries: [], chars: 0, limit: this.limitFor(target) }
+    if (operations.length === 0) return { ok: false, message: 'operations 列表为空。', entries: [], chars: 0, limit: this.limitFor(target) }
     // v28 MEM-01: remove-only batches are the recovery path for the
     // 'over-limit' state (canonical body under a lowered limit) — the drift
     // gate lets them through; grows still refuse with the config-naming text.
@@ -560,14 +560,14 @@ export class MemoryStore {
         // (core's `payloadText`), not to a blank `facts` that shadows a body the
         // op does carry.
         const body = payloadText(op)
-        if (!body) return { result: { ok: false, message: `Operation ${position} (add): facts is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+        if (!body) return { result: { ok: false, message: `第 ${position} 个操作（add）：必须提供 facts。未应用任何操作。${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = this.memoryThreatBlock(body)
-        if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+        if (threat) return { result: { ok: false, message: `第 ${position} 个操作：${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         // V8-02 (0.3.47): same post-prefix inspection as addCore — the
         // `## date\n${body}` seam must not synthesize the delimiter.
         const entryBody = `${datePrefix}${body}`
         if (hasEntryDelimiter(entryBody)) {
-          return { result: { ok: false, message: `Operation ${position} (add): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+          return { result: { ok: false, message: `第 ${position} 个操作（add）：该条目含有分隔符（§），会被拆成多条；请改写为多条独立的事实。${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
         if (!working.some(entry => this.dedupeKey(entry) === body)) {
           working.push(entryBody)
@@ -580,16 +580,16 @@ export class MemoryStore {
       // inspected through unknown (the caller's type can lie).
       const rawAction: unknown = op.action
       if (rawAction !== 'remove' && rawAction !== 'replace') {
-        return { result: { ok: false, message: `Operation ${position}: unknown action "${String(rawAction)}" (expected add/remove/replace). No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+        return { result: { ok: false, message: `第 ${position} 个操作：未知动作「${String(rawAction)}」（应为 add/remove/replace）。未应用任何操作。${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
       }
       const needle = (op.old_text ?? '').trim()
-      if (!needle) return { result: { ok: false, message: `Operation ${position} (${op.action}): old_text is required. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+      if (!needle) return { result: { ok: false, message: `第 ${position} 个操作（${op.action}）：必须提供 old_text。未应用任何操作。${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
       const matches = working.map((entry, matchIndex) => ({ entry, matchIndex })).filter(({ entry }) => entry.includes(needle))
       if (matches.length === 0) {
-        return { result: this.failure(target, `Operation ${position}: no entry matching "${needle}" found. No operations were applied.`, entries), write: null }
+        return { result: this.failure(target, `第 ${position} 个操作：找不到匹配 "${needle}" 的条目。未应用任何操作。`, entries), write: null }
       }
       if (new Set(matches.map(m => m.entry)).size > 1) {
-        return { result: { ok: false, message: `Operation ${position}: "${needle}" matched multiple distinct entries. No operations were applied.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+        return { result: { ok: false, message: `第 ${position} 个操作：「${needle}」匹配到多条不同条目。未应用任何操作。${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
       }
       const matchIndex = matches[0]?.matchIndex ?? -1
       if (op.action === 'remove') {
@@ -598,15 +598,15 @@ export class MemoryStore {
         // PLAN-R2 P2-6 (2026-09-16): same `content` alias as the add branch —
         // this is the replacement body slot, not a facts-only field.
         const body = payloadText(op)
-        if (!body) return { result: { ok: false, message: `Operation ${position} (replace): facts is required.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+        if (!body) return { result: { ok: false, message: `第 ${position} 个操作（replace）：必须提供 facts。${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         const threat = this.memoryThreatBlock(body)
-        if (threat) return { result: { ok: false, message: `Operation ${position}: ${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+        if (threat) return { result: { ok: false, message: `第 ${position} 个操作：${threat}${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         // C-02: the replaced entry carries the date prefix like an
         // added one, and the delimiter guard inspects the FINAL on-disk entry
         // (the V8-02 seam rule — a leading-§ body would synthesize `\n§\n`).
         const entryBody = `${datePrefix}${body}`
         if (hasEntryDelimiter(entryBody)) {
-          return { result: { ok: false, message: `Operation ${position} (replace): Fact contains the entry delimiter (§) and would split into multiple entries; rewrite it as separate facts.${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+          return { result: { ok: false, message: `第 ${position} 个操作（replace）：该条目含有分隔符（§），会被拆成多条；请改写为多条独立的事实。${previewEntries(entries)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
         }
         working[matchIndex] = entryBody
       }
@@ -614,10 +614,10 @@ export class MemoryStore {
     const total = working.join(ENTRY_DELIMITER).length
     const batchLimit = this.limitFor(target)
     if (batchLimit > 0 && total > batchLimit) {
-      return { result: this.failure(target, `Batch result (${total} chars) exceeds the ${batchLimit} limit. Remove or shorten more entries in the same batch.`, entries), write: null }
+      return { result: this.failure(target, `批处理结果（${total} 字符）超过 ${batchLimit} 上限。请在同一个批里再删除或缩短一些条目。`, entries), write: null }
     }
     this.resetFailures()
-    return { result: { ok: true, message: `Applied ${operations.length} operation(s).${this.storageHint(target, total)}`, entries: working, chars: total, limit: this.limitFor(target) }, write: render(working) }
+    return { result: { ok: true, message: `已应用 ${operations.length} 个操作。${this.storageHint(target, total)}`, entries: working, chars: total, limit: this.limitFor(target) }, write: render(working) }
   }
 
   async renderContext(): Promise<string> {
