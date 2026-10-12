@@ -46,16 +46,6 @@ Run the same generic workflow. Capture the standard result. Report the common ou
 `
 }
 
-/** v43 FLOW2-1 fixture: poll until `predicate` holds. A fixed sleep would race
- * a loaded runner, and the sweep-lock case must not be timing-dependent. */
-async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 10_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    if (await predicate()) return
-    await new Promise(resolve => setTimeout(resolve, 10))
-  }
-  throw new Error('waitFor: the condition never held before the deadline')
-}
 
 /** S5.5: curator-state mock record shape and its atomic RMW task signature. */
 type StateRecord = { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }
@@ -1376,58 +1366,11 @@ Body of ${name}.
     ctx.evolutionCurator.stop()
   })
 
-  it('v43 FLOW2-1: a foreign holder of the per-home sweep lock blocks the retention sweep', async () => {
-    // The instance claim is a module-scope Map: a second curator ROW of this
-    // process yields, but a second PROCESS over one home was never excluded —
-    // and the sweep is a multi-step list + delete over a DIRECTORY, so it needs
-    // the io write lock rather than a per-file one. This fixture holds that lock
-    // exactly as a second process would and proves the sweep yields to it.
-    const home = await tempHome('dsh-curator-sweeplock-')
-    const reportsRoot = join(home, 'evolution', 'reports')
-    await mkdir(reportsRoot, { recursive: true })
-    for (let i = 0; i < 25; i += 1) {
-      const startedAt = new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString()
-      await writeFile(join(reportsRoot, `curator-seed-${i}.json`), JSON.stringify({
-        schemaVersion: 1, runId: `seed-${i}`, startedAt, finishedAt: startedAt,
-        staleCandidates: [], llmNominations: [], archiveCandidates: [], archived: [], failed: [],
-      }))
-    }
-    const ctx = new Context()
-    await ctx.plugin(EvolutionIoRegistry)
-    // A 2-attempt lock budget: a HELD lock must fail the sweep fast instead of
-    // burning the production ~2s budget. The refusal is the assertion.
-    const provider: EvolutionIo = { name: 'node-fast', ...nodeEvolutionIo(2) }
-    ctx.evolutionIo.registerProvider(provider, { default: true })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
-    const warnSpy = vi.spyOn(ctx.logger, 'warn')
-
-    // The lock target the inventory row declares for this site
-    // (curator-reports): `<home>/reports/.retention` -> lock file `.retention.lock`.
-    const lockTarget = join(reportsRoot, '.retention')
-    const lockFile = `${lockTarget}.lock`
-    const holder = nodeEvolutionIo()
-    const holding = transactIo(holder, lockTarget, async () => {
-      await new Promise(resolve => setTimeout(resolve, 1_000))
-      return null
-    })
-    await waitFor(async () => (await readFile(lockFile, 'utf8').catch(() => null)) !== null)
-
-    await ctx.evolutionCurator.run({ ignoreGates: true, dryRun: true })
-    const during = (await readdir(reportsRoot)).filter(name => name.startsWith('curator-seed-'))
-    // The sweep was refused: every seeded report survives while the lock is held
-    // (without the lock the run's own retention pass prunes seven of them).
-    expect(during).toHaveLength(25)
-    expect(warnSpy.mock.calls.map(call => String(call[0])).join(' | ')).toContain('failed to retain reports')
-
-    await holding
-    await ctx.evolutionCurator.run({ ignoreGates: true, dryRun: true })
-    const after = (await readdir(reportsRoot)).filter(name => name.startsWith('curator-seed-'))
-    // With the holder gone the SAME sweep prunes its window: the refusal came
-    // from the lock, not from a broken sweep.
-    expect(after.length).toBeLessThan(25)
-    warnSpy.mockRestore()
-    ctx.evolutionCurator.stop()
-  }, 30_000)
+  // RETIRED (0.23.0, S4): this case held the io write lock as a second process would and proved the
+  // retention sweep yields to it. The family deleted that lock protocol with S4 (concurrency now rides
+  // the platform’s versioned write plus in-process serialization), so the premise is gone and the
+  // case could only ever poll until its deadline — red on CI, green by luck locally. Retired with the
+  // mechanism, not patched: see the 0.23.0 CHANGELOG note on the lock protocol.
 
   it('scopeView reports pinned skills as protected through the library view (N-1)', async () => {
     await tempHome('dsh-curator-scopeview-')
