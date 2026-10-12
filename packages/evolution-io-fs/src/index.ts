@@ -86,7 +86,7 @@ export function platformEvolutionIo(
   }
   const fallback = nodeEvolutionIo()
   return {
-    readText: (path) => readTextThrough(fs, path),
+    readText: path => readTextThrough(fs, path),
     async writeText(path, content) {
       await fs.writeText(await fs.resolve(path), content)
     },
@@ -101,7 +101,7 @@ export function platformEvolutionIo(
     async list(path) {
       const target = await fs.resolve(path)
       const entries = await fs.listDir(target).catch(() => [] as Array<{ name: string }>)
-      return entries.map((entry) => entry.name)
+      return entries.map(entry => entry.name)
     },
     async isSymlink(path) {
       const info = await fs.lstat(path).catch(() => undefined)
@@ -135,7 +135,7 @@ export function platformEvolutionIo(
       }
     },
     // Declared gaps (C2): the mutations the platform surface does not carry yet.
-    remove: (path) => fallback.remove(path),
+    remove: path => fallback.remove(path),
     rename: (path, destination) => fallback.rename(path, destination),
     copy: (path, destination) => fallback.copy(path, destination),
   }

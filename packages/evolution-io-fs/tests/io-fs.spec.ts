@@ -35,7 +35,7 @@ function fakeFs(seed: Record<string, string> = {}, options: { readFailsOn?: stri
     },
     async listDir(target: unknown) {
       const path = (target as { path: string }).path
-      return (dirs.get(path) ?? []).map((name) => ({ name }))
+      return (dirs.get(path) ?? []).map(name => ({ name }))
     },
     async writeText(target: unknown, content: string) {
       files.set((target as { path: string }).path, content)

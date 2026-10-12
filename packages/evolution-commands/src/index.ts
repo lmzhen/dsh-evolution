@@ -847,7 +847,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // An UNDECLARED flag keeps the old 'unknown arguments' answer: the table declares what this
         // subcommand accepts (C7), so a typo cannot silently become a bare flag.
         const maintainFlagsDeclared = [...(isParseFailure(maintainParsed) ? [] : maintainParsed.flags.keys())]
-          .every((flag) => flagsOf('maintain').includes('--' + flag))
+          .every(flag => flagsOf('maintain').includes('--' + flag))
         if (!isParseFailure(maintainParsed) && maintainParsed.name === 'maintain' && maintainParsed.positionals.length === 0 && maintainFlagsDeclared) {
           // User-command maintenance RUN (design 011; async since 0.19.0 / S2).
           // Deterministic facts + one-shot subagent → a validated plan that is
@@ -855,8 +855,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // writes to the skill tree, no auto execution, fail-closed when a
           // dependency is missing. `--timeout <ms>` overrides the deadline for
           // THIS run — no file edit, no restart.
-          const timeoutFlag = maintainParsed.flags.get("timeout")
-          const runTimeoutMs = typeof timeoutFlag === "string" ? Number(timeoutFlag) : (config.maintainTimeoutMs ?? 600_000)
+          const timeoutFlag = maintainParsed.flags.get('timeout')
+          const runTimeoutMs = typeof timeoutFlag === 'string' ? Number(timeoutFlag) : (config.maintainTimeoutMs ?? 600_000)
           // V6-29 (0.3.36): AbortSignal.timeout throws a RangeError above 2^32-1
           // — reject the domain explicitly instead of surfacing the platform
           // error from a `--timeout` typo.
@@ -884,7 +884,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // contract ('spawn' + a platform-shaped request); a wider local type made the
           // real service assignable while hiding a future miss from `tsc`.
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-// platform-declaration anchor: the platform’s `subagents`, `tools`, `skillUsage` and `settings` services (all optional; undefined ⇒ the feature is off)
+          // platform-declaration anchor: the platform’s `subagents`, `tools`, `skillUsage` and `settings` services
+          //(all optional; undefined ⇒ the feature is off)
           const subagents = ctx.get('subagents') as MaintainRuntime['subagents'] | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
@@ -1232,7 +1233,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const presetParsed = parseSubcommand(input)
         const presetInstall = isParseFailure(presetParsed) || presetParsed.name !== 'preset'
           ? null
-          : (presetParsed.positionals[0] === 'install' && presetParsed.positionals.length === 1 && [...presetParsed.flags.keys()].every((flag) => flagsOf('preset').includes('--' + flag)) ? presetParsed : false)
+          : (presetParsed.positionals[0] === 'install' && presetParsed.positionals.length === 1 && [...presetParsed.flags.keys()].every(flag => flagsOf('preset').includes('--' + flag)) ? presetParsed : false)
         if (presetInstall !== null && presetInstall !== false) {
           // 0.3.75 (v41 §6.1): this path knew `standard` only, so an
           // npm-installed family could not reach the ptc variant at all. The
@@ -1633,7 +1634,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const evolutionCommand = {
       name: 'evolution',
       description: '自进化：状态与待批准写入',
-      recordInput: false,
+      // F-5 (0.23.0, owner decision): this surface used to declare `recordInput: false`, so the
+      // command text never reached the durable record. The decision is the OPPOSITE — an operator
+      // must be able to reconstruct what was run — so the platform default (record the input)
+      // applies and the line is gone. A stray `false` here would silently reverse it.
       input: {
         // input declaration: the frontend treats a declared-input command as
         // args-tolerant (leading claim keeps the whole rest, spaces included) —

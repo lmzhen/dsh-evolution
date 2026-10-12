@@ -109,7 +109,7 @@ export function apply(ctx: ClientContext): void {
   // BEFORE the settings shell that declares `settings.section` and provides `configForms`,
   // and a captured `undefined` would pin every card to the empty state for the life of the
   // fiber. `sourceFor` reads the probe on each render, when the shell is necessarily active.
-// platform-declaration anchor: the platform’s `configForms` seat (optional; undefined ⇒ the panel renders read-only)
+  // platform-declaration anchor: the platform’s `configForms` seat (optional; undefined ⇒ the panel renders read-only)
   const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined
   const sources = createSourceCache(probe)
   ctx.effect(() => () => { sources.dispose() }, 'evolution-settings: sources')

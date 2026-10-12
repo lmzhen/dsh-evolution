@@ -144,7 +144,8 @@ async function objectOf<T>(read: (() => unknown) | undefined): Promise<T | undef
  * @returns the view; each member is undefined when its surface is not mounted or did not answer.
  */
 export async function readPlatformView(ctx: { get(name: string): unknown }): Promise<PlatformView> {
-// platform-declaration anchor: the platform’s `pluginManager`, `configEditor` and `pluginInventory` services (all optional; undefined ⇒ the view reports it as missing)
+// platform-declaration anchor: the platform’s `pluginManager`, `configEditor` and `pluginInventory` services
+//(all optional; undefined ⇒ the view reports it as missing)
   const manager = ctx.get('pluginManager') as ManagerLike | undefined
   const editor = ctx.get('configEditor') as EditorLike | undefined
   const inventory = ctx.get('pluginInventory') as InventoryLike | undefined

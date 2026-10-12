@@ -638,7 +638,8 @@ function probePresetFreshness(home: string, servicePresent: (name: string) => bo
  * @returns the row the report renders.
  */
 async function legacyMigrationRow(ctx: { get(name: string): unknown }, home: string): Promise<LegacyMigrationRow> {
-// platform-declaration anchor: the platform’s `settings` and `sessionQuery` services (both optional; undefined ⇒ the corresponding check is skipped)
+// platform-declaration anchor: the platform’s `settings` and `sessionQuery` services
+//(both optional; undefined ⇒ the corresponding check is skipped)
   const settings = ctx.get('settings') as SettingsProviderLike | undefined
   const io = (ctx.get('evolutionIo') as { provider?(): EvolutionIoLike } | undefined)?.provider?.()
   if (settings?.describe === undefined || io === undefined) return { state: 'unavailable', source: undefined, pending: [] }

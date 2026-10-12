@@ -385,7 +385,7 @@ it('G2 S4: concurrent RMW on ONE path inside this process never loses an update'
   await io.writeText(target, '0')
   // The surviving concurrency guarantee: one promise chain per path, so twelve readers all see
   // the previous write. (Cross-process mutual exclusion is the platform provider's job now.)
-  await Promise.all(Array.from({ length: 12 }, () => io.transact(target, async (current) => String(Number(current ?? '0') + 1))))
+  await Promise.all(Array.from({ length: 12 }, () => io.transact(target, async current => String(Number(current ?? '0') + 1))))
   expect(await io.readText(target)).toBe('12')
 })
 

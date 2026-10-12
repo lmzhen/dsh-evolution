@@ -88,13 +88,13 @@ describe('one version row as cells (G1)', () => {
 })
 
 it('U-5: shows the recorded hash as a short code whose hover carries the whole value', () => {
-    const cells = versionRowCells(version({ hash: 'abcdef1234567890' }))
-    const hash = cells.title.find(cell => cell.key === 'hash') as { literal?: string; note?: string } | undefined
-    expect(hash?.literal).toBe('abcdef1')
-    expect(hash?.note).toBe('abcdef1234567890')
-    // A row recorded before the field existed still renders: absence is not an error.
-    expect(versionRowCells(version()).title.some(cell => cell.key === 'hash')).toBe(false)
-  })
+  const cells = versionRowCells(version({ hash: 'abcdef1234567890' }))
+  const hash = cells.title.find(cell => cell.key === 'hash') as { literal?: string; note?: string } | undefined
+  expect(hash?.literal).toBe('abcdef1')
+  expect(hash?.note).toBe('abcdef1234567890')
+  // A row recorded before the field existed still renders: absence is not an error.
+  expect(versionRowCells(version()).title.some(cell => cell.key === 'hash')).toBe(false)
+})
 
 describe('one skill row as cells (G1)', () => {
   it('puts the name and the size on the title line', () => {

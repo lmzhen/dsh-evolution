@@ -63,7 +63,7 @@ export function RowConfigCard(props: RowConfigCardProps): ReactNode {
     // the revision is the one this render read, which is exactly what the platform's form model does.
     // G5 P1-1: the Host's boolean IS the verdict, so the entry FORWARDS it (the old body awaited and
     // dropped it, which made every write read as refused once the card trusted the return value).
-    mutateOnce: async (ops) => form.mutate(ops, form.state.revision),
-    clear: async (field) => form.mutate([{ op: 'unset', path: [field] }], form.state.revision),
+    mutateOnce: async ops => form.mutate(ops, form.state.revision),
+    clear: async field => form.mutate([{ op: 'unset', path: [field] }], form.state.revision),
   })
 }

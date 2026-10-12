@@ -281,7 +281,7 @@ export function installEvolutionProjections(ctx: Context): void {
   // Already-mounted registry first: a reader that runs in the same tick as its own mount
   // (a unit spec, an assembly-time probe) must see its units registered, and the injected
   // callback of a not-yet-available service is not guaranteed to have run by then.
-// platform-declaration anchor: the platform’s `sessionProjections` service (optional; undefined ⇒ no measurement)
+  // platform-declaration anchor: the platform’s `sessionProjections` service (optional; undefined ⇒ no measurement)
   const mounted = ctx.get('sessionProjections')
   if (mounted !== undefined) {
     register(mounted)

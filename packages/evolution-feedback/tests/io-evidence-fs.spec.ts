@@ -14,7 +14,7 @@ import * as Feedback from '../src/index.ts'
 import { join } from 'node:path'
 import { tempHome } from '../../test-support/temp-home.ts'
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20))
+const settle = () => new Promise(resolve => setTimeout(resolve, 20))
 
 describe('G2 S3: feedback persists through the platform backend when the deployment mounts one', () => {
   it('records with the fs provider mounted, and works without it', async () => {

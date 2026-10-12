@@ -40,7 +40,7 @@ describe('G2 S3: skill-usage writes through the platform backend when mounted', 
     })
     await withFs.plugin(SkillUsageRegistry, { root })
     await withFs.skillUsage.record('demo', 'use')
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await new Promise(resolve => setTimeout(resolve, 20))
     expect(fsCalls).toBeGreaterThan(0)
   })
 })

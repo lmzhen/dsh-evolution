@@ -9,7 +9,7 @@ import { platformEvolutionIo } from '../src/index.ts'
 /** In-memory platform filesystem with real version semantics and injectable conflicts. */
 function guardedFs(seed: Record<string, string> = {}) {
   const files = new Map(Object.entries(seed))
-  const versions = new Map([...files.keys()].map((k) => [k, 1]))
+  const versions = new Map([...files.keys()].map(k => [k, 1]))
   let onWrite: ((path: string) => void) | undefined
   return {
     files,
@@ -30,7 +30,7 @@ function guardedFs(seed: Record<string, string> = {}) {
       if (text === undefined) { const error = new Error('missing') as Error & { code?: string }; error.code = 'FS_NOT_FOUND'; throw error }
       return text
     },
-    async listDir() { return [...files.keys()].map((name) => ({ name })) },
+    async listDir() { return [...files.keys()].map(name => ({ name })) },
     async writeText(target: unknown, content: string, expected?: { kind: string; version?: unknown }) {
       const path = (target as { path: string }).path
       onWrite?.(path)
@@ -59,7 +59,7 @@ describe('G2 S3: optimistic RMW (CAS retry, not a second lock)', () => {
       fs.versions.set(path, (fs.versions.get(path) ?? 0) + 1)
     })
     const io = platformEvolutionIo(ctxWith(fs))
-    await io.transact?.('/a.txt', (current) => (current ?? '') + 'mine\n')
+    await io.transact?.('/a.txt', current => (current ?? '') + 'mine\n')
     expect(fs.files.get('/a.txt')).toBe('one\nforeign\nmine\n')
   })
 
@@ -67,7 +67,7 @@ describe('G2 S3: optimistic RMW (CAS retry, not a second lock)', () => {
     const fs = guardedFs({ '/b.txt': 'x\n' })
     fs.beforeWrite((path) => { fs.files.set(path, 'other\n'); fs.versions.set(path, (fs.versions.get(path) ?? 0) + 1) })
     const io = platformEvolutionIo(ctxWith(fs), { attempts: 1 })
-    await expect(io.transact?.('/b.txt', (current) => (current ?? '') + 'mine\n')).rejects.toThrow(/stale/)
+    await expect(io.transact?.('/b.txt', current => (current ?? '') + 'mine\n')).rejects.toThrow(/stale/)
   })
 
   it('writes nothing when the task throws', async () => {
@@ -90,7 +90,7 @@ describe('G2 S3: optimistic RMW (CAS retry, not a second lock)', () => {
       fs.versions.set(path, 1)
     })
     const io = platformEvolutionIo(ctxWith(fs))
-    await io.transact?.('/d.txt', (current) => (current === null ? 'mine\n' : current + 'mine\n'))
+    await io.transact?.('/d.txt', current => (current === null ? 'mine\n' : current + 'mine\n'))
     expect(fs.files.get('/d.txt')).toBe('theirs\nmine\n')
   })
 
@@ -98,8 +98,8 @@ describe('G2 S3: optimistic RMW (CAS retry, not a second lock)', () => {
     const fs = guardedFs({ '/e.txt': '' })
     const io = platformEvolutionIo(ctxWith(fs))
     await Promise.all([
-      io.transact?.('/e.txt', async (current) => { await new Promise((r) => setTimeout(r, 1)); return (current ?? '') + 'A\n' }),
-      io.transact?.('/e.txt', async (current) => { await new Promise((r) => setTimeout(r, 1)); return (current ?? '') + 'B\n' }),
+      io.transact?.('/e.txt', async (current) => { await new Promise(r => setTimeout(r, 1)); return (current ?? '') + 'A\n' }),
+      io.transact?.('/e.txt', async (current) => { await new Promise(r => setTimeout(r, 1)); return (current ?? '') + 'B\n' }),
     ])
     const text = fs.files.get('/e.txt') ?? ''
     expect(text.includes('A\n')).toBe(true)

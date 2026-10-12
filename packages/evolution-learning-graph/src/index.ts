@@ -326,7 +326,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const graphCommand = {
       name: 'graph',
       description: 'Show the learning graph, or act on a node: graph [detail|edit|delete] <nodeId>',
-      recordInput: false,
+      // F-5 (0.23.0, owner decision): same as `/evolution` — record the input rather than hiding it
+      // from the durable record; the platform default is what this surface now gets.
       // input declaration (same fix as /evolution, 2026-08-31): the frontend
       // drops every argument after the first word for commands without it —
       // /graph detail <id> submitted as the bare /graph.

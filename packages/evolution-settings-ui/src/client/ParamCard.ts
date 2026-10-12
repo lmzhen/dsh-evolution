@@ -293,7 +293,8 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   // U-4 constraint-first: an unacceptable value blocks the save instead of being staged and refused.
   const peerTextOf = (field: ClientParamField): string | undefined => {
     if (field.atLeast === '') return undefined
-    return fields.some(candidate => candidate.id === field.atLeast) ? textOf(fields.find(candidate => candidate.id === field.atLeast)!) : undefined
+    const related = fields.find(candidate => candidate.id === field.atLeast)
+    return related === undefined ? undefined : textOf(related)
   }
   const blocked = fields.some(field => invalidReason(field, textOf(field), peerTextOf(field)) !== null)
   const change = (id: string, next: string): void => { setDraft({ ...draft, [id]: next }) }
