@@ -568,7 +568,9 @@ writeFileSync(join(distNext, 'manifest.json'), JSON.stringify(Object.fromEntries
 const nameByDir = Object.fromEntries(tarballs.map(item => [item.dir, item.name]))
 const publishGroups = [
   ['evolution-core'],
-  ['evolution-io', 'evolution-state-storage'],
+  // 0.23.0: the byte-seat implementation (G2 S4). It implements the `evolution-io` seat, so it
+  // rides that group; the table must cover every staged tarball (P2-39 above).
+  ['evolution-io', 'evolution-io-fs', 'evolution-state-storage'],
   ['evolution-io-node', 'evolution-state-domain', 'evolution-state-json'],
   ['evolution-state'],
   ['memory', 'memory-files', 'skill-usage'],
