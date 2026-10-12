@@ -10,6 +10,9 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+// Activates the Context merges this row reads. Type-only: the platform packages stay dev-time edges.
+import type {} from '@deepseek-ai/dsh-evolution-curator'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import { makeSkillHealthRoutes } from './routes.ts'
 
 /** No required services: the web server is WAITED ON below, not demanded here. */

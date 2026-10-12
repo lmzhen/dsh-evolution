@@ -2019,7 +2019,6 @@ export class EvolutionCurator extends Service {
           bodyChars: null,
           bodyTokens: null,
           stampDensityPerKb: null,
-          stampHits: null,
           supportGroups: 0,
           supportFiles: null,
           churnPatches: null,
