@@ -110,7 +110,7 @@ describe('G2 S3: optimistic RMW (CAS retry, not a second lock)', () => {
     const { mkdtemp, writeFile, readFile } = await import('node:fs/promises')
     const { tmpdir } = await import('node:os')
     const path = await import('node:path')
-        const join = (...parts: string[]): string => path.join(...parts)
+    const join = (...parts: string[]): string => path.join(...parts)
     const dir = await mkdtemp(join(tmpdir(), 'evo-io-fs-delete-'))
     const file = join(dir, 'gone.txt')
     await writeFile(file, 'delete me', 'utf8')

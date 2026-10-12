@@ -644,9 +644,9 @@ describe('agent preset bases (--base standard|ptc)', () => {
     const skipped = await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot }).then(
       (value: { stdout: string; code: number | null }) => ({ ...value, refused: false }),
       (caught: unknown) => {
-            const c = caught as { stdout?: string; code?: number }
-            return { stdout: c.stdout ?? '', code: c.code ?? null, refused: true }
-          },
+        const c = caught as { stdout?: string; code?: number }
+        return { stdout: c.stdout ?? '', code: c.code ?? null, refused: true }
+      },
     )
     expect(skipped.refused).toBe(true)
     expect(skipped.code).toBe(1)
