@@ -527,7 +527,10 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     // against that LANDED baseline, so it must NOT be refused as stale.
     // Windows writes text through the platform default (CRLF), so the bytes read back differ from
     // the in-memory string only in line endings. Compare the CONTENT, not the platform convention.
-    const lf = (text: string | null): string | null => (text === null ? null : text.split(String.fromCharCode(13) + String.fromCharCode(10)).join(String.fromCharCode(10)))
+    const lf = (text: string | null): string | null => {
+      if (text === null) return null
+      return text.split(String.fromCharCode(13) + String.fromCharCode(10)).join(String.fromCharCode(10))
+    }
     expect(lf(landed)).toBe(lf(second))
   })
 
