@@ -141,6 +141,16 @@
     - id: evolution-skill-history
       name: '@deepseek-ai/dsh-evolution-skill-history'
 
+    # ── skill health: the sidebar panel over the linter's findings ───────────
+    # Host half mounts ONE read-only route under /api/dsh-evolution/skill-health/rows
+    # (the panel's only data path; it writes nothing). The browser half is the
+    # left-sidebar panel row that reads it, grouped by rule. This row SHIPS DISABLED
+    # on purpose: a rule whose threshold is not calibrated yet must not reach a reader
+    # as a number, so the panel stays off until an operator opts in.
+    - id: evolution-skill-health
+      name: '@deepseek-ai/dsh-evolution-skill-health'
+      disabled: true
+
 # ── cross-session recall: enable the native session-query index ─────────────
 # `tool-session-query` (above) exposes `session_search`; this overlay
 # enables the backing SQLite full-text index so that search actually works.

@@ -312,6 +312,12 @@
       "banners": {
         "all": "    # ── skill history: the sidebar panel over the content-version store ──────"
       }
+    },
+    {
+      "id": "evolution-skill-health",
+      "banners": {
+        "all": "    # ── skill health: the sidebar panel over the linter's findings ───────────"
+      }
     }
   ],
   "rows": [
@@ -825,6 +831,24 @@
       ],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-skill-history'"
+      ]
+    },
+    {
+      "id": "evolution-skill-health",
+      "group": "evolution-skill-health",
+      "forms": [
+        "all"
+      ],
+      "lead": [
+        "    # Host half mounts ONE read-only route under /api/dsh-evolution/skill-health/rows",
+        "    # (the panel's only data path; it writes nothing). The browser half is the",
+        "    # left-sidebar panel row that reads it, grouped by rule. This row SHIPS DISABLED",
+        "    # on purpose: a rule whose threshold is not calibrated yet must not reach a reader",
+        "    # as a number, so the panel stays off until an operator opts in."
+      ],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-skill-health'",
+        "      disabled: true"
       ]
     }
   ]
