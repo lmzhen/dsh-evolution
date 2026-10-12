@@ -52,7 +52,9 @@ export interface ParseFailure {
  * @returns whether the line was refused.
  */
 export function isParseFailure(result: ParsedCommand | ParseFailure): result is ParseFailure {
-  return result.kind !== undefined
+  // `Partial` rather than `ParseFailure`: this only asks whether the field is present, and the
+  // narrower assertion is what the linter's own program rejects (its union members are opaque).
+  return (result as Partial<ParseFailure>).kind !== undefined
 }
 
 
