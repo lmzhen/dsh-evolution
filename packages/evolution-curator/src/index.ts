@@ -2010,6 +2010,7 @@ export class EvolutionCurator extends Service {
         overSoftLine: false,
         overTwiceSoftLine: false,
         stampLimitPerKb: thresholds.stampDensityPerKb,
+        churnMinPatches: thresholds.churnMinPatches,
         readable: false,
       })
       rows.push({
