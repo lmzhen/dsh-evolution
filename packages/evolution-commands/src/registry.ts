@@ -26,7 +26,10 @@ export function flagsOf(name: string): string[] {
 
 /** C7 shape, DERIVED: the subcommand name is the first token of `usage` (variants use `|`). */
 export function entryName(entry: CommandEntry): string {
-  return entry.usage.split(' ')[0].split('|')[0]
+  // `noUncheckedIndexedAccess` makes both index reads `string | undefined`; destructuring with a
+  // default says the same thing without two casts (the CI build line proved it).
+  const [head = ''] = entry.usage.split(' ')
+  return head.split('|')[0] ?? ''
 }
 
 /** C7 shape, DERIVED: the flags a `usage` declares, in the form `--flag` (value flags keep their name). */

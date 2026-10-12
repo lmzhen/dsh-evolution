@@ -47,6 +47,9 @@ export function scanToolArgs(toolName: string, args: unknown, maxScanChars: numb
   // hardcoded pair drifted into the S3.10 dead-constant trap.
   if (!EVOLUTION_WRITE_TOOLS.includes(toolName as (typeof EVOLUTION_WRITE_TOOLS)[number])) return null
   const record = asRecord(args)
+  // `asRecord` answers `undefined` for anything that is not a plain mapping: there is nothing to
+  // scan then, and saying so once removes the index-safety noise below (the CI build line proved it).
+  if (record === undefined) return null
   if (toolName === 'memory') {
     for (const text of [record.facts, record.content]) {
       if (typeof text === 'string') {
@@ -60,6 +63,7 @@ export function scanToolArgs(toolName: string, args: unknown, maxScanChars: numb
         // shadow a string `content` — scan BOTH (union), scanning a value
         // twice is cheap and safe.
         const inner = asRecord(op)
+        if (inner === undefined) continue
         for (const text of [inner.facts, inner.content]) {
           if (typeof text === 'string') {
             const hit = scanMemoryThreats(text, maxScanChars, options)

@@ -30,6 +30,10 @@ export const SEAT_MISSING: ParamSectionSnapshot = Object.freeze({
   value: undefined,
   user: undefined,
   writable: false,
+  // U-5 added `base`/`mode` to the snapshot: a constant that predates them must still carry them,
+  // or the type says so (the CI build line did).
+  base: undefined,
+  mode: 'host',
   reason: 'seat-missing',
 })
 
@@ -41,6 +45,8 @@ export const PROJECTION_FAILED: ParamSectionSnapshot = Object.freeze({
   value: undefined,
   user: undefined,
   writable: false,
+  base: undefined,
+  mode: 'host',
   reason: 'projection-failed',
 })
 
@@ -180,8 +186,8 @@ export function sourceFor(probe: SeatProbe, namespace: string): ParamSectionSour
  * @returns the two calls a card's save/reset path uses; without a seat they resolve without writing.
  */
 export function writeFaceFor(probe: SeatProbe, namespace: string): {
-  mutateOnce: (ops: readonly SettingsPathOpLike[]) => Promise<void>
-  clear: (field: string) => Promise<void>
+  mutateOnce: (ops: readonly SettingsPathOpLike[]) => Promise<boolean>
+  clear: (field: string) => Promise<boolean>
 } {
   const form = (): ConfigFormLike | undefined => probe()?.get<Record<string, unknown>>(namespace)
   return {
@@ -191,8 +197,21 @@ export function writeFaceFor(probe: SeatProbe, namespace: string): {
     // silently did not land while the card showed one generic refusal. Handing the whole op list to
     // the seat is the platform's own form model ("apply ordered field edits in one revision-fenced
     // write"); this path passes no fence, exactly as it did before.
-    mutateOnce: async (ops) => { await form()?.mutate(ops) },
-    clear: async (field) => { await form()?.unset(field) },
+    // The card's face asks for a VERDICT, not for absence of an error: `false` means "no seat answered,
+    // so nothing was written" — the same reason the docblock above gives. The CI build line is what
+    // caught the two signatures drifting apart.
+    mutateOnce: async (ops) => {
+      const seat = form()
+      if (seat === undefined) return false
+      await seat.mutate(ops)
+      return true
+    },
+    clear: async (field) => {
+      const seat = form()
+      if (seat === undefined) return false
+      await seat.unset(field)
+      return true
+    },
   }
 }
 

@@ -113,13 +113,16 @@ export function subcommandOf(
  * @returns the parsed command, or the syntax failure that refused it.
  */
 export function parseSubcommand(input: string): ParsedCommand | ParseFailure {
-  const tokens = tokenize(input)
-  if (tokens.length === 0) return { kind: 'unknown-subcommand', name: '' }
-  const name = tokens[0].toLowerCase()
+  const [first, ...rest] = tokenize(input)
+  // Destructured, not indexed: `noUncheckedIndexedAccess` is on for this tree, so `tokens[0]` is
+  // `string | undefined` and every read would need a guard (the CI build line proved it).
+  if (first === undefined) return { kind: 'unknown-subcommand', name: '' }
+  const name = first.toLowerCase()
   const flags = new Map<string, string | true>()
   const positionals: string[] = []
-  for (let index = 1; index < tokens.length; index += 1) {
-    const token = tokens[index]
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index]
+    if (token === undefined) continue
     if (!token.startsWith('--')) { positionals.push(token); continue }
     // Flags are stored WITHOUT their `--` (callers read `flags.get('group')`).
     const equals = token.indexOf('=')
@@ -129,7 +132,7 @@ export function parseSubcommand(input: string): ParsedCommand | ParseFailure {
       continue
     }
     if (!VALUE_FLAGS.includes(flag)) { flags.set(flag, true); continue }
-    const next = tokens[index + 1]
+    const next = rest[index + 1]
     if (next === undefined || next.startsWith('--')) return { kind: 'missing-value', name, flag }
     flags.set(flag, next)
     index += 1

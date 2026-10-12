@@ -228,6 +228,8 @@ export class EvolutionPolicy extends Service {
         return undefined
       }
       const record = asRecord(args)
+      // Not a plain mapping ⇒ nothing this scanner knows how to judge.
+      if (record === undefined) return undefined
       const top = scan(record)
       if (top) return top
       if (Array.isArray(record.operations)) {

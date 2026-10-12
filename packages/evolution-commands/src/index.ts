@@ -18,7 +18,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import {
-  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
 import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import { diagnose, renderDoctorText } from './doctor.ts'
@@ -1293,12 +1293,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // variants, generated against the SAME runtime platform in one pass.
             // Every name is resolved before anything is written, so a typo in
             // the second entry cannot leave the first variant installed.
-            const requestedRaw = presetInstall.flags.get('base') ?? table.defaultBase
+            // `flags.get` answers `string | true | undefined`: a value flag's payload is a string,
+            // a bare flag means `true`. Narrowing here is what keeps the whole selection below typed
+            // (the CI build line proved it).
+            const baseFlag = presetInstall.flags.get('base')
+            const requestedRaw = typeof baseFlag === 'string' ? baseFlag : table.defaultBase
             const requested = [...new Set(requestedRaw.split(',').map(part => part.trim()).filter(part => part !== ''))]
             if (requested.length === 0) {
               return err(`No agent-preset base named — ${join(source, 'bases.json')} lists ${table.entries.map(entry => entry.name).join(', ')}`)
             }
-            const selected = []
+            const selected: (typeof table.entries)[number][] = []
             for (const name of requested) {
               const entry = table.entries.find(candidate => candidate.name === name)
               if (entry === undefined) {
@@ -1356,7 +1360,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               return ok(`Evolution agent preset row installed (${written.join('; ')}). Restart the session switcher to select it.`)
             }
             const runExclusive = hmr?.runExclusive
-            return runExclusive === undefined ? await commit() : await runExclusive.call(hmr, commit)
+            // The host call's own type is `unknown` (it is a generic seam), so the accepted shape is
+            // spelled here rather than leaking `unknown` out of this branch.
+            return runExclusive === undefined ? await commit() : await runExclusive.call(hmr, commit) as CommandResult
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
           }
@@ -1549,7 +1555,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const current = descriptor.value
           const resolved = typeof current === 'object' && current !== null ? current as Record<string, unknown> : undefined
-          const expectedRaw = policyParsed.flags.get('expect')
+          // `flags.get` answers `string | true | undefined` (a value flag carries its payload, a bare
+          // flag means `true`), so the payload is narrowed before it is used as a revision.
+          const expectFlag = policyParsed.flags.get('expect')
+          const expectedRaw = typeof expectFlag === 'string' ? expectFlag : undefined
           const expected = expectedRaw === undefined ? descriptor.revision : Number(expectedRaw)
           if (expectedRaw !== undefined && descriptor.revision !== undefined && Number(expectedRaw) !== descriptor.revision) {
             return err(errorText('e-309-revision-conflict-you-sent', { a1: expectedRaw, a2: descriptor.revision }))
