@@ -12,6 +12,7 @@
 
 import { AUTHORING_SPLIT_LINE_CHARS, UPSTREAM_LIMIT_CHARS_PER_TOKEN } from './constants.ts'
 import { bodyCost, tokenLineFor } from './cost.ts'
+import { type LintFinding, lintSkill } from './skill-lint.ts'
 
 export interface SkillHealthThresholds {
   /** Soft body limit: a body of `softBodyChars` or MORE -> 'warn'; >= 2x ->
@@ -83,6 +84,8 @@ interface SkillHealthSnapshot {
   bodyText?: string | undefined
   /** Number of non-empty support groups (references/ templates/ scripts/). */
   supportGroups: number
+  /** Support FILES under references/ (contract §4), when the caller counted them; null = not measured. */
+  supportFiles?: number | undefined
   /** Usage-side patch count, when the caller has it (A2 churn dimension). */
   patchCount?: number | undefined
   /** Usage-side view count, when the caller has it (A2 churn dimension). */
@@ -95,6 +98,8 @@ interface SkillHealthDim {
   bodyTokens: number
   stampDensityPerKb: number | null
   supportGroups: number
+  /** Support FILES under references/; null = the caller could not count them (never 0-as-unknown). */
+  supportFiles: number | null
   /** Usage churn facts; null when the caller supplied no counts. */
   churnPatches: number | null
   churnReads: number | null
@@ -103,19 +108,20 @@ interface SkillHealthDim {
 export interface SkillHealthAssessment {
   verdict: SkillHealthVerdict
   dims: SkillHealthDim
-  reasons: string[]
+  /** The same judgement as `reasons`, in diffable form: (rule id, severity, count). G1. */
+  findings: LintFinding[]
 }
 
 export function assessStructureHealth(
   snapshot: SkillHealthSnapshot,
   thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
 ): SkillHealthAssessment {
-  const reasons: string[] = []
   const dims: SkillHealthDim = {
     bodyChars: snapshot.bodyChars,
     bodyTokens: Math.round(snapshot.bodyChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN),
     stampDensityPerKb: null,
     supportGroups: snapshot.supportGroups,
+    supportFiles: snapshot.supportFiles ?? null,
     churnPatches: null,
     churnReads: null,
   }
@@ -139,39 +145,40 @@ export function assessStructureHealth(
   const overTwice = cost === null || lineTokens === null
     ? snapshot.bodyChars >= thresholds.softBodyChars * 2
     : cost.tokens >= lineTokens * 2
-  const scale = cost === null || lineTokens === null
-    ? `${snapshot.bodyChars} chars`
-    : `${cost.tokens} tokens (${snapshot.bodyChars} chars)`
-  const lineText = cost === null || lineTokens === null
-    ? `${thresholds.softBodyChars} chars`
-    : `${thresholds.softBodyChars} chars = ${lineTokens} tokens`
-  if (overTwice) {
-    reasons.push(`body ${scale} is >= 2x the soft line (${lineText}) — consider splitting or offloading`)
-  } else if (overLine) {
-    // V7-19 (0.3.43): "at or above" — the branch fires at == too, "above" alone was off by one at the exact threshold.
-    reasons.push(`body ${scale} at or above the soft line (${lineText})`)
-  }
+  // G2 ③: the over-line judgement is now expressed as `findings` (see the RULES table in skill-lint);
+  // the free-text copy that used to live here is gone, and `overLine`/`overTwice` feed the facts above.
   if (snapshot.bodyText && snapshot.bodyChars >= MIN_STAMP_BODY_CHARS) {
     const kb = Math.max(1, snapshot.bodyChars / 1024)
     const stamps = (snapshot.bodyText.match(HEALTH_STAMP_RE) ?? []).length
     dims.stampDensityPerKb = stamps / kb
-    if (dims.stampDensityPerKb >= thresholds.stampDensityPerKb) {
-      reasons.push(`stamp density ${dims.stampDensityPerKb.toFixed(1)}/KB (rc/sha/date lines — log-like content in the body)`)
-    }
-  }
-  if (snapshot.supportGroups === 0 && snapshot.bodyChars >= thresholds.softBodyChars / 2) {
-    reasons.push(`large body (${snapshot.bodyChars} chars) with NO support files — session detail may belong in references/`)
   }
   if (snapshot.patchCount !== undefined && snapshot.readCount !== undefined) {
     dims.churnPatches = snapshot.patchCount
     dims.churnReads = snapshot.readCount
-    if (snapshot.patchCount >= thresholds.churnMinPatches && snapshot.readCount === 0) {
-      reasons.push(`patched ${snapshot.patchCount} times but never read (write-ghost — content may be dead)`)
-    }
   }
-  return {
-    verdict: overTwice ? 'needs-restructure' : reasons.length > 0 ? 'warn' : 'healthy',
+  // G1/§3b: the FORM of the judgement. `skill-lint` owns no thresholds — it re-expresses what this
+  // engine already decided (token-scale line, /1024 stamp density, soft/2 support threshold).
+  const findings = lintSkill({
+    skillName: snapshot.skillName,
     dims,
-    reasons,
+    softLineChars: thresholds.softBodyChars,
+    overSoftLine: overLine,
+    overTwiceSoftLine: overTwice,
+    stampLimitPerKb: thresholds.stampDensityPerKb,
+    churnMinPatches: thresholds.churnMinPatches,
+    // This engine's snapshot always carries a MEASURED body (its type has no null arm yet); the
+    // unreadable case becomes expressible when the caller's type does, and the rule already waits.
+    readable: true,
+  })
+  // G2 ③: the verdict now reads the FINDINGS (equivalent to the reason list by construction — the
+  // churn threshold above was aligned for exactly this switch, and the old tests staying green is
+  // the equivalence proof).
+  const verdict: SkillHealthVerdict = findings.some(f => f.rule === 'body-oversize-2x')
+    ? 'needs-restructure'
+    : findings.length > 0 ? 'warn' : 'healthy'
+  return {
+    verdict,
+    dims,
+    findings,
   }
 }

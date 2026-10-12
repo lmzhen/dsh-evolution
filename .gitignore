@@ -16,3 +16,4 @@ dist.previous/
 dist.next/
 .release-staging.previous/
 .release-staging.next/
+files/

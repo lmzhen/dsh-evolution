@@ -37,6 +37,29 @@ try {
   report = JSON.parse(json)
 }
 
+// G0-3: an independent, path-based criterion — never the guarded party's own counter.
+const missingSubjects = (rules, base) => {
+  const out = []
+  for (const rule of Array.isArray(rules) ? rules : []) {
+    if (rule?.armedWhen !== 'path-exists') continue
+    for (const subject of rule.subjects ?? []) {
+      if (!existsSync(resolve(base, subject))) out.push(rule.id + ' is armed on ' + subject + ' but that file does not exist — the rule is silently unarmed')
+    }
+  }
+  return out
+}
+const armedRules = report.armedRules ?? []
+
+if (argv.includes('--drill')) {
+  // Falsifiability self-test: the criterion source must be able to go red without copying the repo.
+  const pathRules = armedRules.filter((r) => r?.armedWhen === 'path-exists' && (r.subjects ?? []).length > 0)
+  if (pathRules.length === 0) { console.error('verify-arming --drill: no rule declares a path subject — the criterion source cannot be falsified'); process.exit(1) }
+  const probe = missingSubjects([{ id: pathRules[0].id, armedWhen: 'path-exists', subjects: [pathRules[0].subjects[0] + '.drill-missing'] }], root)
+  if (probe.length === 0) { console.error('verify-arming --drill: the path predicate did not bite a synthetic missing subject'); process.exit(1) }
+  console.log('verify-arming --drill: OK — ' + pathRules.length + ' path-armed rule(s); predicate bites a synthetic missing subject (' + pathRules[0].id + ')')
+  process.exit(0)
+}
+
 const problems = []
 const notes = []
 const scanned = report.scanned ?? {}
@@ -49,6 +72,7 @@ for (const [kind, files] of Object.entries(scanned)) {
 if (Object.keys(scanned).length === 0) problems.push('the arming report carries no scan counters at all')
 for (const id of declared) if (!present.has(id)) problems.push(id + ' declares a detector sample but has no detector')
 if ((report.rules ?? 0) === 0) problems.push('the arming report says the registry is empty')
+for (const line of missingSubjects(armedRules, root)) problems.push(line)
 if ((report.violations ?? 0) > 0) notes.push(report.violations + ' guard violation(s) in the same run (see verify-arch-guards)')
 
 const summary = 'rules=' + (report.rules ?? '?') + ' detectors=' + present.size + ' scanned=' + Object.entries(scanned).map(([k, n]) => k + ':' + n).join(' ')

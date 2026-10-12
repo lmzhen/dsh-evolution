@@ -440,3 +440,12 @@ runs:
         name: evolution-scripts-${{ inputs.artifact_suffix }}
         path: upstream/packages/evolution/scripts
         retention-days: 14
+
+    - name: Verify the gate manifest (G0-5: table ∪ CI ↔ reality)
+      shell: bash
+      run: |
+        # The four-way reconciliation runs in CI too — it used to be local-only while being the
+        # executor of the manifest registers (direction 2: a CI-only check nobody registered fails).
+        # No `working-directory`: the table lives in the FAMILY checkout, not in the overlaid
+        # `upstream/` tree the other steps work in.
+        node packages/scripts/verify-gate-manifest.mjs packages

@@ -2264,6 +2264,12 @@ if (process.argv.includes('--arming-json')) {
     detectors: detectorRows,
     scanned: scanCounts,
     violations: violations.length,
+    // G0-3: rules whose control depends on a concrete FILE being present. The arming audit
+    // re-checks these paths itself (existsSync) instead of trusting this report's counters —
+    // deleting the subject used to leave the family count > 0, i.e. the rule went silently unarmed.
+    armedRules: [
+      { id: 'N9', armedWhen: 'path-exists', subjects: [CORE_SRC + '/threats.ts'] },
+    ],
   }))
 }
 

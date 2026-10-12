@@ -535,7 +535,7 @@ describe('evolution-curator', () => {
     expect(names).toContain('source-a')
   })
 
-  it('healthView reports degraded structure only, derived on demand (rc.73 A1)', async () => {
+  it('healthView reports EVERY row (degraded ones still carry their verdict), derived on demand (rc.73 A1; G2)', async () => {
     await tempHome('dsh-curator-health-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
@@ -547,7 +547,11 @@ describe('evolution-curator', () => {
     const rows = await ctx.evolutionCurator.healthView()
     const names = rows.map(row => row.name)
     expect(names).toContain('fat-skill')
-    expect(names).not.toContain('lean-skill')
+    // G2: the healthy row is PRESENT and says healthy — absence used to mean both 'fine' and
+    // 'unreadable', which the panel cannot tell apart.
+    const lean = rows.find(row => row.name === 'lean-skill')
+    expect(lean).toBeDefined()
+    expect(lean?.verdict).toBe('healthy')
     const fat = rows.find(row => row.name === 'fat-skill')
     expect(fat?.verdict).toBe('needs-restructure')
   })
@@ -575,11 +579,15 @@ describe('evolution-curator', () => {
     const rows = await ctx.evolutionCurator.healthView()
     const ghost = rows.find(row => row.name === 'ghost-skill')
     expect(ghost?.verdict).toBe('warn')
-    expect(ghost?.reasons.some(reason => reason.includes('never read'))).toBe(true)
-    expect(rows.some(row => row.name === 'read-skill')).toBe(false)
+    expect(ghost?.findings.map(f => f.rule)).toContain('write-ghost')
+    // G2: healthView returns EVERY row. A healthy skill used to be absent (which made 'healthy'
+    // and 'unreadable' indistinguishable); it must now be present AND say healthy.
+    const read = rows.find(row => row.name === 'read-skill')
+    expect(read).toBeDefined()
+    expect(read?.verdict).toBe('healthy')
   })
 
-  it('suppresses churn rows before any observed read exists (C observation window)', async () => {
+  it('suppresses the churn DIMENSION (not the row) before any observed read exists (C observation window; G2)', async () => {
     await tempHome('dsh-curator-window-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
@@ -595,7 +603,13 @@ describe('evolution-curator', () => {
     // No observed read anywhere in the library: view_count zero is not evidence yet.
     expect(await ctx.evolutionCurator.usageObserved()).toBe(false)
     const rows = await ctx.evolutionCurator.healthView()
-    expect(rows.find(row => row.name === 'ghost-skill')).toBeUndefined()
+    // The row must still EXIST — what the window suppresses is the churn DIMENSION (unknown),
+    // never the row itself: dropping the row would turn 'not measured' into 'healthy'.
+    const windowed = rows.find(row => row.name === 'ghost-skill')
+    expect(windowed).toBeDefined()
+    expect(windowed?.dims.churnPatches).toBeNull()
+    expect(windowed?.dims.churnReads).toBeNull()
+    expect(windowed?.findings.map(f => f.rule)).not.toContain('write-ghost')
   })
 
   it('control-plane folds keep counters and never flatten a malformed usage sidecar (rc.67 K-1)', async () => {

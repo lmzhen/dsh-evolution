@@ -128,6 +128,13 @@ export const DEFAULT_CURATOR_INTERVAL_HOURS = 168
 export const DEFAULT_MIN_IDLE_HOURS = 2
 export const DEFAULT_STALE_AFTER_DAYS = 30
 export const DEFAULT_ARCHIVE_AFTER_DAYS = 90
+
+
+/**
+ * Support-file count above which `references-sprawl` warns (calibrated on both corpora; the
+ * threshold separates the deliberate multi-doc skills from the ones that grew a file per edit).
+ */
+export const SUPPORT_SPRAWL_FILES = 60
 export const DEFAULT_MEMORY_CHAR_LIMIT = 2200
 export const DEFAULT_USER_CHAR_LIMIT = 1375
 /** Consolidation-failure backoff cap, shared by MemoryStore and memory-files' Config default. */

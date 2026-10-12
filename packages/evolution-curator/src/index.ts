@@ -27,6 +27,7 @@ import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepse
 import {
   DEFAULT_CURATOR_MODEL,
   DEFAULT_REVIEW_TIMEOUT_MS as DEFAULT_CURATOR_REVIEW_TIMEOUT_MS,
+  lintSkill,
   MAX_TIMER_DELAY_MS,
   usageObserved,
 } from '@deepseek-ai/dsh-evolution-core'
@@ -1924,7 +1925,20 @@ export class EvolutionCurator extends Service {
    * the deterministic assessment stays here, refinement stays in the judgment
    * layer.
    */
-  async healthView(): Promise<Array<{ name: string; verdict: SkillHealthVerdict; reasons: string[] }>> {
+  async healthView(): Promise<Array<{
+    name: string
+    verdict: SkillHealthVerdict
+    dims: {
+      bodyChars: number | null
+      bodyTokens: number | null
+      stampDensityPerKb: number | null
+      supportGroups: number
+      supportFiles: number | null
+      churnPatches: number | null
+      churnReads: number | null
+    }
+    findings: Array<{ severity: 'warn' | 'error'; rule: string; message: string; count: number }>
+  }>> {
     const settings = this.settings()
     const thresholds: SkillHealthThresholds = {
       softBodyChars: settings.healthSoftBodyChars,
@@ -1936,14 +1950,57 @@ export class EvolutionCurator extends Service {
     // `view_count` zero is not evidence (reads were invisible pre-A2), so the
     // churn dimension is suppressed — no counts reach the assessment at all.
     const observed = usageObserved(usage)
-    const rows: Array<{ name: string; verdict: SkillHealthVerdict; reasons: string[] }> = []
+    // G2: ALL rows, not just the degraded ones. A view that omits healthy and unreadable rows cannot
+    // tell 'nothing is wrong' from 'nothing could be read', and the panel has no denominator.
+    type HealthRow = Awaited<ReturnType<CuratorService['healthView']>>[number]
+    const rows: HealthRow[] = []
     for (const summary of await this.skills.list()) {
       const record = usage.get(summary.name)
       const assessment = await this.skills.assessHealth(summary.name, thresholds, observed && record ? {
         patchCount: record.patch_count,
         readCount: record.view_count,
       } : undefined)
-      if (assessment && assessment.verdict !== 'healthy') rows.push({ name: summary.name, verdict: assessment.verdict, reasons: assessment.reasons })
+      if (assessment !== null) {
+        rows.push({
+          name: summary.name,
+          verdict: assessment.verdict,
+          dims: assessment.dims,
+          findings: assessment.findings,
+        })
+        continue
+      }
+      // Unreadable: still a row, still says WHY — an absent measurement must never read as healthy.
+      const findings = lintSkill({
+        skillName: summary.name,
+        dims: {
+          bodyChars: null,
+          bodyTokens: null,
+          stampDensityPerKb: null,
+          supportGroups: 0,
+          supportFiles: null,
+          churnPatches: null,
+          churnReads: null,
+        },
+        softLineChars: thresholds.softBodyChars,
+        overSoftLine: false,
+        overTwiceSoftLine: false,
+        stampLimitPerKb: thresholds.stampDensityPerKb,
+        readable: false,
+      })
+      rows.push({
+        name: summary.name,
+        verdict: 'warn',
+        dims: {
+          bodyChars: null,
+          bodyTokens: null,
+          stampDensityPerKb: null,
+          supportGroups: 0,
+          supportFiles: null,
+          churnPatches: null,
+          churnReads: null,
+        },
+        findings,
+      })
     }
     return rows
   }

@@ -1,0 +1,629 @@
+{
+  "version": 1,
+  "generatedBy": "packages/scripts/gen-gate-manifest.mjs",
+  "sources": [
+    "CONTRIBUTING.md (gate table)",
+    ".github/actions/evolution-validate/action.yml (CI run steps)"
+  ],
+  "gates": [
+    {
+      "id": "gate-01",
+      "kind": "toolchain",
+      "cmd": "node node_modules/typescript/lib/tsc.js -b tsconfig.host.json",
+      "tree": "overlay",
+      "profiles": [
+        "local"
+      ],
+      "reason": "declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "gate-02",
+      "kind": "toolchain",
+      "cmd": "node node_modules/oxlint/bin/oxlint packages/evolution",
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-03",
+      "kind": "toolchain",
+      "cmd": "node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000",
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-04",
+      "kind": "step",
+      "cmd": "node packages/evolution/scripts/build-lib.mjs",
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+    },
+    {
+      "id": "gate-05",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/smoke-built-entries.mjs packages/evolution",
+      "tree": "overlay",
+      "profiles": [
+        "local"
+      ]
+    },
+    {
+      "id": "gate-06",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-dependency-closure.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-07",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-arch-guards.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-08",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-event-pairing.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-09",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-declared-config.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-10",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-param-registry.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-11",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-bundle-rows.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-12",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-param-channel-parity.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-13",
+      "kind": "external",
+      "cmd": "node D:/dsh/audit-v37/check-tsconfigs.cjs",
+      "tree": "machine-local",
+      "profiles": [],
+      "reason": "machine-local command outside this repo (table row 13)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "gate-14",
+      "kind": "external",
+      "cmd": "node D:/dsh/audit-v37/check-manifests.cjs",
+      "tree": "machine-local",
+      "profiles": [],
+      "reason": "machine-local command outside this repo (table row 14)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "gate-15",
+      "kind": "external",
+      "cmd": "node D:/dsh/audit-v37/mirror-sync.mjs check",
+      "tree": "machine-local",
+      "profiles": [],
+      "reason": "machine-local command outside this repo (table row 15)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "gate-16",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-profile-bundles.mjs",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-17",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-18",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.2.0-rc.2",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-19",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-package-discovery.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-20",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-family-tool-names.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-21",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-skill-roots.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-22",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-gate-manifest.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-23",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-regression-set.mjs packages --upstream <platform tree> --audit-dir <audit dir>",
+      "tree": "mirror",
+      "profiles": [
+        "local"
+      ]
+    },
+    {
+      "id": "gate-24",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-25",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-arming.mjs --packages packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "drillCmd": "node packages/scripts/verify-arming.mjs --drill"
+    },
+    {
+      "id": "gate-26",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-client-seats.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-27",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-client-tokens.mjs packages --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-28",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-platform-ranges.mjs --platform-version <platform version> --manifest-dir packages/evolution/dist",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-29",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-release-artifacts.mjs .github --strict",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-30",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-write-inventory.mjs packages --strict --home <plane home>",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-31",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-client-ui-i18n.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-32",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-error-codes.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-33",
+      "kind": "script",
+      "cmd": "node packages/scripts/gen-install-counts.mjs . --check",
+      "tree": "mirror",
+      "profiles": [
+        "local"
+      ]
+    },
+    {
+      "id": "gate-34",
+      "kind": "script",
+      "cmd": "--check",
+      "tree": "mirror",
+      "profiles": [
+        "local"
+      ]
+    },
+    {
+      "id": "gate-35",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-package-map.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-36",
+      "kind": "script",
+      "cmd": "node packages/scripts/gen-composer-port.mjs packages --check",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-37",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-lock-usage.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-38",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-source-text-single-source.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-39",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-atomic-write-single-source.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-40",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-predicate-single-source.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-41",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-readonly-single-criterion.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-42",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-command-table.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-43",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-bounds.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-44",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-io-discipline.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-45",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-declarations.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "ci-only-01",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-02",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/gen-about.mjs packages/evolution --check",
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-03",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check",
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-04",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check",
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-05",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/gen-client-tokens.mjs packages/evolution --check",
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-06",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/gen-param-client-view.mjs packages/evolution --check",
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-07",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check",
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-08",
+      "kind": "step",
+      "cmd": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
+      "tree": "mirror",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-09",
+      "kind": "step",
+      "cmd": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-10",
+      "kind": "step",
+      "cmd": "node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json",
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-11",
+      "kind": "step",
+      "cmd": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-12",
+      "kind": "step",
+      "cmd": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-13",
+      "kind": "step",
+      "cmd": "node packages/evolution/scripts/run-load-sensitive.mjs .",
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-14",
+      "kind": "script",
+      "cmd": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0",
+      "localSafe": false,
+      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
+    },
+    {
+      "id": "line-identity-ci",
+      "kind": "script",
+      "tree": "mirror",
+      "profiles": [
+        "ci"
+      ],
+      "cmd": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
+      "reason": "CI has no machine bed — policy half only (contract §5e)"
+    },
+    {
+      "id": "line-identity-bed",
+      "kind": "script",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "pre-tag"
+      ],
+      "cmd": "node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict",
+      "reason": "toothed form: compares the bed manifest produced by gen-line-manifest.mjs"
+    },
+    {
+      "id": "health-admission",
+      "kind": "script",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "pre-tag"
+      ],
+      "cmd": "node packages/scripts/verify-health-admission.mjs",
+      "reason": "needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass"
+    }
+  ]
+}

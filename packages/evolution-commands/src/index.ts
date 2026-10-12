@@ -712,16 +712,44 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'skills health') {
-          const curator = ctx.get('evolutionCurator') as { healthView(): Promise<Array<{ name: string; verdict: string; reasons: string[] }>>; usageObserved(): Promise<boolean> } | undefined
+          const curator = ctx.get('evolutionCurator') as {
+            healthView(): Promise<Array<{
+              name: string
+              verdict: string
+              findings?: Array<{ rule: string; severity: string; count: number }>
+            }>>
+            usageObserved(): Promise<boolean>
+          } | undefined
           if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
           const [rows, observed] = await Promise.all([curator.healthView(), curator.usageObserved()])
           // C observation window: before ANY observed read exists, view_count
           // zero is not evidence — say so instead of silently showing a clean
           // (or churn-skewed) verdict.
           const banner = observed ? '' : '使用观测尚未建立 —— 频繁变动（写入幽灵）行已被抑制。'
-          const line = (row: { verdict: string; name: string; reasons: string[] }): string => `${row.verdict.padEnd(18)} ${row.name}${row.reasons.length > 0 ? ` — ${row.reasons.join('; ')}` : ''}`
-          if (rows.length === 0) return ok(banner ? `Structure health: all skills healthy. ${banner}` : 'Structure health: all skills healthy.')
-          return ok([banner ? `Structure health (${rows.length} degraded): ${banner}` : `Structure health (${rows.length} degraded):`, ...rows.map(line)].join('\n'))
+          // G2: aggregate by RULE ID first (the same rule biting five skills is one problem, not five),
+          // then list the rows. Findings are the ONLY text channel now — the free-text `reasons` list
+          // was deleted with the engine switch (G2 ③).
+          const line = (row: {
+            verdict: string
+            name: string
+            findings?: Array<{ rule: string; severity: string; count: number }>
+          }): string => {
+            const detail = (row.findings ?? []).map(f => f.rule + ' x' + String(f.count)).join(', ')
+            return row.verdict.padEnd(18) + ' ' + row.name + (detail === '' ? '' : ' — ' + detail)
+          }
+          const tally = new Map<string, { count: number; severity: string }>()
+          for (const row of rows) for (const f of row.findings ?? []) {
+            const hit = tally.get(f.rule)
+            if (hit === undefined) tally.set(f.rule, { count: 1, severity: f.severity })
+            else hit.count += 1
+          }
+          const aggregate = tally.size === 0
+            ? []
+            : ['Main causes: ' + [...tally.entries()].sort((a, b) => b[1].count - a[1].count).map(([rule, v]) => `${rule} (${v.severity}) x${v.count}`).join(', ')]
+          // Never claim health from an empty row list: an empty list means NO DEGRADED ROW WAS
+          // REPORTED, which is not the same as every skill being readable and healthy.
+          if (rows.length === 0) return ok(['Structure health: no degraded row was reported (this does NOT assert that every skill is readable).', banner].filter(Boolean).join(' '))
+          return ok([banner ? `Structure health (${rows.length} degraded): ${banner}` : `Structure health (${rows.length} degraded):`, ...aggregate, ...rows.map(line)].join('\n'))
         }
         if (input === 'skills refresh') {
           // 0.3.18 (E-71): out-of-band tree edits (manual/git/other process)

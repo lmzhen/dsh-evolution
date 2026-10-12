@@ -72,7 +72,10 @@ describe('evolution-curator G3.1 numeric clamping', () => {
       const rows = await curator.healthView()
       // 2_400 chars < the 40_000 default: healthy, so NOT flagged. If the clamp
       // had left 0 in place, every body would be flagged "above soft limit".
-      expect(rows.find(row => row.name === 'fat-skill')).toBeUndefined()
+      const fat = rows.find(row => row.name === 'fat-skill')
+      expect(fat).toBeDefined()
+      expect(fat?.verdict).toBe('healthy')
+      expect(fat?.findings.map(f => f.rule)).not.toContain('body-oversize')
       curator.stop()
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME

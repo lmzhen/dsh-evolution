@@ -212,7 +212,7 @@ describe('evolution-commands', () => {
     expect(message.content?.[0]?.text).toContain('capture the wake-path lesson')
   })
 
-  it('skills health renders degraded structure rows or a clean verdict (rc.73 A1)', async () => {
+  it('skills health renders degraded rows, or states that no degraded row was reported (rc.73 A1; G2)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
@@ -223,8 +223,8 @@ describe('evolution-commands', () => {
         if (!first) return []
         first = false
         return [
-          { name: 'fat-skill', verdict: 'needs-restructure', reasons: ['body 41000 chars is >= 2x the soft limit (20000)'] },
-          { name: 'log-skill', verdict: 'warn', reasons: ['stamp density 3.2/KB'] },
+          { name: 'fat-skill', verdict: 'needs-restructure', findings: [{ rule: 'body-oversize-2x', severity: 'error', count: 1 }] },
+          { name: 'log-skill', verdict: 'warn', findings: [{ rule: 'stamp-density', severity: 'warn', count: 1 }] },
         ]
       },
       usageObserved: async () => observed,
@@ -234,15 +234,34 @@ describe('evolution-commands', () => {
     expect(result.kind).toBe('success')
     expect(result.text).toContain('Structure health (2 degraded):')
     expect(result.text).toContain('needs-restructure  fat-skill')
-    expect(result.text).toContain('stamp density')
+    expect(result.text).toContain('stamp-density')
     expect(result.text).not.toContain('Usage observation')
     const empty = await captured!.handler({ rawInput: 'skills health' })
-    expect(empty.text).toContain('all skills healthy')
+    expect(empty.text).toContain('no degraded row was reported')
     // C observation window: before any observed read, the verdict says so.
     observed = false
     const windowed = await captured!.handler({ rawInput: 'skills health' })
     expect(windowed.text).toContain('使用观测尚未建立')
-    expect(windowed.text).toContain('all skills healthy')
+    expect(windowed.text).toContain('no degraded row was reported')
+  })
+
+  it('aggregates by rule id when the curator reports findings (G2 W2)', async () => {
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> }
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionCurator', {
+      // Two skills tripping the SAME rule: the panel must read that as one problem with count 2,
+      // not as two unrelated rows (that is what the rule-id aggregation is for).
+      healthView: async () => [
+        { name: 'a-skill', verdict: 'warn', findings: [{ rule: 'body-oversize', severity: 'warn', count: 1 }] },
+        { name: 'b-skill', verdict: 'warn', findings: [{ rule: 'body-oversize', severity: 'warn', count: 1 }] },
+      ],
+      usageObserved: async () => true,
+    })
+    await ctx.plugin(Commands)
+    const result = await captured!.handler({ rawInput: 'skills health' })
+    expect(result.text).toContain('Structure health (2 degraded):')
+    expect(result.text).toContain('Main causes: body-oversize (warn) x2')
   })
 
   it('records a learn event into the event log when the io registry is mounted (rc.68)', async () => {

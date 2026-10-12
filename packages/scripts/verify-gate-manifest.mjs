@@ -49,7 +49,9 @@ if (!existsSync(actionPath)) { console.error('verify-gate-manifest: no composite
 const tableRows = []
 for (const [index, line] of readFileSync(contributingPath, 'utf8').split('\n').entries()) {
   const match = /^\|\s*([0-9]+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/.exec(line)
-  if (match !== null) tableRows.push({ n: Number(match[1]), command: match[2], tree: match[3], line: index + 1 })
+  // G0-5: strip backticks — a command cell whose code span ends the cell (`…mjs`) used to fail
+  // scriptOf's trailing-delimiter rule, silently dropping that row from declaredScripts.
+  if (match !== null) tableRows.push({ n: Number(match[1]), command: match[2].replace(/`/g, ' '), tree: match[3], line: index + 1 })
 }
 if (tableRows.length === 0) { console.error('verify-gate-manifest: the gate table parsed empty — refuse to report a pass on an empty parse'); process.exit(1) }
 for (const [index, row] of tableRows.entries()) {
@@ -118,6 +120,23 @@ for (const script of declaredScripts) {
   problems.push('the table declares ' + script + ' but the CI action never runs it and no register entry covers it — a declared check nobody executes is not a gate')
 }
 
+// G0-5: the manifest is the register both halves read (direction 2 + toolchain exceptions).
+const manifestPath = join(root, 'scripts', 'gate-manifest.json')
+const manifestGates = existsSync(manifestPath) ? (JSON.parse(readFileSync(manifestPath, 'utf8')).gates ?? []) : []
+
+// (4c) G0-5: toolchain rows used to be judged on NEITHER side — scriptOf() returns null for node_modules
+// paths, so tsc/oxlint/vitest never reached the containment loop, and deleting the lint step turned
+// nothing red (0.24.0 shipped 18 lint errors past every gate this way). Judge them by TOOL NAME, and let
+// a manifest entry with a reason stand in for a check this action deliberately does not run.
+for (const tool of ['typescript/lib/tsc.js', 'oxlint/bin/oxlint', 'vitest/vitest.mjs']) {
+  const row = tableRows.find((entry) => entry.command.includes(tool))
+  if (row === undefined) continue
+  if (actionText.includes(tool)) continue
+  const registered = manifestGates.find((gate) => typeof gate.cmd === 'string' && gate.cmd.includes(tool) && typeof gate.reason === 'string')
+  if (registered !== undefined) { notes.push(tool + ' is registered as a declared local check: ' + registered.reason); continue }
+  problems.push('row ' + row.n + ' declares ' + tool + ' but neither this action nor a manifest entry with a reason covers it — a deleted step would go unnoticed (G0-5)')
+}
+
 // (6) composite-action input references must be declared (v46 S1.9, finding T7-01).
 // A composite action reads only the inputs its `inputs:` block declares; any other name
 // evaluates to the empty string, so an `if:` built on it is false forever and the step is
@@ -131,11 +150,18 @@ for (const name of referencedInputs) {
 }
 notes.push('composite action: ' + declaredInputs.size + ' declared input(s), ' + referencedInputs.size + ' referenced')
 
-// (4b) CI-only scripts are allowed; report them so the table can be completed deliberately.
+// (4b) G0-5 direction 2: CI-only scripts are allowed ONLY when the manifest registers them (with a reason
+// where they are not gates). This is the missing half that used to be a note — a wild check could run in CI
+// while nothing on either side named it. The old unexplained `verify-client*` filter is gone with it: those
+// entries are registered like every other one.
 const ciOnly = [...new Set([...actionText.matchAll(/scripts\/([A-Za-z0-9._-]+\.mjs)/g)].map((match) => match[1]))]
-  .filter((script) => !declaredScripts.has(script) && !script.startsWith('verify-client') )
+  .filter((script) => !declaredScripts.has(script))
   .sort()
-if (ciOnly.length > 0) notes.push('CI-only (not in the table): ' + ciOnly.join(', '))
+for (const script of ciOnly) {
+  const registered = manifestGates.find((gate) => typeof gate.cmd === 'string' && gate.cmd.includes(script))
+  if (registered === undefined) problems.push('the CI action runs ' + script + ' but neither the table nor the manifest registers it — a wild check (G0-5 direction 2)')
+}
+if (ciOnly.length > 0) notes.push('CI-only (registered in the manifest): ' + ciOnly.join(', '))
 
 // (5) every count word in the docs equals the row count.
 const countFiles = [contributingPath, join(repo, 'README.md'), join(root, 'scripts', 'verify-client-tokens.mjs')]

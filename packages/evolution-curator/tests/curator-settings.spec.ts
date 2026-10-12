@@ -198,14 +198,20 @@ describe('curator parameter surface (G1: row config, precedence and the cross-fi
       ['ghost-skill', usageRecord(1, 2, 0)],
       ['viewed-skill', usageRecord(1, 0, 3)],
     ]), nodeEvolutionIo())
-    expect(await curator.healthView(), 'the row defaults judge this tree healthy').toEqual([])
+    // G2: 'healthy' is a verdict now, not an absent row — assert the JUDGEMENT, not the row count.
+    const calm = await curator.healthView()
+    const flagged = calm.flatMap(row => row.findings.map(f => f.rule)).filter(rule => rule === 'body-oversize' || rule === 'stamp-density')
+    expect(flagged, 'the row defaults judge this tree healthy').toEqual([])
+    const calmGhost = calm.find(row => row.name === 'ghost-skill')
+    expect(calmGhost?.verdict).toBe('healthy')
     softBody.set(1); stampDensity.set(1); churn.set(1)
     const degraded = await curator.healthView()
     const ghost = degraded.find(row => row.name === 'ghost-skill')
     expect(ghost, 'the moved thresholds flag the body').toBeDefined()
-    expect(ghost?.reasons.join(' | ')).toMatch(/soft line/)
-    expect(ghost?.reasons.join(' | ')).toMatch(/stamp density/)
-    expect(ghost?.reasons.join(' | ')).toMatch(/write-ghost/)
+    const rules = ghost?.findings.map(f => f.rule) ?? []
+    expect(rules).toContain('body-oversize-2x')
+    expect(rules).toContain('stamp-density')
+    expect(rules).toContain('write-ghost')
     curator.stop()
   }, 30_000)
 

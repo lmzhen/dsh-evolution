@@ -9,26 +9,31 @@ it('a small dense body with support files is healthy', () => {
     supportGroups: 1,
   })
   expect(assessment.verdict).toBe('healthy')
-  expect(assessment.reasons).toEqual([])
+  expect(assessment.findings).toEqual([])
 })
 
 it('judges the borrowed char line on the token scale (V6)', () => {
   // No body text: the character line decides (an absent measurement is never a pass).
   const blind = assessStructureHealth({ skillName: 'b', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars + 1, supportGroups: 1 })
   expect(blind.verdict).toBe('warn')
-  expect(blind.reasons[0]).toContain('soft line')
+  expect(blind.findings.map(f => f.rule)).toContain('body-oversize')
   const blindNeeds = assessStructureHealth({ skillName: 'bn', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars * 2, supportGroups: 1 })
   expect(blindNeeds.verdict).toBe('needs-restructure')
-  expect(blindNeeds.reasons[0]).toContain('2x the soft line')
+  expect(blindNeeds.findings.map(f => f.rule)).toContain('body-oversize-2x')
   // With body text the judgment runs in tokens against the per-body line; the two
   // scripts sit on their OWN line at 20k characters, which is the upstream trigger.
   const cjkAt = '中'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
   const cjkUnder = '中'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars - 10)
   const asciiAt = 'a'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
   const atCjk = assessStructureHealth({ skillName: 'c', bodyChars: cjkAt.length, bodyText: cjkAt, supportGroups: 1 })
-  expect(atCjk.reasons.some(reason => reason.includes('tokens'))).toBe(true)
+  // G2 ③: the token-scale evidence used to ride on the reason TEXT. It now has to be an explicit
+  // dimension assertion, or deleting `reasons` would quietly drop the invariant it protected.
+  const asciiSame = assessStructureHealth({ skillName: 'ax', bodyChars: asciiAt.length, bodyText: asciiAt, supportGroups: 1 })
+  expect(atCjk.dims.bodyTokens).toBeGreaterThan(asciiSame.dims.bodyTokens)
   expect(assessStructureHealth({ skillName: 'cu', bodyChars: cjkUnder.length, bodyText: cjkUnder, supportGroups: 1 }).verdict).toBe('healthy')
-  expect(assessStructureHealth({ skillName: 'a', bodyChars: asciiAt.length, bodyText: asciiAt, supportGroups: 1 }).reasons.some(reason => reason.includes('tokens'))).toBe(true)
+  // Same character count, other script: it is at its OWN token line, so it is flagged too —
+  // the token-scale evidence now lives on the dims assertion above (L32), not in reason text.
+  expect(assessStructureHealth({ skillName: 'a', bodyChars: asciiAt.length, bodyText: asciiAt, supportGroups: 1 }).verdict).toBe('warn')
 })
 
 it('stamp density flags log-like content in a large body', () => {
@@ -49,7 +54,7 @@ it('stamp density flags log-like content in a large body', () => {
   const assessment = assessStructureHealth({ skillName: 'log', bodyChars: lines.length, bodyText: lines, supportGroups: 0 })
   expect(assessment.verdict).toBe('warn')
   expect(assessment.dims.stampDensityPerKb).not.toBeNull()
-  expect(assessment.reasons.some(reason => reason.includes('stamp density'))).toBe(true)
+  expect(assessment.findings.map(f => f.rule)).toContain('stamp-density')
 })
 
 it('short bodies skip stamp density — a few dates are ordinary documentation (audit X1)', () => {
@@ -62,7 +67,7 @@ it('short bodies skip stamp density — a few dates are ordinary documentation (
 it('a large body with no support groups is flagged as scatter', () => {
   const assessment = assessStructureHealth({ skillName: 's', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars / 2, supportGroups: 0 })
   expect(assessment.verdict).toBe('warn')
-  expect(assessment.reasons[0]).toContain('NO support files')
+  expect(assessment.findings.map(f => f.rule)).toContain('body-without-support')
 })
 
 it('custom thresholds drive the same rules', () => {
@@ -83,7 +88,7 @@ it('churn dimension warns when patched many times but never read (A2 write-ghost
     readCount: 0,
   }, thresholds)
   expect(ghost.verdict).toBe('warn')
-  expect(ghost.reasons.some(reason => reason.includes('never read'))).toBe(true)
+  expect(ghost.findings.map(f => f.rule)).toContain('write-ghost')
   expect(ghost.dims.churnPatches).toBe(30)
   expect(ghost.dims.churnReads).toBe(0)
 })
@@ -101,7 +106,7 @@ it('churn dimension ignores usage when counts are absent or the skill is read', 
     readCount: 3,
   }, thresholds)
   expect(read.verdict).toBe('healthy')
-  expect(read.reasons.some(reason => reason.includes('never read'))).toBe(false)
+  expect(read.findings.map(f => f.rule)).not.toContain('write-ghost')
 })
 
 it('F-320: HEALTH_STAMP_RE counts offset/non-UTC timestamps and hex-with-digits, not English hex words', () => {
