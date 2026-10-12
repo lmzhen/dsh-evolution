@@ -40,7 +40,7 @@
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
     "@deepseek-ai/dsh-evolution-agent-preset": "workspace:^",
     "@deepseek-ai/dsh-evolution-settings-ui": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-history": "workspace:^"
+    "@deepseek-ai/dsh-evolution-skill-history": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-health": "workspace:^"
   }
 }
