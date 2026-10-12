@@ -162,11 +162,6 @@
               "expiry": "release-phase wiring: add the step to the action or mark the row local-only"
             },
             {
-              "script": "verify-gate-manifest.mjs",
-              "reason": "the table manifest is checked by the local runner; the publish job pins the same facts through its own steps",
-              "expiry": "release-phase wiring: add the step to the action"
-            },
-            {
               "script": "verify-regression-set.mjs",
               "reason": "the merge-time regression set (guards + specs + audit self-checks); the publish job runs its own subset",
               "expiry": "release-phase wiring: decide whether the job adopts this runner"
