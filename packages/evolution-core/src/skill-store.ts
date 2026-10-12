@@ -2637,7 +2637,7 @@ export class SkillLibrary {
       if (unreadable.length === 0) return { ok: false, message: `技能「${name}」不在 .archive 里。` }
       return {
         ok: false,
-          message: `.archive 里没有「${name}」对应的 frontmatter 名，但有 ${unreadable.length} 个名字相似的归档项：${unreadable.join(', ')}。`
+        message: `.archive 里没有「${name}」对应的 frontmatter 名，但有 ${unreadable.length} 个名字相似的归档项：${unreadable.join(', ')}。`
           + '这些归档项没有可读的 SKILL.md（或名字对不上），按名字恢复无法区分它们：请把目录改成技能名后再次恢复，或改用快照恢复。',
       }
     }

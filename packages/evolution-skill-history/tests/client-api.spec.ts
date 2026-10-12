@@ -60,7 +60,7 @@ describe('skill-history client api', () => {
     const stub = stubFetch({ ok: true, body: { ok: false, code: 'undo-refused', message: 'Version v3 of "a" 存的是支撑文件的字节\'s bytes' } })
     const api = createSkillHistoryApi(stub.fetch)
     await expect(api.undo('a', 3)).rejects.toBeInstanceOf(SkillHistoryRefusal)
-    await expect(api.undo('a', 3)).rejects.toThrow("存的是支撑文件的字节")
+    await expect(api.undo('a', 3)).rejects.toThrow('存的是支撑文件的字节')
     const http = stubFetch({ ok: false, status: 403, body: {} })
     const api2 = createSkillHistoryApi(http.fetch)
     await expect(api2.skills()).rejects.toThrow('HTTP 403')

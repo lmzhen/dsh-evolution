@@ -1119,7 +1119,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
           }
           if (wanted === undefined && record.state === 'running') {
-return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
+            return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
@@ -1127,9 +1127,9 @@ return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出
           // "no result" and "an unreadable result" must not look alike (the
           // three-state rule the rest of the family follows).
           if (probed.kind === 'missing') {
-return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
+            return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
           }
-if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
+            if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
           return ok(probed.text)
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
@@ -1184,15 +1184,15 @@ if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读�
             return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
           }
           if (wanted === undefined && record.state === 'running') {
-return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
+            return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法交付报告。')
           const probed = await readRunReport(preferProvider(ioRegistry, ['fs']), record)
           if (probed.kind === 'missing') {
-return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
+            return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
           }
-if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
+            if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
           // Deliver ONLY a pointer plus the report-only protocol: the report file stays
           // the one result home, and the injected text stays small (G2/0.20.0).
           const missingAgent = agentMissing('handoff')
@@ -1382,13 +1382,13 @@ if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读�
           // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
           const restParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(restParsed) || restParsed.name !== 'restructure') {
-return err('用法：/evolution restructure <name> "<## heading>" <to_file>')
+            return err('用法：/evolution restructure <name> "<## heading>" <to_file>')
           }
           const name = restParsed.positionals[0] ?? ''
           const heading = restParsed.positionals[1] ?? ''
           const toFile = restParsed.positionals[2] ?? ''
           if (name === '' || heading === '' || toFile === '') {
-return err('用法：/evolution restructure <name> "<## heading>" <to_file>')
+            return err('用法：/evolution restructure <name> "<## heading>" <to_file>')
           }
           const planFlag = restParsed.flags.get('plan')
           const planRunId = typeof planFlag === 'string' ? planFlag : undefined

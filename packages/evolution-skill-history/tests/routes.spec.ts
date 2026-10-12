@@ -224,7 +224,7 @@ describe('skill-history routes: over a real socket', () => {
       const refusedBody = await refused.json() as { ok: boolean; code: string; message: string }
       expect(refusedBody.ok).toBe(false)
       expect(refusedBody.code).toBe('undo-refused')
-      expect(refusedBody.message).toContain("存的是支撑文件的字节")
+      expect(refusedBody.message).toContain('存的是支撑文件的字节')
       // The undo itself: an empty body means "the state before the last body change".
       const undone = await fetch(host.origin + SKILL_HISTORY_ROUTES.undo, {
         method: 'POST',

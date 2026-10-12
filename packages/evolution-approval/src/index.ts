@@ -692,7 +692,11 @@ export class EvolutionApproval extends Service {
         // F-7 (2026-10-12): the vocabulary is language-agnostic now — the user-visible refusals
         // are Chinese, so the Chinese phrasings of the same five cases are matched too. The
         // structured-code option above remains the long-term fix.
-        const deterministic = /changed since this plan|no entry matching|not found|no longer exists|path traversal|在图渲染之后被改动过|匹配到多条不同条目|已不存在|不存在|路径穿越|不在技能|找不到|被改动过|已改动|不匹配|已过期|changed since it was read/i.test(result.message)
+        const deterministic = new RegExp(
+          'changed since this plan|no entry matching|not found|no longer exists|path traversal|' +
+            '在图渲染之后被改动过|匹配到多条不同条目|已不存在|不存在|路径穿越|不在技能|找不到|被改动过|已改动|不匹配|已过期|changed since it was read',
+          'i',
+        ).test(result.message)
         return {
           ok: false,
           message: deterministic

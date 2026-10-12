@@ -125,7 +125,7 @@ describe('evolution-curator', () => {
     expect(file).toBeDefined()
     const refused = await ctx.evolutionCurator.undo('support-skill', file?.v)
     expect(refused.ok).toBe(false)
-    expect(refused.message).toContain("存的是支撑文件的字节，而不是该技能的 SKILL.md")
+    expect(refused.message).toContain('存的是支撑文件的字节，而不是该技能的 SKILL.md')
     expect(refused.message).toContain('write_file')
     // Nothing was written: the refusal happens before the bytes are read.
     expect(await library.read('support-skill')).toContain('Two.')
@@ -154,7 +154,7 @@ describe('evolution-curator', () => {
     expect(baseline?.path).toBe('references/notes.md')
     const refused = await ctx.evolutionCurator.undo('baseline-skill', baseline?.v)
     expect(refused.ok).toBe(false)
-    expect(refused.message).toContain("存的是支撑文件的字节")
+    expect(refused.message).toContain('存的是支撑文件的字节')
     expect(refused.message).toContain('references/notes.md')
     // The live body still holds its own content, not the support file's bytes.
     expect(await library.read('baseline-skill')).toContain('One.')

@@ -580,7 +580,7 @@ export function validateFrontmatter(
   const unreadable = parsed.platformStringSplit.filter(entry => entry.kind === 'sequence' || entry.kind === 'mapping')
   if (unreadable.length > 0) {
     const named = unreadable.map(entry => `"${entry.key}" (a YAML ${entry.kind})`).join(', ')
-      return `Frontmatter 字段 ${named} 必须是字符串：平台技能目录会把这种字段当作缺失，并忽略整个文件。` +
+    return `Frontmatter 字段 ${named} 必须是字符串：平台技能目录会把这种字段当作缺失，并忽略整个文件。` +
       '请写成纯文本，或用双引号包住取值以保持字面内容。'
   }
   if (!parsed.frontmatter.name) return 'Frontmatter 必须包含 name 字段。'

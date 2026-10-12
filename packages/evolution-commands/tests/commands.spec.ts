@@ -346,7 +346,7 @@ describe('evolution-commands', () => {
     // Without persisted state the status command degrades gracefully.
     state = null
     const empty = await captured!.handler({ rawInput: 'curator status' })
-      expect(empty.text).toContain('还没有策展状态')
+    expect(empty.text).toContain('还没有策展状态')
   })
 
   it('G7.4/C7: the ONE parser answers F-3 and F-4 (order, = spelling, syntax)', async () => {
@@ -505,7 +505,7 @@ describe('evolution-commands', () => {
     expect(await library.isPinned('demo-skill')).toBe(false)
     const usage = await captured!.handler({ rawInput: 'skill pin' })
     expect(usage.kind).toBe('error')
-      expect(usage.text).toContain('用法：/evolution skill pin <name>')
+    expect(usage.text).toContain('用法：/evolution skill pin <name>')
   })
 
   // E-70's decision, pinned on the command side too: the flip is NOT staged, does NOT bump usage and
@@ -1655,7 +1655,7 @@ describe('evolution-commands', () => {
     expect(mutations.text).not.toContain('bad-skill')
     const report = await captured!.handler({ rawInput: 'curator report' })
     expect(report.kind).toBe('error')
-      expect(report.text).toContain('报告文件读不出来。')
+    expect(report.text).toContain('报告文件读不出来。')
   })
 
   it('P2-16 (v38): /evolution curator report surfaces an interrupted run instead of failed=(none)', async () => {
