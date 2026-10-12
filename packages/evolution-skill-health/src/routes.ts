@@ -54,6 +54,7 @@ export function toRouteRows(rows: ReadonlyArray<{
  */
 export function makeSkillHealthRoutes(deps: { getCurator: () => { healthView?: () => Promise<unknown> } | undefined }): WebRoute[] {
   return [{
+    kind: 'exact',
     path: ROUTES.rows,
     handler: async (_req, res) => {
       const curator = deps.getCurator()
