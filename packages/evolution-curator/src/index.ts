@@ -1976,7 +1976,7 @@ export class EvolutionCurator extends Service {
     const observed = usageObserved(usage)
     // G2: ALL rows, not just the degraded ones. A view that omits healthy and unreadable rows cannot
     // tell 'nothing is wrong' from 'nothing could be read', and the panel has no denominator.
-    type HealthRow = Awaited<ReturnType<CuratorService['healthView']>>[number]
+    type HealthRow = Awaited<ReturnType<EvolutionCurator['healthView']>>[number]
     const rows: HealthRow[] = []
     for (const summary of await this.skills.list()) {
       const record = usage.get(summary.name)
