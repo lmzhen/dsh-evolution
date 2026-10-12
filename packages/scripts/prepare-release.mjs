@@ -587,6 +587,8 @@ const publishGroups = [
   // 0.11.0: the skill-history surface. Also client-only in order (its Host half mounts routes
   // but depends on nothing the family orders), and the bundles below depend on it too.
   ['evolution-skill-history'],
+  // 0.25.0: the skill-health surface. Client-only in order too (one read-only route, no infra row).
+  ['evolution-skill-health'],
   ['evolution-host', 'evolution-preset', 'evolution-agent', 'evolution-all'],
 ]
 // P2-39 (v11): the hardcoded table MUST equal the staged tarballs — a stale
