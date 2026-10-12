@@ -1129,7 +1129,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (probed.kind === 'missing') {
             return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
           }
-            if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
+          if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
           return ok(probed.text)
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
@@ -1192,7 +1192,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (probed.kind === 'missing') {
             return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
           }
-            if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
+          if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
           // Deliver ONLY a pointer plus the report-only protocol: the report file stays
           // the one result home, and the injected text stays small (G2/0.20.0).
           const missingAgent = agentMissing('handoff')
