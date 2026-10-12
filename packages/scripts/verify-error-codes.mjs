@@ -14,7 +14,10 @@ import { join } from 'node:path'
 
 const root = process.argv[2] ?? 'packages'
 const SOURCE = join(root, 'evolution-core/src/errors.ts')
-const DOC = 'README.md'
+// G4.3 fix (0.23.0): the doc used to be resolved against the PROCESS CWD, so under the CI's
+// `working-directory: upstream` it read a README that is not ours at all (the pin's repo root) and
+// reported "no row for E-301" for a table that lived elsewhere. The table belongs NEXT TO the codes.
+const DOC = join(root, 'evolution-core/README.md')
 const NL = String.fromCharCode(10)
 import { stripComments as withoutComments } from './lib-source-text.mjs'
 
