@@ -28,6 +28,9 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     // 0.11.0: the skill-history surface. Its Host half mounts four loopback routes and its
     // browser half the sidebar panel; like the cards above it is a CLIENT_ONLY row.
     '@deepseek-ai/dsh-evolution-skill-history',
+    // 0.25.0: the skill-health panel. Its Host half mounts ONE read-only route and its browser
+    // half the sidebar row that reads it; like the two surfaces above it adds no infra row.
+    '@deepseek-ai/dsh-evolution-skill-health',
   ]
   for (const dep of expected) {
     expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe('workspace:^')
