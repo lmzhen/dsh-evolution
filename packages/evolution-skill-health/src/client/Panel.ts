@@ -65,7 +65,7 @@ function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
     createElement('tbody', null, rows.map(entry => createElement('tr', { key: entry.rule },
       createElement('td', null, entry.rule),
       createElement('td', null, entry.skills.join(', ')),
-      createElement('td', null, entry.count === 0 ? t('line.unknown') : String(entry.count)),
+      createElement('td', null, entry.count === 0 ? t('count.notCalibrated') : String(entry.count)),
     ))),
   )
 }
