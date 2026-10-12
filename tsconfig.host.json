@@ -851,6 +851,7 @@
     },
     {
       "path": "./packages/evolution/evolution-skill-history"
+      "path": "./packages/evolution/evolution-skill-health"
     },
     {
       "path": "./packages/evolution/evolution-approval"

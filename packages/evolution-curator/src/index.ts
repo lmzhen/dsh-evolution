@@ -221,6 +221,27 @@ export function gateConsolidations(
 }
 
 
+/**
+ * G5 (in-use protection): which skills are POINTED AT by others, and by whom.
+ *
+ * Pure: derived from the bodies already in hand, using `relatedSkillNames` — the single reader of
+ * that frontmatter field — so this map can never disagree with the catalog or the audit. The value
+ * is a Set of SOURCES, not a boolean, because a refusal has to be able to name the referrers.
+ * @param contents - skill name to its whole SKILL.md text.
+ * @returns target name to the set of skills naming it; targets nobody names are absent.
+ */
+export function referencedSkillNames(contents: ReadonlyMap<string, string>): Map<string, Set<string>> {
+  const referencedBy = new Map<string, Set<string>>()
+  for (const [owner, text] of contents) {
+    for (const target of relatedSkillNames(text, owner)) {
+      const sources = referencedBy.get(target) ?? new Set<string>()
+      sources.add(owner)
+      referencedBy.set(target, sources)
+    }
+  }
+  return referencedBy
+}
+
 export class EvolutionCurator extends Service {
   static inject = ['evolutionIo']
   static Config = z.object({
@@ -1129,6 +1150,9 @@ export class EvolutionCurator extends Service {
       const text = await this.skills.read(name)
       if (text) contents.set(name, text)
     }
+    // G5: a skill that other skills POINT AT must not be nominated either — the F-331 reasoning one
+    // step further: archiving a referenced skill breaks its referrers.
+    const referencedBy = referencedSkillNames(contents)
     // F-331: the consolidation candidate pool must exclude marker-protected
     // skills (pinned/bundled/hub-installed). Nominating them into the LLM pool
     // is guaranteed to fail at the execution gate and only adds fixed report
@@ -1139,7 +1163,7 @@ export class EvolutionCurator extends Service {
       // PLAN-R2 P2-8 (2026-09-16): the scan result now carries a truncation
       // flag; the candidate pool consumes the same `groups`.
       computeDedupGroups({ contents }).groups.filter(group => group.length >= 2).flat(),
-    )].filter(name => !protectedNames.has(name))
+    )].filter(name => !protectedNames.has(name) && !referencedBy.has(name))
     // Score BEFORE the lifecycle transitions (rc.42 audit P1-2): the transition
     // engine reads `quality_warn` to apply the shorter quality-warn stale
     // window, so it must see THIS run's freshly computed scores — the old

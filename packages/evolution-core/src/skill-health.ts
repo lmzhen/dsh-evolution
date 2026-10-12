@@ -97,6 +97,8 @@ interface SkillHealthDim {
   /** The same body on the token scale (limit basis) — the judged quantity. */
   bodyTokens: number
   stampDensityPerKb: number | null
+  /** Raw stamp hits — the number the stamp rule reports as `count`. */
+  stampHits: number | null
   supportGroups: number
   /** Support FILES under references/; null = the caller could not count them (never 0-as-unknown). */
   supportFiles: number | null
@@ -112,6 +114,31 @@ export interface SkillHealthAssessment {
   findings: LintFinding[]
 }
 
+/**
+ * The findings for ONE body, computed by the engine that owns the judgement (G4).
+ *
+ * Deliberately a thin call into `assessStructureHealth`: a later consumer (the write receipt) needs
+ * findings for a body it is about to store, and re-deriving the facts anywhere else would be a
+ * SECOND judgement — the token-scale line, the /1024 stamp density and the soft/2 support threshold
+ * all live in one place and must stay there.
+ * @param skillName - the skill the body belongs to (used in messages).
+ * @param content - the WHOLE SKILL.md text, frontmatter included (the engine's own convention).
+ * @param supportGroups - non-empty support dirs; pass the real count, never a guess.
+ * @param thresholds - the configured thresholds; defaults to the shipped ones.
+ * @returns the findings, in rule order.
+ */
+export function lintBody(
+  skillName: string,
+  content: string,
+  supportGroups: number,
+  thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
+): LintFinding[] {
+  return assessStructureHealth(
+    { skillName, bodyChars: content.length, bodyText: content, supportGroups },
+    thresholds,
+  ).findings
+}
+
 export function assessStructureHealth(
   snapshot: SkillHealthSnapshot,
   thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
@@ -120,6 +147,7 @@ export function assessStructureHealth(
     bodyChars: snapshot.bodyChars,
     bodyTokens: Math.round(snapshot.bodyChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN),
     stampDensityPerKb: null,
+    stampHits: null,
     supportGroups: snapshot.supportGroups,
     supportFiles: snapshot.supportFiles ?? null,
     churnPatches: null,
@@ -151,6 +179,7 @@ export function assessStructureHealth(
     const kb = Math.max(1, snapshot.bodyChars / 1024)
     const stamps = (snapshot.bodyText.match(HEALTH_STAMP_RE) ?? []).length
     dims.stampDensityPerKb = stamps / kb
+    dims.stampHits = stamps
   }
   if (snapshot.patchCount !== undefined && snapshot.readCount !== undefined) {
     dims.churnPatches = snapshot.patchCount

@@ -22,6 +22,9 @@ export interface MutationRecord {
   afterVersion?: number
   summary: string
   at: string
+  /** G5: who caused this mutation — a write face ('foreground', 'background_review', …) or a
+   * migration step. Optional: records written before the ledger carried it stay readable. */
+  origin?: string
 }
 
 export const DEFAULT_MUTATION_CAP = 500

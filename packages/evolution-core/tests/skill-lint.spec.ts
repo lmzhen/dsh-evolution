@@ -12,6 +12,7 @@ const facts = (over: Partial<LintFacts> = {}): LintFacts => ({
     bodyChars: 1_000,
     bodyTokens: 250,
     stampDensityPerKb: null,
+    stampHits: null,
     supportGroups: 1,
     supportFiles: 0,
     churnPatches: null,
@@ -21,6 +22,7 @@ const facts = (over: Partial<LintFacts> = {}): LintFacts => ({
   overSoftLine: false,
   overTwiceSoftLine: false,
   stampLimitPerKb: 1,
+  churnMinPatches: 20,
   readable: true,
   ...over,
 })

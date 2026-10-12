@@ -131,8 +131,10 @@ export const DEFAULT_ARCHIVE_AFTER_DAYS = 90
 
 
 /**
- * Support-file count above which `references-sprawl` warns (calibrated on both corpora; the
- * threshold separates the deliberate multi-doc skills from the ones that grew a file per edit).
+ * Support-file count above which `references-sprawl` warns. **NOT CALIBRATED YET** — 60 is a
+ * placeholder: the platform corpus is empty (no platform skills available here), so the admission
+ * band cannot be checked. Until `gen-health-baseline` reports both corpora, the rule is
+ * REPORT-ONLY: its count must not be shown as a number on any surface (plan G4 ③).
  */
 export const SUPPORT_SPRAWL_FILES = 60
 export const DEFAULT_MEMORY_CHAR_LIMIT = 2200

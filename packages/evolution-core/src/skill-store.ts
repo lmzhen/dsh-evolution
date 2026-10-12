@@ -46,10 +46,12 @@ import { applyReferenceRewrite, describeReferenceRewrite, planReferenceRewrite, 
 import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFrontmatter, shrinksOverLimit, validateFrontmatter } from './frontmatter.ts'
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
 import { makeSerialQueue } from './serial.ts'
+import { h2Sections } from './document-body.ts'
+import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { suppressedFile, usageFile } from './usage.ts'
-import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
+import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
 /** 0.3.16 (S1.13, T-6): the pointer-line prefix written into a body when a
@@ -605,29 +607,21 @@ interface TreeChangePlan {
 }
 
 function planRestructureSections(body: string, moves: SkillRestructureMove[]): RestructurePlan {
+  // G3: the anchor scan has ONE home — document-body's `h2Sections`. A candidate list built from
+  // that function can never name a heading this planner refuses (missing / ambiguous), and the H2
+  // boundary rule (a section spans to the next H2 or EOF) lives there too. The four rejections
+  // below are the store's contract and keep their exact wording.
   const lines = body.split('\n')
+  const sections = h2Sections(body)
   const spans: Array<{ start: number; end: number; rel: string; heading: string; text: string }> = []
   for (const move of moves) {
     const wanted = move.heading.trim()
-    const starts: number[] = []
-    for (let i = 0; i < lines.length; i += 1) {
-      const match = /^#{2}\s+(.+?)\s*$/.exec(lines[i] ?? '')
-      const title = match?.[1]?.trim() ?? ''
-      if (title === wanted) starts.push(i)
-    }
-    const [start] = starts
-    if (start === undefined) return { error: `no "## ${wanted}" heading in the body` }
-    if (starts.length > 1) return { error: `heading "## ${wanted}" appears ${starts.length} times (ambiguous anchor)` }
-    let end = lines.length
-    for (let i = start + 1; i < lines.length; i += 1) {
-      // H2 is the section boundary: a moved section spans to the NEXT `##`
-      // heading (or EOF). Deeper headings travel with their parent section —
-      // anchors are H2-only, so H2-anchored sections can never nest.
-      if (/^#{2}\s/.test(lines[i] ?? '')) {
-        end = i
-        break
-      }
-    }
+    const matching = sections.filter(section => section.title === wanted)
+    if (matching.length === 0) return { error: `no "## ${wanted}" heading in the body` }
+    if (matching.length > 1) return { error: `heading "## ${wanted}" appears ${matching.length} times (ambiguous anchor)` }
+    const section = matching[0]
+    if (section === undefined) return { error: `no "## ${wanted}" heading in the body` }
+    const { start, end } = section
     if (end === start + 1) return { error: `heading "## ${wanted}" has an empty section` }
     if (spans.some(span => start === span.start)) return { error: `heading "## ${wanted}" is moved twice` }
     spans.push({
@@ -1141,6 +1135,27 @@ export class SkillLibrary {
   }
 
   /** Count non-empty support subdirectories (richness input for quality scoring). */
+  /** G4 ⑤-d: the dangling targets THIS write introduced, as a receipt note (empty when none).
+   *
+   * Uses the SAME resolver as the drift signal, so a receipt and a drift row can never disagree;
+   * an absent or unknown listing reports nothing rather than inventing a dead link.
+   */
+  private async danglingNoteFor(skillName: string, before: string, after: string): Promise<string> {
+    try {
+      const listing = await this.listSupportFiles(skillName)
+      if (!isPresent(listing)) return ''
+      const files = listing.value
+      const owner = 'SKILL.md'
+      const seen = new Set(resolveCitations({ content: before, file: owner, files }).dangling.map(ref => ref.target ?? ref.raw))
+      const introduced = resolveCitations({ content: after, file: owner, files }).dangling
+        .map(ref => ref.target ?? ref.raw)
+        .filter(target => !seen.has(target))
+      return introduced.length > 0 ? ' [dangling: ' + introduced.join(',') + ']' : ''
+    } catch {
+      return ''
+    }
+  }
+
   async countSupportDirs(rawName: string): Promise<number> {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
@@ -1296,6 +1311,10 @@ export class SkillLibrary {
     // Which support file the bytes belong to, RELATIVE to the skill directory (absent for the body's
     // own writes): the version entry records it so a face can name the file without guessing.
     path?: string,
+    // G5: who caused this write (a write face such as `foreground` / `background_review`, or a
+    // migration step). Optional so existing callers keep their behaviour; the ledger stores it when
+    // given, and old records without it stay readable.
+    origin?: string,
   ): Promise<void> {
     const at = new Date().toISOString()
     let versions: RecordedVersions | null = null
@@ -1310,6 +1329,28 @@ export class SkillLibrary {
         console.warn(`skill-store: content history not recorded for "${skillName}" (${error instanceof Error ? error.message : String(error)}); the mutation itself landed and the audit ledger keeps its hashes`)
       }
     }
+    // G4 ⑤: what THIS write introduced (and what it made worse) — never the standing backlog. The
+    // judgement comes from the engine (`lintBody` → the one facts builder); a receipt must not fail
+    // the mutation, so a throw here degrades to no note.
+    let healthNote = ''
+    // G4 ⑤-d: filled below when THIS write turns a reference into a dead link.
+    // G4 ⑤-d: a write that turns a reference into a dead link says so; decided by the same resolver
+    // the drift signal uses, and only for targets THIS write broke.
+    const danglingNote = before === null || after === null || before === after
+      ? ''
+      : await this.danglingNoteFor(skillName, before, after)
+    if (before !== null && after !== null && before !== after) {
+      try {
+        const groups = await this.countSupportDirs(skillName)
+        const delta = diffFindings(lintBody(skillName, before, groups), lintBody(skillName, after, groups))
+        const parts: string[] = []
+        if (delta.introduced.length > 0) parts.push('+' + delta.introduced.map(f => f.rule).join(','))
+        if (delta.worsened.length > 0) parts.push('^' + delta.worsened.map(f => f.rule + ' x' + String(f.count)).join(','))
+        if (parts.length > 0) healthNote = ' [health: ' + parts.join(' ') + ']'
+      } catch {
+        healthNote = ''
+      }
+    }
     try {
       await recordMutation(this.root, this.io, {
         skillName,
@@ -1318,8 +1359,9 @@ export class SkillLibrary {
         ...after === null ? {} : { afterHash: contentHash(after) },
         ...versions?.beforeVersion === undefined ? {} : { beforeVersion: versions.beforeVersion },
         ...versions?.afterVersion === undefined ? {} : { afterVersion: versions.afterVersion },
-        summary,
+        summary: summary + healthNote + danglingNote,
         at,
+        ...origin === undefined ? {} : { origin },
       })
     } catch {
       // Auditing is best-effort; a transient disk failure must not surface
@@ -2540,7 +2582,8 @@ export class SkillLibrary {
     const skillMdWrite = landing.find(entry => entry.target.split(/[\\/]/).pop() === 'SKILL.md')
     const auditedBefore = skillMdWrite === undefined ? md : skillMdWrite.previous
     const auditedAfter = skillMdWrite === undefined ? md : skillMdWrite.content
-    await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary)
+    // G5: the plan already carries the write face (`origin`) — put it in the ledger.
+    await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary, undefined, plan.origin)
     this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
     return {
       ok: true,

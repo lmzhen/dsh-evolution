@@ -32,6 +32,8 @@ export interface SkillDims {
   supportGroups: number
   /** Support FILES under references/ (contract §4), or null when the caller cannot count them. */
   supportFiles: number | null
+  /** Raw stamp hits behind `stampDensityPerKb` — the COUNT this rule reports (never a fixed 1). */
+  stampHits: number | null
   churnPatches: number | null
   churnReads: number | null
 }
@@ -91,8 +93,9 @@ export const RULES: readonly LintRule[] = [
     severity: 'warn',
     run: (facts) => {
       const density = facts.dims.stampDensityPerKb
-      if (density === null || density < facts.stampLimitPerKb) return null
-      return { severity: 'warn', rule: 'stamp-density', message: msg([facts.skillName, ': stamp density ', density.toFixed(1), '/KB (rc/sha/date lines — log-like content)']), count: 1 }
+      const hits = facts.dims.stampHits
+      if (density === null || hits === null || density < facts.stampLimitPerKb) return null
+      return { severity: 'warn', rule: 'stamp-density', message: msg([facts.skillName, ': stamp density ', density.toFixed(1), '/KB (rc/sha/date lines — log-like content)']), count: hits }
     },
   },
   {
