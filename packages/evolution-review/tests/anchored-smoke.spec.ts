@@ -525,7 +525,10 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     const { second, landed } = await runTwoOpPlan(name, 'dsh-review-rev06b-ok-', undefined)
     // Op 1 rebased the baseline onto its own bytes; op 2 is then compared
     // against that LANDED baseline, so it must NOT be refused as stale.
-    expect(landed).toBe(second)
+    // Windows writes text through the platform default (CRLF), so the bytes read back differ from
+    // the in-memory string only in line endings. Compare the CONTENT, not the platform convention.
+    const lf = (text: string | null): string | null => (text === null ? null : text.split(String.fromCharCode(13) + String.fromCharCode(10)).join(String.fromCharCode(10)))
+    expect(lf(landed)).toBe(lf(second))
   })
 
   it('TEST-07 (REV-06b): a concurrent writer landing between the two ops is never overwritten', { timeout: 30_000 }, async () => {
