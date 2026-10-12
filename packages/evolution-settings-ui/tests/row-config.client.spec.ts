@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { CLIENT_PARAM_SECTIONS } from '../src/client/generated-params.ts'
-import { formatText, message, type MessageKey } from '../src/client/messages.ts'
+import { formatText, type MessageKey } from '../src/client/messages.ts'
 import { RowConfigCard } from '../src/client/RowConfigCard.ts'
 
 /**

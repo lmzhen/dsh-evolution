@@ -20,7 +20,7 @@ function ioWithUnlistable(names: readonly string[]): ReturnType<typeof nodeEvolu
       }
       return base.list(path)
     },
-  } as typeof base
+  }
 }
 
 const SKILL = `---

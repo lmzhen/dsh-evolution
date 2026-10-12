@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import EvolutionIoRegistry, { preferProvider, type EvolutionIo } from '../src/index.ts'
+import EvolutionIoRegistry, { type EvolutionIo } from '../src/index.ts'
 
 function fake(name: string, calls: string[] = []): EvolutionIo {
   return {

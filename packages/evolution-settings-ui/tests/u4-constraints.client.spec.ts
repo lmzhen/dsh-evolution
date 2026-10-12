@@ -65,7 +65,7 @@ describe('U-4: what the card accepts, and what it refuses to stage', () => {
       status: 'ready', value: { [SELECT.id]: 'legacy-mode' }, base: {}, revision: 7, writable: true, mode: 'host',
       user: { [SELECT.id]: 'legacy-mode' },
     }
-    const view = render(h(RowConfigCard, { namespace: section!.namespace, fields, t, view: 'page', form: { state, mutate } }))
+    const view = render(h(RowConfigCard, { namespace: section.namespace, fields, t, view: 'page', form: { state, mutate } }))
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
     // The sentence is there, and it is the one the rule names.
     const sentence = view.container.querySelector('.evolution-param-error')
@@ -86,7 +86,7 @@ describe('U-4: what the card accepts, and what it refuses to stage', () => {
   it('a card with acceptable values still saves in ONE call (the anchor)', () => {
     const mutate = vi.fn(async () => true)
     const state = { status: 'ready', value: {}, base: {}, user: {}, revision: 7, writable: true, mode: 'host' }
-    const view = render(h(RowConfigCard, { namespace: section!.namespace, fields, t, view: 'page', form: { state, mutate } }))
+    const view = render(h(RowConfigCard, { namespace: section.namespace, fields, t, view: 'page', form: { state, mutate } }))
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
     fireEvent.change(view.container.querySelector('[id="evolution-param-' + NUMBER.id + '"]') as HTMLElement, { target: { value: '9' } })
     const save = view.container.querySelector('[data-primary="true"]') as HTMLButtonElement

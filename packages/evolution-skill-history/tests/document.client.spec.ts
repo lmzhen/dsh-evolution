@@ -16,8 +16,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
-import { DiffBody, PreviewBody, type DocumentFace } from '../src/client/document.ts'
+import { DiffBody, PreviewBody, type DiffState, type DocumentFace } from '../src/client/document.ts'
 import { CSS } from '../src/client/styles.ts'
+
+// Same idiom as the settings-ui client specs: `react`'s own `createElement` resolves to an error
+// type in this package's linter program, so it is re-typed once here and called as `h`.
+const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
 const face: DocumentFace = {
   t: key => key,
@@ -55,7 +59,7 @@ describe('the reading face is a document, not a card of controls (G4)', () => {
   })
 
   it('says how much of a bounded body it is not showing (W23)', () => {
-    const view = render(createElement(PreviewBody, {
+    const view = render(h(PreviewBody, {
       face,
       body: { kind: 'ready', body: { v: 1, display: 'abc', chars: 5000, truncated: true } },
     }))
@@ -66,7 +70,7 @@ describe('the reading face is a document, not a card of controls (G4)', () => {
   })
 
   it('renders the text a reader sees, not the stored bytes (W19)', () => {
-    const view = render(createElement(PreviewBody, {
+    const view = render(h(PreviewBody, {
       face,
       body: { kind: 'ready', body: { v: 1, display: '# Alpha\n\nBody text.', chars: 30, truncated: false } },
     }))
@@ -79,7 +83,7 @@ describe('the reading face is a document, not a card of controls (G4)', () => {
   })
 
   it('degrades to the exact text when the platform renderer is out', () => {
-    const view = render(createElement(PreviewBody, {
+    const view = render(h(PreviewBody, {
       face,
       body: { kind: 'ready', body: { v: 1, display: '# Alpha', chars: 7, truncated: false } },
     }))
@@ -88,7 +92,7 @@ describe('the reading face is a document, not a card of controls (G4)', () => {
   })
 
   it('offers the source/rendered choice as a choice, not as an expansion (W14)', () => {
-    const view = render(createElement(DiffBody, { face, diff: { kind: 'ready', diff } }))
+    const view = render(h(DiffBody, { face, diff: { kind: 'ready', diff } }))
     const switches = [...view.container.querySelectorAll('button[data-kind="switch"]')]
     expect(switches.map(node => node.getAttribute('aria-pressed'))).toEqual(['true', 'false'])
     // The renderer is absent in this lane, so the diff falls back to the exact bytes.
@@ -97,7 +101,7 @@ describe('the reading face is a document, not a card of controls (G4)', () => {
   })
 
   it('separates the facts of a diff header in the stylesheet, not in the component (W15)', () => {
-    const view = render(createElement(DiffBody, { face, diff: { kind: 'ready', diff } }))
+    const view = render(h(DiffBody, { face, diff: { kind: 'ready', diff } }))
     const text = view.container.querySelector('.evo-hist-note')?.textContent ?? ''
     // The separator is a `::before`, so it never reaches the DOM text: a component that concatenated
     // it would leave the character here.
@@ -118,7 +122,8 @@ describe('the reading face is a document, not a card of controls (G4)', () => {
       ],
     }
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const view = render(createElement(DiffBody, { face, diff: { kind: 'ready', diff: twoHunks } as never }))
+    const diffState: DiffState = { kind: 'ready', diff: twoHunks }
+    const view = render(h(DiffBody, { face, diff: diffState }))
     const complaints = spy.mock.calls
       .map(args => args.map(String).join(' '))
       .filter(line => /same key|unique "key"|two children/i.test(line))

@@ -119,8 +119,7 @@ describe('parameter registry (G1/S1.1)', () => {
   })
 
   it('keeps the parsed text and the runtime array in agreement', () => {
-    const source = readFileSync(join(fileURLToPath(new URL('.', import.meta.url)), '..', 'src', 'params.ts'), 'utf8')
-    const parsed = readRegistry(packagesRoot).entries as ParamExposure[]
+        const parsed = readRegistry(packagesRoot).entries as ParamExposure[]
     expect(parsed.length, 'entries found in the text').toBe(PARAM_EXPOSURE.length)
     expect(parsed).toEqual([...PARAM_EXPOSURE])
   })

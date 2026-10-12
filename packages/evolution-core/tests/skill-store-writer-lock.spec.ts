@@ -45,7 +45,7 @@ it('S4: an unlistable support directory REFUSES the archive (fail-closed, the su
       if (path.endsWith('references')) throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
       return base.list(path)
     },
-  } as typeof base
+  }
   const { root, lib } = await seed('dsh-evo-lock-unlistable-', 'unlistable-skill', io)
   await mkdir(join(root, 'unlistable-skill', 'references'), { recursive: true })
   const archived = await lib.archive('unlistable-skill')

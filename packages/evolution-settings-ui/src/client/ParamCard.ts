@@ -115,7 +115,7 @@ interface FieldBlockProps {
  * when the field declares no relation, or when that row is not on this card).
  * @returns the message key explaining the refusal, or null when the value is acceptable.
  */
-export function invalidReason(field: ClientParamField, text: string, peer?: string | undefined): MessageKey | null {
+export function invalidReason(field: ClientParamField, text: string, peer?: string): MessageKey | null {
   const trimmed = text.trim()
   if (trimmed === '') return null
   if (field.control === 'number') {
@@ -140,8 +140,9 @@ export function invalidReason(field: ClientParamField, text: string, peer?: stri
  */
 function resetToOf(value: unknown): string | null {
   if (value === null || value === undefined) return null
-  const kind = typeof value
-  return kind === 'string' || kind === 'number' || kind === 'boolean' ? String(value) : null
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return null
 }
 
 /**

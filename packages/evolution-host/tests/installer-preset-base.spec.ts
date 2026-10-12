@@ -643,7 +643,10 @@ describe('agent preset bases (--base standard|ptc)', () => {
     // an install. The spec therefore expects the failure instead of crashing on it.
     const skipped = await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot }).then(
       (value: { stdout: string; code: number | null }) => ({ ...value, refused: false }),
-      (caught: { stdout?: string; code?: number }) => ({ stdout: String(caught.stdout ?? ''), code: caught.code ?? null, refused: true }),
+      (caught: unknown) => {
+            const c = caught as { stdout?: string; code?: number }
+            return { stdout: c.stdout ?? '', code: c.code ?? null, refused: true }
+          },
     )
     expect(skipped.refused).toBe(true)
     expect(skipped.code).toBe(1)

@@ -52,7 +52,7 @@ export interface ParseFailure {
  * @returns whether the line was refused.
  */
 export function isParseFailure(result: ParsedCommand | ParseFailure): result is ParseFailure {
-  return (result as ParseFailure).kind !== undefined
+  return result.kind !== undefined
 }
 
 

@@ -1323,7 +1323,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const hmr = ctx.get('hmr') as
               | { runExclusive?: <T>(fn: () => T | Promise<T>) => Promise<T> }
               | undefined
-            const commit = async () => {
+            const commit = () => {
               const current = existsSync(profile.patchPath) ? readFileSync(profile.patchPath, 'utf8') : ''
               let merged = current
               const written: string[] = []
@@ -1514,7 +1514,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // slot, and a missing value is a SYNTAX answer instead of a schema-layer failure.
         const policyParsed = parseSubcommand(input)
         if (isParseFailure(policyParsed) && policyParsed.name === 'policy' && policyParsed.kind === 'missing-value') {
-          return err('/evolution policy set needs a value after --' + String(policyParsed.flag ?? '') + '; usage: policy set <id> <value> [--expect <revision>]')
+          return err('/evolution policy set needs a value after --' + (policyParsed.flag ?? '') + '; usage: policy set <id> <value> [--expect <revision>]')
         }
         if (!isParseFailure(policyParsed) && policyParsed.name === 'policy' && policyParsed.positionals[0] === 'set') {
           // S4.2: the WRITE face. One path only — the settings service. There is

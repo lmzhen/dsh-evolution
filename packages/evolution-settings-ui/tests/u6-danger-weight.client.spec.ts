@@ -47,7 +47,7 @@ describe('U-6: a dangerous action carries its weight', () => {
     render(h(PendingCard, { t, api }))
     await waitFor(() => { expect(screen.getByText(message('approvalApprove'))).toBeDefined() })
     const decisions = [message('approvalApprove'), message('approvalReject'), message('approvalPreview')]
-      .map(label => screen.getByText(label) as HTMLElement)
+      .map(label => screen.getByText(label))
     expect(decisions.map(variant)).toEqual(['primary', 'outline', 'ghost'])
   })
 })
