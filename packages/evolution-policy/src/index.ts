@@ -234,7 +234,10 @@ export class EvolutionPolicy extends Service {
       if (top) return top
       if (Array.isArray(record.operations)) {
         for (const op of record.operations) {
-          const inner = scan(asRecord(op))
+          // Same guard as above, one level down: a non-mapping entry has nothing to judge.
+          const opRecord = asRecord(op)
+          if (opRecord === undefined) continue
+          const inner = scan(opRecord)
           if (inner) return inner
         }
       }
