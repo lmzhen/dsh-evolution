@@ -1363,7 +1363,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const runExclusive = hmr?.runExclusive
             // The host call's own type is `unknown` (it is a generic seam), so the accepted shape is
             // spelled here rather than leaking `unknown` out of this branch.
-            return runExclusive === undefined ? commit() : runExclusive.call(hmr, commit) as Promise<CommandResult>
+            if (runExclusive === undefined) return commit()
+            // The host seam's own type is `unknown`; `await` is what the surrounding async
+            // contract requires here (the sync branch above must NOT await).
+            return await runExclusive.call(hmr, commit) as CommandResult
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
           }
