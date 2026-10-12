@@ -41,6 +41,31 @@ function deploymentFormOf(mode) {
 // installer and verify-package-discovery.mjs read ONE array. A local copy here
 // let a new package be published while the installer silently ignored it.
 import { EVOLUTION_BUNDLE_TAILS, EVOLUTION_PREFIXES } from './lib-family-packages.mjs'
+
+// G6.1/M1: the installer used to carry its own copies of the core composer. The port is generated
+// from evolution-core/src/preset-composition.ts (gen-composer-port.mjs --check gates it).
+// The override table is read through loadRowOverrides(ROW_OVERRIDES_PATH): the port sits in
+// scripts/, so the module-relative default would look for scripts/../row-overrides.json.
+import {
+  presetRowId,
+  listDirectories,
+  probeDesktopScope,
+  basePresetPlugins,
+  denseBlockSequence,
+  composePresetRow,
+  composePresetInsert,
+  composePresetEntry,
+  rowBlockSpan,
+  presetRowBody,
+  presetRowBlock,
+  trimTrailingBlankLines,
+  presetPatchText,
+  mergePresetRow,
+  removePresetRow,
+  rowSiblingEnd,
+  loadRowOverrides,
+  compositionRowIds,
+} from './lib-preset-composition.mjs'
 const PACKAGES_DIR = fileURLToPath(new URL('../', import.meta.url))
 const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || '@deepseek-ai'
 const BUNDLES = {
@@ -323,9 +348,6 @@ export function resolveAgentPresetBases(selection = undefined) {
 /** The row id one base's preset occupies in a composition. The platform ships
  * `preset-standard` for id `standard` (`packages/bundle/web-app/presets/standard.patch.yml`), so a
  * family preset id mirrors that spelling. */
-export function presetRowId(id) {
-  return `preset-${id}`
-}
 
 /** The composition identity of one base's row: the row id a profile patch is matched by, plus the
  * preset id and display copy the platform registry serves. */
@@ -616,13 +638,6 @@ const DESKTOP_RESOURCE_SHAPES = [
 
 /** Subdirectories of one directory, or none when it does not exist: a missing level is an ordinary
  * miss on a candidate walk, not a failure. */
-function listDirectories(dir) {
-  try {
-    return readdirSync(dir, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name)
-  } catch {
-    return []
-  }
-}
 
 /** Installation roots a desktop/Electron tree may sit at. */
 function desktopInstallRoots(fromDir) {
@@ -636,16 +651,6 @@ function desktopInstallRoots(fromDir) {
 }
 
 /** Every `@deepseek-ai/dsh-*` preset patch under one unpacked Electron resource root. */
-function probeDesktopScope(resourceRoot, file, probes) {
-  const scopeRoot = join(resourceRoot, 'dsh', 'node_modules', '@deepseek-ai')
-  for (const name of listDirectories(scopeRoot)) {
-    if (!name.startsWith('dsh-')) continue
-    const path = join(scopeRoot, name, 'presets', file)
-    probes.push(path)
-    if (existsSync(path)) return path
-  }
-  return undefined
-}
 
 /**
  * Resolve the platform PATCH FILE one agent-preset BASE names.
@@ -796,37 +801,7 @@ async function resolveBasePresetPatch(base, profileDir, bundles = []) {
  * @param patchText - the base preset patch file's text.
  * @returns the plugin rows, dedented and newline-terminated.
  */
-export function basePresetPlugins(patchText) {
-  const lines = patchText.split('\n')
-  let at = -1
-  let indent = Number.POSITIVE_INFINITY
-  for (let index = 0; index < lines.length; index += 1) {
-    const match = /^(\s*)plugins:\s*$/.exec(lines[index] ?? '')
-    const width = match?.[1]?.length
-    if (width === undefined) continue
-    if (width < indent) {
-      indent = width
-      at = index
-    }
-  }
-  if (at < 0) throw new Error('install-layered: the base preset patch carries no `plugins:` list')
-  const block = []
-  for (const line of lines.slice(at + 1)) {
-    if (line.trim() === '') {
-      block.push(line)
-      continue
-    }
-    if (line.length - line.trimStart().length <= indent) break
-    block.push(line)
-  }
-  while (block.length > 0 && block[block.length - 1]?.trim() === '') block.pop()
-  const widths = block.filter(line => line.trim() !== '').map(line => line.length - line.trimStart().length)
-  const dedent = widths.length === 0 ? 0 : Math.min(...widths)
-  return block.map(line => line.slice(0, dedent).trim() === '' ? line.slice(dedent) : line).join('\n') + '\n'
-}
 
-/** The platform package a DECLARATIVE preset row names (0.2.x replaced preset directories with it). */
-export const AGENT_PRESET_PACKAGE = '@deepseek-ai/dsh-agent-preset'
 
 /**
  * The declarative preset row for one base: the platform base rows plus the family delta, under
@@ -848,48 +823,7 @@ export const AGENT_PRESET_PACKAGE = '@deepseek-ai/dsh-agent-preset'
  * @param text - the composition rows.
  * @returns the rows with the separating blank lines removed.
  */
-function denseBlockSequence(text) {
-  const out = []
-  let scalarIndent = -1
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim()
-    const indent = line.length - line.trimStart().length
-    if (scalarIndent >= 0 && trimmed !== '' && indent <= scalarIndent) scalarIndent = -1
-    if (scalarIndent < 0) {
-      const match = /^(\s*)[\w".-]+:\s*[|>]/.exec(line)
-      if (match !== null) scalarIndent = (match[1] ?? '').length
-    }
-    if (trimmed === '' && scalarIndent < 0) continue
-    out.push(line)
-  }
-  return out.join('\n')
-}
 
-export function composePresetRow(baseComposition, deltaComposition, identity) {
-  const composed = generateAgentPreset(baseComposition, deltaComposition)
-  const plugins = denseBlockSequence(composed)
-    .split('\n')
-    // A kept blank line stays BLANK: indenting it would add trailing spaces to a block scalar's
-    // value (the shape the platform's own base patches use is a truly empty line).
-    .map(line => (line === '' ? '' : '      ' + line))
-    .join('\n')
-  return [
-    '- id: ' + identity.rowId,
-    "  name: '" + AGENT_PRESET_PACKAGE + "'",
-    '  config:',
-    '    id: ' + identity.id,
-    // No trailing commas: the row is YAML, and the platform's own patch parser
-    // rejects a JSON-style comma after a block mapping entry (pinned by the parse
-    // case in evolution-host/tests/installer-preset-base.spec.ts). Byte-identical
-    // with core's composePresetRow.
-    '    name: ' + JSON.stringify(identity.name),
-    '    description: ' + JSON.stringify(identity.description),
-    '    order: ' + String(identity.order),
-    '    plugins:',
-    plugins,
-    '',
-  ].join('\n')
-}
 
 /**
  * Wrap a composed row as the patch entry a profile patch needs.
@@ -900,10 +834,6 @@ export function composePresetRow(baseComposition, deltaComposition, identity) {
  * @param row - the row text, as {@link composePresetRow} returns it.
  * @returns the patch entry text, newline-terminated.
  */
-export function composePresetInsert(row) {
-  const body = row.replace(/\s+$/, '').split('\n').map(line => '    ' + line).join('\n')
-  return `- insert:\n${body}\n`
-}
 
 /**
  * The patch entry a profile patch receives for one base: the platform base rows, the family delta,
@@ -913,9 +843,6 @@ export function composePresetInsert(row) {
  * @param identity - row id, preset id, display fields and order.
  * @returns the patch entry text, newline-terminated.
  */
-export function composePresetEntry(basePatchText, deltaComposition, identity) {
-  return composePresetInsert(composePresetRow(basePresetPlugins(basePatchText), deltaComposition, identity))
-}
 
 /**
  * The span of one row id: the enclosing column-0 list item and the row's own first line.
@@ -927,60 +854,20 @@ export function composePresetEntry(basePatchText, deltaComposition, identity) {
  * @param rowId - the row id to locate.
  * @returns the span, or null when the patch carries no such row.
  */
-function rowBlockSpan(lines, rowId) {
-  const rowRe = new RegExp('^\\s*- id:\\s*' + rowId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$')
-  const rowStart = lines.findIndex(line => rowRe.test(line))
-  if (rowStart < 0) return null
-  let start = rowStart
-  while (start > 0 && !/^- /.test(lines[start] ?? '')) start -= 1
-  let end = lines.length
-  for (let index = start + 1; index < lines.length; index += 1) {
-    if (/^- /.test(lines[index] ?? '')) {
-      end = index
-      break
-    }
-  }
-  return { start, end, rowStart }
-}
 
 /** The text of one row's own patch item, or null when the patch carries no such row — the
  * comparison unit for {@link checkAgentPresetFreshness}. Twin of core's `presetRowBlock`. */
-export function presetRowBody(block) {
-  const lines = block.split('\n')
-  if (!/^- insert:\s*$/.test(lines[0] ?? '')) return block
-  return lines.slice(1).map(line => (line.startsWith('    ') ? line.slice(4) : line)).join('\n')
-}
 
 /** The row body of a patch block, `- insert:` unwrapped — the unit a freshness comparison needs
  * (twin of core's `presetRowBody`): a block found at column 0 and a generated `- insert:` entry
  * describe the same row and must compare equal (G6 review, P2). */
-export function presetRowBlock(patchText, rowId) {
-  const lines = patchText.split('\n')
-  const span = rowBlockSpan(lines, rowId)
-  if (span === null) return null
-  const block = lines.slice(span.start, span.end)
-  while (block.length > 0 && (block[block.length - 1] ?? '').trim() === '') block.pop()
-  return block.join('\n') + '\n'
-}
 
-/** The empty patch list the platform seeds a profile patch with. */
-export const EMPTY_PATCH_SEED = '[]'
 
-/** The seed in any spelling the platform accepts (`[]`, `[ ]`, `[] # empty`). */
-const EMPTY_PATCH_SEED_RE = /^\s*\[\s*\](\s*#.*)?\s*$/
 
 /** Drop trailing blank lines only: a kept line's own terminator (a CRLF file's `\r`) is never touched. */
-function trimTrailingBlankLines(lines) {
-  const out = [...lines]
-  while (out.length > 0 && (out[out.length - 1] ?? '').trim() === '') out.pop()
-  return out
-}
 
 /** The text to write when a patch is left with no entries: the platform's own seed
  * (`packages/boot/app-boot/src/profile.ts`, `PROFILE_PATCH_FILENAME`), never a zero-byte file. */
-export function presetPatchText(patchText) {
-  return patchText.trim() === '' ? `${EMPTY_PATCH_SEED}\n` : patchText
-}
 
 /**
  * Merge one generated entry into a patch (a profile patch) by row id.
@@ -996,25 +883,6 @@ export function presetPatchText(patchText) {
  * @param rowId - the row id to replace or append.
  * @returns the merged patch text, newline-terminated.
  */
-export function mergePresetRow(patchText, row, rowId) {
-  const lines = patchText.split('\n')
-  const block = row.replace(/\s+$/, '').split('\n')
-  const span = rowBlockSpan(lines, rowId)
-  if (span === null) {
-    // Only the SEAM is normalized. The platform seed (`[]`, `[ ]`, `[] # empty`) is a COMPLETE flow
-    // sequence a block sequence may not follow, so that one line goes; every other byte the author
-    // wrote stays — a blank line inside a block scalar (`section: |`) is part of the VALUE, and
-    // filtering the whole file rewrote user content on install (G6 review, P1).
-    const seedIndex = lines.findIndex(line => EMPTY_PATCH_SEED_RE.test(line))
-    const base = seedIndex >= 0 ? [...lines.slice(0, seedIndex), ...lines.slice(seedIndex + 1)] : [...lines]
-    const kept = trimTrailingBlankLines(base)
-    return (kept.length === 0 ? block : [...kept, ...block]).join('\n') + '\n'
-  }
-  const merged = [...lines.slice(0, span.start), ...block, ...lines.slice(span.end)]
-  // Same byte discipline on the replace path: no global blank-line collapsing, and no `\s+$` trim
-  // (it ate the trailing \r of a CRLF file's last line).
-  return trimTrailingBlankLines(merged).join('\n') + '\n'
-}
 
 /**
  * Remove one row from a patch, taking its `- insert:` item with it when that item holds nothing
@@ -1023,65 +891,13 @@ export function mergePresetRow(patchText, row, rowId) {
  * @param rowId - the row id to remove.
  * @returns the patch text, newline-terminated; byte-identical when the id is absent.
  */
-export function removePresetRow(patchText, rowId) {
-  const lines = patchText.split('\n')
-  const span = rowBlockSpan(lines, rowId)
-  if (span === null) return patchText
-  const rowLine = lines[span.rowStart] ?? ''
-  const rowIndent = rowLine.length - rowLine.trimStart().length
-  const nested = rowIndent > 0
-  const siblings = lines.slice(span.start + 1, span.end).filter((line) => {
-    const width = line.length - line.trimStart().length
-    return width === rowIndent && line.trimStart().startsWith('- ')
-  }).length
-  // A nested row inside an entry that holds others is removed alone — before it
-  // or after it alike; the entry itself goes when it held nothing else.
-  const cut = nested && siblings > 1
-    ? { start: span.rowStart, end: rowSiblingEnd(lines, span.rowStart, span.end) }
-    : span
-  const kept = [...lines.slice(0, cut.start), ...lines.slice(cut.end)]
-  const text = kept.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '')
-  return text === '' ? '' : text + '\n'
-}
 
 /** The end of one nested row's own block inside a patch entry.
  * @param lines - the patch text's lines.
  * @param rowStart - the row's `- id:` line.
  * @param itemEnd - the enclosing item's end.
  * @returns the index of the next sibling row, or the item's end. */
-function rowSiblingEnd(lines, rowStart, itemEnd) {
-  const indent = (lines[rowStart] ?? '').length - (lines[rowStart] ?? '').trimStart().length
-  for (let index = rowStart + 1; index < itemEnd; index += 1) {
-    const line = lines[index] ?? ''
-    if (line.trim() === '') continue
-    const width = line.length - line.trimStart().length
-    if (width === indent && line.trimStart().startsWith('- ')) return index
-    if (width < indent) return index
-  }
-  return itemEnd
-}
 
-/**
- * Row id set of a composition fragment — lightweight line parse, no YAML
- * library (v2 §10 scope control). Only `- id:` rows count; a row whose id
- * appears in BOTH fragments would mount twice in the generated composition.
- *
- * PLAN S5.9 (2026-09-16, audit P2-27): the id extraction accepts INDENTED
- * `- id:` rows too, so a collision hidden in a nested group is still caught —
- * the old `^- id:` anchored at column 0 and was blind to exactly the rows an
- * upstream group nesting would produce. Boundary (current, deliberate):
- * DETECTION covers nested rows, while the override INJECTION anchors
- * (`applyRowOverride` below) still match top-level rows only — the injection
- * indent contract (`^ {2}key:`) is defined against a column-0 row.
- */
-function rowIds(composition) {
-  const ids = new Set()
-  for (const line of composition.split('\n')) {
-    const match = /^\s*- id:\s*(\S+)/.exec(line)
-    if (match) ids.add(match[1])
-  }
-  return ids
-}
 
 /**
  * Compose the runtime platform base rows with the evolution delta. The BASE is
@@ -1097,9 +913,25 @@ function rowIds(composition) {
  * a delta row into the platform composition transition (warn + keep both,
  * mounting twice).
  */
+/** G6.1/M1: the composer functions moved to ./lib-preset-composition.mjs (generated from core).
+ * They are re-exported here so the installer keeps the public surface it always had: the specs and
+ * the parity checks evaluate installer.<name> in a subprocess, and an import is not a re-export. */
+export {
+  presetRowId,
+  basePresetPlugins,
+  composePresetRow,
+  composePresetInsert,
+  composePresetEntry,
+  presetRowBody,
+  presetRowBlock,
+  presetPatchText,
+  mergePresetRow,
+  removePresetRow,
+} from './lib-preset-composition.mjs'
+
 export function generateAgentPreset(standardComposition, deltaComposition) {
-  const standardIds = rowIds(standardComposition)
-  const deltaIds = rowIds(deltaComposition)
+  const standardIds = compositionRowIds(standardComposition)
+  const deltaIds = compositionRowIds(deltaComposition)
   const collisions = [...deltaIds].filter(id => standardIds.has(id)).sort()
   if (collisions.length > 0 && process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS !== '1') {
     throw new Error(
@@ -1126,7 +958,7 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
  * standing scope; a profile-root patch (evolution-host/cordis.patch.yml)
  * cannot reach it, so before this injection the layered install ran the
  * platform default (500) on the catalog's read side. Text-level rewrite in
- * the same line-scan style as rowIds() above (no YAML library — v2 §10 scope
+ * the same line-scan style as the composer row scan (no YAML library — v2 §10 scope
  * control). 0.3.53: generateAgentPreset calls this internally; core's
  * composePresetComposition applies the same table, so the npm
  * `/evolution preset install` path gets it too (installer.spec pins parity):
@@ -1143,19 +975,12 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
  * importing the built core package, so no build is needed to install. */
 const ROW_OVERRIDES_PATH = join(PACKAGES_DIR, 'evolution-core', 'row-overrides.json')
 
-function readRowOverrides() {
-  const parsed = JSON.parse(readFileSync(ROW_OVERRIDES_PATH, 'utf8'))
-  if (!Array.isArray(parsed)) {
-    throw new Error(`install-layered: ${ROW_OVERRIDES_PATH} must be an array of override entries`)
-  }
-  return parsed
-}
 
 export function injectToolSkillCap(composition) {
   let lines = composition.split('\n')
   // One table, two generation paths (0.3.77): before this, both sides kept their
   // own copy of the entries below and stayed byte-identical only by hand.
-  for (const override of readRowOverrides()) {
+  for (const override of loadRowOverrides(ROW_OVERRIDES_PATH)) {
     lines = applyRowOverride(lines, override)
   }
   return lines.join('\n')
@@ -1855,8 +1680,16 @@ if (isMain) {
       if (result.missingEntrypoints.length > 0) {
         console.log(`unbuilt:  ${result.missingEntrypoints.length} packages lack lib/index.js — build them first, or boot the profile with a TS loader`)
       }
+      const notApplied = (result.agentPresets ?? []).filter((preset) => !preset.installed && preset.reason !== 'already current')
       for (const preset of result.agentPresets ?? []) {
         console.log(`preset:   ${preset.rowId} → ${preset.patchPath}${preset.installed ? '' : ` (${preset.reason})`}`)
+      }
+      // G1.4 (contract C8): an install that left a preset row un-applied is NOT a success. The row
+      // differing from what a fresh generation writes is a decision only the user can make (--force),
+      // so the run reports it and exits non-zero instead of printing an installed-looking surface.
+      if (notApplied.length > 0) {
+        console.log(`halfDone: ${notApplied.length} preset row(s) left un-applied — re-run with --force to replace a differing block`)
+        if (!options.dryRun) process.exitCode = 1
       }
       if (options.dryRun) console.log('dry-run:  no files were written')
     }

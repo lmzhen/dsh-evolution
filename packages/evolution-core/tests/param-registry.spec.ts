@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { PARAM_ALIASES, PARAM_EXPOSURE, PARAM_NAMESPACES, type ParamExposure } from '@deepseek-ai/dsh-evolution-core'
+import { readRegistry } from '../../scripts/lib-param-registry.mjs'
 
 /**
  * G1/S1.1 guard for the parameter registry. It pins two things the .mjs tools
@@ -27,67 +28,9 @@ const REVIEW_E2 = [
   'reviewMaxDepth', 'reviewToolAllow',
 ]
 
-/** Parse the registry text the .mjs generators read (one entry per line). */
-function parseRegistryText(text: string): ParamExposure[] {
-  const out: ParamExposure[] = []
-  // Head (the 8 keys every row carries) + the two legal endings: a plain close, or
-  // the UI tail in its fixed order plus the OPTIONAL trailing valueLabels
-  // (0.9.0). Mirrors lib-param-registry.mjs, which is the parser the generators
-  // actually use — a row this helper cannot read is exactly the drift the agreement
-  // check exists to catch.
-  const head = new RegExp(
-    "^\\s*\\{ id: '([^']+)', group: '([^']+)', tier: '([^']+)', authority: '([^']+)', "
-    + "owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)'",
-  )
-  const tail = new RegExp(
-    ", label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)'(?:, valueLabels: '([^']*)')? \\},$",
-  )
-  // The exposure key (0.21.0 / G2): exactly one of `card`/`why`, and it terminates the line —
-  // peel it before matching the ending, exactly like the .mjs parser does, including the tail-first
-  // loop that reports a row carrying both keys as the contract violation it is.
-  const cardKey = /, card: '([^']+)' \},$/
-  const whyKey = /, why: '([^']+)' \},$/
-  for (const line of text.split(/\r?\n/)) {
-    const match = head.exec(line)
-    if (!match) continue
-    let rest = line.slice(match[0].length)
-    const exposure: { card?: string; why?: ParamExposure['why'] } = {}
-    for (;;) {
-      const cardMatch = cardKey.exec(rest)
-      const whyMatch = whyKey.exec(rest)
-      const hit = cardMatch ?? whyMatch
-      if (hit === null) break
-      if (cardMatch) exposure.card = cardMatch[1]!
-      else exposure.why = whyMatch![1] as ParamExposure['why']
-      rest = rest.slice(0, hit.index) + ' },'
-    }
-    const ui = tail.exec(rest)
-    if (ui) {
-      out.push({
-        id: match[1]!, group: match[2] as ParamExposure['group'], tier: match[3] as ParamExposure['tier'],
-        authority: match[4] as ParamExposure['authority'], owner: match[5]!,
-        applies: match[6] as ParamExposure['applies'], docAnchor: match[7]!, summary: match[8]!,
-        label: ui[1]!, hint: ui[2]!, control: ui[3] as NonNullable<ParamExposure['control']>,
-        unit: ui[4]!, values: ui[5]!,
-        ...(ui[6] === undefined ? {} : { valueLabels: ui[6] }),
-        // Spelled out rather than spread: under exactOptionalPropertyTypes an explicit `undefined`
-        // is not an absent optional property, and the parser's holder carries both keys always.
-        ...(exposure.card === undefined ? {} : { card: exposure.card }),
-        ...(exposure.why === undefined ? {} : { why: exposure.why }),
-      })
-      continue
-    }
-    if (!/^ \},$/.test(rest)) continue
-    out.push({
-      id: match[1]!, group: match[2] as ParamExposure['group'], tier: match[3] as ParamExposure['tier'],
-      authority: match[4] as ParamExposure['authority'], owner: match[5]!,
-      applies: match[6] as ParamExposure['applies'], docAnchor: match[7]!, summary: match[8]!,
-      ...(exposure.card === undefined ? {} : { card: exposure.card }),
-      ...(exposure.why === undefined ? {} : { why: exposure.why }),
-    })
-  }
-  return out
-}
+// The generators ONE parser, imported rather than mirrored: the mirror this file used to carry went
+// stale the moment the declared ending grew a column (independent review P1-3), which is exactly the
+// drift this case exists to catch. `readRegistry` is the parser the .mjs generators run.
 
 /** The packages root: these specs run from <root>/evolution-core/tests. */
 const packagesRoot = fileURLToPath(new URL('../../', import.meta.url))
@@ -177,7 +120,7 @@ describe('parameter registry (G1/S1.1)', () => {
 
   it('keeps the parsed text and the runtime array in agreement', () => {
     const source = readFileSync(join(fileURLToPath(new URL('.', import.meta.url)), '..', 'src', 'params.ts'), 'utf8')
-    const parsed = parseRegistryText(source)
+    const parsed = readRegistry(packagesRoot).entries as ParamExposure[]
     expect(parsed.length, 'entries found in the text').toBe(PARAM_EXPOSURE.length)
     expect(parsed).toEqual([...PARAM_EXPOSURE])
   })

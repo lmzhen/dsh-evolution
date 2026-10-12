@@ -19,7 +19,7 @@
  *    itself in `this.serial` (archive/restoreFromArchive deliberately do not).
  * 2. **Per-directory write lock** (io.ts LOCK_*) — cross-process mutual
  *    exclusion plus in-process crash ownership (tickets, takeover). Checked
- *    with `hasWriteLock` before any destructive move (archive/restore/
+ *    with `supportDirsUnlistable` before any destructive move (archive/restore/
  *    snapshot); held inside transactIo by byte writers.
  * 3. **CAS baseline (`expected:`)** — any read whose bytes feed a later write
  *    must either live inside the serial section that commits the write, or
@@ -37,7 +37,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
-import { ALIVE_LOCK_TAKEOVER_MS, LOCK_BODY_RE, LOCK_SUFFIX, decideTakeover, isCommittedWarning, isProcessAlive, nodeEvolutionIo, parseLockBody, transactIo, type EvolutionIoLike } from './io.ts'
+import { isCommittedWarning, nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 import { isAbsent, isPresent, isUnknown, probeAbsent, probeList, probeMtime, probePresent, probeText, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
 import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY } from './limits.ts'
@@ -442,16 +442,6 @@ export function markerEntryName(marker: 'bundled' | 'hub-installed' | 'pinned' |
   return `.${marker}`
 }
 
-/** F-17 (v18): the root-level lock files a DESTRUCTIVE MOVER must treat as an
- * active writer (skill body + the two marker writers). Single source with
- * `markerEntryName`/`LOCK_SUFFIX` so a renamed marker cannot silently drop out
- * of the ghost-writer probe. */
-const MARKER_LOCK_NAMES: readonly string[] = [
-  `SKILL.md${LOCK_SUFFIX}`,
-  `.pinned${LOCK_SUFFIX}`,
-  `.hermes-managed${LOCK_SUFFIX}`,
-]
-
 /** v23 (ML-1): `.archive` retention window (see pruneExpiredArchives). */
 const ARCHIVE_RETENTION_DAYS = 365
 
@@ -524,14 +514,9 @@ function validateSupportPath(filePath: string): string | null {
     if (!SUPPORT_FILE_NAME_RE.test(part)) {
       return `Unsupported file name "${part}" — use lowercase letters, digits, dots, hyphens, and underscores (leading letter or digit).`
     }
-    // P2-1 (v17): the `.lock` suffix is RESERVED for the io writer-lock
-    // protocol (`<file>.lock` lives next to its file). A user support file
-    // named `*.lock` would be indistinguishable from a writer lock for the
-    // archive/restore probes and could be swept as residue by
-    // deleteStrandedLocks.
-    if (part.toLowerCase().endsWith(LOCK_SUFFIX)) {
-      return `Unsupported file name "${part}" — the .lock suffix is reserved for the writer-lock protocol.`
-    }
+    // G2 S4: the `.lock` suffix is no longer reserved. It was reserved because a user file named
+    // `*.lock` was indistinguishable from the io writer lock; that protocol is retired (writes go
+    // through the provider's versioned writes), so the name is a user file name like any other.
     // A1-1 (v18): `.corrupt` and `.tmp` are the io layer's protocol artifacts
     // (quarantine copy / durable-write tmp). A user support file with either
     // suffix was eligible for sweepStaleTmps deletion; reserve them too.
@@ -840,17 +825,17 @@ export class SkillLibrary {
    * found no SKILL.md — remove the possibly-resurrected directory ONLY when it
    * holds nothing but this path's own write-lock file. The BR-5 rule from
    * setPinnedCore/createCore applies unchanged: a concurrent mover can land a
-   * full directory between the list probe and the remove, so anything beyond
-   * the lock file (support files, a fresh restore) must never be recursed
-   * away. Best-effort: a failed cleanup leaves the "not found" result
+   * full directory between the list probe and the remove, so ANY content at all (support files, a
+   * fresh restore) must never be recursed away. Best-effort: a failed cleanup leaves the "not found" result
    * unchanged (the operator-facing ghost-dir refusal is fail-loud already).
    */
   private async cleanupGhostDir(skillFilePath: string): Promise<void> {
     const dir = dirname(skillFilePath)
-    const lockName = `${basename(skillFilePath)}${LOCK_SUFFIX}`
     try {
       const leftovers = await this.io.list(dir)
-      if (leftovers.some(entry => entry !== lockName)) return
+      // G2 S4: the old rule also tolerated this path's own write-lock file; that protocol is retired,
+      // so "empty" is the whole test.
+      if (leftovers.length > 0) return
       await this.io.remove(dir)
     } catch {
       // Leave the ghost; restore/archive report it with repair instructions.
@@ -1857,128 +1842,23 @@ export class SkillLibrary {
    * P2 (v16): the write-lock probe for the DESTRUCTIVE MOVERS (archive /
    * restoreFromArchive). A byte-writer mid-flight is the ghost-generator —
    * after the move its transact commit re-creates `<dir>/…` (mkdir
-   * recursive) and the tree ends half-archived. The signal is the writer's
-   * own lock file, and its PLACEMENT (inside the moved directory) is why the
-   * mover must PROBE-and-REFUSE instead of acquiring it: an acquired lock
-   * would be renamed into `.archive` with the tree, stranding a phantom live
-   * lock (the v16 audit proved the probe→rename TOCTOU does exactly that,
-   * and restore would later move the residue back into the live root).
-   * Coverage: `SKILL.md.lock` (update/patch of the body) plus one level of
-   * each support dir (write_file's lock sits next to its file). Residual:
-   * NESTED support-subdir locks and the probe→rename TOCTOU itself remain
-   * fail-safe (renameWithRetry rides the write out; the writer's locked
-   * re-read refuses on the moved-away file). v37 (P2-8): a residue `.lock` whose
-   * holder is GONE is not a writer — `decideTakeover` owns that verdict.
+   * recursive) and the tree ends half-archived.
+   * G2 S4: the writer-lock probe that used to answer this question is retired — writes go through
+   * the provider's versioned writes, so a writer that raced the move fails its own write loudly
+   * instead of landing on a moved-away path. What REMAINS load-bearing here is the fail-closed
+   * listing rule, which is about the filesystem misbehaving rather than about writers.
    */
-  private async hasWriteLock(dir: string): Promise<boolean> {
-    // P3 (v17): marker writers (pin / hermes-managed) hold root-level locks
-    // too — include them in the signal set.
-    const markerLocks = MARKER_LOCK_NAMES.map(name => join(dir, name))
-    for (const lock of markerLocks) {
-      if (await this.isWriterLock(lock)) return true
-    }
+  private async supportDirsUnlistable(dir: string): Promise<boolean> {
     for (const supportDir of SUPPORT_DIRS) {
-      let entries: string[]
-      try { entries = await this.io.list(join(dir, supportDir)) } catch {
-        // P3 (v17): fail-CLOSED — a real list failure (EACCES/EIO; a missing
-        // dir reads as [] per the seam contract) must refuse the move, not
-        // read as "no locks". The v16 draft's `continue` re-opened the ghost
-        // window exactly when the filesystem is misbehaving.
+      try {
+        await this.io.list(join(dir, supportDir))
+      } catch {
+        // P3 (v17), kept: fail-CLOSED — a real list failure (EACCES/EIO; a missing dir reads as []
+        // per the seam contract) must refuse the move, not read as "nothing there".
         return true
-      }
-      for (const entry of entries) {
-        if (!entry.endsWith(LOCK_SUFFIX)) continue
-        if (await this.isWriterLock(join(dir, supportDir, entry))) return true
       }
     }
     return false
-  }
-
-  /** P2 (v17): a `*.lock` file counts as a writer lock only when its body
-   * carries the io layer's protocol — `pid:token`, a bare pid, or an empty body
-   * (a creator between create and body write); anything else is user content
-   * (suffix-only matching refused archiving and deleted user files on restore).
-   * v37 (P2-8): the verdict is `decideTakeover`'s, so the mover refuses exactly
-   * the lock the io layer refuses to reclaim, the 30s empty window included. */
-  private async isWriterLock(lockPath: string): Promise<boolean> {
-    let body: string | null
-    try {
-      body = await this.io.readText(lockPath)
-    } catch {
-      // A1-8 (v18): a real read failure (EACCES/EIO) must not read as "no
-      // lock" — the mover would proceed while a writer may hold it. Only a
-      // missing read (the seam's null) is "no lock".
-      return true
-    }
-    if (body === null) return false
-    const trimmed = body.trim()
-    if (trimmed !== '' && !/^\d+$/.test(trimmed) && !LOCK_BODY_RE.test(trimmed)) return false
-    // A backend without the mtime probe reports an unknown age: read as fresh,
-    // which is also what decideTakeover answers for an unattributable age.
-    let mtimeMs: number | null = null
-    try {
-      mtimeMs = (await this.io.mtime?.(lockPath)) ?? null
-    } catch {
-      mtimeMs = null
-    }
-    return decideTakeover({ body, mtimeMs: mtimeMs ?? Date.now(), alive: isProcessAlive }) === 'none'
-  }
-
-  /** P2 (v16): best-effort removal of lock residue inside a RESTORED tree.
-   * A1-2/A1-7 (v18): the sweep now covers the marker locks the probe checks
-   * (`SKILL.md.lock`/`.pinned.lock`/`.hermes-managed.lock`) and only removes
-   * a lock whose holder pid is NOT alive — a live writer's lock is never
-   * stolen by the sweep. A dead-pid residue would otherwise permanently
-   * refuse archive/restore. */
-  private async deleteStrandedLocks(dir: string): Promise<void> {
-    // P2 (v17): the body-shape check keeps user support files named
-    // `*.lock` (verified: restore used to delete them) out of the sweep.
-    // v20 (A-1): the three root-level names come from MARKER_LOCK_NAMES
-    // (F-17 single source) instead of re-inlined literals — a renamed marker
-    // can no longer silently drop out of the sweep.
-    for (const markerLock of MARKER_LOCK_NAMES) await this.sweepLockIfStranded(join(dir, markerLock))
-    for (const supportDir of SUPPORT_DIRS) {
-      let entries: string[] = []
-      try { entries = await this.io.list(join(dir, supportDir)) } catch { continue }
-      for (const entry of entries) {
-        if (entry.endsWith(LOCK_SUFFIX)) await this.sweepLockIfStranded(join(dir, supportDir, entry))
-      }
-    }
-  }
-
-  /** R2 follow-up (audit of A2): the recycled-pid window from io's
-   * `ALIVE_LOCK_TAKEOVER_MS`, applied to the stranded-lock sweepers. A lock
-   * whose holder pid probes alive but whose mtime is older than the alive
-   * window is a recycled pid, not a live writer (no write in this family
-   * holds a lock for more than minutes) — without this, one recycled pid
-   * blocked whole-tree snapshot recovery forever with a "retry once the
-   * write completes" message that could never become true. A backend without
-   * `mtime` keeps the conservative refuse-on-alive posture. */
-  private async lockHolderAgedOut(lockPath: string): Promise<boolean> {
-    const mtime = await this.io.mtime?.(lockPath).catch(() => null)
-    return typeof mtime === 'number' && Date.now() - mtime > ALIVE_LOCK_TAKEOVER_MS
-  }
-
-  /** Remove `lockPath` only when its body has the writer-lock `pid:token`
-   * shape AND the holder pid is not alive (or is an aged-out recycled pid —
-   * R2 follow-up); anything else (a user support file or a live writer's
-   * lock) is left untouched. */
-  private async sweepLockIfStranded(lockPath: string): Promise<void> {
-    // N36: a lock whose body cannot be READ is not a lock that is not there — leave it in place (a
-    // live writer may hold it) and name the reason instead of swallowing it.
-    const lockProbe = await probeText(this.io, lockPath)
-    if (isUnknown(lockProbe)) {
-      console.warn(`skill-store: could not read ${lockPath} to check whether its holder is alive (${lockProbe.reason}); leaving the lock in place`)
-      return
-    }
-    if (!isPresent(lockProbe)) return
-    const body = lockProbe.value
-    // v20 (A-1): consume the shared `parseLockBody` instead of the previously
-    // inlined third copy of the lock-body regex (F-17 single-source contract).
-    const pid = parseLockBody(body)
-    if (pid === null) return
-    if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid) && !(await this.lockHolderAgedOut(lockPath))) return
-    await this.io.remove(lockPath).catch(() => {})
   }
 
   /** A1-4 (v18): a manifest-declared name is copied with `join(root, name)`;
@@ -1991,31 +1871,6 @@ export class SkillLibrary {
     return name !== '' && name !== '.' && name !== '..'
       && !name.includes('/') && !name.includes('\\')
       && basename(name) === name
-  }
-
-  /** A1-7 (v18): a root-level lock whose holder is alive must refuse the
-   * restore; a dead residue is swept so a crashed writer cannot block
-   * recovery. A non-lock body shape is left alone (user file). */
-  private async refuseLiveLockOrSweep(lockPath: string, label: string): Promise<void> {
-    // P2-5 (v19): a read failure is NOT "no lock". The v18 shape swallowed it
-    // (`.catch(() => null)`) and let the restore proceed over a possibly-live
-    // writer — the opposite direction of `isWriterLock`'s fail-closed rule in
-    // this same file. Refuse the restore instead.
-    let body: string | null
-    try {
-      body = await this.io.readText(lockPath)
-    } catch (error) {
-      throw new Error(`snapshot restore refused: cannot verify ${label} (${error instanceof Error ? error.message : String(error)}); a live writer may hold it`)
-    }
-    if (body === null) return
-    // v20 (A-1): shared `parseLockBody` (F-17 single-source) — same shape
-    // rule as `sweepLockIfStranded` above.
-    const pid = parseLockBody(body)
-    if (pid === null) return
-    if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid) && !(await this.lockHolderAgedOut(lockPath))) {
-      throw new Error(`snapshot restore refused: ${label} is being written (write lock present); retry once the write completes`)
-    }
-    await this.io.remove(lockPath).catch(() => {})
   }
 
   async archive(rawName: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
@@ -2079,10 +1934,12 @@ export class SkillLibrary {
       const link = await this.io.isSymlink(dir)
       if (link === true) return { ok: false, message: `Skill "${name}" is a symlink; refusing to archive it.` }
     }
-    // P2-9 (v15)/v16: probe-and-refuse while any writer is active (see
-    // `hasWriteLock` for the signal set and the placement rationale).
-    if (await this.hasWriteLock(dir)) {
-      return { ok: false, message: `Skill "${name}" is being written (write lock present); retry archiving once the write completes.` }
+    // G2 S4: refuse when a support directory cannot be LISTED (fail-closed — see
+    // `supportDirsUnlistable`). The writer probe that used to stand here is retired: writes are
+    // versioned, so a writer that raced this move fails its own write instead of landing on a
+    // moved-away path.
+    if (await this.supportDirsUnlistable(dir)) {
+      return { ok: false, message: `Skill "${name}" could not be checked for writers (a support directory could not be listed); retry archiving.` }
     }
     // OPT-06 (2026-09): pin/protection RE-CHECK at the commit point. The
     // protection probe near the top runs several awaits before the move; a
@@ -2794,8 +2651,8 @@ export class SkillLibrary {
     // P2-9 (v15): same writer-collision probe as archive — restoring ONTO a
     // skill a writer is mid-write on would drop the new bytes behind the
     // restored tree.
-    if (await this.hasWriteLock(dest)) {
-      return { ok: false, message: `Skill "${name}" is being written (write lock present); retry restoring once the write completes.` }
+    if (await this.supportDirsUnlistable(dest)) {
+      return { ok: false, message: `Skill "${name}" could not be checked for writers (a support directory could not be listed); retry restoring.` }
     }
     const moveFailure = await this.moveDir(source, dest)
     if (moveFailure !== undefined) {
@@ -2808,7 +2665,6 @@ export class SkillLibrary {
     // crashed writer, or the archive-probe TOCTOU strand) — a live-pid lock
     // landing in the live root structurally closes the writers' self-heal and
     // would keep the restored skill unwritable until process restart.
-    await this.deleteStrandedLocks(dest)
     for (const marker of ['.archive-reason', '.archive-name']) {
       // V27 G8.4: both markers are archive-directory metadata — dropping them is
       // what keeps a restored tree identical to the tree that was archived.
@@ -3098,8 +2954,8 @@ export class SkillLibrary {
       const skipped: string[] = []
       const copyable: string[] = []
       for (const name of names) {
-        if (await this.hasWriteLock(this.dirOf(name))) {
-          console.warn(`skill-store: snapshot skipped "${name}" — a byte-writer holds its write lock; the skill is recorded as skipped in the manifest`)
+        if (await this.supportDirsUnlistable(this.dirOf(name))) {
+          console.warn(`skill-store: snapshot skipped "${name}" — its support directory could not be listed; the skill is recorded as skipped in the manifest`)
           skipped.push(name)
         } else {
           copyable.push(name)
@@ -3122,7 +2978,7 @@ export class SkillLibrary {
       // stays on disk but is unreachable through the manifest.
       const suspect: string[] = []
       for (const name of copyable) {
-        if (await this.hasWriteLock(this.dirOf(name))) suspect.push(name)
+        if (await this.supportDirsUnlistable(this.dirOf(name))) suspect.push(name)
       }
       if (suspect.length > 0) {
         for (const name of suspect) {
@@ -3510,14 +3366,9 @@ export class SkillLibrary {
     // same way (a live `.usage.json.lock` must not be deleted by the clear).
     for (const entry of rootEntries) {
       if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json' || entry === '.curator-suppressed.json' || entry === HISTORY_DIR) continue
-      if (entry.endsWith(LOCK_SUFFIX) || entry.endsWith(`${LOCK_SUFFIX}.next`)) {
-        await this.refuseLiveLockOrSweep(join(this.root, entry), entry)
-        continue
-      }
       const dir = join(this.root, entry)
       if (await this.io.exists(join(dir, 'SKILL.md'))) {
-        await this.deleteStrandedLocks(dir)
-        if (await this.hasWriteLock(dir)) {
+        if (await this.supportDirsUnlistable(dir)) {
           throw new Error(`snapshot restore refused: skill "${entry}" is being written (write lock present); retry once the write completes`)
         }
       }
@@ -3544,7 +3395,6 @@ export class SkillLibrary {
       // erase the versions a rollback itself might need.
       if (entry === HISTORY_DIR) continue
       if (entry === '.curator-suppressed.json' && restoresSuppressed) continue
-      if (entry.endsWith(LOCK_SUFFIX) || entry.endsWith(`${LOCK_SUFFIX}.next`)) continue
       await this.io.remove(join(this.root, entry))
     }
     // P2-3 (v19): `manifest` is non-null here — the refusal above precedes the
@@ -3576,7 +3426,6 @@ export class SkillLibrary {
     // every restored skill directory best-effort.
     for (const entry of await this.io.list(this.root)) {
       if (entry.startsWith('.')) continue
-      await this.deleteStrandedLocks(join(this.root, entry))
     }
   }
 }

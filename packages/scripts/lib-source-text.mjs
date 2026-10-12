@@ -13,8 +13,12 @@
 
 /**
  * Drop line and block comments while skipping quoted strings.
+ *
+ * G7-3: comment text becomes BLANKS on the same line and every newline survives, so a caller that
+ * reports `stripComments(text)` line numbers reports the SOURCE line. (The first version deleted
+ * block comments outright, which collapsed their lines and silently shifted every later line.)
  * @param text - the source text to read.
- * @returns the same text with its comments removed.
+ * @returns the same text with its comments blanked out.
  */
 export function stripComments(text) {
   let out = ''
@@ -38,7 +42,10 @@ export function stripComments(text) {
     }
     if (char === '/' && text[index + 1] === '*') {
       const end = text.indexOf('*/', index + 2)
-      index = end < 0 ? text.length : end + 1
+      const stop = end < 0 ? text.length : end + 2
+      // Blank the comment in place: newlines stay, so line numbers do not move.
+      for (let at = index; at < stop; at += 1) out += text[at] === '\n' ? '\n' : ' '
+      index = stop - 1
       continue
     }
     out += char

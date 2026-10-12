@@ -119,11 +119,14 @@ export interface VersionBodyRow {
   readonly truncated: boolean
 }
 
-/** The two chains, plus the live body hash the panel marks as "current". */
+/**
+ * The two chains. G4.2 whitelist audit: the payload's `liveHash` is DELETED here — the host route already
+ * compares it (`undoable: entry.hash !== liveHash`, routes.ts) and delivers the verdict per row, so the
+ * "current" marker has one source. A declared field nobody reads is drift waiting to happen.
+ */
 export interface VersionsPayload {
   readonly content: readonly VersionRow[]
   readonly support: readonly VersionRow[]
-  readonly liveHash: string | null
 }
 
 /** The panel's data face: plain callbacks, no service handle. */

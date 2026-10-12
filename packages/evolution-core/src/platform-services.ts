@@ -1,7 +1,7 @@
 /**
  * Every platform service the family reaches for with `ctx.get`, and what degrades without it.
  *
- * O-2 (v46 audit): the family probes 26 platform services optionally — the platform has no
+ * O-2 (v46 audit): the family probes 28 platform services optionally — the platform has no
  * formalized "optional dependency", so an ABSENT service is a silent downgrade and the diagnostic
  * surface is the only place a reader can learn about it. `/evolution doctor` used to judge six of
  * them; this table is the single source it judges the rest from, and the arch guard cross-checks it
@@ -22,7 +22,7 @@ export interface PlatformServiceProbe {
   readonly side: 'host' | 'client'
 }
 
-/** The 26 probes, in service-name order (the guard checks this list against the tree). */
+/** The 28 probes, in service-name order (the guard checks this list against the tree). */
 export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.freeze([
   { service: 'agents', feature: 'review and curator subagent wake-ups', side: 'host' },
   { service: 'approval', feature: 'the platform approval policy the approval row shadows', side: 'host' },
@@ -31,6 +31,8 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'evolutionApproval', feature: 'pending writes: list, approve and reject from the command surface', side: 'host' },
   { service: 'evolutionCurator', feature: '/evolution curator subcommands, skill undo and history', side: 'host' },
   { service: 'evolutionIo', feature: 'every durable read and write (the IO seam)', side: 'host' },
+  { service: 'fs', feature: 'the platform filesystem the evolution-io-fs backend maps the seam onto (locks + writeText(expected) version CAS)', side: 'host' },
+  { service: 'hmr', feature: 'the preset install read-merge-write commit (the platform HMR lock serializes it)', side: 'host' },
   { service: 'evolutionMemoryBudget', feature: 'the memory-budget divergence section of this report', side: 'host' },
   { service: 'evolutionPolicy', feature: 'the policy snapshot that shadows row knobs', side: 'host' },
   { service: 'evolutionReplay', feature: '/evolution replay', side: 'host' },

@@ -20,7 +20,7 @@ export interface RowConfigFace {
   /** The row's entry id, for the card title. */
   namespace: string
   fields: readonly ClientParamField[]
-  t: (key: MessageKey) => string
+  t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
 }
 
 /** Props one row entry is rendered with: the page's seat plus this row's own face. */
@@ -47,11 +47,11 @@ export function RowConfigCard(props: RowConfigCardProps): ReactNode {
   if (form === undefined) {
     // The page renders an entry only for a row it lists; no form means the deployment did
     // not compose the settings surface, so the page view says so instead of drawing dead controls.
-    return view === 'summary' ? null : createElement('p', { className: 'evolution-param-note' }, t('seatMissing'))
+    return view === 'summary' ? null : createElement('p', { className: 'evolution-param-note', role: 'status' }, t('seatMissing'))
   }
   const changed = overridden(form.state.user, fields)
   if (view === 'summary') {
-    return changed === 0 ? null : createElement('span', null, t('changed').replace('{n}', String(changed)))
+    return changed === 0 ? null : createElement('span', null, t('changed', { n: changed }))
   }
   return ParamCardView({
     namespace,
@@ -61,7 +61,9 @@ export function RowConfigCard(props: RowConfigCardProps): ReactNode {
     // T5-01/A56: ONE fenced write per SAVE. The fence stays (it is what keeps a concurrent editor
     // from being overwritten) — it just covers the whole op list instead of one field at a time, and
     // the revision is the one this render read, which is exactly what the platform's form model does.
-    mutateOnce: async (ops) => { await form.mutate(ops, form.state.revision) },
-    clear: async (field) => { await form.mutate([{ op: 'unset', path: [field] }], form.state.revision) },
+    // G5 P1-1: the Host's boolean IS the verdict, so the entry FORWARDS it (the old body awaited and
+    // dropped it, which made every write read as refused once the card trusted the return value).
+    mutateOnce: async (ops) => form.mutate(ops, form.state.revision),
+    clear: async (field) => form.mutate([{ op: 'unset', path: [field] }], form.state.revision),
   })
 }

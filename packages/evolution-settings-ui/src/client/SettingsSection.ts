@@ -9,6 +9,7 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui/client
  */
 import { createElement, type ReactNode } from 'react'
+import { FAMILY_VERSION, PACKAGE_PURPOSE } from './generated-about.ts'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
 import { CARD_SLOT, PENDING_CARD_KEY, type SectionFace } from './seam.ts'
 
@@ -23,6 +24,11 @@ export function SettingsSection(face: SectionFace): ReactNode {
     { className: 'evolution-params' },
     createElement('h2', { className: 'evolution-params-title' }, face.t('title')),
     createElement('p', { className: 'evolution-params-subtitle' }, face.t('subtitle')),
+    createElement('p', { className: 'evolution-params-about' }, FAMILY_VERSION + ' · ' + PACKAGE_PURPOSE),
+    // G5.10/U-10: the decision line — which family version this surface belongs to and what it is for.
+    // Both values are GENERATED (gen-about.mjs) from the files that own them; the browser half carries
+    // constants because it cannot read a package.json and cannot import core (build-client.mjs keeps
+    // every @deepseek-ai/* specifier external).
     // The staged-write window is not a setting, so it is not one of CLIENT_PARAM_SECTIONS — but it rides
     // this same keyed slot, and a keyed slot renders ONLY the keys a section asks for: registering it is
     // not enough (0.16.0 shipped exactly that bug — the card had no `renderSlot` naming its key, so it

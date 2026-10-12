@@ -5,6 +5,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
@@ -168,8 +170,9 @@ describe('skill-history routes: over a real socket', () => {
       expect(typeof versionBody.data.content[0]?.age.unit).toBe('string')
       // What each row SAYS and where each fact sits is decided in core and travels with the row, so the
       // browser half renders cells instead of assembling a sentence (W1/W15).
-      expect(versionBody.data.content[0]?.cells.title.map(cell => cell.key)).toEqual(['v', 'action', 'time'])
-      expect(versionBody.data.content[0]?.cells.title.map(cell => cell.slot)).toEqual(['meta', 'lead', 'meta'])
+      // U-5/G4.2: the recorded hash is on screen now (a short code, hover = the whole value).
+      expect(versionBody.data.content[0]?.cells.title.map(cell => cell.key)).toEqual(['v', 'action', 'time', 'hash'])
+      expect(versionBody.data.content[0]?.cells.title.map(cell => cell.slot)).toEqual(['meta', 'lead', 'meta', 'meta'])
       // A size change is its own cell exactly when the row HAS a non-zero one, so the rule holds for
       // every row rather than for the fixture's two versions (which happen to be the same length).
       for (const row of versionBody.data.content) {
@@ -234,7 +237,19 @@ describe('skill-history routes: over a real socket', () => {
       expect(undoneBody.data.message).toContain('undone to v1')
       expect(await library.read('panel-skill')).toContain('One.')
       // Transport refusals stay transport refusals: method, missing name, bad body, unknown path.
-      expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.versions, { method: 'POST' })).status).toBe(405)
+      // G7.5/F-8: they carry the SAME envelope as every other refusal. The client parses
+      // {ok:false,code,message}, so a {error} body would drop the server's reason and leave the user
+      // with a bare "HTTP 405" (the audit's finding).
+      const notAllowed = await fetch(host.origin + SKILL_HISTORY_ROUTES.versions, { method: 'POST' })
+      expect(notAllowed.status).toBe(405)
+      const notAllowedBody = await notAllowed.json() as { ok: boolean; code: string; message: string }
+      expect(notAllowedBody.ok).toBe(false)
+      expect(notAllowedBody.code).toBe('method-not-allowed')
+      expect(notAllowedBody.message).toContain('method not allowed')
+      // The 403 branch is unreachable from a loopback test server, so its shape is pinned at the source:
+      // no route may answer with the old {error} envelope.
+      const routesSource = readFileSync(fileURLToPath(new URL('../src/routes.ts', import.meta.url)), 'utf8')
+      expect(routesSource).not.toContain('{ error:')
       expect((await fetch(host.origin + SKILL_HISTORY_ROUTES.versions)).status).toBe(400)
       const badBody = await fetch(host.origin + SKILL_HISTORY_ROUTES.undo, { method: 'POST', body: 'not json' })
       expect(badBody.status).toBe(400)

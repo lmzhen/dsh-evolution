@@ -50,6 +50,7 @@ interface ProfileContextLike {
  * @returns the target, or undefined when no profile is mounted.
  */
 export function presetProfileTarget(ctx: { get(name: string): unknown }): PresetProfileTarget | undefined {
+// platform-declaration anchor: the platform’s `profileContext` service (optional; undefined ⇒ no preset source)
   const profile = ctx.get('profileContext') as ProfileContextLike | undefined
   if (profile === undefined || typeof profile.dir !== 'string' || profile.dir === '') return undefined
   return {

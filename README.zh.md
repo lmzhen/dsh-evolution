@@ -69,7 +69,7 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 |---|---|
 | 已验证的 DSH 平台线 | **`0.2.0-rc.2`**（`PLATFORM_VERSION`；钉住的开发基线是 `UPSTREAM_SHA=fb2c4b9e…`） |
 | 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` 依赖/peer 上都是 `^0.2.0-rc.1`（`PLATFORM_FLOOR`） |
-| 家族版本 | `0.18.0`（本树版本；npm 上的 tag 由发布 tag 决定——各形态状态见 `packages/INSTALL.md`） |
+| 家族版本 | `0.23.0`（本树版本；npm 上的 tag 由发布 tag 决定——各形态状态见 `packages/INSTALL.md`） |
 | Node | 22.19+ 或 24+（`engines`） |
 
 两个值回答两个问题：`PLATFORM_FLOOR` 是发布出去的 range 声明的口径，`PLATFORM_VERSION` 是门禁实际验证的那条线。floor 必须收得住整条线——`^0.2.0-rc.1` 收得住 `0.2.0-rc.2`，而 `^0.2.0-rc.2` 会拒绝它自己验证过的那个 rc。预发布 range 仍然不跨线：更早的预发布线在依赖解析阶段就失败，这是支持窗口，不是 bug。
@@ -184,7 +184,7 @@ doctor 的「参数面分歧」一节会报告两边不一致的地方。
 | `E-319` | 新建或裸删除前的那次确认，等满 `skillWriteConfirmTimeoutSeconds` 秒没人回答（`skillWriteConfirm: 'timeout'`），写入被取消 | 把 `skillWriteConfirm` 设成 `auto`（不问直接写）、保持 `ask`（一直等回答），或把超时调大 |
 | doctor 报 `install form: none` | 没有装任何 bundle | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
-本表是「症状 → 下一步」对照；每条编号的原文只存一处（`evolution-core/src/errors.ts`，`E-301`–`E-319`），运行时按原文输出。
+本表是「症状 → 下一步」对照；每条编号的原文只存一处（`evolution-core/src/errors.ts`，`E-301`–`E-322`），运行时按原文输出。
 
 </details>
 

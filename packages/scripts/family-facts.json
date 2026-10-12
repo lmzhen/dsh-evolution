@@ -152,6 +152,11 @@
         "registers": {
           "localOnly": [
             {
+              "script": "gen-install-counts.mjs",
+              "reason": "the counts come from the mirror tree and README, which the overlay does not carry",
+              "expiry": "release-phase wiring: add the step to the action or mark the row local-only"
+            },
+            {
               "script": "smoke-built-entries.mjs",
               "reason": "needs an installed platform scope; the local runner executes it, the publish job does not",
               "expiry": "release-phase wiring: add the step to the action or mark the row local-only"
@@ -196,7 +201,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 23 steps",
+          "text": "all 45 steps",
           "unique": true
         }
       ],
@@ -397,6 +402,20 @@
           "file": "README.md",
           "scope": "repo",
           "text": "packages/README.md"
+        }
+      ]
+    },
+    {
+      "id": "family-version",
+      "title": "the family own version: one home states it, no document presents a different one as current",
+      "home": "repo:README.md",
+      "machine": {
+        "kind": "family-version",
+        "file": "package.json"
+      },
+      "must": [
+        {
+          "text": "| Family version |"
         }
       ]
     }

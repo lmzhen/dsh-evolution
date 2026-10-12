@@ -87,17 +87,24 @@ interface RowOverride {
  * test can keep — the entries are now data, and a divergence is impossible.
  */
 const ROW_OVERRIDES_URL = new URL('../row-overrides.json', import.meta.url)
-let cachedOverrides: RowOverride[] | undefined
+/** One cache per PATH: the installer reads the same file through its own root, and a single-slot
+ * cache would hand the second caller the first caller's bytes. */
+const overridesCache = new Map<string, RowOverride[]>()
 
 /**
  * Read and validate the shared override table.
+ * G6.1/M1: the path is a PARAMETER (default: the table beside this module). The source installer
+ * runs the generated port from `scripts/`, so its own root has to be passed in — a module-relative
+ * read would look for `scripts/../row-overrides.json` and fail.
+ * @param path - the table to read.
  * @returns the entries, in file order. A malformed table fails LOUD: a composer
  * that silently skipped an entry would ship a preset running the platform
  * default while nothing downstream reported it.
  */
-export function loadRowOverrides(): RowOverride[] {
-  if (cachedOverrides !== undefined) return cachedOverrides
-  const parsed: unknown = JSON.parse(readFileSync(fileURLToPath(ROW_OVERRIDES_URL), 'utf8'))
+export function loadRowOverrides(path: string = fileURLToPath(ROW_OVERRIDES_URL)): RowOverride[] {
+  const cached = overridesCache.get(path)
+  if (cached !== undefined) return cached
+  const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
   if (!Array.isArray(parsed)) {
     throw new Error('evolution-core: row-overrides.json must be an array of override entries')
   }
@@ -113,7 +120,7 @@ export function loadRowOverrides(): RowOverride[] {
     }
     entries.push({ row: candidate.row, key: candidate.key, lines: candidate.lines, missingReason: candidate.missingReason })
   }
-  cachedOverrides = entries
+  overridesCache.set(path, entries)
   return entries
 }
 
@@ -178,7 +185,7 @@ function applyOneOverride(lines: string[], override: RowOverride): string[] {
  * rows only — the injection indent contract (`^ {2}key:`) is defined against a
  * column-0 row.
  */
-function compositionRowIds(composition: string): Set<string> {
+export function compositionRowIds(composition: string): Set<string> {
   const ids = new Set<string>()
   for (const line of composition.split('\n')) {
     const match = /^\s*- id:\s*(\S+)/.exec(line)
@@ -234,7 +241,7 @@ export interface PresetRowIdentity {
  * @param text - the composition rows.
  * @returns the rows with the separating blank lines removed.
  */
-function denseBlockSequence(text: string): string {
+export function denseBlockSequence(text: string): string {
   const out = []
   let scalarIndent = -1
   for (const line of text.split('\n')) {
@@ -282,7 +289,7 @@ export function composePresetRow(
 
 /** The patch-entry key that ADDS a row: a plain entry overrides the row with the same id, so a
  * preset the platform does not ship has to arrive inside an `insert` entry
- * (`packages/boot/app-boot/tests/user-patches.spec.ts:47-64`). */
+ * (the platform's own `user-patches.spec.ts` proves the override-vs-insert split). */
 const PATCH_INSERT_KEY = 'insert'
 
 /**
@@ -547,7 +554,7 @@ function installRoots(fromDir: string): string[] {
  * @param probes - the caller's probe log, appended to for the failure report.
  * @returns the patch path when one exists.
  */
-function probeDesktopScope(resourceRoot: string, file: string, probes: string[]): string | undefined {
+export function probeDesktopScope(resourceRoot: string, file: string, probes: string[]): string | undefined {
   const scopeRoot = join(resourceRoot, 'dsh', 'node_modules', '@deepseek-ai')
   for (const name of listDirectories(scopeRoot)) {
     if (!name.startsWith('dsh-')) continue
@@ -564,7 +571,8 @@ function probeDesktopScope(resourceRoot: string, file: string, probes: string[])
  * @param dir - the directory to list.
  * @returns the directory names.
  */
-function listDirectories(dir: string): string[] {
+// G6.1/M1: exported for the installer port (the same functions were hand-copied there).
+export function listDirectories(dir: string): string[] {
   try {
     return readdirSync(dir, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name)
   } catch {
@@ -582,7 +590,7 @@ function listDirectories(dir: string): string[] {
  * @param rowId - the row id to locate.
  * @returns the span, or null when the patch carries no such row.
  */
-function rowBlockSpan(lines: string[], rowId: string): { start: number; end: number; rowStart: number } | null {
+export function rowBlockSpan(lines: string[], rowId: string): { start: number; end: number; rowStart: number } | null {
   const rowRe = new RegExp('^\\s*- id:\\s*' + rowId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$')
   const rowStart = lines.findIndex(line => rowRe.test(line))
   if (rowStart < 0) return null
@@ -639,7 +647,7 @@ export function removePresetRow(patchText: string, rowId: string): string {
  * @param itemEnd - the enclosing item's end.
  * @returns the index of the next sibling row, or the item's end.
  */
-function rowSiblingEnd(lines: string[], rowStart: number, itemEnd: number): number {
+export function rowSiblingEnd(lines: string[], rowStart: number, itemEnd: number): number {
   const indent = (lines[rowStart] ?? '').length - (lines[rowStart] ?? '').trimStart().length
   for (let index = rowStart + 1; index < itemEnd; index += 1) {
     const line = lines[index] ?? ''
@@ -696,7 +704,7 @@ export const EMPTY_PATCH_SEED = '[]'
 const EMPTY_PATCH_SEED_RE = /^\s*\[\s*\](\s*#.*)?\s*$/
 
 /** Drop trailing blank lines only: a kept line's own terminator (a CRLF file's `\r`) is never touched. */
-function trimTrailingBlankLines(lines: string[]): string[] {
+export function trimTrailingBlankLines(lines: string[]): string[] {
   const out = [...lines]
   while (out.length > 0 && (out[out.length - 1] ?? '').trim() === '') out.pop()
   return out

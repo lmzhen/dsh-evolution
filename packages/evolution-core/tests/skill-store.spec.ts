@@ -1,9 +1,27 @@
 import { expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { authoringFeedback, contentHash, frontmatterCatalogInvalid, parseFrontmatter, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SKILL_NAME_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
+
+/**
+ * G2 S4: the "a writer is here" signal is gone with the write-lock protocol. The surviving
+ * fail-closed signal is a path that cannot be LISTED, so these fixtures make the named skills'
+ * directories unlistable instead of planting `.lock` files.
+ */
+function ioWithUnlistable(names: readonly string[]): ReturnType<typeof nodeEvolutionIo> {
+  const base = nodeEvolutionIo()
+  return {
+    ...base,
+    list: async (path: string) => {
+      if (names.some(name => path.includes(sep + name + sep) || path.endsWith(sep + name))) {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+      }
+      return base.list(path)
+    },
+  } as typeof base
+}
 
 const SKILL = `---
 name: python-testing
@@ -407,14 +425,11 @@ it('snapshot co-copies .archive and restore replaces it with the snapshot state'
   expect(await nodeEvolutionIo().list(join(root, '.archive'))).toEqual(['pre-archived'])
 })
 
-it('V26-14: snapshotAll probes live write locks — a locked skill is skipped, recorded, and not copied', async () => {
+it('V26-14 (S4): a skill whose support path cannot be LISTED is skipped, recorded, and not copied', async () => {
   const root = await tempRoot('dsh-evo-skills-probe-')
-  const lib = new SkillLibrary(root)
+  const lib = new SkillLibrary(root, ioWithUnlistable(['locked-skill']))
   await lib.create('kept-skill', USABLE('kept-skill'), 'foreground')
   await lib.create('locked-skill', USABLE('locked-skill'), 'foreground')
-  // A live writer lock on locked-skill (pid:token body — any well-formed
-  // body trips the conservative probe; liveness is not consulted here).
-  await writeFile(join(root, 'locked-skill', 'SKILL.md.lock'), `${process.pid}:deadbeef`, 'utf8')
   const baseline = await lib.snapshotAll('probe-test')
   const manifest = JSON.parse(await readFile(join(baseline, 'manifest.json'), 'utf8')) as { skills: string[]; skipped: string[] }
   // The locked skill is recorded as skipped and its directory is NOT in the
@@ -457,23 +472,19 @@ it('V27 G0.1 (core-a-10): an INCOMPLETE snapshot is refused before the destructi
 
 it('V27 G0.1 (core-a-10): a snapshot that skipped EVERY skill cannot empty the live library', async () => {
   const root = await tempRoot('dsh-evo-skills-allskip-')
-  const io = nodeEvolutionIo()
+  const io = ioWithUnlistable(['alpha', 'beta'])
   const lib = new SkillLibrary(root, io)
   await lib.create('alpha', USABLE('alpha'), 'foreground')
   await lib.create('beta', USABLE('beta'), 'foreground')
-  // A live writer holds both skills → snapshotAll skips both (skills: [],
+  // Neither skill's tree can be read → snapshotAll skips both (skills: [],
   // skipped: [alpha, beta]). This was the exact shape that reached
   // restoreLatestSnapshot and cleared the whole live library with ok:true.
-  for (const name of ['alpha', 'beta']) {
-    await writeFile(join(root, name, 'SKILL.md.lock'), `${process.pid}:abc123`, 'utf8')
-  }
   const snap = await lib.snapshotAll('all-locked')
   const manifest = JSON.parse(await readFile(join(snap, 'manifest.json'), 'utf8')) as { skills: string[]; skipped: string[] }
   expect(manifest.skills).toEqual([])
   expect(manifest.skipped.sort()).toEqual(['alpha', 'beta'])
-  // Locks released: the restore is now attempted against a snapshot that
-  // brought back nothing — it must refuse and leave both skills in place.
-  for (const name of ['alpha', 'beta']) await rm(join(root, name, 'SKILL.md.lock'), { force: true })
+  // The restore is now attempted against a snapshot that brought back nothing — it must refuse and
+  // leave both skills in place.
   const restored = await lib.restoreLatestSnapshot()
   expect(restored.ok).toBe(false)
   expect(restored.message).toContain('incomplete')
@@ -1120,26 +1131,24 @@ it('v28 G1.1 (EVO-IO-02): the ghost cleanup never takes a directory with real co
 
 it('v28 G2.5 (CORE-SK-03): both refusals pre-clear report an UNCHANGED tree, not "Rescue manually"', async () => {
   const root = await tempRoot('dsh-evo-skills-restore3-')
-  const lib = new SkillLibrary(root)
+  const lib = new SkillLibrary(root, ioWithUnlistable(['second-skill']))
   await lib.create('locked-skill', SKILL.replace('python-testing', 'locked-skill'), 'foreground')
-  // Latest complete snapshot (pre-lock).
+  // Latest complete snapshot (before the second skill existed).
   await lib.snapshotAll('test')
-  // Now create a second skill and hold a LIVE write lock on it.
+  // Now create a second skill whose tree cannot be listed (the S4 signal that replaces the
+  // retired write-lock probe).
   await lib.create('second-skill', SKILL.replace('python-testing', 'second-skill'), 'foreground')
-  const { writeFile } = await import('node:fs/promises')
-  await writeFile(join(root, 'second-skill', 'SKILL.md.lock'), `${process.pid}:deadbeef`, 'utf8')
   const result = await lib.restoreLatestSnapshot()
   expect(result.ok).toBe(false)
-  // The target restore refuses on the live lock; the pre-rollback snapshot is
-  // incomplete (second-skill was skipped) and refuses on completeness — both
-  // pre-clear, so nothing was ever touched.
+  // The target restore refuses on the unlistable tree; the pre-rollback snapshot is incomplete
+  // (second-skill was skipped) and refuses on completeness — both pre-clear, so nothing was ever
+  // touched.
   expect(result.message).toContain('UNCHANGED')
   expect(result.message).not.toContain('Rescue manually')
   // The library is intact.
   const { stat } = await import('node:fs/promises')
   expect((await stat(join(root, 'locked-skill', 'SKILL.md'))).isFile()).toBe(true)
   expect((await stat(join(root, 'second-skill', 'SKILL.md'))).isFile()).toBe(true)
-  await rm(join(root, 'second-skill', 'SKILL.md.lock'), { force: true })
 })
 
 it('v29 LIST-01: a directory squatting on SKILL.md skips the entry instead of killing the whole listing', async () => {

@@ -20,14 +20,41 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
-// v43 FLOW2-1: the orphan criterion reuses core's SINGLE liveness source
-// (`isProcessAlive`) and the io write-lock body parser (`parseLockBody`), so the
-// approval claim and the io lock cannot drift into two liveness rules.
-import { clampOnce, isProcessAlive, parseLockBody } from '@deepseek-ai/dsh-evolution-core'
+// v43 FLOW2-1: the orphan criterion needs ONE liveness rule. G2 S4 retired the io write-lock
+// protocol this grammar was borrowed from, so the claim-id grammar and its pid probe live HERE —
+// the only remaining user — instead of keeping a lock parser alive in core for a non-lock caller.
+import { clampOnce } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
 import { makeApprovalRoutes } from './routes.ts'
+
+/** A claim id carries its holder pid as `<pid>:<hex token>` (minted by `newClaimId()`). */
+const CLAIM_ID_RE = /^(\d+):[0-9a-f]*$/
+
+/**
+ * @param claimId - an id from a record's `claimedBy` field.
+ * @returns the holder pid, or null when the id does not have the claim shape (pre-v43 bare UUID).
+ */
+function claimHolderPid(claimId: string): number | null {
+  const match = CLAIM_ID_RE.exec(claimId.trim())
+  return match === null ? null : Number(match[1])
+}
+
+/**
+ * Whether a pid can still be running. `kill(pid, 0)` is the POSIX/Windows probe: it sends no
+ * signal and answers through the error — EPERM means the process EXISTS but is not ours.
+ * @param pid - the holder pid from a claim id (callers guard `> 0`; there is no pid 0).
+ * @returns true when the process exists.
+ */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
 
 export type { PendingKind, PendingRecord, PendingStatus }
 
@@ -183,6 +210,12 @@ export interface Config {
    * reference and is read at USE time — a settings write changes the window without a reload.
    */
   pendingTtlMs?: Volatile<number>
+  /**
+   * U-6: what the confirmation before an APPROVE does. The same three words `skillWriteConfirm` uses
+   * for a skill write (`tool-skill-manage/src/write-gates.ts:50`) — mirrored, not imported: the two
+   * packages do not depend on each other and this is a vocabulary, not behaviour.
+   */
+  approvalConfirm?: Volatile<'auto' | 'ask' | 'timeout'>
 }
 
 export class EvolutionApproval extends Service {
@@ -199,6 +232,10 @@ export class EvolutionApproval extends Service {
     // fields into a row's settings form — its `volatileForm` projection): without it the registry's
     // E3 row would document a knob no write can reach (G1, 0.21.0).
     pendingTtlMs: z.number().min(0).default(0).volatile(),
+    // U-6: `auto` is the shipped default — an approval batch must not be interrupted by a second
+    // confirmation the operator never asked for (31 号 §U-6 的风险行). `.volatile()` gives the field
+    // its user layer, exactly like `pendingTtlMs` above.
+    approvalConfirm: z.union([z.const('auto'), z.const('ask'), z.const('timeout')]).default('auto').volatile(),
   })
 
   private readonly enabled: boolean
@@ -431,9 +468,9 @@ export class EvolutionApproval extends Service {
    * core/instance-scope.ts, i.e. PER PROCESS, so a second process over one home
    * is not excluded at all. Two checks stand in its place:
    * 1. `inFlight` — an approve/reject running in THIS service instance;
-   * 2. the claim's holder pid. Claim ids are minted as `<pid>:<hex token>`, the
-   *    same body shape the io write lock uses, so `parseLockBody` + the core
-   *    `isProcessAlive` probe answer whether that holder can still be running: a
+   * 2. the claim's holder pid. Claim ids are minted as `<pid>:<hex token>` (this
+   *    service's own grammar, see `claimHolderPid`), so that id plus a liveness
+   *    probe answer whether the holder can still be running: a
    *    LIVE FOREIGN pid REFUSES the release; our own pid is this process's
    *    leftover (a live in-process approve is what `inFlight` covers); a dead pid
    *    is a crash. The last two are releasable, which is the S2-P2-22 case.
@@ -464,7 +501,7 @@ export class EvolutionApproval extends Service {
     // v43 FLOW2-1: a claim naming a LIVE pid that is not ours means another
     // process may be mid-approve right now — never roll that record back under
     // a run that is still going.
-    const holderPid = parseLockBody(claimId)
+    const holderPid = claimHolderPid(claimId)
     // R2 (round-2 audit): `0` is not a pid — `isProcessAlive(0)` probes the
     // caller's own process group on POSIX and would report a corrupt `0:<hex>`
     // claim as a live foreign holder forever. Treat pid 0 as no holder.
@@ -571,12 +608,11 @@ export class EvolutionApproval extends Service {
     return (platformApproval as Partial<ApprovalPolicyLike>).config?.policy ?? 'ask'
   }
 
-  /** v43 FLOW2-1: a claim id that CARRIES its holder pid — `parseLockBody`
-   * reads it back and `isProcessAlive` turns it into `release()`'s verifiable
-   * orphan criterion. The `<pid>:<hex token>` body is the io write lock's own
-   * shape, so one set of core helpers reads both; the token stays unique per
-   * call, so two approves of one record can never share a claim (the token is a
-   * dashed UUID stripped to hex because `LOCK_BODY_RE` accepts only hex). */
+  /** v43 FLOW2-1: a claim id that CARRIES its holder pid — `claimHolderPid` reads
+   * it back and the liveness probe turns it into `release()`'s verifiable orphan
+   * criterion. The token stays unique per call, so two approves of one record can
+   * never share a claim (a dashed UUID stripped to hex, which is what the
+   * claim-id grammar accepts). */
   private newClaimId(): string {
     return `${process.pid}:${randomUUID().split('-').join('')}`
   }

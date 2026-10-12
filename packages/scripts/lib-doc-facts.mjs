@@ -299,6 +299,30 @@ function machineViolations(fact, root, docs, home, repoScope) {
     }
     return out
   }
+  if (machine.kind === 'family-version') {
+    // G4.4: the family's own version has ONE home document that states it. No other tracked document
+    // may present a DIFFERENT value as the current one — comparing versions or recording history is
+    // legitimate (mirrors the platform-version kind, which forbids the same confusion for the line).
+    const version = /"version"\s*:\s*"([^"]+)"/.exec(text)?.[1]
+    if (version === undefined) {
+      console.log(`doc-facts: fact "${fact.id}" not armed in this layout — no version under ${machine.file}`)
+      return out
+    }
+    if (!home.includes(version)) out.push(`${fact.home}: ${machine.file} is ${version}, but the home does not state it`)
+    const CLAIMS = [
+      /\|\s*Family version\s*\|\s*`([^`]+)`/g,
+      /\|\s*家族版本\s*\|\s*`([^`]+)`/g,
+    ]
+    for (const doc of docs) {
+      if (doc.rel === fact.home || doc.reasonLayer) continue
+      for (const claim of CLAIMS) {
+        for (const match of doc.text.matchAll(claim)) {
+          if (match[1] !== version) out.push(`${doc.label}: presents \`${match[1]}\` as the family version while ${machine.file} is ${version}`)
+        }
+      }
+    }
+    return out
+  }
   if (machine.kind === 'gate-set') {
     // v46 S2.4 (finding T7-05, facts half): the gate's executed set has ONE home — the registers
     // below — and two consumers: this re-derivation and verify-gate-manifest.mjs, which used to

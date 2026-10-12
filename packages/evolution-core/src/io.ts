@@ -5,6 +5,7 @@
  * consumers (and the core's own tests) can use `nodeEvolutionIo`.
  */
 
+import { copyFileSync, existsSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { cp, lstat, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
@@ -193,35 +194,6 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
   }
 }
 
-/**
- * F-367 (②): lock paths whose release (the finally `rm`) failed. The next write
- * to the same file proactively recycles our own leftover lock — the holder is
- * us, so a leftover is stale by definition. Module-level by design: it must
- * survive across `nodeEvolutionIo()` instances for the self-heal to be
- * effective. (Not a pure function — the cross-call state is the intent.)
- * V4-05: this set — not an mtime heuristic — is the ONLY signal that a
- * same-pid lock is a leftover rather than a live in-process task, so it is the
- * sole gate for the self-pid recycle branch. Exported (read-only in practice)
- * so `io.spec.ts` can drive the self-heal path deterministically.
- */
-export const pendingSelfCleanup = new Map<string, string>()
-
-/** P2-7 (v11)/P3-10 (v14): record a failed release so the next write to this
- * path self-heals it, keeping the map's 64-entry cap — a never-re-touched path
- * must not pin it, while a path whose lock still EXISTS is the last to drop
- * (dropping it disables the self-heal for a lock that is really there). */
-const recordPendingSelfCleanup = async (lock: string, token: string): Promise<void> => {
-  if (pendingSelfCleanup.size >= 64) {
-    let droppable: string | undefined
-    for (const candidate of pendingSelfCleanup.keys()) {
-      if (candidate === lock) continue
-      if (await readFile(candidate, 'utf8').then(() => false, () => true)) { droppable = candidate; break }
-    }
-    const victim = droppable ?? pendingSelfCleanup.keys().next().value
-    if (victim !== undefined) pendingSelfCleanup.delete(victim)
-  }
-  pendingSelfCleanup.set(lock, token)
-}
 
 // C-28: the transient-EPERM/EBUSY retry budget grows from 3x50ms
 // (~150ms — shorter than a real antivirus/indexer scan window) to ~2s, the
@@ -387,76 +359,15 @@ export function isProcessAlive(pid: number): boolean {
   }
 }
 
-/** F-17 (v18): the write-lock protocol is a cross-module contract — the lock
- * file is `<target>.lock` and its body is `<pid>:<token>`. This module creates
- * them (`withWriteLock`) and `skill-store`'s probes/sweepers parse them, so both
- * consume these two constants instead of repeating the literals. */
-export const LOCK_SUFFIX = '.lock'
-/** Writer-lock body shape: a decimal pid, a colon, then the claim token. A
- * torn body (no parsable pid) still matches the `\\d+:` prefix rule only when
- * the pid part is intact, which is what the takeover probe needs. The capture
- * group feeds `parseLockBody` (v20 A-1: skill-store's sweepers consume this
- * helper instead of re-inlining a third regex copy — F-17 single-source). */
-export const LOCK_BODY_RE = /^(\d+):[0-9a-f]*$/
-/** Parse a writer-lock body into its holder pid. `null` when the body does
- * not have the `pid:token` shape at all (e.g. a user support file named
- * `*.lock`) — callers leave such files alone. A shape-matching body always
- * yields a number, possibly `0` (state corruption / hand edit): there is no
- * pid 0, so a `0` holder must be treated as DEAD by the caller —
- * `isProcessAlive(0)` signals the caller's own process group on POSIX and
- * answers true, so probe sites must guard `holder > 0` before probing. */
-export function parseLockBody(body: string): number | null {
-  const match = LOCK_BODY_RE.exec(body.trim())
-  return match === null ? null : Number(match[1])
-}
-
-/**
- * V27 G0.2 (EVO-IO-01): the write lock named by this claim is no longer ours
- * at the commit point — a takeover reclaimed it while we were inside the
- * critical section. The lock layer converts this into a retry of the whole
- * read-modify-write; it must never reach a caller as a successful write.
- */
-export class LostWriteLock extends Error {
-  constructor() {
-    super('evolution-io: the write lock was reclaimed before the commit')
-    this.name = 'LostWriteLock'
-  }
-}
+/** How long an abandoned quarantine copy is kept for operator rescue. G2 S4: hoisted to module scope
+ * (it used to live inside `nodeEvolutionIo`, in the region the lock protocol occupied). */
+const CORRUPT_SWEEP_AGE_MS = 7 * 24 * 3_600_000
 
 /** V27 G1.4: every quarantine-copy name this family has ever produced —
  * `<file>.corrupt` (current fixed name), `<file>.corrupt.<epoch>`, and the
  * v10-05 legacy `<file>.corrupt-<epoch>-<rand>` series. A user support file
  * keeps a final extension (`.corrupt-backup.md`) and therefore stays. */
 const CORRUPT_COPY_RE = /\.corrupt(\.\d+|-\d+-[0-9a-z]+)?$/
-
-/** V27 G1.1: the three takeover windows, as protocol constants at ONE place
- * (the inline copies that used to live in the acquisition loop, plus the dead
- * branch's bare `1000`, are gone). */
-/** A named holder that is gone, past this age, is reclaimed. Fits inside the
- * `lockAttempts * 50ms` retry budget so a dead holder's lock is reachable
- * within one budget (v19 gate arithmetic: budget >= 2 x threshold). */
-export const DEAD_LOCK_TAKEOVER_MS = 1_000
-/** No body at all: nothing attributes the lock to a holder, so this is the one
- * branch that cannot probe liveness — it must outlast any plausible stall
- * between create and body write (V27 G0.2: 1s was below what a loaded machine
- * actually took, which let a peer delete a live holder's lock). */
-export const EMPTY_LOCK_TAKEOVER_MS = 30_000
-/** A body with no parseable pid (crash mid-write): 1h, far above any legal hold
- * and far below "forever". */
-export const LOCK_TEAR_TAKEOVER_MS = 3_600_000
-/** A2 (audit P1-2): even a lock whose holder pid probes ALIVE is reclaimable
- * past this age. Liveness-by-pid cannot distinguish the original holder from
- * an unrelated process the OS later assigned the same pid, so the plain alive
- * probe let one recycled pid brick every writer of one state file forever.
- * No write in this family holds a lock for more than minutes (the longest is
- * the ~120s review window), so a day-old "alive" lock is a recycled pid, not
- * a live writer. */
-export const ALIVE_LOCK_TAKEOVER_MS = 86_400_000
-/** P2-27 (v37): the commit-point ownership re-read. A transient read failure
- * (EACCES/EMFILE/antivirus hold) must not abort a valid RMW, so the read is
- * retried in place; only a still-unreadable lock fails the attempt. */
-const OWNERSHIP_READ_ATTEMPTS = 3
-const OWNERSHIP_READ_RETRY_MS = 20
 
 /**
  * V27 G1.3: the error `commitTmp` throws when the rename landed but the parent
@@ -470,71 +381,13 @@ export function isCommittedWarning(error: unknown): boolean {
   return (error as { committed?: unknown } | undefined)?.committed === true
 }
 
-/** V27 G1.1: the takeover branches, as a value. */
-type TakeoverDecision = 'none' | 'dead' | 'empty' | 'corrupt'
-
-/** V27 G1.1: one lock observation, plus the liveness probe for its pid. */
-interface TakeoverProbe {
-  /** Raw lock body. An empty string means the file exists with no content. */
-  body: string
-  /** Lock mtime in epoch ms. */
-  mtimeMs: number
-  /** Liveness probe for a pid (injected so the decision is a pure function). */
-  alive: (pid: number) => boolean
-  /** Evaluation instant (defaults to now). */
-  nowMs?: number
-  /** Threshold overrides — production callers use the protocol defaults. */
-  deadAfterMs?: number
-  emptyAfterMs?: number
-  corruptAfterMs?: number
-  aliveAfterMs?: number
-}
-
 /**
- * V27 G1.1: the lock-takeover decision as ONE pure function, so the protocol is
- * testable and exhaustive instead of being an inline expression inside the
- * acquisition loop:
- *   - `none`    the lock is fresh, or its holder is alive within the alive
- *               window → wait, never steal;
- *   - `dead`    a named holder that is gone past the dead threshold, OR whose
- *               pid still probes alive but whose lock is older than the alive
- *               window (A2: a recycled pid must not hold the file forever);
- *   - `empty`   no body at all: nothing attributes it to a holder, so only the
- *               wide `emptyAfterMs` window may reclaim it;
- *   - `corrupt` a body with no parseable pid (a crash mid-write), past the 1h
- *               tear threshold.
- * The age thresholds compare against `nowMs - mtimeMs` with `>` so a lock whose
- * age EQUALS the threshold is not yet reclaimed (the boundary the v19 gate fix
- * pinned).
+ * Build the Node IO backend: plain fs promises, durable tmp + rename commits (crash atomicity) and
+ * ONE concurrency guarantee of its own — writes to the same path are serialized in-process (see
+ * `inProcessWrite`). G2 S4 removed the cross-process write lock and its takeover protocol; the
+ * plugin path gets cross-process safety from the platform provider (`ctx.fs`).
  */
-export function decideTakeover(probe: TakeoverProbe): TakeoverDecision {
-  const now = probe.nowMs ?? Date.now()
-  const age = now - probe.mtimeMs
-  // The pid prefix is read with the SAME rule the acquisition path always used
-  // (`split(':')[0]`), not with `parseLockBody`: the takeover must keep
-  // reclaiming a lock whose body is a bare pid (a hand-written or legacy lock),
-  // while `parseLockBody` is the stricter "is this a writer lock at all" gate
-  // the sweepers use.
-  const holder = Number(probe.body.split(':')[0] ?? '')
-  const namedHolder = Number.isInteger(holder) && holder > 0
-  if (probe.body === '') {
-    return age > (probe.emptyAfterMs ?? EMPTY_LOCK_TAKEOVER_MS) ? 'empty' : 'none'
-  }
-  if (!namedHolder) {
-    return age > (probe.corruptAfterMs ?? LOCK_TEAR_TAKEOVER_MS) ? 'corrupt' : 'none'
-  }
-  if (probe.alive(holder)) return age > (probe.aliveAfterMs ?? ALIVE_LOCK_TAKEOVER_MS) ? 'dead' : 'none'
-  return age > (probe.deadAfterMs ?? DEAD_LOCK_TAKEOVER_MS) ? 'dead' : 'none'
-}
-
-/**
- * Build the Node IO backend. `lockAttempts` scales the write-lock retry budget
- * (attempts × 50ms); the default 40 (~2s, rc.69) covers production contention,
- * while contention TESTS on a loaded runner may raise it (e.g. 240 ≈ 12s) —
- * V10-06 integration: full-suite parallel load made 32-way takeover bursts
- * exceed the default budget and fail loud.
- */
-export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
+export function nodeEvolutionIo(): EvolutionIoLike {
   /**
    * v43 S1-4: delegates to the canonical `isMissingPath` (probe.ts) — one
    * definition for the whole family instead of a second copy of the same two
@@ -550,424 +403,44 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
   const isAlive = isProcessAlive
 
   /**
-   * V10-06 (P1-1 integration fix): a takeover TICKET must never be reclaimed
-   * while its (live) holder can still be committing — the C-28 rename retry
-   * budget is ~2.35s under AV/indexer pressure, so the former 1s ticket age
-   * threshold let a contender steal an in-flight ticket, double-enter the
-   * critical section and drop one RMW (observed as 5/6 increments under
-   * full-suite load). 5s = retry budget + comfortable margin; a DEAD holder's
-   * ticket is still reclaimed immediately via the pid probe.
+   * G2 S4: the family write-lock protocol is retired. Concurrency is the PLATFORM’s job now — the
+   * plugin path requires `ctx.fs`, whose writes are versioned — so this backend keeps exactly one
+   * guarantee of its own: writes to the SAME path inside THIS process are serialized (a promise
+   * chain per path: no timers, no lock files, no takeover windows). Cross-process RMW safety comes
+   * from the provider; a standalone caller sharing a directory across processes must not rely on
+   * this backend alone. The durable tmp + rename commit stays — crash atomicity and mutual
+   * exclusion are different concerns.
    */
-  const TICKET_STALE_MS = 5_000
-
-  /**
-   * Cross-process write lock (claw `withFileLock` parity): an O_EXCL lock file
-   * guards the atomic write. A >1s-old lock is taken over ONLY after probing
-   * the holder pid it carries (rc.66): a LIVE holder is never stolen, so a
-   * slow writer no longer loses its lock to a peer at the threshold (the
-   * takeover is the only best-effort surface; the retry budget fails loud —
-   * rc.65 — instead of ever proceeding unlocked). Budget = 40 * 50ms (~2s,
-   * rc.69): 8-writer contention bursts on a loaded CI runner exceed 10
-   * attempts (500ms), and a fail-loud throw was observed instead of a clean
-   * serialization.
-   * 0.3.17 (E-8): acquisition and the task are now SEPARATE try blocks — a
-   * task error (win32 rename/EBUSY surfaces as EPERM) used to be mistaken for
-   * lock contention, retried up to 40x and finally reported as
-   * "could not acquire write lock" while the real cause was hidden.
-   * 0.3.17 (E-8a): the takeover threshold (1000ms) now fits INSIDE the ~2s
-   * retry budget (budget >= 2 x threshold), so a dead holder's lock is
-   * actually recoverable within one budget instead of being arithmetically
-   * unreachable.
-   * 0.3.21 (F-101), V4-04: takeover re-reads the lock right before acting and
-   * only proceeds when the content still names the dead pid — a peer that
-   * acquired the lock after our stale probe wrote its own pid, and deleting a
-   * LIVE lock is the double-hold (concurrent task) the probe must prevent. The
-   * re-read is necessary but not sufficient: two peers can both pass it, so the
-   * commit itself is an atomic rename to a unique name (only one peer's rename
-   * can succeed; the loser's source is gone). A naive rm lets the later peer
-   * delete the winner's freshly re-acquired live lock.
-   * 0.3.21 (F-367), V4-05: a self-pid lock is recycled ONLY when the failed
-   * release was recorded in pendingSelfCleanup — never on age alone, because an
-   * mtime over 1s is indistinguishable from a long task still executing in this
-   * process, and recycling that live lock would double-hold it. A failure to
-   * release in finally is recorded so the next write self-heals.
-   * V10-07 (P2-1): a third takeover shape — a TORN body (non-empty, no
-   * parseable pid) — is taken over after a wide 1h threshold with a
-   * console.warn; before this branch such a lock blocked every future writer
-   * forever.
-   * V27 G0.2 (EVO-IO-01): the CONTRACT for `task` is therefore: commit only
-   * after calling the `assertOwned` callback it receives, immediately before the
-   * rename (or delete) that publishes the result. A takeover may reclaim a lock
-   * whose holder is alive — an empty body cannot be attributed to a pid, and a
-   * peer can read a stale stat — and the holder cannot see it from the handle it
-   * opened (on POSIX its write lands on the UNLINKED inode). With the guard, a
-   * reclaimed claim aborts the RMW (`LostWriteLock`, converted into a retry
-   * here) instead of overwriting the current holder's result; without it, two
-   * writers commit and one update is silently lost.
-   */
-  const withWriteLock = async <T>(path: string, task: (assertOwned: () => Promise<void>) => Promise<T>): Promise<T> => {
-    const lock = `${path}${LOCK_SUFFIX}`
-    let myClaim = ''
-    for (let attempt = 0; attempt < lockAttempts; attempt += 1) {
-      // Phase 1 — acquire. ONLY acquisition errors are retryable contention.
-      // 0.3.28 (V4-04 32-way repro): the lock body carries `pid:token` so a
-      // takeover probe can tell a stale claim from a freshly created one, and
-      // release verifies identity before deleting. NB: creation MUST stay an
-      // exclusive `open('wx')` — an atomic tmp+rename would be a
-      // REPLACE-on-Windows semantic (MOVEFILE_REPLACE_EXISTING), which
-      // let every contender overwrite the winner's lock (9/9 double-held in
-      // the 10-way repro — far worse than the gap it was meant to close).
-      try {
-        myClaim = `${process.pid}:${randomBytes(4).toString('hex')}`
-        // V6-04 (0.3.35): the exclusive create must not leave an unhandled
-        // 0-byte lock behind — its body fails the pid probe, so no takeover
-        // could ever clear it (the catch below removes OUR artifact).
-        // v28 G1.5 (EVO-IO-03): this single call does NOT eliminate the
-        // empty-lock window. `fsPromises.writeFile` on a path is still
-        // open → write → close, three awaited threadpool steps, and the
-        // observer that matters is another PROCESS, which sees the OS-level
-        // window between the exclusive create and the body regardless of JS
-        // turns. What actually makes the protocol safe is the takeover
-        // budget: an empty-body lock is only stealable after
-        // EMPTY_LOCK_TAKEOVER_MS (30s), the C-27 fresh-body re-check prevents
-        // a just-created lock from being removed mid-flight, and `assertOwned`
-        // re-verifies ownership at the commit point. Do NOT shrink
-        // EMPTY_LOCK_TAKEOVER_MS on the theory that this call closed the
-        // window — it did not (v27 G1.2 claimed as much; that claim was
-        // wrong).
-        await writeFile(lock, myClaim, { flag: 'wx' })
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException | undefined)?.code
-        // Windows surfaces the concurrent-create race as EPERM ("open ... .lock")
-        // when a peer's holder-lock delete races our create; treat it as the
-        // same retryable contention as EEXIST (rc.67).
-        if (code === 'EEXIST' || code === 'EPERM') {
-          // …contended: fall through to the takeover probe below.
-        } else {
-          // V6-04: any other failure happened AFTER the exclusive create took
-          // the name (the open could not have raced anyone), so the file — empty
-          // or truncated — is OURS. Remove it before throwing: a leftover lock
-          // outlives this writer as a permanent deadlock. A wrong rm is
-          // impossible: while the name exists no other process can have created
-          // it (O_EXCL).
-          await rm(lock, { force: true }).catch(() => {})
-          throw error
-        }
-        try {
-          const st = await stat(lock)
-          // V27 G0.2 (EVO-IO-01): a FAILED read must not be coerced to ''.
-          // `.catch(() => '')` fabricated the empty-body shape out of a real
-          // read failure (the usual one: a peer removed the stale lock between
-          // our stat and this read), and `staleEmpty` then matched a lock that
-          // was NOT empty — including a peer's freshly created, still-being-
-          // written claim. The pseudo-empty body also skipped the pid probe, so
-          // the ticket holder removed a LIVE claim: two writers inside the
-          // critical section, one RMW lost, both reporting success (the 30/32
-          // and 5/6 contention failures). An unreadable lock is simply an
-          // observation we cannot act on — re-enter the loop.
-          const holderRead = await readFile(lock, 'utf8').then(
-            body => ({ ok: true as const, body }),
-            () => ({ ok: false as const, body: '' }),
-          )
-          if (!holderRead.ok) continue
-          const holderContent = holderRead.body
-          // Same pid-prefix rule as `decideTakeover` (a bare-pid body is a valid
-          // claim); `parseLockBody` is the stricter sweepers' gate, not this one.
-          const holder = Number(holderContent.split(':')[0] ?? '')
-          // F-367 (①), V4-05: a self-pid lock is recycled ONLY when the failed
-          // release was recorded in pendingSelfCleanup (a task that ended but
-          // could not rm in finally). A same-process lock is NEVER recycled on
-          // age alone: an mtime older than 1s is indistinguishable from a LONG
-          // task still executing in this very process, so the old mtime branch
-          // let a concurrent same-process writer steal a live lock (double-hold
-          // → double execution). An executing lock (of any age) is never
-          // stolen; a leftover-but-unrecorded same-pid lock is deliberately
-          // never recycled either (safe-conservative: the dead owner's
-          // cross-process takeover covers the common crash case; a leftover
-          // naming a REUSED live pid fails loud after the retry budget
-          // instead of ever double-holding; this process's own failed
-          // release is always recorded via pendingSelfCleanup).
-          if (holder === process.pid && pendingSelfCleanup.has(lock)) {
-            // V8-05 (0.3.46): the registration carries the body TOKEN from the
-            // failed release — only a matching current body is our leftover; a
-            // mismatched body is a NEW lock another same-process writer owns.
-            const token = pendingSelfCleanup.get(lock)
-            const current = await readFile(lock, 'utf8').catch(() => '')
-            if (current === token) {
-              try {
-                await rm(lock, { force: true })
-                // Only a successful removal retires the registration; a failed
-                // rm keeps it so the next write still self-heals (the old form
-                // deleted unconditionally and orphaned the record — the
-                // process then never re-tried and failed loud until restart).
-                pendingSelfCleanup.delete(lock)
-              } catch { /* raced with the holder — keep the registration */ }
-            }
-            continue
-          }
-          // V4-04 / F-101: only a stale (>1s) lock NOT held by a live peer is
-          // taken over — with a TICKET. The probe's re-read and the removal are
-          // not atomic, and a naive rename/rm let N peers claim each other's
-          // mid-creation locks (cascade double-hold: 32-way repro lost 94% of
-          // RMWs, 8-way 25% — a peer that inserted a fresh claim between the
-          // probe and the rename got its live lock moved aside, and the former
-          // owner + insertor double-held). The ticket makes the dangerous step
-          // (removing the dead lock) single-owner: `lock.next` is an O_EXCL
-          // creation — exactly one contender holds it; contenders without it
-          // loop. The ticket holder re-verifies the dead body, removes it, then
-          // drops the ticket and RE-ENTERS the fair O_EXCL acquisition loop —
-          // every claim is then won by exactly one peer (whoever wins the
-          // create), so mutual exclusion can never be broken. NB the ticket
-          // file itself is ownership-free: a stale ticket (dead holder, or the
-          // holder crashed) is removed by any prober (its removal is harmless —
-          // the ticket grants no lock).
-          // V6-04: a 0-byte lock (a creator that died between open and write)
-          // carries no pid to probe — it is reclaimable only when also older
-          // than the takeover threshold (a live creator writes its body right
-          // after open, so a lingering empty lock is a crashed creator; the 1s
-          // gate keeps an in-flight create safe). The re-read + ticket flow
-          // below stays the single execution gate for BOTH shapes.
-          // V10-07 (P2-1): a TORN body (non-empty, unparseable pid — a crash
-          // mid-write) matched neither the dead-pid nor the empty-body branch,
-          // so the lock blocked every future writer FOREVER (sweepStaleTmps
-          // deliberately skips `.lock`); past LOCK_TEAR_TAKEOVER_MS it is
-          // taken over too, with a console.warn marking the anomaly.
-          // V27 G1.1: the decision itself is the pure `decideTakeover` — the
-          // three windows (dead / empty / corrupt) live in one testable place
-          // instead of three inline expressions here.
-          const decision = decideTakeover({
-            body: holderContent,
-            mtimeMs: st.mtimeMs,
-            alive: isAlive,
-          })
-          if (decision !== 'none') {
-            // V27 G0.2 (EVO-IO-01): every takeover is a structured, observable
-            // event — the branch that fired, the body it judged, how old the
-            // lock was and which pid (if any) it named. A takeover is the only
-            // best-effort surface in this protocol, so "who took what from
-            // whom" must be reconstructible from the log after the fact.
-            console.warn(
-              `evolution-io: taking over write lock ${lock} (branch=stale${decision[0]?.toUpperCase()}${decision.slice(1)}, `
-              + `body=${JSON.stringify(holderContent)}, ageMs=${Date.now() - st.mtimeMs}, `
-              + `holderPid=${Number.isInteger(holder) && holder > 0 ? holder : 'none'})`,
-            )
-            // v43 audit (B-2): a FAILED re-read must not stand in for the
-            // empty-body shape. `''` made the byte-equality gate below pass for
-            // a lock this process could not actually read — and that gate is the
-            // only safety check before the takeover rm. An unreadable lock is an
-            // observation we cannot act on: leave it to the next attempt (the
-            // same discipline as the probe read above, V27 G0.2).
-            const currentRead = await readFile(lock, 'utf8').then(
-              body => ({ ok: true as const, body }),
-              () => ({ ok: false as const, body: '' }),
-            )
-            if (!currentRead.ok) continue
-            const current = currentRead.body
-            if (current === holderContent) {
-              const ticket = `${lock}.next`
-              // First, reclaim a stale ticket (dead pid in its body, or simply
-              // older than the takeover threshold). Best-effort and ownership-
-              // free: a wrong removal only delays a takeover by one loop.
-              try {
-                const ticketBody = await readFile(ticket, 'utf8').catch(() => '')
-                const ticketMtime = await stat(ticket).then(s => s.mtimeMs, () => 0)
-                const ticketHolder = Number(ticketBody.split(':')[0] ?? '')
-                const ticketStale = !Number.isInteger(ticketHolder) || ticketHolder <= 0
-                  || !isAlive(ticketHolder) || Date.now() - ticketMtime > TICKET_STALE_MS
-                // V6-04: an empty body carries no pid to probe — reclaim only an
-                // OLD ticket (a live creator writes its body right after open;
-                // beyond TICKET_STALE_MS with no body = crashed between create
-                // and write). The ticket grants no lock, so a wrong reclaim
-                // costs the former owner one retry round — never a second
-                // holder. The age threshold must exceed the rename retry
-                // budget (see TICKET_STALE_MS above).
-                if (ticketStale && (ticketBody !== '' || Date.now() - ticketMtime > TICKET_STALE_MS)) {
-                  await rm(ticket, { force: true }).catch(() => {})
-                }
-              } catch { /* ticket vanished — nothing to do */ }
-              try {
-                await writeFile(ticket, `${process.pid}:${randomBytes(4).toString('hex')}`, { flag: 'wx' })
-              } catch {
-                // Another contender owns the ticket (or a stale one was just
-                // reclaimed by someone else's create) — re-attempt the loop.
-                continue
-              }
-              // Ticket held: verify the dead body one more time, then remove
-              // it. Only the ticket owner reaches this line, and no OTHER
-              // contender can have re-created the lock name meanwhile (an
-              // exclusive create cannot succeed while the lock name exists,
-              // and same-pid self-heal never fires for a foreign dead pid) —
-              // so the removed file IS the dead lock, not a live claim.
-              // v22 (LOCK-2): an UNREADABLE lock here means another contender
-              // that won this same takeover already removed it — the name is
-              // free, so release the ticket and retry our own create. Mapping
-              // the ENOENT to `''` (the old `.catch(() => '')`) made the
-              // byte-equality check pass, the empty-body liveness probe read
-              // pid 0, and the rm below delete a LIVE lock a third writer had
-              // created in between (double-hold, lost RMW).
-              const verifyRead = await readFile(lock, 'utf8').then(
-                body => ({ ok: true as const, body }),
-                () => ({ ok: false as const, body: '' }),
-              )
-              if (!verifyRead.ok) {
-                await rm(ticket, { force: true }).catch(() => {})
-                continue
-              }
-              const verify = verifyRead.body
-              if (verify === holderContent) {
-                // C-27: the staleEmpty shape cannot name its creator
-                // from an empty body, so re-parse the FRESH body right before
-                // the removal — if a pid has appeared AND is alive, a creator
-                // stalled >1s between open and write has materialized its
-                // claim, and removing its lock would double-hold a live
-                // writer. The byte-equality re-check above stays the primary
-                // TOCTOU gate (a fully written body already fails it); this
-                // explicit liveness probe is the belt that narrows the
-                // event-loop-starvation window the v10 audit called out.
-                const verifyHolder = Number(verify.split(':')[0] ?? '')
-                const verifyAlive = Number.isInteger(verifyHolder) && verifyHolder > 0 && isAlive(verifyHolder)
-                if (!verifyAlive) {
-                  await rm(lock, { force: true }).catch(() => {})
-                }
-              }
-              await rm(ticket, { force: true }).catch(() => {})
-              continue
-            }
-          }
-        } catch {
-          continue // the lock vanished between fails
-        }
-        await new Promise(resolve => setTimeout(resolve, 50))
-        continue
-      }
-      // Phase 2 — run the task under the held lock. Its own errors propagate
-      // (the lock was released in finally); they are never lock contention.
-      // V27 G0.2 (EVO-IO-01): the commit-point ownership guard. A takeover can
-      // wrongly reclaim a lock whose holder is alive (an unattributable empty
-      // body, a descheduled creator, a peer that read a stale stat), and the
-      // holder cannot see that from the handle it opened — on POSIX it keeps
-      // writing to the UNLINKED inode while the name now belongs to a peer, so
-      // both writers commit and one RMW is silently lost. The invariant that
-      // makes this protocol load-independent is therefore: COMMIT ONLY WHILE
-      // THE NAME STILL CARRIES OUR CLAIM. `io.writeText`/`io.transact` call
-      // this immediately before their rename (after the payload is durable);
-      // losing the claim aborts the whole RMW, which the caller then re-runs
-      // under a fresh acquisition — a lost lock costs one retry, never data.
-      const assertOwned = async (): Promise<void> => {
-        // P2-27 (v37): a FAILED read is not a takeover. Coercing it to `null`
-        // reported an external preemption that never happened and redid the whole
-        // RMW, doubling the task's side effects. Re-read first: only a body that
-        // really differs from our claim is a lost lock.
-        let body = ''
-        let readable = false
-        for (let read = 0; read < OWNERSHIP_READ_ATTEMPTS && !readable; read += 1) {
-          if (read > 0) await new Promise(resolve => setTimeout(resolve, OWNERSHIP_READ_RETRY_MS))
-          const attempt = await readFile(lock, 'utf8').then(
-            value => ({ ok: true as const, value }),
-            () => ({ ok: false as const, value: '' }),
-          )
-          if (attempt.ok) { body = attempt.value; readable = true }
-        }
-        if (!readable) {
-          console.warn(
-            `evolution-io: write lock ${lock} could not be read at the commit point `
-            + `(ownership unverified, ours: ${JSON.stringify(myClaim)}) — `
-            + 'aborting this read-modify-write and retrying under a fresh acquisition',
-          )
-          throw new LostWriteLock()
-        }
-        if (body !== myClaim) {
-          console.warn(
-            `evolution-io: write lock ${lock} was reclaimed by another writer before the commit `
-            + `(on disk now: ${JSON.stringify(body)}, ours: ${JSON.stringify(myClaim)}) — `
-            + 'aborting this read-modify-write and retrying under a fresh acquisition',
-          )
-          throw new LostWriteLock()
-        }
-      }
-      try {
-        return await task(assertOwned)
-      } catch (error) {
-        // A claim lost before its commit is ordinary contention: the whole RMW
-        // is redone (the fresh read sees whatever the new holder wrote).
-        if (error instanceof LostWriteLock) continue
-        throw error
-      } finally {
-        // F-367 (②): a failed release is no longer silently swallowed — record
-        // the path so the NEXT write to the same file self-heals it.
-        // 0.3.28 (V4-04 follow-up): release ONLY a claim that is still OUR
-        // body — a takeover cascade may have moved our lock aside and another
-        // peer re-created the name; deleting it would remove a live peer's lock
-        // (cascade double-hold). A foreign body, a vanished lock and an
-        // UNREADABLE one are all left in place — the owner/rebuilder owns them.
-        const mine = await readFile(lock, 'utf8').then(
-          body => ({ ok: true as const, body }),
-          (error: unknown) => ({ ok: false as const, missing: isMissing(error) }),
-        )
-        if (!mine.ok) {
-          // P1-6 (v37): a FAILED read must not skip the release record. The name
-          // is never rm-ed unverified (it may carry a peer's live claim), but the
-          // body we wrote is KNOWN — registering it under the self-heal's
-          // byte-compare token keeps the leak recoverable instead of bricking
-          // this path for every writer until the process exits.
-          if (!mine.missing) await recordPendingSelfCleanup(lock, myClaim)
-        } else if (mine.body === myClaim) {
-          // V8-05 (0.3.46): record the failed release WITH the lock-body token
-          // — the later self-recycle compares the CURRENT body against this
-          // snapshot, so a fresh lock another same-process writer created at
-          // the same path (the stale-entry hazard) is never removed as if it
-          // were our own leftover.
-          // V10-06 (integration fix): the release rm RETRIES before falling
-          // back to the pending-self-cleanup snapshot. A single-shot rm fails
-          // under AV/indexer pressure (EPERM/EBUSY on a freshly-written file),
-          // and every contender then waits on our (alive) pid until its whole
-          // budget expires — observed as a lost RMW under full-suite load.
-          await rm(lock, { force: true, maxRetries: 20, retryDelay: 100 }).catch(() =>
-            // v43 audit (P1-1, io.ts:849-852): register the claim WE wrote.
-            // The old form read the body back and coerced a failed read to '',
-            // and the two failures share one cause (the same exclusive handle
-            // under AV/indexer pressure) — so the registration was EMPTY, the
-            // self-heal's byte-compare could never match the real body, the leak
-            // was never recycled and every writer in this process failed loud
-            // until it exited. A peer that re-created the name holds a DIFFERENT
-            // body, so the byte-compare still refuses to delete it.
-            recordPendingSelfCleanup(lock, myClaim))
-        }
-      }
+  const queues = new Map<string, Promise<unknown>>()
+  const inProcessWrite = async <T>(path: string, run: () => Promise<T>): Promise<T> => {
+    const previous = queues.get(path) ?? Promise.resolve()
+    const result = previous.then(run, run)
+    const settled = result.then(() => {}, () => {})
+    queues.set(path, settled)
+    try {
+      return await result
+    } finally {
+      if (queues.get(path) === settled) queues.delete(path)
     }
-    throw new Error(`could not acquire write lock for ${path} after ${lockAttempts} attempts`)
   }
 
-  /** 0.3.17 (E-8b): sweep tmp files a crashed writer left behind — same
-   * `<target>.<pid>.<rand>.tmp` shape, older than 1h AND held by a dead pid.
-   * Lazy: only the directory a write is about to touch gets swept, once per
-   * write, inside the write lock. */
+  /**
+   * Sweep transient files a crashed writer left behind, lazily: once per write, for the directory
+   * that write is about to touch.
+   * `<target>.<pid>.<rand>.tmp` — the durable-write tmp. This process's own leftover is recycled
+   * immediately (a live writer's tmp is a current write, not a crash artifact); a foreign tmp
+   * needs an age past an hour AND a dead holder.
+   * `.corrupt*` — quarantine copies past their rescue window.
+   * G2 S4: the lock and takeover-ticket branches are gone with the write-lock protocol.
+   */
   const sweepStaleTmps = async (path: string): Promise<void> => {
     const dir = dirname(path)
     const base = basename(path)
     let entries: string[]
     try { entries = await readdir(dir) } catch { return }
-    const prefix = `${base}.`
-    // V6-18 (0.3.35): the ticket name is a known transient too. `base.lock` is
-    // skipped — this sweep runs inside the held write lock, so that file IS
-    // our live lock; `base.lock.next` is an ownership-free ticket a crashed
-    // takeover leaves behind, reclaimed with the same dead-pid/old semantics
-    // as the per-attempt reclaim.
-    const lockName = `${base}${LOCK_SUFFIX}`
-    const ticketName = `${lockName}.next`
-    // S-10: quarantine copies (the state-json provider's fixed
-    // `<file>.corrupt`, and any legacy timestamped `.corrupt-*` series) older
-    // than 7 days are sweepable — the operator rescue window is days, the
-    // fixed-name copy is bounded at one per target, and without this rule an
-    // abandoned corrupt copy lived forever.
-    const CORRUPT_SWEEP_AGE_MS = 7 * 24 * 3_600_000
     for (const name of entries) {
-      if (!name.startsWith(prefix) || name === lockName) continue
-      // A1-9 (v18): only a tmp whose EXACT prefix is our base belongs to this
-      // target. The old `startsWith(prefix) && endsWith('.tmp')` shape also
-      // matched a SIBLING target's tmp (`a.md.<pid>.<hex>.tmp` while writing
-      // `a`), parsed its first segment as a pid, and could delete an in-flight
-      // write. The strict shape is exactly what writeDurableTmp mints.
+      // A1-9 (v18): only a tmp whose EXACT prefix is our base belongs to this target; the old
+      // `startsWith(prefix) && endsWith('.tmp')` shape also matched a SIBLING target's tmp.
       const tmpMatch = /^(.*)\.(\d+)\.([0-9a-f]+)\.tmp$/.exec(name)
       if (tmpMatch !== null && tmpMatch[1] === base) {
         const tmpPath = join(dir, name)
@@ -975,10 +448,6 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
         try {
           const st = await stat(tmpPath)
           const deadHolder = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
-          // F-366 (③): this process's own leftover tmp is recycled immediately
-          // (a live writer's tmp is a current write, not a crash artifact);
-          // foreign live pids keep the >1h protection so an in-flight write is
-          // not reaped.
           const selfLeftover = holder === process.pid
           if (selfLeftover || (Date.now() - st.mtimeMs > 3_600_000 && deadHolder)) {
             await rm(tmpPath, { force: true })
@@ -988,42 +457,11 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
         }
         continue
       }
-      if (name === ticketName) {
-        const ticketPath = join(dir, name)
-        try {
-          const body = await readFile(ticketPath, 'utf8').catch(() => '')
-          const holder = Number(body.split(':')[0] ?? '')
-          const st = await stat(ticketPath)
-          // v28 G1.4 (EVO-IO-04): the SAME semantics as the per-attempt
-          // reclaim — TICKET_STALE_MS governs age (the sweep's old "1s"
-          // value contradicted the takeover path and could delete a
-          // mid-flight ticket whose creator was stalled under 5s, burning
-          // the contention budget on recycled tickets). Dead-pid tickets are
-          // reclaimable immediately (an empty body has no pid to probe, so
-          // only its age proves a crashed creator — V6-04).
-          const dead = !Number.isInteger(holder) || holder <= 0 || !isAlive(holder)
-          const old = Date.now() - st.mtimeMs > TICKET_STALE_MS
-          if (dead || old) await rm(ticketPath, { force: true })
-        } catch {
-          // The ticket vanished (or a race with its reaper); nothing to clean.
-        }
-        continue
-      }
-      // S-10: a quarantine copy past the rescue window is removed
-      // (best-effort: a vanished file needs no cleanup). A1-1 (v18): the
-      // namespace layer reserves `.corrupt`/`.tmp` suffixes so a user support
-      // file cannot be mistaken for a protocol artifact.
-      // P2-1 (v19): the sweep predicate must match the NAMING rule
-      // (`validateSupportPath` reserves names ending in `.corrupt`), so a user
-      // support file such as `overview.md.corrupt-backup.md` — creatable
-      // because it does not END in `.corrupt` — is not deleted after 7 days.
-      // V27 G1.4: the predicate must also cover EVERY shape this family has
-      // minted, or an abandoned copy lives forever. The v10-05 series was
-      // `<file>.corrupt-<epoch>-<rand>` (a fresh copy per read, hence the
-      // switch to the fixed name), and those copies are still on disk in any
-      // deployment upgraded from that era — the old `\.corrupt(\.\d+)?$` never
-      // matched the hyphenated form.
-      if (CORRUPT_COPY_RE.test(name)) {
+      // S-10: a quarantine copy past the rescue window is removed (best-effort: a vanished file
+      // needs no cleanup). A1-1 (v18): the namespace layer reserves `.corrupt`/`.tmp` suffixes.
+      // Only names belonging to THIS target's series (the same `base.` prefix filter the tmps get):
+      // without it a sibling's quarantine copy was fair game.
+      if (name.startsWith(base + '.') && CORRUPT_COPY_RE.test(name)) {
         const corruptPath = join(dir, name)
         try {
           const st = await stat(corruptPath)
@@ -1046,49 +484,34 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
     },
     async writeText(path, content) {
       await mkdir(dirname(path), { recursive: true })
-      await withWriteLock(path, async (assertOwned) => {
+      // S4: serialized in-process; the durable tmp + rename commit is unchanged.
+      await inProcessWrite(path, async () => {
         await sweepStaleTmps(path)
-        // V10-06 (P1-1): durable tmp (exclusive create + handle fsync) before
-        // the rename — the upstream storage-json crash-durable protocol, not
-        // a bare writeFile whose data blocks could trail the rename metadata
-        // across a power loss.
         const tmp = await writeDurableTmp(path, content)
-        // V27 G0.2: the claim is verified immediately before the commit — the
-        // one instant where a stolen lock turns into a lost update.
-        await assertOwned()
         await commitTmp(tmp, path)
       })
     },
     async transact(path, task) {
       await mkdir(dirname(path), { recursive: true })
-      await withWriteLock(path, async (assertOwned) => {
+      await inProcessWrite(path, async () => {
         await sweepStaleTmps(path)
         let current: string | null
         try {
           current = await readFile(path, 'utf8')
         } catch (error) {
-          // Only "missing" maps to null; any other read failure surfaces so an
-          // unreadable store is never treated as empty and overwritten.
+          // Only "missing" maps to null; a real read failure surfaces so an unreadable store is
+          // never treated as empty and overwritten.
           if (isMissing(error)) current = null
           else throw error
         }
         const next = await task(current)
         if (next === null) {
-          // V27 G0.2: a delete is a commit too — the same ownership gate.
-          await assertOwned()
           await rm(path, { force: true })
           return
         }
-        // V5-03 (0.3.29): a byte-identical result is a no-op — do not rewrite
-        // the file (tmp+rename churn, mtime touch, and the misleading "nothing
-        // written" report on the caller side). noop update/patch, repeated
-        // memory adds and the state-json dedupe short-circuit all funnel here.
-        if (next === current) {
-          return
-        }
-        // V10-06 (P1-1): same durable tmp protocol as writeText.
+        // A byte-identical result is a no-op: no tmp/rename churn and no misleading "written".
+        if (next === current) return
         const tmp = await writeDurableTmp(path, next)
-        await assertOwned()
         await commitTmp(tmp, path)
       })
     },
@@ -1144,5 +567,178 @@ export function nodeEvolutionIo(lockAttempts = 40): EvolutionIoLike {
         throw error
       }
     },
+  }
+}
+
+// G7-3: the family ONE atomic writer, moved here from evolution-commands so the write path lives
+// beside the seam it belongs to. F-211 / V4-17 / V5-17 / V6-28 / V6-42 semantics verbatim.
+
+/** F-211: the fs surface atomicWriteFiles uses — injectable so the commit-phase
+ * rename-failure path is deterministically testable. Defaults to node:fs.
+ * `mtime` (optional) probes a path's last-write time so the failed-commit
+ * recovery message can name the generation it restored from. */
+interface FsOps {
+  writeFileSync(path: string, data: string | Uint8Array): void
+  existsSync(path: string): boolean
+  copyFileSync(from: string, to: string): void
+  renameSync(from: string, to: string): void
+  rmSync(path: string, options?: { force?: boolean; recursive?: boolean }): void
+  mtime?(path: string): number | null
+}
+
+const defaultFs: FsOps = {
+  writeFileSync: (path, data) => { writeFileSync(path, data) },
+  existsSync: path => existsSync(path),
+  copyFileSync: (from, to) => { copyFileSync(from, to) },
+  renameSync: (from, to) => { renameSync(from, to) },
+  rmSync: (path, options) => { rmSync(path, options) },
+  // N14: only a MISSING file is "no mtime" (null). Any other stat failure
+  // rejects, so probeMtime() reports it as unknown instead of as absent.
+  mtime: (path) => {
+    try { return statSync(path).mtimeMs } catch (error) {
+      // v43 S1-4: the canonical predicate (core/probe.ts) — one definition of
+      // "this read failure means it is not there" instead of a second copy.
+      if (isMissingPath(error)) return null
+      throw error
+    }
+  },
+}
+
+/**
+ * S6.3 (E-40): atomically replace a set of files within one directory.
+ * Each file is staged to a sibling `<name>.tmp`, then renamed into place
+ * (atomic on the same filesystem); a pre-existing file keeps a single
+ * `<name>.bak`. A failure at ANY staging step removes the staged temps and
+ * leaves the previous files untouched — a half-written target is impossible
+ * up to the staging and backup phases.
+ *
+ * F-211: the rename COMMIT phase does not carry the same guarantee. When a
+ * filesystem refuses to overwrite the destination, the code removes it and
+ * retries the rename; if the retry ALSO fails the destination is gone. The
+ * single `.bak` created above still holds the previous content, so the target
+ * is restored from it (best-effort) before the original rename error is
+ * rethrown, so a failed commit never leaves the file missing.
+ *
+ * V4-17: the `.bak` is refreshed to the committed content after every
+ * successful commit, so a later failed commit always recovers to the most
+ * recent good generation (a once-at-first-install `.bak` could otherwise
+ * restore content several installs old). The recovery error names the `.bak`
+ * source (and mtime when available) so the caller knows the generation it
+ * restored from.
+ */
+export function atomicWriteFiles(
+  targetDir: string,
+  writes: Array<{ name: string; content: string | Uint8Array }>,
+  fs: FsOps = defaultFs,
+  // F3 (P2-19, v11): warnings go through the caller's logger (the runtime
+  // pipeline), not a raw console.warn — the .bak-refresh failure is a
+  // real production event and must be observable in the operator logs.
+  logger: (message: string) => void = console.warn,
+): void {
+  const stage = (name: string): string => join(targetDir, `${name}.tmp`)
+  // V6-42 (0.3.36): a duplicate name makes the commit re-visit the same
+  // target: the second rename ENOENTs (the tmp already moved), then the
+  // remove-then-rename recovery DELETES the file the first commit just
+  // installed and restores an old `.bak` generation — a self-referential,
+  // confusing failure. Fail loud on the input instead.
+  const dupes = [...new Set(writes.map(write => write.name).filter((name, index, all) => all.indexOf(name) !== index))]
+  if (dupes.length > 0) {
+    throw new Error(`atomicWriteFiles: duplicate input names: ${dupes.join(', ')}`)
+  }
+  try {
+    for (const { name, content } of writes) fs.writeFileSync(stage(name), content)
+    for (const { name } of writes) {
+      const finalPath = join(targetDir, name)
+      const bakPath = join(targetDir, `${name}.bak`)
+      // Back up the currently installed file once, so an interrupted commit can
+      // fall back to the previous usable composition.
+      if (fs.existsSync(finalPath) && !fs.existsSync(bakPath)) fs.copyFileSync(finalPath, bakPath)
+    }
+    const committed: string[] = []
+    for (const { name } of writes) {
+      const finalPath = join(targetDir, name)
+      const bakPath = join(targetDir, `${name}.bak`)
+      const tmp = stage(name)
+      try {
+        fs.renameSync(tmp, finalPath)
+        committed.push(name)
+      } catch {
+        // Some filesystems refuse to overwrite the destination; the single
+        // .bak above already holds the previous file, so remove-then-rename is
+        // safe here.
+        try {
+          fs.rmSync(finalPath, { force: true })
+        } catch (removeError) {
+          // V6-28 (0.3.36): a failed remove must not escape WITHOUT the
+          // disclosure chain — `committed` is the only trace of a partial
+          // install and the recovery narration would be lost (Windows: rename
+          // and unlink often fail together with EPERM/EBUSY).
+          const already = committed.length > 0 ? `; already committed: ${committed.join(', ')}` : ''
+          throw new Error(`atomicWriteFiles: could not remove "${name}" to replace it (${removeError instanceof Error ? removeError.message : String(removeError)})${already}`)
+        }
+        try {
+          fs.renameSync(tmp, finalPath)
+          committed.push(name)
+        } catch (renameError) {
+          // F-211: the retry failed AFTER the target was removed — restore it
+          // from .bak before surfacing the error, so the file is not left
+          // missing. Best-effort: if the restore also fails, note that and
+          // throw the original rename error so the caller still knows why.
+          // V5-17 (0.3.31): a multi-file commit that fails midway is PARTIAL —
+          // the error must disclose which files already landed (the caller is
+          // otherwise told only about the file that failed).
+          const already = committed.length > 0 ? `; already committed: ${committed.join(', ')}` : ''
+          if (fs.existsSync(bakPath)) {
+            try {
+              fs.copyFileSync(bakPath, finalPath)
+            } catch {
+              throw new Error(`atomicWriteFiles: "${name}" was removed but recovery from ${bakPath} failed (${renameError instanceof Error ? renameError.message : String(renameError)}); verify the file manually${already}`)
+            }
+            // V4-17: recovery succeeded — name the source generation so a caller
+            // is not misled into thinking the attempt actually landed.
+            const bakMtime = fs.mtime?.(bakPath)
+            const when = bakMtime !== null && bakMtime !== undefined && Number.isFinite(bakMtime) ? ` (bak mtime ${new Date(bakMtime).toISOString()})` : ''
+            throw new Error(`atomicWriteFiles: "${name}" was removed during commit and restored from the last good generation ${bakPath}${when}; original error: ${renameError instanceof Error ? renameError.message : String(renameError)}${already}`)
+          }
+          throw new Error(`${renameError instanceof Error ? renameError.message : String(renameError)}${already}`)
+        }
+      }
+    }
+    // V4-17: a successful commit refreshes each .bak to the content that just
+    // landed, so a later failed commit recovers to the most recent good
+    // generation rather than one several installs ago (the backup phase above
+    // only ever created a .bak on first install).
+    // V5-17 (0.3.31): the refresh is best-effort maintenance — a failure here
+    // must NOT turn a successful install into a reported failure, and must not
+    // abort mid-loop (which would split the bak pair: some fresh, some old).
+    for (const { name } of writes) {
+      const finalPath = join(targetDir, name)
+      try {
+        if (fs.existsSync(finalPath)) fs.copyFileSync(finalPath, join(targetDir, `${name}.bak`))
+      } catch (refreshError) {
+        logger(`atomicWriteFiles: committed "${name}" but failed to refresh its .bak (${refreshError instanceof Error ? refreshError.message : String(refreshError)}); a later failed commit will recover to an OLDER generation`)
+      }
+    }
+  } catch (error) {
+    // OPT-24 (2026-09): the cleanup loop runs INSIDE the catch — an rmSync
+    // that hits EPERM/EBUSY (Windows: AV indexer, open handle; force only
+    // suppresses ENOENT) escaped the catch and REPLACED the carefully built
+    // recovery diagnostic (including the already-committed disclosure), and
+    // left the remaining staged temps behind. Cleanup failures are now
+    // collected and appended to the original error; every temp gets its
+    // removal attempt.
+    const cleanupFailures: string[] = []
+    for (const { name } of writes) {
+      try {
+        fs.rmSync(stage(name), { force: true, recursive: true })
+      } catch (cleanupError) {
+        cleanupFailures.push(`${name}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`)
+      }
+    }
+    if (cleanupFailures.length > 0) {
+      const original = error instanceof Error ? error.message : String(error)
+      throw new Error(`${original} (staged-temp cleanup also failed: ${cleanupFailures.join('; ')})`)
+    }
+    throw error
   }
 }

@@ -30,6 +30,15 @@ import type { CitationPolicy, LiveValue, SupportFileCharPolicy, WriteAnchor } fr
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from './write-gates.ts'
+/**
+ * F-2 (audit v46 / G7.2): the read-only action set used to be spelled out FOUR times in this file
+ * (usage accounting at the patch_count bump, the cross-source directory exemption, the approval gap
+ * and the replay exemption). The four USES stay where they are — their neighbouring logic differs —
+ * but the CRITERION is this one predicate, so adding an action cannot update three of four.
+ */
+const READ_ONLY_ACTIONS: readonly string[] = ['list', 'review', 'pin', 'unpin']
+const isReadOnlyAction = (action: unknown): boolean =>
+  typeof action === 'string' && READ_ONLY_ACTIONS.includes(action)
 
 export const name = 'tool-skill-manage'
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
@@ -868,7 +877,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // legacy facade here, or review-created skills silently escape the
       // stale/archive lifecycle. Read-only actions (list/review) must
       // never bump counters or emit mutation events.
-      const mutating = action !== 'list' && action !== 'review' && action !== 'pin' && action !== 'unpin'
+      const mutating = !isReadOnlyAction(action)
       // Any non-foreground writer (review channel OR delegated subagent) is an
       // agent-authored skill and must enter the lifecycle as such.
       if (name && action === 'create') {
@@ -1099,7 +1108,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // exactly as before.
       // T2-05/A20: per-CALL (never closure state — a view from an earlier call must not be reused).
       let crossSourceView: readonly SkillSummary[] | null = null
-      if (typeof args.name === 'string' && args.name !== '' && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
+      if (typeof args.name === 'string' && args.name !== '' && !isReadOnlyAction(args.action)) {
         // S1-B2: the shared gate (same body the replay runner runs).
         const gate = await crossSourceRefusal(args.name)
         if (gate.refusal !== null) return { ok: false, message: gate.refusal, skills: [] }
@@ -1160,7 +1169,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return { ok: false, message: refusal, skills: [] }
       }
       const approval = approvalSeam
-      if (approval && args.action !== 'list' && args.action !== 'review' && args.action !== 'pin' && args.action !== 'unpin') {
+      if (approval && !isReadOnlyAction(args.action)) {
         // v23 (AP-3): full-content updates carry the stage-time content hash so
         // the replay (executeCore staleness guard) can refuse a stale overwrite.
         // A missing current skill stays unhashed — the replay surfaces "not
@@ -1233,7 +1242,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // staging time — the catalog ranking may have changed while the write
       // sat pending. Same action exemptions as the tool path.
       const replayAction = operation.action
-      if (replayAction !== 'list' && replayAction !== 'review' && replayAction !== 'pin' && replayAction !== 'unpin') {
+      if (!isReadOnlyAction(replayAction)) {
         return crossSourceRefusal(operation.name, 'replay').then((gate) => {
           if (gate.refusal !== null) return { ok: false, message: `${gate.refusal} (re-checked at approve time: the catalog ranking changed while the write was staged)`, skills: [] }
           // The replay reuses the gate's own observation too (A20): the re-checked write pays one pass.

@@ -20,14 +20,20 @@ declare module '@deepseek-ai/dsh-llm' {
 import {
   errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, isMissingPath, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
+import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { PROFILE_PATCH_FILENAME, baseRefusalReason, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
 // G3: the write-path exclusion asks the ONE owner of <home>/profiles about THIS plane only.
 import { installExclusionTarget } from './profiles.ts'
 import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
-import { renderHelpText, renderHint } from './registry.ts'
-import { copyFileSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { flagsOf, renderHelpText, renderHint } from './registry.ts'
+import { isParseFailure, parseSubcommand, subcommandOf } from './parse.ts'
+// G7-3: the atomic writer moved to the core io seam (one implementation); re-exported so this
+// module public surface -- Commands.atomicWriteFiles, which the F-211 spec drives -- is unchanged.
+import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
+export { atomicWriteFiles }
+import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -305,10 +311,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   })
   let runs: RunRegistry | undefined
   ctx.inject(['evolutionIo'], (ioCtx) => {
-    const ioRegistry = ioCtx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+    const ioRegistry = ioCtx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
     if (!ioRegistry) return
     const registry = newRunRegistry({
-      io: ioRegistry.provider(),
+      io: preferProvider(ioRegistry, ['fs']),
       home: evolutionHome(),
       warn: (message) => { ctx.logger.warn(message) },
     })
@@ -399,8 +405,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return err(errorText('e-306-this-deployment-stages-foreground', { a1: what }))
         }
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
-        const pendingMatch = /^pending(?: --detail)?$/.exec(input)
-        if (pendingMatch) {
+        // G7.4/C7: the ONE parser answers the shape.
+        const pendingParsed = parseSubcommand(input)
+        if (!isParseFailure(pendingParsed) && pendingParsed.name === 'pending') {
           // 0.3.17 (S3.3): 'executing' rows (a previous approve crashed
           // mid-run) stay visible — approve will refuse to re-run them.
           // v29 CMD-05: the two lists come from independent provider
@@ -426,10 +433,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // F-328: `--detail` renders each record's staged args so an operator
           // reviews what approve will actually replay (the summary alone is a
           // 120-char label). The default (collapsed) view is unchanged.
-          const detailed = pendingMatch[0] === 'pending --detail'
+          const detailed = pendingParsed.flags.get('detail') === true
           // A staged write is a DECISION someone has to make, so the row carries when it was staged
           // and who staged it: an abandoned record and one from a minute ago must not look alike.
-          // (The words are the command surface's own — English, like every other line it prints.)
+          // The words are this command surface's own. (Audit F-7: the family is NOT monolingual — the
+          // documented surfaces (help, `params`, the table in registry.ts) speak Chinese while most result
+          // lines here speak English. This row keeps the result side's English; the unification is staged
+          // in the plan, not silently assumed.)
           const nowMs = Date.now()
           const attribution = (p: { createdAt: string; origin?: string | undefined; sessionId?: string | undefined }): string => {
             const age = elapsedSince(p.createdAt, nowMs)
@@ -684,14 +694,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const pinned = !input.startsWith('skill unpin')
           const name = input.slice(pinned ? 10 : 12).trim()
           if (!name) return err(`Usage: /evolution skill ${pinned ? 'pin' : 'unpin'} <name>`)
-          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — skill pinning unavailable.')
           // The write-side library is built exactly like restructure's: one construction recipe. The
           // limits ride along because the name guard reads them, so a deployment that raised the
           // name cap can still pin such a skill.
           const library = newSkillLibrary({
             config: { root: skillsRootValue },
-            io: ioRegistry.provider(),
+            io: preferProvider(ioRegistry, ['fs']),
             ctx,
             limits: {
               ...DEFAULT_SKILL_LIMITS,
@@ -764,7 +774,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // rc.68: the learn action joins the event timeline (the loop
           // substrate). Soft probe: without the io registry the log is
           // skipped and the inject is never blocked.
-          const registry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           const eventIo = registry?.provider()
           if (eventIo) {
             const home = evolutionRoot()
@@ -776,7 +786,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ? ok('Learning request sent to this session. Follow it now.')
             : ok('Learning request queued for this session — this host exposes no wake-up channel, so it is read on your next message.')
         }
-        if (input === 'maintain --facts') {
+        const factsParsed = parseSubcommand(input)
+        if (!isParseFailure(factsParsed) && factsParsed.name === 'maintain' && factsParsed.flags.get('facts') === true && factsParsed.positionals.length === 0) {
           // 0-token deterministic preview (011 §12-1 v12): facts block only,
           // no subagent call, no cooldown (the cooldown guards LLM calls).
           // PLAN S5.4 (2026-09-16, audit P2-22): the preview skipped the M-02
@@ -788,9 +799,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // runtime's, including the v30 LIST-02 empty-root rule), and give
           // orchestrate's three-cause conclusion — the preview must never
           // disagree with the scan it previews.
-          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance facts unavailable.')
-          const library = newSkillLibrary({ config: { root: skillsRootValue }, io: ioRegistry.provider() })
+          const library = newSkillLibrary({ config: { root: skillsRootValue }, io: preferProvider(ioRegistry, ['fs']) })
           const enrichment = await buildEnrichment(ctx, library)
           const readFailures: string[] = []
           const snapshots = await snapshotFromLibrary(library, {
@@ -810,7 +821,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             return err(`maintenance scan could not read ${readFailures.length} listed skill(s) (${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}) and read no skill at all — the library was NOT audited; fix the unreadable skills (or their directory names) and run the scan again`)
           }
           if (snapshots.length === 0 && skillsRootValue !== ''
-            && !(await ioRegistry.provider().exists(skillsRootValue))) {
+            && !(await preferProvider(ioRegistry, ['fs']).exists(skillsRootValue))) {
             return err(`maintenance scan found an empty skill library, but the configured skill root does not exist (${skillsRootValue}) — point the skillsRoot config at a real directory (a literal \`~\` is not expanded) and run the scan again`)
           }
           // PLAN-R2 P2-10 (2026-09-16): cause 3 — no read failures and the
@@ -831,15 +842,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // fell into the unknown-args rejection below. `\s+` before the flag
         // and `[ =]` after it accept both spellings; trailing whitespace was
         // already tolerated and stays tolerated.
-        const maintainArgs = /^maintain(?:\s+--timeout[ =](\d+))?\s*$/.exec(input)
-        if (maintainArgs) {
+        // G7.4/C7: --timeout <ms> and --timeout=<ms> are the same flag to the parser.
+        const maintainParsed = parseSubcommand(input)
+        // An UNDECLARED flag keeps the old 'unknown arguments' answer: the table declares what this
+        // subcommand accepts (C7), so a typo cannot silently become a bare flag.
+        const maintainFlagsDeclared = [...(isParseFailure(maintainParsed) ? [] : maintainParsed.flags.keys())]
+          .every((flag) => flagsOf('maintain').includes('--' + flag))
+        if (!isParseFailure(maintainParsed) && maintainParsed.name === 'maintain' && maintainParsed.positionals.length === 0 && maintainFlagsDeclared) {
           // User-command maintenance RUN (design 011; async since 0.19.0 / S2).
           // Deterministic facts + one-shot subagent → a validated plan that is
           // PERSISTED as this run's report; the command only points at it. No
           // writes to the skill tree, no auto execution, fail-closed when a
           // dependency is missing. `--timeout <ms>` overrides the deadline for
           // THIS run — no file edit, no restart.
-          const runTimeoutMs = maintainArgs[1] ? Number(maintainArgs[1]) : (config.maintainTimeoutMs ?? 600_000)
+          const timeoutFlag = maintainParsed.flags.get("timeout")
+          const runTimeoutMs = typeof timeoutFlag === "string" ? Number(timeoutFlag) : (config.maintainTimeoutMs ?? 600_000)
           // V6-29 (0.3.36): AbortSignal.timeout throws a RangeError above 2^32-1
           // — reject the domain explicitly instead of surfacing the platform
           // error from a `--timeout` typo.
@@ -851,7 +868,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // P2-20 (F3, v11): name the ACTUAL source — a bad config value used
             // to be reported as a `--timeout` CLI typo and permanently
             // deadlock maintain (the user had no CLI flag to fix).
-            return err(maintainArgs[1]
+            return err(timeoutFlag !== undefined
               ? `Invalid --timeout value: expected a positive integer number of milliseconds up to ${MAX_TIMER_DELAY_MS} (e.g. /evolution maintain --timeout 600000).`
               : `The maintainTimeoutMs config is invalid: expected a positive integer number of milliseconds up to ${MAX_TIMER_DELAY_MS}. Fix the evolution-commands row config (maintainTimeoutMs), then retry.`)
           }
@@ -866,7 +883,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // I-5 (v37): the LOCAL view must match MaintainRuntime's tightened subagents
           // contract ('spawn' + a platform-shaped request); a wider local type made the
           // real service assignable while hiding a future miss from `tsc`.
-          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+// platform-declaration anchor: the platform’s `subagents`, `tools`, `skillUsage` and `settings` services (all optional; undefined ⇒ the feature is off)
           const subagents = ctx.get('subagents') as MaintainRuntime['subagents'] | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — maintenance scan unavailable.')
           if (!subagents) return err('Subagents service not mounted — maintenance scan unavailable.')
@@ -918,7 +936,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // could never fire first).
           void (async (): Promise<void> => {
             try {
-              const library = newSkillLibrary({ config: { root: skillsRootValue }, io: ioRegistry.provider() })
+              const library = newSkillLibrary({ config: { root: skillsRootValue }, io: preferProvider(ioRegistry, ['fs']) })
               const enrichment = await buildEnrichment(ctx, library)
               const outcome = await runMaintain(
                 {
@@ -939,7 +957,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                   // v30 LIST-02: the probe runs ONLY when the operator CONFIGURED
                   // a root — `exists('')` is ENOENT, which would report every default
                   // deployment's empty library as "the root does not exist".
-                  rootExists: skillsRootValue === '' ? undefined : () => ioRegistry.provider().exists(skillsRootValue),
+                  rootExists: skillsRootValue === '' ? undefined : () => preferProvider(ioRegistry, ['fs']).exists(skillsRootValue),
                   skillRoot: skillsRootValue,
                 },
                 {
@@ -957,7 +975,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 },
               )
               const endedAt = Date.now()
-              const resultRef = await writeMaintainReport(ioRegistry.provider(), {
+              const resultRef = await writeMaintainReport(preferProvider(ioRegistry, ['fs']), {
                 runId: handle.id,
                 ...(outcome.ok
                   ? {
@@ -983,7 +1001,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 ...(outcome.ok ? {} : { failure: handle.signal.aborted ? 'cancelled: the scan was stopped before it settled' : (outcome.error ?? 'Maintenance scan failed.') }),
               })
               if (outcome.ok) {
-                void appendEvolutionEvent(ioRegistry.provider(), eventsFile(runRoot), {
+                void appendEvolutionEvent(preferProvider(ioRegistry, ['fs']), eventsFile(runRoot), {
                   type: 'maintain',
                   source: 'manual',
                   runId: handle.id,
@@ -1046,12 +1064,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             `- stop:   /evolution maintain cancel ${handle.id}`,
           ].join('\n'))
         }
-        const maintainStatus = /^maintain\s+status(?:\s+(\S+))?\s*$/.exec(input)
-        if (maintainStatus) {
+        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
+        const maintainStatus = subcommandOf(input, 'maintain', 'status', flagsOf('maintain'))
+        if (maintainStatus !== null) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run status unavailable.')
           const synced = await syncRuns(registry)
-          const wanted = maintainStatus[1]
+          const wanted = maintainStatus.positionals[1]
           if (wanted !== undefined) {
             // A specific run this process knows is answerable even when the shared
             // index is unreadable — only the claim "this is the whole history" needs it.
@@ -1077,12 +1096,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             recent.length === 0 ? '' : `Recent:\n${recent.map(renderRunRecord).join('\n')}`,
           ].filter(part => part !== '').join('\n'))
         }
-        const maintainReport = /^maintain\s+report(?:\s+(\S+))?\s*$/.exec(input)
-        if (maintainReport) {
+        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
+        const maintainReport = subcommandOf(input, 'maintain', 'report', flagsOf('maintain'))
+        if (maintainReport !== null) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run results unavailable.')
           const synced = await syncRuns(registry)
-          const wanted = maintainReport[1]
+          const wanted = maintainReport.positionals[1]
           // Review P1-1: for the id-less form an unreadable index WINS over the in-memory view —
           // a stale record the process still holds must not answer as if the home were readable
           // (the posture `maintain status` already takes at its list branch).
@@ -1100,9 +1120,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (wanted === undefined && record.state === 'running') {
             return err(`The newest run ${record.id} is still running — its report appears when it settles; /evolution maintain status ${record.id} shows where it is.`)
           }
-          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — run results unavailable.')
-          const probed = await readRunReport(ioRegistry.provider(), record)
+          const probed = await readRunReport(preferProvider(ioRegistry, ['fs']), record)
           // "no result" and "an unreadable result" must not look alike (the
           // three-state rule the rest of the family follows).
           if (probed.kind === 'missing') {
@@ -1111,12 +1131,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (probed.kind === 'unknown') return err(`Run ${record.id} has a report that could not be read (${probed.reason}) — this is not "no result".`)
           return ok(probed.text)
         }
-        const maintainCancel = /^maintain\s+cancel(?:\s+(\S+))?\s*$/.exec(input)
-        if (maintainCancel) {
+        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
+        const maintainCancel = subcommandOf(input, 'maintain', 'cancel', flagsOf('maintain'))
+        if (maintainCancel !== null) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — run cancellation unavailable.')
           const synced = await syncRuns(registry)
-          const wanted = maintainCancel[1]
+          const wanted = maintainCancel.positionals[1]
           // Review P1-1: the id-less form answers sentence F when the index could not be read,
           // instead of acting on a stale in-memory view (same posture as `report`/`handoff`).
           if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
@@ -1144,12 +1165,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           return ok(`Maintenance run ${record.id} cancelled — the scan stops at its next checkpoint. /evolution maintain status ${record.id} shows the terminal state.`)
         }
-        const maintainHandoff = /^maintain\s+handoff(?:\s+(\S+))?\s*$/.exec(input)
-        if (maintainHandoff) {
+        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
+        const maintainHandoff = subcommandOf(input, 'maintain', 'handoff', flagsOf('maintain'))
+        if (maintainHandoff !== null) {
           const registry = runs
           if (!registry) return err('Evolution IO registry not mounted — the report cannot be handed over.')
           const synced = await syncRuns(registry)
-          const wanted = maintainHandoff[1]
+          const wanted = maintainHandoff.positionals[1]
           // Review P1-1: never inject from a stale view when the home's index is unreadable.
           if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
           const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
@@ -1163,9 +1185,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (wanted === undefined && record.state === 'running') {
             return err(`The newest run ${record.id} is still running — its report appears when it settles; /evolution maintain status ${record.id} shows where it is.`)
           }
-          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — the report cannot be handed over.')
-          const probed = await readRunReport(ioRegistry.provider(), record)
+          const probed = await readRunReport(preferProvider(ioRegistry, ['fs']), record)
           if (probed.kind === 'missing') {
             return err(`Run ${record.id} (${record.state}) has NO result: no report was written${record.failure === undefined ? '' : ` (${record.failure})`}.`)
           }
@@ -1205,16 +1227,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // `handoff`, so it described a grammar two releases behind the one it guards.
           return err('Unknown maintain arguments: expected `maintain`, `maintain --timeout <ms>` / `maintain --timeout=<ms>`, `maintain status [<id>]`, `maintain report [<id>]`, `maintain handoff [<id>]` or `maintain cancel [<id>]`. Got: ' + input)
         }
-        const presetInstall = /^preset install(?: --base (\S+))?$/.exec(input)
-        if (presetInstall !== null || /^preset\b/.test(input)) {
+        // G7.4/C7: the install shape, the base flag and the refusal for any other preset line all
+        // come from the ONE parser.
+        const presetParsed = parseSubcommand(input)
+        const presetInstall = isParseFailure(presetParsed) || presetParsed.name !== 'preset'
+          ? null
+          : (presetParsed.positionals[0] === 'install' && presetParsed.positionals.length === 1 && [...presetParsed.flags.keys()].every((flag) => flagsOf('preset').includes('--' + flag)) ? presetParsed : false)
+        if (presetInstall !== null && presetInstall !== false) {
           // 0.3.75 (v41 §6.1): this path knew `standard` only, so an
           // npm-installed family could not reach the ptc variant at all. The
           // base table now lives in the agent package's bases.json — the SAME
           // file install-layered.mjs reads, so the two install paths cannot
           // disagree about ids or metadata names.
-          if (presetInstall === null) {
-            return err('Unknown preset arguments: expected `preset install` or `preset install --base <name>[,<name>...]` (the names live in the agent package\'s bases.json). Got: ' + input)
-          }
+          // (unreachable: the guard above only enters for the install sub-form)
           // v28 G3.2 (CMD-03): the same three-way mutual exclusion
           // install-layered.mjs enforces up front, applied at the command's
           // write boundary. Writing the preset product while the `all` bundle
@@ -1268,7 +1293,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // variants, generated against the SAME runtime platform in one pass.
             // Every name is resolved before anything is written, so a typo in
             // the second entry cannot leave the first variant installed.
-            const requestedRaw = presetInstall[1] ?? table.defaultBase
+            const requestedRaw = presetInstall.flags.get('base') ?? table.defaultBase
             const requested = [...new Set(requestedRaw.split(',').map(part => part.trim()).filter(part => part !== ''))]
             if (requested.length === 0) {
               return err(`No agent-preset base named — ${join(source, 'bases.json')} lists ${table.entries.map(entry => entry.name).join(', ')}`)
@@ -1286,41 +1311,52 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const profile = presetProfileTarget(ctx)
             if (profile === undefined) return err('No profile is mounted in this process, so there is no profile patch to write the preset row into — run the command in a session started by `dsh --profile <name>`.')
             const delta = readFileSync(deltaPath, 'utf8')
-            const current = existsSync(profile.patchPath) ? readFileSync(profile.patchPath, 'utf8') : ''
-            let merged = current
-            const written: string[] = []
-            for (const base of selected) {
-              // 0.3.78 (G1-②), single-sourced in v46 S2.8: the two refusals live in
-              // ONE function (`baseRefusalReason`) that `/evolution doctor` reads too,
-              // and the service precondition is asked of the RUNTIME — the exact
-              // reason a later mount would refuse. The source-checkout installer asks
-              // the target profile's bundle rows instead, because it runs outside the
-              // host.
-              const refusal = baseRefusalReason(base, name => ctx.get(name) !== undefined)
-              if (refusal !== undefined) return err(refusal)
-              const basePatch = resolvePresetBasePatch(base.name, profile)
-              const rowId = presetRowId(base.id)
-              const entryText = composePresetEntry(readFileSync(basePatch, 'utf8'), delta, {
-                rowId,
-                id: base.id,
-                name: base.display.name,
-                description: base.display.description,
-                order: base.display.order,
-              })
-              const next = mergePresetRow(merged, entryText, rowId)
-              written.push(next === merged ? `${base.name} → ${profile.patchPath} (already current)` : `${base.name} → ${rowId} in ${profile.patchPath}`)
-              merged = next
+            // P2 (v46 G6-②): the read-merge-write below is a read-modify-write on the profile patch.
+            // The platform serializes exactly this kind of change through its HMR lock (see
+            // dsh-plugin-manager: hmr === undefined ? apply() : hmr.runExclusive(apply)), so the commit
+            // runs inside it when the service is mounted, and degrades to the direct call when it is not.
+            const hmr = ctx.get('hmr') as
+              | { runExclusive?: <T>(fn: () => T | Promise<T>) => Promise<T> }
+              | undefined
+            const commit = async () => {
+              const current = existsSync(profile.patchPath) ? readFileSync(profile.patchPath, 'utf8') : ''
+              let merged = current
+              const written: string[] = []
+              for (const base of selected) {
+                // 0.3.78 (G1-②), single-sourced in v46 S2.8: the two refusals live in
+                // ONE function (`baseRefusalReason`) that `/evolution doctor` reads too,
+                // and the service precondition is asked of the RUNTIME — the exact
+                // reason a later mount would refuse. The source-checkout installer asks
+                // the target profile's bundle rows instead, because it runs outside the
+                // host.
+                const refusal = baseRefusalReason(base, name => ctx.get(name) !== undefined)
+                if (refusal !== undefined) return err(refusal)
+                const basePatch = resolvePresetBasePatch(base.name, profile)
+                const rowId = presetRowId(base.id)
+                const entryText = composePresetEntry(readFileSync(basePatch, 'utf8'), delta, {
+                  rowId,
+                  id: base.id,
+                  name: base.display.name,
+                  description: base.display.description,
+                  order: base.display.order,
+                })
+                const next = mergePresetRow(merged, entryText, rowId)
+                written.push(next === merged ? `${base.name} → ${profile.patchPath} (already current)` : `${base.name} → ${rowId} in ${profile.patchPath}`)
+                merged = next
+              }
+              if (merged !== current) {
+                // S6.3 (E-40): commit atomically — the file is staged to a sibling
+                // `<name>.tmp` and renamed into place, a pre-existing file keeping a
+                // single `.bak`, so a failed write leaves the previous patch (and
+                // every session that reads it) untouched.
+                atomicWriteFiles(dirname(profile.patchPath), [
+                  { name: PROFILE_PATCH_FILENAME, content: presetPatchText(merged) },
+                ], undefined, (message) => { ctx.logger.warn(message) })
+              }
+              return ok(`Evolution agent preset row installed (${written.join('; ')}). Restart the session switcher to select it.`)
             }
-            if (merged !== current) {
-              // S6.3 (E-40): commit atomically — the file is staged to a sibling
-              // `<name>.tmp` and renamed into place, a pre-existing file keeping a
-              // single `.bak`, so a failed write leaves the previous patch (and
-              // every session that reads it) untouched.
-              atomicWriteFiles(dirname(profile.patchPath), [
-                { name: PROFILE_PATCH_FILENAME, content: presetPatchText(merged) },
-              ], undefined, (message) => { ctx.logger.warn(message) })
-            }
-            return ok(`Evolution agent preset row installed (${written.join('; ')}). Restart the session switcher to select it.`)
+            const runExclusive = hmr?.runExclusive
+            return runExclusive === undefined ? await commit() : await runExclusive.call(hmr, commit)
           } catch (error) {
             return err(`Preset install failed: ${error instanceof Error ? error.message : String(error)}`)
           }
@@ -1333,16 +1369,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // (011 §10 audit chain; shallow — annotated in the result text).
           // V25-08 (v25): parsed from the ORIGINAL trimmed input so a
           // quoted heading keeps its inner spacing verbatim.
-          const planTail = /\s--plan\s+(\S+)\s*$/.exec(rawInputTrimmed) ?? null
-          const planRunId = planTail?.[1] ?? undefined
-          const rest = planTail ? rawInputTrimmed.slice(0, planTail.index) : rawInputTrimmed
-          const match = /^restructure\s+(\S+)\s+"([^"]+)"\s+(\S+)$/.exec(rest)
-          if (!match) return err('Usage: /evolution restructure <name> "<## heading>" <to_file>')
-          const name = match[1] ?? ''
-          const heading = match[2] ?? ''
-          const toFile = match[3] ?? ''
+          // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
+          const restParsed = parseSubcommand(rawInputTrimmed)
+          if (isParseFailure(restParsed) || restParsed.name !== 'restructure') {
+            return err('Usage: /evolution restructure <name> "<## heading>" <to_file>')
+          }
+          const name = restParsed.positionals[0] ?? ''
+          const heading = restParsed.positionals[1] ?? ''
+          const toFile = restParsed.positionals[2] ?? ''
+          if (name === '' || heading === '' || toFile === '') {
+            return err('Usage: /evolution restructure <name> "<## heading>" <to_file>')
+          }
+          const planFlag = restParsed.flags.get('plan')
+          const planRunId = typeof planFlag === 'string' ? planFlag : undefined
           if (!toFile.startsWith('references/')) return err('to_file must live under references/ (log/detail destination).')
-          const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('Evolution IO registry not mounted — restructure unavailable.')
           // v20 (D-2 / P2-8): the write joins the approval seam like every
           // other user-facing skill write — an approval-enabled deployment
@@ -1405,7 +1446,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // the strict scan unchanged.
           const library = newSkillLibrary({
             config: { root: skillsRootValue },
-            io: ioRegistry.provider(),
+            io: preferProvider(ioRegistry, ['fs']),
             ctx,
             threatExemptLabels: config.threatExemptLabels,
             // 0.5.0 (§16.7): the write-behind stages are deployment policy, so the
@@ -1427,8 +1468,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!replay) return err(errorText('e-303-replay-service-not-mounted'))
           return ok(replay.compare().report)
         }
-        const paramsMatch = /^params(?: --group ([a-z-]+))?(?: --json)?$/.exec(input)
-        if (paramsMatch) {
+        // G7.4/C7: the ONE parser answers the shape (flag order and `=` tolerated, F-4).
+        const paramsParsed = parseSubcommand(input)
+        if (!isParseFailure(paramsParsed) && paramsParsed.name === 'params') {
           // S4.1: the READ face over the registry. Read-only and 0-token — the
           // text renders in the command surface, exactly like `maintain --facts`.
           const provider = ctx.get('settings') as SettingsProviderLike | undefined
@@ -1451,16 +1493,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             }
           }
           const rows = paramSurfaceRows(sections, PARAM_EXPOSURE)
-          const group = paramsMatch[1]
+          const groupFlag = paramsParsed.flags.get('group')
+          // A flag VALUE keeps the caller's case (F-4): an unknown group now reaches E-308's list.
+          const group = typeof groupFlag === 'string' ? groupFlag : undefined
           const selected = group === undefined ? rows : rows.filter(row => row.group === group)
           if (group !== undefined && selected.length === 0) {
             return err(errorText('e-308-unknown-parameter-group-group', { a1: group, a2: paramGroups(PARAM_EXPOSURE).join(', ') }))
           }
-          if (input.endsWith('--json')) return ok(renderParamJson(selected))
+          if (paramsParsed.flags.get('json') === true) return ok(renderParamJson(selected))
           return ok(renderParamRows(selected, { providerMounted: provider !== undefined }))
         }
-        const policySetMatch = /^policy set ([A-Za-z][A-Za-z0-9.-]*) (.+?)(?: --expect (\d+))?$/.exec(input)
-        if (policySetMatch) {
+        // G7.4/C7 + F-3: positionals are positional now — `--expect` can never slide into the VALUE
+        // slot, and a missing value is a SYNTAX answer instead of a schema-layer failure.
+        const policyParsed = parseSubcommand(input)
+        if (isParseFailure(policyParsed) && policyParsed.name === 'policy' && policyParsed.kind === 'missing-value') {
+          return err('/evolution policy set needs a value after --' + String(policyParsed.flag ?? '') + '; usage: policy set <id> <value> [--expect <revision>]')
+        }
+        if (!isParseFailure(policyParsed) && policyParsed.name === 'policy' && policyParsed.positionals[0] === 'set') {
           // S4.2: the WRITE face. One path only — the settings service. There is
           // deliberately no YAML fallback: a command that edits cordis.yml would
           // be a second write path to the same fact (design §8.3).
@@ -1468,8 +1517,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (provider?.update === undefined || provider.describe === undefined) {
             return err(errorText('e-311-no-settings-service-is'))
           }
-          const rawId = policySetMatch[1] ?? ''
-          const rawValue = policySetMatch[2] ?? ''
+          const rawId = policyParsed.positionals[1] ?? ''
+          const rawValue = policyParsed.positionals[2] ?? ''
           let id: string
           try {
             id = canonicalWriteId(rawId)
@@ -1500,12 +1549,24 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const current = descriptor.value
           const resolved = typeof current === 'object' && current !== null ? current as Record<string, unknown> : undefined
-          const expectedRaw = policySetMatch[3]
+          const expectedRaw = policyParsed.flags.get('expect')
           const expected = expectedRaw === undefined ? descriptor.revision : Number(expectedRaw)
           if (expectedRaw !== undefined && descriptor.revision !== undefined && Number(expectedRaw) !== descriptor.revision) {
             return err(errorText('e-309-revision-conflict-you-sent', { a1: expectedRaw, a2: descriptor.revision }))
           }
           const value = parseParamValue(rawValue)
+          // G5.12/U-4: the cross-field constraint is declared ONCE in the registry (core's params.ts,
+          // `relation`) and enforced here. The card reads the SAME column before a save is attempted,
+          // so the two halves cannot disagree about what is legal. The sibling's current value comes
+          // from the snapshot this branch already read — no second read, no cached copy.
+          const floorId = entry.relation?.atLeast
+          if (floorId !== undefined && typeof value === 'number') {
+            const sibling = resolved?.[floorId]
+            const floor = typeof sibling === 'number' ? sibling : Number.NaN
+            if (Number.isFinite(floor) && value < floor) {
+              return err(errorText('e-322-a-parameter-would-break-a', { a1: id, a2: String(floor), a3: String(value) }))
+            }
+          }
           try {
             await provider.update(namespace, { [id]: value }, expected)
           } catch (error) {
@@ -1731,175 +1792,6 @@ function resolveAgentPresetDir(importMetaUrl: string): string {
   }
 }
 
-/** F-211: the fs surface atomicWriteFiles uses — injectable so the commit-phase
- * rename-failure path is deterministically testable. Defaults to node:fs.
- * `mtime` (optional) probes a path's last-write time so the failed-commit
- * recovery message can name the generation it restored from. */
-interface FsOps {
-  writeFileSync(path: string, data: string | Uint8Array): void
-  existsSync(path: string): boolean
-  copyFileSync(from: string, to: string): void
-  renameSync(from: string, to: string): void
-  rmSync(path: string, options?: { force?: boolean; recursive?: boolean }): void
-  mtime?(path: string): number | null
-}
-
-const defaultFs: FsOps = {
-  writeFileSync: (path, data) => { writeFileSync(path, data) },
-  existsSync: path => existsSync(path),
-  copyFileSync: (from, to) => { copyFileSync(from, to) },
-  renameSync: (from, to) => { renameSync(from, to) },
-  rmSync: (path, options) => { rmSync(path, options) },
-  // N14: only a MISSING file is "no mtime" (null). Any other stat failure
-  // rejects, so probeMtime() reports it as unknown instead of as absent.
-  mtime: (path) => {
-    try { return statSync(path).mtimeMs } catch (error) {
-      // v43 S1-4: the canonical predicate (core/probe.ts) — one definition of
-      // "this read failure means it is not there" instead of a second copy.
-      if (isMissingPath(error)) return null
-      throw error
-    }
-  },
-}
-
-/**
- * S6.3 (E-40): atomically replace a set of files within one directory.
- * Each file is staged to a sibling `<name>.tmp`, then renamed into place
- * (atomic on the same filesystem); a pre-existing file keeps a single
- * `<name>.bak`. A failure at ANY staging step removes the staged temps and
- * leaves the previous files untouched — a half-written target is impossible
- * up to the staging and backup phases.
- *
- * F-211: the rename COMMIT phase does not carry the same guarantee. When a
- * filesystem refuses to overwrite the destination, the code removes it and
- * retries the rename; if the retry ALSO fails the destination is gone. The
- * single `.bak` created above still holds the previous content, so the target
- * is restored from it (best-effort) before the original rename error is
- * rethrown, so a failed commit never leaves the file missing.
- *
- * V4-17: the `.bak` is refreshed to the committed content after every
- * successful commit, so a later failed commit always recovers to the most
- * recent good generation (a once-at-first-install `.bak` could otherwise
- * restore content several installs old). The recovery error names the `.bak`
- * source (and mtime when available) so the caller knows the generation it
- * restored from.
- */
-export function atomicWriteFiles(
-  targetDir: string,
-  writes: Array<{ name: string; content: string | Uint8Array }>,
-  fs: FsOps = defaultFs,
-  // F3 (P2-19, v11): warnings go through the caller's logger (the runtime
-  // pipeline), not a raw console.warn — the .bak-refresh failure is a
-  // real production event and must be observable in the operator logs.
-  logger: (message: string) => void = console.warn,
-): void {
-  const stage = (name: string): string => join(targetDir, `${name}.tmp`)
-  // V6-42 (0.3.36): a duplicate name makes the commit re-visit the same
-  // target: the second rename ENOENTs (the tmp already moved), then the
-  // remove-then-rename recovery DELETES the file the first commit just
-  // installed and restores an old `.bak` generation — a self-referential,
-  // confusing failure. Fail loud on the input instead.
-  const dupes = [...new Set(writes.map(write => write.name).filter((name, index, all) => all.indexOf(name) !== index))]
-  if (dupes.length > 0) {
-    throw new Error(`atomicWriteFiles: duplicate input names: ${dupes.join(', ')}`)
-  }
-  try {
-    for (const { name, content } of writes) fs.writeFileSync(stage(name), content)
-    for (const { name } of writes) {
-      const finalPath = join(targetDir, name)
-      const bakPath = join(targetDir, `${name}.bak`)
-      // Back up the currently installed file once, so an interrupted commit can
-      // fall back to the previous usable composition.
-      if (fs.existsSync(finalPath) && !fs.existsSync(bakPath)) fs.copyFileSync(finalPath, bakPath)
-    }
-    const committed: string[] = []
-    for (const { name } of writes) {
-      const finalPath = join(targetDir, name)
-      const bakPath = join(targetDir, `${name}.bak`)
-      const tmp = stage(name)
-      try {
-        fs.renameSync(tmp, finalPath)
-        committed.push(name)
-      } catch {
-        // Some filesystems refuse to overwrite the destination; the single
-        // .bak above already holds the previous file, so remove-then-rename is
-        // safe here.
-        try {
-          fs.rmSync(finalPath, { force: true })
-        } catch (removeError) {
-          // V6-28 (0.3.36): a failed remove must not escape WITHOUT the
-          // disclosure chain — `committed` is the only trace of a partial
-          // install and the recovery narration would be lost (Windows: rename
-          // and unlink often fail together with EPERM/EBUSY).
-          const already = committed.length > 0 ? `; already committed: ${committed.join(', ')}` : ''
-          throw new Error(`atomicWriteFiles: could not remove "${name}" to replace it (${removeError instanceof Error ? removeError.message : String(removeError)})${already}`)
-        }
-        try {
-          fs.renameSync(tmp, finalPath)
-          committed.push(name)
-        } catch (renameError) {
-          // F-211: the retry failed AFTER the target was removed — restore it
-          // from .bak before surfacing the error, so the file is not left
-          // missing. Best-effort: if the restore also fails, note that and
-          // throw the original rename error so the caller still knows why.
-          // V5-17 (0.3.31): a multi-file commit that fails midway is PARTIAL —
-          // the error must disclose which files already landed (the caller is
-          // otherwise told only about the file that failed).
-          const already = committed.length > 0 ? `; already committed: ${committed.join(', ')}` : ''
-          if (fs.existsSync(bakPath)) {
-            try {
-              fs.copyFileSync(bakPath, finalPath)
-            } catch {
-              throw new Error(`atomicWriteFiles: "${name}" was removed but recovery from ${bakPath} failed (${renameError instanceof Error ? renameError.message : String(renameError)}); verify the file manually${already}`)
-            }
-            // V4-17: recovery succeeded — name the source generation so a caller
-            // is not misled into thinking the attempt actually landed.
-            const bakMtime = fs.mtime?.(bakPath)
-            const when = bakMtime !== null && bakMtime !== undefined && Number.isFinite(bakMtime) ? ` (bak mtime ${new Date(bakMtime).toISOString()})` : ''
-            throw new Error(`atomicWriteFiles: "${name}" was removed during commit and restored from the last good generation ${bakPath}${when}; original error: ${renameError instanceof Error ? renameError.message : String(renameError)}${already}`)
-          }
-          throw new Error(`${renameError instanceof Error ? renameError.message : String(renameError)}${already}`)
-        }
-      }
-    }
-    // V4-17: a successful commit refreshes each .bak to the content that just
-    // landed, so a later failed commit recovers to the most recent good
-    // generation rather than one several installs ago (the backup phase above
-    // only ever created a .bak on first install).
-    // V5-17 (0.3.31): the refresh is best-effort maintenance — a failure here
-    // must NOT turn a successful install into a reported failure, and must not
-    // abort mid-loop (which would split the bak pair: some fresh, some old).
-    for (const { name } of writes) {
-      const finalPath = join(targetDir, name)
-      try {
-        if (fs.existsSync(finalPath)) fs.copyFileSync(finalPath, join(targetDir, `${name}.bak`))
-      } catch (refreshError) {
-        logger(`atomicWriteFiles: committed "${name}" but failed to refresh its .bak (${refreshError instanceof Error ? refreshError.message : String(refreshError)}); a later failed commit will recover to an OLDER generation`)
-      }
-    }
-  } catch (error) {
-    // OPT-24 (2026-09): the cleanup loop runs INSIDE the catch — an rmSync
-    // that hits EPERM/EBUSY (Windows: AV indexer, open handle; force only
-    // suppresses ENOENT) escaped the catch and REPLACED the carefully built
-    // recovery diagnostic (including the already-committed disclosure), and
-    // left the remaining staged temps behind. Cleanup failures are now
-    // collected and appended to the original error; every temp gets its
-    // removal attempt.
-    const cleanupFailures: string[] = []
-    for (const { name } of writes) {
-      try {
-        fs.rmSync(stage(name), { force: true, recursive: true })
-      } catch (cleanupError) {
-        cleanupFailures.push(`${name}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`)
-      }
-    }
-    if (cleanupFailures.length > 0) {
-      const original = error instanceof Error ? error.message : String(error)
-      throw new Error(`${original} (staged-temp cleanup also failed: ${cleanupFailures.join('; ')})`)
-    }
-    throw error
-  }
-}
 
 // V10-09 (F-05): countMaintainRecommendations / beforeNotesHeader were
 // deleted — the recommendation count now travels as the structured

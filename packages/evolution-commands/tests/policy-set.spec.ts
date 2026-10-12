@@ -15,6 +15,8 @@ interface FakeOptions {
   conflict?: boolean
   /** Reject the write the way an owner's validate hook does. */
   refusal?: string
+  /** U-4: mount the curator namespace with this staleAfterDays, so a cross-field pair is readable. */
+  curatorStaleAfterDays?: number
 }
 
 /** Mount the command with a settings service stub; returns the recorded writes. */
@@ -28,6 +30,12 @@ async function mount(rawInput: string, options: FakeOptions = {}): Promise<{ kin
       { ns: 'evolution-review', revision: options.revision ?? 4, user: options.user ?? {}, value: { reviewSkillInterval: 10, reviewEnabled: true, reviewMode: 'inject' } },
       // The settings id is the row id (the Loader entry id), not the legacy namespace.
       { ns: 'tool-skill-manage', revision: 7, user: {}, value: { descriptionStrict: false, skillContentChars: 100_000 } },
+      // Opt-in: only a case that names a curator value gets the namespace, so the other fixtures keep
+      // the descriptor list they were written against.
+      ...(options.curatorStaleAfterDays === undefined ? [] : [{
+        ns: 'evolution-curator', revision: 2, user: {},
+        value: { staleAfterDays: options.curatorStaleAfterDays, archiveAfterDays: 90 },
+      }]),
     ],
     update: async (namespace: string, patch: object, expected?: number) => {
       if (options.conflict === true) {
@@ -105,6 +113,20 @@ describe('policy set (G4/S4.2)', () => {
     expect(result.text).toContain('may only be tightened')
   })
 
+  it('U-4: refuses a write that would break a cross-field constraint, and names the floor', async () => {
+    // The real pair from the audit: archiveAfterDays must not go below staleAfterDays.
+    const refused = await mount('policy set archiveAfterDays 45', { curatorStaleAfterDays: 60 })
+    expect(refused.kind).toBe('error')
+    expect(refused.text).toContain('E-322')
+    expect(refused.text).toContain('60')
+    // Nothing was written: the check sits BEFORE provider.update.
+    expect(refused.writes).toEqual([])
+    // The control: the same field at or above the floor still goes through, so the rule is not a
+    // blanket refusal of the field.
+    const allowed = await mount('policy set archiveAfterDays 90', { curatorStaleAfterDays: 60 })
+    expect(allowed.kind).toBe('success')
+    expect(allowed.writes[0]?.patch).toEqual({ archiveAfterDays: 90 })
+  })
   it('refuses to write anything without the settings service', async () => {
     const ctx = new Context()
     let captured: Handler | undefined

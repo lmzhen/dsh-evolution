@@ -48,23 +48,12 @@ if (spec === undefined) {
  * The load-sensitive group. Each entry names the case and WHY it is in the
  * group; the `-t` pattern below is the union of these names.
  */
+// 0.17.0 (S4): the disk write-lock and its takeover tickets were retired, so the fourteen cases
+// that exercised them were deleted. Their entries are REMOVED here too, not left standing: a stale
+// name matches nothing and the count assertion below then fails the release step (independent review P1-4).
 const LOAD_SENSITIVE = [
   { name: 'commits one complete payload per concurrent writer', why: 'two writers contend for one lock (v32 TEST-04 rename)' },
-  { name: 'takes over a stale lock', why: 'takeover deadline vs. wall clock' },
-  { name: 'never steals a lock from a LIVE holder', why: 'liveness deadline (the case that regressed in rc.66)' },
-  { name: 'takes over a stale lock from a GONE pid', why: 'pid-liveness probe under load' },
   { name: 'transact runs read-modify-write atomically under one lock', why: 'cross-process RMW ordering' },
-  { name: 'two peers take over one stale dead lock', why: 'F-101 double-hold window' },
-  { name: 'self-heals a leftover lock carrying this process pid', why: 'same-pid takeover' },
-  { name: 'never removes a NEW same-pid lock', why: 'same-pid cleanup race' },
-  { name: 'does not steal a same-pid lock held by a long-running task', why: 'the V4-05 double-hold case' },
-  { name: 'takeover claims a stale dead lock atomically', why: 'atomic ticket claim (V4-04)' },
-  { name: 'ticket takeover survives 32-way contention', why: 'the high-contention case (V4-04 follow-up)' },
-  { name: 'EMPTY stale lock is taken over', why: 'the empty-body takeover branch (G0.2)' },
-  { name: 'self-heals a 0-byte lock', why: 'crash residue takeover (V6-04)' },
-  { name: 'reclaims a 0-byte takeover ticket', why: 'crash residue takeover (V6-04)' },
-  { name: 'sweeps a stale `.lock.next` ticket', why: 'ticket sweep vs. liveness (V6-18)' },
-  { name: 'keeps a fresh live-pid ticket', why: 'ticket sweep must spare a live holder (V6-18)' },
   { name: 'committed-but-unfsynced write is success-with-warning', why: 'commit-point ownership under a lost lock (G1.3)' },
 ]
 

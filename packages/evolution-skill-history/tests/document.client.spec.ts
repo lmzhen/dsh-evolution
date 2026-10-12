@@ -13,7 +13,7 @@
  * was written from the plan instead of from the tree. The gap is recorded in the design document's
  * §18.11 — a rendered face without a rendered spec is exactly what the family's client lane exists for.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { DiffBody, PreviewBody, type DocumentFace } from '../src/client/document.ts'
@@ -106,4 +106,28 @@ describe('the reading face is a document, not a card of controls (G4)', () => {
     expect(rule('.evo-doc-fact+.evo-doc-fact::before')).toContain('content:"·"')
     cleanup()
   })
+
+  it('C1: a MULTI-hunk source view produces no duplicate React keys', () => {
+    // Two hunks: the row keys used to be a per-hunk index, so both hunks emitted `old-0`/`new-0`
+    // and React reconciled the wrong rows (the reader could see one hunk line replaced by another).
+    const twoHunks = {
+      v: 2, against: 1, linesAdded: 2, linesRemoved: 2, truncated: false,
+      hunks: [
+        { path: 'SKILL.md', oldText: 'first old', newText: 'first new' },
+        { path: 'SKILL.md', oldText: 'second old', newText: 'second new' },
+      ],
+    }
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const view = render(createElement(DiffBody, { face, diff: { kind: 'ready', diff: twoHunks } as never }))
+    const complaints = spy.mock.calls
+      .map(args => args.map(String).join(' '))
+      .filter(line => /same key|unique "key"|two children/i.test(line))
+    spy.mockRestore()
+    expect(complaints).toEqual([])
+    // Both hunks' lines are on screen (a duplicate-key reconciliation could drop one).
+    expect(view.container.textContent).toContain('second old')
+    expect(view.container.textContent).toContain('first new')
+    cleanup()
+  })
 })
+

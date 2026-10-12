@@ -59,6 +59,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `supportFileCharPolicy` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Warn about an oversize support file, or refuse the write. |
 | `skillWriteConfirm` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | What the one confirmation before a create or a bare delete does: write straight through, wait for an answer, or cancel the write when nobody answers within the timeout. |
 | `skillWriteConfirmTimeoutSeconds` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Seconds the confirmation waits for an answer in timeout mode before the write is cancelled. |
+| `approvalConfirm` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | What the confirmation before an APPROVE does: write straight through, ask first, or treat an unanswered prompt as a cancel. The same three words skillWriteConfirm uses for a skill write. |
 
 ## review（会话回顾）
 

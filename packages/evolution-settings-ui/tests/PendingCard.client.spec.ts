@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { ApprovalApi, PendingRow } from '../src/client/api.ts'
-import { message, type MessageKey } from '../src/client/messages.ts'
+import { formatText, message, type MessageKey } from '../src/client/messages.ts'
 import { PendingCard } from '../src/client/PendingCard.ts'
 
 const row = (over: Partial<PendingRow> = {}): PendingRow => ({
@@ -49,7 +49,7 @@ function face(api: Partial<ApprovalApi>): { t: (key: MessageKey) => string; api:
     preview: async () => ({ ok: true, data: { available: false, reason: 'no preview in this fixture' } }),
     ...api,
   }
-  return { t: (key: MessageKey) => message(key), api: complete }
+  return { t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => formatText(key, values), api: complete }
 }
 
 /**

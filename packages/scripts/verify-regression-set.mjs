@@ -20,6 +20,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { formatLineHeader, readLineHeader } from './lib-line-header.mjs'
 
 /** Group 1: [script, ...args] — every entry must exit 0. */
 const GUARDS = [
@@ -37,6 +38,15 @@ const GUARDS = [
   ['verify-gate-manifest.mjs', 'packages'],
   ['verify-profile-bundles.mjs', '--self-test'],
   ['verify-release-artifacts.mjs', '.github', '--strict'],
+  // G1.1 (0.22.x optimization batch): the line-identity policy is checkable without machine state
+  // (the manifest form runs where the bed actually lives; see the 32-group plan, contract C1).
+  ['verify-line-identity.mjs', '--policy-only', '--strict'],
+  ['verify-arming.mjs', '--packages', 'packages', '--strict'],
+  // G1.3 (wiring closure): these two were only reachable from the CI action; both pass locally with
+  // the plain `packages --strict` form (measured). verify-platform-ranges stays OUT: it judges the
+  // staged release manifests and is registered local-only with a reason.
+  ['verify-client-seats.mjs', 'packages', '--strict'],
+  ['verify-client-tokens.mjs', 'packages', '--strict'],
 ]
 
 /** Group 2: the specs that encode the regressions this set exists for. */
@@ -60,6 +70,13 @@ const auditDir = flag('--audit-dir')
 const scriptsDir = join(root, 'scripts')
 const failures = []
 const notes = []
+// G1.5 (contract C1): every conclusion this runner prints names the LINE it was measured on. The
+// manifest is machine-local (two of the bed's sources are machine state); without it the run may
+// report facts but must NOT claim a green conclusion — in strict mode that is a failure.
+const lineHeader = readLineHeader()
+const lineHeaderText = formatLineHeader(lineHeader)
+console.log(lineHeaderText)
+if (lineHeader === null && argv.includes('--strict')) failures.push('the line identity is unknown (no line manifest) — a green result may not be claimed')
 
 // Group 1
 for (const [script, ...args] of GUARDS) {
@@ -140,4 +157,4 @@ if (failures.length > 0) {
   for (const failure of failures) console.error('  - ' + failure)
   process.exit(1)
 }
-console.log('verify-regression-set: OK — ' + GUARDS.length + ' guard(s)' + (notes.length > 0 ? '; ' + notes.join('; ') : ''))
+console.log('verify-regression-set: OK — ' + GUARDS.length + ' guard(s) — ' + (lineHeader === null ? 'line UNKNOWN' : 'lineId=' + lineHeader.lineId) + (notes.length > 0 ? '; ' + notes.join('; ') : ''))

@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-evolution-policy
  */
 
+import { asRecord } from '@deepseek-ai/dsh-evolution-core'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { ToolGuard } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
@@ -240,8 +241,5 @@ export class EvolutionPolicy extends Service {
   }
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-}
 
 export default EvolutionPolicy

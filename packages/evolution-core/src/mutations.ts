@@ -6,6 +6,7 @@
  */
 
 import { createHash } from 'node:crypto'
+import { isRecord } from './guards.ts'
 import { join } from 'node:path'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 
@@ -101,7 +102,7 @@ export async function recordMutation(
       }
     }
     // A2-11 (v18): a newer on-disk version is never downgraded by this writer.
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    if (isRecord(parsed)) {
       const version = (parsed as { version?: unknown }).version
       if (typeof version === 'number' && version > MUTATIONS_FILE_VERSION) {
         console.warn(`mutation audit record dropped: ${mutationsFile(root)} declares version ${version} (newer than ${MUTATIONS_FILE_VERSION}); not overwritten`)

@@ -4,6 +4,7 @@
  */
 
 import { join } from 'node:path'
+import { isRecord } from './guards.ts'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 
 type SkillState = 'active' | 'stale' | 'archived'
@@ -211,7 +212,7 @@ export async function mutateUsage(
       let parsed: Record<string, unknown> | null = null
       try {
         const probe = JSON.parse(current) as unknown
-        if (probe !== null && typeof probe === 'object' && !Array.isArray(probe)) parsed = probe as Record<string, unknown>
+        if (isRecord(probe)) parsed = probe
       } catch { parsed = null }
       if (parsed === null) {
         // Whole-file corruption (unparsable JSON) or wrong top-level shape

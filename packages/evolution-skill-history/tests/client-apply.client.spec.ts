@@ -9,7 +9,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { apply, PANEL_ORDER } from '../src/client/index.ts'
-import { NS } from '../src/client/messages.ts'
+import { NS, en, zh } from '../src/client/messages.ts'
 import { PANEL_ID, type PanelBodyOptions, type PanelRowOptions } from '../src/client/seam.ts'
 
 /** A slots registry and locale seat that record contributions and hand back real disposers. */
@@ -113,9 +113,13 @@ describe('skill-history client bundle: what it contributes, and what it takes ba
     expect(document.querySelectorAll('style[data-plugin-css]')).toHaveLength(1)
     // Reported, not swallowed: the failure names the namespace and says what the reader now sees.
     expect(seams.warnings.some(line => line.includes(NS) && line.includes('falls back to the bundle'))).toBe(true)
-    // The label resolves through the bundle's own copy instead of the raw key name.
+    // The label resolves through the bundle's own copy instead of the raw key name, and that copy is
+    // the ENGLISH one: the platform's FALLBACK_LOCALE is `en` (dsh-client-locale), so an absent or
+    // refused locale seat must read English, not Chinese.
     expect(seams.rows[0]?.label()).not.toBe('entry.label')
     expect(seams.rows[0]?.label()).toBeTypeOf('string')
+    expect(seams.rows[0]?.label()).toBe(en['entry.label'])
+    expect(seams.rows[0]?.label()).not.toBe(zh['entry.label'])
   })
 
   it('leaves nothing behind when the bundle is disposed', () => {

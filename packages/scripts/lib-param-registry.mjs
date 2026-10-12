@@ -20,7 +20,10 @@ import { join } from 'node:path'
 // vanishing from the parsed set — a silent drop is how a registry edit turns
 // into a missing card without any guard firing.
 const ENTRY_HEAD = /^\s*\{ id: '([^']+)', group: '([^']+)', tier: '([^']+)', authority: '([^']+)', owner: '([^']+)', applies: '([^']+)', docAnchor: '([^']+)', summary: '([^']*)'/
-const ENTRY_TAIL = /, label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)'(?:, valueLabels: '([^']*)')? \},$/
+// U-4: a row may declare ONE cross-field relation (`atLeast`) between its value domain and card.
+// The optional group sits after `values`/`valueLabels` and before `card`/`why`, which the caller
+// splits off first — the declaration is extended here rather than worked around at the call site.
+const ENTRY_TAIL = /, label: '([^']*)', hint: '([^']*)', control: '([^']*)', unit: '([^']*)', values: '([^']*)'(?:, valueLabels: '([^']*)')?(?:, relation: \{ atLeast: '([^']+)' \})? \},$/
 // A plain row ends with ' },' and NOTHING else: a half-written UI tail (say only a
 // label) also ends that way, and accepting it would drop the tail silently while
 // the "non-E3 rows must not carry UI metadata" rule never fired.
@@ -158,6 +161,7 @@ export function readRegistry(root) {
         // Absent stays absent: the validator distinguishes 'row did not opt in' from
         // 'row opted in with an empty list'.
         if (tail[6] !== undefined) entry.valueLabels = tail[6]
+        if (tail[7] !== undefined) entry.relation = { atLeast: tail[7] }
         entries.push(entry)
       } else if (ENTRY_PLAIN.test(rest)) {
         entries.push({

@@ -19,6 +19,7 @@
  * @module @deepseek-ai/dsh-evolution-plan-validator
  */
 
+import { isRecord } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_USER_CHAR_LIMIT, FORBIDDEN_CONTROL_KEYS, MAX_RESTRUCTURE_MOVES, SKILL_ACTION_REQUIRED_FIELDS, payloadText, validateRestructureTarget, type EvidenceIndex } from '@deepseek-ai/dsh-evolution-core'
 
 export interface MemoryOp {
@@ -432,12 +433,6 @@ function runPlanRules<Op extends { evidence?: unknown[] }>(
   return null
 }
 
-/** Object root guard (V4-23, symmetric with the maintain validator): null,
- * primitives and arrays are not a plan record and must be rejected with an
- * explicit message, never a raw TypeError from `.memoryOps`/`.summary`. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 export function validateEvolutionPlan(plan: EvolutionPlan, context: ValidationContext): ValidationResult {
   const reports: PlanRuleReport[] = []

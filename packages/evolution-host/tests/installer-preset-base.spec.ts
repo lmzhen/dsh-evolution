@@ -626,7 +626,11 @@ describe('agent preset bases (--base standard|ptc)', () => {
     const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
     await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
     const installed = await readFile(patchPath(home), 'utf8')
+    // C8 tri-state, state 1 (SUCCESS): the runner RESOLVES only on a zero exit (the refusal state
+    // below asserts the non-zero side through the rejection's `code`), so a resolved re-run plus the
+    // absence of the half-done marker is the exit-0 half of the contract.
     const again = await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    expect(again.stdout).not.toContain('halfDone:')
     expect(presetLine(again.stdout, 'preset-evolution')).toContain('already current')
     expect(await readFile(patchPath(home), 'utf8')).toBe(installed)
 
@@ -634,11 +638,21 @@ describe('agent preset bases (--base standard|ptc)', () => {
     // leaves it alone, exactly like --check-presets. --force is the only writer.
     const tuned = installed.replace('- id: persona', '- id: persona-tuned')
     await writeFile(patchPath(home), tuned)
-    const skipped = await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot })
+    // G1.4 (contract C8): a run that leaves the row un-applied is NOT a success — it reports the
+    // half-done marker AND exits non-zero, so a script driving the installer cannot mistake it for
+    // an install. The spec therefore expects the failure instead of crashing on it.
+    const skipped = await runInstaller(home, 'agent', [], { DSH_AGENT_PRESET_ROOT: presetRoot }).then(
+      (value: { stdout: string; code: number | null }) => ({ ...value, refused: false }),
+      (caught: { stdout?: string; code?: number }) => ({ stdout: String(caught.stdout ?? ''), code: caught.code ?? null, refused: true }),
+    )
+    expect(skipped.refused).toBe(true)
+    expect(skipped.code).toBe(1)
+    expect(skipped.stdout).toContain('halfDone:')
     expect(presetLine(skipped.stdout, 'preset-evolution')).toContain('use --force')
     expect(await readFile(patchPath(home), 'utf8')).toBe(tuned)
     const forced = await runInstaller(home, 'agent', ['--force'], { DSH_AGENT_PRESET_ROOT: presetRoot })
     expect(presetLine(forced.stdout, 'preset-evolution')).not.toContain('use --force')
+    expect(forced.stdout).not.toContain('halfDone:')
     expect(await readFile(patchPath(home), 'utf8')).toBe(installed)
   })
 

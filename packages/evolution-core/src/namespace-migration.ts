@@ -15,6 +15,7 @@
  * @module @deepseek-ai/dsh-evolution-core
  */
 import { parse as parseYaml } from 'yaml'
+import { isRecord as isSection } from './guards.ts'
 import { NAMESPACE_MIGRATIONS, PARAM_ALIASES, PARAM_EXPOSURE, resolveParamId } from './params.ts'
 
 /** One value a legacy section carried, with the spelling it used. */
@@ -57,15 +58,6 @@ export interface NamespaceMigrationPlan {
   readonly foreign: readonly string[]
   /** Keys that were found but not migrated. */
   readonly skipped: readonly NamespaceMigrationSkip[]
-}
-
-/**
- * Whether a parsed value is a plain mapping (a settings section).
- * @param value - the parsed value.
- * @returns true for a non-null, non-array object.
- */
-function isSection(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /**

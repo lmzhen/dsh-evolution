@@ -16,7 +16,12 @@
 import { createElement, useEffect, useState, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
-import { landedSettlements, type Settlement } from './settle.ts'
+/**
+ * One staged write awaiting the Host's answer. The verdict is the Host's own boolean (the settings
+ * scope performs a recovery read before it resolves), so this record carries only what the effect
+ * needs to render: whether it was accepted, and whether it was a reset (which reads differently).
+ */
+type PendingWrite = { readonly accepted: boolean; readonly resets: boolean }
 import type { ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike } from './seam.ts'
 
 /**
@@ -30,10 +35,11 @@ import type { ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike } fro
 export interface ParamCardFace {
   namespace: string
   fields: readonly ClientParamField[]
-  t: (key: MessageKey) => string
-  /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). */
-  mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<void>
-  clear: (field: string) => Promise<void>
+  t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
+  /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). The returned boolean IS
+   * the Host's verdict (contract C2/G5): `true` = accepted, `false` = refused after its recovery read. */
+  mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<boolean>
+  clear: (field: string) => Promise<boolean>
   hooks: { paramSection: ParamSectionSource }
 }
 
@@ -78,10 +84,8 @@ function parseFor(control: ClientParamField['control'], text: string): unknown {
   }
 }
 
-/** Whether a value is a plain section object. */
-function isSection(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
+// G7.1/A8: the predicate is generated from core (guards.ts); the local name is kept.
+import { isRecord as isSection } from './guards.ts'
 
 interface FieldBlockProps {
   field: ClientParamField
@@ -91,17 +95,76 @@ interface FieldBlockProps {
   disabled: boolean
   /** THIS field's reset is in flight (T5-05/A60) — the button says so. */
   clearing: boolean
-  t: (key: MessageKey) => string
+  t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
   onChange: (id: string, text: string) => void
   /** Ask for this field's deployment default back; the verdict is judged from the next snapshot. */
   onClear: (field: string) => void
+  /** U-5: what that reset would restore (the seat's `base`), already spelled for the reader. */
+  resetTo: string | null
+  /** U-4: why the current value is unacceptable, or null. */
+  invalid: MessageKey | null
+}
+
+/**
+ * U-4: whether one field's CURRENT text is a value the Host can take. The controls constrain their own
+ * domains (a number input sanitizes, a select only offers listed values), so the reachable case is a
+ * value the registry no longer lists — carried in the user layer and re-staged by any other edit.
+ * @param field - the generated field.
+ * @param text - the text the control holds right now.
+ * @param peer - U-4: the text the row this field declares `atLeast` against currently holds (absent
+ * when the field declares no relation, or when that row is not on this card).
+ * @returns the message key explaining the refusal, or null when the value is acceptable.
+ */
+export function invalidReason(field: ClientParamField, text: string, peer?: string | undefined): MessageKey | null {
+  const trimmed = text.trim()
+  if (trimmed === '') return null
+  if (field.control === 'number') {
+    if (!Number.isFinite(Number(trimmed))) return 'invalidNumber'
+    // The cross-field half of the same check the Host enforces (core's params.ts `relation`): the
+    // card refuses the pair before a save is staged, so the operator learns it here rather than from
+    // an E-322 after the fact.
+    if (field.atLeast !== '' && peer !== undefined && peer.trim() !== '' && Number.isFinite(Number(peer))) {
+      if (Number(trimmed) < Number(peer)) return 'invalidAtLeast'
+    }
+    return null
+  }
+  if (field.control === 'select') return field.values.includes(trimmed) ? null : 'invalidSelect'
+  return null
+}
+
+/**
+ * U-5: the value a reset would restore, spelled for a reader. Only primitives are shown: the seat's
+ * `base` may be a nested object, and `[object Object]` is worse than saying nothing.
+ * @param value - the seat's base value for one field.
+ * @returns its display string, or null when it is not a primitive.
+ */
+function resetToOf(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  const kind = typeof value
+  return kind === 'string' || kind === 'number' || kind === 'boolean' ? String(value) : null
+}
+
+/**
+ * The DOM id a field's control, its label and its explanation node all share. ONE definition: the
+ * three call sites used to spell the string out, and the third one (the explanation node) referred to
+ * a local that only existed inside the control — a ReferenceError on every invalid value, which the
+ * unit-level fixture could not see because it never rendered one (independent review, P1-1).
+ */
+function controlId(field: ClientParamField): string {
+  return 'evolution-param-' + field.id
 }
 
 /** One field's control, typed from the registry. */
 function FieldControl(props: FieldBlockProps): ReactNode {
   const { field, text } = props
-  const id = 'evolution-param-' + field.id
-  const common = { id, disabled: props.disabled, className: 'evolution-param-input' }
+  const id = controlId(field)
+  // U-4: an unacceptable value must SAY so — invalid state plus a described explanation node.
+  const common = {
+    id,
+    disabled: props.disabled,
+    className: 'evolution-param-input',
+    ...(props.invalid === null ? {} : { 'aria-invalid': 'true', 'aria-describedby': id + '-invalid' }),
+  }
   if (field.control === 'switch') {
     return createElement('input', {
       ...common,
@@ -142,15 +205,19 @@ function FieldBlock(props: FieldBlockProps): ReactNode {
   const unit = field.unit === '' ? null : createElement('span', { className: 'evolution-param-unit' }, '（' + field.unit + '）')
   return createElement('div', { className: 'evolution-param-field' },
     createElement('div', { className: 'evolution-param-label' },
-      createElement('label', { htmlFor: 'evolution-param-' + field.id }, field.label === '' ? field.id : field.label),
+      createElement('label', { htmlFor: controlId(field) }, field.label === '' ? field.id : field.label),
       unit,
-      createElement('span', {
-        className: 'evolution-param-source',
-        'data-user': props.overridden ? 'true' : 'false',
-      }, props.overridden ? t('overridden') : t('deployment')),
+      // U-3: the chip IS the information "this field is overridden" — printing "deployment default" on
+      // every untouched field is ten chips of zero information on the curator row alone.
+      props.overridden
+        ? createElement('span', { className: 'evolution-param-source', 'data-user': 'true' }, t('overridden'))
+        : null,
     ),
     FieldControl(props),
     createElement('p', { className: 'evolution-param-hint' }, field.hint === '' ? field.doc : field.hint),
+    props.invalid === null
+      ? null
+      : createElement('p', { id: controlId(field) + '-invalid', className: 'evolution-param-error', role: 'status' }, t(props.invalid)),
     props.overridden
       ? createElement('div', { className: 'evolution-param-actions' },
         createElement('button', {
@@ -159,6 +226,8 @@ function FieldBlock(props: FieldBlockProps): ReactNode {
           disabled: props.disabled || props.clearing,
           onClick: () => { props.onClear(field.id) },
         }, props.clearing ? t('resetting') : t('reset')),
+        // U-5 judge ②: name the value the button would restore — "restore default" is a decision.
+        props.resetTo === null ? null : createElement('span', { className: 'evolution-param-hint' }, t('resetTo', { value: props.resetTo })),
       )
       : null,
   )
@@ -173,11 +242,11 @@ function FieldBlock(props: FieldBlockProps): ReactNode {
 export interface ParamCardViewProps {
   namespace: string
   fields: readonly ClientParamField[]
-  t: (key: MessageKey) => string
+  t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
   /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). */
-  mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<void>
+  mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<boolean>
   /** Ask the scope to drop one override; resolves when the scope answered, not when it landed. */
-  clear: (field: string) => Promise<void>
+  clear: (field: string) => Promise<boolean>
   /** The current row state, from whichever source owns it (the bound hook or the page). */
   snapshot: ParamSectionSnapshot
 }
@@ -193,11 +262,11 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [pending, setPending] = useState<readonly Settlement[] | null>(null)
+  const [pending, setPending] = useState<PendingWrite | null>(null)
   // The field whose reset is in flight (T5-05/A60): the button says so and the controls lock, the
   // same posture the save path takes while its write is outstanding.
   const [clearing, setClearing] = useState<string | null>(null)
-  if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('loading'))
+  if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('loading'))
   // Three different absences, told apart on screen because the operator's next move differs:
   // this UI has no settings seat (compose the settings surface), the seat serves no such row
   // (compose the row), or projecting that row failed (read the log). They must never read the
@@ -206,7 +275,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     const key: MessageKey = snapshot.reason === 'seat-missing'
       ? 'seatMissing'
       : snapshot.reason === 'projection-failed' ? 'projectionFailed' : 'unavailable'
-    return createElement('p', { className: 'evolution-param-note' }, t(key))
+    return createElement('p', { className: 'evolution-param-note', role: 'status' }, t(key))
   }
   const user = isSection(snapshot.user) ? snapshot.user : {}
   const value = isSection(snapshot.value) ? snapshot.value : {}
@@ -221,6 +290,12 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const changed = fields.filter(field => Object.hasOwn(user, field.id)).length
   const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[field.id])
   const dirty = fields.filter(field => draft[field.id] !== undefined && draft[field.id] !== format(value[field.id]))
+  // U-4 constraint-first: an unacceptable value blocks the save instead of being staged and refused.
+  const peerTextOf = (field: ClientParamField): string | undefined => {
+    if (field.atLeast === '') return undefined
+    return fields.some(candidate => candidate.id === field.atLeast) ? textOf(fields.find(candidate => candidate.id === field.atLeast)!) : undefined
+  }
+  const blocked = fields.some(field => invalidReason(field, textOf(field), peerTextOf(field)) !== null)
   const change = (id: string, next: string): void => { setDraft({ ...draft, [id]: next }) }
   /**
    * Settle a staged write against the Host's answer.
@@ -240,13 +315,17 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     setPending(null)
     setBusy(false)
     setClearing(null)
-    if (!landedSettlements(pending, snapshot.user)) {
+    // G5 P1-1: the verdict is the HOST'S boolean. Comparing the settled user layer against the
+    // requested values read a REFUSED write as accepted whenever the value already matched (a
+    // concurrent editor, or a field the operator had already overridden) — the exact "refused but
+    // reported as saved" defect. The platform resolves `false` for a refusal, so trust it.
+    if (!pending.accepted) {
       // A refused reset reads differently from a refused save: in the first the row still shows the
       // operator's value, which is what a reader who clicked "restore default" needs to be told.
-      setError(t(pending.every(entry => entry.op === 'unset') ? 'resetRefused' : 'refused'))
+      setError(t(pending.resets ? 'resetRefused' : 'refused'))
       return
     }
-    if (pending.some(entry => entry.op === 'set')) setDraft({})
+    if (!pending.resets) setDraft({})
   }, [pending, snapshot.user, t])
   /**
    * Restore one field's deployment default (T5-05/A60).
@@ -260,14 +339,15 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     setClearing(field)
     setError('')
     void (async () => {
+      let accepted: boolean
       try {
-        await clear(field)
+        accepted = await clear(field)
       } catch (caught) {
         setClearing(null)
         setError(caught instanceof Error && caught.message !== '' ? caught.message : t('resetRefused'))
         return
       }
-      setPending([{ op: 'unset', id: field }])
+      setPending({ accepted, resets: true })
     })()
   }
   const save = (): void => {
@@ -279,8 +359,8 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
         // which the Plugins page fenced with the render-time revision — the second field was then
         // refused by the host and its change silently did not land.
         const ops: SettingsParamOp[] = dirty.map(field => ({ op: 'set', path: [field.id], value: parseFor(field.control, textOf(field)) }))
-        await mutateOnce(ops)
-        setPending(dirty.map(field => ({ op: 'set' as const, id: field.id, want: parseFor(field.control, textOf(field)) })))
+        const accepted = await mutateOnce(ops)
+        setPending({ accepted, resets: false })
       } catch (caught) {
         // Transport-level failures (and any future shell that rejects): keep the draft
         // so nothing the operator typed is lost.
@@ -297,31 +377,43 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
       onClick: () => { setOpen(!open) },
     },
     createElement('span', { className: 'evolution-param-card-title' }, title),
-    changed === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('changed').replace('{n}', String(changed))),
+    changed === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('changed', { n: changed })),
+    // U-5 judge ①: where a save lands. `memory` is this session only; saying so is not a refusal.
+    createElement('span', { className: 'evolution-param-dest' }, snapshot.mode === 'memory' ? t('destMemory') : t('destHost')),
     createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼'),
     ),
     open
       ? createElement('div', { className: 'evolution-param-body' },
-        disabled ? createElement('p', { className: 'evolution-param-note' }, t('readonly')) : null,
+        disabled ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('readonly')) : null,
         fields.length === 0
-          ? createElement('p', { className: 'evolution-param-note' }, t('empty'))
-          : fields.map(field => createElement(FieldBlock, {
-            key: field.id,
-            field,
-            text: textOf(field),
-            overridden: Object.hasOwn(user, field.id),
-            disabled: locked,
-            clearing: clearing === field.id,
-            t,
-            onChange: change,
-            onClear: reset,
-          })),
-        error === '' ? null : createElement('p', { className: 'evolution-param-error' }, error),
+          ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('empty'))
+          // U-3: the generated table already carries `group`; it was never rendered. One heading per
+          // distinct group (the table is ordered, so a change of group is the whole rule).
+          : fields.flatMap((field, index) => [
+            index === 0 || fields[index - 1]?.group !== field.group
+              ? createElement('h3', { key: 'group-' + field.group, className: 'evolution-param-group' }, field.group)
+              : null,
+            createElement(FieldBlock, {
+              key: field.id,
+              field,
+              text: textOf(field),
+              overridden: Object.hasOwn(user, field.id),
+              disabled: locked,
+              clearing: clearing === field.id,
+              // U-5: primitives only — a nested object is not a reader-facing value.
+              resetTo: resetToOf(snapshot.base?.[field.id]),
+              invalid: invalidReason(field, textOf(field), peerTextOf(field)),
+              t,
+              onChange: change,
+              onClear: reset,
+            }),
+          ]),
+        error === '' ? null : createElement('p', { className: 'evolution-param-error', role: 'status' }, error),
         fields.length === 0 ? null : createElement('div', { className: 'evolution-param-footer' },
           createElement('button', {
             type: 'button',
             className: 'evolution-param-button',
-            disabled: busy || dirty.length === 0,
+            disabled: busy || dirty.length === 0 || blocked,
             onClick: () => { setDraft({}); setError('') },
           }, t('discard')),
           createElement('button', {

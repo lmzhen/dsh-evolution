@@ -96,7 +96,8 @@ export function apply(ctx: ClientContext): void {
   // literal initializer), and the refusal is exactly what this branch answers for.
   // oxlint-disable-next-line typescript/no-unnecessary-condition -- set inside the registration try
   const seatTranslator = registered ? seam.locale.bind(NS) : null
-  const t = (key: string): string => seatTranslator === null ? message('zh', key) : seatTranslator(key)
+  // G5: with no locale seat the fallback follows the platform's FALLBACK_LOCALE (`en`), not Chinese.
+  const t = (key: string): string => seatTranslator === null ? message('en', key) : seatTranslator(key)
   // The panel's own stylesheet, injected once behind its tag. The bundle is built outside the
   // platform's CSS-Modules pipeline, so it carries the string itself (the family's settings section
   // does the same); the tag id keeps a hot reload from stacking copies.

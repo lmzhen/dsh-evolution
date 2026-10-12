@@ -11,6 +11,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isRecord } from './guards.ts'
 
 /** Largest request body a family route accepts; a bigger one reads as "no body" (400 from the handler). */
 export const MAX_REQUEST_BODY_BYTES = 64 * 1024
@@ -117,5 +118,5 @@ export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
  */
 export async function readJsonObject(req: IncomingMessage): Promise<Record<string, unknown> | null> {
   const body = await readJsonBody(req)
-  return body !== null && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : null
+  return isRecord(body) ? body : null
 }

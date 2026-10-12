@@ -667,6 +667,8 @@ const FORMAT_CLASS_TOKEN_RE = /\\p\{Cf\}/
 // through ctx.get — postmortem 0001). Baselines are the pre-v39 site counts;
 // a file already mentioning the platform passes.
 const PLATFORM_GET_RE = /ctx\.get\('(?!evolution)[A-Za-z][\w-]*'\)/g
+/** The ONLY N10 file-level exemption (G1.2): an explicit declaration marker in the file. */
+const PLATFORM_DECLARATION_RE = /platform-declaration\s+anchor/i
 const PLATFORM_GET_BASELINE = new Map([
   ['evolution-commands/src/index.ts', 4],
   ['evolution-approval/src/index.ts', 3],
@@ -731,6 +733,7 @@ const MUTABLE_STATE = new Map([
   // and N20 fails when the declared serialization is not in the code.
   ['evolution-core/src/instance-scope.ts :: claims', 'WHY MODULE SCOPE (S4.4): this IS the process-wide coordination table — two different plugins, each with its own fiber and instance, consult the SAME claim for one home; an instance field would give each plugin its own table and the single-instance exclusion would stop excluding. B3 / G4 (0.3.78): the per-home single-instance claims (home :: key -> holder). Every sidecar writer runs on a per-instance serial queue, so ONE instance per home may own a writer key; lifecycle claimInstance (get-or-set, re-entrant for the same owner) / releaseInstance (owner-only delete, called from the consumer disposer); evidence evolution-core/tests/instance-scope.spec.ts and evolution-curator/tests/instance-claim.spec.ts; validity single-process (the cross-process half is the IO write lock), listed in persisted-write-inventory.json.'],
   ['evolution-core/src/review-channel.ts :: markedSessions', 'WHY MODULE SCOPE (S4.4): the marker rides three FREE functions (markReviewChannel / clearReviewChannel / sweepReviewChannelSessions) that other packages call with a Session — there is no service instance in the picture, so an instance field would have no owner to live on. v37 S2.2: session.header.origin is a closed set (only \'subagent\'), so a plugin-driven turn cannot be attributed by the platform; evidence evolution-core/tests/review-channel.spec.ts; validity single-process.'],
+  ['evolution-core/src/preset-composition.ts :: overridesCache', 'WHY MODULE SCOPE (S4.4): the override table is IMMUTABLE data read from disk, so process scope changes no behaviour; the cache is keyed by PATH because the plugin side and the generated installer port each resolve their own root (G6.1/M1), and re-parsing the table on every composition buys nothing.'],
   ['evolution-core/src/signals.ts :: dispatchLedgers', 'WHY MODULE SCOPE (S4.4): the store is keyed by the SIGNAL OBJECT through a WeakMap (entries die with the object) and is reached from the core fold, which has no service instance to hang it on; a per-instance store would have to be threaded through the whole fold for no ownership gain. v37 P7a: the platform writes ONE dispatch vocabulary per mounted runtime mode, and the fold needs per-turn state the TurnSignals value cannot carry; lifecycle normalizerForSignal (get-or-create) with weak keys; evidence evolution-core/tests/tool-dispatch.spec.ts; validity single-process.'],
 ])
 // N13a (P5): must-execute payloads still on the non-waking primitive.
@@ -847,15 +850,21 @@ function isInvariantCompanion(hasSrcInvariant, manifestPublishes) {
 }
 
 /** N10 (v39, S3.4 rule 4): new platform-service probes in a file that carries no anchor.
- * The file-level exemption is a `platform` mention (the docblock owns the rationale).
+ * G1.2 fixed two defects here, both found by the arming audit:
+ *  - the file-level exemption was ANY occurrence of the substring `platform` (it silently exempted
+ *    every file that merely mentioned the word) — it is now an EXPLICIT declaration marker;
+ *  - the probe count ran over the RAW text, so a `ctx.get('server')` mentioned in a comment counted
+ *    as a probe (skill-history was reported for a comment). Counts are taken on stripped text; the
+ *    declaration marker is looked up in the RAW text, because that is where comments live.
  * @param text - the file's source.
  * @param rel - the tree-relative path.
  * @param baseline - how many probes this file is already recorded as carrying.
+ * @param hasDeclaration - whether the RAW file carries a `platform-declaration anchor:` marker.
  * @returns the number of unanchored probes.
  */
-function unanchoredPlatformProbes(text, rel, baseline) {
+function unanchoredPlatformProbes(text, rel, baseline, hasDeclaration) {
   const sites = (text.match(PLATFORM_GET_RE) ?? []).length
-  if (!rel.includes('/src/') || sites <= baseline || /platform/i.test(text)) return 0
+  if (!rel.includes('/src/') || sites <= baseline || hasDeclaration) return 0
   return sites - baseline
 }
 
@@ -940,7 +949,7 @@ const GUARD_VACUITY = [
  */
 function clientStyleLiterals(text) {
   // Comments may discuss a literal without shipping one (`// no font-size here`).
-  const stripped = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+  const stripped = stripComments(text)
   const findings = []
   for (const match of stripped.matchAll(/\b(font-size|font-family|font|fontSize|fontFamily)\s*:\s*(['"]?)([^;'"}\n,]*)/g)) {
     const value = (match[3] ?? '').trim()
@@ -953,9 +962,7 @@ function clientStyleLiterals(text) {
 }
 
 /** A client half's source without its comments: prose may discuss a literal without shipping one. */
-function withoutComments(text) {
-  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
-}
+import { stripComments as withoutComments } from './lib-source-text.mjs'
 
 /**
  * N25 (0.15): a radius or a hairline width written as a literal inside a client half.
@@ -1474,7 +1481,7 @@ function walk(dir) {
       }
       // N10 (v39, S3.4 rule ④): new platform service probe — see docblock.
       {
-        const unanchored = unanchoredPlatformProbes(text, rel, PLATFORM_GET_BASELINE.get(rel) ?? 0)
+        const unanchored = unanchoredPlatformProbes(stripComments(text), rel, PLATFORM_GET_BASELINE.get(rel) ?? 0, PLATFORM_DECLARATION_RE.test(text))
         if (unanchored > 0) {
           violations.push(`${rel}: ${unanchored} new ctx.get('<platform service>') probe(s) with no platform-declaration anchor in the file (cite the platform declaration; baseline lives in PLATFORM_GET_BASELINE)`)
         }
@@ -1631,6 +1638,9 @@ function walk(dir) {
 
 // N38 / N39 predicates live HERE (top level) so the rule, its detector and its probe all read the
 // same pattern — a detector that re-spells the regex witnesses nothing (review P1-1, 0.22.0).
+// G1.2: filled by the detector block below, read by the --arming-json report at the end.
+let armedDetectorIds = []
+
 const CONFIG_READ_PATTERN = /(?<![A-Za-z0-9_$.])(?:rawConfig|this\.config|config)\s*(?:\[\s*[^\]]{1,80}\s*\]|\.[A-Za-z_$][\w$]*)\s*\??\.\s*get\s*\(/
 const PROFILES_READDIR_RE = /readdirSync\s*\(/
 const PROFILES_JOIN_RE = /join\s*\([^)]*['"]profiles['"]/
@@ -1698,10 +1708,11 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
       && FORMAT_CLASS_TOKEN_RE.test('\\p{Cf}')
       && !FORMAT_CLASS_TOKEN_RE.test('a-z0-9')
       && [...'new RegExp(`[FORMAT_CONTROL_CLASS]`)'.matchAll(REGEXP_CLASS_RE)].length === 1],
-    ['N10', () => unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 0) === 1
-      && unanchoredPlatformProbes('// platform-declaration anchor: tools\nctx.get(\'tools\')', 'pkg/src/a.ts', 0) === 0
-      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 1) === 0
-      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/tests/a.ts', 0) === 0
+    ['N10', () => unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 0, false) === 1
+      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 0, true) === 0
+      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/src/a.ts', 1, false) === 0
+      && unanchoredPlatformProbes('ctx.get(\'tools\')', 'pkg/tests/a.ts', 0, false) === 0
+      && unanchoredPlatformProbes('// the platform layer\nctx.get(\'tools\')', 'pkg/src/a.ts', 0, PLATFORM_DECLARATION_RE.test('// the platform layer')) === 1
       && probedServiceKeysIn("const t = ctx.get('tools')").join() === 'tools'
       && probedServiceKeysIn('const w = ctx.get("webServer")').join() === 'webServer'
       && probedServiceKeysIn('// prose: ctx.get(\'tools\') is named but not called').length === 1
@@ -1899,6 +1910,7 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
   // field only, so a rule could claim `sample: 'detector'` with no row in the table and the summary
   // still printed a full count (review P1-1). Count the intersection, and print the list from here.
   const detectorIds = new Set(detectors.map(([id]) => id))
+  armedDetectorIds = [...detectorIds]
   const undetected = RULES.filter(rule => rule.sample === 'detector' && !detectorIds.has(rule.id)).map(rule => rule.id)
   if (undetected.length > 0) {
     console.error(`verify-arch-guards: rule(s) declare a detector sample with no detector in the table — [${undetected.join(', ')}]`)
@@ -2080,10 +2092,13 @@ if (orphanKeys.length > 0) {
   violations.push(`ghost service key(s) probed but never provided: ${orphanKeys.join(', ')} (an evolution service key with zero providers makes a diagnosis silently lie)` )
 }
 
+// G1.2 (0.22.x): the three scan counters are reported instead of discarded, so the arming
+// audit can tell "this rule family scanned the real tree" from "it silently scanned nothing".
+const scanCounts = { client: 0, live: 0, profiles: 0 }
+
 // N24 (0.14): the client halves draw with tokens, not literals. The rule exists because the
 // panel's stylesheet is a plain string in the bundle: no build step can typecheck it.
 {
-  let clientFilesScanned = 0
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory() || SKIP.has(entry.name)) continue
     const clientRoot = join(root, entry.name, 'src', 'client')
@@ -2093,7 +2108,7 @@ if (orphanKeys.length > 0) {
         const full = join(dir, child.name)
         if (child.isDirectory()) { walk(full); continue }
         if (!/\.(ts|tsx)$/.test(child.name)) continue
-        clientFilesScanned += 1
+        scanCounts.client += 1
         const findings = clientStyleLiterals(readFileSync(full, 'utf8'))
         if (findings.length > 0) {
           violations.push(`literal type/colour in a client half (N24): ${relative(root, full)} — ${findings.slice(0, 4).join(' | ')} (use a --dsh-/--dsw- token or a calc() over one)`)
@@ -2103,9 +2118,8 @@ if (orphanKeys.length > 0) {
     walk(clientRoot)
   }
   // No vacuum violation here on purpose: a tree may legitimately have no client half (the guard
-  // specs scan synthetic fixtures), and the whole-tree vacuum check above already owns the
-  // "did anything get scanned at all" class.
-  void clientFilesScanned
+  // specs scan synthetic fixtures). The EXPECTATION side lives in the arming audit (G1.2): it runs
+  // this guard on the real tree and fails when a family scanned zero files.
 }
 // N25/N26/N27/E1/N29/N30 (0.15, 0.18): six more answers about the same client halves N24 walks. They
 // are one block on purpose — the rule family is "a browser half can only use what the platform gives
@@ -2171,7 +2185,7 @@ if (orphanKeys.length > 0) {
   const LIVE_OWNER = CORE_SRC + '/live.ts'
   const CONFIG_READ_RE = new RegExp(CONFIG_READ_PATTERN.source, 'g')
   const offenders = []
-  let liveScanFiles = 0
+  // scans are reported through scanCounts (see the arming audit)
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory() || SKIP.has(entry.name)) continue
     const srcDir = join(root, entry.name, 'src')
@@ -2183,7 +2197,7 @@ if (orphanKeys.length > 0) {
         if (!child.name.endsWith('.ts')) continue
         const rel = relative(root, full).split('\\').join('/')
         if (rel === LIVE_OWNER) continue
-        liveScanFiles += 1
+        scanCounts.live += 1
         const code = stripComments(readFileSync(full, 'utf8'))
         for (const match of code.matchAll(CONFIG_READ_RE)) {
           offenders.push(rel + ' — ' + match[0].replace(/\s+/g, ' '))
@@ -2192,7 +2206,7 @@ if (orphanKeys.length > 0) {
     }
     walk(srcDir)
   }
-  if (liveScanFiles === 0) {
+  if (scanCounts.live === 0) {
     violations.push('no package source scanned under ' + root + ' — the N38 config-read scan cannot decide (a vacuum pass is not a pass)')
   }
   if (offenders.length > 0) {
@@ -2210,7 +2224,7 @@ if (orphanKeys.length > 0) {
   const PROFILES_OWNER = 'evolution-commands/src/profiles.ts'
   // The three predicates are the top-level PROFILES_* consts (shared with the N39 detector).
   const offenders = []
-  let profilesScanFiles = 0
+  // scans are reported through scanCounts (see the arming audit)
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory() || SKIP.has(entry.name)) continue
     const srcDir = join(root, entry.name, 'src')
@@ -2222,7 +2236,7 @@ if (orphanKeys.length > 0) {
         if (!child.name.endsWith('.ts')) continue
         const rel = relative(root, full).split('\\').join('/')
         if (rel === PROFILES_OWNER) continue
-        profilesScanFiles += 1
+        scanCounts.profiles += 1
         const code = stripComments(readFileSync(full, 'utf8'))
         for (const line of code.split('\n')) {
           if (profilesLineOffends(line)) offenders.push(rel + ' — ' + line.trim())
@@ -2231,12 +2245,26 @@ if (orphanKeys.length > 0) {
     }
     walk(srcDir)
   }
-  if (profilesScanFiles === 0) {
+  if (scanCounts.profiles === 0) {
     violations.push('no package source scanned under ' + root + ' — the N39 profile-surface scan cannot decide (a vacuum pass is not a pass)')
   }
   if (offenders.length > 0) {
     violations.push('<home>/profiles is read outside ' + PROFILES_OWNER + ' (N39: the profile surface has ONE owner — ask profiles.ts): ' + offenders.slice(0, 5).join(' | ') + (offenders.length > 5 ? ' (+' + (offenders.length - 5) + ' more)' : ''))
   }
+}
+
+// G1.2: the machine-readable arming report. It answers, for the run that just happened, which
+// rule families actually scanned the tree — the fact the summary line alone cannot convey, and the
+// one the arming audit asserts against the REAL tree (a family that scanned 0 files is unarmed).
+if (process.argv.includes('--arming-json')) {
+  const detectorRows = armedDetectorIds
+  console.log(JSON.stringify({
+    rules: RULES.length,
+    declaredDetectors: RULES.filter((rule) => rule.sample === 'detector').map((rule) => rule.id),
+    detectors: detectorRows,
+    scanned: scanCounts,
+    violations: violations.length,
+  }))
 }
 
 if (checkedCount === 0) {

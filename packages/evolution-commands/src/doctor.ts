@@ -9,6 +9,7 @@
  * actions so any finding carries its next step.
  */
 import { readFileSync, existsSync } from 'node:fs'
+import { asRecord } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { composePresetEntry, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, presetRowBlock, presetRowBody, presetRowId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
@@ -203,7 +204,8 @@ function liveRowTails(plugins: readonly PlatformPlugin[]): ReadonlySet<string> {
  * @returns the mapping, or undefined for anything else.
  */
 function asMapping(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+  // G7.1/A8: the ONE plain-object predicate lives in core (guards.ts).
+  return asRecord(value)
 }
 
 /** G3 (stage 8): what the family's LEGACY settings document still holds.
@@ -636,6 +638,7 @@ function probePresetFreshness(home: string, servicePresent: (name: string) => bo
  * @returns the row the report renders.
  */
 async function legacyMigrationRow(ctx: { get(name: string): unknown }, home: string): Promise<LegacyMigrationRow> {
+// platform-declaration anchor: the platform’s `settings` and `sessionQuery` services (both optional; undefined ⇒ the corresponding check is skipped)
   const settings = ctx.get('settings') as SettingsProviderLike | undefined
   const io = (ctx.get('evolutionIo') as { provider?(): EvolutionIoLike } | undefined)?.provider?.()
   if (settings?.describe === undefined || io === undefined) return { state: 'unavailable', source: undefined, pending: [] }

@@ -3,7 +3,7 @@ import { afterAll, expect, it, vi } from 'vitest'
 // them far beyond the vitest default (audit v10 integration fix).
 vi.setConfig({ testTimeout: 30_000 })
 // V27 G7.2 LOAD-SENSITIVE GROUP: the cases that decide by a lock TIMING or
-// LIVENESS threshold are listed in `scripts/run-load-sensitive.mjs` (17 entries,
+// LIVENESS threshold are listed in `scripts/run-load-sensitive.mjs` (3 entries,
 // each with its reason) and are run there ONCE at a pinned worker count — so a
 // green result is a green at a known concurrency instead of an accident of the
 // default one. Renaming a case means updating its entry in that list: the runner
@@ -11,9 +11,8 @@ vi.setConfig({ testTimeout: 30_000 })
 import { chmod, mkdir, readdir, rename, stat, writeFile, readFile, utimes, open } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
-import { decideTakeover, ALIVE_LOCK_TAKEOVER_MS, DEAD_LOCK_TAKEOVER_MS, EMPTY_LOCK_TAKEOVER_MS, LOCK_TEAR_TAKEOVER_MS, nodeEvolutionIo, pendingSelfCleanup, renameWithRetry, transactIo, writeDurableTmp } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, renameWithRetry, transactIo, writeDurableTmp } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { DEAD_PID, deadLockBody } from '../../test-support/lock-fixtures.ts'
 
 // A genuinely alive foreign pid: the tests below need a LIVE holder that is NOT
 // this process (F-367 recycles our own pid leftover, and F-366 sweeps our own
@@ -29,92 +28,28 @@ afterAll(() => {
   liveChildren.clear()
 })
 
-it('nodeEvolutionIo.writeText commits one complete payload per concurrent writer and cleans its lock', async () => {
+it('nodeEvolutionIo.writeText commits one complete payload per concurrent writer', async () => {
   // v32 TEST-04: a blind `writeText` cannot prove SERIALIZATION (atomic rename
   // alone yields one complete payload even without any lock). This case pins
-  // atomicity + lock cleanup; the serialization invariant is pinned by the
-  // `transact` RMW counter cases below (which would fail on a lost update).
+  // atomicity; the serialization invariant is pinned by the `transact` RMW
+  // counter cases below (which would fail on a lost update). The old title also
+  // promised lock cleanup — an assertion that could no longer fail once the lock
+  // protocol was retired, so it was deleted rather than kept green (P2-7).
   const root = await tempRoot('dsh-io-lock-')
   const io = nodeEvolutionIo()
   const target = join(root, 'shared.txt')
   await Promise.all(Array.from({ length: 8 }, (_, i) => io.writeText(target, `writer-${i}`)))
-  // The file holds exactly one complete writer payload; the lock is released.
+  // The file holds exactly one complete writer payload.
   const content = await readFile(target, 'utf8')
   expect(content).toMatch(/^writer-\d$/m)
-  expect((await io.readText(`${target}.lock`))).toBeNull()
 })
 
 // v32 TEST-03: the commit-point ownership guard. A foreign claim landing on
-// the lock file BETWEEN acquisition and commit must be detected by
-// `assertOwned` (LostWriteLock) and the whole RMW must be REDONE — this is
-// the load-independent invariant that keeps cross-process writes
-// loss-free (the class that broke as EVO-IO-01). Single-process simulation:
-// the task itself corrupts the lock body once, simulating a foreign steal.
-it('a foreign lock overwrite mid-RMW is detected at the commit point and the RMW is redone', async () => {
-  const root = await tempRoot('dsh-io-owned-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'owned.txt')
-  let attempts = 0
-  let sawLost = false
-  const transact = io.transact
-  expect(transact).toBeTypeOf('function')
-  await transact!(target, async (current) => {
-    attempts += 1
-    if (attempts === 1) {
-      // Simulate the steal: another process took the lock and wrote its own
-      // claim (dead pid -> stealable on the retry, live enough to break the
-      // commit gate on this attempt).
-      await writeFile(`${target}.lock`, deadLockBody()).catch(() => {})
-      sawLost = true
-    }
-    return `${current ?? ''}x`
-  })
-  // Attempt 1 was invalidated (LostWriteLock) and the RMW ran a second time.
-  expect(attempts).toBe(2)
-  expect(sawLost).toBe(true)
-  expect(await readFile(target, 'utf8')).toBe('x')
-})
-
-it('nodeEvolutionIo.writeText takes over a stale lock (1s, E-8a) and still writes', async () => {
-  const root = await tempRoot('dsh-io-stale-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'stale.txt')
-  // A pid that cannot exist: the lock is stale AND holderless (rc.66 probe).
-  await writeFile(`${target}.lock`, String(DEAD_PID), 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  await io.writeText(target, 'fresh')
-  expect(await readFile(target, 'utf8')).toBe('fresh')
-  expect((await io.readText(`${target}.lock`))).toBeNull()
-})
-
-it('nodeEvolutionIo never steals a lock from a LIVE holder older than 1s (rc.66)', async () => {
-  const root = await tempRoot('dsh-io-live-lock-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'live.txt')
-  // A real live FOREIGN pid (a spawned child): the probe must refuse the
-  // takeover even though the lock looks stale by age. (`process.pid` would be
-  // recycled as a F-367 leftover, so it cannot stand in for a foreign peer.)
-  await writeFile(`${target}.lock`, String(spawnLivePid()), 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  await expect(io.writeText(target, 'fresh')).rejects.toThrow(/could not acquire write lock/)
-  // The probe loop spends ~2s nominal (40 x 50ms retry budget); a loaded
-  // machine crossed the default 5s cap in the full parallel run (0.3.28
-  // release gate) — explicit budget so the retry loop owns the unbounded part.
-}, 15_000)
-
-it('nodeEvolutionIo takes over a stale lock from a GONE pid (rc.66)', async () => {
-  const root = await tempRoot('dsh-io-gone-lock-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'gone.txt')
-  await writeFile(`${target}.lock`, '999999', 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  await io.writeText(target, 'fresh')
-  expect(await readFile(target, 'utf8')).toBe('fresh')
-})
-
+// the commit point and the whole RMW must be REDONE — this is the load-independent
+// invariant that keeps concurrent writes loss-free (the class that broke as
+// EVO-IO-01). The retired lock protocol's own guard (`assertOwned`) named in the
+// old comment is gone with it; what remains is the counter that loses an update
+// if the RMW is not atomic.
 it('nodeEvolutionIo.transact runs read-modify-write atomically under one lock', async () => {
   const root = await tempRoot('dsh-io-transact-')
   const io = nodeEvolutionIo()
@@ -127,7 +62,6 @@ it('nodeEvolutionIo.transact runs read-modify-write atomically under one lock', 
     return JSON.stringify(value + 1)
   })))
   expect(await readFile(target, 'utf8')).toBe('8')
-  expect((await io.readText(`${target}.lock`))).toBeNull()
 })
 
 it('nodeEvolutionIo.transact deletes the file when task returns null', async () => {
@@ -153,8 +87,6 @@ it('a task failure propagates immediately — it is never lock contention (E-8, 
   // Executed ONCE — the old shape retried the task up to 40 times and ended
   // with the misleading "could not acquire write lock".
   expect(calls).toBe(1)
-  // The lock was released on the failure path.
-  expect(await io.readText(`${target}.lock`)).toBeNull()
 })
 
 it('sweeps stale tmp files of dead writers on the next write (E-8b, 0.3.17)', async () => {
@@ -193,178 +125,6 @@ it('nodeEvolutionIo.list reports ENOENT as empty (P2-4) and isSymlink probes the
   expect(await io.isSymlink?.(join(root, 'missing'))).toBeNull()
 })
 
-it('two peers take over one stale dead lock without double-holding (F-101)', async () => {
-  const root = await tempRoot('dsh-io-dual-takeover-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'dual.json')
-  // A stale lock from a dead pid is the takeover target for TWO peers at once.
-  // The re-read-before-rm guard (F-101) must keep them serialized: each peer
-  // re-reads the lock before deleting it and refuses to delete a lock a peer
-  // has since acquired, so the RMWs never interleave (no double-hold).
-  await writeFile(`${target}.lock`, '999999', 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  const transact = io.transact!
-  await Promise.all(Array.from({ length: 2 }, () => transact(target, async (current) => {
-    const value = JSON.parse(current ?? '0') as number
-    return JSON.stringify(value + 1)
-  })))
-  expect(await readFile(target, 'utf8')).toBe('2')
-  expect((await io.readText(`${target}.lock`))).toBeNull()
-})
-
-it('self-heals a leftover lock carrying this process pid (F-367)', async () => {
-  const root = await tempRoot('dsh-io-selfheal-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'self.json')
-  const lock = `${target}.lock`
-  // A leftover lock naming OUR pid, whose failed release was recorded in
-  // pendingSelfCleanup (with the body TOKEN — V8-05), is stale by definition —
-  // the next write recycles it when the current body still matches.
-  // (V4-05: without the pendingSelfCleanup registration an old same-pid lock
-  // is treated as a live in-process task and deliberately NOT recycled.)
-  pendingSelfCleanup.set(lock, String(process.pid))
-  await writeFile(lock, String(process.pid), 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(lock, old, old)
-  try {
-    await io.writeText(target, 'fresh')
-    expect(await readFile(target, 'utf8')).toBe('fresh')
-    expect(await io.readText(lock)).toBeNull()
-  } finally {
-    pendingSelfCleanup.delete(lock)
-  }
-})
-
-it('V8-05: a stale pendingSelfCleanup entry never removes a NEW same-pid lock (0.3.46)', async () => {
-  const root = await tempRoot('dsh-io-v805-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'v805.json')
-  const lock = `${target}.lock`
-  // The stale-entry hazard: a registered leftover was externally removed, and
-  // another same-process writer created a FRESH lock at the path. The old
-  // implementation compared two live reads and recycled it; V8-05 compares
-  // the CURRENT body against the REGISTERED TOKEN from the failed release.
-  pendingSelfCleanup.set(lock, 'old-token-body')
-  await writeFile(lock, `${process.pid}:fresh-claim`, 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(lock, old, old)
-  try {
-    await expect(io.writeText(target, 'x')).rejects.toThrow()
-    // The fresh lock survived — fail-loud instead of double-hold.
-    expect(await io.readText(lock)).toBe(`${process.pid}:fresh-claim`)
-  } finally {
-    pendingSelfCleanup.delete(lock)
-  }
-}, 60_000)
-
-it('does not steal a same-pid lock held by a long-running task (V4-05)', async () => {
-  const root = await tempRoot('dsh-io-live-samepid-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'live.json')
-  const transact = io.transact!
-  // The first RMW acquires the lock and holds it well past the 1s takeover
-  // threshold — a genuinely in-flight same-process task.
-  const first = transact(target, async () => {
-    await new Promise(resolve => setTimeout(resolve, 1400))
-    return 'v1'
-  })
-  // Ensure the first task owns the lock before the second writer starts.
-  await new Promise(resolve => setTimeout(resolve, 60))
-  // The second writer starts while the first is still holding. An mtime>1s
-  // same-pid steal would rm the live lock and DOUBLE-EXECUTE (both think they
-  // hold it, one increment is dropped). The fix waits instead: after the first
-  // releases, the second reads its committed value and appends.
-  const second = transact(target, async current => `${current ?? ''}|v2`)
-  await Promise.all([first, second])
-  expect(await readFile(target, 'utf8')).toBe('v1|v2')
-  expect((await io.readText(`${target}.lock`))).toBeNull()
-})
-
-it('takeover claims a stale dead lock atomically and leaves no residue (V4-04)', async () => {
-  const root = await tempRoot('dsh-io-atomic-takeover-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'atomic.json')
-  await writeFile(`${target}.lock`, '999999', 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  // Six peers contend for one stale dead lock. The atomic rename takeover must
-  // leave exactly one live claim (no double-hold) and no `.takeover-*` residue.
-  const transact = io.transact!
-  await Promise.all(Array.from({ length: 6 }, () => transact(target, async (current) => {
-    const value = JSON.parse(current ?? '0') as number
-    return JSON.stringify(value + 1)
-  })))
-  expect(await readFile(target, 'utf8')).toBe('6')
-  expect(await io.readText(`${target}.lock`)).toBeNull()
-  const entries = await readdir(root)
-  expect(entries.filter(e => e.startsWith('atomic.json.takeover-'))).toEqual([])
-  expect(entries.filter(e => e.endsWith('.lock'))).toEqual([])
-  expect(entries).toEqual(['atomic.json'])
-})
-
-it('ticket takeover survives 32-way contention on one dead lock — no lost RMW (V4-04 follow-up)', async () => {
-  const root = await tempRoot('dsh-io-ticket-takeover-')
-  // 240 attempts (~12s): under full-suite load the 32-way burst legitimately
-  // exceeds the default ~2s budget; fail-loud only past a real stall.
-  const io = nodeEvolutionIo(240)
-  const target = join(root, 'ticket.json')
-  await writeFile(`${target}.lock`, '999999', 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  // 32 peers contend for one stale dead lock. Before the ticket protocol the
-  // probe→rename TOCTOU let multiple peers claim each other's mid-creation
-  // locks (cascade double-hold: 32-way lost ~1-4 of 32 RMWs, 8-way 25%).
-  // The ticket (`<lock>.next`, O_EXCL) makes the dead-lock removal single-
-  // owner, so every claim is won by exactly one peer via the fair create.
-  const transact = io.transact!
-  await Promise.all(Array.from({ length: 32 }, () => transact(target, async (current) => {
-    const value = JSON.parse(current ?? '0') as number
-    return JSON.stringify(value + 1)
-  })))
-  expect(await readFile(target, 'utf8')).toBe('32')
-  expect(await io.readText(`${target}.lock`)).toBeNull()
-  const entries = await readdir(root)
-  expect(entries.filter(e => e.startsWith('ticket.json.takeover-'))).toEqual([])
-  expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
-  expect(entries).toEqual(['ticket.json'])
-  // 32 serialized acquisitions take ~3-5s nominal; a loaded full-suite run
-  // crossed the default 5s cap (0.3.28 follow-up gate) — explicit budget.
-}, 15_000)
-
-it('V27 G0.2 (EVO-IO-01): an EMPTY stale lock is taken over without admitting a second holder', async () => {
-  const root = await tempRoot('dsh-io-emptylock-takeover-')
-  const io = nodeEvolutionIo(240)
-  const target = join(root, 'empty-takeover.json')
-  // The shape the audit flagged: a creator that died (or was stalled between
-  // `open('wx')` and the body write) leaves a 0-byte lock. It is the one body
-  // nothing can attribute to a live holder, so the takeover judges it by age —
-  // and the removal race it opens is what let two holders into the critical
-  // section (observed as 30/32 and 31/32 increments under load).
-  await writeFile(`${target}.lock`, '', 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  const warnings: string[] = []
-  const originalWarn = console.warn
-  console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(' ')) }
-  try {
-    const transact = io.transact!
-    await Promise.all(Array.from({ length: 32 }, () => transact(target, async (current) => {
-      const value = JSON.parse(current ?? '0') as number
-      return JSON.stringify(value + 1)
-    })))
-  } finally {
-    console.warn = originalWarn
-  }
-  // No RMW lost: taking over an unattributable lock may not admit a second
-  // holder — a claim that lost its name is retried, never executed.
-  expect(await readFile(target, 'utf8')).toBe('32')
-  const entries = await readdir(root)
-  expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
-  // Takeovers are observable, naming the branch that fired and the body judged.
-  expect(warnings.some(line => line.includes('taking over write lock') && line.includes('branch=staleEmpty'))).toBe(true)
-}, 15_000)
-
 it('V27 G1.4: the quarantine sweep covers every historical copy shape and spares user files', async () => {
   const root = await tempRoot('dsh-io-corrupt-sweep-')
   const io = nodeEvolutionIo()
@@ -389,42 +149,6 @@ it('V27 G1.4: the quarantine sweep covers every historical copy shape and spares
   for (const name of shapes) expect(left).not.toContain(name)
   expect(left).toContain('overview.md.corrupt-backup.md')
   expect(left).toContain('state.json')
-})
-
-it('V27 G1.1: decideTakeover is the exhaustive decision table (branch x holder state x boundary)', () => {
-  const alive = (pid: number) => pid === 42
-  const probe = (body: string, ageMs: number, now = 100_000): Parameters<typeof decideTakeover>[0] =>
-    ({ body, mtimeMs: now - ageMs, nowMs: now, alive })
-  // Fresh locks of every shape are left alone.
-  expect(decideTakeover(probe('42:abc', 0))).toBe('none')
-  expect(decideTakeover(probe('999:abc', 0))).toBe('none')
-  expect(decideTakeover(probe('', 0))).toBe('none')
-  expect(decideTakeover(probe('torn', 0))).toBe('none')
-  // A LIVE holder is not stolen while the lock is plausibly held (well under
-  // the alive window).
-  expect(decideTakeover(probe('42:abc', 10 * 3_600_000))).toBe('none')
-  // A2 (audit P1-2): an ALIVE holder is STILL reclaimed past the alive window —
-  // liveness-by-pid cannot tell the original holder from a recycled pid, and a
-  // day-old "live" lock is a recycled pid, not a live writer.
-  expect(decideTakeover(probe('42:abc', ALIVE_LOCK_TAKEOVER_MS))).toBe('none')
-  expect(decideTakeover(probe('42:abc', ALIVE_LOCK_TAKEOVER_MS + 1))).toBe('dead')
-  expect(decideTakeover({ ...probe('42:abc', 10 * 3_600_000), aliveAfterMs: 3_600_000 })).toBe('dead')
-  // A dead named holder is reclaimed only past the dead window (boundary is
-  // strict: age == threshold still waits).
-  expect(decideTakeover(probe('999:abc', DEAD_LOCK_TAKEOVER_MS))).toBe('none')
-  expect(decideTakeover(probe('999:abc', DEAD_LOCK_TAKEOVER_MS + 1))).toBe('dead')
-  // Bare-pid bodies (legacy/hand-written) follow the same rule.
-  expect(decideTakeover(probe('999', DEAD_LOCK_TAKEOVER_MS + 1))).toBe('dead')
-  // An empty body needs the WIDE window (nothing can attribute it to a holder).
-  expect(decideTakeover(probe('', DEAD_LOCK_TAKEOVER_MS + 1))).toBe('none')
-  expect(decideTakeover(probe('', EMPTY_LOCK_TAKEOVER_MS))).toBe('none')
-  expect(decideTakeover(probe('', EMPTY_LOCK_TAKEOVER_MS + 1))).toBe('empty')
-  // A torn body needs the 1h tear window.
-  expect(decideTakeover(probe('torn', 60_000))).toBe('none')
-  expect(decideTakeover(probe('torn', LOCK_TEAR_TAKEOVER_MS + 1))).toBe('corrupt')
-  // Overrides are honoured (the thresholds are injectable for tests/other media).
-  expect(decideTakeover(probe('', 5_000, 100_000))).toBe('none')
-  expect(decideTakeover({ ...probe('', 5_000, 100_000), emptyAfterMs: 1_000 })).toBe('empty')
 })
 
 it('renameWithRetry recovers from a transient EPERM and still commits (F-366)', async () => {
@@ -489,62 +213,6 @@ it('sweeps this process own tmp immediately regardless of age (F-366)', async ()
   expect(await readFile(target, 'utf8')).toBe('fresh')
 })
 
-it('self-heals a 0-byte lock left by a crashed creator (V6-04, 0.3.35)', async () => {
-  const root = await tempRoot('dsh-io-emptylock-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'empty-lock.json')
-  // A creator that died between open and write leaves a 0-byte lock whose body
-  // never passes the pid probe — without the self-heal every future writer
-  // fails loud after the retry budget, forever.
-  await writeFile(`${target}.lock`, '', 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  await io.writeText(target, 'fresh')
-  expect(await readFile(target, 'utf8')).toBe('fresh')
-  const entries = await readdir(root)
-  expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
-})
-
-it('reclaims a 0-byte takeover ticket older than the takeover threshold (V6-04, 0.3.35)', async () => {
-  const root = await tempRoot('dsh-io-emptyticket-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'empty-ticket.json')
-  await writeFile(`${target}.lock`, '999999', 'utf8')
-  await writeFile(`${target}.lock.next`, '', 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock`, old, old)
-  await utimes(`${target}.lock.next`, old, old)
-  await io.writeText(target, 'fresh')
-  expect(await readFile(target, 'utf8')).toBe('fresh')
-  const entries = await readdir(root)
-  expect(entries.filter(e => e.endsWith('.lock') || e.endsWith('.next'))).toEqual([])
-})
-
-it('sweeps a stale `.lock.next` ticket left by a crashed takeover (V6-18, 0.3.35)', async () => {
-  const root = await tempRoot('dsh-io-ticketsweep-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'ticket-sweep.json')
-  // No lock present: the write acquires on the first attempt, so nothing in
-  // the contention path ever sees the ticket — only the sweep can clean it.
-  await writeFile(`${target}.lock.next`, '999999', 'utf8')
-  const old = new Date(Date.now() - 60_000)
-  await utimes(`${target}.lock.next`, old, old)
-  await io.writeText(target, 'fresh')
-  expect(await readFile(target, 'utf8')).toBe('fresh')
-  expect(await io.readText(`${target}.lock.next`)).toBeNull()
-})
-
-it('keeps a fresh live-pid ticket in the sweep (V6-18, 0.3.35)', async () => {
-  const root = await tempRoot('dsh-io-ticketkeep-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'ticket-keep.json')
-  // A peer's in-flight takeover: a fresh ticket naming a LIVE pid is not a
-  // crash artifact, so the sweep must leave it alone.
-  await writeFile(`${target}.lock.next`, String(spawnLivePid()), 'utf8')
-  await io.writeText(target, 'fresh')
-  expect(await io.readText(`${target}.lock.next`)).not.toBeNull()
-})
-
 it('V5-03: a byte-identical transact does not touch the file mtime (direct regression, 0.3.29)', async () => {
   const root = await tempRoot('dsh-io-noop-mtime-')
   const io = nodeEvolutionIo()
@@ -595,39 +263,6 @@ it('V10-06 (P1-1): a durable writeText still sweeps stale tmps and leaves no res
   expect(await io.readText(stale)).toBeNull()
   expect(await readdir(root)).toEqual(['durable.txt'])
 })
-
-it('V10-07 (P2-1): a torn lock body is refused while fresh, then taken over past the 1h threshold (warned once)', async () => {
-  const root = await tempRoot('dsh-io-tornlock-')
-  const io = nodeEvolutionIo()
-  const target = join(root, 'torn.json')
-  // A torn body: non-empty, pid prefix unparseable (NaN) — it matched neither
-  // the dead-pid nor the empty-body takeover, so every future writer failed
-  // loud forever (sweepStaleTmps deliberately skips `.lock`).
-  await writeFile(`${target}.lock`, 'ab:cd1234', 'utf8')
-  await expect(io.writeText(target, 'fresh')).rejects.toThrow(/could not acquire write lock/)
-  // Still stuck while the lock is far below the 1h tear threshold.
-  await expect(io.writeText(target, 'fresh')).rejects.toThrow(/could not acquire write lock/)
-  // Age past the 1h threshold: the takeover fires (warned exactly once) and
-  // the write recovers; the lock is released normally afterwards.
-  const warns: string[] = []
-  const originalWarn = console.warn
-  console.warn = (message?: unknown) => { warns.push(String(message)) }
-  try {
-    const torn = new Date(Date.now() - 3_600_000 - 60_000)
-    await utimes(`${target}.lock`, torn, torn)
-    await io.writeText(target, 'fresh')
-    expect(await readFile(target, 'utf8')).toBe('fresh')
-    expect(await io.readText(`${target}.lock`)).toBeNull()
-    expect(warns).toHaveLength(1)
-    // V27 G0.2: takeovers log one structured line naming the branch that fired
-    // (the corrupt-body branch is the torn-lock recovery path).
-    expect(warns.join('\n')).toMatch(/taking over write lock/)
-    expect(warns.join('\n')).toMatch(/branch=staleCorrupt/)
-  } finally {
-    console.warn = originalWarn
-  }
-  // Two ~2s refused-acquisition budgets dominate the runtime.
-}, 20_000)
 
 it('S-10: a `.corrupt` quarantine copy older than 7 days is swept by the next write', async () => {
   const root = await tempRoot('dsh-io-corruptsweep-')
@@ -741,4 +376,27 @@ it('P3-9 (v14): an atomic rewrite preserves a tightened file mode (POSIX)', asyn
   await io.writeText(target, 'second')
   expect((await stat(target)).mode & 0o777).toBe(0o600)
   expect(await readFile(target, 'utf8')).toBe('second')
+})
+
+it('G2 S4: concurrent RMW on ONE path inside this process never loses an update', async () => {
+  const root = await tempRoot('dsh-io-serial-')
+  const io = nodeEvolutionIo()
+  const target = join(root, 'counter.txt')
+  await io.writeText(target, '0')
+  // The surviving concurrency guarantee: one promise chain per path, so twelve readers all see
+  // the previous write. (Cross-process mutual exclusion is the platform provider's job now.)
+  await Promise.all(Array.from({ length: 12 }, () => io.transact(target, async (current) => String(Number(current ?? '0') + 1))))
+  expect(await io.readText(target)).toBe('12')
+})
+
+it('G2 S4: a `*.lock` file is inert data — writes ignore it and it is never swept', async () => {
+  const root = await tempRoot('dsh-io-lockinert-')
+  const io = nodeEvolutionIo()
+  const target = join(root, 'state.json')
+  await writeFile(`${target}.lock`, `${process.pid}:deadbeef`, 'utf8')
+  await io.writeText(target, 'fresh')
+  await io.transact(target, async () => 'next')
+  expect(await io.readText(target)).toBe('next')
+  // It is the user's bytes, not a protocol artifact: writes neither obey nor delete it.
+  expect(await io.readText(`${target}.lock`)).toBe(`${process.pid}:deadbeef`)
 })

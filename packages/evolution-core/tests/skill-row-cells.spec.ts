@@ -87,6 +87,15 @@ describe('one version row as cells (G1)', () => {
   })
 })
 
+it('U-5: shows the recorded hash as a short code whose hover carries the whole value', () => {
+    const cells = versionRowCells(version({ hash: 'abcdef1234567890' }))
+    const hash = cells.title.find(cell => cell.key === 'hash') as { literal?: string; note?: string } | undefined
+    expect(hash?.literal).toBe('abcdef1')
+    expect(hash?.note).toBe('abcdef1234567890')
+    // A row recorded before the field existed still renders: absence is not an error.
+    expect(versionRowCells(version()).title.some(cell => cell.key === 'hash')).toBe(false)
+  })
+
 describe('one skill row as cells (G1)', () => {
   it('puts the name and the size on the title line', () => {
     const cells = skillRowCells(skill())
@@ -132,6 +141,15 @@ describe('the words a cell may not carry (G1)', () => {
     expect(skillStateKey(skill({ protectedBy: 'guard' }))).toBe('state.protected')
     // An unreadable marker outranks both: claiming 'managed' or 'protected' would be a guess.
     expect(skillStateKey(skill({ protectionUnknown: true, protectedBy: 'guard' }))).toBe('state.unknown')
+  })
+
+  it('U-5: a protected row names the guard (the state cell only says that it is held)', () => {
+    const cells = skillRowCells(skill({ protectedBy: 'guard' })).meta
+    const cell = cells.find(candidate => candidate.key === 'protectedBy')
+    expect(cell?.literal).toBe('guard')
+    expect(cell?.note).toBe('guard')
+    // An unprotected row carries no such cell at all — an empty one would read as a fact of its own.
+    expect(skillRowCells(skill()).meta.some(candidate => candidate.key === 'protectedBy')).toBe(false)
   })
 
   it('emits locale keys, never sentences', () => {

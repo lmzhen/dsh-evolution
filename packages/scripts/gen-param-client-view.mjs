@@ -67,6 +67,10 @@ for (const entry of registry.entries) {
     // Display names for `values`, same order; an empty list keeps the raw value as the
     // option text (older registries have no valueLabels at all).
     valueLabels: (entry.valueLabels ?? '').split('|').filter(Boolean),
+    // U-4: the cross-field constraint travels with the field, so the CARD can refuse a violating
+    // pair before a save is attempted. It is declared once in the registry (params.ts) and the Host
+    // write path derives the same check from that same column.
+    atLeast: entry.relation?.atLeast ?? '',
   })
   sections.set(namespace, fields)
 }
@@ -120,6 +124,8 @@ const lines = [
   "export interface ClientParamField {",
   "  id: string",
   "  group: string",
+  "  /** U-4: the sibling id this field may not go below (an empty string when the row declares no relation). */",
+  "  atLeast: string",
   "  /** The registry summary (English), kept for parity with PARAMETERS.md. */",
   "  doc: string",
   "  /** Card label, from the registry UI tail (Chinese). */",
@@ -161,7 +167,10 @@ for (const [namespace, fields] of ordered) {
     const valueLabels = '[' + field.valueLabels.map(single).join(', ') + ']'
     lines.push('      { id: ' + single(field.id) + ', group: ' + single(field.group) + ', doc: ' + single(field.doc) +
       ', label: ' + single(field.label) + ', hint: ' + single(field.hint) + ', control: ' + single(field.control) +
-      ', unit: ' + single(field.unit) + ', values: ' + values + ', valueLabels: ' + valueLabels + ' },')
+      ', unit: ' + single(field.unit) + ', values: ' + values + ', valueLabels: ' + valueLabels +
+      // U-4: the cross-field column is rendered explicitly, like every other key here — a field object
+      // that carries it and a renderer that drops it would be the same silent loss the card exists for.
+      ', atLeast: ' + single(field.atLeast ?? '') + ' },')
   }
   lines.push('    ],')
   lines.push('  },')

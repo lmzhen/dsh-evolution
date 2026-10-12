@@ -1,0 +1,75 @@
+{
+  "$comment": "C6 client exception table (G4 shape). Contract C6 freezes {fieldId, reason, owner}: a field listed here is DELIBERATELY the family own control because the platform offers no piece for it. verify-declarations.mjs derives the expected set from the GENERATED client view (switch/select = no platform piece) and checks both directions, so this file cannot silently drift.",
+  "exceptions": [
+    {
+      "fieldId": "evolution-commands.maintainHandoffOnSettle",
+      "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "minIdleFailOpen",
+      "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "llmReview",
+      "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "skillReviewTrigger",
+      "reason": "select — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "reviewEnabled",
+      "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "reviewMode",
+      "reason": "select — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "reviewWakeInject",
+      "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "addDatePrefix",
+      "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "descriptionStrict",
+      "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "strictCrossSource",
+      "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "citationPolicy",
+      "reason": "select — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "supportFileCharPolicy",
+      "reason": "select — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "skillWriteConfirm",
+      "reason": "select — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
+      "fieldId": "approvalConfirm",
+      "reason": "select — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
+      "owner": "G5"
+    }
+  ]
+}

@@ -29,8 +29,8 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createApprovalApi } from './api.ts'
 import { CLIENT_PARAM_SECTIONS, CLIENT_ROW_SEATS } from './generated-params.ts'
-import { PendingCard, type PendingCardFace } from './PendingCard.ts'
-import { en, message, NS, zh, type MessageKey } from './messages.ts'
+import { PendingCard, confirmModeFrom, type PendingCardFace } from './PendingCard.ts'
+import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
 import { ParamCard, type ParamCardFace } from './ParamCard.ts'
 import { RowConfigCard, type RowConfigFace } from './RowConfigCard.ts'
 import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey, type ClientSeam, type ConfigFormsSeat, type ParamSectionSource } from './seam.ts'
@@ -88,7 +88,7 @@ export function apply(ctx: ClientContext): void {
   // render. `bind` itself does not throw (a missing key falls back to the key name), so
   // the meaningful guard is whether the REGISTRATION above succeeded.
   let bound: ((key: string) => string) | null = null
-  const t = (key: MessageKey): string => {
+  const translate = (key: MessageKey): string => {
     if (!registered) return message(key)
     if (bound === null) {
       try {
@@ -99,15 +99,25 @@ export function apply(ctx: ClientContext): void {
     }
     return bound(key)
   }
+  // G5 C4: the seat's translator takes the values, so filling happens in ONE place — the call
+  // sites used to write `t('changed').replace('{n}', …)` seven times.
+  const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string =>
+    values === undefined ? translate(key) : fill(translate(key), values)
   // G2: the client settings seat, probed LAZILY (see `inject`). Without a seat every card
   // renders the stated empty state and the Plugins page says the same — never a blank card
   // and never a thrown render. The probe must not be captured here: this row may activate
   // BEFORE the settings shell that declares `settings.section` and provides `configForms`,
   // and a captured `undefined` would pin every card to the empty state for the life of the
   // fiber. `sourceFor` reads the probe on each render, when the shell is necessarily active.
+// platform-declaration anchor: the platform’s `configForms` seat (optional; undefined ⇒ the panel renders read-only)
   const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined
   const sources = createSourceCache(probe)
   ctx.effect(() => () => { sources.dispose() }, 'evolution-settings: sources')
+  // U-6 (registry `approvalConfirm`): the pending card reads the approval row's own user layer on
+  // each render and falls back to the shipped default. `getSnapshot` is synchronous BY DESIGN — the
+  // card has no hook compartment, and a value captured once would pin the gate for the fiber's life.
+  const approvalSource = sources.sourceFor('evolution-approval')
+  const confirmMode = (): 'auto' | 'ask' | 'timeout' => confirmModeFrom(approvalSource.getSnapshot().user)
   // T5-11/A66: the platform's own "this service arrived" channel. The lazy probe alone left a card
   // that had already rendered its "no settings surface" state stuck there when the shell mounted
   // LATER (nothing tells React to read again), and the row's subscription was never attached. The
@@ -153,7 +163,7 @@ export function apply(ctx: ClientContext): void {
     yield seam.slots.register({
       name: CARD_SLOT,
       key: PENDING_CARD_KEY,
-      inject: (): PendingCardFace => ({ t, api }),
+      inject: (): PendingCardFace => ({ t, api, confirmMode }),
     }, PendingCard)
   })
 

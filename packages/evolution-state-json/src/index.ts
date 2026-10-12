@@ -8,7 +8,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
+import { isRecord } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
   assertCloneable,
@@ -91,8 +92,8 @@ const pendingArchiveKey = (record: PendingRecord): string =>
  * corrupt map that used to read as "empty" and was silently overwritten by
  * the next save. Only these four files are record maps; the archive sidecar
  * is a top-level ARRAY and must NOT be gated by this predicate. */
-const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value)
+// G7.1/A8: the one plain-object predicate lives in core (guards.ts); this keeps the local name.
+const isPlainRecord = isRecord
 
 const RECORD_MAP_FILES = new Set([REVIEW_STATE_FILE, CURATOR_STATE_FILE, PENDING_STATE_FILE, PENDING_LEGACY_FILE])
 
@@ -455,7 +456,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   if (rawConfig.root !== undefined && rawConfig.root.trim() !== '' && !isAbsolute(rawConfig.root)) {
     ctx.logger.warn(`evolution-state-json: config.root "${rawConfig.root}" is a relative path and resolves against the process CWD ("${root}") — pass an absolute path to make the store location launch-independent`)
   }
-  const io = () => ctx.evolutionIo.provider()
+  // G2 S3 migration: prefer the platform backend when the deployment mounts one (this consumer is
+  // write-heavy, so the CAS-backed transact matters here), else the default backend.
+  const io = () => preferProvider(ctx.evolutionIo, ['fs'])
   const pathOf = (file: string) => join(root, file)
   // N12/O-6 (S4.4): this PROVIDER INSTANCE owns the quarantine bookkeeping (warn-once sets and the
   // last `.corrupt` rewrite key). It used to be module scope, which the file itself documented as

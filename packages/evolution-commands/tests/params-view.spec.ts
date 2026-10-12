@@ -48,6 +48,25 @@ describe('params view (G4/S4.1)', () => {
     expect(paramSurfaceRows(new Map()).every(row => row.source === 'unregistered')).toBe(true)
   })
 
+  it('F-1: without a settings provider the source column says UNKNOWN, not「不可改」', () => {
+    const rows = paramSurfaceRows(new Map())
+    const e3 = rows.find(row => row.tier === 'E3')!
+    // Named, not just shaped: the first E3 row is a fact about the registry's ORDER, so a new row
+    // above it would silently re-point this case (independent review P2-9).
+    expect(e3.id).toBe('reviewSkillInterval')
+    const withoutProvider = renderParamRows(rows, { providerMounted: false })
+    const line = withoutProvider.split(String.fromCharCode(10)).find(candidate => candidate.startsWith(e3.id))!
+    // The legend and the footer promise that 「不可改」 is a fact about the OWNER publishing no
+    // settings namespace. With no provider at all, writability is UNKNOWN — the column used to
+    // contradict the same output's own footer.
+    expect(line).toContain('未知')
+    expect(line).not.toContain('不可改')
+    // With a provider, the owner-level fact still reads as before (the fix must not erase it).
+    const withProvider = renderParamRows(rows, { providerMounted: true })
+    const same = withProvider.split(String.fromCharCode(10)).find(candidate => candidate.startsWith(e3.id))!
+    expect(same).toContain('不可改')
+  })
+
   it('renders one line per row plus the counts, JSON for scripts', () => {
     const rows = paramSurfaceRows(new Map([[REVIEW_NS, { user: { reviewSkillInterval: 30 }, value: { reviewSkillInterval: 30 } }]]))
     const text = renderParamRows(rows, { providerMounted: true })

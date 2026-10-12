@@ -270,20 +270,21 @@ describe('V15 write-boundary closures', () => {
 })
 
 describe('V17 lock-probe and lock-sweep precision', () => {
-  it('P3 (v17): a writer-shaped lock in a support dir refuses the archive', async () => {
+  it('G2 S4: a `pid:token` file in a support dir is user content too and does NOT block the archive', async () => {
     const io = fakeIo()
     const lib = new SkillLibrary('/skills', io)
     await lib.create('boundary-skill', SKILL, 'foreground')
     await lib.writeSupportFile('boundary-skill', 'references/note.md', '# note')
-    // A writer lock for the support file (pid:token body — the io layer's shape).
+    // The body shape that used to mark a writer lock now means nothing: the protocol is retired, so
+    // the mover no longer probes it and the bytes travel with the tree.
     io.files.set('/skills/boundary-skill/references/note.md.lock', '4242:deadbeef')
     const archived = await lib.archive('boundary-skill')
-    expect(archived.ok).toBe(false)
-    expect(archived.message).toContain('write lock present')
-    expect(await io.exists('/skills/boundary-skill/SKILL.md')).toBe(true)
+    expect(archived.ok).toBe(true)
+    expect(await io.readText('/skills/.archive/boundary-skill/references/note.md.lock')).toBe('4242:deadbeef')
+    expect(await io.exists('/skills/boundary-skill/SKILL.md')).toBe(false)
   })
 
-  it('P2 (v17): a user support file named *.lock does NOT block archiving (body-shape probe)', async () => {
+  it('a user support file named *.lock does NOT block archiving (S4: body shape is irrelevant now)', async () => {
     const io = fakeIo()
     const lib = new SkillLibrary('/skills', io)
     await lib.create('boundary-skill', SKILL, 'foreground')
@@ -295,44 +296,45 @@ describe('V17 lock-probe and lock-sweep precision', () => {
     expect(await io.readText('/skills/.archive/boundary-skill/references/timer.lock')).toBe('MY TIMER STATE v3')
   })
 
-  it('P2 (v17): write_file refuses the reserved .lock suffix', async () => {
+  it('G2 S4: a support file named *.lock is a user file again (the writer-lock protocol is retired)', async () => {
     const io = fakeIo()
     const lib = new SkillLibrary('/skills', io)
     await lib.create('boundary-skill', SKILL, 'foreground')
     const result = await lib.writeSupportFile('boundary-skill', 'references/timer.lock', 'state')
-    expect(result.ok).toBe(false)
-    expect(result.message).toContain('.lock suffix is reserved')
-    expect(await io.exists('/skills/boundary-skill/references/timer.lock')).toBe(false)
+    // The suffix used to be refused because a user file was indistinguishable from the io writer
+    // lock for the archive/restore probes. Writes now go through the provider's versioned writes, so
+    // there is no lock file to confuse it with — and the name is the user's to use.
+    expect(result.ok).toBe(true)
+    expect(await io.readText('/skills/boundary-skill/references/timer.lock')).toBe('state')
   })
 
-  it('P3 (v17): restore sweeps a stranded writer lock but keeps user files', async () => {
+  it('G2 S4: restore keeps every *.lock file (there is no sweep any more)', async () => {
     const io = fakeIo()
     const lib = new SkillLibrary('/skills', io)
     await lib.create('boundary-skill', SKILL, 'foreground')
     await lib.writeSupportFile('boundary-skill', 'references/note.md', '# note')
-    // Simulate a stranded writer lock that rode into .archive (a crash or the
-    // archive-probe TOCTOU — lib.archive itself would now refuse a live lock).
+    // A lock-shaped file that rode into .archive (a crash, or a tree archived before S4).
     await io.copy('/skills/boundary-skill', '/skills/.archive/boundary-skill')
     await io.remove('/skills/boundary-skill')
-    // The stranded writer lock rides in the archived entry (body pid:token).
+    // It is ordinary content now.
     io.files.set('/skills/.archive/boundary-skill/references/note.md.lock', deadLockBody())
     expect(await io.exists('/skills/.archive/boundary-skill/SKILL.md')).toBe(true)
     expect(await io.exists('/skills/.archive/boundary-skill/references/note.md.lock')).toBe(true)
     const restored = await lib.restoreFromArchive('boundary-skill')
     expect(restored.ok).toBe(true)
-    // The stranded lock is swept; the real support file survives.
-    expect(await io.exists('/skills/boundary-skill/references/note.md.lock')).toBe(false)
+    // It is restored with the tree instead of being swept; the real support file survives too.
+    expect(await io.exists('/skills/boundary-skill/references/note.md.lock')).toBe(true)
     expect(await io.readText('/skills/boundary-skill/references/note.md')).toBe('# note')
   })
 
-  it('P3 (v17): marker writer locks (.pinned.lock) refuse the archive too', async () => {
+  it('G2 S4: a marker-shaped `*.lock` does not refuse the archive either', async () => {
     const io = fakeIo()
     const lib = new SkillLibrary('/skills', io)
     await lib.create('boundary-skill', SKILL, 'foreground')
     io.files.set('/skills/boundary-skill/.pinned.lock', '4242:deadbeef')
     const archived = await lib.archive('boundary-skill')
-    expect(archived.ok).toBe(false)
-    expect(archived.message).toContain('write lock present')
+    expect(archived.ok).toBe(true)
+    expect(await io.readText('/skills/.archive/boundary-skill/.pinned.lock')).toBe('4242:deadbeef')
   })
 
   it('P2 (v17): create refuses atomically when the skill appears at commit time', async () => {

@@ -8,6 +8,7 @@
  * recommendation is right — only whether it is well-formed and traceable.
  */
 
+import { isRecord } from '@deepseek-ai/dsh-evolution-core'
 import { findDriftSignal, MAINTAIN_PROMPT, type DriftReport, type DriftSignal } from '@deepseek-ai/dsh-evolution-core'
 
 /**
@@ -70,9 +71,6 @@ const KINDS: ReadonlySet<string> = new Set(['skill-level', 'relationship-level',
 const REVERSIBILITIES: ReadonlySet<string> = new Set(['archive', 'restructure', 'patch', 'rename', 'none'])
 const IMPACTS: ReadonlySet<string> = new Set(['better', 'worse', 'neutral'])
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 function str(value: unknown, fallback: string): string {
   return isNonEmptyString(value) ? value : fallback

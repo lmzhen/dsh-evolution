@@ -11,6 +11,8 @@
  * @module @deepseek-ai/dsh-evolution-commands/platform-view
  */
 
+import { isRecord } from '@deepseek-ai/dsh-evolution-core'
+
 /** One installed bundle as the platform reports it (the fields the doctor reads). */
 export interface PlatformBundle {
   /** Package name. */
@@ -129,7 +131,8 @@ async function objectOf<T>(read: (() => unknown) | undefined): Promise<T | undef
   if (read === undefined) return undefined
   try {
     const value = await read()
-    return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as T : undefined
+    // G7.1/A8: the ONE plain-object predicate lives in core (guards.ts); the T cast stays here.
+    return isRecord(value) ? value as T : undefined
   } catch {
     return undefined
   }
@@ -141,6 +144,7 @@ async function objectOf<T>(read: (() => unknown) | undefined): Promise<T | undef
  * @returns the view; each member is undefined when its surface is not mounted or did not answer.
  */
 export async function readPlatformView(ctx: { get(name: string): unknown }): Promise<PlatformView> {
+// platform-declaration anchor: the platform’s `pluginManager`, `configEditor` and `pluginInventory` services (all optional; undefined ⇒ the view reports it as missing)
   const manager = ctx.get('pluginManager') as ManagerLike | undefined
   const editor = ctx.get('configEditor') as EditorLike | undefined
   const inventory = ctx.get('pluginInventory') as InventoryLike | undefined

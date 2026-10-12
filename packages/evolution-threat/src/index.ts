@@ -3,6 +3,7 @@
  * @module @deepseek-ai/dsh-evolution-threat
  */
 
+import { asRecord } from '@deepseek-ai/dsh-evolution-core'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { DEFAULT_THREAT_MAX_SCAN_CHARS, EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
@@ -36,9 +37,6 @@ export const Config: z<Config> = z.object({
   threatExemptLabels: z.array(z.string()).default([]),
 })
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-}
 
 /** Scan one tool invocation for threat-shaped payload text. Exported so the
  * guard contract is testable directly (0.3.17). `options.excludeLabels` carries

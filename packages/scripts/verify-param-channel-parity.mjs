@@ -78,16 +78,7 @@ const SCHEMA_ANCHOR = /(?:export const Config|static Config)\b[^\n]*= z\.object\
  * @param text - the source text.
  * @returns the same text without comments.
  */
-function stripComments(text) {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .split('\n')
-    .map(line => {
-      const at = line.indexOf('//')
-      return at < 0 || line.slice(0, at).endsWith(':') ? line : line.slice(0, at)
-    })
-    .join('\n')
-}
+import { stripComments } from './lib-source-text.mjs'
 
 /**
  * The keys a schemastery `z.object({ … })` block declares (unquoted identifiers).

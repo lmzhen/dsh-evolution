@@ -1,0 +1,15 @@
+{
+  "$comment": "C1 line policy (G1.1): which LINE the bed may resolve each package from. Any other combination is a platform line mismatch. Machine-state kinds are allowed but must be declared here.",
+  "allowedKinds": ["evo-src", "upstream", "closure", "mono", "store", "profile-hoist"],
+  "familyKinds": ["evo-src"],
+  "machineStateKinds": ["profile-hoist", "closure", "mono"],
+  "familyRoots": ["D:/dsh/deepseek-harness/packages/evolution", "D:/dsh/dsh-evolution-mirror"],
+  "profileHoist": {
+    "@deepseek-ai/schemastery": { "status": "declared", "reason": "closure pins 3.18.2 whose .volatile() is types-only; the profile hoist (3.18.4) is what the family’s volatile tests exercise" },
+    "@deepseek-ai/dsh-tool-session-query": { "status": "necessary", "reason": "only present in the profile; the closure does not ship it" }
+  },
+  "removedHoists": {
+    "@deepseek-ai/cosmokit": "2026-10-11: was hoisted implicitly and SHADOWED the closure's copy (machine-state skew). Not declared ⇒ no longer hoisted; the bed now takes the closure's cosmokit.",
+    "@deepseek-ai/dsh-brand": "2026-10-11: same class as cosmokit — implicit hoist, closure ships it. Removed from the hoist set."
+  }
+}

@@ -37,12 +37,12 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | Package | Role |
 |---|---|
 | `evolution-core` | Shared pure stores/prompts/signals/constants plus the skill content history (`skill-history.ts`), the two named similarity questions (`quality.ts`) and the session-frame classification (`evidence.ts`); no main Cordis plugin entry (importing the package root is the only entry) |
-| `evolution-io` / `evolution-io-node` | File-tree IO seam registry + atomic node:fs provider |
+| `evolution-io` / `evolution-io-node` / `evolution-io-fs` | File-tree IO seam registry + atomic node:fs provider + the ctx.fs (platform) provider |
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
 | `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
 | `evolution-policy` | Immutable policy snapshot + native `tools.guard` denials |
 | `evolution-plan-validator` | Deterministic validation for model-produced plans |
-| `evolution-state-storage` / `-domain` / `-json` / `evolution-state` | State seam: provider registry, storage-domain KV, JSON fallback, consumer |
+| `evolution-state-storage` / `evolution-state-domain` / `evolution-state-json` / `evolution-state` | State seam: provider registry, storage-domain KV, JSON fallback, consumer |
 | `evolution-approval` | Hermes-style staged/pending writes over `evolutionState` |
 | `evolution-threat` | `tools.guard` content threat guard |
 | `evolution-review` | Signal gate → end-of-conversation review (`reviewMode: 'inject'` default since 0.3.74; opt-in one-shot subagent) → validated plan execution |
@@ -119,7 +119,7 @@ the install forms that mount it, and the prose that belongs to a single form
 sit outside the `- insert:` list). `node packages/scripts/gen-bundle-patches.mjs
 packages` renders the patches, so moving a row between install forms is a one-field
 edit instead of a synchronized edit of two or three files.
-`verify-bundle-rows.mjs` (gate step 11) runs that generator with `--check`, which is
+`verify-bundle-rows.mjs` runs that generator with `--check`, which is
 what makes a hand-edited patch fail the gate; the three-way byte comparison in
 `evolution-host/tests/bundle-mutual-exclusion.spec.ts` stays as the independent
 cross-check of the emitted files.

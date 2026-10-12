@@ -14,6 +14,9 @@ import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, 
 export const name = 'tool-memory'
 
 /** Max characters of each echoed memory entry (single source for the Config default and the runtime slice). */
+/** G2.4/C3: the give-up bound of the snapshot retry — a NAMED ceiling, not a literal in the call. */
+const SNAPSHOT_RETRY_GIVE_UP_MS = 60_000
+
 const DEFAULT_ENTRY_PREVIEW_CHARS = 200
 
 
@@ -222,7 +225,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
       // already unref'd; the interval was the one holding the loop.
       retryTimer.unref()
       ctx.effect(() => () => { clearInterval(retryTimer) }, 'tool-memory.snapshot-retry')
-      setTimeout(() => { clearInterval(retryTimer) }, 60_000).unref()
+      setTimeout(() => { clearInterval(retryTimer) }, SNAPSHOT_RETRY_GIVE_UP_MS).unref()
     }
   } else if (!memoryDisabled) {
     ctx.logger.warn('tool-memory: systemPrompt service not mounted; memory guidance and snapshot are not injected (the write tool still works)')

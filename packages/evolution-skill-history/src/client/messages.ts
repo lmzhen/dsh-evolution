@@ -83,7 +83,7 @@ export const zh: Record<string, string> = {
   'time.years': '{n} 年前',
   'time.years.one': '1 年前',
   error: '读取失败',
-  'error.hint': '面板读不到宿主路由：通常是插件版本与宿主不匹配，重启 dsh web 后重试。',
+  'error.hint': '面板读不到宿主路由：通常是插件版本与宿主不匹配。请重启 DeepSeek Harness 后重试；仍不行就在对话里说明。',
 }
 
 /** English dictionary: the same keys, or the panel falls back to the key itself. */
@@ -159,7 +159,7 @@ export const en: Record<string, string> = {
   'time.years': '{n} years ago',
   'time.years.one': '1 year ago',
   error: 'Could not load',
-  'error.hint': 'The panel could not reach the host routes — usually a plugin/host version mismatch; restart dsh web and retry.',
+  'error.hint': 'The panel could not reach the host routes — usually a plugin/host version mismatch. Restart DeepSeek Harness and retry; if it persists, ask in the conversation.',
 }
 
 /**
@@ -169,7 +169,9 @@ export const en: Record<string, string> = {
  * @returns the copy, or the key itself when neither dictionary carries it.
  */
 export function message(language: 'zh' | 'en', key: string): string {
-  const dictionary = language === 'en' ? en : zh
+  // G5: the fallback is the PLATFORM's FALLBACK_LOCALE (`DEFAULT_CASES`/`en` in dsh-client-locale),
+  // not Chinese: an unknown or absent locale must read English, like every other platform surface.
+  const dictionary = language === 'zh' ? zh : en
   return dictionary[key] ?? key
 }
 

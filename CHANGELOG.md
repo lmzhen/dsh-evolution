@@ -1,6 +1,20 @@
 # Changelog
 
 
+## 0.23.0 (minor) — 审计 v46 批次：把「面—声明—清单—门禁」四层里剩下的**漂移面**逐条收口（含一条新的批准前确认门）
+
+> **由来**：30 号全量审计（00–08 面）＋ 31 号六角色评审指出的失效面，本批按「先读文档 → 定性（不变式 I-1..I-5／失效模式 M1–M5）→ 读全部相关代码与引用 → 详细设计 → 才动代码」逐条落地，共 **87 个文件、+1668/−2427 行**（净减代码）。
+> **G1 反馈环路与线身份**：门禁分级（`green=23` 的本地套件与 CI 的 33 条接线同源）＋ **两条元门禁**——`verify-arming`（空目录 ⇒ exit 1，"a vacuum pass is not a pass"）与 `verify-line-identity`（床不对 ⇒ **第一条错误**即 `platform line mismatch`）＋ 四条同类门禁补上**真空断言**（`scanned=0` 不再算通过）。
+> **G2 介质与端口**：`evolution-io-node` 由**默认**退为**显式降级**（平台 `FileSystem` 缺 `remove/rename/copy` 时的落点，33 号 P-3 的删除条件已书面化）；家族**自建锁协议整体删除**（`io.ts` 1148 → 571 行），并发交给平台的版本化写＋进程内串行，两条语义在 docblock 里写明"进程内 FIFO **不是**跨进程保证"。
+> **G4 声明管线**：注册表新增**第五段可选列** `relation`（跨字段下限），一条声明同时喂给三处——文档生成物、**客户端卡片视图**（保存前给字典句）、**Host 写路径**（违规回新码 **E-322**，且"什么都没写"）；`verify-param-registry` 的声明语法随之扩展，`param-registry.spec.ts` 改为 **import 生成器用的那一个解析器**（不再自抄镜像）。
+> **G5 客户端合同与一致性**：U-3 装饰只在有信息时渲染；U-4 约束前置（含跨字段）；U-5 三条决策信息上屏；U-6 **批准前的确认门**（新参数 `approvalConfirm`，三态 `auto|ask|timeout`，**默认 `auto`＝原地二次点击、不弹窗**，`ask` 时渲染**具名**确认件）；U-7 无障碍基线（`role="status"`／`aria-describedby`）；U-8 术语表＋**新门禁 `verify-client-ui-i18n`**（跨面指令退出 GUI 文案）；U-10 版本与用途摘要由生成器派生。
+> **G6 组合写路径与失败语义**：装机失败语义统一（`halfDone:` 三态断言在册）；写入清单从裸数组升为 `{ symbols, sites }` 信封（**符号图例**让每条路径可审计，N20 的 15 个写站点逐条对应写者）。
+> **G7 重复实现合并**：谓词／原子写／stripComments／只读判据／组合器五条的**份数=1** 各有一条门禁（`verify-predicate-single-source` 等，逐条带"注入缺陷必红"的 drill）；`verify-command-table` 新增**双向**交叉核对（表里的取值型标志 ⇄ 解析器的 `VALUE_FLAGS`，两向各自点名失效模式）。
+> **G8 平台请求**：33 号十条逐条写"现状／临时形态／删除条件"；P-5 的措辞按树**据实更正**（"以 `ctx.fs` 为硬要求" ≠ 现实：默认 node、偏好 fs、缺条静默回落），并把"未接平台 io 要**标未接**"登记为家族内部待办。
+> **验收**（本机实跑读数）：`verify-arch-guards --strict` **39 条 clean**；`verify-doc-facts --strict --require-repo-docs` **11 fact / 0 violation**；本地门禁套件 **green=23 red=0**；四个生成物 `--check` 全 0；错误码表 **E-301…E-322 全登记**、注册表 **102 行 0 待定**；家族车道逐包全绿（core 71 文件/773 格、commands 10/149、客户端 27/112、approval、io 23/23）；家族 A/B **按逐包车道判**（聚合默认并行的红经隔离复跑证实为**负载假红**）。
+> **切 tag 前的独立只读复核**（**一位**只读复核员，prompt 自包含、不带本轮上下文、全程只读并自证未改树；结论 **P0 = 0**）：**P1-1** U-4 的拒绝句在真实渲染路径上必抛 `ReferenceError`（夹具只测了单元层 ⇒ 全绿）⇒ 抽出唯一定义 `controlId` ＋ 补**渲染级**夹具与 drill；**P1-2** 客户端样式引用两个**未声明** token ⇒ 已声明门禁 `verify-client-tokens` 红（而本地 23 件套**不含**它 ⇒ "全绿"是子集口径）⇒ 改用已声明 token；**P1-4** 发布链步骤 `run-load-sensitive` 的 17 条用例名有 14 条随锁协议退休 ⇒ 计数断言必红 ⇒ 清单按"决定"收缩为 3 条。**P2 已关 10 项**（真空断言×4、错误码表头、台账陈旧行、死标志、孤儿 JSDoc、恒真断言、第二份声明交叉核对、单源扫描面声明、两处解析器同源），余 1 项（夹具按"形状"挑样本，手法已记）。
+> **不做**：不为对齐测试床升级全局 dsh；不给 host-only 能力补挂工具；不把窗口化 diff 改成整文 diff；不为缺操作自建第二套路径 API；不续写家族锁接管；不用无 fsync 的原子写做持久写；不重写域逻辑（G3 空号）；**不把"本地没能复现的 CI 口径"说成已验**（本地 lint 口径与 CI 不同源 ⇒ 交 CI 判）；**5 屏验证无截图 ⇒ 一律标注"需截图对照后通过"**；F-5／F-7 的出入口文案与语言统一待用户裁定；G8 是否向上游提 issue 待用户裁定。
+
 ## 0.22.0 (minor) — 面—声明—清单—门禁四层收口：一个 home 一个面、一份清单一张图例、一条命令一次装机
 > **由来**：三条结构病灶同批收口。①**同一语义写 N 遍**：配置活引用 vs 裸值的两形读取在 6 个包里各有写法（`clampOnce`／commands 的模块级 `liveFlag`／memory-files 与 tool-skill-manage 各自的 `typeof === 'object'`／test-support 的第四种），漏一处即**静默失效**（布尔恒假、数值折 NaN），而 37 条 arch-guard 里 `volatile` 零命中。②**清单不能当审计输入**：写入清单四个符号指两个真实根，`events` 条目与代码矛盾且同一文件被第二条声明用另一套符号再写一遍，N20 只核对 `marker` 字面量所以一路绿。③**一个裸函数服务两种语义**：`<home>/profiles` 既是 doctor 的全部 profile汇总面、又是 `/evolution preset install` 的互斥判据面；分家后旧面残留的 `profiles/web` 让**本面拒装**。
 > **G1 读取语义归一**：新增 `evolution-core/src/live.ts`（`LiveValue<T>`／`unwrapLive`（判别 `typeof get === 'function'`，比旧 `typeof value === 'object'` 更准）／`liveNumber/liveBool/liveString/liveEnum`；`clampOnce` 薄适配、旧签名零改动）；6 包 18 处裸读归零。新增门禁 **N38**：配置成员的裸 `.get()` 即红，锚在**接收者** ⇒ 平台服务访问器天然不匹配、**不建例外表**。

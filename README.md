@@ -51,7 +51,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all   # the DEFAULT full bund
 /evolution doctor
 ```
 
-You should see 29 packages installed (the published list is 30; `@lmzhen/dsh-evolution-preset` ships as an agent preset, not as a `node_modules` plugin), and after the restart a doctor report naming your install form and the
+You should see<!-- gen:install-counts --> 31 packages installed (the published list is 32; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the
 rows it found. Verify without asking the model anything:
 
 ```bash
@@ -84,7 +84,7 @@ state onto an empty domain.
 |---|---|
 | Validated DSH platform line | **`0.2.0-rc.2`** (`PLATFORM_VERSION`; the pinned dev baseline is `UPSTREAM_SHA=fb2c4b9e…`) |
 | Declared dependency window | `^0.2.0-rc.1` on every `@deepseek-ai/dsh-*` dependency/peer (`PLATFORM_FLOOR`) |
-| Family version | `0.18.0` (this tree; the npm tag comes from the release tag — per-form status in `packages/INSTALL.md`) |
+| Family version | `0.23.0` (this tree; the npm tag comes from the release tag — per-form status in `packages/INSTALL.md`) |
 | Node | 22.19+ or 24+ (`engines`) |
 
 Two values answer two questions: `PLATFORM_FLOOR` is what the published range declares, `PLATFORM_VERSION` is
@@ -230,15 +230,19 @@ review.
 | `E-304` | the mounted approval service predates the release capability (a skewed/partial upgrade) | `reject` the pending record instead of `release` |
 | `E-305` | the invocation carries no agent (a script/headless caller reached a session-backed branch) | run the command from a session in the GUI or the CLI |
 | `E-307` / `E-311` | the settings service is missing or cannot report its sections (`/evolution params`, `/evolution policy set`) | mount the settings row (ships with host/all), then run doctor |
+| `E-312` | a parameter id or value was rejected, with the reason included | run `/evolution params` to see the canonical ids |
 | `E-308` / `E-313` | unknown parameter group or id | list them: `/evolution params` shows every registered id with its tier and owner |
 | `E-314` / `E-315` / `E-316` | the id is a deployment parameter, has no user layer, or its owner is not mounted | write it in `cordis.yml`, or mount the owner row — the message names tier, owner and namespace |
 | `E-309` / `E-310` | your write lost a revision race, or the settings service refused it (the reason is included) | re-read with `/evolution params` and retry |
 | `E-317` | you declined the confirmation the tool asked before creating or deleting a skill (a foreground create or bare delete asks when `skillWriteConfirm` is `ask` or `timeout`; the default `auto` does not ask at all) | nothing was written; repeat the call if you do want it |
 | `E-318` | a write without a read: the session never loaded that skill, so the write is refused (skills only; the foreground operator session is exempt) | load it with the `skill` tool, then repeat the write |
+| `E-320` | the profile home is not reported by this host, so the legacy settings document cannot be located | run the command in a session whose profile home is set |
+| `E-321` | no evolution-io provider is mounted, so the legacy settings document cannot be read | mount the `evolution-io-node` row |
+| `E-322` | a cross-field parameter constraint would be broken (the field, its floor and the attempted value are included) | raise the value to the named floor, or lower the sibling first |
 | `E-319` | the confirmation before a create or bare delete went unanswered for `skillWriteConfirmTimeoutSeconds` (`skillWriteConfirm: 'timeout'`), so the write was cancelled | set `skillWriteConfirm` to `auto` (write without asking), keep `ask` (wait until answered), or raise the timeout |
 | doctor says `install form: none` | no bundle installed | `dsh plugin --profile web add @lmzhen/dsh-evolution-all` |
 
-Symptom → next step; the exact text of every code (`E-301`–`E-319`) is stored once in
+Symptom → next step; the exact text of every code (`E-301`–`E-322`) is stored once in
 `evolution-core/src/errors.ts` and printed verbatim.
 
 </details>
@@ -260,7 +264,7 @@ The loops stop, your data does not: memory, skills, state, reports and approval 
 | [`packages/INSTALL.md`](./packages/INSTALL.md) | install-form semantics and the per-platform verification matrix |
 | [`packages/README.md`](./packages/README.md) | command reference, package map, environment/knob reference, layout notes |
 | [`CHANGELOG.md`](./CHANGELOG.md) | what changed in each version, with reasons and evidence |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact may live, the 23-step gate, house rules |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact may live, the 45-step gate, house rules |
 
 <details>
 <summary>For maintainers: upstream upgrade checklist</summary>

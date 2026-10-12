@@ -112,10 +112,26 @@ const SOURCE_LABELS: Readonly<Record<string, string>> = Object.freeze({ user: '�
 /** What the E-tiers mean, so the count line reads without the docs. */
 const TIER_LEGEND = '档位：E0 固定／E1 只读／E2 安装时定／E3 你可改／E4 装完固化。'
 
+/**
+ * The source column's word for one row (F-1).
+ *
+ * `unregistered` covers TWO different facts: the owner publishes no settings namespace (the value
+ * really cannot be written — E-315/E-316) and the settings service itself is missing (then whether
+ * the value could be written is UNKNOWN). Without a provider the column must not claim "不可改", or it
+ * contradicts the legend and the footer of the very same output.
+ * @param row - the row's surface facts.
+ * @param providerMounted - whether a settings provider answered.
+ * @returns the label for the source column.
+ */
+function sourceLabel(row: ParamSurfaceRow, providerMounted: boolean): string {
+  const label = SOURCE_LABELS[row.source] ?? row.source
+  return providerMounted || row.source !== 'unregistered' ? label : '未知'
+}
+
 export function renderParamRows(rows: readonly ParamSurfaceRow[], options: { providerMounted: boolean }): string {
   const header = pad('参数', 36) + pad('分组', 12) + pad('档位', 6) + pad('生效', 8) + pad('来源', 10) + '当前值'
   const body = rows.map(row => pad(row.id, 36) + pad(PARAM_GROUP_LABELS[row.group], 12) + pad(row.tier, 6)
-    + pad(APPLIES_LABELS[row.applies] ?? row.applies, 8) + pad(SOURCE_LABELS[row.source] ?? row.source, 10) + renderValue(row.value))
+    + pad(APPLIES_LABELS[row.applies] ?? row.applies, 8) + pad(sourceLabel(row, options.providerMounted), 10) + renderValue(row.value))
   const tiers = ['E0', 'E1', 'E2', 'E3', 'E4']
     .map(tier => `${tier} ${rows.filter(row => row.tier === tier).length}`).join(' / ')
   const userRows = rows.filter(row => row.source === 'user').length

@@ -44,14 +44,10 @@ export const PROJECTION_FAILED: ParamSectionSnapshot = Object.freeze({
   reason: 'projection-failed',
 })
 
-/**
- * Whether a value is a plain section object.
- * @param value - the value to test.
- * @returns true for a non-null, non-array object.
- */
-export function isSection(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
+// G7.1/A8: the predicate is generated from core (guards.ts). Import for this module's own calls AND
+// re-export: `export { x } from` alone binds nothing locally (the round-58 lesson, re-learned here).
+import { isRecord as isSection } from './guards.ts'
+export { isSection }
 
 /**
  * Project one platform snapshot into the card's own shape.
@@ -64,6 +60,9 @@ export function sectionSnapshotOf(snapshot: ConfigFormSnapshotLike): ParamSectio
     value: isSection(snapshot.value) ? snapshot.value : undefined,
     user: snapshot.user,
     writable: snapshot.writable,
+    // U-5: the two facts the reader needs and the projection used to drop.
+    base: isSection(snapshot.base) ? snapshot.base : undefined,
+    mode: snapshot.mode,
     ...snapshot.status === 'unavailable' ? { reason: 'not-served' as const } : {},
   }
 }

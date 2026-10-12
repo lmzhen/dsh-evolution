@@ -19,7 +19,7 @@ import type {
   SkillProviderControl,
   SkillProviderObservation,
 } from '@deepseek-ai/dsh-skill'
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { evolutionIoAdapter, isAbsent, isUnknown, parseFrontmatter, newSkillLibrary, probeList, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
@@ -95,7 +95,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     modelInvocable: rawConfig.modelInvocable ?? true,
     userInvocable: rawConfig.userInvocable ?? true,
   }
-  const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+  // G2 S1 (contract C2): this consumer only reads, so it prefers the platform backend when the
+  // deployment mounts one (evolution-io-fs) and falls back to the default backend otherwise.
+  const io = evolutionIoAdapter(() => preferProvider(ctx.evolutionIo, ['fs']))
   const library = newSkillLibrary({ config: rawConfig, io })
   const included = new Set(rawConfig.includeSkillNames ?? [])
   const excluded = new Set(rawConfig.excludeSkillNames ?? [])

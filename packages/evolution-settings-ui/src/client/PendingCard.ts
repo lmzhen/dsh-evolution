@@ -22,8 +22,26 @@ import {
 
 /** Injected face: the copy seat and the host calls. No hook compartment — this card keeps its own state. */
 export interface PendingCardFace {
-  t: (key: MessageKey) => string
+  t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
   api: ApprovalApi
+  /**
+   * U-6 (registry `approvalConfirm`): read PER RENDER, like the entry's own seat probe — a value
+   * captured once would pin the gate for the life of the fiber. Absent ⇒ the shipped default `auto`.
+   */
+  confirmMode?: () => 'auto' | 'ask' | 'timeout'
+}
+
+
+/**
+ * U-6: the registry's gate word, read out of a section's user layer. ONE definition, exported so the
+ * mapping itself is judgeable: the entry does the wiring, this does the reading. Anything that is not
+ * one of the two explicit words falls back to the shipped default (`auto`) — a document written by a
+ * future version must not silently turn the confirmation ON, and a typo must not turn it off. The
+ * independent review flagged that this reader had no case at all (P2-11).
+ */
+export function confirmModeFrom(user: unknown): 'auto' | 'ask' | 'timeout' {
+  const value = typeof user === 'object' && user !== null ? (user as Record<string, unknown>).approvalConfirm : undefined
+  return value === 'ask' || value === 'timeout' ? value : 'auto'
 }
 
 /** Which word one age bucket gets; an unknown bucket falls back to the count form. */
@@ -49,6 +67,10 @@ const KIND_KEYS: Readonly<Record<PendingRow['kind'], MessageKey>> = Object.freez
  */
 export function PendingCard(props: PendingCardFace): ReactNode {
   const { t, api } = props
+  // U-6: which entry is ARMED for a second click. `auto` (the default) never arms: an approval batch
+  // must not be interrupted by a confirmation nobody asked for (31 号 §U-6 的风险行).
+  const confirmMode = props.confirmMode?.() ?? 'auto'
+  const [armed, setArmed] = useState<string | null>(null)
   const [state, setState] = useState<PendingState>(INITIAL_PENDING_STATE)
   const [open, setOpen] = useState(true)
   // The card reads the LATEST state from a holder rather than through an update function: the ambient
@@ -114,7 +136,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   const age = (row: PendingRow): string => {
     const key = AGE_KEYS[row.age.unit]
     if (key === undefined) return String(row.age.n)
-    return t(key).replace('{n}', String(row.age.n))
+    return t(key, { n: row.age.n })
   }
 
   /** Ask the host what this record would store; the answer lands only if the row is still open. */
@@ -137,12 +159,12 @@ export function PendingCard(props: PendingCardFace): ReactNode {
 
   /** The facts line, then the source view: the same shape the history panel's diff uses. */
   const preview = (view: PreviewView): ReactNode => {
-    if (view.kind === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('approvalPreviewReading'))
-    if (view.kind === 'failed') return createElement('p', { className: 'evolution-param-error' }, view.message)
-    if (view.kind === 'unavailable') return createElement('p', { className: 'evolution-param-error' }, t('approvalPreviewNone') + view.reason)
+    if (view.kind === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalPreviewReading'))
+    if (view.kind === 'failed') return createElement('p', { className: 'evolution-param-error', role: 'status' }, view.message)
+    if (view.kind === 'unavailable') return createElement('p', { className: 'evolution-param-error', role: 'status' }, t('approvalPreviewNone') + view.reason)
     const facts: ReactNode[] = [
-      createElement('span', { className: 'evolution-param-fact', key: 'added' }, t('approvalDiffAdded').replace('{n}', String(view.answer.linesAdded))),
-      createElement('span', { className: 'evolution-param-fact', key: 'removed' }, t('approvalDiffRemoved').replace('{n}', String(view.answer.linesRemoved))),
+      createElement('span', { className: 'evolution-param-fact', key: 'added' }, t('approvalDiffAdded', { n: view.answer.linesAdded })),
+      createElement('span', { className: 'evolution-param-fact', key: 'removed' }, t('approvalDiffRemoved', { n: view.answer.linesRemoved })),
       ...view.answer.truncated ? [createElement('span', { className: 'evolution-param-fact', key: 'cut' }, t('approvalDiffCut'))] : [],
     ]
     const lines: ReactNode[] = []
@@ -174,44 +196,78 @@ export function PendingCard(props: PendingCardFace): ReactNode {
           createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
           createElement('span', { className: 'evolution-param-value' }, entry.summary)),
         createElement('p', { className: 'evolution-param-hint' }, age(entry)),
-        createElement('p', { className: 'evolution-param-note' }, t('approvalExecuting')),
+        createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalExecuting')),
         entry.claimedBy === undefined ? null : createElement('p', { className: 'evolution-param-hint' }, entry.claimedBy))
     }
     const busy = state.busy.includes(entry.id)
-    const button = (label: MessageKey, action: 'approve' | 'reject'): ReactNode =>
+    // U-6: the weight of the action is part of the decision. Approve is the destructive one (it
+    // replays a staged write) and carries the family's existing primary convention; reject is an
+    // outlined alternative; preview merely reveals and stays weightless.
+    const button = (label: MessageKey, action: 'approve' | 'reject', tone: 'primary' | 'outline'): ReactNode =>
       createElement('button', {
         className: 'evolution-param-button',
         type: 'button',
         disabled: busy,
-        onClick: () => { decide(entry.id, action) },
+        ...(tone === 'primary' ? { 'data-primary': 'true' } : { 'data-tone': tone }),
+        onClick: () => {
+          // The gate sits on the destructive side only, and only when the registry says `ask`.
+          if (action === 'approve' && confirmMode === 'ask' && armed !== entry.id) {
+            setArmed(entry.id)
+            return
+          }
+          setArmed(null)
+          decide(entry.id, action)
+        },
       }, busy ? t('approvalLoading') : t(label))
     return createElement('div', { className: 'evolution-param-field', key: entry.id },
       createElement('div', { className: 'evolution-param-label' },
         createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
         createElement('span', { className: 'evolution-param-value' }, entry.summary)),
       createElement('p', { className: 'evolution-param-hint' }, age(entry)),
+      armed === entry.id
+        ? createElement('p', { className: 'evolution-param-note', role: 'status' },
+          // The sentence gets its OWN element: a bare text child shares the paragraph with the two
+          // buttons, and an assertion on it then has to fight the query's own-text rule (U-6 fixture).
+          createElement('span', { className: 'evolution-param-value' }, t('approvalConfirmNamed', { n: entry.summary })),
+          createElement('button', {
+            className: 'evolution-param-button',
+            type: 'button',
+            // A marker of its own, because its label is the same word as the row's approve button:
+            // an assertion that goes by text alone would find two elements (U-6 fixture).
+            'data-confirm': 'yes',
+            'data-primary': 'true',
+            onClick: () => { setArmed(null); decide(entry.id, 'approve') },
+          }, t('approvalConfirmYes')),
+          createElement('button', {
+            className: 'evolution-param-button',
+            type: 'button',
+            'data-tone': 'ghost',
+            onClick: () => { setArmed(null) },
+          }, t('approvalConfirmNo')))
+        : null,
       createElement('div', { className: 'evolution-param-actions' },
-        button('approvalApprove', 'approve'),
-        button('approvalReject', 'reject'),
+        button('approvalApprove', 'approve', 'primary'),
+        button('approvalReject', 'reject', 'outline'),
         createElement('button', {
           className: 'evolution-param-button',
           type: 'button',
+          'data-tone': 'ghost',
           onClick: () => { togglePreview(entry.id) },
         }, state.open === entry.id ? t('approvalPreviewClose') : t('approvalPreview'))),
       state.open === entry.id && state.preview !== null ? preview(state.preview) : null)
   }
 
   const body = (): ReactNode => {
-    if (state.view.kind === 'loading') return createElement('p', { className: 'evolution-param-note' }, t('approvalLoading'))
-    if (state.view.kind === 'empty') return createElement('p', { className: 'evolution-param-note' }, t('approvalEmpty'))
+    if (state.view.kind === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalLoading'))
+    if (state.view.kind === 'empty') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalEmpty'))
     if (state.view.kind === 'failed') {
       return createElement('div', { className: 'evolution-param-actions' },
-        createElement('p', { className: 'evolution-param-error' }, t('approvalFailed') + ': ' + state.view.message),
+        createElement('p', { className: 'evolution-param-error', role: 'status' }, t('approvalFailed') + ': ' + state.view.message),
         createElement('button', { className: 'evolution-param-button', type: 'button', onClick: () => { void load() } }, t('approvalRetry')))
     }
     return createElement('div', null,
       ...state.view.rows.map(row),
-      state.notice === null ? null : createElement('p', { className: 'evolution-param-error' }, state.notice))
+      state.notice === null ? null : createElement('p', { className: 'evolution-param-error', role: 'status' }, state.notice))
   }
 
   // The two windows are counted apart: a running record is not "waiting", and one number over both
@@ -227,8 +283,8 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       'aria-expanded': open,
     },
     createElement('span', { className: 'evolution-param-card-title' }, t('approvalTitle')),
-    waiting === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalCount').replace('{n}', String(waiting))),
-    running === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalRunningCount').replace('{n}', String(running))),
+    waiting === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalCount', { n: waiting })),
+    running === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalRunningCount', { n: running })),
     createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼')),
     open
       ? createElement('div', { className: 'evolution-param-body' },

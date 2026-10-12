@@ -50,6 +50,10 @@ export interface ParamSectionSnapshot {
   /** Raw user section: a key's PRESENCE marks the override, not its value. */
   user: unknown
   writable: boolean
+  /** U-5: the composition layer a cleared field reverts to (platform `base`, previously dropped). */
+  base: Record<string, unknown> | undefined
+  /** U-5: where a save lands — `memory` means this session only (platform `mode`, previously dropped). */
+  mode: 'host' | 'memory'
   /**
    * Why an `unavailable` snapshot is unavailable: this bundle found no settings seat at
    * all, or the seat is there and serves no such row. The two read differently to the

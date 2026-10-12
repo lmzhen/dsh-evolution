@@ -60,11 +60,11 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
   /** Guard: trust fence, then method. Every refusal is a JSON body, never an empty response. */
   const guard = (req: IncomingMessage, res: ServerResponse, method: string): boolean => {
     if (!isLoopbackRequest(req)) {
-      writeJson(res, 403, { error: 'forbidden: loopback-only' })
+      writeJson(res, 403, { ok: false, code: 'forbidden', message: 'forbidden: loopback-only' })
       return false
     }
     if (req.method !== method) {
-      writeJson(res, 405, { error: 'method not allowed: ' + (req.method ?? '') })
+      writeJson(res, 405, { ok: false, code: 'method-not-allowed', message: 'method not allowed: ' + (req.method ?? '') })
       return false
     }
     return true

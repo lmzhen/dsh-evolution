@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { CLIENT_PARAM_SECTIONS } from '../src/client/generated-params.ts'
-import { message, type MessageKey } from '../src/client/messages.ts'
+import { formatText, message, type MessageKey } from '../src/client/messages.ts'
 import { RowConfigCard } from '../src/client/RowConfigCard.ts'
 
 /**
@@ -24,13 +24,15 @@ import { RowConfigCard } from '../src/client/RowConfigCard.ts'
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
 /** The bundle's own copy, so the assertions read the same text the operator does. */
-const t = (key: MessageKey): string => message(key)
+const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string => formatText(key, values)
 
 const section = CLIENT_PARAM_SECTIONS.find(candidate => candidate.namespace === 'memory-files')
 if (section === undefined) throw new Error('the generated view lost the memory-files row')
 const fields = section.fields
 /** A numeric field, so one edit's parse rule is unambiguous. */
 const NUMBER_FIELD = fields.find(field => field.control === 'number')
+// Named, not just shaped: a shape pick re-points silently when the section grows (P2-9).
+expect(NUMBER_FIELD?.id).toBe('memoryChars')
 if (NUMBER_FIELD === undefined) throw new Error('the memory-files row lost its numeric fields')
 
 /** One row entry, rendered with the page's view/form seat. */
@@ -109,7 +111,10 @@ describe('the per-row configuration entry', () => {
     // the page state therefore still holds the override. Before this verdict the click changed
     // NOTHING on screen: the row kept its "edited by you" chip and the reader concluded the button
     // was broken.
-    const mutate = vi.fn(async () => true)
+    // G5 P1-1: the refusal is the HOST'S boolean (the settings scope answers `false` after its recovery
+    // read) — the old fixture simulated it by leaving the value in place, which the value-comparison
+    // verdict could see but the contract's own answer states directly.
+    const mutate = vi.fn(async () => false)
     const view = render(card({ view: 'page', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate } }))
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
     fireEvent.click(resetButton(view.container))

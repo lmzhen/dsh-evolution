@@ -1,5 +1,5 @@
 /**
- * THE error-code table: E-301…E-319 with the exact text each one emits (E-317…E-319 are the
+ * THE error-code table: E-301…E-322 with the exact text each one emits (E-317…E-319 are the
  * write-admission gates' own refusals).
  *
  * The codes used to be spelled out at 33 call sites across two packages, so one
@@ -62,6 +62,10 @@ export const EVOLUTION_ERRORS = Object.freeze({
   // 0.12.0: the confirmation's own deadline (`skillWriteConfirm: 'timeout'`).
   'e-320-the-profile-home-is-not':
     'E-320: the profile home is not reported by this host, so the legacy settings document cannot be located. /evolution migrate reads `<profile home>/settings.yaml.imported`; run it from a profile-launched session.',
+  // G5.12/U-4: the cross-field constraint the registry declares (params.ts) has one enforcement
+  // point, and this is its message. The card shows the same relation before a save is attempted.
+  'e-322-a-parameter-would-break-a':
+    'E-322: %a1% must be at least %a2%, but this write sets it to %a3%. Nothing was written.',
   'e-321-no-io-provider-is':
     'E-321: no evolution-io provider is mounted, so the legacy settings document cannot be read. Mount the evolution-io row (evolution-host/evolution-all) and retry.',
   'e-319-skill-write-confirm-timed-out':

@@ -18,11 +18,18 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import z from '@deepseek-ai/schemastery'
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SKILL_NAME_RE, newSkillLibrary, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SkillLibrary, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
-import { DEFAULT_CURATOR_MODEL, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
+// G2.4/C3: the review ceiling has ONE home (core's DEFAULT_REVIEW_TIMEOUT_MS) — this package used to
+// declare its own 120_000 beside it, which the bounds gate reports as a second home of the same number.
+import {
+  DEFAULT_CURATOR_MODEL,
+  DEFAULT_REVIEW_TIMEOUT_MS as DEFAULT_CURATOR_REVIEW_TIMEOUT_MS,
+  MAX_TIMER_DELAY_MS,
+  usageObserved,
+} from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
@@ -43,7 +50,7 @@ const DEFAULT_QUALITY_WARN_STALE_AFTER_DAYS = 7
  * (`run()` never returns; `restore()`/`consolidate()` queue behind it).
  * 120s matches the review subagent default; the 32-bit ceiling is Node's
  * timer-delay limit (`AbortSignal.timeout` throws above it). */
-const DEFAULT_CURATOR_REVIEW_TIMEOUT_MS = 120_000
+// (the ceiling is core's DEFAULT_REVIEW_TIMEOUT_MS, imported under this name above)
 // V27 G2.4: the timer ceiling is the core protocol constant (was a local copy).
 
 
@@ -328,7 +335,9 @@ export class EvolutionCurator extends Service {
     if (!verifyPromptBundle(PROMPT_BUNDLE)) {
       throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to run the curator')
     }
-    this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+    // G2 S3: prefer the platform backend when the deployment mounts it (this covers the reads AND the
+    // CAS-backed RMW transact); fall back to the default backend otherwise — contract C2 degradation.
+    this.io = evolutionIoAdapter(() => preferProvider(ctx.evolutionIo, ['fs']))
     // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
     // honour the same deployment-selected stages as every other writer.
     this.skills = newSkillLibrary({

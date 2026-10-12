@@ -655,36 +655,7 @@ const FAMILY_INSTALLER_SOURCE = 'scripts/install-layered.mjs'
  * @param text - the source text to read.
  * @returns the same text with its comments removed.
  */
-function stripComments(text) {
-  let out = ''
-  let quote = ''
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index]
-    if (quote !== '') {
-      out += char
-      if (char === quote && text[index - 1] !== '\\') quote = ''
-      continue
-    }
-    if (char === "'" || char === '"' || char === '`') {
-      quote = char
-      out += char
-      continue
-    }
-    if (char === '/' && text[index + 1] === '/') {
-      while (index < text.length && text[index] !== '\n') index += 1
-      out += '\n'
-      continue
-    }
-    if (char === '/' && text[index + 1] === '*') {
-      index += 2
-      while (index < text.length && !(text[index] === '*' && text[index + 1] === '/')) index += 1
-      index += 1
-      continue
-    }
-    out += char
-  }
-  return out
-}
+import { stripComments } from './lib-source-text.mjs'
 
 /**
  * The text inside the brace-delimited literal that `marker` opens, braces

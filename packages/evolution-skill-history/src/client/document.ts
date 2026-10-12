@@ -35,14 +35,17 @@ export interface DocumentFace extends Copy {
 /** One `<pre>` rendering of a diff: added lines marked `+`, removed ones `-`. */
 function sourceBlock(diff: VersionDiffRow): ReactNode {
   const rows: ReactNode[] = []
-  for (const hunk of diff.hunks) {
+  // C1: the row key is scoped to its HUNK. A per-hunk index restarts at 0, so two hunks produced the
+  // same `old-0`/`new-0` keys and React reconciled the wrong rows (duplicate-key warning, and a
+  // reader could see one hunk's line replaced by another's).
+  for (const [hunkIndex, hunk] of diff.hunks.entries()) {
     for (const [index, line] of hunk.oldText.split('\n').entries()) {
       if (hunk.oldText === '' && line === '') continue
-      rows.push(createElement('div', { key: 'old-' + String(index), className: 'evo-doc-line-del' }, '- ' + line))
+      rows.push(createElement('div', { key: 'old-' + String(hunkIndex) + '-' + String(index), className: 'evo-doc-line-del' }, '- ' + line))
     }
     for (const [index, line] of hunk.newText.split('\n').entries()) {
       if (hunk.newText === '' && line === '') continue
-      rows.push(createElement('div', { key: 'new-' + String(index), className: 'evo-doc-line-add' }, '+ ' + line))
+      rows.push(createElement('div', { key: 'new-' + String(hunkIndex) + '-' + String(index), className: 'evo-doc-line-add' }, '+ ' + line))
     }
   }
   return createElement('pre', { className: 'evo-doc-source' }, rows.length === 0 ? '\u00b1' : rows)

@@ -16,7 +16,7 @@ export const NS = 'evolution-settings'
 export const zh = {
   title: '自进化',
   subtitle: '待你决定的写入在最上面；下面按功能列出你能改的参数，没有列出的由安装时的配置决定。',
-  overridden: '我改过',
+  overridden: '已覆盖',
   deployment: '默认',
   loading: '正在读取设置…',
   unavailable: '这个功能没有启动（对应的插件没有安装）',
@@ -26,12 +26,21 @@ export const zh = {
   apply: '保存',
   reset: '恢复默认值',
   empty: '这里没有可改项',
-  changed: '{n} 项已改',
+  changed: '{n} 项已覆盖',
   discard: '放弃修改',
   saving: '保存中…',
   resetting: '恢复中…',
-  refused: '这个值没有被接受（界面上保持原样）。想看原因：运行 /evolution params 或 /evolution doctor。',
-  resetRefused: '恢复默认值没有生效（这一行还是你的值）。想看原因：运行 /evolution params 或 /evolution doctor。',
+  destHost: '保存去向：本机配置',
+  invalidNumber: '需要一个数字',
+  invalidSelect: '不在允许的取值里',
+  invalidAtLeast: '不能小于同组的 {n}',
+  approvalConfirmNamed: '即将批准：{n}',
+  approvalConfirmYes: '确认批准',
+  approvalConfirmNo: '取消',
+  destMemory: '保存去向：仅本次会话',
+  resetTo: '复位为 {value}',
+  refused: '这个值没有被接受（界面上保持原样）。想看原因：在对话里让它说明。',
+  resetRefused: '恢复默认值没有生效（这一行还是你的值）。想看原因：在对话里让它说明。',
   cardReview: '会话回顾',
   cardMemory: '长期记忆',
   cardToolMemory: '记忆写入',
@@ -71,7 +80,7 @@ export const zh = {
 export const en: Record<keyof typeof zh, string> = {
   title: 'Self-evolution',
   subtitle: 'Writes waiting for your decision come first; the changeable parameters are listed by feature below, and anything not listed comes from the deployment configuration.',
-  overridden: 'edited by you',
+  overridden: 'Overridden',
   deployment: 'default',
   loading: 'reading settings…',
   unavailable: 'this feature is not running (its plugin is not installed)',
@@ -81,12 +90,21 @@ export const en: Record<keyof typeof zh, string> = {
   apply: 'Save',
   reset: 'Reset to default',
   empty: 'nothing to change here',
-  changed: '{n} changed',
+  changed: '{n} overridden',
   discard: 'Discard',
   saving: 'Saving…',
   resetting: 'Resetting…',
-  refused: 'The value was not accepted (the page keeps what you see). For the reason run /evolution params or /evolution doctor.',
-  resetRefused: 'The reset did not take (this row still holds your value). For the reason run /evolution params or /evolution doctor.',
+  destHost: 'Saved to: this machine',
+  invalidNumber: 'Needs a number',
+  invalidSelect: 'Not one of the allowed values',
+  invalidAtLeast: 'must not be below {n}',
+  approvalConfirmNamed: 'About to approve: {n}',
+  approvalConfirmYes: 'Approve',
+  approvalConfirmNo: 'Cancel',
+  destMemory: 'Saved to: this session only',
+  resetTo: 'Restores {value}',
+  refused: 'The value was not accepted (the page keeps what you see). For the reason, ask in the conversation.',
+  resetRefused: 'The reset did not take (this row still holds your value). For the reason, ask in the conversation.',
   cardReview: 'Session review',
   cardMemory: 'Long-term memory',
   cardToolMemory: 'Writing memory',
@@ -148,6 +166,34 @@ export type MessageKey = keyof typeof zh
  * @param language - which dictionary to read; defaults to Chinese.
  * @returns the copy this bundle carries.
  */
-export function message(key: MessageKey, language: 'zh' | 'en' = 'zh'): string {
+export function message(key: MessageKey, language: 'zh' | 'en' = 'en'): string {
   return language === 'zh' ? zh[key] : en[key]
+}
+
+/**
+ * Fill one TEMPLATE's `{slot}` placeholders (G5 C4). The seat's translator takes the values, so the
+ * rule lives here instead of at every call site — `t('changed').replace('{n}', …)` used to be
+ * written seven times across three components. An UNKNOWN slot is left standing: a missing value
+ * must not print "undefined" into the operator's UI.
+ * @param template - the resolved copy, with `{slot}` placeholders.
+ * @param values - substitutions keyed by the slot name inside the braces.
+ * @returns the filled copy.
+ */
+export function fill(template: string, values: Readonly<Record<string, string | number>>): string {
+  return template.replace(/\{(\w+)\}/g, (match, slot: string) => {
+    const value = values[slot]
+    return value === undefined ? match : String(value)
+  })
+}
+
+/**
+ * Resolve one message and fill its slots in one step: exactly what the seat's `t` does (G5 C4),
+ * for specs and stand-alone callers that hold no seat.
+ * @param key - the copy key.
+ * @param values - substitutions, or undefined for the plain copy.
+ * @returns the copy a reader sees.
+ */
+export function formatText(key: MessageKey, values?: Readonly<Record<string, string | number>>): string {
+  const text = message(key)
+  return values === undefined ? text : fill(text, values)
 }

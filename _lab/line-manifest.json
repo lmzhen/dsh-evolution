@@ -1,0 +1,2568 @@
+{
+  "pin": "4da24ee",
+  "bed": {
+    "mono": "D:/dsh/deepseek-harness",
+    "evo": "D:\\dsh\\deepseek-harness\\packages\\evolution",
+    "profileHoistFrom": "C:/Users/limengzhen/.dsh/profiles/desktop/node_modules/@deepseek-ai",
+    "upstreamFrom": "D:/dsh/dsh-upstream-0.2.0-rc.2-evolution/packages",
+    "closureFrom": "C:/Users/limengzhen/AppData/Roaming/npm/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai"
+  },
+  "generatedAt": "2026-10-11T15:34:23.795Z",
+  "counts": {
+    "store": 6,
+    "evo-src": 32,
+    "profile-hoist": 2,
+    "closure": 286,
+    "mono": 38
+  },
+  "entries": [
+    {
+      "id": "zod",
+      "kind": "store",
+      "resolvedPath": "D:/dsh/deepseek-harness/node_modules/.pnpm/zod@4.4.3/node_modules/zod",
+      "source": "zod@4.4.3 (mono pnpm store)",
+      "version": "4.4.3"
+    },
+    {
+      "id": "react",
+      "kind": "store",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\node_modules\\.pnpm\\react@18.3.1\\node_modules\\react",
+      "source": "pnpm store (client test dependency)",
+      "version": "18.3.1"
+    },
+    {
+      "id": "react-dom",
+      "kind": "store",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\node_modules\\.pnpm\\react-dom@18.3.1_react@18.3.1\\node_modules\\react-dom",
+      "source": "pnpm store (client test dependency)",
+      "version": "18.3.1"
+    },
+    {
+      "id": "@testing-library/react",
+      "kind": "store",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\node_modules\\.pnpm\\@testing-library+react@16.3_b0bbe147884ef4cbbf95e64a97c782e8\\node_modules\\@testing-library\\react",
+      "source": "pnpm store (client test dependency)",
+      "version": "16.3.2"
+    },
+    {
+      "id": "@testing-library/dom",
+      "kind": "store",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\node_modules\\.pnpm\\@testing-library+dom@10.4.1\\node_modules\\@testing-library\\dom",
+      "source": "pnpm store (client test dependency)",
+      "version": "10.4.1"
+    },
+    {
+      "id": "jsdom",
+      "kind": "store",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\node_modules\\.pnpm\\jsdom@29.1.1\\node_modules\\jsdom",
+      "source": "pnpm store (client test dependency)",
+      "version": "29.1.1"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-activity",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-activity\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-agent-preset",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-agent\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-all",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-all\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-approval",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-approval\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-commands",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-commands\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-core\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-curator",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-curator\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-feedback",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-feedback\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-host",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-host\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-io",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-io\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-io-fs",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-io-fs\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-io-node",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-io-node\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-learning-graph",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-learning-graph\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-maintenance",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-maintenance\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-plan-validator",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-plan-validator\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-policy",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-policy\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-preset",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-preset\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-replay",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-replay\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-review",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-review\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-settings-ui",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-settings-ui\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-skill-catalog",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-skill-catalog\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-skill-history",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-skill-history\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-state",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-state\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-state-domain",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-state-domain\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-state-json",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-state-json\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-state-storage",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-state-storage\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-threat",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\evolution-threat\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-memory",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\memory\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-memory-files",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\memory-files\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-skill-usage",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\skill-usage\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-memory",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\tool-memory\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-skill-manage",
+      "kind": "evo-src",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\evolution\\tool-skill-manage\\src\\index.ts",
+      "source": "overlay src",
+      "version": "0.22.0"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-session-query",
+      "kind": "profile-hoist",
+      "resolvedPath": "C:\\Users\\limengzhen\\.dsh\\profiles\\desktop\\node_modules\\@deepseek-ai\\dsh-tool-session-query",
+      "source": "desktop profile node_modules (necessary)",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/schemastery",
+      "kind": "profile-hoist",
+      "resolvedPath": "C:\\Users\\limengzhen\\.dsh\\profiles\\desktop\\node_modules\\@deepseek-ai\\schemastery",
+      "source": "desktop profile node_modules (declared)",
+      "version": "3.18.4"
+    },
+    {
+      "id": "@deepseek-ai/cordis",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\cordis",
+      "source": "npm closure",
+      "version": "4.0.4"
+    },
+    {
+      "id": "@deepseek-ai/cordis-plugin-group",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\cordis-plugin-group",
+      "source": "npm closure",
+      "version": "1.0.4"
+    },
+    {
+      "id": "@deepseek-ai/cordis-plugin-include",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\cordis-plugin-include",
+      "source": "npm closure",
+      "version": "1.0.9"
+    },
+    {
+      "id": "@deepseek-ai/cordis-plugin-loader",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\cordis-plugin-loader",
+      "source": "npm closure",
+      "version": "1.0.5"
+    },
+    {
+      "id": "@deepseek-ai/cordis-plugin-timer",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\cordis-plugin-timer",
+      "source": "npm closure",
+      "version": "1.1.6"
+    },
+    {
+      "id": "@deepseek-ai/cosmokit",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\cosmokit",
+      "source": "npm closure",
+      "version": "1.8.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-acp",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-acp",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-acp-app",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-acp-app",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-agent",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-default-model",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-agent-default-model",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-instructions",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-agent-instructions",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-loop",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-agent-loop",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-preset",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-agent-preset",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-preset-registry",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-agent-preset-registry",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-tool-presentation",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-agent-tool-presentation",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-anonymous-user-id",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-anonymous-user-id",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-account-controller",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-account-controller",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-gateway",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-gateway",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-job-controller",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-job-controller",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-remotes",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-remotes",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-session-controller",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-session-controller",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-settings-controller",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-settings-controller",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-terminal-controller",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-terminal-controller",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-workspace-controller",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-workspace-controller",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-api-workspace-files",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-api-workspace-files",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-app-boot",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-app-boot",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-atomic-write",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-atomic-write",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-attachment",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-attachment",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-attachment-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-attachment-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-authorization",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-authorization",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-base",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-base",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-bash-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-bash-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-bash-sandbox",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-bash-sandbox",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-brand",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-brand",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-chunked-list",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-chunked-list",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-connection",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-connection",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-file-upload",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-file-upload",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-hmr",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-hmr",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-locale",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-locale",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-modules",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-modules",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-product-analytics",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-product-analytics",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-resources",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-resources",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-shortcuts",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-shortcuts",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-store",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-store",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-agent-preset",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-agent-preset",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-approval",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-approval",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-attachment",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-attachment",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-brand-official",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-brand-official",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-chat",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-chat",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-commands",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-commands",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-conversation",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-conversation",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-cordis",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-cordis",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-deliverables",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-deliverables",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-directory-picker-browse",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-directory-picker-browse",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-directory-picker-native",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-directory-picker-native",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-goal",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-goal",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-input-trigger",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-input-trigger",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-jobs",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-jobs",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-layout",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-layout",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-message-feedback",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-message-feedback",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-model-selection",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-model-selection",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-open-in-app",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-open-in-app",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-permission-presets",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-permission-presets",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-plan",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-plan",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-plugin-manager",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-plugin-manager",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-primitives",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-primitives",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-reference",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-reference",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-renderer",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-renderer",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-schedule",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-schedule",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-session",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-session",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-account",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-account",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-agent-loop",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-agent-loop",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-general",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-general",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-models",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-models",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-plugin-inventory",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-plugin-inventory",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-plugins",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-plugins",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-session-log",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-session-log",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-shell",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-shell",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-subagent",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-subagent",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-settings-web-search",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-settings-web-search",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-shortcuts",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-shortcuts",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-sidebar",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-sidebar",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-sidebar-browser",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-sidebar-browser",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-sidebar-documentpreview",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-sidebar-files",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-sidebar-files",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-sidebar-right",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-sidebar-right",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-sidebar-terminal",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-sidebar-terminal",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-skill",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-skill",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-slots",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-slots",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-subagent",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-subagent",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-theme",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-theme",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-tool",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-tool",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-trajectory",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-trajectory",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-user-questions",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-user-questions",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-workflow-run",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-workflow-run",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-ui-workspace",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-client-ui-workspace",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-cmdline",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-cmdline",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-command-compact",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-command-compact",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-command-feedback",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-command-feedback",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-command-goal",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-command-goal",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-commands",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-commands",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-compaction",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-compaction",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-compaction-basic",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-compaction-basic",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-compaction-image-offload",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-compaction-image-offload",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-compaction-tool-result-pruner",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-config-editor",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-config-editor",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-cordis-client-runner",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-cordis-client-runner",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-cordis-host-runner",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-cordis-host-runner",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-credentials",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-credentials",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-credentials-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-credentials-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-deepseek-account",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-deepseek-account",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-deepseek-account-platform",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-deepseek-account-platform",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-deepseek-llm-api-extensions",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-deepseek-llm-api-extensions",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-deque",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-deque",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-agent-team",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-agent-team",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-agent-team-profile",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-agent-team-profile",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-api-speech-to-text",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-api-speech-to-text",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-auto-review",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-auto-review",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-client-ui-agent-team",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-client-ui-agent-team",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-client-ui-voice-input",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-client-ui-voice-input",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-schedule-bundle",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-schedule-bundle",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-speech-to-text",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-speech-to-text",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-speech-to-text-sensevoice",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-speech-to-text-sensevoice",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-tool-agent-team",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-tool-agent-team",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-experimental-voice-input-bundle",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-experimental-voice-input-bundle",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-file-reference",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-file-reference",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-file-reference-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-file-reference-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-fs",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-fs",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-fs-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-fs-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-fs-observation-policy",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-fs-observation-policy",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-fs-sandbox",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-fs-sandbox",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-goal",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-goal",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-goal-round-driver",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-goal-round-driver",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-headless",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-headless",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-hmr",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-hmr",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-home-paths",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-home-paths",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-hook-protocol",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-hook-protocol",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-hooks-claude-code",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-hooks-claude-code",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-hooks-codex",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-hooks-codex",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-directory-picker",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-directory-picker",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-directory-picker-auto",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-directory-picker-auto",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-directory-picker-browse",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-directory-picker-browse",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-directory-picker-native",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-directory-picker-native",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-frontend-static",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-frontend-static",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-open-in-app",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-open-in-app",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-plugin-inventory",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-plugin-inventory",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-product-telemetry-otel",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-product-telemetry-otel",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-webserver",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-host-webserver",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-http-proxy",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-http-proxy",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-invariants",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-invariants",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-jobs",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-jobs",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-jobs-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-jobs-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-launch-environment",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-launch-environment",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-lazy-require",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-lazy-require",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-llm",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-llm",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-llm-deepseek",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-llm-deepseek",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-llm-deepseek-account",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-llm-deepseek-account",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-llm-deepseek-api-key",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-llm-deepseek-api-key",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-llm-pi-ai",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-llm-pi-ai",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-llm-retry",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-llm-retry",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-mcp-client",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-mcp-client",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-mcp-resources",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-mcp-resources",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-message-feedback",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-message-feedback",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-native-command",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-native-command",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-office-to-pdf",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-office-to-pdf",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-otel",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-otel",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-output-retention",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-output-retention",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-package-manifest",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-package-manifest",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-permission-presets",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-permission-presets",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-persona",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-persona",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-plan-mode",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-plan-mode",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-plugin-manager",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-plugin-manager",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-plugin-package-inventory-deepseek",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-plugin-package-inventory-deepseek",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-ptc-runtime",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-ptc-runtime",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-ptc-runtime-node",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-ptc-runtime-node",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-pwsh-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-pwsh-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-pwsh-sandbox",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-pwsh-sandbox",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-repeat-tool-reminder",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-repeat-tool-reminder",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sandbox",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-sandbox",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sandbox-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-sandbox-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sandbox-policy",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-sandbox-policy",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sandbox-windows-acl",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-sandbox-windows-acl",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-schedule",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-schedule",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-scope",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-scope",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sdk-app",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-sdk-app",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sdk-jsonrpc-server",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-sdk-jsonrpc-server",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sdk-minimal",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-sdk-minimal",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sdk-protocol",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-sdk-protocol",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-checkpoint-policy",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-checkpoint-policy",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-format",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-format",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-format-catalog",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-format-catalog",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-format-v0-to-v1",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-format-v0-to-v1",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-format-v1-to-v2",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-format-v1-to-v2",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-format-v2-to-v3",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-format-v2-to-v3",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-format-v3-to-v4",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-format-v3-to-v4",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-log-deepseek",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-log-deepseek",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-log-export",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-log-export",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-persistence",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-persistence",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-persistence-jsonl",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-persistence-jsonl",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-projection",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-projection",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-projection-cache",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-projection-cache",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-query",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-query",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-query-sqlite",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-query-sqlite",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-reference",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-reference",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-stats",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-stats",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-telemetry",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-telemetry",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-telemetry-otel",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-telemetry-otel",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-title",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-title",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-title-first-prompt-llm",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-title-first-prompt-llm",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-title-llm",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-title-llm",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-turn-outline",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-session-turn-outline",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-settings",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-settings",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-shell",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-shell",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-shell-env",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-shell-env",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-skill",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-skill",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-skill-badge",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-skill-badge",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-skill-filesystem",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-skill-filesystem",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-skill-office",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-skill-office",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-spill",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-spill",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-spill-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-spill-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-spill-policy",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-spill-policy",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-storage",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-storage",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-storage-domain",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-storage-json",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subagent",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-subagent",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subagent-fork-in-process",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-subagent-fork-in-process",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subagent-in-process-driver",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-subagent-in-process-driver",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subagent-spawn-in-process",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-subagent-spawn-in-process",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subprocess",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-subprocess",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subprocess-local",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-subprocess-local",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-system-prompt",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-system-prompt",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-terminal",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-terminal",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-terminal-bash",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-terminal-bash",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-time-context",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-time-context",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-timeout",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-timeout",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tmux-context",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tmux-context",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-token-meter",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-token-meter",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-ask-user",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-ask-user",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-bash",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-bash",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-bash-persistent",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-bash-persistent",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-call-timeout-policy",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-call-timeout-policy",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-cordis",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-cordis",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-fs",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-fs",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-fs-search",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-fs-search",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-goal",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-goal",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-jobs",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-jobs",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-present",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-present",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-pwsh",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-pwsh",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-pwsh-persistent",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-pwsh-persistent",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-ralph",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-ralph",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-skill",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-skill",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-str-replace-editor",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-str-replace-editor",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-subagent",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-subagent",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-subagent-control",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-subagent-control",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-todo",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-todo",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-web",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-web",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-workflow",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-workflow",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-workspace-dependencies",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tool-workspace-dependencies",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tools",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-tools",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-typert-loader",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-typert-loader",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-typert-protocol",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-typert-protocol",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-typert-registry",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-typert-registry",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-user-approval",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-user-approval",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-user-questions",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-user-questions",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-util-code-language",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-util-code-language",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-util-crypto",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-util-crypto",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-util-time",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-util-time",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-util-values",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-util-values",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-util-workspace-path",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-util-workspace-path",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-web",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-web",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-web-app",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-web-app",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-web-fetch-http",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-web-fetch-http",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-web-frontend",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-web-frontend",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-web-search-deepseek",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-web-search-deepseek",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-webhook",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-webhook",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-webhook-github",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-webhook-github",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-win32-process",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-win32-process",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-workflow",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-workflow",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-workflow-ptc",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-workflow-ptc",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-workspace",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-workspace",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-workspace-changes",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\dsh-workspace-changes",
+      "source": "npm closure",
+      "version": "0.2.0-rc.2"
+    },
+    {
+      "id": "@deepseek-ai/libreoffice-kit",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\libreoffice-kit",
+      "source": "npm closure",
+      "version": "0.1.5"
+    },
+    {
+      "id": "@deepseek-ai/libreoffice-kit-win32-x64",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\libreoffice-kit-win32-x64",
+      "source": "npm closure",
+      "version": "0.1.5"
+    },
+    {
+      "id": "@deepseek-ai/node-addon-system",
+      "kind": "closure",
+      "resolvedPath": "C:\\Users\\limengzhen\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai\\node-addon-system",
+      "source": "npm closure",
+      "version": "0.1.2"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-runtime",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\client\\runtime\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-schema-form",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\client\\schema-form\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-web",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\client\\web\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-web-react",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\client\\web-react\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-code-runtime",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\code-runtime\\code-runtime\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-code-runtime-worker-thread",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\code-runtime\\code-runtime-worker-thread\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-e2b",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\e2b\\e2b\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-fs-e2b",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\e2b\\fs-e2b\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subprocess-e2b",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\e2b\\subprocess-e2b\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-acp-demo",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\examples\\acp-demo\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-spine-demo",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\examples\\agent-spine-demo\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sdk-jsonrpc-demo",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\examples\\jsonrpc-demo\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-host-apiproxy",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\host\\apiproxy\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-lsp",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\lsp\\lsp\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-lsp-stdio",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\lsp\\lsp-stdio\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-lsp",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\lsp\\tool-lsp\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-presets",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\preset\\agent-presets\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-sdk-client",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\sdk\\client\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-persistence-sqlite",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\session\\session-persistence-sqlite\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session-title-all-prompts-llm",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\session\\session-title-all-prompts-llm\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-settings-file",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\settings\\settings-file\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-storage-sqlite",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\storage\\storage-sqlite\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subagent-acp",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\subagent\\subagent-acp\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subagent-claude-code",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\subagent\\subagent-claude-code\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subagent-codex",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\subagent\\subagent-codex\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-subagent-dsh-sdk",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\subagent\\subagent-dsh-sdk\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-subagent-report",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\subagent\\tool-subagent-report\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-terminal",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\terminal\\tool-terminal\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-acp-snapshot",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\test-support\\acp-snapshot\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-agent-loop-testkit",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\test-support\\agent-loop-testkit\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-test-runtime",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\test-support\\client-runtime\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-llm-mock-server",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\test-support\\llm-mock-server\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-llm-replay",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\test-support\\llm-replay\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-loader-smoke",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\test-support\\loader-smoke\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-typert-generator",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\typert\\generator\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-web-search-exa",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\web\\web-search-exa\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-web-search-perplexity",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\web\\web-search-perplexity\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    },
+    {
+      "id": "@deepseek-ai/dsh-workflow-worker-thread",
+      "kind": "mono",
+      "resolvedPath": "D:\\dsh\\deepseek-harness\\packages\\workflow\\workflow-worker-thread\\src\\index.ts",
+      "source": "monorepo packages",
+      "version": "0.1.0-rc.5"
+    }
+  ]
+}

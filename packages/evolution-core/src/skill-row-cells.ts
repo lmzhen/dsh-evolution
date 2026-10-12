@@ -62,6 +62,8 @@ export interface VersionRowFacts {
   readonly charsDelta?: number
   readonly path?: string
   readonly summary?: string
+  /** U-5: the body hash the host recorded for this version (the row shows a short code, hover = full). */
+  readonly hash?: string
 }
 
 /** The facts a skill row needs. The client's `SkillRow` satisfies this structurally. */
@@ -138,6 +140,11 @@ export function versionRowCells(row: VersionRowFacts): RowCells {
       slot: 'meta',
     })
   }
+  // U-5: the recorded hash, as a SHORT code (seven chars) whose hover carries the full value — the
+  // platform already puts `hash` on the row; nothing rendered it, so the fact was declared and unused.
+  if (row.hash !== undefined && row.hash !== '') {
+    title.push({ key: 'hash', literal: row.hash.slice(0, 7), tone: 'tertiary', slot: 'meta', note: row.hash })
+  }
   const meta: RowCell[] = []
   // The summary is the one line a deployment may or may not generate; the host sends it already
   // verbatim, so it needs no dictionary key.
@@ -167,6 +174,12 @@ export function skillRowCells(skill: SkillRowFacts): RowCells {
     { key: 'description', literal: skill.description, tone: 'tertiary', slot: 'lead', note: skill.description },
     { key: 'state', copy: skillStateKey(skill), tone: 'tertiary', slot: 'meta' },
   ]
+  // U-5 (history half): a protected skill says WHO holds it, not only that it is held. The state cell
+  // above answers 'protected or not' from the same field; this cell carries the guard's own name, a
+  // verbatim fact (no dictionary key — literals are values the host owns).
+  if (skill.protectedBy !== null) {
+    meta.push({ key: 'protectedBy', literal: skill.protectedBy, tone: 'tertiary', slot: 'meta', note: skill.protectedBy })
+  }
   if (skill.age !== null) {
     meta.push({ key: 'age', copy: ageCopyKey(skill.age), values: { n: skill.age.n }, tone: 'tertiary', slot: 'aside' })
   }

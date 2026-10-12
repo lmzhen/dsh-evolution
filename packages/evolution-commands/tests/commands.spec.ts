@@ -349,6 +349,35 @@ describe('evolution-commands', () => {
     expect(empty.text).toContain('No curator state yet')
   })
 
+  it('G7.4/C7: the ONE parser answers F-3 and F-4 (order, = spelling, syntax)', async () => {
+    const home = await tempHome('evo-commands-parse-e2e-')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-parse-skills-')) })
+    const run = (rawInput: string) => handler!.handler({ rawInput })
+
+    // F-4: the flag ORDER and the --flag=value spelling used to be refused as "not a subcommand".
+    // No settings service is mounted here, so the branch answers E-311 — the point is WHICH answer it
+    // is: a domain error, never the generic "is not a subcommand this build answers".
+    for (const line of ['params --json --group review', 'params --group=review', 'params --group review --json']) {
+      const result = await run(line)
+      expect(result.text, line).not.toContain('is not a subcommand this build answers')
+    }
+
+    // F-3: a value flag left without its value is a SYNTAX answer, not a swallowed value that fails
+    // later at the settings schema.
+    const missing = await run('policy set a.b --expect')
+    expect(missing.kind).toBe('error')
+    expect(missing.text).toContain('needs a value after --expect')
+
+    // ...and the well-formed line still reaches the domain layer (E-311 here, not the syntax answer).
+    const wellFormed = await run('policy set a.b 5 --expect 3')
+    expect(wellFormed.text).not.toContain('needs a value after')
+    expect(home).toBeTruthy()
+  })
+
   it('curator status survives a corrupt lastRunAt (rc.43 regression)', async () => {
 
     const ctx = new Context()
@@ -738,6 +767,50 @@ describe('evolution-commands', () => {
     await settleMaintain(handler!, equals)
     const spaced = await handler!.handler({ rawInput: 'maintain   --timeout 600000' })
     expect(spaced.kind).toBe('success')
+  })
+
+  it('G6-②: the preset install read-merge-write runs inside the platform HMR lock', async () => {
+    const home = await tempHome('evo-commands-preset-lock-')
+    const profileDir = join(home, 'profiles', 'web')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await seedPlatformBase(profileDir, 'standard', '- id: agent-loop\n  name: \"@deepseek-ai/dsh-agent-loop\"\n')
+    const patchPath = profilePatchPath(profileDir)
+    ctx.provide('profileContext', profileContext('web', profileDir))
+    // The lock: exactly one call, and the patch may only exist INSIDE it.
+    let calls = 0
+    let existedInside = false
+    ctx.provide('hmr', {
+      runExclusive: async <T>(fn: () => T | Promise<T>): Promise<T> => {
+        calls += 1
+        const result = await fn()
+        existedInside = existsSync(patchPath)
+        return result
+      },
+    })
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-lock-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install' })
+    expect(result.kind).toBe('success')
+    expect(calls).toBe(1)
+    expect(existedInside).toBe(true)
+  })
+
+  it('G6-②: without an hmr service the same install still commits (the platform degrade shape)', async () => {
+    const home = await tempHome('evo-commands-preset-nolock-')
+    const profileDir = join(home, 'profiles', 'web')
+    const ctx = new Context()
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    await seedPlatformBase(profileDir, 'standard', '- id: agent-loop\n  name: \"@deepseek-ai/dsh-agent-loop\"\n')
+    const patchPath = profilePatchPath(profileDir)
+    ctx.provide('profileContext', profileContext('web', profileDir))
+    await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-nolock-skills-')) })
+    const result = await handler!.handler({ rawInput: 'preset install' })
+    expect(result.kind).toBe('success')
+    expect(existsSync(patchPath)).toBe(true)
   })
 
   it('preset install composes the runtime standard + delta into the profile patch row (0.3.15)', async () => {

@@ -164,6 +164,16 @@ export interface ParamExposure {
   /** The registered reason this row has NO card. Required on every non-E3 row; mutually exclusive
    * with `card`. This is what makes "an E3 row that no card renders" unspellable. */
   why?: ParamWhy
+  /**
+   * A cross-field constraint this row must satisfy, declared ONCE here (U-4). The card checks it
+   * before a save is attempted and the Host write path derives the same check from the same column,
+   * so "保存前就知道输入合不合法" needs no second rule table. Only relations with real behaviour
+   * behind them are declared; this is not a constraint language.
+   */
+  relation?: {
+    /** The sibling id in the SAME group whose value this row may not go below. */
+    readonly atLeast?: string
+  }
   /** Unit suffix shown next to a number (empty when it carries none). */
   unit?: string
   /** Pipe-joined allowed values; non-empty exactly when control is 'select'. */
@@ -215,7 +225,7 @@ export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
   { id: 'maxConsolidationFailures', group: 'memory', tier: 'E3', authority: 'cordis', owner: 'memory-files', applies: 'live', docAnchor: 'PARAMETERS.md#memory', summary: 'Consolidation failures one turn tolerates before the tool gives up.', label: '合并失败重试', hint: '合并记忆连续失败多少次后停止。', control: 'number', unit: '次', values: '', card: 'memory-files' },
   { id: 'curatorIntervalHours', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Minimum hours between deterministic curation passes.', label: '自动整理间隔', hint: '两次自动整理之间至少间隔多少小时。', control: 'number', unit: '小时', values: '', card: 'evolution-curator' },
   { id: 'staleAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Inactive days before a skill counts as stale.', label: '多久没用算过时', hint: '技能连续多少天没被用到就算过时。', control: 'number', unit: '天', values: '', card: 'evolution-curator' },
-  { id: 'archiveAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Inactive days before a stale skill is archived (must be >= staleAfterDays).', label: '过时后归档', hint: '过时技能再过多少天移入归档（不能小于上一项）。', control: 'number', unit: '天', values: '', card: 'evolution-curator' },
+  { id: 'archiveAfterDays', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Inactive days before a stale skill is archived (must be >= staleAfterDays).', label: '过时后归档', hint: '过时技能再过多少天移入归档（不能小于上一项）。', control: 'number', unit: '天', values: '', relation: { atLeast: 'staleAfterDays' }, card: 'evolution-curator' },
   { id: 'qualityWarnStaleAfterDays', group: 'curator', tier: 'E2', authority: 'cordis', owner: 'evolution-curator', applies: 'none', docAnchor: 'PARAMETERS.md#curator', summary: 'Age at which a low quality score starts warning (the pair of evolution-feedback.qualityWarnThreshold; both live on the deployment face so one bar is not half user-set).', why: 'internal' },
   { id: 'minIdleHours', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Idle hours required before an automatic curation pass runs.', label: '最少空闲时长', hint: '你至少多少小时没用，才运行自动整理。', control: 'number', unit: '小时', values: '', card: 'evolution-curator' },
   { id: 'minIdleFailOpen', group: 'curator', tier: 'E3', authority: 'cordis', owner: 'evolution-curator', applies: 'live', docAnchor: 'PARAMETERS.md#curator', summary: 'Let the idle gate open when the activity probe is unavailable.', label: '检测不到活动也运行', hint: '无法判断你是否空闲时，仍然运行自动整理。', control: 'switch', unit: '', values: '', card: 'evolution-curator' },
@@ -270,6 +280,7 @@ export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
   { id: 'evolution-approval.enabled', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-approval', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Require approval before a staged write executes.', why: 'security' },
   { id: 'evolution-approval.stageForeground', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-approval', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Stage foreground agent writes for approval too.', why: 'security' },
   { id: 'evolution-approval.pendingTtlMs', group: 'deployment', tier: 'E3', authority: 'cordis', owner: 'evolution-approval', applies: 'live', docAnchor: 'PARAMETERS.md#deployment', summary: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'number', unit: '毫秒', values: '', card: 'evolution-approval' },
+  { id: 'approvalConfirm', group: 'write-caps', tier: 'E3', authority: 'cordis', owner: 'evolution-approval', applies: 'live', docAnchor: 'PARAMETERS.md#write-caps', summary: 'What the confirmation before an APPROVE does: write straight through, ask first, or treat an unanswered prompt as a cancel. The same three words skillWriteConfirm uses for a skill write.', label: '批准前先确认', hint: '点「批准」时要不要再确认一次：直接执行 / 先确认 / 等待超时即取消。默认直接执行（不打断批量批准）。', control: 'select', unit: '', values: 'auto|ask|timeout', valueLabels: '直接执行|先确认|等待超时即取消', card: 'evolution-approval' },
   { id: 'qualityWarnThreshold', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-feedback', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Feedback score below which a skill carries a warning.', why: 'internal' },
   { id: 'replay.maxPlans', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-replay', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Plans compared in one replay report.', why: 'internal' },
   { id: 'replay.weights', group: 'deployment', tier: 'E2', authority: 'cordis', owner: 'evolution-replay', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Scoring weights of the replay comparison.', why: 'internal' },
@@ -372,6 +383,7 @@ export function paramSettingsId(owner: string): string | undefined {
  * @returns the keys present in that row's user layer.
  */
 export function userSetKeys(ctx: { get(name: string): unknown }, rowId: string): ReadonlySet<string> {
+// platform-declaration anchor: the platform’s `settings` service (optional; undefined ⇒ the source column reports “unknown”)
   const settings = ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
   const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === rowId)
   return new Set(Object.keys(entry?.user ?? {}))

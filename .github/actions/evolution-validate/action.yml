@@ -263,6 +263,34 @@ runs:
         # "does any path escape the plane it claims", not "what is on this machine".
         node packages/evolution/scripts/verify-write-inventory.mjs packages/evolution --strict --home "$RUNNER_TEMP/plane-home"
 
+    - name: Verify the line-identity policy (G1.1)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The manifest form of this gate judges the MACHINE BED and therefore cannot run here; the
+        # policy-only form is the repo-side half (kinds, hoist whitelist with reasons, removal notes)
+        # and is what CI can hold. The doc-facts rule requires a declared check to be run by CI or
+        # registered as local-only — this step is that wiring.
+        node packages/evolution/scripts/verify-line-identity.mjs --policy-only --strict
+
+    - name: Declare the line this CI run measured (G1.5)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # Every conclusion names its line. On a runner the line is the checkout plus the declared kind
+        # policy (no bed manifest exists here), so this is the explicit CI form rather than the
+        # fail-closed local one.
+        node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json
+
+    - name: Verify the gates are armed (G1.2)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # A rule can be clean and still never judge anything: its scan may have found no files at all.
+        # This gate consumes the guard's --arming-json report and fails when a rule family scanned zero
+        # files on the real tree (a vacuum pass is not a pass).
+        node packages/evolution/scripts/verify-arming.mjs --packages packages/evolution --strict
+
     - name: Verify event pairing (G7.3)
       shell: bash
       working-directory: upstream
@@ -328,6 +356,40 @@ runs:
         node packages/evolution/scripts/verify-param-channel-parity.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-client-tokens.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-client-seats.mjs packages/evolution --strict --upstream .
+        # U-8/G5.9: the client halves' visible copy must come from a dictionary (no undeclared
+        # literal child, no cross-face instruction in a string).
+        node packages/evolution/scripts/verify-client-ui-i18n.mjs packages/evolution
+        # G4.3/C5: the error-code table and README must be the same set, and the stated range must match.
+        node packages/evolution/scripts/verify-error-codes.mjs packages/evolution
+        # G4.1/C5: the package map must name exactly what the tree publishes.
+        node packages/evolution/scripts/verify-package-map.mjs packages/evolution
+        # G6-②: profile-patch writes must call the platform HMR lock (and keep its degrade shape).
+        node packages/evolution/scripts/verify-lock-usage.mjs packages/evolution
+        # G7-3: one comment stripper for the whole tooling (lib-source-text.mjs).
+        node packages/evolution/scripts/verify-source-text-single-source.mjs packages/evolution
+        # G7-3: one atomic writer for the family (the io seam).
+        node packages/evolution/scripts/verify-atomic-write-single-source.mjs packages/evolution
+        # G7.1/A8: one plain-object predicate (the client halves use the generated copy).
+        node packages/evolution/scripts/verify-predicate-single-source.mjs packages/evolution
+        # G7.2/F-2: the read-only action criterion is spelled once.
+        node packages/evolution/scripts/verify-readonly-single-criterion.mjs packages/evolution
+        # G7.4/C7: the command table and the dispatch must agree.
+        node packages/evolution/scripts/verify-command-table.mjs packages/evolution
+        # G2.4/C3: one lock, one upper bound.
+        node packages/evolution/scripts/verify-bounds.mjs packages/evolution
+        # G2.2/C4: the write facade is the only door to the disk.
+        node packages/evolution/scripts/verify-io-discipline.mjs packages/evolution
+        # G4/C5+C6: declared fields are rendered; every self-kept control is declared.
+        node packages/evolution/scripts/verify-declarations.mjs packages/evolution
+        # G4.1/C5: the generated artifacts must match their sources.
+        node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check
+        node packages/evolution/scripts/gen-client-tokens.mjs packages/evolution --check
+        node packages/evolution/scripts/gen-param-client-view.mjs packages/evolution --check
+        node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check
+        node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check
+        node packages/evolution/scripts/gen-about.mjs packages/evolution --check
+        # G6.1/M1: the installer-side composer port is generated from core, never hand-edited.
+        node packages/evolution/scripts/gen-composer-port.mjs packages/evolution --check
         node packages/evolution/scripts/verify-profile-bundles.mjs --self-test
         # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
         # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs

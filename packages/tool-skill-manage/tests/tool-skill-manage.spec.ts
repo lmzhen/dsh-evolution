@@ -374,6 +374,14 @@ describe('tool-skill-manage', () => {
     // 'list' is the remaining read-only probe for the counter assertion.
     const listing = await execute({ action: 'list' })
     expect(listing.isError).toBe(false)
+    // G7.2/F-2 single-criteria fixture: ALL FOUR read-only actions go through the one
+    // `isReadOnlyAction` predicate, so each of them must leave the counters and the mutation stream
+    // alone. `pin`/`unpin` joined the enum later — this is the half that used to be asserted for
+    // `list`/`review` only.
+    for (const action of ['pin', 'unpin']) {
+      const result = await execute({ action, name: 'audit-skill' })
+      expect(result.isError, action).toBe(false)
+    }
     // Read-only actions neither bump counters nor emit mutation events. The
     // usage sidecar may be shared across fixtures, so assert on the delta.
     expect(mutationEvents).toBe(1)

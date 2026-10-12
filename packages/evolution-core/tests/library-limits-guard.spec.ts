@@ -23,8 +23,8 @@ import { fileURLToPath } from 'node:url'
  * `limits:` or it takes the defaults and belongs in this register.
  */
 const REGISTERED_DEFAULTS: Record<string, string> = {
-  'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: ioRegistry.provider() }': 'read-only: the commands listing walks the tree, no write goes through this instance',
-  'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: ioRegistry.provider() } #2': 'read-only: as above',
+  'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: preferProvider(ioRegistry, [\'fs\']) }': 'read-only: the commands listing',
+  'evolution-commands/src/index.ts :: { config: { root: skillsRootValue }, io: preferProvider(ioRegistry, [\'fs\']) } #2': 'read-only: as above',
   'evolution-learning-graph/src/index.ts :: { config: rawConfig, io: evolutionIoAdapter(() => io.provider()), ctx, threatExemptLabels: rawConfig.threatExemptLabels }': 'read-only: withSkills() serves reads and the graph read path',
   'evolution-maintenance/src/tools.ts :: { config: rootConfig, io: ioRegistry.provider() }': 'read-only: the maintenance probe walks the tree',
   'evolution-review/src/index.ts :: { config: rootConfig, io: evolutionIoAdapter(() => io.provider()) }': 'read-only: the pre-run hash snapshot',

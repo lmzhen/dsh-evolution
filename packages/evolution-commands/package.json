@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-commands",
   "description": "Human commands for the evolution family (/evolution pending|curator|maintain|doctor)",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "publishConfig": {
     "access": "public"
   },
@@ -37,6 +37,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-commands": "workspace:^",
+    "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^"
   },
   "devDependencies": {
