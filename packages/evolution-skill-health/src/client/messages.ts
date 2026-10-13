@@ -35,10 +35,12 @@ export const zh: Record<string, string> = {
   'line.unknown': '位置：未知',
   'unreadable.note': '读不到内容，因此无法判断（不是「通过」）。',
   'loading.failed': '读取失败——现在判断不了；点「刷新」重试。',
+  'read.failed': '这次没读到数据（下面一行是原始信息）：',
 }
 
 /** English dictionary. */
 export const en: Record<string, string> = {
+  'read.failed': 'This read failed (raw message below):',
   'entry.label': 'Skill Health',
   'title': 'Skill Health',
   'hint': 'What the health engine found, aggregated by rule. A rule whose threshold is not calibrated yet is named without a number; skills that cannot be read are listed as unreadable, never as fine.',

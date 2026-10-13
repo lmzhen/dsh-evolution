@@ -57,20 +57,37 @@ function byRule(rows: readonly HealthRow[]): Array<{ rule: string; count: number
   return [...table.values()].sort((a, b) => b.skills.length - a.skills.length || a.rule.localeCompare(b.rule))
 }
 
-/** The rule table: name always, count only when the threshold behind it is calibrated. */
+/** The verdict a rule's row speaks in: the worst one among the skills that carry it. */
+function worstVerdict(face: HealthFace, skills: readonly string[]): string {
+  const order = ['error', 'warn', 'unreadable', 'ok']
+  let worst = 'ok'
+  for (const row of face.rows) {
+    if (!skills.includes(row.name)) continue
+    if (order.indexOf(row.verdict) < order.indexOf(worst)) worst = row.verdict
+  }
+  return worst
+}
+
+/** The rule table: a grid so counts line up, with a tone bar per row and skill pills. */
 function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
   const rows = byRule(face.rows)
-  return createElement('table', null,
-    createElement('thead', null, createElement('tr', null,
-      createElement('th', null, t('col.rule')),
-      createElement('th', null, t('col.skills')),
-      createElement('th', null, t('col.count')),
+  const cell = (role: string, children: ReactNode, key?: string): ReactNode =>
+    createElement('div', key === undefined ? { 'data-role': role } : { 'data-role': role, key }, children)
+  return createElement('div', { 'data-role': 'rule-table' },
+    createElement('div', { 'data-role': 'rule-row', 'data-role-head': 'true' },
+      createElement('div', { 'data-role': 'rule-name' }, t('col.rule')),
+      createElement('div', { 'data-role': 'skills' }, t('col.skills')),
+      createElement('div', { 'data-role': 'rule-count' }, t('col.count')),
+    ),
+    rows.map(entry => createElement('div', {
+      key: entry.rule,
+      'data-role': 'rule-row',
+      'data-tone': worstVerdict(face, entry.skills),
+    },
+    cell('rule-name', entry.rule),
+    cell('skills', entry.skills.map((name, i) => createElement('span', { 'data-role': 'skill-pill', key: name + ':' + String(i), title: name }, name))),
+    cell('rule-count', entry.count === 0 ? t('count.notCalibrated') : String(entry.count)),
     )),
-    createElement('tbody', null, rows.map(entry => createElement('tr', { key: entry.rule },
-      createElement('td', null, entry.rule),
-      createElement('td', null, entry.skills.join(', ')),
-      createElement('td', null, entry.count === 0 ? t('count.notCalibrated') : String(entry.count)),
-    ))),
   )
 }
 
@@ -99,19 +116,24 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
     return () => { live = false }
   }, [face])
   const counts = new Map(KINDS.map(kind => [kind, view.rows.filter((row: HealthRow) => row.verdict === kind).length]))
-  const summary = t('counts')
-    .replace('{ok}', String(counts.get('ok') ?? 0))
-    .replace('{warn}', String(counts.get('warn') ?? 0))
-    .replace('{error}', String(counts.get('error') ?? 0))
-    .replace('{unreadable}', String(counts.get('unreadable') ?? 0))
+  // Four verdict cards, not one sentence: the number is the fact a reader scans for, and the tone
+  // bar carries the severity. A verdict with no rows still shows its zero — silence would read as
+  // 'not checked' rather than 'nothing found'.
+  const stats = createElement('div', { 'data-role': 'stats' },
+    KINDS.map(kind => createElement('div', { key: kind, 'data-role': 'stat', 'data-tone': kind },
+      createElement('div', { 'data-role': 'stat-value' }, String(counts.get(kind) ?? 0)),
+      createElement('div', { 'data-role': 'stat-label' }, t('verdict.' + kind)),
+    )),
+  )
   return createElement('section', null,
-    createElement('p', null, summary),
-    view.truncated ? createElement('p', null, t('loading.failed')) : null,
-    failed === undefined ? null : createElement('p', null, failed),
-    view.rows.length === 0 ? createElement('p', null, t('empty.noneReported')) : null,
-    createElement('h3', null, t('group.byRule')),
+    createElement('p', { 'data-role': 'hint' }, t('hint')),
+    stats,
+    view.truncated ? createElement('p', { 'data-role': 'note' }, t('loading.failed')) : null,
+    failed === undefined ? null : createElement('p', { 'data-role': 'note' }, t('read.failed') + ' ' + failed),
+    view.rows.length === 0 ? createElement('p', { 'data-role': 'note' }, t('empty.noneReported')) : null,
+    createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')),
     ruleTable(view, t),
     view.rows.filter((row: HealthRow) => row.verdict === 'unreadable').map((row: HealthRow) =>
-      createElement('p', { key: row.name + ':unreadable' }, row.name + ' — ' + t('unreadable.note'))),
+      createElement('p', { key: row.name + ':unreadable', 'data-role': 'note' }, row.name + ' — ' + t('unreadable.note'))),
   )
 }
