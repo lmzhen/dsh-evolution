@@ -91,6 +91,12 @@ export function frontmatterBlock(content: string): { block: string; lines: strin
  */
 export interface FrontmatterRead {
   frontmatter: Frontmatter
+  /** P0′: the structured `metadata:` mapping, when the strict parser loaded one.
+   * Published as an OBJECT (never stringified): nested mappings used to be dropped
+   * because a lossy string could be picked up by a routing field — keeping it
+   * structured removes that risk while giving the one consumer the nested
+   * `metadata.hermes.related_skills` form the real corpus actually writes. */
+  metadata?: Record<string, unknown>
   body: string
   /** Raw entries whose UNQUOTED value the strict catalog cannot load as
    * written. Quotes are included, so a value already normalized by the write
@@ -191,6 +197,7 @@ function strictFrontmatterValues(block: string): StrictFrontmatterValues | null 
   if (typeof loaded !== 'object' || Array.isArray(loaded)) return null
   const values = new Map<string, string>()
   const split: PlatformStringSplit[] = []
+  let metadata: Record<string, unknown> | undefined
   for (const [key, value] of Object.entries(loaded as Record<string, unknown>)) {
     if (typeof value !== 'string' && PLATFORM_STRING_FIELDS.includes(key)) {
       split.push({ key, kind: value === null || value === undefined ? 'null' : Array.isArray(value) ? 'sequence' : typeof value === 'object' ? 'mapping' : 'scalar' })
@@ -198,8 +205,12 @@ function strictFrontmatterValues(block: string): StrictFrontmatterValues | null 
     if (typeof value === 'string') { values.set(key, value.trim()); continue }
     if (typeof value === 'number' || typeof value === 'boolean') { values.set(key, String(value)); continue }
     if (Array.isArray(value)) { values.set(key, `[${value.map(item => String(item)).join(', ')}]`); continue }
+    if (key === 'metadata' && value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      metadata = value as Record<string, unknown>
+      continue
+    }
   }
-  return { values, split }
+  return { values, split, metadata }
 }
 
 /**
@@ -259,6 +270,12 @@ function lenientFrontmatterValues(block: string, nl: string): Map<string, string
 /** What one frontmatter block says, before any body requirement is applied. */
 interface FrontmatterBlockRead {
   frontmatter: Frontmatter
+  /** P0′: the structured `metadata:` mapping, when the strict parser loaded one.
+   * Published as an OBJECT (never stringified): nested mappings used to be dropped
+   * because a lossy string could be picked up by a routing field — keeping it
+   * structured removes that risk while giving the one consumer the nested
+   * `metadata.hermes.related_skills` form the real corpus actually writes. */
+  metadata?: Record<string, unknown>
   body: string
   unsafeValues: Array<{ key: string; value: string }>
   /** The strict parser rejected the block outright. */
@@ -291,6 +308,7 @@ function readFrontmatterBlock(content: string): FrontmatterBlockRead | null {
     unsafeValues: unsafeFrontmatterEntries(found.block),
     strictFailed: strict === null,
     platformStringSplit: strict?.split ?? [],
+    metadata: strict?.metadata,
   }
 }
 
@@ -311,6 +329,7 @@ export function parseFrontmatter(content: string): FrontmatterRead | null {
     frontmatter: read.frontmatter,
     body: read.body,
     unsafeValues: read.unsafeValues,
+    metadata: read.metadata,
     catalogInvalid: read.strictFailed || read.unsafeValues.length > 0 || read.platformStringSplit.length > 0,
     platformStringSplit: read.platformStringSplit,
   }
@@ -522,7 +541,21 @@ export function normalizeFrontmatter(content: string): FrontmatterNormalizeResul
 export function relatedSkillNames(content: string, exclude?: string): string[] {
   const parsed = parseFrontmatter(content)
   if (!parsed) return []
-  const raw = parsed.frontmatter['related_skills']
+  // P0′ (2026-10-14): the real corpus writes the NESTED form —
+  // `metadata: hermes: related_skills: [...]` — and the flat top-level key is
+  // empty on every live file (实测 52 份：顶层 0 / 嵌套 33). The flat key stays
+  // supported for legacy blocks; the nested array is folded into the same
+  // delimited-name scan below, so the F-321 name-shape guard still applies.
+  const nestedHost = parsed.metadata?.['hermes']
+  const nestedRaw = nestedHost && typeof nestedHost === 'object' && !Array.isArray(nestedHost)
+    ? (nestedHost as Record<string, unknown>)['related_skills']
+    : undefined
+  const flat = parsed.frontmatter['related_skills']
+  const raw = typeof flat === 'string'
+    ? flat
+    : Array.isArray(nestedRaw)
+      ? `[${nestedRaw.map(item => String(item)).join(', ')}]`
+      : undefined
   if (typeof raw !== 'string') return []
   const names = new Set<string>()
   // F-321 (0.3.25): the old bare `[a-z0-9][a-z0-9-]*` scan matched an inner

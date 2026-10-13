@@ -25,9 +25,7 @@
       "profiles": [
         "local",
         "ci"
-      ],
-      "reason": "LOCAL RED IS EXPECTED: the dev overlay carries no platform types/modules, so oxlint reports no-unsafe-* on code that is correct against the full platform tree. The family lanes (vitest, normal mode) are green on the same sources. Release judgement belongs to CI, which has the platform tree.",
-      "expiry": "0.26.0"
+      ]
     },
     {
       "id": "gate-03",
@@ -445,6 +443,16 @@
       "id": "gate-45",
       "kind": "script",
       "cmd": "node packages/scripts/verify-declarations.mjs packages",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-42",
+      "kind": "script",
+      "cmd": "node packages/scripts/verify-graph-edges.mjs --self-test",
       "tree": "mirror",
       "profiles": [
         "local",

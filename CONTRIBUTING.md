@@ -20,7 +20,7 @@ stale side must never be copied back over this one.
    `D:/dsh/deepseek-harness` checkout is the stale former dev tree and is never
    a source to copy from.
 3. **Run the gate**. `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` executes
-   all 45 steps and writes one log per step plus a summary (§The gate has
+   all 46 steps and writes one log per step plus a summary (§The gate has
    the table and says which step runs in which tree).
 4. **Decide where your words live**. §Where a fact is allowed to live is the
    rule that fails a conclusion stated in two documents (N19).
@@ -53,7 +53,7 @@ cite the home (`cites`), and the machine owner that re-derives the value
 
 - Run it: `node packages/scripts/verify-doc-facts.mjs packages --strict`
 - It is also architecture rule **N19** inside `verify-arch-guards.mjs`, so the
-  45-step gate runs it on every batch; a second copy fails and names both files.
+  46-step gate runs it on every batch; a second copy fails and names both files.
 - `packages/docs/**` is gitignored: it is a source of material, never a home.
   Move the conclusion into a tracked document before citing it.
 
@@ -128,6 +128,7 @@ Run from the two trees (never reorder or rename these steps):
 | 43 | `node packages/scripts/verify-bounds.mjs packages`（G2.4/C3：**一个锁、一个上界**——A 凡出现 instance-idiom（instanceHome／holdsInstance／claimInstance／single-flight）又自造模块级守卫且**不**消费 claimInstance ⇒ 必红；B 计时调用（setTimeout／setInterval／AbortSignal.timeout／sleep）里出现**裸毫秒字面量** ⇒ 必红，超时常量**跨包重值**只报告。drill：注入自造锁 ⇒ 点名；注入 `setTimeout(f, 5000)` ⇒ 点名；撤回即绿） | mirror |
 | 44 | `node packages/scripts/verify-io-discipline.mjs packages`（G2.2/C4：**写门面是通往磁盘的唯一一道门**——域内 src 不得裸调 rmSync／unlinkSync／renameSync／copyFileSync／writeFileSync／mkdirSync 或裸异步 rm(／unlink(／rename(／copyFile(；**方法调用**（io().rename(、this.io.remove(）放行；介质＝evolution-core/src/io.ts ＋ evolution-io-fs＋evolution-io-node 的 src。drill：往域内注入一个 rmSync ⇒ 点名必红；撤回即绿） | mirror |
 | 45 | `node packages/scripts/verify-declarations.mjs packages`（G4/C5+C6：**声明了就必被渲染，例外必须显式**——A 生成视图里每个字段的 control 必须在 ParamCard.ts 有渲染分支；B **双向**对账 C6 表 `scripts/client-exceptions.json`（`{fieldId, reason, owner}`）：无平台件的 switch/select 字段**必须**在表里（缺 ⇒ 必红），表里**不得有**生成视图已不带的陈旧条目（有 ⇒ 必红）；C reason／owner 非空、id 唯一。drill：删一条例外 ⇒ 点名必红；加一条陈旧条目 ⇒ 必红） | mirror |
+| 46 | `node packages/scripts/verify-graph-edges.mjs --self-test`（P0′ 读路径：技能"参见边"的解析与悬空检查门禁 —— 自证形进 CI；活根形 `--report` 只留 local/pre-tag，CI 无技能根会 exit 2。三态：0=边>0且悬空=0／1=悬空·自指·形态非法／2=CANNOT DECIDE；无降级读器，运行时读器不可用即 exit 2 且不给数字）| mirror |
 
 The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
 writes one log per step plus a summary, and prints the step names it ran, so a
