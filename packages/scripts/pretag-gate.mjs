@@ -36,8 +36,10 @@ const strays = [...pkgVersions].filter(([, v]) => v !== rootVersion)
 record('version three-way', strays.length === 0 && headVersion === rootVersion, 'root=' + rootVersion + ' changelog=' + headVersion + ' packages=' + pkgVersions.size + (strays.length ? ' strays=' + strays.map(([n, v]) => n + '@' + v).join(',') : ''))
 
 // 2) lint through the overlay toolchain
+// The binary path is declared OUTSIDE the try: the catch has to re-run the probe, and a block-scoped
+// `ox` made that path throw `ReferenceError: ox is not defined` instead of reporting the findings.
+const ox = path.join(overlay, 'node_modules', '.bin', process.platform === 'win32' ? 'oxlint.cmd' : 'oxlint')
 try {
-  const ox = path.join(overlay, 'node_modules', '.bin', process.platform === 'win32' ? 'oxlint.cmd' : 'oxlint')
   // `-A typescript`: the type-aware rules need the PLATFORM's resolved types, which differ between
   // this machine's checkout and CI's pinned upstream; they fire here on unresolved imports and pass
   // in CI. The local gate keeps every non-type rule (arrow-parens, max-len, …) and says so.
@@ -51,6 +53,7 @@ try {
   // probe through spawnSync, whose result holds stdout/stderr regardless of the exit code.
   const probe = spawnSync(ox, ['--config', '.oxlintrc.json', '-A', 'typescript', 'packages/evolution/evolution-core', 'packages/evolution/evolution-skill-health', 'packages/evolution/evolution-review'], { cwd: overlay, encoding: 'utf8', shell: true })
   const raw = String(probe.stdout || '') + String(probe.stderr || '')
+  const findings = raw.split('\n').map((l) => l.trim()).filter((l) => /^x [a-z-]+\//.test(l))
   // `no-unsafe-*` is the type-aware family: on a machine whose platform checkout is a different ref
   // than CI's pinned upstream they fire on unresolved imports and pass in CI, so they are reported
   // as local noise; any OTHER finding is a real refusal.
