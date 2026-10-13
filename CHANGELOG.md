@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.5 (patch) — 面板有座位无数据；装机 patch 静默丢行
+
+> **现象**：0.25.4 装到 3080 并 opt-in 后侧栏出现「技能健康」，但面板没有任何数据（四态摘要全 0、规则表空）。同一台机器上，装机包内的 `cordis.patch.yml` 还比 npm 发布产物**少一行**；该行缺失时整个客户端包**不会进入页面的启动清单**（`__DSH_BOOT__`），且重装修不好——版本要求已满足时 `dsh plugin add` 是 no-op（实测 `resolved 63, reused 2, downloaded 0, added 0`）。
+> **根因**：① 客户端半 `main` 座位的 `inject` face 返回写死的空数据（`{ rows: [], truncated: false }`），从未读取宿主半已经挂好的只读路由；② 装机产物与发布产物之间没有任何比对，任何不一致都会静默长期存在。
+> **修复**：① 补 `src/client/api.ts`（镜像宿主半 `ROUTES.rows` 的 `/api/dsh-evolution/skill-health/rows`；拒绝一律以 `ok:false` + 宿主原句返回，与斜杠命令同一套措辞）＋`HealthFace` 增加 `loadRows`，面板挂载后取数并渲染真实结果（取数失败保留种子数据并把宿主原句显示出来）；② opt-in 改由 profile 自己的 `cordis.patch.yml` 承担（平台注释明示「Edit cordis.patch.yml, not this file」；该文件是 patch 列表，覆盖已有 id 须写在**第 0 列**），包内文件保持与发布产物逐字节一致。
+> **验证**：`build-client.mjs` 产出 `lib/client.js` 且其中出现 `api.rows`/`loadRows`；装机后侧栏行在，面板渲染真实技能清单（语义快照/截图留证）。
 ## 0.25.4 (patch) — 技能健康的行仍未注册：补齐座位的样式表与"行渲染件是组件"两处形态
 
 > **现象**：0.25.3 装机并 opt-in 后，页面能正常启动（`exports["./client"]` 修复有效），但侧栏仍无「技能健康」行。
