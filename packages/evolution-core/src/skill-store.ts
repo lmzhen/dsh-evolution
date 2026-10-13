@@ -97,6 +97,9 @@ function collisionsNote(collisions: readonly string[]): string {
 }
 import type { EvolutionSkillMutatedEvent } from './events.ts'
 
+// G3a: process-local sequence so two tree changes in one millisecond still get distinct unit ids.
+let nextUnitSeq = 0
+
 export interface SkillSummary {
   name: string
   description: string
@@ -1314,6 +1317,8 @@ export class SkillLibrary {
     // G5: who caused this write (a write face such as `foreground` / `background_review`, or a
     // migration step). Optional so existing callers keep their behaviour; the ledger stores it when
     // given, and old records without it stay readable.
+    // G3a: one tree change writes N paths under ONE unit id; the entries it writes share it.
+    unitId?: string,
     origin?: string,
   ): Promise<void> {
     const at = new Date().toISOString()
@@ -1321,7 +1326,7 @@ export class SkillLibrary {
     try {
       const keep = this.limits.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP
       // `exactOptionalPropertyTypes` is on: omit the key rather than passing an explicit undefined.
-      const input = { skillName, action, before, after, at, ...path === undefined ? {} : { path } }
+      const input = { skillName, action, before, after, at, ...path === undefined ? {} : { path }, ...unitId === undefined ? {} : { unitId } }
       versions = await recordVersions(this.root, this.io, input, keep)
     } catch (error) {
       if (!this.historyWarned) {
@@ -2579,11 +2584,18 @@ export class SkillLibrary {
     // CAS write compared against and the bytes the rollback restores — instead of the earlier `md`
     // read, which names a state the commit did not necessarily replace. (In every current caller the
     // CAS refuses a drift between the two reads, so this is the same value on every committing run.)
-    const skillMdWrite = landing.find(entry => entry.target.split(/[\\/]/).pop() === 'SKILL.md')
-    const auditedBefore = skillMdWrite === undefined ? md : skillMdWrite.previous
-    const auditedAfter = skillMdWrite === undefined ? md : skillMdWrite.content
-    // G5: the plan already carries the write face (`origin`) — put it in the ledger.
-    await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary, undefined, plan.origin)
+    // G3a: ONE tree change is ONE unit — every path it wrote is audited under a shared unit id.
+    // The old form picked only the SKILL.md landing, so a support file the same change moved got
+    // no version entry at all and the undo could not restore the file set as a unit.
+    const unitId = 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
+    for (const land of landing) {
+      const isBody = land.target.split(/[\\/]/).pop() === 'SKILL.md'
+      const rel = isBody ? undefined : land.target.slice(dir.length + 1).split('\\').join('/')
+      const auditedBefore = isBody ? (land.previous === undefined ? md : land.previous) : land.previous
+      const auditedAfter = isBody ? (land.content === undefined ? md : land.content) : land.content
+      // G5: the plan already carries the write face (`origin`) — put it in the ledger; G3a adds the unit.
+      await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary, rel, unitId, plan.origin)
+    }
     this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
     return {
       ok: true,

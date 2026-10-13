@@ -12,7 +12,7 @@ import { nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 const stamp = String.fromCharCode(10)
 const bodyWithExtra = ['---', 'name: r-skill', 'description: r-skill body', '---', '', '## Extra', 'extra content', ''].join(stamp)
 
-it.fails('R-G3a-1：restructure 写过的每个路径都有版本条目，且共享同一个 unitId（今天必红）', async () => {
+it('R-G3a-1：restructure 写过的每个路径都有版本条目，且共享同一个 unitId', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-unit-undo-'))
   try {
     const lib = new SkillLibrary(root, nodeEvolutionIo())

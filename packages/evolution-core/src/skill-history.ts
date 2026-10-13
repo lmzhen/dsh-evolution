@@ -47,6 +47,8 @@ export interface SkillVersion {
   /** Monotonic per skill; the identity, unlike {@link SkillVersion.at}. */
   v: number
   at: string
+  /** G3a: the unit this entry belongs to (one tree change = one unit); absent on entries recorded before it. */
+  unitId?: string
   /** The mutation that produced it (`create`/`update`/`patch`/…), or {@link BASELINE_ACTION}. */
   action: string
   /** sha256 of the stored content. */
@@ -84,6 +86,8 @@ export interface VersionRecordInput {
   summary?: string
   /** The support file this write touched, relative to the skill directory; undefined for content. */
   path?: string
+  /** G3a: the unit this write belongs to — one tree change writes N paths under ONE id. */
+  unitId?: string
 }
 
 /** The version numbers one write produced; a side with no content contributes nothing. */
@@ -292,6 +296,7 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
   // reader drops is dropped for good on the next write).
   const summary = typeof candidate.summary === 'string' && candidate.summary !== '' ? candidate.summary : undefined
   const path = typeof candidate.path === 'string' && candidate.path !== '' ? candidate.path : undefined
+  const unitId = typeof candidate.unitId === 'string' && candidate.unitId !== '' ? candidate.unitId : undefined
   const base: SkillVersion = {
     v: candidate.v,
     at: candidate.at,
@@ -300,6 +305,7 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
     chars: candidate.chars,
     ...summary === undefined ? {} : { summary },
     ...path === undefined ? {} : { path },
+    ...unitId === undefined ? {} : { unitId },
   }
   return typeof candidate.beforeHash === 'string' && candidate.beforeHash !== ''
     ? { ...base, beforeHash: candidate.beforeHash }
@@ -392,7 +398,7 @@ export function nextHistoryIndex(
   if (afterHash !== null) {
     const tail = grown[grown.length - 1]
     if (tail?.hash !== afterHash) {
-      grown.push({
+      grown.push({ ...input.unitId === undefined ? {} : { unitId: input.unitId },
         v: nextVersion(grown),
         at: input.at,
         action: input.action,
