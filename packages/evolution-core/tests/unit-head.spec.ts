@@ -30,6 +30,15 @@ it('G3b：代表片必须带 unitHead.moves（全量 manifest）与 unitHead.sou
     expect((head.unitHead.sources ?? [])[0]).toEqual({ skill: 'h-skill' })
     // R2: this restructure CREATES references/extra.md, so kind must be created (a blanket 'moved' is red).
     expect((head.unitHead.moves as Array<{ kind: string }>).every(m => m.kind === 'created')).toBe(true)
+    // F-G3b-1: the invariant is PER UNIT -- a landing that mints a baseline AND an after must still
+    // leave exactly one head, otherwise member resolution counts every shard twice.
+    const headsByUnit = new Map<string, number>()
+    for (const v of versions) {
+      const u = (v as { unitId?: string }).unitId
+      if (u === undefined) continue
+      if ((v as { unitHead?: unknown }).unitHead !== undefined) headsByUnit.set(u, (headsByUnit.get(u) ?? 0) + 1)
+    }
+    expect([...headsByUnit.values()].every((count) => count === 1)).toBe(true)
     // R1: exactly ONE entry carries the head, and it is the FIRST entry of the unit.
     const withHead = versions.filter(v => (v as { unitHead?: unknown }).unitHead !== undefined)
     expect(withHead.length).toBe(1)

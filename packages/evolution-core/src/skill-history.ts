@@ -409,7 +409,10 @@ export function nextHistoryIndex(
       ...pathField,
       // G3a: a baseline is part of THIS unit too -- an unlabelled baseline splits the unit into
       // adjacent segments and the prune (by unit) then keeps only one of them.
-      ...input.unitHead === undefined ? {} : { unitHead: input.unitHead },
+      // F-G3b-1 (independent review, 2026-10-14): the head rides ONLY the last entry this landing
+      // mints (the after entry, or the removal when there is no after). Putting it here as well left
+      // TWO heads in one unit whenever a landing minted a baseline AND an after -- member resolution
+      // then double-counted every path into `duplicated` and refused a resolvable unit.
       ...input.unitId === undefined ? {} : { unitId: input.unitId },
     })
   }
@@ -453,6 +456,9 @@ export function nextHistoryIndex(
         chars: input.before?.length ?? 0,
         ...pathField,
         ...input.unitId === undefined ? {} : { unitId: input.unitId },
+        // F-G3b-1: a removal-only landing IS the last entry of its unit, so it carries the head;
+        // otherwise a pure-deletion representative would leave the unit headless.
+        ...input.unitHead === undefined ? {} : { unitHead: input.unitHead },
         ...input.summary === undefined ? {} : { summary: input.summary },
       })
     }
