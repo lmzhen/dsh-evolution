@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.3 (patch) — 启用技能健康面板后页面启动失败：包缺 `exports["./client"]`
+
+> **现象**：操作者把该 bundle 行从 `disabled: true` 改为启用后，页面报 `Failed to load plugins / web boot: window.__ModuleLoader__ bootstrap facade is missing`。
+> **根因**：平台的客户端加载器按包的 **`exports["./client"]`** 解析浏览器半；本包的 `exports` 只声明了 `"."` 与 `"./package.json"`（兄弟包 `evolution-skill-history` 有 `"./client" -> ./lib/client.js`）⇒ 加载器拿不到正确的模块入口。
+> **修复**：`exports` 补齐 `"./client"`（与兄弟包同形）。**验证**：装机后启用该行、刷新页面，侧栏出现「技能健康」且面板能出数据。
+
 ## 0.25.2 (patch) — 技能健康面板在侧栏不出现：客户端半缺"语言字典 + 座位渲染件"这套契约
 
 > **现象**：0.25.1 已装到 3080（profile 依赖 0.25.1、包内有 `lib/client.js`、宿主路由 401 已挂载），刷新后侧栏仍无「技能健康」行。

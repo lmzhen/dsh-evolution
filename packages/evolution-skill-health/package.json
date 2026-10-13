@@ -11,7 +11,7 @@
       ]
     }
   },
-  "version": "0.25.2",
+  "version": "0.25.3",
   "publishConfig": {
     "access": "public"
   },
@@ -28,6 +28,11 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
