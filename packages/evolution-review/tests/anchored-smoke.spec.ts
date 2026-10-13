@@ -515,12 +515,23 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
         // inventing a tighter budget of its own.
         { timeout: 15_000, interval: 50 },
       ).toBe(true)
-      // The read-back must settle BEFORE this helper tears the tree down: polling in the caller
-      // reads a deleted DSH_HOME and sees null forever.
+      // The read-back must settle BEFORE this helper tears the tree down (a caller-side poll reads a
+      // deleted DSH_HOME and sees null forever), and it must settle on "two consecutive equal
+      // samples" rather than on `second`: TEST-07 is the clobber direction, where the concurrent
+      // writer's bytes legitimately win.
       let settled: string | null = null
+      let previousSettled: string | null = null
       await expect
-        .poll(async () => { settled = await library.read(name).catch(() => null); return lf(settled) }, { timeout: 10_000, interval: 50 })
-        .toBe(lf(second))
+        .poll(
+          async () => {
+            settled = await library.read(name).catch(() => null)
+            const stable = settled !== null && settled === previousSettled
+            previousSettled = settled
+            return stable
+          },
+          { timeout: 10_000, interval: 50 },
+        )
+        .toBe(true)
       return { first, second, landed: settled, library }
     } finally {
       await reviewFiber?.dispose()
