@@ -39,13 +39,14 @@ const FACES = [
 ]
 
 function parseArgs(argv) {
-  const out = { report: false, selfTest: false, json: false, roots: null }
+  const out = { report: false, selfTest: false, json: false, roots: null, planned: null }
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i]
     if (a === '--report') out.report = true
     else if (a === '--self-test') out.selfTest = true
     else if (a === '--json') out.json = true
     else if (a === '--roots' && argv[i + 1]) { out.roots = argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean); i += 1 }
+    else if (a === '--planned' && argv[i + 1]) { out.planned = argv[i + 1]; i += 1 }
   }
   return out
 }
@@ -56,6 +57,23 @@ const CATALOG_DESCRIPTION_CAP = 60
 function foldedDescription(text, describe, cap = CATALOG_DESCRIPTION_CAP) {
   const folded = String(describe(text) ?? '').replace(/\s+/g, ' ').trim()
   return Math.min(folded.length, cap)
+}
+
+/** E16 planned channel: the catalog rows a planned change WOULD add, in the row form the
+ * platform publishes (`- \`name\`: description`), folded and capped exactly like the live ones. */
+function plannedResidentChars(file) {
+  let rows = []
+  // A BOM is legal in a file a person wrote with an editor or PowerShell: strip it before parsing,
+  // otherwise a perfectly good planned table silently reads as "no planned rows" (red on the ledger).
+  try { rows = JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) } catch { return null }
+  if (!Array.isArray(rows)) return null
+  let sum = 0
+  for (const row of rows) {
+    const name = String(row?.name ?? '')
+    const line = '- `' + name + '`: ' + String(row?.description ?? '')
+    sum += Math.min(line.replace(/\s+/g, ' ').trim().length, CATALOG_DESCRIPTION_CAP)
+  }
+  return sum
 }
 
 function makeReader() {
@@ -71,6 +89,10 @@ function makeReader() {
 
 function evaluate(faces) {
   const { reader, declared, describe } = makeReader()
+  // E16 planned channel: what a PLANNED change would add to the catalog (status=planned), so the
+  // cost of P2a is on the same ledger as the live resident bytes instead of invisible.
+  const plannedFile = parseArgs(process.argv.slice(2)).planned
+  const plannedChars = plannedFile === null ? null : plannedResidentChars(plannedFile)
   const scan = faces.map((f) => ({ ...f, skills: discovery.discoverSkillFiles(f.root), missing: !existsSync(f.root) }))
   const known = new Set()
   for (const s of scan) for (const k of s.skills) known.add(k.name)
@@ -103,7 +125,7 @@ function evaluate(faces) {
   else if (edges === 0 || skills === 0) { exit = 2; reason = 'no-edges' }
   else if (dangling > 0 || selfRef > 0) { exit = 1; reason = selfRef > 0 ? 'self-ref' : 'dangling' }
   else if (facesWithTool === 0) { exit = 2; reason = 'no-face-with-tool' }
-  return { reader, importError, scan, skills, declaring, edges, dangling, selfRef, unresolved, skippedFaces, facesWithTool, exit, reason, channel: 'src' }
+  return { reader, importError, scan, skills, declaring, edges, dangling, selfRef, unresolved, skippedFaces, facesWithTool, exit, reason, channel: 'src', plannedChars }
 }
 
 function jsonOf(result) {
@@ -128,13 +150,15 @@ function jsonOf(result) {
     channel: result.channel,
     faces: result.scan.map((s) => ({ face: s.face, root: s.root, hasSkillTool: s.hasSkillTool, skills: s.skills.length, edges: decided ? s.edges : null, dangling: decided ? s.dangling : null, residentChars: decided ? (s.residentChars ?? 0) : null })),
     residentChars: decided ? result.scan.reduce((sum, s) => sum + (s.residentChars ?? 0), 0) : null,
+    residentStatus: decided ? { live: result.scan.reduce((sum, s) => sum + (s.residentChars ?? 0), 0), planned: result.plannedChars } : null,
+    plannedChars: decided ? result.plannedChars : null,
   }
 }
 
 function humanLine(result) {
   const j = jsonOf(result)
   const na = (v) => (v === null || v === undefined ? 'n/a' : String(v))
-  const parts = ['skills=' + j.skills, 'declaring=' + na(j.declaring), 'edges=' + na(j.edges), 'dangling=' + na(j.dangling), 'residentChars=' + na(j.residentChars)]
+  const parts = ['skills=' + j.skills, 'declaring=' + na(j.declaring), 'edges=' + na(j.edges), 'dangling=' + na(j.dangling), 'residentChars=' + na(j.residentChars), 'residentPlanned=' + na(j.plannedChars)]
   parts.push('self=' + result.selfRef, 'invisible=0', 'face=' + j.face, 'visibility=' + (result.facesWithTool ? 'model' : 'CANNOT DECIDE'))
   parts.push('roots=' + j.faces.length, 'depth=2', 'ignore=.archive,.backups,._*', 'reader=' + result.reader, 'exit=' + j.exit)
   return parts.join(' ') + (Array.isArray(j.unresolved) && j.unresolved.length ? ' unresolved=' + j.unresolved.join(',') : '') + (j.reason ? ' reason=' + j.reason : '')
