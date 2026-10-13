@@ -420,7 +420,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     name: string,
     homePrefix: string,
     betweenOps: ((library: SkillLibrary) => Promise<void>) | undefined,
-  ): Promise<{ first: string; second: string; landed: string | null }> => {
+  ): Promise<{ first: string; second: string; landed: string | null; library: SkillLibrary }> => {
     const root = await mkdtemp(join(tmpdir(), homePrefix))
     const previous = process.env.DSH_HOME
     process.env.DSH_HOME = root
