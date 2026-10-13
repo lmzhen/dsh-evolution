@@ -69,6 +69,16 @@ function plannedResidentChars(file) {
   // otherwise a perfectly good planned table silently reads as "no planned rows" (red on the ledger).
   try { rows = JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) } catch { return null }
   if (!Array.isArray(rows)) return null
+  // A planned description is AUTHOR-CONTROLLED input, so `& < >` is a red that names the row: the
+  // platform expands them (`&` -> `&amp;`, +4) after truncation, so a lower-bound number would
+  // silently understate the bytes the author is about to add to every request.
+  for (const row of rows) {
+    const desc = String(row?.description ?? '')
+    if (/[&<>]/.test(desc)) {
+      console.error('verify-graph-edges: planned row "' + String(row?.name ?? '?') + '" contains & < > -- the platform escapes these (cost grows); rewrite it or extend the ledger')
+      return null
+    }
+  }
   let sum = 0
   for (const row of rows) {
     const name = String(row?.name ?? '')
