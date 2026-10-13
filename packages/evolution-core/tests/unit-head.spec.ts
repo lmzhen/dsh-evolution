@@ -2,6 +2,7 @@
  * G3b（PLAN-R6 §28.2/28.3）：`unitHead` 一字段两形态 —— 代表片带 {moves, sources}、路标只带 {skill}。
  * 今天字段还不存在 ⇒ 用 `it.fails` 钉住；G3b 落地时翻成 `it`，翻牌即「已实现」的证据。
  */
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -55,5 +56,29 @@ it('G3b：代表片必须带 unitHead.moves（全量 manifest）与 unitHead.sou
       return h !== undefined && h.moves !== undefined && h.skill !== undefined
     })
     expect(both).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+it('F-G3b-1 见证：代表片同铸 baseline 与 after 时，单元仍只有一条 head', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-unit-head-witness-'))
+  try {
+    const lib = new SkillLibrary(root, nodeEvolutionIo())
+    await lib.create('c-skill', ['---', 'name: c-skill', 'description: c-skill body', '---', '', '## Extra', 'extra content', ''].join(String.fromCharCode(10)))
+    // 直接用 fs 造一个"在盘上存在、但从未进过本索引"的支撑文件 => 下一次 landing 的 previous 不在索引里 => 铸 baseline。
+    mkdirSync(join(root, 'c-skill', 'references'), { recursive: true })
+    writeFileSync(join(root, 'c-skill', 'references', 'extra.md'), '# hand-written\nnever indexed\n')
+    const moved = await lib.restructure('c-skill', [{ heading: 'Extra', toFile: 'references/extra.md' }], 'foreground')
+    expect(moved.ok, moved.message).toBe(true)
+    const versions = await lib.listVersions('c-skill')
+    // 场景断言：确实铸过 baseline（否则本条会退化成"没造出场景也绿"）。
+    const hasBaseline = versions.some(v => String((v as { action?: unknown }).action).toLowerCase().includes('base'))
+    expect(hasBaseline).toBe(true)
+    // 结论断言：每个单元恰好一条带 head 的条目。
+    const headsByUnit = new Map<string, number>()
+    for (const v of versions) {
+      const u = (v as { unitId?: string }).unitId
+      if (u === undefined) continue
+      if ((v as { unitHead?: unknown }).unitHead !== undefined) headsByUnit.set(u, (headsByUnit.get(u) ?? 0) + 1)
+    }
+    expect([...headsByUnit.values()].every(count => count === 1)).toBe(true)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
