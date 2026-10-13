@@ -76,3 +76,9 @@ This package adds **no model-visible content**: no prompt section, no tool schem
 - **The six routes are loopback-only by design.** The fence is the family's shared loopback check, authoritative on the socket (`X-Forwarded-For` is never trusted), so a LAN-facing host that answers the platform's `/api` normally returns **403** here for any non-loopback client; reach the host over loopback (a local browser, or an SSH tunnel). Following the platform's `trustedHosts` instead is an open decision (v46 `决策 3`; the mechanism lives in `evolution-core`'s `http-routes.ts`).
 - **Support-file bytes are history only.** They share the index with the body, so they are listed and labelled, but `undo` refuses them by name — the bytes stay in the blob store for a hand copy.
 - **No occupancy row.** `.history` growth is documented in the evolution-core README; showing the size in the panel would promise a cleanup path the family has not designed (a whole-library reference count belongs to the curator).
+
+## 单元与撤销（本包负责的面）
+
+- 面板行的 undoable 是**单元属性**：同 unitId 的记录同值；路标（有 skill、无 moves）返回 undefined ⇒ 路由侧**省略该键**，绝不为 false；聚合时跳过路标，避免它的 hash 污染兄弟片（src/unit-undoable.ts）。
+- 面板不拥有规则：哪条记录持正文、哪条已是当前，由 core 的 partitionVersions 与该行的哈希决定；本包只把结论送上 wire。
+- 面向读者的完整说明见仓库 docs/units-and-undo.md；撤销的决策层在 evolution-curator（src/unit-undo-plan.ts）。

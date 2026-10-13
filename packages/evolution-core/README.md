@@ -95,3 +95,10 @@ consumer — so the `@mode` target stays at six (decision 10, provisional: keep)
 | `E-322` | a cross-field parameter constraint would be broken (the field, its floor and the attempted value are included) | raise the value to the named floor, or lower the sibling first |
 | `E-319` | the confirmation before a create or bare delete went unanswered for `skillWriteConfirmTimeoutSeconds` (`skillWriteConfirm: 'timeout'`), so the write was cancelled | set `skillWriteConfirm` to `auto` (write without asking), keep `ask` (wait until answered), or raise the timeout |
 Symptom → next step; the exact text of every code (`E-301`–`E-322`) is stored once in
+
+## 单元与撤销（本包负责的契约）
+
+- 本包持有单元契约的**类型与折叠**：SkillVersion.unitHead 两形态互斥（代表片 { moves, sources }／路标 { skill }），判别式固定为 moves !== undefined；读端折叠必须带上新字段，否则下一次写就丢。
+- 成员解析与孤路标判定在 src/unit-members.ts：candidateSkills（代表片首位、去重保序）、resolveUnitMembersFromIndexes（只按已知 key、三向校验）、landmarkVerdict 与 staleRouteStubs（可跳 ⟺ 目标存在 ∧ 其索引仍持该 unitId；输出按 skill/version/owner 确定性排序）。
+- 写作端的硬规则：kind 判 previous === null（不是 undefined）；path 抄循环里既有的 rel；同一目标写两次时清单保留最后一次写入的 afterRef。
+- 面向读者的完整说明见仓库 docs/units-and-undo.md。
