@@ -11,7 +11,7 @@ import { nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 const stamp = String.fromCharCode(10)
 const bodyWithExtra = ['---', 'name: h-skill', 'description: h-skill body', '---', '', '## Extra', 'extra content', ''].join(stamp)
 
-it.fails('G3b：代表片必须带 unitHead.moves（全量 manifest）与 unitHead.sources（成员入口）', async () => {
+it('G3b：代表片必须带 unitHead.moves（全量 manifest）与 unitHead.sources（成员入口）', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-unit-head-'))
   try {
     const lib = new SkillLibrary(root, nodeEvolutionIo())

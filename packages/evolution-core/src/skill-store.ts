@@ -1332,7 +1332,7 @@ export class SkillLibrary {
     try {
       const keep = this.limits.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP
       // `exactOptionalPropertyTypes` is on: omit the key rather than passing an explicit undefined.
-      const input = { skillName, action, before, after, at, ...path === undefined ? {} : { path }, ...unitId === undefined ? {} : { unitId } }
+      const input = { skillName, action, before, after, at, ...path === undefined ? {} : { path }, ...unitId === undefined ? {} : { unitId }, ...unitHead === undefined ? {} : { unitHead } }
       versions = await recordVersions(this.root, this.io, input, keep)
     } catch (error) {
       if (!this.historyWarned) {
