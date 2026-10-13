@@ -50,15 +50,27 @@ function parseArgs(argv) {
   return out
 }
 
+/** E16: the catalog shows a folded, trimmed, CAPPED description — that string is what every
+ * request pays for. The cap is the platform's `catalogDescriptionMaxLength` (60 today). */
+const CATALOG_DESCRIPTION_CAP = 60
+function foldedDescription(text, describe, cap = CATALOG_DESCRIPTION_CAP) {
+  const folded = String(describe(text) ?? '').replace(/\s+/g, ' ').trim()
+  return Math.min(folded.length, cap)
+}
+
 function makeReader() {
   if (frontmatter && typeof frontmatter.relatedSkillNames === 'function') {
-    return { reader: 'src-import', declared: (c) => frontmatter.relatedSkillNames(c) }
+    return {
+      reader: 'src-import',
+      declared: (c) => frontmatter.relatedSkillNames(c),
+      describe: (c) => (typeof frontmatter.parseFrontmatter === 'function' ? frontmatter.parseFrontmatter(c)?.frontmatter?.description : ''),
+    }
   }
-  return { reader: 'unavailable', declared: () => [] }
+  return { reader: 'unavailable', declared: () => [], describe: () => '' }
 }
 
 function evaluate(faces) {
-  const { reader, declared } = makeReader()
+  const { reader, declared, describe } = makeReader()
   const scan = faces.map((f) => ({ ...f, skills: discovery.discoverSkillFiles(f.root), missing: !existsSync(f.root) }))
   const known = new Set()
   for (const s of scan) for (const k of s.skills) known.add(k.name)
@@ -70,9 +82,12 @@ function evaluate(faces) {
     skills += s.skills.length
     s.edges = 0
     s.dangling = 0
+    s.residentChars = 0
     for (const sk of s.skills) {
       let names = []
-      try { names = declared(readFileSync(sk.path, 'utf8')) } catch { continue }
+      let text = ''
+      try { text = readFileSync(sk.path, 'utf8'); names = declared(text) } catch { continue }
+      s.residentChars += foldedDescription(text, describe)
       if (names.length) declaring += 1
       for (const n of names) {
         edges += 1
@@ -111,14 +126,15 @@ function jsonOf(result) {
     exit: result.exit,
     reader: result.reader,
     channel: result.channel,
-    faces: result.scan.map((s) => ({ face: s.face, root: s.root, hasSkillTool: s.hasSkillTool, skills: s.skills.length, edges: decided ? s.edges : null, dangling: decided ? s.dangling : null })),
+    faces: result.scan.map((s) => ({ face: s.face, root: s.root, hasSkillTool: s.hasSkillTool, skills: s.skills.length, edges: decided ? s.edges : null, dangling: decided ? s.dangling : null, residentChars: decided ? (s.residentChars ?? 0) : null })),
+    residentChars: decided ? result.scan.reduce((sum, s) => sum + (s.residentChars ?? 0), 0) : null,
   }
 }
 
 function humanLine(result) {
   const j = jsonOf(result)
   const na = (v) => (v === null || v === undefined ? 'n/a' : String(v))
-  const parts = ['skills=' + j.skills, 'declaring=' + na(j.declaring), 'edges=' + na(j.edges), 'dangling=' + na(j.dangling)]
+  const parts = ['skills=' + j.skills, 'declaring=' + na(j.declaring), 'edges=' + na(j.edges), 'dangling=' + na(j.dangling), 'residentChars=' + na(j.residentChars)]
   parts.push('self=' + result.selfRef, 'invisible=0', 'face=' + j.face, 'visibility=' + (result.facesWithTool ? 'model' : 'CANNOT DECIDE'))
   parts.push('roots=' + j.faces.length, 'depth=2', 'ignore=.archive,.backups,._*', 'reader=' + result.reader, 'exit=' + j.exit)
   return parts.join(' ') + (Array.isArray(j.unresolved) && j.unresolved.length ? ' unresolved=' + j.unresolved.join(',') : '') + (j.reason ? ' reason=' + j.reason : '')
@@ -166,6 +182,9 @@ function selfTest() {
   assert(emptyRun.length > 0, '输出必须非空（空输出 + exit 0 ⇒ 红）')
   assert(emptyRun.includes('face=') && emptyRun.includes('exit='), '人类行必须含 face= 与 exit=')
   assert(emptyRun.includes('reason='), '人类行必须含 reason=')
+  // E16：目录常驻账的计量口径（折叠空白＋trim，再按该面上限截断）本身要有判据。
+  assert(foldedDescription('x', () => '  a  b\nc  ', 60) === 5, 'E16：折叠空白＋trim 后计数（a b c = 5）')
+  assert(foldedDescription('x', () => 'y'.repeat(100), 60) === 60, 'E16：超过上限必须截断到上限')
   if (fails.length) { console.error('SELF-TEST FAILED:\n  ' + fails.join('\n  ')); return 1 }
   console.log('SELF-TEST OK (10 fixtures)')
   return 0
