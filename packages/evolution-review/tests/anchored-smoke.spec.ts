@@ -562,7 +562,8 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     // The writer's bytes must survive: the refresh only happens after a write
     // THIS plan landed, and op 1 is refused as stale against the concurrent
     // write, so nothing re-bases op 2 onto the writer's content.
-    expect(landed).toBe(writerBytes)
+    // Same content-vs-platform-convention rule as TEST-06: Windows reads the bytes back with CRLF.
+    expect(lf(landed)).toBe(lf(writerBytes))
   })
 })
 
