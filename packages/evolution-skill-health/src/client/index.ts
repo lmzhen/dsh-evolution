@@ -10,7 +10,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement } from 'react'
 import { PANEL_ID, PANEL_ORDER, type ClientSeam } from './seam.ts'
-import { NS } from './messages.ts'
+import { NS, en, zh } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
 
 /** Required client services: the slot registry and the locale seat. */
@@ -25,7 +25,29 @@ export type HealthFaceLoader = () => Promise<HealthFace>
  */
 export function apply(ctx: ClientContext): void {
   const seam = ctx as unknown as ClientSeam
-  const label = (): string => seam.locale.bind(NS)('entry.label')
+  // The dictionary registration is an effect AND is guarded: the seat throws when this namespace is
+  // already registered (a second bundle, or a hot reload whose dispose has not run yet), and an
+  // uncaught throw here aborts apply(), so the row and body registrations below never run and the
+  // panel disappears without a message. The sibling half carries the same guard for the same reason.
+  let registered: boolean = false
+  ctx.effect(() => {
+    try {
+      const dispose = seam.locale.register(NS, { zh, en })
+      registered = true
+      return dispose
+    } catch (error) {
+      ctx.logger.warn(
+        `evolution-skill-health: the locale seat refused the "${NS}" dictionary (${String(error)});`
+          + ' the row falls back to the bundle copy.',
+      )
+      return () => {}
+    }
+  }, 'evolution-skill-health: locale')
+  const label = (): string => {
+    const fallback = String(zh['entry.label'] ?? '技能健康')
+    if (!registered) return fallback
+    try { return seam.locale.bind(NS)('entry.label') } catch { return fallback }
+  }
   seam.slots.inject('sidebar.panellist', function* () {
     yield seam.slots.register(
       { name: 'sidebar.panellist', id: PANEL_ID, order: PANEL_ORDER, label },

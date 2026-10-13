@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.2 (patch) — 技能健康面板在侧栏不出现：客户端半缺"语言字典 + 座位渲染件"这套契约
+
+> **现象**：0.25.1 已装到 3080（profile 依赖 0.25.1、包内有 `lib/client.js`、宿主路由 401 已挂载），刷新后侧栏仍无「技能健康」行。
+> **根因**：`src/client/index.ts` 只注册了 `sidebar.panellist` 与 keyed `main` 两处，**没有按座位契约注册本包的语言字典**（`ctx.effect` 内 `locale.register(NS, { zh, en })`）。座位对"命名空间已注册"会抛错；该异常从 `apply()` 逃出后，**后面的行与体注册根本不执行**，面板整块消失且不留消息（同族 `evolution-skill-history` 的客户端半早已带同样的守卫与告警）。
+> **修复**：补上受守卫的字典注册（失败时告警并退回包内字典），标签解析加兜底，不再让 `apply()` 因字典冲突而中断。
+> **验证**：`node packages/evolution/scripts/build-client.mjs evolution-skill-health` 产出 `lib/client.js` 且其中出现 `entry.label`/`locale` 注册；装机刷新后侧栏出现该行。
+
 ## 0.25.1 (patch) — 技能健康面板的客户端半未进包：补 `dsh.client` 声明，侧栏行才会出现
 
 > **现象**：0.25.0 装到 3080 那台（npm 装的 DSH）后，`/api/dsh-evolution/skill-health/rows` 由 404 变 401（host 半在），但侧栏**没有**「技能健康」行。
