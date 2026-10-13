@@ -9,6 +9,7 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactElement } from 'react'
+import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER, type ClientSeam } from './seam.ts'
 import { NS, en, zh } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
@@ -90,7 +91,9 @@ export function apply(ctx: ClientContext): void {
       PanelIcon,
     )
     yield seam.slots.register(
-      { name: 'main', key: PANEL_ID, inject: (): HealthFace => ({ rows: [], truncated: false }) },
+      // Seeded empty for the first paint; `loadRows` is what makes the panel show real data (api.ts
+      // is the only place a request is made, and the host route is its mirror of ROUTES.rows).
+      { name: 'main', key: PANEL_ID, inject: (): HealthFace => ({ rows: [], truncated: false, loadRows: api.rows }) },
       (props: unknown) => createElement(SkillHealthPanel, { face: (props as { face: HealthFace }).face, locale: seam.locale }),
     )
   })

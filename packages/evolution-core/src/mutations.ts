@@ -36,7 +36,9 @@ export function mutationsFile(root: string): string {
 }
 
 export function contentHash(content: string): string {
-  return createHash('sha256').update(content).digest('hex')
+  // Content identity, not byte identity: Windows reads a file back with CRLF while the caller
+  // staged the in-memory LF, so hashing raw bytes reports `drift` for an unchanged skill.
+  return createHash('sha256').update(content.replaceAll('\r\n', '\n')).digest('hex')
 }
 
 /**
