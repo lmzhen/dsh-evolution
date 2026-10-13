@@ -9,6 +9,8 @@
  */
 
 import { createElement, useEffect, useState, type ReactNode } from 'react'
+// The stylesheet is scoped to this class; without it on the root element the panel renders unstyled.
+import { CSS_TAG_ID } from './styles.ts'
 import type { HealthOutcome } from './api.ts'
 
 /** One finding, as the host reports it: `line` is null when the position cannot be named. */
@@ -125,7 +127,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
       createElement('div', { 'data-role': 'stat-label' }, t('verdict.' + kind)),
     )),
   )
-  return createElement('section', null,
+  return createElement('section', { className: CSS_TAG_ID },
     createElement('p', { 'data-role': 'hint' }, t('hint')),
     stats,
     view.truncated ? createElement('p', { 'data-role': 'note' }, t('loading.failed')) : null,
