@@ -2614,7 +2614,9 @@ export class SkillLibrary {
           .filter((m, idx, all) => all.findIndex((x) => x.path === m.path) === idx),
         sources: [{ skill: name }],
       } : undefined
-      const auditedBefore = isBody ? (land.previous === undefined ? md : land.previous) : land.previous
+      // A22: previous is string | null (a read failure rejects the whole plan), so the old
+      // `=== undefined ? md : previous` was an unreachable branch -- the type is the truth.
+      const auditedBefore = land.previous
       const auditedAfter = isBody ? (land.content === undefined ? md : land.content) : land.content
       // G5: the plan already carries the write face (`origin`) — put it in the ledger; G3a adds the unit.
       await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary, rel, unitId, unitHead, plan.origin)
