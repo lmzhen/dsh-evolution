@@ -18,3 +18,158 @@ import { tmpdir } from 'node:os'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FAMILY_ROOT = resolve(HERE, '..')
 const CORE_SRC = join(FAMILY_ROOT, 'evolution-core', 'src')
+
+let importError = null
+async function loadModule(name) {
+  try { return await import(pathToFileURL(join(CORE_SRC, name)).href) } catch (error) {
+    importError = String((error && error.code) || '') + ' ' + String((error && error.message) || error)
+    return null
+  }
+}
+const discovery = await loadModule('skill-discovery.ts')
+const frontmatter = await loadModule('frontmatter.ts')
+if (!discovery) {
+  console.error('verify-graph-edges: 无法加载 evolution-core/src/skill-discovery.ts（扫描谓词缺失 ⇒ CANNOT DECIDE）')
+  process.exit(2)
+}
+
+const FACES = [
+  { face: 'desktop', root: join(process.env.USERPROFILE || '', '.dsh', 'skills'), hasSkillTool: true },
+  { face: 'web', root: 'D:/dsh-homes/web/skills', hasSkillTool: false },
+]
+
+function parseArgs(argv) {
+  const out = { report: false, selfTest: false, json: false, roots: null }
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i]
+    if (a === '--report') out.report = true
+    else if (a === '--self-test') out.selfTest = true
+    else if (a === '--json') out.json = true
+    else if (a === '--roots' && argv[i + 1]) { out.roots = argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean); i += 1 }
+  }
+  return out
+}
+
+function makeReader() {
+  if (frontmatter && typeof frontmatter.relatedSkillNames === 'function') {
+    return { reader: 'src-import', declared: (c) => frontmatter.relatedSkillNames(c) }
+  }
+  return { reader: 'unavailable', declared: () => [] }
+}
+
+function evaluate(faces) {
+  const { reader, declared } = makeReader()
+  const scan = faces.map((f) => ({ ...f, skills: discovery.discoverSkillFiles(f.root), missing: !existsSync(f.root) }))
+  const known = new Set()
+  for (const s of scan) for (const k of s.skills) known.add(k.name)
+  let edges = 0, dangling = 0, selfRef = 0, declaring = 0, skills = 0, skippedFaces = 0, facesWithTool = 0
+  const unresolved = []
+  for (const s of scan) {
+    if (s.hasSkillTool && !s.missing) facesWithTool += 1
+    if (s.missing) { skippedFaces += 1; continue }
+    skills += s.skills.length
+    s.edges = 0
+    s.dangling = 0
+    for (const sk of s.skills) {
+      let names = []
+      try { names = declared(readFileSync(sk.path, 'utf8')) } catch { continue }
+      if (names.length) declaring += 1
+      for (const n of names) {
+        edges += 1
+        s.edges += 1
+        if (n === sk.name) { selfRef += 1; continue }
+        if (!known.has(n)) { dangling += 1; s.dangling += 1; if (!unresolved.includes(n)) unresolved.push(n) }
+      }
+    }
+  }
+  let exit = 0
+  let reason = 'ok'
+  if (reader !== 'src-import') { exit = 2; reason = 'reader-unavailable' }
+  else if (edges === 0 || skills === 0) { exit = 2; reason = 'no-edges' }
+  else if (dangling > 0 || selfRef > 0) { exit = 1; reason = selfRef > 0 ? 'self-ref' : 'dangling' }
+  else if (facesWithTool === 0) { exit = 2; reason = 'no-face-with-tool' }
+  return { reader, importError, scan, skills, declaring, edges, dangling, selfRef, unresolved, skippedFaces, facesWithTool, exit, reason, channel: 'src' }
+}
+
+function jsonOf(result) {
+  const primary = result.scan.find((s) => s.hasSkillTool && !s.missing) || result.scan[0] || { root: '', skills: [], face: 'none' }
+  const decided = result.reader === 'src-import'
+  return {
+    root: primary.root,
+    recursive: false,
+    maxDepth: 2,
+    ignoredDirs: ['.archive', '.backups', '._*', '.history'],
+    skills: result.skills,
+    declaring: decided ? result.declaring : null,
+    edges: decided ? result.edges : null,
+    dangling: decided ? result.dangling : null,
+    unresolved: decided ? result.unresolved : null,
+    face: primary.face || 'none',
+    reason: result.reason,
+    detail: result.reader === 'src-import' ? undefined : 'cannot import evolution-core/src/frontmatter.ts: ' + String(result.importError),
+    faceAggregate: 'all',
+    exit: result.exit,
+    reader: result.reader,
+    channel: result.channel,
+    faces: result.scan.map((s) => ({ face: s.face, root: s.root, hasSkillTool: s.hasSkillTool, skills: s.skills.length, edges: decided ? s.edges : null, dangling: decided ? s.dangling : null })),
+  }
+}
+
+function humanLine(result) {
+  const j = jsonOf(result)
+  const na = (v) => (v === null || v === undefined ? 'n/a' : String(v))
+  const parts = ['skills=' + j.skills, 'declaring=' + na(j.declaring), 'edges=' + na(j.edges), 'dangling=' + na(j.dangling)]
+  parts.push('self=' + result.selfRef, 'invisible=0', 'face=' + j.face, 'visibility=' + (result.facesWithTool ? 'model' : 'CANNOT DECIDE'))
+  parts.push('roots=' + j.faces.length, 'depth=2', 'ignore=.archive,.backups,._*', 'reader=' + result.reader, 'exit=' + j.exit)
+  return parts.join(' ') + (Array.isArray(j.unresolved) && j.unresolved.length ? ' unresolved=' + j.unresolved.join(',') : '') + (j.reason ? ' reason=' + j.reason : '')
+}
+
+function selfTest() {
+  const fails = []
+  const assert = (ok, msg) => { if (!ok) fails.push(msg) }
+  assert(discovery.isSkillName('good-name'), 'kebab-case 接受')
+  assert(!discovery.isSkillName('Bad_Name'), 'Bad_Name 必须不被接受（名字文法）')
+  assert(!discovery.isSkillName('._x'), '._x 必须不被接受（点前缀）')
+  assert(discovery.isPotentialSkillPath('good-name/SKILL.md'), 'depth 2 的 SKILL.md 是候选路径')
+  assert(!discovery.isPotentialSkillPath('.backups/snap/good-name/SKILL.md'), 'depth 3 不是候选路径')
+  const dir = join(tmpdir(), 'vge-selftest-' + String(process.pid))
+  rmSync(dir, { recursive: true, force: true })
+  for (const p of ['live-skill/SKILL.md', 'Bad_Name/SKILL.md', '._x/SKILL.md', '.backups/snap/live-skill/SKILL.md', '.archive/old-skill/SKILL.md']) {
+    const f = join(dir, p)
+    mkdirSync(dirname(f), { recursive: true })
+    writeFileSync(f, '---\nname: x\ndescription: d\n---\nbody\n')
+  }
+  const found = discovery.discoverSkillFiles(dir).map((s) => s.name)
+  // ④ F-archive-copy（R88）：忽略目录里的边既不计入也不算悬空；且不是一刀切忽略。
+  const dir2 = join(tmpdir(), 'vge-archive-copy-' + String(process.pid))
+  rmSync(dir2, { recursive: true, force: true })
+  const mk = (p, body) => { const f = join(dir2, p); mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, body) }
+  mk('live-a/SKILL.md', '---\nname: live-a\ndescription: d\nmetadata:\n  hermes:\n    related_skills: [live-b]\n---\nbody\n')
+  mk('live-b/SKILL.md', '---\nname: live-b\ndescription: d\n---\nbody\n')
+  mk('.archive/old-b/SKILL.md', '---\nname: old-b\ndescription: d\nmetadata:\n  hermes:\n    related_skills: [live-a]\n---\nbody\n')
+  mk('.backups/snap/c/SKILL.md', '---\nname: c\ndescription: d\nmetadata:\n  hermes:\n    related_skills: [live-a]\n---\nbody\n')
+  let s2 = discovery.discoverSkillFiles(dir2).map((x) => x.name)
+  assert(s2.length === 2 && s2[0] === 'live-a' && s2[1] === 'live-b', 'F-archive-copy 第一向：忽略目录不进扫描面（scanned==2）')
+  mk('old-b/SKILL.md', '---\nname: old-b\ndescription: d\n---\nbody\n')
+  mk('copy-of-archive/old-b/SKILL.md', '---\nname: old-b\ndescription: d\n---\nbody\n')
+  s2 = discovery.discoverSkillFiles(dir2).map((x) => x.name)
+  assert(s2.length === 3 && s2.includes('old-b'), 'F-archive-copy 第二向：2 段复制必须被发现（证明不是一刀切忽略）')
+  rmSync(dir2, { recursive: true, force: true })
+  assert(found.length === 1 && found[0] === 'live-skill', '扫描面只认 live-skill（Bad_Name/._x/.backups/.archive 都不算）')
+  rmSync(dir, { recursive: true, force: true })
+  const zh = '中文语料'
+  assert(Buffer.byteLength(zh, 'utf8') !== zh.length, '中文语料下 bytes != chars')
+  assert(!(zh.length === Buffer.byteLength(zh, 'utf8')), '反例：写成 s.length === size 必须失败')
+  assert(Buffer.byteLength('x', 'utf8') === 1, '字节断言基线')
+  if (fails.length) { console.error('SELF-TEST FAILED:\n  ' + fails.join('\n  ')); return 1 }
+  console.log('SELF-TEST OK (10 fixtures)')
+  return 0
+}
+
+const args = parseArgs(process.argv.slice(2))
+if (args.selfTest) process.exit(selfTest())
+const faces = args.roots ? args.roots.map((r) => ({ face: r, root: r, hasSkillTool: true })) : FACES
+const result = evaluate(faces)
+if (args.json) console.log(JSON.stringify(jsonOf(result), null, 2))
+else console.log(humanLine(result))
+process.exit(args.report ? 0 : result.exit)
