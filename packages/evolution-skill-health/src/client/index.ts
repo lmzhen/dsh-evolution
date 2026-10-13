@@ -8,7 +8,7 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { createElement } from 'react'
+import { createElement, type ReactElement } from 'react'
 import { PANEL_ID, PANEL_ORDER, type ClientSeam } from './seam.ts'
 import { NS, en, zh } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
@@ -30,7 +30,7 @@ export type HealthFaceLoader = () => Promise<HealthFace>
  * @param props - the seat-provided size and active flag.
  * @returns the glyph element.
  */
-function PanelIcon(props: { size?: number; active?: boolean } = {}): unknown {
+function PanelIcon(props: { size?: number; active?: boolean } = {}): ReactElement {
   const size = typeof props.size === 'number' && props.size > 0 ? props.size : 16
   return createElement(
     'svg',

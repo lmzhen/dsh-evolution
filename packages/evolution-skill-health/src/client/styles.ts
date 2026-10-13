@@ -20,4 +20,4 @@ export const CSS = [
   ':where(' + root + ') { ' + TOKEN_CSS + ' }',
   ':where(' + root + ' [data-role="row"]) { display: flex; align-items: baseline; justify-content: space-between; gap: var(--evo-space-8); border-bottom: var(--evo-hairline-width) solid var(--evo-tone-quiet); }',
   ':where(' + root + ' [data-role="note"]) { color: var(--evo-tone-quiet); }',
-].join(NL)
+].join(String.fromCharCode(10))

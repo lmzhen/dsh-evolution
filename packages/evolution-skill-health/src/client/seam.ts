@@ -44,7 +44,7 @@ export interface LocaleSeat {
 /** The slot registry: a generator body may register (and is disposed when it unmounts). */
 export interface SlotsSeat {
   inject(name: string, body: () => Generator<() => void, void, void>): void
-  register(options: PanelRowOptions | PanelBodyOptions, component: (props: unknown) => ReactNode): () => void
+  register(options: PanelRowOptions | PanelBodyOptions, component: (props: never) => ReactNode): () => void
 }
 
 /** Everything this bundle asks the shell for. */
