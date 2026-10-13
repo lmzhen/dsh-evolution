@@ -162,7 +162,8 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
           // row can never offer (or hide) an undo that belongs to a sibling shard.
           const unitFlags = unitUndoableFlags([...groups.content, ...groups.support], liveHash)
           const content = groups.content.map((entry, index) => {
-            const row = { ...decorate(entry, index, groups.content, true), undoable: undoableFor(entry, unitFlags, liveHash) }
+            const undoable = undoableFor(entry, unitFlags, liveHash)
+            const row = { ...decorate(entry, index, groups.content, true), ...undoable === undefined ? {} : { undoable } }
             return { ...row, cells: versionRowCells(row) }
           })
           const support = groups.support.map((entry, index) => {

@@ -27,4 +27,20 @@ it('无 unitId 的条目退回逐条判定（老条目是单例单元）', () =>
   expect(flags.size).toBe(0)
   expect(undoableFor(entry({ v: 9, hash: 'x' }), flags, 'live')).toBe(true)
   expect(undoableFor(entry({ v: 9, hash: 'live' }), flags, 'live')).toBe(false)
+
+})
+
+it('G3b：跨技能路标（unitHead.skill 且无 moves）⇒ undefined，绝不为 false', () => {
+  const landmark = entry({ v: 5, unitId: 'uL', hash: 'foreign', unitHead: { skill: 'owning-skill' } })
+  const flags = unitUndoableFlags([landmark], 'live')
+  expect(flags.get('uL')).toBeUndefined()
+  expect(undoableFor(landmark, flags, 'live')).toBeUndefined()
+})
+
+it('G3b：路标不得污染同单元兄弟片的判定（跳过路标的 hash）', () => {
+  const shard = entry({ v: 6, unitId: 'uM', hash: 'live' })
+  const landmark = entry({ v: 7, unitId: 'uM', hash: 'foreign', unitHead: { skill: 'other' } })
+  const flags = unitUndoableFlags([shard, landmark], 'live')
+  expect(flags.get('uM')).toBe(false)
+  expect(undoableFor(shard, flags, 'live')).toBe(false)
 })

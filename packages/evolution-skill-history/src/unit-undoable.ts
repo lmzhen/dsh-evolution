@@ -12,10 +12,18 @@ import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 /** @param members - every entry that shares the unit (content and support chains together).
  * @param liveHash - hash of the live body, or null when the skill is not readable.
  * @returns one flag per unit id; unknown ids fall back to the per-entry rule. */
+function isLandmark(entry: SkillVersion): boolean {
+  const head = entry.unitHead
+  return head !== undefined && head.moves === undefined && head.skill !== undefined
+}
+
 export function unitUndoableFlags(members: readonly SkillVersion[], liveHash: string | null): Map<string, boolean> {
   const flags = new Map<string, boolean>()
   for (const entry of members) {
     if (entry.unitId === undefined) continue
+    // A cross-skill LANDMARK describes a unit whose records live in ANOTHER skill, so its hash says
+    // nothing about this skill's live body -- it must not poison the unit's flag.
+    if (isLandmark(entry)) continue
     const differs = entry.hash !== liveHash
     flags.set(entry.unitId, (flags.get(entry.unitId) ?? false) || differs)
   }
@@ -24,7 +32,10 @@ export function unitUndoableFlags(members: readonly SkillVersion[], liveHash: st
 
 /** @param entry - the entry being rendered. @param flags - the unit flags from {@link unitUndoableFlags}.
  * @param liveHash - hash of the live body. @returns the row's `undoable` value. */
-export function undoableFor(entry: SkillVersion, flags: Map<string, boolean>, liveHash: string | null): boolean {
+export function undoableFor(entry: SkillVersion, flags: Map<string, boolean>, liveHash: string | null): boolean | undefined {
+  // Frozen G3b shape: a landmark reports `undefined` (the wire omits the key) -- never `false`,
+  // which would claim this skill can prove the unit is not undoable.
+  if (isLandmark(entry)) return undefined
   const unit = entry.unitId
   if (unit !== undefined) {
     const flagged = flags.get(unit)
