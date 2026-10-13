@@ -92,6 +92,12 @@ export async function resolveUnitMembers(
   }
   return resolveUnitMembersFromIndexes(head, indexes, raw => readEntries(raw))
 }
+/** G3b: a LANDMARK carries the owning skill and no manifest (the two forms never coexist). */
+export function isLandmark(entry: SkillVersion): boolean {
+  const head = entry.unitHead
+  return head !== undefined && head.moves === undefined && head.skill !== undefined
+}
+
 /** A landmark is jumpable only when its owner exists AND that index still holds the unit. */
 export type LandmarkVerdict =
   | { readonly jumpable: true }
@@ -101,7 +107,7 @@ export type LandmarkVerdict =
  * the owner has no readable index. */
 export function landmarkVerdict(entry: SkillVersion, ownerEntries: readonly SkillVersion[] | null): LandmarkVerdict {
   const head = entry.unitHead
-  const skill = head !== undefined && head.moves === undefined ? head.skill : undefined
+  const skill = isLandmark(entry) ? head?.skill : undefined
   if (skill === undefined || entry.unitId === undefined) return { jumpable: false, reason: 'not-a-landmark' }
   if (ownerEntries === null) return { jumpable: false, reason: 'owner-absent' }
   const held = ownerEntries.some(candidate => candidate.unitId === entry.unitId)
@@ -126,7 +132,7 @@ export function staleRouteStubs(indexes: ReadonlyMap<string, readonly SkillVersi
     if (entries === null) continue
     for (const entry of entries) {
       const head = entry.unitHead
-      const owner = head !== undefined && head.moves === undefined ? head.skill : undefined
+      const owner = isLandmark(entry) ? head?.skill : undefined
       if (owner === undefined) continue
       const verdict = landmarkVerdict(entry, indexes.get(owner) ?? null)
       if (!verdict.jumpable && verdict.reason !== 'not-a-landmark') out.push({ skill, v: entry.v, owner, reason: verdict.reason })

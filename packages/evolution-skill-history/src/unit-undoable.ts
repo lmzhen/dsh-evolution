@@ -7,15 +7,11 @@
  *
  * Entries without a unit id keep the per-entry answer (they are their own singleton unit).
  */
-import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+import { isLandmark, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 
 /** @param members - every entry that shares the unit (content and support chains together).
  * @param liveHash - hash of the live body, or null when the skill is not readable.
  * @returns one flag per unit id; unknown ids fall back to the per-entry rule. */
-function isLandmark(entry: SkillVersion): boolean {
-  const head = entry.unitHead
-  return head !== undefined && head.moves === undefined && head.skill !== undefined
-}
 
 export function unitUndoableFlags(members: readonly SkillVersion[], liveHash: string | null): Map<string, boolean> {
   const flags = new Map<string, boolean>()
