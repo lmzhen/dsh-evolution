@@ -42,6 +42,16 @@ export const HISTORY_INDEX_VERSION = 1
  * feature existed, or a hand-edited tree): it says "this is what was there", not what wrote it. */
 export const BASELINE_ACTION = 'baseline'
 
+/** G3b: one unit's head. Exactly one of the two forms is present (they never coexist). */
+export interface UnitHead {
+  /** Representative shard: the unit's WHOLE manifest of moves (one entry per written path). */
+  moves?: readonly Readonly<Record<string, unknown>>[]
+  /** Representative shard: the skills this unit wrote, so members resolve without a directory scan. */
+  sources?: readonly { readonly skill: string; readonly dest?: string }[]
+  /** Cross-skill landmark: the skill that owns the unit (route-only; never carries `moves`). */
+  skill?: string
+}
+
 /** One recorded version of one skill. */
 export interface SkillVersion {
   /** Monotonic per skill; the identity, unlike {@link SkillVersion.at}. */
@@ -49,6 +59,11 @@ export interface SkillVersion {
   at: string
   /** G3a: the unit this entry belongs to (one tree change = one unit); absent on entries recorded before it. */
   unitId?: string
+  /** G3b: the unit HEAD. A representative shard carries `{ moves, sources }` (`moves` is the whole
+   * manifest of the unit, `sources` names the skills it wrote); a cross-skill landmark carries
+   * `{ skill }` only, and the two forms are mutually exclusive. Discriminate on `moves !== undefined`
+   * (a landmark also carries `unitId`, so that field can never discriminate). */
+  unitHead?: UnitHead
   /** The mutation that produced it (`create`/`update`/`patch`/…), or {@link BASELINE_ACTION}. */
   action: string
   /** sha256 of the stored content. */
@@ -88,6 +103,8 @@ export interface VersionRecordInput {
   path?: string
   /** G3a: the unit this write belongs to — one tree change writes N paths under ONE id. */
   unitId?: string
+  /** G3b: present only on the unit's representative shard (see {@link SkillVersion.unitHead}). */
+  unitHead?: UnitHead
 }
 
 /** The version numbers one write produced; a side with no content contributes nothing. */
@@ -297,6 +314,8 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
   const summary = typeof candidate.summary === 'string' && candidate.summary !== '' ? candidate.summary : undefined
   const path = typeof candidate.path === 'string' && candidate.path !== '' ? candidate.path : undefined
   const unitId = typeof candidate.unitId === 'string' && candidate.unitId !== '' ? candidate.unitId : undefined
+  // The fold must carry unitHead or the next write drops it for good (the G3a lesson).
+  const unitHead = candidate.unitHead as UnitHead | undefined
   const base: SkillVersion = {
     v: candidate.v,
     at: candidate.at,
@@ -306,6 +325,7 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
     ...summary === undefined ? {} : { summary },
     ...path === undefined ? {} : { path },
     ...unitId === undefined ? {} : { unitId },
+    ...unitHead === undefined ? {} : { unitHead },
   }
   return typeof candidate.beforeHash === 'string' && candidate.beforeHash !== ''
     ? { ...base, beforeHash: candidate.beforeHash }
@@ -389,6 +409,7 @@ export function nextHistoryIndex(
       ...pathField,
       // G3a: a baseline is part of THIS unit too -- an unlabelled baseline splits the unit into
       // adjacent segments and the prune (by unit) then keeps only one of them.
+      ...input.unitHead === undefined ? {} : { unitHead: input.unitHead },
       ...input.unitId === undefined ? {} : { unitId: input.unitId },
     })
   }
@@ -402,6 +423,7 @@ export function nextHistoryIndex(
     const tail = grown[grown.length - 1]
     if (tail?.hash !== afterHash) {
       grown.push({ ...input.unitId === undefined ? {} : { unitId: input.unitId },
+        ...input.unitHead === undefined ? {} : { unitHead: input.unitHead },
         v: nextVersion(grown),
         at: input.at,
         action: input.action,
