@@ -68,6 +68,8 @@ it('R-G3a-3：支撑文件被手改过 ⇒ 零写拒绝，文件原样保留', a
     const unit = newestUnitId(await lib.listVersions('u-skill'))
     const undone = await curator.undoUnit('u-skill', unit)
     expect(undone.ok).toBe(false)
+    // R86 同源：拒绝必须点名被判对象 —— 只断 ok===false 无法归因（可能拒错了东西）。
+    expect(undone.message).toContain('references/extra.md')
     expect(existsSync(target)).toBe(true)
     expect(readFileSync(target, 'utf8')).toBe(handEdited)
   } finally { await rm(home, { recursive: true, force: true }) }
