@@ -54,6 +54,8 @@ function parseArgs(argv) {
 /** E16: the catalog shows a folded, trimmed, CAPPED description — that string is what every
  * request pays for. The cap is the platform's `catalogDescriptionMaxLength` (60 today). */
 const CATALOG_DESCRIPTION_CAP = 60
+/** E16 恒等式的夹具常量（块口径 − markup 口径 == 行数）。 */
+const E16_IDENTITY_FIXTURE = { block: 5742, markup: 5673, rows: 69 }
 function foldedDescription(text, describe, cap = CATALOG_DESCRIPTION_CAP) {
   const folded = String(describe(text) ?? '').replace(/\s+/g, ' ').trim()
   return Math.min(folded.length, cap)
@@ -161,7 +163,11 @@ function jsonOf(result) {
     faces: result.scan.map((s) => ({ face: s.face, root: s.root, hasSkillTool: s.hasSkillTool, skills: s.skills.length, edges: decided ? s.edges : null, dangling: decided ? s.dangling : null, residentChars: decided ? (s.residentChars ?? 0) : null, residentLineChars: decided ? (s.residentLineChars ?? 0) : null })),
     residentChars: decided ? result.scan.reduce((sum, s) => sum + (s.residentChars ?? 0), 0) : null,
     // The cost ledger uses THIS one (line form); `residentChars` stays for the older readings.
+    // Two readings of the SAME catalog, one identity apart: `residentLineChars` counts the block
+    // (every line carries its newline: markup 6 + separator 1 = 7 per line), `residentMarkupChars`
+    // counts the row markup only (+6). Identity: block - markup === the number of catalog rows.
     residentLineChars: decided ? result.scan.reduce((sum, s) => sum + (s.residentLineChars ?? 0), 0) : null,
+    residentMarkupChars: decided ? result.scan.reduce((sum, s) => sum + (s.residentLineChars ?? 0) - s.skills.length, 0) : null,
     residentStatus: decided ? { live: result.scan.reduce((sum, s) => sum + (s.residentChars ?? 0), 0), planned: result.plannedChars } : null,
     plannedChars: decided ? result.plannedChars : null,
   }
@@ -221,6 +227,9 @@ function selfTest() {
   // E16：目录常驻账的计量口径（折叠空白＋trim，再按该面上限截断）本身要有判据。
   assert(foldedDescription('x', () => '  a  b\nc  ', 60) === 5, 'E16：折叠空白＋trim 后计数（a b c = 5）')
   assert(foldedDescription('x', () => 'y'.repeat(100), 60) === 60, 'E16：超过上限必须截断到上限')
+  // E16 恒等式：块口径 − markup 口径 == 目录行数（每行自带 1 个换行）。夹具钉住这条，
+  // 将来谁把两个口径混成一个，这里先红。
+  assert(E16_IDENTITY_FIXTURE.block - E16_IDENTITY_FIXTURE.markup === E16_IDENTITY_FIXTURE.rows, 'E16：块口径与 markup 口径只差每行一个换行')
   if (fails.length) { console.error('SELF-TEST FAILED:\n  ' + fails.join('\n  ')); return 1 }
   console.log('SELF-TEST OK (10 fixtures)')
   return 0
