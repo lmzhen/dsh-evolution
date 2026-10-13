@@ -38,7 +38,7 @@ it('G3b：代表片必须带 unitHead.moves（全量 manifest）与 unitHead.sou
       if (u === undefined) continue
       if ((v as { unitHead?: unknown }).unitHead !== undefined) headsByUnit.set(u, (headsByUnit.get(u) ?? 0) + 1)
     }
-    expect([...headsByUnit.values()].every((count) => count === 1)).toBe(true)
+    expect([...headsByUnit.values()].every(count => count === 1)).toBe(true)
     // R1: exactly ONE entry carries the head, and it is the FIRST entry of the unit.
     const withHead = versions.filter(v => (v as { unitHead?: unknown }).unitHead !== undefined)
     expect(withHead.length).toBe(1)
