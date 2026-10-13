@@ -1358,7 +1358,7 @@ export class EvolutionCurator extends Service {
         if (!isPresent(probe)) { indexes.set(name, null); continue }
         try { indexes.set(name, ((JSON.parse(probe.value) as RawIndex).versions) ?? null) } catch { indexes.set(name, null) }
       }
-      const detail = staleRouteStubs(indexes as never).map((stub) => ({ skill: stub.skill, v: stub.v, owner: stub.owner, reason: stub.reason }))
+      const detail = staleRouteStubs(indexes as never).map((stub: { skill: string; v: number; owner: string; reason: string }) => ({ skill: stub.skill, v: stub.v, owner: stub.owner, reason: stub.reason }))
       return { skills: indexes.size, stubs: detail.length, reason: 'ok', detail }
     })()
     ;(report as { routeStubs?: typeof routeStubs }).routeStubs = routeStubs
@@ -2306,21 +2306,26 @@ export class EvolutionCurator extends Service {
     // member from those known keys (never by scanning a directory) and refuse -- naming the objects --
     // when anything is missing or conflicting; guessing from the shards we happen to see would undo
     // half a unit.
-    const head = members[0]
-    const sources = head?.unitHead?.sources
+    // The unit head lives on the version record; read it STRUCTURALLY so this call site does not
+    // depend on which declaration of `SkillVersion` a local checkout resolves (a stale dist type
+    // silently lacks the field). The shape is the frozen one: { moves?, sources?, skill? }.
+    type UnitHeadLike = { readonly moves?: readonly unknown[]; readonly sources?: readonly { readonly skill: string }[]; readonly skill?: string }
+    const head = members[0] as { unitHead?: UnitHeadLike } | undefined
+    const headLike = head !== undefined && head.unitHead !== undefined ? head.unitHead : undefined
+    const sources = headLike?.sources
     if (sources !== undefined && sources.length > 0) {
       const resolved = await resolveUnitMembers(
         this.skills.root, this.io,
-        { skill: name, unitId: unit, sources, ...head.unitHead === undefined ? {} : { unitHead: head.unitHead } },
+        { skill: name, unitId: unit, sources, ...headLike === undefined ? {} : { unitHead: headLike as never } },
         historyIndexFile, parseHistoryIndex,
       )
       if (!unitMembersAreComplete(resolved)) {
-        const missing = resolved.missing.map(m => m.skill + (m.reason === 'index-absent' ? '（索引文件不在）' : '（索引里没有这个单元）')).join('、')
-        const conflicts = resolved.conflicts.map(c => c.path + '（' + c.kind + '）').join('、')
+        const missing = resolved.missing.map((m: { skill: string; reason: string }) => m.skill + (m.reason === 'index-absent' ? '（索引文件不在）' : '（索引里没有这个单元）')).join('、')
+        const conflicts = resolved.conflicts.map((c: { path: string; kind: string }) => c.path + '（' + c.kind + '）').join('、')
         return { ok: false, message: '单元 ' + unit + ' 的成员没解析齐：' + missing + (conflicts === '' ? '' : '；冲突：' + conflicts) + ' —— 拒绝用剩余片段拼一个撤销。' }
       }
       if (resolved.members.length > 1) {
-        return { ok: false, message: '单元 ' + unit + ' 跨 ' + String(resolved.members.length) + ' 个技能（' + resolved.members.map(m => m.skill).join('、') + '）—— 跨技能整体撤销尚未接线，拒绝只撤销其中一片。' }
+        return { ok: false, message: '单元 ' + unit + ' 跨 ' + String(resolved.members.length) + ' 个技能（' + resolved.members.map((m: { skill: string }) => m.skill).join('、') + '）—— 跨技能整体撤销尚未接线，拒绝只撤销其中一片。' }
       }
     }
     const blobOf = async (hash: string | undefined): Promise<string | null> => {
