@@ -177,6 +177,13 @@ for (const file of countFiles) {
   }
 }
 
+// P0-prime (R146/工具链席缺口 ③)：表格编号必须唯一 —— 编号即 id 来源，
+// 撞号会让 --check 报 stale、并让 --only/--drill <id> 目标不唯一（实测 gate-42 撞号）。
+const seenNumbers = new Map()
+for (const row of tableRows) {
+  if (seenNumbers.has(row.n)) problems.push('table row ' + row.line + ' reuses number ' + row.n + ' (already used at line ' + seenNumbers.get(row.n) + ') — a duplicate number makes --only/--drill <id> ambiguous and the generated manifest stale')
+  else seenNumbers.set(row.n, row.line)
+}
 if (problems.length > 0) {
   console.error('verify-gate-manifest: ' + problems.length + ' problem(s)')
   for (const problem of problems) console.error('  - ' + problem)
