@@ -607,6 +607,11 @@ interface TreeChangePlan {
   auditAction: string
   auditSummary: string
   eventAction: string
+  // G3a: the unit this plan belongs to. A user-level operation that fans out into SEVERAL tree
+  // writes (restructure writes a support file and then the body) mints ONE id and hands it to every
+  // plan it composes, so the entries they record are pruned and undone as one unit. Absent ⇒ the
+  // tree change mints its own (a single-write operation is a unit of one).
+  unitId?: string
 }
 
 function planRestructureSections(body: string, moves: SkillRestructureMove[]): RestructurePlan {
@@ -2587,7 +2592,7 @@ export class SkillLibrary {
     // G3a: ONE tree change is ONE unit — every path it wrote is audited under a shared unit id.
     // The old form picked only the SKILL.md landing, so a support file the same change moved got
     // no version entry at all and the undo could not restore the file set as a unit.
-    const unitId = 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
+    const unitId = plan.unitId ?? 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
     for (const land of landing) {
       const isBody = land.target.split(/[\\/]/).pop() === 'SKILL.md'
       const rel = isBody ? undefined : land.target.slice(dir.length + 1).split('\\').join('/')
