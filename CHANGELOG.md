@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.4 (patch) — 技能健康的行仍未注册：补齐座位的样式表与"行渲染件是组件"两处形态
+
+> **现象**：0.25.3 装机并 opt-in 后，页面能正常启动（`exports["./client"]` 修复有效），但侧栏仍无「技能健康」行。
+> **差距**（与能显示的兄弟包 `evolution-skill-history/src/client/` 逐项对比）：① 兄弟包有 `styles.ts`（导出 `CSS`/`CSS_TAG_ID`）并在 `ctx.effect` 里注入带 `data-plugin-css` 标签的 `<style>`；本包**没有样式表**。② 兄弟包把**组件**（`PanelIcon`，消费座位给的 `{size, active}`）作为行渲染件传入 `seam.slots.register`；本包传的是"返回 span 的箭头"。
+> **修复**：补 `src/client/styles.ts`（只用生成的家族标尺 `TOKEN_CSS` 与 `--evo-*` 变量，无字面值）＋在 `apply()` 的 `ctx.effect` 里注入；行渲染件改为组件形态的行内图标 `PanelIcon`（线形 glyph、`currentColor`）。
+> **验证**：`build-client.mjs` 产物由 5.4 kB 增至 10.8 kB，且其中可见 `entry.label`、`PanelIcon`、`data-plugin-css` 的注入；装机 opt-in 后侧栏应出现该行（下一步用后台窗口截图核对）。
+
 ## 0.25.3 (patch) — 启用技能健康面板后页面启动失败：包缺 `exports["./client"]`
 
 > **现象**：操作者把该 bundle 行从 `disabled: true` 改为启用后，页面报 `Failed to load plugins / web boot: window.__ModuleLoader__ bootstrap facade is missing`。
