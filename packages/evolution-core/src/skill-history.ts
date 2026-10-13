@@ -387,6 +387,9 @@ export function nextHistoryIndex(
       hash: beforeHash,
       chars: input.before?.length ?? 0,
       ...pathField,
+      // G3a: a baseline is part of THIS unit too -- an unlabelled baseline splits the unit into
+      // adjacent segments and the prune (by unit) then keeps only one of them.
+      ...input.unitId === undefined ? {} : { unitId: input.unitId },
     })
   }
   // A REMOVAL has no "after" bytes, so nothing below would mint an entry — and when the removed bytes
@@ -427,11 +430,31 @@ export function nextHistoryIndex(
         hash: removalHash,
         chars: input.before?.length ?? 0,
         ...pathField,
+        ...input.unitId === undefined ? {} : { unitId: input.unitId },
         ...input.summary === undefined ? {} : { summary: input.summary },
       })
     }
   }
-  const trimmed = grown.slice(Math.max(0, grown.length - clampKeep(keep)))
+  // G3a (R-G3a-5): retention cuts by UNIT and never through one. A unit is the run of consecutive
+  // entries sharing a `unitId`; entries recorded before unit ids are singletons (their own group).
+  // Walk newest to oldest, take whole groups while the budget allows, and stop at the first group
+  // that does not fit -- the newest group is ALWAYS kept whole, even when it alone exceeds `keep`
+  // (half a unit is an unrecoverable state: undo could neither restore nor refuse it honestly).
+  const budget = clampKeep(keep)
+  const groups: SkillVersion[][] = []
+  for (const entry of grown) {
+    const tail = groups[groups.length - 1]
+    if (tail !== undefined && entry.unitId !== undefined && tail[0]?.unitId === entry.unitId) tail.push(entry)
+    else groups.push([entry])
+  }
+  const kept: SkillVersion[] = []
+  for (let i = groups.length - 1; i >= 0; i -= 1) {
+    const group = groups[i]
+    if (group === undefined) continue
+    if (kept.length > 0 && kept.length + group.length > budget) break
+    kept.unshift(...group)
+  }
+  const trimmed = kept
   const recorded: RecordedVersions = {}
   if (beforeHash !== null) {
     const v = lastVersionOf(trimmed, beforeHash)
