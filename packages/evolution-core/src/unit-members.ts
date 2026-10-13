@@ -124,7 +124,7 @@ export interface StaleRouteStub {
 
 /**
  * Scan a whole corpus (skill name -> index entries, or null when unreadable) for stale route stubs.
- * Order follows the caller's map insertion order (deterministic for a given input); nothing is cached.
+ * Sorted by (skill, version, owner): a function of the corpus, not of the caller's map order.
  */
 export function staleRouteStubs(indexes: ReadonlyMap<string, readonly SkillVersion[] | null>): StaleRouteStub[] {
   const out: StaleRouteStub[] = []
@@ -138,5 +138,7 @@ export function staleRouteStubs(indexes: ReadonlyMap<string, readonly SkillVersi
       if (!verdict.jumpable && verdict.reason !== 'not-a-landmark') out.push({ skill, v: entry.v, owner, reason: verdict.reason })
     }
   }
-  return out
+  // F3 (independent review, 2026-10-14): sort so the reading is a function of the corpus rather than of
+  // the caller's Map insertion order (a concurrent index assembly would otherwise reorder the report).
+  return out.sort((a, b) => a.skill.localeCompare(b.skill) || a.v - b.v || a.owner.localeCompare(b.owner))
 }
