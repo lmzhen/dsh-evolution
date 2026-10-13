@@ -65,8 +65,8 @@ export function planUnitUndo(members: SkillVersion[], versions: SkillVersion[]):
       else { body.oldest ??= entry; body.newest = entry }
       continue
     }
-    const slot = slots.get(path as string) ?? {}
-    slots.set(path as string, slot)
+    const slot = slots.get(path) ?? {}
+    slots.set(path, slot)
     if (entry.action === BASELINE_ACTION) slot.baseline ??= entry
     else { slot.oldest ??= entry; slot.newest = entry }
   }

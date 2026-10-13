@@ -65,8 +65,17 @@ export interface CuratorFailedSkill {
 
 export interface CuratorRunReport {
   /** G3b: cross-index orphan landmarks -- report-only, never a verdict. */
-  routeStubs?: { readonly skills: number; readonly stubs: number; readonly reason: string
-    readonly detail: readonly { readonly skill: string; readonly v: number; readonly owner: string; readonly reason: string }[] }
+  routeStubs?: {
+    readonly skills: number
+    readonly stubs: number
+    readonly reason: string
+    readonly detail: readonly {
+      readonly skill: string
+      readonly v: number
+      readonly owner: string
+      readonly reason: string
+    }[]
+  }
   /** Report shape version; readers may ignore unknown fields on later versions. */
   schemaVersion: 1
   runId: string
@@ -179,7 +188,7 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
     ...section('Archived', report.archived.map(item => `${item.name} (${item.reason})`)),
     ...section('Failed', report.failed.map(item => `${item.name}: ${item.reason}`)),
     ...section('Unattributed', report.unattributed ?? []),
-    ...section('Stale route stubs', (report.routeStubs?.detail ?? []).map((stub) => stub.skill + ' v' + String(stub.v) + ' -> ' + stub.owner + ' (' + stub.reason + ')')),
+    ...section('Stale route stubs', (report.routeStubs?.detail ?? []).map(stub => stub.skill + ' v' + String(stub.v) + ' -> ' + stub.owner + ' (' + stub.reason + ')')),
     ...section('Stale candidates', report.staleCandidates),
     ...section('LLM nominations', report.llmNominations),
     ...section('Retention (kept, not deleted)', report.wouldPrune ?? []),

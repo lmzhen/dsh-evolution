@@ -20,6 +20,9 @@ declare module '@deepseek-ai/dsh-llm' {
 import z from '@deepseek-ai/schemastery'
 import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SKILL_NAME_RE, newSkillLibrary, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SkillLibrary, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
+
+/** Shape of one history index file (only the field this reading needs). */
+type RawIndex = { versions?: unknown[] }
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 // G2.4/C3: the review ceiling has ONE home (core's DEFAULT_REVIEW_TIMEOUT_MS) — this package used to
@@ -1353,7 +1356,7 @@ export class EvolutionCurator extends Service {
       for (const name of listed.value) {
         const probe = await probeText(this.io, join(history, name, 'index.json'))
         if (!isPresent(probe)) { indexes.set(name, null); continue }
-        try { indexes.set(name, ((JSON.parse(probe.value) as { versions?: unknown[] }).versions) ?? null) } catch { indexes.set(name, null) }
+        try { indexes.set(name, ((JSON.parse(probe.value) as RawIndex).versions) ?? null) } catch { indexes.set(name, null) }
       }
       const detail = staleRouteStubs(indexes as never).map((stub) => ({ skill: stub.skill, v: stub.v, owner: stub.owner, reason: stub.reason }))
       return { skills: indexes.size, stubs: detail.length, reason: 'ok', detail }

@@ -1332,7 +1332,16 @@ export class SkillLibrary {
     try {
       const keep = this.limits.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP
       // `exactOptionalPropertyTypes` is on: omit the key rather than passing an explicit undefined.
-      const input = { skillName, action, before, after, at, ...path === undefined ? {} : { path }, ...unitId === undefined ? {} : { unitId }, ...unitHead === undefined ? {} : { unitHead } }
+      const input = {
+        skillName,
+        action,
+        before,
+        after,
+        at,
+        ...path === undefined ? {} : { path },
+        ...unitId === undefined ? {} : { unitId },
+        ...unitHead === undefined ? {} : { unitHead },
+      }
       versions = await recordVersions(this.root, this.io, input, keep)
     } catch (error) {
       if (!this.historyWarned) {
@@ -2600,7 +2609,7 @@ export class SkillLibrary {
       // G3b（A22）：代表片＝第一条 landing；kind 判 null（previous 的取值域只有 string/null）。
       const unitHead = land === landing[0] ? {
         moves: landing
-          .filter((l) => l.target.split(/[\\/]/).pop() !== 'SKILL.md')
+          .filter(l => l.target.split(/[\\/]/).pop() !== 'SKILL.md')
           .map((l) => {
             const p = l.target.slice(dir.length + 1).split(String.fromCharCode(92)).join(String.fromCharCode(47))
             return {
@@ -2611,7 +2620,7 @@ export class SkillLibrary {
               afterRef: contentHash(l.content),
             }
           })
-          .filter((m, idx, all) => all.findIndex((x) => x.path === m.path) === idx),
+          .filter((m, idx, all) => all.findIndex(x => x.path === m.path) === idx),
         sources: [{ skill: name }],
       } : undefined
       // A22: previous is string | null (a read failure rejects the whole plan), so the old

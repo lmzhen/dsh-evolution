@@ -15,7 +15,7 @@ it('R-G3a-5：keep=1 时单元的条目必须整组保留（支撑 + baseline + 
     const result = await lib.restructure('q-skill', [{ heading: 'Extra', toFile: 'references/extra.md' }], 'foreground')
     expect(result.ok, result.message).toBe(true)
     const versions = await lib.listVersions('q-skill')
-    const ids = versions.map((v) => (v as { unitId?: string }).unitId).filter((u): u is string => typeof u === 'string' && u.length > 0)
+    const ids = versions.map(v => (v as { unitId?: string }).unitId).filter((u): u is string => typeof u === 'string' && u.length > 0)
     expect(new Set(ids).size).toBe(1)
     expect(ids.length).toBe(3)
   } finally { await rm(root, { recursive: true, force: true }) }

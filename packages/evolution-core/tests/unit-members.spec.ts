@@ -24,8 +24,8 @@ describe('resolveUnitMembers', () => {
       ['head-skill', JSON.stringify([entry({ v: 1, unitId: 'u1' })])],
       ['other-skill', JSON.stringify([entry({ v: 2, unitId: 'u1' })])],
     ]), parse)
-    expect(members.members.map((m) => m.skill)).toEqual(['head-skill', 'other-skill'])
-    expect(members.conflicts.filter((c) => c.kind === 'duplicated')).toEqual([])
+    expect(members.members.map(m => m.skill)).toEqual(['head-skill', 'other-skill'])
+    expect(members.conflicts.filter(c => c.kind === 'duplicated')).toEqual([])
   })
 
   it('M3：index-absent 与 unit-absent 分开报且点名技能', () => {
@@ -73,13 +73,13 @@ describe('resolveUnitMembers', () => {
     const io = { readText: async (path: string) => { seen.push(path); return path.includes('head-skill') ? JSON.stringify([entry({ v: 1, unitId: 'u1' })]) : null } }
     const members = await resolveUnitMembers('ROOT', io, head, (root, name) => root + '/' + name + '/index.json', parse)
     expect(seen).toEqual(['ROOT/head-skill/index.json', 'ROOT/other-skill/index.json'])
-    expect(members.members.map((m) => m.skill)).toEqual(['head-skill'])
+    expect(members.members.map(m => m.skill)).toEqual(['head-skill'])
     expect(members.missing).toEqual([{ skill: 'other-skill', reason: 'index-absent' }])
   })
 })
 
 describe('landmarkVerdict（跨索引孤路标）', () => {
-  const landmark = entry({ v: 3, unitId: 'uL', unitHead: { skill: 'owner' } } as never)
+  const landmark = entry({ v: 3, unitId: 'uL', unitHead: { skill: 'owner' } })
 
   it('可跳 ⟺ 目标存在 ∧ 其索引仍持该 unitId', async () => {
     const { landmarkVerdict } = await import('../src/unit-members.ts')
@@ -92,8 +92,8 @@ describe('landmarkVerdict（跨索引孤路标）', () => {
   it('全库扫描点名孤路标（技能名 ＋ 版本 ＋ 目标 ＋ 原因），可跳的不报', async () => {
     const { staleRouteStubs } = await import('../src/unit-members.ts')
     const corpus = new Map<string, readonly SkillVersion[] | null>([
-      ['a-skill', [entry({ v: 1, unitId: 'uL', unitHead: { skill: 'gone' } } as never)]],
-      ['b-skill', [entry({ v: 2, unitId: 'uM', unitHead: { skill: 'c-skill' } } as never)]],
+      ['a-skill', [entry({ v: 1, unitId: 'uL', unitHead: { skill: 'gone' } })]],
+      ['b-skill', [entry({ v: 2, unitId: 'uM', unitHead: { skill: 'c-skill' } })]],
       ['c-skill', [entry({ v: 3, unitId: 'uM' })]],
       ['d-skill', null],
     ])

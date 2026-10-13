@@ -20,9 +20,9 @@ it('R-G3a-1：restructure 写过的每个路径都有版本条目，且共享同
     const result = await lib.restructure('r-skill', [{ heading: 'Extra', toFile: 'references/extra.md' }], 'foreground')
     expect(result.ok, result.message).toBe(true)
     const versions = await lib.listVersions('r-skill')
-    const paths = versions.map((v) => (v as { path?: string }).path ?? 'SKILL.md')
+    const paths = versions.map(v => (v as { path?: string }).path ?? 'SKILL.md')
     expect(paths).toContain('references/extra.md')
-    const units = new Set(versions.map((v) => (v as { unitId?: string }).unitId).filter((u): u is string => typeof u === 'string' && u.length > 0))
+    const units = new Set(versions.map(v => (v as { unitId?: string }).unitId).filter((u): u is string => typeof u === 'string' && u.length > 0))
     expect(units.size).toBe(1)
   } finally { await rm(root, { recursive: true, force: true }) }
 })

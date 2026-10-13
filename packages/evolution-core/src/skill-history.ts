@@ -315,7 +315,7 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
   const path = typeof candidate.path === 'string' && candidate.path !== '' ? candidate.path : undefined
   const unitId = typeof candidate.unitId === 'string' && candidate.unitId !== '' ? candidate.unitId : undefined
   // The fold must carry unitHead or the next write drops it for good (the G3a lesson).
-  const unitHead = candidate.unitHead as UnitHead | undefined
+  const unitHead = candidate.unitHead
   const base: SkillVersion = {
     v: candidate.v,
     at: candidate.at,

@@ -42,7 +42,7 @@ export function resolveUnitMembersFromIndexes(
   for (const skill of candidateSkills(head)) {
     const text = indexes.get(skill)
     if (text === undefined || text === null) { missing.push({ skill, reason: 'index-absent' }); continue }
-    const entries = readEntries(text).filter((entry) => entry.unitId === head.unitId)
+    const entries = readEntries(text).filter(entry => entry.unitId === head.unitId)
     if (entries.length === 0) { missing.push({ skill, reason: 'unit-absent' }); continue }
     members.push({ skill, entries })
   }
@@ -58,10 +58,10 @@ export function resolveUnitMembersFromIndexes(
         }
       }
     }
-    const wanted = manifest.map((move) => String((move as { path?: unknown }).path ?? '')).filter((p) => p !== '')
+    const wanted = manifest.map(move => String((move as { path?: unknown }).path ?? '')).filter(p => p !== '')
     for (const path of wanted) if (!shardPaths.includes(path)) conflicts.push({ kind: 'missing', path })
     for (const path of shardPaths) if (!wanted.includes(path)) conflicts.push({ kind: 'foreign', path })
-    for (const path of wanted) if (shardPaths.filter((p) => p === path).length > 1) conflicts.push({ kind: 'duplicated', path })
+    for (const path of wanted) if (shardPaths.filter(p => p === path).length > 1) conflicts.push({ kind: 'duplicated', path })
   }
   return { members, missing, conflicts }
 }
@@ -90,7 +90,7 @@ export async function resolveUnitMembers(
     try { text = await io.readText(indexPath(root, skill)) } catch { text = null }
     indexes.set(skill, text)
   }
-  return resolveUnitMembersFromIndexes(head, indexes, (raw) => readEntries(raw))
+  return resolveUnitMembersFromIndexes(head, indexes, raw => readEntries(raw))
 }
 /** A landmark is jumpable only when its owner exists AND that index still holds the unit. */
 export type LandmarkVerdict =
@@ -104,7 +104,7 @@ export function landmarkVerdict(entry: SkillVersion, ownerEntries: readonly Skil
   const skill = head !== undefined && head.moves === undefined ? head.skill : undefined
   if (skill === undefined || entry.unitId === undefined) return { jumpable: false, reason: 'not-a-landmark' }
   if (ownerEntries === null) return { jumpable: false, reason: 'owner-absent' }
-  const held = ownerEntries.some((candidate) => candidate.unitId === entry.unitId)
+  const held = ownerEntries.some(candidate => candidate.unitId === entry.unitId)
   return held ? { jumpable: true } : { jumpable: false, reason: 'unit-absent' }
 }
 

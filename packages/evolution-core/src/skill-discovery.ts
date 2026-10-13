@@ -20,7 +20,7 @@ export function isSkillName(name: string): boolean {
 
 /** 相对技能根的路径是否落在平台会发现的位置（depth<=2 且最后一段是 SKILL.md 或 `<name>.md`）。 */
 export function isPotentialSkillPath(relPath: string): boolean {
-  const parts = relPath.split(/[\\/]+/).filter((p) => p.length > 0)
+  const parts = relPath.split(/[\\/]+/).filter(p => p.length > 0)
   if (parts.length < 1 || parts.length > 2) return false
   const last = parts[parts.length - 1]
   if (parts.length === 2) return last === 'SKILL.md' && isSkillName(parts[0])
