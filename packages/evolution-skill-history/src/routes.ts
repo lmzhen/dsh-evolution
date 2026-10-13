@@ -10,6 +10,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
+import { undoableFor, unitUndoableFlags } from './unit-undoable.ts'
 import { contentHash, displayBodyOf, elapsedSince, errorText, isLoopbackRequest, latestVersionAt, partitionVersions, readJsonObject, skillRowCells, textDiffFacts, versionActionKind, versionRowCells, writeJson } from '@deepseek-ai/dsh-evolution-core'
 
 /** Route paths. The client bundle mirrors these literals; a spec asserts the two sides agree. */
@@ -157,8 +158,11 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
               ...!withDelta || previous === undefined ? {} : { charsDelta: entry.chars - previous.chars },
             }
           }
+          // G3b: one unit, one answer — the flag is aggregated over content AND support members, so a
+          // row can never offer (or hide) an undo that belongs to a sibling shard.
+          const unitFlags = unitUndoableFlags([...groups.content, ...groups.support], liveHash)
           const content = groups.content.map((entry, index) => {
-            const row = { ...decorate(entry, index, groups.content, true), undoable: entry.hash !== liveHash }
+            const row = { ...decorate(entry, index, groups.content, true), undoable: undoableFor(entry, unitFlags, liveHash) }
             return { ...row, cells: versionRowCells(row) }
           })
           const support = groups.support.map((entry, index) => {
