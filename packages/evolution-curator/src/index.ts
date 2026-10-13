@@ -32,6 +32,7 @@ import {
   usageObserved,
 } from '@deepseek-ai/dsh-evolution-core'
 import { newestUnitId, planUnitUndo } from './unit-undo-plan.ts'
+import { historyIndexFile, parseHistoryIndex, resolveUnitMembers, unitMembersAreComplete } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import { INSTANCE_KEYS, blobPath, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
@@ -2281,6 +2282,27 @@ export class EvolutionCurator extends Service {
     if (unit === undefined) return { ok: false, message: `技能「${name}」还没有记录任何单元 —— 没有可整体撤销的。` }
     const members = versions.filter(entry => entry.unitId === unit)
     if (members.length === 0) return { ok: false, message: `单元 ${unit} 不在「${name}」已记录的历史里 —— 拒绝瞎猜、不做写入。` }
+    // G3b/A19.2: when the unit head carries sources[], the unit may span SEVERAL skills. Resolve every
+    // member from those known keys (never by scanning a directory) and refuse -- naming the objects --
+    // when anything is missing or conflicting; guessing from the shards we happen to see would undo
+    // half a unit.
+    const head = members[0]
+    const sources = head?.unitHead?.sources
+    if (sources !== undefined && sources.length > 0) {
+      const resolved = await resolveUnitMembers(
+        this.skills.root, this.io,
+        { skill: name, unitId: unit, sources, ...head.unitHead === undefined ? {} : { unitHead: head.unitHead } },
+        historyIndexFile, parseHistoryIndex,
+      )
+      if (!unitMembersAreComplete(resolved)) {
+        const missing = resolved.missing.map(m => m.skill + (m.reason === 'index-absent' ? '（索引文件不在）' : '（索引里没有这个单元）')).join('、')
+        const conflicts = resolved.conflicts.map(c => c.path + '（' + c.kind + '）').join('、')
+        return { ok: false, message: '单元 ' + unit + ' 的成员没解析齐：' + missing + (conflicts === '' ? '' : '；冲突：' + conflicts) + ' —— 拒绝用剩余片段拼一个撤销。' }
+      }
+      if (resolved.members.length > 1) {
+        return { ok: false, message: '单元 ' + unit + ' 跨 ' + String(resolved.members.length) + ' 个技能（' + resolved.members.map(m => m.skill).join('、') + '）—— 跨技能整体撤销尚未接线，拒绝只撤销其中一片。' }
+      }
+    }
     const blobOf = async (hash: string | undefined): Promise<string | null> => {
       if (hash === undefined) return null
       const probe = await probeText(this.io, blobPath(this.skills.root, hash))
