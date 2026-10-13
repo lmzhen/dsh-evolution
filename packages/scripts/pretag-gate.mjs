@@ -55,6 +55,14 @@ try {
   record('client bundle', bytes.includes(route), 'client.js bytes=' + bytes.length + ' route=' + String(bytes.includes(route)) + (out.trim() ? ' | ' + out.trim().slice(0, 60) : ''))
 } catch (error) { record('client bundle', false, String(error.message).slice(0, 140)) }
 
+// 3b) the client data layer's own specs (self-contained: they load only src/client/api.ts, so they
+//     run even on a machine whose platform checkout is a different ref than CI's upstream)
+try {
+  const out = execFileSync('npx.cmd', ['vitest', 'run', 'packages/evolution/evolution-skill-health/tests'], { cwd: overlay, encoding: 'utf8', shell: true })
+  const summary = (String(out).match(/Tests\s+\d+ passed[^\n]*/) || ['(no summary)'])[0]
+  record('client data-layer specs', /failed/.test(summary) === false && /passed/.test(summary), summary.slice(0, 80))
+} catch (error) { record('client data-layer specs', false, String(error.stdout || error.message).split('\n').filter((l) => /Tests|FAIL/.test(l)).slice(0, 2).join(' ').slice(0, 140)) }
+
 // 4) installed bundle patch vs the published artifact
 try {
   const installed = path.join(profile, 'node_modules/@lmzhen/dsh-evolution-all/cordis.patch.yml')
