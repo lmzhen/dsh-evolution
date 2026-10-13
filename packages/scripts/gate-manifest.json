@@ -450,7 +450,7 @@
       ]
     },
     {
-      "id": "gate-42",
+      "id": "gate-46",
       "kind": "script",
       "cmd": "node packages/scripts/verify-graph-edges.mjs --self-test",
       "tree": "mirror",
