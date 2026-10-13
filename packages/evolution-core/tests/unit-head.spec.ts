@@ -26,6 +26,10 @@ it('G3b：代表片必须带 unitHead.moves（全量 manifest）与 unitHead.sou
     expect(head.unitHead.moves.length).toBeGreaterThan(0)
     expect(Array.isArray(head.unitHead.sources)).toBe(true)
     expect((head.unitHead.sources ?? []).length).toBeGreaterThan(0)
+    expect((head.unitHead.sources ?? []).length).toBe(1)
+    expect((head.unitHead.sources ?? [])[0]).toEqual({ skill: 'h-skill' })
+    // R2: this restructure CREATES references/extra.md, so kind must be created (a blanket 'moved' is red).
+    expect((head.unitHead.moves as Array<{ kind: string }>).every((m) => m.kind === 'created')).toBe(true)
     // 两形态互斥：同一 entry 不得同时带 moves 与 skill。
     const both = versions.filter((v) => {
       const h = (v as { unitHead?: { moves?: unknown; skill?: unknown } }).unitHead
