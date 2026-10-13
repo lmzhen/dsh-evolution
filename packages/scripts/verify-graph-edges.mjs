@@ -161,6 +161,11 @@ function selfTest() {
   assert(Buffer.byteLength(zh, 'utf8') !== zh.length, '中文语料下 bytes != chars')
   assert(!(zh.length === Buffer.byteLength(zh, 'utf8')), '反例：写成 s.length === size 必须失败')
   assert(Buffer.byteLength('x', 'utf8') === 1, '字节断言基线')
+  // R86/R100/R105：入口必须有输出 —— 空输出 + exit 0 是「绿而无判」，exit 码本身不能证明跑过。
+  const emptyRun = humanLine(evaluate([]))
+  assert(emptyRun.length > 0, '输出必须非空（空输出 + exit 0 ⇒ 红）')
+  assert(emptyRun.includes('face=') && emptyRun.includes('exit='), '人类行必须含 face= 与 exit=')
+  assert(emptyRun.includes('reason='), '人类行必须含 reason=')
   if (fails.length) { console.error('SELF-TEST FAILED:\n  ' + fails.join('\n  ')); return 1 }
   console.log('SELF-TEST OK (10 fixtures)')
   return 0
