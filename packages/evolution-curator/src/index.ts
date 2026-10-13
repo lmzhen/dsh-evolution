@@ -33,7 +33,7 @@ import {
 } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { BASELINE_ACTION, INSTANCE_KEYS, blobPath, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -2258,6 +2258,87 @@ export class EvolutionCurator extends Service {
     }
   }
 
+  /**
+   * G3a: undo ONE unit — every path that unit wrote goes back together, or nothing does.
+   *
+   * Phase A is a ZERO-WRITE preflight (the body and each support file still hold the unit’s
+   * after-bytes, and every before-blob is readable); Phase B applies support files first and the
+   * body last, passing the anchors Phase A computed so a concurrent change is refused, not
+   * overwritten. Blobs are read BY HASH — entries are pruned by `keep`, blobs are never reclaimed.
+   * @param name - the skill.
+   * @param unitId - the unit to undo; omitted takes the newest unit the index carries.
+   * @returns the outcome; the message names what was reverted, or why nothing was written.
+   */
+  async undoUnit(name: string, unitId?: string): Promise<SkillActionResult> {
+    const versions = await this.skills.listVersions(name)
+    if (versions.length === 0) return { ok: false, message: `技能「${name}」还没有记录内容版本 —— 没有可撤销的。` }
+    const live = await this.skills.read(name)
+    if (live === null) {
+      return { ok: false, message: `「${name}」不在活动目录树里 —— 撤销恢复的是存活技能；若它已归档，请先 restore。` }
+    }
+    const unit = unitId ?? [...versions].reverse().find(entry => entry.unitId !== undefined)?.unitId
+    if (unit === undefined) return { ok: false, message: `技能「${name}」还没有记录任何单元 —— 没有可整体撤销的。` }
+    const members = versions.filter(entry => entry.unitId === unit)
+    if (members.length === 0) return { ok: false, message: `单元 ${unit} 不在「${name}」已记录的历史里 —— 拒绝瞎猜、不做写入。` }
+    const blobOf = async (hash: string | undefined): Promise<string | null> => {
+      if (hash === undefined) return null
+      const probe = await probeText(this.io, blobPath(this.skills.root, hash))
+      return isPresent(probe) ? probe.value : null
+    }
+    interface Slot { baseline?: SkillVersion; oldest?: SkillVersion; newest?: SkillVersion }
+    const slots = new Map<string, Slot>()
+    const slotOf = (key: string): Slot => {
+      const found = slots.get(key)
+      if (found !== undefined) return found
+      const made: Slot = {}
+      slots.set(key, made)
+      return made
+    }
+    let body: Slot = {}
+    for (const entry of members) {
+      const path = entry.path
+      const target = path !== undefined && entryTarget(entry, versions) === 'support' ? slotOf(path) : body
+      if (entry.action === BASELINE_ACTION) { target.baseline ??= entry; continue }
+      target.oldest ??= entry
+      target.newest = entry
+    }
+    const refused: string[] = []
+    const ops: Array<{ remove: boolean; path: string; bytes: string; anchor: WriteAnchor }> = []
+    for (const [path, slot] of slots) {
+      if (slot.newest === undefined) { refused.push(`${path}（单元里没有该路径的 after 条目）`); continue }
+      const preUnit = slot.baseline !== undefined ? slot.baseline.hash : slot.oldest?.beforeHash
+      const back = await blobOf(preUnit)
+      if (preUnit !== undefined && back === null) { refused.push(`${path}（before 字节读不到：blob ${preUnit}）`); continue }
+      const liveProbe = await probeText(this.io, join(this.skills.root, name, ...path.split('/')))
+      if (isPresent(liveProbe) && contentHash(liveProbe.value) !== slot.newest.hash) {
+        refused.push(`${path}（盘上字节已变，回退会覆盖别人的改动）`)
+        continue
+      }
+      ops.push({ remove: preUnit === undefined, path, bytes: back ?? '', anchor: { sha256: slot.newest.hash } })
+    }
+    const bodyPre = body.baseline !== undefined ? body.baseline.hash : body.oldest?.beforeHash
+    const bodyBytes = await blobOf(bodyPre)
+    if (body.newest !== undefined && bodyPre !== undefined && bodyBytes === null) refused.push('SKILL.md（正文 before 字节读不到）')
+    if (refused.length > 0) {
+      return { ok: false, message: `整单元撤销未开始（零写）—— 预检未通过：${refused.join('；')}。修好后可重试。` }
+    }
+    const undoUnitId = `u-undo-${Date.now().toString(36)}`
+    const reverted: string[] = []
+    const done = (): string => (reverted.length === 0 ? '无' : reverted.join(', '))
+    for (const op of ops) {
+      const result = op.remove
+        ? await this.skills.removeSupportFile(name, op.path, 'foreground', op.anchor, undoUnitId)
+        : await this.skills.writeSupportFile(name, op.path, op.bytes, 'foreground', op.anchor)
+      if (!result.ok) return { ok: false, message: `「${op.path}」：${result.message} —— 撤销未完成（已回退：${done()}）。` }
+      reverted.push(op.path)
+    }
+    if (body.newest !== undefined && bodyBytes !== null) {
+      const result = await this.skills.update(name, bodyBytes, 'foreground', { sha256: contentHash(live) })
+      if (!result.ok) return { ok: false, message: `正文：${result.message} —— 撤销未完成（已回退：${done()}）。` }
+      reverted.push('SKILL.md')
+    }
+    return { ok: true, message: `已按单元撤销「${name}」：${reverted.join(', ')}（撤销单元 ${undoUnitId}，被撤单元 ${unit}）。` }
+  }
   /** The content the live bytes replaced: the CHAIN first, the recorded order as the fallback.
    *
    * Every entry written from 0.10.0 on carries `beforeHash`, read under the content lock, so the link
