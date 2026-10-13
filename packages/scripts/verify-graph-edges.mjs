@@ -109,7 +109,11 @@ function evaluate(faces) {
       let names = []
       let text = ''
       try { text = readFileSync(sk.path, 'utf8'); names = declared(text) } catch { continue }
+      // E16 counts the CATALOG LINE, not just the description: `- ` + name + `: ` + capped
+      // description + the newline (5 fixed characters). Counting only the description understates
+      // the standing cost by ~a third (measured: desc 3717 vs line 5604 across the two faces).
       s.residentChars += foldedDescription(text, describe)
+      s.residentLineChars = (s.residentLineChars ?? 0) + sk.name.length + foldedDescription(text, describe) + 5
       if (names.length) declaring += 1
       for (const n of names) {
         edges += 1
@@ -148,8 +152,10 @@ function jsonOf(result) {
     exit: result.exit,
     reader: result.reader,
     channel: result.channel,
-    faces: result.scan.map((s) => ({ face: s.face, root: s.root, hasSkillTool: s.hasSkillTool, skills: s.skills.length, edges: decided ? s.edges : null, dangling: decided ? s.dangling : null, residentChars: decided ? (s.residentChars ?? 0) : null })),
+    faces: result.scan.map((s) => ({ face: s.face, root: s.root, hasSkillTool: s.hasSkillTool, skills: s.skills.length, edges: decided ? s.edges : null, dangling: decided ? s.dangling : null, residentChars: decided ? (s.residentChars ?? 0) : null, residentLineChars: decided ? (s.residentLineChars ?? 0) : null })),
     residentChars: decided ? result.scan.reduce((sum, s) => sum + (s.residentChars ?? 0), 0) : null,
+    // The cost ledger uses THIS one (line form); `residentChars` stays for the older readings.
+    residentLineChars: decided ? result.scan.reduce((sum, s) => sum + (s.residentLineChars ?? 0), 0) : null,
     residentStatus: decided ? { live: result.scan.reduce((sum, s) => sum + (s.residentChars ?? 0), 0), planned: result.plannedChars } : null,
     plannedChars: decided ? result.plannedChars : null,
   }
