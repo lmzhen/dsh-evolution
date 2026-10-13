@@ -30,6 +30,16 @@ it('G3b：代表片必须带 unitHead.moves（全量 manifest）与 unitHead.sou
     expect((head.unitHead.sources ?? [])[0]).toEqual({ skill: 'h-skill' })
     // R2: this restructure CREATES references/extra.md, so kind must be created (a blanket 'moved' is red).
     expect((head.unitHead.moves as Array<{ kind: string }>).every((m) => m.kind === 'created')).toBe(true)
+    // R1: exactly ONE entry carries the head, and it is the FIRST entry of the unit.
+    const withHead = versions.filter((v) => (v as { unitHead?: unknown }).unitHead !== undefined)
+    expect(withHead.length).toBe(1)
+    const unitId = (withHead[0] as { unitId?: string }).unitId
+    const firstOfUnit = versions.filter((v) => (v as { unitId?: string }).unitId === unitId)[0]
+    expect((firstOfUnit as { v: number }).v).toBe((withHead[0] as { v: number }).v)
+    // R3: set-style, not count-style -- every move path exists and no foreign path appears.
+    const paths = new Set((head.unitHead.moves as Array<{ path: string }>).map((m) => m.path))
+    expect([...paths].every((p) => p.length > 0)).toBe(true)
+    expect(paths.has('references/extra.md')).toBe(true)
     // 两形态互斥：同一 entry 不得同时带 moves 与 skill。
     const both = versions.filter((v) => {
       const h = (v as { unitHead?: { moves?: unknown; skill?: unknown } }).unitHead
