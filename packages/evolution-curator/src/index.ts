@@ -1351,7 +1351,7 @@ export class EvolutionCurator extends Service {
     const routeStubs = await (async () => {
       const history = join(this.skills.root, '.history', 'skills')
       const listed = await probeList(this.io, history)
-      if (!isPresent(listed)) return { skills: 0, stubs: 0, reason: 'index-root-absent', detail: [] as Array<{ skill: string; v: number; owner: string; reason: string }> }
+      if (!isPresent(listed)) return { skills: 0, stubs: 0, reason: 'index-root-absent', detail: [] as readonly { skill: string; v: number; owner: string; reason: string }[] }
       const indexes = new Map<string, unknown[] | null>()
       for (const name of listed.value) {
         const probe = await probeText(this.io, join(history, name, 'index.json'))
