@@ -38,7 +38,10 @@ record('version three-way', strays.length === 0 && headVersion === rootVersion, 
 // 2) lint through the overlay toolchain
 try {
   const ox = path.join(overlay, 'node_modules', '.bin', process.platform === 'win32' ? 'oxlint.cmd' : 'oxlint')
-  const out = execFileSync(ox, ['--config', '.oxlintrc.json', 'packages/evolution/evolution-core', 'packages/evolution/evolution-skill-health', 'packages/evolution/evolution-review'], { cwd: overlay, encoding: 'utf8', shell: true })
+  // `-A typescript`: the type-aware rules need the PLATFORM's resolved types, which differ between
+  // this machine's checkout and CI's pinned upstream; they fire here on unresolved imports and pass
+  // in CI. The local gate keeps every non-type rule (arrow-parens, max-len, …) and says so.
+  const out = execFileSync(ox, ['--config', '.oxlintrc.json', '-A', 'typescript', 'packages/evolution/evolution-core', 'packages/evolution/evolution-skill-health', 'packages/evolution/evolution-review'], { cwd: overlay, encoding: 'utf8', shell: true })
   // oxlint exits non-zero when it finds anything, so reaching this line already means clean;
   // the summary line is reported as evidence rather than re-parsed.
   const summary = (String(out).match(/Found [^\n]*/) || ['(no summary line)'])[0]
