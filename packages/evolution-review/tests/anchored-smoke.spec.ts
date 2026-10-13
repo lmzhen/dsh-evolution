@@ -511,7 +511,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
         // inventing a tighter budget of its own.
         { timeout: 15_000, interval: 50 },
       ).toBe(true)
-      return { first, second, landed: await library.read(name).catch(() => null) }
+      return { first, second, landed: await library.read(name).catch(() => null), library }
     } finally {
       await reviewFiber?.dispose()
       if (previous === undefined) delete process.env.DSH_HOME
@@ -522,7 +522,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
 
   it('TEST-06 (REV-06b): the second of two updates on ONE skill lands (no false stale refusal)', { timeout: 30_000 }, async () => {
     const name = 'twice-skill'
-    const { second, landed } = await runTwoOpPlan(name, 'dsh-review-rev06b-ok-', undefined)
+    const { second, library } = await runTwoOpPlan(name, 'dsh-review-rev06b-ok-', undefined)
     // Op 1 rebased the baseline onto its own bytes; op 2 is then compared
     // against that LANDED baseline, so it must NOT be refused as stale.
     // Windows writes text through the platform default (CRLF), so the bytes read back differ from
