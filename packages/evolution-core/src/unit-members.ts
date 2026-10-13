@@ -70,3 +70,25 @@ export function resolveUnitMembersFromIndexes(
 export function unitMembersAreComplete(members: UnitMembers): boolean {
   return members.missing.length === 0 && members.conflicts.length === 0
 }
+/** Minimal io view the shell needs (structural, so this module imports no io type). */
+export interface UnitMemberIo { readText(path: string): Promise<string | null> }
+
+/**
+ * The io shell (A19.2): open ONLY the known keys -- never enumerate a directory. A skill whose index
+ * file is unreadable becomes `null` (index-absent), which the core then reports by name.
+ */
+export async function resolveUnitMembers(
+  root: string,
+  io: UnitMemberIo,
+  head: UnitHeadInput,
+  indexPath: (root: string, name: string) => string,
+  readEntries: (raw: string | null) => readonly SkillVersion[],
+): Promise<UnitMembers> {
+  const indexes = new Map<string, string | null>()
+  for (const skill of candidateSkills(head)) {
+    let text: string | null = null
+    try { text = await io.readText(indexPath(root, skill)) } catch { text = null }
+    indexes.set(skill, text)
+  }
+  return resolveUnitMembersFromIndexes(head, indexes, (raw) => readEntries(raw))
+}
