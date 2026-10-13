@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "note": "E15 工具描述字节账：新增描述字节必须先入账再改码（家族规则）。deltaBytes 为 null 表示尚未实测的认领值；provenance 标明「实测/认领/近似」。",
+  "rows": [
+    {
+      "id": "skill-manage-desc",
+      "ruling": "baseline",
+      "target": "tool-skill-manage/src/index.ts:1022-1033 的 skill_manage description",
+      "deltaBytes": 1670,
+      "where": "tool description (every request)",
+      "face": "both",
+      "provenance": "source-text extraction (single-line quoted fragments joined) -- APPROXIMATE: a fragment split across lines is missed; replace with a runtime measurement when a harness runs this plugin"
+    },
+    {
+      "id": "p1-3a",
+      "ruling": "claimed 2026-10-14",
+      "target": "③a 提案",
+      "deltaBytes": null,
+      "claimedBytes": 145,
+      "where": "tool description",
+      "face": "desktop",
+      "provenance": "模型面席认领，未实测"
+    },
+    {
+      "id": "rx2-to-skill",
+      "ruling": "claimed 2026-10-14",
+      "target": "RX2 to_skill 字段",
+      "deltaBytes": null,
+      "claimedBytes": 28,
+      "where": "plan schema text",
+      "face": "desktop",
+      "provenance": "模型面席认领，未实测"
+    }
+  ]
+}
