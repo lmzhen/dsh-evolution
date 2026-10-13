@@ -441,20 +441,33 @@ export function nextHistoryIndex(
   // that does not fit -- the newest group is ALWAYS kept whole, even when it alone exceeds `keep`
   // (half a unit is an unrecoverable state: undo could neither restore nor refuse it honestly).
   const budget = clampKeep(keep)
+  // Group by unit, not by ADJACENCY: a unit whose entries ended up apart in the index (a later write
+  // can mint a baseline whose hash repeats an older unit's) must still be ONE group, otherwise the
+  // `break` below preserves a whole GROUP but half a UNIT -- the half-cut R120 forbids.
   const groups: SkillVersion[][] = []
+  const byUnit = new Map<string, SkillVersion[]>()
   for (const entry of grown) {
-    const tail = groups[groups.length - 1]
-    if (tail !== undefined && entry.unitId !== undefined && tail[0]?.unitId === entry.unitId) tail.push(entry)
-    else groups.push([entry])
+    const unit = entry.unitId
+    if (unit === undefined) { groups.push([entry]); continue }
+    const found = byUnit.get(unit)
+    if (found !== undefined) { found.push(entry); continue }
+    const made: SkillVersion[] = [entry]
+    byUnit.set(unit, made)
+    groups.push(made)
   }
-  const kept: SkillVersion[] = []
+  // Decide by membership, then filter the ORIGINAL array: prepending groups would re-order the
+  // retained list (a merged, non-adjacent unit's older member would jump next to its newer one),
+  // and the index's order is append order — readers rely on it.
+  const keptIndexes = new Set<number>()
+  let keptCount = 0
   for (let i = groups.length - 1; i >= 0; i -= 1) {
     const group = groups[i]
     if (group === undefined) continue
-    if (kept.length > 0 && kept.length + group.length > budget) break
-    kept.unshift(...group)
+    if (keptCount > 0 && keptCount + group.length > budget) break
+    for (const entry of group) keptIndexes.add(grown.indexOf(entry))
+    keptCount += group.length
   }
-  const trimmed = kept
+  const trimmed = grown.filter((_, index) => keptIndexes.has(index))
   const recorded: RecordedVersions = {}
   if (beforeHash !== null) {
     const v = lastVersionOf(trimmed, beforeHash)
