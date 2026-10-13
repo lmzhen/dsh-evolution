@@ -77,3 +77,28 @@ describe('resolveUnitMembers', () => {
     expect(members.missing).toEqual([{ skill: 'other-skill', reason: 'index-absent' }])
   })
 })
+
+describe('landmarkVerdict（跨索引孤路标）', () => {
+  const landmark = entry({ v: 3, unitId: 'uL', unitHead: { skill: 'owner' } } as never)
+
+  it('可跳 ⟺ 目标存在 ∧ 其索引仍持该 unitId', async () => {
+    const { landmarkVerdict } = await import('../src/unit-members.ts')
+    expect(landmarkVerdict(landmark, [entry({ v: 1, unitId: 'uL' })])).toEqual({ jumpable: true })
+    expect(landmarkVerdict(landmark, [entry({ v: 1, unitId: 'other' })])).toEqual({ jumpable: false, reason: 'unit-absent' })
+    expect(landmarkVerdict(landmark, null)).toEqual({ jumpable: false, reason: 'owner-absent' })
+    expect(landmarkVerdict(entry({ v: 4, unitId: 'u1' }), [])).toEqual({ jumpable: false, reason: 'not-a-landmark' })
+  })
+
+  it('全库扫描点名孤路标（技能名 ＋ 版本 ＋ 目标 ＋ 原因），可跳的不报', async () => {
+    const { staleRouteStubs } = await import('../src/unit-members.ts')
+    const corpus = new Map<string, readonly SkillVersion[] | null>([
+      ['a-skill', [entry({ v: 1, unitId: 'uL', unitHead: { skill: 'gone' } } as never)]],
+      ['b-skill', [entry({ v: 2, unitId: 'uM', unitHead: { skill: 'c-skill' } } as never)]],
+      ['c-skill', [entry({ v: 3, unitId: 'uM' })]],
+      ['d-skill', null],
+    ])
+    expect(staleRouteStubs(corpus)).toEqual([
+      { skill: 'a-skill', v: 1, owner: 'gone', reason: 'owner-absent' },
+    ])
+  })
+})

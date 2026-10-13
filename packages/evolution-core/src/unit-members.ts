@@ -92,3 +92,45 @@ export async function resolveUnitMembers(
   }
   return resolveUnitMembersFromIndexes(head, indexes, (raw) => readEntries(raw))
 }
+/** A landmark is jumpable only when its owner exists AND that index still holds the unit. */
+export type LandmarkVerdict =
+  | { readonly jumpable: true }
+  | { readonly jumpable: false; readonly reason: 'not-a-landmark' | 'owner-absent' | 'unit-absent' }
+
+/** @param entry - the entry being judged. @param ownerEntries - the owner skill's index, or null when
+ * the owner has no readable index. */
+export function landmarkVerdict(entry: SkillVersion, ownerEntries: readonly SkillVersion[] | null): LandmarkVerdict {
+  const head = entry.unitHead
+  const skill = head !== undefined && head.moves === undefined ? head.skill : undefined
+  if (skill === undefined || entry.unitId === undefined) return { jumpable: false, reason: 'not-a-landmark' }
+  if (ownerEntries === null) return { jumpable: false, reason: 'owner-absent' }
+  const held = ownerEntries.some((candidate) => candidate.unitId === entry.unitId)
+  return held ? { jumpable: true } : { jumpable: false, reason: 'unit-absent' }
+}
+
+/** One cross-index orphan: a landmark whose owner or unit can no longer be reached. */
+export interface StaleRouteStub {
+  readonly skill: string
+  readonly v: number
+  readonly owner: string
+  readonly reason: 'owner-absent' | 'unit-absent'
+}
+
+/**
+ * Scan a whole corpus (skill name -> index entries, or null when unreadable) for stale route stubs.
+ * Order follows the caller's map insertion order (deterministic for a given input); nothing is cached.
+ */
+export function staleRouteStubs(indexes: ReadonlyMap<string, readonly SkillVersion[] | null>): StaleRouteStub[] {
+  const out: StaleRouteStub[] = []
+  for (const [skill, entries] of indexes) {
+    if (entries === null) continue
+    for (const entry of entries) {
+      const head = entry.unitHead
+      const owner = head !== undefined && head.moves === undefined ? head.skill : undefined
+      if (owner === undefined) continue
+      const verdict = landmarkVerdict(entry, indexes.get(owner) ?? null)
+      if (!verdict.jumpable && verdict.reason !== 'not-a-landmark') out.push({ skill, v: entry.v, owner, reason: verdict.reason })
+    }
+  }
+  return out
+}
