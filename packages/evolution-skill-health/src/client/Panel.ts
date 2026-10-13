@@ -89,7 +89,7 @@ export function SkillHealthPanel(props: { face: HealthFace; locale: LocaleSeat }
     if (load === undefined) return
     let live = true
     load()
-      .then(outcome => {
+      .then((outcome) => {
         if (!live) return
         if (outcome.ok) setFace({ ...props.face, rows: outcome.payload.rows, truncated: outcome.payload.truncated })
         else setFailed(outcome.message)
