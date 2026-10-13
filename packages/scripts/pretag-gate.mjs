@@ -83,6 +83,19 @@ try {
   record('family architecture guards', false, lines.slice(0, 165) || String(error.message).slice(0, 120))
 }
 
+// 2c) client token discipline: every `--evo-*` a client half reads must be DECLARED in
+//     packages/scripts/client-tokens.json. This is the check that failed CI twice on 0.25.7
+//     (`--evo-line`, `--evo-radius-6`, `--evo-tone-ok` were invented by the panel), so it runs here.
+try {
+  const out = execFileSync(process.execPath, ['packages/evolution/scripts/verify-client-tokens.mjs', 'packages/evolution', '--strict'], { cwd: overlay, encoding: 'utf8' })
+  const summary = (String(out).match(/verify-client-tokens: (?:strict )?(?:pass|ok)[^\n]*/g) || ['']).slice(-1)[0]
+  record('client token discipline', /strict pass|\bok\b/.test(String(out)), summary.slice(0, 90) || 'strict pass')
+} catch (error) {
+  const raw = String(error.stdout || '') + String(error.stderr || '')
+  const first = raw.split('\n').find((l) => /does not declare/.test(l)) || raw.split('\n')[0] || ''
+  record('client token discipline', false, first.trim().slice(0, 165))
+}
+
 // 3b) the client data layer's own specs (self-contained: they load only src/client/api.ts, so they
 //     run even on a machine whose platform checkout is a different ref than CI's upstream)
 try {
