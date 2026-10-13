@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.1 (patch) — 技能健康面板的客户端半未进包：补 `dsh.client` 声明，侧栏行才会出现
+
+> **现象**：0.25.0 装到 3080 那台（npm 装的 DSH）后，`/api/dsh-evolution/skill-health/rows` 由 404 变 401（host 半在），但侧栏**没有**「技能健康」行。
+> **根因**：家族按 `package.json` 的 `dsh.client` 声明**派生**浏览器半（`packages/scripts/build-client.mjs`）——本包**漏了这条声明**，于是 `lib/client.js` 从未生成、也没进 tarball；`audit-release-tarballs.mjs` 只校验"声明了就必须带 `lib/client.js`"，**不声明就被静默跳过**。
+> **修复**：补 `dsh.client`（与 `evolution-skill-history` 同形）⇒ 既有机制自动产出 `lib/client.js`，既有审计自动守住这条不变量。无新增硬编码清单、无补丁。
+> **验证**：`node packages/evolution/scripts/build-client.mjs evolution-skill-health` ⇒ `client build: wrote evolution-skill-health\lib\client.js`；装到 web 面后侧栏出现该行。
+
 ## 0.25.0 (minor) — 分组分步优化计划 G0–G5：门禁可信度、引擎判据单源、写入回执与在用保护，外加技能健康面板脚手架
 
 > **由来**：《分组分步优化计划》G0–G5，按「①读文档 → ②定性 → ③读全部代码与引用 → ④详细设计（忽略短期工程量）→ ⑤改码」逐项推进，每项过判据才进下一项。
