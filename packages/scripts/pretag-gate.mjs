@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 
 const argv = process.argv.slice(2)
 const arg = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : dflt }
@@ -47,8 +47,10 @@ try {
   const summary = (String(out).match(/Found [^\n]*/) || ['(no summary line)'])[0]
   record('family lint', true, summary.slice(0, 90))
 } catch (error) {
-  const raw = String(error.stdout || '') + String(error.stderr || '')
-  const findings = raw.split('\n').map((l) => l.trim()).filter((l) => /^x [a-z-]+\//.test(l))
+  // With `shell: true` the failure carries no captured streams on some Node builds; re-run the
+  // probe through spawnSync, whose result holds stdout/stderr regardless of the exit code.
+  const probe = spawnSync(ox, ['--config', '.oxlintrc.json', '-A', 'typescript', 'packages/evolution/evolution-core', 'packages/evolution/evolution-skill-health', 'packages/evolution/evolution-review'], { cwd: overlay, encoding: 'utf8', shell: true })
+  const raw = String(probe.stdout || '') + String(probe.stderr || '')
   // `no-unsafe-*` is the type-aware family: on a machine whose platform checkout is a different ref
   // than CI's pinned upstream they fire on unresolved imports and pass in CI, so they are reported
   // as local noise; any OTHER finding is a real refusal.
