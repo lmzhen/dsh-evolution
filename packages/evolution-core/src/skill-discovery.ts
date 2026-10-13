@@ -2,7 +2,7 @@
  * 技能发现形状 —— 家族里**唯一**的实现，门禁（`packages/scripts/verify-graph-edges.mjs`）
  * 与图谱/边解析必须都调用它（R21/R69：两处各自实现＝68/63 并存那类症状的根源）。
  *
- * 平台判定见 skill-filesystem/src/index.ts:677-684 (`isPotentialSkillPath`：`<root>/<name>.md`
+ * 平台判定见 skill-filesystem/src/index.ts (`isPotentialSkillPath`：`<root>/<name>.md`
  * 或 `<root>/<name>/SKILL.md`，即 depth<=2) 与 parseSkillFile:816-819 (`isSkillName`：kebab-case)；
  * 排除机制是三条而非一条前缀规则：`.archive/`、`.backups/` 靠**深度**（3 段 > 2），
  * `._x/` 靠**名字文法**，`.system` 才是真前缀排除(:666/:680)。
