@@ -32,7 +32,7 @@ import {
   usageObserved,
 } from '@deepseek-ai/dsh-evolution-core'
 import { newestUnitId, planUnitUndo } from './unit-undo-plan.ts'
-import { historyIndexFile, parseHistoryIndex, resolveUnitMembers, unitMembersAreComplete } from '@deepseek-ai/dsh-evolution-core'
+import { historyIndexFile, parseHistoryIndex, resolveUnitMembers, unitMembersAreComplete, staleRouteStubs } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import { INSTANCE_KEYS, blobPath, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
@@ -1342,6 +1342,23 @@ export class EvolutionCurator extends Service {
       // surface in the run report instead of a silent shape change.
       ...gatedNominations.warnings.length > 0 ? { nominationsWarnings: gatedNominations.warnings } : {},
     })
+    // G3b: cross-index orphan landmarks -- a REPORT-ONLY reading (no gate, no verdict). Jumpable
+    // <=> the owner skill exists AND its index still holds the unit id. Indexes load from the
+    // history layout, never by scanning skill directories.
+    const routeStubs = await (async () => {
+      const history = join(this.skills.root, '.history', 'skills')
+      const listed = await probeList(this.io, history)
+      if (!isPresent(listed)) return { skills: 0, stubs: 0, reason: 'index-root-absent', detail: [] as Array<{ skill: string; v: number; owner: string; reason: string }> }
+      const indexes = new Map<string, unknown[] | null>()
+      for (const name of listed.value) {
+        const probe = await probeText(this.io, join(history, name, 'index.json'))
+        if (!isPresent(probe)) { indexes.set(name, null); continue }
+        try { indexes.set(name, ((JSON.parse(probe.value) as { versions?: unknown[] }).versions) ?? null) } catch { indexes.set(name, null) }
+      }
+      const detail = staleRouteStubs(indexes as never).map((stub) => ({ skill: stub.skill, v: stub.v, owner: stub.owner, reason: stub.reason }))
+      return { skills: indexes.size, stubs: detail.length, reason: 'ok', detail }
+    })()
+    ;(report as { routeStubs?: typeof routeStubs }).routeStubs = routeStubs
     const reportsRoot = join(evolutionHome(), 'reports')
     try {
       await this.io.writeText(join(reportsRoot, `curator-${runId}.json`), JSON.stringify(report, null, 2))
