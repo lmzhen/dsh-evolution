@@ -457,7 +457,8 @@
       "profiles": [
         "local",
         "ci"
-      ]
+      ],
+      "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test"
     },
     {
       "id": "ci-only-01",
@@ -623,6 +624,18 @@
       ],
       "cmd": "node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict",
       "reason": "toothed form: compares the bed manifest produced by gen-line-manifest.mjs"
+    },
+    {
+      "id": "graph-edges-live",
+      "kind": "script",
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "pre-tag"
+      ],
+      "cmd": "node packages/scripts/verify-graph-edges.mjs --report",
+      "reason": "live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)",
+      "expiry": "0.26.0"
     },
     {
       "id": "health-admission",

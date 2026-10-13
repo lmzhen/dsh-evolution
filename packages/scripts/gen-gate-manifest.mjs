@@ -107,12 +107,25 @@ for (const g of gates) {
 // G0-3: the arming gate can drill its own criterion source (contract §5d)
 for (const g of gates) if (g.cmd.includes('verify-arming.mjs')) g.drillCmd = 'node packages/scripts/verify-arming.mjs --drill'
 
+// P0-prime: the graph-edges gate can drill its own criterion source (contract §5d)
+for (const g of gates) if (g.cmd.includes('verify-graph-edges.mjs')) g.drillCmd = 'node packages/scripts/verify-graph-edges.mjs --self-test'
+
 // G0-4（契约 §5e）：同一脚本两条 —— CI 只有 policy 形体（CI 无床），真比对进 local/pre-tag。
 gates.push(
   { id: 'line-identity-ci', kind: 'script', tree: 'mirror', profiles: ['ci'], cmd: 'node packages/scripts/verify-line-identity.mjs --policy-only --strict', reason: 'CI has no machine bed — policy half only (contract §5e)' },
   { id: 'line-identity-bed', kind: 'script', tree: 'mirror', profiles: ['local', 'pre-tag'], cmd: 'node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict', reason: 'toothed form: compares the bed manifest produced by gen-line-manifest.mjs' },
 )
 
+// P0-prime（R99）：活根形是第二条 —— 需要依赖可解析的树 + 技能根；裸 mirror 预期 exit 2 / reader-unavailable。
+gates.push({
+  id: 'graph-edges-live',
+  kind: 'script',
+  tree: 'overlay',
+  profiles: ['local', 'pre-tag'],
+  cmd: 'node packages/scripts/verify-graph-edges.mjs --report',
+  reason: 'live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)',
+  expiry: '0.26.0',
+})
 // G0-5：tsc 行是**声明在本地跑**的检查 —— CI 注释（action.yml L168-171）写明 D-9 测试文件类型检查已随
 // baseline job 移除、`tsc -b tsconfig.host.json` 落在 **build line** 上 ⇒ 给该条目补 reason+expiry，
 // 让 verify-gate-manifest 的 toolchain containment 能把它认作**已登记例外**（而不是当成漏跑）。
