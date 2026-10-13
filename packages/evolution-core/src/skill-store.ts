@@ -1324,6 +1324,7 @@ export class SkillLibrary {
     // given, and old records without it stay readable.
     // G3a: one tree change writes N paths under ONE unit id; the entries it writes share it.
     unitId?: string,
+    unitHead?: UnitHead,
     origin?: string,
   ): Promise<void> {
     const at = new Date().toISOString()
@@ -2596,10 +2597,27 @@ export class SkillLibrary {
     for (const land of landing) {
       const isBody = land.target.split(/[\\/]/).pop() === 'SKILL.md'
       const rel = isBody ? undefined : land.target.slice(dir.length + 1).split('\\').join('/')
+      // G3b（A22）：代表片＝第一条 landing；kind 判 null（previous 的取值域只有 string/null）。
+      const unitHead = land === landing[0] ? {
+        moves: landing
+          .filter((l) => l.target.split(/[\\/]/).pop() !== 'SKILL.md')
+          .map((l) => {
+            const p = l.target.slice(dir.length + 1).split(String.fromCharCode(92)).join(String.fromCharCode(47))
+            return {
+              path: p,
+              kind: l.previous === null ? 'created' : 'moved',
+              to: p,
+              ...l.previous === null ? {} : { beforeRef: contentHash(l.previous) },
+              afterRef: contentHash(l.content),
+            }
+          })
+          .filter((m, idx, all) => all.findIndex((x) => x.path === m.path) === idx),
+        sources: [{ skill: name }],
+      } : undefined
       const auditedBefore = isBody ? (land.previous === undefined ? md : land.previous) : land.previous
       const auditedAfter = isBody ? (land.content === undefined ? md : land.content) : land.content
       // G5: the plan already carries the write face (`origin`) — put it in the ledger; G3a adds the unit.
-      await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary, rel, unitId, plan.origin)
+      await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary, rel, unitId, unitHead, plan.origin)
     }
     this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
     return {
