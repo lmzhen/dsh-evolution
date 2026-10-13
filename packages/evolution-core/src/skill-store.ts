@@ -2811,13 +2811,13 @@ export class SkillLibrary {
     }, anchor !== undefined ? () => anchorUnverifiable(name, filePath) : error => unreadableTarget(name + '/' + filePath, error))
   }
 
-  async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor): Promise<SkillActionResult> {
+  async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor, unitId?: string): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // P2-4 (v11): the exists/read/remove window runs under the serialize queue
     // — writeSupportFile wraps itself (F-208), so an unwrapped remove could
     // interleave with a concurrent write and silently drop its write.
-    return await this.serial(() => this.removeSupportFileCore(name, filePath, origin, anchor))
+    return await this.serial(() => this.removeSupportFileCore(name, filePath, origin, anchor, unitId))
   }
 
   private async removeSupportFileCore(
@@ -2825,6 +2825,9 @@ export class SkillLibrary {
     filePath: string,
     origin: WriteOrigin,
     anchor?: WriteAnchor,
+    // G3a: the unit this removal belongs to (the undo path stamps its own `u-undo-*`), so the
+    // `remove_file` entry it audits lands under the same unit as the rest of that operation.
+    unitId?: string,
   ): Promise<SkillActionResult> {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
@@ -2888,7 +2891,7 @@ export class SkillLibrary {
       await this.io.remove(target)
     }
     if (verdict !== 'match') return anchorRefusalFile(name, filePath, verdict)
-    await this.audit(name, 'remove_file', lockedBefore, null, `removed ${filePath}`, filePath)
+    await this.audit(name, 'remove_file', lockedBefore, null, `removed ${filePath}`, filePath, unitId)
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
     return { ok: true, message: `支撑文件「${filePath}」已从「${name}」移除。`, path: target }
   }
