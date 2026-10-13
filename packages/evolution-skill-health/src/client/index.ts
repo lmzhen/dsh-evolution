@@ -85,16 +85,24 @@ export function apply(ctx: ClientContext): void {
     if (!registered) return fallback
     try { return seam.locale.bind(NS)('entry.label') } catch { return fallback }
   }
+  // The panel's translator: the seat's dictionary binding, with the bundle's own copy as the fallback
+  // (a locale service that is absent or refuses must not turn the panel into a blank area).
+  const t = (key: string): string => {
+    const fallback = zh[key] ?? key
+    if (!registered) return fallback
+    try { return seam.locale.bind(NS)(key) } catch { return fallback }
+  }
   seam.slots.inject('sidebar.panellist', function* () {
     yield seam.slots.register(
       { name: 'sidebar.panellist', id: PANEL_ID, order: PANEL_ORDER, label },
       PanelIcon,
     )
     yield seam.slots.register(
-      // Seeded empty for the first paint; `loadRows` is what makes the panel show real data (api.ts
-      // is the only place a request is made, and the host route is its mirror of ROUTES.rows).
-      { name: 'main', key: PANEL_ID, inject: (): HealthFace => ({ rows: [], truncated: false, loadRows: api.rows }) },
-      (props: unknown) => createElement(SkillHealthPanel, { face: (props as { face: HealthFace }).face, locale: seam.locale }),
+      // Seeded empty for the first paint; `loadRows` is what makes the panel show real data (api.ts is
+      // the only place a request is made; the host route is its mirror of ROUTES.rows). The seat spreads
+      // this face AS the component's props, so the component takes the face itself — the sibling's shape.
+      { name: 'main', key: PANEL_ID, inject: (): HealthFace => ({ rows: [], truncated: false, loadRows: api.rows, t }) },
+      SkillHealthPanel,
     )
   })
 }

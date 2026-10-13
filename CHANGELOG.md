@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.6 (patch) — 面板点开是空白：组件收的是“扁平 face”，我给了嵌套 `{ face, locale }`
+
+> **现象**：0.25.5 装机后侧栏「技能健康」行在、也能点中（图标高亮），但主区域**不渲染任何内容**（浏览器控制台无我们可见的输出）。
+> **根因**：座位把 `inject` 返回的 face **摊开当作组件 props**（兄弟包 `evolution-skill-history` 的写法：`export function SkillHistoryPanel(face: PanelFace)`），而我写成 `SkillHealthPanel(props: { face, locale })` 并用包一层 `createElement(..., { face, locale })` 去喂 ⇒ `props.face` 是 `undefined`，组件读 `face.rows` 即抛错 ⇒ 平台吞掉渲染，只剩空白 ✗。
+> **修复**：与兄弟包对齐 —— 组件签名改为**收 face 本身**，face 内自带 `t` 翻译器（由座位注入，字典仍是本包的）；注册处直接传组件。
+> **验证**：本机 lint 0 报错、`api.client.spec.ts` 4 例通过、`build-client.mjs` 产出更新；装机后点开面板应显示四态摘要与按规则聚合的真实技能清单（截图留证）。
 ## 0.25.5 (patch) — 面板有座位无数据；装机 patch 静默丢行
 
 > **现象**：0.25.4 装到 3080 并 opt-in 后侧栏出现「技能健康」，但面板没有任何数据（四态摘要全 0、规则表空）。同一台机器上，装机包内的 `cordis.patch.yml` 还比 npm 发布产物**少一行**；该行缺失时整个客户端包**不会进入页面的启动清单**（`__DSH_BOOT__`），且重装修不好——版本要求已满足时 `dsh plugin add` 是 no-op（实测 `resolved 63, reused 2, downloaded 0, added 0`）。

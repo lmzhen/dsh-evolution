@@ -10,7 +10,6 @@
 
 import { createElement, useEffect, useState, type ReactNode } from 'react'
 import type { HealthOutcome } from './api.ts'
-import type { LocaleSeat } from './seam.ts'
 
 /** One finding, as the host reports it: `line` is null when the position cannot be named. */
 export interface HealthFinding {
@@ -37,6 +36,8 @@ export interface HealthFace {
   openHistory?: (name: string) => void
   /** Reads the scan result from the host route. Absent faces render their seeded rows unchanged. */
   loadRows?: () => Promise<HealthOutcome>
+  /** The seat's translator for this bundle's dictionary — the panel never reaches for a service. */
+  t: (key: string) => string
 }
 
 /** Kinds in the order the summary reads them. */
@@ -78,26 +79,26 @@ function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
  * @param props - the face (`{ rows, truncated, openHistory? }`) and the locale seat's translator.
  * @returns the panel body.
  */
-export function SkillHealthPanel(props: { face: HealthFace; locale: LocaleSeat }): ReactNode {
-  const t = props.locale.bind('evolution-skill-health')
+export function SkillHealthPanel(face: HealthFace): ReactNode {
+  const t = face.t
   // The face seeds the first paint; the host route replaces it once read. A refusal keeps the seed
   // (so the counts stay a lower bound) and reports the host's own sentence instead of a verdict.
-  const [face, setFace] = useState<HealthFace>(props.face)
+  const [view, setView] = useState<HealthFace>(face)
   const [failed, setFailed] = useState<string | undefined>(undefined)
   useEffect(() => {
-    const load = props.face.loadRows
+    const load = face.loadRows
     if (load === undefined) return
     let live = true
     load()
       .then((outcome) => {
         if (!live) return
-        if (outcome.ok) setFace({ ...props.face, rows: outcome.payload.rows, truncated: outcome.payload.truncated })
+        if (outcome.ok) setView({ ...face, rows: outcome.payload.rows, truncated: outcome.payload.truncated })
         else setFailed(outcome.message)
       })
       .catch((error: unknown) => { if (live) setFailed(String(error)) })
     return () => { live = false }
-  }, [props.face])
-  const counts = new Map(KINDS.map(kind => [kind, face.rows.filter((row: HealthRow) => row.verdict === kind).length]))
+  }, [face])
+  const counts = new Map(KINDS.map(kind => [kind, view.rows.filter((row: HealthRow) => row.verdict === kind).length]))
   const summary = t('counts')
     .replace('{ok}', String(counts.get('ok') ?? 0))
     .replace('{warn}', String(counts.get('warn') ?? 0))
@@ -105,12 +106,12 @@ export function SkillHealthPanel(props: { face: HealthFace; locale: LocaleSeat }
     .replace('{unreadable}', String(counts.get('unreadable') ?? 0))
   return createElement('section', null,
     createElement('p', null, summary),
-    face.truncated ? createElement('p', null, t('loading.failed')) : null,
+    view.truncated ? createElement('p', null, t('loading.failed')) : null,
     failed === undefined ? null : createElement('p', null, failed),
-    face.rows.length === 0 ? createElement('p', null, t('empty.noneReported')) : null,
+    view.rows.length === 0 ? createElement('p', null, t('empty.noneReported')) : null,
     createElement('h3', null, t('group.byRule')),
-    ruleTable(face, t),
-    face.rows.filter((row: HealthRow) => row.verdict === 'unreadable').map((row: HealthRow) =>
+    ruleTable(view, t),
+    view.rows.filter((row: HealthRow) => row.verdict === 'unreadable').map((row: HealthRow) =>
       createElement('p', { key: row.name + ':unreadable' }, row.name + ' — ' + t('unreadable.note'))),
   )
 }
