@@ -2620,7 +2620,10 @@ export class SkillLibrary {
               afterRef: contentHash(l.content),
             }
           })
-          .filter((m, idx, all) => all.findIndex(x => x.path === m.path) === idx),
+          // F1 (independent review, 2026-10-14): when one plan writes the SAME path twice, keep the
+          // LAST write -- first-wins left `afterRef` describing the earlier bytes (stale). `beforeRef`
+          // and `kind` are unaffected: both come from the same per-path pre-read.
+          .filter((m, idx, all) => all.map(x => x.path).lastIndexOf(m.path) === idx),
         sources: [{ skill: name }],
       } : undefined
       // A22: previous is string | null (a read failure rejects the whole plan), so the old
