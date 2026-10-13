@@ -70,8 +70,10 @@ function plannedResidentChars(file) {
   let sum = 0
   for (const row of rows) {
     const name = String(row?.name ?? '')
-    const line = '- `' + name + '`: ' + String(row?.description ?? '')
-    sum += Math.min(line.replace(/\s+/g, ' ').trim().length, CATALOG_DESCRIPTION_CAP)
+    // Platform shape: `- \`name\`: <desc>` where ONLY the description is normalized and capped
+    // (a truncated description records the cap itself: slice(0, cap - 3) + '...' stays INSIDE it).
+    const desc = String(row?.description ?? '').replace(/\s+/g, ' ').trim()
+    sum += 6 + name.length + Math.min(desc.length, CATALOG_DESCRIPTION_CAP)
   }
   return sum
 }
@@ -113,7 +115,11 @@ function evaluate(faces) {
       // description + the newline (5 fixed characters). Counting only the description understates
       // the standing cost by ~a third (measured: desc 3717 vs line 5604 across the two faces).
       s.residentChars += foldedDescription(text, describe)
-      s.residentLineChars = (s.residentLineChars ?? 0) + sk.name.length + foldedDescription(text, describe) + 5
+      // Fixed characters per catalog line = 6: `- ` + a backtick, the name, a backtick + `: `
+      // (platform: tool-skill/src/index.ts renders `- \`name\`: description`). 7 when the newline
+      // is counted — tests measure the block WITHOUT separators, so 6. escapeText (& < >) can only
+      // INFLATE the real bytes, so 6 is the lower bound and the fixture asserts no such characters.
+      s.residentLineChars = (s.residentLineChars ?? 0) + sk.name.length + foldedDescription(text, describe) + 6
       if (names.length) declaring += 1
       for (const n of names) {
         edges += 1
