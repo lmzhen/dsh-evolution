@@ -44,7 +44,7 @@ export function apply(ctx: ClientContext): void {
     }
   }, 'evolution-skill-health: locale')
   const label = (): string => {
-    const fallback = String(zh['entry.label'] ?? '技能健康')
+    const fallback = zh['entry.label'] ?? '技能健康'
     if (!registered) return fallback
     try { return seam.locale.bind(NS)('entry.label') } catch { return fallback }
   }
