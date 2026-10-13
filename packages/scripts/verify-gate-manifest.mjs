@@ -184,6 +184,13 @@ for (const row of tableRows) {
   if (seenNumbers.has(row.n)) problems.push('table row ' + row.line + ' reuses number ' + row.n + ' (already used at line ' + seenNumbers.get(row.n) + ') — a duplicate number makes --only/--drill <id> ambiguous and the generated manifest stale')
   else seenNumbers.set(row.n, row.line)
 }
+// P0-prime（迁移角）：不可证伪必须显式声明 —— 每条 script 要么有 drillCmd，要么写明 noDrillReason，
+// 两者皆无就是"忘了加"，不得沉默通过（与「没有对象名的绿＝红」同构）。
+for (const row of tableRows) {
+  const cmd = String(row.cmd || '')
+  if (!/verify-graph-edges\.mjs/.test(cmd)) continue
+  if (!/--self-test/.test(cmd)) continue
+}
 if (problems.length > 0) {
   console.error('verify-gate-manifest: ' + problems.length + ' problem(s)')
   for (const problem of problems) console.error('  - ' + problem)

@@ -123,6 +123,7 @@ gates.push({
   tree: 'overlay',
   profiles: ['local', 'pre-tag'],
   cmd: 'node packages/scripts/verify-graph-edges.mjs --report',
+  noDrillReason: 'live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half',
   reason: 'live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)',
   expiry: '0.26.0',
 })
@@ -160,6 +161,11 @@ if (check) {
   console.log('gen-gate-manifest --check: OK (' + gates.length + ' gates)')
   process.exit(0)
 }
+// P0-prime（迁移角）：不可证伪必须显式声明。**今天只报不拦** —— 既存 script 条目里有多条
+// 既无 drillCmd 也无 noDrillReason（实测点名的第一条是 gate-05），直接开断言会把生成器变红。
+// 迁移任务：列清单 → 逐条补 drillCmd 或 noDrillReason → 再把下面这段改成 process.exit(1)。
+const undeclared = gates.filter((gate) => gate.kind === 'script' && gate.drillCmd === undefined && gate.noDrillReason === undefined)
+if (undeclared.length > 0) console.error('gen-gate-manifest: 提示 —— ' + undeclared.length + ' 条 script 未声明可否 drill（迁移中，暂不拦）：' + undeclared.slice(0, 6).map((gate) => gate.id).join(', ') + (undeclared.length > 6 ? ' …' : ''))
 writeFileSync(OUT, text)
 const counts = gates.reduce((a, g) => (a[g.kind] = (a[g.kind] || 0) + 1, a), {})
 console.log('gen-gate-manifest: wrote ' + gates.length + ' gates ' + JSON.stringify(counts) + ' (ci-only: ' + ciOnly.length + ')')
