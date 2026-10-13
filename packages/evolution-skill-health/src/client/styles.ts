@@ -36,11 +36,13 @@ export const CSS = [
   ':where(' + root + ') { display: flex; flex-direction: column; gap: var(--evo-space-12); padding: var(--evo-space-16); color: var(--dsw-alias-label-primary); font-size: var(--evo-type-sm); line-height: var(--evo-leading-base); }',
   ':where(' + root + ' [data-role="hint"]) { margin: 0; color: var(--dsw-alias-label-secondary); }',
   ':where(' + root + ' [data-role="stats"]) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--evo-space-8); }',
-  ':where(' + root + ' [data-role="stat"]) { display: flex; flex-direction: column; gap: var(--evo-space-2); padding: var(--evo-space-8) var(--evo-space-10); border: var(--evo-hairline-width) solid var(--evo-line); border-left-width: 3px; border-radius: var(--evo-radius-6); }',
-  ':where(' + root + ' [data-role="stat"][data-tone="ok"]) { border-left-color: var(--evo-tone-ok); }',
-  ':where(' + root + ' [data-role="stat"][data-tone="warn"]) { border-left-color: var(--evo-tone-warn); }',
-  ':where(' + root + ' [data-role="stat"][data-tone="error"]) { border-left-color: var(--evo-tone-error); }',
-  ':where(' + root + ' [data-role="stat"][data-tone="unreadable"]) { border-left-color: var(--evo-tone-quiet); }',
+  // The verdict bar is an inset shadow, not a border: the family guard forbids pixel geometry
+  // literals in a client half (N25/N27), and the row tone below uses the same shape.
+  ':where(' + root + ' [data-role="stat"]) { display: flex; flex-direction: column; gap: var(--evo-space-2); padding: var(--evo-space-8) var(--evo-space-10); border: var(--evo-hairline-width) solid var(--evo-line); border-radius: var(--evo-radius-6); }',
+  ':where(' + root + ' [data-role="stat"][data-tone="ok"]) { box-shadow: inset 2px 0 0 var(--evo-tone-ok); }',
+  ':where(' + root + ' [data-role="stat"][data-tone="warn"]) { box-shadow: inset 2px 0 0 var(--evo-tone-warn); }',
+  ':where(' + root + ' [data-role="stat"][data-tone="error"]) { box-shadow: inset 2px 0 0 var(--evo-tone-error); }',
+  ':where(' + root + ' [data-role="stat"][data-tone="unreadable"]) { box-shadow: inset 2px 0 0 var(--evo-tone-quiet); }',
   ':where(' + root + ' [data-role="stat-value"]) { font-size: var(--evo-type-lg); font-variant-numeric: tabular-nums; line-height: 1; }',
   ':where(' + root + ' [data-role="stat-label"]) { color: var(--dsw-alias-label-tertiary); }',
   ':where(' + root + ' [data-role="group-title"]) { margin: 0; font-weight: 500; }',

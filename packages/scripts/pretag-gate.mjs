@@ -70,6 +70,19 @@ try {
   record('client bundle', bytes.includes(route), 'client.js bytes=' + bytes.length + ' route=' + String(bytes.includes(route)) + (out.trim() ? ' | ' + out.trim().slice(0, 60) : ''))
 } catch (error) { record('client bundle', false, String(error.message).slice(0, 140)) }
 
+// 2b) the family's architecture guards: they run in CI's Build/test/lint step and catch client-half
+//     rules the lint pass cannot see (pixel geometry literals, radius/hairline from the scale, …).
+try {
+  const out = execFileSync(process.execPath, ['packages/evolution/scripts/verify-arch-guards.mjs', 'packages/evolution'], { cwd: overlay, encoding: 'utf8' })
+  const summary = (String(out).match(/verify-arch-guards: OK[^\n]*/) || [''])[0]
+  const violations = String(out).match(/verify-arch-guards \[warn\]: (\d+) architecture guard violation/)[1]
+  record('family architecture guards', Number(violations) === 0, violations === '0' ? summary.slice(0, 90) : violations + ' violation(s) — run the guard in the overlay for the lines')
+} catch (error) {
+  const raw = String(error.stdout || '') + String(error.stderr || '')
+  const lines = raw.split('\n').filter((l) => /N[0-9]+|violation/.test(l)).slice(0, 3).join(' | ')
+  record('family architecture guards', false, lines.slice(0, 165) || String(error.message).slice(0, 120))
+}
+
 // 3b) the client data layer's own specs (self-contained: they load only src/client/api.ts, so they
 //     run even on a machine whose platform checkout is a different ref than CI's upstream)
 try {
