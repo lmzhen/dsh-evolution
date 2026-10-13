@@ -73,7 +73,7 @@ function plannedResidentChars(file) {
     // Platform shape: `- \`name\`: <desc>` where ONLY the description is normalized and capped
     // (a truncated description records the cap itself: slice(0, cap - 3) + '...' stays INSIDE it).
     const desc = String(row?.description ?? '').replace(/\s+/g, ' ').trim()
-    sum += 6 + name.length + Math.min(desc.length, CATALOG_DESCRIPTION_CAP)
+    sum += 7 + name.length + Math.min(desc.length, CATALOG_DESCRIPTION_CAP)
   }
   return sum
 }
@@ -119,7 +119,7 @@ function evaluate(faces) {
       // (platform: tool-skill/src/index.ts renders `- \`name\`: description`). 7 when the newline
       // is counted — tests measure the block WITHOUT separators, so 6. escapeText (& < >) can only
       // INFLATE the real bytes, so 6 is the lower bound and the fixture asserts no such characters.
-      s.residentLineChars = (s.residentLineChars ?? 0) + sk.name.length + foldedDescription(text, describe) + 6
+      s.residentLineChars = (s.residentLineChars ?? 0) + sk.name.length + foldedDescription(text, describe) + 7
       if (names.length) declaring += 1
       for (const n of names) {
         edges += 1
