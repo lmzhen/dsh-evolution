@@ -22,8 +22,10 @@ export function isSkillName(name: string): boolean {
 export function isPotentialSkillPath(relPath: string): boolean {
   const parts = relPath.split(/[\\/]+/).filter(p => p.length > 0)
   if (parts.length < 1 || parts.length > 2) return false
-  const last = parts[parts.length - 1]
-  if (parts.length === 2) return last === 'SKILL.md' && isSkillName(parts[0])
+  // `noUncheckedIndexedAccess` is on: an empty part list cannot happen (length >= 1 above), but the
+  // index expression still types as `string | undefined` -- an empty fallback fails both tests below.
+  const last = parts[parts.length - 1] ?? ''
+  if (parts.length === 2) return last === 'SKILL.md' && isSkillName(parts[0] ?? '')
   return last.endsWith('.md') && isSkillName(last.slice(0, -3))
 }
 
