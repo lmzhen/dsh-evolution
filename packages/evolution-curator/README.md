@@ -37,3 +37,12 @@ Deterministic skill lifecycle and recovery
 ## Notes and history
 
 - The one-click `/evolution consolidate <target> <source...>` remains the direct manual path (P2-8, v11: the earlier "no LLM pass proposes merge groups" wording contradicted the tested nomination chain).
+
+## 单元与撤销（对外契约摘要）
+
+- 一个单元 = 一次树改动（一个 unitId）。索引里只有一条记录带 unitHead，两形态互斥：代表片 { moves, sources }（全量清单 + 它写过哪些技能）／路标 { skill }（记录在别的技能里）；判别式固定为 moves !== undefined。
+- undoUnit(name, unitId?)：逐路径回该单元铸的基线；没有基线才回退到最早那条的 beforeHash；单元前不存在的路径删除并锚定（盘上字节被别人改过就拒绝，不覆盖）。决策在纯函数 src/unit-undo-plan.ts，IO 与主机不进决策层。
+- 跨技能单元：成员只按 sources[] 的已知 key 解析（禁止目录扫描）；缺片／外来片／重复片一律拒绝并点名对象 —— 不得用剩下的片段拼一个撤销。
+- 路标的 undoable 是 undefined（wire 上不出现该键），绝不为 false；聚合时跳过路标，避免它的 hash 污染同单元兄弟片。
+- 剪枝按单元 all-or-nothing；保留窗口今天仍按条目计（切换条件见仓库文档）。
+- 完整说明（含回退与验证命令）见仓库 docs/units-and-undo.md；该目录不随 npm 发布，故在此摘要。
