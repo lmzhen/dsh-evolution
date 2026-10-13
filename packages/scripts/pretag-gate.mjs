@@ -53,7 +53,7 @@ try {
   // probe through spawnSync, whose result holds stdout/stderr regardless of the exit code.
   const probe = spawnSync(ox, ['--config', '.oxlintrc.json', '-A', 'typescript', 'packages/evolution/evolution-core', 'packages/evolution/evolution-skill-health', 'packages/evolution/evolution-review'], { cwd: overlay, encoding: 'utf8', shell: true })
   const raw = String(probe.stdout || '') + String(probe.stderr || '')
-  const findings = raw.split('\n').map((l) => l.trim()).filter((l) => /^x [a-z-]+\//.test(l))
+  const findings = raw.split('\n').map((l) => l.trim()).filter((l) => /^[x×]\s+\S+:/.test(l))
   // `no-unsafe-*` is the type-aware family: on a machine whose platform checkout is a different ref
   // than CI's pinned upstream they fire on unresolved imports and pass in CI, so they are reported
   // as local noise; any OTHER finding is a real refusal.
@@ -78,7 +78,10 @@ try {
 try {
   const out = execFileSync(process.execPath, ['packages/evolution/scripts/verify-arch-guards.mjs', 'packages/evolution'], { cwd: overlay, encoding: 'utf8' })
   const summary = (String(out).match(/verify-arch-guards: OK[^\n]*/) || [''])[0]
-  const violations = String(out).match(/verify-arch-guards \[warn\]: (\d+) architecture guard violation/)[1]
+  // A CLEAN guard run prints NO warning line, so the old `.match(...)[1]` dereferenced null and
+  // turned a passing check into a crash (found in the 0.25.8 pre-tag rehearsal).
+  const warn = String(out).match(/verify-arch-guards \[warn\]: (\d+) architecture guard violation/)
+  const violations = warn === null ? '0' : warn[1]
   record('family architecture guards', Number(violations) === 0, violations === '0' ? summary.slice(0, 90) : violations + ' violation(s) — run the guard in the overlay for the lines')
 } catch (error) {
   const raw = String(error.stdout || '') + String(error.stderr || '')
