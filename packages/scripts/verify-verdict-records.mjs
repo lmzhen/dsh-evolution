@@ -85,6 +85,8 @@ if (mismatch !== null) assertVacuum('profile-mismatch', mismatch.parsed, mismatc
 const unusable = run('unusable-argv', [
   { id: 'probe-placeholder', kind: 'script', human: 'node x.mjs <plane home>', argv: ['node', 'x.mjs', '<plane home>'], tree: 'mirror', profiles: ['local'] },
   { id: 'probe-no-argv', kind: 'script', human: 'prose cell with no command', argv: null, argvProblem: 'composite-cell: 2 commands in one table row', tree: 'mirror', profiles: ['local'] },
+  // negative class 4 (非命令 cmd): argv[0] is a flag, so nothing can be executed at all
+  { id: 'probe-noncommand', kind: 'script', human: '--check', argv: ['--check'], tree: 'mirror', profiles: ['local'] },
 ])
 if (unusable !== null) {
   assertVacuum('unusable-argv', unusable.parsed, unusable.exitCode)
@@ -94,6 +96,9 @@ if (unusable !== null) {
   const noArgv = unusable.parsed.gates.find((record) => record.id === 'probe-no-argv')
   if (noArgv === undefined) note('unusable-argv: the argv-less row produced no record')
   else if (!(noArgv.missing ?? []).some((token) => String(token).includes('composite-cell'))) note('unusable-argv: the argv-less row does not name its argvProblem (got ' + JSON.stringify(noArgv.missing) + ')')
+  const nonCommand = unusable.parsed.gates.find((record) => record.id === 'probe-noncommand')
+  if (nonCommand === undefined) note('unusable-argv: the non-command row produced no record')
+  else if (!(nonCommand.missing ?? []).some((token) => String(token).includes('argv[0]'))) note('unusable-argv: the non-command row does not name argv[0] (got ' + JSON.stringify(nonCommand.missing) + ')')
 }
 
 // (4) HEALTHY control: one runnable row that exits 0 must be a pass with exit 0
@@ -111,4 +116,4 @@ if (failures.length > 0) {
   process.exit(1)
 }
 rmSync(root, { recursive: true, force: true })
-console.log('verify-verdict-records: OK - ' + copied + ' file(s) copied, 4 case(s): empty-manifest / profile-mismatch / unusable-argv => cannot-decide + missing + exit 2; healthy-control => pass + exit 0')
+console.log('verify-verdict-records: OK - ' + copied + ' file(s) copied, 4 case(s): empty-manifest / profile-mismatch / unusable-argv (placeholder + no-argv + non-command) => cannot-decide + missing + exit 2; healthy-control => pass + exit 0')
