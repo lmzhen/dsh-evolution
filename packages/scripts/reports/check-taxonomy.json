@@ -71,11 +71,9 @@
         "evolution-core::tests/numeric.spec.ts",
         "evolution-core::tests/params.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
-        "evolution-core::tests/probe.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/quality-thresholds.spec.ts",
         "evolution-core::tests/reference-rewrite.spec.ts",
-        "evolution-core::tests/restructure-candidates.spec.ts",
         "evolution-core::tests/review-channel.spec.ts",
         "evolution-core::tests/signals.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
@@ -252,7 +250,6 @@
         "evolution-core::tests/params.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
-        "evolution-core::tests/probe.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/quality-thresholds.spec.ts",
         "evolution-core::tests/quality.spec.ts",
@@ -260,7 +257,6 @@
         "evolution-core::tests/reference-rewrite.spec.ts",
         "evolution-core::tests/reports.spec.ts",
         "evolution-core::tests/restore-and-transact-guards.spec.ts",
-        "evolution-core::tests/restructure-candidates.spec.ts",
         "evolution-core::tests/review-channel.spec.ts",
         "evolution-core::tests/run-registry.spec.ts",
         "evolution-core::tests/s1-9-batch.spec.ts",
@@ -608,7 +604,6 @@
         "evolution-core::tests/params.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
-        "evolution-core::tests/probe.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/quality-thresholds.spec.ts",
         "evolution-core::tests/quality.spec.ts",
@@ -616,7 +611,6 @@
         "evolution-core::tests/reference-rewrite.spec.ts",
         "evolution-core::tests/reports.spec.ts",
         "evolution-core::tests/restore-and-transact-guards.spec.ts",
-        "evolution-core::tests/restructure-candidates.spec.ts",
         "evolution-core::tests/review-channel.spec.ts",
         "evolution-core::tests/run-registry.spec.ts",
         "evolution-core::tests/s1-9-batch.spec.ts",
@@ -901,7 +895,6 @@
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/preset-composition.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
-        "evolution-core::tests/probe.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/quality-thresholds.spec.ts",
         "evolution-core::tests/quality.spec.ts",
@@ -909,7 +902,6 @@
         "evolution-core::tests/reference-rewrite.spec.ts",
         "evolution-core::tests/reports.spec.ts",
         "evolution-core::tests/restore-and-transact-guards.spec.ts",
-        "evolution-core::tests/restructure-candidates.spec.ts",
         "evolution-core::tests/review-channel.spec.ts",
         "evolution-core::tests/run-registry.spec.ts",
         "evolution-core::tests/s1-9-batch.spec.ts",
@@ -1132,11 +1124,11 @@
   "counts": {
     "fast": {
       "gates": 44,
-      "specs": 44
+      "specs": 42
     },
     "pre-tag": {
       "gates": 44,
-      "specs": 175
+      "specs": 173
     },
     "ci-only": {
       "gates": 9,
@@ -1144,16 +1136,16 @@
     },
     "full(ci=off)": {
       "gates": 44,
-      "specs": 175
+      "specs": 173
     },
     "full(ci=on)": {
       "gates": 53,
-      "specs": 237
+      "specs": 235
     }
   },
   "specs": {
-    "total": 237,
-    "marked": 237,
+    "total": 235,
+    "marked": 235,
     "unmarked": 0
   }
 }
