@@ -1280,6 +1280,19 @@
               "provenAt": "2026-10-14T08:18:18.295Z",
               "provenSha": "5dd6dc3b76f7b5b98096bd13cac2605cc59e99438db2579fd40ed4afaceb8e36"
             }
+          ],
+          "gate-20": [
+            {
+              "mutate": {
+                "file": "packages/evolution-core/src/opt-in.ts",
+                "find": "'skill_manage'",
+                "replace": "'skill_manage_probe'"
+              },
+              "expect": "red",
+              "note": "a name in the hardcoded family-session tool list that no package produces: the gate links that list to the tool packages, and the whole point is that a rename turns the probe blind",
+              "provenAt": "2026-10-14T08:19:24.222Z",
+              "provenSha": "75a59788fe3ec29d4ab8b5b9ddf4e7586f436493ef764ab220391298d5275a9d"
+            }
           ]
         },
         "mutationExempt": {
