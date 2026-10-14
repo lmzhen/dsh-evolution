@@ -86,11 +86,12 @@ state onto an empty domain.
 | Declared dependency window | `^0.2.0-rc.1` on every `@deepseek-ai/dsh-*` dependency/peer (`PLATFORM_FLOOR`) |
 | Family version | `0.25.9` (this tree; the npm tag comes from the release tag — per-form status in `packages/INSTALL.md`) |
 | Node | 22.19+ or 24+ (`engines`) |
+| Platform-line history | `0.17.0-rc.1` and later → `0.2.0-rc.2`; `0.3.70`–`0.16.1` → `0.1.5-rc.2`; `0.3.69` and earlier → `0.1.1-rc.2` |
 
 Two values answer two questions: `PLATFORM_FLOOR` is what the published range declares, `PLATFORM_VERSION` is
 the exact line the gate validates. The floor has to admit the whole line — `^0.2.0-rc.1` admits `0.2.0-rc.2`,
 while `^0.2.0-rc.2` would refuse the very rc it was tested on. A prerelease range still does not cross lines:
-an earlier prerelease line fails at dependency resolution, which is the support window, not a bug.
+an earlier prerelease line fails at dependency resolution, which is the support window, not a bug. The line a given tag was validated against is that tag's `PLATFORM_VERSION` in `.github/workflows/release.yml` (`git show <tag>:.github/workflows/release.yml`); the history row above is that value summarised by release range.
 
 ## How it works
 

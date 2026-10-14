@@ -71,8 +71,9 @@ M 编号在**本文件**定义；安装**形态**以及各形态在平台线上�
 | 声明的依赖窗口 | 每个 `@deepseek-ai/dsh-*` 依赖/peer 上都是 `^0.2.0-rc.1`（`PLATFORM_FLOOR`） |
 | 家族版本 | `0.25.9`（本树版本；npm 上的 tag 由发布 tag 决定——各形态状态见 `packages/INSTALL.md`） |
 | Node | 22.19+ 或 24+（`engines`） |
+| 平台线沿革 | `0.17.0-rc.1` 起 → `0.2.0-rc.2`；`0.3.70`–`0.16.1` → `0.1.5-rc.2`；`0.3.69` 及更早 → `0.1.1-rc.2` |
 
-两个值回答两个问题：`PLATFORM_FLOOR` 是发布出去的 range 声明的口径，`PLATFORM_VERSION` 是门禁实际验证的那条线。floor 必须收得住整条线——`^0.2.0-rc.1` 收得住 `0.2.0-rc.2`，而 `^0.2.0-rc.2` 会拒绝它自己验证过的那个 rc。预发布 range 仍然不跨线：更早的预发布线在依赖解析阶段就失败，这是支持窗口，不是 bug。
+两个值回答两个问题：`PLATFORM_FLOOR` 是发布出去的 range 声明的口径，`PLATFORM_VERSION` 是门禁实际验证的那条线。floor 必须收得住整条线——`^0.2.0-rc.1` 收得住 `0.2.0-rc.2`，而 `^0.2.0-rc.2` 会拒绝它自己验证过的那个 rc。预发布 range 仍然不跨线：更早的预发布线在依赖解析阶段就失败，这是支持窗口，不是 bug。某个 tag 是哪条线，就是该 tag 的 `.github/workflows/release.yml` 里的 `PLATFORM_VERSION`（`git show <tag>:.github/workflows/release.yml`）；上表那行沿革是它按版本区间的汇总。
 
 ## 工作原理
 
