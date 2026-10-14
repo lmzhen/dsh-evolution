@@ -1204,6 +1204,30 @@
               "provenAt": "2026-10-14T07:59:32.105Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
+          ],
+          "gate-36": [
+            {
+              "mutate": {
+                "file": "packages/evolution-commands/src/index.ts",
+                "find": "if (runExclusive === undefined) return commit()",
+                "replace": "if (true) return commit()"
+              },
+              "expect": "red",
+              "note": "rule B probe: the degrade shape (direct call when no hmr is mounted) is replaced by an unconditional early return, so the platform lock can never be taken",
+              "provenAt": "2026-10-14T08:01:31.182Z",
+              "provenSha": "392d9dd75c246a74bf9b81aa6f5a5d84b9a6d6fe3db9048a2f1b879ecc7f8ffa"
+            },
+            {
+              "mutate": {
+                "file": "packages/evolution-commands/src/index.ts",
+                "find": "return await runExclusive.call(hmr, commit) as CommandResult",
+                "replace": "return await commit() as CommandResult"
+              },
+              "expect": "red",
+              "note": "rule A probe: the runExclusive call is dropped from the profile-patch write, leaving a serialization-free commit",
+              "provenAt": "2026-10-14T08:01:31.188Z",
+              "provenSha": "392d9dd75c246a74bf9b81aa6f5a5d84b9a6d6fe3db9048a2f1b879ecc7f8ffa"
+            }
           ]
         },
         "mutationExempt": {
