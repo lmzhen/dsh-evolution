@@ -1074,6 +1074,19 @@
               "provenAt": "2026-10-14T07:44:45.627Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
+          ],
+          "gate-07": [
+            {
+              "mutate": {
+                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
+                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst DSH_HOME_PROBE = process.env.DSH_HOME"
+              },
+              "expect": "red",
+              "note": "a DSH_HOME read introduced outside evolution-core/src: rule N1 is zero-tolerance, so the guard names the file and the line",
+              "provenAt": "2026-10-14T07:46:09.529Z",
+              "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
+            }
           ]
         },
         "unmappedTier": [
