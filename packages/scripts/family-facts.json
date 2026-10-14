@@ -1371,6 +1371,19 @@
               "provenAt": "2026-10-14T08:28:45.162Z",
               "provenSha": "9fcc72f41e290751845718e56d1f02b3327332f8dcb2064fe10499dec89610f4"
             }
+          ],
+          "gate-30": [
+            {
+              "mutate": {
+                "file": "packages/evolution-settings-ui/src/client/PendingCard.ts",
+                "find": "import type { ApprovalApi, PendingRow } from './api.ts'",
+                "replace": "import type { ApprovalApi, PendingRow } from './api.ts'\nconst FACE_PROBE = 'dsh web'"
+              },
+              "expect": "red",
+              "note": "a cross-face instruction (dsh web) placed in a string literal inside a client half: rule B bans exactly those literals, and this file is inside src/client so it is in the scan surface (the plugin sources are not)",
+              "provenAt": "2026-10-14T08:29:21.275Z",
+              "provenSha": "2b609a0d6b33eeb6e55f5858b44f7a89b3b0d584635b6c61b72f94be4e41f96a"
+            }
           ]
         },
         "mutationExempt": {
