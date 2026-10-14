@@ -1100,6 +1100,19 @@
               "provenAt": "2026-10-14T07:52:14.854Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
+          ],
+          "gate-38": [
+            {
+              "mutate": {
+                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
+                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst ATOMIC_PROBE = renameSync('.tmp/probe', 'probe')"
+              },
+              "expect": "red",
+              "note": "renameSync co-occurring with a .tmp staging name outside the one atomic-write implementation: that co-occurrence IS the rule",
+              "provenAt": "2026-10-14T07:52:44.113Z",
+              "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
+            }
           ]
         },
         "mutationExempt": {
