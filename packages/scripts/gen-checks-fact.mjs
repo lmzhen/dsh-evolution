@@ -87,6 +87,9 @@ function entryFor(id, extra) {
 
 function buildFact(carrier, asset) {
   const previous = (asset.facts === undefined ? [] : asset.facts).find((fact) => fact && fact.machine && fact.machine.kind === 'checks')
+  // the axis register is AUTHORED (each entry is a debt with a measured size, an expiry and an
+  // owner) - regeneration must carry it, exactly like a written claim or a requires list.
+  const pendingAxes = previous && previous.machine && Array.isArray(previous.machine.pendingAxes) ? previous.machine.pendingAxes : []
   const written = new Map()
   const requiresOf = new Map()
   const rows = previous && previous.machine && Array.isArray(previous.machine.declarations) ? previous.machine.declarations : []
@@ -131,6 +134,7 @@ function buildFact(carrier, asset) {
       },
       declarations: declarations,
       pendingColumns: pendingColumns,
+      pendingAxes: pendingAxes,
       unmappedTier: unmappedTier,
       unknownCriterion: unknownCriterion,
       duplicateGroups: duplicateGroups
