@@ -159,7 +159,12 @@
         "health-admission",
         "line-identity-bed"
       ],
-      "specs": [],
+      "specs": [
+        "evolution-host::tests/bundle-mutual-exclusion.spec.ts",
+        "evolution-host::tests/installation-matrix.spec.ts",
+        "evolution-host::tests/installer-preset-base.spec.ts",
+        "evolution-host::tests/installer.spec.ts"
+      ],
       "gatesLocal": [
         "gate-01",
         "gate-02",
@@ -278,7 +283,12 @@
         "health-admission",
         "line-identity-bed"
       ],
-      "specs": [],
+      "specs": [
+        "evolution-host::tests/bundle-mutual-exclusion.spec.ts",
+        "evolution-host::tests/installation-matrix.spec.ts",
+        "evolution-host::tests/installer-preset-base.spec.ts",
+        "evolution-host::tests/installer.spec.ts"
+      ],
       "gatesLocal": [
         "gate-01",
         "gate-02",
@@ -389,7 +399,12 @@
         "line-identity-bed",
         "line-identity-ci"
       ],
-      "specs": [],
+      "specs": [
+        "evolution-host::tests/bundle-mutual-exclusion.spec.ts",
+        "evolution-host::tests/installation-matrix.spec.ts",
+        "evolution-host::tests/installer-preset-base.spec.ts",
+        "evolution-host::tests/installer.spec.ts"
+      ],
       "gatesLocal": [
         "gate-01",
         "gate-02",
@@ -446,7 +461,7 @@
     },
     "pre-tag": {
       "gates": 45,
-      "specs": 0
+      "specs": 4
     },
     "ci-only": {
       "gates": 9,
@@ -454,11 +469,16 @@
     },
     "full(ci=off)": {
       "gates": 45,
-      "specs": 0
+      "specs": 4
     },
     "full(ci=on)": {
       "gates": 54,
-      "specs": 0
+      "specs": 4
     }
+  },
+  "specs": {
+    "total": 240,
+    "marked": 4,
+    "unmarked": 236
   }
 }

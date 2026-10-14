@@ -62,10 +62,42 @@ if (adapterSha === "absent" && process.env.FAMILY_ALLOW_ABSENT_ADAPTER !== "1") 
   process.exit(2);
 }
 
+// C1/C2 membership: the taxonomy view is the projection (gen-check-taxonomy; R22' - a view owns
+// no policy). A spec WITH a marker belongs to its tier's lanes; a spec WITHOUT one runs in the
+// full lane only until the contract's requiredFrom makes the marker mandatory (R28).
+const viewPath = resolve(here, "reports", "check-taxonomy.json");
+let lanes = null;
+try { lanes = JSON.parse(readFileSync(viewPath, "utf8")).lanes ?? null; } catch { lanes = null; }
+if (lanes === null) {
+  console.error("vitest.family.config: CANNOT DECIDE - the taxonomy view is missing (" + viewPath + "); run gen-check-taxonomy.mjs");
+  process.exit(2);
+}
+const census = (() => { try { return JSON.parse(readFileSync(viewPath, "utf8")).specs ?? { total: 0 } } catch { return { total: 0 } } })();
+const laneKey = tier === "full" ? (process.env.CI ? "full(ci=on)" : "full(ci=off)") : tier;
+const lane = lanes[laneKey];
+if (lane === undefined) {
+  console.error("vitest.family.config: CANNOT DECIDE - the view has no lane " + laneKey + " (lanes: " + Object.keys(lanes).join(", ") + ")");
+  process.exit(2);
+}
+const marked = new Set(Object.values(lanes).flatMap((entry) => entry.specs));
+const members = new Set(lane.specs);
+// A lane narrower than full must run EXACTLY its members: an exclude-list cannot express that,
+// because the specs WITHOUT a marker are not in any list to exclude (the first version let an
+// untagged spec run in the pre-tag lane and looked right while doing it). full keeps the
+// layout-agnostic glob and only drops the specs that a marker sends to another lane.
+const laneIsFull = laneKey.startsWith("full");
+const memberGlobs = [...members].map((key) => key.split("::").join("/"));
+const excluded = laneIsFull ? [...marked].filter((key) => !members.has(key)).map((key) => key.split("::").join("/")) : [];
+console.log("vitest.family.config: lane=" + laneKey + " members=" + String(members.size) + " excluded=" + String(excluded.length) + " marked=" + String(marked.size) + "/" + String(census.total));
+if (members.size === 0) {
+  console.error("vitest.family.config: CANNOT DECIDE - tier " + tier + " has no spec member yet (an empty REQUIRED lane is not a green run; tag the specs with @tier or run lane=full)");
+  process.exit(2);
+}
+
 export default {
   test: {
     root: familyTree,
-    include: ["*/tests/**/*.spec.ts"],
-    exclude: ["**/node_modules/**"],
+    include: laneIsFull ? ["*/tests/**/*.spec.ts"] : memberGlobs,
+    exclude: ["**/node_modules/**", ...excluded],
   },
 };

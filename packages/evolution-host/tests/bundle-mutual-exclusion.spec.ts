@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { loadOverlayPatches, composeEntries } from '@deepseek-ai/dsh-app-boot'
 import { fileURLToPath } from 'node:url'

@@ -119,12 +119,15 @@ const out = {
   sources: ['scripts/gate-manifest.json (row profiles)', String(contract.specGlob ?? '*/tests/**/*.spec.ts') + ' (@tier header contract)', 'family-facts.json testing-policy (lane chain + tier policy)'],
   lanes,
   counts: Object.fromEntries(Object.entries(lanes).map(([lane, members]) => [lane, { gates: members.gates.length, specs: members.specs.length }])),
+  // the census is NOT a lane: it sits beside counts so every consumer that iterates counts stays
+  // a lane loop (a mixed-key object is how a report loop starts reading a number as a lane).
+  specs: { total: specFiles.length, marked: new Set(Object.values(lanes).flatMap((lane) => lane.specs)).size, unmarked: specFiles.length - new Set(Object.values(lanes).flatMap((lane) => lane.specs)).size },
 }
 const text = JSON.stringify(out, null, 2) + '\n'
 
 if (report) {
   const totalSpecs = specFiles.length
-  console.log('gen-check-taxonomy [report] ' + manifest.gates.length + ' gate row(s), ' + totalSpecs + ' spec(s), lanes ' + Object.keys(lanes).join('/'))
+  console.log('gen-check-taxonomy [report] ' + manifest.gates.length + ' gate row(s), ' + totalSpecs + ' spec(s) (' + out.specs.marked + ' marked, ' + out.specs.unmarked + ' unmarked), lanes ' + Object.keys(lanes).join('/'))
   for (const [lane, counts] of Object.entries(out.counts)) console.log('  lane ' + lane + ': gates=' + counts.gates + ' specs=' + counts.specs + ' (tiers ' + (lanes[lane].tiers).join('+') + ')')
   for (const observation of observations) console.log('  - ' + observation.kind + ': ' + observation.detail)
   if (observations.length === 0) console.log('  (no observation)')
