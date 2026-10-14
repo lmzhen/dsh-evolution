@@ -1340,6 +1340,10 @@
           "ci-only-08": {
             "reason": "its TARGET path (upstream/tsconfig.base.json) exists only in the CI overlay job, never in this repo: the row injects alias lines into the upstream tree that the compat job checks out, so no mutation inside this repo can change what it judges",
             "expiry": "release gate: if the row ever names an in-repo target, delete this exemption and prove it by mutation"
+          },
+          "gate-18": {
+            "reason": "its subject is the PLATFORM tree outside this repo: the receipts name packages/core/... files and the argv points at an out-of-repo upstream checkout, so the reviewed repo carries neither the files it judges nor a way to change them",
+            "expiry": "release gate: if the row ever judges in-repo files, delete this exemption and prove it by mutation"
           }
         },
         "unmappedTier": [
