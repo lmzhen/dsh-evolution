@@ -77,7 +77,6 @@
         "evolution-core::tests/errors.spec.ts",
         "evolution-core::tests/event-version.spec.ts",
         "evolution-core::tests/evidence.spec.ts",
-        "evolution-core::tests/evolution-events.spec.ts",
         "evolution-core::tests/frontmatter-mixed-endings.spec.ts",
         "evolution-core::tests/frontmatter-normalize.spec.ts",
         "evolution-core::tests/frontmatter-platform-string-fields.spec.ts",
@@ -110,9 +109,7 @@
         "evolution-core::tests/signals.spec.ts",
         "evolution-core::tests/skill-consolidate.spec.ts",
         "evolution-core::tests/skill-health.spec.ts",
-        "evolution-core::tests/skill-history.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
-        "evolution-core::tests/skill-restructure.spec.ts",
         "evolution-core::tests/skill-row-cells.spec.ts",
         "evolution-core::tests/skill-store-boundary.spec.ts",
         "evolution-core::tests/skill-store-listing-failure.spec.ts",
@@ -134,11 +131,9 @@
         "evolution-curator::tests/instance-claim.spec.ts",
         "evolution-curator::tests/io-preference.spec.ts",
         "evolution-curator::tests/referenced-skills.spec.ts",
-        "evolution-curator::tests/unit-undo-e2e.spec.ts",
         "evolution-curator::tests/unit-undo-plan.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
         "evolution-host::tests/dial-reference.spec.ts",
-        "evolution-host::tests/guard-scripts.negative.spec.ts",
         "evolution-host::tests/sidecar-inventory.spec.ts",
         "evolution-io-fs::tests/io-fs.spec.ts",
         "evolution-io-node::tests/io-node.spec.ts",
@@ -185,7 +180,6 @@
         "evolution-state-json::tests/boundary.spec.ts",
         "evolution-state-json::tests/consistency-forge.spec.ts",
         "evolution-state-json::tests/gate-drop-pending.spec.ts",
-        "evolution-state-json::tests/json.spec.ts",
         "evolution-state-json::tests/pending-growth-warning.spec.ts",
         "evolution-state-json::tests/record-gate.spec.ts",
         "evolution-state-json::tests/root-resolution.spec.ts",
@@ -1243,7 +1237,7 @@
   "counts": {
     "fast": {
       "gates": 45,
-      "specs": 140
+      "specs": 134
     },
     "pre-tag": {
       "gates": 45,

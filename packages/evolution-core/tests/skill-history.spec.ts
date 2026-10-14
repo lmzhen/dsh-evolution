@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 /**
  * Skill content history (design \`dsh-evolution-skill-history-design.md\` batch A).
  *

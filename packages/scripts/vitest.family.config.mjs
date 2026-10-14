@@ -113,8 +113,18 @@ const members = new Set(lane.specs);
 // untagged spec run in the pre-tag lane and looked right while doing it). full keeps the
 // layout-agnostic glob and only drops the specs that a marker sends to another lane.
 const laneIsFull = laneKey.startsWith("full");
+// The SPEC TIMEOUT is policy data too (testing-policy.timeouts.spec: the registry owns the
+// paramId, this fact owns the milliseconds). The config used to set nothing at all, so every
+// spec without its own vi.setConfig ate vitest's 5s default - which is what the 23 failing files
+// in the full-lane run mostly were.
+const specTimeoutMs = policyFact?.machine?.timeouts?.spec?.ms;
+if (!Number.isInteger(specTimeoutMs) || specTimeoutMs <= 0) {
+  console.error("vitest.family.config: CANNOT DECIDE - the testing-policy fact states no timeouts.spec.ms (" + policyPath + ")");
+  process.exit(2);
+}
 const memberGlobs = [...members].map((key) => key.split("::").join("/"));
 const excluded = laneIsFull ? [...marked].filter((key) => !members.has(key)).map((key) => key.split("::").join("/")) : [];
+console.log("vitest.family.config: testTimeoutMs=" + String(specTimeoutMs));
 console.log("vitest.family.config: lane=" + laneKey + " members=" + String(members.size) + " excluded=" + String(excluded.length) + " marked=" + String(marked.size) + "/" + String(census.total));
 if (members.size === 0) {
   console.error("vitest.family.config: CANNOT DECIDE - tier " + tier + " has no spec member yet (an empty REQUIRED lane is not a green run; tag the specs with @tier or run lane=full)");
@@ -125,6 +135,7 @@ export default {
   resolve: { alias: aliasList },
   test: {
     root: familyTree,
+    testTimeout: specTimeoutMs,
     include: laneIsFull ? ["*/tests/**/*.spec.ts"] : memberGlobs,
     exclude: ["**/node_modules/**", ...excluded],
   },
