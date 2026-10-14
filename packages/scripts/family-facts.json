@@ -443,7 +443,12 @@
           }
         },
         "overrides": [],
-        "testLines": []
+        "testLines": [],
+        "timeouts": {
+          "gate": { "paramId": "timeout.gate.default", "ms": 30000 },
+          "spec": { "paramId": "timeout.spec.default", "ms": 30000 },
+          "overrides": []
+        }
       }
     }
   ],

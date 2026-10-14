@@ -293,6 +293,8 @@ export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
   { id: 'install.basePreset', group: 'deployment', tier: 'E4', authority: 'install', owner: 'scripts', applies: 'restart', docAnchor: 'PARAMETERS.md#deployment', summary: 'Agent-preset base the layered install composes from (--base).', why: 'install' },
   { id: 'install.home', group: 'deployment', tier: 'E4', authority: 'install', owner: 'scripts', applies: 'restart', docAnchor: 'PARAMETERS.md#deployment', summary: 'Harness home the installer writes into (--home).', why: 'install' },
   { id: 'install.presetRowOverrides', group: 'deployment', tier: 'E4', authority: 'install', owner: 'scripts', applies: 'restart', docAnchor: 'PARAMETERS.md#deployment', summary: 'Preset row overrides the installer injects (row-overrides.json).', why: 'install' },
+  { id: 'timeout.gate.default', group: 'deployment', tier: 'E2', authority: 'install', owner: 'scripts', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Gate budget: the vitest --testTimeout the gate table and the CI step carry (the number lives in testing-policy.timeouts).', why: 'internal' },
+  { id: 'timeout.spec.default', group: 'deployment', tier: 'E2', authority: 'install', owner: 'scripts', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Local spec budget: the vitest testTimeout the family config generates per leaf tier (the number lives in testing-policy.timeouts).', why: 'internal' },
 ])
 
 /** The settings namespace each OWNER PACKAGE registers (design §7.2).

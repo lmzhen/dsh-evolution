@@ -389,6 +389,19 @@ function machineViolations(fact, root, docs, home, repoScope) {
       if (ext.sha256 !== adapter.sha256) out.push(`${FACTS_ASSET}: fact ${fact.id} adapter sha256 and extendsExternal sha256 disagree — one fact, one value`)
       if (String(ext.path ?? '').includes('packages/')) out.push(`${FACTS_ASSET}: fact ${fact.id} extendsExternal points inside the repo — that is the in-repo form, drop the block`)
     }
+    const timeouts = machine.timeouts ?? {}
+    for (const slot of ['gate', 'spec']) {
+      const t = timeouts[slot]
+      if (t === undefined) { out.push(`${FACTS_ASSET}: fact ${fact.id} timeouts.${slot} is missing — the number must have one home`) ; continue }
+      if (typeof t.paramId !== 'string' || t.paramId.trim() === '') out.push(`${FACTS_ASSET}: fact ${fact.id} timeouts.${slot} names no paramId — the registry owns the name, this fact owns the number`)
+      if (!Number.isInteger(t.ms) || t.ms <= 0) out.push(`${FACTS_ASSET}: fact ${fact.id} timeouts.${slot}.ms is not a positive integer — canonical form is milliseconds`)
+    }
+    for (const entry of timeouts.overrides ?? []) {
+      for (const field of ['path', 'reasonRef', 'expiry', 'owner']) {
+        if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') out.push(`${FACTS_ASSET}: fact ${fact.id} timeouts.overrides entry is missing ${field}`)
+      }
+      if (!Number.isInteger(entry?.ms) || entry.ms <= 0) out.push(`${FACTS_ASSET}: fact ${fact.id} timeouts.overrides entry has no positive integer ms`)
+    }
     for (const [kind, fields] of [["testLines", ["spec", "expectedLine", "reasonRef", "expiry", "owner"]], ["overrides", ["path", "reasonRef", "expiry", "owner"]]]) {
       for (const entry of machine[kind] ?? []) {
         for (const field of fields) {
