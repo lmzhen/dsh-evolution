@@ -1254,6 +1254,19 @@
               "provenAt": "2026-10-14T08:15:56.455Z",
               "provenSha": "d028d0f02ef324e4ac0dd5d216237d17d23bc946041e932ee428e132a9bd27fb"
             }
+          ],
+          "gate-09": [
+            {
+              "mutate": {
+                "file": "packages/evolution-core/row-overrides.json",
+                "find": "catalogDescriptionMaxLength",
+                "replace": "catalogDescriptionMaxLengthX"
+              },
+              "expect": "red",
+              "note": "renaming the declared key in its own home breaks the composer-reach needle: the guard pairs each declaration with a { file, needle } receipt, so the receipt stops matching",
+              "provenAt": "2026-10-14T08:17:17.775Z",
+              "provenSha": "1a40671d172440fa69ff7247942cd9f0e4de2a541ffdc5b26861b5a9ca6657cd"
+            }
           ]
         },
         "mutationExempt": {
