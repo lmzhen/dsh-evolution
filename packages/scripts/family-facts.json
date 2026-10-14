@@ -1089,6 +1089,12 @@
             }
           ]
         },
+        "mutationExempt": {
+          "gate-49": {
+            "reason": "the ledger itself: its declared state is cannot-decide while records are missing, so a mutation cannot flip it to red",
+            "expiry": "release gate: revisit when every other check carries a stamped record"
+          }
+        },
         "unmappedTier": [
           {
             "id": "gate-04",

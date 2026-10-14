@@ -95,6 +95,8 @@ function buildFact(carrier, asset) {
   const pendingAxes = previous && previous.machine && Array.isArray(previous.machine.pendingAxes) ? previous.machine.pendingAxes : []
   // the mutation records are AUTHORED evidence (G5): regeneration must carry them too
   const checkMutations = previous && previous.machine && previous.machine.checkMutations !== undefined ? previous.machine.checkMutations : {}
+  // authored too: the mutation-exemption register (reason + expiry per check)
+  const mutationExempt = previous && previous.machine && previous.machine.mutationExempt !== undefined ? previous.machine.mutationExempt : {}
   const written = new Map()
   const requiresOf = new Map()
   const rows = previous && previous.machine && Array.isArray(previous.machine.declarations) ? previous.machine.declarations : []
@@ -141,6 +143,7 @@ function buildFact(carrier, asset) {
       pendingColumns: pendingColumns,
       pendingAxes: pendingAxes,
       checkMutations: checkMutations,
+      mutationExempt: mutationExempt,
       unmappedTier: unmappedTier,
       unknownCriterion: unknownCriterion,
       duplicateGroups: duplicateGroups

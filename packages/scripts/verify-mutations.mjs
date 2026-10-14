@@ -38,21 +38,41 @@ if (gates.length === 0) {
 }
 // the design's home for the records: a fact-level block keyed by check id
 const records = checksFact?.machine?.checkMutations ?? {}
+// A gate whose DECLARED state is cannot-decide (it needs a machine-local corpus, or its subject is
+// absent here) can never be mutation-proven: it has no green baseline to lose. Pretending it is
+// "pending" makes exit 0 unreachable by construction, so it is EXEMPT - registered with a reason
+// and an expiry, printed on every run. An exemption missing either field is NOT honoured (the
+// loophole guard): an exemption is a debt with an owner, not a way to silence the ledger.
+const exemptions = checksFact?.machine?.mutationExempt ?? {}
+const exemptionOf = (id) => {
+  const entry = exemptions[id]
+  if (entry === undefined || entry === null) return null
+  const valid = typeof entry.reason === 'string' && entry.reason.trim().length > 0 && typeof entry.expiry === 'string' && entry.expiry.trim().length > 0
+  return valid ? entry : null
+}
 const entries = []
 for (const gate of gates) {
   const list = Array.isArray(records[gate.id]) ? records[gate.id] : []
   const complete = list.length > 0 && list.every((entry) => typeof entry?.expect === 'string' && ['red', 'cannot-decide', 'green'].includes(entry.expect) && typeof entry?.mutate?.file === 'string' && typeof entry?.mutate?.find === 'string' && typeof entry?.mutate?.replace === 'string')
+  const exempt = exemptionOf(gate.id)
+  if (exempt !== null && !complete) {
+    entries.push({ id: gate.id, records: list.length, status: 'exempt', why: exempt.reason + ' (expires: ' + exempt.expiry + ')' })
+    continue
+  }
   entries.push({ id: gate.id, records: list.length, status: complete ? 'recorded' : 'cannot-decide', why: complete ? '' : (list.length === 0 ? 'no mutation record' : 'a record is missing expect|mutate.file|mutate.find|mutate.replace') })
 }
 const counts = {
   recorded: entries.filter((e) => e.status === 'recorded').length,
   cannotDecide: entries.filter((e) => e.status === 'cannot-decide').length,
+  exempt: entries.filter((e) => e.status === 'exempt').length,
   redProven: entries.filter((e) => e.status === 'recorded' && (records[e.id] ?? []).some((r) => r.expect === 'red' && typeof r.provenAt === 'string')).length,
   unstamped: entries.filter((e) => e.status === 'recorded' && !(records[e.id] ?? []).every((r) => typeof r.provenAt === 'string')).length,
 }
 const accountWanted = process.argv.includes('--coverage') || (!process.argv.includes('--only') && !process.argv.includes('--self-test'))
 if (json && accountWanted) console.log(JSON.stringify({ schema: 1, gates: gates.length, counts, entries }, null, 2))
 else if (accountWanted) {
+  const exemptIds = entries.filter((e) => e.status === 'exempt').map((e) => e.id)
+  if (exemptIds.length > 0) console.log('verify-mutations: EXEMPT ' + String(exemptIds.length) + ' check(s) (registered with reason + expiry, printed every run): ' + exemptIds.join(', '))
   const unstampedIds = entries.filter((e) => e.status === 'recorded' && !(records[e.id] ?? []).every((r) => typeof r.provenAt === 'string')).map((e) => e.id)
   console.log('verify-mutations --coverage: ' + gates.length + ' gate(s): recorded=' + counts.recorded + ' unstamped=' + counts.unstamped + (unstampedIds.length > 0 ? ' (' + unstampedIds.slice(0, 6).join(',') + ')' : '') + ' cannotDecide=' + counts.cannotDecide + ' redProven=' + counts.redProven)
   const missing = entries.filter((e) => e.status === 'cannot-decide')
