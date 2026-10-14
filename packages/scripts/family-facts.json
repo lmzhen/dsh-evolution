@@ -1178,6 +1178,19 @@
               "provenAt": "2026-10-14T07:58:24.408Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
+          ],
+          "gate-40": [
+            {
+              "mutate": {
+                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
+                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst READONLY_PROBE = action !== 'list' && action !== 'unpin'"
+              },
+              "expect": "red",
+              "note": "an inline enumeration of the read-only actions (!== list && !== unpin) instead of consulting the single criterion - the mutation satisfies the guard detector constant INLINE exactly",
+              "provenAt": "2026-10-14T07:58:58.267Z",
+              "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
+            }
           ]
         },
         "mutationExempt": {
