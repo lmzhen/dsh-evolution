@@ -53,7 +53,6 @@
         "gate-43",
         "gate-44",
         "gate-45",
-        "gate-46",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -147,7 +146,6 @@
         "gate-43",
         "gate-44",
         "gate-45",
-        "gate-46",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -200,7 +198,6 @@
         "gate-43",
         "gate-44",
         "gate-45",
-        "gate-46",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -425,7 +422,6 @@
         "gate-43",
         "gate-44",
         "gate-45",
-        "gate-46",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -561,7 +557,6 @@
         "gate-43",
         "gate-44",
         "gate-45",
-        "gate-46",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -786,7 +781,6 @@
         "gate-43",
         "gate-44",
         "gate-45",
-        "gate-46",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -848,7 +842,6 @@
         "gate-43",
         "gate-44",
         "gate-45",
-        "gate-46",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed",
@@ -1138,7 +1131,6 @@
         "gate-43",
         "gate-44",
         "gate-45",
-        "gate-46",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -1147,11 +1139,11 @@
   },
   "counts": {
     "fast": {
-      "gates": 45,
+      "gates": 44,
       "specs": 45
     },
     "pre-tag": {
-      "gates": 45,
+      "gates": 44,
       "specs": 176
     },
     "ci-only": {
@@ -1159,11 +1151,11 @@
       "specs": 64
     },
     "full(ci=off)": {
-      "gates": 45,
+      "gates": 44,
       "specs": 176
     },
     "full(ci=on)": {
-      "gates": 54,
+      "gates": 53,
       "specs": 240
     }
   },

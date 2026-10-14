@@ -160,11 +160,6 @@
               "script": "smoke-built-entries.mjs",
               "reason": "needs an installed platform scope; the local runner executes it, the publish job does not",
               "expiry": "release-phase wiring: add the step to the action or mark the row local-only"
-            },
-            {
-              "script": "verify-regression-set.mjs",
-              "reason": "the merge-time regression set (guards + specs + audit self-checks); the publish job runs its own subset",
-              "expiry": "release-phase wiring: decide whether the job adopts this runner"
             }
           ],
           "machineLocal": [
@@ -196,7 +191,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 46 steps",
+          "text": "all 45 steps",
           "unique": true
         }
       ],
@@ -565,7 +560,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "f3d906e6297c85f943e668a086fdfb96540b0bceb810daf0a8887b2fcc5e8382",
+        "sha256": "51f91d1cda9c812782be1496986ef75926d2b3a8333f9f68fe10d74022221eeb",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -690,120 +685,115 @@
           {
             "id": "gate-23",
             "tier": "fast",
-            "criterion": "verify-regression-set"
+            "criterion": "verify-line-identity"
           },
           {
             "id": "gate-24",
             "tier": "fast",
-            "criterion": "verify-line-identity"
+            "criterion": "verify-arming"
           },
           {
             "id": "gate-25",
             "tier": "fast",
-            "criterion": "verify-arming"
+            "criterion": "verify-client-seats"
           },
           {
             "id": "gate-26",
             "tier": "fast",
-            "criterion": "verify-client-seats"
+            "criterion": "verify-client-tokens"
           },
           {
             "id": "gate-27",
             "tier": "fast",
-            "criterion": "verify-client-tokens"
+            "criterion": "verify-platform-ranges"
           },
           {
             "id": "gate-28",
             "tier": "fast",
-            "criterion": "verify-platform-ranges"
+            "criterion": "verify-release-artifacts"
           },
           {
             "id": "gate-29",
             "tier": "fast",
-            "criterion": "verify-release-artifacts"
+            "criterion": "verify-write-inventory"
           },
           {
             "id": "gate-30",
             "tier": "fast",
-            "criterion": "verify-write-inventory"
+            "criterion": "verify-client-ui-i18n"
           },
           {
             "id": "gate-31",
             "tier": "fast",
-            "criterion": "verify-client-ui-i18n"
+            "criterion": "verify-error-codes"
           },
           {
             "id": "gate-32",
             "tier": "fast",
-            "criterion": "verify-error-codes"
+            "criterion": "gen-install-counts"
           },
           {
             "id": "gate-33",
             "tier": "fast",
-            "criterion": "gen-install-counts"
+            "criterion": "unknown"
           },
           {
             "id": "gate-34",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "verify-package-map"
           },
           {
             "id": "gate-35",
             "tier": "fast",
-            "criterion": "verify-package-map"
+            "criterion": "gen-composer-port"
           },
           {
             "id": "gate-36",
             "tier": "fast",
-            "criterion": "gen-composer-port"
+            "criterion": "verify-lock-usage"
           },
           {
             "id": "gate-37",
             "tier": "fast",
-            "criterion": "verify-lock-usage"
+            "criterion": "verify-source-text-single-source"
           },
           {
             "id": "gate-38",
             "tier": "fast",
-            "criterion": "verify-source-text-single-source"
+            "criterion": "verify-atomic-write-single-source"
           },
           {
             "id": "gate-39",
             "tier": "fast",
-            "criterion": "verify-atomic-write-single-source"
+            "criterion": "verify-predicate-single-source"
           },
           {
             "id": "gate-40",
             "tier": "fast",
-            "criterion": "verify-predicate-single-source"
+            "criterion": "verify-readonly-single-criterion"
           },
           {
             "id": "gate-41",
             "tier": "fast",
-            "criterion": "verify-readonly-single-criterion"
+            "criterion": "verify-command-table"
           },
           {
             "id": "gate-42",
             "tier": "fast",
-            "criterion": "verify-command-table"
+            "criterion": "verify-bounds"
           },
           {
             "id": "gate-43",
             "tier": "fast",
-            "criterion": "verify-bounds"
+            "criterion": "verify-io-discipline"
           },
           {
             "id": "gate-44",
             "tier": "fast",
-            "criterion": "verify-io-discipline"
-          },
-          {
-            "id": "gate-45",
-            "tier": "fast",
             "criterion": "verify-declarations"
           },
           {
-            "id": "gate-46",
+            "id": "gate-45",
             "tier": "fast",
             "criterion": "verify-graph-edges"
           },
@@ -928,7 +918,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 64,
+            "rowsWithoutIt": 63,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -944,14 +934,14 @@
           },
           {
             "axis": "no-placeholders",
-            "rows": 4,
-            "reasonRef": "gate-23 (two), gate-28, gate-30: an argument slot needs a declared value source",
+            "rows": 2,
+            "reasonRef": "gate-23 (two), gate-28, gate-30 before the regression-set row was retired; now gate-28 and gate-30: an argument slot needs a declared value source",
             "expiry": "0.26.0",
             "owner": "scripts"
           },
           {
             "axis": "falsifiability-carrier",
-            "rows": 61,
+            "rows": 60,
             "reasonRef": "rows declare neither drillCmd nor noDrillReason: G6 gate-truth needs this number to fall",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -1048,8 +1038,8 @@
             "owner": "scripts"
           },
           {
-            "id": "gate-34",
-            "reasonRef": "scripts/gate-manifest.json#gate-34",
+            "id": "gate-33",
+            "reasonRef": "scripts/gate-manifest.json#gate-33",
             "expiry": "0.26.0",
             "owner": "scripts"
           }
@@ -1058,7 +1048,7 @@
           {
             "key": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
             "ids": [
-              "gate-24",
+              "gate-23",
               "line-identity-ci"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
