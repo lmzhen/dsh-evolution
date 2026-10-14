@@ -205,6 +205,10 @@ if (check) {
 // 迁移任务：列清单 → 逐条补 drillCmd 或 noDrillReason → 再把下面这段改成 process.exit(1)。
 const undeclared = gates.filter((gate) => gate.kind === 'script' && gate.drillCmd === undefined && gate.noDrillReason === undefined)
 if (undeclared.length > 0) console.error('gen-gate-manifest: 提示 —— ' + undeclared.length + ' 条 script 未声明可否 drill（迁移中，暂不拦）：' + undeclared.slice(0, 6).map((gate) => gate.id).join(', ') + (undeclared.length > 6 ? ' …' : ''))
+// ORDER: this generator writes gate-manifest.json, and scripts/gen-checks-fact.mjs DERIVES the
+// `checks` fact FROM that file. Regenerating the manifest therefore invalidates the derived fact:
+// run this first, then gen-checks-fact (the reverse order leaves `gen-checks-fact --check` and
+// verify-doc-facts red until the fact is re-derived - measured both ways).
 writeFileSync(OUT, text)
 const counts = gates.reduce((a, g) => (a[g.kind] = (a[g.kind] || 0) + 1, a), {})
 console.log('gen-gate-manifest: wrote ' + gates.length + ' gates ' + JSON.stringify(counts) + ' (ci-only: ' + ciOnly.length + ')')

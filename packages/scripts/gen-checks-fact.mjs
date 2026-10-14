@@ -34,6 +34,9 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ASSET = join(HERE, 'family-facts.json')
+// ORDER: the manifest is this generator's INPUT (see the header): regenerate it first with
+// gen-gate-manifest.mjs, then re-derive here. A stale derivation is caught, never silent -
+// `--check` and verify-doc-facts both go red.
 const CARRIER = join(HERE, 'gate-manifest.json')
 const CARRIER_REL = 'scripts/gate-manifest.json'
 const EXPIRY = '0.26.0'
