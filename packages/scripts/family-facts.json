@@ -1449,6 +1449,19 @@
               "provenAt": "2026-10-14T08:33:45.995Z",
               "provenSha": "b2c6b521079b008d3ae4d70b52f8d150cab0305f41991f04f15f13fda6643eca"
             }
+          ],
+          "gate-28": [
+            {
+              "mutate": {
+                "file": ".github/workflows/release.yml",
+                "find": "name: evolution-dist-released",
+                "replace": "name: evolution-dist-released-x"
+              },
+              "expect": "red",
+              "note": "a download-artifact name no producer anywhere carries: with a cross-run download the name only has to exist somewhere in the repository workflows, so a name that exists nowhere is exactly the class of the 2026-10-09 artifact-not-found incident",
+              "provenAt": "2026-10-14T08:34:33.741Z",
+              "provenSha": "91b4059538b725c08bb2a50e04b4ba6097678d01d92d75ae5532afbb9d60ca7c"
+            }
           ]
         },
         "mutationExempt": {
