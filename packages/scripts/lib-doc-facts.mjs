@@ -399,6 +399,15 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     if (current === undefined) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' cannot read the family version under ' + root + ' - a version-based exemption cannot be evaluated (a vacuum pass is not a pass)'); return out }
     for (const tier of tiers) {
       const entry = tierTable[tier] ?? {}
+      // the tier BUDGET is data too (the redesign's schema: tiers.<t>.maxWallMs), and a measured
+      // reading must carry its stamp - a bare number beside another bare number is how a budget
+      // stops meaning anything.
+      if (entry.maxWallMs !== undefined && (!Number.isInteger(entry.maxWallMs) || entry.maxWallMs <= 0)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' maxWallMs is not a positive integer')
+      const measured = entry.budgetMeasured
+      if (measured !== undefined) {
+        if (!Number.isInteger(measured.ms) || measured.ms <= 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' budgetMeasured.ms is not a positive integer')
+        for (const field of ['where', 'note']) if (typeof measured[field] !== 'string' || measured[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' budgetMeasured has no ' + field + ' - a reading without a stamp is not evidence')
+      }
       if (typeof entry.required !== 'boolean') out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' does not state required (true|false) - an unstated requirement is how an empty tier passes')
       const forbid = Array.isArray(entry.forbid) ? entry.forbid : null
       if (forbid === null) out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' carries no forbid list - the ban list is part of the tier policy')

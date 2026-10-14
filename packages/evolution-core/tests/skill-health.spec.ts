@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 import { expect, it } from 'vitest'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, HEALTH_STAMP_RE } from '@deepseek-ai/dsh-evolution-core'
 

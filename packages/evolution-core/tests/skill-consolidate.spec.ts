@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 import { expect, it } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

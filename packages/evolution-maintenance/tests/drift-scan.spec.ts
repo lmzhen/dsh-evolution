@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { computeDriftSignals } from '@deepseek-ai/dsh-evolution-core'
 import { snapshotFromLibrary, type SkillLibraryLike } from '../src/index.ts'

@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * S1.1 (v37 P1-4): a MIXED-ending SKILL.md is readable and writable.
  *

@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * G3: the legacy-namespace migration.
  *

@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * 0.5.0 (design §16.7): ONE conversion from the deployment policy snapshot to
  * library limits. Only present fields are copied — pinning `undefined` onto an

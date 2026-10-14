@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 import { expect, it } from 'vitest'
 import { evidenceKindIndex } from '@deepseek-ai/dsh-evolution-core'
 

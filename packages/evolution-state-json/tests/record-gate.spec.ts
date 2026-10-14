@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { readdir, rm } from 'node:fs/promises'

@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * What a reader sees when one version is opened as a document (G1, W19/W23).
  *

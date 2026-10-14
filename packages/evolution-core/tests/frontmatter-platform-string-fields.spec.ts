@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * S2.2 (v37 P2-9): a platform STRING field carrying a non-string YAML value.
  *

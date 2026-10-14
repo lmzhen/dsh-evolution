@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * S2-14 (FLOW2-1/flow-3): a target that cannot be READ at all gets the same
  * explicit classification on every write path.

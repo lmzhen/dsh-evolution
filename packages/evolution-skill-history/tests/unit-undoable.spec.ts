@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /** G3b：undoable 是**单元**属性 —— 同单元的条目必须同值（U1，今天必红的那条）。 */
 import { expect, it } from 'vitest'
 import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core'

@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'

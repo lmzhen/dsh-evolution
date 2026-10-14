@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { AUTHORING_SPLIT_LINE_CHARS, UPSTREAM_LIMIT_CHARS_PER_TOKEN, bodyCost, tokenLineFor, COST_ASCII_TOKEN_HIGH, COST_ASCII_TOKEN_LOW, COST_CJK_TOKEN_HIGH, COST_CJK_TOKEN_LOW, DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core'
 

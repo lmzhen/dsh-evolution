@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { appendEvolutionEvent, eventsFile, nodeEvolutionIo, parseEvolutionEvents, readEvolutionEvents } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'

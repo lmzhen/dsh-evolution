@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * S1.4 (v37 P1-5 / P2-7): the two failure shapes a whole-tree restore and a
  * transact-contract violation used to hide.

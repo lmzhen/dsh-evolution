@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * V4 (design §16.6): upstream applies the 100k-character cap to EVERY written
  * file, not just SKILL.md. It lands here in report mode first — a write over the

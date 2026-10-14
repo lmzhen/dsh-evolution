@@ -1,4 +1,4 @@
-// @tier fast
+// @tier ci-only
 /**
  * G3b（PLAN-R6 §28.2/28.3）：`unitHead` 一字段两形态 —— 代表片带 {moves, sources}、路标只带 {skill}。
  * 今天字段还不存在 ⇒ 用 `it.fails` 钉住；G3b 落地时翻成 `it`，翻牌即「已实现」的证据。
