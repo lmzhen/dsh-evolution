@@ -13,31 +13,7 @@ import { DEFAULT_SKILL_LIMITS } from '../src/limits.ts'
 import { nodeEvolutionIo, type EvolutionIoLike } from '../src/io.ts'
 import { SkillLibrary } from '../src/skill-store.ts'
 import { contentHash } from '../src/mutations.ts'
-import {
-  BASELINE_ACTION,
-  contentRetentionFeedback,
-  entryTarget,
-  HISTORY_INDEX_VERSION,
-  historyIndexFile,
-  loadVersions,
-  nextHistoryIndex,
-  orderVersions,
-  partitionVersions,
-  parseHistoryIndex,
-  readHistoryIndex,
-  latestVersionAt,
-  loadVersionContent,
-  recordVersions,
-  normalizeVersionSummary,
-  RETENTION_FEEDBACK_MIN_CHARS,
-  type SkillVersion,
-  textDiffFacts,
-  TEXT_DIFF_MAX_LINES,
-  VERSION_SUMMARY_MAX_CHARS,
-  versionActionKind,
-  versionSummaryPrompt,
-  versionTarget,
-} from '../src/skill-history.ts'
+import { BASELINE_ACTION, contentRetentionFeedback, entryTarget, HISTORY_INDEX_VERSION, historyIndexFile, loadVersions, nextHistoryIndex, orderVersions, partitionVersions, parseHistoryIndex, readHistoryIndex, latestVersionAt, loadVersionContent, recordVersions, RETENTION_FEEDBACK_MIN_CHARS, type SkillVersion, textDiffFacts, TEXT_DIFF_MAX_LINES, versionActionKind, versionTarget } from '../src/skill-history.ts'
 
 const skill = (name: string, body = 'Body.'): string => `---\nname: ${name}\ndescription: history fixture\n---\n${body}\n`
 
