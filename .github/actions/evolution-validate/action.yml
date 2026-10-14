@@ -409,6 +409,14 @@ runs:
         # in the same workflow (v0.17.0-rc.1 spent a human approval, then failed on `-baseline`,
         # whose producing job had been retired). Walks up from the working directory for `.github`.
         node packages/evolution/scripts/verify-release-artifacts.mjs ../.github --strict --self-test
+        # G6/M5 registration: a check DECLARED in the gate table must also be EXECUTED here -
+        # gate-22 refuses a declaration the action never runs (and no register covers). The view
+        # census, the verdict-records vacuum fixture and the seven-axis ledger therefore run in CI;
+        # the mutation ledger is registered instead (its records are still being filled, so its
+        # --coverage form is legitimately CANNOT DECIDE and must not fail the job).
+        node packages/evolution/scripts/gen-check-taxonomy.mjs packages/evolution --check
+        node packages/evolution/scripts/verify-verdict-records.mjs packages/evolution
+        node packages/evolution/scripts/verify-check-registry.mjs packages/evolution --strict
 
     - name: Install smoke into a throwaway DSH_HOME (desktop plane)
       if: inputs.install_smoke == 'true'

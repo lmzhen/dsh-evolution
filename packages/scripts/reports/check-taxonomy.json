@@ -53,6 +53,11 @@
         "gate-43",
         "gate-44",
         "gate-45",
+        "gate-46",
+        "gate-47",
+        "gate-48",
+        "gate-49",
+        "gate-50",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -143,6 +148,11 @@
         "gate-43",
         "gate-44",
         "gate-45",
+        "gate-46",
+        "gate-47",
+        "gate-48",
+        "gate-49",
+        "gate-50",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -195,6 +205,11 @@
         "gate-43",
         "gate-44",
         "gate-45",
+        "gate-46",
+        "gate-47",
+        "gate-48",
+        "gate-49",
+        "gate-50",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -416,6 +431,11 @@
         "gate-43",
         "gate-44",
         "gate-45",
+        "gate-46",
+        "gate-47",
+        "gate-48",
+        "gate-49",
+        "gate-50",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -549,6 +569,11 @@
         "gate-43",
         "gate-44",
         "gate-45",
+        "gate-46",
+        "gate-47",
+        "gate-48",
+        "gate-49",
+        "gate-50",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -770,6 +795,11 @@
         "gate-43",
         "gate-44",
         "gate-45",
+        "gate-46",
+        "gate-47",
+        "gate-48",
+        "gate-49",
+        "gate-50",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -831,6 +861,11 @@
         "gate-43",
         "gate-44",
         "gate-45",
+        "gate-46",
+        "gate-47",
+        "gate-48",
+        "gate-49",
+        "gate-50",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed",
@@ -1115,6 +1150,11 @@
         "gate-43",
         "gate-44",
         "gate-45",
+        "gate-46",
+        "gate-47",
+        "gate-48",
+        "gate-49",
+        "gate-50",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -1123,11 +1163,11 @@
   },
   "counts": {
     "fast": {
-      "gates": 44,
+      "gates": 49,
       "specs": 42
     },
     "pre-tag": {
-      "gates": 44,
+      "gates": 49,
       "specs": 173
     },
     "ci-only": {
@@ -1135,11 +1175,11 @@
       "specs": 62
     },
     "full(ci=off)": {
-      "gates": 44,
+      "gates": 49,
       "specs": 173
     },
     "full(ci=on)": {
-      "gates": 53,
+      "gates": 58,
       "specs": 235
     }
   },

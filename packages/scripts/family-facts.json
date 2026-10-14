@@ -160,6 +160,16 @@
               "script": "smoke-built-entries.mjs",
               "reason": "needs an installed platform scope; the local runner executes it, the publish job does not",
               "expiry": "release-phase wiring: add the step to the action or mark the row local-only"
+            },
+            {
+              "script": "verify-mutations.mjs",
+              "reason": "the mutation ledger is still being filled (3 of 68 checks have a proven record): --coverage is legitimately CANNOT DECIDE, so CI would read a cannot-decide as a failure; the records accrue per check as their retirements land",
+              "expiry": "release gate: --coverage must reach exit 0 (every check carries a proven red record) before the tag, or this row is re-registered with the remaining count named"
+            },
+            {
+              "script": "gen-health-baseline.mjs",
+              "reason": "the health-baseline corpus is produced from the TARGET machine's user skills (the family maintains it per machine); the CI overlay carries no user skills, so a CI run would produce an empty corpus rather than the real one",
+              "expiry": "release gate: the corpus is refreshed on the machine that owns it and its digest is recorded in the release readings; if a CI-side corpus is ever required, this row moves into the action"
             }
           ],
           "machineLocal": [
@@ -191,7 +201,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 45 steps",
+          "text": "all 50 steps",
           "unique": true
         }
       ],
@@ -560,7 +570,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "51f91d1cda9c812782be1496986ef75926d2b3a8333f9f68fe10d74022221eeb",
+        "sha256": "d561392c128f47424e5684312f62414dd3a5ddc5d8ff6687c7eec673c0b79bc1",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -798,6 +808,31 @@
             "criterion": "verify-graph-edges"
           },
           {
+            "id": "gate-46",
+            "tier": "fast",
+            "criterion": "gen-check-taxonomy"
+          },
+          {
+            "id": "gate-47",
+            "tier": "fast",
+            "criterion": "verify-verdict-records"
+          },
+          {
+            "id": "gate-48",
+            "tier": "fast",
+            "criterion": "verify-check-registry"
+          },
+          {
+            "id": "gate-49",
+            "tier": "fast",
+            "criterion": "verify-mutations"
+          },
+          {
+            "id": "gate-50",
+            "tier": "fast",
+            "criterion": "gen-health-baseline"
+          },
+          {
             "id": "ci-only-01",
             "tier": "ci-only",
             "criterion": "audit-release-tarballs",
@@ -918,7 +953,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 63,
+            "rowsWithoutIt": 68,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -941,7 +976,7 @@
           },
           {
             "axis": "falsifiability-carrier",
-            "rows": 60,
+            "rows": 65,
             "reasonRef": "rows declare neither drillCmd nor noDrillReason: G6 gate-truth needs this number to fall",
             "expiry": "0.26.0",
             "owner": "scripts"

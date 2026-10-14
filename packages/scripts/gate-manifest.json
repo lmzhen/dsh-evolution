@@ -705,6 +705,80 @@
       "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test"
     },
     {
+      "id": "gate-46",
+      "kind": "script",
+      "human": "`node packages/scripts/gen-check-taxonomy.mjs packages`（G2/M1 视图：把「门禁 × 档位 × spec」的普查视图从**声明面生成**出来（`--report` 人读、`--json` 机读）；`--check` 判生成物与声明面一致。**空档位必须 exit 2**——一个跑不到任何 spec 的档不是\"干净\"，是真空）",
+      "argv": [
+        "node",
+        "packages/scripts/gen-check-taxonomy.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-47",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-verdict-records.mjs packages`（G1/C7 判决记录：夹具四例＋健康对照——输入置空时每条 check 必须 `cannot-decide` 且 `missing≠∅` 且 **exit 2**；判决与理由必须同源，读数只计 `criterionEvaluated===true ∧ verdict==='fail'` 并按 `cause.kind` 分列）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-verdict-records.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-48",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-check-registry.mjs packages --strict`（七轴总账：闭包／可执行性／到期／mutation 覆盖／生产者接线／真空证伪／占位符——**在册的轴计数与实测不符即红**，到期项未施加亦红）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-check-registry.mjs",
+        "packages",
+        "--strict"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
+      "id": "gate-49",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-mutations.mjs --coverage`（G5/1 变异库：每条 check 需 `checkMutations` 记录，缺／残 ⇒ **cannot-decide ＋ exit 2**；`--only <id>` 现场打补丁→跑→断言语义→**还原并校验哈希**，`--self-test` 必须抓出等值 mutation 与矛盾期望）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-mutations.mjs",
+        "--coverage"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local"
+      ]
+    },
+    {
+      "id": "gate-50",
+      "kind": "script",
+      "human": "`node packages/scripts/gen-health-baseline.mjs packages`（G4/① 生产者：健康基线语料的**唯一作者**；消费侧缺产物一律 cannot-decide，不许绿色兜底）",
+      "argv": [
+        "node",
+        "packages/scripts/gen-health-baseline.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
