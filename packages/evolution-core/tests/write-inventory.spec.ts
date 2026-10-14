@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import { INSTANCE_KEYS, instanceClaimedWriteSites, persistedWriteSite, persistedWriteSites } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, persistedWriteSites } from '@deepseek-ai/dsh-evolution-core'
 import { claimInstance, releaseInstance } from '@deepseek-ai/dsh-evolution-core'
 
 const packagesRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..')
@@ -46,41 +46,10 @@ describe('persisted write inventory (B3 / G4)', () => {
     expect(failures).toEqual([])
   })
 
-  it('keeps the instance-claim contract for any row that declares it', () => {
-    // v43 FLOW2-1: the claim is a module-scope Map (instance-scope.ts), so it can
-    // only serialize ROWS of one process. A row that still declares it must name a
-    // declared key, prove the claim call in its writer, and SAY in its note that the
-    // guarantee is single-process — and the multi-step sweep site (curator-reports)
-    // may never be such a row: a Map cannot protect the cross-process shape.
-    const claimed = instanceClaimedWriteSites()
-    const declared = new Set<string>(Object.values(INSTANCE_KEYS))
-    for (const site of claimed) {
-      expect(declared.has(site.instance)).toBe(true)
-      expect(readFileSync(join(packagesRoot, site.writer), 'utf8')).toContain('claimInstance(')
-      expect(site.note.toLowerCase()).toMatch(/in-process|single-process/)
-    }
-    expect(claimed.map(site => site.id)).not.toContain('curator-reports')
-  })
-
-  it('v43 FLOW2-1: curator-reports declares the cross-process lock its sweep takes', () => {
-    const site = persistedWriteSite('curator-reports')
-    // The declaration names the mechanism the CODE implements (rule N20's
-    // subject). `instance-claim` — the former value here — can never be it: a Map
-    // cannot exclude a second PROCESS over one home.
-    expect(site.serializedBy).toBe('transact')
-    expect(site.instance).toBeUndefined()
-    expect(readFileSync(join(packagesRoot, site.writer), 'utf8')).toContain(site.marker)
-    // The lock is the SWEEP's (a list + delete over a directory), so the note has
-    // to name the lock target, the scope it does not cover, and the trigger.
-    expect(site.note).toContain('.retention')
-    expect(site.note).toMatch(/PROCESS/)
-  })
-
-  it('fails loud on an undeclared id instead of reading nothing', () => {
-    expect(persistedWriteSite('curator-reports').serializedBy).toBe('transact')
-    expect(() => persistedWriteSite('no-such-site')).toThrow(/no persisted write site/)
-  })
-
+  // G5 step 5 (audit F1/F2): the three assertions on instanceClaimedWriteSites() and
+  // persistedWriteSite() were retired - the write-site inventory's authoritative judge is
+  // verify-write-inventory.mjs (rule N20's subject), and neither export has a non-test caller.
+  // The claim GRANT below stays: it exercises instance-scope.ts's behaviour, not the inventory's.
   it('the claim the inventory declares is the one instance-scope.ts grants', () => {
     // End-to-end shape of a row: the declared key, claimed once, refused twice.
     const home = '/home/inventory'

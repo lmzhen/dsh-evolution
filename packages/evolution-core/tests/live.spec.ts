@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { describe, expect, it } from 'vitest'
-import { clampOnce, liveBool, liveEnum, liveNumber, liveString, unwrapLive } from '../src/live.ts'
+import { clampOnce, liveBool, liveNumber, unwrapLive } from '../src/live.ts'
 
 /** A stand-in for the platform's live reference (schema-parsed `.volatile()` field). */
 const live = <T>(read: () => T | undefined): { get(): T | undefined } => ({ get: read })
@@ -68,26 +68,13 @@ describe('clampOnce — the pre-0.22 adapter keeps its signature and behaviour',
   })
 })
 
-describe('liveBool / liveEnum / liveString — the tri-state readers (L5)', () => {
+// G5 step 5 (audit F1): the liveEnum / liveString assertions were retired with their exports -
+// no non-test consumer calls them (liveNumber and liveBool do have callers, so their assertions stay).
+describe('liveBool — the tri-state reader (L5)', () => {
   it('reads booleans in all three shapes', () => {
     expect(liveBool(true)).toBe(true)
     expect(liveBool(live(() => false))).toBe(false)
     expect(liveBool(undefined)).toBe(false)
     expect(liveBool(undefined, true)).toBe(true)
-  })
-
-  it('accepts only a listed enum value', () => {
-    const allowed = ['inject', 'review'] as const
-    expect(liveEnum('review', allowed, 'inject')).toBe('review')
-    expect(liveEnum(live(() => 'review' as const), allowed, 'inject')).toBe('review')
-    expect(liveEnum('typo' as 'inject', allowed, 'inject')).toBe('inject')
-    expect(liveEnum(undefined, allowed, 'inject')).toBe('inject')
-  })
-
-  it('treats a blank string as unset and trims a real one', () => {
-    expect(liveString('  D:\\x  ', '/default')).toBe('D:\\x')
-    expect(liveString('   ', '/default')).toBe('/default')
-    expect(liveString(live(() => 'a'), '/default')).toBe('a')
-    expect(liveString(undefined, '/default')).toBe('/default')
   })
 })
