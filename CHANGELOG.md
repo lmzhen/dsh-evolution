@@ -1,11 +1,11 @@
 # Changelog
 
-## 0.25.8 (patch) — 面板一直是无样式裸文本：根元素没带样式作用域类
+## 0.25.9 (minor) — 分组分步优化计划 G0–G6b：模型能自己找到技能，结构改动可整体撤销
 
-> **现象**：0.25.6/0.25.7 装机后数据是真实的，但面板看起来是一列裸文本（状态、规则、技能名全竖排，卡片与表格都没生效），用户判定界面差劲。
-> **根因**：样式表全部以 `:where(.dsh-evolution-skill-health) …` 作用域选择器编写，而面板根元素**从未带上这个类** ⇒ CSS 一条都没匹配上 ⇒ 反复调整样式值当然无效。
-> **修复**：根元素加 `className: CSS_TAG_ID`（从 `./styles.ts` 引入）；同步复核 `verify-client-tokens --strict`（只读已声明标尺）与 `verify-arch-guards`（N25/N27 禁像素几何字面量）均通过。
-> **验证**：本机 lint 0 报错、客户端构建更新、pre-tag 闸全绿；装机后点开面板应看到四张状态卡 + 网格规则表 + 技能药丸。
+> **现象**：技能目录里已有四十多个技能，但该用家族技能的六类场合（发布/CI、客户端文案、门禁规则、全量审计、本机参数、双平面宿主重启）里，模型**选不到**它们——命中只能靠人点名；家族树里声明过的关系，运行时读出来是 **0 条边**。
+> **根因**：①目录条目是功能清单式措辞（"发布与 CI：镜像→tag→npm 装机…"），与用户描述任务的说法对不上；六个域技能当时并不在目录里，只有 hub 能被选到；②声明边只写在技能文件里，读路径没有任何运行时读点。
+> **修复**：① hub 描述改为"场景→一句话"，六个域技能落盘为真身（client-ui／gates／platform-seams／defect-patterns／skill-library／release）；② 新增 `verify-graph-edges.mjs` 门禁：运行时读声明边，三态 exit（0 绿／1 红／**2 读器不可用且不给数字**），面判据（没有 skill 工具的面 skip 并打面名），注册进 `gate-manifest.json`（63 条 id）。
+> **验证**：npm 网页版（3080 面，home `D:/dsh-homes/web`）12 条**单轮全新会话**实测 **12/12 命中、留出 4/4**（判据＝会话里真的调用 `skill` 且名字 ∈ 该条 `expect[]`；首次加载全部发生在 step 1；12 条目录指纹一致，skills=36）；离线标尺同口径 12/12（reader sha `fef1760a0601c383`）。装置与逐条读数：`data/e10c-b/READING-E10c-b.md`。
 
 ### 单元化与可逆：一次结构改动 = 一个可整体撤销的单元
 
@@ -14,24 +14,42 @@
 > **修复**：引入 **`unitId`**（一次树改动一个）；单元里**只有一条记录带 `unitHead`**，两形态互斥 —— **代表片** `{ moves, sources }`（全量清单 ＋ 它写过哪些技能）、**路标** `{ skill }`（记录在别的技能里）；判别式固定为 `moves !== undefined`。撤销走**纯决策层**（`packages/evolution-curator/src/unit-undo-plan.ts`）：逐路径回该单元铸的**基线**、没有基线才回退到**最早**那条的 `beforeHash`、单元前不存在的路径**删除并锚定**（别人手改过就拒绝）；跨技能成员**只按已知 key** 解析（禁目录扫描），缺片/冲突一律**拒绝并点名对象**；路标的 `undoable` 是 **`undefined`**（wire 上不出现该键）**绝不为 `false`**。剪枝**按单元** all-or-nothing。
 > **验证**：家族 spec（唯一入口 `-c D:\dsh\_tools\vitest-family-preflight.mjs`，按文件跑）——`unit-head`／`unit-members`／`unit-undo` 全绿，`evolution-curator` 全套 **9 files / 105**；端到端三例（整单元回滚／追加写回／手改零写拒绝）；**独立复验 5/5 PASS**（逐条带 `file:line`），三条复验发现（去重取最后一次、谓词单一化、输出确定性排序）均已闭合。
 > **文档**：面向读者的契约说明见 `docs/units-and-undo.md`。
+
+### 家族树边：声明了关系，运行时却读不到
+
+> **现象**：技能里写了 `skill:` 指针与 `related_skills`，门禁与工具却一律显示 **0 条边**——关系等于没写。
+> **根因**：投影只保留字符串化的 `metadata`，嵌套键（`metadata.hermes.related_skills`）读不到；"如何发现技能文件"也没有唯一形状，扫描口径各写一份。
+> **修复**：`frontmatter.ts` 保留结构化 `metadata`（不字符串化）、`relatedSkillNames` 认嵌套键、新增 `evolution-core/src/skill-discovery.ts`（`discoverSkillFiles` depth ≤2，`isPotentialSkillPath` 与平台镜像对齐）；门禁读数一律写全 **树 ＋ reader ＋ channel** 三件套。
+> **验证**：dev overlay 通道 `reader=src-import channel=src` ⇒ `edges=102 dangling=2`，面内 desktop 63/2、web 39/0；未装依赖的裸树上 **exit 2 ＋ 原因、不给数字**（不静默给 0）；元门禁绿且 manifest 含该 id。
+
+## 0.25.8 (patch) — 面板一直是无样式裸文本：根元素没带样式作用域类
+
+> **现象**：0.25.6/0.25.7 装机后数据是真实的，但面板看起来是一列裸文本（状态、规则、技能名全竖排，卡片与表格都没生效），用户判定界面差劲。
+> **根因**：样式表全部以 `:where(.dsh-evolution-skill-health) …` 作用域选择器编写，而面板根元素**从未带上这个类** ⇒ CSS 一条都没匹配上 ⇒ 反复调整样式值当然无效。
+> **修复**：根元素加 `className: CSS_TAG_ID`（从 `./styles.ts` 引入）；同步复核 `verify-client-tokens --strict`（只读已声明标尺）与 `verify-arch-guards`（N25/N27 禁像素几何字面量）均通过。
+> **验证**：本机 lint 0 报错、客户端构建更新、pre-tag 闸全绿；装机后点开面板应看到四张状态卡 + 网格规则表 + 技能药丸。
+
 ## 0.25.7 (patch) — 面板样式改按平台约定：语义 token + 家族标尺，度量抄平台并注明出处
 
 > **现象**：0.25.6 装机后功能已通（面板出真实数据），但界面被判「好差劲」：摘要是一行文字、规则表列宽漂移、数字不齐、没有语义色。
 > **根因**：第一版样式是**自创**的（自定网格、自造色变量），而家族与平台都有既定做法 —— 颜色用平台 `--dsw-*` 语义别名、字号/间距/圆角用家族标尺 `tokens.ts`、**度量值从平台组件抄来并在文件头逐个注明出处**（侧栏行＝`ui-sidebar/…/SidebarRoot.module.css`；输入框圆角 8px＝`ui-primitives/Input.module.css`；卡片 0.5px 边框＝`ui-chat/…/GenericCommandCard.module.css`）。
 > **修复**：① 样式全部改用平台语义 token 与家族标尺，文件头注明每个度量出处；② 摘要改成**四张状态卡**（数字大、标签小、左侧语义色条）；③ 规则表改成**网格**（规则 / 涉及技能 / 次数右对齐等宽数字）＋行悬停与焦点环（照平台侧栏行）＋按该规则最差判定给左色条；④ 技能名做成**药丸**并折行；⑤ 取数失败时给中文结论句，原始信息另起一行，不再把 `TypeError` 直接甩给读者。
 > **验证**：本机 lint 0 报错、`api.client.spec.ts` 4 例通过、`build-client.mjs` 产出更新；装机后点开面板应看到四张状态卡与网格化规则表（截图留证）。
+
 ## 0.25.6 (patch) — 面板点开是空白：组件收的是“扁平 face”，我给了嵌套 `{ face, locale }`
 
 > **现象**：0.25.5 装机后侧栏「技能健康」行在、也能点中（图标高亮），但主区域**不渲染任何内容**（浏览器控制台无我们可见的输出）。
 > **根因**：座位把 `inject` 返回的 face **摊开当作组件 props**（兄弟包 `evolution-skill-history` 的写法：`export function SkillHistoryPanel(face: PanelFace)`），而我写成 `SkillHealthPanel(props: { face, locale })` 并用包一层 `createElement(..., { face, locale })` 去喂 ⇒ `props.face` 是 `undefined`，组件读 `face.rows` 即抛错 ⇒ 平台吞掉渲染，只剩空白 ✗。
 > **修复**：与兄弟包对齐 —— 组件签名改为**收 face 本身**，face 内自带 `t` 翻译器（由座位注入，字典仍是本包的）；注册处直接传组件。
 > **验证**：本机 lint 0 报错、`api.client.spec.ts` 4 例通过、`build-client.mjs` 产出更新；装机后点开面板应显示四态摘要与按规则聚合的真实技能清单（截图留证）。
+
 ## 0.25.5 (patch) — 面板有座位无数据；装机 patch 静默丢行
 
 > **现象**：0.25.4 装到 3080 并 opt-in 后侧栏出现「技能健康」，但面板没有任何数据（四态摘要全 0、规则表空）。同一台机器上，装机包内的 `cordis.patch.yml` 还比 npm 发布产物**少一行**；该行缺失时整个客户端包**不会进入页面的启动清单**（`__DSH_BOOT__`），且重装修不好——版本要求已满足时 `dsh plugin add` 是 no-op（实测 `resolved 63, reused 2, downloaded 0, added 0`）。
 > **根因**：① 客户端半 `main` 座位的 `inject` face 返回写死的空数据（`{ rows: [], truncated: false }`），从未读取宿主半已经挂好的只读路由；② 装机产物与发布产物之间没有任何比对，任何不一致都会静默长期存在。
 > **修复**：① 补 `src/client/api.ts`（镜像宿主半 `ROUTES.rows` 的 `/api/dsh-evolution/skill-health/rows`；拒绝一律以 `ok:false` + 宿主原句返回，与斜杠命令同一套措辞）＋`HealthFace` 增加 `loadRows`，面板挂载后取数并渲染真实结果（取数失败保留种子数据并把宿主原句显示出来）；② opt-in 改由 profile 自己的 `cordis.patch.yml` 承担（平台注释明示「Edit cordis.patch.yml, not this file」；该文件是 patch 列表，覆盖已有 id 须写在**第 0 列**），包内文件保持与发布产物逐字节一致。
 > **验证**：`build-client.mjs` 产出 `lib/client.js` 且其中出现 `api.rows`/`loadRows`；装机后侧栏行在，面板渲染真实技能清单（语义快照/截图留证）。
+
 ## 0.25.4 (patch) — 技能健康的行仍未注册：补齐座位的样式表与"行渲染件是组件"两处形态
 
 > **现象**：0.25.3 装机并 opt-in 后，页面能正常启动（`exports["./client"]` 修复有效），但侧栏仍无「技能健康」行。
@@ -106,6 +124,7 @@
 > **验收**：静态门禁全绿——`verify-arch-guards --strict` **39 条 clean**（含新 N38／N39）；`verify-write-inventory --strict` **两平面各 15 site／6 symbol／14 path 全落在各自 home 内**；参数通道四件（registry 101／parity 7 E3 owner 全 `auto:false`／两份生成物 up to date）；`audit-param-exposure` 三读数 **0**；**CI 等价 `tsc -b tsconfig.host.json` exit 0**；各门禁 drill 留痕（N38／N39 注入必红点名、写入清单四支、G3 五支夹具）；家族全量套件 **205 文件：25 红／180 绿**——红集全部落在既有基线类（review 13、host installer 2、client lane 8），另 2 个（curator、skill-catalog）为**负载抖动**：单跑 **78/78 全绿** ⇒ **NEW=∅**。本地 oxlint：本批自家文件 **0 error**（`live.ts`／`write-inventory.ts`），余项为本地调用未解析 cordis 类型的噪声（同一规则命中未改动行、报文自述 `'Volatile<boolean>' is an 'error' type`）⇒ 以 CI lint 为准。**装机实测口径**：只做 npm/web 面（用户指示），桌面端如需重启可暂不测。
 > **切 tag 前的独立只读复核**（**两位**只读复核员各自逐条到源码，镜像零改动；结论 **P0=0**）：**P1-1** 两条新规则登记 `sample:'detector'` 却无自测条目、完备性只数声明字段 ⇒ 假全带自证 ⇒ 已修（补 N38／N39 真 detector、探针与 detector **共用同一谓词**、计数改为**与 detectors 表求交**、`--list-rules` 移到表之后；实测 39/39 且 `--strict` 39 条 clean）；**P1-2（书面残余）** N38 是词法探针，只覆盖取引用半场，活引用被当值读无法词法判定 ⇒ 正则由迁移完整性（35 个 volatile 字段读点全部走 `live*`）＋参数通道门禁枚举承担；**P1-3** 新门禁未接任何流水线、且缺 `--home` 时静默跳过最强一步仍报 OK ⇒ 已修（`--strict` 缺 home 打 `NOT ARMED` 并 exit 1；已接进 CI 的 `evolution-validate` action）。另修 **P2-3**（Windows 上 owner 豁免未归一化路径 ⇒ 潜伏误红）与 **P2-11**（位置参数可被旗标顺序解除武装），并收窄 N39 谓词。
 > **不做**：不给 ~60 个一次性探针加 home 门面（登记为可归档）；不自动删用户 profile 目录；不替用户重启桌面宿主；不加启动断言 home 一致（桌面侧不设 `DSH_HOME`，断言必假）；不新增**读整份状态／产物文件**的门禁探针（门禁探针读源码文本是既定形态：剥注释＋按声明正则，本批两条新规则照此写）；不动上游 `~/.agents` 默认；不为分家单独发版。
+
 ## 0.21.0 (minor) — 参数暴露面收口：每个旋钮都有档位与「为什么」，三个缺口补上用户层
 
 > **由来**：家族参数的「谁能改、改了何时生效、为什么没有设置项」此前只存在于人的记忆与文档里——注册表能声明档位，但「E3 却没有卡」在语法上完全合法（`evolution-approval.pendingTtlMs` 就是这么出门的）；`maintainHandoffOnSettle` 只能改 cordis.yml；`pin` 只有模型能调。本版把这三件事变成**数据与门禁能表达的事实**，按 `17`／`18` 的五组计划落地（G1 可达性收口 → G2 暴露声明 → G3 补卡 → G4 pin 用户面 → G5 归位），发布是唯一串行点。
@@ -117,6 +136,7 @@
 > **验收**：家族全量低并发 A/B（2 worker，204 文件）**修后失败集 ≡ 基线**（两侧同为 25 文件红，NEW=∅／FIXED=∅；首轮高并发跑多出的 3 个红在单跑下 140/140 全绿，属负载抖动，两轮读数都留档）。受影响夹具：`guard-scripts` 35/35（含新增四格）、`param-registry` 6/6、`maintain-handoff` 5/5（含新增「活写」一格）、`commands` 55/55（含 pin／unpin 两格）。参数面门禁：`verify-param-registry --strict` OK 101 行、`verify-param-channel-parity --strict` OK（7 E3 owner／7 namespace，curator 行 22 键 11 volatile）、两份生成物 `--check` 一致（7 namespace／35 field／3 bundle seat／19 row）、`verify-client-seats --strict` OK（7 行／7 卡／7 seat）、`verify-doc-facts` 0 violation、`audit-param-exposure.mjs` 三读数 0。**门禁牙口在真树逐条实测 11/11**（改坏即红且点名、随后逐字节还原）：E3 行缺键／两键同现／`card` 指别人／`why` 取值非法／E3 行字段没 `.volatile()`／owner 没 `settings.configure({ auto: false }, <fiber>)`／owner 行 Config 缺该键／多出一个没有 E3 行的 `.volatile()`／手改文档或客户端视图（STALE）／`card` 指向没有 bundle 挂载的行。**组可单独 revert 实测**：摘掉 G4 ⇒ 同批夹具 172/172 绿；摘掉 G5 ⇒ 139/139 绿（G1–G4 不依赖它）。`oxlint` 本批改动文件 0 error（唯一告警在 `curator:1685`，批次 hunk 之外）。
 > **切 tag 前的独立只读复核**（P0=1／P1=1／P2=6，只读、逐条到源码）：**P0**＝`verify-param-channel-parity` 的 `settings.configure({ auto: false }, <fiber>)` 检测对整份文件文本跑正则、不剥注释 ⇒ 七个 owner 里六个的**注释本身**就满足它，删掉真调用门禁照样绿（假阴性）——已修（新增 `stripComments`：块注释与整行/行尾 `//` 都剥、`://` 不截断；三条文本探针全改读代码），并实测：真调用删成注释 ⇒ **exit 1 且点名**，`.volatile()` 只写在行尾/块注释 ⇒ 同样红，还原即 OK。**P1**＝G5 自称的「值仍被读到」证据没牙（举的那格用的是 schema 默认值，读取退化成常量它也绿）——已补**判别性**一格（同一条质量告警 + 闲置 5 天的技能：默认 7 天**不**stale、行配置 3 天**stale**），并实测把 `plainNumber` 改成返回默认值 ⇒ 该格**红**。**P2** 逐条：policy 快照覆盖的说法**不成立**（该键不在 policy 行 schema 里，行 config 是唯一来源）⇒ 已改正文；「`verify-client-seats` 没有 runner」**不成立**（CI 的 composite action 就在跑它，且带 `--upstream .`）；`.volatile()` 判定只剥整行注释、policy schema 取键锚在注释上（可能整段落空仍报通过）⇒ 两处**已修**（锚点改 schema 声明，锚不到即报 problem）；`ParamGroup` 的 `internal` 组与 `why: 'internal'` 同名不同轴 ⇒ 已写进两处契约注释；`memory-files`／`tool-memory` 各一处单形 `.get()` 读取（批外文件）⇒ 登记下一批。另有一次更窄的只读复核同时启动，因与上面覆盖同一面、且上面已交出逐条报告而停止。
 > **不做**：不做「未写决定的行按缺省解释＋到期」（长期解是声明必填、每行恰好一个键）；不给 `qualityWarnThreshold`／`autoStart` 建卡；不新开 pin 的设置卡；不把 pin 纳入审批缝；不为收口去改读侧门禁的判据。
+
 ## 0.20.0 (minor) — 维护报告的人机交接：`maintain handoff`（指针＋汇报协议）＋ `report`／`cancel` 省略 id
 
 > **由来**：维护扫描的结果此前只在框里回一段正文，用户看不到「改什么、为什么、能不能撤、要不要我确认」；本版把**报告变成不可变账本**，并把「谁来读、按什么规矩动手」交给一次注入完成。方案经七角色评审与平台覆盖差集（`todo`／`deliverables`／`spill` 全部复用，净工作量下降），并由用户裁定：**不新建命令、不接审批闸**，走提示词路线。
@@ -126,6 +146,7 @@
 > **验收**：新增 `maintain-handoff.spec.ts` **3 块 13 格**（三空态／坏 id／索引不可读／指针与协议逐字／在跑与无报告**不注入**／省略 id 的 `report` 与 `cancel`／仅注入态／`E-305`／接收者原型方法）；受影响夹具 **17 文件 221 例全绿**；**家族套件 A/B：修后失败集 ≡ 基线**（两侧同为 25 文件红，零新增、零修复）；合并门禁组（13 守卫＋2 平台守卫＋3 规格）中仅平台两条红（`verify-declared-config` 3 条 upstream-drift、`verify-platform-contract` 87 条 host-surface difference），二者在基线同样红；`packages/README.md` 命令钉表 25→26 行、`PARAMETERS.md` 101 条、参数通道 exit 0。**只读验收四格 22/22**（`handoff` 后不回复 ⇒ 技能树逐字节不变、注入不夹带正文；回复批准子集 ⇒ 仅该子集 `names` 命中文件变化且账本 `beforeVersion→afterVersion` 连续、`beforeHash` ＝改前哈希；out-of-band 写不落账本而检查器以 `live-file` 指认被旁路的那一个技能；平台座位在役）。
 > **切 tag 前的独立只读复核**（P0=0／P1=1／P2=12）：**P1**＝索引不可读时 id-less 的 `report`／`cancel`／`handoff` 会改用陈旧内存视图作答（`status` 不是这口径）⇒ 已修（三条分支统一先判索引，并补一条**判别性**夹具：撤掉修复即红）；便宜的 P2 一并修（E-305 文案说成 learn request、自动交接在无投递通道时**静默**、id-less `cancel` 在「别面在跑」分支的补白指错方向、未知参数语法提示漏 `handoff`、101 条参数里唯一中文摘要、commands README 自相矛盾且软闸限制只写在未发布的 `packages/docs/`）；其余 P2（非 `succeeded` 也注入、指针不复查 `.md`、三处解析骨架重复）与三条批外既有观察记进 `evolution-commands/README.md` 的 Known limitations。
 > **不做**：不做 `maintain apply`、不注入报告正文、不做扫描进度帧／心跳、不按「会话」取最新（记录无会话字段）。
+
 ## 0.19.3 (patch) — run registry 结构收口：**一行一个写者**（owned／foreign 两 Map ＋ 单调不变量）
 
 > **由来**：0.19.0 → 0.19.1 → 0.19.2 修的是**同一个病根的投影**——`records` 一个数组里混了两种权威（本进程起的行＝内存权威；索引读来的行＝文件权威），而读写两侧对两者用同一条「内存胜过磁盘」。0.19.0 的 stale-running（读侧漏刷新）、0.19.1→0.19.2 的写侧复活，都是它。本版按复核方设计把两种权威拆开，删掉为绕病根而加的特例。
@@ -216,6 +237,7 @@
 > **验证**：家族测试全绿（190 文件／1829+ 用例）；门禁 **25/25**；`verify-platform-ranges: OK — 67 platform range(s) all ^0.2.0-rc.1`；`verify-declared-config --upstream` 54 可达 0 违规 0 漂移；`verify-platform-contract` 245 条平台引用 0 断。
 > **真机（桌面 0.2.0-rc.2 宿主 ＋ 隔离 `DSH_HOME`）**：安装 6 次复现；客户端半侧出现（侧栏「技能历史」、设置「自进化」、行页「配置 @deepseek-ai/dsh-memory-files」）；行页改键落盘（`memoryChars` 1234→1500）；`/evolution migrate` 在真实文档上写出、第二次零写入、存量值赢；doctor 三段与平台插件页逐项一致。
 > **文档**：README／README.zh／两处 INSTALL／三个 bundle patch 的平台锚点全部刷到 `0.2.0-rc.2` 与 `^0.2.0-rc.1`，并写清两个值的分工。
+
 ## 0.16.1 (patch) — 待批写入卡真的出现了：keyed slot 只渲染被点名的键
 
 > **由来**：0.16.0 的真机验收第一步就没过——设置「自进化」里**根本没有那张卡**。用一个真 Chrome（同一台机器、同一个宿主）无头打开页面点开设置：DOM 里只有 5 张参数卡、零个 `/api/dsh-evolution/approval/*` 请求；而宿主**确实在服务** 0.16.0 的客户端半（把 `/plugins/??…` 那份拼接 bundle 拉下来，`approval-pending`／`evolution-param-facts`／四条路由字面量都在里面，15.2 MB，200）。所以不是装机、不是缓存，是代码。
@@ -226,6 +248,7 @@
 > **真机（真 Chrome ＋ 真宿主）**：卡以「待批写入｜2 项待批」出现在「自进化」**最上面**，两行各带 技能 chip／摘要／年龄（「12 分钟前」）与 批准・拒绝・预览；点预览得「1 行新增／1 行删除」＋ `-`/`+` 两块；点批准后**卡片自行重读**为「1 项待批」、该行消失，且写入真的落盘（`SKILL.md` 出现补丁文本）；再拒绝剩下那条 → 「没有待批的写入」；对已被别处结清的旧行点批准，卡片如实显示宿主原话 `Pending write "…" is not in the pending window (rotated or resolved).`。截图 `D:\dsh\_shots\accept-0*.png`。
 > **更正 0.16.0 验收点⑤的表述**：附带文件**不能**回退（属 §5 D2「明确不做」）——`POST /undo {v:<support 版本>}` 返回 200 但 `code=undo-refused`，宿主原话「undo restores the body only… copy the blob back over that file to restore them」。正确判据＝删除行可见（`support-remove`，带 `path`・`chars`，hash＝被删字节）＋ 字节留在历史库 ＋ 回退只对正文生效（正文回退实测可用）。
 > **影响面**：**只改客户端半** ⇒ 装机后**刷新页面**即可（不必重启宿主；实测直接替换盘上的 `lib/client.js` 后新开页面即生效）。
+
 ## 0.16.0 (minor) — 待批写入看得见了：面板里能列、能批、能看预览（顺带清掉三条老欠账）
 
 > **由来**：台账 §3 的 B1（待批项可见性）与 B2（审批 diff 预览）是两条挂账——卡在「客户端半能否调宿主服务」这个前置上；0.14.0 的路由链（技能历史「回退」→ `curator.undo`）把它解开了，本批就做这一件。顺带清掉同批的 E2／E7／E8／E9。
@@ -344,6 +367,7 @@
 > **另外三行是怎么做的（先读再改）**：它们**不是** `panellist` 注册——装机包里搜不到这个槽名（命中只有本包）；第三方走 **DOM 注入**进平台侧栏，并用自有 CSS 定尺：`…entryIcon svg{width:18px;height:18px;display:block}`（`@linxin666/dsh-ssh/lib/client.js`，与 task-board／skill-explorer 共用 `shared/client/sidebar-entry-core.ts`）。两种实现都指向同一个结论：**行图标的尺寸由外部给（prop 或 CSS），组件自己不许用百分比撑**。
 > **修法**：`PanelIcon(props)` 取 `props.size`（正数才用），回退值取邻近行的 **18**；SVG 用像素 `width/height`。契约与两条实现的出处写在组件 docblock 里，避免下次再犯。
 > **验证**：`tsc -b` 0；`build-client.mjs` 产出 30.59 kB（bundle 30,052→32,052 字节，含新注释）；本包不变量测试与门禁同 0.13.0。真机复验见发布记录（页面刷新／重启后核对左栏图标为 18px）。
+
 ## 0.13.0 (minor) — 对外界面按「事实只算一次、词只在各自字典、控件与排版走平台 token」重整：面板信息设计重写、确认卡说明用途、命令首行结论化
 
 > **由来**：用户两轮口径——① 「技能历史页面美观性很差…没有多少有助于决策的信息；创建技能的询问界面也一样」② 「检查全量对外功能里是否还有同类问题」——收敛成 `dsh-evolution-ui-ux-gap-list.md`（三轮共 22 条，P／A／C／T 四组）。本版按该档 §9 架构方案与 §10 分组计划实施 G1–G3。
@@ -391,6 +415,7 @@
 > **不动的部分**：问题的形状（id `evolution-skill-write`／选项 `Create`|`Delete` ＋ `Cancel`／只问前台 root／带 `absorbed_into` 的合并不问）、`E-317` 的语义与文案、以及「提问服务缺席即放行 ＋ 一次 warn」的 fail-open 姿态。
 > **新增用例**：`write-gates.spec.ts` 的模式块 5 条（默认 `auto` 不提问照写、`auto` 的裸删除不提问、`timeout` 未答 ⇒ `E-319` ＋ 信号已 abort ＋ 盘上无文件、`timeout` 及时回答照写、`ask` 被拒仍是 `E-317` 而非 `E-319`）；spec 的挂载默认改成 `ask`（旧用例都写在「必问」时代），**默认行为由 `{}` 显式驱动**，不靠 fixture 的默认值蒙对。
 > **文档与生成物**：`PARAMETERS.md`（98 行）与设置卡视图（34 字段）由生成器重出；错误码表范围改为 `E-301`–`E-319`（实测 **25 键／25 条／24 条互异文案**），根 README 中英两表各补 `E-319` 行、`E-317` 行补上模式前提；工具 README 新增模式表；写入准入设计档补 §12 修订（G4 口径随之更正）。
+
 ## 0.11.3 (patch) — 修复：面板的回退结果句被随后的重读抹掉（真机点出来的；0.11.1 那句「结果句直接显示」没兑现）
 
 > **症状（在**已安装产物**上点出来的；CI 全绿测不出）**：面板里点「回退到此版」→ 内联确认 → **内容确实退回去了**（磁盘 `SKILL.md` 的 sha256 与目标版一致、索引多出一条 `update`、行列表也刷新了），但屏幕上**从头到尾没有出现 curator 的结果句**——0.11.1 的变更表里「结果句直接显示 curator 的原话，随后重读列表」这句在真机上不成立。
@@ -408,6 +433,7 @@
 > **修法**：改成 `ctx.inject(['webServer'], (scope) => scope.effect(() => …))`——服务到了再挂；永远没有 web server 的 profile 只是不执行回调（**惰性，且不产生 pending 行**，与原意一致）。
 > **回归与判别性验证**：新增 `tests/apply-order.spec.ts`（web server **后到**仍注册四条路由；没有 web server 也不抛）；把旧 apply 体放回 overlay 复跑 ⇒ **必须见红**（1 failed | 1 passed）；还原 ⇒ 见绿（2 passed）。
 > **npm／发布面**：无变化——包名与 OIDC 绑定照旧，本版只是抬版本重发（0.11.1 的包内容除这一处外完全相同）。
+
 ## 0.11.1 (minor) — 技能历史的图形面：左栏「技能历史」面板 ＋ 四条 loopback 路由（版本分链，文件版本按名拒绝，G6 占用行决定不做）
 
 > **为什么重切（0.11.0 → 0.11.1）**：tag `v0.11.0` 已推、CI 的 `validate (baseline)` 红在
@@ -498,6 +524,7 @@
 | P2 | 设计档 §3B 的「并发改 ⇒ 锚点拒绝」**没有用例**（I7 缺口） | curator 加**确定性竞态用例**：注入一个「读完就改写文件」的默认 io，使 undo 的锚点必然过期 ⇒ 断言拒绝且盘上留下竞态写者的内容 |
 
 > 复核另给「七问」的逐条答复（历史不被判定读取／撤销无第二条通道／提示不改判定／计划路径拒绝行为**逐字节不变**／模型可见字面量**零删除**／参数三角完整／两张排除表与快照关系正确），与自查一致；它同时列出未扫描面（平台树、真实运行时装配、注入竞态下的 curator 上下文、21 步门禁其余步骤），本轮修复正是针对其中可判定的部分。
+
 ### 相似度问句具名与创建期判重（C）
 
 > **由来**：`quality.ts` 原有三把尺（规范化哈希、token Jaccard、首词名字索引）问句重叠却都没有名字；判定档 §7.1 的口径是「新增尺不是禁区，**未具名、问句重叠**的第四把尺才是」。
@@ -519,6 +546,7 @@
 - **新增/扩展用例**：`skill-history.spec.ts` 10 条（版本规则纯函数、索引三态、保留策略）；curator 端到端撤销 2 条（含三种拒绝）；`quality.spec.ts` ＋6（两个问句、投影声明、摘要判重，含「正文相同而摘要无关 ⇒ 不报」的证伪用例）；`tool-skill-manage.spec.ts` ＋1（提示出现／照常写入／投影盲区三向）；`evidence.spec.ts` 4 条；`validator.spec.ts` ＋4（规则表 id 与顺序、只报告、三态、一 op 一结论）；`review.spec.ts` ＋2（真实会话端到端：报告计数进 `plan-applied`；无 seq 的桩日志静默）；`activity-store.spec.ts` ＋1（新维度进 sidecar，缺省时键保持缺失）。
 - **反覆盖反馈补齐**（见 A＋B 节末）：`skill-history.spec.ts` ＋3（阈值与地板、非整篇替换一律沉默、真实库的一次「10 节压成 1 节」update 出现该行且 `ok` 不变、反向增长保持安静），core 62 个 spec 文件 681 条全绿（`--maxWorkers=2`，与门禁同参数）。
 - **发布前独立只读复核**（子代理读全量 diff，只报 P0–P2、每条附可证伪命令）＋ 逐条源码复验，结果见下方小节。
+
 ## 0.9.0 (minor) — 技能写入门禁（设计档 B1–B5 ＋ 发布前复核批 B6）＋ 用词改版：界面／命令／文档说人话（「策展」等内部词退场）
 
 > **由来**：0.8.0 装机复验时，用户直接反馈「『策展』这个词不知道是什么」。据此按判据 J1–J6（行业词／内部代号／英文裸词／自造缩略／自造比喻／生硬书面语）**全量排查**所有用户可见的配置项说明，清单与逐条建议留档 `D:\dsh\dsh-evolution-user-facing-wording-audit.md`。
@@ -553,6 +581,7 @@
 > **改法（B5，① 三个描述长度数字 ＋ cadence 单位文案）**：三个数字**各自都有出处**，缺的是**一处写清它们的关系**，落在 `tool-skill-manage/README.md` 的一张表里——**写作参考线 60**（`AUTHORING_DESCRIPTION_BAR`，上游 60-char rule，只在 authoring feedback 里提示、`descriptionStrict` 才拒）、**家族存储上限 1024**（`MAX_DESCRIPTION_LENGTH`／本行 `maxDescriptionLength`，三者中**唯一**的拒绝阈值）、**平台目录视图默认 500**（`catalogDescriptionMaxLength`，在 core 常量里具名为 `PLATFORM_CATALOG_DESCRIPTION_DEFAULT` 并标出处）——关系写清了，而同尺比较不能混：**家族自己的 host/all 行把该字段设成 60**，所以自带组合里真正的目录截断就是 60。**不加「超 500 警告」**（对本档 ① 项验收口径的更正，原因记在设计档实施记录）：家族自带组合的目录上限已是 60，超 500 必然已超 60、既有那行反馈已经说了「目录会按配置的上限截断」，再加一条只是同尺重复。cadence 两个参数的说明把「活动」换成**准确单位**：`signals.ts:170/175` 里计数按**工具调用数**累加、一轮没有工具调用也按 1 计；`PARAMETERS.md` 与设置卡视图由生成器跟上。
 > **发布前独立复核与修复（B6）**：按家族纪律跑**独立只读复核**（子代理读 `864ec9c..HEAD` 全 diff，只报 P0–P2 且每条附可证伪命令），我**逐条源码复验**后全部落地——**无 P0**；① **P1 真缺口**：`absorbed_into: ''`（空白）在 gate 里不算「无」、在 `library.archive` 调用里按真值当「无」⇒ **裸归档绕过了确认**；已把空白按缺失处理（与计划层 `!(op.absorbed_into ?? '').trim()` 同口径）并加哨兵（空白删除**会问**，随后由库拒绝该空伞名）。② `ASK_ABORTED`（提问被取消／卡片被关掉）原被归入「放行」⇒ 改为**算未确认**（拒绝回 `E-317`），只有「问不出来」才放行。③ 非字符串 `action` 原会落到读判定、回 `E-318` 误导模型 ⇒ 已列入形状判定；**缺** action 则交给库回「Unknown action」。④ 口径对齐实现：两个「只警告一次」是**每进程**（不是每会话／每次写入），执行点三条 gate 的**文案先后**已补记在行为变化里。⑤ 事实修正：B1 适配器「两个调用方」的说法不成立（只有一个，已改写）；`packages/README.md` 的「24 条文案」精确为「24 个字面量、去重 23 条」；工具 README 写明三条 gate 只覆盖**本工具**的写入面（命令面与计划执行器各自持库句柄，理由已写）；描述长度表第三行点名 host/all/preset 三行并指向 `packages/README.md`；审查侧两处「Activity units」注释与 cadence 单位统一（并把「本轮本身用到技能只加 1」这半句补上）；B4 补两条哨兵（provider 抛错；空名单时该节**等于常量本身**）。
 > **验证（B1–B6 各批均过 21 步门禁：tsc／oxlint 0／vitest-full／build-lib／smoke＋16 个 verify，mirror-sync differ=0）**：新 spec `tool-skill-manage/tests/write-gates.spec.ts` 17 条（未读被拒／读过放行／失败的读不算／前台豁免／日志不可读放行＋只警告一次／纯判定先于读判定／准入先于审批缝不产生 pending／执行点仍拒存下来的坏记录；确认：问一次且选项正确／拒绝即无写入／裸删除问、吸收删除不问／子代理与回放都不问／缺参先于提问／无服务放行＋只警告一次／`CALLER_NOT_LIVE` 回退到注册表的活 root／无活 root 放行＋警告）；`tool-skill-manage.spec.ts` 新增 B4 一条（无策略行时该节的插值结果**等于常量本身**且不留 `{{` 残迹／清单出现／改名单后下一次装配即反映且旧名不残留／策略 `get()` 抛错时退化为指引原文）；`write-gates.spec.ts` 再补 B6 三条（空白 `absorbed_into` 会问且随后被库拒绝／`ASK_ABORTED` 拒绝且无写入／非字符串 `action` 由形状判定拒绝、缺 `action` 不落 `E-318`）；`PARAMETERS.md` 与 `generated-params.ts` 由生成器回填（`--check` 门禁过）。
+
 ## 0.8.0 (minor) — 收敛批：同一事实只拼一次（行集／错误码／命名空间）＋ 三条守卫；并带上未发布的设置卡修复
 
 > **由来（两条线）**：① 0.7.0 线发布后做的一轮**实现侧收敛**——先把镜像与净室重写版逐项对照（行数构成、实现层构造、可借鉴/不可借鉴清单均已留档），再按设计档 `dsh-evolution-cleanup-design.md` 的批次 C1–C5 落地；判断标准是「同一事实只拼一次、生成物可门禁、守卫必须能证伪」，不是单纯减行数。② 同期在装机产物＋真实界面上复验 0.7.0 时抓到设置卡保存的 P0，修复一度在本地冻结为 0.7.1 但**从未发布**，按事实并入本版（下节原文保留）。
@@ -606,6 +635,7 @@
 | B2 | 移除三个导出的常量 `CURATOR_SETTINGS_NAMESPACE`／`REVIEW_SETTINGS_NAMESPACE`／`SKILLS_SETTINGS_NAMESPACE`，改用 `paramNamespace(owner)` | 实测全仓（含测试与文档）无消费者；跨包 import 它们的代码改一行 |
 
 > **口径**：本版**不减行数**——C1/C2 净增约 1,450 行（声明面＋生成器＋验证器＋哨兵＋门禁两步）；C4（state 栈折叠）与 C5 的多数子项经**前置实测否决**（两个已发布提供者 ＋ 已发布 conformance 套件 ＋ 部署面 `provider` 选择；动作表／有界原语／替身 kit／侧车各自不同形或属兼容保证），否决理由逐条写进设计档以防重提。
+
 ## 0.7.0 (minor) — 设置面重做：参数卡片独立成栏、按注册表类型渲染、卡级保存
 
 > **由来**：0.6.1 实机验收时，参数卡片被判为「丑且摸不着头脑」。把装机产物里的卡片与平台官方同类 UI（终端／Agent 循环等）逐项对照后确认：卡片是**没有样式表的裸标签**（类名存在但无任何 CSS），字段名、值、英文徽标与输入框挤在一行，输入框里放的是被裁断的英文说明。
@@ -629,12 +659,14 @@
 | B1 | 参数卡片**不再出现在平台「插件」栏**，改为独立设置栏「自进化」 | 撤掉/禁用 `@lmzhen/dsh-evolution-settings-ui` 行 ⇒ 该栏消失；host 侧与命令面零影响 |
 | B2 | 卡片形态与交互重做（折叠、类型化控件、卡级保存）；英文徽标 `deployment value`／`user override` 改为中文 chip `部署`／`用户` | 纯表现层与交互层：读写仍走同一 settings 作用域（revision 围栏），已写入的用户值原样生效 |
 | B3 | 六个旧参数名**仍可读**——0.6.x 曾预告「0.7.0 移除」，实际代码保留了别名，移除推迟到后续版本 | 无变化：写路径一直拒绝旧名并给出 canonical 名 |
+
 ## 0.6.1 (patch) — 发布面重切：0.6.0 未完成发布，功能面与 0.6.0 相同
 
 > **为什么重切**：0.6.0 的 tag 与 CI 在「发布本批新增包」一步中断——`@lmzhen/dsh-evolution-settings-ui` 是新包名，npm 的 OIDC 受信发布**不能创建尚不存在的包**（首次 PUT 返回 404）；手工补发的那一份又与 CI 打包字节不同、被清单完整性守卫拒绝，处置中该版本被 unpublish，而注册表对已 unpublish 的版本留永久墓碑（`E400 Cannot publish over previously published version "0.6.0"`）⇒ **0.6.0 记为撤回，不可复活**。
 > **撤回的实际影响**：26 个包留在 0.6.0，四个入口包（`host`／`preset`／`agent-preset`／`all`）从未发布，因此不存在一个能装起来的 0.6.0 组合；0.6.1 把 **30 个包一次发齐**。
 > **本版不含功能变化**：能力表 N1–N7 与行为变化表 B1–B5 与 0.6.0 完全一致，直接见下一节；代码、参数注册表与门禁步骤三处均无差异。
 > **发布工程结论**（已写入发布 runbook）：新增包名必须在切 tag 之前**先把名字建出来**（人工首发一次或先推一个占位版本），否则 CI 的 OIDC 发布必然 404；并且**任何已发布版本都不要 unpublish**——同版本不可再发，只能抬版本。
+
 ## 0.6.0 (minor) — 参数治理批：注册表与门禁 / 用户设置层四个命名空间 / 命令面与卡片 / 四渠道同名守卫
 
 > 依据 `dsh-evolution-parameter-governance-design.md` 与施工手册 §S0–S5 落地（G0 归集 → G1 注册表与守卫 → G2 三面分配 → G3 参数层 → G4 接口与展示 → G5 收口）。
@@ -692,6 +724,7 @@
 | B4 | 支持文件同受 **100,000 字符上限**（默认只警告不拒写） | 超限写入仍成功、消息带咨询；`supportFileCharPolicy: 'enforce'` 才拒写，且两档都保留净缩减豁免 |
 | B5 | 软带＝上游拆线（20,000 字符）并**在判定时按本正文成分折成 token 线**（CJK 正文 20k 字符＝20k token 线；全 ASCII 同字符数＝7,273 token 线） | `body_size` 与健康视图的 **verdict 改按 token 判定**（数学上与「字符 ≥ 20,000」等价，故与上游文本效果同点）、value/threshold/detail 文本改成 token；老快照无 `bodyText` 时退回字符判定 |
 | B6 | 维护提示词条款扩展（钩子/退役/软带）并订正软带字段名（`band=` → 现行 value／threshold／`body=Nx`），bundle 版本 18 → 20 | 模型可见文本变化，随包发布 |
+
 ## 0.4.1 (patch) — 鲁棒性修复批：审计 P1×5 + P2×10 落地（**行为修复，无导出面/配置键/事件/数据格式变化**）
 
 > 依据全量审计（对照 `0.1.5-rc.2` 平台源码）落地十项行为修复与二轮复审的收敛，每项均为最小 diff，
@@ -797,6 +830,7 @@
 
 - 沿用 0.3.83 条目的挂账清单（`evolution-review` 三处小改、`reviewTimeoutMs` 触顶告警补断言、`evolution-curator` 接住 `truncated`、`tool-memory` 预检文案单源化、引号表前导指示符假阳性）。
 - 本版新增候选：`computeDedupGroups` 渲染时对组内名字排序，让报告输出确定化（当前由测试侧改为顺序无关来兜住）。
+
 ## 0.3.83 (patch) — 审计驱动优化批：P0/P1 止血 + 分层加固 + 继续审查全量修正（S1.1–S5.10）
 
 > 本版来自 2026-09-16 全量审计（`dsh-evolution-mirror-全量审计报告-0.3.82-vs-0.1.5-rc.2-2026-09-16.md`）与
@@ -929,6 +963,7 @@
 - 迟到落地仍**无 `plan-applied` 审计条目**（活动/回放低报）——需「迟到补记」emit 设计；`claim` 身份平台不暴露 ⇒ 标记/抑制沿用顺序身份与队列前置检查。
 - 剩余 **64 个死导出**按「每次发布清 ≤20」的触发条件挂账；**97 个测试专用导出**登记为测试接缝。
 - 平台侧 6 条缺口（P-1…P-6）已成上报包（含每条的最小复现/期望/现状/影响面），平台修复前家族只做「让坏语料可见」的缓解。
+
 ## 0.3.81 (patch) — 会话面缺陷收口：无 agent 调用不再崩、评审投递就地合并
 
 > 本版来自 0.3.80 的安装后功能核查：一处命令面裸崩溃（脚本/无会话调用者）、一处注入队列堆积（长忙期同一条评审提示被重复入队）。
@@ -1014,6 +1049,7 @@
 - 出厂面：`prepare-release` 后 `.release-staging/evolution-core/` 与其 tarball 均含 `package/persisted-write-inventory.json`。
 - 安装面：本机 profile 热修后逐个 `import()` 28 个家族包 **28/28 通过**（修复前 8/28）；升级到 0.3.79 后同样复测。
 - 全量门禁 10/10（`audit-v42/release-0.3.79-summary.txt`）+ 彩排 7/7（`release-rehearsal-0.3.79.txt`）。
+
 ## 0.3.78 (patch) — 单源化 · 门禁升级 · 单实例契约（优化计划 B1–B4）
 
 > 本版按 `audit-v42/optimization-plan-evolution-layers.md` 的四个批次落地，每批各自带回归、各自一轮全量门禁 10/10。B5（变体自包含）按计划仅在"产品要求字面零挂载"时做，本版不做。

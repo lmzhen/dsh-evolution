@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-io-node",
   "description": "Local atomic node:fs IO provider",
-  "version": "0.25.8",
+  "version": "0.25.9",
   "publishConfig": {
     "access": "public"
   },
