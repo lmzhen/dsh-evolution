@@ -1,12 +1,2534 @@
-ages now carry the original's "Consider splitting into a smaller SKILL.md with supporting files." — the one-line gap against the original.
-- Design: `docs/design-review/008-skill-loop-completion.md` (judgement table, four-seam architecture, robust batch decomposition A1/A2/B/C). Zero behavior change: assessment is read-only exposure; both new seams are additive.
+# Changelog
+
 ## 0.26.11 (patch) — 夹具里的示意路径不再被读成平台引用
 
-> **现象**：引用扫描面收窄后，平台契约校验仍报两条差异，点名 decide-requires.spec.ts 的第 35 与 36 行引用了 packages/x/。
-> **根因**：那两行是夹具里的示意产品路径（path 字段的取值），写成 packages/x/dist 之后，首段是 packages、又不能在家族根下解析到，于是被引用扫描当成平台引用。判定规则里本来有豁免：以点开头的引用会被跳过。
-> **修复**：两处示意值改成以点开头的相对形式，语义不变（该字面量没有被任何断言引用，只用于构造夹具输入）；夹具的三轴形态与判据一字未动。
-> **验证**：该 spec 仍是十六项全通过；本机跑平台契约脚本 OK（四十条真实引用全部解析，六条语义断言成立）；全仓 packages/x/ 出现次数为零。
+> **现象**：引用扫描面收窄后平台契约校验仍报两条差异，点名 decide-requires.spec.ts 第 35 与 36 行引用了 packages/x/。
+> **根因**：那两行是夹具里的示意产品路径，写成 packages/x/dist 后首段是 packages 又不能在家族根下解析到，于是被引用扫描当成平台引用；判定规则本有豁免，以点开头的引用会被跳过。
+> **修复**：两处示意值改成以点开头的相对形式，语义不变（该字面量没有被任何断言引用）；夹具形态与判据一字未动。
+> **验证**：该 spec 十六项全通过；本机平台契约脚本 OK（四十条引用全解析、六条语义断言成立）；全仓 packages/x/ 计数为零。
 
+## 0.26.10 (patch) — 平台契约的引用扫描面收窄：生成台账不再被当成引用面
+
+> **现象**：发布链推进到平台契约校验后转红，报三条引用缺失，点名的都是家族自己的测试路径（evolution-agent、evolution-host、evolution-preset），而对应 spec 在同一次运行的测试步里是通过的。
+> **根因**：引用遍历会扫家族根下的**每个文件**，于是由 gen-test-lines 生成的台账 family-test-lines.json 也被当成引用面；它里面的镜像布局家族路径（形如 packages/evolution-X/tests/…）在家族根能解析到 tests 时会被豁免，而在**不含 tests 的检出**里豁免失效，于是被报成缺失。
+> **修复**：新增显式的 CITATION_SKIP_FILES 文件名单，把该台账排除在引用扫描之外（与既有的目录跳过同级）；**刻意写文件名而不是通配**，因为排除是对扫描面的判断，应当点名具体文件。台账本身内容与用途不变。
+> **验证**：红绿成对——把一条探针引用植入台账后，绕过排除时运行会报出该探针并退 1；启用排除时同一次运行 OK，四十条真实引用全部解析、退 0。
+
+## 0.26.8 (minor) — lint 债清零与类型声明补齐，发布前一致性恢复
+
+> **现象**：发布 tag 连打七个（v0.26.0 到 v0.26.7）全部在 CI 红，且红点逐轮前移，从 lint 一直推到打包步。
+> **根因**：①两处 spec 从三个**纯 .mjs** 守卫模块导入（run-gates、param-registry、health-corpus），TS 侧拿不到类型，于是每次成员访问都被判成 error 类型，同一族规则在 CI 里报出**七十四个错误**；②两处抑制指令与三处写法在类型补齐后**失去作用**，oxlint 把它们报成未被使用的抑制指令（警告也会让该步失败）；③发布前**清单版本停在 0.25.9**，而 tag 已经走到 0.26.x，打包步的一致性检查拒绝继续。
+> **修复**：①给三个 .mjs 各补一份同名声明文件（.d.mts），把已读全的导出形状写成 interface 与 declare，不透明处不用 Function 这类过宽类型（它本身会被点名），而是给出具体签名；②删掉因此失去作用的两条抑制指令与其解释性注释，并把夹具里索引访问得到的 string 或 undefined 用 String() 在源头收窄（拼接结果逐字节不变）；③按仓库自身的纪律抬版本：CHANGELOG 头行加本行，跑 normalize-mirror 把三十四个清单对齐到本行，再打同名 tag。
+> **验证**：CI 汇总行从**七十四错二十七条不同消息**降到 **0 错 0 警**（轨迹 74→57→18→2→0，警告 2→1→0），动作 Build test and lint 与 G7.2 负载敏感组均由 failure 转 **success**；本机同一批改动后三份 spec 分别 35/35、16/16、26/26 通过。
+
+## 0.25.9 (minor) — 分组分步优化计划 G0–G6b：模型能自己找到技能，结构改动可整体撤销
+
+> **现象**：技能目录里已有四十多个技能，但该用家族技能的六类场合（发布/CI、客户端文案、门禁规则、全量审计、本机参数、双平面宿主重启）里，模型**选不到**它们——命中只能靠人点名；家族树里声明过的关系，运行时读出来是 **0 条边**。
+> **根因**：①目录条目是功能清单式措辞（"发布与 CI：镜像→tag→npm 装机…"），与用户描述任务的说法对不上；六个域技能当时并不在目录里，只有 hub 能被选到；②声明边只写在技能文件里，读路径没有任何运行时读点。
+> **修复**：① hub 描述改为"场景→一句话"，六个域技能落盘为真身（client-ui／gates／platform-seams／defect-patterns／skill-library／release）；② 新增 `verify-graph-edges.mjs` 门禁：运行时读声明边，三态 exit（0 绿／1 红／**2 读器不可用且不给数字**），面判据（没有 skill 工具的面 skip 并打面名），注册进 `gate-manifest.json`（63 条 id）。
+> **验证**：npm 网页版（3080 面，home `D:/dsh-homes/web`）12 条**单轮全新会话**实测 **12/12 命中、留出 4/4**（判据＝会话里真的调用 `skill` 且名字 ∈ 该条 `expect[]`；首次加载全部发生在 step 1；12 条目录指纹一致，skills=36）；离线标尺同口径 12/12（reader sha `fef1760a0601c383`）。装置与逐条读数：`data/e10c-b/READING-E10c-b.md`。
+
+### 单元化与可逆：一次结构改动 = 一个可整体撤销的单元
+
+> **现象**：重构（搬段到 `references/`）或删支持文件之后，历史索引里同一件事被记成**多条互不相干**的记录 —— "撤销"只能一条条退，退到一半停下就留下**半切**的文件集；跨技能时甚至看不出这个单元的记录在**哪个技能的索引**里。
+> **根因**：早先每次写盘各铸一条记录，没有"单元"这层身份；撤销按条目做，剪枝也按条目留，于是"整体性"既没被表达、也没被验证。
+> **修复**：引入 **`unitId`**（一次树改动一个）；单元里**只有一条记录带 `unitHead`**，两形态互斥 —— **代表片** `{ moves, sources }`（全量清单 ＋ 它写过哪些技能）、**路标** `{ skill }`（记录在别的技能里）；判别式固定为 `moves !== undefined`。撤销走**纯决策层**（`packages/evolution-curator/src/unit-undo-plan.ts`）：逐路径回该单元铸的**基线**、没有基线才回退到**最早**那条的 `beforeHash`、单元前不存在的路径**删除并锚定**（别人手改过就拒绝）；跨技能成员**只按已知 key** 解析（禁目录扫描），缺片/冲突一律**拒绝并点名对象**；路标的 `undoable` 是 **`undefined`**（wire 上不出现该键）**绝不为 `false`**。剪枝**按单元** all-or-nothing。
+> **验证**：家族 spec（唯一入口 `-c D:\dsh\_tools\vitest-family-preflight.mjs`，按文件跑）——`unit-head`／`unit-members`／`unit-undo` 全绿，`evolution-curator` 全套 **9 files / 105**；端到端三例（整单元回滚／追加写回／手改零写拒绝）；**独立复验 5/5 PASS**（逐条带 `file:line`），三条复验发现（去重取最后一次、谓词单一化、输出确定性排序）均已闭合。
+> **文档**：面向读者的契约说明见 `docs/units-and-undo.md`。
+
+### 家族树边：声明了关系，运行时却读不到
+
+> **现象**：技能里写了 `skill:` 指针与 `related_skills`，门禁与工具却一律显示 **0 条边**——关系等于没写。
+> **根因**：投影只保留字符串化的 `metadata`，嵌套键（`metadata.hermes.related_skills`）读不到；"如何发现技能文件"也没有唯一形状，扫描口径各写一份。
+> **修复**：`frontmatter.ts` 保留结构化 `metadata`（不字符串化）、`relatedSkillNames` 认嵌套键、新增 `evolution-core/src/skill-discovery.ts`（`discoverSkillFiles` depth ≤2，`isPotentialSkillPath` 与平台镜像对齐）；门禁读数一律写全 **树 ＋ reader ＋ channel** 三件套。
+> **验证**：dev overlay 通道 `reader=src-import channel=src` ⇒ `edges=102 dangling=2`，面内 desktop 63/2、web 39/0；未装依赖的裸树上 **exit 2 ＋ 原因、不给数字**（不静默给 0）；元门禁绿且 manifest 含该 id。
+
+## 0.25.8 (patch) — 面板一直是无样式裸文本：根元素没带样式作用域类
+
+> **现象**：0.25.6/0.25.7 装机后数据是真实的，但面板看起来是一列裸文本（状态、规则、技能名全竖排，卡片与表格都没生效），用户判定界面差劲。
+> **根因**：样式表全部以 `:where(.dsh-evolution-skill-health) …` 作用域选择器编写，而面板根元素**从未带上这个类** ⇒ CSS 一条都没匹配上 ⇒ 反复调整样式值当然无效。
+> **修复**：根元素加 `className: CSS_TAG_ID`（从 `./styles.ts` 引入）；同步复核 `verify-client-tokens --strict`（只读已声明标尺）与 `verify-arch-guards`（N25/N27 禁像素几何字面量）均通过。
+> **验证**：本机 lint 0 报错、客户端构建更新、pre-tag 闸全绿；装机后点开面板应看到四张状态卡 + 网格规则表 + 技能药丸。
+
+## 0.25.7 (patch) — 面板样式改按平台约定：语义 token + 家族标尺，度量抄平台并注明出处
+
+> **现象**：0.25.6 装机后功能已通（面板出真实数据），但界面被判「好差劲」：摘要是一行文字、规则表列宽漂移、数字不齐、没有语义色。
+> **根因**：第一版样式是**自创**的（自定网格、自造色变量），而家族与平台都有既定做法 —— 颜色用平台 `--dsw-*` 语义别名、字号/间距/圆角用家族标尺 `tokens.ts`、**度量值从平台组件抄来并在文件头逐个注明出处**（侧栏行＝`ui-sidebar/…/SidebarRoot.module.css`；输入框圆角 8px＝`ui-primitives/Input.module.css`；卡片 0.5px 边框＝`ui-chat/…/GenericCommandCard.module.css`）。
+> **修复**：① 样式全部改用平台语义 token 与家族标尺，文件头注明每个度量出处；② 摘要改成**四张状态卡**（数字大、标签小、左侧语义色条）；③ 规则表改成**网格**（规则 / 涉及技能 / 次数右对齐等宽数字）＋行悬停与焦点环（照平台侧栏行）＋按该规则最差判定给左色条；④ 技能名做成**药丸**并折行；⑤ 取数失败时给中文结论句，原始信息另起一行，不再把 `TypeError` 直接甩给读者。
+> **验证**：本机 lint 0 报错、`api.client.spec.ts` 4 例通过、`build-client.mjs` 产出更新；装机后点开面板应看到四张状态卡与网格化规则表（截图留证）。
+
+## 0.25.6 (patch) — 面板点开是空白：组件收的是“扁平 face”，我给了嵌套 `{ face, locale }`
+
+> **现象**：0.25.5 装机后侧栏「技能健康」行在、也能点中（图标高亮），但主区域**不渲染任何内容**（浏览器控制台无我们可见的输出）。
+> **根因**：座位把 `inject` 返回的 face **摊开当作组件 props**（兄弟包 `evolution-skill-history` 的写法：`export function SkillHistoryPanel(face: PanelFace)`），而我写成 `SkillHealthPanel(props: { face, locale })` 并用包一层 `createElement(..., { face, locale })` 去喂 ⇒ `props.face` 是 `undefined`，组件读 `face.rows` 即抛错 ⇒ 平台吞掉渲染，只剩空白 ✗。
+> **修复**：与兄弟包对齐 —— 组件签名改为**收 face 本身**，face 内自带 `t` 翻译器（由座位注入，字典仍是本包的）；注册处直接传组件。
+> **验证**：本机 lint 0 报错、`api.client.spec.ts` 4 例通过、`build-client.mjs` 产出更新；装机后点开面板应显示四态摘要与按规则聚合的真实技能清单（截图留证）。
+
+## 0.25.5 (patch) — 面板有座位无数据；装机 patch 静默丢行
+
+> **现象**：0.25.4 装到 3080 并 opt-in 后侧栏出现「技能健康」，但面板没有任何数据（四态摘要全 0、规则表空）。同一台机器上，装机包内的 `cordis.patch.yml` 还比 npm 发布产物**少一行**；该行缺失时整个客户端包**不会进入页面的启动清单**（`__DSH_BOOT__`），且重装修不好——版本要求已满足时 `dsh plugin add` 是 no-op（实测 `resolved 63, reused 2, downloaded 0, added 0`）。
+> **根因**：① 客户端半 `main` 座位的 `inject` face 返回写死的空数据（`{ rows: [], truncated: false }`），从未读取宿主半已经挂好的只读路由；② 装机产物与发布产物之间没有任何比对，任何不一致都会静默长期存在。
+> **修复**：① 补 `src/client/api.ts`（镜像宿主半 `ROUTES.rows` 的 `/api/dsh-evolution/skill-health/rows`；拒绝一律以 `ok:false` + 宿主原句返回，与斜杠命令同一套措辞）＋`HealthFace` 增加 `loadRows`，面板挂载后取数并渲染真实结果（取数失败保留种子数据并把宿主原句显示出来）；② opt-in 改由 profile 自己的 `cordis.patch.yml` 承担（平台注释明示「Edit cordis.patch.yml, not this file」；该文件是 patch 列表，覆盖已有 id 须写在**第 0 列**），包内文件保持与发布产物逐字节一致。
+> **验证**：`build-client.mjs` 产出 `lib/client.js` 且其中出现 `api.rows`/`loadRows`；装机后侧栏行在，面板渲染真实技能清单（语义快照/截图留证）。
+
+## 0.25.4 (patch) — 技能健康的行仍未注册：补齐座位的样式表与"行渲染件是组件"两处形态
+
+> **现象**：0.25.3 装机并 opt-in 后，页面能正常启动（`exports["./client"]` 修复有效），但侧栏仍无「技能健康」行。
+> **差距**（与能显示的兄弟包 `evolution-skill-history/src/client/` 逐项对比）：① 兄弟包有 `styles.ts`（导出 `CSS`/`CSS_TAG_ID`）并在 `ctx.effect` 里注入带 `data-plugin-css` 标签的 `<style>`；本包**没有样式表**。② 兄弟包把**组件**（`PanelIcon`，消费座位给的 `{size, active}`）作为行渲染件传入 `seam.slots.register`；本包传的是"返回 span 的箭头"。
+> **修复**：补 `src/client/styles.ts`（只用生成的家族标尺 `TOKEN_CSS` 与 `--evo-*` 变量，无字面值）＋在 `apply()` 的 `ctx.effect` 里注入；行渲染件改为组件形态的行内图标 `PanelIcon`（线形 glyph、`currentColor`）。
+> **验证**：`build-client.mjs` 产物由 5.4 kB 增至 10.8 kB，且其中可见 `entry.label`、`PanelIcon`、`data-plugin-css` 的注入；装机 opt-in 后侧栏应出现该行（下一步用后台窗口截图核对）。
+
+## 0.25.3 (patch) — 启用技能健康面板后页面启动失败：包缺 `exports["./client"]`
+
+> **现象**：操作者把该 bundle 行从 `disabled: true` 改为启用后，页面报 `Failed to load plugins / web boot: window.__ModuleLoader__ bootstrap facade is missing`。
+> **根因**：平台的客户端加载器按包的 **`exports["./client"]`** 解析浏览器半；本包的 `exports` 只声明了 `"."` 与 `"./package.json"`（兄弟包 `evolution-skill-history` 有 `"./client" -> ./lib/client.js`）⇒ 加载器拿不到正确的模块入口。
+> **修复**：`exports` 补齐 `"./client"`（与兄弟包同形）。**验证**：装机后启用该行、刷新页面，侧栏出现「技能健康」且面板能出数据。
+
+## 0.25.2 (patch) — 技能健康面板在侧栏不出现：客户端半缺"语言字典 + 座位渲染件"这套契约
+
+> **现象**：0.25.1 已装到 3080（profile 依赖 0.25.1、包内有 `lib/client.js`、宿主路由 401 已挂载），刷新后侧栏仍无「技能健康」行。
+> **根因**：`src/client/index.ts` 只注册了 `sidebar.panellist` 与 keyed `main` 两处，**没有按座位契约注册本包的语言字典**（`ctx.effect` 内 `locale.register(NS, { zh, en })`）。座位对"命名空间已注册"会抛错；该异常从 `apply()` 逃出后，**后面的行与体注册根本不执行**，面板整块消失且不留消息（同族 `evolution-skill-history` 的客户端半早已带同样的守卫与告警）。
+> **修复**：补上受守卫的字典注册（失败时告警并退回包内字典），标签解析加兜底，不再让 `apply()` 因字典冲突而中断。
+> **验证**：`node packages/evolution/scripts/build-client.mjs evolution-skill-health` 产出 `lib/client.js` 且其中出现 `entry.label`/`locale` 注册；装机刷新后侧栏出现该行。
+
+## 0.25.1 (patch) — 技能健康面板的客户端半未进包：补 `dsh.client` 声明，侧栏行才会出现
+
+> **现象**：0.25.0 装到 3080 那台（npm 装的 DSH）后，`/api/dsh-evolution/skill-health/rows` 由 404 变 401（host 半在），但侧栏**没有**「技能健康」行。
+> **根因**：家族按 `package.json` 的 `dsh.client` 声明**派生**浏览器半（`packages/scripts/build-client.mjs`）——本包**漏了这条声明**，于是 `lib/client.js` 从未生成、也没进 tarball；`audit-release-tarballs.mjs` 只校验"声明了就必须带 `lib/client.js`"，**不声明就被静默跳过**。
+> **修复**：补 `dsh.client`（与 `evolution-skill-history` 同形）⇒ 既有机制自动产出 `lib/client.js`，既有审计自动守住这条不变量。无新增硬编码清单、无补丁。
+> **验证**：`node packages/evolution/scripts/build-client.mjs evolution-skill-health` ⇒ `client build: wrote evolution-skill-health\lib\client.js`；装到 web 面后侧栏出现该行。
+
+## 0.25.0 (minor) — 分组分步优化计划 G0–G5：门禁可信度、引擎判据单源、写入回执与在用保护，外加技能健康面板脚手架
+
+> **由来**：《分组分步优化计划》G0–G5，按「①读文档 → ②定性 → ③读全部代码与引用 → ④详细设计（忽略短期工程量）→ ⑤改码」逐项推进，每项过判据才进下一项。
+> **G0 门禁可信度**：门禁清单的包含关系按种类核对（CI 独有必须登记，否则红）；清单只登记不重复实现（产物由 TS 侧生成，门禁只读）。
+> **G1 引擎判据**：lint 规则自带严重度（非模型打分、非统计），刻度用 token；戳记密度按 /1024 且仅在正文 ≥ 2000 字符时计算；「无支撑」阈值＝正文 ≥ 软线一半。软线真源仍是 `AUTHORING_SPLIT_LINE_CHARS`，本批不改。
+> **G3 单源扫描**：H2 节扫描收敛为 `document-body.ts` 的 `h2Sections`，store 与其共用同一扫描，重构候选结构上不可能产出「不存在／歧义」的锚点。
+> **G4 写入回执**：写入前后各跑一次同一引擎的 `lintBody`，回执只报**本次新引入／恶化**（存量不进）；悬空引用复用同一解析器，只报本次写坏的目标；未标定的阈值只报规则名、不报数字。
+> **G5 治理**：账本记录写入面（`origin`，经 `TreeChangePlan` 透传）；「被其它技能引用」的技能不再进合并候选池（纯函数派生，可点名引用者）；异常配置只提醒一次沿用既有 `clampOnce`。
+> **面板脚手架**：新包 `evolution-skill-health`（浏览器半四文件 ＋ host 半一条只读路由），bundle 行**默认禁用**直至阈值标定完成；npm 名 `@lmzhen/dsh-evolution-skill-health` 已占并绑定 Trusted Publisher（OIDC）。
+> **验证**：`evolution-core` 76 文件/794 格、`evolution-curator` 7 文件/98 格全绿；本机 pre-tag「除已登记漂移外全绿」；发布判定交 CI。
+> **已知漂移（登记在案）**：本机覆层缺平台类型/模块 ⇒ `gate-01`（tsc）与 `gate-02`（oxlint）在本机必红；`ci-only-01`（tarball 审计）需 `tar`，属 CI 专属；准入判定缺平台语料时输出 CANNOT DECIDE（设计如此）。
+
+## 0.24.0 (minor) — F-7 家族文案中文化：把「用户可见」输出统一为中文
+
+> **由来**：32 号计划 F-7 项，按所有者口径——界面/CLI 输出以中文为准；提示词与 skill 正文保持英文。
+> **范围**：命令结果行、错误句、界面文案；按包分批，每批先出清单（字段式／构造器／常量三种形状扫描，带 CJK 过滤），白名单替换并同批追平夹具。
+> **已覆盖（仅用户可见输出）**：命令结果行、错误句、CLI 提示、界面文案、确认弹窗与按钮；覆盖 evolution-commands／evolution-approval／evolution-learning-graph／tool-memory／evolution-curator／tool-skill-manage／evolution-core／evolution-review／evolution-maintenance／evolution-replay。
+> **不在范围（保持英文）**：面向模型的提示词与宿主日志、skill 正文、客户端双语表的 en 半边、参数元数据（params.ts）与威胁检测正则（threats.ts）；两处刻意保留原文：maintenance 的 `Maintenance run <id> started`（测试用正则解析）与 `HTTP <status>`（语言中立）。标识符类 token（instance-held、DEGRADED）、long-runs 的 note 元数据与 host 日志里的英文短语同样保持原文。
+> **文风**：中文按严肃技术文档规范（去翻译腔与 AI 味）；量化自查用 `scripts/audit-chinese-style.mjs`，本轮据《35-文案风格审查-0.24.0》整改了破折号与被动句的头部问题。
+> **跳过并留档**：params 参数元数据、prompts 提示词、threats 检测正则、client/messages 表的 en 半边。
+> **验证**：各包车道全绿（evolution-core 77 文件/868 格等）＋ 全量门禁 `green=23 red=0`。
+
+## 0.23.0 (minor) — 审计 v46 批次：把「面—声明—清单—门禁」四层里剩下的**漂移面**逐条收口（含一条新的批准前确认门）
+
+> **由来**：30 号全量审计（00–08 面）＋ 31 号六角色评审指出的失效面，本批按「先读文档 → 定性（不变式 I-1..I-5／失效模式 M1–M5）→ 读全部相关代码与引用 → 详细设计 → 才动代码」逐条落地，共 **87 个文件、+1668/−2427 行**（净减代码）。
+> **G1 反馈环路与线身份**：门禁分级（`green=23` 的本地套件与 CI 的 33 条接线同源）＋ **两条元门禁**——`verify-arming`（空目录 ⇒ exit 1，"a vacuum pass is not a pass"）与 `verify-line-identity`（床不对 ⇒ **第一条错误**即 `platform line mismatch`）＋ 四条同类门禁补上**真空断言**（`scanned=0` 不再算通过）。
+> **G2 介质与端口**：`evolution-io-node` 由**默认**退为**显式降级**（平台 `FileSystem` 缺 `remove/rename/copy` 时的落点，33 号 P-3 的删除条件已书面化）；家族**自建锁协议整体删除**（`io.ts` 1148 → 571 行），并发交给平台的版本化写＋进程内串行，两条语义在 docblock 里写明"进程内 FIFO **不是**跨进程保证"。
+> **G4 声明管线**：注册表新增**第五段可选列** `relation`（跨字段下限），一条声明同时喂给三处——文档生成物、**客户端卡片视图**（保存前给字典句）、**Host 写路径**（违规回新码 **E-322**，且"什么都没写"）；`verify-param-registry` 的声明语法随之扩展，`param-registry.spec.ts` 改为 **import 生成器用的那一个解析器**（不再自抄镜像）。
+> **G5 客户端合同与一致性**：U-3 装饰只在有信息时渲染；U-4 约束前置（含跨字段）；U-5 三条决策信息上屏；U-6 **批准前的确认门**（新参数 `approvalConfirm`，三态 `auto|ask|timeout`，**默认 `auto`＝原地二次点击、不弹窗**，`ask` 时渲染**具名**确认件）；U-7 无障碍基线（`role="status"`／`aria-describedby`）；U-8 术语表＋**新门禁 `verify-client-ui-i18n`**（跨面指令退出 GUI 文案）；U-10 版本与用途摘要由生成器派生。
+> **G6 组合写路径与失败语义**：装机失败语义统一（`halfDone:` 三态断言在册）；写入清单从裸数组升为 `{ symbols, sites }` 信封（**符号图例**让每条路径可审计，N20 的 15 个写站点逐条对应写者）。
+> **G7 重复实现合并**：谓词／原子写／stripComments／只读判据／组合器五条的**份数=1** 各有一条门禁（`verify-predicate-single-source` 等，逐条带"注入缺陷必红"的 drill）；`verify-command-table` 新增**双向**交叉核对（表里的取值型标志 ⇄ 解析器的 `VALUE_FLAGS`，两向各自点名失效模式）。
+> **G8 平台请求**：33 号十条逐条写"现状／临时形态／删除条件"；P-5 的措辞按树**据实更正**（"以 `ctx.fs` 为硬要求" ≠ 现实：默认 node、偏好 fs、缺条静默回落），并把"未接平台 io 要**标未接**"登记为家族内部待办。
+> **F-5 定案（0.23.0）**：`/evolution` 与 `/graph` 曾声明 `recordInput: false`（命令原文不入持久记录）；按所有者决定改为**记录原文**（跟随平台默认）——运维需要能回溯"跑过什么"。两处声明已删除，注释写明"此处再出现 `false` 即等于静默翻案"。
+> **验收**（本机实跑读数）：`verify-arch-guards --strict` **39 条 clean**；`verify-doc-facts --strict --require-repo-docs` **11 fact / 0 violation**；本地门禁套件 **green=23 red=0**；四个生成物 `--check` 全 0；错误码表 **E-301…E-322 全登记**、注册表 **102 行 0 待定**；家族车道逐包全绿（core 71 文件/773 格、commands 10/149、客户端 27/112、approval、io 23/23）；家族 A/B **按逐包车道判**（聚合默认并行的红经隔离复跑证实为**负载假红**）。
+> **切 tag 前的独立只读复核**（**一位**只读复核员，prompt 自包含、不带本轮上下文、全程只读并自证未改树；结论 **P0 = 0**）：**P1-1** U-4 的拒绝句在真实渲染路径上必抛 `ReferenceError`（夹具只测了单元层 ⇒ 全绿）⇒ 抽出唯一定义 `controlId` ＋ 补**渲染级**夹具与 drill；**P1-2** 客户端样式引用两个**未声明** token ⇒ 已声明门禁 `verify-client-tokens` 红（而本地 23 件套**不含**它 ⇒ "全绿"是子集口径）⇒ 改用已声明 token；**P1-4** 发布链步骤 `run-load-sensitive` 的 17 条用例名有 14 条随锁协议退休 ⇒ 计数断言必红 ⇒ 清单按"决定"收缩为 3 条。**P2 已关 10 项**（真空断言×4、错误码表头、台账陈旧行、死标志、孤儿 JSDoc、恒真断言、第二份声明交叉核对、单源扫描面声明、两处解析器同源），余 1 项（夹具按"形状"挑样本，手法已记）。
+> **不做**：不为对齐测试床升级全局 dsh；不给 host-only 能力补挂工具；不把窗口化 diff 改成整文 diff；不为缺操作自建第二套路径 API；不续写家族锁接管；不用无 fsync 的原子写做持久写；不重写域逻辑（G3 空号）；**不把"本地没能复现的 CI 口径"说成已验**（本地 lint 口径与 CI 不同源 ⇒ 交 CI 判）；**5 屏验证无截图 ⇒ 一律标注"需截图对照后通过"**；F-5／F-7 的出入口文案与语言统一待用户裁定；G8 是否向上游提 issue 待用户裁定。
+
+## 0.22.0 (minor) — 面—声明—清单—门禁四层收口：一个 home 一个面、一份清单一张图例、一条命令一次装机
+> **由来**：三条结构病灶同批收口。①**同一语义写 N 遍**：配置活引用 vs 裸值的两形读取在 6 个包里各有写法（`clampOnce`／commands 的模块级 `liveFlag`／memory-files 与 tool-skill-manage 各自的 `typeof === 'object'`／test-support 的第四种），漏一处即**静默失效**（布尔恒假、数值折 NaN），而 37 条 arch-guard 里 `volatile` 零命中。②**清单不能当审计输入**：写入清单四个符号指两个真实根，`events` 条目与代码矛盾且同一文件被第二条声明用另一套符号再写一遍，N20 只核对 `marker` 字面量所以一路绿。③**一个裸函数服务两种语义**：`<home>/profiles` 既是 doctor 的全部 profile汇总面、又是 `/evolution preset install` 的互斥判据面；分家后旧面残留的 `profiles/web` 让**本面拒装**。
+> **G1 读取语义归一**：新增 `evolution-core/src/live.ts`（`LiveValue<T>`／`unwrapLive`（判别 `typeof get === 'function'`，比旧 `typeof value === 'object'` 更准）／`liveNumber/liveBool/liveString/liveEnum`；`clampOnce` 薄适配、旧签名零改动）；6 包 18 处裸读归零。新增门禁 **N38**：配置成员的裸 `.get()` 即红，锚在**接收者** ⇒ 平台服务访问器天然不匹配、**不建例外表**。
+> **G2 清单符号图例**：写入清单改为 `{ symbols, sites }` 信封（六符号 `<dshHome>/<evolutionHome>/<skillsRoot>/<memoryRoot>/<historyRoot>/<callerSupplied>`），四条路径按代码真值统一（`events` 与 `feedback-events`＝同一文件的**两个写者**）；N20 扩展为前导符号必须来自图例（后置 `<…>` 是文件名占位符）；新增 `_tools/verify-write-inventory.mjs`（形状 → **图例 segments 与根解析函数源码对账** → 落点必须在 home 内）。
+> **G3 home 派生面单 owner**：新增 `evolution-commands/src/profiles.ts`（全家族唯一的 `readdirSync(<home>/profiles)`）；preset install 互斥**只看本面**（`profileContext` 的 startedBundles ＋ 本面 manifest），拿不到身份或 manifest 撕裂**仍拒装**（ENOENT 视为无声明）；doctor 增 `profiles-foreign:` 一行。新增门禁 **N39**：除 `profiles.ts` 外读该目录即红。
+> **G4 装机一条命令**：`_tools/lib-home.mjs`（唯一解析＋回显 `home=`，支持 `--profile` 反推）＋ `_tools/install-family.mjs`（七步：解析面／策略 glob／**版本存在性**／选 CLI／装／integrity／**已安装字节探针**／web 三核；默认 **web→desktop**；`--dry-run` 零写入；桌面宿主永不重启）。
+> **G5 部署面归一**：清旧 home 面外残留五项（小件有备份；大目录以另一面 home 的完整克隆为备份）⇒ 本面 `/evolution preset install` 不再被别面 profile 卡住；平台侧最后一个共享技能根由 `DSH_AGENTS_HOME` **两面各设一处**（桌面＝用户级 env、web＝启动脚本一行＋自证 echo）。
+> **验收**：静态门禁全绿——`verify-arch-guards --strict` **39 条 clean**（含新 N38／N39）；`verify-write-inventory --strict` **两平面各 15 site／6 symbol／14 path 全落在各自 home 内**；参数通道四件（registry 101／parity 7 E3 owner 全 `auto:false`／两份生成物 up to date）；`audit-param-exposure` 三读数 **0**；**CI 等价 `tsc -b tsconfig.host.json` exit 0**；各门禁 drill 留痕（N38／N39 注入必红点名、写入清单四支、G3 五支夹具）；家族全量套件 **205 文件：25 红／180 绿**——红集全部落在既有基线类（review 13、host installer 2、client lane 8），另 2 个（curator、skill-catalog）为**负载抖动**：单跑 **78/78 全绿** ⇒ **NEW=∅**。本地 oxlint：本批自家文件 **0 error**（`live.ts`／`write-inventory.ts`），余项为本地调用未解析 cordis 类型的噪声（同一规则命中未改动行、报文自述 `'Volatile<boolean>' is an 'error' type`）⇒ 以 CI lint 为准。**装机实测口径**：只做 npm/web 面（用户指示），桌面端如需重启可暂不测。
+> **切 tag 前的独立只读复核**（**两位**只读复核员各自逐条到源码，镜像零改动；结论 **P0=0**）：**P1-1** 两条新规则登记 `sample:'detector'` 却无自测条目、完备性只数声明字段 ⇒ 假全带自证 ⇒ 已修（补 N38／N39 真 detector、探针与 detector **共用同一谓词**、计数改为**与 detectors 表求交**、`--list-rules` 移到表之后；实测 39/39 且 `--strict` 39 条 clean）；**P1-2（书面残余）** N38 是词法探针，只覆盖取引用半场，活引用被当值读无法词法判定 ⇒ 正则由迁移完整性（35 个 volatile 字段读点全部走 `live*`）＋参数通道门禁枚举承担；**P1-3** 新门禁未接任何流水线、且缺 `--home` 时静默跳过最强一步仍报 OK ⇒ 已修（`--strict` 缺 home 打 `NOT ARMED` 并 exit 1；已接进 CI 的 `evolution-validate` action）。另修 **P2-3**（Windows 上 owner 豁免未归一化路径 ⇒ 潜伏误红）与 **P2-11**（位置参数可被旗标顺序解除武装），并收窄 N39 谓词。
+> **不做**：不给 ~60 个一次性探针加 home 门面（登记为可归档）；不自动删用户 profile 目录；不替用户重启桌面宿主；不加启动断言 home 一致（桌面侧不设 `DSH_HOME`，断言必假）；不新增**读整份状态／产物文件**的门禁探针（门禁探针读源码文本是既定形态：剥注释＋按声明正则，本批两条新规则照此写）；不动上游 `~/.agents` 默认；不为分家单独发版。
+
+## 0.21.0 (minor) — 参数暴露面收口：每个旋钮都有档位与「为什么」，三个缺口补上用户层
+
+> **由来**：家族参数的「谁能改、改了何时生效、为什么没有设置项」此前只存在于人的记忆与文档里——注册表能声明档位，但「E3 却没有卡」在语法上完全合法（`evolution-approval.pendingTtlMs` 就是这么出门的）；`maintainHandoffOnSettle` 只能改 cordis.yml；`pin` 只有模型能调。本版把这三件事变成**数据与门禁能表达的事实**，按 `17`／`18` 的五组计划落地（G1 可达性收口 → G2 暴露声明 → G3 补卡 → G4 pin 用户面 → G5 归位），发布是唯一串行点。
+> **G1 可达性收口**：`verify-param-channel-parity` 的两处「按已登记命名空间取子集」去掉（「E3 行而 owner 无命名空间」这一类此前对门禁**不可见**）；限定名 id 与行 Config 裸键对齐（`evolution-approval.pendingTtlMs` 不再误报）；`pendingTtlMs` 补上用户层（`.volatile()` ＋ USE 时 `clampOnce` ＋ 自己的卡 ＋ `settings.configure({ auto: false })`）；doctor 把「owner 没有命名空间」与「行没挂载」拆成两句。
+> **G2 暴露声明**：注册表每行**恰好一个第四段暴露键**——E3 行写 `, card: '<本行 id>'`，非 E3 行写 `, why: '<六值枚举>'`；「E3 却没有卡」在语法上不可表达。101 行一次写全（35 `card` ＋ 66 `why`），三面从同一份数据派生：`PARAMETERS.md` 第 8 列「设置面」、客户端按 `card` 出卡并拒绝「没有 bundle 挂载的卡」、「`card` 必须等于本行 id」与「有卡的 namespace 必有 seat」进 `verify-param-registry`／`verify-client-seats`。夹具四格钉死「两键同现」「缺该档必填键」「生成器遇到未挂载卡」；两个文本解析器（.mjs 与 spec）改成**尾先循环剥键**，两键同现报出点名的契约违规而不是「读不懂」。
+> **G3 补卡**：`maintainHandoffOnSettle` 从 E2 升 E3（`applies: live`）并上 `evolution-commands` 卡（标题「维护扫描」）；字段 `.volatile()`、平台自建页关掉、读取改成两形（裸布尔与活引用都认——活引用下 `=== true` 恒假，开关会静默失效）；新增一格「同一实例两次扫描之间经写符号写活引用，行为随之改变」证明 `applies: live` 名副其实。
+> **G4 pin 用户面**：`/evolution skill pin <name>`／`unpin <name>`，复用 `skill_manage` 的同一个库方法（`setPinned`）与 E-70 的既定语义（在审批缝之外、不 bump usage、不发 mutation 事件、重复执行幂等）；README 命令钉表同步。
+> **G5 归位**：`qualityWarnStaleAfterDays` 降到部署面（`why: internal`），与它的另一半 `qualityWarnThreshold` 同档（同一功能的旋钮不许劈档，跨 owner 又不能并卡）；`autoStart` 保持部署面，并在行摘要与 curator README 写明「启动默认 vs 运行期 `curator pause`／`resume` 覆盖」；超时族与保留窗口族给出**不动**的判据（同 owner 功能组不许拆半）。收口读数：`audit-param-exposure.mjs` 三读数全 0。
+> **验收**：家族全量低并发 A/B（2 worker，204 文件）**修后失败集 ≡ 基线**（两侧同为 25 文件红，NEW=∅／FIXED=∅；首轮高并发跑多出的 3 个红在单跑下 140/140 全绿，属负载抖动，两轮读数都留档）。受影响夹具：`guard-scripts` 35/35（含新增四格）、`param-registry` 6/6、`maintain-handoff` 5/5（含新增「活写」一格）、`commands` 55/55（含 pin／unpin 两格）。参数面门禁：`verify-param-registry --strict` OK 101 行、`verify-param-channel-parity --strict` OK（7 E3 owner／7 namespace，curator 行 22 键 11 volatile）、两份生成物 `--check` 一致（7 namespace／35 field／3 bundle seat／19 row）、`verify-client-seats --strict` OK（7 行／7 卡／7 seat）、`verify-doc-facts` 0 violation、`audit-param-exposure.mjs` 三读数 0。**门禁牙口在真树逐条实测 11/11**（改坏即红且点名、随后逐字节还原）：E3 行缺键／两键同现／`card` 指别人／`why` 取值非法／E3 行字段没 `.volatile()`／owner 没 `settings.configure({ auto: false }, <fiber>)`／owner 行 Config 缺该键／多出一个没有 E3 行的 `.volatile()`／手改文档或客户端视图（STALE）／`card` 指向没有 bundle 挂载的行。**组可单独 revert 实测**：摘掉 G4 ⇒ 同批夹具 172/172 绿；摘掉 G5 ⇒ 139/139 绿（G1–G4 不依赖它）。`oxlint` 本批改动文件 0 error（唯一告警在 `curator:1685`，批次 hunk 之外）。
+> **切 tag 前的独立只读复核**（P0=1／P1=1／P2=6，只读、逐条到源码）：**P0**＝`verify-param-channel-parity` 的 `settings.configure({ auto: false }, <fiber>)` 检测对整份文件文本跑正则、不剥注释 ⇒ 七个 owner 里六个的**注释本身**就满足它，删掉真调用门禁照样绿（假阴性）——已修（新增 `stripComments`：块注释与整行/行尾 `//` 都剥、`://` 不截断；三条文本探针全改读代码），并实测：真调用删成注释 ⇒ **exit 1 且点名**，`.volatile()` 只写在行尾/块注释 ⇒ 同样红，还原即 OK。**P1**＝G5 自称的「值仍被读到」证据没牙（举的那格用的是 schema 默认值，读取退化成常量它也绿）——已补**判别性**一格（同一条质量告警 + 闲置 5 天的技能：默认 7 天**不**stale、行配置 3 天**stale**），并实测把 `plainNumber` 改成返回默认值 ⇒ 该格**红**。**P2** 逐条：policy 快照覆盖的说法**不成立**（该键不在 policy 行 schema 里，行 config 是唯一来源）⇒ 已改正文；「`verify-client-seats` 没有 runner」**不成立**（CI 的 composite action 就在跑它，且带 `--upstream .`）；`.volatile()` 判定只剥整行注释、policy schema 取键锚在注释上（可能整段落空仍报通过）⇒ 两处**已修**（锚点改 schema 声明，锚不到即报 problem）；`ParamGroup` 的 `internal` 组与 `why: 'internal'` 同名不同轴 ⇒ 已写进两处契约注释；`memory-files`／`tool-memory` 各一处单形 `.get()` 读取（批外文件）⇒ 登记下一批。另有一次更窄的只读复核同时启动，因与上面覆盖同一面、且上面已交出逐条报告而停止。
+> **不做**：不做「未写决定的行按缺省解释＋到期」（长期解是声明必填、每行恰好一个键）；不给 `qualityWarnThreshold`／`autoStart` 建卡；不新开 pin 的设置卡；不把 pin 纳入审批缝；不为收口去改读侧门禁的判据。
+
+## 0.20.0 (minor) — 维护报告的人机交接：`maintain handoff`（指针＋汇报协议）＋ `report`／`cancel` 省略 id
+
+> **由来**：维护扫描的结果此前只在框里回一段正文，用户看不到「改什么、为什么、能不能撤、要不要我确认」；本版把**报告变成不可变账本**，并把「谁来读、按什么规矩动手」交给一次注入完成。方案经七角色评审与平台覆盖差集（`todo`／`deliverables`／`spill` 全部复用，净工作量下降），并由用户裁定：**不新建命令、不接审批闸**，走提示词路线。
+> **账本（G1）**：报告 json 在既有 `{runId, verdict, recommendationCount, startedAt, endedAt, text}` 上增 `items[]`（＝校验后的 `MaintainPlanItem`）、`needsHumanCount`、`forcedHuman[]`、`notes[]`；md 每条加**稳定 `[n]` 前缀**（与 `items` 索引同序，`needs_human` 条目仍带 `HUMAN`），`text` 仍是权威正文（字段名与结构不变，但正文本身按设计多出每条一行的 `[n]` 前缀）。两条自洽由夹具钉住：`items.length == recommendationCount`、`needsHumanCount == items.filter(needs_human).length`。
+> **命令面（G2）**：新增 `maintain handoff [<id>]`——只注入**指针＋汇报协议**（报告绝对路径＋`verdict`／条目数／需确认数＋`REPORT-ONLY`／「逐条一行汇报」／「只做批准的条目」／「必须走 `skill_manage`，out-of-band 写不留版本不留审计」），正文仍由模型按需 `read`（注入实测 **1148 字符**≈290 token：指针＋协议；8 KB 正文不常驻上下文——协议块是这条注入的主要成本，改它＝改模型行为）。`maintain report`／`cancel` 可**省略 id** ＝ 本 home **最新一条**，三态措辞互不混同（本 home 还没有 run／仍在跑／终态无报告／索引读不了——最后一种绝不答成「没有 run」）；`cancel` 省略 id 时**只有**「最新一条、本进程拥有、且在跑」才真取消，别面在飞的 run 只拒、不产生任何终态。配置项 `maintainHandoffOnSettle`（默认 **false**；登记 group `deployment`／tier E2／authority cordis）在扫描**成功结算且报告可读**后自动交接：用**起 run 时捕获**的 agent 引用调用一次唤醒原语，失败只 warn、不改 run 终态与报告——成本默认不开，无人值守不会自己动手。
+> **为什么不接硬闸**：提示词路线是**软闸**（「批准了什么」只在对话里，没有平台级批准留痕）。出现「无人值守批量改技能／多人协作要审批留痕／要求不可抵赖」时，再走既有 `evolution-approval` 通道立项；触发条件与代价写进 `packages/docs/known-limitations.md` 第 13 条。
+> **验收**：新增 `maintain-handoff.spec.ts` **3 块 13 格**（三空态／坏 id／索引不可读／指针与协议逐字／在跑与无报告**不注入**／省略 id 的 `report` 与 `cancel`／仅注入态／`E-305`／接收者原型方法）；受影响夹具 **17 文件 221 例全绿**；**家族套件 A/B：修后失败集 ≡ 基线**（两侧同为 25 文件红，零新增、零修复）；合并门禁组（13 守卫＋2 平台守卫＋3 规格）中仅平台两条红（`verify-declared-config` 3 条 upstream-drift、`verify-platform-contract` 87 条 host-surface difference），二者在基线同样红；`packages/README.md` 命令钉表 25→26 行、`PARAMETERS.md` 101 条、参数通道 exit 0。**只读验收四格 22/22**（`handoff` 后不回复 ⇒ 技能树逐字节不变、注入不夹带正文；回复批准子集 ⇒ 仅该子集 `names` 命中文件变化且账本 `beforeVersion→afterVersion` 连续、`beforeHash` ＝改前哈希；out-of-band 写不落账本而检查器以 `live-file` 指认被旁路的那一个技能；平台座位在役）。
+> **切 tag 前的独立只读复核**（P0=0／P1=1／P2=12）：**P1**＝索引不可读时 id-less 的 `report`／`cancel`／`handoff` 会改用陈旧内存视图作答（`status` 不是这口径）⇒ 已修（三条分支统一先判索引，并补一条**判别性**夹具：撤掉修复即红）；便宜的 P2 一并修（E-305 文案说成 learn request、自动交接在无投递通道时**静默**、id-less `cancel` 在「别面在跑」分支的补白指错方向、未知参数语法提示漏 `handoff`、101 条参数里唯一中文摘要、commands README 自相矛盾且软闸限制只写在未发布的 `packages/docs/`）；其余 P2（非 `succeeded` 也注入、指针不复查 `.md`、三处解析骨架重复）与三条批外既有观察记进 `evolution-commands/README.md` 的 Known limitations。
+> **不做**：不做 `maintain apply`、不注入报告正文、不做扫描进度帧／心跳、不按「会话」取最新（记录无会话字段）。
+
+## 0.19.3 (patch) — run registry 结构收口：**一行一个写者**（owned／foreign 两 Map ＋ 单调不变量）
+
+> **由来**：0.19.0 → 0.19.1 → 0.19.2 修的是**同一个病根的投影**——`records` 一个数组里混了两种权威（本进程起的行＝内存权威；索引读来的行＝文件权威），而读写两侧对两者用同一条「内存胜过磁盘」。0.19.0 的 stale-running（读侧漏刷新）、0.19.1→0.19.2 的写侧复活，都是它。本版按复核方设计把两种权威拆开，删掉为绕病根而加的特例。
+> **一条不变量（写进模块头）**：**每一行只有一个写者——起它的那个进程**。`owned`（内存是唯一事实）／`foreign`（文件是唯一事实：每次 `load()` **整体重建**，存活行**原地更新**以保持对象身份）；非拥有者唯一允许的写是「行主已死」的孤儿判决，且必须在同一事务里按**刚读到的行**复核（事务里读到的行就是 CAS）。
+> **单调不变量**：到达终态的行**永不再读作 running**——只有拥有者能把它变 running，而 `settle()` 是终态一次性 ⇒ 对已结算行的 running 声明只可能来自**陈旧写者**（旧版本持旧视图）：读侧**拒收**（note 报出），写侧**修复**索引（否则新挂载的面会被那条陈旧行骗住，症状与 0.19.0 同形）。
+> **删掉的特例**：`knownIndex` 定位与身份替换、`!TERMINAL.has(known.state)` 单调守卫、known 分支里的二次孤儿收敛、`trim()`（保留量改为对合并视图的 cap，running 永不丢）。`controllers` 只表「还能不能取消」，**不再被当作所有权**（`settle()` 会删它）。公开接口不变（`cancel()` 仍同步）。
+> **验收**：`run-registry.spec.ts` **15 例**（+1：陈旧写者把已结算行写回 running ⇒ 仍读作终态、守卫不被占、**索引被修复**）；受影响三文件 **143 例全绿**（registry 15 ＋ commands 53 ＋ curator 75）；**复核方独立 5 格 A/B 全绿**（A 主缺陷／H1 不复活／H2 单调／H3 拥有为准／H4 write-through）——H2 正是本版重构后一度回归、由「单调不变量 ＋ 写侧修复」补回的那一格；家族套件 A/B：修后失败集 ⊆ 基线、零新增红；守卫 37 规则 0 违规，参数通道 exit 0。
+
+## 0.19.2 (patch) — 跨面 run 状态的**写侧**规则：已结算的别面 run 不再被本面写回 running
+
+> **由来**：0.19.1 修的是**读**侧（已知 id 按索引刷新）；同一条缺陷还有**写**侧的另一半，被独立复核的 A/B 实测抓出（它拿 0.19.1 源码对**已发布的 0.19.0 安装字节**做同 home 对照，五格：主缺陷／单调／自拥有为准／write-through 全过，H1 红）。本版补写侧，并把复核点名的两处债一并收掉。
+> **H1（写侧没有所有权规则）**：`persist()` 的合并是「内存里每一条都覆盖磁盘」，而采纳只发生在**读**时；`begin()`／`settle()`／`cancel()` 都**不**先读 ⇒ 触发路径：观察面采纳别面在飞的 run（此刻它没有 `endedAt`／`resultRef`）→ 别面结算（磁盘 `succeeded` ＋ `resultRef`）→ 观察面因自己的 run `begin()`＋`settle()` 落一次盘 ⇒ **已结算的行被写回 `running`**：终态与 `resultRef` 从索引里消失，而那条幽灵 run 的 `pid` 还活着 ⇒ 别的面把它当**在飞**，守卫被占。修法：`persist()` 合并时对**本进程不拥有**的行加一条规则——磁盘已终态而内存还在 `running` ⇒ **不写**（所有权判据就是 `controllers`：`begin()` 登记、`settle()` 释放）。
+> **两处债（复核点名）**：① 孤儿判定原在**两处**各写一遍（同一文案、同一构造）⇒ 抽成 `orphanOf(record)` ＋ `ORPHAN_FAILURE` 常量（家族口径「近义重复按缺陷处理」）；② 采纳原本 `records[i] = record` **换对象身份** ⇒ 改**原地** `Object.assign`（并清掉已结算行不再携带的 `endedAt`／`resultRef`／`failure`），跨 `load()` 持有引用的读者看到的是同一个对象。
+> **文档**：`packages/docs/known-limitations.md` 第 13 条补两条边界——**必须同机**（`isProcessAlive(pid)` 只在同机成立；跨机共享同一 home 会把活主判成 orphan，而单调规则让这个错判**不可自愈**）与**单调保证**（终态永不退回 `running`，也不再被别面的写回覆盖）；`evolution-commands/README.md` 同段补写侧保证。
+> **验收**：`run-registry.spec.ts` **14 例**（+1：别面 run 已结算而本进程不读就写，索引里仍是 `succeeded` 且 `resultRef` 保留；既有 P1-2 例加一条「持有的引用随采纳一起 heal」）；受影响三文件 **142 例全绿**（registry 14 ＋ commands 53 ＋ curator 75）。
+
+## 0.19.1 (patch) — 跨面 run 状态修正：观察面不再永久谎报 running；起 run 先落盘再答「started」
+
+> **由来**：0.19.0 的复核 P1 修复（活的别面 run 读作**在飞**）在真机上带出一条**新的 P1**；本版修它，并把复核报的 P2（起 run 的行与那句「started」之间的窗口）一并收掉——一次补丁不连发。
+> **P1（review P1-2，永久谎报 ＋ 卡死）**：`RunRegistry.load()` 的幂等合并对**已知 id 直接跳过**、从不按磁盘刷新 ⇒「先挂载、后看到别面在飞 run」的进程，在别面结算后**永远**把那条记成 `running`：`status <id>` 一直答 `running`（时长一直涨）、列表一直挂在 `In flight:`，且**裸 `maintain` 被自己的在飞守卫拒绝**（`Maintenance run <id> is already running (started ~Ns ago)`）⇒ 该面**重启前无法再起维护扫描**；`persist()` 的「内存胜磁盘」合并还有把已结算记录**复活成 running** 的风险。真机复现（安装字节 ＋ 真实 `~/.dsh/evolution`，独立脚本三次一致）：在飞时 `running 1s` → owner 结算 `cancelled` → 观察面 `status` 仍 `running 25s`、裸 `maintain` 被拒。
+> **修法**：`load()` 里对**本进程不拥有**的已知记录，走与新增记录**相同**的两条收敛规则——索引里是终态 ⇒ **采纳**磁盘（`state`／`endedAt`／`resultRef`／`failure`，notes 报出 `N run(s) settled by their owner were re-read from the index`）；主人已死（无 pid 或 pid 不活）⇒ 收敛为 `failed(orphan)`。**本进程拥有的 run 仍以内存为准**（终态一次性不变）。**不引入定时器**：一致性发生在**读时**。
+> **P2（review P2，窗口）**：`begin()` 原是 `void persist()`（fire-and-forget）⇒ 另一面在 ack 后 ~44–142 ms 内读共享索引会得到假否定 `No run <id> in this home`。`begin()` 改为 **async 且在 resolve 前 `await persist()`**：ack 从 ~5 ms 变 ~10–30 ms（仍秒回）；`persist()` 内部吞异常 ⇒ 家不可写也不会扣住句柄。
+> **验收**：`evolution-core/tests/run-registry.spec.ts` **13 例**（+3：已知别面 run 在 owner 结算后被重读、且本进程后续写入不复活它；`begin()` resolve 时行已在索引里；已知 run 的主死后随读收敛）；`begin` 变 async 的调用点（commands 1 处 ＋ 夹具）同步更新；本机受影响三文件 **141 例全绿**（registry 13 ＋ commands 53 ＋ curator 75）；家族套件 **A/B**：修后失败集 **⊆** 基线失败集（基线 26 文件红／修后 25，差集只有基线独有一次 curator 并行负载抖动），**零新增红**。
+> **依据**：`packages/docs/known-limitations.md` 第 13 条（跨面最终一致）与 `evolution-commands/README.md` 的 Known limitations（发布面）。
+
+## 0.19.0 (minor) — 长跑生命周期归位：run registry、唯一结果家、maintain 异步化（长跑生命周期方案 · 批次 B）
+
+> **由来**：0.18.1 证明「墙在交互面」；本版把长跑的寿命从请求挪到插件，并给它一个终态与一个结果家。**唯一的行为契约变更**：`/evolution maintain` 由同步改异步。
+> **S2（core `RunRegistry` ＝唯一所有者）**：`{id,kind,state:running|succeeded|failed|cancelled,startedAt,endedAt,resultRef,failure}`；**不引入任何定时器**——上一进程留下的 `running` 在**读时**收敛为 `failed(orphan)`；**终态一次性**（`settle` 不覆盖已终态，取消与失败的竞态不会翻盘）；`cancel` 只对本进程拥有的 run 生效（别面正在跑的 run 不会被本进程标成 cancelled）；索引写是**事务式合并**（桌面与 web 共用 `DSH_HOME` ⇒ 两面互相看得见各自的 run，而不是互相覆盖）。`evolution-commands` 的三处模块级全局（`lastMaintainAt`／`lastMaintainRunId`／`maintainInFlightSince`）**删除**，并发守卫只剩注册表一套。
+> **S2（命令面与唯一结果家）**：`/evolution maintain` 起 run 后**立刻**回指针；新增 `maintain status [<id>]`／`report <id>`／`cancel <id>`；结果写一次到 `<evolutionHome>/reports/maintain-<runId>.{json,md}`（保留窗口由 core 的共享 sweep 管，与 curator 报告**共用同一把** `reports/.retention` 锁）；`report` 对「没有结果」与「读不了」分别明说，不渲染空计划。`--facts` 0-token 预览保持同步。
+> **S4（长跑清单与文档面）**：core `long-runs.ts` 是**唯一**的长跑事实点（id／kind／所有者／寿命／实测／预算／结果家），渲染成 `packages/README.md` 的 "Long-running work" 并被 `tests/long-runs.spec.ts` **逐字钉住**（T-WD2 同款）；`known-limitations` 第 11/12 条与 commands／maintenance／core 三份 README 写明用户可见后果；`upstream-contract-checklist` 补第 21 条「交互面单条请求寿命」（不在平台树内 ⇒ 记行为 ＋ 判定法 ＋ 触发，不硬塞成源码锚点）。
+> **验收**：轴 A 四条判定法（人为 abort 后可区分／dispose 收敛／重启后孤儿收敛／报告缺失明说）由 `evolution-core/tests/run-registry.spec.ts`（8 例）与 commands 的异步面夹具（+2）覆盖；家族预检 8 文件 **169** 例全绿；架构守卫 37 条 0 违规（N20 15 个写点，两个新写点均已声明）；参数通道校验 exit 0；桌面面命令秒回（起 run 即答）。
+> **独立复核与修复**：发布前做了对抗式只读复核（复核方自建 16 项断言探针 ＋ 逐条证伪），抓到 **1 个 P1** 与 6 个 P2。**P1**：core 的读时收敛会把**另一面正在跑**的 run 改写成 `failed(orphan)` 并落盘（桌面与 web 共用一个 `DSH_HOME`），反向也看不见对方的在飞 run、命令面还会答「No run <id> in this home」这种假话。修法三件：① 记录带 owner `pid`，**只收敛没有活主**的记录（无 pid 视为已死；活主保留为**在飞** ⇒ 并发守卫与冷却**跨面**生效）；② `cancel`／`cancelAll` 只对**本进程拥有**的 run 生效；③ 命令面**每次作答前刷新索引**，挂载之后才出现的 run 下一条命令就能看见。**P2 修 5 条**：索引不可读不再渲染成「还没有 run」；报告写失败**告警**且照样跑保留窗口；**未知 state 的记录不再被下一次写抹掉**（`schemaVersion` 不一致会被报出）；replay 的读失败只归因于**读本身**的拒绝；reports 的重用例补上它需要的超时。**记 1 条**：探针声明预算但不消费 `exec.signal`（平台到点替换结果而工具继续读完树——只读且 `isConcurrencySafe`，无写入危害）。
+
+## 0.18.1 (patch) — 长跑预算与失败终态可区分（长跑生命周期方案 · 批次 A）
+
+> **由来**：`audit-v46-0.17.1/08` 的「长跑生命周期」方案先落**零行为变更**的一批：给唯一会长跑的家族工具补平台形状的预算、把「模型通道没跑完」从日志搬进持久报告、把这一类的审计口径补进规则。三条都不改任何正常路径的结果。
+> **S1（预算按平台形状给，语义是挂住守卫）**：`maintenance_probe` 拿预算——行配置 `probeTimeoutMs`（schema 双端界 ＋ N3 clamp）→ `ToolDefinition.timeoutMs`，形状照平台 `dsh-tool-web` 的 `fetchTimeoutMs`；默认 `DEFAULT_PROBE_TIMEOUT_MS = 120_000` **由实测定**（实测一次探针 188/220/225 ms @28 技能/418 KB、≈5.5 ms/技能且线性；最坏合成库 400 技能 1.9–2.5 s ⇒ 默认留 ~50× 余量，正常使用永不触发）。语义是**挂住守卫**：探针走可插拔的 `evolutionIo` provider，一个不答话的 provider 是它自己报不出来的状态，平台会把预算变成可诊断的 `tool call timed out after <ms>ms`（此前是请求被掐断、什么都没留下）。参数进注册表（`evolution-maintenance.probeTimeoutMs`，deployment/E2）与 `PARAMETERS.md`。
+> **S3（失败不再折成「什么都没发生」）**：curator 的 LLM 提名腿**超时**与**抛错**都写进运行报告的 `nominationsWarnings`（超时读 `AbortSignal` 而不是错误文案；此前 `return empty` 让「通道死了」与「模型看过了、无可提名」在落盘记录里**完全同形**）；replay 的 backfill **读抛异常**新增独立态 `sourceReadFailure` 并在报告里明说「读失败了，这不是没记录」，且**绝不**把读失败当成「字节坏」（终态一次性；任何被回答的读都会清掉它）。
+> **S5（审计口径三件，仓库外）**：严重度补 **P1-可用性**（同一命令在一个面跑得通、在另一个面被更短的墙掐断；判定法固定为跨 plane 对照，**不进常规验收**，改触发式）；读码镜头补一问「这段工作借用了谁的生命周期？」；两条落进 `codebase-defect-audit` 技能，下一轮审计直接继承。
+> **实测（本版新增的事实）**：同一维护命令在桌面面 4/4 于 **305.6/307.0/306.0/305.7 s** 被壳掐断，而在**无 Electron** 的 web 面 **949.7 s** 成功出计划 ⇒ 墙在交互面、不在平台；家族既有 600 s 预算在桌面面永远轮不到触发——这正是批次 B 要解的病。
+
+## 0.18.0 (minor) — v46 审计六组整改：门禁可信、单一事实点、未知态三态、生命周期归位、跨界口径与规模、平台对齐与命名
+
+> **由来**：`audit-v46-0.17.1` 对 0.17.1 做了四面只读审计（先例引用、平台契约、并发纪律、规模不变性），产出编号发现与六组整改计划；本版是按该计划**逐组落地**的结果——六组各以「夹具全绿 ＋ 判据逐条核销」收尾。外观与平台口径未变：本版不新增功能面，改的是「同一件事只有一处定义、说不清就说清、无人值守不卡死」。
+> **组 1（门禁可信）**：架构规则的 `RULES` 条目由 `{id,title}` 扩为**五字段**（＋`incident`／`canonicalForm`／`vacuity`／`sample`），缺字段即启动失败，11 条存量规则补齐「事故形态 ＋ 干净形态」样本；修四处**空转通过**——`verify-param-channel-parity` 第二段把结果 push 进死常量（真判之后第一次运行即报出真实违规）、`verify-declared-config` 的提前退出、`verify-family-tool-names` 的「扫到 0 个也 exit 0」（出现 0 即红）、`verify-skill-roots` 的 `declared=0` 空转（登记为到期项，组 3 关闭）；门禁清单改为**从 `CONTRIBUTING.md` 的声明与 `action.yml`／`release.yml` 双向对拍生成**（首次运行报出 4 处不一致）；`--strict` 语义统一为「红」；把审批状态机并发分支、正向夹具与审计面自检接成「每次合并前必跑」的一条命令。
+> **组 2（单一事实点）**：立起**事实表**——10 条事实／8 个 `machine.kind`（`platform-version` · `gate-set` · `event-mode` · `skill-name-home` · `service-key-prefix` · `bases-json` · `row-override-cap` · `doctor-forms`），每条都从源码／workflow 推导、都能咬合（改一处事实即红）；N15 的扫描面从 `.md` 扩到 `.ts`／`.mjs`／`.cjs` 注释与唯一 basename 的 bare 形态（`install-layered.mjs:479` 这类旧规则看不见的引用当场点名），新增 **N35** 把族外平台行号引用冻结成 **50 处／27 文件**的登记（新增即报、随改动燃尽）；单源收敛：pending 的 `kind`／`status` 原本有**四份**独立字面量（TS 联合、写入门 `Set`、zod union、routes 校验表）→ 一对 `as const` 数组派生；`userSetKeys`／`pickWithPolicy`／`clampOnce` 从 review／curator／memory-files／tool-skill-manage **四包合并进 core**（新增 N34 禁旧写法）；`referencesUnknown` 改为按 `item.names` 收窄（同一份证据不再得两个答案）；五处 `emitReviewScheduled` 样板与「最新报告」口径各收成一处；错误码文本重复、悬空 `/**`、无操作展开清零；`^3.18.1` → **`^3.18.4`**（`.volatile()` 的能力下限，并有守卫要求已发布 range 的下界 ≥ 已验证树的 vendored 版本）；文档写实批：root 环境变量表**删表改指针**、`.agent-presets` 目录机制改写成现行的 profile patch 行、清单计数不再写会过时的数字、`:line` 锚改符号、`--mode profile-root` 这个 `MODES` 从来不收的值从三处清除。
+> **组 3（未知态三态）**：状态域代数三处（`listPending` 去重先于过滤、legacy 退休 rename 失败后视图不再少列已落盘记录、`landedWrites` 改键序无关比较）；探针族 `probeText`／`probeList`／`probeMtime` 落到**唯一定义点**，表达式形态的吞读（`.catch(() => null)`）由 **N36** 登记成带到期批次的债务（块形态**清零**）；「unknown／未检查／未执行／失败」四类词在 doctor／CLI／卡片三面共 **9 个格、0 个空格**；组 1 唯一的到期项（`verify-skill-roots` 空转）在本组关闭 ⇒ 真空登记数组清空。
+> **组 4（生命周期归位）**：每个 `apply()` 一个 `AbortController`——dispose **先** abort，子代理腿用 `AbortSignal.any([timeout, fiber.signal])` 合并，写腿 `executePlan` 在**每个 op 边界**查一次（HMR／卸载后旧 fiber 的写不再继续落盘，已落盘部分照实返回）；快照补偿重试的 `setInterval` 补 `unref()`（此前 `dsh headless` 这类一次性进程会多活最多一分钟）；`memory.registerProvider` 对**同一个对象**再次注册改为幂等（与另两个同角色注册表对齐，同名不同对象仍抛）；模块级可变状态 **6 → 3**（搬走的三条归一个实例所有，留下的三条各自写明为何必须进程级）；新增 E3 参数 `pendingTtlMs`（**默认 0＝永不过期**），实现为**读时收敛**——超期记录经状态 seam 的恰好一次转移成 `rejected` 并写 `resolvedAt`，**runner 永不调用**（没被批准的写效果不可能落地），不引入定时器；locale 座位二次注册改为「守卫 ＋ 报出」（一次字典冲突不再让整个面板连同行与样式一起消失）。
+> **组 5（跨界口径与规模不变性）**：**一次保存＝一次写**——插件页原先逐字段发写、每个字段都带渲染期 revision，第一个字段落地后其余全被判冲突而**静默不落地**；现在交给座位**一个 op 列表**（整批一次 revision 栅栏）；`.evolution-param-source` 一个类名两种东西（行的来源 chip 与预览的 diff 块）拆名 `.evolution-param-diff`（此前 diff 被 chip 的样式压成横排一行）；家族尺度补 `.evolution-param-card`（插件页把同一张卡渲染在页面自己的 section 里，此前 `--evo-*` 全未定义）；迟到座位改用平台**自带的到位通道** `ctx.inject(deps, cb)` ＋ `sources.revive()`（卡片画过「没有这个座位」之后会自己变好，不引入定时器）；计数版 io 断言把两次全树读收敛为一次（4 个技能的列表与创建各 **8 → 4** 次 `SKILL.md` 读）；图与库的成员集**差集为 0**（手工目录可见、只在侧车里存在的幽灵名不可见）；`payloadText`／`foldUntrustedLines`／技能树列名各有唯一定义点。
+> **组 6（平台对齐与命名）**：家族不再读平台弃用的同步日志访问器——回退路径换成家族自有、由调用方提供的 `EvolutionSessionLogView.readEvents?()`，并新增规则 **N37**（只扫生产：测试里约 30 处 stub 是有意拼出来的平台形状）与一处按文件登记的探测例外；平台契约探针从 **24 → 35 个锚点**（`CONTEXT_ORDERS`、技能根四键、`agent-inbox-surface`、`subagent-start-request`／`-result`／`-run`、`approval-policy-values`、`profile-context-surface`）；自有 6 个进程事件补 `@mode emit` 声明，新增 **N33** 要求「声明存在 ＋ 与事实表一致 ＋ 生产里有派发点」（名单读事实 home，不重述）；服务键前缀写成 **N31**、服务属性读必须声明写成 **N32**（今日 **37 条规则** clean）；`ClientParamSection` 的 `namespace` 一名字两义拆出 `seatKey`（今天同值＝行 id，行为不变，宿主从此可分别键值）；命令定义删掉平台并不存在的 `run` 成员、`evolution-threat` 的 `tools` 依赖两份声明择一留座位；技能根集合与平台一致（家族 `skillsRoot()` **就是**平台的用户根 `<dshHome>/skills`，同树契约本身成立；平台按 cwd 派生的**项目级根**登记为未立项、只留判定法）；判断层按 `决策 4` 的「不开放」分支写成一段写实（实测：policy provider 注册 0、`ctx.bail/waterfall/parallel/serial` 各 0 ⇒ 今天没有第三方插件能站进「记住什么／什么算威胁／复查被问什么」这条路径，并写明若裁定开放必须一并交付的两件事）。
+> **护栏与门禁**：架构规则 31 → **37 条**（新增 **N32–N37** 六条；`N31` 是事实表里 `service-key-prefix` 那条机器检查的名字，不占规则号，由 `verify-doc-facts` 判），全部带自检样本（无样本即启动失败，不再有「匹配不到东西也算通过」）；门禁清单与实际执行集合差集 **0**（表 23 行／家族脚本 15 个）；平台契约探针 35 个锚点；覆盖率自检 92/92、两个一致性自检全绿。
+> **验证**：构建线家族全量套件 **200 文件／1943 用例全绿**（`--maxWorkers=4`；默认并发下 `anchored-smoke` 两条是已知写锁竞争假红，孤跑 7/7 绿）；宿主面 `tsc -b tsconfig.host.json` 与客户端面 `tsc -b` 均 **0 错**；`verify-arch-guards` **37 条规则 0 违规**；带到期批次的债务登记如实打印（**N35 50 处／27 文件**，横跨 `.ts` 与脚本两半；N36 的表达式吞读已由组 5 清零，故不再打印债务行）。
+> **待裁登记（按临时口径先写实，未擅自改行为）**：`决策 1`（技能名口径＝目录名 vs frontmatter `name`，仍标 open）· `决策 2`（对应夹具不动）· `决策 3`（围栏以 socket 回环为权威 ⇒ LAN 部署下家族的 **10 条 loopback 路由（4 审批 ＋ 6 技能历史）**整体 403 而平台 `/api` 正常，写实进 `known-limitations` §8）· `决策 4`（判断层不开放）· `决策 5`（TTL 默认值在参数注册表与生成的 `PARAMETERS.md` 同源，**卡片面未达标**：该行的两个键是部署权威键，用户层暴露面待裁）· `决策 10`（两枚零消费广播保留 ⇒ `@mode` 目标恒为 6）。
+> **平台口径未变**：`PLATFORM_FLOOR=0.2.0-rc.1`、`PLATFORM_VERSION=0.2.0-rc.2`。
+
+## 0.17.1 (patch) — 设置参数卡整片消失、侧栏行错位：两处「跨半契约的隐式假设」
+
+> **由来**：0.17.0 在桌面真机（0.2.0-rc.2 Electron ＋ CDP 直读 DOM）暴露两个界面缺陷：① 设置 →「自进化」的 6 个 group 里 5 个只剩 `<div data-slot-error="evolution.namespace.card">` 空占位，console 同一处报 5 次 `Minified React error #185`；② 左侧「全局面板」三行几何不一致——平台的 插件／自动化任务 两行字形盒 16px、标题左边缘 46px，家族「技能历史」26px／56px。
+> **根因①（快照引用）**：`evolution-settings-ui/src/client/source.ts` 的 `getSnapshot: () => sectionSnapshotOf(form.getSnapshot())` **每次调用都新建对象**。渲染器把 inject face 的 `hooks` 隔间里的裸 observable 绑成 `use<Name>`（`useSyncExternalStoreWithSelector`），而该钩子要求「事实变化前快照保持同一引用」（平台 `packages/client/AGENTS.md` 的 Reactive 纪律；平台自己的 `ConfigFormController.getSnapshot()` 文档写明同一口径）。引用每次都变 ⇒ 无限重渲染 ⇒ React #185 ⇒ 被平台的 `SlotErrorBoundary` 吞成错误占位，页面上只表现为「卡片消失」。同页的「待批写入」卡无恙，因为它的 inject face **没有 hooks 隔间**，不走 uSES。
+> **根因②（像素盒）**：`evolution-skill-history/src/client/index.ts` 用 `GLYPH_BOX = 26`，注释里把「任务看板／SSH／技能中心」三个**注入裸 DOM** 的邻居行的 24px 图标盒当成了契约；而平台通过 `renderSlot('sidebar.panellist', { size: wide ? 16 : 18, active }, { only: id })` 把尺寸交给占用者，平台自己的两行按 16 画。该文件**不在** 0.16.1→0.17.0 的适配清单里（适配的 30 个 src 文件里没有它），迁移时没人复核它的几何。
+> **抽象成一类**：**跨半契约的隐式假设**——家族对平台只做一跳式读取，并把自己一侧的实现细节（快照引用、像素盒）当成稳定契约；平台侧演进后不报错、不写日志，只表现为「整片消失／错位」。
+> **修法①（惰性座位＋按引用缓存的投影）**：`source.ts` 重写——座位改为**每次读时再探**的可调用探针（`SeatProbe`，apply 期不再捕获 `ctx.get('configForms')` 的结果，因为家族分区可能先于提供座位的设置外壳激活）；投影**按原始快照引用缓存**（同一原始引用返回同一对象，引用变了才重建）；投影失败返回冻结的 `PROJECTION_FAILED`（`getSnapshot` 抛异常发生在渲染器的渲染期，家族 catch 不到，只能给值）；`createSourceCache(probe)` 保证一个命名空间恒为**同一个 source 对象**（渲染器按 source 对象缓存 hook 绑定，每次渲染新建 source 会重绑并重挂载卡片）。卡片对不可用态因此有三条因：`seat-missing`／`projection-failed`／`not-served`，各有自己的白话文案。
+> **修法②（几何归座位）**：`PanelIcon` 直接用座位给的 `size` 画，删掉 `GLYPH_BOX` 与随之而来的 viewBox 缩放；字形盒、内缩与到标签的间距都归平台的行所有。
+> **护栏（接进既有门禁步骤，门禁步数不变）**：`verify-arch-guards.mjs` 新增 **N29**（客户端入口不得把平台服务读进 apply 层的绑定，必须走可调用探针）与 **N30**（observable source 单一归属：`getSnapshot` 只允许定义在 `source.ts`，`hooks` 隔间只允许引用该模块造出的对象）；`verify-client-seats.mjs` 新增 **E 段**（座位传参几何：从平台树**生成**「向占用者传 size 的座位」清单，占用者画出的 `width`/`height` 必须来自 `size`），并给该守卫加了**启动自检**——探针不再咬合就 exit 1，不留「匹配不到东西也算通过」的空转。两条新规则都带自检样例与夹具（`guard-scripts.spec.ts`：真树通过 ＋ 故意违规必红且点名位置与修法）。
+> **验证**：家族测试 193 文件／1870 用例全绿；`tsc -b tsconfig.host.json` 0 错；oxlint 0 警告 0 错；`verify-arch-guards` 31 条规则 0 违规；`verify-client-seats`（含新 E 段）OK；门禁 **26／26** 全绿（前缀 `baseline-019`：tsc-host／oxlint／vitest 193 文件 1870 用例／build-lib 31 包／smoke-built-entries／12 枚守卫／release-rehearsal 打包 31 包／verify-platform-ranges 67 条 range 全 `^0.2.0-rc.1`）。
+> **真机（桌面面；只装桌面 profile，未动 npm／web 面）**：设置 →「自进化」错误占位 0 个、参数卡 6 张、console 干净；左侧「全局面板」三行标题左边缘同为 46px。
+> **平台口径未变**：`PLATFORM_FLOOR=0.2.0-rc.1`、`PLATFORM_VERSION=0.2.0-rc.2`。
+
+## 0.17.0 (stable) — 平台单线 0.2.x 的首个正式版
+
+> **来历**：`0.17.0-rc.1` 在 npm `next` 上跑完生产安装路径复验后抬为正式版——**包内容与 rc.1 逐字节相同**，本版差异只在版本号与 dist-tag（stable ⇒ `latest`）。
+> **生产安装路径复验（2026-10-09 实测，registry 上的包）**：① **桌面面**——隔离 `DSH_HOME` ＋真机 Electron 0.2.0-rc.2，`dsh plugin --profile desktop add @lmzhen/dsh-evolution-all@0.17.0-rc.1` → 30 个 `@lmzhen` 包同版本零混装、`dsh.profile.bundles` 落家族行、冷启动 boot 日志**零** `did not activate`／零 Error、侧栏家族行与插件页「配置 @lmzhen/dsh-memory-files」行页可用；② **web 面**——0.2.0-rc.2 CLI ＋隔离 home 同一条 `plugin add` → 冷启动零失败项、3098 端口起服务正常。判据说明：`all` 形态是「无 agent-preset 步骤」的默认装法（`all`／`host`／one-click preset 三选一互斥），模式选择器里不出现 Evolution 预设属设计口径，不是缺陷。
+> **发布链修复（同批）**：`publish` 的产物来源改为**本 run 的 `-released` 集**（此前下 `evolution-dist-baseline`，而产出该产物的作业已随 0.1.5 线退役 ⇒ 人工批准后必红在 `Artifact not found`）；新增 `verify-release-artifacts` 守卫（一个 workflow 里每个 `download-artifact` 名必须由同 workflow 的 `upload-artifact` 产出，含复合 action 模板实例化与跨 run 判别），接进 CI 复合 action 与本地门禁；补齐发布前审字节所需的 `tar` 模块并删掉该脚本里写死的本机路径。门禁 25 → **26 步**。
+> **平台口径未变**：`PLATFORM_FLOOR=0.2.0-rc.1`、`PLATFORM_VERSION=0.2.0-rc.2`。
+
+## 0.17.0-rc.1 (minor, prerelease) — 平台线跳到 0.2.0-rc.2：参数面、客户端座位、命名空间、诊断面、发布口径全量对齐
+
+> **由来**：0.2.x 一次改掉了四件家族赖以工作的机制——参数面（`z` 配置改成 `.volatile()` 活引用）、客户端设置座位（客户端插件从平台自带的表单读，行配置页按 `<bundle>#<rowId>` 挂）、设置命名空间（行 id 就是命名空间，旧的 `evolution-*` 字符串不再指向任何东西）、agent preset（目录式取消，改成 profile patch 里的一条 `dsh-agent-preset` 声明）。不做完这四件，家族在新线上是「装得上、点不动、配不了、迁不走」。
+> **G1 参数面归位**：E3 参数一律 `.volatile()`；`params.ts` 新增 `paramSettingsId(owner)`（行 id → 设置命名空间），`PARAM_NAMESPACES` 降级为**只读的迁移源**——旧字符串的唯一用途是把老配置搬到新行上。
+> **G2 客户端半侧**：插件页的**行配置页**座位（`plugins.row.config`，键 `<bundle>#<rowId>`）与设置里的**自进化分区**并存，两者共用同一张参数卡；座位缺失时只读降级并写明原因，不画死控件。
+> **G3 命名空间迁移**：新增 `/evolution migrate` 与**启动一次性迁移**——平台的一次性导入只认它自己表里的 section，家族的旧 section 会原样留在被改名的文档里；现在它们按行 id 归一（含 6 条别名键），**存量值赢、等值零写入**（第二次跑不动 revision）、未知键拒绝并报因，doctor 多一段「旧文档里还有几项没迁」。
+> **G4 会话读法**：全家族不再 `snapshotEvents()`，改成 host-only 的投影单元（活动、证据、读名、回合信号）＋ review 自己的有界 dispatch 尾巴。
+> **G5 诊断面归位**：doctor 的安装形态／行与服务在场／参数面三段改读**平台自己的读面**（`pluginManager.listBundles/listPlugins`、`configEditor.configuration`、插件清单），跨 profile 聚合保留但明确标注「不是本运行时挂载面」；读面缺席给一行明确判词，不静默、不退回自扫。
+> **G6 安装与打包轴**：安装器／命令面／doctor 全部改成**声明式 preset 行**；行台账按新线重录；profile 种子与平台表逐键比对（模板、字段集、bundle 列表、默认模板、种子键集）。
+> **G7 发布与门禁**：**floor 与被测线拆成两个量**——发布出去的 `@deepseek-ai/dsh-*` range 声明 `^0.2.0-rc.1`（收得住整条线），门禁构建并验证 `0.2.0-rc.2`；唯一出口是 `prepare-release.mjs --platform-floor`，唯一把它们绑在一起的检查是门禁末两步（真跑一次打包再按 floor 判 67 条 range）。
+> **护栏**：门禁加到 **25 步**（新增 `release-rehearsal` ＋ `verify-platform-ranges`），CI 补上家族那 10 个此前只在本地跑的守卫与一个 `desktop-install`（`windows-latest`：临时 `DSH_HOME` 装一次、再用 profile 守卫判它产出的 profile），成为 `publish` 的 `needs`。
+> **验证**：家族测试全绿（190 文件／1829+ 用例）；门禁 **25/25**；`verify-platform-ranges: OK — 67 platform range(s) all ^0.2.0-rc.1`；`verify-declared-config --upstream` 54 可达 0 违规 0 漂移；`verify-platform-contract` 245 条平台引用 0 断。
+> **真机（桌面 0.2.0-rc.2 宿主 ＋ 隔离 `DSH_HOME`）**：安装 6 次复现；客户端半侧出现（侧栏「技能历史」、设置「自进化」、行页「配置 @deepseek-ai/dsh-memory-files」）；行页改键落盘（`memoryChars` 1234→1500）；`/evolution migrate` 在真实文档上写出、第二次零写入、存量值赢；doctor 三段与平台插件页逐项一致。
+> **文档**：README／README.zh／两处 INSTALL／三个 bundle patch 的平台锚点全部刷到 `0.2.0-rc.2` 与 `^0.2.0-rc.1`，并写清两个值的分工。
+
+## 0.16.1 (patch) — 待批写入卡真的出现了：keyed slot 只渲染被点名的键
+
+> **由来**：0.16.0 的真机验收第一步就没过——设置「自进化」里**根本没有那张卡**。用一个真 Chrome（同一台机器、同一个宿主）无头打开页面点开设置：DOM 里只有 5 张参数卡、零个 `/api/dsh-evolution/approval/*` 请求；而宿主**确实在服务** 0.16.0 的客户端半（把 `/plugins/??…` 那份拼接 bundle 拉下来，`approval-pending`／`evolution-param-facts`／四条路由字面量都在里面，15.2 MB，200）。所以不是装机、不是缓存，是代码。
+> **根因**：`SettingsSection` 只对 `CLIENT_PARAM_SECTIONS` 里的命名空间逐个 `renderSlot(CARD_SLOT, {}, { entryKey })`，而 keyed slot **只渲染被点名的键**；待批卡注册的键是 `approval-pending`，没有任何一处 `renderSlot` 点它的名 ⇒ 注册了、永远不渲染。0.16.0 的卡片 spec 拦不住：它直接把 `PendingCard` 组件配一个 face 渲染，看不见「section 有没有问这个键」。
+> **修法**：`PENDING_CARD_KEY` 挪进 `seam.ts`（注册处与 section 共用一个常量，避免 `index.ts ↔ SettingsSection` 成环），`SettingsSection` 显式点名它并**放在最前**（这里唯一等人决定的卡），副标题相应改为「待你决定的写入在最上面；下面按功能列出你能改的参数，没有列出的由安装时的配置决定。」
+> **护栏**：新增 `tests/section.client.spec.ts`——驱动真实的 `apply()`（假 shell 收集注册），要求 section 的 `renderSlot` 覆盖**每一个**注册进该 slot 的键。把 0.16.0 的写法放回去，它当场红：`AssertionError: expected [ 'evolution-curator', …(4) ] to include 'approval-pending'`。
+> **验证**：`evolution-settings-ui` 4 文件／21 用例全绿（含新 spec）；门禁 22/22（前缀 `p4`）。
+> **真机（真 Chrome ＋ 真宿主）**：卡以「待批写入｜2 项待批」出现在「自进化」**最上面**，两行各带 技能 chip／摘要／年龄（「12 分钟前」）与 批准・拒绝・预览；点预览得「1 行新增／1 行删除」＋ `-`/`+` 两块；点批准后**卡片自行重读**为「1 项待批」、该行消失，且写入真的落盘（`SKILL.md` 出现补丁文本）；再拒绝剩下那条 → 「没有待批的写入」；对已被别处结清的旧行点批准，卡片如实显示宿主原话 `Pending write "…" is not in the pending window (rotated or resolved).`。截图 `D:\dsh\_shots\accept-0*.png`。
+> **更正 0.16.0 验收点⑤的表述**：附带文件**不能**回退（属 §5 D2「明确不做」）——`POST /undo {v:<support 版本>}` 返回 200 但 `code=undo-refused`，宿主原话「undo restores the body only… copy the blob back over that file to restore them」。正确判据＝删除行可见（`support-remove`，带 `path`・`chars`，hash＝被删字节）＋ 字节留在历史库 ＋ 回退只对正文生效（正文回退实测可用）。
+> **影响面**：**只改客户端半** ⇒ 装机后**刷新页面**即可（不必重启宿主；实测直接替换盘上的 `lib/client.js` 后新开页面即生效）。
+
+## 0.16.0 (minor) — 待批写入看得见了：面板里能列、能批、能看预览（顺带清掉三条老欠账）
+
+> **由来**：台账 §3 的 B1（待批项可见性）与 B2（审批 diff 预览）是两条挂账——卡在「客户端半能否调宿主服务」这个前置上；0.14.0 的路由链（技能历史「回退」→ `curator.undo`）把它解开了，本批就做这一件。顺带清掉同批的 E2／E7／E8／E9。
+> **机制（一句话）**：待批窗口从「只能敲命令」变成「面板里一张卡」——宿主侧四条 loopback 路由**转发既有服务方法**（列／批／拒／预览），预览由**拥有回放的那个包**注册的只读伴生解析，卡片复用既有卡片外壳与既有差异面设计。
+> **G1 宿主面**：`evolution-approval/src/routes.ts`：`GET /pending`、`POST /approve`、`POST /reject`、`GET /preview`。前三条走的就是命令面那三个方法（两面不可能漂移）；业务拒绝仍是 HTTP 200 带服务原话，服务抛错也回成一条带原因的答案。**顺手把重复的 HTTP 管道收成一处**：loopback 围栏、限长 JSON body 读取、JSON 写回搬进 `evolution-core/src/http-routes.ts`（家族所有路由面共用），技能历史行为零变化。
+> **G2 卡片**：`evolution-settings-ui` 的「自进化」区块加一张**待批写入**卡，穿的是既有卡片外壳（标题／计数／折叠头、字段块、按钮行）与既有 button 词汇表；**读取／空／失败三态各有各的话**，决定之后**重新读一遍窗口**而不是本地删行。
+> **G3 预览**：`registerRunner(kind, runner, preview?)` 多一个**只读伴生**，由拥有回放语义的包提供（`tool-skill-manage` 给 `skill`）；字节用写路径同一套助手（`normalizeFrontmatter`／`fuzzyPatch`／落盘的 `trimEnd()+换行` 尾规），锚点判定调 core 的 `anchorVerdict`（本轮导出）；差异事实用 core 的 `textDiffFacts`——与技能历史差异路由**同一实现**。解析不出来就回 `{available:false, reason}`，卡片只负责把那句话显示出来。行内展开渲染 facts＋源码块（`-`/`+` 行、tone 色），**离开的行丢弃迟到答案**。
+> **G4 随批顺手项**：**E2（真缺口，已修）**——版本索引只从 after 侧铸条目，所以「删除支持文件」在字节已记过时**一条记录都不留**（`support-remove` 词条不可达）；现在删除会留下带被删字节的条目，历史里出现「删除附带文件」一行、回退它即把文件放回去。**E7** 技能历史面板的「读取中」不再冒充「没有数据」（读失败也落到空态＋错误句）。**E8** 结清归因从 info 改 warn（默认级别会吞 info，真机看不到那行）。**E9** `provider-consistency` 预算 180s→300s（单跑 45.9s，余量只有 ~4×；**断言语义未动**）。
+> **不动的（契约）**：`HISTORY_INDEX_VERSION` **不抬**（条目形状未变，`remove_file` 的分类在旧读者里也已存在）；命令面保持原样（路由只是它的第二个出口）；不新增 npm 依赖、不新增状态文件、不新增视觉语言；预览不写盘、不占位。
+> **影响面**：**宿主半＋客户端半都改了** ⇒ 装机后**先重启 dsh，再刷新页面**（反序会报错）。
+> **真机验收点（重启后）**：① 设置「自进化」里出现「待批写入」卡，没有待批时说的是「没有待批的写入」而不是一直转圈；② 造一条待批后卡里能看到它，点「预览」能看到改动行数与 `-`/`+` 两块；③ 批准后卡片**自己重新读一遍**（该行消失、计数减一），拒绝时显示宿主那句原话；④ 技能历史面板：打开时先显示「正在读取…」再出列表；⑤ 删一个支持文件后，该文件链末尾出现「删除附带文件」，回退它能把文件放回去。
+> **验证**：`tsc -b tsconfig.host.json` 0；`oxlint` 0/0；`evolution-core` 723／`tool-skill-manage` 76／`evolution-approval` 44／`evolution-settings-ui` 20／`evolution-review` 110 用例全绿；门禁 22/22（前缀 `g5b1`）。
+
+## 0.15.2 (patch) — 复查调度：一条未结的通知决定「投不投」和「什么时候清零」
+
+> **由来**：界面批次收尾后，台账 §8 剩下的调度半（两消息＋标记残留）单独立项。旧实现是三处互相打补丁：队列里可以同时排多条复查提示（同 kind 就地 `replace`，还要补一个跟随唤醒桩）、计数窗口在**投递**时就清零（没跑成的复查也算跑过）、投递后按「下一个结束的回合」推断抑制（忙期里会认错回合）。三者是同一个事实的影子——平台自己就有那条队列，而插件没读它。
+> **机制（一句话）**：一条复查通知只有两种去向——被队列丢掉就立刻清零；被某个回合取走，就等那个回合结束再清零，而且那一段不再投第二条。
+> **A 记录**：新增 `src/review-notice.ts`：`{ messageId, turn }` 的状态机（纯函数，可脱宿主单测）。三条平台活事件接在插件级 `ctx.on`（`agent/inbox/inserted`／`claimed`／`discarded`；平台先例 `jobs/tool-jobs/src/index.ts:224`），按 `agent.session.id` 分键写进第十个 per-session 集合 `pendingReviewNotices`。`inserted`／`claimed` 认领（last wins），`discarded` 只结清「正是记录里那条」的通知。
+> **B 时钟**：清零从「投递成功」挪到「通知离队」：`discarded` 立刻结清；`claimed` 记下回合号，由那个回合的 `turn/end` 结清，且**那个回合不计入窗口**（它跑的正是我们自己的提示词，V7-02 的自我连锁由此堵住）。没有 `inbox` 的宿主没有任何队列事件可等 ⇒ 退回「投递即结清」（`delivery-no-inbox`）。
+> **C 闸门＋删三处**：`deliverMessage` 只对**复查提示**设闸——本会话已有未结通知时返回 `false`（调用方保留它的一次性闩锁，下一个边界再试），结果通知（`💾 Self-improvement review …`）照发。有了闸门，队列里至多一条，旧机制于是整段删掉：0.3.81 的「同 kind 就地替换」与它补的跟随唤醒桩、`(wake)` 摘要约定，以及 `skipNextCadenceFire` ＋ 它依赖的 `lastTurnStart` 表（per-session 集合 10 → 8；抑制改由「取走它的那个回合」直接识别，S2-9 的忙期误判与 PLAN-R2 的 `turns: 2` 计数一并消失）。
+> **D 兜底与可观测**：记录在内存、队列在盘上，判断同时读两边——重启后队列里还排着我那条，就按队列重建记录（否则会再排一条）；记录说「还在排队」而队列里已经没有它（事件漏过一次）就按 `queue-lost` 结清；取走它的那个回合的 `turn/end` 若漏了，之后任一回合的结束同样结清它（回合号按会话递增，越过了就说明那次已经结束）——闸门不会因为丢一次事件永久关着。每次结清留一行归因：`discarded`／`turn-end`／`delivery-no-inbox`／`subagent-flush` 记 info，`queue-lost` 记 warn。
+> **不动的（契约）**：索引格式、写通道、命令面、依赖与包结构一律不动；不加参数、不加定时器、不做整卷 fold；结果通知通道不变。
+> **影响面**：**宿主半** ⇒ 装机后**需重启 dsh**，只刷新页面不够。
+> **验证**：`tsc -b tsconfig.host.json` 0；`oxlint packages/evolution` 0/0；`evolution-review` 110 测试全绿（新增 `outstanding-window.spec.ts` 8 例；删掉钉旧机制的 `inbox-replace-wake.spec.ts`／`cadence-suppression.spec.ts`，`lifecycle.spec.ts` 的 lastTurnStart 例随之退场）；门禁 **22/22 exit=0**（前缀 `rev3`：vitest-full 183 文件／1766 测试全绿）。
+
+## 0.15.1 (patch) — 发布后复验发现的三条未落地项（W3／W10／W15）＋ 阅读面的渲染型 spec
+
+> **由来**：0.15.0 发布后拿 §16.2 的逐条映射去**代码里找落地物**（不是回看叙述），发现三条计划里已映射、代码里却没做：W3 组边界留白、W10 数字不等宽、W15 差异头仍在组件里拼分隔符。同时发现 **G4 的提交信息不实**——它声称新增 `document.client.spec.ts`，而那个文件当时并未落盘（同批一次编辑报错中止了整个程序，写在它后面的调用没跑），**0.15.0 的阅读面因此没有渲染型 spec**。
+> **W3**：组标题由 `10px 0 2px` 改为 `var(--evo-space-16) 0 var(--evo-space-4)`——G2 只把旧值换成了 token，边界并没有比行距更大。
+> **W10**：`.evo-hist-cell` 加 `font-variant-numeric:tabular-nums`，版本数／时间／增删字符数按列比较时对齐。
+> **W15**：差异头的四个事实改成四个 `.evo-doc-fact` 元素，分隔符由样式表 `::before` 给——组件里不再拼 `' · '`。
+> **spec 补齐**：新增 `document.client.spec.ts`（7 项：W14/W15/W18/W19/W20/W21/W23），`chrome.client.spec.ts` 加 W3／W10 断言。教训写进 spec 头注释：**提交信息按树写，不按计划写**。
+> **不动的（契约）**：索引格式、写通道、命令面、依赖与包结构一律不动；本版只碰客户端半两个文件 ＋ 三个 spec。
+> **影响面**：**纯客户端半** ⇒ 装机后**刷新页面即可**，不必重启 dsh。
+> **验证**：`tsc -b tsconfig.host.json` 0；`oxlint packages/evolution` 0/0；包内 10 文件／48 测试绿；门禁 **22/22 exit=0**（前缀 `g6c`，vitest-full 182 文件／1751 测试）。真机复验与 0.15.0 的验收合并进行（同一台装机件）。
+
+## 0.15.0 (minor) — 技能历史与设置卡的界面重整：行由 cell 决定、两面分离、家族尺度层与四条新门禁
+
+> **由来**：设计档 `dsh-evolution-ui-ux-gap-list.md` §14 的 W1–W23（分四层：缺陷／平台标准／布局力学／审美）＋ 遗留 E1／A8 ⇒ §15 架构方案与 §16 分组计划 G0–G6。这是**一次结构重整**，拆成多版会让「两面各留一半」的中间态长期存在，所以一次做完（实施记录见该档 §18）。
+> **L0 事实层（core）**：新增 `skill-row-cells.ts`——一行＝**有序 cell 列表**（`{key,slot,tone}` ＋ `copy` 键与值／`literal`），`slot∈{lead,meta,aside}`；`aside`（版本数、时间）右对齐且永不被省略号吃掉。W1 的根因是**拼接顺序**：原来 `描述 · 状态 · 时间` 拼成一行，真实技能库里每行的尾部都被裁掉。新增 `document-body.ts` 的 `displayBodyOf`（只在家族自己的 frontmatter 读取器认这块时才剥，失败开放）。
+> **L1 宿主面**：**客户端半不能 import core**（`build-client.mjs` 把 `@deepseek-ai/*` 全 external）⇒ cell 由宿主算好**随行下发**，`routes.ts` 的类型与客户端 `api.ts` 的形状互为约束；`/versions/body` 的 `text` 改为 **`display`**（frontmatter 已剥；精确字节仍在差异路由里）。
+> **L2a 尺度层**：`packages/scripts/client-tokens.json`＝九组 29 个 token（字号阶／间距阶／半径／发丝线／行宽／行距／语气／焦点环／容器上限）；`gen-client-tokens.mjs` 生成两份**字节相同**的 `src/client/tokens.ts`；`verify-client-tokens.mjs` 进 21 步门禁（第 22 步，生成物＝源 ＋ 引用必须被声明——这条当场抓到一次变量名不一致）。值有据：`radius.control=8px` 取平台自家 `ui-primitives/Input.module.css`，`280/260` 沿用现值，删掉了无出处的 420。
+> **L2b 面分离**：客户端半拆成 `atoms.ts`（`button`／`chip`／`note`／`icon`）＋`chrome.ts`（工具面：列表与动作）＋`document.ts`（阅读面：一个版本作为文档）＋`Panel.ts`（只剩状态机）；样式表按 `.evo-hist-*` / `.evo-doc-*` 两块前缀分开互不覆盖。
+> **用户可见的变化**：① 技能行的版本数与最近改动时间不会再被长描述挤掉，描述给整段、由 CSS 省略号裁、悬浮出全文；② 动作区不再离正文 ≈700px（行 `max-width: measure × 1.5`）；③ 控件有了词汇表——会做事的（有边框）／展开更多的（无边框＋自绘 V 形）／二选一的（无边框文字），**只有会写盘的那一击**是主色；④ 状态胶囊改用中性层，不再借交互色；⑤ 错误通知有容器与警示字形，不再只靠颜色；⑥ 预览是**文档**：有行宽、无卡片外壳、无内滚动（读者只碰到主列那一条滚动条），frontmatter 不再抢标题位；截断时说清「显示前 N 个字符（共 M 个）」；⑦ 设置卡不再随「对话内容字号」这个平台自家界面都不读的设置缩放，字段焦点环与面板统一；⑧ 说明段不再常驻首屏（只在右侧无内容可读时出现）。
+> **不动的（契约）**：`HISTORY_INDEX_VERSION` **不抬**（索引格式没改）；写通道仍只有 `curator.undo`；命令面保持纯文本；**不新增 npm 依赖、不建新包**；平台原语仍不静态 import（Markdown 仍是运行时接缝）。
+> **L3 门禁**：`verify-arch-guards.mjs` 新增 **N25**（半径／发丝线必须来自尺度）、**N26**（交互色只出现在交互能到达的选择器上）、**N27**（几何不得是裸像素，判据在 CSS 字符串上）、**N28**（浏览器半不 import node、不写盘），各带探针（故意违规实测 exit=1）。
+> **影响面**：**宿主半与客户端半都改**（行多带 `cells`、body 路由改字段） ⇒ 装机后**需要重启 dsh**，只刷新页面不够。
+> **验证**：`tsc -b tsconfig.host.json` 0；`oxlint packages/evolution` 0/0（301 文件）；门禁 **22/22 exit=0**（前缀 `g5a`，vitest-full 182 文件／1751 测试）；`verify-client-tokens --strict` ok（9 组 29 属性 28 引用 2 份相同）；真机复验与截图见 `dsh-evolution-0.15.0-release-record.md`。
+
+## 0.14.1 (patch) — 热修：Markdown 渲染被自己的类型守卫挡掉了（预览与渲染差异退回源码）
+
+> **症状（真机实测，2026-09-28）**：面板的 `[预览]` 与差异视图的 `[渲染]` 都只显示**原始源码**（frontmatter 的 `---`、标题的 `#`、行内代码的反引号都原样可见），看不出任何 Markdown 渲染；宿主与客户端都是 0.14.0，两条只读路由都正常。
+> **机制**：0.14.0 为了让「模块在而没有导出」不再把错误推迟到渲染期，给接缝加了 `typeof MarkdownText === 'function'` 的守卫——**但平台自己的 `MarkdownText` 是 `memo(function MarkdownText …)`，`memo` 返回的是对象**，守卫于是把真正的渲染器判成「没有渲染器」，`renderMarkdown` 一直返回 `{ok:false}`，调用方按设计退回源码视图。守卫本身没错，错在**把「函数」当成了「组件」的全部**。
+> **修法**：新增并导出纯函数 `rendererOf(row)`（`tests/markdown.client.spec.ts` 钉住四种情形）——接受的域是 React 的 **element type 域**：函数，或非 null 对象；`{}\/`null`/`字符串` 仍判为「没有渲染器」。接缝只改这一处判断，行为其余不变。
+> **影响面**：客户端半单文件；宿主半零改动 ⇒ **装机后刷新页面即可**，不需要重启 dsh。
+
+## 0.14.0 (minor) — 技能历史：版本可预览、差异可渲染、support 版本记文件名；组件车道与 N24 门禁补齐
+
+> **由来**：设计档 `dsh-evolution-skill-history-entry-options.md` §18／§18.7／§18.8 与 §17.4 的重筛结论——用户口径是「记录 file_path 最小改动 + b′ 渲染 + 重筛里所有能做的 + 2b 最近改动时间」，一次做进同一版。
+> **G0 探针（先做）**：原计划是「parser 用库（micromark/mdast）+ 自绘 renderer（b′）」。实测**平台自己已经导出一个 Markdown 组件**：`@deepseek-ai/dsh-client-ui-primitives` 的 `MarkdownText`（chat 那套 mdast 管线），而该包**就在 `PLATFORM_MODULES` 基线模块表里**。静态 import 仍然死（tsconfig paths 把平台源码拉进本包 ⇒ TS6059/TS6307，再撞本包 `react.d.ts` 的 React 类型遮蔽 ⇒ TS2305；ambient `declare module` 输给 paths 映射），但**运行时 require 走得通**：`src/client/markdown.ts` 是唯一接缝，用 `declare function require` + 本地最小接口取 `MarkdownText`，构建器靠 `external: [/^@deepseek-ai\//]` 保持裸 require。⇒ **b′ 未启用**：零第三方依赖、零内联、零许可成本（产物 34,797 → 46,828 字节，仅我们自己的代码）。渲染器缺席时返回 `{ok:false}`，调用方退回源码视图——**永不白屏**。
+> **support 版本记文件名**：索引条目新增 `path?`（**相对**技能目录，如 `references/notes.md`）。写路径把写入时就已拿到的 `filePath` 一路带到索引（`write_file`／`remove_file`），**两处铸造点都带**（baseline 是同一文件的前一版字节，after 是本写入）；`readVersionEntry` 同步重构——**所有可选字段折进一个 `base`**，两个 return 只差链环，从此不会有字段被某一条分支丢掉。**旧条目没有 path 且不可回填**（blob 是内容寻址、不带文件名），面板如实显示「（路径未记录）」。
+> **面板新增两个视图**：① 每行 `[预览]`——把该版正文交给平台 `MarkdownText` 渲染（新只读路由 `GET /versions/body`，复用 `curator.skills.readVersion`，20k 字符上限 + `truncated`）；② 差异视图的 `[源码]／[渲染]` 就地切换，渲染态把 `-`／`+` **两块各自**渲染成 Markdown（块级、语义色左边框，不做行级交错）。状态**收敛**：`openDiff + diffs` → `expanded:{v,kind}` + 双缓存，变量数不增。
+> **技能行补「最近改动时间」**：宿主用 core 的新纯函数 `latestVersionAt()`（跨正文与 support 两条链取最新 `at`，因为索引是 append 序、两个写入者可交错）算好，连同 age 桶一起下发；面板放在**第 2 行尾部**（第 1 行的技能名不吃挤压，长名字仍有行 `title` 兜底）。**「最近改动」不是「最后使用」**：使用计数仍在 usage store，照旧不进面板。
+> **质量面（§17.4 重筛的「真缺口」）**：① **jsdom 组件车道**建立（首个组件 spec：结果句不掉／两击确认＋取消／迟到响应被票据丢弃／空态与错态，4/4；spec 用 `.ts` + `createElement`，不动未验证的 JSX 配置）；② 宿主 **dispose spec**（dispose 后 6 条路由全释放）；③ **客户端注册释放 spec**（图标行／keyed 面板／locale 命名空间／样式标签，dispose 后全清，且把 inject face 的成员列表钉住）；④ **路径字面量一致 spec**（客户端路由表 ↔ 宿主 `ROUTES`，含「客户端不得发明宿主没发布的路径」）；⑤ **N24 门禁**：`verify-arch-guards` 新增「客户端半禁字面字号／字体／颜色」（带探针），并**当场修掉设置卡遗留的 7 处字面字号**（`font-size:12px/13px` → 平台 token / `calc()`）。
+> **不动的（契约）**：写通道仍只有 `curator.undo`（support 回退**不做**，本版只记录路径）；命令面保持纯文本；`HISTORY_INDEX_VERSION` **不抬**（新增字段是兼容的可选字段）；平台原语仍不静态 import。
+> **验证**：`tsc -b` 0；`oxlint packages/evolution` 0/0（含一条函数级 `no-require-imports` 豁免，家族首例，理由在行内）；门禁 **21/21**（前缀 `v0137d`，含新增的 N24 与三组新 spec）。真机复验见发布记录。
+
+## 0.13.6 (patch) — 重发：npm 上 `dsh-skill-usage@0.13.5` 只有元数据、没有 tarball
+
+> **症状**：0.13.5 发布后本机安装报 `ERR_PNPM_FETCH_404 …/@lmzhen/dsh-skill-usage/-/dsh-skill-usage-0.13.5.tgz`；registry 的 packument 里 0.13.5 在（`latest` 也是它），但 **tarball 拉不到**（HEAD 持续 404 二十余分钟）。⇒ 装机出现 29×0.13.5 ＋ 1×0.13.4 的混装。
+> **为什么不能就地补**：`publish-scoped.mjs` 对「已在 registry 且 integrity 一致」的版本是 **skip**（不一致才抛 E409），所以重跑 publish 作业不会重传；而 0.13.5 的 `dist.integrity` 与本地 tarball 一致 ⇒ 判定为 registry 侧的 blob 缺失，不是我们发错内容。本机没有 npm 发布凭据（`npm whoami` 空），unpublish 也走不了。
+> **修法**：抬版本到 **0.13.6**（家族口径：已发布版本只能抬版本），整套 31 包重新发布。**代码与 0.13.5 完全相同**（只有版本号变），所以门禁沿用 `v0135a` 的 **21/21 exit=0**，不重复跑。
+> **验证**：npm **31/31 at 0.13.6**，且单独 HEAD 过 `@lmzhen/dsh-skill-usage` 的 0.13.6 tarball（200）；本机 `dsh plugin add` 后 30 包全 0.13.6、零混装。
+
+## 0.13.5 (patch) — 左列加宽 16px：把 V6 的 12px 内缩还给技能名
+
+> **症状**：0.13.3 的 V6 把左列列表的横向内距从 6px 改成 12px（让技能行与上面的搜索框共用同一条左缘），行宽因此少 12px；最长的技能名 `dsh-evolution-maintenance`（26 字符）正好卡在这 12px 上，真机显示成 `dsh-evolution-maint…`——而它在 0.13.2 是完整的。
+> **修法**：左列 `264px → 280px`（列表 24px 内距 ＋ 行 16px 内距 ＋ 名字与计数共 230px ⇒ 需 ≥270，取 280 留余量）。V6 的对齐不动，计数也不缩短。
+> **验证**：`tsc -b` 0；`oxlint packages/evolution` 0/0；vitest 全绿；门禁 **21/21**（前缀 `v0135a`）。真机复验见发布记录（`dsh-evolution-maintenance` 与 `windows-computer-use` 均完整显示）。
+> **教训（写进发布记录）**：客户端半的「观感」改动只有发布＋装机之后才看得见 ⇒ 外观批次的第一版发布后要立刻做真机复核，把 fallout 收进紧随的补丁；本轮 0.13.4／0.13.5 两发都是这一类收尾。
+
+## 0.13.4 (patch) — 修 0.13.3 的一处自伤：面板字号回到「chrome 减一档」，技能名不再被截断
+
+> **症状**：0.13.3 把面板根的 `font-size` 从 token 改成「继承 chrome 尺寸」后，正文由 13px 变 14px；左列固定 264px 已装不下 `dsh-evolution-maintenance` 与 `windows-computer-use`，真机上两行技能名分别显示成 `dsh-evolution-mai…`／`windows-computer-…`——面板里最要紧的标识被截断。
+> **口径不变，改相对量**：面板**不跟随会话内容字号**（该设置文案是「仅影响会话内容的字号」，平台自己的面也不读它），但也不必吃满 chrome 尺寸——根改 `font-size: calc(1em - 1px)`（chrome 减一档，本机 13px），标题与组标签继续在其上 `calc(1em + 2px)`／`calc(1em - 1px)`。
+> **顺带**：技能行加 `title`＝完整技能名，长名字仍可悬停读到全称。
+> **验证**：`tsc -b` 0；`oxlint packages/evolution` 0/0；vitest 全绿；门禁 **21/21**（日志前缀 `v0134a`）。真机复验见发布记录（两个技能名恢复完整显示）。
+
+## 0.13.3 (patch) — 审美审查第二批量：层级／时间／对齐／分隔线／空态／动作词／胶囊／字号口径，左栏行按用户口径对齐邻居三行
+
+> **由来**：`dsh-evolution-ui-ux-gap-list.md` §13 的 V4–V8、V10–V12，加用户拍板的 V13（原话：「对齐邻居三行，不要对齐工作区」）。四条真缺陷（V1 描述行溢出／V2 中文句间空格／V3 差异加号配色／V9 确认态无出口）已在 0.13.2 发布。
+> **V4 标题层级**：面板标题此前与正文同号（都继承根 13px，只靠字重区分）。现在标题 `calc(1em + 2px)`、组标题 `calc(1em - 1px)` 并转 `--dsw-alias-label-secondary`、正文继承 chrome 尺寸 ⇒ 16／14／13 三级。
+> **V5 时间写两遍**：行内 `2026-09-27 18:36 · 5 小时前` 改为只写相对时间，绝对时间进 `title`（悬停可读）——一行只留一个扫读信号。
+> **V6 两列首元素不对齐**：左列搜索区上内距 10→12px、列表横向内距 6→12px（技能行此前比搜索框左出 6px）、右列主区横向内距 14→12px ⇒ 两列首行共用同一条左缘。
+> **V7 分隔线**：版本行发丝线 `border-l3`（12% 黑）→ `border-l2`（10%，平台自身分隔线的主流取值），并去掉每组**第一行**的上边线——此前它读成组标题的下划线。
+> **V8 空态**：没选技能时右列补一句行动指引（新键 `empty.pick`：「从左栏选一个技能，看它记录过的版本。」；左列一个技能都没有时显示既有的 `empty.skills`），不再是一片留白。
+> **V10 动作词带括注**：`删除（存的是被删的正文）`／`归档（存的是被归档的正文）` 收成 `删除`／`归档`，那句解释改为动作词的悬停文本（`action.delete.note`／`action.archive.note`）——行不再被括注挤宽。
+> **V11 状态胶囊**：`当前` 从「.5px 描边 + 圆角」改成**实底胶囊**（`--dsw-alias-interactive-bg-active`）——它旁边就是两个真按钮，描边让它看起来也能点。
+> **V12 字号口径（改的是口径，不只是样式）**：面板根不再声明 `font-size`。此前挂 `--dsh-content-font-size-secondary`，而该设置那一行的文案是「**仅影响会话内容的字号**」；平台自己的面（如设置卡）一处 `font-size` 都不写、全继承 ⇒ 面板改为继承 chrome 尺寸，步进用 `calc(1em ± Npx)`。只有差异 `<pre>` 继续用平台代码块 token（`--dsw-font-markdown-code-block-small`）——它渲染的是内容，不是界面。
+> **V13 左栏行对齐邻居**：图标盒从「图标自身尺寸」改成 **26px 定尺盒**，图标仍按槽位给的 `size` 居中（宽态 16／rail 18，用 viewBox 换算）⇒ 图标墨迹与文字左缘分别落在 **13px／42px**，与上面三行（DOM 注入：10px 内边距 + 24px 图标盒 + 18px 图标）**完全重合**。代价是与下面平台自己的工作区行（8px／32px）差 5／10px——这是用户已知并选择的（A/B 二选一）。
+> **验证**：`tsc -b` 0；`oxlint packages/evolution` 0/0；vitest 全绿；门禁 **21/21**（日志前缀 `v0133a`）。真机复验见发布记录（页面刷新后核对：标题比正文大一档／组标题更小更淡／行内只有一个时间／两列首行同一条左缘／每行发丝线更浅且首行无线／空态出现指引句／删除与归档只剩短词且悬停有解释／`当前` 是实底胶囊／左栏图标与文字与上面三行齐平）。
+
+## 0.13.2 (patch) — 审美审查第一批量：左列描述行溢出、中文句间空格、差异加号配色、确认态没有取消出口
+
+> **由来**：用户要求「以优秀前端＋UI 设计师的眼睛查一遍插件相关界面还有哪些审美问题」。做法＝真机操作＋抓屏量像素＋回代码定根因，得出 13 条（`dsh-evolution-ui-ux-gap-list.md` §13）。本版只做其中四条「看得出错／点不下去」的（V1／V2／V3／V9）；层级与口径那九条留给下一批，左栏行首缩进（V13）等用户选 A/B 后再动。
+> **V1 左列技能行的描述行溢出，且没有省略号**：实测描述墨迹到 x=743，而该行底色胶囊右缘 737、分栏线 746 ⇒ 文字跨出底色、贴住分栏线被硬切。根因：`Panel.ts` 里描述是 `<span>`（**行内盒**），而 `styles.ts` 的 `overflow:hidden;text-overflow:ellipsis` 对非替换行内盒**不生效**（同一行的名字没事，因为它的父级是 flex，子项被块化）。修法：`.evo-hist-skill-desc{display:block;…}`。
+> **V2 中文提示里两个句子被一个空格连起来**（「…策展状态不变。␣内容相同的版本…」）：根因是面板用 `t('hint') + ' ' + t('hint.current')` 拼两段字典，那个空格是给英文的。修法：整句由单个 `hint` 键拥有（zh 不带空格、en 带句间空格），并删掉从此无人使用的 `hint.current`。
+> **V3 差异里 `+` 行用的是主文本色**：`-` 行红（`--dsw-alias-state-error-primary`，实测像素 232,32,27），而 `+` 行用 `--dsw-alias-brand-primary`——该 token 浅色主题下近黑、深色主题下近白，**不是绿**，于是加/减只剩红色在区分。修法：改用主题里既有的语义对 `--dsw-alias-state-success-primary`（green-500；平台自己用它标「完成」）。
+> **V9 两击确认没有出口**：点「回退到此版」→ 变「确认回退」，再点同一键即执行；字典里的 `undo.no:取消` 从未被渲染，想反悔只能去点**别的行**的回退（等于把待确认对象换掉）。修法：确认态在确认键左侧渲染「取消」（复用既有的 `undo.no`），点击即 `setPending(undefined)`，两击确认本身不变。
+> **验证**：`tsc -b` 0；`oxlint packages/evolution` 0/0；vitest 全绿；门禁 **21/21**（日志前缀 `v0132a`）。真机复验见发布记录（页面刷新后核对：描述行出现省略号且不越分栏线／提示句号后无空格／差异 `+` 行转绿／确认态出现「取消」且能退回未确认态）。
+
+## 0.13.1 (patch) — 修 0.13.0 的面板行图标：按槽位契约取 `size`，不再用 `100%` 撑满整列
+
+> **症状**：0.13.0 把左栏「技能历史」行的 emoji 换成内联 SVG 后，真机上那枚图标**撑满整个左栏**（截图：一个占满列宽的大时钟），而它上面三行（任务看板／SSH／技能中心）是正常 18px。
+> **根因**：我把 SVG 写成 `width/height: 100%`，而平台槽位并没有给图标一个定尺的盒子（`panelGlyph` 是 content-sized 的 flex 盒）⇒ `100%` 解析成列宽。**契约是反的**：平台自己的测试与实现都把尺寸**当 prop 传进来**——`SidebarRoot.tsx` `renderSlot('sidebar.panellist', { size: wide ? 16 : 18, active }, …)`，平台图标照 `size={size}` 出图（`ui-sidebar/tests/panel-list.client.spec.tsx:88-93`）。
+> **另外三行是怎么做的（先读再改）**：它们**不是** `panellist` 注册——装机包里搜不到这个槽名（命中只有本包）；第三方走 **DOM 注入**进平台侧栏，并用自有 CSS 定尺：`…entryIcon svg{width:18px;height:18px;display:block}`（`@linxin666/dsh-ssh/lib/client.js`，与 task-board／skill-explorer 共用 `shared/client/sidebar-entry-core.ts`）。两种实现都指向同一个结论：**行图标的尺寸由外部给（prop 或 CSS），组件自己不许用百分比撑**。
+> **修法**：`PanelIcon(props)` 取 `props.size`（正数才用），回退值取邻近行的 **18**；SVG 用像素 `width/height`。契约与两条实现的出处写在组件 docblock 里，避免下次再犯。
+> **验证**：`tsc -b` 0；`build-client.mjs` 产出 30.59 kB（bundle 30,052→32,052 字节，含新注释）；本包不变量测试与门禁同 0.13.0。真机复验见发布记录（页面刷新／重启后核对左栏图标为 18px）。
+
+## 0.13.0 (minor) — 对外界面按「事实只算一次、词只在各自字典、控件与排版走平台 token」重整：面板信息设计重写、确认卡说明用途、命令首行结论化
+
+> **由来**：用户两轮口径——① 「技能历史页面美观性很差…没有多少有助于决策的信息；创建技能的询问界面也一样」② 「检查全量对外功能里是否还有同类问题」——收敛成 `dsh-evolution-ui-ux-gap-list.md`（三轮共 22 条，P／A／C／T 四组）。本版按该档 §9 架构方案与 §10 分组计划实施 G1–G3。
+> **G0 探针结论（先做，且否决了原路线）**：方案原本要让面板直接用平台原语（`ui-primitives` 的 Button/Tag/StateDot/DisclosureRow/HoverCard/DiffBlock…）。实测**走不通**：该 specifier 在家族 tsconfig 里有 `paths` 映射，`tsc -b tsconfig.host.json` 会把平台客户端包的**源码**拉进本包工程 ⇒ `TS6059`（不在 rootDir 下）＋ `TS6307`（不在工程文件表内）＋ `TS2305`（家族的 `react.d.ts` 环境声明遮蔽真 react 类型，平台源码自己编不过）。走这条路要给本包**拆 host/client 两个编译面**＋加 `react` devDeps＋装依赖＋改 CI 图——不是一条 import 能解决的事。
+> **因此改走 §10 的备用路线（自绘 ＋ token）**：面板自带一张样式表（`src/client/styles.ts`，与家族设置卡同一姿势：字符串注入 `<style data-plugin-css=…>`），**度量从平台自己的 CSS 抄来并写明出处**（命令卡的 `<pre>`：`--dsw-font-markdown-code-block-small`／`.5px` 边框／`12px 16px` 内距／`max-height:260px`／radius `12px`；侧栏行的 hover 与焦点环：`--dsw-alias-interactive-bg-hover` ＋ 2px 内嵌 outline），字号一律走 token（`--dsh-content-font-size-secondary` 与其 `calc()` 派生），**不再有字面字号／字体／颜色**。对照物（用户举的标杆「技能中心」＝第三方 `dsh-client-ui-skill-explorer`）同样自绘＋token：这条路在本平台有先例。
+> **⚠ 本版未做（如实记，各有归属）**：③ 新门禁规则 **N24**（客户端半禁字面字号／字体／颜色）；④ **jsdom 组件车道**（需本包加 `react` devDep ＋ overlay 跑一次 `pnpm install`；写法已查明）；⑤ **G4 摘要档**（`skillVersionSummary` 参数 ＋ 写路径调用；core 侧提示词与 `summary` 字段**已就位**）；⑥ **P1-5**（设置卡显示被覆盖的部署默认值）——查证后确认**数据不在客户端手上**（`snapshot.user`／`snapshot.value` 是覆盖值与解析值），要先在设置缝里加字段，故列为后续项而不是硬造。
+
+### 改了什么（用户可见）
+
+| 表面 | 之后 |
+|---|---|
+| 左栏面板行图标 | **emoji 🕘 → 平台风格线图标**（内联 SVG：`currentColor`、1.5px 描边、随侧栏槽位的 16/18px）——emoji 不跟主题色、不吃尺寸约定、跨系统形状不同 |
+| 面板左列 | 两行式：名字 ＋「N 个版本」；第二行是**技能描述**（列表本来就带，此前被丢掉）＋ 管理状态；顶部**搜索框**（名字或描述过滤，纯客户端，无新路由） |
+| 面板版本行 | 从 `v1 <ISO> baseline 11836 chars <hash12>` 改成 `v2  定点修改  2026-09-27 18:20 · 3 小时前  （+1363 字符）`；「当前」是胶囊、动作是按钮；**「差异」就地展开**该版与前驱的差异（增删行数＋变更区域，超长标注截断） |
+| 错误态 | **先给可行动的解释**（「面板读不到宿主路由——通常是插件版本与宿主不匹配，重启 dsh web 后重试」）再附宿主原句 |
+| 时间与动作词 | 时间＝本地时间＋相对量（`elapsedSince` 在 core，返回 `{unit, n}`，**词在 locale 字典**）；动作词＝`versionActionKind` 的闭集键 → 字典（初始快照／新建／定点修改／整篇更新／回退／删除／归档／合并／结构调整／附带文件写入） |
+| 创建/删除确认卡 | 问句后**多两行事实**：`What it does: <frontmatter description>` 与 `Content versions recorded: N`。数据由工具**惰性**提供（不问就不读），措辞仍只在 `write-gates.ts` 一处 |
+| 命令面首行 | `/evolution`（裸）＝`/evolution subcommands (N):`；`/evolution params`＝`共 N 个参数：…；你改过的：M 项。`（平台命令卡把**第一行**当折叠摘要，此前两条的第一行分别是子命令列表与表头） |
+| 待批项 | `/evolution pending` 每行补**年龄与来源**：`· 5 minutes ago  from foreground (session 1a2b3c4d)` |
+| 暂存结果 | 被 stage 的写入在**文本里**带上句柄：`… (staged id: <id> — /evolution pending lists it)` |
+| 设置卡字号 | 标题／标签／输入／提示改走平台 token，跟随「字号大小」设置，不再写死 16/13/12px |
+
+### 不动的（契约）
+
+- **模型可见文本**：`skill_manage` 的 description 与工具 schema 不变；新增的只有工具结果文本里的一小段（暂存 id）与确认卡的问题正文（人看的）。
+- **写通道**：仍只有 `curator.undo`（面板）与库句柄（工具／命令）；面板照旧不写盘、不订阅、不轮询，新增的 diff 只是**多一条只读 loopback 路由**。
+- **唯一座位**：`sidebar.panellist` 一行 ＋ 同 id 的 `main` 面板体，没有新座位、没有新 store、不绑定会话。
+- **命令面形态**：纯文本（有意为之），本版只改首行与补字段，不做卡片。
+- **core 依旧无句子**：`versionActionKind`／`textDiffFacts`／`elapsedSince`／`normalizeVersionSummary`／`versionSummaryPrompt` 全部返回事实或固定提示词，用户可见字句只在 locale 字典与命令面英文里。
+
+### 新用例与证据
+
+- `evolution-core/tests/skill-history.spec.ts` ＋6：动作闭集 pin（源码扫描：库能写的 action 不许落到 `other`）、diff 边界（无变化／单处／超长截断）、**summary 两条读取分支**（无 `beforeHash` 的那条正是会丢字段的）、摘要归一与提示词 pin。
+- `evolution-skill-history/tests/routes.spec.ts`：skills 行的描述/状态、versions 行的 `actionKind`／`age`／`undoable`、**新 diff 路由**（正常／与 v1 比较／不在历史回 404／坏参数回 400）；`apply-order.spec.ts` 改断言五条路由。
+- `evolution-commands/tests/params-view.spec.ts` 与 `commands.spec.ts`：首行＝结论行、待批行的归属段（正则锚定，不再依赖固定换行）。
+
+## 0.12.0 (minor) — 技能写入的确认变成**可配模式**（含删除），默认**不弹窗直接写**
+
+> **由来（用户口径，2026-09-27 真机）**：0.9.0 那次「创建/删除前问一次」在真机上暴露两件事：① **无人应答时它会挂住**——工具调用停在问题上，本轮再也走不到下一步（实测挂满一次 600s 调用上限），后台/无人值守的 run 等于被卡死；② 人不在电脑边就干等。要求：**包括删除在内，所有弹窗都做成可配置的**，并把**默认设为不弹窗自动确认**。
+> **改法**：两个新的 E3 参数（`/evolution params` ＋ 设置卡「技能写入规则」，都是热生效）：
+> - `skillWriteConfirm`：`auto`（**本版默认**，不问直接写）／`ask`（一直等你回答，即 0.9.0 的行为）／`timeout`（问，但到点自己取消）。
+> - `skillWriteConfirmTimeoutSeconds`：`timeout` 模式等多少秒（默认 120）。
+> **新增错误码 `E-319`**：`timeout` 模式下没人回答 ⇒ 写入被取消，报文点名三个旋钮（设成 `auto`／保持 `ask`／调大超时）。答非确认项、或卡片被关掉，仍是 `E-317`，文案逐字不变。
+> **截止由 gate 自己兜**：`AbortSignal` 交给提问服务（客户端因此能撤卡），同时用 `Promise.race` 自己计时——**即使没有任何一方理会那个信号，调用也会返回**。这是「不挂住」的机制保证，不是约定。
+> **不动的部分**：问题的形状（id `evolution-skill-write`／选项 `Create`|`Delete` ＋ `Cancel`／只问前台 root／带 `absorbed_into` 的合并不问）、`E-317` 的语义与文案、以及「提问服务缺席即放行 ＋ 一次 warn」的 fail-open 姿态。
+> **新增用例**：`write-gates.spec.ts` 的模式块 5 条（默认 `auto` 不提问照写、`auto` 的裸删除不提问、`timeout` 未答 ⇒ `E-319` ＋ 信号已 abort ＋ 盘上无文件、`timeout` 及时回答照写、`ask` 被拒仍是 `E-317` 而非 `E-319`）；spec 的挂载默认改成 `ask`（旧用例都写在「必问」时代），**默认行为由 `{}` 显式驱动**，不靠 fixture 的默认值蒙对。
+> **文档与生成物**：`PARAMETERS.md`（98 行）与设置卡视图（34 字段）由生成器重出；错误码表范围改为 `E-301`–`E-319`（实测 **25 键／25 条／24 条互异文案**），根 README 中英两表各补 `E-319` 行、`E-317` 行补上模式前提；工具 README 新增模式表；写入准入设计档补 §12 修订（G4 口径随之更正）。
+
+## 0.11.3 (patch) — 修复：面板的回退结果句被随后的重读抹掉（真机点出来的；0.11.1 那句「结果句直接显示」没兑现）
+
+> **症状（在**已安装产物**上点出来的；CI 全绿测不出）**：面板里点「回退到此版」→ 内联确认 → **内容确实退回去了**（磁盘 `SKILL.md` 的 sha256 与目标版一致、索引多出一条 `update`、行列表也刷新了），但屏幕上**从头到尾没有出现 curator 的结果句**——0.11.1 的变更表里「结果句直接显示 curator 的原话，随后重读列表」这句在真机上不成立。
+> **根因（纯客户端半的状态顺序，宿主无涉）**：`restore()` 的成功回调写的是 `setNoteText(message); open(selected)`，而 `open()` 内部又有 `setNoteText(undefined)`（它要清掉上一个技能留下的句子）——同一批更新里后者胜，句子永远不显示。
+> **这条路径此前没有任何测试覆盖**：家族没有渲染型客户端测试车道（0 个 jsdom pragma／0 个组件 spec），`tsc`、bundle 构建与 api 层 spec 都看不见「两次 setState 的先后」。
+> **修法**：把「重读」与「清句子」拆成两件事——`showVersions(name)` 只重读（不碰句子），`open(name)` ＝ 清句子 ＋ 重读；回退成功走 `showVersions` 再 `setNoteText(message)`。
+> **同批修掉的两处同面缺陷**（同样只有真机会撞到）：① 「刷新」这个 copy 键**从来没人渲染**（字典里有、界面没有）⇒ 补一个刷新按钮，重读技能列表与当前打开的技能——此前要看别的写入者刚记的版本，只能重开面板（列表）或重新点一次该技能（版本行），而左列计数只在挂载时读一次；② 面板铺满 layout 的整个 `main` 区，2560px 屏上一行的「回退到此版」离它作用的版本文字约 **2000px** ⇒ 面板根加 `maxWidth: 960px`。
+> **判别性证据（修复前）**：0.11.2 上同一条路径的实测截图（`D:\dsh\audit-v42\shots\v0112-after-undo-crop.png`：v1／v2 两行变三行、v3 是 `update`、面板哈希与索引、磁盘 sha256 三方一致），唯独没有结果句；本版装好后按 `dsh-evolution-skill-history-entry-options.md` §16.4 的步骤再走一遍，结果落在同一处。
+> **npm／发布面**：无变化——包名与 OIDC 绑定照旧，本版只是抬版本重发。
+
+## 0.11.2 (patch) — 修复：宿主半在 web server 之后装配时路由不注册（面板能开、每次调用 404）
+
+> **症状（在**已安装产物**上实测；CI 全绿测不出）**：左栏「技能历史」行出现、面板正常渲染（标题／提示／空态都对），但每次读取都回 `读取失败：HTTP 404`。
+> **根因**：`src/index.ts` 的 apply 里 `const webServer = ctx.get('webServer')` ＋ `if (webServer === undefined) return`——profile 行按文件顺序装配，**这一行 apply 时 web server 还没提供**，于是"没有 web server 就惰性"的本意被一个**时序事实**误判成永久静默 inert：路由从未注册。
+> **修法**：改成 `ctx.inject(['webServer'], (scope) => scope.effect(() => …))`——服务到了再挂；永远没有 web server 的 profile 只是不执行回调（**惰性，且不产生 pending 行**，与原意一致）。
+> **回归与判别性验证**：新增 `tests/apply-order.spec.ts`（web server **后到**仍注册四条路由；没有 web server 也不抛）；把旧 apply 体放回 overlay 复跑 ⇒ **必须见红**（1 failed | 1 passed）；还原 ⇒ 见绿（2 passed）。
+> **npm／发布面**：无变化——包名与 OIDC 绑定照旧，本版只是抬版本重发（0.11.1 的包内容除这一处外完全相同）。
+
+## 0.11.1 (minor) — 技能历史的图形面：左栏「技能历史」面板 ＋ 四条 loopback 路由（版本分链，文件版本按名拒绝，G6 占用行决定不做）
+
+> **为什么重切（0.11.0 → 0.11.1）**：tag `v0.11.0` 已推、CI 的 `validate (baseline)` 红在
+> `File '…/packages/evolution/evolution-skill-history/src/routes.ts' is not listed within the file list of project '…/tsconfig.host.json'`
+> ——baseline 作业会把**镜像根目录的 `tsconfig.host.json`（项目图）覆盖进 upstream**，而新包没进那份图（本地 overlay 的同一份图我加了引用，镜像那份漏了）。
+> **npm 侧一个包都没发出去**（publish 作业被 skip），故按家族口径**抬版本重切**；tag `v0.11.0` 保留为历史，不删不挪。
+
+> **由来**：0.10.0 把内容版本与单技能撤销做成了两条斜杠命令（A/B 批），但"事后想起来去看"的用户没有可点的面。判定档 `dsh-evolution-skill-history-entry-options.md` §10–§13 逐项取优＋整体复核后定下三条：**只开一个新面**（⑥b 左栏面板行）、**复用唯一写通道**（`curator.undo`）、**先修事实层再上面板**。
+> **命令面不动**：`/evolution skill history|undo` 的解析与文案逐字不变——CLI／无 GUI 会话里它们是唯一入口，也是这个面的等价物。
+
+### 改了什么（用户可见）
+
+| 表面 | 之后 |
+|---|---|
+| 左栏新增一行 | 「技能历史」面板行（`sidebar.panellist`，id `skill-history`，order 35）＋ 同 id 的 layout `main` 面板体；禁用或删掉该行即整块消失，host 侧不留残余 |
+| 面板内容 | 左列列出**有版本记录的技能**；右列是该技能的两条链：**正文版本**（可回退；已是当前内容的那版标「当前」）与**文件版本（不可回退）** |
+| 回退 | 面板内一次「回退到此版」＝**内联确认**后走 `curator.undo`（与斜杠命令同一条写通道）；结果句直接显示 curator 的原话，随后重读列表 |
+| 命令面 | `/evolution skill history` 现在**分两组**列：正文版本 ＋ `Support-file versions (history only — undo restores SKILL.md, not these bytes)`（此前文件版本混在"内容版本"里） |
+| 拒绝面 | `skill undo --to <文件版本>` **在读取字节之前**就按名拒绝（`holds a SUPPORT FILE's bytes…`），不再由 frontmatter 校验以看不懂的理由挡回 |
+| 安装面 | `all` bundle 多一行 `@lmzhen/dsh-evolution-skill-history`（纯客户端面，与 `evolution-settings-ui` 同类；`host`／`preset` 表不含它），聚合包 `dsh-evolution-all` 随之多一个依赖 |
+
+### 不动的（契约）
+
+- **模型可见文本**：零改动——本版没有 prompt／tool schema／工具结果文案变化（面板是人的面）。
+- **写通道**：仍只有 `curator.undo` 一条；新包的 `src/` 里 `writeText|writeFile|node:fs` 命中数为 **0**（面板与路由不直接写盘）。
+- **斜杠命令**：两条命令的解析路径与既有文案逐字不变，只有 `skill history` 的分组渲染改了。
+- **版本视图只准有一个家**：本版**不**新增 ④ 命令富视图／⑤ 工具卡／⑥a 右栏标签／⑥d DOM 注入——家族内 `sidebar.panellist` 的注册只有这一处。
+- **平台槽契约**：`sidebar.panellist`（list／root）与 `main`（keyed／root）用**同一个 id**；面板**不绑定会话**（契约原文 "other keys receive no Session binding"），它取的是全局事实。
+- **G6（面板里的只读占用行）决定不做**（2026-09-27 用户口径）：占用一旦可见就得配套"清理/适配"那条新功能，因此占用继续只写在 `evolution-core/README.md`。
+
+### 事实层的一处修正（0.10.0 的已知缺口）
+
+> **症状**：索引把**附带文件版本**与**正文版本**混在同一编号空间——`skill history` 会把 `write_file` 行当"内容版本"列出；`undo --to` 会把文件字节当正文写（被 frontmatter 校验挡住，但理由说不清）；两条链还让 `orderVersions` 退回追加顺序。
+> **改法（不加字段）**：core 新增**一个派生谓词** `versionTarget(action)`（`content`／`support`／`other`，未知 action **fail-closed**）＋ `partitionVersions()`（两条链分开、各自按链重建顺序）；`curator.undo` 对 support 版本**按名拒绝**、默认目标跳过 support；命令面与面板消费同一分组。
+> **为什么不在条目里加字段**：那要动 7 处 `audit()` 调用点与 plan schema，且 `action` 与目标两个事实会漂移、旧条目还要默认值 ⇒ 双读路径长期存在（判断依据见判定档 §14 第 1 条）。
+
+### 新包与门禁
+
+- 新包 `@deepseek-ai/dsh-evolution-skill-history`：宿主半 4 条 loopback 路由（`/api/dsh-evolution/skill-history/{skills,versions,undo,health}`，平台同款信任栏：socket 权威＋Host loopback＋`sec-fetch-site`＋Origin 同源；`ctx.get('webServer')` 惰性，headless 装配不挂；curator **每请求解析**，缺失时答家族 E-302 原句）；浏览器半一行面板（`label` 用 thunk 跟语言；组件只拿 inject face 的纯回调，无 store、不建订阅；全部文案进 locale 字典）。
+- **type-only 导入也要声明**：`verify-dependency-closure` 把 `import type {}` 也算 value-import ⇒ `dsh-evolution-curator`／`dsh-host-webserver` 进 `peerDependencies`。
+- **面板渲染没有 CI 覆盖**（家族无 jsdom 车道）：按 `evolution-settings-ui` 的成文姿态用 `tsc` ＋ client bundle 构建 ＋ `tests/client-api.spec.ts`（唯一逻辑层）＋ 真机过一遍，并**如实写在新包 README 的 Known limitations**。
+
+## 0.10.0 (minor) — 技能内容版本与单技能撤销 ＋ 两处判定收敛（相似度问句具名、计划规则成表）
+
+> **由来**：外部档《SKILL-ATOMIC-UNITS.md》评估（判定档 `dsh-evolution-skill-atomic-units-eval.md` §7 架构层级撞车检查、§8 屎山判定与收敛方案）后定下的四条可借项；口径是**忽略短期工程量、从效果最优化出发**，同时把**防屎山**当硬约束。批次划分、七条不变量与逐批验收见设计档 `dsh-evolution-skill-history-design.md`（本机存档）。
+> **四条线可分别回退**：A 内容历史缝（无用户可见变化）→ B 单技能版本读/撤销（首个用户可见收益）→ C 两个相似度问句具名 ＋ 创建期判重提示 → D 计划路径规则表 ＋ 证据类别**只报告**。
+
+### 改了什么（用户可见）
+
+| 表面 | 之后 |
+|---|---|
+| 新命令 | `/evolution skill history <name>` 列出某技能的内容版本（版本号／时间／动作／字符数／哈希前缀）；`/evolution skill undo <name> [--to v<N>]` 把该技能内容退回某一版（默认上一版；只动内容，撤销本身也记为新的一版） |
+| 技能写入的反馈 | `skill_manage` 在**新建疑似重复**时多一行提示（点名最接近的既有技能与相似度，指向 patch/update）——**照常写入**，只是让模型看见 |
+| 技能写入的反馈（2） | 整篇替换一次技能正文、且新版**不足旧版一半**时，结果消息多一行保留率（例如「保留了 26%（2104／8123 字符），被替换的版本仍在版本史里」）——只提示，不拒写；小技能（旧正文 < 200 字符）不打扰 |
+| 磁盘 | 每次技能写入留一版内容：`$DSH_HOME/skills/.history/blobs/<sha256>`（同内容天然去重）＋ `.history/skills/<name>/index.json`；每技能保留份数＝新参数 `skillVersionKeep`（默认 20） |
+| 后台审查 | 计划里**证据只引用 turn/step 边界帧**的 op 会被**记一笔**（操作者日志一行 ＋ `evolution/plan-applied` 的 `evidenceClassReports` ＋ `activity.json` 记录），**不拒绝、不丢 op**；模型可见文本不变 |
+
+### 不动的（契约）
+
+- **模型可见文本**：A 批零改动；C 批只**新增**那一行（既有「Authoring check」各行逐字不变）；D 批零改动（报告只走操作者面）；**A＋B 节末补的反覆盖反馈行是另一条新增行**（整篇替换且保留不足一半时，追加在既有 `Skill "x" updated.` 之后，既有文本一字不动）。发布前独立复核实测：六个创作面文件的字面量集合**零删除**（只有新增）。
+- **写路径**：撤销＝**一次正常的带锚点 update**，不新建第二条写通道；威胁扫描、策略、审批缝、审计账本照旧。
+- **去重判定**：`computeDedupGroups` 行为逐字节不变（阈值 0.95、精确哈希预合并、pair 预算与 `truncated` 语义都不动），既有用例原样通过。
+- **计划路径的拒绝行为**不变：`EVIDENCE_CLASS` 只报告；`EVIDENCE_RANGE` 仍是唯一的证据拒绝行。
+- **参数三角**照旧：新参数只走 core 常量 ＋ Config schema ＋ 注册表行 ＋ `PARAMETERS.md` 生成物（E2，本版无新增设置卡）。
+
+### 内容历史与单技能撤销（A ＋ B）
+
+> **由来**：`mutations.ts` 自称 "reviewable and replayable"，但记录只有哈希、内容**无法回放**；改坏一个技能今天只能整树快照回滚（连带丢别的改动）或从 `.archive` 取回被删的。
+> **改法（A）**：core 新模块 `skill-history.ts` —— 内容寻址 blob（`.history/blobs/<sha256>`）＋ 逐技能版本索引（`.history/skills/<name>/index.json`，条目 `{v, at, action, hash, chars}`）；挂进写路径**已有的共享写后漏斗** `SkillLibrary.audit()`（**7 个调用点**覆盖 create/update/patch/write_file/remove_file/archive/restore/restructure/pin 这 9 个动作；before/after 正文都在手，**不需要碰锁**）；与账本记录**互相独立 best-effort**（两个 try）——历史写失败**不静默**（每实例警告一次），且绝不让写入失败。`.history` 同时进**两张**排除表：写者探针跳过表与**整树恢复的 clear 跳过表**（后者不改，一次 `restoreLatestSnapshot` 就会把历史清空——历史与账本同属「真实历史，恢复不该抹掉」）。
+> **改法（B）**：`SkillLibrary.listVersions/readVersion` 只读封装；`EvolutionCurator.history(name)`（只读、不抢控制面互斥——人问「有哪些版本」不该被正在跑的整理挡住）与 `undo(name, v?)`（抢互斥 ＋ 实例声明；实现为**一次正常 update**：内容取该版字节、锚点取**当前 live 哈希**，因此并发改写被锚点拒绝、撤销本身进版本史、可以再撤销）。命令面两条经 `registry.ts` 单一来源（README 命令表由生成物逐字节比对）。
+> **保留份数**：新参数 `skillVersionKeep`（E2，owner=tool-skill-manage，与 `archiveRetention` 同组；默认 20；客户端无卡片）。**本轮仍不做 blob GC**：trim 只裁索引——跨技能共享的 blob 需要全局引用计数，那是全库扫描的活，写路径不做（模块 docblock 写明），且**当前没有任何清扫器**（发布前复核发现生成物文案曾承诺「等 curator 清扫」，已改正）。**实测增长**（2026-09-27）：3.6 KB 正文、写 41 次（`versionKeep=20`）⇒ 索引 5,718 B／20 条，blob 41 个文件共 150 KB ≈ 41× 当前正文；**无变化写入 +0 B**。增长随「历史上出现过的不同正文数」走，不随保留份数走——已作为限制写进 `evolution-core/README.md`（含手工清理指引）。
+> **反覆盖反馈（判定档 §4 覆盖表第 3 条）**：**最终自查时发现这一条在设计档 §3 的批次改法里没有落点**（§4 覆盖表列了它、§2 也写了「库在写锁内算＋自己的 message 加一行」，但 A–D 四批的改法都没有它）——本轮补齐：core 具名函数 `contentRetentionFeedback`，在写后漏斗（两个正文都还在手的地方）算出保留率并追加到该次写入自己的结果消息里；阈值 `RETENTION_FEEDBACK_KEEP_RATIO = 0.5` ＋ 地板 `RETENTION_FEEDBACK_MIN_CHARS = 200`；只对整篇 `update` 生效（patch 是锚点编辑、support 文件是另一种产物、create/archive 没有可比的正文对）；**不加开关**（没有读取点的开关＝什么都不做的配置）。
+> **语义边界**：撤销的是**内容**，不含 `.pinned`/`.hermes-managed` 标记、用量计数与策展状态——结果文案明说，避免被读成时光机。**读的边界**：索引读不出来／字段布局陌生／由更新的读者写过，一律读作「没有版本」（never-guess 姿态）；下一次成功写入会用基线条目重新播种索引，所以是**自愈**而非静默丢失。
+
+### 发布前独立复核与修复（8 条全部为真）
+
+> **口径**：子代理**只读**复核 `4269158..d93c9d0`（A–D 四批）＋当时的 activity 改动，只报 P0–P2 且每条附**可证伪命令**（探针只写 `%TEMP%`）；我逐条**源码复验**后落地。**无 P0**；2 条 P1、6 条 P2，**无一条误报**。
+
+| 级 | 发现 | 修复 |
+|---|---|---|
+| P1 | 内容历史在**内容锁外**追加 ⇒ 两个写者会让索引顺序交错，且基线判定按尾巴算会补出假基线 | 索引条目新增 **`beforeHash`**（写锁内读到的旧字节哈希）：基线判定改为「整表是否已记录过该前驱」，**`undo` 的默认目标沿链回溯**，列表用 `orderVersions` 按链复原内容顺序（链不完整退回存储顺序）。没有把历史塞进 `transact`——那个 API 的写发生在任务返回**之后**，塞进去会记下尚未落地的内容 |
+| P1 | **读不懂的索引被覆盖**（malformed／陌生形态／更新的读者），与 docblock 的「never overwrite」相反 | 照 activity 的既有先例：读不懂的字节先 **copy 到 `<index>.corrupt`** 再起新索引；**copy 失败则拒绝记录**（宁可这次不记，也不毁唯一副本）。新增三态读 `readHistoryIndex`（ok／absent／unreadable，含「能解析但有条目必须被丢弃」） |
+| P2 | 创建期提示**并非零读**：`library.list()` 会整篇读每个 SKILL.md 解 frontmatter | **改口径不改实现**：提示自身不新增读、不调用 `library.read`、不留正文；上文与本节的措辞已按实测改正 |
+| P2 | activity 读屏障**漏了新维度** ⇒ 手工编辑的 sidecar 能把字符串喂进数字字段 | `evidenceClassReports` 进 `isOptionalCount` 链（与兄弟字段同规）＋ 用例 |
+| P2 | `--to v<N>` 指向当前内容时写是 no-op，却回报「撤销本身也记为一版」 | 读 `result.noop`：改报「已经是该版本的内容——什么都没写，也没有新版本」 |
+| P2 | 撤销拒绝**断言假原因**（把被 trim 的版本说成「blob 丢了」） | 先查索引里有没有该 `v`：没有就说「不在已记录的版本里（现有：…）」；只有真在索引里而内容读不出才是 blob 问题。**不新增 E 码**（命令面拒绝按 `skill restore` 先例走消息） |
+| P2 | blob 永不回收，而生成物文案承诺「等 curator 清扫」 | 改正注册表 summary（回填 `PARAMETERS.md`）＋ 把**实测增长**写进 core README 的 Known limitations（含手工清理指引） |
+| P2 | 设计档 §3B 的「并发改 ⇒ 锚点拒绝」**没有用例**（I7 缺口） | curator 加**确定性竞态用例**：注入一个「读完就改写文件」的默认 io，使 undo 的锚点必然过期 ⇒ 断言拒绝且盘上留下竞态写者的内容 |
+
+> 复核另给「七问」的逐条答复（历史不被判定读取／撤销无第二条通道／提示不改判定／计划路径拒绝行为**逐字节不变**／模型可见字面量**零删除**／参数三角完整／两张排除表与快照关系正确），与自查一致；它同时列出未扫描面（平台树、真实运行时装配、注入竞态下的 curator 上下文、21 步门禁其余步骤），本轮修复正是针对其中可判定的部分。
+
+### 相似度问句具名与创建期判重（C）
+
+> **由来**：`quality.ts` 原有三把尺（规范化哈希、token Jaccard、首词名字索引）问句重叠却都没有名字；判定档 §7.1 的口径是「新增尺不是禁区，**未具名、问句重叠**的第四把尺才是」。
+> **改法**：收敛成**两个具名问句** ＋ 一个**调用方声明的投影**：`identity(text)`（「是同一段文本吗？」规范化内容哈希）与 `affinity(a, b)`（「两段文本共享多少词汇？」两个 `vocabulary()` 集合的 Jaccard），都问在 `projectionText(projection, input)` 上（`body`＝整篇 SKILL.md；`summary`＝名＋描述）。`computePrefixClusters` 保持原样：名字侧的**结构索引**，不是相似度分数。顺手把 docblock 自 PLAN-R2 起就 `{@link}` 却**并不存在**的 `DEDUP_SIMILARITY_THRESHOLD`（0.95）补成真常量——值不变。
+> **创建期判重**：`skill_manage create` 前用 `library.list()`（**提示自身不新增任何读**：该 listing 本就要读每个 SKILL.md 解 frontmatter，提示不调用 `library.read`、不留正文、不做正文比对）＋ `nearDuplicateSummaries`（同一个 affinity 问句，问在 summary 投影上）给一行提示。**阈值 0.5 有实测依据**：本机真实 24 个技能两两 summary affinity 的最高合法对是 0.333（`capability-claim-audit` ~ `theory-paper-log-audit`），0.5 落在实测空档；`dsh-session-forensics` ~ `dsh-session-preset-repair` 这类同前缀异域技能本就低于 0.5，不误报。
+> **验收用投影盲区而非调用计数**：同一对「正文近乎相同、名＋描述无关」的技能在 `review`（body 投影）里**成组**、在 create 提示里**静默**——调用计数区分不了 `list()` 的 frontmatter 读与 `read()` 的整篇读（同走 `readText`），投影盲区能。
+
+### 计划路径规则表与证据类别只报告（D）
+
+> **由来**：计划路径的每-op 判定原本是匿名内联检查；`turn/start` 这类记账帧满足「区间内的整数」却承载不了任何断言。
+> **改法**：每类 op 一张**具名有序规则表** `PLAN_RULES`（与工具路径的 `write-gates.ts` 同形：规则体读 core 的共享表，本模块拥有**顺序**与文案），id 与顺序由用例钉死；新增 `EVIDENCE_CLASS` **只报告**行，读 `ValidationContext.substantiveEvidenceSeqs`（core 新模块 `evidence.ts`：deny list＝四个 turn/step bookends，未知帧算「有内容」）。
+> **三态**：`undefined`（日志根本没有 seq，例如测试桩）**保持沉默**——把「无法分类」当成「全无内容」会把每个 op 都报一遍；空集（有 seq 且全是边界）才是真报告。**一 op 一结论**：报告只对**通过全部拒绝行**的 op 产生。索引与证据区间**同一时刻读**（计划不能引用作者当时还不存在的帧）。
+> **实现路线由架构守卫 N11 决定**：家族守卫禁止 `evidence.ts` 直接匹配 `'tool/call'`/`'tool/result'`（平台派发词表只有一个读者），deny list 方案对这两类帧天然都算内容——零词表、零违规。
+> **账本两处都落**：`evidenceClassReports` 先进事件载荷（与 `evidenceQuotes` 同形：可选、有值时才有），再折进 `evolution-activity` 的持久记录（同形可选字段；`ACTIVITY_FILE_VERSION` 仍是 2——可选字段是加法，旧 sidecar 照常解析）。**文档阶段改正过一次口径**：初稿写成「只进事件、不进 activity」，而操作者实际读的是 `activity.json`，阶段 1 的观察窗必须落在那里。
+
+### 验证
+
+- **四批各自过 21 步门禁**（tsc／oxlint 0／vitest-full／build-lib／smoke ＋ 16 个 verify；`mirror-sync differ=0`）：A `2a6cd54`（tsc 12s／vitest-full 511s）、B `b2c5ee0`（tsc 9s／548s）、C `62001b5`（tsc 9s／516s）、D `d93c9d0`（tsc 60s／512s）。
+- **新增/扩展用例**：`skill-history.spec.ts` 10 条（版本规则纯函数、索引三态、保留策略）；curator 端到端撤销 2 条（含三种拒绝）；`quality.spec.ts` ＋6（两个问句、投影声明、摘要判重，含「正文相同而摘要无关 ⇒ 不报」的证伪用例）；`tool-skill-manage.spec.ts` ＋1（提示出现／照常写入／投影盲区三向）；`evidence.spec.ts` 4 条；`validator.spec.ts` ＋4（规则表 id 与顺序、只报告、三态、一 op 一结论）；`review.spec.ts` ＋2（真实会话端到端：报告计数进 `plan-applied`；无 seq 的桩日志静默）；`activity-store.spec.ts` ＋1（新维度进 sidecar，缺省时键保持缺失）。
+- **反覆盖反馈补齐**（见 A＋B 节末）：`skill-history.spec.ts` ＋3（阈值与地板、非整篇替换一律沉默、真实库的一次「10 节压成 1 节」update 出现该行且 `ok` 不变、反向增长保持安静），core 62 个 spec 文件 681 条全绿（`--maxWorkers=2`，与门禁同参数）。
+- **发布前独立只读复核**（子代理读全量 diff，只报 P0–P2、每条附可证伪命令）＋ 逐条源码复验，结果见下方小节。
+
+## 0.9.0 (minor) — 技能写入门禁（设计档 B1–B5 ＋ 发布前复核批 B6）＋ 用词改版：界面／命令／文档说人话（「策展」等内部词退场）
+
+> **由来**：0.8.0 装机复验时，用户直接反馈「『策展』这个词不知道是什么」。据此按判据 J1–J6（行业词／内部代号／英文裸词／自造缩略／自造比喻／生硬书面语）**全量排查**所有用户可见的配置项说明，清单与逐条建议留档 `D:\dsh\dsh-evolution-user-facing-wording-audit.md`。
+> **本版另有独立的一条行为线**：技能写入的**准入序列**（新增两个错误码 `E-317`/`E-318`、一次前台确认、受保护清单进提示词、三个描述长度数字落档），逐项见下方「技能写入准入：一条 gate 序列」小节；两线互不依赖，可分别回退。
+> **改法**：文案仍保持**单一来源**（字段文案只在 `evolution-core/src/params.ts` 的 UI 尾、界面框架只在 `messages.ts`、命令帮助只在 `registry.ts`）；为此新增**可选** `valueLabels`（枚举的显示名，**存储值不变**，解析器与校验器同步加严：仅 select 行、段数与 `values` 相同、每段中文）；CLI 表格中文化并按**显示宽度**对齐（CJK 计两列）；README 命令表与 `PARAMETERS.md` 由生成器跟上，门禁照旧逐字节比对。
+
+### 改了什么（用户可见）
+
+| 表面 | 之后 |
+|---|---|
+| 设置卡 | 卡片名：策展→**技能整理**、审查→**会话回顾**、技能→**技能写入规则**、记忆→**长期记忆**、记忆工具→**记忆写入**；状态词 用户／部署→**我改过／默认**；副标题、不可用、只读、失败提示全部改写（不再出现「命名空间／用户层／部署面／宿主」） |
+| 32 个字段的标签与说明 | 「策展间隔」→**自动整理间隔**、「两次确定性策展」→**两次自动整理**、「判为陈旧的天数」→**多久没用算过时**、「空闲探针失败时放行」→**检测不到活动也运行**、「正文软带」→**正文长度参考值**、「空写判定补丁数」→**只写不读判定次数**、「启用 LLM 提名」→**用模型挑选**、「墙钟上限」→**最长运行时间**、「支持文件」→**附带文件**、「严格档／超限档／校验档」→**即拒绝／超限时／检查方式**（标签不再重复单位，单位仍由卡片统一附上） |
+| 枚举选项 | `cadence/completion/both`、`inject/subagent`、`verify/refuse`、`report/enforce` **仍按原值存储**，界面**显示**为「按间隔／按任务完成／两者」等中文名（新增可选 `valueLabels`） |
+| `/evolution params` | 列头 参数／分组／档位／生效／来源／当前值；分组与来源用中文显示名（`review`→会话回顾、`write-caps`→写入上限、`curator`→技能整理…；`deployment`→默认、`unregistered`→不可改）；页脚「共 95 个参数：…；你改过的：0 项。」＋新增**档位图例**一行 |
+| `/evolution` 帮助 | 17 条说明与命令描述中文化（usage 语法串不变） |
+| `PARAMETERS.md` | 分组标题带中文名（`## curator（技能整理）`），说明列仍为注册表的英文 summary |
+
+### 不动的（契约）
+
+- 参数 id、settings 命名空间、包名、行 id、`--group` 取值、枚举**存储值**、`--json` 字段名与取值：**一律不变**（设计档不变量 I1–I3）。
+- 错误文案（`errors.ts`）本轮**不改**：它同时是**模型可见**的诊断面（家族错误语言一贯英文），而用户可见的外层提示已在 `messages.ts` 改成中文；若要整句中文化，另立一版。
+- 测试跟着行为走：`registry.spec.ts` 的「README 命令表逐字节一致」由生成器回填，`params-view.spec.ts` 的页脚断言同步更新。
+
+### 技能写入准入：一条 gate 序列（设计档 B1–B6）
+
+> **由来**：外部审计档 §7 的 7 项里，⑤「先读后写」当时只在**审查的计划路径**生效（未读就改＝从计划里静默剔除），**工具路径看不到这条判定**；缺参判定则在「审批缝前的预检」和「执行核内的复核」两处各写一遍。方案与不变量 G1–G7 见 `D:\dsh\dsh-evolution-write-gate-design.md`。
+> **改法**：规则本体搬进 core（`skill-reads.ts`；读取器仍是 `tool-dispatch.collectReadSkillNames`，审查侧那份会话形状的副本是它的逐行重复，已删）。工具侧新增**一张有序表** `tool-skill-manage/src/write-gates.ts`：参数形状 → 每动作必填参数 → 策略保护名单 → 先读后写；纯判定在前、需要人工往返的在后。两个点读同一张表：**准入点**（`execute`，在审批缝**之前**——该拒的写入不再被 stage、不再浪费一次人工审批）与**执行点**（`executeCore`，直连与回放都经过——回放执行的是**存下来的参数**，没有 schema 过，保护名单也可能在挂起期间变过）。
+> **行为变化（只影响技能写入的工具路径）**：同一调用同时踩多条时，**拒绝文案的先后**改由表的顺序决定（形状 → 缺参 → 保护名单 → 先读后写 → 确认），过去是「保护名单先于缺参」——两者都仍是拒绝，变的只是模型看到哪一条。非前台（子代理／审查注入）去写一个本会话**没读过**的技能，过去无人拦，现在**拒绝并回 `E-318`**、提示先用 `skill` 工具读；只算**没失败**的读（v32 REV-06(a) 的旧口径不变）。前台操作者自己的会话照旧豁免；会话日志在这个组合里读不到时**放行并只警告一次**（软探针口径，与跨源检查一致）。审查的计划路径口径不变（仍是剔除未读 op，只是改用同一份判定）。
+> **口径更正（本轮实测）**：`packages/README.md` 与审计档都写「20 键／22 条」，实测本轮开工前是 **22 键／22 条**（`E-301`–`E-316`，每个键一条原文），本轮加 `E-318` 后为 **23 键／23 条**，范围 `E-301`–`E-318`；两处文档均按实测改正（"measured" 的计数写错也是错，一并纠正）；B3 再加 `E-317` 后为 **24 键／24 条**（24 个键、24 条字面量，其中两个 E-305 场景共用同一条字面量 ⇒ 去重后 23 条）。**本节与 0.8.0 节的口径冲突就此记明**：0.8.0 节当时写「文档计数本就正确（复核脚本把 22 条文案数当成了键数）」，实测不成立——旧表是 22 个键；0.8.0 节按历史保留不改，以本节为准。
+> **改法（B3，③ 创建/删除前确认）**：前台 `create` 与**不带** `absorbed_into` 的 `delete` 各问**一次**（GUI 问题卡：选项「Create／Delete」与「Cancel」，不声明 `intent`），答非确认项即**拒绝并回 `E-317`**、什么都不写；带 `absorbed_into` 的删除是**合并协议**（审查层只能这样删，见 core 的表注释），不问。这条 gate 只挂在**准入点**：回放已经有那次人工放行，再问就是同一次写入打断两次。它是 UX 而不是安全门——**可用性优先**：没挂提问服务、调用方不是注册表里那个**活着的 root agent**、或提问本身抛错，都**放行＋只警告一次**（操作者的会话仍是这次写入的授权方）。平台 `ask()` 会校验「必须是注册表里那个确切实例且是 root」（`CALLER_NOT_LIVE`／`DELEGATED_CALLER`），而工具的 exec 契约只声明结构，所以拿到 `CALLER_NOT_LIVE` 时按会话 id 回注册表反查一次活着的 root，仍拿不到就放行＋警告。
+> **改法（B4，② 技能指引动态化）**：技能指引那一节末尾多一行**受保护技能清单**（`Protected skills (do not edit): …`），由提示词变量 `evolution_skill_guard` 在**每次装配**时同步读取策略快照——这份清单过去只出现在审查提示词里，工具路径的模型只能靠「写一次被拒一次」才知道。变量与 section 在**同一个 effect** 里注册/释放：平台遇到「引用了未注册变量」的 section 会**抛错**（`system-prompt/src/index.ts:344`），只注册其一的窗口会让那段时间的每个请求都失败。没有策略行或清单为空时返回**空串**（不是 `undefined`——平台把 undefined 当「无值」同样抛错），此时该节与原来逐字节相同，指引的 prefix cache 不受影响；清单超过 12 个时折叠为「… and N more」，因为这行在**每个请求**里。
+> **改法（B5，① 三个描述长度数字 ＋ cadence 单位文案）**：三个数字**各自都有出处**，缺的是**一处写清它们的关系**，落在 `tool-skill-manage/README.md` 的一张表里——**写作参考线 60**（`AUTHORING_DESCRIPTION_BAR`，上游 60-char rule，只在 authoring feedback 里提示、`descriptionStrict` 才拒）、**家族存储上限 1024**（`MAX_DESCRIPTION_LENGTH`／本行 `maxDescriptionLength`，三者中**唯一**的拒绝阈值）、**平台目录视图默认 500**（`catalogDescriptionMaxLength`，在 core 常量里具名为 `PLATFORM_CATALOG_DESCRIPTION_DEFAULT` 并标出处）——关系写清了，而同尺比较不能混：**家族自己的 host/all 行把该字段设成 60**，所以自带组合里真正的目录截断就是 60。**不加「超 500 警告」**（对本档 ① 项验收口径的更正，原因记在设计档实施记录）：家族自带组合的目录上限已是 60，超 500 必然已超 60、既有那行反馈已经说了「目录会按配置的上限截断」，再加一条只是同尺重复。cadence 两个参数的说明把「活动」换成**准确单位**：`signals.ts:170/175` 里计数按**工具调用数**累加、一轮没有工具调用也按 1 计；`PARAMETERS.md` 与设置卡视图由生成器跟上。
+> **发布前独立复核与修复（B6）**：按家族纪律跑**独立只读复核**（子代理读 `864ec9c..HEAD` 全 diff，只报 P0–P2 且每条附可证伪命令），我**逐条源码复验**后全部落地——**无 P0**；① **P1 真缺口**：`absorbed_into: ''`（空白）在 gate 里不算「无」、在 `library.archive` 调用里按真值当「无」⇒ **裸归档绕过了确认**；已把空白按缺失处理（与计划层 `!(op.absorbed_into ?? '').trim()` 同口径）并加哨兵（空白删除**会问**，随后由库拒绝该空伞名）。② `ASK_ABORTED`（提问被取消／卡片被关掉）原被归入「放行」⇒ 改为**算未确认**（拒绝回 `E-317`），只有「问不出来」才放行。③ 非字符串 `action` 原会落到读判定、回 `E-318` 误导模型 ⇒ 已列入形状判定；**缺** action 则交给库回「Unknown action」。④ 口径对齐实现：两个「只警告一次」是**每进程**（不是每会话／每次写入），执行点三条 gate 的**文案先后**已补记在行为变化里。⑤ 事实修正：B1 适配器「两个调用方」的说法不成立（只有一个，已改写）；`packages/README.md` 的「24 条文案」精确为「24 个字面量、去重 23 条」；工具 README 写明三条 gate 只覆盖**本工具**的写入面（命令面与计划执行器各自持库句柄，理由已写）；描述长度表第三行点名 host/all/preset 三行并指向 `packages/README.md`；审查侧两处「Activity units」注释与 cadence 单位统一（并把「本轮本身用到技能只加 1」这半句补上）；B4 补两条哨兵（provider 抛错；空名单时该节**等于常量本身**）。
+> **验证（B1–B6 各批均过 21 步门禁：tsc／oxlint 0／vitest-full／build-lib／smoke＋16 个 verify，mirror-sync differ=0）**：新 spec `tool-skill-manage/tests/write-gates.spec.ts` 17 条（未读被拒／读过放行／失败的读不算／前台豁免／日志不可读放行＋只警告一次／纯判定先于读判定／准入先于审批缝不产生 pending／执行点仍拒存下来的坏记录；确认：问一次且选项正确／拒绝即无写入／裸删除问、吸收删除不问／子代理与回放都不问／缺参先于提问／无服务放行＋只警告一次／`CALLER_NOT_LIVE` 回退到注册表的活 root／无活 root 放行＋警告）；`tool-skill-manage.spec.ts` 新增 B4 一条（无策略行时该节的插值结果**等于常量本身**且不留 `{{` 残迹／清单出现／改名单后下一次装配即反映且旧名不残留／策略 `get()` 抛错时退化为指引原文）；`write-gates.spec.ts` 再补 B6 三条（空白 `absorbed_into` 会问且随后被库拒绝／`ASK_ABORTED` 拒绝且无写入／非字符串 `action` 由形状判定拒绝、缺 `action` 不落 `E-318`）；`PARAMETERS.md` 与 `generated-params.ts` 由生成器回填（`--check` 门禁过）。
+
+## 0.8.0 (minor) — 收敛批：同一事实只拼一次（行集／错误码／命名空间）＋ 三条守卫；并带上未发布的设置卡修复
+
+> **由来（两条线）**：① 0.7.0 线发布后做的一轮**实现侧收敛**——先把镜像与净室重写版逐项对照（行数构成、实现层构造、可借鉴/不可借鉴清单均已留档），再按设计档 `dsh-evolution-cleanup-design.md` 的批次 C1–C5 落地；判断标准是「同一事实只拼一次、生成物可门禁、守卫必须能证伪」，不是单纯减行数。② 同期在装机产物＋真实界面上复验 0.7.0 时抓到设置卡保存的 P0，修复一度在本地冻结为 0.7.1 但**从未发布**，按事实并入本版（下节原文保留）。
+> **发布面**：仍 **30** 个包、无新增包名；参数注册表、E3 边界与读写路径不变；门禁 19 → **21** 步（新增 `build-lib` 与 `smoke-built-entries`）。
+
+### 设置卡修复（原本地冻结为 0.7.1，未发布，并入本版）
+
+> **由来**：0.7.0 发布后的实机验收（装机产物、真实界面）在「自进化 → 策展」卡上点保存，字段下渲染出 `Cannot read properties of undefined (reading 'paramSection')`，而不是 N4 承诺的那行提示。
+> **根因在判定，不在写路径**：卡片把注入面当成了组件 props。平台的插槽契约是「`hooks` 舱位由渲染器绑成 `use<名字>` 座位，并从交给组件的 props 里**删掉** `hooks`」（`PropsHooks` ＋ `Omit<注入面, 'hooks'>`），所以 `props.hooks` 恒为 `undefined`——**每一次**保存都会抛这个 TypeError。写本身是好的：实测越界值确实被宿主拒绝（settings.yaml 未变），合法值确实落盘并把 chip 翻成「用户」。
+> **修法**：判定改到 effect 里读渲染期的座位。两个设置作用域（平台自带控制器与桥接版）都在写入 promise resolve **之前**做完恢复读，所以那一刻的用户层就是结论；props 类型改成 `Omit<ParamCardFace, 'hooks'> & { useParamSection }`（照抄渲染器的派生方式），同一个错误再犯会**编译不过**；写入在途时控件上锁；本地 React 声明补 `useEffect`。
+
+| # | 修复 | 位置 |
+|---|---|---|
+| F1 | 保存成败改由渲染期座位判定：被拒 ⇒ 字段下出现提示且保留草稿；成功 ⇒ 清空草稿 | `src/client/ParamCard.ts` |
+| F2 | 卡片 props 类型按插槽契约派生（`Omit<注入面, 'hooks'>`），读 `props.hooks` 从此编译不过 | 同上 |
+| F3 | 写入在途时控件上锁，保存期间的新输入不会被随后清掉的草稿带走 | 同上 |
+| F4 | 本地 React 声明补 `useEffect` | `src/client/react.d.ts` |
+
+> **本版最终形态（发布前独立复核修正，见下 R1）**：保存成败的判定从「用户层有没有这个键」改为「请求的值是否真的进了用户层」，被拒提示渲染在**卡片底部（字段列表之后）**，不是字段正下方。
+>
+> **运维口径（本版实测）**：客户端半**不能**手改装机包里的 `lib/client.js` 来验证——平台按客户端模块摘要装载，改过的文件会让整包客户端行加载失败（`failed to import loader entry … client-modules: bundle /plugins/??…`）。验证只能走「发布 → 装包 → 刷新页面」这条路。
+
+### 内部收敛（逐批留档；C4／C5 经前置实测无代码目标）
+
+| # | 内容 | 门禁与守卫 |
+|---|---|---|
+| C1 | 行集单源：`packages/scripts/bundle-rows.json` → `gen-bundle-patches.mjs` 生成三份 `cordis.patch.yml`（与手写版**逐字节相同**） | 新 `verify-bundle-rows.mjs`（门禁第 11 步）＋哨兵「手改 patch 必红」 |
+| C2 | 错误码表 `evolution-core/src/errors.ts`（20 个场景键 / 22 条逐字文案，`E-301`–`E-316`）＋装机产物冒烟 `smoke-built-entries.mjs`（把 `lib/`＋manifest 拷进**临时作用域**、平台包**逐个 junction**，不写安装目录；实测 24 个被挂载入口＋30 个包根全部导入） | 规则 **N21**（码只在表内）；门禁新增 `build-lib`／`smoke-built-entries` |
+| C3 | 命名空间单点 `paramNamespace(owner)`（删 3 个同值常量与永不生效的 `??` 兜底）＋每个 E3 行必须是其 owner section schema 的键、反之亦然（实测 **32 ↔ 32**） | 规则 **N22**；四渠道 parity 守卫增加写面校验 |
+| C5 | 规则 **N23**：durable-file 写只在 io 缝内（缝按路径豁免 ＋ 登记册 ＋ **反向判定**：fs 导入里非只读 API 即违规） | 守卫 **24** 条规则干净；证伪探针 **13** 条（含 R3 的四种绕过形状） |
+
+### 发布前独立复核（2026-09-22；四条发现全部落地）
+
+独立子代理做对抗式复核（范围 `ea1b100..af9b100`；只报 P0–P2，每条要求 file:line 与可复现命令）。四条发现与处置：
+
+| # | 复核发现 | 处置 |
+|---|---|---|
+| R1（P0） | 保存判定只看「用户层有没有这个键」：字段此前已带用户覆盖时，**被拒**写入的键本来就在 ⇒ 判成成功、草稿被静默清掉 —— 正是本次修复要消灭的那种「像成功一样回退」 | 判定改比**请求值**：保存时记下每个待写 id 与请求值，结算时要求该 id 现在就是该值（新 `src/client/settle.ts`，`ParamCard` 改用 `landedWrites`）；新增该包**首个用例** `tests/settle.spec.ts`（含「已覆盖字段被拒」这条反例） |
+| R2（P1） | 装机产物冒烟把家族包**写进了已安装的平台作用域**（整作用域 junction ⇒ `cpSync` 穿透，清理只删链接）：30 份副本留在 `~/.dsh/profiles/node_modules/@deepseek-ai`，并让改名/删包后的 import 仍能解析到旧包 | 暂存改成真目录 ＋ **平台包逐个 junction**（家族包落临时目录）；本机那 30 份残留已按创建时间戳核对后清除；mounted 计数加**非零断言**；docblock 与本文档口径同步改正 |
+| R3（P1） | 规则 **N23** 只认「从 `node:fs` 具名导入的白名单名字」：`open`＋`writeFile`、`promises as fsp`、去掉 `node:` 前缀、`openSync`/`writeSync`、动态 `import()`/`require` 全部**绕过**（缝自己用的就是 `open`） | 判定改**反向**：fs 模块导入里凡不是已知**只读** API 的一律违规，另加动态导入／`require` 文本检查；内置证伪探针 5 → **13** 条（含上述五种绕过形状）；当前树仍 **24 规则干净** |
+| R4（P2） | 行集生成器对「group 拼错」或「forms 为空」的行**静默丢弃**，而生成的 patch 依旧算「新鲜」 | `gen-bundle-patches.mjs` 增加 `validate()`：未知 group／未知 form／空 forms 一律 exit 2 |
+
+> 复核同时**验证成立**的：C1 产物与重构前逐字节相同且手改必红；C2 的 33 个调用点在占位符归一化后与旧字面量**多重集完全相等**（无文案漂移）；C4 parity 不可平凡满足；C3 确为 built 产物导入（空平台作用域 48 红）。
+> 复核的 P2-1（称错误码表是「22 键」）**不成立**：实测 **20 键 / 22 条文案（其中一对逐字相同 ⇒ 21 条互异）/ 16 个码 `E-301`–`E-316`**，调用点 **33**（commands 32／graph 1）——文档计数本就正确（该复核脚本把 22 条文案数当成了键数）。
+
+### 行为变化（升级前必读）
+
+| # | 变化 | 回退／影响 |
+|---|---|---|
+| B1 | 设置卡保存：被宿主拒绝时**卡片底部**出现提示并**保留草稿**（判定按请求值，已带用户覆盖的字段不再被误判成成功） | 撤 `evolution-settings-ui` 行即回原状 |
+| B2 | 移除三个导出的常量 `CURATOR_SETTINGS_NAMESPACE`／`REVIEW_SETTINGS_NAMESPACE`／`SKILLS_SETTINGS_NAMESPACE`，改用 `paramNamespace(owner)` | 实测全仓（含测试与文档）无消费者；跨包 import 它们的代码改一行 |
+
+> **口径**：本版**不减行数**——C1/C2 净增约 1,450 行（声明面＋生成器＋验证器＋哨兵＋门禁两步）；C4（state 栈折叠）与 C5 的多数子项经**前置实测否决**（两个已发布提供者 ＋ 已发布 conformance 套件 ＋ 部署面 `provider` 选择；动作表／有界原语／替身 kit／侧车各自不同形或属兼容保证），否决理由逐条写进设计档以防重提。
+
+## 0.7.0 (minor) — 设置面重做：参数卡片独立成栏、按注册表类型渲染、卡级保存
+
+> **由来**：0.6.1 实机验收时，参数卡片被判为「丑且摸不着头脑」。把装机产物里的卡片与平台官方同类 UI（终端／Agent 循环等）逐项对照后确认：卡片是**没有样式表的裸标签**（类名存在但无任何 CSS），字段名、值、英文徽标与输入框挤在一行，输入框里放的是被裁断的英文说明。
+> **本版把形态对齐官方、并把入口摆正**：参数不再塞在平台「插件」栏里，而是家族自己的设置栏 **「自进化」**（与插件市场／皮肤／Web 插件同样的做法：注册 `settings.section`）；字段改为「中文标签（含单位）→ 控件 → 中文说明」三段式，控件**按注册表类型**渲染；提交改为卡级「放弃修改／保存」。
+> **行为变化集中在两处**（B1–B2）：入口位置与卡片形态。读写路径、E3 边界、六个旧名的可读性都不变。发布面仍 **30** 个包，无新增包名。
+
+### 新能力（用户可感）
+
+| # | 能力 | 位置 |
+|---|---|---|
+| N1 | 设置栏**「自进化」**：五个命名空间各一张卡（审查／记忆／记忆工具／策展／技能），折叠态显示标题与「N 项已改」 | `evolution-settings-ui`（`settings.section`，id `evolution`，order 25） |
+| N2 | 字段三段式：**中文标签（含单位）→ 控件 → 中文说明**；控件按注册表类型渲染（开关／下拉／数字／文本），下拉取值与单位都来自注册表 | 同上（字段元数据由 `packages/scripts/gen-param-client-view.mjs` 从参数注册表生成） |
+| N3 | `用户`／`部署` 来源 chip：被用户覆盖的字段高亮，并出现「恢复部署默认」 | 同上 |
+| N4 | 卡级 `放弃修改`／`保存`：草稿只存在于被编辑过的字段，保存只写脏字段，成功后清空；**成败以「写后回读用户层」判定**——客户端设置作用域对被拒写入也是 resolve（它恢复快照后返回，远端一元调用从不 reject），所以被宿主的校验拒掉时字段下会出现一行提示且**保留草稿**，不会伪装成静默回退 | 同上 |
+| N5 | 样式只读平台设计 token（`--dsw-alias-*`）并在运行时注入，亮／暗主题自动适配；字段度量与官方设置字段一致 | `src/client/styles.ts` |
+
+### 行为变化（升级前必读）
+
+| # | 变化 | 对既有的影响与回退 |
+|---|---|---|
+| B1 | 参数卡片**不再出现在平台「插件」栏**，改为独立设置栏「自进化」 | 撤掉/禁用 `@lmzhen/dsh-evolution-settings-ui` 行 ⇒ 该栏消失；host 侧与命令面零影响 |
+| B2 | 卡片形态与交互重做（折叠、类型化控件、卡级保存）；英文徽标 `deployment value`／`user override` 改为中文 chip `部署`／`用户` | 纯表现层与交互层：读写仍走同一 settings 作用域（revision 围栏），已写入的用户值原样生效 |
+| B3 | 六个旧参数名**仍可读**——0.6.x 曾预告「0.7.0 移除」，实际代码保留了别名，移除推迟到后续版本 | 无变化：写路径一直拒绝旧名并给出 canonical 名 |
+
+## 0.6.1 (patch) — 发布面重切：0.6.0 未完成发布，功能面与 0.6.0 相同
+
+> **为什么重切**：0.6.0 的 tag 与 CI 在「发布本批新增包」一步中断——`@lmzhen/dsh-evolution-settings-ui` 是新包名，npm 的 OIDC 受信发布**不能创建尚不存在的包**（首次 PUT 返回 404）；手工补发的那一份又与 CI 打包字节不同、被清单完整性守卫拒绝，处置中该版本被 unpublish，而注册表对已 unpublish 的版本留永久墓碑（`E400 Cannot publish over previously published version "0.6.0"`）⇒ **0.6.0 记为撤回，不可复活**。
+> **撤回的实际影响**：26 个包留在 0.6.0，四个入口包（`host`／`preset`／`agent-preset`／`all`）从未发布，因此不存在一个能装起来的 0.6.0 组合；0.6.1 把 **30 个包一次发齐**。
+> **本版不含功能变化**：能力表 N1–N7 与行为变化表 B1–B5 与 0.6.0 完全一致，直接见下一节；代码、参数注册表与门禁步骤三处均无差异。
+> **发布工程结论**（已写入发布 runbook）：新增包名必须在切 tag 之前**先把名字建出来**（人工首发一次或先推一个占位版本），否则 CI 的 OIDC 发布必然 404；并且**任何已发布版本都不要 unpublish**——同版本不可再发，只能抬版本。
+
+## 0.6.0 (minor) — 参数治理批：注册表与门禁 / 用户设置层四个命名空间 / 命令面与卡片 / 四渠道同名守卫
+
+> 依据 `dsh-evolution-parameter-governance-design.md` 与施工手册 §S0–S5 落地（G0 归集 → G1 注册表与守卫 → G2 三面分配 → G3 参数层 → G4 接口与展示 → G5 收口）。
+> **行为变化集中在三处**（见下表 B1–B3）：用户设置层首次生效、写上限只许收紧且跨字段规则在**写入时**拒绝、两个写行为档位（引用校验／支持文件上限）改为 live；另新增两条命令与一个客户端卡片包。
+> 磁盘布局与既有事件不变；新增注册表（95 条）与生成物 `packages/PARAMETERS.md`；门禁 16 → **18 步**（＋`verify-param-registry`、＋`verify-param-channel-parity`）；发布面 29 → **30 个包**（＋`@lmzhen/dsh-evolution-settings-ui`）。
+
+### 新能力（用户可感）
+
+| # | 能力 | 位置 |
+|---|---|---|
+| N1 | `/evolution params [--group <name>] [--json]`：按注册表列出每条参数的组／档／生效时机／当前值与**来源**（user／deployment／unregistered），0 token（只渲染给用户） | `evolution-commands` |
+| N2 | `/evolution policy set <id> <value> [--expect <n>]`：只走 settings 的写面（E3；E1/E2 明确拒绝并指 cordis.yml），带 revision 冲突保护，owner 的拒绝报文原样透出 | `evolution-commands` |
+| N3 | 四组用户可改参数**即时生效**：review 7 个、memory 4＋1 个（两个命名空间）、curator 12 个、skills 8 个（四个写上限、描述严格档、跨源严格档、引用校验档、支持文件上限档）；注册表 E3 因此 32 条 | `evolution-review`／`memory-files`／`tool-memory`／`evolution-curator`／`tool-skill-manage` |
+| N4 | **跨字段与只许收紧**：`archiveAfterDays ≥ staleAfterDays`、四个写上限不得高于部署值——由平台 owner `validate` 钩子在写入时拒绝 | `evolution-core`（`ParamSectionOptions.validate`） |
+| N5 | doctor 新增「参数面分歧」三类：用户覆盖／旧名仍在写／声明可写但本组合没有用户层；设置面读不出时明确报『未检查』 | `evolution-commands/src/doctor.ts` |
+| N6 | 客户端卡片包 `@lmzhen/dsh-evolution-settings-ui`：设置页按命名空间出现四张卡（当前值＋来源徽标＋写入／恢复为部署默认）；Host 半不注册任何东西，禁用该行只消失卡片 | 新包 |
+| N7 | 生成物 `packages/PARAMETERS.md`（95 条／6 组）＋门禁第 17 步 `verify-param-registry`（契约与新鲜度）与第 18 步 `verify-param-channel-parity`（四渠道同名同义） | `packages/scripts` |
+
+### 行为变化（升级前必读）
+
+| # | 变化 | 对既有的影响与回退 |
+|---|---|---|
+| B1 | **用户设置层生效**（此前只有部署面）：`settings.yaml` 按 canonical id 写的值优先于 policy 行与插件行；未设的键仍走部署值与 schema 默认 | 不写用户设置者**零变化**；要回到纯部署面，清空对应命名空间的用户段即可 |
+| B2 | 写上限**只许收紧**：用户设的上限高于部署值即在写入时被拒（报文写明超了哪个值） | 部署值不变；要放宽只能改 `cordis.yml` |
+| B3 | 两个写行为档位（`citationPolicy`／`supportFileCharPolicy`）改判 **applies: live**（原表为 restart）；另两个（`referenceRewrite`／`archiveRetention`）**保持部署面**（E2，policy 快照选定）——它们的消费者在别的包（合并走 curator 的 `consolidate`、归档清理由快照路径触发），本包写路径读不到用户值，因此不改登记档位以避免『写了不生效』 | 改这两个档位仍在 `cordis.yml`／policy 行；不写用户设置者不受影响 |
+| B4 | 六个旧名（`skillInterval`／`memoryInterval`／`intervalHours`／`maxSkillContentChars`／`memoryCharLimit`／`userCharLimit`）**可读不可写**，写路径拒绝并给出 canonical 名 | 既有 `cordis.yml` 行继续可用旧名读取；建议按 `/evolution params` 的登记名迁移（0.7.0 移除） |
+| B5 | 卡片包新增一行到 `evolution-all` 的补丁层 | 老 profile 升级后即出现卡片；不要卡片就禁用该行（host 侧零影响） |
+
+## 0.5.0 (minor) — 技能库维护能力批：引用解析 / 成本口径（判定统一 token 尺）/ 需求观测 / 钩子与退役建议 + 四个档位开关
+
+> 依据 `references/design-skill-library-maintenance.md` 的七步方案与 §16 的架构分层批次（V1–V6）落地。
+> **行为变化集中在四处**（见下表 B1–B4）：`restructure` 默认放行更宽、归档保留不再自动删除、合并拒绝消息会附重挂计划、
+> 支持文件也受 10 万字符上限约束（默认只警告）。磁盘布局、导出面与既有事件不变；
+> 新增两个漂移信号（`citation_resolution`、`demand`，`DRIFT_SIGNALS_VERSION` 2 → 3）与四个可部署切档的策略字段。
+
+### 新能力（用户可感）
+
+| # | 能力 | 位置 |
+|---|---|---|
+| N1 | **引用解析器**：正文里的支持目录路径按技能根解析，区分「悬空 / 不可判定 / 方言（URL、围栏、命令行）」；误报归零有实测 | `evolution-core/citations.ts` |
+| N2 | **成本口径**：判定与报告统一到 **token 尺**（限额基准 CJK 1.0 / ASCII 1÷2.75，ASCII 侧与平台 `CHARS_PER_TOKEN=4` 的旧口径区分开），另给 4 一侧的估算区间 `tokensLow/High`；`body_size` 的值与详情给出软带倍数 | `evolution-core/cost.ts`、`drift-signals.ts` |
+| N3 | **按文件需求观测**：`read` 工具落到具体支持文件即计数（`support_reads`），由此产出 `demand` 信号（窗未开报 unknown） | `skill-usage`、`drift-signals.ts` |
+| N4 | **钩子语法 + 退役建议**：`- 症状 → references/x.md` 为规范钩子；`unhooked` 进 `pointer_missing` 详情；退役候选 propose-only，`<!-- keep: 路径 原因 -->` 为逃生门 | `citations.ts`、`drift-signals.ts` |
+| N5 | **指针块带链接表**：`restructure` 搬走整节后，正文保留指针行 + 「本节引用」纯路径表，搬迁不再制造指针缺口 | `skill-store.ts` |
+| N6 | **合并重挂 + 改写**：`apply` 档下把源正文真正引用的支持文件搬进目标、改写其引用、校验 `dangling=0` 后才归档源 | `reference-rewrite.ts`、`skill-store.ts` |
+| N7 | **档位开关可在 `cordis.yml` 切换**：`citationPolicy` / `referenceRewrite` / `archiveRetention` / `supportFileCharPolicy` 成为 evolution-policy 的闭合枚举字段 | `evolution-policy`、`limits.ts` |
+
+### 行为变化（升级前必读）
+
+| # | 变化 | 对既有的影响与回退 |
+|---|---|---|
+| B1 | `restructure` 的引用守卫从「含引用即拒」改为**存在性校验** | 以前被拒的搬迁现在可执行；要旧行为设 `citationPolicy: 'refuse'` |
+| B2 | 归档保留默认改为**只报告、不删除** | 365 天窗口不再自动清 `.archive`；`wouldPrune` 进 curator 运行报告（读不到列表写 unknown）；要旧行为设 `archiveRetention: 'prune'` |
+| B3 | 合并被拒时会附**重挂/改写计划**（`referenceRewrite` 默认 `plan`） | 拒绝语义不变、消息变长；`apply` 才真的合并并改写引用 |
+| B4 | 支持文件同受 **100,000 字符上限**（默认只警告不拒写） | 超限写入仍成功、消息带咨询；`supportFileCharPolicy: 'enforce'` 才拒写，且两档都保留净缩减豁免 |
+| B5 | 软带＝上游拆线（20,000 字符）并**在判定时按本正文成分折成 token 线**（CJK 正文 20k 字符＝20k token 线；全 ASCII 同字符数＝7,273 token 线） | `body_size` 与健康视图的 **verdict 改按 token 判定**（数学上与「字符 ≥ 20,000」等价，故与上游文本效果同点）、value/threshold/detail 文本改成 token；老快照无 `bodyText` 时退回字符判定 |
+| B6 | 维护提示词条款扩展（钩子/退役/软带）并订正软带字段名（`band=` → 现行 value／threshold／`body=Nx`），bundle 版本 18 → 20 | 模型可见文本变化，随包发布 |
+
+## 0.4.1 (patch) — 鲁棒性修复批：审计 P1×5 + P2×10 落地（**行为修复，无导出面/配置键/事件/数据格式变化**）
+
+> 依据全量审计（对照 `0.1.5-rc.2` 平台源码）落地十项行为修复与二轮复审的收敛，每项均为最小 diff，
+> 每处行为变更都以回归测试钉住新契约（或修正钉住旧错误行为的断言）。A5/A6/A9/A10 是用户可感语义变化（见下表），
+> `$DSH_HOME` 数据布局与落点原样，未迁移任何磁盘格式。全量 16 步门禁在「行为修复态」与「0.4.1 定版态」各复跑一次，
+> 两轮均 16/16 绿，数字与冒烟见「验收与证据」。
+
+### 行为修复（用户可感）
+
+| # | 修复 | 位置 |
+|---|---|---|
+| A1 | **PTC 会话评审证据块不再为空**：`renderToolResultLine` 覆盖 `tool/ptc-dispatch` 结算载荷（顶层 `content`/`isError`，无 `message` 包装），结果行携带被派发工具的名字与参数（此前 PTC 会话在"证据强制"提示下拿到零工具证据） | `evolution-review` |
+| A2 | **PID 重用不再永久锁死状态文件**：写锁接管对"持有者 pid 仍存活"的锁加 24h 年龄上限（本家族没有任何写入持锁超过分钟级；一天旧的"存活"锁是被 OS 重用的 pid） | `evolution-core/io.ts` |
+| A3 | **`/evolution preset install` 变体元数据落到平台唯一可读的 `preset.yml`**（此前写 `preset.ptc.yml` 等源文件名，选择器显示裸 id、无描述与排序）；与 `install-layered.mjs` 路径行为对齐 | `evolution-commands` |
+| A4 | **`/graph` 对无会话调用方回 E-305**（此前 TypeError），且四个写分支的来源解析改用 core 单源 `resolveExecOrigins`（补回 review-channel 标记，评审标记窗口内与工具路径的 staging 决策一致） | `evolution-learning-graph` |
+| A5 | **遗留 `pending.json` 损坏不再永久砖化审批面**：quarantine 类失败改移除旁置（`.corrupt.<epoch>`）+ 一次性告警，视图继续 current-only；非损坏类失败（EACCES 等）保留原文件仅跳过本次读 | `evolution-state-json` |
+| A6 | `assessHealth` 兑现"不可读返回 null"契约（真实读错误不再中断整个健康视图）；`create` 的 hermes-managed 标记写失败不再跳过审计/事件，改为成功 + 明确警告（重试不再撞 "already exists" 死路） | `evolution-core/skill-store.ts` |
+| A7 | curator 策略路径补 `archiveAfterDays ≥ staleAfterDays` 钳制 + 告警（此前坏策略静默跳过 stale 阶段）；中止回写优先用 transact 基线，多进程不再回拨调度锚 | `evolution-curator` |
+| A8 | 安装器对"存在但不可解析"的 profile manifest 由静默 fail-open 改为告警（6 处调用点）；profile 种子文件（`cordis.patch.yml`/`pnpm-workspace.yaml`）改 tmp+rename 原子写入 | `packages/scripts/install-layered.mjs` |
+| A9 | frontmatter 审计扫描改为与重写路径一致的换行无关迭代（混合换行块不再漏报 `catalogInvalid`）；skill 目录根列表失败时 catalog 观察改报 `complete: false`（不再让陈旧目录被平台缓存为权威） | `evolution-core`、`evolution-skill-catalog` |
+| A10 | 事件追加的 transact 任务在锁层重试时完整复位闭包状态（`parsedBody`/`refuseMessage`/`assigned`——含二轮复审补上的 `assigned`，杜绝"拒绝路径报告幻影成功 seq"） | `evolution-core/evolution-events.ts` |
+
+### 二轮复审收敛（对上表的自我审计）
+
+- A2 的"存活即拒绝"残面收敛：`skill-store` 的 `sweepLockIfStranded` / `refuseLiveLockOrSweep` 同步采用 24h 年龄窗口（无 `mtime` 的后端保持保守拒绝），整树快照恢复不再被重用 pid 的残留锁永久阻塞；approval `release()` 因记录无 claim 时间戳维持原状（`reject` 仍为逃生门）。
+- A6 警告文案拆分：marker 失败不再被包进 fsync/durability 措辞，操作者看到的是自洽的两句话。
+- 文档同步：`evolution-agent/README.md` 的元数据列澄清（列= 包内源文件，安装时一律写平台 `preset.yml`）；根 README（中英）与 `packages/README.md` 的错误码表补 `E-304`/`E-305`、环境变量表补 `DSH_AGENT_PRESET_ROOT`。
+
+### 第二批：遗留 P2 收敛（同轮复审驱动）
+
+| # | 修复 | 位置 |
+|---|---|---|
+| P2-07 | **记忆注入快照不再因挂载顺序整进程为空**：provider 晚于本行应用时按 500ms 有界重试（60s 上限，卸载即清），首个成功渲染即停 | `tool-memory` |
+| P2-13 | **反馈缓存不再在 Windows rename 不可见窗口固化丢带**：活动日志缺席而档案在场时跳过本次缓存写入 | `evolution-feedback` |
+| P2-04 | `skill_manage` 的 stage 期锚点对不可读目标改 fail-closed（锚为 `'absent'`，与 `/graph` 姿态一致），不再留无锚静默覆盖残留 | `tool-skill-manage` |
+| P2-08 | 模块文档兑现事实：写明 365 天归档清理与 5 份快照保留这两处**有意的**保留期硬删（原"永不硬删"表述过度承诺） | `tool-skill-manage` |
+| P2-20 | 安装目标尾部清单（all/host/preset）单源化到 `lib-family-packages.mjs`；`doctor.ts` 保留 TS 侧副本并由守卫用例互相钉死（此前三处手工复制无互检） | `scripts`、`evolution-commands` |
+| P2-22a | 安装器包拷贝改 `.staging-<pid>` 暂存 + rm/rename 换入：中断/EPERM 不再撕裂已挂载 profile 的活包树（旧树保持完整，残留下次运行清除） | `packages/scripts/install-layered.mjs` |
+| R2/R3 | 二轮复审收敛：`release()` 与 `parseLockBody` 文档对 pid 0 的真实语义（`isProcessAlive(0)` 在 POSIX 探测的是调用方进程组）+ approval 侧 `holder > 0` 防护；review 的 `pendingCadenceWarned` 纳入清扫触发集；评审身份前向扫描加 2000 事件尾窗界；`Authorization: Basic <b64>` 纳入脱敏（值形 + `authorization` 关键字，原先零覆盖直达模型边界）；maintenance 输出 schema 的 `undo_path` 与校验器 E-56 语义对齐（不可逆项可省略） | 多包 |
+
+### 测试
+
+- 新增：PTC 证据 4 例（`evidence-mutex.spec.ts`）、遗留 pending 新契约 1 例（`shape-gate.spec.ts`）、decideTakeover 存活窗口边界断言（`io.spec.ts`）、doctor↔lib 尾清单互钉 1 例（`guard-scripts.spec.ts`）；修正 2 处钉住旧错误行为的断言（`commands.spec.ts` 元数据文件名、`shape-gate.spec.ts` 遗留 fail-loud 行）。
+
+### 验收与证据
+
+- 全量 16 步门禁（`node D:/dsh/audit-v42/run-baseline.mjs v041b`，本批修复态）**16/16 exit=0**：
+  `tsc -b tsconfig.host.json`（含 tests）0 错、`oxlint packages/evolution` **0 warning / 0 error**、
+  `vitest` **153 文件 / 1450 用例全绿**（112s）、13 项 `verify-*`/`check-*` 全 0 —— 含
+  `check-tsconfigs` 29 份 tsconfig 无重复引用、`check-manifests` 29 份包 manifest 合法、
+  `mirror-sync-check` 镜像↔取证树 405 文件逐字节一致、`verify-arch-guards --strict` 21 条规则、
+  `verify-doc-facts --strict --require-repo-docs` 5 条事实 0 violation、`verify-platform-contract` 174 条平台引用 0 断链。
+- 用例账：0.4.0 基线 1444 → 本版 **1450**（新增 PTC 证据 4 例、遗留 pending 新契约 1 例、
+  doctor↔lib 尾清单互钉 1 例、Basic 脱敏 1 例；`decideTakeover` 存活窗口 3 条边界断言加在既有用例内）；
+  另修正 2 处钉住旧错误行为的断言（`commands.spec.ts` 元数据文件名、`shape-gate.spec.ts` 遗留 fail-loud 行）。
+- 发布前评审补记：本批交付时的门禁曾红在 `oxlint`（22 处，全部是类型/风格规则；同轮 `tsc` 与 `vitest` 已绿），
+  逐条修净并复跑；脱敏新增用例按仓库既有的源码级拼接写法（`key(...)`）落地，仓库内仍无真实密钥字面量。
+- 已发布形态冒烟（发布后执行，结果记入 `packages/INSTALL.md` §5 与发布记录）：
+  `dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.4.1` → 28 包全部 0.4.1、`lib/index.js` 逐个
+  `import()` 通过、`--dump-config` 的 id 数与不重复性核对。
+
+### 明确不做 / 挂账
+
+- 沿用 0.4.0 的挂账清单：`evolution-review` 三处小改（`subagents.start` 无界、replace 唤醒与
+  `reviewWakeInject` 的关系、单槽节奏抑制）、`reviewTimeoutMs` 触顶告警补断言、`evolution-curator` 接住
+  `truncated`、`tool-memory` 预检文案单源化、引号表前导指示符假阳性、`computeDedupGroups` 渲染定序。
+- **本版撤出（发布前评审）**：原第三批的 P2-19「删除镜像根 `tsconfig.base.json` / `tsconfig.host.json`」不成立 ——
+  发布 CI 的基线作业以它们为来源（`.github/actions/evolution-validate/action.yml` 在 `copy_host_tsconfig: 'true'`
+  时执行 `cp tsconfig.base.json upstream/`），删除会让 `validate (baseline)` 直接红，而本地 16 步门禁看不到这一步。
+  两文件已恢复，本版不含该项；要与 CI 改造同批再评估。
+- 组 B（P2-01/02/03/05 结构重构）、组 C（休眠子系统出树等删除项）、组 D（包合并 29→15–18、安装面 `.next` 发布）
+  按优化计划留给 0.5.0。本版只有行为修复，不含结构重构，也不新增导出面、配置键、事件或磁盘格式。
+
+## 0.4.0 (minor) — 文档全量重写与测试/仓库卫生批（**无运行时行为变化**）
+
+> 本版把 0.3.83 之后的全部改动收口：一次按「读者第一性原理」做的**全量文档重写**（根 README 中英、29 份包 README、7 份作者清单、两份安装文档、模板），
+> 两处**测试加固**，以及一次**仓库安全面**治理。`packages/*/src/**` 相对 0.3.83 只有一处注释澄清（`evolution-review` 的 D6 口径），
+> 没有导出面、配置键、事件或行为变化；升级到本版**不需要**改任何部署配置，也不会改变既有会话/状态/技能树的落点。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| 根 README（EN/中文） | 按读者路径重写：3 枚信息性徽章（npm 版本 / release CI / MIT）+ 锚点导航 + 「你该装吗」+ 60 秒安装（含 28 包与 18 行 / 207 id 的自证命令）+ M1–M4 选型 + 兼容矩阵（平台锚 `0.1.5-rc.2`、依赖窗口 `^0.1.5-rc.2`、Node 22.19+/24+）+ 合并后的「层 / 做什么 / 你能察觉到什么」表与数据落点 + 「三种关法」+ `<details>` 折起的环境变量/错误码/维护者上游清单。**删掉**同类项目那种徽章墙、star CTA、居中排场与装饰性终端片段（体积 355 → 249 行，中文同构 204 行） |
+| 29 份包 README | 四层 `## Model Experience` 样板（每份 ≈480 B 只装 3 个事实）→ `## Model surface` 三条（Model-visible / Prompt prefix·KV cache 只引用 `packages/README.md` 单源 / Mount it?）；真有 config 键的 10 个包补 `## Configuration`（默认值逐项对 `evolution-core/src/constants.ts` 或该包 schema 复核）；带版本戳的**独立审计句原文**迁入 `## Notes and history`，正文只讲当下行为。行数 509 → 398，字节 +7.7%（自设上限 +10%） |
+| 7 份作者清单 + 模板 | 每份开头补「什么时候用这个清单」；`index.md` 改为「我想加 X → 读哪份」路由表；`templates/package/README.tmpl.md` 与 `new-package.md` 同步新骨架（Model surface / Configuration / Known limitations / Notes and history），防止回潮 |
+| 安装文档 | 根 `INSTALL.md` 按用户路径重排：**默认的生产安装形态从最后一节提到最前**（此前用户要先读本地开发形态）；节名改为场景名，`§1–§5` 编号仍单源在 `packages/INSTALL.md` 的形态矩阵。两份文档都补「Where to start / 从哪开始」，并写明「读状态列是读证据，不是读预期」 |
+| 准确性与语气 | 清除与现状矛盾的声明（旧 scope 拼写、失效交叉引用、死链、计数错误）；`deliverEnsuringWake` 明确标注为「登记在 `INJECT_SITES` 的迁移目标，不是现成 API」；去掉聚簇破折号（单段最多 12 个 → 全仓 0 个 ≥2 破折号的段）、46 处机械冒号、中文 `——` 分隔符 23 → 0 与十余处直译词（单源在/被治理/住在/不 spawn…） |
+| `tool-skill-manage`（测试） | dedup 分组断言改为**顺序无关**：组内 `a ~ b` 的方向由目录列举顺序决定，原断言会 flaky；反向断言 `not.toContain('Ghost_C ~ Ghost_D')` 在反向渲染时会漏检，已改双向正则 |
+| `evolution-host`（测试） | `installer.spec.ts` 里两处断言曾把家族版本硬编码成 `/^\^0\.3\./`，0.4.0 一升版就红；已改为**版本无关**的 `/^\^\d+\.\d+\.\d+$/`——它要验的是「安装器把家族包沿 caret 范围钉进 dependencies」，不是某个具体小版本 |
+| 脱敏测试（测试） | 两个 `redact.spec.ts` 的厂商形状夹具改为**源码级拼接**（`const key = (...p) => p.join('')`）：运行期字符串与断言完全不变，但仓库里不再有连续的 `AIza…`/`AKIA…`/`ghp_…` 文本——这是公开仓库下 GitHub secret scanning 误报的根治手段 |
+| 仓库卫生 | 告警 #1（Google API key，实为脱敏夹具）以 `used_in_tests` 结案；`.github/secret_scanning.yml` 一度用于豁免两个 spec，随后**删除**（改用夹具拼接，不给扫描器留任何豁免面） |
+
+### 验收与证据
+
+- 全量 16 步门禁：`tsc -b`（含 `tsconfig.host.json` 覆盖的 tests）0 错、`oxlint` 0/0、`vitest` **153 文件 / 1444 用例**全绿、13 项 `verify-*`/`check-*` 全 0（含 `check-manifests` 的「30 份 manifest == CHANGELOG 头版本」与 `mirror-sync-check` 的镜像↔取证树字节一致）。
+- 脱敏夹具改动由 `redact.spec.ts`（core 27 例 + review 2 例）直接判别：拼接前后运行期值相同，用例未改语义即全绿。
+- 文档守卫：`verify-doc-facts --strict --require-repo-docs` 与 `verify-arch-guards --strict`（N15 锚点解析 / N19 单一 home）均 0 violation；相对链接 0 断链。
+- 已发布形态冒烟：`dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.4.0` → 28 包全部 0.4.0、`lib/index.js` 逐个 `import()` 28/28 成功、`--dump-config` 773 行 / 207 id 全不重复。
+- GitHub：secret scanning open alert = 0；8 类厂商形状（google/aws-id/ghp/fine-pat/gitlab/stripe/slack/openai）在全仓连续匹配 0 处。
+
+### 明确不做 / 挂账
+
+- 沿用 0.3.83 条目的挂账清单（`evolution-review` 三处小改、`reviewTimeoutMs` 触顶告警补断言、`evolution-curator` 接住 `truncated`、`tool-memory` 预检文案单源化、引号表前导指示符假阳性）。
+- 本版新增候选：`computeDedupGroups` 渲染时对组内名字排序，让报告输出确定化（当前由测试侧改为顺序无关来兜住）。
+
+## 0.3.83 (patch) — 审计驱动优化批：P0/P1 止血 + 分层加固 + 继续审查全量修正（S1.1–S5.10）
+
+> 本版来自 2026-09-16 全量审计（`dsh-evolution-mirror-全量审计报告-0.3.82-vs-0.1.5-rc.2-2026-09-16.md`）与
+> `dsh-evolution-mirror-分层分步优化计划-基于0.3.82审计-2026-09-16.md` 的执行批。每步独立 commit 粒度实施、
+> 全部带红/绿验证（先在未修复副本上确认新用例红，再恢复绿）。**四处部署可见的行为变化**：① review subagent 评审看门狗时序、
+> ② `DSH_HOME` 原文值 + 恒 `resolve()`、③ frontmatter 解析器换 `yaml`、④ 无 `evolutionIo` 的部署不再写
+> `feedback_score/feedback_warn` 侧车字段（S4.6 契约如实化）。**一处依赖替换**（js-yaml → yaml）与**导出面变动**
+> （`computeDedupGroups` 返回型 `string[][]` → `{ groups, truncated }`、删零引用 `isGlobalRead`）在下表点名；
+> 两条新告警通道（`reviewTimeoutMs` 触顶、dedup 对数预算截断）见增补小节。定版前对两批合并态重跑 16 步门禁，
+> 首轮暴露的 5 处 `tsc` 严格错误 + 11 处 `oxlint` 违规（全在测试面与 1 处 lint 形态，无生产语义变化）已在本批内修复。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-review` | **S1.1（P0-1）**：subagent 评审 settle 看门狗改为**自 abort 期限起算**（总等待 = `reviewTimeoutMs + min(5s, reviewTimeoutMs)`）——旧实现在调用即刻起算 `min(reviewTimeoutMs, 5s)`，默认 `reviewTimeoutMs=120000` 下任何超过 5 秒的真实评审都被 `ReviewSettleTimeout` 杀死并静默退回 inject，opt-in 的 subagent 通道整体不可用；新增默认配置回归用例（旧实现必红） |
+| `evolution-review` | **S4.1**：`lastTurnStart` 并入死会话清扫（长驻 host 不再泄漏）；`buildReviewRequest` 复用块形状守卫（持久化 `content:[null]` 不再打断评审腿）；inbox `replace` 分支补齐投递契约——被换行在 `next-turn`（唤醒）通道时补发一次 `(wake)` stub 唤醒（含 V7-02 单次抑制），**任何返回 true 的路径都与"调用方清 latch"的实际可消费性一致** |
+| `evolution-core` | **S1.2（P1-1）**：redact 的 CANDIDATE 遍改 `exec` 循环——键名被拒时只跳过 lead+key+separator，不再整行消费；同行多键布局（JSON 常态）下的 camelCase 凭据（`clientSecret` 等）不再明文泄漏出会话边界（已实测复现并钉住）；S0.3 的 `tokenizer/secretary` 负向语义保持 |
+| `evolution-core` | **S2.1（P2-1）**：frontmatter 解析器从 js-yaml（YAML 1.1）**替换为上游同款 `yaml` 包**（1.2 core schema，`^2.4.2`），"与平台目录同判"声明首次为真——`description: 2026-13-45` 等**非法日期不再被 js-yaml 静默溢出**、`2026-09-16` 按字符串接受（平台一致）；快速路径补 `±.inf/±.nan` 引号识别（写入平台安全的字符串形态，未加引号直写时按平台语义 fail-closed 拒绝）；对拍确认差异面仅日期/二进制字面量/错误文案三类 |
+| `evolution-core` | **S2.2（P2-3，行为变化）**：`evolutionRoot` 与上游 `resolveDshHome` 逐行对齐——`DSH_HOME` 采纳测试用 trim、**值用原文**、恒 `resolve()` 绝对化。空白填充值（如 `" /x "`）与未规范化绝对路径（尾斜杠/`..`）下的部署根路径将变化；依赖旧行为的部署需修正环境变量值本身 |
+| `evolution-core` | **S2.3（P2-6）**：redact 块式配对跳过键值之间的空行（`api_key:` 与缩进值行之间有空行时值原样出边界的漏脱敏修复）；**P2-31（core 半）**：`resolveSkillsRoot` 显式相对 root 补 `resolve()`（不再落在进程 CWD） |
+| `evolution-core` | **S2.4（P2-4/P2-5）**：删除零消费者导出 `isGlobalRead`；`saveSuppressedNames` 改走 `transactIo` 通道消除无锁 RMW 并如实标 `@internal`；`write-inventory` 三个测试专用 getter 补如实 `@internal` docblock |
+| `evolution-core` | **S4.3（P2-14）**：`read_secrets` 对 `.env.example/.env.sample/.env.local.example` 等文档化模板变体豁免；真 `.env`/`.env.local` 保持拦截、`.envrc` 不触发、`.env.samples`（非精确后缀）保守拦截（逐 variant 实测钉住） |
+| `evolution-core` | **S5.9（P2-27）**：`compositionRowIds` 碰撞检测的 `- id:` 提取支持缩进行（注入锚定仍限顶层，边界以 spec 固化）；与 `install-layered.mjs` 同步修，byte-parity fixtures 扩展嵌套行样本 |
+| `evolution-state-json` | **S1.3（P1-2）**：`transactCuratorState` 以 `cloneRecord` 克隆交递 task——task 原地变异后返回 null 不再把变异持久化（对齐 domain 与 seam 契约 "null = record unchanged"）；**S3.2（P2-8）**：补 `transactTaskGuard`（后端不调 task 的假写显式失败，与三条兄弟 save* 路径纪律一致） |
+| `evolution-state-storage` | **S1.3**：conformance 套件新增"task 收到副本、变异不可达存储"向量（第三方 provider 同受约束） |
+| `evolution-state-domain` | **S3.1（P2-7）**：漂移键修复统一为 **canonical 记录胜出**（漂移记录不再覆盖 canonical 槽；与 json `keyPendingById` 同一 tie-break），跨介质修复结果一致 |
+| `evolution-feedback` | **S1.4（P1-3）**：restore 合并的"内存获胜"收窄到 **in-flight 追加窗口**（pending 集，finally 清除）——多进程共享 DSH_HOME 时，本进程触摸过的 target 不再永久覆盖 refold 真值，过期的 `feedback_score/feedback_warn` 不再写进 usage 侧车；rc.66 启动竞态保护保持 |
+| `evolution-feedback` | **S4.6（P2-20）**：无 `evolutionIo` 时 `pushQuality` 直接返回——乐观内存分不再写进持久 usage 侧车（"durable through ctx.evolutionIo (when mounted)"契约首次完全为真） |
+| `evolution-curator` | **S4.5（P2-16）**：非持有实例的手动 `restore/consolidate/restoreSnapshot` 补 instance-claim 门（与 `run()` 同词 `instance-held` 拒绝，`SkillActionResult` 形状，命令面零改动）；**（P2-17）**：first-run defer 播种改 `transactCuratorState`（并发 `setPaused` 不再被 `paused:false` 整记录覆盖） |
+| `evolution-policy` | **S4.2（P2-13）**：默认保护名单引用 core `PROTECTED_BUILTIN_SKILLS` 单源（哨兵 mock 测试证明字面量删除） |
+| `evolution-approval` | **S4.4（P2-15）**：REV-07 确定性失败词表补 `path traversal`——穿越路径 staged 记录 approve 失败一次即获"改用 reject"指引，不再是永久反复失败的 pending 行 |
+| `evolution-replay` | **S5.1（P2-18）**：`sourceCorrupt` 限定语跟随**当次读取状态**（io 重载且非 corrupt 读取即复位；再损坏复现；历史损坏仍 warn 一次可观测） |
+| `evolution-activity` | **S5.2（P2-19）**：`loadActivity` docstring 的 V24-13 失实生产消费者声明更正为如实 `@internal`（导出面不破坏） |
+| `evolution-commands` | **S5.4（P2-22）**：`maintain --facts` 预览接 M-02 失败判别（onReadError + rootExists 探针）——配错 root/全树不可读时如实报错，不再渲染"干净 facts"误导；**S5.5（P2-23）**：restructure 无 session 时 E-306 结构化拒绝（不再落地无会话归因的 staged 记录，与 consolidate/restore 姿态一致）；**S5.10（P2-28）**：doctor 对 all/standalone preset 与分层 Evolution preset 并存补显式 warn（双模型行 + 双 systemPrompt section、loader 不报错靠遮蔽）；**S5.3（审计修正）**：T-WD2 实际锚定**家族级 README**（原有机制健康、`renderCommandTable` 非死代码——审计该条为误报），包内 README 改为引用单源并以 N19 规则消除重复事实，`registry.ts` 注释澄清 "README" 指代 |
+| `evolution-skill-catalog` | **P2-30**：legacy 禁用键 `disableModelInvocation`（含拼错值）存在时 `modelInvocable` 回退 **false**（disable 倾向）——此前回退行默认 true，作者"禁止模型调用"意图被反转为允许（上游对同文件是整体丢弃） |
+| `memory-files` | **P2-31（另一半）**：显式相对 `root` 挂载即 `resolve()` 绝对化（缺省 `memoryRoot()` 不变）——宿主换 CWD 重启不再"记忆凭空消失" |
+| `scripts`（不进包） | **S5.6（P2-24）**：`prepare-release.mjs` 把各包 `README.md` 纳入 `rewriteScopedText`（家族/seam 包名改写、平台名原样），并加 shipped-README 二次扫描（对齐 V24-18）；**S5.8（P2-26）**：`.staging-manifest.json` 记录 `scope`，`install-layered.mjs` freshness 加 scope 比对（错配/缺失 fail-loud，给出两条修复路径） |
+| workflow | **S5.10（P2-29，审计修正）**：核实 `verify-declared-config --strict --upstream` 发布门**已存在**（`.github/actions/evolution-validate`，compat-check 硬门 `publish`，0.3.70 起）——审计"守卫在发布链之外"的前提过时，未改 workflow；本地以 0.1.5-rc.2 树实测绿（54 reachable / 0 violation） |
+
+### 验收与证据
+
+- 全图类型检查：上游检出内 `tsc -b` 全部 29 个 overlay 包零错误（基于平台真实源码）。
+- 全量测试：`vitest run packages/evolution/*/tests` 全绿（新增约 40 个回归用例，全部先红后绿）。
+- 守卫脚本：`verify-arch-guards`（21 规则）、`verify-doc-facts`、`verify-event-pairing` 全部 0 violation。
+- 回滚快照：改动前完整备份于 `D:\dsh\_evo-pre-opt-backup-20260916\mirror-packages.tgz`。
+
+### 增补：继续审查修正（同一发布批的第二轮实施，依《继续审查报告-0.3.83本地批》P1-1 + P2-1…P2-11 全量修正）
+
+| 层 | 变更 |
+|---|---|
+| `evolution-review` | **P1-1**：replace 补唤醒的 cadence 抑制从单发扩展为**两轮**（`skipNextCadenceFire` 值形状加 `turns`，append 单轮路径行为不变）——stub 轮不再裸奔触发多余评审；注释与 README 的 "suppressed once" 措辞同步为两轮语义。**P2-1**：settle 预算按 `MAX_TIMER_DELAY_MS` **封顶**（新公式在 `reviewTimeoutMs` 接近 2^31-1 的合法配置下曾溢出 int32、看门狗退化为 1ms 误杀每次评审），触顶一次性告警。**P2-2**：`run.dispose` 看门狗改用**仅宽限**预算（原顺带放大到 timeout+grace，挂死的 dispose 占单飞链 ~125s），错误消息按武装点区分（dispose 消息去掉失实的 "after the review timeout" 锚点），文件头注释同步 |
+| `evolution-core` | **P2-3**：`read_secrets` 的 example/sample 豁免后缀由 `\b` 收紧为 `(?=$|[\s"'])`——`.env.example.local`、`.env.sample-x`、`.env.example/` 等续体形态恢复拦截，三类文档化模板变体仍放行。**P2-6**：参考实现 `MemoryStore.applyBatchCore` 承认 `content` 别名（`facts ?? content`，add/replace 两处内容位）——直连 core store 的第三方 provider 不再对 schema 合法的 content 写报错；四处适配垫片保留（继续为第三方 provider 归一化）。**P2-8**：`computeDedupGroups` 增加**对数预算**（`DEDUP_MAX_PAIR_COMPARISONS=250_000`，超限截断并带 `truncated` 指示，三个消费方（`drift-signals` / `maintenance probe` / `skill-manage review`）各补截断提示行（curator 的近重复候选池只消费 `groups`，截断仍会静默缩小该池——记下版处置）；默认预算下输出逐字节不变）——大库上 review/dedup_group 的 O(n²) 热路径获得上界 |
+| `evolution-maintenance` | **P2-4**：maintain 计划校验器的 §3 完备性门从信号 id 粒度改为**实例粒度**（`skill::id`）——同一 over 信号命中多技能时，未被计划建议覆盖且未被 notes 解释的实例（`skill-b::narrow_name` 形态）现在会被拒绝并点名；notes 通道保持 id 级（自由文本解释覆盖该 id 全部实例）；库级单次渲染信号保持裸 id 实例 |
+| `tool-skill-manage` | **P2-7（skill 侧）**：`SKILL_ACTION_REQUIRED_FIELDS` 缺参预检**上提到审批 stage 边界之前**（与 executeCore 共享同一 helper 与消息，判定不可能分叉）——审批启用的部署上缺参写不再先 stage、批准后必败。**P2-5**：review 的去重分组排除读取失败/空体的技能（不再产出 `a ~ b` 假"近重复组"），并追加排除数量说明行 |
+| `tool-memory` | **P2-7（memory 侧）**：按 store 的逐 action 必填契约（add 需 facts/content、remove/replace 需 old_text、replace 需新内容）在审批门前做**镜像预检**（字段级判定与 store 文本一致）——缺参写不再产生"批准后必败"的 pending 记录 |
+| `evolution-skill-catalog` | **P2-9**：P2-30 的意图反转修复扩展到兄弟 legacy 键——`modelInvocable`/`userInvocable` legacy 值解析成功则尊重作者意图（false→false）、解析失败保守 false（对齐上游整文件丢弃的方向）；修正被旧测试钉错的 `modelInvocable: false → 发布 true` 断言 |
+| `evolution-commands` | **P2-10**：`maintain --facts` 的空库第三因改为返回与全扫描**逐字相同**的消息（不再渲染空 facts 块与扫描结论相悖）。**P2-11**：包 README 对家族 README 的命令表引用从仓库相对链接改为纯文字（npm 发布产物内相对链接必为死链） |
+
+#### 增补批验收与证据
+
+- 全图类型检查：29 个 overlay 包 `tsc -b` 零错误；全量 `vitest` 153 个测试文件全部通过（较上一批新增约 25 个回归用例，全部先红后绿；其中 core 与 tool-skill-manage 两路在 dedup 调用面的并发改动经合并态复验共存全绿）。定版前合并态 16 步门禁复跑：`tsc -b`（含 `tsconfig.host.json` 覆盖的 tests 全量，`--force`）、`oxlint`、`vitest` 153 文件与 13 项 verify/check 全绿（首轮 5 tsc + 11 oxlint 的修复即本次）。
+- 守卫脚本：`verify-arch-guards`（21 规则）、`verify-doc-facts`、`verify-event-pairing --strict` 全部 0 violation（`verify-platform-ranges` 在 dev overlay 下按设计不可运行——它面向 @lmzhen 发布树，需 release staging，非本批回归）。
+- 说明：`reviewTimeoutMs` 触顶告警与 dedup 截断提示是仅有的两处新告警通道，均为 fail-可见方向；接口面只动了下表点名的两处（`computeDedupGroups` 签名收窄、删零引用 `isGlobalRead`），无新配置项（预算为内部常量）。
+
+#### 定版前复查修正（第三轮：合并态门禁 + 三路读码复查，2026-09-16）
+
+- **门禁首轮红→绿**：合并态首跑暴露 5 处 `tsc` 严格错误（`lifecycle.spec` 缺 `Session` 类型导入、`feedback.spec` 未用局部变量、`tool-skill-manage.spec` 收窄后的 `.message`）+ 11 处 `oxlint`（arrow-parens ×3、max-len、unbound-method ×2、no-unsafe-* ×3、no-unnecessary-type-conversion、no-unused-vars）——全在**测试面**与 1 处 lint 形态，无生产语义变化；修复后 16 步门禁复跑全绿。
+- **`evolution-feedback` 在飞标记改引用计数**（复查 C-P2-1）：`pendingAppends` 由「每 target 一个布尔标记」改为 **Map 计数**——同一 target 两次追加同时在飞时，先落地那次的 `finally` 不再提前清标记（旧形态下第二次追加的乐观增量会被中间那次 merge 用日志真值覆盖）。判别用例 `feedback.spec.ts`「TWO appends in flight for the same target…」在旧实现下**实测红**（`positive` 期望 2、实得 1）。
+- **`redact` 候选遍恢复线性**（复查 B-P1，性能回归）：模式第四组由**消费式** `([^\r\n]+)` 改为零宽前瞻 + 循环内手工定位值尾——160k 字符单行赋值链由实测 ~2.1s（320k 为 7.0s；被替换掉的 `.replace` 形态 ~0.1ms）回到毫秒级；新增文件内既有惯例的计时卫语句（<1s）。拒绝路径的续扫位置与「宁可过度遮挡」权衡不变。
+- **`frontmatter` `±.nan` 假阳性**（复查 B-P2）：两个解析器都把带符号 `.nan` 读作**字符串**，原引号表会把正确值改写并报 `catalog-invalid`；表收紧为 `^(?:[-+]?\.inf|\.nan)$`，spec 断言同步更正（`+.nan` → `false`；`-.nan` 仍为 `true`，但归因改为既有的**前导指示符**规则——引号本身安全，缺陷只在假阳性的 `catalog-invalid`）。
+- **`install-layered.resolveHome` 与运行时对齐**（复查 B-P2）：`trim()` 仅作采纳判据、值用原文、恒 `resolve()` 且展开 `~`——安装器、core `evolutionRoot` 与上游 `resolveDshHome` 三处同形；填充空白/相对 `DSH_HOME` 下不再装进插件永不读取的树。
+- 复查同时确认（未改动）：`DSH_HOME` 语义与宿主 `dsh-home-paths` 逐行一致；`yaml@^2.4.2` 与平台 `skill-filesystem` 同依赖且发布闭包可达；state-json 克隆/守卫的新用例均有判别力；`isGlobalRead` 全镜像零引用。
+
+### 明确不做 / 挂账（对应计划第 5 节）
+
+- 不做状态介质迁移工具；不统一 .mjs/.ts 行覆盖双实现为共享构建产物（保持 byte-parity 测试）；不把 `verify-profile-bundles` 接入宿主启动路径。
+- 不为库层错误建结构化错误码体系（S4.4 已在注释挂账）；不引入自动化死代码检测基建。
+- `loadActivity` 为已发布导出面，本期仅更正声明，下个大版本删除。
+- 定版前复查新增挂账（下版）：`evolution-curator` 的近重复候选池消费 `computeDedupGroups` 时丢弃 `truncated`（截断阈值 ≈708 技能，报告里无提示）；`reviewTimeoutMs` 触顶告警的「只发一次」无断言；coalescing 路径未看 `reviewWakeInject`（本插件自身投递路径下不可达）；`tool-memory` 的审批前预检与 store 拒绝文案是手抄副本（建议单源化）。
+- 定版前复查另记（**既有**，非本批引入）：`yamlPlainScalarNeedsQuotes` 的前导指示符分支把 `-foo`/`?x`/`:x` 判为需引号，而两个解析器都读作普通字符串 ⇒ 对平台正常加载的文件报 `catalog=yaml-invalid`（`render-facts.ts`）；按 YAML 1.2 `ns-plain-first` 应只在 `-/?/:` **后接空格**时判指示符，但该谓词同时服务审计判决与写路径引号（frontmatter.ts:114-118 的同一性设计），放宽需先拆分两用。
+- 0.3.83 发布后复查挂账（复查 A 组，均 P2）：`evolution-review` 的 `subagents.start` 仍是评审腿唯一无界 `await`（provider 不 resolve 则 `reviewInFlight` 永久为真、延迟队列向 cap 16 逼近且无 `review-error`）；replace 补唤醒未过 `reviewWakeInject` 门（本插件投递路径下不可达）；cadence 抑制是每 session **单槽**（append 会把 `turns:2` 覆盖成单发，重复 replace 重置计数并再堆不可合并的 stub 行）；触顶告警「每 mount 只发一次」无断言（删掉守卫仍全绿）；看门狗定时器不 `unref`（对照 curator 纪律）。
+- 文档口径更正（复查 D6）：增补表 P2-2 行与 `evolution-review/src/index.ts` 的「原顺带放大到 timeout+grace、挂死 dispose 占单飞链 ~125s」指**本批 S1.1 中间态**，不是 0.3.82——已发布基线的 dispose 预算本就是 `min(5s, reviewTimeoutMs)`，相对基线 P2-2 只改日志文案；`settle-watchdog.spec` 头部已注明该用例对已发布基线恒绿。
+- 已知代价（保留）：`yaml` 的解析成本高于 js-yaml（多键 62k 实测 226ms vs 10.5ms、anchor 100k 256ms vs 19.5ms），单文件受 `MAX_SKILL_CONTENT_CHARS=100_000` 约束（≤~0.26s），全库扫描时是乘数——这是「与平台同解析器」换来的确定性，不改为分叉解析。
+
+## 0.3.82 (patch) — 分层优化批：S0–S4 全量收口（鲁棒性 / 单源化 / 结构 / 交付）
+
+> 本版来自 `dsh-evolution-optimization-plan-v44.md` 的执行批：按「核查 → 设计 → 实现」逐步推进 S0–S4，每一步都在镜像提交并跑 16 步门禁。
+> 无接口破坏以外的兼容问题；**一处 API 收窄**（删 16 个零引用类型导出）与**一处新增导出**（发布出去的 provider 合规套件）已在下表点名。
+> 平台口径未变：`PLATFORM_VERSION=0.1.5-rc.2`、`UPSTREAM_SHA=fb2c4b9e…` 与本批取证树一致，无需迁移。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-commands` | `/evolution consolidate`、`restore`、`skill restore` 在**启用审批的部署**下改为 **E-306 拒绝**（它们无法被 skill runner 回放，原先静默直写）；`stageForeground: false` 或会话 `never` 策略仍可执行 |
+| `evolution-commands` | `/evolution doctor` 新增 **session-query 探针**（平台 P-1/P-2 的家族侧缓解）：列出失败即原文报出并附带隔离配方；挂载却答错类型单列一条；**探针设 5s 界**——探测「会让命令挂住」的病态时，超时本身成为发现项，而不再是命令挂死 |
+| `evolution-review` | cadence 通知的 summary 现在**带评审种类**（`auto-review:<kind>`）——同 kind 才合并，避免 memory/skill 提示互相替换 |
+| `evolution-review` | 直写路径对 **noop 写不再计 patch_count/last_patched_at**（低质量 warn 不再被无效写抑制） |
+| `evolution-review` | **有界 settle 等待 + 看门狗**：`run.result`/`run.dispose` 超预算即放弃该句柄（预算 `min(reviewTimeoutMs, 5s)`）并发出 `evolution/review-error`；平台不兑现 abort 时不再让单飞行标志永久为真、队列永不 drain |
+| `evolution-review` | **结清点移到投递确认处**：飞行期间到达的触发按 `(session, kind)` 合并（last-wins，cap 只约束不同会话）；drain 投递失败时**重新武装该会话的 cadence latch**（原先该段评审会无声消失） |
+| `evolution-review` | **评审通道标记不再落在用户轮**：投递前检查队列，若已有真人消息（`source.kind === 'user'`）则不落标记并诊断一次（平台不暴露 claim 身份时的既定退路） |
+| `evolution-review` | **cadence 抑制绑定被唤醒的那一轮**：抑制记录投递时最近一次 `turn/start` 的轮号，只有轮号更大者才消费它——忙期无关轮不再吃掉抑制 |
+| `evolution-review` | **截止后落地的 op 也会上报**：越过写腿截止的落地逐条通知模型（含迟到计数与截止前已落地数），不再只在日志里留一句 |
+| `evolution-approval` | release 的孤儿判据改为**可验证**（claim id 带 pid；活的外来 pid 硬拒绝；无 pid 的旧 claim 降级为显式破坏性动作）；`releasePendingClaim` 失败会留痕并回读确认 |
+| `evolution-curator` | 留存清扫进 `transactIo` 真跨进程锁；`persisted-write-inventory.json` 的 `curator-reports` 由 instance-claim 改为 **transact**（与实现相符） |
+| `evolution-state-json` | 三条 `save*` 在**transact 契约违约**时改为抛错（原先静默丢写）；pending 变更路径现在都上报 gate 丢弃集（legacy 孪生不再被复活） |
+| `evolution-state-json` | **staged 表的两条成长信号**：除记录条数外新增 **args 字节预算**（1 MB）告警；两条信号从 `savePending` 扩到 **claim / resolve** 路径，告警点名是哪条路径观察到的 |
+| `evolution-core` | 时间线读取：未来版本归档**置 malformed**、归档读失败拒绝轮转、未知年龄的 `.collide` 不删；`feedback` 的 malformed 读**不写 boot cache**（warn 一次） |
+| `evolution-core` | 写入清单资产改为**惰性读**（资产缺失不再导致全族加载失败；首次使用 fail loud） |
+| `evolution-core` | 派发账本键改为 `(session, callId)`（跨会话不再串键） |
+| `evolution-core` | **写路径的「读不到」不再裸奔**：目标不可读（EISDIR/EACCES…）时 update/patch/write_file 返回**结构化拒绝并点名原因**，不再把裸 errno 抛给模型；suppressed 边车读失败不再被覆盖；usage 边车的**版本冻结在没有回调时也会报告** |
+| `evolution-activity` / `evolution-replay` | **读侧判定通道**：`loadActivityState` 同时给出 records 与 `corrupt` 判定；replay 回填时若侧车不可读则 warn 并在每次比较结果上标注「这不是记录下来的历史」 |
+| `evolution-memory-files` | **记忆预算两处配置面收敛**：未显式设置的 `memoryCharLimit/userCharLimit` 跟随 `evolution-policy`（显式值仍优先，冲突 warn 一次），并把生效预算发布为 `evolutionMemoryBudget` |
+| `evolution-state-storage` | **发布 provider 合规套件**：新增导出 `runStateProviderConsistency(provider, assert)`（断言面注入，模块零测试运行器依赖）——第三方 provider 可自测整条 seam 契约 |
+| `evolution-state-storage` | **API 收窄**：删除 16 个零引用**类型**导出（仅 `.d.ts` 面变化，无运行时影响）；两个 seam cap 常量迁到 `constants.ts`（导出面不变） |
+| `evolution-skill-catalog` | 跨层 rank 语义成文并加**跨层 spec**：最近层直接赢同名、rank 只在同层内破平；`evolution-all`（global 层）与 `evolution-preset`（预设层）两处行注释写明各自何时管辖、开关设在哪里 |
+| `evolution-review` | 运行期文案不再指向被 gitignore 的 `packages/docs/`（改指本包 README 的 Known Limitations），并由 `guard-scripts.spec` 机械守卫 |
+| docs | `CONTRIBUTING.md` 点名被冻结的旧树与**两树漂移探针**（机器本地、仅告警），并说明为何不把它做成仓内守卫 |
+| `scripts`（不进包） | 新增门禁 `verify-package-discovery`、`verify-family-tool-names`、`verify-skill-roots`，并把 profile-bundles/doc-facts/platform-contract 接进批次门禁（10 → **16 步**）；`CONTRIBUTING.md` 门禁表与执行集逐行对齐 |
+
+### 验收与证据
+
+- 门禁：`run-baseline` **16/16 exit=0**（最终 HEAD；含 tsc-host / oxlint / 全量 vitest / 六个 verify-* 与 check-*）。
+- 结构度量：死导出 **80 → 64**（本批清 16 个类型）；`evolution-core` 导出面 **289** 名、`evolution-state-storage` **34** 名（含新增两个 conformance 导出）。
+- 复查（以源码为先）：两条真缺陷当场修复——诊断探针**无界**（命令会挂在它要报告的状态上）与探针**收 promise 而非 thunk**（同步抛错打崩命令）；两条都附判别性证据。
+
+### 明确不做 / 挂账
+
+- 迟到落地仍**无 `plan-applied` 审计条目**（活动/回放低报）——需「迟到补记」emit 设计；`claim` 身份平台不暴露 ⇒ 标记/抑制沿用顺序身份与队列前置检查。
+- 剩余 **64 个死导出**按「每次发布清 ≤20」的触发条件挂账；**97 个测试专用导出**登记为测试接缝。
+- 平台侧 6 条缺口（P-1…P-6）已成上报包（含每条的最小复现/期望/现状/影响面），平台修复前家族只做「让坏语料可见」的缓解。
+
+## 0.3.81 (patch) — 会话面缺陷收口：无 agent 调用不再崩、评审投递就地合并
+
+> 本版来自 0.3.80 的安装后功能核查：一处命令面裸崩溃（脚本/无会话调用者）、一处注入队列堆积（长忙期同一条评审提示被重复入队）。
+> 两处都在发布前拿到源码路径级归因与新增回归；无接口破坏、无新配置项。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-commands` | **E-305**：`/evolution learn` 等需要会话通道的分支此前裸解引用 `invocation.agent`——脚本/无会话调用者拿到的是 `TypeError: Cannot read properties of undefined (reading 'followup')`，而兄弟分支都答文档化的 E-3xx。现由**一个** `agentMissing(need)` 断言器统一作答（含原因与补救：从会话内运行）；唤醒原语仍**在接收者上调用**（N13b / 0.3.73 的接收者丢失教训），既不选进局部变量，宿主两原语都缺时也答同一条 E-305 而不是第二次崩溃；`restructure` 同源的 `invocation.agent.session` 解引用一并收口——session 变可选，且`willStage` 在无 session 时**拒绝** staging（staged 写必须能指名会话），退化为直接写而不是崩或落一条无归属记录 |
+| `evolution-review` | **投递就地合并**：`deliverMessage` 在 append 之前读平台公开的 `agent.inbox.nextTurn/nextStep`，命中**同 kind**（`source.plugin + form + summary`）的待发通知则 `replace(id, message)` 就地换新——长忙期同一条 cadence 评审提示不再被重复排队（`next-turn` 每轮只取一条，重复入队＝之后连开多轮）。合并成功即视为投递成功：调用方的 latch 照常消费、`reviewPrompt` 照常标记评审通道，但**不设** `skipNextCadenceFire`（本次没有唤醒任何轮）。异 kind／异插件照常并排排队；`replace` 返回 `false`（已被某步取走）、宿主无 `inbox`、访问器抛错一律**回退**到原 `followup`/`inject` 分支 |
+| docs | 修正 0.3.80 节自相矛盾的一行（变更表新增 `/evolution release <id>`，"明确不做"却称不新增该命令面） |
+
+### 明确不做
+
+- 投递不做「静默等待 0.5–2s 再判定」的 pending 门：同队列的读与写都是同步的，只要中间不 `await` 就没有 TOCTOU，定时器只会引入不确定性，也修不了「已被取走」；
+- 不区分 `agent/inbox/claimed` 与 `discarded` 来做投递决策：两者载荷相同（只有 `{message}`），**用户手动删除**与 `cancel()` 清队不可区分，据此重投会与用户意图对撞；
+- `evolution-commands` 的 learn 唤醒不做合并：它由用户显式命令触发、一次一条，不存在重复堆积。
+
+### 验证
+
+- 新增回归：`commands.spec.ts` 无 agent 调用答 E-305 而非抛错；`review.spec.ts` 三条合并用例（就地替换且不追加＋计数归零 / 异 kind 与异插件照常排队 / `replace` 被拒仍另发一条），夹具新增 `inbox` 选项；
+- 门禁 10/10（`D:/dsh/audit-v42/release-0.3.81-*`）：tsc-host 0 / oxlint 0-0 / vitest **132 文件 1298 用例** / 四守卫 / 两校验器 / `mirror-sync differ=0`。
+
+## 0.3.80 (patch) — 架构分层优化：审计收口（3×P1 + 行为级 P2 + 契约对齐）
+
+> 本版按《架构分层优化计划》（2026-09-15）实施：阶段 0 微修复、阶段 1 三项 P1 收口、
+> 阶段 2 行为级 P2、阶段 3 契约与文档对齐。全部改动均有对应回归或守卫验证；
+> 明确不做清单（避免过度开发）见计划文档 §2.2。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | **S1-E1** consolidate 两段式提交中归档后的三处 `return` 改为 `throw`——此前它们绕过 catch 回滚器，源技能留在 `.archive` 而消息声称"只是被拒绝"；**S1-E5** 每个源归档前一刻重读并比对计划期字节，跨进程漂移即中止（走同一回滚）；**S1-E2** `restoreLatestSnapshot` 的 manifest/extras 读取收进结构化拒绝；**S1-E4** 锚定 `update` 的读失败拒绝改用 `anchorUnverifiable`（"无法验证"不再冒充"不存在"）；**S1-E8** 新增 `resolveExecOrigins(exec)` 单点 origin 解析（header origin + v37 S2.2 会话标记二合一）；**S1-E3** 修复威胁扫描 ZWJ 豁免的转义错误（`'\\u200d'` 永不等于真实 U+200D，emoji 组合序列不再误报 `unicode_format_control`）；**S1-E6** 删除 `ToolDispatchKind` 不可达的 `'program-root'` 值（平台事件顺序下不可达）；**S1-C4** 策展提名解析器为悬挂的 `- from:`（截断或覆盖）补 warning |
+| `tool-memory` | **S1-B1** origin 解析迁移到 `resolveExecOrigins`——inject 评审模式的 memory 写不再被误标 `foreground`，`stageForeground:false` 下不再绕过审批 staging；**S1-B3** `memoryEnabled:false` 时注册显式拒绝 runner（经与启用路径相同的 trailing inject），存量 staged 写在 approve 时得到明确答复而非永久孤儿 |
+| `tool-skill-manage` | **S1-B1** origin 解析同点迁移（行为不变）；**S1-B2** `strictCrossSource` 跨源检查提取为共用函数，审批回放路径同样执行（staging 与 approve 之间目标被高优先级 source 占用时拒绝落盘），与工具路径同豁免 list/review/pin/unpin |
+| `evolution-plan-validator` | **S1-C1** `SkillOp` 增 `replace_all?: boolean`（非布尔拒绝）——此前校验面不认识该字段而执行面硬编码首处替换 |
+| `evolution-review` | **S1-C1** patch 执行透传 `op.replace_all`；**S1-C2** REV-06(b) 门内重读成功的字节回填锚附加——staging 读瞬时失败 + 门内验证通过的计划不再被 `'absent'` 哨兵确定性拒绝 |
+| `evolution-commands` | **S1-F1** doctor 的 layered 检测从硬编码 `~/.agent-presets/evolution` 改为枚举全部已交付家族 base（`evolution-ptc`/`evolution-cordis`），`unsupported` 基座（minimal）与外来 preset 目录不计入——ptc/cordis 变体安装不再被误判 `none` 并诱导叠加 `all` 双挂载；**S1-F2** approval 未挂载时 `/evolution pending` 返回结构化错误（对齐 E-301），不再伪装"队列为空"；**S2-O4** bases.json 不可读的回退分支增加内容标记校验（家族生成物必引 `@deepseek-ai/dsh-*`），外来 preset 不再误报冲突 |
+| `evolution-approval` + `evolution-commands` | **S2-P2-22** 新增 `/evolution release <id>`：把孤儿 `executing` 记录（approve 崩溃残留）退回 pending 窗口——凭据取自记录自身 `claimedBy`（无需扩 state seam），双重防护（本进程 inFlight 拒绝 + 家族单实例契约）；doctor 的 EXECUTING 行动项同步指引 |
+| `evolution-state-domain` | **S1-D3** `DETERMINISTIC_OPEN_CODES` 补 `already-open`（确定性失败不再空耗 3 轮退避）；**S1-D2** `listPending` 对"表键 ≠ record.id"的漂移行按 id 重键修复 + 一次性 warn（对齐 json 侧 P2-5，漂移 pending 不再是审批视图永久僵尸）；**S2-O3** 修复失败时的重读按 record.id 去重（put/delete 两步之间失败不再同记录双列） |
+| `evolution-core`（tool-dispatch）+ `skill-usage` | **S2-P2-12** view 计数从 reveal 移到 SETTLE（normalizer 新增 `settledSignalOf` settle 通道，同一 result 事件只结算一次）——拼写错误/读取失败的 skill 加载不再虚增 view_count，未 settle 的调用不计（保守方向）；**S2-P2-14** live 监听器的 ledger 上限 4096（opt-in `maxTracked`，全量日志折叠路径默认无限），长驻宿主不再随工具调用线性增长 |
+| `evolution-skill-catalog` | **S2-P2-10** OPT-10 注释如实化：scan 亦会在 usage 计数落盘后触发（sidecar 位于受监视根内、rename 推高根 mtime）；根因级重设计（sidecar 迁出监视根）留缓做清单 |
+| `evolution-skill-catalog`（第二轮） | **S3-P2-10** summaries 缓存戳从根目录 mtime 改为**非点条目名集合**（经 seam 必需的 `list`，三态 probe）——usage 计数落盘的 tmp+rename 不再触碰该戳，每次计数落盘触发全树重扫的churn消除；对外部增/删/改名的感知不变，且对无 mtime 后端更稳健（`list` 必需）；`io.ts` 的 mtime seam 契约注释同步更新 |
+| `evolution-curator` | **S1-C3** `llmReview:true` 但 llm 服务缺席时补一次性 warn 并在提名结果中显式标注（对齐 E-52 可观测纪律） |
+| `evolution-learning-graph` | **S1-F3** `/graph` edit/delete 前置探测只把 ENOENT 读作"不存在"，其余 IO 错误如实上报（不再把瞬时读失败伪装成"技能不存在"） |
+| `evolution-host` / `evolution-all` / `evolution-preset`（组合） | **S1-D1** `evolution-state` 行显式 `config: { provider: json }`（三方字节一致）——overlay 仅启用 domain 行不再静默把整个状态介质切到空 domain；切换需显式覆盖该 pin |
+| `evolution-preset/cordis.yml` | **S1-A1** 注释如实化：standalone 行**有意**缺 `sessionScoped`（bare mount 全量观察），删除失实的 "byte-consistent" 声明 |
+| `scripts/lib-doc-facts.mjs` + `scripts/checklists/**` | **S3-G1** 引用存在性正则从 `verify-*.mjs` 扩为任意裸脚本名（`.mjs`/`.cjs`，排除带路径引用）——立即抓出并修复 5 个此前不可见的幻影脚本名共 11 处引用（`check-manifests.cjs`、`mirror-sync.mjs`、`check-tsconfigs.cjs`、`rule-snippet.mjs` 及 CONTRIBUTING 中 2 处机器特定路径 `D:/dsh/audit-v37/*`） |
+| docs | **S3-A2/G2** `INSTALL.md` 说明 `evolution-all` 对 `agent-preset` 硬依赖的闭包守卫用途（不改依赖类型）；`CONTRIBUTING.md` 门禁表退役机器特定路径（`D:/dsh/audit-v37/*`），补齐镜像侧 verify 脚本步骤 |
+
+### 明确不做（防过度开发，见计划 §2.2 / §7）
+
+- 不建注释声明校验 DSL；不统一评审/工具两条写路径；不给 normalizer 加后台清理；
+- 孤儿 `executing` 审批记录的**自动**回收仍不做：本版只提供手动 `/evolution release <id>`（见上表 S2-P2-22），无人值守的自动退回列入缓做清单；
+- usage view 计数时点、normalizer 容量上限、catalog 事件驱动失效：列入缓做清单及重启条件。
+
+### 验证
+
+- 行为步骤均携带新增/更新回归（consolidate 回滚、replace_all 校验、doctor 多基座、
+  B1 origin 标记、B3 拒绝 runner、C4 悬挂提名、E3 ZWJ 误报）。
+- 平台 strict tsc 全插件包 0 错误；`verify-doc-facts --strict --require-repo-docs` 0 违规；
+  三方组合行字节一致守卫成立（D1 三文件同步修改）。
+
+## 0.3.79 (patch) — 修复 0.3.78 的发布面缺陷（家族在出厂包里加载即失败）
+
+> 0.3.78 的功能代码属实，但**发布出去的包是坏的**：`evolution-core` 新增的包根数据资产
+> `persisted-write-inventory.json` 没被写进 `files`，而它在模块作用域被读取——tarball 里没有它，
+> 于是任何 `import dsh-evolution-core` 都在导入期抛 `ENOENT`；core 被几乎所有家族包依赖，整族随之死掉。
+> 门禁 10/10、彩排 7/7、CI 全绿都没拦住，因为它们跑的是**源码树**（那里有该文件）。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | `persisted-write-inventory.json` 写进 `files`，并按 `row-overrides.json` 的先例写进 `exports` |
+| `scripts/verify-dependency-closure.mjs` | 新增第三维：**代码按路径读取（`new URL(..., import.meta.url)`）的包根资产必须被 `files[]` 覆盖**（npm glob 语义：精确 / 单段星号 / 目录子树）；OK 行打印资产计数，避免"什么都没匹配到"的静默通过。它同时跑在 10 步门禁与 CI 里 |
+
+### 验证
+
+- 检测器自证：去掉 `files` 登记 → exit 1 并点名 `evolution-core: src/write-inventory.ts reads "persisted-write-inventory.json", not covered by files[]`；恢复 → OK（2 assets）。
+- 出厂面：`prepare-release` 后 `.release-staging/evolution-core/` 与其 tarball 均含 `package/persisted-write-inventory.json`。
+- 安装面：本机 profile 热修后逐个 `import()` 28 个家族包 **28/28 通过**（修复前 8/28）；升级到 0.3.79 后同样复测。
+- 全量门禁 10/10（`audit-v42/release-0.3.79-summary.txt`）+ 彩排 7/7（`release-rehearsal-0.3.79.txt`）。
+
+## 0.3.78 (patch) — 单源化 · 门禁升级 · 单实例契约（优化计划 B1–B4）
+
+> 本版按 `audit-v42/optimization-plan-evolution-layers.md` 的四个批次落地，每批各自带回归、各自一轮全量门禁 10/10。B5（变体自包含）按计划仅在"产品要求字面零挂载"时做，本版不做。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | **B1/G1** 新增 `row-overrides.json`（包根数据资产，`files`+`exports` 双声明），`loadRowOverrides()` 带形状校验（fail-loud），`applyRowOverrides` 默认读表；**B3/G4** 新增 `instance-scope.ts`（按 `<home> :: <key>` 的实例认领：同 owner 重挂不算第二实例、第二个认领者被告知持有人、dispose 释放）与 `write-inventory.ts` + `persisted-write-inventory.json`（每个持久写入点：写者／串行化机制／模块级状态绑定）；**B3/N14** 技能列举改为三态读：读不出来或只读出一部分 → `unknown` + 原因，不再把空/短列表当完整 |
+| `evolution-agent` | **B1/G1** `bases.json` 增可选 `requires` / `unsupported` 字段，登记平台自带但家族无法建变体的两个基座（`cordis` 需 web 档的 `dynamicCordisRunner`；`minimal` 无 `tool-skill` 行、技能面无落点）+ 对应 `preset.*.yml` |
+| `scripts/install-layered.mjs` | **B1/G1** `injectToolSkillCap` 改为表驱动（删掉手抄的五行 tool-skill 专用匹配）；基座选择按表拒绝 `unsupported`／按 profile bundle 拒绝缺 web 档的 `requires`；**B2/G3** 新增 `checkAgentPresetFreshness()` + `--check-presets`（只报不写：`fresh` / `DIFFERS` / `absent`） |
+| `evolution-commands` | **B2/G3-②** `/evolution doctor` 新增 `presetFreshness: fresh \| differs \| absent \| unknown`——用 core 的组合规则（含行覆盖表）重算"全新生成会写出什么"再与磁盘逐字节比对，只有 `differs` 进 actions，registry 缺失/资产读不到/组合冲突报 `unknown` 并带原因；doctor 仍然只读 |
+| `evolution-commands/src/index.ts` | **B3/N14** mtime 探针只把 ENOENT/ENOTDIR 当"不存在"，其余 stat 失败一律上抛 → 探针报 `unknown` 而不是 `absent` |
+| `evolution-curator` | **B3/G4** 挂载即认领单实例键，第二个实例被拒时说明持有人 |
+| `scripts/verify-platform-contract.mjs` | **B1/G2** 新增第四维「平台锚」：扫描家族全部非排除文件，认 `platform:<pkg>/<file>:<line>` 约定式与裸引用（`packages/<g>/<pkg>/src/<f>.ts:1194`、`core/tools/src/index.ts:1194`、`llm/src/message.ts:258`、`apps/...`、目录/glob 形），逐个在 `--upstream` 下解析并要求被引行号落在文件内；识别词表是记录式常量、识别到 0 条本身即漂移（空 upstream 不可能静默变绿）；另加 6 条**语义断言**（web-app 三个必须保持 disable 的 ITEM、`tools.get` 的 scope 语义行、会话格式版本值、原生/PTC 工具事件词表），按文件自身结构判定、不钉行号；坏引用与坏断言都是 `recordedDrift`（`--accept-recorded` 容忍，出厂模式致命） |
+| `scripts/verify-arch-guards.mjs` | **B3** 新增"认领点与写入点清单一致"规则 + N12 登记新模块级存储；**B4** 追加规则 **N19**（doc-facts 单源门禁） |
+| `scripts/family-facts.json` 等 | **B4/G5** 新增单一数据源（5 条跨文件事实，每条 = 一个 home + `must(unique)` + `forbid` + `cites` + `machine`）、`lib-doc-facts.mjs` 引擎与 `verify-doc-facts.mjs` 独立 CLI |
+| docs | **B4/G5** 修三条真实漂移（`INSTALL.md`「no cordis base is published」、两处 README 的 60 字可达面逐字重复、根 README 落后于 0.3.77 多基座的命令表）+ `README.zh.md` 同源失效结论与两处指向 gitignore 面 `packages/docs/**` 的引用；**B2/G3-③** `packages/INSTALL.md` 登记命令面已知差异；**B4/G6** 新增 `CONTRIBUTING.md`（三层约定 + 事实登记流程 + 门禁表）与 `packages/scripts/checklists/**`（新包／新基座／新命令／新事件／新消费者／新架构规则的骨架 + 模板） |
+| tsconfig | **B1** 删两条死别名与两个指向已删文件的 include |
+
+### 验证
+
+- 每批一轮全量门禁 **10/10** 绿：`audit-v42/g378-g2-*`（B1/G2）、`g378-installmd-*`（B2/G3-③）、`g378-b234b-*`（B2+B3+B4 并集）；`verify-arch-guards --strict` **21 规则 0 违规**；`mirror-sync differ=0 onlyOverlay=0`。
+- 新增回归：行覆盖表单源（四件套）、基座前置条件（表↔资产一致性 + 两条拒绝路径）、平台锚核验（vacuity 哨兵 + 副本变异：摘 `disabled: true`／删平台文件均红）、doctor 新鲜度四态（含"被检文件未被改动"）、单实例认领（首认领/重入/分 home/释放/分 key）、写入点清单与断言绑定、N19 doc-facts 四态夹具与"第二个家"变异。
+- **真机（安装面）**：临时 `DSH_HOME` 跑 `--mode variant --profile web` → exit 0，自报 `form: variant (session opt-in: original presets carry no family rows)`，生成预设 15490 字节 22 行（平台 standard 行 + 末端 4 条家族模型行）；紧接 `--check-presets` → `evolution fresh` / `evolution-ptc absent`。
+- 途中修掉的真实问题：`verify-declared-config` 的 composer-reach 证据锚改指单一数据源；`installer.spec` 夹具缺新数据文件；安装器判定块早于 `profileDir` 的 TDZ 崩溃；新命令回归缺 `tempHome` 导致 E-33 扫描读到真实 `DSH_HOME`；B3 两个新 spec 的类型错（并集首跑 tsc 红）。
+
+### 已知差异 / 明确不做
+
+- **① 变体形态下，跑平台原版预设的会话仍看得见 `/evolution …` 命令**：平台命令按作用域分层注册，家族只在 host 面注册一次、落进全局层。该面是管理/只读面（doctor、curator status…），**自动路径**（评审节奏与注入、用量遥测、策展）已由 `sessionAudited` 逐会话门控，原版预设会话在命令背后拿不到家族行为。按会话隐藏命令面需要在每个 agent 作用域内注册并自带注册/拆除生命周期，属计划"明确不做"，故登记为已知差异（`packages/INSTALL.md`）。
+- B5（变体自包含）不做；npm 发布不在本批范围内。
+
+## 0.3.77 (patch) — 安装形态命名（① 变体 / ② 挂原版）· C 轴会话 opt-in · 变体多选 · N18
+
+> **本批四件事**：
+> 1. **①/② 有名字了**：两种安装形态此前只以内部模式名（`layered` / `oneclick`）存在，用户与 doctor 都看不出自己装的是哪一种，而这两者的产品语义**正相反**——① 变体是会话级 opt-in（原版 `standard`/`ptc`/`minimal`/`cordis` 会话**不带任何 evolution 行为**），② 挂原版是 profile 级（每个会话都带）。现在 `--mode variant|attach` 是一等公民（旧名保留为别名），安装摘要与 `/evolution doctor` 都打印 `deployment: variant|attach`。
+> 2. **C 轴：跨会话消费者按会话 opt-in**（修复一个可复现的真实缺陷）：变体形态下家族 infra 挂在 profile 根，而 review/telemetry 监听的是宿主平面的 `session/event`——用户装了变体，却在一个**平台原版预设**的会话里被注入 `[Auto-review — Skills]`、被计进 usage。现在这些消费者先过 `sessionAudited`：会话看不到家族自有模型工具 (`skill_manage`/`memory`) 就不作用。
+> 3. **变体多选**：`--base standard,ptc`（installer 与 `/evolution preset install` 同一规则）一次生成多个变体，每个跟随**它自己那个基座**的平台 composition；所有名字先校验再落盘（第二个名字写错则一个都不写）。
+> 4. **N18 架构规则**：家族消费者订阅平台会话流时必须过 opt-in 门，否则失败（附登记表与自检样本）——把 ② 的修复锁成"下一处也不会漏"。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | 新增 `src/opt-in.ts`：`sessionAudited(ctx, sessionId, sessionScoped)` 与 `sessionSeesFamilyTools(ctx, sessionId)`——用**平台自身的可见性语义**判定"这个会话是否带着家族模型工具"（`tools.get(name, scopeOf(agent.ctx))`，`core/tools/src/index.ts:1194`），挂在 profile 根则人人可见、挂在变体预设里只有选了该预设的 agent 可见（`preset/agent-presets/src/mount.ts:4-13`）。**无预设 id 清单、无第二张表、无安装期快照** |
+| `evolution-review` / `skill-usage` | 各加 Config `sessionScoped`（默认 false = 历史行为）并在监听入口过门：变体形态下不被注入、不被计数；② 形态与所有旧部署逐字不变 |
+| `evolution-host` / `evolution-preset` / `evolution-all` | 两条跨会话行**三处逐字节一致**地声明 `sessionScoped: true`（E-33 不变式：`bundle-mutual-exclusion` spec 的比较对象是 name/config/disabled） |
+| `scripts/install-layered.mjs` | `--mode variant|attach` 别名（`MODE_ALIASES` + `normalizeMode`，库调用同样归一）；`result.form` 与安装摘要打印形态；`--base` 接受逗号列表/重复，新增 `resolveAgentPresetBases`，逐基座解析 runtime composition 并逐个生成；`result.bases[]/agentPresets[]`（`agentPreset` 保留为首个，journal/CLI/doctor 读取面不变）；uninstall 支持列表收窄 |
+| `evolution-commands` | `/evolution preset install --base <name>[,<name>...]`：同名先全部解析、再逐个原子写（S6.3 E-40 不变）；doctor 新增 `deploymentForm`（variant/attach/host-only/preset-only/none）并在报告头与动作阶梯里说明两种形态的后果 |
+| `scripts/verify-arch-guards.mjs` | 新增 **N18**：`src/` 内订阅 `session/event` 却未引用 opt-in 门即失败，附 `SESSION_GATE_REGISTER` 登记与自检样本 |
+
+### 新增回归（含红/绿实证）
+
+| 测试 / 探针 | 钉住的契约 |
+|---|---|
+| `evolution-core/tests/opt-in.spec.ts`（5 例） | 无 tools registry 必为假；**全局视图为真**（② 形态根挂载，人人过关）；**按会话作用域为真**（① 形态只有 joined 的 agent 看得到）；只探家族自有工具名（`session_search` 不算）；`sessionScoped` 两态 |
+| `skill-usage.spec.ts` 新增 1 例 | 变体形态下"不可见即不计、可见即计"（同一条 `tool/call` 事件） |
+| `installer-preset-base.spec.ts` 新增 2 例 | 一次安装写两个变体、各自跟随自己的基座；`--mode variant` 摘要打印 `mode: layered` + `form: variant`，近似拼写仍 fail-loud |
+| `doctor.spec.ts` 3 处断言 | `full → attach`、`layered → variant`、`host → host-only` 的形态映射 |
+| `guard-scripts.spec.ts` N18 夹具 | 未接门的 `ctx.on('session/event')` 被判红并点名修法；接门后干净 |
+
+### 验证
+
+- 全量门禁 10/10（`audit-v42/caxis-c2-*`、`multi-form-*`）：`tsc -b` 0、`oxlint` 0-0、全量 vitest 全绿、四个 `verify-*` 0、两个校验器 0、`mirror-sync differ=0 onlyOverlay=0`。
+- 发布链彩排 7/7（`build-lib` → `run-load-sensitive` → `prepare-release` → `verify-platform-ranges` → `publish-scoped --dry-run` → `verify-declared-config` → `verify-platform-contract`）。
+- **真机验证（变体形态，真实 CLI + 真实 profile，`audit-v42/verify-variant-profile.ps1`）**：以 `--mode variant --base standard,ptc` 装进一个全新 DSH_HOME → 安装摘要打印 `form: variant`；`dsh --profile web --dump-config` 组合出 **172 行、零重复 id**，profile 根**只有 infra 行、四条模型行全部缺席**（这正是"原版预设会话不带家族行"的结构保证），`sessionScoped: true` 落在 skill-usage 与 review 两行上；生成的两个变体预设各自携带模型行。
+- **模型可见行为的真机验证（待用户侧一次会话）**：本机 `DEEPSEEK_API_KEY` 不存在，无法在此代替真实会话；需在 web GUI 里各跑一次"变体预设会话"与"平台原版预设会话"，看前者照常有 review/usage、后者零注入零计数。
+
+
+## 0.3.76 (patch) — 读三态 `Probe<T>` · 作用域对齐（N16） · 预设行覆盖改为数据表 · C 轴收口（N17）
+
+> **本批三件事**（v41 阶段一之后的跟进批次）：
+> 1. **读三态落地**：家族此前把"读失败"与"确实没有"压成两态，N14 只能登记债务。现在 core 有了具名联合 `Probe<T>`，并有第一个真实消费点（跨源守卫），第三态在类型上不可与"空"混淆。
+> 2. **作用域对齐**：平台注册表读取是**作用域敏感**的——`skills.list()` 的 `scope` 注释写明"省略即只读全局层"（`skill/skill/src/index.ts:113-120`），`tools.get(name)` 同语义（`core/tools/src/index.ts:1194`）。而家族自己的目录 provider 是**预设行**，于是"预设挂载形态"下这条守卫会把健康的树判成空视图。现在读取统一走 `callingScope(ctx)`，并新增规则 **N16** 禁止无作用域的平台注册表读取（有意为之的诊断读需登记）。
+> 3. **预设行覆盖改为数据表**：V10-14 的目录描述上限从专用注入器泛化成 `ROW_OVERRIDES` 表；语义上明确"**我们按 key 追加/更新，绝不整对象替换 `config`**"——与平台 patch 层的行为正相反，这是合成器能在不抹掉平台默认值的前提下加键的依据。
+> 4. **C 轴收口**（v41 §C）：记账早已由 `evolution-core/src/tool-dispatch.ts` 把两种派发词汇归一化（v37 P7a），本轮把它钉成可机械检查的三件事——消费方不得按模态分支（新规则 **N17**，唯一登记点 `signals.ts`）、同一脚本场景下 native 与 ptc 的读取技能名集合/派发条数/技能信号必须相等（回归）、平台侧"每个持久派发词汇只有一个写点"实测成表（`verify-platform-contract` 5 条写点记录 + 模态无关接缝 `tools/result` 两条锚）。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-core` | 新增 `src/probe.ts`（`Probe<T>` = present \| absent \| unknown{reason}；`probePresent/probeAbsent/probeUnknown`、`isPresent/isAbsent/isUnknown`、`valueOr`、`mapProbe`）与 `src/scope.ts`（`callingScope(ctx, held?)`、`isGlobalRead`）；新增 peer+dev 依赖 `@deepseek-ai/dsh-scope` |
+| `evolution-core` | `preset-composition.ts`：`injectCatalogDescriptionCap` → `applyRowOverrides(composition, overrides)` + `ROW_OVERRIDES` 数据表；保留幂等、标记注释、行缺失只 warn 三条性质 |
+| `tool-skill-manage` | `catalogWinner` 的 `{ winner, unverifiable }` 迁到 `Probe<SkillSummary \| undefined>`（旧形状允许"既有 winner 又有 unverifiable"的非法组合）；跨源守卫改为 `catalog.list({ scope: callingScope(ctx) })` |
+| `scripts/verify-arch-guards.mjs` | 新增 **N16**（17 条规则）：`src/` 内无作用域的平台注册表读取即失败，附可粘贴修法与 `SCOPE_READ_REGISTER` 理由登记（当前 1 条：review 的有意全局层诊断）；新增 **N17**（18 条规则）：按派发模态分支即失败，附 `MODALITY_BRANCH_REGISTER`（当前 1 条：`signals.ts` 的模型面计数切分） |
+| `scripts/verify-platform-contract.mjs` | 新增"派发写点单一性"实测表（native call/result 各 1、PTC start/settle 各 1、registry 0）与模态无关接缝 `tools/result` 两条锚（声明 + 唯一发射点）；更正 `code-dispatch-waterfall` 已过时的 consumer 文案 |
+
+### 新增回归（含红/绿实证）
+
+| 测试 / 探针 | 钉住的契约 |
+|---|---|
+| `evolution-core/tests/probe.spec.ts` | 三态各自可判别；`mapProbe` 不把 unknown 塌成 absent（只测 present/absent 的实现会失败） |
+| N16 启动自检（4 样本） | 无参 `list()` / 单参 `get(name)` 必命中；`list({ scope })` / `get(name, scope)` 必干净 |
+| N16 夹具（`p5-fixture` 的 `bad-registry.ts`，A 缺陷原始形态） | 真树 0 违规、夹具两条被点名 |
+| `preset-composition` + `commands` spec（43 用例） | 行覆盖泛化后行为逐字不变（含"无 tool-skill 行"告警路径与幂等路径） |
+| `tool-dispatch.spec.ts` 模态对称性 | 同一脚本场景 native vs ptc：读取技能名集合、派发条数、`skillSignal` 三项相等（P7a 事故的恢复点；模型面计数按设计不参与对称） |
+| `guard-scripts.spec.ts` N17 夹具 | 违规树 exit 1 且点名违规表达式与登记表名；同形比较落在 `tool-dispatch.ts` 内则干净 |
+| `verify-platform-contract` vacuity sentry | 空树必须逐条点名 5 个写点（`native-call`…`registry-writes-none`），不得"找不到即通过" |
+
+### 验证
+
+- 全量门禁 10/10（两次独立复跑，第二次在干净 overlay 上）：`tsc -b` 0、`oxlint` 0-0、全量 vitest **126 文件 / 1228 用例**全绿、四个 `verify-*` 0（18 条架构规则）、两个校验器 0、`mirror-sync differ=0 onlyOverlay=0`。
+- 发布链彩排 7/7 PASS（`build-lib` → `run-load-sensitive`（17 例）→ `prepare-release`（29 包）→ `verify-platform-ranges`（61 条平台范围）→ `publish-scoped --dry-run` → `verify-declared-config` → `verify-platform-contract`）。
+
+## 0.3.75 (patch) — 依赖闭包**双向**化 · `newSkillLibrary()` 单一构造点 · 架构守卫 N12–N14（v41 阶段一，家族侧非破坏批次）
+
+> **本批的四条主线**（v41 §5.3 未落地项 + §6.1 npm/PTC 缺口 + §8 盲区）：
+> 1. **依赖闭包只朝一个方向看**：0.3.21 的守卫只问"import 了却没声明"，从不问"声明了却没人引用"——后者**永远不会让构建失败**，所以能活过任意次重构。实测：29 个包共 **71 条死声明**（其中 58 条 = 已退役的 `@deepseek-ai/dsh-invariants` companion，peer+dev 各 29），全部随发布清单出厂，给每个用户装上一堆幻影平台依赖。
+> 2. **`new SkillLibrary(...)` 有 11 个构造点**，各自重新推导 root、各自手搓 `evolution/skill-mutated` 事件箭头——事件名是跨包契约（catalog 就靠那个字符串失效缓存），第二份拼写就是一次静默分叉。
+> 3. **文档型结论没有机械锚**：`iface-audit/storage.md` 结论 4 引用的 `core/io.ts:*` 根本不存在（真实锚点见下）。
+> 4. **npm 路径够不到 ptc 变体**：base 表只活在 `install-layered.mjs` 里（源码树工具），`/evolution preset install` 把 `standard` 硬编码在**五处**，npm 用户无法安装 ptc 预设。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `scripts/verify-dependency-closure.mjs` | **新增正向半边**：`dependencies/peerDependencies/optionalDependencies/devDependencies` 的每一条声明都必须在本包内有**引用点**。引用点 = **带引号的模块说明符**（`from 'X'` / `import('X')` / `require("X")` / tsconfig `paths` 键 / bundle 行 `name: 'X'`）或其子路径（`X/tools`）；注释与 README 散文**故意不算**（`dsh-invariants` 的 58 条正是靠散文提及活下来的）。`@types/foo` 与其主语 `foo` 视为**同一个事实**（TS 就是从 import 推出 types 包）。新增 `--json`（把同一份规则交给修复器/测试，而不是再写一遍），未知标志 → exit 2（`--stict` 不再静默跑默认扫描） |
+| 29 × `package.json` | 删除 **71 条无人引用的声明**：`@deepseek-ai/dsh-invariants`（29 peer + 29 dev，0 引用 0 tsconfig 引用）、`@deepseek-ai/cordis`（4 个纯组合包的 peer/dev，src/tests 0 引用；其 `tsconfig` 工程引用保留——构建图边不等同于清单声明）、`@deepseek-ai/dsh-evolution-io/-io-node/-state-json`（approval/state 的 devDeps）。声明的总量 320 → **249**，且每条都有引用点 |
+| `evolution-core/src/skill-store.ts` | 新增 **`newSkillLibrary({ config, io, limits?, ctx?, transact?, threatExemptLabels? })`** + `NewSkillLibraryOptions` + `SkillMutationSink`：root 解析、limits 决策、`evolution/skill-mutated` 事件接线、`threatExemptLabels` 防御性拷贝各**只有一处**实现 |
+| `evolution-curator/commands/review/skill-catalog/learning-graph/maintenance` · `tool-skill-manage` | 11 个构造点全部改走 helper；学习图那处多余的 `graphSkillsRoot` 预解析删除（解析归 `resolveSkillsRoot` 一处） |
+| `scripts/verify-arch-guards.mjs` | **N7 收敛**：`SKILL_LIBRARY_TODO` 清空——任何 core 之外的新 `new SkillLibrary(` 直接失败，违规输出带**可直接粘贴的** `newSkillLibrary({...})` 形参清单 |
+| `scripts/verify-arch-guards.mjs` | **新增 N12–N14**（v41 §5.3 待落地项）：N12 模块级可变存储登记（当前 5 条，含 `signals.ts :: dispatchLedgers`）；N13a 非唤醒原语上的"必须执行"载荷登记（2 条债务：`evolution-commands :: invocation.agent.inject(message)`、`evolution-review :: agent.inject(message)`）；N13b 唤醒原语读入局部变量（0 处）；N14 持久读失败吞异常登记（4 条）。同时加**启动自检**：docblock 规则 id 必须与 `RULES` 注册表一一对应（本轮立刻抓到 N3/H2 缺席 docblock），每条规则必须在自己的人造片段上**报得出违规**，否则守卫 exit 1；新增 `--list-rules` |
+| `scripts/verify-arch-guards.mjs` | **新增 N15**：家族 Markdown 里的代码锚（`evolution-core/src/x.ts:42`）必须解析得到——文件存在且行号落在文件内。散文引代码永远不会让构建失败，所以符号搬走/改名后文档会继续描述一棵已经不存在的树（audit-v37 的 `core/io.ts:475-481` 就是这样活过两轮审计的）。`<pkg>/<file>` 是单 src 包简称；上游路径锚不属本规则（`verify-platform-contract` 负责已登记的平台锚） |
+| `docs/hermes-alignment-audit-rc39.md` | 修正一条真实失效锚：`evolution-review/src/redact.ts:9-31` → `evolution-core/src/redact.ts:11-35`（redact 早已迁到 core，N15 首次运行即抓到） |
+| `evolution-host/tests/wake-delivery-guard.spec.ts` | **删除**：N13b 的唯一实现移入守卫（单一来源），两份 README 的引用改指"规则 N13b" |
+| `evolution-host/tests/guard-scripts.spec.ts` | 新增正向半边的哨兵用例（含 `@types/js-yaml` 不得误报、`--stict` → exit 2）；真空根仍 exit 1（与 `verify-dependency-closure` 的 V4-29 同一约定），`verify-arch-guards` 的真空 `--strict` 由 exit 2 改回 **exit 1**——退出码家族统一为「0 干净 / 1 跑了且不合格 / 2 跑不起来（用法、缺根）」 |
+| `evolution-core/tests/library-limits-guard.spec.ts` | v35 A6 登记表**改锚到 helper 边界**（内容寻址的 `newSkillLibrary({...})` 实参文本）：11 个构造点变成 2 处显式 `limits:` + 9 条登记默认值（3 条 KNOWN GAP 原样保留），并屏蔽行注释（一处散文提及不再重钉登记表） |
+| `evolution-agent/bases.json`（新增，随包发布） | **base 表的唯一数据源**：`default: standard` + `standard → { id: evolution, metadata: preset.yml }`、`ptc → { id: evolution-ptc, metadata: preset.ptc.yml }`。`name` 是一个事实：`--base` 取值 = 平台组合目录 = 运行时 agent-preset 注册表 id |
+| `scripts/install-layered.mjs` | `AGENT_PRESET_BASES` / `DEFAULT_AGENT_PRESET_BASE` 改为**读 bases.json**（缺失/结构错/默认值不在表内一律 fail-loud），不再自带字面量表 |
+| `evolution-commands`（`/evolution preset install`） | 支持 `--base <name>`：从 bases.json 取 id/metadata/name，写到 `.agent-presets/<id>/` 并以该 base 的平台组合做 compose；未知 base fail-loud 并列出可用名字；未匹配的 `preset …` 参数不再落进 help（真拒绝）。**这是 npm 用户此前完全够不到 ptc 变体的直接原因** |
+| `scripts/prepare-release.mjs` | 组合文件重写从**硬编码四文件白名单**改为**遍历 staged 副本里的每个 `.yml/.yaml`**（`preset.ptc.yml` 原本在白名单之外，只剩 V24-18 扫描兜底）；预设容器检查改为**从 exports map 派生**元数据变体（第三个 base 不会再逃过检查） |
+| `INSTALL.md`（根 + `packages/`）· `evolution-agent/README.md` · `evolution-commands/src/registry.ts` | 文档与帮助同步：`--base ptc` 落点目录、`bases.json` 是唯一表、`preset install [--base <name>]` |
+
+### 新增回归（含红/绿实证）
+
+| 测试 / 探针 | 钉住的契约 | 红 → 绿 |
+|---|---|---|
+| 正向闭包（`guard-scripts.spec.ts`） | 无引用点的声明必须 exit 1 且点名该包该节；`@types/*` 不得误报；未知标志 exit 2 | 旧守卫对 HEAD 树 exit 0「OK」→ 新守卫 **71 条**点名（`audit-v42/red-tree` 复现）；清理后 0 条 |
+| 哨兵真空根 | 空根 exit 1（不得空手「OK」） | 两向共用 |
+| N7 收敛 | core 之外的 `new SkillLibrary(` 必报，并给出 helper 形参 | 11 处曾被 TODO 名单豁免 → 名单清空后夹具 `bad-skill-library.ts` 立即被点名 |
+| N12–N14 | 每条规则在自己的人造片段上报得出（否则守卫 exit 1） | 夹具 4 文件 → 四条规则全部点名；真空根 exit 2 |
+| 启动自检 | docblock id 集合 == `RULES` 注册表 | 立即抓到 N3/H2 缺席 |
+| v35 A6 限值决策 | 每个 `newSkillLibrary(` 调用要么显式 `limits:`，要么在登记表里给出理由；登记项过期即失败 | 空表 → 打印 10 条待登记键（含一条注释误报，已由屏蔽修正）→ 9 条登记后绿 |
+| N15 锚存在性 | 家族 Markdown 中 177 条家族锚全部可解析（含 `<pkg>/<file>` 简称）；探测器的解析+行号判定在启动自检里各自证伪/证实 | 首轮实测 **1 条**失效锚（`evolution-review/src/redact.ts`）→ 真树 0 违规；夹具树仍 7 违规 |
+| `preset install --base ptc` | 注册表按 `ptc` 读；写 `.agent-presets/evolution-ptc/` + `preset.ptc.yml`，绝不写 standard 元数据；未知 base 报错并提 bases.json | 旧命令只认 `standard`（`input === 'preset install'`）→ 新用例覆盖变体与拒绝路径 |
+| base 表单一来源（`installer-preset-base.spec.ts`） | `AGENT_PRESET_BASES` 必须**逐字等于** `bases.json`，且首个键 == `bases.json.default` | 安装器的字面量表 → 数据表 |
+
+### 验证
+
+- 全量门禁（overlay 树，CI 等价路径）：`tsc -b tsconfig.host.json` · `oxlint packages/evolution` · `vitest run packages/evolution --maxWorkers=2 --testTimeout=30000` · 四个 `verify-*` 脚本（`--strict`）· `verify-platform-contract` 全绿；`mirror-sync check` `differ=0 / onlyOverlay=0`。
+- 守卫实测：真树 exit 0（15 规则、N12=5 / N13a=2 / N13b=0 / N14=4）；夹具树 exit 1（四条新规则 + N7 全部点名）；真空树 exit 2。
+
+### 本批未做（下一批，勿读成本批已交付）
+
+| 项 | 为什么留到下一批 |
+|---|---|
+| **P2-25 后半**：`skill_manage` 常驻描述瘦身 | 现状已定位（`tool-skill-manage/src/index.ts:412-423` 的 description 引用核心常量 `DSH_AUTHORING_STANDARDS`，非复制；`SKILLS_GUIDANCE` 走 `:116` 的 prompt section）。要动**模型可见文本**，必须配一次真实会话验证与一条"标准文本单一来源"回归，不塞进 patch 尾巴 |
+| **家族三态 `Probe<T>` 过渡模块 + `deliverEnsuringWake`** | 需先列全 `protectionUnknown`/`unverifiable` 两态补丁点再迁移，否则只是换类型不改语义；守卫侧已由 N13a（2 条 `agent.inject` 债务）与 N13b（唤醒原语读入局部 = 0 处）钉住 |
+| **`audit-v37/iface-audit/storage.md` 平台锚** | 结论 4 的 `core/io.ts:*` 在 0.1.5-rc.2 不存在；本轮已加 append-only 更正块（真实锚 `fs/fs-local/src/fsio.ts:216-220,263`、`fs/fs-sandbox/src/containment.ts:12`）。**指向平台仓的锚的机械核验**（`platform:<pkg>/<file>:<line>` 前缀 + `verify-platform-contract --upstream`）留待独立批次 |
+| **N12 的 `apply()` 体内实例状态 AST 覆盖** | 现为文本级 + 已文档化边界；扩到实例态需要 AST 或高误报启发式 |
+
+## 0.3.74 (patch) — 审查默认改为 `reviewMode: 'inject'`：子代理与主代理**不可能**共享前缀缓存（附成本证据）
+
+> **问题**：默认的 `reviewMode: 'subagent'` 下，子代理与主代理能否共享前缀缓存以降本？
+> **结论：不能。** 三条结构性原因，逐条有源码坐标：
+> 1. **模型不同** —— 子代理以 `agentOptions: { model }` 显式指定：skill 审查 = `skillReviewModel`（默认 `deepseek-v4-pro`）、memory 审查 = `memoryReviewModel`（默认 `deepseek-v4-flash`），而主会话跑部署默认路由的模型。缓存按（模型 × 前缀字节）寻址，模型不同即无从共享。
+> 2. **系统提示不同** —— 子代理是 `spawn` 子会话、跑**部署默认 preset**（README「Known Limitations」明写：不 fork 父代理组合以保住 `skill` 工具），另带 `persona: reviewPrompt(kind, 'plan')` 与 `toolFilter: { allow: ['skill'] }` —— 第 0 个 token 就分叉。
+> 3. **"对话"字节不同** —— 交给子代理的不是主会话的消息前缀，而是 `buildReviewRequest()` 重新序列化的摘要：**头部前置**（`Review kind: … / Signals: … / Recent tool activity (n): … / Return ONLY the structured JSON plan…`）、消息被改写成 `USER:`/`ASSISTANT:` 并逐条截断（`reviewMessageChars` 默认 2000）、最多 `reviewContextMessages`（默认 60）条、最后整体过 `redactReviewSecrets()` 再改一遍字节。前缀缓存要求从第 0 个 token 起逐字节相同——这里连"同一份历史"都不是。
+>
+> **顺带说明 inject 侧的成本结构**（本次变更的依据）：inject 把**有界的**审查提示词 `reviewPrompt(kind)` 追加到主会话**已经热着的**前缀之后 —— 只需为新增 token 付费，且审查直接在主会话上下文里进行（不需要摘要，因为它本来就有全部历史）；代价是审查自己的读取与计划留在主线程里。
+> **故按指令把默认改为 `reviewMode: 'inject'`**（`subagent` 保留为显式选项）。
+
+### 变更
+
+| 层 | 变更 |
+|---|---|
+| `evolution-review` | `Config.reviewMode` 默认 `'subagent'` → **`'inject'`**，并补 JSDoc 说明两种模式的缓存/成本差异与适用场景 |
+| `evolution-policy` | 策略快照 schema 默认同步为 `'inject'`（**策略快照会覆盖插件配置**，两层默认不允许分叉）；`reviewMode` 归一化分支由"非 inject 一律回落 subagent"改为"**只有显式 `'subagent'` 才选子代理**"，其余（未设/非法）一律 `'inject'` |
+| README | `evolution-review` 的投递契约段写明新默认与成本理由、`subagent` 适用场景；「Known Limitations」标注模型/上下文路由仅在 subagent 模式生效；家族 README 的能力表同步 |
+
+### 新增回归（含红/绿实证）
+
+| 测试 | 钉住的契约 |
+|---|---|
+| `evolution-review/tests/review.spec.ts`（schema 断言，新增） | `Config` 默认 `reviewMode === 'inject'` |
+| `evolution-review/tests/review.spec.ts`（行为断言，新增） | **无 policy、无显式配置**时，completed 边界把 `[Auto-review …]` 提示词注入父代理，且 `subagents.start` **零调用**、计数被消费 |
+| `evolution-policy/tests/policy.spec.ts`（新增） | 策略快照默认 `reviewMode === 'inject'` |
+| 红/绿实证 | 把默认临时改回 `'subagent'` → 两条断言立刻变红（`expected 'subagent' to be 'inject'`；`expected [ 'spawn' ] to have a length of +0 but got 1`），恢复后 **70/70 绿**（review+policy 两包）；全量门禁 **10/10**（vitest **113 文件 / 1092 用例**全绿、`tsc-host` 0 错、`oxlint` 0/0） |
+
+### 影响与撤回（部署方须知）
+
+- **行为变更**：升级后（重启生效）审查默认在主会话内进行 —— 子代理不再生成，审查读到的技能正文与产出的计划会留在父会话线程里（上下文增长）；审查改用**父代理的模型**，`skillReviewModel`/`memoryReviewModel` 不再是它的路由。
+- **子代理专用旋钮**在 inject 模式下不再生效：`reviewProvider`、`reviewTimeoutMs`、`reviewMaxDepth`、`reviewToolAllow`、以及上面两个 review 模型。
+- **撤回 = 一行配置**（profile patch 的 evolution-review 行）：`reviewMode: subagent`（策略层同理，二选一即可，策略优先）。
+
+## 0.3.73 (patch) — 修复「注入提示词自 2026-09-07 起静默消失」：唤醒投递丢接收者 + 同类全库排查 + 机械门禁
+
+> **症状**：很久没有出现 `[Auto-review — Skills]` 注入提示词（用户报告）。
+> **根因（不是计数、也不是时机，是接口用法）**：`deliverMessage` 把 `agent.followup` **取成局部变量后再调用**——方法脱离了实例，`this` 丢失。平台 `ReactLoopAgent.followup` 是**原型方法**（`this.send(input, 'next-turn', true)`），因此每次投递都抛 `TypeError: Cannot read properties of undefined (reading 'send')`；调用点的 `catch` 只 `ctx.logger.warn`（console，不落任何会话记录），而**计数照旧清零** → 每段任务的复习被"静默消费"：既没有提示词，也没有结果通知，也没有任何重试。
+> **时间线证据**：会话 `b7f84810` 累计 **212 次**注入、最后一次 **2026-09-07 19:30:23**；同一天 **0.3.40（`6bd59d5`）** 引入该写法（0.3.42 `b4eff81` 把"结果通知"也接上它），此后 6 天 **0 次**注入，而期间**触发一切正常**（本会话 `review-state.json` 的 `lastTurn` 与会话日志的 `turn/end` 逐字对齐；近 14 小时 24 次 review 子代理照常生成）。
+> **同类全库排查**：扫描 230 个生产文件（`const x = obj.method` 赋值、对象字面量回调、解构、`map/then/on` 传方法引用四类形态）→ 命中 **2 处**，已全部修复；另 1 处同类形态经核验**安全**。
+
+### 修复
+
+- **`evolution-review`**：`deliverMessage` 改为**在实例上调用**唤醒原语，并返回 `boolean`（失败只 `warn`，不再抛）。**投递被拒时不再清零计数、不再丢弃 latch**：该段复习保留到下一个 `completed` 边界重试——四处调用（显式 `inject` 模式、子代理失败回退、completion 通道、deferred 队列 drain）统一该契约。结果通知改为直接调用（内部自警，不再需要外层 try/catch）。
+- **`evolution-commands`**：`/evolution learn` 同样改为在实例上调用（0.3.68 `6baea33` 引入；症状＝命令报 "Follow it now" 而实际什么都没投递）。
+- **核验安全**：`skill-store` 的 `const t = ioLike.transact; t(path, task)` 属同类形态但**安全**——seam 类型显式声明 `transact?(this: void, …)`，且两个实现（`nodeEvolutionIo` 的对象字面量、io adapter 的箭头属性）都不使用 `this`。
+
+### 为什么既有测试与 lint 都没抓到
+
+- 所有桩都是**对象字面量箭头函数**（`followup: (m) => {…}`）——天然绑定，脱离调用照常工作；平台是**真类实例**（原型方法）。
+- `typescript(unbound-method)` 规则**确实处于启用状态**，但原写法把接收者 cast 成**属性形态**（`(agent as { followup?: (m) => void }).followup`），"方法性"被擦除，规则因此看不见——**cast 成函数属性 = 同时骗过类型系统与 lint**。
+
+### 新增门禁与回归（红/绿实证）
+
+| 测试 | 钉住的契约 |
+|---|---|
+| `evolution-review/tests/review.spec.ts` 新增 2 条 | 类实例（原型方法经 `this`）上投递必须成功；**投递被拒时不得消费该段**（计数不清零 + 下一次边界重试成功） |
+| `evolution-commands/tests/commands.spec.ts` 新增 1 条 | learn 的唤醒原语在实例上调用（走 `followup` 而非 `inject`） |
+| `evolution-host/tests/wake-delivery-guard.spec.ts`（新增） | **机械门禁**：生产 `src` 中禁止把 `followup`/`inject`/`steer` 取成局部或解构；自带检测器正例自证 + 扫描非空断言（正则失效不得空转通过） |
+| 红/绿实证 | 把两处临时改回"脱离实例"形态 → **4 条断言全红**（review ×2、commands ×1、守卫报出 2 处站点），恢复后 **69/69 绿**；全量门禁 **10/10**（vitest **113 文件 / 1089 用例**全绿、`tsc -b tsconfig.host.json` 0 错、`oxlint` 0 warnings / 0 errors） |
+
+### 行为变更
+
+- 投递失败从"静默消费一段复习"变为"**warn + 该段复习保留重试**"（计数不再无条件清零）。
+
+### 已知残余（本版未做，实测数据供决策）
+
+- `reviewTimeoutMs` 默认 **120 s**：近 14 小时 **24 次** review 子代理中 **17 次在恰好 120 秒被父级中止**（`turn/end reason {"kind":"aborted","reason":{"kind":"parent"}}`）——读技能 + 出计划跑不完。投递修好后中止会回退为"把提示词注入会话"（可见），但子代理通道成功率仍低；是否把默认抬到 300 s 属部署调优（`Config.reviewTimeoutMs` 已可覆盖）。
+- 投递失败仍只进 logger（不再静默吞掉整段复习，但也没有会话可见信号）。
+
+## 0.3.72 (patch) — 全量审计 31/32 步落地：P0 冻结参数写入路径 + 4×P1 + 22×P2 收口
+
+> **输入**：`dsh-evolution-mirror-审计报告-2026-09-13.md`（1 P0 / 4 P1 / 22 P2，逐条附双端行号与触发场景）、`dsh-evolution-mirror-优化计划-2026-09-13.md`（G0–G7 共 32 步 + 5 个决策点）、`dsh-evolution-mirror-实施报告-2026-09-13.md`（31 步落地说明与 3 处实施偏差）。
+> **发布门禁（本版实测，0.1.5-rc.2 验证树）**：全链 **10/10** —— `native-system`、`build-lib`（29 包）、`vitest` **112 文件 / 1085 用例全绿**（`--maxWorkers=2 --testTimeout=30000`）、`tsc -b tsconfig.host.json` **0 错**、`oxlint` **0 warnings / 0 errors**（211 文件）、`verify-dependency-closure`、`verify-arch-guards`、`verify-event-pairing`、`verify-declared-config`、`run-load-sensitive`；三树 `authority↔mirror↔overlay` **354 文件 0 差异**。
+> **发布前补齐的三处（实施报告未覆盖的面，全部由门禁抓出）**：① 跨源目录探针原用 `ctx.skills` **属性代理**——本插件并未注入 `skills`（运行期会抛，类型上 `Context` 也无该成员），改为 `ctx.get('skills')` + 平台 `SkillSummary` 类型，并在 `tool-skill-manage` 补 `@deepseek-ai/dsh-skill` 的 peer/dev 依赖与 tsconfig 工程引用（依赖闭包守卫要求）；② 5 处 lint（`arrow-parens` ×3、`max-len` ×1、`no-unnecessary-boolean-literal-compare` ×2、`no-unnecessary-type-assertion` ×1）；③ A6 守卫登记行号随位移同步（`evolution-skill-catalog:97→98`）。**这三处正是 vitest 面看不见、而 `tsc-host`/`oxlint`/`build-lib` 面才暴露的缺陷**——实施期的验证只跑了 vitest。
+
+### 一、P0：上游冻结工具参数使写入路径必崩
+
+- `tool-skill-manage`：staging 锚不再**原地写**到 `args`（0.1.5-rc.2 的 `ToolRuntime` 对 args 做 `deepFreeze`，原地赋值使每次真实分派的 update/edit/write_file/remove_file 抛 `TypeError: … not extensible`），改为浅拷贝 `operation = { ...args, staged_from_sha256 }`，同时喂给审批 staged 记录与直执行路径。**回归钉**：新用例挂载 approval 服务 + 真实 `ctx.tools.execute`（走 deepFreeze 路径）断言 update 与 `write_file`（`'absent'` 哨兵分支）均正常落地；既有用例全绿的原因是它们不挂 approval 服务、staging 段整段被跳过。
+
+### 二、P1（4）
+
+- **consolidate 丢失更新**：源读取 / `parts` 与 `referenceWrites` 构建 / archive 循环 / target 合并 / 提交 / 回滚整体移入单个 `this.serial` 回调（与 `restructure` 同型包装）；确认 archive/restoreFromArchive 不持串行链，队内嵌套调用无自锁，全部拒绝路径仍发生在任何副作用之前。
+- **CRLF 脱敏失效**：`evolution-core/redact` 的块锚改为容忍 `\r`（键行 `\s*:(?:\r)?$`、值行 `([ \t]*)(?:\r)?$`），不做整体行尾归一化（保持送入模型上下文的文本形态）；新增 LF/CRLF 双形态用例（AWS 形 + 任意口令形）。
+- **卸载误删共享预设**：`scripts/install-layered.mjs` 的 `readInstallJournal` 补 `await`——Promise 恒为真值使 `?.agentPreset` 恒 `undefined`，v31 INST-04 守卫对"仅 journal、无 bundle 行"这一目标形态从未生效，卸载清扫会删掉另一个 profile 仍拥有的 home-global 预设。跨 profile 用例钉住（A 仅 journal + B layered 卸载 → 预设必须保留）。
+- **目录影子覆盖每技能可见性**：`evolution-skill-catalog` 扫描时逐技能读 SKILL.md 并解析 `disable-model-invocation` / `user-invocable`，**按字段**覆盖行级默认（文件未设置的字段回落行默认；legacy/非法值 warn 一次后回落，不 throw 以免坏文件炸掉整个目录扫描）；新增 4 形态 + 坏布尔回落用例。
+
+### 三、P2（按层归并）
+
+- **G0 组合与工具链**：三份 `cordis.patch.yml` 的 `tool-skill` 行补注释（如实说明 web 平面根行被上游禁用、覆盖仅达 base/预设平面）；README「Upstream upgrade checklist」追加 3 条（ToolRuntime 参数 deepFreeze 契约、每技能 invocation 键、`resolveDshHome` 的 trim/expand/resolve 语义）。
+- **G2 安全面**：技能写阻断消息改述**真实阻断模式**（过滤 unicode 类别后取首个 label，纯 unicode 走独立文案；与 memory 变体对齐）；必填字段表两端同源（core `SKILL_ACTION_REQUIRED_FIELDS`，plan-validator 与工具共用一张表——此前 `write_file`/`remove_file` 缺 `file_path` 能过校验、到工具才被拒）。
+- **G3 核心域存储**：archive 提交点复检（`hasWriteLock` 后、`moveDir` 前）；快照复制后复探写锁（新上锁者降级进 `skipped`，manifest 如实反映）；restore 追加大小写变体探测（撞名给出定向修复文案）；`skill-store` 模块头新增「Concurrency discipline」小节（三种原语分工、非重入约束、三处已文档化残余）。
+- **G4 状态与 IO 接缝**：`evolution-state-json` 关闭"幽灵孪生"（gate 丢弃的已决议 id 不再被 legacy `pending` 孪生复活，新增 `onGateDrop` 回报）；pending/executing 行数超 `PENDING_RESOLVED_CAP` 时一次性 warn（不做淘汰，C-6 契约保持）。
+- **G5 演化循环**：`patch` 加入陈旧锚新鲜度门（落地前现读现比，读失败按漂移拒绝，fail-closed）；快照后、应用变更前二次复检活跃会话（命中则持久化种子基线并结构化返回 `skipped: 'active-session'`）；evidence 上界改为**计划成稿时刻**的 seq（子代理运行期新增事件不再放宽校验）；curator 汇总行 `consolidated:` 改用真实计数；`setPaused` 无状态分支文案改为"pause NOT effective"；子代理未返回结构化计划时透出 `stopReason`/`diagnostic`。
+- **G6 交互与观测**：`doctor` 新增 `preset-only` 安装形态（有预设工件、无 bundle → 建议重挂 host、**勿加 all**，会双挂模型行），并只在**真实双挂行**上给"keep exactly one"建议（降级行保留在报告与 `--json`）；`atomicWriteFiles` 的 temp 清理失败不再吞掉已提交披露的诊断；`feedback` 的 `snapshot()` 标注 `@internal` test-support，README 如实写明**家族不带 feedback 生产者**（`feedback_score`/`feedback_warn` 仅在部署方接线后生效）。
+- **G7 横切**：boot-cache 计数的超限**钳制 + warn**（与迁移读取器同一常量、同一威胁模型，对称）；`evolutionRoot` 语义升级（见下）；`evolution-core/src/index.ts` 包头新增「Layer map」导读（本物理包承载横切基础 / 安全原语 / 核心域三层）。
+
+### 四、行为变更（部署方需要知道的）
+
+- **新 Config**：`tool-skill-manage` 的 `strictCrossSource`（默认 `false` = 同名跨源写入仅 **warn**；`true` = **拒绝**）。用于"平台目录把同一技能名解析到更高优先级的 project/custom 源"这一形态——写入仍落在家族树，目录并不服务那份字节。
+- **路径语义**：`evolutionRoot` / `memoryRoot` / `skillsRoot` 现在展开 `~` 并把相对值 `resolve` 成绝对路径（对齐上游 `resolveDshHome`）；**绝对路径字节不变**，只有 `~` 前缀与相对值改变落点（此前 `~/x` 会在 CWD 下建一个字面名为 `~` 的目录，与上游监视的 `<home>/skills` 形成分脑）。
+- **`patch` 动作**加入陈旧锚门（与 update/edit 同门，拒绝文案按算子分词）。
+- **`evolution-review`** 的 evidence 上界=计划成稿时刻的 seq。
+- **新依赖**：`tool-skill-manage` → `@deepseek-ai/dsh-skill`（peer + dev，仅类型面使用）。
+- **顺延（1/32）**：浮动 Promise 的 lint 规则（`no-floating-promises` 或等价）需在 CI overlay 树的 lint 配置里落地，并单独清点全库存量违例——镜像仓库自身只跑 release 工作流、不跑 lint（P1-3 即此类缺陷的实例，已修）。
+
+### 五、验证
+
+- 实施期：定向套件首轮 20 失败 → 修三处偏差（`operation` 作用域、invocation 按字段融合、feedback 对称钳制）+ 两处测试适配后全绿；全量 `--maxWorkers 3` **112 文件 / 1085 用例**；时敏用例的失败集合逐轮不同、隔离复跑全绿，判为负载抖动。
+- 本版发布前：三树逐字节一致 + 全量门禁 **10/10**，并额外覆盖实施期未跑的 `tsc-host` / `oxlint` / `build-lib` 三步（抓出上节"发布前补齐的三处"）。
+
+## 0.3.71 (patch) — v34 文本面降长（净 −1.5k 行）＋ v35 结构面 I/O 与正确性收口
+
+> **范围**：① `dsh-evolution-mirror-loc-audit-v34.md` §8 的杠杆 D/B/C 逐项实测、E 面六方向榨取；② `dsh-evolution-mirror-codepath-audit-v35.md` 的「能做，但要带条件」清单逐项裁决后，只做**不损可维护性与鲁棒性**的那一类；③ 两项零语义风险的收口（C11 窄版、A6 防漂移守卫）。
+> **发布门禁（本版实测，0.1.5-rc.2 验证树最终态）**：全链 **10/10** —— `native-system`、`build-lib`（29 包）、`vitest` **112 文件 / 1078 用例全绿**（`--maxWorkers=2 --testTimeout=30000`）、`tsc -b tsconfig.host.json` **0 错**、`oxlint` **0 warnings / 0 errors**（211 文件）、`verify-dependency-closure`、`verify-arch-guards`、`verify-event-pairing`、`verify-declared-config`、`run-load-sensitive` 全 exit 0；三树 `authority↔mirror↔overlay` **354 文件 0 差异**。
+> **账目**：镜像相对 `v0.3.70` 的**代码面**（不含本 CHANGELOG 与 30 份 manifest 的版本对齐）= **98 文件、+3,290 / −4,840 = 净 −1,550 行**（含 6 个新文件 286 行：`evolution-core/tests/library-limits-guard.spec.ts`、`test-support/{fake-io,temp-home,commands-stub,state-stack}.ts`、`tsconfig.pkg.json`）。**本版不以行数为唯一目标**：v35 结构面主动把其中 **+234 行**换成「I/O 更少 + 一处正确性修复」（见第二节），C11/A6 两笔同属等价交换。
+> **未动的三项（需用户决策）**：**A 注释治理**（2,000–5,000 行；注释占 src 字节 48%，是文本面最大杠杆，但属「搬家到台账」且 R-04 等审计锚的证据载体就在注释里）、**`invariant.ts` 退役**（≈665 行；v28 UP-02 刻意契约 vs 平台 0.1.5 的新规范）、**C 的守卫改造版**（≈50 行 + 改 `verify-declared-config.mjs` 的注释要求，属发布链改动）。
+
+### 一、v34 文本面：逐杠杆实测交付
+
+| 批次 | 内容 | 实测净行/树 |
+|---|---|---|
+| D | 29 份包 tsconfig 收敛（`packages/tsconfig.pkg.json` + `${configDir}` 相对化） | −469 |
+| E/F6 | `fakeIo()` 三份合一（core / host / preset） | −85 |
+| E/F1① | 临时根目录 + `DSH_HOME` 存取 + rm 重试仪式 → `test-support/temp-home.ts` | −471 |
+| E/F1② | 测试体末尾清理（Pattern B；由三条新守卫倒逼出规则） | −553 |
+| E/F2① | commands 捕获桩去重 → `test-support/commands-stub.ts` | −177 |
+| E/F9 | 挂载栈提取 → `test-support/state-stack.ts` | −81 |
+| E/F5 | 本地 mount 夹具 + `makeTmp` 合并 | −100 |
+| E/F11 | 其余小簇（`makeTmp` 收口） | −15 |
+
+> 上表各批为**该批实测**（口径＝镜像工作树 diff，逐批单独跑过全量门禁）；四份新 `test-support` 文件与 `tsconfig.pkg.json` 的行数只在上一节总账里计入 —— 两处口径不同，故不逐项相加。
+
+### 二、v35 结构面：把行数换成 I/O 与正确性（净 +234 行）
+
+| 项 | 改动 | 效果 | 验证 |
+|---|---|---|---|
+| **R1**（正确性） | `memory` 的 `registerProvider` 加 dispose **代次 guard**（句柄只在仍是当前代时生效） | 关闭「dispose → 重注册同一对象 → 旧句柄删掉活注册」——原判据只有对象身份，分辨不了代次 | 新增回归用例；**红/绿实证**（未修复源码下该用例红，修复后绿） |
+| **C7** | `skill-usage` 窗口开启判据 `usageTotals(map).views === 0` → `!usageObserved(map)`（core 已有早退） | 每次「读技能」判定 O(N) → O(1)；事件 payload 仍用全量求和不改 | 43 用例 + 全链 |
+| **C4** | `evolution-curator` 的 `scoreTree(usage, treeNames, contents)` → `referenceCounts(contents)`，复用本轮已读正文 | 每次 curator 运行少 **N 次读 + 1 次 list** | 173 用例 + 全链 |
+| **C2** | `evolution-core` 新增 `readEvolutionTimeline(io, path, archives?)`；`evolution-feedback` 把缓存文件读一次、归档列一次 | 每次 boot restore 少 **1 次目录列 + 1 次文件读** | 同上 |
+| **C10** | `evolution-review` pre-run 陈旧比对复用 staging 那次读（两者之间无 await） | 每个 update/edit op 少 **1 次读** | 同上（含 anchored-smoke） |
+| **R7** | `evolution-approval` 删自建 `EvolutionStateLike`、改用导出服务类型；`evolution-review` 去手写形状后**连 cast 都不需要**（模块增强已给出类型） | 服务改名/漂移由 `tsc` 捕获；契约单一所有者 | tsc + oxlint（两处冗余都是 oxlint 抓的） |
+| **R6（队列）** | `skill-usage` 手写串行链 → core `makeSerialQueue()`；`invalidate()` 用「入队空任务」表达 drain | 进程内队列单一实现（第 5 处使用） | tsc + oxlint + 全链 |
+| **C9** | 陈旧锚折进库内 RMW：`SkillLibrary.update/writeSupportFile/removeSupportFile(+ *Core)` 接受 `WriteAnchor`（`{sha256}` 或 `{absent:true}`），在**锁内**读后判定 `match/drift/missing`；`runSingleWrite` 把锁内读失败转成结构化拒绝 | 每个 staged 写**少 1 次锁外读**，且 **guard→commit 的丢失更新窗关闭**（并发写落在两者之间时，由「可能覆盖、双方都报成功」变为「必然拒绝」） | 5 条新用例（`skill-store.spec.ts` 的 `v35 C9:` 组）；`tool-skill-manage` / `evolution-review` 的锁外预检查改为把锚交给库；家族原文案逐字保留（含 `(content no longer exists)` / `(content hash mismatch)` / `(or its state could not be verified)` 三态映射） |
+| **R5** | `migrateFeedbackEvents` 用 core 的 `evolutionEventPayloadIssue` 过滤合成批次：命中即**整批拒绝** + `warn`（不写半截日志） | 关掉第二个事件日志写入者对 payload 门的绕过 | feedback 29 用例 + 全链 |
+
+**两项收口（零语义风险）**：
+
+- **C11 窄版**：`SkillLibrary.list(options)` 新增**默认关闭**的 `withContent`；`evolution-review` 的 `treeSkillHashes` 由「list + 逐技能读」改为单遍读 —— 每次 review 计划执行少 **N 次读**。（maintenance 的两条消费者**未切**：它们需要先统一错误策略，属行为变更，留待独立批次。）
+- **A6 防漂移守卫**：`evolution-core/tests/library-limits-guard.spec.ts` **不**改组合面，而是把「11 处 `new SkillLibrary` 中 9 处取默认 limits」这一**已复核集合**钉住（其中 3 处是写入者，即 v35 审计 REV-04 记录的漂移面；其余 6 处只读），新增构造点或新增写调用即**变红并强制决策**。守卫自带**空转保护**（register 里出现「已消失的站点」同样红），并已做**红/绿实证**（临时给 `evolution-skill-catalog/src/index.ts` 加一个未登记的构造点 → 恰报 1 条未登记项，撤销后绿）。
+
+### 三、实测否决与刻意跳过（附数字，避免重复立案）
+
+- **F8**（三份 `dependency-contract.spec.ts` 去重）**不是杠杆**：只有 host/preset 两份 97% 相同、共可省 36 行，而共享 helper（含 JSDoc 与两个断言助手）需 59–61 行 → 净 **+25 行**，已按实数回退。
+- **B2**（clamp 模板 5 处）：实测净 **+8 行** → 回退。
+- **C**（YAML 单源）：实测 **≈45–55 行**，且被 `verify-declared-config.mjs` 的「平台键必须出现在 yml 注释里」要求挡住（搬注释必须同时改守卫，属发布链改动）→ 不做。
+- **F2**（`retainReports` 两个默认参内联）：实测 **0 行**净变化。
+- **C8 / C12**（review 直连路径的重复锚校验、inject 分支的第二次 RMW）：看似可删，实为「两次读之间被外部改写」的唯一拦截点 → 与 **C9** 合并处置（本版已做），**不单删**。
+- **F5 尾项**（`record/markArchived` 的 `at`、`assessHealth` 默认阈值）：是刻意保留的**测试时间注入缝**，删除只省 1–2 行却砍掉注入点。
+- **R6 其余子项**（sha256 ×6、`isRecord` ×8、marker 探测 ×5、sanitizer ×2 等 ≈70 行、触及约 25 个文件）：值得单独一批单独验证，不与本轮混做。
+
+### 四、验证
+
+- 每批：定向 vitest 套件（43 / 98 / 115 / 173 用例等）+ `tsc-host` + `oxlint` 全跑；**改动含 tests 时 oxlint 覆盖 tests 目录** —— 本轮即由 `tsc-host`/`oxlint` 抓出守卫文件的 2 类类型错与 3 处风格错（`member-delimiter-style`、`restrict-plus-operands`、`noUncheckedIndexedAccess`），修完复跑两步骤各自 1/1 绿。
+- 末次全量：见开头门禁行（10/10）。
+
+## 0.3.70 (patch) — 平台跨代适配：目标线 DSH 0.1.5-rc.2（v33 兼容审计 18 步）
+
+> **支持窗口（本版声明）**：本版本**已在平台 `0.1.5-rc.2` 上验证**。**`0.1.1-rc.2` 及更早不在支持窗口内**，两条硬依据：① node-semver 预发布准入规则使 `^0.1.1-rc.2` 不匹配 `0.1.5-rc.2`（对稳定 `0.1.5` 却匹配），失败发生在**依赖解析**阶段；② `@deepseek-ai/dsh` 自 0.1.5 起不再发布 `config/`，agent 预设迁到 `packages/preset/agent-presets/presets/`（`code` 预设改名 `ptc`——**家族不受此改名影响**：只解析 `standard`，自装预设固定在 `$DSH_HOME/.agent-presets/evolution`）。家族定位为**跟随当前已验证线**，不做双代兼容、不引入适配层。
+> **依据**：`dsh-evolution-mirror-audit-report-v33-dsh-0.1.5-rc.2-compat.md` + `dsh-evolution-mirror-optimization-plan-v33-dsh-0.1.5-rc.2-compat.md`（分片证据 `D:\dsh\audit-015-compat\`）。
+> **发布门禁（本版实测，0.1.5-rc.2 验证树最终态）**：`build-lib` exit 0（29 包 tsdown 全 Build complete）；`tsc -b tsconfig.host.json` **0 错**；`vitest run packages/evolution --maxWorkers=4` **111 文件 / 1071 用例全绿**（本批新增 G0.3 的真实 Session 回归用例）；`oxlint packages/evolution` **0 warnings / 0 errors**（206 文件）；`verify-dependency-closure` / `verify-arch-guards --strict` / `verify-event-pairing --strict` / `verify-declared-config --strict` 全 exit 0；`run-load-sensitive .` **17/17 @ pinned 4 worker**；目标线两个探针全绿——`verify-platform-contract` 默认 strict：`OK — the recorded host surface is unchanged`（14 条锚点已重录到 0.1.5），`verify-declared-config --upstream`：`0 upstream-drift violation(s)`（从平台源码重算）；家族 dev↔mirror 347 文件 `compare-trees` 0 差异、镜像 layout 守卫 16 脚本 0 drift。
+
+### G0 止血批（让 0.1.5 上"能跑"）
+- G0.1 会话事件读取迁移到平台新口径（`session.snapshotEvents()`）— **已实施（0.1.5 树实测）**：4 个生产站点改为 `snapshotEvents()`（`evolution-core/src/signals.ts:174-175` 先取数组再按索引迭代；`evolution-review/src/index.ts:1446`、`:1609`；`evolution-curator/src/index.ts:1333`），计划漏列的第 5 处测试站点 `evolution-review/tests/persistence-resume.spec.ts` 同批迁移。验收：家族树 `session.events` 归零（只剩 `evolution-approval/src/index.ts:58` 的迁移说明注释）；`tsc -b tsconfig.host.json` exit 0。**另修一类计划未覆盖的站点**：家族自己的测试替身仍以数据属性 `events: [...]` 假扮 Session（`review.spec.ts:513,916`、`evidence-mutex.spec.ts:197`、`curator/tests/boundary.spec.ts:76`、`approval.spec.ts:104`、`tool-memory/tests/*` 共 7 处），它们经 `as unknown as Session` 转换对编译器不可见，只有真跑测试才暴露（RED 实测：`TypeError: agent.session.snapshotEvents is not a function`，review 套件 27 例静默失败）
+- G0.2 `CallId` → `ToolCallId` 机械改名（4 个测试文件）— **已实施**：import 与 29 处调用表达式全部改名（`anchored-smoke.spec.ts` 9、`tool-skill-manage.spec.ts` 18、`boundary.spec.ts` 4、`threat-guard.spec.ts` 2）；家族树 `CallId` 独立标识符归零（只剩探针记录锚点里的历史文本，见 G4.2 的重录）
+- G0.3 新增“真实 Session”回归用例 — **已实施**：`evolution-review/tests/session-accessor-real-session.spec.ts`（1 条用例，用真实 Session 驱动 `foldTurn` / curator 空闲门 / review 读前置三条路径）。**验收按“可判真”形式给出**：分别把两条非直连路径改回 `.events` 后该用例必红 —— curator 路径 `TypeError: Cannot read properties of undefined (reading 'length')`（用例第 156 行）；review 路径读前置信用丢失、计划被当作未读丢弃（10s 轮询超时，第 166 行）。计划原写的“0.1.1 与 0.1.5 两侧都绿”在单线策略下不成立（0.1.1 上家族已不编译），此处如实改为单侧可判真
+- G0.4 计划外、但同批必须处置的跨代断点（0.1.5 树实测发现）— ① `SessionPersistence.load()` 在 0.1.5 被删除，读路径改为读句柄（`open(id, 'read')` + `read()`），durable 写入由 agent loop 持有（`agent-loop/src/index.ts`）→ `evolution-review/tests/persistence-resume.spec.ts` 两个用例按新契约重写：经 `sessionPersistence.create(header)` + `handle.append()` 落盘，再由新上下文 `open('read')` 复读；负例断言换成平台真实的读路径拒绝（实测 `SessionFormatUnsupportedError: … contains event type "evolution/plan-applied" (seq 1) unknown to this harness and not marked ignorable`）。② `CommandInvocation.attachments` 在 0.1.5 变为必需字段 → `evolution-learning-graph/tests/graph.spec.ts` 夹具补 `attachments: []`。③ G3.1 需要真实 `Session` 类型 → `evolution-curator` 新增 `@deepseek-ai/dsh-session` 的 peer+dev 依赖与 tsconfig 工程引用。④ G0.3 用例要经 curator 的公共 `run()` 驱动空闲门 → `evolution-review` 新增对 `@deepseek-ai/dsh-evolution-curator` 的 test-only devDependency。⑤ 0.1.5 overlay 需要显式 `zod` 别名（store 内 `zod@4.4.3`；`inject-evolution-paths.mjs` 按设计排除 zod，本地覆盖脚本单独注入），否则 `evolution-state-domain/src/index.ts:12` 报 `Cannot find module 'zod'`
+- G0.5 预发布全量门禁抓出的第二类残留（**只有真实主机升级之后才显形**）— ① 家族的 anchored-standard 兼容夹具两个 `.mjs`（`test-support/anchored-standard/{compaction-epoch,tool-bootstrap}.mjs`）仍在读被 0.1.5 删除的 `Session.events` 属性：抛出的 TypeError 被 `system-prompt/assemble` 过滤器的兜底 catch 吃掉，行为退化成"暴露全量目录"，3 条 anchored 兼容用例因此静默失去被测对象（RED：`expected [ 'bash', 'memory', … ] to not include 'memory'`），已改为 `snapshotEvents()`；② `install-layered.mjs` 的 `standard` 预设探测链漏了两种真实形态——0.1.5 的 **source 形态** `packages/preset/agent-presets/presets`（0.1.5 把预设移出 CLI 包，`apps/cli/config/agent-presets` 已不存在）与 **npm 全局嵌套形态** `<npm-root>/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-presets/presets`（`dsh-agent-presets` 是 CLI 包的依赖、不是它的兄弟）——主机升到 0.1.5 后 `--mode layered` 相关的 9 条用例报 `cannot find a runtime 'standard' agent preset`，补上两种形态后全绿。**教训**：这类残留在旧平台测试与 `tsc` 下都不可见，只有"新平台 + 真实全局安装"的组合门禁能抓（本批即由预发布全量门禁抓到）。
+
+### G1 版本域与兼容锚
+- G1.1 `PLATFORM_VERSION` → `0.1.5-rc.2`（release.yml 唯一定义点）— **已实施（镜像侧）**：`.github/workflows/release.yml:43` = `0.1.5-rc.2`，派生面随之切换（发布元数据把 111 条 `@deepseek-ai/dsh-*` range 改写为 `^0.1.5-rc.2`，`compat-check` 的 `upstream_ref` = `dsh-v0.1.5-rc.2`）。**同批抬了 baseline 旋钮**：镜像根 `UPSTREAM_SHA` `47f943859bef60e4160492346772ded9b24f765a` → `fb2c4b9e698e30edb738bca4cf0618587db7d203`，并重建镜像的两份 tsconfig（见 G4.4）
+- G1.2 range 门写明"锚点即窗口"，并把跨锚点不兼容做成可执行断言 — **已实施**：`verify-platform-ranges.mjs` 新增 `assertSupportWindow()`，把审计 §P1-1 的 4 行 semver@7.8.5 实测结果变成可执行断言表（外加"锚点自含"、"由锚点派生的前一代锚被排斥"、可选 `--previous-anchor`）。RED（删掉预发布 tuple 规则）：`predicate says ^0.1.1-rc.2 vs 0.1.5-rc.2 = true, semver@7.8.5 measured false`，exit 1；GREEN：`support window — ^0.1.5-rc.2 rejects the previous anchor 0.1.1-rc.2 (prerelease-admission rule; the declared window is exactly this anchor)`
+- G1.3 三处声明支持窗口（README / INSTALL / 本 CHANGELOG）— **已完成**：README `## Installation` 与 INSTALL `## Prerequisites` 均写明"已验证平台 = `0.1.5-rc.2`；`0.1.1-rc.2` 及更早不在支持窗口内"，并给出 node-semver 机制与"失败发生在依赖解析而非运行时"的判据；本节开头即 CHANGELOG 部分
+- G1 发行链排演（`--platform-version 0.1.5-rc.2`，dev 树）：`prepare-release.mjs` → `packed 29 packages -> …/dist`；`verify-platform-ranges.mjs` → `OK — scanned 29 package manifest(s), 111 @deepseek-ai/dsh-* platform range(s) all ^0.1.5-rc.2`（同次打印 `support window — ^0.1.5-rc.2 rejects the previous anchor 0.1.1-rc.2 …`）；`publish-scoped.mjs --no-provenance --dry-run` → `publish run complete`（29 包 dry-run）
+
+### G2 平台解析委托 / G3 契约口径收敛 / G4 门禁机械化 / G5 模型可见面 / G6 文档与残余登记
+
+**G2 平台解析委托**
+- G2.1 `resolveStandardComposition` 改为"先问平台"：探测链首插 `node_modules/@deepseek-ai/dsh-agent-presets/presets/`（0.1.5 的 `SHIPPED_PRESET_ROOT` 形态，逐级上溯），历史 `apps/cli/config/agent-presets` 与全局 npm 根（两种形态）保留为回退，失败文案补"0.1.5 起预设随 `dsh-agent-presets` 发布"的指引 — 新用例 `installer.spec.ts`「G2.1 (v33): resolves the preset from the 0.1.5 shipped location, not the legacy CLI config dir」：RED（把探测链还原为仅历史路径 → 首行断言拿到 dev 树的 `# The 'standard' agent preset: …` 而非夹具的 `# v33-G2.1 platform-shipped standard composition`）/ GREEN（该文件 32/32）
+- G2.2 `PROFILE_SEED_TEMPLATES` 五点模板（`acp`/`web`/`headless`/`sdk`/`sdk-minimal`，各带 `patchReload`；`sdk-minimal` 为"只含 sdk 包"的特例）+ `ensureProfile` 落盘 `dsh.profile.patchReload`；常量旁注明"这是平台 `PROFILE_TEMPLATES` 的冻结快照，探针负责变红" — 新用例「G2.2 (v33): a self-created profile carries the platform template bundles and patch reload」：RED（把 `sdk-minimal` 键改名 → `expected [ '@deepseek-ai/dsh-base', …(1) ] to deeply equal [ Array(2) ]`）/ GREEN
+- G2.3 三份 bundle 的整块替换注释（显式写明"其余平台键回落 schema 默认"并列出平台真实键集）— RED（删掉 `evolution-all` 注释里的 `snippetChars` → `evolution-all: the whole-config-replacement note has no mention of platform key(s) snippetChars for row session-query-sqlite …`，exit 1）/ GREEN。**计划书写的键集不全**：`session-query-sqlite` 的 0.1.5 真实 Config 是 9 键（计划列 7 键，漏 `snippetChars`、`readWindowMax`），注释与探针按真实集对齐
+
+**G3 契约口径收敛**
+- G3.1 手写 Session 形状 → 真实 `Session` 类型 — **已实施**：`evolution-curator/src/index.ts:1320-1323` 的手写形状换成从 `@deepseek-ai/dsh-session` 引入的真实 `Session`（P0-1 第 4 站点此前对编译器不可见的原因）。验收（可判真）：把该处 `snapshotEvents()` 改回 `.events` → `tsc -b tsconfig.host.json` 报 `packages/evolution/evolution-curator/src/index.ts(1333,36): error TS2339: Property 'events' does not exist on type 'Session'`；改回后 exit 0
+- G3.2 三处过期前提注释（`evolution-approval/src/index.ts` ×3、`tool-memory/src/index.ts`、`tool-skill-manage/src/index.ts`）改写为"平台 `overrideOf` 需要 Session 的日志视图（0.1.5 起经 `snapshotEvents()`）"，并把 `approval.spec.ts` 的平台形状测试替身同步到 0.1.5 口径 — `grep -rn 'reads\s*.?session\.events' packages/evolution` **0 命中**；`approval.spec.ts` **23/23**
+
+**G4 门禁机械化**
+- G4.1 `verify-declared-config.mjs` 新增 `--upstream <平台树>`：从平台自己的 `packages/bundle/*/cordis.patch.yml` 重算平面 `disabled`（精确集）/`mounted`（确认表）、从平台源码重算被覆盖行的 Config 键集、并检查三份注释点名了每个平台键；表内 `disabled` 补全为 0.1.5 完整集，`source` 去掉会腐坏的行号锚点 — 0.1.5 树：`0 upstream-drift violation(s)` 并打印重算清单；0.1.1 树：**3 条 drift 且值正确**（`base` 少 `hmr`；`web-app` 多 `hmr, tool-str-replace-editor`、少 `ui-schedule, command-goal`；`session-query-sqlite` 的 `persistedInspectConcurrency` ↔ `persistedReadConcurrency`/`preparedSessionCacheSize`），exit 1；人为改错表一行 → strict 下 exit 1；sentry 用例（把 drift 函数改成恒返回空 → `AssertionError: expected null not to be null`）
+- G4.2 新增 `verify-platform-contract.mjs`（14 条记录锚点 + 活体导入符号 22 条 + `ctx.get` 服务名 16 条 + section-order 量纲窗口）— 0.1.1 树：`OK — the recorded host surface is unchanged`（0 漂移）；0.1.5 树：**恰 14 条差异**（P0-1 `session-events-accessor`、P1-2 `call-id-brand`、P2-A1 ×2、P2-A2 ×3、P2-A3、P2-B1 ×2、`PERSONA_SECTION`/`PERSONA_ORDER` ×2、P2-D4、P2-F2），导入符号 22/22、服务名 16/16 命中（不多报）；记录表之外的漂移仍然红（实测：临时引入一个不存在的平台符号 → `1 unrecorded host-surface difference(s)` + 该符号名，exit 1）。CI 以 `--accept-recorded --upstream .` 接在 released-upstream compat 作业（`action.yml` 第 16 步，`if: inputs.copy_host_tsconfig == 'false'`），baseline 作业不接（其树是 `UPSTREAM_SHA` 开发基线，与锚点本就不同） **v33 G0 收口时已重录锚点并去掉 `--accept-recorded`**：14 条锚点逐条改指 0.1.5 的实际文本（`snapshotEvents(`、`ToolCallId`、`native' | 'ptc`、`readonly attachments?: boolean`、`tools/ptc-dispatch-log`、`tool/ptc-dispatch`、`tools:ptc-only`、`SESSION_FORMAT_VERSION = 3`、`inheritedEventCount`、`DEPLOYMENT_PERSONA_PREFIX: 0` / `DEPLOYMENT_PERSONA_SUFFIX: 10200`、`DshProfileManifest` 的新家 `packages/util/package-manifest`、`LlmRuntime extends TypertRemoteService`），默认（strict）模式对本树 `OK — the recorded host surface is unchanged`；CI 接线同步改为不带 flag（`action.yml` 第 16 步），`--accept-recorded` 的定位改写为“下一代升级的起步模式”
+- G4.3 空不变量处置决策 — **选 (a)：保留现状不改造**（`verify-package-invariants` 是上游门禁，本仓库不存在该消费者），并写出改选 (b) 的触发条件（overlay 到上游跑门禁前必须先处置）；落在 `packages/docs/upstream-contract-checklist.md` 新增小节
+- G4.4 镜像侧基线产物重建（抬 `UPSTREAM_SHA` 的必备前置）— baseline 作业会把镜像的 `tsconfig.base.json`/`tsconfig.host.json` 覆盖到 `UPSTREAM_SHA` 检出树上，而这两份文件此前按 0.1.0-rc.5 时代生成（212 条平台工程引用、166 条 paths），对 0.1.5 布局会指向已删除或改名的包。本轮按 0.1.5 树重建（`D:\dsh\audit-mirror-v33\prepare-0.1.5-overlay.mjs` 的产物，幂等可复跑）：`tsconfig.base.json` = 0.1.5 自带 base（410 条 paths，覆盖全部平台包）+ 家族别名 + `zod` 别名（sha256 `06fd7a9d5f4514b5`）；`tsconfig.host.json` = 0.1.5 自带 host 聚合（226 条平台引用，`exclude` 原样保留）+ 25 条家族工程引用 + 3 条家族 test-support 包含（sha256 `28fc9eabf3dcbcdb`）。**踩坑记录**：生成器首版只搬运 extends/compilerOptions/include/references、漏掉上游的 `exclude`，客户端面文件（`packages/client/*/src/**`、`*.client.spec.ts`）因此进入 host 程序、两套 cordis Context 合流，报出 **~480 条** `Property 'plugin' does not exist on type 'Context'` 假错误淹没真错；补上 `exclude` 后同一棵树只剩真实的 17 条跨代错误
+
+**G5 模型可见面**
+- G5.1 两段 section order 收敛为具名常量 `MEMORY_GUIDANCE_SECTION_ORDER = 11000` / `SKILLS_GUIDANCE_SECTION_ORDER = 11100`（`evolution-core/src/constants.ts`，附"量纲随平台版本变化、0.1.5 起第一方最高 10200"），`tool-memory` 与 `tool-skill-manage` 改用具名常量（`tool-memory` 的 **context** 不动）— 探针输出 `section order scale — platform highest DEPLOYMENT_PERSONA_SUFFIX=10200; family lowest MEMORY_GUIDANCE_SECTION_ORDER=11000`；RED（常量改回 900 → `MEMORY_GUIDANCE_SECTION_ORDER=900 does not sort after the platform's highest first-party section DEPLOYMENT_PERSONA_SUFFIX=10200 — the section would render before the tool guidance`）
+- G5.2 KV 影响显式声明 — README 新增「Model-visible prompt prefix and the KV cache」：系统前缀由两段 section 构成、改文本或改序都会让**全部会话的 KV 前缀作废一次**、本轮唯一一次位移（量纲重标 → 两常量抬到 11000/11100）、记忆快照走 `systemPrompt.context`（尾插 + 文本未变即跳过，**不属前缀**）
+
+**G6 文档与残余登记**
+- G6.1 `packages/docs/upstream-contract-checklist.md` 15 → **18 条**（16 日志访问器类、17 `PromptSection.order` 量纲与 tie-break、18 预设/模板发现路径），全表新增 `0.1.5-rc.2 判定` 列；"升级操作建议"第 1 步的 `git diff` 目录补 `packages/preset/agent-presets` 与 `packages/boot/app-boot`（含 `src/profile.ts`），新增第 5 步跑两个探针
+- G6.2 新增 `packages/docs/v33-no-action-register.md`：11 条零动作 P2（A1/A3/B1/B2/C1/C3/D3/D4/E1/E2/F2）逐条写"为什么不需要动作"，并划清与"待办项"的边界；INSTALL 新增安装形态矩阵（每格 `已验证` / `部分已验证` / `未验证（源码级判定）` + 依据），README 指向上表与登记表
+
+> **如实标注（本轮完成度与残余）**：① 本 CHANGELOG 的全部数字出自平台验证树 `D:\dsh\dsh-upstream-0.1.5-rc.2`（tag `dsh-v0.1.5-rc.2` = `fb2c4b9e…`）叠加家族 overlay；旧 dev overlay（`D:\dsh\deepseek-harness`，平台 0.1.0-rc.5）与本机现装平台（0.1.1-rc.2）**都不再能编译或运行家族测试**，这是单线策略的有意结果，不是配置事故（编辑与同步源仍是 `D:\dsh\deepseek-harness\packages\evolution`，两棵树 347 文件逐字节相同）。② 计划未覆盖、本批补齐的三处断点与两类依赖新增见 **G0.4**；③ 镜像侧本轮改动 5 处：`release.yml:43`、`UPSTREAM_SHA`、`tsconfig.base.json`/`tsconfig.host.json`（按 0.1.5 派生重建，见 G4.4）、`action.yml`（探针转 strict），README/INSTALL 口径随之一致；④ 锚点重录已同步写入 `packages/docs/upstream-contract-checklist.md`（新增「平台契约探针锚点重录」一节：新文本清单、默认 strict 模式用法、下一代升级流程，并记录 `USER_DSH_RANK` 在 0.1.5 上仍为 400 的独立复核）；残余：`0.1.5 树上` 家族测试与全部门禁目前是本机手工执行，CI 侧要等 tag 后的两个作业确认。
+
+## 0.3.69 (patch) — v28–v32 五轮审计闭环（12×P1 + ~70×P2）+ 发布链加固 + REV-06(b) 基线刷新修正
+
+> **范围**：v28→v32 五轮"审计-修复"循环（26 路次分片 + 主代理逐项复核），依据 `dsh-evolution-mirror-audit-report-v28..v32.md`；另含本版提交前的独立复核修正。
+> **发布门禁（本版实测）**：`vitest` 110 文件 / 1059 用例全绿；`tsc -b tsconfig.host.json` 0 错；`oxlint` 0/0；四守卫全 exit 0；负载敏感锁组 17/17 @ pinned 4 worker。
+> **如实标注**：P1 表中的 REG-02 与 F-1 两行，其缺陷**由本批自身引入后又在同批修回**（v31 INST-03 给 agent 模式新增 journal 写入才产生 REG-02 的 ENOENT；v31 INST-07 给 `ensureProfile` 加 `existsSync` 门才产生 F-1），不是 0.3.68 基线里的既有缺陷；STATE-03 为纯文档修正。
+
+### 提交前独立复核修正
+
+- **REV-06(b) 基线刷新点错位（真实缺陷）**：原实现把 pre-run 哈希基线刷在"自己的比较"之前、且**即使该 op 被判 stale 也刷**。后果 A：同计划第二步（rewrite→adjust）仍被误判 stale；后果 B（更严重）：被拒的那一步把基线**改成并发写入者的字节**，后续 op 比较相等而被放行 → 覆盖并发写，正是 REV-06(b) 要消灭的"双写都成功"。现改为**只在本计划真正落地的写之后**、按盘上字节刷新；并发写落在两步之间仍被拒。
+- **注释损坏修复**：`evolution-review/tests/anchored-smoke.spec.ts` 的 11 处 em-dash 曾被写成 GBK 误读形态（`鈥?`）并把注释行并成一行，已修回；两侧树扫描无残留。
+- **诊断一致性**：`doctor` 的 profile 清单解析失败不再静默吞掉（原为"枚举失败 fail-closed、单文件解析 fail-open"的不一致：截断的清单会让双挂载门禁 fail-open）；`install-layered.mjs` 的块缩进与其所属 `if (needsAgent)` 对齐（**纯排版**——括号嵌套本就正确，不是行为修复）。
+- **覆盖补充**：`packages/scripts/*.mjs` 的 5 处发布链修复与 REV-06(b) 判别用例在本版补齐（原 `TEST-01` 对 REV-06(b) 是空转的：它实际由 REV-01 的锚检查拦下）。
+
+### v28 批次（P1=3 / P2=22）
+
+### 行为变化需知
+- **memory 降限不再冻结**（v28 MEM-01）：调低 `memoryCharLimit`/`userCharLimit` 后，store 自己写入的历史长条目不再被误报为"外部漂移"；增长类操作得到点名配置的拒绝文案，remove/纯收缩 batch 保持可用（自愈通道恢复）。非规范形的外部改动仍照旧拒绝并备份（Hermes 信号 #2 仅作用于非规范形）。
+- **`/evolution preset install` 前置互斥**（v28 CMD-03）：home 内任一 profile 已挂 `evolution-all` 或 `evolution-preset` bundle 时拒绝安装分层预设（此前与 install-layered 的排他口径不一致，写完预设才在下次启动 fail-loud）。
+- **state provider 多注册告警**（v28 STATE-04）：未 pin 且注册了 2+ 个 state provider 时，未定选择点发出一次性命名警告（有效 provider=注册序；另一 provider 的现存状态不可见）。
+- **curator 中止不推进调度**（v28 CUR-01）：dispose 中止的运行不再把 `lastRunAt`/`runCount` 当完成推进——被跳过的工作在下一个检查点即可重跑（E-15 幂等），而不是等满 `intervalHours`（默认 168h）。
+- **curator 提交前复核 min-idle**（v28 CUR-02）：自动 pass 在 `applyMutations` 前复核会话活跃，命中即以 `skipped:'active-session'` 收尾；跨层"自动 pass 不进活跃窗"的注释此后为真。
+- **curator 报告不再编造归档路径**（v28 CUR-03）：consolidation 来源的 `archived[].path` 在无法确定（碰撞带 stamp）时**省略**，reason 指向 `evolution/skill-mutated` 事件的 `archivedPath`。
+- **replay 单计划 margin=null**（v28 RPL-01）：只有一条计划时不再把绝对分当"领先分"，报告附"single plan recorded"说明。
+- **命令面异常翻译**（v28 CMD-01）：`/evolution` 与 `/graph` 的 handler 顶层各有一道 try/catch，任何服务层异常（状态文件隔离、暂态 IO）转为结构化 `kind:'error'` + 下一步指引，不再裸抛给平台 dispatcher。
+- **脱敏扩展**（v28 REDACT-01/02）：PEM 私钥块整段遮蔽；`api_key:` 换行缩进取值的块式形态被遮蔽（此前多行凭据原样出站）。
+
+### 修复（择要）
+- state-json：cap 驱逐的归档凭据与活表驱逐**同生共死**——追加失败时补偿合流回活表，堵死"legacy 孪生复活→已解决写被重放"的窗口（v28 STATE-01）；合法 JSON 但形状错误的归档文件改走 C-9 隔离，不再被静默覆盖（STATE-01b）。
+- approval：`doApprove` 的 resolve 纳入保护——resolve 抛错时报告"效果已落地、审计行留在 executing"，不再抛裸异常（APPR-01）。
+- skill-store：update/patch 的归档竞态共享补偿清理——不再留下永久阻塞 `restoreFromArchive` 的幽灵目录（EVO-IO-02）；`restoreLatestSnapshot` 双 pre-clear 拒绝改为"树未动、无需手动抢救"的口径（CORE-SK-03）；`committed` 谓词收敛到 `isCommittedWarning` 单源（EVO-IO-05）；删除零调用导出 `frontmatterYamlUnsafeValues`（CORE-DEAD-01）。
+- frontmatter：快速路径补 YAML 1.2 core 数字形态（hex/octal/指数/`.inf`/`.nan`），catalogInvalid 不再假阴性（CORE-SK-01）；BOM/混合换行的不可检出块 fail-closed（CORE-SK-02）。
+- io：ticket sweep 阈值统一到 `TICKET_STALE_MS`（EVO-IO-04）；G1.2 假不变量注释改写为真实保护链描述（EVO-IO-03）。
+- usage：未知 per-record 字段在 RMW 往返中穿透保留（USAGE-01）；`selectPendingOverflow` 文档按可实现语义修正（STATE-03）。
+- policy：`tools.guard` 改用上游 `ToolGuard` 真型（UP-01）；29 个 `invariant.ts` 模板写明生产语义约定（UP-02）。
+- 守卫：`run-load-sensitive.mjs` 支持 dev/flat 双布局（G-01）。
+
+### v29-v32 批次（P1=9 / P2≈48）
+
+- **v29**：LIST-01（`SkillLibrary.list()` 被单个 EISDIR/暂态读取失败整体击穿）→ 只吸收 EISDIR、其余响亮失败；STATE-05（归档追加失败后 legacy 孪生复活为可领取 pending）→ 驱逐与追加在事务内同生共死；MEM-02 shrinkOnly 载荷 64MB 上限。
+- **v30**：REV-01（审查直写通道整内容更新不校验 staleness 锚，并发前台 patch 被静默覆盖）→ 执行前重读字节比对锚、失配拒绝；REV-02/04（policy 快照经 optional 边界读取、protected 直写拒绝）；CUR-04 blocked-run 基线持久化。
+- **v31**：REDACT-03（块式脱敏漏掉全部带连接前缀的凭据键，如 AWS_SECRET_ACCESS_KEY，实测泄漏）→ 补连接前缀组；INST-01（install-layered 就地非原子写 profile 清单，崩溃即砖 profile）→ 五处调用点 tmp+rename 原子写 + 解析失败告警；INST-05（`--scope --version` 把下一个 flag 当值、裸 `--otp` 把下一个 flag 当 OTP）→ 显式守卫；INST-02（staging 的 `.tgz` 被拷进用户 profile）→ 过滤。
+- **v32**：REV-06(a)（失败的技能读取也计入\u201c已读\u201d）→ call/result 配对且 `isError !== true` 才计入；REV-06(b)（锚绑定在 staging 而非读取时刻）→ executePlan 循环内 pre-run 哈希对比（其基线刷新点错位在本版修正）；REG-02/F-1（本批自造并自填，见如实标注）；UP-01/UP-02（policy 改用上游 `ToolGuard` 真型；29 个 invariant.ts 写明生产语义约定）；PROMPT-01（纠正 `verifyPromptBundle` 作用域措辞，PROMPT_BUNDLE_VERSION 16→17）。
+
+## 0.3.68 (patch) — v27 三轮批次闭环：12×P1 + 52×P2 处置 + 四条新门禁 + 测试类型检查接通
+
+> **范围**：v27 全量审计（P0=0 / P1=12 / P2=52）按 `dsh-evolution-mirror-optimization-plan-v27.md` 的批次 1（G0 止血，5 步）、批次 2（G1+G2+G4，13 步）、批次 3（G3+G5+G6+G7+G8，19 步）全部落地；另处置审计列为 P2/suspect 的 CC-4 / M-07 / S4 / INS-04 / INS-05 五项。
+> **发布门禁（本版实测）**：`build-lib` exit 0；`tsc -b tsconfig.host.json` **0 错**（含全部测试文件，D-9 本版首次接通）；`vitest run packages/evolution` **110 文件 / 1021 用例全绿**；`oxlint` 0 warnings / 0 errors；`verify-dependency-closure` / `verify-arch-guards --strict` / `verify-event-pairing --strict` / `verify-declared-config --strict` 全 exit 0；负载敏感锁组 17/17 @ pinned 4 worker，并在 3 进程并发下 4 轮 × 3 = 12/12；dev↔mirror 双树 0 差异。
+> **行为变化需知的四点**：① replay 打分不再对"未读被跳过"二次计罚（R-03：`rejectedOps` 只统计校验拒绝，新增 `skippedUnread`）；② `ctx.skills` catalog 发布的 `content` 改为**正文**（不含 frontmatter），与上游 `skill-filesystem` 对齐；③ frontmatter 取值改走**真 YAML**（块标量仍受支持），围栏判定与上游逐字 `---` 对齐（仅容忍 `\r`）；④ `skillsRoot` 别名**退役**——再设置会**加载即报错**。
+
+### 批次 1（G0 止血，12×P1）
+- 写锁协议：接管分支不再把 `readFile` 失败伪造成"空体锁"（这是负载下双持的根因）；空体锁阈值 1s→30s；每次提交前 `assertOwned()` 复核锁体归属，丢锁抛 `LostWriteLock` 并重做整个 RMW（EVO-IO-01）。
+- 快照恢复：`manifest.skipped.length > 0` 视为不完整，破坏性清空前拒绝（真·空树 `skipped=[]` 行为不变）。
+- frontmatter：块标量头（`>`/`|`）不再被当普通标量加引号（core-a-07）；`extras` 逐项净化且读取移到破坏性替换前（core-a-01）。
+- 脱敏：JSON 形态 `"password": "hunter2"` 被遮蔽（CB-1）；`/evolution learn` 改 followup-first，无 `followup` 时降级 `inject`（U-1）。
+- 报告/门控：维护笔记在 `no_issues` 也渲染（M-01）；空库三态诊断（M-02）；curator 报告新增中止/未归属字段（CUR-2）；review 队列满丢弃路径恢复 latch 且不误清计数（R-01/R-03）。
+
+### 批次 2（G1 事务 / G2 契约单源 / G4 报告诚实）
+- G1：`decideTakeover` 纯函数 + 接管协议常量单源；锁创建与写体合并为单次 `writeFile(flag:'wx')`（消除 0 字节窗口）；`committed:true` 在 `transactIo` 单点容忍；隔离副本清扫覆盖四种历史命名。
+- G2：frontmatter 单一解析入口（`readFrontmatterBlock` + `parseFrontmatter`/`frontmatterCatalogInvalid` 两个投影：取值走真 YAML，严格解析拒绝时才回落行扫描并由 `catalogInvalid` 报出）；漂移判据单点（`drifted` + `driftRefusal`，两个写路径与 `detectDrift` 共用同一谓词）；memory 写路径单骨架（`chainedWrite`）；cap 算术单点（`selectPendingOverflow` / `selectSessionOverflow`，state-json 与 state-domain 共用）；`MAX_TIMER_DELAY_MS` 上收 core（review 里那份重复定义删除）、`DEFAULT_*` 收敛、`skillsRoot` 别名退役。
+- G4：curator 报告 `aborted` / `unattributed` 落盘并渲染；`rejectedOps` 口径修复 + 新增 `skippedUnread`；计划执行的超时/中止路径账目诚实（`onLanded`，超时分支也补发已落地账目）；队列满丢弃与 cadence 计数对称回滚。
+
+### 批次 3（G3 门禁 / G5 模型契约 / G6 装配 / G7 验证 / G8 收口）
+- G3：新增 `verify-declared-config.mjs`——把"声明了会生效"的配置逐条判可达性（row-mounted / profile-root / preset-composer），上游面事实带 `packages/bundle/*` 源锚点，claimed 的 composer 可达必须由代码锚点证明；门禁复现并报出 T-1（web profile 下 `tool-skill` 行被上游 `disabled:true`，60 字上限只经预设组合器可达）。提示词字段集 == 校验器 schema 字段集（双向比对，落为 self-consistency 第 ⑥ 条）。`verify-event-pairing.mjs` 扩展持久化事件"只写不读"检查：`feedback` 有生产读者，`learn`/`usage`/`maintain` 显式登记为外部契约观测日志（各带理由）。
+- G5：`skill_manage` 描述补 `replace_all` / `file_path` 语义与逐 action 必填参数，缺参给可执行文案，首次命中多锚点时报告"替换了第 1/N 处"；命令缝（`/evolution` 与 `/graph`）改用上游 `@deepseek-ai/dsh-commands` 真实类型（本地结构视图删除，上游形状变更现在会使本族编译失败）；catalog `content` 对齐上游"正文"语义。
+- G6：README 明确 60 字上限的**真实可达面**（profile-root 仅 headless/base 生效；web 下由预设组合器注入；非组合器生成的预设仍是平台默认）；approval 模块文档不再声称 curator 写入也暂存，`sessionPolicy` 标注为"平台 approval 服务在场时被忽略的兜底"；`memory` 服务新增 `provider` pin（未满足时注册期 warn、首次读写硬失败）；doctor 的 `all × 预设产物目录` 同居冲突可检出。
+- G7：`tsc -b tsconfig.host.json` 接入 CI 并修掉 73 个测试文件类型错误（D-9 闭环）；新增负载敏感锁组 runner 与 CI 固定并发步骤；双实现等价性/单点用例；INS-04（`/graph` 读扇出分批 + 单个文件读失败不再毁掉整张图）、INS-05（`preBackfillIds` FIFO 上限）、CC-4（矛盾超时配置按归档下界处置而非"复活"）、M-07（quality_low 强制不再被带空白的目录名绕过）、S4（`transactCuratorState` 的 task 收到副本）五项边界用例。
+- G8：`skillsRoot` 过期承诺清零（JSDoc 与 INSTALL 改为事实）；归档写 `.archive-name` 标记，使 0 字节 SKILL.md 的归档仍可按名 restore，且无匹配时给出事实文案而非"不在 .archive"；`applyTreeChange` 只在回滚真的成功时才说"已回滚"（回滚失败会点名目标）；FIFO/cap 等注释与实现对齐；根 README 包表与 `packages/README` 统一。
+
+### 门禁与校验体系（本版新增/变更）
+- 新增 `verify-declared-config.mjs`（CI 以 `--strict` 运行）与 `run-load-sensitive.mjs`（固定 4 worker、`--retry=0`、组内 17 条，匹配数不足即判失败——防止改名导致空转）。
+- CI（`.github/actions/evolution-validate/action.yml`）新增两步：测试文件类型检查（仅 baseline 作业）、负载敏感锁组固定并发运行。
+- 记账与偏离（详见 `packages/docs/v27-batch2-3-execution-plan.md`）：G0.2 采用"提交点所有权复核 + 空体锁阈值调整"而非删除按年龄接管分支；G5.1 仅在描述中声明逐 action 必填（工具 schema 只能表达无条件必填）；G6.1 的"row enabled 且 config 生效"由 `verify-declared-config` 的 sourced 表覆盖，而非 installer.spec 断言；G2.2 的 cap 纯函数落在 `evolution-state-storage`（seam 契约归 seam 所有）。
+
+## 0.3.67 (patch) — v24–v26 三轮审计闭环：3×P1 + 46×P2 全部处置 + 回归测试夹具修正
+
+> **范围**：v24 全量审计 → 全部修复 → v25 对修复的继续审计 → 修正 → v26 再审计 → 修正，三轮合计 3×P1 + 46×P2，全部闭环，零遗留 P0–P2。三个 P1 均为并发/生命周期类，且后两个 P1 都是在对前一轮修复的复审中发现的。
+>
+> **发布门禁（本版实测）**：vitest 109 文件 / 978 用例全绿；build-lib（29 包 tsc -b）exit 0；oxlint 0 warnings / 0 errors；dependency-closure / event-pairing / arch-guards 全 exit 0；mirror↔dev 树 339/339 逐字节一致。
+>
+> **回归测试夹具修正**：V25-02/V25-03 的双会话夹具原先使用恒 null 的 review-state 加载器，每轮计数被重置，Y 的 cadence 从未触发 subagent、X 也从未真正进入 deferred drain；两条用例因此在“撤销对应修复”后仍全绿（v26 报告的反事实推演未复现这一夹具缺陷）。本版改为按会话持久化的内存状态，并在 V25-03 重放轮前复位 X 计数以隔离 completion 通道；两条用例现均满足“撤销对应修复即红”，已用定向变异实测确认。
+
+### 核心修复
+
+- **V24-01 / V26-01（P1）**：`applyTreeChange` 的 CAS 基线改取计划期字节 `TreeChangeWrite.expected`（缺省回落预读），consolidate/restructure 全部写入携带基线；漂移即中止回滚。新增确定性 CAS 漂移回归测试（transact 内注入并发 patch，撤销 CAS 即红）。
+- **V25-01 / V26-05（P1）**：replay activity 回灌改为 once-per-driver latch；首挂载窄窗口内先 live 记录的 planId 在回灌时去重，io provider 重载不再翻倍。
+- **V25-02 / V25-03 / V26-06（P2）**：deferred completion 队列条目携带自身的 sessionId/count 窗口/channel；drain 投递失败按 entry session 回滚 `completionInjected`，队列 cap 丢弃路径同样回滚。
+- **其余 P2**：skill-catalog 摘要缓存 epoch 代次守卫；review-state 每会话状态锁 + 会话 cap（500，双介质惰性淘汰）；feedback 迁移复用 S6.4 逐记录消毒 + clamp；state-json 归档/备份吞错可观察（quarantine rethrow / warn）；`args: undefined` 写入门收紧 + 入口归一；suppressed sidecar 未来版本拒写；restructure 携带 session 维度；doctor preset×layered 产物检测与空目录误报修正；命令空白变体归一分发；no_issues 逐信号 notes 校验；JSON 模型工具元素 null 守卫；snapshotAll 写锁探针 + `manifest.skipped` 全链路（净化/读取/restore 明示）；uninstall journal.scope、staging familyVersion 基准、shipped yml 残留扫描；文档三方同步与审计标签撞号修正。
+
+
+## 0.3.66 (patch) — v20–v23 四轮审计闭环：15×P1 + 62×P2 全部处置（4 个审计批合并发布 + capability 包退役）
+
+> **合并说明**：以下四个批次是 2026-09-09～09-10 的"审计 → 修复 → 回归审计"四轮闭环（合计 77 项：0×P0 / 15×P1 / 62×P2），全部改动集中在本版发布；每批的发现数与主题见其小标题。回归审计连续在后续批次中抓到前三批自身引入的缺陷（批 2 引入 2 项、批 3 引入 1×P1 + 2 项边角），共同形态是"用例全绿但语义有缺陷"。本版另含一项**非审计**改动：批 5（capability 包退役），理由与范围见其小节。
+>
+> **发布门禁（本版实测）**：`build-lib`（tsc -b 全 29 包 + tsdown）exit 0；oxlint（上游严格配置）0 warnings / 0 errors；dependency-closure / arch-guards --strict / event-pairing --strict / layout-sync / profile-bundles 全 exit 0。全量 vitest **109 spec**（用例 964 → 965，见批 5）：**空载实测 109/964 全绿**；此后本机被无关负载占满，installer / curator / catalog 的 wall-clock 用例在 5–60s 上限上超时（同一文件 193s → 566s，纯环境性 2.9× 膨胀；失败用例单跑全部复现为绿，证据见批 5）。**注**：合并发布前复核发现四批改动带 3 个 tsc 错误 + 9 个 lint 错误（未使用导入/参数、箭头函数风格、恒假条件、隐式 any 索引），已在本版一并修复——此前批次只用 vitest 验证，未跑 tsc/oxlint。
+
+### 批 5（capability 包退役）— 生产层删除 + 消费层保留 + 台账结案
+
+- **来源**：用户裁决——"这个包其实是可删除的，但删除了不知道会不会对之前的 npm 包产生影响，不如未来就设置成默认不安装好了"。核查结论：**"默认不安装"已是现状**（rc.51 起无任何 bundle 挂载它；0.3.65 起 `private: true` + 发布链排除，不会有新版本）；**发布侧零影响**（无任何已发布包依赖它，且 `prepare-release` 的依赖守卫正是为这条线而加；已发布 tarball 不可变，装过的人不受影响）；故剩余决策只有"源码留不留"，裁决为**删除**。
+- **退役理由（架构级）**：capability 把"批准"复制了一份到自己队列，却把"执行"留给平台 Creator 模式（批准消息即 `manual activation in Creator mode (no code was executed)`）。**审批若不约束执行，就只是日志**，而日志的所有者不是效果的所有者——记录权在 evolution、生效权在平台，两边都不完整（批 4 SC-1 那条"npm 无法解析"的告警本身也是错的：实测 0.3.65 仍可安装）。它同时与家族纲领冲突（`README.md`："模型只能写 memory 和 skills；policy/prompt/routing/state 是控制面"）——动态插件恰是那份控制面清单里的东西，因此它只能靠"什么都不做"来保证安全。
+- **删除范围（生产层）**：`packages/evolution-capability/` 整目录（src / invariant / 2 个 spec / README / manifest / tsconfig）；`tsconfig.base.json` 路径别名与 `tsconfig.host.json` 工程引用；`scripts/prepare-release.mjs` 的 `UNPUBLISHED_DIRS` 机制（含 v21 S-2 的依赖守卫——删包后该机制零消费者）；`evolution-preset` 契约 spec 中针对它的负向断言（删包后恒真）；host / all / preset 三处 D-9 注释改为退役说明；dev 树 `pnpm-lock.yaml` 的 importer 条目。
+- **保留范围（消费层，附理由）**：`PendingKind`、`PENDING_KINDS`、domain 读 schema、approval 的 capability 分支**全部保留**，并在 4 处标注为"读兼容成员"：≤0.3.65 安装写入的记录必须仍能加载、在 `/evolution pending` 列出、并被 approve/reject。删掉该成员会让这些记录成为孤儿（domain `open()` 解析失败 + 写门禁拒绝解析写）——即"删生产者、留读者"。
+- **文档**：根 `INSTALL.md` 与 `packages/INSTALL.md` 的 Capability 节改写为退役说明（**取代批 4 SC-1 的 "Dormant and NOT published" 措辞**）；根 `README.md` / `README.zh.md` 的包表行、治理图与安全边界第 3 条同步；`packages/README.md` 包表行删除；`docs/deferred-items-v10.md` 的 **H-09b 结案**（触发条件成立 → 退役，附复审前置条件）。
+- **全量 diff 复核（退役批自检）**：被删源码以 `git archive f8e2a5f` 归档备查（7 文件）；确认删除包的导出名（`EvolutionCapability` / `validateCapabilityPackage` / `CapabilityPackage` / `CapabilityLimits` …）全仓零引用；包集合与发布顺序的来源全部是目录派生（`prepare-release` 与 `normalize-mirror` 的 `readdirSync`、`publish-scoped` 读 staging 清单），无硬编码清单；`.release-staging` / `*tsbuildinfo` / 根 `node_modules` 均无残留。复核中发现并处置三项：
+  - **保留分支失去唯一覆盖**：approval 的 capability 分支此前只被已删的 `capability.spec.ts` 覆盖（`approval.spec.ts` 的 V9-12「无 runner」用例走的是 memory 的通用分支）→ 新增用例钉住兼容承诺：无 runner 时可暂存、可批准、返回 `no code was executed`、记录进入 approved 列表。
+  - **`domain-state.spec.ts` 缺显式超时**：该文件每个用例都挂载上游 `Storage` / `DomainFacility`，却是同类文件里唯一用 vitest 5s 默认值的（layout-sync / platform-range / guard-scripts 都用 `vi.setConfig({ testTimeout: 30_000 })`）→ 补齐。**同一风险在 CI**：`evolution-validate` 的 vitest 未传 `--maxWorkers`（默认并发更高）。此项是测试配置，不改产品行为，若要最小 diff 可单独回退。
+  - **自撰注释的失实部分已更正**：原写「写门禁会拒绝解析写」只对 json provider 成立；按实测改为各自事实——json 把该行隔离到 `<file>.corrupt` 并拒绝解析写，domain 在 mount 时校验全表、单条坏行会让整个域以 `invalid-record` 打不开。
+- **清理与文档**：`evolution-host` / `evolution-preset` 的 `node_modules` 中指向已删包的悬空符号链接（旧安装遗留；`pnpm install` 亦会回收）；dev 树 `pnpm-lock.yaml` 的 importer 条目（CI 用 `--lockfile-only` 重生成，故仅为本地整洁）。`docs/`：`integration-plan-m0-g8.md` 的 D-9 条目补「0.3.66 退役」指针；`upstream-contract-checklist.md` 第 5 条把 `AbortSignal.timeout` 上限从 `4_294_967_295` 更正为 `2_147_483_647`（v19 P2-10 已改代码，清单未跟上）；`hermes-alignment-map.md` 的 v21 勘误从镜像回灌 dev——此前只改了镜像，而发布链的 dev→mirror robocopy 会在下次发布把它覆盖回去（本次复核抓到的实际隐患）。
+- **全量测试的环境证据**：失败形态**只有** `Test timed out`，无断言失败。同一份代码：installer 文件 193s（15:14 空载）→ 304s（16:24）→ 566s（16:14，与无关的 `D:\worker-test\openclaw` agent 进程同时运行）；把失败用例单跑即全绿——installer 两个 V6-49 为 13.3s / 12.2s，curator `pins through the marker` 为 1.5s，catalog 整文件为 2.5s。故本地全量的红判定为环境性；最终以 CI（全新 runner、默认 `--maxWorkers`）复核。
+- **发布**：`0.3.66` 发布集合仍为 **29 个包**（capability 自 0.3.65 起已被排除），故本次删除**不改变任何发布产物**，只改仓库形态；npm 上 `@lmzhen/dsh-evolution-capability@0.3.65` 保持可装、不再有新版本。
+
+### 批 4（v23 审计闭环）— 2 个 P1 + 13 个 P2（修复批回归 + 审批状态机端到端 + 记忆管线/数据生命周期 + 三批自洽性）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v23.md`。**回归审查第三轮连续在修复批中抓到引入缺陷**（BR-1 为批 3 引入），闸门/生命周期类修复必须有独立回归 pass。
+- **BR-1（P1·批3引入）**：curator 合并阶段的 dispose 闸门不再提前返回——归档循环上方已真实落盘的账目（archivedSkills/抑制/usage 折叠）在闸门触发时仍完整持久化（旧写法报告 archived:0 而树已被改，且跳过两个持久化阶段）；只跳过合并循环本体。
+- **BR-2（P2）**：三处 dispose 闸门/中止均补 `logger.warn`（报告的 `failed` 过滤器无法承载自由文本中止原因，日志是唯一可见渠道）。
+- **BR-3/BR-4（P2×2，journal 记账语义）**：journal 恢复"依赖行后即写基础账"（preset 阶段崩溃仍留可回放记录），preset 落地后再刷新 `agentPreset`；重装不再把先前 layered 安装的 `agentPreset:true` 记账覆盖为 `false`（否则 layered 卸载永久跳过 preset 删除）。
+- **BR-5（P2）**：pin/create 的补偿清理在递归删除目录前复核"目录仅剩本 marker"（并发 restore 落位不再被误删）；createCore 非前台路径同步。
+- **AP（P2×3，审批状态机端到端）**：AP-1 capability 批准记录豁免 `PENDING_RESOLVED_CAP` 驱逐（json+domain 两侧；否则 approvedPackage 读不到、已批准能力永久不可激活）；AP-2 doctor 新增 `executingCount` 统计、渲染行与 next-step 提示（executing 是唯一只能由 operator reject 清除的状态，旧自检不可见）；AP-3 skill 全量 update/edit 的审批重放加**陈旧快照防护**——三个 stage 点（tool/review/graph）附带 `staged_from_sha256`，重放时内容不匹配即结构化拒绝并退回 pending（与 memory 的 old_text 防护对齐；无 hash 的旧记录保持原行为）。
+- **ML（P2×3，数据生命周期）**：ML-1 `.archive` 新增保留策略（快照前清理超过 365 天的归档条目，无 mtime 探测的后端跳过；keep-5 快照的 ×6 放大随之有界）；ML-2 manifest 缺失/损坏的孤儿快照进入保留窗口（createdAt 置空排最旧、优先被驱逐，不再永久逃逸）；ML-3 事件 seq 续接取 active 与归档文件名的最大值（active 被回退到旧备份时不再复用归档 seq 遮蔽历史）。
+- **SC（1×P1 + 3×P2，三批自洽性）**：SC-1 根 INSTALL.md 的 Capability 节改写为"Dormant and NOT published"（原文仍教用户安装已停止发布的 `@lmzhen/dsh-evolution-capability`，照做即 npm 解析失败）；SC-2 evolution-all/README 的模型面计数补第五只读面；SC-3 README 正文移除批间过程注记；SC-4 memory-store/skill-store 两处注释更新对已删除旧常量名的引用。
+- **测试**：111 文件 / 973 用例全绿（与批 3 持平；threats/redact 新用例已在批 3 计入）。
+
+### 批 3（v22 审计闭环）— 5 个 P1 + 11 个 P2（回归审查 + 锁机制/内容安全/preset 组装深查）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v22.md`（4 路分片：v21 修复批回归审查 + 跨进程锁逐行 + 内容安全 + preset 生成器）。**回归审查在本批 v21 修复中抓到 2 个引入缺陷**（闸门作用域写错、journal 删除位置回退）——修复批自身需要被审计。
+- **R-1（P1·批2引入）**：curator 后两处 dispose 闸门返回 `applyMutations` 的真实形状（此前引用不在作用域的 `runId/startedAt` 且返回 runCore 形状，触发即 ReferenceError）。
+- **R-2（P1·批2引入）**：journal 删除收回回放分支内、仅在 keep/removed 判定后执行——`--mode agent` 与"包被保留"的卸载不再丢失台账（否则后续卸载落入前缀回退、误删手工安装包）。
+- **R-3（P2）**：isMain 判定改 `realpathSync` + win32 大小写归一（v21 S-8 的 pathToFileURL 方案经实测对盘符大小写/符号链接仍无效）。
+- **LOCK-1（P1）**：restructure/consolidate 的树变更写从"锁外预读 + 盲写"改为 **CAS 条件事务写**——磁盘字节仍等于预读基线才提交，漂移即结构化失败并回滚（此前跨进程并发 patch 被静默覆盖、双双报成功）。
+- **LOCK-2..4（P2×3）**：空锁残留接管时 verify 读失败（对端已删）改为释放 ticket 重试而非 `rm(force)`（消除删掉第三者活锁的双持窗口）；`retireLegacyOnce` 的 archivedIds 过滤移入 transact 任务锁内（消除 cap 驱逐窗口复活 pending 幽灵）；pin/create 的 marker 写入后补 exists(SKILL.md) 复查 + 补偿清理（与 archive 竞态不再留下卡死 restore 的幽灵目录）。
+- **SEC（1×P1 + 3×P2，威胁模式面升级）**：SEC-1 report 级排版字符（ZWNJ/软连字符等）不再能拆散 blocking 正则——模式匹配在"空格重建 + 删除重建"两个变体文本上进行（实测一行 ZWNJ 即可绕过全部注入检测且 report 被静默丢弃）；SEC-2 外泄模式间隙允许跨行；SEC-3 私钥块头补 OPENSSH/EC/DSA/ENCRYPTED/PGP；SEC-4 redact 补 npm/Stripe/GitHub fine-grained/Google 密钥、URL 内嵌口令（保留 scheme/user）与 AWS secret 的配对行脱敏；SEC-5 新增 5 条中文注入/外泄模式（含误伤面负例）。
+- **PRE（1×P1 + 2×P2）**：PRE-1 agent preset 的互斥检查扩展到 **home 内全部 profiles**（preset 是全局产物，旧守卫只探测目标 profile，跨 profile 的 all/oneclick 组合可漏放成启动双挂载）；PRE-2 normalize-mirror 改 tmp+rename 原子写 + 逐文件隔离（中断不再留下永久损坏的 manifest 与混合版本树）；PRE-3 cap 注入的 `config:` 探测锚定条目自身缩进（防 platform preset 嵌套后静默失效），core 与 installer 两侧同步。
+- **LOCK-5（记录性）**：Windows rename 覆盖对无锁读者的瞬时 ENOENT 窗口在 `renameWithRetry` 契约中显式文档化（全部无锁读下游已核实为自愈语义，不加全局读重试以免拖慢普通缺失探测）。
+- **测试**：threats 新增 SEC-1 绕过回归 + 中文/私钥/跨行用例（含误伤面负例）；redact 新增 2 组新形态用例；skill-store T-14 测试的写失败注入点随 CAS 提交层同步（transact 层拦截）。**111 文件 / 973 用例全绿**（较批 2 +6）。
+
+### 批 2（v21 审计闭环）— 5 个 P1 + 24 个 P2（scripts 首次深查 + 生命周期/平台/测试质量横切）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v21.md`（含对本地批 1 的回归审查：除 2 条 P2 外全部 hunk 干净）。执行原则同优化计划 v20：最小 diff、单一来源优先、文档向代码事实对齐。
+- **S-1（P1，安装台账"只写不读"）**：uninstall 真正消费 journal——`dependencyAdded:false` 时保留用户预先 pin 的依赖行；包删除按 journal 记录的拷包清单精确定位（无 journal 的 ≤0.3.64 旧安装回退前缀规则）；preset 仅在 journal 记录"本安装器实际安装"时才删除；journal 改为在全部逆向动作与 keep 判定之后删除（旧代码先删且注释谎称"已回放"）；journal 记录真实值（`agentPreset` 记实际安装结果而非意图）。
+- **L-1/L-2（P1+P2，usage sidecar 整文件损坏静默冻结）**：不可解析/错误顶层数组形状 → 隔离副本（`.corrupt`）+ onQuarantine 告警 + 自愈重启（对齐 state-json E-9 姿态）；未来 schema 版本保持冻结但明确告警（永不静默降级）；隔离副本**写失败时拒绝本次写入**（保留可恢复字节，P2-17 纪律），消息不再谎称"已拷贝"。同族 **L-3**：state-json pending 审计档抢救副本失败时跳过本次追加并 warn。
+- **D-1/D-2（P1×2，文档与行为相反）**：README/README.zh 的"用 M3 停掉写入"更正为"M2 把关后台写、M3 仅移除模型工具（自动化照常）"；6 处 "no model tools / infrastructure only" 绝对化措辞改齐（host 自带只读 `maintenance_probe`），packages/INSTALL.md 的"镜像根 INSTALL"声明与 §5 scope 指引更正（npm 实际发布在 `@lmzhen`）。
+- **T-1（P1，sidecar 事务门卫形同虚设）**：具名条目改为**函数体级** transactIo 检查（旧实现文件级子串 + 匹配调用点的正则，被审函数改回裸读写照样绿）；清单数量从 `>=7` 改为精确钉死。
+- **scripts 其余（P2×6）**：S-2 对 UNPUBLISHED_DIRS 包的依赖在 releaseSpec 显式 throw（此前静默落平台版本范围）；S-3 agent preset 组成解析前置到任何 profile 变更之前（消除半安装态）；S-4 `--version` 与包 manifest 版本 staging 前对账（消除"发布成功、安装被拒"缝隙）；S-5 `--mode agent` 不再创建幽灵 web profile；S-6 verify-layout-sync 全等结果输出"此次运行未验证手工同步"告示；S-7 行首动态值导入不再误豁免为 type-only（转为保守过报）；S-8 isMain 判定改 pathToFileURL（Windows 小写盘符/符号链接下 CLI 静默空转）。
+- **生命周期（P2×3）**：L-4 curator 三个变更阶段（快照/归档/合并）加 dispose 中途闸门；L-5 review 卸载时清空延迟队列并在注释中声明单飞为 per-mount 状态（重载窗口由 per-file 锁 + marker 探测覆盖）；R-1 修正 withTimeout 超时分支的失实注释并在 catch 中显式告警"被放弃的写入无审计记录"。
+- **平台（P2）**：D-6 `create` 对大小写变体目录拒绝（NTFS/POSIX 行为分叉收口，读路径保持平台原生）。
+- **测试质量（P2×7 + R-2）**：T-2 agent 行契约改为总集钉死（pinnedRowIds 使无 id 行显形）；T-3 insertedRows 合并全部 insert 块（旧版只看第一块）；T-4 README 命令表改双向顺序比对 + 表尾多余行检查；T-5 P1-9 fail-closed 预检补正向对照（0-landing 通知必须到达）；T-7 互斥守卫改 vi.waitFor；T-8 curator 两 spec 增加 DSH_HOME afterEach 兜底；R-2 新增经 approval replay runner 直达标量闸门的用例（schema 旁路路径）。期间依测试结果修正两处误判：approve 并发语义为 dedupe 合流（两调用共享同一成功结果，非"一胜一败"）；restore 对损坏 sidecar 的状态折叠无可折对象（计数损失是损坏固有代价，目录移动照常落盘）。
+- **测试计数**：111 文件 / 967 用例全绿（较 v20 批 +2：R-2 runner 闸门用例、L-1 未来版本冻结告警用例）。
+
+### 批 1（v20 审计落地）— 3 个 P1 + 14 个 P2 按《分层分组优化计划 v20》修复
+
+- **来源**：`dsh-evolution-mirror-audit-report-v20.md` + `dsh-evolution-mirror-optimization-plan-v20.md`。执行原则：不新增包 / 不新增服务 / 不重设计协议；契约与注释向代码事实对齐；漂移副本收敛回既有单一来源；每项最小 diff。
+- **P1-3（review 单飞被 fallback 打破）**：`reviewInFlight` 命中时不再立即向父会话注入 review prompt——改入队延迟投递（上限 16），在单飞窗口关闭的 `finally` 中统一投递，E-19 声称的"绝不与 subagent 并发写"自此真正成立；调用方以 `true | 'deferred' | false` 三态区分。
+- **P1-2（review/curator 跨包并发写）**：按计划 C-3① 先契约化——在 review `reviewInFlight` 与 curator `acquireMutex` 两侧写明：跨层唯一互斥是 skill-store per-file 锁 + F-17 marker 探测，`ignoreGates` 手动 run 的交错窗口如实声明（失败 op + 快照回滚兜底）；advisory 令牌暂缓，待真实碰撞日志。
+- **P1-1（host "零模型工具"契约不成立）**：文档向事实对齐——host patch 头注、host README（Model Experience 四处 + 已知限制）、host package.json description 统一改为"基础设施 + 唯一只读模型面 `maintenance_probe`"；evolution-all patch 头注改为"四个 agent-preset 类模型行 + host 面只读探针"。装配行为零变化。
+- **引擎**：executePlan 写入腿加 `withTimeout`（预算=reviewTimeoutMs，此前挂起会让 `reviewInFlight` 永久为真、subagent 通道整进程降级）；curator first-run-defer 的 `saveCuratorState` 补 best-effort catch（对齐本文件 C1 纪律）；subagent 会话不再写入 `turnStarts`（其条目原本只能等 128 阈值清扫）。
+- **治理**：`effectiveSessionPolicy` 对 `config` 改可选形状读取（与 :312 同款；裸 stub 平台服务不再 TypeError），`ApprovalPolicyLike` 停止导出（全仓零外部消费者）；删除死常量 `THREAT_EXEMPT_HINT`（docblock 与事实相反），豁免提示三份漂移副本收敛为单一 `THREAT_EXEMPTION_HINT`；evolution-capability 停止发布（`private: true` + prepare-release 排除，源码保留）。
+- **基础层**：`LOCK_BODY_RE` 加捕获组并新增 `parseLockBody`，skill-store 两处内联锁体正则与 `deleteStrandedLocks` 三处硬编码 marker 名全部收敛回单一来源（F-17）；`mtime` seam 的"无在树消费者"失实注释更正为列出 4 个真实消费者及其静默降级后果；删除零消费者死 API `hasProvider`（对齐 P3-D1 先例）。
+- **状态缝**：state-domain 在 claim 路径写明 provider 契约——被 guard 拒绝的 RMW = 一次 no-op 持久化写 + 一条 changed 事件，属接受的行为（seam 无条件写原语，与 json provider 的字节级短路为文档化不对称）。
+- **工具/命令面**：`skill_manage` 标量参数（name/content/old_string/new_string/file_path/file_content/absorbed_into）非字符串一律结构化拒绝（此前以裸 TypeError 逃逸，V8-09 同族），restructure move 字段同步收紧；`/evolution restructure` 接入 approval seam（`hasRunner('skill')` 预检 + staging，沿用 learning-graph P2-6 pattern；approval 关闭/放行场景直写行为不变）；learning-graph 记忆写拒绝提示更正为"evolution-all / preset overlay（host 不携带该行）"。
+- **文档**：`packages/README.md` 环境变量表补齐 `DSH_EVOLUTION_DELTA_PATH`、`DSH_EVOLUTION_ARCH_STRICT`（env.ts "lists every key" 声明自此为真）。
+- **新增用例**：approval 裸 stub 降级为 `ask`（B-1）、skill_manage 非字符串标量结构化拒绝（D-1）；io.spec 的 `hasProvider` 断言改走 `provider()` fail-loud 路径。
+
+## 0.3.65 (patch) — v19 审计闭环：3 个 P1 回归修复 + 26 项 P2（含 state seam 契约下沉与安装台账）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v19.md`（3×P1 + 26×P2，报告的门禁结论经独立实跑复现）。本版按"**从实际场景需要的设计理念**"取向修复，而不只是打补丁：守卫的合法集合必须**派生自生产者的声明**、同一设施只允许**一个方向**、"保字节"必须**可观测**、平台边界按**平台真值**、模型可见面要么**已解析**要么不存在。
+- **P1（日常操作即可触发，全部关闭）**：
+  1. **威胁扫描不再误拒 emoji 与合法排版**（`threats.ts`）：VS15/16（❤️ ⚠️ ✔️）、ZWNJ（波斯/阿拉伯排版）、软连字符（PDF 粘贴）、ALM、MVS 改为 `severity:'report'`——保留审计痕迹但**不阻断写入**；ZWJ 仅在**不与 emoji 相邻**时阻断（👨‍👩‍👧 放行、词间 ZWJ 仍拒）；隐写核心（ZWSP/WORD JOINER/不可见运算符/废弃格式符/BOM/CGJ/双向控制）与 **TAG 区间**（v18 把区间写在字符类之外，等于空操作）仍阻断。
+  2. **空技能树快照可恢复**（`skill-store.ts`）：守卫的合法集合改为 `manifest.skills ∪ manifest.sidecars ∪ {manifest.json, extras, .archive}` **派生**（此前硬编码三名字，拒绝了 `snapshotAll` 自己放进快照根目录的 `.usage.json`/`.curator-suppressed.json`，导致"树被清空后快照 + 回滚通道整体失效"）；恢复顺序改为**先验证后破坏**（manifest-less 拒绝不再发生在清树之后）；非字符串 manifest 条目结构化拒绝（不再抛 `name.includes is not a function`）。
+  3. **卸载闭环**（`install-layered.mjs`）：新增 `<profile>/.evolution-install.json` 安装台账（bundle 行 / 依赖行 / 拷包清单 / preset），卸载时删除依赖行与台账本身——此前 D-3 写入的 `dependencies[...]` 在卸载后残留，下一次 `dsh plugin add`/`pnpm install` 必然 E404；依赖 range 取**家族包版本**而非宿主根 `package.json`（overlay 布局此前写入 `^0.1.x`）。
+- **结构层（一次收口 6 项 P2）**：record 契约下沉到 `evolution-state-storage`（新增 `recordIssue`/`assertCloneable`/`cloneRecord`/`UNKNOWN_FIELD_POLICY='preserve'`），json 与 domain 两个 provider 的**所有**写路径过同一道门：`transactCuratorState` 不再绕过校验、写侧深拷贝（`args` 别名）、`listPending` 先 filter 后 clone、domain schemas 改 `.loose()`（未知字段不再被 zod strip）；跨 provider 一致性 harness 补"坏输入必拒 / 好输入必收 / 未知字段保留 / 非可克隆拒绝"四向断言。
+- **回归类 P2**：timer 上限按 Node 真值 **2^31-1**（schema 与 `maintain --timeout` 门同步；`2^31..2^32-1` 此前被静默置为 1ms）；`redactSecrets` 的值改为**整行**且分隔符不再跨行（`api_key:` 不再吞掉下一行，`token="a"b"c"` 不再残留尾部）；`.corrupt` 清扫谓词与命名规则同源；锁探针方向统一为 fail-closed；`/evolution restore <tail>` 显式拒绝（此前静默执行整树回滚）；graph 通道转发 `threatExemptLabels`；`packages/INSTALL.md` 同步四形态；usage 形状守卫改为"**隔离坏条目 + 一次性 warn + 好条目继续服务**"（此前保字节但静默冻结全部写入）；json 隔离副本写失败时**不再重写主文件**（坏记录保留）、同内容复用固定名 / 不同内容带戳（永不覆盖唯一救援副本）。
+- **纪律层**：每个安全/校验改动同时补"命中（坏输入必拒）+ 误伤（日常合法输入必过）"双向用例；每个能拒绝恢复的守卫补"健康输入必过"用例（P1-2 正是缺这一类）。
+- **门禁**：`build-lib`（tsc -b 全 30 包 + tsdown）exit 0；全量 vitest `--maxWorkers=4` 通过；oxlint（上游严格配置）0/0；dependency-closure / arch-guards --strict / event-pairing --strict / layout-sync / profile-bundles 全 exit 0；installer 单独跑通过。
+- **仍延后（触发条件见 `completion-report-v18.md` §5 与 v19 §4.1）**：C-10 json 读被写队列阻塞、A1-10 独占创建 seam、A2-14 curator N+1、B-11 feedback 重启重放、E-13 多 memory provider、计划 §15 非目标；P2-13 的逐出残余窗口（同步 `get` 与排队 `delete` 之间）已如实文档化，闭合需要 seam 的条件删除原语。
+
+## 0.3.64 (patch) — v18 收尾批：P1 脱敏泄漏回归修复 + A 类 12 项 + B 类 7 项 + C 类 8 项（余下 C 类延后）
+
+- **来源**：`audit-v18/`（7 份子报告）+ `optimization-plan-v18.md` + `completion-report-v18.md` + 独立审查 `dsh-evolution-mirror-independent-review-v18.md`（首轮检出 1 项 P1 回归、6 条用例失败、5 个 oxlint 错误，本版全部关闭）。
+- **行为契约变化（用户/部署可见，逐条）**：
+  1. **脱敏器不再泄漏未闭合引号的值**：值以 `"` 开头且本行无闭合引号（截断日志、多行值）时，A2-5 的首版分支回退成"只掩码一个空格"，原文泄漏；未加引号分支改为整行掩码，合法引号值连引号一起掩码（`api_key: <redacted>`）。
+  2. **技能名加严到上游形态**：`SKILL_NAME_RE` = `/^[a-z0-9]+(?:-[a-z0-9]+)*$/`（拒绝尾随/连续连字符），`skill_manage`/create 对旧名 fail-loud；catalog provider 仍过滤存量树里的旧名，避免一条坏记录中断整个 `ctx.skills` 收集。
+  3. **root 配置键统一**：`evolution-commands` / `evolution-maintenance-tools` / `evolution-review` 改用规范键 `root`；`skillsRoot` 保留为**弃用别名**一个次版本（仅在 `root` 为空时生效并 warn，0.3.65 移除）。
+  4. **catalog 发布 `whenToUse`**：frontmatter 的单行 `whenToUse` 透传给 `ctx.skills`（与上游 filesystem provider 一致，恢复 host/UI 的路由提示）；`metadata` 仍不发布（显式声明）。
+  5. **`SkillSummary.protectionUnknown`**：目录 list 与逐标记探针都失败时，条目报告"保护未知"，curator / 维护面的保护名单按**受保护**处理（此前被当成无保护）。
+  6. **`restoreFromArchive` 拒绝理由准确**：目标目录存在但缺 `SKILL.md` 时给出可行动文案（此前落入 moveDir 的 dest-exists 失败）。
+  7. **domain provider 返回值深拷贝**（`structuredClone`）：调用方原地改返回值（含嵌套 `args`）不再污染 domain 内存；`savePending` 缺必需 `args` 键时与 json 门一致 fail-loud（C-3）。
+  8. **质量分真实化**：`usageFrequency` / `stability` 改用 **`view_count` + `use_count`**（`view_count` 是 in-tree 生产者记录的加载信号，`use_count` 保留为外部宿主信号）——两个因子不再恒为常量。
+  9. **事件日志写边界校验**：`appendEvolutionEvent` 拒绝无法折叠的 payload（未知 `type`、feedback 缺 `kind`/`rating`、maintain 缺 `runId`）。
+  10. **pending cap 语义如实**：`PENDING_RESOLVED_CAP` 只在 resolve 路径维持；直接 `savePending` 已决记录不触发逐出（JSDoc 更正 + 边界用例）。
+  11. **提交后 fsync 失败不再当作"写失败"**（A1-15）：rename 已落盘、仅目录 fsync 失败时，`commitTmp` 抛出带 `committed: true` 的错误，写路径仍记 audit/发 mutation 事件并返回"已写入但持久性未确认"的告警（此前两阶段调用方会回滚/重试一次已经可见的写）。
+  12. **curator 生命周期折叠改为 CAS**（A2-4）：`foldCuratorFields` 仅在磁盘 state 仍等于本 run 起点 state 时写 lifecycle 对；被并发进程改过的名字跳过并 warn（此前跨进程双 run 可把 `archived` 回退为 `stale`）。
+  13. **domain pending cap 逐出前复检**（C-5）：删除前重读该 key，只有仍是同一条已决记录（status + `resolvedAt` 未变）才删——同 id 被并发重新挂载的活记录不会被误删。
+  14. **发布链网络依赖收敛**（D-7）：删除 `prepare-release` 中不可达的 registry 版本解析、每次 pack 的 16 次 `npm view` 与死逃生口 `--allow-unresolved-external`；遇到**新增**外部依赖时改为 fail-loud（必须在 `releaseSpec` 里显式给出 range）。
+  15. **tarball 门禁补覆盖**（D-8）：校验 `manifest.dsh.bundle.patch` 与 preset 容器的 `agent.cordis.yml`/`preset.yml` 确实在 tarball 内（此前 `files` 白名单回归会绿灯发出装不上的 bundle）。
+- **批次要点**：**A1-13** 删除死分支（`TreeChangePlan.validate`/`preconditions`）与死字段（`SkillSummary.archived`），`WIN32_RESERVED_DEVICE_NAMES` 收回包内；**A1-17** 保护探针 fail-closed；**A1-20** 见上；**F-17** 锁名/锁体常量单源（`LOCK_SUFFIX`/`LOCK_BODY_RE`）；**F-20** 常量/正则/类型单源（`DEFAULT_SKILL_CONTENT_CHARS` 派生自 `MAX_SKILL_CONTENT_CHARS`、support/extra 名正则单源、`events.ts` 用 `ReviewKind`）；**F-16** 审计子集补 `@internal` 语义，其余过度导出按计划分批登记；**I-4** 跨 provider 共享断言补"写坏记录必须被拒"与"返回值修改不污染介质"；**I-5** 见上；**C-12** registry 同对象幂等重注册 + 代际守卫用例；**B-4** feedback `record` 明确为**外部生产者契约**（上游 `/feedback` 只写自由文本事件，无法映射 target/rating）+ 并集读判别用例；**E-3/E-11/F-14** 测试缺口按"红→绿"补齐；**D-5** release.yml 与 evolution-validate 的 5 个 Action 全部固定 commit SHA；**D-9** `copy_host_tsconfig` 的现状如实注释（`tsc -b tsconfig.host.json` 目前会报测试文件类型错，接线需先修那些错）；**D-10** publish 取 baseline 产物这一取舍写入 workflow 注释；**Phase 0** 修 redact 泄漏、catalog 新用例 fixture、installer 三处断言与 domain fake 契约（`Table.get` 是同步 `V | undefined`）、5 处 oxlint。
+- **门禁**：`build-lib`（tsc -b 全 30 包 + tsdown）exit 0；全量 vitest `--maxWorkers=4` **110 spec / 953 用例通过**；oxlint（上游严格配置）0 warning / 0 error；`verify-dependency-closure` / `verify-arch-guards --strict` / `verify-event-pairing --strict` / `verify-layout-sync`（13 脚本一致、版本与 CHANGELOG head 对齐）/ `verify-profile-bundles` 全部 exit 0；installer spec 单独跑 25/25。
+- **保持延后（C 类，触发条件见 `completion-report-v18.md` §5）**：C-10 json 读被写队列阻塞（架构性）、A1-10 独占创建 seam（计划判定不划算）、A2-14 curator N+1（无实测）、B-11 feedback 重启重放（需新 API）、E-13 多 memory provider（假想需求）、计划 §15 非目标。
+
+## 0.3.63 (patch) — v15→v17 三轮"全量审计 → 修复 → 再审计"闭环（116 项检出，修 107 / 登记 9）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v15/v16/v17.md` + `optimization-plan-v15.md` + `optimization-completion-v15.md` + `dsh-evolution-mirror-final-summary-report.md`。三轮检出 **0 P0 / 2 P1 / 21 P2 / 93 P3**（64 → 32 → 20 收敛）；**无 P0/P1 遗留、P2 清零**。发布前独立复核见 `dsh-evolution-mirror-code-quality-check.md`（镜像↔开发树 55/55 逐字节一致、927/927 用例、受影响 20 包 tsc 0 错（全仓 30 包）、四守卫全绿、11 项关键交叉点核实、逐 src diff 缺陷审查无新引入 bug）。
+- **行为契约变化（用户/部署可见，逐条）**：
+  1. **`skill_manage` 拒绝 win32 保留设备名技能与非法 `absorbed_into`**；支持文件名**保留 `.lock` 后缀**（写锁协议专用）；`remove_file` **拒绝目录**（此前递归删整棵子树且审计无 before 哈希）。
+  2. **json 状态写回补记录字段门（fail-loud）**；**pending live 表有界**（cap=200，json 与 domain 两 provider 一致，按 `resolvedAt` 淘汰最旧；审计归档 sidecar 仍为 json 特有）。
+  3. **feedback 写独立的 `feedback_score` / `feedback_warn` 字段**（不再写 curator 拥有的 `quality_score`/`quality_warn`）；生命周期陈旧窗与 scope 警告面读 **`quality_warn || feedback_warn` 并集**——负反馈重新影响策展决策（此前被 `scoreTree` 每轮覆写，通道实际是死的）。
+  4. **approval**：reject / capability 路径 claim-scoped resolve（并发写者不再被 stomp）；capability 拒绝文案如实（点明实际放行原因）；`bootGraceSeconds` 钳制上限 3600。
+  5. **`plan-validator`**：非字符串字段按 op 拒绝（此前 TypeError 使整轮 review 失败）；`write_file` 仅认 `file_content`（与执行器一致，不再回退 `content` 写出空文件）。
+  6. **`/graph edit|delete memory:*` 在 approval 启用部署下走 staged 审批**（与 memory 工具同缝）；staged 前置 `hasRunner` 预检（无 runner 时给出可行动错误而非造出不可重放的 pending）。
+  7. **`skill_manage` 枚举删除 `skip`**（死面）；review 删除死配置 `executionTimeoutMs`；`EVOLUTION_ENV_KEYS` 死导出删除。
+  8. **`/evolution doctor [--json]` 进入单源命令表**；consolidate/restructure 用法补 `[--plan <runId>]`。
+  9. **上游 scope 占用清单与弱契约 cast 类型化**（`llm`/`ToolGuard`/`PromptSection`/`PromptContext` 等改用真实上游类型；升级安全，非运行时变化）。
+- **批次要点**：**B1** 写边界名称守卫矩阵全覆盖（`patch`/探测四方法/`absorbedInto`/保留名/移动者逃生通道）、moveDir 探-拒与降级守卫、create 存在性移入跨进程 transact、`renderContext` 单代序列化；**B2** 审批 claim-scoped 全路径、io 注册表身份幂等 + 代际守卫、curator stateless 一次性 warn、远程 subagent 限制文档化、io 默认 provider 显式化；**B3** 命令表/env 表/发布 scope 口径单源、patch 注释与 pin 口径、失实注释清理、镜像工程面边界声明；**B4** io 错误分类（`isSymlink` 只对缺失返回 null）、原子写保留目标 mode、锁体形状校验（`pid:token`，用户 `*.lock` 支持文件不再误判/误删）、威胁规则边界（`.envrc` 不误报、JWT 形态检测、unicode 可豁免）、activity/replay 有限数守卫、记忆备份与过滤提示；**B5** 默认值单点（5 个 `DEFAULT_*`）、门禁降噪（N4 死兜底清单下线，78 行误报消失）、接缝包契约用例、模块级状态语义注释、其余小项。
+- **门禁**：全量 **110 spec / 927 用例通过**（`--maxWorkers=4`；个别慢用例贴近默认 5s 超时，高负载下可能抖动——以 CI 为准）；受影响 20 包 `tsc --noEmit` exit 0；arch-guards / event-pairing / dependency-closure / profile-bundles 四守卫全绿；发布前独立复核另跑：镜像↔开发树 55/55 sha256 一致、P1-1 与 P2-1 两条真实红→绿实证。
+- **登记不修（9 项，均有触发条件）**：curator 无 state 时 interval 基线=进程寿命（已告警）；远程 subagent 子读不可见（README Known Limitations）；domain 侧无归档 sidecar；threat 逐字段扫描分片绕过（Hermes 同源）；policy 不下探嵌套对象；moveDir 探针→rename TOCTOU 残余（fail-safe）；嵌套支持子目录锁不在探针深度；seam 层锁判别物料未暴露；`.lock` 后缀保留对既有用户文件的存量影响（升级说明）。
+
+## 0.3.62 (patch) — v14 全量审计优化批：安全边界 + 契约对称 + 鲁棒性 + 单源文档（B1–B5 全量，49 文件 / +772 −145 / 20 条新判别用例）
+
+- **来源**：`dsh-evolution-mirror-audit-report-v14.md`（1×P1 + 9×P2 + 39×P3，首次全量审计）→ `optimization-plan-v14.md`（B1–B5 五批 + §7 扩展点 + §8 非目标）→ 实施完成情况见 `optimization-completion-v14.md`（含发布前独立复核章节：镜像↔开发树 46/46 sha256 一致、110 files/898 tests、21 包 tsc 0、oxlint 0/0、四道守卫 exit 0、P1-1 与 P2-1 两条真实红→绿实证）。
+- **行为契约变化（用户/部署可见，逐条）**：
+  1. **`skill_manage action=patch` 拒绝非法名称**（含 `..`）——此前该分支是唯一未经 `badName` 的写路径，可改写 skills root 之外的**已存在**支持文件（P1-1，安全边界）。
+  2. **json 状态 provider 的写回补记录字段门（fail-loud）**——此前"先落盘、下轮读才隔离"的静默丢失窗口消除，与 domain provider 的"写入即校验"对齐（P2-1）。
+  3. **审批 claim 语义收紧**：`approve` 只在仍持有 claim 时 resolve；被并发 `reject` 后返回"写已落地、审计读 rejected，请勿重放"的明确指引（原为含糊的 "already resolved"）；`reject` 的 executing 救援分支显式声明允许无 claim（P2-2）。
+  4. **删除 `executionTimeoutMs`**（声明即死配置，无读取点）；**删除死导出 `EVOLUTION_ENV_KEYS`**（P3-4/P3-1）。
+  5. **`evolution-threat` 新增 `threatExemptLabels`**（本轮唯一新增配置字段，计划批准）：guard 与 store 的豁免语义一致，拦截文案不再指向无效开关（P2-4）。
+  6. **威胁规则边界调整**：`read_secrets` 不再误报 `.envrc` 与词中 `credentials`；新增 JWT 形态密钥检测；unicode 发现可被豁免（P3-22）。
+- **其余批次**：B1（`patch`/四探测方法统一 `badName`、`.archive-reason` 写失败降级 best-effort、`renderContext` 进 `serializedWrite` 单代一致）；B2（审批 claim 归属、io 默认 provider 显式化 `registerProvider(..., {default})` + `hasProvider`、curator stateless 一次性 warn、review 远程 subagent 限制文档化）；B3（命令表单源补 `[--plan <runId>]`、env 表补 `EVOLUTION_SCOPE`、发布 scope 口径统一为"monorepo 内 `@deepseek-ai/*`、发布重写 `@lmzhen/*`"、patch 注释与 pin 口径对齐、失实注释清理、镜像工程面边界声明）；B4（io 错误分类/原子写保 mode/锁淘汰/注册幂等、威胁规则边界、activity+replay 有限数守卫、记忆备份与过滤提示）；B5（默认值单点、死配置清理、**门禁降噪（N4 死兜底清单下线，78 行误报消失）**、接缝包契约用例、模块级状态注释与其余小项）。
+- **门禁**：全量 110 files / 898 tests；受影响 21 包 `tsc --noEmit` exit 0；oxlint 0/0（206 文件）；arch-guards / event-pairing / dependency-closure / profile-bundles 全 exit 0。本批含实施方 18/20 条红→绿自证 + 发布前独立复核抽证 2 条（P1-1、P2-1）。
+- **未执行（计划内非目标/待决策）**：拆 `skill-store.ts`、引框架/缓存、统一 `~` 展开、curator stateless 调度语义变更、远程 subagent 读集回传（上游契约扩展）、P3-10 专门回归用例——理由与触发条件见计划 §8 与完成说明 §6。
+
+## 0.3.61 (patch) — profile 双 bundle 事故闭环：仓库级守卫 + 发布链集成 + 安装文档核查
+
+- **背景**：0.3.59/0.3.60 的 profile 升级命令同时安装了 `dsh-evolution-all` 与 `dsh-evolution-host` 两个互斥捆绑——`dsh plugin add` 的 bundle reconcile 只增不减，`dsh.profile.bundles` 出现双行，两捆绑的 patch 插入相同 infra 行（`evolution-policy` 首个冲突）→ cordis loader fail-loud，`dsh web` 启动 abort（GUI 旧进程掩盖至重启才暴露）。
+- **新守卫 `scripts/verify-profile-bundles.mjs`**（双布局，dev `packages/evolution/scripts/` + mirror `packages/scripts/`，与 normalize-mirror 同性质；随发布链自动同步）：
+  ① evolution 捆绑（all/host/preset，scope-agnostic tail 匹配）在 `dsh.profile.bundles` 中**至多一行**（互斥 E-33，附"保留 all（超集）"指引）；② mounted 捆绑必须同时是 `dependencies` 显式 pin（幽灵行 → loader 无法解析）；③ vacant guard（无 manifest exit 2，空检≠通过）；④ Windows BOM 剥离（本机 `Out-File` 默认 BOM 会炸 JSON.parse）。
+- **发布链集成**：publish-chain 步骤 2 新增 **`profile-check` 阶段**（发布=升级前置，每次发布先验本机 profile；`--skip-profile-check` 逃生）；头注释与同步日志的脚本计数改为**动态**（"12 个"静态计数不再随新脚本漂移）。
+- **核查结论（无需修改，已覆盖）**：doctor 的 all+host 冲突检测（T-WB2 用例在位）、INSTALL.md 与根 README 的三方互斥明示（"never add more than one"）**均已存在**——缺口仅在"无自动关卡"与"发布流程未执行验证"，本批闭环。
+- **用户侧修复（非本仓库）**：profile bundles 已由现场修复为单 `dsh-evolution-all`（all 为超集：host 基础设施行 ∪ 4 模型行——G-A 守卫断言）；dependencies 保留 host pin（all 依赖它，同版无碍）。
+- **门禁**：verify-profile-bundles 四场景冒烟（真实 profile OK / 双行 exit1 / 幽灵行 exit1 / 缺文件 exit2）＋ publish-chain 语法检查；其余以本机与 CI 实跑为准。
+
+## 0.3.60 (patch) — v13 审计修复批：3×P2 + 6×P3 全部收口（问题规模连续第三轮收敛）
+
+- **P2-1（state-json 裂割）**：`quarantine()` 整文件损坏覆盖 `.corrupt` 后补 `corruptWritten.delete(file)`——整文件快照覆盖后旧键失效，记录门禁下次命中按新键重写**记录集副本**（修复前"键匹配 + 在盘"会基于陈旧键跳过，副本从此是整文件快照、违反"仅含失败记录"契约）；判别用例走完整时序（gate 写记录集 → 整文件损坏 quarantine 覆盖 → 修复 JSON → 断言副本重回记录集——红转绿有效）。
+- **P2-2（installer）**：E-33 host⇄oneclick 互斥检查**提出 dry-run 门**（与 N10 的 all 半边一致——dry-run 解析真实 profileDir，报告必须与真实模式一致；干跑谎报类别全灭）；自相矛盾注释改写；补两条判别用例（dry-run host 遇 preset / dry-run oneclick 遇 host 均拒绝）。
+- **P2-3（声明失实纠正）**：补 **N2 判别用例**（.corrupt 写失败不置键——stub io 注入写失败，第二次读仍重试 writes=2，修复前=1 红转绿）；0.3.59 声称的"各带红转绿用例"里唯一缺项就此补齐；发布链自检模式（挂账存在性）同源教训记录。
+- **P3 批**：① `deferred-v11.md` 补 v11 计划 H1 点名的两项（state-store 命名债、`~` 不展开——0.3.58 CHANGELOG 声称含它们而未入表）+ P2-1 附带的 quarantine 零去重登记（既有边界）；② signals tool/call 分支失实注释（"local contract"——守卫已并入共享前置）改写；③ feedback restore 种子**按 kind 轮转交错**（原 skills 全量先入使超 cap 的"丢最旧"系统性偏向 skill notes——V5-29 质量回滚通道；交错后两通道均摊）；④ publish-chain：挂账自检**只扫当前版本节**（历史节提及不再误杀）+ 正则兼容 `deferred-items-v10` 旧命名；CI 轮询 30 分钟耗尽**显式归因退出**（"run 未完成，非 npm 失败——勿立即 --resume"——不再跌入 npm 段误报 "missing on npm"）；头注释 11→12。
+- **门禁**：state-json（+N2/P2-1 判别 2）/ host installer（+P2-2 判别 2）/ feedback（种子交错回跑）/ core signals（注释）；oxlint / tsc / 守卫以本机与 CI 实跑为准。
+
+## 0.3.59 (patch) — v12 审计修复批：修复的"最后一公里"收口（N1–N18 + v11 遗留 P2-12 一并闭合）
+
+- **P1（N1 真实缺口修复）**：`/graph edit|delete` 的审批请求改为**携带命令 invocation 的会话**（`invocation.agent.session`——evolution-commands `/evolution learn` 早已用 `invocation.agent.inject`，命令级会话通道并非"平台不支持"）——`never`-policy 会话不再被当作 foreground 直接落盘；P2-34 的失实取舍注释改写为如实声明（照 tool-skill-manage 同型模式：sessionId/session/sessionPolicy 三字段随行）。
+- **P2 批（v12 §3 全部 12 项）**：① state-json `.corrupt` 写**成功才置键**（写失败重试 + 可观测 warn——N2）；事务基线坏记录剔除路径补同款 warn/去重（N3——transact 路径此前零日志，E-52 新吞错点）；`.corrupt` 重写前校验副本在盘（已被 7 天清扫删除则重建——N12）；② signals `user/message` `assistant/message` 分支补 `data` 形状前置守卫（N4——P1-1 病灶类在另两分支存活）；③ skill-usage `setQuality`/`observeRead` 收进 **trim 单源**（N5——feedback 带原始 target 写质量分此前静默不落盘）；④ curator Config schema 补 `root` 字段（N6——interface/构造声明的 20 字段唯独漏它）；⑤ feedback `restore()` 种子路径补 512 cap（N7——长跑部署一次 restore 永久超界水位）；⑥ installer host/oneclick 互斥检查在 `--dry-run` 下同样拒绝（N10——dry-run 解析真实 profileDir，注释失实已纠正）；`removedBundle` 如实（dry-run/无该行=null——N11）；⑦ review README trigger 段与新 jsdoc 对齐（N9——cadence 恒开、标志只门控 completion 通道）；⑧ doctor 报告注明 bundle 聚合口径（N13——跨全部 profile 采集，非本运行时挂载）。
+- **v11 遗留闭合（P2-12）**：review **completion 通道接入 `deliverMessage`**——不再绕行直接 `agent.inject`（reviewWakeInject 生效 + woken-turn cadence 一次抑制，与 flush/结果通知同一通道）。
+- **观察批（N14–N18）**：`deferred-v11.md` **真实落档**（0.3.58 声称挂账而文件缺失——N8；含 P2-15/28/29/30 触发条件与 N14 三处机械宽行登记）；判别用例补齐（N15——N1/N2/N4/N5/N7/N10/N11/N12/P2-12 各带红转绿用例；P2-42 验收断言由永真改真值断言）；prompts 残留 "stays untouched in this batch" 注释清理（N16）；verify 脚本 SKIP 补 `dist.next/dist.previous`（N17）；arch-guards 头注释声明 H2 启发式边界（N18）。
+- **流程**：publish-chain 同步步骤将 `docs` 纳入 robocopy（挂账/审计文件不再靠手动双写——N8 教训），并新增**挂账存在性自检**（CHANGELOG 声称的 deferred 文件缺失即 fail——v12 §6.4 流程建议）；本脚本新增逐行时间戳 + 分阶段耗时 + 持久化 timing 日志。
+- **门禁**：core（+N4 判别 2）/ state-json（+N12）/ skill-usage（+N5 判别 2）/ curator（schema root）/ feedback（+N7）/ learning-graph（+N1 判别 2）/ review（+P2-12 判别）/ host installer（+N10、P2-42 断言修真）/ commands doctor（聚合口径）；oxlint / tsc 以本机与 CI 实跑为准。
+
+## 0.3.58 (patch) — v11 审计修复批 2：写入面契约统一 + 模型面对齐 + 交互/文档（阶段 D+E+F+H）
+
+- **阶段 D（跨包写入面契约统一）**：① skill 名称 trim 下沉到 **skill-usage 服务层**（record/ensureRecordCreated/markAgentCreated/markArchived 四入口——侧车键与 SkillLibrary 全入口 trim 单源一致，幽灵键「 foo 」消除）；② **curator 补 `root` 配置**（自定义 root 部署下 curator 作用于真实技能树——此前是全家族唯一无 root 的树消费者，生命周期在自定义树部署下整体失效）；③ graph 审批归属：invocation 无会话通道（实测）——注释声明取舍（不造命令级会话机制）；④ feedback 两个进程级 Map 512 上界；⑤ 契约钉住：trim/root 判别用例（D1/D2 验收）。
+- **阶段 E（模型面对齐，PROMPT_BUNDLE_VERSION 15→16 一次 bump）**：① 维护校验器补 **§3 完整性契约**（空洞 `{issues,[],[]}` 拒绝 + 每个 over 信号须被 evidence 覆盖或 notes 点名——P1-6 从提示词承诺变机械执行；no_issues 豁免）；② `MAINTAIN_OUTPUT_INSTRUCTION` 如实（不再否认 maintenance_probe 存在——P1-7 系统性抑制 probe）；③ review `skillReviewTrigger` jsdoc 如实（该标志只门控 completion 通道——P1-8 文档失实）；④ replay 失败权重裁决=report-only（注释对齐——P1-10 选 a）。
+- **阶段 F（交互/文档一致性）**：① commands + maintenance 补家族 **Config schema**（唯一无 schema 层防线缺口闭合——P2-18）；② T-WD2 改为**真实调用 renderCommandTable** 与 README 逐行比对（P2-17 死导出消灭）；③ atomicWriteFiles 走 logger 参数 / maintainTimeoutMs 报错区分配置与 CLI（P2-20）/ 失败扫描保留上次成功 runId（P2-21）；④ 文档八处批量（curator 合并通道描述/commands token 口径/learning-graph 头注释/patch "KV first" 标题×2/review 两测试 docblock；host README 的 cap 段已不存在无需修）；⑤ clampReviewConfig 类型精确化 + reviewToolAllow 兜底（P2-16）。
+- **阶段 H（防回归）**：① 挂账 deferred-v11（domain 值语义/executionTimeoutMs/命名债/`~` 展开——触发条件登记）；② **arch-guards 新增幽灵服务键静态守卫**（P0-1 class：探测键必须存在提供方——dev 扫描时当场抓出 evolutionReplay 提供面正则盲区并修正——守卫验证有效）。
+- **门禁**：core 305 / commands 49 / maintenance 71（+E1 三判别）/ review 48 / replay / skill-usage 22（+trim）/ curator 51（+root）/ feedback 27 / learning-graph / arch-guards --strict exit 0（含 H2 守卫）；oxlint 0/0（206 文件）；tsc 0（九包）；全量以 CI Linux 为准。
+
+## 0.3.57 (patch) — v11 审计修复批 1：P0 止血 + 持久化/核心/安装链（阶段 A+B+C+G）
+
+- **阶段 A（P0 交互面止血）**：① doctor 删除 `evolutionReview` 幽灵服务键——review 从不 provide 服务，自检永远显示 false——改为按安装形态推断（full/host/preset 任一即已装配）；② 裸 `restore` 命令分发修复（注册表/文档声明 `restore`，handler 只匹配 `restore ` 参数形态——裸输入落 help）。
+- **阶段 B（持久化数据完整性）**：事务基线复用记录字段门（字符串 runCount 等不再经 `(x ?? 0)+1` 污染写回）；`archivedIdsCache` 进程级缓存删除（每次直读——跨进程陈旧缓存可复活 ghost pending 双胞胎，V7-08 只修了进程内失效）；`retireLegacyOnce` 失败不再放行未过滤 legacy（僵尸「可见不可 claim」视图消除）；`appendArchive` 非对象条目防御 + 吞错补 warn（E-52）；`.corrupt` 重写去重（坏集不变则跳过——写放大 + mtime 触清扫失效）；quarantine 抢救失败如实报告（不再声称 preserved）；IO seam rename 接入 renameWithRetry（C-28 一致）。
+- **阶段 C（core 域逻辑）**：signals `tool/call` 分支补形状守卫（P1-1——唯一无守卫分支，坏事件使 review 信号整轮丢失）；`appendEvolutionEvent` 删重复 rotateIfDue；`restoreFromArchive` 换 badName() 单源（补 64 长度限制）；`create`/`removeSupportFile` 纳入串行队列（F-208 纪律双缺口闭合）；`snapshotAll` 失败清理半成品目录（孤儿快照无界增长）；curator 三小修（invalidate 吞错补 warn / 侧车键进 RegExp 前过 SKILL_NAME_RE / autoCheck docstring 如实）；`pendingSelfCleanup` 64 条上界。
+- **阶段 G（安装链/CI）**：installer host/oneclick 遇已装 all 拒绝（三方互斥补全）；uninstall 对称移除 all bundle 行（+scope-agnostic 匹配——精确名挡 @lmzhen 差）；`removedAgentPreset` 如实（dry-run/不存在=false）；CHANGELOG head 版本解析单源（lib-changelog.mjs——prerelease 版式两脚本一致）；publishGroups 与 staged 目录双向核验 fail-loud（不再写 null）；prepare-release 导入校验边界注释；CI overlay 清理 staging 残留 + 校验步注释如实（脚本半边 CI 恒等、真校验在发布前本机）；N3/N4 启发式边界注释；anchored 基座 P1-11 调查结论（pinned 上游全树 0 命中三工具名——注释声明适用平台线，行为保留）。
+- **门禁**：core 363 / commands 48 / state-json 49 / host 59（installer 17 含 4 新）/ state-storage；oxlint 0/0（206 文件）；tsc 0；全量以 CI Linux 为准。方案两处修正：审计 P2 计数 29→42、E 阶段 PROMPT_BUNDLE_VERSION 15→16（0.3.58 执行）。
+
+## 0.3.56 (patch) — 0.4.0 系列批 2：配置两层化 / 错误附下一步 / 文档五区（WC/WD2-D4/WE/C4）
+
+- **WC 配置两层化**：①**拨盘层**——5 个语义拨盘（autonomy / scope / curatorBackground / memoryInjection / threatStrictness）文档化 + 背后字段映射表（全部实测存在，T-WC2 钉住 7 个字段）与三档风险标注（日常/调优/高危）；②**env 收口**——core 新增 `env.ts` 单源模块（`allowRowCollisions()` + 键表），`DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` 读取迁移（行为不变）；配置层 `!!js` env（SESSION_QUERY/SESSION_QUERY_PATH）按边界**保留在 profile 配置求值层**（不可迁移），文档表区分两读取层；③**生成式导航**：命令表/拨盘/env 表均以「单源渲染 + 测试守卫」形态落地（README 五区）。
+- **WD2-D4 失败与命令体验**：①常见错误编号化 E-301/302/303（approval/curator/replay 服务未挂载——附「下一步」指向 doctor）；②threat 拒绝消息统一附豁免通道指引（`threatExemptLabels`——内存/技能双写面）；③README Operate 区 Troubleshooting 表（already registered 双装解读、E-3xx、threat、form none——每行含下一步）。
+- **WE 文档五区**：根 README 重组为 Concepts / Get started（含 **C4 首 10 分钟叙事**：首次审阅 defer、第一条记忆/技能从哪来、去 `/evolution doctor`/`mutations` 看什么、怎么停）/ Reference（命令表×拨盘×env）/ Operate（Troubleshooting×Migration 四类用户）/ Development（包地图+compositions+invariants+双布局下沉）；zh 同步（配置拨盘表 + 常见问题表）；dev README 补 dials/env 节（canonical 测试面）。
+- **护栏**：T-WC2（dial-reference 守卫：README 拨盘节存在 + 7 字段逐一存在于所属包源码）；T-WD2 既有（命令表/hint 单源）延续。
+- **门禁**：core 303（+env 迁移下 preset-composition 9）、commands 47（+E-xxx 断言面）、dial-reference 2；oxlint 0/0（206 文件）；tsc 0；全量以 CI Linux 为准。
+
+## 0.3.55 (patch) — 0.4.0 系列批 1：概念产品化 + 安装模式 + 生成式命令面（WA/WB/WD1）
+
+- **WA 概念产品化**：根 README 首屏新增「Concepts: the two evolution loops」——记忆进化/技能进化两回路 + 共享引擎（Review 心脏 + Curator 代谢 + Governance 闸门）+ 术语表（plan/pending/staged/snapshot/consolidate/nomination/drift/substantive/catalog/rank/review mode——中英单源，与命令输出同一套词汇）；zh 快速开始同步（含概念简报 + 模式表）。
+- **WB 安装模式产品化**：M1–M4 模式表（M1 全自动默认 / M2 人审把关 / M3 只装底座 / M4 按会话进阶——与 all 互斥）；**新增 `/evolution doctor`**（只读自检：安装形态识别 full/host/preset/layered/none、三方冲突检测（all/host/preset 双装 + all vs layered）、`DSH_EVOLUTION_*` 体检（SESSION_QUERY 白名单等）、服务挂载清单、pending 数；`--json` 供脚本；输出末尾附建议动作）；INSTALL 验证节改为「跑 doctor 应看到 ✓」；npm 元数据场景化（host/preset/commands/all description 改写为语言）。
+- **WD1 生成式命令面**：`evolution-commands/src/registry.ts` 子命令注册表成为**单源**——input hint、bare `/evolution` help、README 命令表全部由它渲染（原三处手写副本删除——v10 R-13 类漂移根治）；README/zh 命令表同步为注册表渲染。
+- **护栏**：T-WB2（doctor 六用例：四形态分类/冲突/env 体检/渲染尾建议/多 profile 聚合）；T-WD2（hint==注册表合成、README 命令表与注册表逐条一致、summary 非空）。
+- **门禁**：evolution-commands 47/47（+doctor 7 + registry 3）；oxlint 0/0（204 文件）；tsc 0；全量以 CI Linux 为准。
+
+## 0.3.54 (patch) — route B：默认安装即全量（`dsh-evolution-all` 升级为完整 bundle）
+
+- **行为契约（安装体验反转）**：
+  1. `@lmzhen/dsh-evolution-all` 从被动聚合包升为**完整 bundle**——新增 `dsh.bundle.patch`（`cordis.patch.yml`）：行集 = evolution-host 基础设施行 ∪ 4 个模型工具行（`tool-memory`/`tool-skill-manage`/`tool-session-query`/`evolution-skill-catalog`），全部 profile **root** 级。`dsh plugin add all` = 装完即全量：每会话自动获得后台自动化 + 记忆/技能工具 + SKILLS/MEMORY 指引注入，**无需预设与会话选择**（旧 all 用户升级重启后即全量——行为变更）；
+  2. **删减 = 包选择**：`host` 保持 infra-only（same automation minus model tools）——移除全量 = 卸 all 装 host；
+  3. **三方互斥 fail-loud**：all / host / one-click preset 两两互斥（同 scope 双装 = 重复行 → 上游 invariants `already registered` 启动即抛）；**all 与 layered Evolution 预设亦互斥**（预设 scope 模型行双挂载同类触发）。install-layered `--mode agent/layered` 检测到 profile 已装 all 时提前拒绝并给出二选一文案。
+- **防漂移守卫**：bundle-mutual-exclusion.spec 新增 G-A（all 的 infra 行体 ≡ host.patch）/G-B（all 的 4 模型行体 ≡ preset.patch）/ G-C（模型行包 ⊆ all 依赖闭包——infra 行由 host 自身契约担保）；T2 组合层证明 all+host / all+preset 双装真实构成重复行（fail-loud 前提）；installer T5（agent 模式遇 all 拒绝）。all.spec 依赖断言升级 6 项（补 `dsh-tool-session-query`——v10 F6 缺口在此版闭合）。
+- **文档**：根 README/README.zh/INSTALL/包 README 三向安装表重写（全量默认 → 精简换包 → 进阶 layered → 兼容 preset）；evolution-all/README 与 src docstring 重写（不再是"one command 装但只挂 infra"的 H-08 语义）。
+- **门禁**：host/all/preset 69/69（+G-A/G-B/T2×2/T5、all 依赖 6 项）；oxlint 0/0；tsc 0（三包）；全量以 CI Linux 为准。设计蓝本：`dsh-evolution-mirror-plan-route-b-full-bundle.md`（机制事实含 applyEntryPatches insert 无去重——互斥 fail-loud 的承重证据）。
+
+## 0.3.53 (patch) — P1-2 延伸修复：catalog cap 注入下沉至预设组合器（V10-14 收尾）
+
+- **P1-2 延伸 [组合层可达]**：v10 修复只在 install-layered（源码树自举工具）注入 `catalogDescriptionMaxLength: 60`——而 `/evolution preset install`（commands 路径，**npm 用户唯一预设生成途径**）走 core `composePresetComposition`，无注入：生成预设的会话可见 tool-skill 行仍跑平台默认 500，P1-2 症状在该路径原样存活。**修复**：cap 注入下沉为**组合器契约**——core `composePresetComposition` 内建 `injectCatalogDescriptionCap`（幂等：已有 `config:` 行不动；marker 注释标识组合器文本；无 tool-skill 行时 warn 一次并原样返回），install-layered `generateAgentPreset` 同步内化同一规则；两路径输出字节一致（installer.spec parity 钉，fixture 升级为含 tool-skill 行——任一侧漏注入即红）；commands preset install 端到端用例补 cap 断言（判别力：旧 fixture 无 tool-skill 行测不出注入）。
+- **门禁**：core preset-composition 9（+2 判别：注入/幂等）、installer 13（parity 升级）、commands（preset install 含 cap 断言）共 50/50；oxlint 0/0（200 文件）；tsc 0（core/host/commands/agent 四包）；全量以 CI Linux 为准。
+
+## 0.3.52 (patch) — v10 审计轮（批次 0–8）：行为契约变更声明（V10-01~18）
+
+**来源**：v10 审计报告（P1×2、P2×19、P3≈80）按架构层级分批（批次 0–8）实施；按计划约定，本节集中声明本轮**行为契约变更**，逐条一行。批次 8（T 横切：README/INSTALL 同步、invariant 样板注释、延后台账落档）同版交付。
+
+- **V10-01 [P2·数据完整性]**：consolidate reference 模式目标已存在时改为**追加**（原无条件覆盖——"consolidate → 重建 → 再 consolidate"静默清除旧降级知识；与 restructure 追加语义对齐）。
+- **V10-02 [P2·数据完整性]**：normalizeFrontmatter 发现**重复 key 拒写**（进 issues 拦截；原按 key 查 Map 改写错行、带病字节经 last-wins 校验静默落盘）。
+- **V10-03 [P2·误报通道]**：SkillLibrary/MemoryStore 新增 `threatExemptLabels` 选项（默认空=行为不变）——部署可经 config 打开豁免白名单；拒绝消息附加命中 label 与豁免提示。
+- **V10-04 [P2·数据完整性]**：state-json **记录级门禁**——必填字段/枚举不过关的记录走 quarantine 隔离并在返回集合剔除（原 `{"foo":1}` 被当作合法记录、NaN 静默传播，非法 status 成为查询不可见僵尸）。
+- **V10-05 [P2·有界化]**：损坏文件隔离副本收敛为**固定名 `<file>.corrupt`** 原子覆盖（原时间戳+随机后缀，每次读取新写一份无限堆积）；历史 `.corrupt-*` 由 sweep 超 7 天兜底清理。
+- **V10-06 [P1·耐久性]**：io 写路径对齐上游 crash-durable 协议——tmp `open('wx')` + `handle.sync()` + POSIX 目录 fsync 后 rename（原裸 writeFile+rename 无 fsync，掉电产生空/截断状态文件，触发 E-9 永不自愈 fail-loud）。
+- **V10-07 [P2·锁完备]**：写锁接管新增**第三分支**——锁体非空、pid 不可解析（NaN）、mtime 超 1h 宽阈值可接管并 warn 一次（原撕裂写锁使该目标全部写入永久 fail-loud 需人工删锁）。
+- **V10-08 [P3·语义]**：`/evolution maintain` 冷却/在飞拒绝改返回 **err**（原 success 文本——消费方无法从结果类型区分"已执行/被拒"；monorepo 内已核无按文案判断的消费方）。
+- **V10-09 [P3·结构化契约]**：`MaintainOutcome` 新增 `recommendationCount`；commands 侧**删除** formatPlan 渲染文本解析（`/^- \[/gm`+Notes 切割，不留双轨；渲染本身不变）。
+- **V10-10 [P2·接口失配]**：review 证据通道改读 `tool/result` 的 `message.content`（tool-result 块文本；原 `output` 字段上游 rc.2 不存在、`[result]` 行恒空、审阅证据静默降级）；错误标记同时看 `data.error` 与块级 `isError`；截断预算不变。
+- **V10-11 [P2·root 统一]**：review / learning-graph 新增 `skillsRoot` 配置（默认空=原行为），接入 `resolveSkillsRoot` 统一解析——自定义 root 部署下 review/`/graph` 不再向默认树写错。
+- **V10-12 [P2·防御纵深]**：威胁 deny 迁入 `tools.guard` **单调通道**（与 policy 同通道，不可被 pre-execute 监听器短路）；原监听器移除避免双扫描。
+- **V10-13 [P2·状态机]**：review `skillReviewTrigger:'both'` 同回合**互斥**——completed 回合命中 cadence flush 后跳过 completion 通道（原同一完成点可双发、双倍 token 互相干扰）。
+- **V10-14 [P1·组合可达]**：install-layered 生成 Evolution 预设时向 standard 来源的 `tool-skill` 行注入 `catalogDescriptionMaxLength: 60`（幂等：已有 config 跳过）——layered 形态读取侧 60 字符 cap 恢复生效（原 host patch 覆盖到不了预设 scope、模型可见上限实为平台默认 500）。
+- **V10-15 [P2·env 边界]**：`DSH_EVOLUTION_SESSION_QUERY_PATH` 空串回退默认路径（原 `resolve('')` 落进程 CWD 产生杂散 session-query.db）；`DSH_EVOLUTION_SESSION_QUERY` 非法值白名单归一 `startup`（原直接炸 zod ValidationError、profile 无法启动）。
+- **V10-16 [P2·装配]**：standalone `cordis.yml` 的 `evolution-state` 行**显式 pin `provider: 'domain'`**（原实际生效 provider 由 yml 行序隐式决定、双 provider 注册介质静默分叉；头注释 "fallback" 改写为真实语义）。
+- **V10-17 [P2·发布元数据]**：tarball `repository.directory` 改由打包目录名生成、指向实际扁平目录 `packages/evolution-*`（原按改写后包名拼接指向不存在路径，已发布包源码跳转全部失效）。
+- **V10-18 [P2·CI]**：版本守卫（verify-layout-sync）接入 validate action；安装步骤改 frozen-lockfile（或步骤名如实化，以 CI 实跑二选一）；release.yml 补 `timeout-minutes` 与 PR paths-ignore。
+- **落地状态注记**：批次 8（本节落笔）时点对照工作树核验，批次 0–7 修复**均尚未见于工作树**（并行批次实施中）——上列条目按计划声明；收尾消项复核（计划 §6-6）确认某条未落地时由主控在该条补注 deferred。
+- **T 横切（批次 8，本版已交付）**：README/README.zh 新增 `/evolution` 命令面全量枚举（对齐 `evolution-commands` 注册面，内建 help 为权威；原清单缺 curator pause/resume/status/scope、mutations、consolidate、learn、maintain、preset install、restructure、replay 等十余条，且裸 `|` 破坏表格渲染）；INSTALL 验证一节 vitest 路径修正为扁平布局 + 双布局注记（G5.5 口径）；30 份 `src/invariant.ts` 头注释补样板声明（audit v10 S-09；不抽共享工厂，计划 §4-3）；README（en+zh）补测试导入取舍声明（I-03：约 30 组未声明 `@deepseek-ai/*` 测试导入依赖合并布局，不为测试补 devDependencies）与上游升级对照清单（I-02：USER_DSH_RANK 影子 rank 对照 + `@deepseek-ai` 包名撞名检查）；`packages/docs/deferred-items-v10.md` 落档计划 §5 全部 12 项延后台账（含重访触发条件，本地存档不上传）。
+
+## 0.3.51 (patch) — v9 审计批 2：口径与判别力批（V9-05~12）
+
+**来源**：v9 审计报告剩余八项——文档口径修正（`~` 展开挂账、CHANGELOG 失实句、mtime 消费方声明）+ 实现与注释对齐（threats 边界、redact 锚注、maxDepth 守卫、.bak 失败形态）+ 测试判别力补强。全部先核验后修复，无报告字面照办。
+
+- **V9-05 [P3·口径/分裂脑]**：三处 DSH_HOME resolver 行为分裂——`state-store.evolutionRoot()` 有 trim 守卫（V8-06，自称 single source），而 `memoryRoot`/`skillsRoot` 仍用裸 `||`：`DSH_HOME=" "` 曾解析到 CWD 相对 `" /memories"` 侧车。**修复**：两个 root 复用 `evolutionRoot()`（核心逻辑单点，注释指向）；判别用例（三 root 对空串/空白/真实值行为一致——用一个用例钉住 split-brain 不再复发）。
+- **V9-06 [P3·历史文档失实句]**：0.3.47 的 V8-14 条目隐含交付「parity 恢复 + 无 failed 噪声」——但当时仅函数级参数接线，生产 run() 仍 4 参（0.3.50 V9-02 才补）。**修复**：该条目附**更正注记**（历史句按交付事实保留，注记为当前权威陈述：0.3.47=函数级；0.3.50=生产接线；0.3.51=注记）。
+- **V9-07 [P3·文档失实]**：io.ts 的 `mtime` 探针注释称「Consumers use it as a cheap invalidation stamp」——**全树无消费方**（skill-catalog 失效是事件驱动的 `skill-mutated`/`skills-refresh`）。**修复**：注释如实化（无消费方声明，探针保留为后端契约扩展点，接线前先补文档）。
+- **V9-08 [P3·边角声明]**：0.3.49 固定名 `.bak` 的 two failure shapes 未声明——(1) 旧 `.bak` 删除失败：无害（copy 契约=覆盖 `cp force`）；(2) copy 失败：backup null → 拒绝消息无备份后缀、语义不变。**修复**：backupFile 注释声明两形态 + 判别用例（copy 抛错 → 拒绝消息无 backup 后缀 + drift 语义保留）。
+- **V9-09 [P3·测试断言]**：① 重复 add 容忍（`no duplicate added`）实现存在但**无断言**（曾消失）——恢复判别用例（add 重复 → ok:true + 消息含 no duplicate added + 条目数不变；batch add 同容忍）；② render-facts 的 dup_heading 只有 pass 形态断言——补 **over 形态渲染断言**（value=重复标题(2) verdict=over 完整面）。
+- **V9-10 [P3·边界/注释]**：① threats `ssh_backdoor` `/authorized_keys/i` 无 `\b`——`unauthorized_keys` 类复合词曾误红（C2 表纪律对齐）；真实 `.ssh/authorized_keys` 引用不受影响；判别用例（复合词不触发 + 真 .ssh 引用封锁）。② redact 注释「other patterns already carry their own anchors」**失实**——JWT（`eyJ…`）与 bearer 行并无左锚；注释如实化（无 `\b` 是有意选择，出现真误报再评估）。
+- **V9-11 [P3·挂账]**：evolution 配置路径面（`skillsRoot`/`eventsHome`/preset target）**不展开 `~`**——主库 `@deepseek-ai/dsh-home-paths` 的 `expandHomePath` 未复用；`skillsRoot:"~/skills"` 按字面解析。**挂账（低严重度暂不修）**——平台层无统一展开契约，家族自行展开会造成行为分裂；登记 `known-limitations 局限九`（触发条件：真实用户反馈 `~` 不生效时再评估，首选项=复用主库 expandHomePath 于 resolveSkillsRoot 单点）。
+- **V9-12 [P2·测试判别力专项]**（五项，全部红转绿可判别）：
+  1. **approval 重放路径**：approve 的两个未测分支补判别——runner **throw**（`{ok:false}` 之外的形态：记录保持 pending + claim 释放，`remains pending` 消息）与 **无 runner** approve（claim 释放 + `No replay runner registered` + 记录仍可 reject）；
+  2. **V8-08 record 半边**：restructure 端到端用例此前只断言事件——补 `skillUsage.record(name,'patch')` 断言（记录行被误删时用例必须红）；
+  3. **maxDepth 守卫**：实现与注释不一致——负数通过 `Number.isFinite` 却被注释声称兜底 1。**修复**：守卫补 `>= 1`（注释与实现对齐）+ 行为用例（NaN/Infinity/0/-2 → 1；合法 4 原样透传）；
+  4. **plan-validator action 写回**：V8-23⑪ 的 memory 侧无 action→`add` 写回有实现无断言——补判别用例（skill 侧 V6-26 对称既有）；
+  5. **.bak 判别精确化**：三处 `startsWith('MEMORY.md.bak')` 是前缀超集（时间戳累积形态也会绿）——改**精确名**判别 + 固定名覆盖用例（两次漂移 → 恒 1 个 .bak 且为最新字节）。
+- **门禁**：core 316/316（+状态 22/memory 22/threats 10）+ approval 20（+2）+ maintenance 92（+orchestrate 21/render-facts 5 含新）+ validator 12（+1）+ commands（含 record 半边断言）；oxlint 0/0（全树 194 文件）；tsc 0（五包 --force）；全量以 CI Linux 为准。
+
+## 0.3.50 (patch) — v9 审计批 1：仓库状态与声明修复补完（V9-01/02/03/04）
+
+**来源**：v9 审计报告修正类批——三项「声明修复的补完」与一项修复引入回归。
+
+- **V9-01 [P2·仓库状态]**：**30 个 manifest 版本被 dcebd8c（0.3.45 pinned-contract update）反向改写为 dev 基线 `0.1.0-rc.1` 且四个版次未对齐**（root=0.3.45、CHANGELOG=0.3.49 三方不一致——一次「robocopy 二次同步带入 dev 清单后未跑 normalize」的反向同步事故；发布不受影响（tarball 版本由 git tag 在 pack 时覆写），但 committed 预览契约被破坏且 normalize 文档契约与仓库现状自相矛盾）。**修复**：① 本版发布链 normalize 把 31 个 manifest 钉回发布线（0.3.50）；② **新守卫挂入 verify-layout-sync**：「manifest 版本 == CHANGELOG 头节」检查（根 CHANGELOG 首个 `## x.y.z` 与全部包 manifest + 根 package.json 一致）——当前漂移形态被守卫当场抓出（30 manifest + 根全报），未来 CI 可见。
+- **V9-02 [P2·修复未接线]**：V8-14 的 `protectedNames` 只接了 core 签名与 scopeView——**生产调用 run() 仍 4 参**，marker 保护的 `created_by:'agent'` 技能照旧进归档候选 → deleteProtection 拒绝 → error 噪声（v8 报告 V8-14 原症状在生产入口原样存活）。**修复**：run() 补第 5 参（一行）+ **run() 全链路集成判别用例**（bundled marker + agent 记录 → errors 空、archived 不含——**红转绿实证**：临时去参 → errors [Array(1)] 红 → 还原绿）。**教训**：带新参数的修复必须核验全部生产调用方接线（V6-48 同型第二例，已入收口检查单）。
+- **V9-03 [P2·声明失实]**：V8-22 未交付——0.3.49 的修改目标是**镜像** packages/README，随后发布链 robocopy 用 dev 版覆写掉了；且根 README 互注断言「对侧注释存在」为假。**修复**：改 **dev 树 README.md（canonical——robocopy 同步镜像 packages 副本）**——补 preset install 注记 + 双布局命令规则两段 + 改互注（准确描述 canonical 关系）；根 README 互注同步修正。**教训**：双副本/布局文件的 canonical 端是 dev 树，镜像侧编辑会被 robocopy 冲掉。
+- **V9-04 [P2·修复引入回归]**：V8-11 把 target 存在性/合并校验后移到归档之后——干净拒绝（not found/超限）变成「先归档全部 source 再逐回滚」的破坏性路径（restore 失败即半完成）。**修复**：归档循环前恢复**廉价 target 存在性预检**（serial 内权威读保留——竞态修复目标不失）；判别用例（missing target → ok:false + source 未归档）——预备检对拒绝路径零破坏。
+- **门禁**：curator 51/51（+V9-02 集成）+ skill-store 38/38（+V9-04 拒绝路径）；oxlint 0/0（全树）；tsc 0（--force）；verify-layout-sync 守卫对当前漂移报 31 项（判别力实证——发布链 normalize 后应 0 项）；全量以 CI Linux 为准。
+
+## 0.3.49 (patch) — v8 审计批 6（收尾）：文档同步 + 死代码清扫 + 测试缺口（V8-22/23）
+
+**来源**：v8 审计报告批次 6（L6 文档 + T 横切）——v8 审计轮最后一个版次。
+
+- **V8-22 [P3]**：`packages/README.md` 补根 README 的两段补句（preset install 注记 + 双布局命令路径规则）——0.3.43 的修复只落了根副本；两文件头部互加 **「双副本需同步修改」** 注记（不做生成机制/守卫脚本——漂移面仅两处，手动同步 + 互注成本最合理）。
+- **V8-23 [P3·死代码/文档漂移批]**（十二子项）：
+  - **删除**：`saveActivity`（零生产调用、apply 直用 transactIo+serialize——含 F-304 注释更新与测试注释修正）、`summarizeAssessment`（零生产引用，jsdoc「for tests and replays」失实——含测试删除与类型导入清理）、constants 与 review 两处过期 doc-comment（合并残渣）、curator 孤儿 JSDoc、plan-validator 零 import 的 schemastery 运行时依赖、evolution-state 的 storage-domain/state-domain 幽灵 devDeps、evolution-state README 标题改写。
+  - **修正**：io.ts size/mtime doc 对齐实现（仅 ENOENT/ENOTDIR 归 null，其余 stat 错误是 IO error）、tsconfig.host.json 悬挂指针加 "(upstream tree only)" 限定。
+  - **补齐**：state-json 漏报 io-node devDeps（9 spec 实测用）、state-domain 漏报 storage/storage-json（3 spec 实测用）。
+  - **点修**：orchestrate maxDepth 加 Number.isFinite 守卫（导出 API 面——NaN/负值防折叠）；plan-validator memory ops 按 V6-26 口径写回显式 `action: 'add'`（新消费端不再猜默认）；memory 漂移备份改**固定名 `<file>.bak`**（写前删旧——原 `.bak.<stamp>` 无保留策略跨会话无限累积；既有测试断言同步适配）。
+- **T 横切**：V7-11 累计预算专项用例（多命中 replaceAll 超累计预算 → 整体拒绝——此前 fuzzy-patch.spec 无该专项，覆盖靠随机 fuzz；判别用例：300 段 × 单次 ~1M 扫描 ≈ 累计 300M ≫ 8M——`## Section  title` 双空格形态保证 fuzzy 非 exact 命中）。
+- **门禁**：受影响面全绿（skill-store 37/memory-store 19/activity 12/render-facts 4/validator 11/review 28）；oxlint 0/0（全树）；tsc 0（四包 --force）；全量以 CI Linux 为准。**v8 审计轮 24 项新发现 + 平台对照全部闭环：修 19 / 核验不修 2（V7-10 观察项延续、V8-04 已修）/ 文档 3**。
+
+## 0.3.48 (patch) — v8 审计批 3+5：review 状态机收尾 + 发布链守卫（V8-03/04/17/18/19/20/21）
+
+**来源**：v8 审计报告批次 3（L4 状态机）+ 批次 5（L6 发布链守卫）合并。
+
+- **V8-03 [P3·保护域]**：flush 的 `evolution/review-scheduled` emit（subagent 成功路径）与 completion 通道同款 emit 均包 try/catch + warn——抛错监听器曾穿透 flush 跳过计数清零（V7-04 重复交付的 emit 入口变体）；判别用例（抛错监听器 → 通知仍达 + 计数清零 + warn 命中）。
+- **V8-04 [P3·状态机]**：flush 取值改 **fresh 优先**（`kind ?? latch ?? undefined`）——完成轮当轮跨过第二阈值时 `advanceReview` 返回 combined 但旧 latch-first 丢弃它（V7-14 裁定的「完成轮当轮交叉」残余窗口——无中间轮覆写）；fresh 优先语义与「last-trigger-wins 越晚越贴近相关性」一致；skip 轮 kind=null 自然回落 latch。**行为变更（CHANGELOG 声明）**：完成轮 fire 与段内旧 latch 并存时以当轮 fresh 为准。判别用例（5/10 双阈值 10 轮序列：turn9 前 latch=memory → turn10 completed 交叉 → 交付 `[Auto-review]`（combined）而非 `[Auto-review — Memory]`）。
+- **V8-17 [P3]**：publish-scoped 的 npmCliJs 候选只在 env 存在时加入（APPDATA/ProgramFiles 未设曾产生 CWD 相对幻影候选——install-layered V6-51 同款处理）。
+- **V8-18 [P3]**：发布主链路真空守卫——manifest 或 publish-order 声明 0 包即 fail-loud（原来空集相等比较通过、循环零次后打印 "publish run complete"——F-103 教义与 verify-* 三脚本对齐）。
+- **V8-19 [P3]**：`--only` × `--groups` 组合——点名包落在截断切片之外时 fail-loud（原来静默跳过仍报 complete——操作者以为发了实际没发）。
+- **V8-20 [P3]**：prepare-release 的 exports 校验覆盖**对象形态**（{types, default} 递归一层同 inShipped 检查）——string 形 35 处原已查、object 形 61 处（含全部主导出与 ./invariant）从不校验的空转被闭合。
+- **V8-21 [P3]**：`@deepseek-ai/dsh-evolution-agent-preset` 列入 evolution-commands 的 **optionalDependencies**（运行时 createRequire().resolve 的声明语义——被补齐；verify-dependency-closure 静态 import 盲区的运行时面获得声明）。
+- **门禁**：review 28/28（+2 判别）+ anchored-smoke 2/2 + lifecycle 2/2；oxlint 0/0（含 scripts）；tsc 0（review --force）；publish-scoped/prepare-release `node --check` 语法校验通过；全量以 CI Linux 为准。
+
+## 0.3.47 (patch) — v8 审计批 2+4：守卫与口径批（V8-02/06/07/08/09/10/12/13/14）
+
+**来源**：v8 审计报告批次 2（L2 守卫）+ 批次 4（工具命令面）合并；V8-06（plan 批次遗漏项）补入。9 项全部先核验后修复。
+
+- **V8-02 [P2·数据完整性]**：memory 分隔符守卫改为检查**最终落盘 entry**（`addDatePrefix` 前缀与内容的接缝可合成 `\n§\n`——`§\nfoo` 过旧守卫但变 `## date\n§\nfoo` 后分裂为两条且 drift 假阴性）——addCore 与 applyBatch 两入口同修；判别用例（addDatePrefix:true + `§\nfoo` → 拒；无前缀同 fact 行为不变）。
+- **V8-06 [P3·口径]**：`evolutionRoot` 的 DSH_HOME 空串守卫扩展为 **trim**（上游 home-paths `trim().length > 0` 采纳测试）——`DSH_HOME=" "` 不再产生 CWD 相对侧车（/evolution preset install 与 evolutionHome 同源修复）；判别用例。
+- **V8-07 [P3·配置]**：maintainCooldownMs 接入家族 clampedNumber 管道（min:0 保留「0=禁用冷却」）——NaN 曾静默禁用冷却（恰是该配置要防的重复模型调用场景）、±Infinity 曾永久冷却；**注意**：cordis 加载剥键（0.3.45 实证）使该路径经 schema 即默认值——clamp 为直构/深度垃圾的防御层（判别=clampedNumber 既有测试族 + 注释说明）。
+- **V8-08 [P3·观测面]**：`/evolution restructure` 命令的 SkillLibrary 构造接入**单一写汇**（第 4 参 onMutation——`evolution/skill-mutated` 事件此刻发出）+ 成功后 `skillUsage.record(name,'patch')`（与 skill_manage 同动作的观测面一致）；判别用例（端到端 restructure → 事件 `{action:'restructure', name}` 收到）。
+- **V8-09 [P3·形状守卫]**：skill_manage 的 `args.restructure` 加 `Array.isArray` 守卫（非数组垃圾实参曾 `.map` TypeError）——第二道防线（tool schema 先拒）；测试证「结构化拒绝 non-TypeError」。
+- **V8-10 [P3·双口径单源]**：RESTRUCTURE_TARGET_RE 加 `(?!.*\.\.)`——restructure 可创建的集合与 validateSupportPath 可打开的集合重合（`references/my..notes.md` 曾可建不可开——孤儿文件；RE 侧收紧而非放宽 traversal 面）；判别用例（双点拒/单点存）。
+- **V8-12 [P3·误伤]**：redact `sk-` 模式加 `\b` 左边界（`task-…`/`risk-…` 词尾 sk- 曾整段误红）；判别用例（task-/risk- 不误伤 + 真密钥仍红）。
+- **V8-13 [P3·误伤（行为契约放宽，CHANGELOG 声明）】**：threats exfil 组 `cat/curl/wget` 加 `\b` 词边界（`concat .env files` 曾触发 scope='all' 全局写封锁——任意 prose 命中即全锁）；判别用例（concat/wget-demo/scurl 不触发 + 真 `cat .env`/`curl "$API_KEY"`/`wget "$TOKEN"` 仍封锁）。
+- **V8-14 [P3·视图口径]**：lifecycleCandidate 与 computeLifecycleTransitions 增加 **protectedNames 参数**（与 computeScopeView 共享同一 marker 集）——marker 保护的 `created_by:'agent'` 技能不再同时出现在 managed[] 与 protected[]（视图与转移 parity 恢复；转移引擎不再产生被 deleteProtection 拒绝的 failed 噪声）；判别用例（marker+agent → protected 有、managed 无、archive 无）。
+  - **更正注记（0.3.51 V9-06）**：本条目所述 parity 恢复在本版交付时只完成了**函数级**参数接线——生产 `run()` 当时仍以 4 参调用，运行态视图分裂与 failed 噪声依然存在；`run()` 第 5 参接线与全链路集成用例由 0.3.50（V9-02）补成。历史句按 0.3.47 交付事实表述，本注记为当前权威陈述。
+- **门禁**：受影响面全绿（memory-store 19/redact 7/threats 9/state-store 4/skill-store 36/curator 50/commands 30/tool-skill-manage 17=172）；oxlint 0/0（全树 194 文件）；tsc 0（三包 --force）；全量以 CI Linux 为准。
+
+## 0.3.46 (patch) — v8 审计批 1：L1 存储与并发基座（V8-05/15/16/11）
+
+**来源**：v8 审计报告批次 1（L1 基座——先核验再修，四项均亲核属实后落地）。
+
+- **V8-05 [P3·并发]**：`pendingSelfCleanup` 生命周期双不对称修复：
+  1. (a) 登记删除移入 rm **成功**路径——rm 瞬态失败（Windows EPERM/EBUSY）时保留登记，下一写仍可自愈（原来无条件删除使注释承诺的 "always recorded" 失实，进程重启前只 fail-loud）；
+  2. (b) 登记表 `Set` → `Map<lock, bodyToken>`：登记时记录失败释放的锁体 token——自愈分支比对「当前 body == 登记 token」才删——登记后残留锁被外部移除、同进程另一写者在同路径新建活锁的场景不再误删（V4-05 注释声称杜绝的形态实际可达）。
+  - **验收**：io.spec 新增 V8-05 判别用例（登记旧 token + 磁盘新同 pid 锁 → 写者 fail-loud 且活锁不被删）；F-367 用例适配 Map 形态；**32-way 压测前后整跑 0 丢失**。
+- **V8-15 [P3·provider 契约]**：json provider `releasePendingClaim` 补 domain 同款 status 守卫（`pending/executing` 之外直接返回）——已解析（approved/rejected）记录的 claimedBy/claimedAt 审计归因不再被剥；**G7.4 一致性 harness 补「resolve 之后再 release」段**（json/domain 两侧行为一致断言——补上此前只测 executing→release 的分叉面）。
+- **V8-16 [P3·形状门]**：record-map 文件的**value 级**形状门（readJson 与 jsonTransact 两入口同款）——`{"a": null}` 这类 value 畸形经过原顶层门后会在 listPending/enforceResolvedCap 触发裸 `.status` TypeError；现在 quarantine（原始字节保留）并指名具体 record id。判别用例（`{"a":null}` → 拒绝且 `.corrupt-*` 旁本在位）。
+- **V8-11 [P3·并发/申报]**：`consolidate` 的 target 预读与 merged/pointer 构建**移入 in-process serial 队列**（与 update/patch/restructure/writeSupportFile 同一第二层）——并发 patch 在「预读与提交」之间的交错覆盖窗口闭合（判别用例：consolidate×patch 并发双写皆存；时序性——旧实现大多时序下会覆盖 patch 而红）。**申报**（按 G2.5 先例）：`create`/`archive`/`removeSupportFile`/`setPinned` 四个低频单文件入口的无锁读→写标注为文档化残留（core README 并发模型段补条——不做加锁：收益不抵锁面扩大）。
+- **门禁**：受影响面 88/88（io 25 含 32-way/V8-05、skill-store 35 含 V8-11 并发、state 家族 28 全绿）；oxlint 0/0（含 tests）；tsc 0（--force）；全量以 CI Linux 为准。
+
+## 0.3.45 (patch) — v8 审计批 0：V8-01 平台契约 P1 — review 子代理 outputSchema 去 `'json'` 方言
+
+**来源**：v8 审计报告批次 0（最高优先 P1——独立先行发布）。
+
+- **V8-01 [P1·接口冲突/平台契约]**：review 子代理的 `outputSchema` 使用了 `defineTool` 作者 DSL 方言 `items: { type: 'json' }`——而 `subagents.start` 的 outputSchema 走 **raw JSON Schema 校验边界**（上游 `assertObjectJsonSchema`，dsh-tools json-schema.ts 的 SCHEMA_TYPES 七个类型无 'json'）——**默认部署（reviewMode='subagent'）的评审通道在真实平台 100% start 失败**，每次静默降级为 inject 回退；结构化计划管线（validate→read-before-write→approve→execute）自初始开源发布起从未运行过。8 轮审计未发现的原因 = mock 化测试（10 处 `ctx.provide('subagents')`） + `SubagentLike` 把 request 声明为 `unknown`（TS 无法拦截） + 无跨仓 schema 对照。**修复**：
+  1. `REVIEW_OUTPUT_SCHEMA` 单源常量（模块级导出）——数组节点改为 `{ type: 'array' }` **省略 items**（上游语义 "absent accepts any JSON item"；per-op 结构校验由 plan-validator 分层承担）；
+  2. `SubagentLike.start` 的 `request` 从 `unknown` 收窄为 `SubagentStartRequestLike`（outputSchema 按 raw JSON-Schema 子集字面量类型化——`'json'` 若再入在 TS 层即报错）；
+  3. **契约测试**（review.spec V8-01）：以上游 SCHEMA_TYPES 白名单**递归遍历** REVIEW_OUTPUT_SCHEMA 断言每个 `type` 值合法——并做**红转绿判别力验证**（临时注入 `'json'` → 测试红 → 还原绿）——防 mock 化测试再次放行同类漂移（本缺陷潜伏 8 轮的直接原因）。
+- **对照核验**：evolution-maintenance 的 outputSchema（orchestrate.ts）本就合法未动；review 其余 start 字段面与上游一致（v8 报告 3.0 平台对照表）。
+- **门禁**：review.spec 26/26（+1 契约用例）；oxlint 0/0；tsc 0（review --force）；全量以 CI Linux 为准。
+
+## 0.3.44 (patch) — v7 收尾批：P3 清扫（V7-08/09/11/15/16/18）+ 测试专项补齐（V7-20）
+
+**来源**：v7 审计轮最后一批（P3 清扫 + 四项测试缺口）。
+
+- **V7-08 [P3]**：`archivedIdsCache`（json provider 每实例读一次）在 archive **任何写入后**失效——原实现只在实例启动读一次，cache 建立后的 append/轮转加入的新 id 永不被 mutation 路径（`mergedWithFilteredLegacy`）排除——幽灵 pending 双胞胎可经「append 后、list 前」的 mutation 并入。修复同时覆盖轮转与非轮转写入（两处 return 前失效）；判别用例（cache 空建立 → resolve append live-0 → legacy ghost 键=id → mutation → 排除；**教训：filterLegacy 按 legacy 键对比 archivedIds（id 值）——测试构造的键必须等于 id，键≠id 的"幽灵"不被排除是正确行为**）。
+- **V7-09 [P3]**：signals 的 assistant 分支补 `data.message` 本身缺场守卫（V6-21 只守 content——message 缺场 `.content` 仍 TypeError 且被 E-6 吞掉整轮信号；user 分支的 E-49 同款不对称残余）。
+- **V7-10 [P3] 核验裁决：不修（观察项）**：空体锁接管 1s 门（io.ts:304）静态双持窗口需「创建者在 open 与 write 间被阻塞 >1s 或时钟偏差 >1s」——未实证 + 锁协议第五版经 32-way 压测多轮稳定 + 接管后仍有 re-read+票二次验证——成本收益不划算，记录观察（若未来出现该形态事故再配合压力实跑修复）。
+- **V7-11 [P3]**：fuzzyReplace 的 replaceAll 循环加**累计预算**（每次扫描 work 累加，超 FUZZY_MAX_WORK 返回 null——不部分应用任意前缀）；单次预算（V6-17）与累计预算分离；null 的上层消息补「or the replaceAll fuzzy budget was exceeded」。
+- **V7-15 [P3]**：`skillReviewTrigger`（review）与 `reviewMode`（policy）schema 与 Config 接口均收窄为**字面量联合**（类型面闭合——拼错在 TS/配置作者层即失败；schemastery 仍剥键静默（0.3.43 实证），运行时 warn 不可达，已在注释中写明）。
+- **V7-16 [P3]**：cleanup 枚举补全 0.3.38-0.3.42 新增的四张 per-session 状态表（pendingCadenceReviews/pendingCadenceWarned/skipNextCadenceFire/cadenceResetWarned——原 cleanup 只清三张旧表；实际无泄漏（闭包整体回收），口径已对齐）。
+- **V7-18 [P3]**：install-layered 的 E-33 互斥检查从全名 includes 改为**包尾段匹配**（scope 无关——`@lmzhen/dsh-evolution-preset` 不再绕过默认 scope 装 host 的互斥）；判别用例（直接构造跨 scope manifest——scoped 安装需 .release-staging 测试不可行，检查先于 copy 故构造可行）。
+- **V7-20 [P3·测试专项补齐]**：① V6-31（.bak 键集）+ V7-08 行为用例；② V6-33（claimPending 返回拷贝——调用方 mutation 不污染域表）；③ V6-16（无 transact 后端下 serial 队列串行化并发 add——丢记录判别）；④ V6-08/V5-20（stamp 探针同秒后缀形态 `<name>-<stamp>-<rand>`——原只测 plain+正例）。
+- **回归**：受影响 spec 全绿（pending-cap 12/12、installer 12/12（+V7-18）、curator 49/49、domain 6/6、memory-store 18/18、skill-store 34/34、review 25/25）；oxlint 0/0（全树）；tsc 0（五包 --force）；全量以 CI Linux 为准。**v7 审计轮 20 项+1（V6-48 失效）全部闭环（修 11 / 核验不修 2（V7-10/14）/ 文档 7）**。
+
+## 0.3.43 (patch) — v7 批三：发布文档契约（V7-05/06/17）+ 声明失实与死代码（V7-07/12/13/19）
+
+**来源**：v7 审计轮第三批（文档契约 + 低风险文字面/实现补正）。
+
+- **V7-05 [P2·文档漂移]**：`evolution-review/README.md` 补 **Review delivery contract** 节（两通道在 `turn/end completed` 时执行、中途零执行；`reviewMode` 显式 inject 的「立即注入契约 0.3.39 已取代」；`skillReviewTrigger` 默认 'cadence' 与 'both' 的双结尾注入警示；`reviewWakeInject` 默认 true + followup 唤醒 + 无 followup 降级 + 唤醒轮 fire 一次抑制；计数窗口「注入→注入」（resetOnFire:false + flush 清零）；完成轮 `?? kind` 兜底；通知与 prompt 同通道；清零持久化失败一次性 warn）；CHANGELOG 0.3.38 条目「显式 inject 保留立即注入契约」句加 **superseded by 0.3.39** 标注。
+- **V7-06 [P2·文档三方不一致]**：英文 README「Layered install」节补 `/evolution preset install` 一次性步骤（写 `.agent-presets/evolution/`——走 `dsh plugin add` 发布链的部署者此前按英文文档装完 host 却无预设；对齐 zh README 三处口径）。
+- **V7-17 [P3]**：三份 INSTALL（根 + packages/ + dev 树）六处 `packages/evolution/scripts/install-layered.mjs` 修正为 **`packages/scripts/install-layered.mjs`**（平铺镜像的实际路径——照抄原路径必 ENOENT）；README 双布局节补同规则说明（安装命令路径随布局而变）。
+- **V7-07 [P3·声明失实 → 补实现]**：tool-memory 的 `operations: []` 现**前置拒绝**（approval 门之前，`ok:false`「No operations provided」）——0.3.37 V6-25 声明「空 operations 的 approval 前置拒绝在 tool-memory 层已有」本不成立（空数组会走 approval 得 "memory 0 ops" 且可 staged、重放无意义），本版把声明变实（**行为**：空批量数组不再进入审批）。
+- **V7-12 [P3·死代码]**：tool-skill-manage 的 clamp 告警移到 `limit()` 调用**之后**（原位置求值恒空数组——warn 永不触发）。**实证加深**：schemastery 对 NaN/0/Infinity **剥键/置 null 且不报错**——经 cordis 加载路径非法值本就到不了 limit——warn 覆盖的是**直构/其它解析器**（防御层定位已在注释与测试中写明——测试锁「非法值永不到达为合法数字」的非负断言形态，防止将来 schema 放宽）。V7-12 报告称「tool-memory 同款先钳后查」不实（tool-memory 无该 warn 机制）——已在测试注释与 release-log 记录。
+- **V7-13 [P3]**：evolution-threat 的 `apply` 注释对齐 V6-05 现状（钳制下限 PATTERN_OVERLAP+1 = 4097，非 G3.1 时代的 at least 1；schema `.min(1)` 同段说明更新）。
+- **V7-19 [P3]**：skill-health `reasons` 文案「above the soft limit」→「**at or above** the soft limit」（`>=` 分支在 == 阈值也触发；既有测试的子串断言兼容）。
+- **测试**：tool-memory 12/12（+V7-07 空数组拒绝 + approval 门零调用断言）；tool-skill-manage 16/16（+V7-12 schema 剥离三输入断言）；skill-health 9/9（文案子串兼容）；review 25/25（README 仅文档，无代码变化）。
+- **回归**：oxlint 0/0；tsc 0（受影响包 --force）；全量（以 CI Linux 为准）。
+
+## 0.3.42 (patch) — v7 批二：V7-03 通知唤醒通道 + V7-04 清零失败留痕（V7-14 核验不修）
+
+**来源**：v7 审计轮第二批（0.3.40 状态机收尾）。
+
+- **V7-03 [P2·行为不一致]**：`trySubagentReview` 成功路径的结果通知（applied / 零落地两处）原为 `agent.inject`（非唤醒）——默认 subagent 部署的成功路径里主会话对审查结果**零感知**（通知 pending 至用户下轮发言），与 0.3.40「任务结束模型立刻开始总结」的决策口径相悖。**修复**：抽出共享唤醒通道 `deliverMessage(agent, text, summary)`（followup 优先 + 唤醒轮 cadence fire 一次旗标 + 无 followup 降级 inject），review prompt 与两条结果通知统一走该通道——subagent 成功路径的通知现在**被唤醒的模型立即感知**（skip 旗标随行，interval=1 不自驱）。completion 通道（task-complete 提示词）保持 inject（其 session 级一次性旗标不同域）。
+- **V7-04 [P2·状态机]**：flush 交付后的计数清零持久化（`saveReviewState`）失败时——交付已发生、latch 已删、磁盘计数仍 ≥ 阈值——stateful 部署下轮会重复交付（无崩溃、审查幂等，纯成本）。**修复**：清零 save 包 try/catch + **一次性 warn per session**（「could not be persisted … a stateful reload may re-deliver」）——留痕供操作者识别重复来源；内存计数已清零（当前进程保持新段）。
+- **V7-14 [P2] 核验结论：不修（判据推翻）**：报告按 0.3.39 语义（fire 即归零）静态推演「已到期的 skill 被覆盖/复位」；0.3.40 的 `resetOnFire:false` 使**先到期域计数持续超标**——后到域到期时 `advanceReview` 必返回 `combined`（涵盖两域），latch 单槽覆盖终被 combined 兜住；「纯 kind 覆盖另一到期 kind」与「单 kind 交付 + 另一域已到期」在持续 due 语义下**不可达**。单槽的「越晚越贴近当前相关性」注释语义（0.3.38）保持。**防过度修复不做结构改动**；未实跑（逻辑推演 + 全部源码实证）。
+- **测试**：V7-03 判别（subagent 成功 → 通知走 followup、inject 零——onFollowup/onInject 分叉断言）；V7-04 判别（fixture `failSaveFrom:2`——交付前 save 成功、交付后清零 save 抛 → 交付 1 次 + warn 文本命中）；review.spec 25/25 + lifecycle/anchored-smoke/persistence-resume 6/6（通知相关既有用例 G4.4/V6-24/V4-21 因 fixture followup 桥接 onInject 保持断言兼容）。
+- **回归**：oxlint 0/0（194 文件）；tsc 0（review --force）；全量（结果以本版 CI Linux 为准）。
+
+## 0.3.41 (patch) — v7 审计轮第一批：V7-01 发布链 P1 + V7-02 审查自激循环（P2）
+
+**来源**：v7 审计报告（`dsh-evolution-mirror-audit-report-v7.md`）核验轮——全部 20 项新发现经主审亲核 + 只读子代理交叉验证**全部属实，0 误判**；本版交付第一批（P1 + 发散性 P2）。
+
+- **V7-01 [P1·发布链修复自身失效]**：V6-48 把 `cmd.exe /c npm` 换成 `npm.cmd` 直启（shell:false）——Node ≥18.20/20.12/22 的 CVE-2024-27980 加固使无 shell 的 `.cmd` spawn 必抛 EINVAL（本机 Node 26 实测复现；同仓 install-layered.mjs:243 注释早已自认「spawn of npm.cmd is blocked on Windows (EINVAL)」——V6-48 未做同仓知识检索）。**修复**：`publish-scoped.mjs` 解析 npm CLI 入口（候选：APPDATA 独立安装 / node.exe 旁 bundnode_modules / Program Files\nodejs——本机三候选均在），用 **node 直启 npm-cli.js**——execFileSync 保持无 shell：tarball 路径含空格不再被重分词（V6-48 的原始动机同时保全）且无 `.cmd` spawn 面；候选全缺则 fail-loud。**实跑取证**：`node npm-cli.js --version`（12.0.2）+ 含空格 cache 路径参数 `npm view` 成功（重分词 canary）+ 旧形态对照 EINVAL。
+- **V7-02 [P2·状态机]**：0.3.40 唤醒式注入在 `interval=1` 下可自激成「审查→新轮→再审查」无界循环——五环节全部源码实证：① 上游 agent.ts:283 把 followup 消息 append 为 `user/message` 无来源过滤；② observeEvent 无条件累计（MEMORY_REVIEW_PROMPT ≈474 字符 ≥ substantiveMinUserChars 默认 200）；③ flush 交付后清零（resetOnFire:false）→ 注入轮从 0 起；④ interval schema/clamp 均允许 1；⑤ 注入轮 completed → `pendingKind = latch ?? kind` 再 flush 再 followup。**修复**：`skipNextCadenceFire` 一次旗标——deliverReview 走 **followup 分支**时 set；下一个 turn/end 的 cadence **fire 抑制一次**（计数照常累计——同轮混入的真实用户内容不丢失；下真实轮正常再触发）；inject 降级/非唤醒路径不 set（无新轮无需抑制）。旗标并入死会话 sweep（P1-10 同款）与 pending 表同域；in-memory（重启清 inbox 队列，循环无法存活）。
+- **测试**：V7-02 判别用例（interval=1 + followup：turn1 真实轮注入恰一次 → turn2 唤醒轮被抑制（无 skip 则二次注入）→ turn3 真实轮再注入——三断言区分循环/抑制/再仲裁）；F-102 适配（subagent abort → fallback 唤醒交付 → 唤醒轮被抑制 → 下一**真实**轮 spawn 成功——单飞复位语义保持，断言补一轮）；review.spec 23/23 + lifecycle/anchored-smoke/persistence-resume 6/6。
+- **回归**：全量 736 中 730+ 绿、失败 6 例全为已知 Windows 负载 flake 族（guard/inject-paths 5s 子进程超时、ENOTEMPTY 临时目录竞态）隔离复跑全绿；oxlint 0/0；tsc 0（review/core --force）。
+
+## 0.3.40 (patch) — V6-27 真 Session 对象修复 + 计数注入时清零 + 唤醒式审查注入（followup）
+
+**用户决策**：① 审查注入改**唤醒式**——`agent.followup`（= next-turn + 唤醒，空闲驱动立即开新轮）替代非唤醒 `inject`（pending 至下一驱动点）：任务结束瞬间大模型立刻开始总结任务；② 计数窗口改为「注入→注入」——阈值命中不再归零（`resetOnFire:false`），flush 注入时清零重计（续聊从新段起点计算）；③ 段内阈值多次命中只注入一次（session 级 latch 保持）。
+
+- **V6-27 【真缺陷修复】approval 平台形状 TypeError**：平台 `user-approval` 的 `overrideOf(session: Session)` 无守卫读 `session.events`（`user-approval` 真实实现 `effectiveApprovalPolicy(session.events)` 即 `undefined.length`——逐字重放实证）；历史传参 `sessionId` 字符串在**启用 approval 的部署上 request() 必崩**（默认 `enabled=false` 使其潜伏）。修复：`ApprovalRequest` 增 `session?: Session`，三调用面（review/approval-precheck？—— 实为 review runApproved/tool-memory/tool-skill-manage）随 `exec.agent.session` 透传**真对象**；`deriveSessionPolicy(sessionId?, session?)` **无 session 对象不再探测**（字符串永不进入 `overrideOf`）；无 session 时配置链 `config.policy ?? 'ask'` 兜底。
+- **【核心】计数窗口 = 注入时刻**：`advanceReview` 增 `resetOnFire?:boolean`（默认 true 保留既有语义；review 传 false 使计数跨阈值单调累计）——阈值命中不再清零；flush 执行注入后 `turnsSinceMemory/turnsSinceSkill=0` 并 `saveReviewState`（续聊从注入点重计，下段不误触发）。完成轮命中（latch 空 + 本轮 fire）经 `pendingKind = latch ?? kind` 兜入 flush（不再像 0.3.39 那样完成轮命中丢失）。
+- **【核心】唤醒式注入**：`deliverReview` 优先 `agent.followup(message)`（平台语义：next-turn + 唤醒；`source:{kind:'plugin',plugin:'dsh-evolution-review'}` 合法唤醒源），无 followup 的宿主降级 `inject`（`reviewWakeInject` 默认 true，显式 false 走 inject）。
+- **平台事实（核验，写入文档口径）**：`send()` 原语按 (target×wakeup) 路由；`agent.followup(msg)`= next-turn+唤醒（**无完成句柄**——message id 标识领取/丢弃事实）；`agent.inject(msg)`= next-step 不唤醒；`agent.steer(msg)`= next-step+唤醒。followup 在 turn/end 后唤醒=新 turn 开始（agent-loop idle 的 followup/steer 先例）。
+- **测试**：V6-27 平台形状桩回归（mock `overrideOf` 逐字节重放真实 shape：读 `session.events` 无守卫 + 调用记录断言 session **对象**传入、无 session 时不探测）；计数/latch stateful 用例（interval=2 全序列：段内 fire×2 零注入 → 完成轮注入恰一次 → 注入后清零（下一段 silent）→ 新段再触发——七轮断言）；`reviewWakeInject` 默认 followup 判别（onFollowup 收到、onInject 零）+ no-followup 降级 inject；既有九条两段流用例 turn1 改段内轮（blocked）+ turn2 完成轮 flush（0.3.40 完成轮命中即注入语义）。
+- **回归**：全量 vitest（735 全绿 731 + 4 已知 Windows 负载 flake 隔离复跑全绿，CI Linux 为准）；oxlint 0/0；包级 tsc 0。
+
+## 0.3.39 (patch) — 审查全通道延迟化 + 默认 trigger 收敛（V6-53 follow-up）
+
+**用户决策**：不仅注入，**子代理执行也在任务完成后进行**（平台机制：`subagents.start` = 唤醒式子代理（立即驱动、立即生成），`agent.inject` = 非唤醒式（pending 至下一驱动点）——0.3.38 只延迟了注入回退，subagent 仍在阈值命中即跑）。且 `'cadence'` 与 `'completion'` 在结尾注入时机重叠 → 默认 `'both'` 无意义。
+
+- **两通道统一延迟（核心）**：cadence 阈值命中 → **只暂存 kind（0 执行：不 spawn、不注入）**；`turn/end` 且 `reason.kind==='completed'`（平台语义：turn 正常完成——`aborted/blocked/error/max-tokens/interrupted` 均不算）时统一执行：
+  - `reviewMode='subagent'`（默认）→ 此时才 `subagents.start` 跑审查（子代理失败 → fallback 在结尾注入——已无更晚边界）；
+  - 显式 `'inject'` → 此时才注入（**原「立即注入」契约被取代**：BOTH 模式都按用户定案在任务完成后执行）。
+  - flush 先于 cadence 暂存块（完成轮本身可能同时是阈值触发轮）。
+- **默认 `skillReviewTrigger='completion'` 无需，改为默认 `'cadence'`**：0.3.38 后 cadence 的延迟执行即「结尾总结」，`'both'` 会在同一边界再注入一次 task-complete 提示词（双注入）；completion 通道保留为显式可选（`'completion'`/`'both'` 部署行为不变）。
+- **平台事实（核验，写入文档口径）**：`TurnEndReasonMap` = `completed / aborted / blocked / error / max-tokens / interrupted`（可合并扩展）；无会话级结束事件——「任务结尾」只能从 turn/end reason 派生；`agent.inject` 为 non-waking（结束瞬间不会自动开新模型轮——总结在**下一驱动点**执行，用户不再回复则保持 pending 不消费）。
+- **计数口径**：cadence 内部计数 `turnsSince*` 阈值即归零（滚动等窗口——每次触发标准与首次相同）；completion 通道的 20 次门槛用会话累计（无重置）；延迟 flush 不叠加 20 门（阈值已证值得审）。
+- **测试**：E-19/E-59c/E-41/F-203/G4.4/V4-21/F-102/V6-24/lifecycle 九条按两段流重写（turn1 暂存零执行 + turn2 flush 执行）+ 默认断言 'both'→'cadence'；新 E-19 变体断言「多个阈值命中 = 一次 flush 执行、单飞行保持」。
+- **回归**：全量 vitest（本机并行已知 Windows 负载 flake 隔离复跑全绿，CI Linux 为准）；oxlint 0/0；包级 tsc 0。
+
+## 0.3.38 (patch) — 审查注入延迟化 + v6 M5 收口挂账清点
+
+**背景（用户报告）**：auto-review 提示词在中途注入打断任务（且注入同时使主对话前缀缓存从该轮起全部失效）。核验发现的真相：**`skillReviewTrigger` 只门控 completion 通道**；中途注入的唯一来源 = cadence 通道在回退路径（子代理不可用/单飞行/失败/子代理无结构化计划）下的立即 `agent.inject`——阈值检测逻辑本身无问题，需要改的是「注入时机」。
+
+- **【核心】cadence 回退延迟注入化**：默认（`reviewMode='subagent'`）下，回退不再立即注入——审查按 session 暂存（`pendingCadenceReviews`，同一 session 最后一次触发覆盖前次——越晚越贴近当前相关性；warn 每 session 一次），**在对话结束（turn/end reason=completed）时注入**；延迟审查经阈值触发已证明值得审，故 flush 不叠加 completion 通道的 20 次调用门（两者并存、各司其职：延迟审查=阈值分析，completion=任务完成专属提示词）。显式 `reviewMode:'inject'` 部署保留原立即注入契约（显式自选不受默认变更影响）——**superseded by 0.3.39**（0.3.39 起两通道均在任务完成后执行，显式 inject 也不立即注入；本句不再准确）。flush 置于 cadence 块**之前**（完成轮本身可能是 cadence 触发轮——置后则永不到达）；暂存表并入死会话 sweep（P1-10 同款）。**效果：默认部署全程零中途注入——打断与主前缀缓存污染同灭；阈值检测与末尾注入并存**（用户设计的「照常触发、延后注入」落地；`skillReviewTrigger` 默认保持 `'both'` 不再需要改）。
+- **验证**：E-59c/E-41/lifecycle 三条原「fallback 立即注入」断言改为「无即时注入+延迟」；新用例 V6-53（子代理失败→turn1 零注入 → turn2 结束时注入且仅一次——stateless 夹具下 interval=1 逐轮触发、flush 前置于 cadence 块的设计被该用例钉住；首次实现 flaky 根因=夹具 state 每轮重建 + flush 位置，均已修正）。
+- **v6 M5 收口**：T.1 余项已在 0.3.37 完成（threats 实计 26、prompts 标题 v14、V5-03 mtime 回归）；**审计挂账清点（按「不修申报项」口径维持，防口径漂移）**：F-328（完整 hash）、G4.8/N-2（上游平台议题）、F-309/310/311/354（脚本层申报）、capability 接线声明——全部维持挂账，不在修复范围。
+- **回归**：全量 vitest（本机并行已知 Windows 负载 flake 隔离复跑全绿，CI Linux 为准）；oxlint 0/0；包级 tsc 0。
+
+## 0.3.37 (patch) — v6 审计 M4：契约对齐与发布卫生（V6-16~52 大项 + T.1 余项）
+
+v6 审计（0.3.33 全量复审轮）M4 里程碑（最后一批实质项；M5 收口随本版）；每项先核验属实再修。**行为/契约变更声明**：V6-26（缺省 action 归一为显式 patch）、V6-27（部署级 `config.policy='never'` 在 request() 内生效——此前静默 staged 堆积）、V6-25（enum 外 action fail-loud——此前静默按 replace 执行）、V6-45（发布包移除失效 `./src/*` 导出子路径——全仓零消费已证）。
+
+- **V6-16 [P3]**：MemoryStore 补进程内 serial 队列（SkillLibrary 同款）——无 transact 自定义后端上的同进程并发 RMW 裸 read→write 丢更新；add/applyBatch 走队列链（node 后端跨进程锁不变）。
+- **V6-17 [P3]**：patch 的 fuzzy 扫描 O(n·m) 无输入上限（实测 20k×20k 6.1s 阻塞事件循环）→ 非精确锚超预算（>4096 字符或 n·m > 8M）显式拒绝「too large for fuzzy match」；精确命中走快路径仍放行。
+- **V6-19 [P3]**：runSingleWrite 对 transact 契约违规（task 未被调用）返回结构化错误（原无条件解引用 TypeError）；带「write 字段」形状守卫。
+- **V6-20 [P3]**：parseUsage 顶层 Array 拒绝（原 `Object.entries([…])` 产生 "0"/"1" 幻影技能记录并被 RMW 持久化）——与其他入口的 shape 防御补齐。
+- **V6-21 [P3]**：signals 的 assistant/message 分支补 content 数组守卫（E-49 只修了 user 半边；malformed assistant content 曾 TypeError 且被 review catch 吞掉整个 turn 的信号）。
+- **V6-25 [P3]**：applyBatchCore 对 enum 外 action（'Add'/'upsert' 等）显式 fail-loud（原带 old_text 时**静默按 replace 执行**且 ok:true——语义漂移）；空 operations 的 approval 前置拒绝在 tool-memory 层已有（applyBatch 自身早已返回 ok:false）。**行为契约变更**。
+- **V6-26 [P3]**：缺省 action 归一——plan-validator 接受的 skill op 一律带显式 action（缺省 → 'patch'）；review 的 filterUnreadSkillOps 删除 `!== undefined` 前置条件（缺省 action 的未读技能不再靠下游"Unknown skill action"兜底逃过滤网）。**行为契约变更**。
+- **V6-27 [P3]**：approval 的 deriveSessionPolicy 补有效取值链 `overrideOf ?? config.policy ?? 'ask'`（与导出的 effectiveSessionPolicy 同口径——部署级 `policy:'never'` + 无会话 override 时写不再被 staged 堆积，方向 fail-closed 不变）。**行为契约变更**。
+- **V6-43 [P3]**：skill-usage 的 `session/event` 监听器改 `ctx.effect` 登记（家族 tool-memory/skill-catalog 惯用——插件卸载/重装不再残留无主观察者；HMR 归属测试钉住）。
+- **V6-44 [P3]**：`invalidate()` 与 `MemoryRegistry.snapshot()` 标注 test-support API（无生产消费方，按声明保留）。
+- **V6-45 [P3]**：30 包 package.json 移除 `"./src/*"` 导出（发布产物无 src——该子路径必然 404；全仓零 `@deepseek-ai/dsh-evolution-*/src/` 导入已 grep 实证）。**行为契约变更（发布面收紧）**。
+- **V6-46 [P3]**：verify-event-pairing 的 EMIT_RE 同步 `\w*[Cc]tx`（V5-01 只修了 ON 侧——ioCtx.emit 形态生产者对守卫自身盲区；哨兵用例新增 ioCtx.emit 负例）。
+- **V6-47 [P3]**：normalize-mirror 无 `## x.y.z` 标题时 **fail-loud exit 1**（原安全回退 '0.1.0-rc.1' 会把 31 个 manifest 版本全部降级改写——一次格式漂移即版本回退事故）。
+- **V6-48 [P3]**：publish-scoped Windows 分支弃 `cmd.exe /c`（重新分词——含空格的绝对路径被斩断）改 `npm.cmd` shell:false（仅本地手动 publish 路径）。
+- **V6-49 [P3]**：install-layered 的 install() 安装前检查同 profile 已有另一 bundle（host ⇄ preset 互斥）→ fail-loud（文档警告不是 enforcement——工具自身曾能把文档化事故变成现实）；`DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` 不豁免（互斥是安装面语义）；dry-run 不查（幻影 profile 无真实状态）。
+- **V6-50 [P3]**：prepare-release 未用 spawnSync 导入删除；install-layered `=== prefix` 被 startsWith 覆盖的冗余分支删除。
+- **V6-51 [P3]**：install-layered Windows APPDATA 未设时跳过该候选根（原 `join('', …)` 得 CWD 相对路径进入 existsSync 探测）。
+- **V6-52 [P3]**：agent.cordis.yml 头注释「agent/layered/oneclick modes」→ 实际两模式（oneclick 装 preset bundle 行不写该文件）；evolution-all 注释补第 5 项依赖（evolution-agent-preset）。
+- **V6-22/30/31/32 [P3]（state-json 残余边界）**：appendArchive 折叠发生且无新增时也落盘（磁盘残留自愈）；enforceResolvedCap 逐出按 **entry 键集**（同 id 双 entry 不再过逐出/漏归档——每条逐出必对应归档）；readArchivedIds 并入 `.bak` 键集（轮转后的旧 id 仍是幽灵排除依据）；jsonTransact 注释与 transact-guard/transact.spec 用例名「null = keep」→「null = ensure-absent」（文件存在即删除——与 seam 行为一致；provider 状态层 null=keep 语义不变，两层注释已区分）。
+- **V6-33 [P3]**：state-domain 的 claim/tryResolve 返回值浅拷贝（json provider 副本口径——调用方就地修改不再无声明污染 domain 内存 map）。
+- **V6-34/37 [P3]（口径小项）**：skill-health softBodyChars 注释对齐实现（>= 即 warn）；saveUsage 补 doc-comment「whole-file write，绕过 malformed 防御与 transact——prefer mutateUsage」（生产引用 0，保留为测试播种）。
+- **T.1 余项**：threats.spec 注释「28 patterns」→ 实计 26；prompts.spec 用例标题 v13 → v14（PROMPT_BUNDLE_VERSION 0.3.30 已升）；io.spec 补 V5-03 noop 短路直接回归（stat mtime 不变断言）。
+- **回归**：全量 vitest（本机并行下已知 Windows 负载 flake 隔离复跑全绿；CI Linux 为准）；oxlint 0/0（194 文件，首跑 3 差全为我改动区的 no-unnecessary-condition——按「unknown 先守卫」手法修正）；包级 tsc 0；mjs `node --check` 全过。
+
+## 0.3.36 (patch) — v6 审计 M3：观测与治理精度（V6-10/15/23/24/28/29/35/36/38/41/42/08/09）
+
+v6 审计（0.3.33 全量复审轮）M3 里程碑；每项先核验属实再修（全部 12 项经源码复读确认——其中 V4-26 的「字段内嵌独立 Notes: 行」为残余真实缺陷、V6-09 的 `.catch(()=>[])` 与 V5-20「不再静默」声明相抵）。
+
+- **V6-10 [P3] 失败可观测闭环（activity/replay）**：V5-19① 的事件维度是「半接线」——`EvolutionActivityRecord` 折叠白名单与 `ReplayPlan`/`record()` 都丢弃 `executionFailures`/`executionError`，全执行失败的 plan 在持久观测与 replay 记分中呈现为「0/0 干净空计划」。修复：activity 记录/折叠保留两字段（旧 sidecar 缺字段按缺失读取）；replay 入 record、记分板报表追加 `N failed(: 原因)`（历史/测试构造的 plan 无该字段按 0 显示——可选字段兼容）。
+- **V6-15 [P3] writeSupportFile noop 纪律**：对同一支持文件重复写相同内容时 IO 层被 V5-03 物理短路，但 audit、mutation event 与 tool 侧 patch_count 照涨（update/patch/memory-add 的同根收敛漏了 write_file）。修复：`writeSupportFileCore` 字节等同（trimEnd 归一，update 同款判定）→ `noop: true, write: null`——`runSingleWrite` 既有 write:null 语义自动跳过 audit/event；tool-skill-manage 既有 `result.noop !== true` 门自动不计数。
+- **V6-23 [P3] onTurnEnd catch 内 review-error 裸奔**：turn-end 失败路径的 `ctx.emit('evolution/review-error')` 无保护域（cordis emit 同步直呼监听器——抛错监听器变 unhandledRejection，V5-19③ 同类漏网）；与 trySubagentReview 内已保护的 emit 对齐：包 try/catch + warn。
+- **V6-24 [P3] 零落地计划对模型零反馈**：`if (actions.length > 0)` 门使全部 op 被 stage/拒绝/吞跳的 plan 无任何 inject——「部分失败有通知、全失败无反馈」不对称。修复：零落地也 inject「0 ops landed + 原因摘要（validation 拒绝数 / 未读跳过数 / 执行失败数+细节 / abort）/ 500 字符预算」，与已落地通知同通道。
+- **V6-28 [P3] atomicWriteFiles commit 段 rmSync 裸露**：rename 与 unlink 常同因 EPERM/EBUSY 双败——rm 抛错穿透外层 catch，`already committed` 披露链整条丢失（node 实测 T4: discloses? false）。修复：rmSync 包 try/catch，失败消息携带 `already committed: ...` 披露（部分安装对操作者可见）。
+- **V6-29 [P3] maintain timeout 缺域上界**：`--timeout 5000000000` 超 `AbortSignal.timeout` 上限（2^32-1）同步 RangeError，被外层 catch 转译不崩溃但校验缺域。修复：命令门 + `runMaintain` 双处校验（≤ 4294967295，显式拒绝消息）。
+- **V6-35 [P3] lenient 提名解析器两处静默语义丢失**：`mode:` 出现在 `into:`（或 from）之后被静默丢弃（demote 降级为 append）与 `- name:` 在 consolidations 段内使 section 翻转为 prunings（名变归档提名）。修复：`CuratorNominations` 增 `warnings`（解析器**补 YAML 段标题行跟踪**以区分「prunings 段正常首行」与「真错位」——首次实现曾误告警 canonical 形状，自测抓出）；warning 流经 recommend → run report 新字段 `nominationsWarnings`（build/render 同步），归因对操作者可见、解析保持 lenient。
+- **V6-36 [P3] computeScopeView 漏 builtin 桶**：`PROTECTED_BUILTIN_SKILLS`（'plan'）命中被共享门挡下却不在 exempted/protected/managed 任何桶——视图少一个解释维度、「视图总能预测 curator 可触碰」承诺破口。修复：builtin 归 protected 桶；`/evolution curator scope` 标签补 `/ builtin`。
+- **V6-38 [P3] 字段内嵌独立 Notes: 行仍截断**：V4-26 的 standalone-header 匹配对「finding 值自带 `\nNotes:\n`」仍提前截断（node 实测 2 条建议计 1）。修复：`formatPlan` 渲染前对 finding/recommendation **字段值预处理**（内嵌独立 `Notes:` 行改写为 `> Notes: (inside the field above)`）——渲染层不可能再把它当段头。
+- **V6-41 [P3] mutations/curator report 无防崩加固**：`curator status` 有显式姿态而这两处无——形状受损的审计/报告文件让命令抛未捕获 TypeError。修复：raw 数据先降 unknown 再形状守卫（Array.isArray / typeof 校验，损坏行丢弃或「Report file unreadable.」）；**注**：守卫直接写类型化数组上会触发 oxlint no-unnecessary-condition（声明类型已非空）——先 `const records: unknown = ...` 是正确形态。
+- **V6-42 [P3] atomicWriteFiles 重复 name 自我指涉**：第二次 rename ENOENT → rm 掉刚提交的新文件 → 从 .bak 恢复旧内容、报错自我指涉。修复：入口唯一性校验 fail-loud（`duplicate input names: ...`）。
+- **V6-08 [P3] stamp 探针前缀匹配兄弟技能假阳性**：`.archive` 枚举 `entry.startsWith(\`${name}-\`)` 命中 bundled 兄弟（`foo-bar-<stamp>`）→ 崩溃归档的非 bundled `foo` 被假阳性 suppression（日后同名重建静默脱离生命周期门）。修复：按 skill-store 归档命名的**精确形态**匹配（`^<name>-\d{14}(-[0-9a-z]{1,6})?$`——名称字符集保证锚点无需转义）+ 命中后 frontmatter 名称复核（E-3 先例；**SKILL.md 缺失时不复核**——崩溃态 marker 保持为信号，缺失正文不得反向漏 suppression，delta 复核发现的收紧）。
+- **V6-09 [P3] `.archive` 枚举失败仍静默**：`.catch(() => [])` 把失败降级为「非 bundled」（与 V5-20「probe 失败 warn 不再静默」声明相抵，exists 抛错有 warn、list 抛错没有）。修复：去掉内联 catch，让失败流入外层 probe catch 统一 warn。
+- **回归**：全量 vitest **717**（+12 新用例：V6-10×2 / V6-15 / V6-23 / V6-24 / V6-28 / V6-29×1 命令门+orchestrate / V6-35 / V6-36 / V6-38×2 / V6-41 / V6-42；curator.spec 两处 recommend 断言补 warnings）；oxlint 0/0（194 文件）；包级 tsc 0；本机并行下 5 例已知 Windows 负载 flake（guard 5s 超时 / ENOTEMPTY×3 / 32-way 预算边缘）隔离复跑全绿——以 CI Linux 为准。
+
+## 0.3.35 (patch) — v6 审计 M2：并发自愈与配置防御（V6-04/05/06/18/39/40）
+
+v6 审计（0.3.33 全量复审轮）M2 里程碑；每项先核验属实再修（全部 6 项均经源码复读确认：V6-04/18 的「空体锁/票永久锁死」、V6-05 的扫描窗口悬崖为确定性缺陷，V6-06/39/40 为配置/口径穿透）。
+
+- **V6-04 [P2] 空体锁/空体票的永久锁死闭环**：
+  - 建锁路径改为显式 `open('wx')` + 独立写体——**仅当本轮创建成功打开过文件**（`lockHandle` 非空）时，写/关闭阶段的失败先关闭并 `rm` 自身残留再 throw（O_EXCL 保证该文件属于本轮；此前 `writeFile('wx')` 在打开后的失败会留下 0 字节/半体锁，其体永不通过 pid 探针 → 接管永不触发 → 该路径所有后续写者 40 次预算耗尽后永久 fail-loud）。
+  - 接管条件扩展「**空体死锁**」（创建者死于 open 与写体之间）——空体无 pid 可探测，仅在 mtime > 1s（与接管阈值同值）时按死锁接管：在途创建者写体紧跟 open，>1s 无体即已死/挂起；1s 门防误删并行创建中的活锁。接管仍走单一执行门（`current === holderContent` 重读 + 票协议，BOTH 形态共用）。
+  - 空体 `.next` 票回收——`:290` 的 `ticketBody !== ''` 门放宽为「体非空走旧票规则 ∪ 空体且 mtime > 1s」：空体票此前永不被回收（空体 → pid 解析 0 → 旧「stale 且非空」门恒假）→ `writeFile(ticket,'wx')` 永远 EEXIST → 每次接管 40 次预算耗尽。**评审补强**：票错回收代价=接管者重试一轮；票无持有权（与「锁体 mtime 启发式」被 V4-05 证伪的本质区别——票回收不产生第二持有者）。
+- **V6-18 [P3] sweep 覆盖接管票残留**：`sweepStaleTmps` 的匹配集合从仅 `.tmp` 扩展为「`.tmp` + `<base>.lock.next`」；`<base>.lock` 明确跳过（sweep 运行于已持锁内部——该文件即本轮活锁，匹配=自杀）。票回收语义与逐次接管路径一致（死 pid 或 >1s 旧票；空体仅按年龄回收）。崩溃接管者留下的票此前只靠「下一次接管」顺带清，无人撮合则永存。
+- **V6-05 [P2] threats 扫描窗口下限与步长回退**：
+  - `clampedNumber` 下限从 `{min:1}` 提为 `PATTERN_OVERLAP + 1`（4097）——0.3.16 的「不成文约束」显式化；小于下界的值回退默认 65_536。
+  - `step` 改为**比例步长** `Math.max(Math.floor(windowSize/2), 1)`；任意合法窗口值下重叠 = `ceil(w/2)` ≥ 2049 > 最长模式跨窗 span（~530 字符，E-12 覆盖注记同步），全文本覆盖保证不变；扫描代价 O(n×2) 而非 O(n×w)（旧式 w≤4096 时 step 塌缩为 1——108KB 文本 4096 窗口实测 **5829ms**，修复后回落到个位毫秒）。
+  - evolution-threat：schema `.min(PATTERN_OVERLAP + 1)` + `resolveMaxScanChars` 同步下限；README 声明合法区间（`z.number()` 仍放行 NaN/±Infinity，由装配钳制兜底）。
+- **V6-06 [P2] 数值配置全部接入 clampedNumber 管道**：tool-skill-manage 的 maxSkillNameLength/maxDescriptionLength/maxSkillContentChars/maxSkillFileBytes 与 tool-memory 的 entryPreviewChars 从 `?? default` 改为装配期 `clampedNumber(…, {min:1})` + 一次性 warn（G3.1 同款——NaN/±Infinity 穿透 bare number schema 后 `limit > NaN` 恒假 → 沉默解除限长防线；entryPreviewChars NaN → `slice(0, NaN)` 空预览且 `slice(0,负)` 语义反转）。schemastery `.min(1)` 保留为装载期第一道；合法值行为零变化。
+- **V6-39 [P3] feedback path 空白串穿透**：`rawConfig.path || undefined` 把 truthy 的 `'   '` 当路径（写 CWD 相对空白文件名）→ `(rawConfig.path ?? '').trim() || undefined`（V5-11 同式）。
+- **V6-40 [P3] feedback 移除 qualityWired 一次性旗标**：`ctx.inject(['skillUsage'])` 在依赖被**替换**时重跑回调（cordis fiber 源码实证：epoch 按依赖 `impl.fiber.uid` 计算，提供方 fiber 变更即重装）——旗标使重挂后的新实例得不到接线（推送持续进入已卸载实例的闭包）。移除后每次重跑重包 `feedback.record`/`onRollback`（`baseRecord` 绑定位置保证幂等——重包是赋值替换、不叠加）。
+- **回归**：全量 vitest **701/701**（+10：io 空体锁自愈/空体票回收/sweep 票回收与保留 ×4、threats 覆盖下限与性能 ×2、skill-manage NaN、tool-memory NaN、feedback 重挂接线/path trim ×2；threat-guard 矩阵更新）；oxlint 0/0（194 文件）；tsc 0；32-way 票压测 ×3 稳定 0 丢；本机并行下 2 例已知 Windows 负载 flake（guard 脚本 5s 超时、ENOTEMPTY 清理竞态）隔离复跑全绿——以 CI Linux 为准。
+
+## 0.3.34 (patch) — v6 审计 M1：数据与安装正确性（V6-01/02/03/07 + V5-23 用例）
+
+v6 审计（0.3.33 全量复审轮）M1 里程碑；每项先核验属实再修（V6-01/02 均为 v6 报告的确定性/高置信发现，主审复读确认）。
+
+- **V6-01 [P1] 退休过滤被四条写路径绕过——根除**：savePending/claimPending/releasePendingClaim/tryResolvePending 的内层 legacy 合并此前**不带归档排除**——升级后首个状态操作若是 mutation（review staging 先于任何 list、操作员直接 `/approve`），归档集中的幽灵 pending 双胞胎会被写进活 map 并**永久化**（此后退休的 `id in current` 跳过使其不可再剔除）→ 可 claim → 重放数月前 staged args（V5-02 宣称根除的危害经修复自身写路径重新可达）。修复：提取**单源** `mergedWithFilteredLegacy`（`readArchivedIds` 缓存一次 + `filterLegacy` 双排除——与退休读路径同一逻辑），四路 mutation 全部改走该 merge；注释「merge result is identical anyway」随之删除（过滤存在后该叙述不成立）。
+- **V6-02 [P2] 退休 transact 锁内参数**：`retireLegacyOnce` 的合并任务改用 `(fresh) => ({ ...retired, ...(fresh ?? {}) })`——此前零参闭包捕获锁外快照，跨进程并发写（进程 A 在 B 的退休窗口落盘 staged/approved）会被陈旧快照整文件覆盖（Y 消失 or X 从 approved 回退 pending → 可再 claim）。current-wins 语义不变、retired 仅补缺。
+- **收敛记录**：V6-01 的「mutation 先于 list」场景同时是 0.3.29 V5-02 修复的真实遗漏——本批以确定性用例钉死（savePending 先行 → current 无幽灵 + claim null）；V6-02 依赖跨进程并发（单进程用例不可构造），以锁内参数语义 + 代码评审在案。
+- **V6-03 [P1] 安装文档**：INSTALL.md §5 删除「手工拷贝 `evolution-agent/` 到 `.agent-presets/evolution/`」指引——该文件是 DELTA-only（4 个模型工具行），上游 agent-presets discovery 把发现的 `agent.cordis.yml` 当**完整装配**原样挂载（无 standard 合并）——按文档操作的生产会话只挂 4 行、丢失 standard 全部行。改为「装配经 install-layered 或 `dsh plugin add` 生成；手工路径仅允许拷贝 standard+delta 合成产物」。
+- **V6-07 [P2] 中文文档**：README.zh.md 的 review 子代理允许列表仍写 `skill、skill_search、skill_load`（英文面 0.3.28/0.3.32 已修、中文漏改——V5-24/25 的镜像文档）→ 改为 `skill`（DSH 平台目录只存在 plain `skill`）。
+- **T.1(1) 判别力用例 + 实现修正**：V5-23（0.3.32）首次补专项用例时发现实现缺陷——**精确拼写（`Foo`）也被歧义误拒**（lowercase 后命中歧义键）→ 修正：`spellingsByName` 按拼写集合判定——精确拼写恒合法、单拼写保留 canonical 归一、多拼写键的非精确形式才 fail-loud「use the exact spelling」（用例：`FOO` 拒绝、`Foo` 通过）。
+- **回归**：全量 vitest **690/690**（+2：V6-01 用例子集 + V5-23 双用例）；oxlint 0/0；tsc 0。
+
+## 0.3.33 (patch) — v5 审计补修：归档既有重复清理（V5-07 残余）
+
+v5 审计 0.3.32 收口后的**复核轮**（逐项检查「已修项是否真实到位」）；发现并补修唯一真实遗留。
+
+- **V5-07 残余补修**：0.3.32 收口时 V5-07 按「随 V5-02 legacy 退休收敛」登记——但复核查证：**档案内「既有重复条目」**（去重键引入前的历史重复，`id+status+resolvedAt` 相同）仍占用 5000 cap 且永不清理 → appendArchive 加载时按去重键**折叠重复**（首见保留，best-effort；`.bak` 可能仍含，审计允许落后）；新增「collapses historical duplicates」回归用例。
+- **复核轮三档结论**（详见 release-log）：v5 全部 35 项——已修复 34 · 非缺陷/以核验销案 1（V4-38 口径争议——家族无 CONTRIBUTING 文件，口径以 v4/v5 核验结论记录为准）· 0.3.32 真遗留 1（V5-07，本轮补修）；残余记录（V5-04 的 `.takeover-*` 已被 0.3.29 ticket 协议淘汰；V5-08 的「不重写」已由 V5-03 短路实现）。
+- **回归**：全量 vitest **689/689**（+1）；oxlint 0/0；tsc 0。
+
+## 0.3.32 (patch) — v5 审计批 4（收口）：口径/文档与残余窗口（V5-06/11/12/20/23/24/25/27/31/35）
+
+v5 审计（0.3.28 修复核验轮）批次 4（口径/文档失实 + 残余窗口），v5 审计**收口版**；每项先核验属实再修。
+
+- **V5-06**：memory-store 批量 threat 拒绝（add/replace 两条）补齐 `current-entries` 预览——与同函数其余全部失败路径一致（V4-49 消息统一收尾）。
+- **V5-11**：memory-files 的 whitespace-only `root` 穿透（`config.root ?` 不 trim → CWD 相对根）——V4-09 同类第三处（state-json/maintenance 已修）→ trim 后与空串同落地默认根。
+- **V5-12**：state-json README 并发声明与实现相反（「cross-process locking is a storage-layer limitation」——本 provider 每次变更都走 transactIo 跨进程锁）→ 声明改为「进程内 + IO 后端跨进程锁」如实；「storage-json 无跨进程锁」的 caveat 限定到 domain provider（storage 侧原意保留）。
+- **V5-20**：curator 的 bundled marker 探针只查 `.archive/<name>/.bundled`——同名二次归档的 **`<name>-<stamp>[-rand]`** 目的地不识别（bundled 性在两次归档间变化时结论错向；exists 抛错被 `.catch(()=>false)` 静默降级为「非 bundled」→ suppression 不落盘）→ 双形态探针 + probe 失败 warn（不再静默）。
+- **V5-23**：validate-plan 的 canonical 归一在 facts 含**仅大小写不同的双名**时 last-wins 塌缩（`Foo`/`foo` 同存时重锚到另一真实技能）→ 歧义键显式 fail-loud（「use the exact spelling」），不再重锚。
+- **V5-24**：preset 三处矛盾——①standalone「mount twice」论据改为如实（60-char cap override 由 host 提供、preset 用平台默认；host/preset 互斥不得同装——共享行如 maintenance-tools/session-query 由各自载体自己持有）；②standalone review 行补 `reviewToolAllow: [skill]`（与 overlay/host 字节一致，消除三形态行为差）；③README 的「relies on the base host for the two overrides」改写为逐项事实（preset 自持 session-query override、60-char cap preset-alone 用平台默认并附自行添加指引）。
+- **V5-25**：INSTALL.md 的 `reviewToolAllow: [skill, skill_search, skill_load, read]` 示例列平台不存在的 skill_search/skill_load（与 0.3.18 幻影清扫相抵）→ `[skill]` + 注释。
+- **V5-27**：threats.ts 注释「All in-repo call sites pass the default」失实（threat 包下传配置派生值）→ 「callers pass valid/clamped values；钳制是第三方调用的保证」。
+- **V5-31**：tool-memory 的 `dsh-memory-files` 声明在 peerDependencies 但 src 零 import（仅 3 个 spec 使用）→ 从 peer 删除（测试归属已在 devDependencies）——闭合守卫抓不到的「反向虚增」。
+- **V5-35**：core README 并发模型段更新——0.3.27 起构造**默认绑定**后端 transact（update/patch/writeSupportFile/restructure 逐文件入跨进程锁——「current default callers 未注入」叙事过时）；两阶段路径（create 双探针/archive-consolidate rename/restructure 多文件半应用树）如实声明为**文档化残留**而非锁定；顺带修 archive 复制回退的裸 ENOENT（并发归档败者/源消失 → ok:false 如实消息，技能留在原地）。
+- **回归**：全量 vitest **688/688**；oxlint 0/0；tsc 0。
+- **v5 审计闭环声明**：V5-01~V6 全部批次（1 并发数据完整性 / 2 守卫验证盲区 / 3 失败可观测性 / 4 口径文档）落地（V5-04 已被 0.3.29 的 ticket 协议淘汰；V5-05/07/26 经修复收敛）；剩余挂账同 v5 §5（平台议题 G4.8/N-2、F-328 申报、F-309/310/311/354、capability 接线声明）。
+
+## 0.3.31 (patch) — v5 审计批 3：失败可观测性与发布链卫生（V5-13/14/17/18/19/29/32/33）
+
+v5 审计（0.3.28 修复核验轮）批次 3（失败可观测性 + 发布链卫生）；每项先核验属实再修。
+
+- **V5-19 执行失败可观测性（review 三缺口）**：① `plan-applied` payload 新增 `executionFailures`/`executionError` 维度（`rejectedOps` 只计校验拒绝——消费方不再把执行层失败当成「没有工作发生」；abort 或首个非 throw 失败都会命名）；② `executePlan` 记录每个非 throw 失败（`failedOps`）——任何失败都发 operator warn，**全部落空时更是显式断言**（旧代码零落地完全静默）；③ `plan-applied` 与 `review-error` emit 均移入保护域——同步抛错的监听器不再经外层 catch 把 `started` 翻 false 触发重复注入（V4-21① 封闭形态的换位复发，达性低但同类）。
+- **V5-17 多文件部分提交披露**：atomicWriteFiles 的 commit 中途失败现在披露「已落盘文件清单」（`already committed: a, b`——旧代码只报失败文件，调用方把部分安装当「没发生」）；收尾 `.bak` 刷新循环 best-effort per-file（失败 console.warn、**不再把成功安装报成失败、不再中途劈开 bak 对**）。
+- **V5-18 approve 归因诚实化**：executing 分支消息改为「并发在途/崩溃后遗留」双归因 + 明确「非你发起的 approve 不要 reject」（旧文案只怪崩溃并指引 reject——跨进程并发时后到者会被误导杀掉在途 approve；reject 侧早有诚实口径，现两侧对齐）。
+- **V5-29 feedback 回滚回推**：失败 append 回滚内存计数/note 后，新 `onRollback` 钩子触发——apply 层用它重推 `skillUsage.setQuality`（旧行为：按 rollback 前乐观值推给 usage，usage 侧长期持有从未落盘的分数/quality_warn）。
+- **V5-32 warn once 闸**：append 失败 warn 按**失败原因**去重（version-mismatch 类持续拒绝不再随每条 feedback 刷屏——消息含 target 会规避简单去重，故按 cause 键）；家族「进程级一次」模式对齐。
+- **V5-33 policy 字符串面 warn**：非法 `reviewMode` 静默落 `'subagent'` 无 warn（数值字段钳制必 warn——字符串面不对称）→ 加入 clamped 列表、走同一条一次性 fallback warn。
+- **V5-13/14 发布链卫生**：`atomicSwap` 重跑恢复——中断态（target 缺失、`.previous`=唯一 good copy）在重跑首句被无条件删除的窗口闭合（恢复 `.previous`→target 再走换入）；`.gitignore` 补 `dist.previous/.next`、`.release-staging.previous/.next` 规则（中断残留不再被 `git add -A` 误提交，`git check-ignore` 实测）。
+- **回归**：全量 vitest **688/688**（+3：V5-17 部分披露 / V5-29 onRollback / V5-33 reviewMode warn；V5-18/19/32 断言扩展）；oxlint 0/0（194 文件）；tsc 0；mjs --check 过。
+
+## 0.3.30 (patch) — v5 审计批 2：守卫与验证盲区（V5-01/05/15/16/21/22/26/28/30）
+
+v5 审计（0.3.28 修复核验轮）批次 2（守卫/门禁自身与测试精度）；每项先核验属实再修。
+
+- **V5-01 守卫失明根治**：event-pairing 的 `\w*ctx\.on\(` 大小写敏感——ioCtx/commandCtx/approvalCtx/toolCtx 全不匹配（v5 三项 node 实测复现；旧的「0 orphan」报告纯靠 replay 裸 `ctx.on` 兜底）→ 正则改 `\w*[Cc]tx` + 注释如实；**修复后实跑 6 emitted/4 listened/0 orphan/0 dangling——本次 0 orphan 是真实的**（activity 的 ioCtx 消费被计数、与 replay 冗余监听解耦）。
+- **V5-15 真空/孤儿 strict 化**：event-pairing 新增 `--strict`（真空扫描 exit 1、orphan/dangling exit 1——与 arch-guards 口径一致）；action.yml 的 CI 调用补 `--strict`；非 strict 保持 WARN 报告形态（README 声明 EXEMPT 语义不变）。
+- **V5-16 哨兵补盲**：guard-scripts.spec 新增「emit + `ioCtx.on` → 0 orphan」用例（正是 V5-01 漏网形态——门禁必须覆盖门禁）。
+- **V5-26 计数与注释**：CHANGELOG 0.3.28 的「12 包」修正为「13 包」（git stat 实证，state-storage 含入）；verify-arch-guards 与 verify-event-pairing 头注释 Usage 改双布局说明（dev `packages/evolution/scripts/…` / 镜像 `packages/scripts/…`，按字面执行不再失败）。
+- **V5-05 prompt 版本履约**：`PROMPT_BUNDLE_VERSION` 13→14（0.3.28 V4-39 语义性修改了 SKILL_REVIEW/COMBINED 文案但未按自订契约升版——混布部署版本层不可区分）；prompts.spec 断言同步。
+- **V5-21 F-331 bundled 断言**：curator.spec 的 F-331 用例此前只造 pinned（标题写 pinned/bundled）——补树内 `.bundled` marker 技能 + 「LLM 提名不含 bundled」断言。
+- **V5-22 最老淘汰钉死 + 防御对称**：V4-22 用例 seed 报告 mtime 拉开（同秒并列时淘汰对象原本不确定）→ 断言「最老 15 个 error 被淘汰、最新 10 个保留」；curator autoCheck catch 内的 `retainReports()` 补 try/catch（恢复路径唯一裸露调用点——provider 畸形输出的 unhandled rejection 消除，与持久化防御姿势一致）。
+- **V5-28 durableNote 主分支用例**：V4-41 此前只测双失败（durable=undefined）——补「note-A 落盘成功 → 事件日志升版 → note-B 失败 → 还原为 note-A（最后已确认）且失败计数回滚」。
+- **V5-30 死轮询修正**：activity-store.spec 的 `pollUntil(root,'plan-2')` 永不匹配（emit p1/p2/p3、稳态只剩 p2/p3）——每跑烧满 8s deadline——改 poll 'plan-3'。
+- **回归**：全量 vitest **685/685**（+1）；oxlint 0/0；tsc core/curator/host 0；三守卫 strict 全过（closure 30 包 OK / arch strict 0——N4 71 warn-only 保持，+2 为票协议解析的合法 `?? ''` 兜底启发式误报类 / pairing 0 orphan + 真空 exit 1 实测）；mjs --check 过。
+
+## 0.3.29 (patch) — v5 审计批 1：并发与数据完整性（V4-04 残余根治 + V5-02/03/07/08/09/10）
+
+v5 审计（0.3.28 修复核验轮）批次 1（并发与数据完整性）；每项先核验属实再修。**方法论备注**：V4-04 在 v5 中被判「FIXED-VERIFIED」（静态推演不变量 + 6 路用例），但本批以运行压力实跑推翻——**6 路 0 复现、8 路 25% 丢、32 路 94% 丢**（writeFile open→write 空窗锁 + 探测→rename TOCTOU 双持级联）——并发类结论必须以「比生产最坏更坏的压力」验证为准（6 路 0 复现≠无缺陷）。
+
+- **V4-04 残余根治（ticket 预占票接管制）**：接管从「rename 移走死锁」改为 **`<lock>.next` 预占票（O_EXCL 独占）**——同一时刻只有一个接管者可删除死锁（他人循环等待），删后回环进入公平 O_EXCL 竞争——**双持在构造上不可能**；锁内容改 `pid:token`（探测端识别创建中的空锁永不接管——空内容≠无主死锁）；释放端**身份化**（只删自己的内体，连锁删锁根除）；票文件无持有权语义（死票/崩溃票由探测者无害回收）。实证：**32/16/8/6 路 100/60/60/60 轮 0 丢**；48 路 fail-loud 为 2s 预算数学极限（正确语义）。新增 io.spec「32-way ticket takeover」回归测试（含残留断言 + 15s 预算）。
+- **V5-03 noop 短路**：node 后端 `transact` 对**字节等同**结果（`next === current`）直接返回——不再 tmp+rename 重写（目录 mtime 搅动、「nothing written」消息失真）；noop update/patch、重复 memory add、state-json 去重回环等四处同根一并收敛（V5-08 的「不重写」口径顺带恢复）。
+- **V5-02 legacy 一次性退休**：`pending.json`（pre-0.3.22 只读合并）在首次 `listPending` 时**迁移并退休**——并入 current、**以归档键集排除「已完成历史的幽灵 pending 双胞胎」**（cap 轮转已逐出 resolved 副本时，legacy 的 `status:'pending'` 旧副本不再胜出→不可再 claim→不可重放数月前 staged args）、改名 `pending.json.migrated`（证据保留）；claim/save/release/tryResolve 内层 legacy 读取以迁移完成标志短路（迁移失败幂等重试——跨进程安全：rename 后他进程读 null）。V5-07 的「跨代反复归档」随退休根除（注释更新）。
+- **V5-09 逐出键集修正**：enforceResolvedCap 改按**记录 id** 逐出（手工文件 key≠id 不再「已归档却未逐出」造成 cap 静默失效）；畸形 `resolvedAt`（Date.parse NaN）按「最老未知」排序（不再不稳定排序）。
+- **V5-10 轮转边界**：空档案不写 `[]` 的 `.bak`；单批 fresh 超 cap 时截断保留最新 CAP 条（最旧丢弃——审计面 best-effort 语义）。
+- **回归**：全量 vitest **684/684**（+3 新回归：V5-02 退休链 / V5-09 键集 / V5-10 空 .bak）；oxlint 0/0；tsc state-json+core 0；32 路×30 轮压力 0 丢 0 错。
+
+## 0.3.28 (patch) — v4 审计收口：口径/文档/后台缺陷批（V4-07~V4-50 剩余全部）
+
+v4 审计（修复核验轮）收口批次——批次 1（0.3.26）门禁与修复有效性 + 批次 2（0.3.27）数据与并发完整性之后的剩余 P3 全部 + V4-22 设计；5 组并行子代理（文件面互不相交）逐项先核验再修（A core 域 / B state 域 / C 工具命令面 / D 后台审计面 / E 发布文档预设面），主代理逐项复跑 + 亲读验收。
+
+- **state/接缝**：V4-07 一致性基座扩为逐字段比对（claimedAt/resolvedAt 类型级——json/domain 两 provider 无既有差异故零豁免、零实现缺陷）；V4-08 jsonTransact 写侧形状守卫（task 返数组/标量 fail-loud 且不落盘；quarantine/jsonTransact 模块级化仅供测试直调——函数插件仍无 default 导出）；V4-10 注释如实（seam 无 delete 语义）；V4-11 **+ 全仓扫描 13 包** tsconfig 幽灵 schemastery references 清扫（G5.5 同类，零 import 证实，逐包 tsc 0）。
+- **core 口径**：V4-38 **核验推翻「test-only export」**——标称 11 符号（saveUsage/saveSuppressedNames/5 个 review prompt 常量/retainEventArchives/readEvolutionEvents/memoryRoot/QUALITY_WEIGHTS/ENTRY_DELIMITER）全有生产或跨文件消费方，无一 refs≤1（全仓 refs 计数口径，零删除、不占 V4-38 的改动面）；V4-39 prompts pinned 文案如实（任何 writer 无法归档——先移除 .pinned marker；foreground/delegated 的 update/patch 仍允许）；V4-43 scanThreats 自卫（maxScanChars 0/NaN/负 → clampedNumber 钳制）；V4-48 version 类型消息（`got "1" (string)`，数字/字符串歧义消除）；V4-49 分隔符拒绝消息形态统一（单条去 `Operation 1` 前缀、批量补 current-entries 预览）。
+- **工具/命令面**：V4-13 graph noop 不计 patch（对齐 tool-skill-manage 口径）；V4-14 skill-usage README 监听面如实（skill_load 已删）；V4-15 单操作叠词（"memory add"——F-329 规则扩展到单操作）；V4-16 maintenance 探针 resolveSkillsRoot（''/' ' 不再落 CWD 相对根）；V4-17 atomicWriteFiles `.bak` 每次成功提交刷新（恢复回最新代）+ 消息含来源；V4-19 `--detail` 截断附 `…(truncated N chars)`；V4-24 names 校验 trim + 大小写不敏感（canonical 名，未知名字仍拒）；V4-26 行首独立 `Notes:` 定位（字段内嵌换行不再击穿推荐计数）；V4-27 测试缺口（noop 计数消费实测 src 正确仅补测 / F-331 pinned+bundled 不入 LLM 提示 / F-102 abort dispose 同构）。
+- **后台/审计**：V4-18 轮转误导消息区分（「记录不在 pending 窗口」vs 正在被执行——归因不再误导）；V4-21 executePlan 中途 IO throw 改 **{actions, ok:false} 返回**——已应用项显式 + 「部分操作失败，以下操作已应用，请勿重复执行」提示，不再重复注入同 kind；completionInjected 在 inject 抛错时回滚（错误恢复后 completion 可重触发）；V4-22 curator-error **独立预算**（真报告 keep-20 / 错误 cap-10，F-327 排序）+ 每次 run 结束（成功或失败）都触发回收——持续抛错宿主 error 报告不再无界累积、真报告保留窗口不被挤占；V4-23 validateEvolutionPlan 根守卫（null/数组/标量显式拒绝而非 TypeError，与 maintain 对称）；V4-25 review README 声明 executionTimeoutMs 无效（未消费——配置 reviewTimeoutMs）；V4-40 replay weights 钳制 warn（与 maxPlans 一致）；V4-41 feedback **durableNote**（双失败回滚还原到最后一个已确认落盘的 note，绝不复现从未落盘值；注释如实：进程内 restore 不自愈、仅重启可自愈——由 durableNote 消除该边界）；V4-42 activity maxItems:0 钳制 warn（程序化装配面）；V4-44 钳制 warn 断言补齐（review 精确钳制值 + `AbortSignal.timeout(0)` 行为级 + capability/feedback/curator warn 断言）；V4-45 capability 负例双测（非 staged allow 拒收、approved 记录带外篡改 re-validate 拒绝——逻辑本就正确只补测）；V4-46 replay `dsh-session` devDep 幽灵删除；V4-50 feedback 拒绝经已注入 warn 通道（未来版本事件不再无痕丢失）。
+- **发布链/文档/预设**：V4-32 publish-scoped `--groups ≤0`/非整数显式 fail（空转不再"完成"）；V4-33 核验=版本漂移已随 0.3.27 normalize 修复（不单独立项）；V4-34 prepare-release **atomicSwap**（target→`.previous` 两段换入、失败回滚、可重跑；staging 保留 lib/ 的说明——CI 恒先构建，过滤会丢运行时）；V4-35 头注释路径如实（flat 布局）+ CHANGELOG 0.3.21 G0.5 措辞拆分（BOM 实际在 inject-evolution-paths——V4-35 修正）；V4-36 根 README 包地图补 evolution-all/capability/maintenance + activity 行按实际功能描述（zh 为独立改写文档非镜像）；V4-37 standalone/oneclick 头注释**全量声明**行集差异（storage host-plane / tool-session-query 在 delta / maintenance-tools+session-query-sqlite+60-char cap 由 evolution-host 拥有——**E-33 互斥安装目标，零行集增删保字节 parity**；capability D-9 持出；V4-37② 以注释说明出处而非加行）；V4-47 activity description 按实际功能 + README `.min(1)` fail-loud 说明 + **七处 README `- - ` 畸形列表修正**（feedback/capability/io-node/host/state-domain/state-storage/preset——全树清零）。
+- **回归（发布前全量发现并修复）**：首跑全量 102 文件 1 例失败——curator「paused gate」在并行负载下被饿过默认 5s 超时（5.04s；孤立全文件 47 用例仅 5.00s、单测 169ms——纯负载饥饿非功能回归）→ 该测试给显式 15s 预算 → 复跑 **102 文件 / 680 测试** 全绿；oxlint 0/0（194 文件）；tsc 30 包 0；dependency-closure 30 包 OK；arch-guards strict 0（N4 69 项 warn-only 保持）；event-pairing 0 orphan/0 dangling；publish-scoped/prepare-release `node --check` 过。
+- **闭环声明**：v4 审计报告（`references/audit-report-v4.md`）P3 全部落地（V4-38 核验为不适用、V4-33 已随 0.3.27 修复、V4-44 的 plan-validator/approval 无该面不强加）。剩余挂账=上游平台议题（G4.8/N-2）+ F-328 申报 + F-309/310/311/354 脚本层申报 + capability 接线状态（README 已声明"implemented but not yet wired"）。
+
+## 0.3.27 (patch) — v4 审计批 2：数据与并发完整性（V4-01/04/05/06/09/12/20）
+
+v4 审计（修复核验轮）新发现的批次 2（数据与并发完整性）；每项先核验属实再修（A/B 子代理分域实施，主代理逐项亲读验收）；transact 接线按用户裁决=构造默认绑定。
+
+- **V4-01 归档重复增长**：pending-state-archive.json 无去重且每次 append 全量重写（O(A²)）——只读合并的 legacy `pending.json` 会把已轮转记录重新引入再归档，无限膨胀 → append 按 id+status+resolvedAt 去重（fresh 空则短路返回 current 不重写）+ `ARCHIVE_RESOLVED_CAP=5000` 超限轮转 `.bak` 侧车（与 PENDING_RESOLVED_CAP 同款纪律）。
+- **V4-04 锁接管窗口**：stale 接管的「重读一致→rm」下，两 peer 同过探针时后完成者会删除对手刚重获的**活锁**（双持→并发执行）→ 接管改为 `rename` 原子独占（rename 源独占，仅一人成功；失败者 ENOENT 回环重试，绝不删他人活锁）；接管名与锁同目录（同文件系统保证原子）。
+- **V4-05 同 pid 活锁可被同进程写者抢占**：`pendingSelfCleanup.has(lock) || mtime>1000` 的 mtime 分支把「本进程另一任务执行>1s」误判为死锁 → 同 pid 分支只保留 `pendingSelfCleanup.has`：执行中的锁（任何时长）绝不回收，仅回收「任务已结束但 finally rm 失败并登记」的遗留锁（安全保守——遗留未登记的由跨进程接管路径覆盖）。
+- **V4-06 双重 quarantine**：readJson 的形状检查原在 parse try 内——wrong-shape 的 quarantine（throw）落入 catch 再 quarantine 一次（每读二份 `.corrupt-*`）→ 形状检查移出 parse try。
+- **V4-09 root 空白穿透**：state-json 配置 root 未 trim——whitespace-only `' '` truthy 落到 CWD 相对路径（与 resolveSkillsRoot 口径不一致）→ `(rawConfig.root ?? '').trim() || evolutionHome()`。
+- **V4-12 snapshot 两读让渡**：memory/user 两次独立 await 之间可插入 serializedWrite（applyBatch）——混合代快照 + sha256 钉在不存在的状态 → 两读收进同一 serializedWrite 任务（单代快照；跨进程窗口保留为已声明接受）。
+- **V4-20 SkillLibrary transact 默认绑定**：构造第 5 参未注入时默认 undefined（旧无锁行为；8 个生产实例化点均未注入）→ `transact ?? (io.transact ? 适配包装 : undefined)`——显式注入优先；后端 `(path, task)` 实例签名自动适配；无 transact 后端保留纯 read→write + 进程内 serial 链。**用户裁决（四性）**：构造默认绑定（单点优于 8 处注入）。
+- **测试确定性修复（发布前全量回归发现）**：全量首跑 3 例失败（并行负载下计时敏感）——feedback「persists across restarts」固定 20ms 等待 restore（改确定性轮询）、commands「records a learn event」固定 50ms 等待 fire-and-forget 写（改轮询）、installer「installs host bundle + agent preset」20s 超时被真实 npm 安装子进程越限（提至 60s 与兄弟测试一致）；隔离复跑 55/55 绿。
+- **回归**：全量 vitest **100 文件 / 647 测试** 全绿；oxlint 0/0（192 文件）；tsc 30 包 0；dependency-closure 30 包 OK；arch-guards strict 0（N4 70 项 warn-only——新增 2 项为 `resolvedAt?`/`root?` 类的合法可选字段兜底，行级启发式正则误报类）；event-pairing 0 orphan/0 dangling。
+- **核验说明**：V4-20 前生产 SkillLibrary 全未注入 transact；现在任何提供 transact 的 io 后端上的 SkillLibrary（commands/curator/review/maintenance/learning-graph/tool-skill-manage/skill-catalog 等）默认走跨进程 transact——本批以家族全量 vitest 覆盖。
+
+## 0.3.26 (patch) — v4 审计批 1：门禁与修复有效性（V4-02/03/28-31）
+
+v4 审计（修复核验轮）P2 新发现的批次 1（门禁与修复有效性——先修护栏再修内容）；每项先核验属实再修（v4 行号为准）。
+
+- **V4-03 依赖闭包守卫接入 CI**：`verify-dependency-closure` 此前零调用点（F-105 防回归半边落空——「守卫正确但无人运行」）→ action.yml 在打包前插入该步骤（与 arch-guards 同款接线）。
+- **V4-29 守卫自族 fail-loud**：closure 脚本补 `inspected===0` 真空 fail（原「打印 OK across 0 package(s)」真空通过）；头注释矛盾修正（type-only import 同样必须声明——d.ts 引用走同一声明，发布包无 tsconfig paths）；动态 import 不可见注明为文档限制。
+- **V4-30 空转保护 + 守卫自测**：arch-guards 与 event-pairing 补「扫描文件/事件为 0 时失败/告警」（F-103 真空守卫类）；新增 `guard-scripts.spec.ts`（5 个哨兵用例：三守卫 × 正例+故意违规——真实树 OK、真空根失败、未声明 import 失败、DSH_HOME 违规失败、孤儿 emit 标记——门禁必须被门禁覆盖）。
+- **V4-02 F-330 修复有效性（死代码→真修复）**：原补丁的 `bundledNames.has(name)` 在 `!treeNames.has(name)` 分支**不可达**（`bundledNames ⊆ treeNames` 构造不变量——同一次 `list()` 填充）——bundled 幽灵场景从未闭环；改为**归档副本 marker 探针**（`.archive/<name>/.bundled`——崩溃归档的 rename 已随目录携带 marker；`markerEntryName` 因跨包消费而导出，保持 N-1 单源）；补「bundled 崩溃自愈→suppression 落盘」专项用例（此前 E-15 测试全部用非 bundled 技能）。
+- **V4-28/31 守卫注释与识别修正**：action.yml 的「N3/N4 stay warn-only」注释更正（0.3.25 起 N3 已翻 gate）；event-pairing 的 `ctx.on` 接收器正则修正为 `\w*ctx.on`（`ioCtx.on(...)` 的 plan-applied 消费此前不被计数——单一消费者的 `xCtx.on` 形态会误报 orphan）。
+- **回归（发布前检查发现并修复真 bug）**：全量首跑 feedback.spec「persists across restarts」**2/2 连续复现** ENOTEMPTY（§56 模式：ctx2 的 Feedback 恢复链未 settle 就 rm 临时 home；负载变化使其从偶发变必现）→ teardown 补 `waitIdle()`（两处同类测试）；全量复跑 **99 文件 / 636 测试** 全绿；oxlint 0/0（191 文件）；tsc core/curator/host 0。
+- **裁决记录（用户授权，四性权衡）**：①transact 生产接线（V4-20）=**构造默认绑定 `io.transact`**（0.3.27 实施——单点优于 8 处注入）；②F-328 完整 hash=**维持申报**（契约迁移复杂度 > 罕见场景收益，`--detail` + 声明已充分缓解）。
+- **未在此批（顺延 0.3.27）**：V4-01（归档重复增长）、V4-04/05（锁残余 + 同 pid 抢锁）、V4-20（transact 默认绑定）、V4-06/09/12（state 域小修）。
+
+## 0.3.25 (patch) — G5 其余 + G6 清扫 + G7.2 文档化 + N3 门禁翻转（批次 5，计划收官）
+
+审计优化计划最后一批（批次 5：装配与清扫）；每项先核验再修（B 组发现计划 F 编号系统性错位——以审计报告原文机制描述为准核验；3 项核验为已满足/仅报告）。
+
+- **G5.1 preset 行集统一**：agent delta 行集核验后按实际处理（tool-session-query 已在；60-char/maintenance-tools 由 host 拥有——delta 加入会双挂载）→ delta 注释显式声明最小集差异；standalone cordis.yml 与 README 按决策点 8 声明「storage 为 host-plane、preset 不拥有、standalone 无 host 时显式声明依赖」；README 手工组合示例与两 bundle 行集同步（补 session-query-sqlite/tool-skill override/reviewToolAllow/domain disabled）。
+- **G5.2 碰撞契约统一**：core `composePresetComposition` 与 install-layered 接受同一 `DSH_EVOLUTION_ALLOW_ROW_COLLISIONS` env（默认 fail、=1 warn+keep-both）——头注释「Same contract」由虚改实；core 与 installer.spec 补碰撞路径对偶用例。
+- **G5.5 tsconfig 治理**：删除幽灵 references（commands→curator、learning-graph→memory/skill-usage——grep 证实无 import）；plan-validator 引用改兄弟式；README 声明「packages/evolution paths/refs 仅在完整 upstream checkout 可解析」（CI overlay）。
+- **G5.6 zod 别名出域**：inject-evolution-paths 的注入列表**排除 zod**（其 pnpm-store 路径机器特定；且上游自带 zod 键会误触发 already-declares fail）——inject-paths 测试同步（2 条注入 + zod 负断言）；zod `^3.0.0` 声明 vs 实际解析 4.4.3 的偏差记录为已知项。
+- **G6.1 死代码清零批**：PENDING_STATUSES 删除（类型内联字面量联合）、CLAIM_EXPIRY 死逻辑删除（**决策点 6**——expiry 分支不可达：canClaim 只放行 pending；executing 永不自动重放=E-24 安全语义真相化）、ensureRecord 删除（测试调用改 ensureRecordCreated）、skill_load 幻影键删除（读工具名单与 review 侧对齐）；**moved-twice 分支核验不符未删**（可达且有测试）；registryVersion/smoke-package/verify-layout-sync 核验后报告（脚本层，附主代理裁决）；core 死导出扫描=已满足（无 refs=1 真死 value 导出）。
+- **G6.2 边界缺陷批（12 项）**：HEALTH_STAMP_RE 支持偏移/无时区 + hex 词强制含数字（`defaced` 不再误计）、relatedSkillNames 词边界（CamelCase 垃圾词元清零——如 `MySkill`→`y`）、feedback lastNote 回滚仅在本轮 note 时还原、零计数迁移注释、maintain names ∈ facts 校验、curator-error 纳入 retainReports（mtime 回退）、E-15 自愈补 bundled suppression、consolidations 候选池 marker 预过滤、normalizeSummary 杜绝「memory memory」叠词、plan-validator 容器级畸形逐项拒绝（Array.isArray 前置）、activity serializeActivity 单源、snapshot 恢复清理快照后点文件（F-316——`.usage.json` 幽灵清零，审计/抑制态保留）。
+- **G6.3 契约对齐**：pinned 前台归档 → 守卫消息明确指引（决策点 5：改提示词——「移除 .pinned marker 后重试」）；io.spec 5s→1s 注释修正。
+- **G6.4 测试缺口批**：FORBIDDEN_CONTROL_KEYS 专项覆盖、review.spec 名实修正、completion 通道集成（F-363——通过 runOnTurnEnd 的 inject 通道，非 subagent spawn）、recommend 抛错路径（F-364——E-52 warn+空提名）、note 灌水负例（F-365——Notes 段先截除再计数）；并发 approve+reject 已于 0.3.24 满足（报告跳过）。
+- **G7.2 对偶形态 checklist**：落点=技能库（维护过程资产不进公开仓库）——清单固化于技能库正文（数值矩阵/JSON 三态/seam 字段/退出路径/提示词承诺矩阵）。
+- **N3 门禁翻转**：剩余 25 项数值字段全部钳制（activity/capability/curator/review/memory-files——决策表：仅 curator `minIdleHours`/`bootGraceSeconds` 允许 0（`.min(0)`），其余 `.min(1)`；`reviewTimeoutMs` 0 不是 no-timeout——`AbortSignal.timeout(0)` 立即中止；`executionTimeoutMs` 判定为未消费的声明字段）；arch-guards N3 从 warn-only **翻转为 gate**（strict 失败）。
+- **回归**：全量 vitest **98 文件 / 630 测试**；oxlint 0/0（190 文件）；tsc 28 包 0；arch-guards strict 0（N4 68 项 warn-only 保持——多为合法兜底）；dependency-closure 30 包 OK。
+- **闭环声明**：v3 优化计划 **G0-G7 全部批次落地**。剩余非本地项：①上游平台议题（G4.8 的 config 全局默认策略服务端派生分歧 + N-2 overrideOf 签名——待平台包可考）；②F-328 完整 hash 方案（需放宽 PendingRecord 共享契约——申报为已知限制）。
+
+## 0.3.24 (patch) — G4 控制面 + G5.3/G5.4 命令面（批次 4，5 组）
+
+审计优化计划批次 4（控制面与命令面）；每项先按报告行号核对现状再修（12 项核验中 3 项已满足：G4.8 本地收敛已于 0.3.23 完成、G7.3 事件配对门禁已于 0.3.21 接入 CI、F-323 计数已行首锚定排除 notes）。
+
+- **G4.1 maintain 子代理 dispose 对齐 review**：runMaintain 的 subagents.start 返回类型加可选 `dispose?`；start 后全部 return/throw 路径 try/finally 统一 dispose，失败经 `logger?.warn` 留痕不遮主结果；commands 生产路径接入 logger（dispose 失败在生产可见）。
+- **G4.2 maintenance_probe disposer 绑定**：tools.register 经 `toolCtx.effect(..., 'evolution-maintenance.tools')` 绑定（HMR 卸载真移除——新测试证明 fiber dispose 后工具移除）。
+- **G4.4 review emit 时序与双审查窗口**：①结果通知 inject 独立 try/catch（失败不再误判整条 pipeline 失败→修复「计划落地后 fallback 再注入」的双重审查）；②plan-applied emit 移到结果通知之后（E-41 同类原则；inject 失败仍记录 plan-applied——计划确已落地）；③completion 通道的 review-scheduled 后移到完成注入之后。
+- **G4.5 review stateless 可观测性**：state 服务缺失时进程级一次性 warn（不每回合刷屏）+ README 已知限制声明。
+- **G4.6 memory 计数活动加权（决策点 2）**：advanceReview 的 memory 行对齐 skill 行——无 memory 信号回合按 toolCalls 推进（`signal.memorySignal ? 1 : Math.max(1, signal.toolCalls)`）；memoryInterval=10 下高活动会话的记忆评审节奏加快（预期）；新增 5 用例（纯活动触发/混合累积/重置/skill 对称）；activity/feedback 零回退。
+- **G4.3 reject executing 分支语义如实化**：注释与消息改为「best-effort 操作员清理、不持 claim、可能与在途 approve runner 竞争、写效果以实际为准」（不再误称 "crashed approve cleaned up"）；approval README 补并发 approve+reject 窗口声明；新增受控 gate 并发测试（executions==1、audit 如实）。
+- **G4.9 /evolution pending --detail**：`pending [--detail]` 渲染每条记录的 staged args（500 字符截断、fail-safe）；默认折叠视图不变；消除「盲批」。
+- **G4.10 挂空事件归属声明**：review README 声明 `review-scheduled`/`review-error` 为外部属主（宿主/平台消费方接线），与 verify-event-pairing 的 EXEMPT_ORPHANS 对齐（脚本注释与文档失配收口）。
+- **G5.3 atomicWriteFiles 提交段自愈**：二次 rename 失败后从 `.bak` 恢复被删目标（best-effort、恢复失败注明、抛原始错误）——失败提交不再留下缺失文件；函数导出 + fs 注入（rename 失败路径确定性单测 2 用例）。
+- **G5.4 /graph 节点可寻址**：memory 节点行渲染完整 id 含 snapshot token（`[id: memory:<source>:<index>:<8hex>]`）——copy/paste 保留 E-21 漂移守卫（裸前缀会静默跳过）；新增 2 用例（渲染形态 + 往返）。
+- **回归**：全量 vitest **94 文件 / 609 测试**（+16）；oxlint 0/0（186 文件）；tsc 6 包 0；arch-guards strict 0（N1/N2 零违规；N3 25 项 G3.1 TODO warn-only 不变）；commands logger 接线后 tsc 复验。
+- **未在此批收敛（顺延 0.3.25+）**：G3.1 剩余 25 处数值钳制、G5 其余（preset 行集/碰撞契约/tsconfig 治理/zod 别名）、G6 清扫、G7.2 文档化；F-328 完整 hash 方案（需放宽 PendingRecord 共享契约）。
+
+## 0.3.23 (patch) — G3 配置治理 + G4.7 + G1.3 seam 单源 + G7.1 门禁生效（4 组）
+
+审计优化计划批次 3（配置治理）；每项先按报告行号核对现状再修（14 项核验中 1 项部分属实——F-340 的 `this: void` 两边已一致，transact 宽度与 size 文档措辞为真实漂移）。
+
+- **G3.1 数值配置统一钳制管道**：core 新增纯值助手 `clampedNumber(value, fallback, {min?, max?})`（core 保持零 schemastery 分层——校验器留在各包 Config 内联）；policy 12 数值字段、threat `maxScanChars`、replay `maxPlans/weights`（accepted/rejectedPenalty/evidence min 1、cost min 0）、feedback `qualityWarnThreshold`（[-1,1]，0/负合法）全部接入——schema `.min()/.max()` 装载期硬校验 + 装配期钳制（authoritative）+ 修正时一次性 warn。**schemastery 实测**：`.min(1)` 拒绝 0/负（fail loud），NaN/±Infinity 穿透由 clamp 兜底——决策点 3「0 回落默认」以「schema fail-loud + clamp 兜底」双保险实现（与家族 T-13 先例一致）；memory 内部 `limit<=0=unbounded` 保留为库内防御并在 README 声明。
+- **G3.3 注册表 fail-fast**：`MemoryRegistry.provider(name)` 命名未命中由静默回退 first 改 throw（对齐 io/state-storage 注册表；grep 确认无调用方依赖旧回退）。
+- **G3.4 redact 覆盖扩展**：bearer 改 `i` 大小写不敏感 + `\s+` 空白宽容；inline 赋值模式支持下划线/连字符连接键（`auth_token=`/`client_secret=`/`access_token=`）——连接前缀 `[\w-]+[_\-]` 设计保持 `monkey=` 负例不误伤（node 实测样例钉住）。
+- **G4.7 JSON null 原始值防御**：skill-usage `skillNameFromToolCall` 与 review `collectReadSkillNames` 对 `JSON.parse('null')` 成功返回 null 的场景补非对象守卫（此前 `parsed.name` 抛 TypeError 击穿 E-65 防御）。
+- **G1.3 seam 类型单源**：`EvolutionIo` 从 core `EvolutionIoLike` 派生（`Omit<...,'transact'> & { name; transact 窄化 }`）——size/isSymlink/mtime 契约与 `this: void` 全部单源继承，唯一有意差异（transact task 宽度）注释说明；双向编译断言（seam⊆core + node provider⊆seam）；evolution-io 新增 core 依赖与 tsconfig 引用。
+- **G4.8 本地收敛（G7.1 前置）**：approval 包导出权威 `ApprovalPolicyLike` + `effectiveSessionPolicy`（单源）；tool-memory/tool-skill-manage 删除逐字节相同的本地副本改 import；approval 5 单测（override 优先/config 兜底/都无→'ask'）。
+- **G7.1 门禁生效**：arch-guards N1/N2 **零违规 + `--strict` 上线**（action.yml 调用加 `--strict`）；N2 豁免区随权威移动（core→approval）；本次顺带修补 N1 漏网（skill-usage 的 `DSH_HOME` 裸读——F-207 清单外、0.3.21 起就在的第三处）；N3 上线（warn-only 清单，28→25 项外部包 G3.1 TODO）、N4 上线（warn-only `?? ''`/`?? id` 死回退列示，67 处多为合法兜底）。
+- **回归**：全量 vitest **91 文件 / 593 测试**（+27）；oxlint 0/0（183 文件）；tsc 13 包 0；verify-dependency-closure 30 包 OK；arch-guards strict 干跑 0。
+- **未在此批收敛（顺延 0.3.24+）**：G3.1 剩余 25 处（activity/capability/curator/review/memory-files 数值字段）、G4 其余控制面、G5/G6。
+
+## 0.3.22 (patch) — G2 数据完整性 + G3.2 解析单源 + G7.4 一致性基座（3 组）
+
+外部审计优化计划（optimization-plan-v3）第二批（批次 2：数据完整性）；每项先按报告行号核对现状再修，15 处核验全部属实后落地。
+
+- **G2.1 transactCuratorState null=keep 统一**：seam 文档与 json 实现统一为「task 返回 null = 保留原记录」（与 domain 原语能力一致；生产调用方从不依赖 null=delete，json 曾删 primary 是唯一分歧点）；json/domain 两 provider 补直接测试（missing-key 种子 / null 入参 / 覆盖）。
+- **G2.2 state-json 形状门**：readJson 与 jsonTransact 的 parse 后加每文件顶层形状校验（review-state/curator-state/pending-state/pending 的 map-of-record 结构），合法 JSON 但错误形状（`[]`/`42`/`"str"`）走既有 quarantine（原字节备份 + throw）——不再被当空状态无备份覆盖；归档侧车（数组）显式豁免。
+- **G2.3 domain pendingSchema 补齐**：加 `origin`/`sessionId` 可选字段——zod 默认 strip 曾把审计归因字段在 domain 后端静默剥离；补「写→重开→读回字段保留」往返测试。
+- **G2.4 MemoryStore 分隔符防御**：add/applyBatchCore（add+replace 分支）拒绝含 `ENTRY_DELIMITER`（`\n§\n`）或尾 `\n§` 片段的 facts（明确错误消息含操作+position）——根治「末尾 § 砖化永久 drift」与「中部 § 静默裂分」两种形态。
+- **G2.5 SkillLibrary 事务化**：构造加可选 `transact` 注入（默认旧行为，向后兼容零改动）+ 私有 `makeSerialQueue` 串行链——update/patch/restructure/writeSupportFile 的整段 read→validate→write 进程内串行、单文件写在注入时走跨进程 transactIo；create/archive/consolidate 保留既有两阶段提交；README 补并发模型声明（进程内串行 + 跨进程锁 + 多写面 last-writer-wins）。
+- **G2.6 审计哈希同源**：create/update/patch 把落盘字节（`trimEnd()+'\n'`）算一次作为 onDisk，writeText 与 audit 同源——审计 afterHash 与磁盘实际字节一致（可 reviewable/replayable）。
+- **G2.7 审批存储治理**：pending-state.json 的 resolved 记录 cap 200 + 归档轮转（最老记录移入 `pending-state-archive.json`，best-effort 永不 fail resolve；只裁 approved/rejected）；approval 注释同步修订「KEPT as audit history」承诺；domain releasePendingClaim 的 missing-key 对齐 json 的 no-op 语义（良性/恶性区分与 claim/tryResolve 一致）。
+- **G2.8 事件日志 version 校验**：读取端 v1-only——非 v1 读作空且不被误解析；appendEvolutionEvent 对非 v1 body 拒绝重写（保留原字节），版本不匹配消息与 malformed 区分。
+- **G3.2 解析单源收尾**：core 新增 `evolutionRoot()`（`||` 空串回退单源；`evolutionHome()` 改由它派生——弃 `dirname(evolutionHome())` 派生的「DSH_HOME 恰以 evolution 结尾剥真实后缀」陷阱）；feedback×2 与 commands×3 的 `DSH_HOME ?? homedir()` 全部替换；commands×3 的 `new SkillLibrary(config.skillsRoot, …)` → `resolveSkillsRoot({ root: config.skillsRoot })`（空串/空白配置不再落到 CWD 相对根）。
+- **G7.4 跨 provider 一致性基座**：test-support 新增 `runStateProviderConsistency(provider)`（review 往返 / claim→resolve / claim→release / transactCuratorState null 入参 / listPending 状态过滤——时间戳字段剔除比较）；json 与 domain 各调用一次。
+- **回归**：全量 vitest **90 文件 / 566 测试**（+43：core 225 / provider 46 / consumer 108 等）；oxlint 0/0（181 文件）；tsc 7 包 0（含修复 G3.2 引入的 exactOptionalPropertyTypes 真 bug——`resolveSkillsRoot` 参数显式 `| undefined`）；策划/审批零回退。
+- **未在此批收敛（顺延 0.3.23+）**：G3 其余（数值钳制管道/注册表 fail-fast/redact 扩展）、G4 控制面、G5/G6、arch-guards 翻 strict。
+
+## 0.3.21 (patch) — G0 发布工程 + G1 锁协议 v2 + G7 门禁（3 组）
+
+外部审计优化计划（audit-report-v3 / optimization-plan-v3）的首批落地；每项先按报告行号核对现状再修，修复后逐条交叉验证。
+
+- **G0.1 依赖闭包守卫**：新增 `verify-dependency-closure.mjs`——30 包的 value import 必须已声明（type-only 感知，混合 import 按 value 上报）；补 feedback/state-json/tool-memory/evolution-review 缺失的 workspace 依赖；清除 11 处幽灵依赖（io/io-node/memory/learning-graph/commands 移除未用 schemastery；state 移除 dsh-storage-domain / dsh-evolution-state-domain）。
+- **G0.2 平台范围守卫修复**：`verify-platform-ranges.mjs` 此前扫描数为空时静默通过（vacuous-pass）——改为 `scanned===0` fail-loud；action.yml 的 `--manifest-dir` 指向 `packages/evolution/.release-staging`；platform-range.spec.ts 重钉。
+- **G0.3 重写补丁覆盖 .d.ts**：`rewriteScopedJs` 覆盖 `lib/types/**/*.d.ts`；29 个包 `files` 列表改为 `["lib/*.js","lib/types/**/*.d.ts"]`；守卫校验 `packed.files`，避免发布包留上游 scope 痕迹。
+- **G0.4 暂存清单与版本一致**：`.staging-manifest.json`（包/版本/来源声明）+ install-layered 版本比较 fail-loud（防回滚安装）；`.release-staging` 生命周期清理。
+- **G0.5 发布链 fail-fast**：publish-scoped 任一包失败即停；prepare-release `.next` 目录原子切换（rename 保留旧 build 可重跑）；inject-evolution-paths tsconfig 注入保留 BOM（tmp+rename——0.3.28 措辞修正，BOM 逻辑不在 prepare-release）；install-layered 原子写 + dry-run 不落盘。
+- **G0.6 布局文档与元数据**：INSTALL/README 路径与 package-map 更新；build-lib 头注释；镜像根 package.json 移除 `workspaces`（扁平发布载体不再伪装工作区）。
+- **G1 锁协议 v2（io.ts 单点）**：takeover 前重读锁内容（`current === holderContent` 才删除，防持锁者已换内容误删）；同 pid 锁回收改双条件（`pendingSelfCleanup.has(lock) || mtime > 1000`——同 pid 并发写者不可互相"治愈"，根治回收锁截胡）；`commitTmp` 失败主动删 tmp、renameWithRetry（EPERM/EBUSY ≤3 次重试 50ms）、同 pid 失败即时 sweep；io.spec +6 用例（203 全绿）。
+- **G7.1 架构守卫**：新增 `verify-arch-guards.mjs`——DSH_HOME 只允许 evolution-core 解析（N1）+ ApprovalPolicyLike / effectiveSessionPolicy 单源（N2）；本版 warn 模式（5 处遗留 = G3.2/G4.8 收敛 TODO，收敛后翻 `--strict`）。
+- **G7.3 事件配对守卫**：新增 `verify-event-pairing.mjs`——生产 src 的 `evolution/*` emit/on 配对核验：0 孤儿 0 悬空（`review-scheduled`/`review-error` 为 README 声明的外部属主豁免）。
+- **回归检查**：vitest 全量 80 文件 / 523 测试全绿（+6 个 G1 io 用例；修复 anchored-smoke teardown `ENOTEMPTY` 竞态——先 dispose review fiber 再 rm、rm 带重试；修复 io.spec `transact` 可选成员调用类型）；oxlint 0/0（170 文件 89 规则）；tsc -b evolution-core 0；改动 specs 定向 typecheck 0 错；11 个脚本 `node --check` 全过。
+- **未在此批收敛（顺延 0.3.22+）**：G2 数据完整性、G3 架构收敛（arch-guards 5 处）、G7.4 其余门禁。
+
+## 0.3.20 (patch) — v2 审计复核修复批（外审新发现 N-1..N-5 + 行级卫生，6 组）
+
+v2 再审计报告（audit-report-v2）经修复方逐条交叉验证后的处置批次；每项先按报告行号核对现状再修。
+
+- **N-1 前台工具 sessionId 透传（P2 行为回归）**：tool-memory / tool-skill-manage 的 approval request 此前只传自报 `sessionPolicy` 不传 `sessionId`，平台 approval 服务挂载时服务端派生（`deriveSessionPolicy(undefined)`）恒不触发——无人值守（override 'never'）会话的写全部滞留 staging，与 approval docstring 矛盾。两工具补传 `sessionId`（exec 类型与 review 侧对齐）。
+- **N-3 预算并集（P2 旁路）**：plan-validator 的 patch 预算从 `file_content ?? content ?? new_string ?? ''` fallback 链改为三字段取 max——空 `content` 不再遮蔽巨大 `new_string`；新增回归测试（N-3 用例）。
+- **N-4 发布管线版本驱动 tag（发布前置）**：`publish-scoped.mjs` 恢复版本驱动的自动 tag 选择（prerelease→next / stable→latest；显式 `--tag` 仅覆盖）——0.3.18 删除该自动选择正是"latest 缺位"事故根因；release.yml 恢复裸跑（去掉硬编码 `--tag latest`，防止首个 `v0.4.0-rc.x` 被标成 latest）。
+- **N-5 工具名单单源化兑现**：`EVOLUTION_WRITE_TOOLS`（core constants）此前零引用死导出——threat 与 policy 的本地硬编码写工具二元组改为引用该常量（S3.10 承诺补齐）。
+- **行级卫生**：curator `latestReport` 的 glob 排除 `curator-error-*.json`（伪报告 + retainReports 永不回收）；tool-memory staged 返回改条件展开（消灭 `pending_id ?? ''`，与 tool-skill-manage E-70 对齐）；activity README 纠正 0.3.19 引入的低估表述（实现已用 `transactIo` 跨进程原子，原文"single-process safe only"过保守）。
+- 门禁：vitest 全量（80 文件 / 515+ 测试，本轮涉改 8 包全绿）、oxlint 0/0、tsc 8 包 0。
+- 未在此批闭环（需上游定谳）：**N-2**（`overrideOf` 签名在 approval 侧 string 与工具侧 session 对象矛盾——平台包不在镜像）；E-45/E-49 半边、E-59 中途异常路径、E-73 混代收窄等 v2 报告的 PARTIAL 项按优先级列入后续批次。
+
+## 0.3.19 (patch) — audit 计划收尾（W1 契约单点化 + T-10 文档对齐 + D-10 死通道清理，4 组）
+
+外部审计计划的收尾批次；每步先核验问题属实再修。
+
+- **W1.2 ApprovalLike 权威化**：evolution-approval 新增导出权威 `ApprovalLike`（按公共方法面构造：request/run/hasRunner/registerRunner/list/approve/reject + 可选 isEnabled）；tool-memory、tool-skill-manage、evolution-review、evolution-commands、evolution-learning-graph 五处本地内联视图删除改 import（曾漂移：learning-graph 版漏 isEnabled、commands 版 status 联合更宽）——核验时发现第 5 处（learning-graph，0.3.18 E-26 新增）一并收敛；五包补 dependencies + tsconfig reference。
+- **W1.3 home 解析单点**：evolution-state-json 删除本地 `defaultRoot`（`??` 写法带 DSH_HOME 空串穿透缺陷），改 import core `evolutionHome()`（`||` 兜底单源）。
+- **D-10 AbortSignal 死通道清理**：evolution-io 的 `EvolutionIo` 与 memory 的 `MemoryProvider`/`MemoryRegistry` 删掉从未被任何调用方使用/转发的 `signal?` 参数（接口 6 处 + 实现 3 处；memory-files provider 同步收窄）；subagent 的 `AbortSignal.timeout`（review/maintain）不属死通道，保留。
+- **S7.4 文档与元数据对齐（T-10）**：evolution-activity README 重写为现实现（durable plan-outcome store；退役的 session projection 双注册说明已失实删除，补 maxItems 配置与单进程局限）；evolution-review README 更正（审核工具面 = `skill` 单工具，Hermes 谱系的 `skill_search/skill_load` 允许清单在本平台不存在）；evolution-approval README 更正 runner 注册方（tool-memory / tool-skill-manage，而非已退役的 core evolution 插件；与 0.3.18 E-70 的声明确认一致）；approval-precheck 测试标题与 review.spec 断言核对一致、test-support 头注释核对无失实（两项记录为已就绪）。
+- 回归验证：全量 vitest 80 文件/515 测试全绿；oxlint 0/0；tsc 涉改 14 包 0。（0.3.18 遗留说明：0.3.18 曾因 publish-scoped 默认 --tag next 进入 next tag；release.yml 已修复显式 --tag latest，本版起 latest 自动指向 0.3.19。）
+
+## 0.3.18 (patch) — 审计 v13 修复批（阶段 4-6：工具面 + 后台通道 + 命令观测，31 组修复）
+
+外部审计（dsh-evolution-mirror-audit-report.md）的第三批落地（S4.1-S4.6、S5.1-S5.11、S6.1-S6.6 全量 + L7 批次），每步先核验问题属实再修。
+
+**工具面（S4）**
+- **S4.1/E-30 技能树 root 单源**：core 新增 `resolveSkillsRoot(config)`（空/空白配置回落默认），tool-skill-manage / evolution-skill-catalog / skill-usage / evolution-learning-graph 四处统一调用（graph 此前无视配置）。
+- **S4.2/E-20 快照单汇点**：tool-memory 删除 executeCore 内的双重渲染，快照刷新只保留 `evolution/memory-applied` 监听器（写时竞态/后完成者胜消除）。
+- **S4.3/E-67 依赖强度与启动顺序**：systemPrompt 改软探测（M-7 教义；缺失时跳过引导/快照并 warn，主机照常启动）；挂载期 renderContext 包 try/catch（provider 未注册降级为空快照，首次写入自愈）。
+- **S4.4/E-68/69/70**：patch old===new 短路（不重写、不计数、不失效 catalog——`noop` 结果）；`delete X absorbed_into=X` 自吸收拒绝；create 遥测合并为单次原子 `ensureRecordCreated`（消除 null 窗口与双锁流量）；staged 不再 `pending_id ?? ''` 冒充缺省；pin/unpin 免审批取舍声明（包注释 + README Safety model）；review 建议数上限命名常量。
+- **S4.5/E-71/X-7**：catalog 进程内 summaries 缓存（mutation 事件 + 根 mtime 探针失效；带外改动经 `/evolution skills refresh` 显式失效 + README 声明）；core io seam 新增可选 `mtime?` 探针（node 后端实现，adapter 兜底 null）。
+- **S4.6/T-13**：tool-memory `entryPreviewChars` 与 tool-skill-manage 四个 limit 配置加 `.min(1)`（负值/0 在配置期拒绝而非语义反转/全拒）。
+
+**后台通道稳定性（S5.1-S5.3）**
+- **S5.1/E-6/E-19**：review `onTurnEnd` 整体包 try/catch（warn + `evolution/review-error` 事件，绝不冒泡）；`trySubagentReview` 进程级单飞（in-flight 期间的 turn/end 只累计信号不触发子代理）。
+- **S5.2/E-7**：curator `autoCheck` 顶层 try/catch（自动 tick 的瞬时 IO 故障不再 unhandled rejection；写 `curator-error-<id>.json` 留痕）。
+- **S5.3/E-18**：stateless 组合 first-run defer 死循环修复——内存基线推进 + 一次性标记 + `first-run-deferred(stateless)` 标注；第二次到期 tick 真正执行 curate。
+
+**后台通道数据面（S5.4-S5.8）**
+- **S5.4/E-15**：archive+fold 两阶段自愈——目录已失但 usage 未折叠的记录下次 run 直接置 archived（崩溃窗口形态），永久 failed 条目消除。
+- **S5.5/E-16**：curator state 原子化——state-storage seam 新增 `transactCuratorState(fn)`（json/domain 两 provider 实现），setPaused 与 runCore 收尾统一走单次原子读写。
+- **S5.6/E-51**：fresh-install 手动 run 基线锚定 run 时刻（`lastRunAt: Date.now()`；dryRun 保留不推基线）。
+- **S5.7/E-36/E-36a**：probe 与 facts 一致性——`snapshotFromLibrary` 接受并传递 `usageObserved`（同一构造）；core 导出 `MIN_STAMP_BODY_CHARS`；probe 输出 `below-min-body` 标记并区分 observed/unobserved/unknown（不再混同）；同 snapshot 探针/事实逐维度一致性测试。
+- **S5.8/E-55**：maintain 模型路由读 `evolutionPolicy.get().curatorModel`（与 curator 同源，缺省 'deepseek-v4-pro'）；`jointSignature` 的 minStampBodyChars 从 core 导入（阈值单源，drift-signals 同步改引用）。
+
+**后台通道契约清理（S5.9-S5.11）**
+- **S5.9/E-57/58/59/41/37**：review 删除本地 `PolicyLike`/`EvolutionPlan` 分歧视图（改 import evolution-policy `PolicySnapshot` / plan-validator 类型）；`inject` 移除未用 'tools'；`reviewMode` 收紧为 `z.union([const('subagent'), const('inject')])`（审计建议的 'both' 经核系 skillReviewTrigger 混淆，未加死值）；`!result.structured` → review-error 事件 + warn + inject 兜底（不再静默 return true）；executePlan 部分失败返回已应用标记（注入提示"以下操作已应用，勿重复执行"）；`review-scheduled` 移到子代理确认启动后（先做后发，inject 兜底不误发）；删 `skill_load` 幻影分支（平台无此工具），skill_manage 无单技能读 action 的缺口写 README；completion 状态重启清零为接受行为（注释 + README）。
+- **S5.10/E-52/53/54**：recommend 死分支删除 + 空 catch 补 warn；`CuratorStateRecord` 改 import 权威类型（schemaVersion 作为持久化字段延伸）；latestReport 改按 mtime 排序（UUID 文件名字典序误导死操作消除）；新增 `minIdleFailOpen` 配置（agents 缺失时 fail-open 可关）；policy 读取统一软探测。
+- **S5.11/E-56/T-8/X-6**：validate-plan 停止原地改写调用方输入（归一化副本）；orchestrate outputSchema 补 required 与 validator 对齐；maintenance 删除未用 schemastery devDep；tools 注册去双重 cast。
+
+**命令观测（S6）**
+- **S6.2/E-29**：`/evolution` 命令注册包进 effect（卸载/重载不重复注册）。
+- **S6.3/E-40**：preset install 原子化（临时名 + rename + `.bak` 保留 + 失败清理半截文件；第二写失败保持旧组合可用）。
+- **S6.4/E-34/31/32/63**：feedback/activity 的 apply 期 `ctx.get` 改为 `ctx.inject` 延迟绑定；`maxItems`/非有限值钳制守卫；feedback 校验 rating ∈ {positive,negative}（NaN 不再写入）；parseCache 逐记录数值域校验（非法跳过 + warn）；零计数 legacy 记录迁移生成独立 note 事件；追加失败回滚乐观计数。
+- **S6.5/E-26/21/72**：/graph edit|delete 的 skill 分支走审批 + 遥测（与 skill_manage 同等可用性模式）；memory 节点 id 嵌入快照 token（`memory:<source>:<index>:<snapshot>`），编辑/删除前重读索引位比对（TOCTOU 拒绝 + 提示重新 /graph）；memory→skill 建边改词元级全词匹配（`run` 不再与 running/grunt 建假边）；死分支 `?? id` 删除。
+- **S6.6/E-64/65/66**：commands 删除 `resolveAgentPresetDir` 死分支；help/hint 补 `mutations` 与 `maintain --facts`；建议数改锚定行首正则；skill-usage 对畸形 tool/call 事件防御（`data?.name` + typeof 窄化）；usage→events 锁序契约固化 + 锚点失败 warn。
+- **S6.1/E-5/E-39**：核验 0.3.16 已实现（单飞置位在 try 首行、失败/成功均更新冷却），无需改动。
+
+**装配收尾（S7）**
+- **S7.1/E-4**：核验 preset patch 已无 capability 行且依赖契约测试已存在，无需改动。
+- **S7.2/E-33**：host/preset 双 bundle 互斥声明 ×3（INSTALL + 两 README）+ 行级互斥契约测试（共享行配置字节一致，preset 显式补 reviewToolAllow 对齐）；install-layered 无冲突检测能力故未加拒绝逻辑。
+- **S7.3/E-74**：preset/host patch 的 `?? 'startup'` 改 `|| 'startup'`（空串穿透）；preset 路径改平台 `dshHomePath()`（home 解析单源）。
+- **S7.5/D-12/X-5**：30 包 invariant 注释收敛为统一一句话模板；curator 类声明格式修正。
+
+**发布前专项回归（本批交互引入的新 bug 修复）**
+- `latestReport` 的 `this.io.mtime(...)` 未做可选调用（S4.5 新增 optional 探针 × S5.10 实现的接口边缘）→ `?.` 修复。
+- maintain 模型路由 `runtime.evolutionPolicy?.get().curatorModel` 在 get() 返回 undefined 时读 undefined 属性（软探测接线 × E-55 实现）→ `get()?` + 类型携带 undefined。
+- commands 补 E-55 生产接线（`evolutionPolicy: { get: ... }` 软探测透传，否则同源能力只存在于测试）。
+
+**门禁**：vitest 全量 **80 文件/515 测试**（基线 77/462，+53）；oxlint 0/0（10 处风格/类型错误清零）；tsc 涉改 17 包 0；review/curator/maintenance 等各包新增回归测试（单飞、E-18 双 tick、TOCTOU、假边、probe-facts 一致、mtime 排序、原子 state 竞态等）。
+
+**已知未做（0.3.19 收口）**：S7.4 文档与元数据对齐（T-10）、W1 收口（ApprovalLike 权威化剩余 4 处内联 + state-json `defaultRoot` 并入 core）、D-10 AbortSignal 死通道（随 0.3.19）。
+
+## 0.3.17 (patch) — 审计 v13 修复批（阶段 2+3：存储介质层 + 审批控制面 19 步）
+
+外部审计（dsh-evolution-mirror-audit-report.md）的第二批落地；每步先核验问题属实再修。
+
+**存储介质层（S2.1-S2.8）**
+- **E-8 写锁误判**：锁获取与任务分离为两个 try——win32 rename/EBUSY 的 EPERM 不再被当成锁竞争重试 40 次再报"could not acquire"（真实错误立即直抛）；接管阈值 5000ms→1000ms（此前大于 2000ms 重试预算，算术上永不接管死锁残留）。
+- **E-8b tmp 残留**：写前惰性清扫同目录 `*.tmp`（>1h 且 pid 已死才删；在途新 tmp 保留）。
+- **E-9 损坏状态文件**：JSON 解析失败不再当"空"覆写（曾静默清空全部 review state / pending 表）——原文件隔离为 `*.corrupt-<时间戳>` 并抛结构化错误；契约测试反转（quarantine + 拒绝覆写）。
+- **E-10 resolve 返回分歧**：domain 的 tryResolvePending 对"已决但状态不符"改为返回记录（与 json 一致）——两个 provider 平行契约测试。
+- **E-11 消费门面耦合**：evolution-state 不再运行时 re-export domain 的 zod schema/EVOLUTION_DOMAIN（纯 json 部署不再被拖入 zod + storage-domain 栈）；schema 留在其属主。
+- **E-17 句柄泄漏**：dispose 先等待在途 open（重试预算内）再 close。
+- **E-73 memory 注册表/快照**：provider 支持按名取用（与另两个 registry 对齐）；快照双读改为串行（消除混合代际）。
+- **E-75/T-1**：claim 过期常量单点化（state-storage `CLAIM_EXPIRY_MS`）；状态 json 与 memory-files 的串行队列合并为 core `makeSerialQueue()`。
+- **D-10 AbortSignal 死通道**：审议后保留（接口删除触面大，列入 0.4）。
+
+**审批与控制面（S3.1-S3.11）**
+- **S3.1/E-22 sessionPolicy 服务端化**：平台 approval 服务挂载时，会话策略由 `overrideOf(sessionId)` 派生——调用方自报值仅在无平台服务时作为回退（"自报 never 绕过暂存"关闭）；review 执行面透传 sessionId。
+- **S3.2/E-23 run 闸门**：approval.run 是声明式的后台评审回放通道（无意图调用被拒）。
+- **S3.3/E-24 崩溃窗口（executing 中间态）**：claim 原子置 `executing`——runner 执行后、resolve 落盘前崩溃，记录保持 executing+claimed：二次 approve 被拒（重复执行结构性不可能）；reject 提供无 runner 的清理通道；release 回滚 executing→pending（失败可重试）；`/evolution pending` 显式显示 EXECUTING。状态机（canClaim/canResolve/releasedStatus）在 state-storage 单点，两个 provider 共用（消灭 E-10 类漂移）。
+- **S3.4/E-25/E-61 审计归因**：PendingRecord 记录 origin+sessionId；reject 失败路径释放 claim（原与 approve 不对称）；approve 成功消息含 id+summary。
+- **S3.5/D-4**：PendingKind 删除 `skill_batch`（从未有创建方；zod 同步）。
+- **S3.6/E-27**：validator 内容预算纳入 patch `new_string`（此前该字段可绕过 100K 上限）。
+- **S3.7/E-28/E-28a**：policy 守卫扫描 memory `operations[]` 内层禁写键；threat 对 op 的 facts/content 取并集扫描（facts 非字符串不再遮蔽 content）。
+- **S3.8/E-60**：validator 对畸形 op（null/string/[]）逐条拒绝而非 TypeError（模型输出面）。
+- **S3.9/E-35**：capability 名正则禁尾/双连字符；approvedPackage 读回重校验（防带外篡改进入 Creator 激活）。
+- **S3.10/T-1**：禁写键 + 写工具名单单点化 core constants（validator/policy/threat 三处引用）。
+- **S3.11/E-76**：replay 空 policyFingerprint 视为缺失（排行榜不再出现空名条目）。
+
+**门禁修正（重要）**：vitest include 曾漏 9 个包（approval/policy/threat/io/io-node/state/state-storage/capability/memory-files 的测试从未进入全量套件）——已补全；全量从 68 文件/429 测试提升到 **77 文件/462 测试**；新增状态机/崩溃回归/双 provider 平行测试。本地：77/77（462）、oxlint 0/0、tsc（全部涉改包）0。
+
+## 0.3.16 (patch) — audit v13 修复批（阶段 0+1：7 项 P1/P2/P3 修复 + 债务批）
+
+外部审计（dsh-evolution-mirror-audit-report.md，5 路分包全量通读 + 实测复现）的第一批落地，每步先核验问题属实再修。
+
+- **E-1 redact 偏移量污染**：无捕获组模式改用字面量替换（旧 replacer 把 match offset 数字写进输出，如 `'use 4<redacted>'`）；仅 inline-assignment 保留前缀拼接；core 新增 redact 测试网（8 模式 + 无污染 + 幂等）。
+- **E-2 fuzzyPatch `$` 展开**：精确匹配路径改用替换函数（字符串替换串会展开 `$&`/`$'`/`$$`，LLM 写 shell 替换文本会静默损坏文件）；快速/模糊/replaceAll 三条路径字面量语义一致 + 测试。
+- **E-3 归档恢复前缀误伤**：`startsWith(\`${name}-\`)` 会把兄弟技能归档（foo-bar）误认为 foo——恢复前校验候选归档内 SKILL.md 的 frontmatter name；恢复回退失败 fail-soft（返回结构化结果，不裸抛）。
+- **E-4 preset 未声明依赖**：删除 `evolution-preset/cordis.patch.yml` 的 evolution-capability 挂载行（与 D-9 注释矛盾、依赖未声明）+ 新增 dependency-contract 契约测试——**顺带抓到第二个**：patch 挂了 `evolution-state` 行而依赖未声明，已补（host 此前已正确声明）。
+- **E-5/E-39 maintain 卡死与冷却**：单飞标志、富化与扫描整体移入一个 try/finally——富化抛错不再永久卡住 "already running" 且无日志；冷却在成功/失败时都更新；异常翻译为结构化命令错误 + 回归测试。
+- **E-12 威胁扫描盲区**：`slice(0, 65_536)` 让 65K 之后的技能内容全部漏扫（内容上限 100K）——改为整文本重叠窗口扫描（重叠 4K >> 最长模式跨度），同一模式跨窗口命中去重。
+- **E-13 快照恢复无保护**：restoreLatestSnapshot 抽取 `restoreSnapshotIntoRoot` 并包 try/catch——恢复失败自动回滚到 pre-rollback 快照（双失败时给出双路径救援提示），不再清空 root + 裸抛。
+- **E-14 archive 跨介质双份**：copy 成功而 remove 失败时先回滚已拷贝的归档，再回滚失败也给出"双份待清理"明确消息。
+- **T-14 consolidate 回滚静默**：`restoreFromArchive(source).catch(() => {})` 不再吞——回滚失败清单写入结果（"rolled back EXCEPT …"）。
+- **E-38/E-38a restructure 定位与行尾**：改用 frontmatterBlock 严格闭合行（旧 `indexOf('\n---')` 匹配 `----` 行导致 frontmatter 泄漏进正文）；body 按字节切片保留闭合行后的换行符；CRLF 文件保留原行尾（不再整体 LF 化）。
+- **E-42..E-50 P3 批**：`DSH_HOME ??` → `||`（空串视为未设置，3 处）；SKILL.md 为目录时 SkillLibrary.read 视为 absent（readText 保持 EISDIR——rotation 的损坏归档检测不松动）；afterHash 选 SKILL.md 改 basename 判断；hermes_env 补 `%USERPROFILE%` 变体；latestActivityAt 改 Date.parse 数值比较；yaml plain-scalar 补 null/bool/number/结尾冒号；reviewPrompt('memory','plan') 返回合并计划提示词（旧为错误通道）；observeEvent 内容形状守卫；mutation 事件 `filePath` 拆为 `skillDir`+`file`。
+- **S1.10-S1.14 债务**：删除零调用 `MemoryStore.write()`（裸写路径，D-2）；`AUTHORING_DESCRIPTION_BAR` 迁 constants（drift-signals 不再 import skill-store）；`PROMPT_BUNDLE_ID` 由 VERSION 派生（T-5 双源消除）；指针行常量单点化（T-6）；X-1/X-2 随手修（transact 任务允许同步返回）。
+- 本地：vitest 68/68（429）、oxlint 0/0、tsc -b（core/commands/maintenance）0。
+
+## 0.3.15 (patch) — preset install composes the runtime standard + delta (P1-1 follow-up)
+
+0.3.14's `/evolution preset install` copied the published `agent.cordis.yml` **delta-only** fragment into `$DSH_HOME/.agent-presets/evolution/`. The agent-preset registry mounts a preset's composition file **verbatim** (verified against `dsh-agent-presets` `mountPreset`), so the delta alone would have produced an agent carrying only the delta rows (no tools, no persona). The source installer path (`install-layered.mjs`) already generated the full composition — the 0.3.14 command skipped that step.
+
+- `evolution-core`: new pure `composePresetComposition(standard, delta)` — standard rows first, then the delta, with the same colliding-row guard as `install-layered.mjs`; `installer.spec` pins **byte parity** between the two implementations.
+- `evolution-commands` `preset install`: reads the runtime `standard` composition via the agent-preset registry (`agentPresets.read('standard')`), merges the delta shipped in `dsh-evolution-agent-preset`, and writes the composed `agent.cordis.yml` + `preset.yml` (idempotent; fails loud when delta rows collide with a standard that already absorbed them).
+- Docs (README/README.zh/INSTALL.md): preset-install step now describes the compose semantics (was "copies the preset files").
+- Tests: commands (composed output assertion + collision refusal), core (compose table), installer (parity pin).
+
+- Local: full suite 65/65 (404), oxlint 0/0, tsc -b (core/commands/host) 0.
+
+## 0.3.14 (patch) — audit v13 batch: preset delivery (P1-1), single-flight TOCTOU (P2-1), seven P3 items
+
+The v13 audit verified the 0.3.12 install story and found a **claimed-but-unbacked mechanism**: the docs promised "preset installed by the family's preset layer — no manual copying", but `dsh plugin add` has no agent-preset install channel (upstream `apps/cli/src/plugin.ts` verified) and the preset files were not inside any published dependency closure — a user following the docs could not select the Evolution preset. The same audit surfaced a single-flight race and seven P3 items.
+
+- **P1-1 preset delivery**: `dsh-evolution-all` now depends on `dsh-evolution-agent-preset` (the preset container — `agent.cordis.yml`/`preset.yml` ship inside the published dependency closure); new `/evolution preset install` command copies them idempotently into `$DSH_HOME/.agent-presets/evolution/` (no manual file copying anywhere); docs (README/README.zh/INSTALL.md) updated to the one-time `preset install` step; command hint + help text list it.
+- **P2-1 single-flight TOCTOU**: `maintainInFlightSince` is now set **before** the first await (`buildEnrichment` is the slowest segment) — check and set are adjacent across synchronous code only, so two re-triggers during the enrich window can no longer both pass the guard; concurrent-window regression test asserts the second trigger gets "already running" and the scan starts once.
+- **P3-1 doc values**: `011-maintenance-subagent-v2.md` still said `maintainTimeoutMs 默认 120_000` (code: 600_000 since 0.3.10) and cooldown 130s with the withdrawn "≥ timeout" rationale (code: 30s since 80ec941) — corrected + "以 code 常量为准" note.
+- **P3-2 unknown maintain args**: `maintain --foo` / `--timeout=600000` silently fell into the generic help branch despite the branch comment claiming explicit rejection — replaced with an explicit `^maintain\b` rejection.
+- **P3-3 frontmatter boundary single-owner**: new shared `frontmatterBlock` is the single closing-`---` detector for parse/normalize/detector (previously `parseFrontmatter`'s `indexOf('\n---', 3)` also matched `\n----` while normalize/detector required a trimmed exact line — a `----`-closed file would be seen as no-frontmatter by the normalizer but parsed by the family parser).
+- **P3-4 real-parser verification**: `normalizeFrontmatter` now re-verifies every rewrite with the real YAML parser (`js-yaml` — the platform catalog's parser; new `evolution-core` dependency + `@types/js-yaml` dev dep): if the rewritten block no longer parses or a rewritten value's parsed content differs (the multiline flow `[a,` fast-path mis-quote shape), the rewrite is rolled back and reported in `issues` — fail-loud, never a silent value mutation.
+- **P3-5 protected set enforced**: `validate-plan` builds `protectedNames` from `report.skills[].protected` and rejects any recommendation naming a protected skill — §7 "protected set → 0 recommendations" is now mechanical, not prompt-layer only.
+- **P3-6 abort detection tightened**: the abort signal is hoisted so the catch can consult it; detection is `abortSignal?.aborted === true || name === 'AbortError' || message === 'This operation was aborted'` (replaces the broad `/abort/i`) — a cancelled run still translates to the aborted message, an unrelated "abort" string no longer does.
+- **P3-7 manifest version alignment**: `normalize-mirror` aligns every package + root manifest version to the newest CHANGELOG line (was a hardcoded dev baseline `0.1.0-rc.1` — 13 releases off from what humans read); the dev-tree twin is a documented no-op (never rewrites canonical dev manifests); the exact release version still comes from the git tag via `prepare-release --version`.
+
+- Local: full suite 64/64 (398 tests), oxlint 0/0, tsc -b (core/maintenance/commands/all) 0.
+
+## 0.3.13 (patch) — maintain template v13: §6 language de-coupling
+
+Content-level audit of MAINTAIN_PROMPT (v12) found exactly one dataset-visible coupling: the §6 language rule hardcoded the output language as `（中文）` ("follow the library body language (Chinese)"). On a non-Chinese library this would mis-drive the output language.
+
+- §6: `与库正文一致（中文）` → `与库正文语言一致（不自订语言）` — the design intent (output follows the audited library) is preserved; the language anchor is gone.
+- `PROMPT_BUNDLE_ID`/`VERSION` 12 → 13 (template text changed semantically; id and version bump together per the module contract).
+- prompts.spec: version pin 13 + anchor on the de-coupled wording + a `not.toContain('（中文）')` guard against re-coupling.
+- Local: full suite 64/64 (393), oxlint 0/0.
+
+## 0.3.12 (patch) — one-command aggregate entry `dsh-evolution-all` + install docs
+
+The family's published install previously needed five entry packages. `dsh-evolution-all` (dependency-only aggregate, no composition rows of its own — `evolution-host` plus the three model-tool packages `tool-memory`/`tool-skill-manage`/`evolution-skill-catalog`) makes it one command:
+
+```bash
+dsh plugin --profile web add @lmzhen/dsh-evolution-all
+```
+
+- New package `evolution-all`: manifest-only aggregate (contract test pins the four-entry dependency set; `prepare-release` publish order extended).
+- Docs (README/README.zh/INSTALL.md): install section rewritten with the aggregate entry, a mechanism sentence (auto-recognized `dsh.bundle.patch` manifests → dependency tree pulled without flags), and a "choosing an install" table mapping scenario → operation → capability surface (full family / host-only / fine-grained exposure / legacy preset) — the model-tool visibility column is the safety-posture information a decision table previously lacked.
+- Local: evolution full suite + contract tests, oxlint 0/0, tsc 0.
+
+## 0.3.11 (patch) — authoring normalization + review completeness batch (template v12)
+
+The inkos-harness case exposed a class defect: its frontmatter description carried an unquoted `: ` (YAML plain-scalar violation), so the **platform catalog silently dropped the whole skill** (strict YAML parse) while the family's lenient `parseFrontmatter` still scanned it — a skill invisible to the platform but "present" to the audit. This release fixes the class at the write point, surfaces it in the audit, and closes the review-completeness gaps found across four real runs (13:38 / A-B arms / 15:01).
+
+**Generation side (write-point enforcement — guidance already existed but was ignorable):**
+- core: `yamlPlainScalarNeedsQuotes` (single rule source) + `normalizeFrontmatter` — `SkillLibrary.create/update/patch` auto-quote YAML-unsafe frontmatter values before writing (double quotes; single-quote `''`-doubling fallback so `"`/`\` values stay fixable — no catch-22 on legacy descriptions); unfixable control characters reject instead of writing a broken skill; `normalizedFrontmatterFields` reported back, tool-skill-manage surfaces it as an `Authoring check` line.
+- `frontmatterYamlUnsafeValues` — raw-line scan shared by the normalizer and the audit detector (quotes included: a value normalized by the write path is never re-flagged).
+
+**Audit side:**
+- facts skill headers now always carry meta: `# skill=x (protected=none catalog=yaml-invalid)` — §7 "protected set → 0 recommendations" becomes executable from fact data; catalog-unloadable skills become a visible flag instead of the auditor's honest-but-silent read-failure.
+- `maintenance_probe` `description_chars` returns `desc-text:` (truncated at 160 with `(truncated: N total)`) — the §5-B5 nature triage (event-commitment/narrative/dense) becomes exercisable for skills the auditor cannot read.
+- template **v12**: §5-B2 pointer_missing one-way semantics (`支持文件存在、正文无引用` — fixes the 15:01 inverted finding); §5-B5 third-class gate is semi-mechanical now (write a ≤60-char compression attempt first; keeping all route keys disqualifies the third class; failure must show the attempt + failing point) + per-class text signatures + "text visible → still classify; length-only → conf≤0.4".
+
+**Command side:** single-flight guard — a re-trigger while a scan is running returns "already running" instead of spawning (0.3.5 discovered the cooldown never covers in-flight runs; a re-submit used to cancel the running scan at the platform level).
+
+**Data:** inkos-harness description double-quoted (the instance fix).
+
+Tests: frontmatter normalize (+ truth table, idempotence, no-touch, catch-22 regression, embedded-newline skip), write-path integration (create/update/patch), raw-line detector, facts meta, probe desc-text, single-flight four-state. Local: 63 files / 392 tests, oxlint 0/0, tsc 0; real-library render: inkos `catalog=yaml-invalid` → (after fix) 6/6 `catalog=visible`, zero-touch verified byte-identical.
+
+## 0.3.10 (patch) — maintain default timeout 120s → 600s
+
+A bare `/evolution maintain` run (14:37, commandId cmd-adce9ea7-1) aborted with "Maintenance scan was aborted..." exactly **119.94s** after the subagent spawned — the `AbortSignal.timeout(120_000)` default, verified from session logs (child createdAt → turn/end kind:parent; no user interrupt, no duplicate submission). The child was mid-analysis (§4 step ②, B2/B5 with the inkos-harness read-failure being handled correctly per §4) and needed only more time — the 13:38 run with `--timeout 600000` completed the same scan. 0.3.4's flag was the workaround; the persistent default stayed too tight.
+
+- `evolution-commands` `maintainTimeoutMs` default 120_000 → **600_000** (comment updated with the evidence).
+- `evolution-maintenance` orchestrate `options.timeoutMs ?? 120_000` → `?? 600_000` (standalone default parity).
+- No test pinned the old default (specs pass explicit values). Local: maintenance + commands 59/59, oxlint 0/0.
+
+## 0.3.9 (patch) — maintain probe: single-source description/quality enrichment
+
+First real run (13:38) surfaced a source inconsistency as a B5 note: the facts block measured real `description_chars` (198/104/…) from SKILL.md frontmatter while `maintenance_probe` answered `description=missing` for the same skills. Root cause: the probe tool built **body-only** snapshots and never ran the scan's enrichment — two measurement sources for one signal (the 011 single-source violation).
+
+- `evolution-maintenance`: `buildEnrichment` (descriptions/supportFiles/quality/usageObserved over the live library) moved from `evolution-commands` into the maintenance package (`src/enrichment.ts`, re-exported by index) — enrichment construction is now owned next to the scanner and shared by the facts preview AND the probe tool.
+- `tools.ts` probe execute builds snapshots via `buildEnrichment(ctx, library)` + `snapshotFromLibrary(library, { descriptions, supportFiles, quality })` — the same construction the scan uses; `description_chars` can no longer disagree with the facts block.
+- `evolution-commands` imports the shared `buildEnrichment` (local copy removed, unused imports dropped).
+- Tests: probe contract test — enriched description → `${len} chars`, snapshot without one → `description=missing`. Local: evolution suite 62/62 (374 tests), oxlint 0/0.
+
+## 0.3.8 (patch) — maintain cancelled-run translation
+
+A cancelled `/evolution maintain` surfaced misleading text: the platform's driver **resolves** (not rejects) a cancelled run with `structured: undefined, stopReason: "aborted"`, while the command-retry cancellation path can also reject with a plain `Error("This operation was aborted")` (name not AbortError). Both slipped past the 0.3.3 name-only detection and were reported raw/undefined-plan.
+
+- `orchestrate` no-plan branch now reads `runResult.stopReason === 'aborted'` → "Maintenance scan was aborted (the run was cancelled before the subagent produced a plan) — retry when the session is idle; concurrent re-submission cancels the previous scan."; other no-plan results keep the clarified message.
+- `orchestrate` catch broadens abort detection to `name === 'AbortError' || /abort/i.test(name + message)` — the plain-Error abort shape now translates too.
+- Tests: plain-Error abort shape, cancelled settle with stopReason. Local: orchestrate + commands 58/58, oxlint 0/0.
+
+## 0.3.7 (patch) — maintain template v11: prompt-guidance rebuild (subagent-verified loop)
+
+MAINTAIN_PROMPT rewritten (PROMPT_BUNDLE v10→v11) after a three-round **rewrite → real-subagent run → review-against-standards → fix** loop on the real skill library. Guidance fixes that landed:
+
+- **§3 completeness contract** (validator-enforced): every `over` signal must land in an item's evidence or be declared in notes ("已审·无条款对应·不动作") — no silent omission (fixes the earlier 5-of-12 overlong-line underreporting shape).
+- **§4 workflow**: explicit 5-step order + honest tool-fact reporting on read failure (the previous run papered over an unreadable skill as "无法读取").
+- **§5-B1 three-question test** for anchor-vs-residue (cross-file reference / extra semantics / deletion impact), explicit *anchor ≠ readable* (a >4000-char line splits even when the anchor verdict holds), and **no is_override on the anchor path** (override is the §7 appeal channel only).
+- **§5-B5 nature triage with a strict third-class gate**: event-commitment → trim; narrative → compress; dense-but-compliant requires an explicit "60 chars cannot hold this use-case boundary" proof before an override grant (the first loop ran all six descriptions as "豁免" — the shortcut the gate now closes).
+- **§6 confidence downgrade rule** (semantic inference caps at 0.4) + **pre-submit checklist** (§7 reviewer perspective: independent judgment first, self-narrative as clue only, stricter bar for self-owned skills).
+- Verified by three subagent rounds: round 1 (broken input) executed the §1 contract refusal correctly; round 2 exposed the exemption shortcut + mechanism mixing; round 3 converged (4 of 6 descriptions diverge into compress/pending, B1 kept without override, honest tool-fact report). Local: prompts 12/12, maintenance 40, commands 16, anchored-smoke 2/2; oxlint 0/0.
+
+## 0.3.6 (patch) — maintain plan: truthful undo_path default for irreversible items
+
+First real subagent plan hit `Maintain plan rejected by validator: plan[0].undo_path: required` — the model omitted/emptied `undo_path` on an item whose `reversibility` was `none`. The mechanical gate now normalizes that case instead of rejecting: `reversibility: none` + missing/empty `undo_path` → `'n/a'` (the display/audit contract's existing value). Reversible items (archive/restructure/patch/rename) keep the hard requirement — a fabricated undo path is never acceptable. Tests: missing undo_path + none → ok with `n/a`; missing + restructure → still rejected.
+
+## 0.3.5 (patch) — maintain cooldown default 130s → 30s
+
+`maintainCooldownMs` default lowered to 30s. The old 130s rationale ("≥ maintain timeout, so the window also covers in-flight runs") was a comment bug: `lastMaintainAt` updates AFTER a run settles, so the window never deduped in-flight runs anyway — 130s only punished rapid legitimate retries (e.g. iterating a failing scan). 30s remains a sufficient misclick guard; the window still applies on success AND failure.
+
+## 0.3.4 (patch) — per-run maintenance timeout flag
+
+`/evolution maintain --timeout <ms>` overrides the subagent deadline for THAT run only — no file edit, no restart (the runtime-facing answer to "keep timing out"). `maintainTimeoutMs` stays as the persistent default; the flag wins when present.
+
+- `evolution-commands`: maintain branch parses `--timeout <ms>` (positive safe integer, rejects anything else explicitly — 011 §3 no-silent-swallow), threads it into `runMaintain` options; command hint + help text updated.
+- Test: flag parsing (invalid value rejected with guidance; `--timeout 600000` reaches the subagent start with a signal). Note the test library must be NON-empty — `runMaintain` short-circuits an empty library before the subagent start (the empty-library path returns "Nothing to do" without spending a model call).
+- Local: commands 16/16 + maintenance 38.
+
+## 0.3.3 (patch) — maintenance abort translation + configurable timeout
+
+0.3.2's `/evolution maintain` could surface the raw platform abort text (`Error: This operation was aborted`) when the one-shot subagent hit the 120s `AbortSignal.timeout` deadline (or a cancelled turn) — the orchestrate catch funneled `String(error)` straight to the command reply.
+
+- `evolution-maintenance` orchestrate catch now detects `AbortError` **by name** (DOMException does not reliably extend Error) and returns a readable message ("Maintenance scan was aborted (subagent timeout or cancellation) — retry, or raise the timeout..."); other errors get a `Maintenance scan failed:` prefix instead of the bare `Error:` text.
+- `evolution-commands` gains `maintainTimeoutMs` (default 120_000) threaded into the subagent `signal` — slow providers / very large skill libraries can raise the deadline.
+- Tests: AbortError translation (clean message, raw text absent), timeout pass-through via the signal, existing failure-message case unchanged. Local: orchestrate 11/11 + commands 15/15.
+
+## 0.3.2 (patch) — subagent maxDepth semantics fix
+
+0.3.1's `maintain`/`review` subagents crashed on any real run with `SubagentDepthError: subagent depth 1 exceeds maxDepth 0`. The `maxDepth` spawn option is the **absolute cap of the child's own delegation depth** (platform `resolveChildDepth`: `childDepth = parentDepth+1` must be `<= maxDepth`), not "the subagent may not nest" — a `0` rejects the spawn itself. P2-9 had verified the value as *legal* (validator accepts non-negative safe integers) but not the *semantics*; the shape pins locked the wrong value and fake-subagent tests never exercised the real check.
+
+- `evolution-review` `config.reviewMaxDepth` default `0` → `1` (interface comment corrected too).
+- `evolution-maintenance` orchestrate spawn `maxDepth: options.maxDepth ?? 0` → `?? 1`.
+- `anchored-smoke.spec.ts` shape pin now asserts `1` with the corrected contract note; local run 38/38 green (maintenance suite + anchored-smoke).
+- Integration-plan P2-9 note corrected with the 0.3.2 re-read.
+
+## 0.3.1 (patch) — fixes the 0.3.0 maintenance package packaging
+
+0.3.0 shipped `@lmzhen/dsh-evolution-maintenance` broken in two ways (both fixed here, both caught by a new pack-time guard):
+
+- **Missing bundle chunk**: the tsdown build splits the shared `probe.ts` into `lib/probe-<hash>.js`, but the package `files` whitelist only listed `lib/{index,invariant,tools}.js` — `npm pack` silently excluded the chunk while `lib/index.js` and `lib/tools.js` both `import "./probe-<hash>.js"`. Runtime signature: `ERR_MODULE_NOT_FOUND` for `.../lib/probe-*.js` on plugin-tree load. Fix: whitelist is now `lib/*.js` + `lib/types/**/*.d.ts` (chunks ship, tsc-only `lib/types/*.js` and `tsbuildinfo` still do not).
+- **Unrewritten scope in a second entry**: `rewriteScopedJs` passed a single one-shot `names.keys()` iterator into every file's rewrite — the first file consumed the whole family-name set, so later files kept `@deepseek-ai/dsh-evolution-*`. Only `evolution-maintenance` has a non-index entry importing family code (`lib/tools.js` → `@deepseek-ai/dsh-evolution-core`), which is why only it broke. Fix: materialize `[...names.keys()]` (re-iterable per file) + comment pinned at the call site.
+- **Pack-time guard** (`prepare-release.mjs`): the post-pack validation now scans EVERY runtime bundle in `lib/` (not just `index.js`) for unrewritten family names AND resolves every relative `"./x.js"` import against the staged bundle set — both 0.3.0 defects would now fail the validate chain instead of reaching npm. Also accepts npm 12's object-shaped `npm pack --json` output (npm 11 returns an array).
+
+## 0.2.1 (patch) — memory snapshot refresh bypass fix (v8 audit P2)
+
+- **Write-sink refresh** (`memory/src/index.ts`): `MemoryRegistry.applyBatch` now emits `evolution/memory-applied` after ANY successful write — the snapshot refresh moved from the foreground `memory` tool's own callback to the single write sink. Bypass paths (`/graph edit|delete memory:` and background-review direct writes, both default-deployment paths) now refresh the model-visible snapshot instead of leaving it stale until the next foreground tool call.
+- **Subscriber** (`tool-memory/src/index.ts`): listens to the event and re-renders `snapshotText` (best-effort; the local tool callback stays as immediate refresh — idempotent double refresh at negligible cost). Zero cache cost: an unchanged snapshot injects nothing, a changed one appends one tail message (platform dedup).
+- Tests: registry event unit (emit after successful write), tool-memory bypass regression (direct `applyBatch` → assembled context snapshot contains the new fact). Local: P2 clusters 32/32, full 294/311 (17 red = 14 timeouts + feedback 8-writer + layout-sync timing + anchored-smoke scheduling-sensitivity — all known/isolation-green classes, zero memory-surface), tsc 0, oxlint 0/0.
+- Tooling: `vitest.evo5.tmp.mjs` include restored for `memory/tests` and `learning-graph/tests` (they were never collected by the suite).
+
+## Unreleased — v7 audit fixes (P1-1 restructure frontmatter duplication + P3-1/P3-2/P3-3)
+
+- **P1-1 (correctness, in the tagged rc.1/rc.2 code)**: `restructure` assembled `header + plan.body` where the planner had been fed the FULL normalized text — every successful call wrote a second frontmatter block (duplicate `name`/`description` keys, accumulating on repeated calls). The lenient `parseFrontmatter` and all `toContain`-style tests tolerated it (v7 audit caught it; 009-R claimed "zero behavior change" and this betrayed that claim). Fix: the planner now receives the body only; structure-level regression added — parsed body must never start with `---` and a second restructure must not stack copies.
+- **P3-1 (gate completeness)**: `supportRefs` now matches ANY extension and nested paths (`scripts/run.sh`, `references/sub/x.md`) — the `.md`-only regex missed both, so the "dangling links are not constructible" claim was stronger than the implementation. `..` traversal stays out of the link set (path validation owns that class). Regression: non-md + nested refusal in append mode.
+- **P3-2 (comment accuracy)**: `appendUsageWindowEvent` no longer claims "the next observed read retries" — the anchor fires exactly once (view 0→1); a failed append is never retried (sidecar stays the truth).
+- **P3-3**: removed the dead `tag` variable in mirror `publish-scoped.mjs` (unused since distTag auto-selection); 008 design doc gains an implementation note (`type:'usage'` not `type:'skill'`; restructure events live on the process bus, not the timeline; anchor is fire-once). Cosmetic double-blank-line residue in skill-store comments left as-is (zero behavior).
+- Local: v7-fix clusters 33/33, full 303/308 (5 load-timeout/8-writer class failures, known pattern), tsc 0, oxlint 0/0.
+
+## Unreleased — 009: unified tree-change kernel — package-integrity gate + reference-mode demote (design 009, all batches)
+
+- **Kernel `applyTreeChange`** (`evolution-core/src/skill-store.ts`): the single commit point for deterministic tree mutations — owns validation order (badName → protection → preconditions mount → pre-read rollback bytes → semantic/bytes/threat validation), two-phase write with byte-level rollback, audit and the mutation event. Mutators compose `TreeChangePlan`s; consolidate and restructure no longer implement two-phase commit themselves (009-I + 009-R; the archive step stays outside the kernel — it is a tree-external move with its own rollback loop).
+- **Package-integrity gate** (009-I): `supportRefs()` (pure) extracts support-directory links; append-mode consolidation REFUSES a source that carries support files or whose body links its own references/templates/scripts/assets — zero side effects (no archive, no write), the message directs to `mode:'reference'` or whole-package archive. Restructure refuses a moved section whose text carries support links (those links stay behind); a new pointer line is a fresh link to a file written in the same plan. Dangling support links are no longer constructible.
+- **Reference-mode demote** (009-II): `consolidate(target, sources, origin, { mode: 'reference' })` writes each source's body (frontmatter stripped, provenance comment) as `target/references/<source>.md`, adds a `> 详见 references/<source>.md` pointer line to the umbrella body, and archives the source (absorbed-into). Source bodies with support links are refused (dangling demote). Nominator surface: `CuratorConsolidation.mode` + `parseCuratorNominations` reads an optional `mode:` line BEFORE `into:`; the curator executor threads it; CURATOR_PROMPT documents the mode line and the YAML ordering contract. PROMPT_BUNDLE bumped 8 → 9.
+- Solves the audit gaps 3-1 (execution-time package integrity) and 3-2 (demote execution surface) in one architecture; 3-3 stays a declared design boundary (review channel creates new umbrellas).
+- Tests: core consolidate matrix (append merge / support-files refusal with zero side effects / linked-body refusal / reference demote + pointer + archive / reference refusal) 5 cases, parse mode unit, curator demote chain (nomination → reference file → pointer → archive), prompts pin 9. 009 clusters 86/86, tsc 0, oxlint 0/0.
+
+## Unreleased — C: observation window semantics + usage anchor events (008 batch IV)
+
+- **Observation window（信号门，零持久化）**：`usageObserved(usage)`（core，纯派生）判定库内是否已有任一观察证据；curator `healthView()` 在窗口开启前**不向评估传递 usage 计数**——churn（写幽灵）维度整体抑制（无 counts = 无可信输入），新增 `usageObserved()` 公开方法供命令面使用。`/evolution skills health` 在窗口未开时输出 `Usage observation not yet established — churn (write-ghost) rows are suppressed.`，不再静默显示干净结果。语义：`view_count=0` 仅在窗口开启后（库内出现任一可观测读）才等于"从未被读"——A2 部署前历史读取不可见的迁移期失真由此消除。
+- **Usage 锚点事件**（`evolution-events.ts`）：`EvolutionEvent.type` 联合扩展 `'usage'`，新增 `counts`（库级累计快照 skills/views/use/patches）与 `window.opened` 字段；skill-usage 在**库级首次观察读**（view 0→1）时向事件时间线追加一次锚点事件（`type:'usage'`, `kind:'skill'`, `source:'observation'`, `note:'observation window opened'`，best-effort，侧车仍为真值）。语义注释入模块头。`eventsHome` 加入 skill-usage Config（默认 DSH_HOME/`~/.dsh`，测试显式隔离）。
+- 周期聚合快照（每 N 次观察）**有意未实现**：观察计数在 usage 侧车已权威（时间线事件仅作窗口锚+时序可回溯），快照在真实观察高频且需跨重启聚合展示时再加（见 known-limitations #4）。
+- Tests: 锚点事件（首读写一次/不重复/快照语义）、窗口抑制（无 view 时 ghost 不出现）、commands 窗口注记（有/无观察两态）。C 簇 51/51，全量 296/299（3 例已知负载假失败类，隔离绿），tsc 0，oxlint 0/0。
+
+## Unreleased — B: restructure execution loop — SkillLibrary.restructure + plan op + approval reuse + prompt line (008 batch III)
+
+- **`SkillLibrary.restructure(name, moves, origin)`** (`evolution-core/src/skill-store.ts`): deterministic content-distribution repair — body sections anchored by their exact `## heading` line move into `references/<topic>.md` and each span becomes a `> 详见 references/<file>` pointer line. The skill's name/directory never change (routing stays; the fat body sheds log-like detail — the mechanical counterpart of A1's size/stamp/scatter signals). Deterministic contract: H2-only anchors, H2 section boundaries (deeper headings travel with their parent), `references/`-only targets (`RESTRUCTURE_TARGET_RE`, no `templates/`, no subdirectories), max 5 moves (`MAX_RESTRUCTURE_MOVES`), duplicate/ambiguous/empty sections rejected with zero writes, frontmatter + threat + byte-budget revalidation, pinned/bundled/hub origin gate, two-phase commit with full byte-level rollback, audit trail + `evolution/skill-mutated` event (action `restructure`). Never automatic: candidates come from the approved review plan.
+- **Plan op** (`evolution-plan-validator`): `SkillOp` action `restructure` with `restructure: [{heading, to_file}]` — validator checks the non-empty list, the move cap per plan, non-empty headings, and the `references/<topic>.md` target shape.
+- **Review channel** (`evolution-review` + `evolution-core/prompts.ts`): the SKILL and COMBINED review prompts gain the restructure preference step (only headings that exist verbatim; never restructure a healthy skill), PROMPT_BUNDLE bumped 7 → 8; `executeSkillDirect` routes the op straight into `SkillLibrary.restructure` with the `background_review` origin. Approval reuse is unchanged (runApproved / runner replay both carry the op as-is — the skill runner gained the restructure branch). Read-before-write now treats `restructure` like patch/delete: an op on a skill never read this session is dropped with the other unread ops.
+- **Tool surface** (`tool-skill-manage`): `skill_manage` action enum + parameters gain `restructure` (with `heading`/`to_file` items) and the description carries the mechanism; the tool path converts `to_file` → `toFile` and records a patch (it mutates content).
+- Tests: core restructure suite (single move / append / multi-move ordering / unknown heading zero-write / duplicate / empty / out-of-domain targets / pinned origin gate / deeper-heading travel), validator restructure branch (shape/domain/cap), tool end-to-end restructure, prompts version pin 8. Local: B clusters 94/94, full 294/296 (2 load-sensitive flake classes — feedback 8-writer transact + installer 20s cold window — both isolation green), tsc 0, oxlint 0/0.
+
+## Unreleased — A2: skill-usage read observation + usage churn dimension (008 batch II)
+
+- **Read-side observation** (`skill-usage/src/index.ts`): the service now listens on `session/event` for `tool/call` records of the read tools (`skill`, `skill_load`) — the same bus seam evolution-review already uses — parses the skill name the same way, and bumps `view` on EXISTING records only. The declarative `READ_TOOL_KIND` table is the single classification point; a read of an unknown skill never mints a usage record (records stay authored by creation / patch / curator seed). This closes the read-side telemetry gap: the usage sidecar's view counters are live, so `usage.json = {}` no longer means "no reads".
+- **Churn dimension** (`evolution-core/src/skill-health.ts`): `assessStructureHealth` gains an optional usage dimension — patch count at/above `churnMinPatches` (default 20, `DEFAULT_HEALTH_THRESHOLDS`) with zero reads warns "patched N times but never read (write-ghost — content may be dead)". Absent counts keep the dimension null; the verdict logic and the six-factor quality scoring stay untouched.
+- **Curator `healthView()`** now loads the usage sidecar and passes per-skill `patch_count` / `view_count` into the assessment; `healthChurnMinPatches` joins the threshold config surface. Existing behavior pinned: observation is additive wiring, the write path (`record`/`report`/`setQuality`/archival) is unchanged.
+- Tests: session/event emission through a real Cordis ctx (view counts from `skill` + `skill_load`, non-read tools ignored, no mint for unknown reads), churn warn/ignore units, curator write-ghost row via seeded usage counts. Zero behavior change, zero version move (008 program stays main-only).
+
+## Unreleased — rc.73 A1: skill structure-health observability (008 batch I)
+
+- **`SkillHealth` domain** (`evolution-core/src/skill-health.ts`): a pure, derived assessment dimension beside the six-factor usage quality — `assessStructureHealth` over body size (soft limit 40k chars, `needs-restructure` at 2x), stamp density (rc.NN / commit-sha / ISO-date lines per KB — the "invalid info" indicator) and scatter (large body with no support groups). Thresholds are declarative `DEFAULT_HEALTH_THRESHOLDS`, curator-configurable (`healthSoftBodyChars` / `healthStampDensityPerKb`).
+- **Curator `healthView()`**: degraded skills only (verdict + reasons), derived on demand — never persisted, never a 7th quality factor (different dimension, different consumers).
+- **`/evolution skills health`**: prints degraded rows or a clean verdict.
+- **100k gate split-advice**: the create and patch error messages now carry the original's "Consider splitting into a smaller SKILL.md with supporting files." — the one-line gap against the original.
+- Design: `docs/design-review/008-skill-loop-completion.md` (judgement table, four-seam architecture, robust batch decomposition A1/A2/B/C). Zero behavior change: assessment is read-only exposure; both new seams are additive.
 
 ## 0.1.0 (stable) — rc.72 content: audit-v6 + deep-sweep batch (G-1..G-3, H-1..H-3)
 
