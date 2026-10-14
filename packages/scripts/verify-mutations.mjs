@@ -47,16 +47,18 @@ for (const gate of gates) {
 const counts = {
   recorded: entries.filter((e) => e.status === 'recorded').length,
   cannotDecide: entries.filter((e) => e.status === 'cannot-decide').length,
-  redProven: entries.filter((e) => e.status === 'recorded' && (records[e.id] ?? []).some((r) => r.expect === 'red')).length,
+  redProven: entries.filter((e) => e.status === 'recorded' && (records[e.id] ?? []).some((r) => r.expect === 'red' && typeof r.provenAt === 'string')).length,
+  unstamped: entries.filter((e) => e.status === 'recorded' && !(records[e.id] ?? []).every((r) => typeof r.provenAt === 'string')).length,
 }
 const accountWanted = process.argv.includes('--coverage') || (!process.argv.includes('--only') && !process.argv.includes('--self-test'))
 if (json && accountWanted) console.log(JSON.stringify({ schema: 1, gates: gates.length, counts, entries }, null, 2))
 else if (accountWanted) {
-  console.log('verify-mutations --coverage: ' + gates.length + ' gate(s): recorded=' + counts.recorded + ' cannotDecide=' + counts.cannotDecide + ' redProven=' + counts.redProven)
+  const unstampedIds = entries.filter((e) => e.status === 'recorded' && !(records[e.id] ?? []).every((r) => typeof r.provenAt === 'string')).map((e) => e.id)
+  console.log('verify-mutations --coverage: ' + gates.length + ' gate(s): recorded=' + counts.recorded + ' unstamped=' + counts.unstamped + (unstampedIds.length > 0 ? ' (' + unstampedIds.slice(0, 6).join(',') + ')' : '') + ' cannotDecide=' + counts.cannotDecide + ' redProven=' + counts.redProven)
   const missing = entries.filter((e) => e.status === 'cannot-decide')
   for (const entry of missing.slice(0, 8)) console.log('  - ' + entry.id + ': ' + entry.why)
   if (missing.length > 8) console.log('  ... ' + (missing.length - 8) + ' more')
-  console.log('verify-mutations: a red-proven count of 0 means NOBODY has proven a check can fail - not that the checks are weak. Fill checkMutations in the checks fact, then prove each record with --only <id>')
+  console.log('verify-mutations: redProven=' + counts.redProven + ' of ' + gates.length + ' check(s) carry a PROVEN red record' + (counts.redProven === 0 ? ' - a count of 0 means NOBODY has proven a check can fail, not that the checks are weak' : '') + '; fill checkMutations in the checks fact, then prove each record with --only <id> (which stamps provenAt + provenSha)')
 }
 // ── --only <id>: patch -> run -> assert the verdict -> restore and verify the bytes ──────────
 // The discipline (reviewer 13): a mutation that cannot be restored is worse than no mutation, so
@@ -111,8 +113,30 @@ if (onlyIndex >= 0) {
   }
   for (const record of list) results.push({ id, ...runRecord(id, record) })
   for (const result of results) console.log('  ' + result.status.padEnd(28) + result.detail)
+/** Write the proof stamp back into the record's home: a proof nobody can see is a claim, and
+ *  --coverage counts stamps. provenSha names the revision the proof applies to (the file as
+ *  restored), so a later edit to that file invalidates the stamp visibly instead of silently. */
+function stampRecords(id, results) {
+  const assetPath = resolvePath(HERE, 'family-facts.json')
+  const asset = JSON.parse(readBytes(assetPath, 'utf8'))
+  const checks = (asset.facts ?? []).find((fact) => fact.machine && fact.machine.kind === 'checks')
+  const block = checks.machine.checkMutations
+  const list = Array.isArray(block[id]) ? block[id] : []
+  let stamped = 0
+  for (let i = 0; i < list.length && i < results.length; i++) {
+    if (!results[i].status.startsWith('PROVEN')) continue
+    list[i].provenAt = new Date().toISOString()
+    list[i].provenSha = sha256(readBytes(resolvePath(HERE, '..', '..', list[i].mutate.file), 'utf8'))
+    stamped += 1
+  }
+  if (stamped > 0) writeBytes(assetPath, JSON.stringify(asset, null, 2) + String.fromCharCode(10))
+  console.log('verify-mutations: stamped ' + stamped + ' record(s) for ' + id + ' (provenAt + provenSha)')
+  return stamped
+}
+
   const failed = results.filter((r) => !r.status.startsWith('PROVEN'))
   console.log('verify-mutations --only: ' + results.length + ' record(s), ' + (results.length - failed.length) + ' proven, ' + failed.length + ' not')
+  if (failed.length === 0) stampRecords(id, results)
   process.exit(failed.length === 0 ? 0 : 1)
 }
 if (selfTest) {

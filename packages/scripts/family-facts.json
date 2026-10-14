@@ -1005,7 +1005,9 @@
                 "replace": "\"id\": \"gate-17x\""
               },
               "expect": "red",
-              "note": "breaking one declaration id breaks the closure both ways, so the doc-facts gate must red: this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)"
+              "note": "breaking one declaration id breaks the closure both ways, so the doc-facts gate must red: this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)",
+              "provenAt": "2026-10-14T07:42:48.792Z",
+              "provenSha": "abd1cabb6b5cb337a7f404f6ac6d28095743103808c350301c36a66b7412485f"
             }
           ],
           "gate-08": [
@@ -1016,7 +1018,9 @@
                 "replace": "ctx.on('evolution/skill-mutated-typo', () => {"
               },
               "expect": "red",
-              "note": "renaming a listener leaves the emit unlistened, so the pairing guard must red; this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)"
+              "note": "renaming a listener leaves the emit unlistened, so the pairing guard must red; this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)",
+              "provenAt": "2026-10-14T07:42:49.893Z",
+              "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
           ],
           "gate-12": [
@@ -1027,7 +1031,9 @@
                 "replace": "reviewSkillIntervals"
               },
               "expect": "red",
-              "note": "a hand edit in a generated artifact must fail the four-channel parity guard before the byte-freshness check even runs; replacement evidence for the retired real-tree pass"
+              "note": "a hand edit in a generated artifact must fail the four-channel parity guard before the byte-freshness check even runs; replacement evidence for the retired real-tree pass",
+              "provenAt": "2026-10-14T07:42:50.899Z",
+              "provenSha": "144ad133e417671b15001e42925999c5bf376c527b1d92de63f9b3a8d8c06b90"
             }
           ],
           "gate-22": [
@@ -1038,7 +1044,9 @@
                 "replace": "49-step"
               },
               "expect": "red",
-              "note": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)"
+              "note": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)",
+              "provenAt": "2026-10-14T07:42:53.601Z",
+              "provenSha": "d445e2dace7e8023f77b8208b9682df02a826fbed5128f55aa57f90ff7cdf91a"
             }
           ],
           "gate-48": [
@@ -1049,7 +1057,9 @@
                 "replace": "\"rows\": 60"
               },
               "expect": "red",
-              "note": "a registered axis count that disagrees with the live measurement: the ledger reports the drift and both numbers"
+              "note": "a registered axis count that disagrees with the live measurement: the ledger reports the drift and both numbers",
+              "provenAt": "2026-10-14T07:42:55.952Z",
+              "provenSha": "66f3b7509fc0bda804dfa6a3a1b93d725c64aeb15d081cc6fe8bba4fb5ab0da3"
             }
           ]
         },
