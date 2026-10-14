@@ -570,7 +570,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "f55bc187d101f70e2a3239ae49663169fcc9609aab6106bf20c35d05a25457e6",
+        "sha256": "a941d3afb2f8d62cf9e6975feec45b665dd958842afe962444eb5401a6496d66",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1227,6 +1227,19 @@
               "note": "rule A probe: the runExclusive call is dropped from the profile-patch write, leaving a serialization-free commit",
               "provenAt": "2026-10-14T08:01:31.188Z",
               "provenSha": "392d9dd75c246a74bf9b81aa6f5a5d84b9a6d6fe3db9048a2f1b879ecc7f8ffa"
+            }
+          ],
+          "gate-46": [
+            {
+              "mutate": {
+                "file": "packages/scripts/reports/check-taxonomy.json",
+                "find": "\"version\": 1",
+                "replace": "\"version\": 9"
+              },
+              "expect": "red",
+              "note": "forensic probe (round 83)",
+              "provenAt": "2026-10-14T08:04:33.557Z",
+              "provenSha": "bbe321feb3ce7644bf9e1eef2d072713a787be00185736eef1d40506bb67c60d"
             }
           ]
         },

@@ -708,11 +708,12 @@
     {
       "id": "gate-46",
       "kind": "script",
-      "human": "`node packages/scripts/gen-check-taxonomy.mjs packages`（G2/M1 视图：把「门禁 × 档位 × spec」的普查视图从**声明面生成**出来（`--report` 人读、`--json` 机读）；`--check` 判生成物与声明面一致。**空档位必须 exit 2**——一个跑不到任何 spec 的档不是\"干净\"，是真空）",
+      "human": "`node packages/scripts/gen-check-taxonomy.mjs packages --check`（G2/M1 视图：把「门禁 × 档位 × spec」的普查视图从**声明面生成**出来（`--report` 人读、`--json` 机读）；`--check` 判生成物与声明面一致。**空档位必须 exit 2**——一个跑不到任何 spec 的档不是\"干净\"，是真空）",
       "argv": [
         "node",
         "packages/scripts/gen-check-taxonomy.mjs",
-        "packages"
+        "packages",
+        "--check"
       ],
       "tree": "mirror",
       "profiles": [

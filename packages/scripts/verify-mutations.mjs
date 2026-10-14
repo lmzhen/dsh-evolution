@@ -113,6 +113,10 @@ function runRecord(id, record) {
   if (gate.tree === 'overlay') {
     return { status: 'TREE MISMATCH', detail: id + ': this row runs in the overlay while mutations are applied in the mirror - the run cannot see the patch' }
   }
+  // FORENSICS (round 83): when a probe reports NOT PROVEN the first question is whether the patch
+  // reached the file the check actually reads, so every probe prints the resolved path, the bytes'
+  // hash before and after the write, and the child's cwd + argv.
+  console.log('[probe] ' + id + ' file=' + file + ' sha-before=' + beforeSha.slice(0, 10))
   const baseline = spawnSync(process.execPath, argv[0] === 'node' ? argv.slice(1) : argv, { cwd: resolvePath(HERE, '..', '..'), encoding: 'utf8' })
   const baselineVerdict = VERDICT_OF_EXIT[baseline.status ?? 1] ?? 'red'
   if (baselineVerdict !== 'green') {
@@ -124,6 +128,7 @@ function runRecord(id, record) {
   const cwd = gate.tree === 'overlay' ? resolvePath(HERE, '..', '..', '..', 'deepseek-harness') : resolvePath(HERE, '..', '..')
   try {
     writeBytes(file, before.replace(record.mutate.find, record.mutate.replace))
+    console.log('[probe] sha-after-write=' + sha256(readBytes(file, 'utf8')).slice(0, 10))
     const child = spawnSync(process.execPath, argv[0] === 'node' ? argv.slice(1) : argv, { cwd, encoding: 'utf8' })
     const actual = VERDICT_OF_EXIT[child.status ?? 1] ?? 'red'
     const expected = record.expect
