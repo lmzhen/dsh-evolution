@@ -10,6 +10,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { EvolutionCurator } from '../src/index.ts'
+import { countingIo } from '../../test-support/counting-io.ts'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -42,23 +43,17 @@ describe('G2 S3: the curator prefers the platform backend when the deployment mo
       a.stop()
 
       // Deployment B: node stays the default AND a platform backend is mounted.
-      let fsCalls = 0
+      // G5 step 4: the counter is the SHARED wrapper (test-support/counting-io.ts); it wraps every
+      // method, so a backend that gains a new io entry point cannot silently escape the count.
+      const counted = countingIo(base)
       const withFs = new Context()
       await withFs.plugin(EvolutionIoRegistry)
       await withFs.plugin(NodeIo)
-      withFs.evolutionIo.registerProvider({
-        name: 'fs',
-        ...base,
-        readText: async (path) => { fsCalls += 1; return base.readText(path) },
-        list: async (path) => { fsCalls += 1; return base.list(path) },
-        writeText: async (path, text) => { fsCalls += 1; return base.writeText(path, text) },
-        exists: async (path) => { fsCalls += 1; return base.exists(path) },
-        size: async (path) => { fsCalls += 1; return base.size ? base.size(path) : null },
-      })
+      withFs.evolutionIo.registerProvider({ name: 'fs', ...counted.provider })
       const b = new EvolutionCurator(withFs, { autoStart: false })
       await b.skills.create('demo', content, 'foreground')
       await b.run({ dryRun: true, ignoreGates: true })
-      expect(fsCalls).toBeGreaterThan(0)
+      expect(counted.calls()).toBeGreaterThan(0)
       b.stop()
     })
   })
