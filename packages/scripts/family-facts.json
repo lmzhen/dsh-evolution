@@ -1410,6 +1410,19 @@
               "provenAt": "2026-10-14T08:32:28.937Z",
               "provenSha": "c257ed0fe7100b16158830e0997f889da8e1e2e4e4e2d555662b17fc69484859"
             }
+          ],
+          "gate-25": [
+            {
+              "mutate": {
+                "file": "packages/evolution-settings-ui/src/client/generated-params.ts",
+                "find": "{ bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage']",
+                "replace": "{ bundle: '@probe/not-a-family-bundle', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage']"
+              },
+              "expect": "red",
+              "note": "a seat row naming a bundle that is not a family bundle: judgement C checks the generated client view against the registry and the family bundle set, so an unknown bundle is its subject",
+              "provenAt": "2026-10-14T08:32:58.637Z",
+              "provenSha": "d028d0f02ef324e4ac0dd5d216237d17d23bc946041e932ee428e132a9bd27fb"
+            }
           ]
         },
         "mutationExempt": {
