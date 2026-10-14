@@ -966,13 +966,6 @@
             "reasonRef": "scripts/gate-manifest.json#gate-34 (composite table cell: six commands in one row)",
             "expiry": "0.26.0",
             "owner": "scripts"
-          },
-          {
-            "axis": "falsifiability-carrier",
-            "rows": 30,
-            "reasonRef": "rows declaring neither a drillCmd nor a noDrillReason: 36 rows now declare their drill (the mutation ledger invocation, so a declaration cannot drift from its proof; see scripts/drill-declarations.json) - the balance is what remains",
-            "expiry": "0.26.0",
-            "owner": "scripts"
           }
         ],
         "checkMutations": {

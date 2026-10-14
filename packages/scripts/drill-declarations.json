@@ -1,5 +1,5 @@
 {
-  "$comment": "How each row green can be turned red. For the rows the mutation ledger has proven, the drill IS the ledger invocation (the prover applies the recorded mutation, runs the row, asserts the verdict and restores) - so a proof and its declaration cannot drift. verify-gate-manifest reads this table directly: a row declared here is no longer a falsifiability-carrier observation.",
+  "$comment": "How each row green can be turned red. For the rows the mutation ledger has proven, the drill IS the ledger invocation (the prover applies the recorded mutation, runs the row, asserts the verdict and restores) - so a proof and its declaration cannot drift. verify-gate-manifest reads this table directly: a row declared here is no longer a falsifiability-carrier observation. Rows that cannot be drilled derive their noDrillReason from the mutation-exemption register, so a declared reason and its registration cannot drift either.",
   "drills": {
     "gate-17": {
       "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-17",
@@ -180,6 +180,134 @@
       "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-24",
       "evidence": "the single path-armed rule pointed at a file that does not exist: the arming audit re-checks these paths itself instead of trusting the report counters, because",
       "provenAt": "2026-10-14T08:37:13.545Z"
+    },
+    "gate-49": {
+      "noDrillReason": "the ledger itself: its declared state is cannot-decide while records are missing, so a mutation cannot flip it to red",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-33": {
+      "noDrillReason": "this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-13": {
+      "noDrillReason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-14": {
+      "noDrillReason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-15": {
+      "noDrillReason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-16": {
+      "noDrillReason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture ",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-45": {
+      "noDrillReason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture ",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-08": {
+      "noDrillReason": "its TARGET path (upstream/tsconfig.base.json) exists only in the CI overlay job, never in this repo: the row injects alias lines into the upstream tree that the compat job checks out, so no mutation i",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-18": {
+      "noDrillReason": "its subject is the PLATFORM tree outside this repo: the receipts name packages/core/... files and the argv points at an out-of-repo upstream checkout, so the reviewed repo carries neither the files it",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-01": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-02": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-03": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-04": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-05": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-01": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-02": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-03": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-04": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-05": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-06": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-07": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-09": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-10": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-11": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-12": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-13": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-14": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "graph-edges-live": {
+      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "line-identity-bed": {
+      "noDrillReason": "ABSENT-LOCALLY SUBJECT: its argv names packages/scripts/line-manifest.json as the bed manifest, and that file does not exist in this repo (it is produced on the bed tree it describes, from machine sta",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-27": {
+      "noDrillReason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mu",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "health-admission": {
+      "noDrillReason": "CANNOT-DECIDE BY DESIGN: run as registered it reports CANNOT DECIDE (user=46 platform=0) because a 0-hit count over an EMPTY corpus would admit every rule - the guard refuses rather than pass, so it h",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-50": {
+      "noDrillReason": "PRODUCER ROW, NOT A CHECK: its registered argv carries no --check, and the script only READS the machine skill corpora and WRITES scripts/reports/health-baseline.json through the engine - it has no ve",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
     }
   }
 }

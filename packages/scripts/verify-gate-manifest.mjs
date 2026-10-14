@@ -284,7 +284,7 @@ const observeAxis = (axis, id, message) => {
   // why it cannot be yet (noDrillReason). Neither means somebody forgot, which G6's gate-truth counts.
   const declaredDrill = drillDeclarations[gate.id]
   if (typeof gate.drillCmd !== 'string' && typeof gate.noDrillReason !== 'string') {
-    if (declaredDrill !== undefined && typeof declaredDrill.drillCmd === 'string') {
+    if (declaredDrill !== undefined && (typeof declaredDrill.drillCmd === 'string' || typeof declaredDrill.noDrillReason === 'string')) {
       // a declared drill satisfies the carrier axis: emit NO observation for this row
     } else
     observeAxis('falsifiability-carrier', gate.id, 'declares neither drillCmd nor noDrillReason - a green nobody can turn red is an F=0 candidate')
