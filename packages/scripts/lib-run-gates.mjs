@@ -1,5 +1,28 @@
 #!/usr/bin/env node
 /**
+ * @typedef {object} GateDecision
+ * @property {string} verdict
+ * @property {boolean} criterionEvaluated
+ * @property {{ kind: string }} [cause]
+ * @property {string} [evidence]
+ * @property {string} [next]
+ * @property {string[]} [missing]
+ */
+
+/**
+ * @typedef {object} RunOutcome
+ * @property {string[]} argv
+ * @property {string|null} cwd
+ * @property {number|null} status
+ * @property {'budget'|'external'|null} killedBy
+ * @property {number} [budgetMs]
+ * @property {string|null} [signal]
+ * @property {string} [errorCode]
+ * @property {number} [ms]
+ * @property {boolean} [present]
+ */
+
+/**
  * lib-run-gates.mjs (G1/S4): the runner seam and the PURE prerequisite decision.
  *
  * Why this exists: the executor used to spawn and judge in the same breath, so "why did this
@@ -13,25 +36,44 @@
  * declared and the process was externally SIGTERMed" must not read as a budget kill.
  */
 
+/** @type {string[]} */
 /** The prerequisite kinds and modes; the cross product is the declared closed set. */
 export const KINDS = ['in-repo', 'external']
+/** @type {string[]} */
 export const MODES = ['run', 'present']
+/** @type {string[]} */
 export const LEGAL_COMBINATIONS = KINDS.flatMap((kind) => MODES.map((mode) => kind + '/' + mode))
 
+/** @type {Record<string, string>} */
 /** The errno classification the matrix branches on. A code outside this map is UNKNOWN, which is
  * a cannot-decide with the raw code named - never a silent pass and never a fail. */
 export const ERRNO_CLASS = { ENOENT: 'missing', EACCES: 'denied', EPERM: 'denied', ETIMEDOUT: 'timeout' }
 
+/**
+ * @param {string} code
+ * @returns {'missing'|'denied'|'timeout'|'unknown'|null}
+ */
 export function classifyErrno(code) {
   if (typeof code !== 'string' || code === '') return null
   return Object.prototype.hasOwnProperty.call(ERRNO_CLASS, code) ? ERRNO_CLASS[code] : 'unknown'
 }
 
+/**
+ * @param {string} kind
+ * @param {string} mode
+ * @returns {boolean}
+ */
 /** Declaration-time form check: an unlisted (kind, mode) has no semantics, so it is red there. */
 export function isLegalCombination(kind, mode) {
   return LEGAL_COMBINATIONS.includes(String(kind) + '/' + String(mode))
 }
 
+/**
+ * @param {RunOutcome} result
+ * @param {string} kind
+ * @param {string} mode
+ * @returns {GateDecision}
+ */
 /**
  * Decide ONE prerequisite from what the runner observed. Pure and total: every branch returns a
  * decision fragment (verdict + whether THIS check's invariant was evaluated + cause + next +
@@ -106,6 +148,10 @@ export function decideRequires(result, kind, mode) {
     evidence: where + ' exit=' + String(seen.status === undefined || seen.status === null ? 'null' : seen.status) + ' after ' + String(seen.ms === undefined ? '?' : seen.ms) + 'ms' }
 }
 
+/**
+ * @param {{ spawn: Function, now: () => number }} deps
+ * @returns {{ run: Function }}
+ */
 /**
  * The seam. The CLI wires the real spawnSync; fixtures inject a stub, so no fixture has to start
  * a process to prove what the runner reports. The runner never decides - it observes.
