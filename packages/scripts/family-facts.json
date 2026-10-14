@@ -1358,6 +1358,19 @@
               "provenAt": "2026-10-14T08:28:09.313Z",
               "provenSha": "3fdd8ef62d69ab22d0ef484b926197731786796cef96600d5f58687a609dd641"
             }
+          ],
+          "gate-35": [
+            {
+              "mutate": {
+                "file": "packages/scripts/lib-preset-composition.mjs",
+                "find": "// GENERATED FILE — do not edit. Source: evolution-core/src/preset-composition.ts",
+                "replace": "// GENERATED FILE — do not edit. Source: evolution-core/src/preset-composition.ts // HAND-EDIT PROBE"
+              },
+              "expect": "red",
+              "note": "a hand edit to the generated installer-side port: the gate exists exactly to fail when the port is edited by hand instead of regenerated from the TypeScript source",
+              "provenAt": "2026-10-14T08:28:45.162Z",
+              "provenSha": "9fcc72f41e290751845718e56d1f02b3327332f8dcb2064fe10499dec89610f4"
+            }
           ]
         },
         "mutationExempt": {
