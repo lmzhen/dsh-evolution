@@ -442,8 +442,8 @@
             "maxWallMs": 60000,
             "budgetMeasured": {
               "ms": 49100,
-              "where": "machine-local stale dev tree, lane fast, 45 files / 223 tests, 2026-10-14 (vitest Duration 43.56s)",
-              "note": "the design target is 60s and the lane meets it once fast is DEFINED BY MEASUREMENT: the wall cost is a per-file floor (about 1.2s per file; 8 workers moved 179s to 165s, so the lane is not parallelism-bound), hence fast = the cheapest 45 measured files rather than all-but-the-slowest. Raising the budget is not the lever; the file count is"
+              "where": "machine-local overlay, lane fast(ci=off), 45 files / 223 tests, 2026-10-14 (vitest Duration 43.56s)",
+              "note": "the design target is 60s and the lane meets it on an idle machine; a second reading the same day with FEWER members (42 files / 218 tests) took 61.9s wall (Vitest passed, exit 0) - the wall time is LOAD-SENSITIVE, so a reading above the budget is a measurement condition, not a regression: re-measure before moving files out, and never widen the budget to absorb a loaded run"
             }
           },
           "pre-tag": {
