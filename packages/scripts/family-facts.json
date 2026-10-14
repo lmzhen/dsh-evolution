@@ -1061,6 +1061,19 @@
               "provenAt": "2026-10-14T07:42:55.952Z",
               "provenSha": "66f3b7509fc0bda804dfa6a3a1b93d725c64aeb15d081cc6fe8bba4fb5ab0da3"
             }
+          ],
+          "gate-06": [
+            {
+              "mutate": {
+                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
+                "replace": "import type {} from '@deepseek-ai/dsh-evolution-core-typo'"
+              },
+              "expect": "red",
+              "note": "one source import renamed to a package the manifest does not declare (the whole line is the anchor: the bare specifier occurs twice in this file and twice in the manifest)",
+              "provenAt": "2026-10-14T07:44:45.627Z",
+              "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
+            }
           ]
         },
         "unmappedTier": [
