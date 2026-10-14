@@ -1126,6 +1126,19 @@
               "provenAt": "2026-10-14T07:53:21.655Z",
               "provenSha": "4a38598ed694cb6924967c64c7236e4256d2689657a100d24341288d3dfd4582"
             }
+          ],
+          "gate-10": [
+            {
+              "mutate": {
+                "file": "packages/evolution-core/src/params.ts",
+                "find": "  { id: 'reviewSkillInterval', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Tool calls between skill-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself used a skill.', label: '技能检查间隔', hint: '每累计多少次工具调用检查一次技能：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到技能则只算 1 次。', control: 'number', unit: '次', values: '', card: 'evolution-review' },",
+                "replace": "  { id: 'reviewMemoryInterval', group: 'review', tier: 'E3', authority: 'cordis', owner: 'evolution-review', applies: 'live', docAnchor: 'PARAMETERS.md#review', summary: 'Tool calls between skill-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself used a skill.', label: '技能检查间隔', hint: '每累计多少次工具调用检查一次技能：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到技能则只算 1 次。', control: 'number', unit: '次', values: '', card: 'evolution-review' },"
+              },
+              "expect": "red",
+              "note": "two registry rows sharing one id: the param-registry guard requires unique canonical ids",
+              "provenAt": "2026-10-14T07:55:16.394Z",
+              "provenSha": "7f5f34f7e6fac9ab7ee7bf8716530e2f82752581bbfc4b9f5c48dd035ed27e66"
+            }
           ]
         },
         "mutationExempt": {
