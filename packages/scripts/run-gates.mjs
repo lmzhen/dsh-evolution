@@ -50,7 +50,7 @@ const identityFor = (lane) => ({
 })
 
 const parts = (cmd) => (cmd.replace(/^node\s+/, '').match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [])
-const show = (list) => list.map((g) => g.id.padEnd(9) + g.tree.padEnd(8) + g.cmd)
+const show = (list) => list.map((g) => g.id.padEnd(9) + g.tree.padEnd(8) + g.human)
 const emitList = (list, label) => {
   if (has('--json')) { console.log(JSON.stringify({ profile: label, count: list.length, ids: list.map((g) => g.id) }, null, 2)); return }
   console.log('run-gates [' + label + '] ' + list.length + ' gate(s)')
@@ -77,18 +77,28 @@ if (has('--list')) { emitList(list, profile); process.exit(0) }
 const runner = createRunner({ spawn: spawnSync })
 const identity = identityFor(profile)
 const records = []
-const base = (g, extra) => ({ id: g.id, check: g.cmd, criterion: g.id + '-criterion', identity, subject: { kind: 'paths', count: 0 }, ...extra })
+const base = (g, extra) => ({ id: g.id, check: g.human, criterion: g.id + '-criterion', identity, subject: { kind: 'paths', count: 0 }, ...extra })
 
 for (const g of list) {
   // 1) static executability: a placeholder token or a non-command argv[0] cannot run a criterion at all
-  const argv = parts(g.cmd)
-  // the placeholder is named from the RAW command: a multi-word one (<platform tree>) tokenises apart
-  const placeholder = (g.cmd.match(/<[^>]*>/) || [])[0]
+  // M2: the executable form is the declared argv; the human cell is prose and may carry
+  // placeholders. A row that declares no single command (a composite table cell) is
+  // cannot-decide with its reason named - never "run the first thing that looks like a command".
+  const argv = Array.isArray(g.argv) ? g.argv : null
+  // the placeholder is read from the JOINED argv (the executable form): a multi-word one
+  // (<platform tree>) stays whole (R124), and a placeholder that lives only in the human
+  // annotation is prose about usage - the table row 24 annotates a <path> it never passes.
+  const executable = argv === null ? '' : argv.join(' ')
+  const placeholder = (executable.match(/<[^>]*>/) || [])[0]
+  if (argv === null || argv.length === 0) {
+    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [g.argvProblem === undefined ? 'argv' : g.argvProblem], path: 'UNRESOLVED', next: 'declare ONE executable command for this row (split the prose cell, or give the row an argv with a value source for every placeholder)', evidence: MANIFEST + ':' + g.id + ' declares no argv' + (g.argvProblem === undefined ? '' : ' (' + g.argvProblem + ')') }))
+    continue
+  }
   if (placeholder !== undefined) {
     records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [placeholder], path: 'UNRESOLVED', next: 'declare the placeholder value in the gate table (or register an args[] source) so the command is executable', evidence: MANIFEST + ':' + g.id + ' cmd contains ' + placeholder }))
     continue
   }
-  if (argv.length === 0 || argv[0].startsWith('-')) {
+  if (argv[0].startsWith('-')) {
     records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: ['argv[0]'], path: 'UNRESOLVED', next: 'name a script as argv[0] (a bare flag is not a command) or register the step explicitly', evidence: MANIFEST + ':' + g.id + ' argv[0]=' + String(argv[0]) }))
     continue
   }
@@ -101,7 +111,11 @@ for (const g of list) {
     continue
   }
   const cwd = g.tree === 'overlay' ? overlayRoot : MIRROR_ROOT
-  const [script, ...rest] = argv
+  // the declared argv names the command as the table writes it (`node <script> ...`); the runner
+  // always spawns through process.execPath, so the leading token is dropped here - keeping it
+  // would spawn `node node script` and every spawning gate would read as a broken check.
+  const declared = argv[0] === 'node' ? argv.slice(1) : argv
+  const [script, ...rest] = declared
   // the seam owns the spawn and reports killedBy explicitly; this file never infers it
   const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: has('--json') ? 'pipe' : 'inherit' })
   const ms = observed.ms

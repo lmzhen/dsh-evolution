@@ -504,7 +504,9 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     if (unwritten > 0 && pending.length === 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' has ' + unwritten + ' declaration(s) without a claim and no pendingColumns register - an unwritten column is a register row, never a silent blank')
     if (unwritten === 0 && pending.length > 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' still registers ' + String(pending[0]?.column) + ' as pending, but every declaration carries one - a stale register')
     for (const [id, row] of rowById) {
-      const cmd = String(gateById.get(id)?.cmd ?? '')
+      const gate = gateById.get(id)
+      // M2: the declaration is checked against BOTH forms the row declares (argv + human cell)
+      const cmd = Array.isArray(gate?.argv) ? gate.argv.join(' ') : String(gate?.human ?? '')
       const reason = gateById.get(id)?.reason
       if (typeof row.claim === 'string' && row.claim.trim() !== '') {
         const claim = row.claim.trim()
@@ -524,7 +526,8 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     for (const id of unknownIds) if (rowById.get(id)?.criterion !== sentinelCriterion) out.push(FACTS_ASSET + ': fact ' + fact.id + ' unknownCriterion registers ' + id + ', whose criterion is not the sentinel - the register and the rows disagree')
     const byCommand = new Map()
     for (const gate of gates) {
-      const key = String(gate?.cmd ?? '').trim().replace(/\s+/g, ' ')
+      // M2: the collision key is the executable form (a composite row declares none)
+      const key = (Array.isArray(gate?.argv) ? gate.argv.join(' ') : String(gate?.human ?? '')).trim().replace(/\s+/g, ' ')
       if (key === '') continue
       const ids = byCommand.get(key)
       if (ids === undefined) byCommand.set(key, [gate.id])

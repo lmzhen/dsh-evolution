@@ -54,13 +54,18 @@ function tierOf(gate) {
 
 /** criterion: the script the row runs, by basename; no script => unknown. */
 function criterionOf(gate) {
-  const match = String(gate.cmd === undefined ? '' : gate.cmd).match(/([A-Za-z0-9._-]+)\.(?:mjs|cjs)/)
+  // M2: the executable form is argv (human is prose); the criterion is the script the row runs
+  // a row with no single executable command has no criterion either: reading one out of the
+  // prose would invent a judge (gate-34's composite cell names six scripts)
+  const text = Array.isArray(gate.argv) ? gate.argv.join(' ') : ''
+  const match = text.match(/([A-Za-z0-9._-]+)\.(?:mjs|cjs)/)
   return match === null ? SENTINEL_CRITERION : match[1]
 }
 
 /** Normalized command: the collision key (whitespace is not an identity). */
 function commandKey(gate) {
-  return String(gate.cmd === undefined ? '' : gate.cmd).trim().replace(/\s+/g, ' ')
+  const text = Array.isArray(gate.argv) ? gate.argv.join(' ') : String(gate.human === undefined ? '' : gate.human)
+  return text.trim().replace(/\s+/g, ' ')
 }
 
 function collisionGroups(gates) {

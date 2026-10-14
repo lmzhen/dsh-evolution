@@ -133,7 +133,7 @@ for (const tool of ['typescript/lib/tsc.js', 'oxlint/bin/oxlint', 'vitest/vitest
   const row = tableRows.find((entry) => entry.command.includes(tool))
   if (row === undefined) continue
   if (actionText.includes(tool)) continue
-  const registered = manifestGates.find((gate) => typeof gate.cmd === 'string' && gate.cmd.includes(tool) && typeof gate.reason === 'string')
+  const registered = manifestGates.find((gate) => typeof gate.human === 'string' && gate.human.includes(tool) && typeof gate.reason === 'string')
   if (registered !== undefined) { notes.push(tool + ' is registered as a declared local check: ' + registered.reason); continue }
   problems.push('row ' + row.n + ' declares ' + tool + ' but neither this action nor a manifest entry with a reason covers it — a deleted step would go unnoticed (G0-5)')
 }
@@ -159,7 +159,7 @@ const ciOnly = [...new Set([...actionText.matchAll(/scripts\/([A-Za-z0-9._-]+\.m
   .filter((script) => !declaredScripts.has(script))
   .sort()
 for (const script of ciOnly) {
-  const registered = manifestGates.find((gate) => typeof gate.cmd === 'string' && gate.cmd.includes(script))
+  const registered = manifestGates.find((gate) => typeof gate.human === 'string' && gate.human.includes(script))
   if (registered === undefined) problems.push('the CI action runs ' + script + ' but neither the table nor the manifest registers it — a wild check (G0-5 direction 2)')
 }
 if (ciOnly.length > 0) notes.push('CI-only (registered in the manifest): ' + ciOnly.join(', '))
@@ -199,14 +199,16 @@ const overlayRoot = overlayArg === '' ? resolve(repo, '..', 'deepseek-harness') 
 const familyVer = familyVersion(root)
 const observations = []
 const note = (criterion, subject, detail) => observations.push({ criterion, subject, detail })
-const tokensOf = (command) => String(command).match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? []
 for (const gate of manifestGates) {
-  const command = String(gate.cmd ?? '')
-  // (R1) executability: the row must name a command, and the script it names must exist in the
-  // tree the row declares. gate-34's bare `--check` is the live specimen of a non-command row.
-  const argvRow = tokensOf(command)
-  if (argvRow.length === 0 || argvRow[0].startsWith('-')) {
-    note('executability', gate.id, 'argv[0]=' + JSON.stringify(argvRow[0] ?? '') + ' is not a command - name the script the row runs')
+  const human = String(gate.human ?? '')
+  const argvRow = Array.isArray(gate.argv) ? gate.argv : null
+  // (R1) executability: the row must declare ONE executable command, and the script it names must
+  // exist in the tree the row declares. gate-34 (a composite prose cell: six commands in one row)
+  // is the live specimen - its reason is named, not guessed.
+  if (argvRow === null || argvRow.length === 0) {
+    note('executability', gate.id, (gate.argvProblem === undefined ? 'declares no argv' : gate.argvProblem) + ' - declare one executable command (split the cell or add an argv with a value source)')
+  } else if (argvRow[0].startsWith('-')) {
+    note('executability', gate.id, 'argv[0]=' + JSON.stringify(argvRow[0]) + ' is not a command - name the script the row runs')
   } else if (argvRow[0] === 'node' && argvRow.length > 1 && !argvRow[1].startsWith('-') && !argvRow[1].startsWith('<')) {
     const target = argvRow[1]
     const base = gate.tree === 'overlay' ? overlayRoot : repo
@@ -214,10 +216,13 @@ for (const gate of manifestGates) {
     if (!existsSync(base)) note('executability', gate.id, 'the ' + String(gate.tree) + ' tree is not present at ' + base + ' - the script cannot be resolved (and that is not a pass)')
     else if (!existsSync(resolved)) note('executability', gate.id, 'runs ' + target + ', which does not exist at ' + resolved)
   }
-  // (R2) no placeholders: `<...>` documents a shape and cannot execute a criterion; the WHOLE
-  // token is named (R124) so the reader can find the row it belongs to.
-  for (const token of String(command).matchAll(/<[^>]*>/g)) {
-    note('no-placeholders', gate.id, 'cmd carries ' + token[0] + ' - declare the value (an args source) or register the row as pending')
+  // (R2) no placeholders: a `<...>` in the EXECUTABLE form documents a shape and cannot run a
+  // criterion. The scan is on the JOINED argv (not the tokenised array), so a multi-word
+  // placeholder stays whole (R124); a placeholder that appears only in the human annotation is
+  // prose about usage, not an argument this row passes.
+  const executable = argvRow === null ? '' : argvRow.join(' ')
+  for (const token of executable.matchAll(/<[^>]*>/g)) {
+    note('no-placeholders', gate.id, 'the row carries ' + token[0] + ' - declare the value (an args source) or register the row as pending')
   }
   // (R3) expiry due: a registered exemption the family version has reached is red, not permanent.
   if (typeof gate.expiry === 'string' && gate.expiry.trim() !== '') {
