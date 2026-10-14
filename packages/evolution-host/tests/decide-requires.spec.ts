@@ -56,8 +56,8 @@ describe('decideRequires: (kind, mode) x observed result', () => {
 describe('unlisted combinations fail closed', () => {
   const rows = [['vendored', 'run'], ['in-repo', 'always']]
   for (const row of rows) {
-    const kind = row[0]
-    const mode = row[1]
+    const kind = String(row[0])
+    const mode = String(row[1])
     it(kind + '/' + mode + ' has no declared combination', () => {
       expect(isLegalCombination(kind, mode)).toBe(false)
       const decision = decideRequires({ status: 0 }, kind, mode)
