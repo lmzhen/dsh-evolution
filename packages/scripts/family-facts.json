@@ -968,13 +968,6 @@
             "owner": "scripts"
           },
           {
-            "axis": "no-placeholders",
-            "rows": 2,
-            "reasonRef": "gate-23 (two), gate-28, gate-30 before the regression-set row was retired; now gate-28 and gate-30: an argument slot needs a declared value source",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
             "axis": "falsifiability-carrier",
             "rows": 65,
             "reasonRef": "rows declare neither drillCmd nor noDrillReason: G6 gate-truth needs this number to fall",

@@ -33,6 +33,17 @@ const notes = []
 // fact-table re-derivation in lib-doc-facts). An unreadable table is a hard failure: treating it
 // as 「no exceptions」 would make every declared-but-unexecuted step look like a violation and hide
 // the real reason the registers exist.
+// Placeholder arguments with a DECLARED value source. One home: scripts/args-sources.json, read
+// here directly (the same pattern as the client-exceptions table). A declared token stops being a
+// no-placeholders observation; an undeclared one still is, so a live gap with no register entry
+// still fails the registry. A malformed table is a hard failure - 「no declarations」 would hide
+// exactly the rows the table exists to declare.
+let argsSources = {}
+const argsPath = join(root, 'scripts', 'args-sources.json')
+if (existsSync(argsPath)) {
+  try { argsSources = JSON.parse(readFileSync(argsPath, 'utf8')).sources ?? {} }
+  catch (error) { console.error('verify-gate-manifest: ' + argsPath + ' is unreadable (' + (error instanceof Error ? error.message : String(error)) + ') - fix the declaration table'); process.exit(2) }
+}
 const registers = familyGateRegisters(root)
 if (registers === null) {
   console.error('verify-gate-manifest: the gate-set fact (or its machine registers) is missing from scripts/family-facts.json — the exception registers have no home')
@@ -232,7 +243,9 @@ for (const gate of manifestGates) {
   // placeholder stays whole (R124); a placeholder that appears only in the human annotation is
   // prose about usage, not an argument this row passes.
   const executable = argvRow === null ? '' : argvRow.join(' ')
+  const declaredSources = argsSources[gate.id] ?? {}
   for (const token of executable.matchAll(/<[^>]*>/g)) {
+    if (typeof declaredSources[token[0]] === 'string' && declaredSources[token[0]].trim() !== '') continue
     note('no-placeholders', gate.id, 'the row carries ' + token[0] + ' - declare the value (an args source) or register the row as pending')
   }
   // (R3) expiry due: a registered exemption the family version has reached is red, not permanent.

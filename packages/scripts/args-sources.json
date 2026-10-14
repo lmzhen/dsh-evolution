@@ -1,0 +1,11 @@
+{
+  "$comment": "Placeholder arguments with a DECLARED value source. Each entry names the row and, per placeholder token, where that value comes from at run time. verify-gate-manifest reads this table directly (the same pattern as client-exceptions.json): a declared token is no longer a no-placeholders observation, and an UNDECLARED one still is - a live gap with no register entry fails the registry.",
+  "sources": {
+    "gate-27": {
+      "<platform version>": "the platform version the run targets; release.yml passes it as PLATFORM_VERSION to the validate action, which forwards --platform-version"
+    },
+    "gate-29": {
+      "<plane home>": "the plane home directory the run audits; the CI job supplies it as the checkout home and forwards --home"
+    }
+  }
+}
