@@ -1397,6 +1397,19 @@
               "provenAt": "2026-10-14T08:30:24.841Z",
               "provenSha": "af92c10778dfec1544389a6450f66647831f6b40b196fc015a5d59618737a39b"
             }
+          ],
+          "gate-21": [
+            {
+              "mutate": {
+                "file": "packages/evolution-preset/cordis.yml",
+                "find": "  name: '@deepseek-ai/dsh-storage-json'\n",
+                "replace": ""
+              },
+              "expect": "red",
+              "note": "a root row whose package NAME is dropped: the guard fails loud on a row it cannot attribute to either side (a parse-shape failure must never pass silently), which is the second of its two judgements; the agreement comparison cannot fire here because no derived consumer declares a root",
+              "provenAt": "2026-10-14T08:32:28.937Z",
+              "provenSha": "c257ed0fe7100b16158830e0997f889da8e1e2e4e4e2d555662b17fc69484859"
+            }
           ]
         },
         "mutationExempt": {
