@@ -1344,6 +1344,82 @@
           "gate-18": {
             "reason": "its subject is the PLATFORM tree outside this repo: the receipts name packages/core/... files and the argv points at an out-of-repo upstream checkout, so the reviewed repo carries neither the files it judges nor a way to change them",
             "expiry": "release gate: if the row ever judges in-repo files, delete this exemption and prove it by mutation"
+          },
+          "gate-01": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "gate-02": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "gate-03": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "gate-04": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "gate-05": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-01": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-02": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-03": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-04": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-05": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-06": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-07": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-09": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-10": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-11": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-12": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-13": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "ci-only-14": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+          },
+          "graph-edges-live": {
+            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           }
         },
         "unmappedTier": [
