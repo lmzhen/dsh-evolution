@@ -56,6 +56,33 @@ if (typeof platformLine !== "string" || platformLine.trim() === "") {
 }
 let adapterSha = "absent";
 if (existsSync(ADAPTER)) adapterSha = createHash("sha256").update(readFileSync(ADAPTER)).digest("hex").slice(0, 8);
+// The adapter is NOT decoration: it is the one place that knows the resolution order
+// (mono -> profile -> closure -> upstream -> store), so the config consumes its ALIAS LIST.
+// The previous revision printed platformLine= and adapter=<sha8> while resolving nothing through
+// it, which is exactly why every platform-coupled spec died on
+// "Failed to resolve entry for package @deepseek-ai/cordis" and why 87 files were re-laned by a
+// measurement of the CONFIG rather than of the specs.
+let aliasList = [];
+if (existsSync(ADAPTER)) {
+  try {
+    const adapter = await import("file:///" + ADAPTER);
+    if (typeof adapter.resolveAliases === "function") aliasList = adapter.resolveAliases();
+  } catch (error) {
+    aliasList = [];
+    if (process.env.FAMILY_ALLOW_ABSENT_ADAPTER !== "1") {
+      console.error("vitest.family.config: CANNOT DECIDE - the adapter at " + ADAPTER + " could not be loaded (" + (error instanceof Error ? error.message : String(error)) + ")");
+      process.exit(2);
+    }
+  }
+}
+// A replacement that does not exist on THIS machine cannot be aliased: pointing the bed at a
+// missing tree makes vitest fail to start its forks ("Failed to start forks worker") instead of
+// failing the spec that needed it. The dropped entries are PRINTED - an alias silently skipped
+// would be a resolution nobody can see.
+const aliasesAll = aliasList;
+aliasList = aliasList.filter((entry) => typeof entry?.replacement === "string" && existsSync(entry.replacement));
+console.log("vitest.family.config: alias=" + String(aliasList.length) + "/" + String(aliasesAll.length) + " (live/total from the adapter; the pin above is the sha of the file that produced them)"
+  + (aliasesAll.length === aliasList.length ? "" : " dropped=" + aliasesAll.filter((entry) => !aliasList.includes(entry)).map((entry) => entry.find).slice(0, 8).join(",")));
 console.log("vitest.family.config: root=" + familyTree + " tier=" + tier + " lane=" + tier + "(ci=" + (process.env.CI ? "on" : "off") + ") platformLine=" + platformLine + " adapter=" + adapterSha);
 if (adapterSha === "absent" && process.env.FAMILY_ALLOW_ABSENT_ADAPTER !== "1") {
   console.error("vitest.family.config: CANNOT DECIDE - no pinned line resolver at " + ADAPTER + " (set FAMILY_ALLOW_ABSENT_ADAPTER=1 to run anyway)");
@@ -95,6 +122,7 @@ if (members.size === 0) {
 }
 
 export default {
+  resolve: { alias: aliasList },
   test: {
     root: familyTree,
     include: laneIsFull ? ["*/tests/**/*.spec.ts"] : memberGlobs,
