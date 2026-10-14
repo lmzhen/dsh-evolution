@@ -18,6 +18,7 @@
  * when the mirror root is not detected the repo-scope checks are SKIPPED BY
  * NAME and reported, never silently passed.
  */
+import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 
@@ -118,7 +119,7 @@ function readMachineText(root, machine) {
 }
 
 /** Machine owners: re-derive the value a fact states so a changed value fails. */
-function machineViolations(fact, root, docs, home, repoScope) {
+function machineViolations(fact, root, docs, home, repoScope, asset) {
   const out = []
   const machine = fact.machine
   if (machine === undefined) return out
@@ -411,6 +412,105 @@ function machineViolations(fact, root, docs, home, repoScope) {
     }
     return out
   }
+  if (machine.kind === 'checks') {
+    // G0 S0.3: the declaration face. The carrier (the table transcription) owns the
+    // commands; this fact owns what nothing else owns - the claim, the tier and the
+    // criterion - plus the registers for what has not been written. Everything below is
+    // re-derived from the carrier, so a declaration that drifts from the table fails here
+    // instead of standing on its own.
+    const sha = createHash('sha256').update(text).digest('hex')
+    if (sha !== machine.sha256) {
+      out.push(String(machine.file) + ': the carrier moved (sha256 ' + sha.slice(0, 8) + ' != pinned ' + String(machine.sha256).slice(0, 8) + ') - re-run gen-checks-fact.mjs so the declarations follow the table')
+    }
+    let gates = []
+    try {
+      gates = JSON.parse(text).gates ?? []
+    } catch (error) {
+      out.push(String(machine.file) + ': the carrier is not valid JSON (' + (error instanceof Error ? error.message : String(error)) + ')')
+      return out
+    }
+    if (gates.length === 0) {
+      out.push(String(machine.file) + ': the carrier declares no gate - the declaration face cannot be compared (a vacuum pass is not a pass)')
+      return out
+    }
+    const tierFact = (asset?.facts ?? []).find((entry) => entry?.id === machine.tierSource)
+    const tiers = Array.isArray(tierFact?.machine?.tiers) ? tierFact.machine.tiers : []
+    if (tiers.length === 0) {
+      out.push(FACTS_ASSET + ': fact ' + fact.id + ' names tierSource ' + String(machine.tierSource) + ', which is not the fact that owns the tier closed set - the tiers have no home to compare against')
+      return out
+    }
+    const sentinelTier = machine.sentinel?.tier
+    const sentinelCriterion = machine.sentinel?.criterion
+    const rows = Array.isArray(machine.declarations) ? machine.declarations : []
+    const rowById = new Map()
+    for (const row of rows) {
+      if (typeof row?.id !== 'string' || row.id === '') { out.push(FACTS_ASSET + ': fact ' + fact.id + ' carries a declaration with no id - an unnameable row cannot be joined to the table'); continue }
+      if (rowById.has(row.id)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' declares ' + row.id + ' twice - one row per check')
+      rowById.set(row.id, row)
+    }
+    const gateById = new Map(gates.map((gate) => [gate.id, gate]))
+    for (const id of gateById.keys()) if (!rowById.has(id)) out.push(String(machine.file) + ': ' + id + ' is a check the declaration face never saw - every row of the table needs a claim, a tier and a criterion')
+    for (const id of rowById.keys()) if (!gateById.has(id)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' declares ' + id + ', which ' + String(machine.file) + ' no longer carries - a stale declaration')
+    const registerIds = (name, extraFields) => {
+      const entries = Array.isArray(machine[name]) ? machine[name] : []
+      const ids = new Set()
+      for (const entry of entries) {
+        const label = String(entry?.id ?? entry?.key ?? entry?.column ?? '(no id)')
+        for (const field of ['reasonRef', 'expiry', 'owner'].concat(extraFields ?? [])) {
+          if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + name + ' entry ' + label + ' is missing ' + field + ' - an unregistered exception is an unowned one')
+        }
+        if (typeof entry?.id === 'string') ids.add(entry.id)
+      }
+      return ids
+    }
+    const pending = Array.isArray(machine.pendingColumns) ? machine.pendingColumns : []
+    const unmappedIds = registerIds('unmappedTier')
+    const unknownIds = registerIds('unknownCriterion')
+    const unwritten = [...rowById.values()].filter((row) => typeof row.claim !== 'string' || row.claim.trim() === '').length
+    for (const entry of pending) {
+      if (typeof entry?.column !== 'string' || entry.column.trim() === '') { out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingColumns carries an entry without a column name - a register that does not say what it defers'); continue }
+      if (!Number.isInteger(entry.rowsWithoutIt) || entry.rowsWithoutIt <= 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingColumns ' + entry.column + ' carries no positive rowsWithoutIt - the register must state the measured size of the gap')
+      else if (entry.rowsWithoutIt !== unwritten) out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingColumns ' + entry.column + ' says ' + entry.rowsWithoutIt + ' row(s) without it, the declarations say ' + unwritten + ' - the register and the rows disagree')
+    }
+    if (unwritten > 0 && pending.length === 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' has ' + unwritten + ' declaration(s) without a claim and no pendingColumns register - an unwritten column is a register row, never a silent blank')
+    if (unwritten === 0 && pending.length > 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' still registers ' + String(pending[0]?.column) + ' as pending, but every declaration carries one - a stale register')
+    for (const [id, row] of rowById) {
+      const cmd = String(gateById.get(id)?.cmd ?? '')
+      const reason = gateById.get(id)?.reason
+      if (typeof row.claim === 'string' && row.claim.trim() !== '') {
+        const claim = row.claim.trim()
+        if (claim.length < 24) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim is ' + claim.length + ' chars - a claim is a sentence a reader can judge, not a label')
+        if (claim.includes('TODO')) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim still carries a TODO marker - write the claim or drop the field and let pendingColumns register it')
+        if (typeof reason === 'string' && claim === reason.trim()) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim copies the carrier reason - the claim states what the check asserts, the reason states why it exists')
+      }
+      const tier = row.tier
+      if (typeof tier !== 'string' || tier === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier is missing - every check states the lane the policy requires it at')
+      else if (tier === sentinelTier) { if (!unmappedIds.has(id)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier is the sentinel ' + String(sentinelTier) + ' but unmappedTier does not carry it - an undecided tier is a decision somebody still owes') }
+      else if (!tiers.includes(tier)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier "' + tier + '" is neither one of the ' + String(machine.tierSource) + ' tiers [' + tiers.join(', ') + '] nor the sentinel ' + String(sentinelTier) + ' - a tier outside the policy closed set')
+      if (typeof row.criterion !== 'string' || row.criterion === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.criterion is missing - every check names what judges it')
+      else if (row.criterion === sentinelCriterion) { if (!unknownIds.has(id)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.criterion is the sentinel ' + String(sentinelCriterion) + ' but unknownCriterion does not carry it') }
+      else if (!cmd.includes(row.criterion)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.criterion "' + row.criterion + '" does not occur in the command the table runs (' + cmd + ') - the declaration and the table disagree')
+    }
+    for (const id of unmappedIds) if (rowById.get(id)?.tier !== sentinelTier) out.push(FACTS_ASSET + ': fact ' + fact.id + ' unmappedTier registers ' + id + ', whose tier is not the sentinel - the register and the rows disagree')
+    for (const id of unknownIds) if (rowById.get(id)?.criterion !== sentinelCriterion) out.push(FACTS_ASSET + ': fact ' + fact.id + ' unknownCriterion registers ' + id + ', whose criterion is not the sentinel - the register and the rows disagree')
+    const byCommand = new Map()
+    for (const gate of gates) {
+      const key = String(gate?.cmd ?? '').trim().replace(/\s+/g, ' ')
+      if (key === '') continue
+      const ids = byCommand.get(key)
+      if (ids === undefined) byCommand.set(key, [gate.id])
+      else ids.push(gate.id)
+    }
+    const collisions = [...byCommand.entries()].filter((entry) => entry[1].length > 1)
+    const declaredCollisions = Array.isArray(machine.duplicateGroups) ? machine.duplicateGroups : []
+    for (const entry of declaredCollisions) {
+      for (const field of ['key', 'reasonRef', 'expiry', 'owner']) if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' duplicateGroups entry is missing ' + field)
+      if (!Array.isArray(entry?.ids) || entry.ids.length < 2) out.push(FACTS_ASSET + ': fact ' + fact.id + ' duplicateGroups entry carries fewer than two ids - a collision names both sides')
+    }
+    for (const collision of collisions) if (!declaredCollisions.some((entry) => entry?.key === collision[0])) out.push(String(machine.file) + ': ' + collision[1].join(' = ') + ' run the same command but duplicateGroups does not carry the group - a duplicated check is known debt, not a silent one')
+    for (const entry of declaredCollisions) if (!collisions.some((collision) => collision[0] === entry?.key)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' duplicateGroups registers a command no two rows share any more - the register is stale (' + String(entry?.expiry ?? '') + ')')
+    return out
+  }
   if (machine.kind === 'skill-name-home') {
     // v46 S2.5b (finding T2-01): the family's canonical name is the DIRECTORY name, and the
     // validator is what makes that true — it refuses a frontmatter `name` that differs from the
@@ -584,7 +684,7 @@ export function docFactViolations(root, options = {}) {
         result.violations.push(`${doc.label}: fact "${fact.id}" is stated in ${fact.home} — this document must cite it (expected the text "${cite.text}")`)
       }
     }
-    result.violations.push(...machineViolations(fact, root, all, homeDoc.text, repoRoot !== null))
+    result.violations.push(...machineViolations(fact, root, all, homeDoc.text, repoRoot !== null, asset))
   }
   const checklistDocs = checklistViolations(root, repoRoot, asset, result.violations)
   result.counts.checklists = checklistDocs

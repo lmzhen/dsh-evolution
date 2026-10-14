@@ -508,6 +508,457 @@
           ]
         }
       }
+    },
+    {
+      "id": "checks",
+      "title": "the declaration face of every check: its claim, its tier and its criterion",
+      "home": "README.md",
+      "must": [
+        {
+          "text": "A column nobody has written yet is not a pass",
+          "unique": true
+        }
+      ],
+      "machine": {
+        "kind": "checks",
+        "file": "scripts/gate-manifest.json",
+        "sha256": "9c4baf29b504297018c6d76fe9106722a1ee57de8badae5ebc743ee44bec3c6b",
+        "tierSource": "testing-policy",
+        "sentinel": {
+          "tier": "unmapped",
+          "criterion": "unknown"
+        },
+        "rule": {
+          "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only, no profile => unmapped (registered)",
+          "criterion": "the basename of the first .mjs/.cjs the row runs; a row that runs no script => unknown (registered)",
+          "claim": "human-written; a row without one sits in pendingHuman with a reason, an expiry and an owner"
+        },
+        "declarations": [
+          {
+            "id": "gate-01",
+            "tier": "fast",
+            "criterion": "unknown"
+          },
+          {
+            "id": "gate-02",
+            "tier": "fast",
+            "criterion": "unknown"
+          },
+          {
+            "id": "gate-03",
+            "tier": "fast",
+            "criterion": "vitest"
+          },
+          {
+            "id": "gate-04",
+            "tier": "unmapped",
+            "criterion": "build-lib"
+          },
+          {
+            "id": "gate-05",
+            "tier": "fast",
+            "criterion": "smoke-built-entries"
+          },
+          {
+            "id": "gate-06",
+            "tier": "fast",
+            "criterion": "verify-dependency-closure"
+          },
+          {
+            "id": "gate-07",
+            "tier": "fast",
+            "criterion": "verify-arch-guards"
+          },
+          {
+            "id": "gate-08",
+            "tier": "fast",
+            "criterion": "verify-event-pairing"
+          },
+          {
+            "id": "gate-09",
+            "tier": "fast",
+            "criterion": "verify-declared-config"
+          },
+          {
+            "id": "gate-10",
+            "tier": "fast",
+            "criterion": "verify-param-registry"
+          },
+          {
+            "id": "gate-11",
+            "tier": "fast",
+            "criterion": "verify-bundle-rows"
+          },
+          {
+            "id": "gate-12",
+            "tier": "fast",
+            "criterion": "verify-param-channel-parity"
+          },
+          {
+            "id": "gate-13",
+            "tier": "unmapped",
+            "criterion": "check-tsconfigs"
+          },
+          {
+            "id": "gate-14",
+            "tier": "unmapped",
+            "criterion": "check-manifests"
+          },
+          {
+            "id": "gate-15",
+            "tier": "unmapped",
+            "criterion": "mirror-sync"
+          },
+          {
+            "id": "gate-16",
+            "tier": "fast",
+            "criterion": "verify-profile-bundles"
+          },
+          {
+            "id": "gate-17",
+            "tier": "fast",
+            "criterion": "verify-doc-facts"
+          },
+          {
+            "id": "gate-18",
+            "tier": "fast",
+            "criterion": "verify-platform-contract"
+          },
+          {
+            "id": "gate-19",
+            "tier": "fast",
+            "criterion": "verify-package-discovery"
+          },
+          {
+            "id": "gate-20",
+            "tier": "fast",
+            "criterion": "verify-family-tool-names"
+          },
+          {
+            "id": "gate-21",
+            "tier": "fast",
+            "criterion": "verify-skill-roots"
+          },
+          {
+            "id": "gate-22",
+            "tier": "fast",
+            "criterion": "verify-gate-manifest"
+          },
+          {
+            "id": "gate-23",
+            "tier": "fast",
+            "criterion": "verify-regression-set"
+          },
+          {
+            "id": "gate-24",
+            "tier": "fast",
+            "criterion": "verify-line-identity"
+          },
+          {
+            "id": "gate-25",
+            "tier": "fast",
+            "criterion": "verify-arming"
+          },
+          {
+            "id": "gate-26",
+            "tier": "fast",
+            "criterion": "verify-client-seats"
+          },
+          {
+            "id": "gate-27",
+            "tier": "fast",
+            "criterion": "verify-client-tokens"
+          },
+          {
+            "id": "gate-28",
+            "tier": "fast",
+            "criterion": "verify-platform-ranges"
+          },
+          {
+            "id": "gate-29",
+            "tier": "fast",
+            "criterion": "verify-release-artifacts"
+          },
+          {
+            "id": "gate-30",
+            "tier": "fast",
+            "criterion": "verify-write-inventory"
+          },
+          {
+            "id": "gate-31",
+            "tier": "fast",
+            "criterion": "verify-client-ui-i18n"
+          },
+          {
+            "id": "gate-32",
+            "tier": "fast",
+            "criterion": "verify-error-codes"
+          },
+          {
+            "id": "gate-33",
+            "tier": "fast",
+            "criterion": "gen-install-counts"
+          },
+          {
+            "id": "gate-34",
+            "tier": "fast",
+            "criterion": "unknown"
+          },
+          {
+            "id": "gate-35",
+            "tier": "fast",
+            "criterion": "verify-package-map"
+          },
+          {
+            "id": "gate-36",
+            "tier": "fast",
+            "criterion": "gen-composer-port"
+          },
+          {
+            "id": "gate-37",
+            "tier": "fast",
+            "criterion": "verify-lock-usage"
+          },
+          {
+            "id": "gate-38",
+            "tier": "fast",
+            "criterion": "verify-source-text-single-source"
+          },
+          {
+            "id": "gate-39",
+            "tier": "fast",
+            "criterion": "verify-atomic-write-single-source"
+          },
+          {
+            "id": "gate-40",
+            "tier": "fast",
+            "criterion": "verify-predicate-single-source"
+          },
+          {
+            "id": "gate-41",
+            "tier": "fast",
+            "criterion": "verify-readonly-single-criterion"
+          },
+          {
+            "id": "gate-42",
+            "tier": "fast",
+            "criterion": "verify-command-table"
+          },
+          {
+            "id": "gate-43",
+            "tier": "fast",
+            "criterion": "verify-bounds"
+          },
+          {
+            "id": "gate-44",
+            "tier": "fast",
+            "criterion": "verify-io-discipline"
+          },
+          {
+            "id": "gate-45",
+            "tier": "fast",
+            "criterion": "verify-declarations"
+          },
+          {
+            "id": "gate-46",
+            "tier": "fast",
+            "criterion": "verify-graph-edges"
+          },
+          {
+            "id": "ci-only-01",
+            "tier": "ci-only",
+            "criterion": "audit-release-tarballs"
+          },
+          {
+            "id": "ci-only-02",
+            "tier": "ci-only",
+            "criterion": "gen-about"
+          },
+          {
+            "id": "ci-only-03",
+            "tier": "ci-only",
+            "criterion": "gen-bundle-patches"
+          },
+          {
+            "id": "ci-only-04",
+            "tier": "ci-only",
+            "criterion": "gen-client-guards"
+          },
+          {
+            "id": "ci-only-05",
+            "tier": "ci-only",
+            "criterion": "gen-client-tokens"
+          },
+          {
+            "id": "ci-only-06",
+            "tier": "ci-only",
+            "criterion": "gen-param-client-view"
+          },
+          {
+            "id": "ci-only-07",
+            "tier": "ci-only",
+            "criterion": "gen-param-docs"
+          },
+          {
+            "id": "ci-only-08",
+            "tier": "unmapped",
+            "criterion": "inject-evolution-paths"
+          },
+          {
+            "id": "ci-only-09",
+            "tier": "unmapped",
+            "criterion": "install-layered"
+          },
+          {
+            "id": "ci-only-10",
+            "tier": "unmapped",
+            "criterion": "lib-line-header"
+          },
+          {
+            "id": "ci-only-11",
+            "tier": "unmapped",
+            "criterion": "prepare-release"
+          },
+          {
+            "id": "ci-only-12",
+            "tier": "unmapped",
+            "criterion": "publish-scoped"
+          },
+          {
+            "id": "ci-only-13",
+            "tier": "unmapped",
+            "criterion": "run-load-sensitive"
+          },
+          {
+            "id": "ci-only-14",
+            "tier": "ci-only",
+            "criterion": "verify-layout-sync"
+          },
+          {
+            "id": "line-identity-ci",
+            "tier": "ci-only",
+            "criterion": "verify-line-identity"
+          },
+          {
+            "id": "line-identity-bed",
+            "tier": "fast",
+            "criterion": "verify-line-identity"
+          },
+          {
+            "id": "graph-edges-live",
+            "tier": "fast",
+            "criterion": "verify-graph-edges"
+          },
+          {
+            "id": "health-admission",
+            "tier": "fast",
+            "criterion": "verify-health-admission"
+          }
+        ],
+        "pendingColumns": [
+          {
+            "column": "claim",
+            "rowsWithoutIt": 64,
+            "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          }
+        ],
+        "unmappedTier": [
+          {
+            "id": "gate-04",
+            "reasonRef": "scripts/gate-manifest.json#gate-04",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-13",
+            "reasonRef": "scripts/gate-manifest.json#gate-13",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-14",
+            "reasonRef": "scripts/gate-manifest.json#gate-14",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-15",
+            "reasonRef": "scripts/gate-manifest.json#gate-15",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-08",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-08",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-09",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-09",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-10",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-10",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-11",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-11",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-12",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-12",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-13",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-13",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          }
+        ],
+        "unknownCriterion": [
+          {
+            "id": "gate-01",
+            "reasonRef": "scripts/gate-manifest.json#gate-01",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-02",
+            "reasonRef": "scripts/gate-manifest.json#gate-02",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-34",
+            "reasonRef": "scripts/gate-manifest.json#gate-34",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          }
+        ],
+        "duplicateGroups": [
+          {
+            "key": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
+            "ids": [
+              "gate-24",
+              "line-identity-ci"
+            ],
+            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          }
+        ]
+      }
     }
   ],
   "checklists": {

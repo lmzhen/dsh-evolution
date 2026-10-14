@@ -466,6 +466,20 @@ being bypassed. (v14 audit §7.)
 | New agent-preset row | `evolution-agent/agent.cordis.yml` (delta only) | never repeat a host-owned row; `composePresetComposition` / installer byte-parity test |
 | Upstream platform bump | `UPSTREAM_SHA` + `PLATFORM_VERSION` + the name-collision check | CI baseline **and** released-compat chains; re-verify the seams listed in the audit report §3 |
 
+## Declared checks
+
+The gate table says what runs; it does not say what each check asserts. Every row
+of `scripts/gate-manifest.json` therefore has a declaration in
+`scripts/family-facts.json` under the `checks` fact: the `claim` the check
+asserts, the `tier` the policy requires it at, and the `criterion` that judges it.
+The two files are joined, never copied: the carrier owns the command, the
+declaration owns the column, and `verify-doc-facts.mjs` re-derives the join (the
+id set in both directions, the criterion against the command, the tier against
+the policy's closed set, and the commands two rows share) on every gate run.
+A column nobody has written yet is not a pass. It is a row in that fact's
+`pendingColumns` register, with a reason, an expiry and an owner, and a check
+whose claim is still unwritten reads `cannot-decide`, never `pass`.
+
 ## Development: the two layouts and their tsconfigs
 
 Authoring happens HERE, in the flat mirror (`packages/evolution-*`), which is
