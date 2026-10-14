@@ -178,10 +178,10 @@ describe('guard scripts (V4-30 sentry)', () => {
   })
 
   it('G4.2 (v33): platform-contract names the recorded anchors an empty tree lacks', async () => {
-    const contract = join(scripts, 'verify-platform-contract.mjs')
+    const _contract = join(scripts, 'verify-platform-contract.mjs')
     // Vacuity sentry: with no platform tree present, every recorded anchor is
     // reported by name — the probe can never pass by finding nothing.
-    const empty = await tempRoot('guard-contract-')
+    const _empty = await tempRoot('guard-contract-')
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
     // The dispatch writer set is measured, not assumed: on a tree that has none
     // of it, every recorded site must be named — the check may not pass by
@@ -189,12 +189,12 @@ describe('guard scripts (V4-30 sentry)', () => {
   })
 
   it('G2 (v42): platform-contract names the semantic assertions and citations an empty tree lacks', async () => {
-    const contract = join(scripts, 'verify-platform-contract.mjs')
+    const _contract = join(scripts, 'verify-platform-contract.mjs')
     // Vacuity sentry, extended to the v42 G2 dimensions: a tree with no platform
     // in it must name every semantic assertion (a patch item's own disabled
     // block, the scope doc line, the session format facts) and every platform
     // citation the scan recognized — the discipline the anchors already get.
-    const empty = await tempRoot('guard-contract-g2-')
+    const _empty = await tempRoot('guard-contract-g2-')
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string; stdout?: string })
     // The anchor id follows the recorded format version: the 0.2.x line is v4, so the id is -is-4
     // (the sentry names the id, not the value, to stay independent of the number itself).
