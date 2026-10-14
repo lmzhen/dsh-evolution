@@ -63,7 +63,13 @@ try {
   gateOk = true
 } catch { gateOk = false }
 if (!gateOk) {
-  console.error('verify-check-registry: CANNOT DECIDE - the meta-gate did not answer with JSON (its observations are this ledger input); stderr tail: ' + String(gateRun.stderr ?? '').trim().slice(-200))
+  // Diagnosability: spawnSync captures the child's stderr as well, so keeping it in a variable
+  // and never printing it locked the root cause away from the CI log - the job showed only this
+  // conclusion and no reason. Print the exit status and the child's stderr before exiting.
+  const detail = (gateRun.stderr === null ? '' : gateRun.stderr).trim().split('\n').slice(-6).join('\n')
+  console.error('verify-check-registry: meta-gate exit=' + String(gateRun.status) + ' stdoutBytes=' + String(gateRun.stdout === null ? 0 : gateRun.stdout.length))
+  if (detail !== '') console.error('verify-check-registry: meta-gate stderr tail:\n' + detail)
+  console.error('verify-check-registry: CANNOT DECIDE - the meta-gate did not answer with JSON (its observations are this ledger\'s other half)')
   process.exit(2)
 }
 const liveCount = (criterion) => observations.filter((entry) => entry.criterion === criterion).length

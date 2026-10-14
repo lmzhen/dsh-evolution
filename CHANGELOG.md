@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.26.12 (patch) — 依赖方不再吞掉被依赖方的证据：守卫失败时打印元门禁的退出码与 stderr
+
+> **现象**：家族守卫集里的 verify-check-registry 在 CI 报 CANNOT DECIDE（元门禁没有以 JSON 作答），而日志里**没有任何一行**说明元门禁为什么没说话。
+> **根因**：该守卫用 spawnSync 拉起元门禁，设了 encoding 时子进程的 stdout 与 stderr 都被捕获；代码只用 stdout 解析 JSON，解析失败时把 stderr 留在变量里从不打印，于是根因被锁在变量中。
+> **修复**：解析失败分支在打印结论之前，先打印元门禁的退出码与 stdout 字节数，并在 stderr 非空时打印其后六行；exit 2 的语义（无法判定）保持不变。
+> **验证**：脚本通过 node --check；本机同参数直接运行元门禁退出码为零、stderr 为空（说明本机条件正常，差异在 CI 侧），下一次 CI 运行即可由新打印直接给出根因。
+
 ## 0.26.11 (patch) — 夹具里的示意路径不再被读成平台引用
 
 > **现象**：引用扫描面收窄后平台契约校验仍报两条差异，点名 decide-requires.spec.ts 第 35 与 36 行引用了 packages/x/。
