@@ -30,7 +30,7 @@ walk(join(ROOT, "packages"));
 const candidates = [];
 for (const f of specFiles) {
   const text = readFileSync(f, "utf8");
-  for (const m of text.matchAll(/from\s+["\']([^"\']+)["\']/g)) {
+  for (const m of text.matchAll(/(?:from\s+)?["'](@deepseek-ai\/[^"']+)["']/g)) {
     const id = m[1];
     if (FAMILY.test(id)) continue;
     const kind = TESTKIT.test(id) ? "testkit" : PLATFORM.test(id) ? "platform" : null;
@@ -60,6 +60,7 @@ console.log(JSON.stringify({
   actualOnly: actualOnly.length,
   declaredOnly: declaredOnly.length,
   mode: STRICT ? "strict" : "report",
+  fullCandidates: process.argv.includes("--full") ? candidates : undefined,
   sampleActualOnly: actualOnly.slice(0, 5),
   sampleDeclaredOnly: declaredOnly.slice(0, 5),
 }, null, 2));
