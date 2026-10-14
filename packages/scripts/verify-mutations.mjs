@@ -117,6 +117,7 @@ function runRecord(id, record) {
   // reached the file the check actually reads, so every probe prints the resolved path, the bytes'
   // hash before and after the write, and the child's cwd + argv.
   console.log('[probe] ' + id + ' file=' + file + ' sha-before=' + beforeSha.slice(0, 10))
+  const preDirty = dirtySet()
   const baseline = spawnSync(process.execPath, argv[0] === 'node' ? argv.slice(1) : argv, { cwd: resolvePath(HERE, '..', '..'), encoding: 'utf8' })
   const baselineVerdict = VERDICT_OF_EXIT[baseline.status ?? 1] ?? 'red'
   if (baselineVerdict !== 'green') {
@@ -137,12 +138,23 @@ function runRecord(id, record) {
     return { status: 'PROVEN ' + expected.toUpperCase(), detail: id + ': expected ' + expected + ' and got it' }
   } finally {
     writeBytes(file, before)
+    for (const written of dirtySet()) {
+      if (preDirty.has(written)) continue
+      spawnSync('git', ['-C', repoRoot, 'checkout', '--', written], { encoding: 'utf8' })
+      results.push({ id, status: 'SIDE EFFECT REVERTED', detail: written + ' was written by the check run and was reverted (the row is a producer)' })
+    }
     const afterSha = sha256(readBytes(file, 'utf8'))
     if (afterSha !== beforeSha) {
       results.push({ id, status: 'RESTORE FAILED', detail: record.mutate.file + ' was not restored byte-for-byte' })
     }
   }
 }
+// Side-effect guard (round 155): a row's argv may WRITE tracked artifacts - a producer row rewrites
+// its own product during the baseline run - and restoring only the MUTATED file leaves those behind.
+// The probe therefore snapshots the dirty set and reverts whatever became newly dirty.
+const repoRoot = resolvePath(HERE, '..', '..')
+const dirtySet = () => new Set((spawnSync('git', ['-C', repoRoot, 'status', '--porcelain'], { encoding: 'utf8' }).stdout ?? '')
+  .split(String.fromCharCode(10)).map((line) => line.slice(3).trim()).filter((entry) => entry !== ''))
 const results = []
 if (onlyIndex >= 0) {
   const id = process.argv[onlyIndex + 1]

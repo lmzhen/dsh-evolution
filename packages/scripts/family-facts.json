@@ -1306,7 +1306,7 @@
               },
               "expect": "red",
               "note": "a number changed INSIDE the marked install-counts region of README (one line carrying both markers): the generator owns exactly that region, and an earlier probe that edited the step count outside it was invisible",
-              "provenAt": "2026-10-14T08:27:34.003Z",
+              "provenAt": "2026-10-14T09:17:07.295Z",
               "provenSha": "d445e2dace7e8023f77b8208b9682df02a826fbed5128f55aa57f90ff7cdf91a"
             }
           ],
