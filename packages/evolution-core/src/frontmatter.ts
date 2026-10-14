@@ -96,7 +96,7 @@ export interface FrontmatterRead {
    * because a lossy string could be picked up by a routing field — keeping it
    * structured removes that risk while giving the one consumer the nested
    * `metadata.hermes.related_skills` form the real corpus actually writes. */
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown> | undefined
   body: string
   /** Raw entries whose UNQUOTED value the strict catalog cannot load as
    * written. Quotes are included, so a value already normalized by the write
@@ -163,6 +163,11 @@ export interface PlatformStringSplit {
 interface StrictFrontmatterValues {
   values: Map<string, string>
   split: PlatformStringSplit[]
+  /** P0′: the structured `metadata:` mapping the strict parser loaded, published as an
+   * object so a nested `metadata.hermes.related_skills` survives the read. Absent when
+   * the block carried no mapping (the `| undefined` keeps the write side honest under
+   * `exactOptionalPropertyTypes`, which the build-line project enables). */
+  metadata?: Record<string, unknown> | undefined
 }
 
 /**
@@ -275,7 +280,7 @@ interface FrontmatterBlockRead {
    * because a lossy string could be picked up by a routing field — keeping it
    * structured removes that risk while giving the one consumer the nested
    * `metadata.hermes.related_skills` form the real corpus actually writes. */
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown> | undefined
   body: string
   unsafeValues: Array<{ key: string; value: string }>
   /** The strict parser rejected the block outright. */
