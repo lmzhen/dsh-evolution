@@ -256,6 +256,15 @@ for (const gate of manifestGates) {
 // The axis register escalates: a note stays a note during migration, but once the family version
 // reaches the register entry's own expiry the same observation becomes a PROBLEM - the debt's
 // expiry is what makes it self-enforcing instead of a hint that outlives its migration.
+// Declared drills: how a row's green can be turned red (one home: scripts/drill-declarations.json,
+// read directly like the args-sources table). The rows the mutation ledger has proven declare the
+// ledger invocation itself, so a declaration cannot drift from its proof.
+let drillDeclarations = {}
+const drillPath = join(root, 'scripts', 'drill-declarations.json')
+if (existsSync(drillPath)) {
+  try { drillDeclarations = JSON.parse(readFileSync(drillPath, 'utf8')).drills ?? {} }
+  catch (error) { console.error('verify-gate-manifest: ' + drillPath + ' is unreadable (' + (error instanceof Error ? error.message : String(error)) + ') - fix the declaration table'); process.exit(2) }
+}
 const axisRegister = (() => {
   try {
     const facts = JSON.parse(readFileSync(join(root, 'scripts', 'family-facts.json'), 'utf8'))
@@ -273,7 +282,11 @@ const observeAxis = (axis, id, message) => {
 }
   // (R4) falsifiability carrier: every row states how its green can be turned red (drillCmd), or
   // why it cannot be yet (noDrillReason). Neither means somebody forgot, which G6's gate-truth counts.
+  const declaredDrill = drillDeclarations[gate.id]
   if (typeof gate.drillCmd !== 'string' && typeof gate.noDrillReason !== 'string') {
+    if (declaredDrill !== undefined && typeof declaredDrill.drillCmd === 'string') {
+      // a declared drill satisfies the carrier axis: emit NO observation for this row
+    } else
     observeAxis('falsifiability-carrier', gate.id, 'declares neither drillCmd nor noDrillReason - a green nobody can turn red is an F=0 candidate')
   }
 }

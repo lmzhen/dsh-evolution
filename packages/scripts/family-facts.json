@@ -969,8 +969,8 @@
           },
           {
             "axis": "falsifiability-carrier",
-            "rows": 65,
-            "reasonRef": "rows declare neither drillCmd nor noDrillReason: G6 gate-truth needs this number to fall",
+            "rows": 30,
+            "reasonRef": "rows declaring neither a drillCmd nor a noDrillReason: 36 rows now declare their drill (the mutation ledger invocation, so a declaration cannot drift from its proof; see scripts/drill-declarations.json) - the balance is what remains",
             "expiry": "0.26.0",
             "owner": "scripts"
           }

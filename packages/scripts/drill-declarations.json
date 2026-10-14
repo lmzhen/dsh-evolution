@@ -1,0 +1,185 @@
+{
+  "$comment": "How each row green can be turned red. For the rows the mutation ledger has proven, the drill IS the ledger invocation (the prover applies the recorded mutation, runs the row, asserts the verdict and restores) - so a proof and its declaration cannot drift. verify-gate-manifest reads this table directly: a row declared here is no longer a falsifiability-carrier observation.",
+  "drills": {
+    "gate-17": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-17",
+      "evidence": "breaking one declaration id breaks the closure both ways, so the doc-facts gate must red: this is the replacement evidence for the real-tree pass retired from g",
+      "provenAt": "2026-10-14T07:48:55.098Z"
+    },
+    "gate-08": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-08",
+      "evidence": "renaming a listener leaves the emit unlistened, so the pairing guard must red; this is the replacement evidence for the real-tree pass retired from guard-script",
+      "provenAt": "2026-10-14T07:48:57.625Z"
+    },
+    "gate-12": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-12",
+      "evidence": "a hand edit in a generated artifact must fail the four-channel parity guard before the byte-freshness check even runs; replacement evidence for the retired real",
+      "provenAt": "2026-10-14T07:49:02.553Z"
+    },
+    "gate-22": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-22",
+      "evidence": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)",
+      "provenAt": "2026-10-14T07:49:05.991Z"
+    },
+    "gate-48": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-48",
+      "evidence": "a registered axis count that disagrees with the live measurement: the ledger reports the drift and both numbers",
+      "provenAt": "2026-10-14T07:49:09.220Z"
+    },
+    "gate-06": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-06",
+      "evidence": "one source import renamed to a package the manifest does not declare (the whole line is the anchor: the bare specifier occurs twice in this file and twice in th",
+      "provenAt": "2026-10-14T07:49:12.878Z"
+    },
+    "gate-07": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-07",
+      "evidence": "a DSH_HOME read introduced outside evolution-core/src: rule N1 is zero-tolerance, so the guard names the file and the line",
+      "provenAt": "2026-10-14T07:49:22.928Z"
+    },
+    "gate-43": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-43",
+      "evidence": "a raw writeFileSync call introduced outside the write facade: the io-discipline rule bans the raw disk write in domain src",
+      "provenAt": "2026-10-14T07:52:14.854Z"
+    },
+    "gate-38": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-38",
+      "evidence": "renameSync co-occurring with a .tmp staging name outside the one atomic-write implementation: that co-occurrence IS the rule",
+      "provenAt": "2026-10-14T07:52:44.113Z"
+    },
+    "gate-41": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-41",
+      "evidence": "a registry entry whose summary is empty: the command-table rule requires every entry to carry a non-empty summary (C7 shape)",
+      "provenAt": "2026-10-14T07:53:21.655Z"
+    },
+    "gate-10": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-10",
+      "evidence": "two registry rows sharing one id: the param-registry guard requires unique canonical ids",
+      "provenAt": "2026-10-14T07:55:16.394Z"
+    },
+    "gate-11": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-11",
+      "evidence": "a hand edit to one of the three GENERATED patches: by the guard its own header states, a hand edit of any patch is drift by definition, because bundle-rows.json",
+      "provenAt": "2026-10-14T07:57:12.619Z"
+    },
+    "gate-37": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-37",
+      "evidence": "a second comment stripper in the tooling: the guard bans any .mjs under scripts/ other than lib-source-text.mjs from defining one BY NAME (stripComments|without",
+      "provenAt": "2026-10-14T07:57:44.131Z"
+    },
+    "gate-39": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-39",
+      "evidence": "the plain-object clause inlined into a plugin TypeScript source: rule A allows it only in the home or in a GENERATED file naming the home (the .mjs tooling file",
+      "provenAt": "2026-10-14T07:58:24.408Z"
+    },
+    "gate-40": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-40",
+      "evidence": "an inline enumeration of the read-only actions (!== list && !== unpin) instead of consulting the single criterion - the mutation satisfies the guard detector co",
+      "provenAt": "2026-10-14T07:58:58.267Z"
+    },
+    "gate-42": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-42",
+      "evidence": "rule B of the one-lock-one-bound gate: a timer call carrying a BARE millisecond literal - the guard detector TIMER_CALL matches setTimeout(... 5000) exactly",
+      "provenAt": "2026-10-14T07:59:32.105Z"
+    },
+    "gate-36": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-36",
+      "evidence": "rule B probe: the degrade shape (direct call when no hmr is mounted) is replaced by an unconditional early return, so the platform lock can never be taken",
+      "provenAt": "2026-10-14T08:01:31.182Z"
+    },
+    "gate-46": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-46",
+      "evidence": "forensic probe (round 83)",
+      "provenAt": "2026-10-14T08:04:33.557Z"
+    },
+    "gate-44": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-44",
+      "evidence": "a control kind OUTSIDE the generators union (slider instead of number): the guard reads the view with a regex limited to number|switch|select|text and then requ",
+      "provenAt": "2026-10-14T08:15:56.455Z"
+    },
+    "gate-09": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-09",
+      "evidence": "renaming the declared key in its own home breaks the composer-reach needle: the guard pairs each declaration with a { file, needle } receipt, so the receipt sto",
+      "provenAt": "2026-10-14T08:17:17.775Z"
+    },
+    "gate-47": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-47",
+      "evidence": "the empty-profile guard stops declaring its own cause kind: the vacuum fixture asserts what an empty input must produce, so a wrong kind is a wrong verdict for ",
+      "provenAt": "2026-10-14T08:18:18.295Z"
+    },
+    "gate-20": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-20",
+      "evidence": "a name in the hardcoded family-session tool list that no package produces: the gate links that list to the tool packages, and the whole point is that a rename t",
+      "provenAt": "2026-10-14T08:19:24.222Z"
+    },
+    "gate-26": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-26",
+      "evidence": "a dangling reference to the client token scale from a client source (anchored on a unique import line): the guard collects every var(--evo-...) reference from t",
+      "provenAt": "2026-10-14T08:20:33.739Z"
+    },
+    "gate-31": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-31",
+      "evidence": "a code added to the SOURCE table as real code (anchored on the first export line, so the addition is not swallowed by a comment block) while the README document",
+      "provenAt": "2026-10-14T08:25:43.657Z"
+    },
+    "gate-34": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-34",
+      "evidence": "one published package dropped from the Package map: the roster must list exactly the publishable packages in the tree, so a missing row is its subject (the READ",
+      "provenAt": "2026-10-14T08:26:15.223Z"
+    },
+    "gate-32": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-32",
+      "evidence": "a number changed INSIDE the marked install-counts region of README (one line carrying both markers): the generator owns exactly that region, and an earlier prob",
+      "provenAt": "2026-10-14T08:27:34.003Z"
+    },
+    "gate-29": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-29",
+      "evidence": "a write site whose leading root symbol is not in the table own legend: step 1 of the inventory audit requires every leading <root> to be declared, so an unknown",
+      "provenAt": "2026-10-14T08:28:09.313Z"
+    },
+    "gate-35": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-35",
+      "evidence": "a hand edit to the generated installer-side port: the gate exists exactly to fail when the port is edited by hand instead of regenerated from the TypeScript sou",
+      "provenAt": "2026-10-14T08:28:45.162Z"
+    },
+    "gate-30": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-30",
+      "evidence": "a cross-face instruction (dsh web) placed in a string literal inside a client half: rule B bans exactly those literals, and this file is inside src/client so it",
+      "provenAt": "2026-10-14T08:29:21.275Z"
+    },
+    "gate-19": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-19",
+      "evidence": "a package whose manifest name leaves the family scope: the release script would still publish it while the installer discovery rule would never accept it - exac",
+      "provenAt": "2026-10-14T08:30:24.841Z"
+    },
+    "gate-21": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-21",
+      "evidence": "a root row whose package NAME is dropped: the guard fails loud on a row it cannot attribute to either side (a parse-shape failure must never pass silently), whi",
+      "provenAt": "2026-10-14T08:32:28.937Z"
+    },
+    "gate-25": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-25",
+      "evidence": "a seat row naming a bundle that is not a family bundle: judgement C checks the generated client view against the registry and the family bundle set, so an unkno",
+      "provenAt": "2026-10-14T08:32:58.637Z"
+    },
+    "gate-23": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-23",
+      "evidence": "a profileHoist entry whose reason is not a string: in policy-only form the guard requires every hoist entry to carry a reason, so a non-string reason is its sub",
+      "provenAt": "2026-10-14T08:33:35.644Z"
+    },
+    "line-identity-ci": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only line-identity-ci",
+      "evidence": "the CI row runs the same script in the same policy-only form, so the same non-string-reason mutation is its red too; two rows sharing one script still carry the",
+      "provenAt": "2026-10-14T08:33:45.995Z"
+    },
+    "gate-28": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-28",
+      "evidence": "a download-artifact name no producer anywhere carries: with a cross-run download the name only has to exist somewhere in the repository workflows, so a name tha",
+      "provenAt": "2026-10-14T08:34:33.741Z"
+    },
+    "gate-24": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-24",
+      "evidence": "the single path-armed rule pointed at a file that does not exist: the arming audit re-checks these paths itself instead of trusting the report counters, because",
+      "provenAt": "2026-10-14T08:37:13.545Z"
+    }
+  }
+}
