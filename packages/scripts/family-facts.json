@@ -1293,6 +1293,19 @@
               "provenAt": "2026-10-14T08:19:24.222Z",
               "provenSha": "75a59788fe3ec29d4ab8b5b9ddf4e7586f436493ef764ab220391298d5275a9d"
             }
+          ],
+          "gate-26": [
+            {
+              "mutate": {
+                "file": "packages/evolution-settings-ui/src/client/PendingCard.ts",
+                "find": "import type { ApprovalApi, PendingRow } from './api.ts'",
+                "replace": "import type { ApprovalApi, PendingRow } from './api.ts'\nconst TOKEN_PROBE = 'var(--evo-does-not-exist)'"
+              },
+              "expect": "red",
+              "note": "a dangling reference to the client token scale from a client source (anchored on a unique import line): the guard collects every var(--evo-...) reference from the halves and requires each name to be declared by the generated tokens.ts",
+              "provenAt": "2026-10-14T08:20:33.739Z",
+              "provenSha": "2b609a0d6b33eeb6e55f5858b44f7a89b3b0d584635b6c61b72f94be4e41f96a"
+            }
           ]
         },
         "mutationExempt": {
