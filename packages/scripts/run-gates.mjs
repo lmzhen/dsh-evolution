@@ -2,6 +2,8 @@
 /**
  * run-gates — 门禁清单的唯一执行器（G0-2）。只判不改。
  * G1: every gate now emits a VerdictRecord; the runner renders, it does not decide by exit code alone.
+ * G1/S4: the spawn seam lives in lib-run-gates.mjs (createRunner) - this file wires spawnSync and
+ * renders what the runner observed; no env/CLI switch reaches the seam.
  * 用法：node packages/scripts/run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--only <id>] [--drill <id>] [--overlay <path>]
  * 规则：seed = CI ∪ 表；pre-tag = local ∪ ci；runner 只跑 kind=script|toolchain；tree=overlay 的门禁在 overlay 根下跑。
  */
@@ -11,6 +13,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { validate, counts, render, actionBlock } from './lib-verdict.mjs'
+import { createRunner } from './lib-run-gates.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MIRROR_ROOT = resolve(HERE, '..', '..')
@@ -71,6 +74,7 @@ const only = flag('--only')
 if (only !== undefined) { list = list.filter((g) => g.id === only); if (list.length === 0) { console.error('run-gates: --only ' + only + ' not in profile ' + profile); process.exit(2) } }
 if (has('--list')) { emitList(list, profile); process.exit(0) }
 
+const runner = createRunner({ spawn: spawnSync })
 const identity = identityFor(profile)
 const records = []
 const base = (g, extra) => ({ id: g.id, check: g.cmd, criterion: g.id + '-criterion', identity, subject: { kind: 'paths', count: 0 }, ...extra })
@@ -98,10 +102,10 @@ for (const g of list) {
   }
   const cwd = g.tree === 'overlay' ? overlayRoot : MIRROR_ROOT
   const [script, ...rest] = argv
-  const started = Date.now()
-  const r = spawnSync(process.execPath, [script, ...rest], { cwd, stdio: has('--json') ? 'pipe' : 'inherit' })
-  const ms = Date.now() - started
-  const status = r.status ?? 1
+  // the seam owns the spawn and reports killedBy explicitly; this file never infers it
+  const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: has('--json') ? 'pipe' : 'inherit' })
+  const ms = observed.ms
+  const status = observed.status ?? 1
   if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
   else records.push(base(g, { verdict: 'fail', criterionEvaluated: true, cause: { kind: 'non-zero-exit' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, next: 'read the failing script output above, then fix the gate or the tree it judges', evidence: script + ' exit=' + status }))
 }
