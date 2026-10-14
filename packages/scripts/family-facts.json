@@ -425,7 +425,7 @@
       ],
       "machine": {
         "kind": "testing-policy",
-        "file": ".github/actions/evolution-validate/action.yml",
+        "file": "packages/scripts/vitest.family.config.mjs",
         "tiers": [
           "fast",
           "pre-tag",
