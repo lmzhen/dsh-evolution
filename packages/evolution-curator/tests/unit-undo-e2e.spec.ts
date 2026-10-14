@@ -1,3 +1,4 @@
+// @tier fast
 /** G3a-2/3/4 端到端：undoUnit 必须整单元回滚（零写预检 + 四分量），并守住两条硬判据。 */
 import { expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'

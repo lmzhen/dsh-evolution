@@ -1,3 +1,4 @@
+// @tier ci-only
 // @vitest-environment node
 /**
  * T3-03/A31: the review digest is a plain-text prompt whose PRODUCT is a plan with

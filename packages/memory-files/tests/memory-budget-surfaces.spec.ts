@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * S2-12③ (FLOW5-4): the memory budget's two configuration surfaces.
  *

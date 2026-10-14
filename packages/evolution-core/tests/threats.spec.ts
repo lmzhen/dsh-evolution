@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { expect, it } from 'vitest'
 import { evaluateThreat, MemoryStore, scanContentThreats, scanMemoryThreats, scanThreats, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'

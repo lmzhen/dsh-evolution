@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * S0.1 (v37 P0-1): prompt-variable neutralization for the memory snapshot.
  *

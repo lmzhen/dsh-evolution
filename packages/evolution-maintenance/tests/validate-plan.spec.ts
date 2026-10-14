@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { computeLifecycleTransitions, type DriftReport, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 import { MAINTAIN_RULE_IDS, validateAndNormalizeMaintainPlan, type ValidationResult } from '../src/index.ts'

@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * G5 C5: the bundle's fallback copy is the platform's FALLBACK_LOCALE (`en` — dsh-client-locale),

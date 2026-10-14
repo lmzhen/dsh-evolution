@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * The stylesheet's two structural invariants (T5-02/A57, T5-03/A58).

@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it, vi } from 'vitest'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'

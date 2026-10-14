@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * G5 P1-1 drill: a REFUSED write whose value already matches the on-screen state must still read as

@@ -1,3 +1,4 @@
+// @tier pre-tag
 // @vitest-environment node
 /**
  * T4-09/A51: the staged window has a third terminal state.

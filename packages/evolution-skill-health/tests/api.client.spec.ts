@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * The client data layer: `api.rows` is the panel's ONLY source of facts, so its three outcomes
  * (payload, host refusal, transport failure) are pinned here — a panel that renders an empty state

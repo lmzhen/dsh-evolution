@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
 // Spawn-based guard tests slow down under full-suite parallel load.
 vi.setConfig({ testTimeout: 30_000 })

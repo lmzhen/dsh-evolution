@@ -1,3 +1,4 @@
+// @tier fast
 // guard-scripts.negative.spec.ts (G4): the GUARD-side half of the four negative classes.
 //
 // Why it exists: those classes used to sit inside guard-scripts.spec.ts, each one welded to a

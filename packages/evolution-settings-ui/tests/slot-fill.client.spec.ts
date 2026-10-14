@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * G5 C4: ONE filler for the settings half. The rule used to be written at seven call sites
  * (`t('changed').replace('{n}', …)`); it now lives in `fill`/`formatText`, and these two properties

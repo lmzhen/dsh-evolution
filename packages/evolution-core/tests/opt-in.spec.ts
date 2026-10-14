@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * The variant-form opt-in gate: which sessions the family's cross-session
  * consumers act on (0.3.77 / C axis).

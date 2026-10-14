@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { afterAll, expect, it, vi } from 'vitest'
 // Contention tests spawn real fs races; full-suite parallel load can stretch
 // them far beyond the vitest default (audit v10 integration fix).

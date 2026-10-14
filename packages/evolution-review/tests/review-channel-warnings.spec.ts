@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * S2.2 (v37): the review channel's two LOAD-TIME disclosures.
  *

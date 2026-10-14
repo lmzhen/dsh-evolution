@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * The skill-history host routes: the trust fence as a pure decision, then one end-to-end pass over a
  * real HTTP socket so the fence, the method gate, the bounded body reader and the curator seam are

@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * U-6 (G5.5): the weight of a dangerous action. Approve/reject/preview used to be three identical

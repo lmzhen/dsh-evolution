@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { EvolutionGateSet, createGateSet, lifecycleCandidate, computeLifecycleTransitions, computeScopeView, PROTECTED_BUILTIN_SKILLS, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 

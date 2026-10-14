@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { renderMaintainTemplate, runMaintain, type MaintainRuntime, type SubagentResultLike, type SubagentRunLike, type SubagentStartRequestLike } from '../src/index.ts'

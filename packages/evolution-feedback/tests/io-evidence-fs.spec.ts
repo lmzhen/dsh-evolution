@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * G2 S3: feedback persists through skill-usage's io, and that path writes through the RMW entry point
  * (`mutateUsage` → `transact`) — so the counter wraps `transact` as well. It also has to let the

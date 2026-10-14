@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * G5: the platform read surfaces.
  *

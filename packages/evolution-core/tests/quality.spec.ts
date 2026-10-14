@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { computeQualityScores, computeDedupGroups, computePrefixClusters, normalizeUsageRecord, identity, affinity, vocabulary, projectionText, nearDuplicateSummaries, SUMMARY_DUPLICATE_HINT_THRESHOLD } from '@deepseek-ai/dsh-evolution-core'
 

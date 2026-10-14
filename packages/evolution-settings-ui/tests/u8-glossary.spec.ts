@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * U-8 (G5.9): one concept, one word — and no cross-face instructions in the GUI.
  *

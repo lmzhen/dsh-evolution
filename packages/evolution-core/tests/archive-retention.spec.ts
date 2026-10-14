@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * 0.5.0 V1 (design §16.6-④): the archive retention window REPORTS by default.
  * Upstream's hard invariant is never to delete an archived skill, and §14 rules

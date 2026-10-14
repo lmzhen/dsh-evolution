@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * S3-5 (J-6 / H-3): ONE version-mismatch policy, pinned for every versioned
  * artifact the family writes.

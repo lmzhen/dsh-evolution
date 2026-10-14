@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * E2 probe (2026-09-30): does removing a support file leave a version entry, and does that entry read as a
  * support change?

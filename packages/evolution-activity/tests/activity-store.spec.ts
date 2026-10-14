@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { readFile } from 'node:fs/promises'

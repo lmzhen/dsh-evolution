@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * S2.2 (v37 P1-2): what marks a session as the review channel, and what ends
  * the window.

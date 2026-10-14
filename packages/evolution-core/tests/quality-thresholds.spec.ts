@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * S2-11 (the by-product of FLOW4-1): THRESHOLD REACHABILITY for the quality model.
  *

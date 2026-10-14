@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * U-7 (G5.6): the accessibility baseline the platform gives for free. Two judges, both assertable:

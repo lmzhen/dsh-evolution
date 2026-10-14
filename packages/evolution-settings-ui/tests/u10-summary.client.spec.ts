@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * G5.10 / U-10: the section states its DECISION LINE — which family version this surface belongs to

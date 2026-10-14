@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * G2 S3: the migrated curator must actually USE the mounted platform backend, and must keep working
  * when only the default backend exists. The call count is the evidence — "switched backend" is

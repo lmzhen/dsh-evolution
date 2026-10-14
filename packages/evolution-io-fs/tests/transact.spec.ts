@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * G2 S3 drills: the platform provider's optimistic RMW. Each case is a defect that MUST go red if the
  * retry logic regresses — a stale write must not silently overwrite, a failed task must not write at

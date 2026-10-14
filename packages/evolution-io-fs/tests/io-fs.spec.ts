@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * G2 S0: the platform `ctx.fs` provider — what it maps, and what it declares as a gap.
  *

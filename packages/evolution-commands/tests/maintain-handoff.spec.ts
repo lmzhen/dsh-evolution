@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * G2 (0.20.0) command-face fixtures: `maintain handoff`, id-less `report`/`cancel`,
  * the three empty states, and the opt-in automatic handoff. Every case runs under

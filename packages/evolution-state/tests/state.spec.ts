@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'

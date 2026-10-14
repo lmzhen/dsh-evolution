@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * The client's route table against the host's: the panel calls literals it declares itself, and a
  * rename on one side that missed the other would surface as a 404 in the GUI rather than in CI.

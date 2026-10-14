@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it, vi } from 'vitest'
 
 // v43 audit (S2-3 / P1-10): the inventory asset is read LAZILY. The eager

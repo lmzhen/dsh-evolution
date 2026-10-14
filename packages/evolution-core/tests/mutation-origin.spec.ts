@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * G5: the ledger records WHO wrote (`origin`), and it does so end to end: the parse guard is a type
  * PREDICATE (it keeps the original object), so a field written by `recordMutation` comes back

@@ -1,3 +1,4 @@
+// @tier ci-only
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { join } from 'node:path'

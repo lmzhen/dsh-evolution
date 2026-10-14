@@ -1,3 +1,4 @@
+// @tier fast
 // The three-axis fixture for the prerequisite decision (F11/F12/F15's whole decision face).
 // Discipline: the FIRST assertion is a shape assertion (M4-12); the matrix is data; no fixture
 // starts a process (the seam takes a stub); and no fixture asserts elapsed time - a budget kill

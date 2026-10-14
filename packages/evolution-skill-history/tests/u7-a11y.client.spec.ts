@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * U-7 (G5.6) judge ①, the skill-history half: a focus ring that fires on mouse clicks is noise, so

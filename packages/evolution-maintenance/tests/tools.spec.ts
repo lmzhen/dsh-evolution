@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { DEFAULT_PROBE_TIMEOUT_MS, emptyRecord, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'

@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * S2-7 (FLOW1-2 / FLOW1-4): the cadence/inject delivery must settle where the
  * delivery is CONFIRMED, not where the trigger is enqueued.

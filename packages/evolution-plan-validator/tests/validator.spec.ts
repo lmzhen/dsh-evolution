@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import type { MemoryOp, SkillOp } from '../src/index.ts'
 import { PLAN_RULES, validateEvolutionPlan } from '../src/index.ts'

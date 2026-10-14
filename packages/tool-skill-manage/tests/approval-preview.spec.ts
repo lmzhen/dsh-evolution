@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * The staged skill write's PREVIEW: what the replay would store, resolved without writing.
  *

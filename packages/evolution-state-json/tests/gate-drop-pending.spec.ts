@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
 import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'

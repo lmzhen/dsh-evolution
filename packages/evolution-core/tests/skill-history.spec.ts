@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * Skill content history (design \`dsh-evolution-skill-history-design.md\` batch A).
  *

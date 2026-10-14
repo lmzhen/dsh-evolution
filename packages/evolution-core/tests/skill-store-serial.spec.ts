@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * S2-1: the in-process serial queue (makeSerialQueue) is NOT reentrant — a
  * task that awaits `this.serial` again from inside its own section never

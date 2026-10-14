@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * U-3 (G5.4): decoration is only rendered when it carries information. The row used to print one

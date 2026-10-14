@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * S2.1 (PLAN 2026-09-16, audit P2-1): the family's strict frontmatter parser
  * is the `yaml` package (YAML 1.2 core schema) — the same dependency the

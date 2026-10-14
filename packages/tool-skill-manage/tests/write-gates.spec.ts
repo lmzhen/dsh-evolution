@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * The write-admission sequence (design dsh-evolution-write-gate-design.md §3/§4.2).
  *

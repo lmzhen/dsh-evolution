@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Storage, storageBackendServiceKey } from '@deepseek-ai/dsh-storage'

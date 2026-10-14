@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { claimInstance, instanceClaimKey, instanceHolder, releaseInstance } from '@deepseek-ai/dsh-evolution-core'
 

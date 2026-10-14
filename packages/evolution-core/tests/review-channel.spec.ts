@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * S2.2 (v37 P1-2): the review channel's session mark.
  *

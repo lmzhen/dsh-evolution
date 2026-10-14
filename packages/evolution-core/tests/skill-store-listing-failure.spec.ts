@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { SkillLibrary } from '../src/skill-store.ts'
 

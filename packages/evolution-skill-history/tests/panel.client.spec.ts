@@ -1,3 +1,4 @@
+// @tier pre-tag
 // @vitest-environment jsdom
 /**
  * The panel's state machine, RENDERED: the family of behaviour neither \`tsc\` nor the bundle build can

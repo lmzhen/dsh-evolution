@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * The error table's own invariants (S2.9/1-5).
  *

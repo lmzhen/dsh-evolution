@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { expect, it, vi } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

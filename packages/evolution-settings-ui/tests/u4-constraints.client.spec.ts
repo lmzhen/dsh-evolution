@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * U-4 (G5.8): constraint-first, scoped to what is REACHABLE — the finding from ③ is worth more than

@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * The section's SLOT WIRING — the one thing the card's own spec cannot see.

@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * G3 caller half: locating the legacy document and running the migration through the
  * platform's own write.

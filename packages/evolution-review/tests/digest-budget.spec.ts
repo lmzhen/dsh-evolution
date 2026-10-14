@@ -1,3 +1,4 @@
+// @tier ci-only
 // @vitest-environment node
 /**
  * T3-08/A36: the digest window is sized by the data the review MUST see.

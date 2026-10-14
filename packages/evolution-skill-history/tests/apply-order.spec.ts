@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * Mounting order: the sidebar panel renders as soon as the browser half loads, so the HOST half must
  * still register its routes when the web server arrives AFTER this row applies. 0.11.1 read

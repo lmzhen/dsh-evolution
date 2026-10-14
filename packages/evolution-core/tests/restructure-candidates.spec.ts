@@ -1,3 +1,4 @@
+// @tier fast
 /*
  * G3: the candidate list and the store's anchor validation read the SAME H2 scan, so a candidate
  * can never name a heading the store would refuse. This spec pins the two refusals that used to be

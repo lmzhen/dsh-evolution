@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * S2.2 (v37 P1-2): `skill_manage` reads the family review-channel mark.
  *

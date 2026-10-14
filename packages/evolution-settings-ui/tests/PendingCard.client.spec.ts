@@ -1,3 +1,4 @@
+// @tier fast
 // @vitest-environment jsdom
 /**
  * The pending card RENDERED: the three states the review asked for each say so in their own words, and a

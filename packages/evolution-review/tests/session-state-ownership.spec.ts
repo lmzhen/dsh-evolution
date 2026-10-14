@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * P1-9 (S2-2): the review plugin's per-session collections register at their
  * declaration site, so the dispose hook cannot drift behind a new map. These

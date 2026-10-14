@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it, vi } from 'vitest'
 // Child-process spawns slow down under full-suite parallel load; the vitest
 // default 5s per test is too tight for multiple node spawns (audit v10 fix).

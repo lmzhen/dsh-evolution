@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { spawn } from 'node:child_process'

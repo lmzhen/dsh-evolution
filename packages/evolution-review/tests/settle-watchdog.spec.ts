@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * S2-6 (FLOW1-1): the platform's abort is not guaranteed to settle the subagent
  * run handle. `run.result` / `run.dispose` were awaited without a bound, so a

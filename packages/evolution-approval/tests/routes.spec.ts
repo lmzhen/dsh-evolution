@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * The approval route surface, driven through a REAL loopback http server (the fence reads the socket, so
  * a fabricated request cannot exercise it) plus one source tripwire for the browser half's copy of the

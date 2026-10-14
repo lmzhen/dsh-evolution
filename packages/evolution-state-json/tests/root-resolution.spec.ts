@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
 import { tempHome, tempRoot } from '../../test-support/temp-home.ts'

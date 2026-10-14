@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { PARAM_ALIASES, canonicalWriteId, isDeprecatedParamId, readParam, resolveParamId } from '@deepseek-ai/dsh-evolution-core'
 

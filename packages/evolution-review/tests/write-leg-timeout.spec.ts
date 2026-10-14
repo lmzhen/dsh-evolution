@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * S2-10 (FLOW1-6): the write-leg deadline does not stop the abandoned leg.
  *

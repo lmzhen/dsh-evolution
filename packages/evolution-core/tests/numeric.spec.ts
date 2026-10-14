@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { clampedNumber } from '../src/numeric.ts'
 

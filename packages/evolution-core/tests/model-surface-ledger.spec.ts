@@ -1,3 +1,4 @@
+// @tier fast
 /** E4：家族前缀 section 的字节账（UTF-16 长度 ＋ UTF-8 SHA-256 双轨冻结）。
  * 红＝文本变了而摘要没跟着更新 —— 前缀在每一轮请求里，变动必须被看见。
  * 口径：UTF-8 sha256 取 Buffer.from(text, 'utf8')；UTF-16 长度取 String.length（与平台目录口径同源）。

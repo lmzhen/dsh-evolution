@@ -1,3 +1,4 @@
+// @tier ci-only
 /**
  * G2 S1: the migrated reader must actually USE the preferred backend — and still work without it.
  *

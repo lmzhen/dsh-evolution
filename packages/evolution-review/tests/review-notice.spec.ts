@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * The outstanding-notice state machine (A 组).
  *

@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * The browser half's data face: the request each callback makes, and the refusal path that keeps the
  * curator's own sentence instead of inventing one. The rendered panel is covered by tsc, the bundle

@@ -1,3 +1,4 @@
+// @tier pre-tag
 /**
  * G2 S3 evidence for the skill-usage seam: `record()` writes through `this.io`, so a counting platform
  * backend must observe the write. This is the decisive experiment for the feedback evidence: feedback

@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * The pending card's two halves that can be judged without a browser: the request mapping (every answer,
  * refusal and transport failure lands on the same shape) and the state machine (loading, empty and

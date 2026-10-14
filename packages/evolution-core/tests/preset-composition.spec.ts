@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'

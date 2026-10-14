@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { fileURLToPath } from 'node:url'

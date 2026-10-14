@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { redactSecrets } from '@deepseek-ai/dsh-evolution-core'
 

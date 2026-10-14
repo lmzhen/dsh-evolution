@@ -1,3 +1,4 @@
+// @tier fast
 /**
  * S2-12 (FLOW5-3 / FLOW5-4): the staged table's growth signals.
  *
