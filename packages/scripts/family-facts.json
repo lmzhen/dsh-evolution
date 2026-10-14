@@ -1029,6 +1029,28 @@
               "expect": "red",
               "note": "a hand edit in a generated artifact must fail the four-channel parity guard before the byte-freshness check even runs; replacement evidence for the retired real-tree pass"
             }
+          ],
+          "gate-22": [
+            {
+              "mutate": {
+                "file": "README.md",
+                "find": "50-step",
+                "replace": "49-step"
+              },
+              "expect": "red",
+              "note": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)"
+            }
+          ],
+          "gate-48": [
+            {
+              "mutate": {
+                "file": "packages/scripts/family-facts.json",
+                "find": "\"rows\": 65",
+                "replace": "\"rows\": 60"
+              },
+              "expect": "red",
+              "note": "a registered axis count that disagrees with the live measurement: the ledger reports the drift and both numbers"
+            }
           ]
         },
         "unmappedTier": [
