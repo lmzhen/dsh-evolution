@@ -1384,6 +1384,19 @@
               "provenAt": "2026-10-14T08:29:21.275Z",
               "provenSha": "2b609a0d6b33eeb6e55f5858b44f7a89b3b0d584635b6c61b72f94be4e41f96a"
             }
+          ],
+          "gate-19": [
+            {
+              "mutate": {
+                "file": "packages/evolution-skill-catalog/package.json",
+                "find": "\"name\": \"@deepseek-ai/dsh-evolution-skill-catalog\"",
+                "replace": "\"name\": \"@probe/not-a-family-package\""
+              },
+              "expect": "red",
+              "note": "a package whose manifest name leaves the family scope: the release script would still publish it while the installer discovery rule would never accept it - exactly the silent gap this gate converts into a red",
+              "provenAt": "2026-10-14T08:30:24.841Z",
+              "provenSha": "af92c10778dfec1544389a6450f66647831f6b40b196fc015a5d59618737a39b"
+            }
           ]
         },
         "mutationExempt": {
