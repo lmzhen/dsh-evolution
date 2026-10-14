@@ -161,10 +161,20 @@ for (const g of list) {
   const declared = argv[0] === 'node' ? argv.slice(1) : argv
   const [script, ...rest] = declared
   // the seam owns the spawn and reports killedBy explicitly; this file never infers it
-  const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: has('--json') ? 'pipe' : 'inherit' })
+  const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: 'pipe' })
   const ms = observed.ms
   const status = observed.status ?? 1
   if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
+  else if (status === 2) {
+    // The family's CLI convention is 0 = pass / 1 = fail / 2 = CANNOT DECIDE. Collapsing 2 into
+    // fail makes a missing input (an empty corpus, an absent bed, a reader that is not there)
+    // read as a violated invariant - infrastructure failure must not masquerade as a check
+    // failure. The child's own CANNOT DECIDE line is carried into the evidence so the reason
+    // travels with the verdict instead of being re-invented here.
+    const childLine = String((observed.stderr === undefined || observed.stderr === null ? '' : observed.stderr) + (observed.stdout === undefined || observed.stdout === null ? '' : observed.stdout))
+      .split('\n').map((line) => line.trim()).find((line) => /CANNOT DECIDE|cannot decide/i.test(line))
+    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the check reported CANNOT DECIDE: read its own line above (it names the input that is not there) - supply that input or register the check as cannot-decide on this machine', evidence: script + ' exit=2' + (childLine === undefined ? '' : ' :: ' + childLine) }))
+  }
   else records.push(base(g, { verdict: 'fail', criterionEvaluated: true, cause: { kind: 'non-zero-exit' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, next: 'read the failing script output above, then fix the gate or the tree it judges', evidence: script + ' exit=' + status }))
 }
 

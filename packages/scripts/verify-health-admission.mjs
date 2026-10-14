@@ -19,7 +19,7 @@ const policyPath = resolve(arg('--policy', join(HERE, 'health-admission-policy.j
 
 if (existsSync(baselinePath) === false) {
   console.error('verify-health-admission: no baseline at ' + baselinePath)
-  console.error('  produce it with WRITE_HEALTH_BASELINE=1 on the evolution-core health-baseline spec')
+  console.error('  produce it with: node packages/scripts/gen-health-baseline.mjs (the producer owns the write; the spec only asserts)')
   process.exit(1)
 }
 const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'))

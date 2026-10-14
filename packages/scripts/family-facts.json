@@ -907,7 +907,16 @@
           {
             "id": "health-admission",
             "tier": "fast",
-            "criterion": "verify-health-admission"
+            "criterion": "verify-health-admission",
+            "requires": [
+              {
+                "script": "gen-health-baseline.mjs",
+                "mode": "present",
+                "path": "packages/scripts/reports/health-baseline.json",
+                "reason": "the admission gate only reads the calibration artifact; the producer gen-health-baseline.mjs writes it (a test used to, guarded by a write flag on that spec), so a missing product is cannot-decide and a missing producer is red",
+                "owner": "scripts"
+              }
+            ]
           }
         ],
         "pendingColumns": [
