@@ -13,6 +13,7 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import * as Feedback from '../src/index.ts'
 import { join } from 'node:path'
+import { countingIo } from '../../test-support/counting-io.ts'
 import { tempHome } from '../../test-support/temp-home.ts'
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 20))
@@ -32,32 +33,24 @@ describe('G2 S3: feedback persists through the platform backend when the deploym
     onlyNode.evolutionFeedback.record('demo', 'positive', undefined, 'skill')
     await onlyNode.evolutionFeedback.waitIdle()
 
-    let fsCalls = 0
     const base = nodeEvolutionIo()
+    const counted = countingIo(base) // G5 step 4: the shared wrapper
     const withFs = new Context()
     await withFs.plugin(EvolutionIoRegistry)
     await withFs.plugin(NodeIo)
     await withFs.plugin(SkillUsageRegistry, { root: join(home, 'skills') })
-    withFs.evolutionIo.registerProvider({
-      name: 'fs',
-      ...base,
-      readText: async (path) => { fsCalls += 1; return base.readText(path) },
-      list: async (path) => { fsCalls += 1; return base.list(path) },
-      writeText: async (path, text) => { fsCalls += 1; return base.writeText(path, text) },
-      exists: async (path) => { fsCalls += 1; return base.exists(path) },
-      transact: async (path, task) => { fsCalls += 1; return base.transact!(path, task) },
-    })
+    withFs.evolutionIo.registerProvider({ name: 'fs', ...counted.provider })
     // Isolate the plumbing first: the registered backend must be resolvable and its counter live.
     const registered = withFs.evolutionIo.provider('fs')
     await registered.writeText(join(home, 'probe.txt'), 'x')
-    expect(fsCalls).toBeGreaterThan(0)
-    fsCalls = 0
+    expect(counted.calls()).toBeGreaterThan(0)
+    counted.reset()
 
     await withFs.plugin(Feedback)
     await settle()
     withFs.evolutionFeedback.record('demo', 'negative', undefined, 'skill')
     await withFs.evolutionFeedback.waitIdle()
     await settle()
-    expect(fsCalls).toBeGreaterThan(0)
+    expect(counted.calls()).toBeGreaterThan(0)
   })
 })

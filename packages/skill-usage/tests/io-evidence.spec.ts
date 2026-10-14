@@ -10,6 +10,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import SkillUsageRegistry from '../src/index.ts'
+import { countingIo } from '../../test-support/counting-io.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('G2 S3: skill-usage writes through the platform backend when mounted', () => {
@@ -23,25 +24,18 @@ describe('G2 S3: skill-usage writes through the platform backend when mounted', 
     await onlyNode.skillUsage.record('demo', 'use')
     expect((await onlyNode.skillUsage.report()).get('demo')?.use_count).toBe(1)
 
-    let fsCalls = 0
+    // G5 step 4: the counter is the SHARED wrapper (test-support/counting-io.ts). It wraps EVERY
+    // method, which matters most for the RMW entry point: `mutateUsage` writes through `transact`,
+    // so a wrapper that only counted readText/writeText would see ZERO calls while the seam is in use.
     const base = nodeEvolutionIo()
+    const counted = countingIo(base)
     const withFs = new Context()
     await withFs.plugin(EvolutionIoRegistry)
     await withFs.plugin(NodeIo)
-    withFs.evolutionIo.registerProvider({
-      name: 'fs',
-      ...base,
-      readText: async (path) => { fsCalls += 1; return base.readText(path) },
-      list: async (path) => { fsCalls += 1; return base.list(path) },
-      writeText: async (path, text) => { fsCalls += 1; return base.writeText(path, text) },
-      exists: async (path) => { fsCalls += 1; return base.exists(path) },
-      // The RMW entry point matters most: `mutateUsage` writes through `transact`, so a wrapper that
-      // only counts readText/writeText sees ZERO calls even though the seam is in use.
-      transact: async (path, task) => { fsCalls += 1; return base.transact!(path, task) },
-    })
+    withFs.evolutionIo.registerProvider({ name: 'fs', ...counted.provider })
     await withFs.plugin(SkillUsageRegistry, { root })
     await withFs.skillUsage.record('demo', 'use')
     await new Promise(resolve => setTimeout(resolve, 20))
-    expect(fsCalls).toBeGreaterThan(0)
+    expect(counted.calls()).toBeGreaterThan(0)
   })
 })
