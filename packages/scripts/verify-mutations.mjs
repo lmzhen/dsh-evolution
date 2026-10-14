@@ -87,6 +87,12 @@ function runRecord(id, record) {
   // record whose argv cannot even run here (a missing module, a wrong tree) would read as a
   // proven red for a reason that has nothing to do with the mutation - the exact false evidence
   // this ledger exists to prevent.
+  // The tree the RECORD mutates and the tree the CHECK runs in must be the same one: a row that
+  // runs in the overlay never reads a mirror-side patch, so its verdict would be independent of
+  // the mutation (a green baseline plus a mutated file proves nothing about the check).
+  if (gate.tree === 'overlay') {
+    return { status: 'TREE MISMATCH', detail: id + ': this row runs in the overlay while mutations are applied in the mirror - the run cannot see the patch' }
+  }
   const baseline = spawnSync(process.execPath, argv[0] === 'node' ? argv.slice(1) : argv, { cwd: resolvePath(HERE, '..', '..'), encoding: 'utf8' })
   const baselineVerdict = VERDICT_OF_EXIT[baseline.status ?? 1] ?? 'red'
   if (baselineVerdict !== 'green') {
