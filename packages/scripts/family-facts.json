@@ -971,6 +971,7 @@
             "owner": "scripts"
           }
         ],
+        "checkMutations": {},
         "unmappedTier": [
           {
             "id": "gate-04",
