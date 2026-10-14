@@ -235,10 +235,6 @@ export class EvolutionApproval extends Service {
     // U-6: `auto` is the shipped default — an approval batch must not be interrupted by a second
     // confirmation the operator never asked for (31 号 §U-6 的风险行). `.volatile()` gives the field
     // its user layer, exactly like `pendingTtlMs` above.
-    // `zod` resolves to an ERROR type in this package's linter program: the pre-existing
-    // `pendingTtlMs` line above is reported by the same three rules. `.volatile()` exists at
-    // runtime (the platform patches it onto the builder schemas, which is how that line works).
-    /* oxlint-disable typescript/no-unsafe-call, typescript/no-unsafe-assignment, typescript/no-unsafe-member-access */
     approvalConfirm: z.union([z.const('auto'), z.const('ask'), z.const('timeout')]).default('auto').volatile(),
   })
 
