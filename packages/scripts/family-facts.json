@@ -1345,6 +1345,19 @@
               "provenAt": "2026-10-14T08:27:34.003Z",
               "provenSha": "d445e2dace7e8023f77b8208b9682df02a826fbed5128f55aa57f90ff7cdf91a"
             }
+          ],
+          "gate-29": [
+            {
+              "mutate": {
+                "file": "packages/evolution-core/persisted-write-inventory.json",
+                "find": "\"path\": \"<skillsRoot>/.usage.json\"",
+                "replace": "\"path\": \"<zzz>/.usage.json\""
+              },
+              "expect": "red",
+              "note": "a write site whose leading root symbol is not in the table own legend: step 1 of the inventory audit requires every leading <root> to be declared, so an unknown root is its subject",
+              "provenAt": "2026-10-14T08:28:09.313Z",
+              "provenSha": "3fdd8ef62d69ab22d0ef484b926197731786796cef96600d5f58687a609dd641"
+            }
           ]
         },
         "mutationExempt": {
