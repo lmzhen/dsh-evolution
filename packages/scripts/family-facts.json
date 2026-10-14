@@ -413,8 +413,7 @@
           "text": "| Family version |"
         }
       ]
-    }
-,
+    },
     {
       "id": "testing-policy",
       "title": "the testing policy: leaf tiers, overrides, platform line and the resolver pin",
@@ -427,7 +426,11 @@
       "machine": {
         "kind": "testing-policy",
         "file": ".github/actions/evolution-validate/action.yml",
-        "tiers": ["fast", "pre-tag", "ci-only"],
+        "tiers": [
+          "fast",
+          "pre-tag",
+          "ci-only"
+        ],
         "baselineParamOfTier": {
           "fast": "timeout.spec.default",
           "pre-tag": "timeout.spec.default",
@@ -442,61 +445,67 @@
             "sha256": "e9c92046c2098fc6428665db01202f6d515a2812486c370969f86e04fd7d8c56"
           }
         },
-        "overrides": [
-          {
-            "path": "packages/evolution-core/tests/io.spec.ts",
-            "key": "testTimeout",
-            "ms": 30000,
-            "reasonRef": "packages/evolution-core/tests/io.spec.ts:4",
-            "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-            "owner": "scripts"
-          },
-          {
-            "path": "packages/evolution-host/tests/guard-scripts.spec.ts",
-            "key": "testTimeout",
-            "ms": 30000,
-            "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:4",
-            "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-            "owner": "scripts"
-          },
-          {
-            "path": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-            "key": "testTimeout",
-            "ms": 60000,
-            "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:15",
-            "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-            "owner": "scripts"
-          },
-          {
-            "path": "packages/evolution-host/tests/layout-sync.spec.ts",
-            "key": "testTimeout",
-            "ms": 30000,
-            "reasonRef": "packages/evolution-host/tests/layout-sync.spec.ts:4",
-            "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-            "owner": "scripts"
-          },
-          {
-            "path": "packages/evolution-host/tests/platform-range.spec.ts",
-            "key": "testTimeout",
-            "ms": 30000,
-            "reasonRef": "packages/evolution-host/tests/platform-range.spec.ts:3",
-            "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-            "owner": "scripts"
-          },
-          {
-            "path": "packages/evolution-state-domain/tests/domain-state.spec.ts",
-            "key": "testTimeout",
-            "ms": 30000,
-            "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:13",
-            "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-            "owner": "scripts"
-          }
-        ],
+        "overrides": [],
         "testLines": [],
         "timeouts": {
-          "gate": { "paramId": "timeout.gate.default", "ms": 30000 },
-          "spec": { "paramId": "timeout.spec.default", "ms": 30000 },
-          "overrides": []
+          "gate": {
+            "paramId": "timeout.gate.default",
+            "ms": 30000
+          },
+          "spec": {
+            "paramId": "timeout.spec.default",
+            "ms": 30000
+          },
+          "overrides": [
+            {
+              "path": "packages/evolution-core/tests/io.spec.ts",
+              "key": "testTimeout",
+              "ms": 30000,
+              "reasonRef": "packages/evolution-core/tests/io.spec.ts:4",
+              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
+              "owner": "scripts"
+            },
+            {
+              "path": "packages/evolution-host/tests/guard-scripts.spec.ts",
+              "key": "testTimeout",
+              "ms": 30000,
+              "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:4",
+              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
+              "owner": "scripts"
+            },
+            {
+              "path": "packages/evolution-host/tests/installer-preset-base.spec.ts",
+              "key": "testTimeout",
+              "ms": 60000,
+              "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:15",
+              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
+              "owner": "scripts"
+            },
+            {
+              "path": "packages/evolution-host/tests/layout-sync.spec.ts",
+              "key": "testTimeout",
+              "ms": 30000,
+              "reasonRef": "packages/evolution-host/tests/layout-sync.spec.ts:4",
+              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
+              "owner": "scripts"
+            },
+            {
+              "path": "packages/evolution-host/tests/platform-range.spec.ts",
+              "key": "testTimeout",
+              "ms": 30000,
+              "reasonRef": "packages/evolution-host/tests/platform-range.spec.ts:3",
+              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
+              "owner": "scripts"
+            },
+            {
+              "path": "packages/evolution-state-domain/tests/domain-state.spec.ts",
+              "key": "testTimeout",
+              "ms": 30000,
+              "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:13",
+              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
+              "owner": "scripts"
+            }
+          ]
         }
       }
     }
