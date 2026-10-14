@@ -253,10 +253,28 @@ for (const gate of manifestGates) {
     const due = familyVer === undefined ? null : versionReached(familyVer, gate.expiry)
     if (due === true) note('expiry-due', gate.id, 'expiry ' + gate.expiry + ' is reached by ' + String(familyVer) + ' - close the exemption or move it with a reason')
   }
+// The axis register escalates: a note stays a note during migration, but once the family version
+// reaches the register entry's own expiry the same observation becomes a PROBLEM - the debt's
+// expiry is what makes it self-enforcing instead of a hint that outlives its migration.
+const axisRegister = (() => {
+  try {
+    const facts = JSON.parse(readFileSync(join(root, 'scripts', 'family-facts.json'), 'utf8'))
+    const checks = (facts.facts ?? []).find((fact) => fact.id === 'checks')
+    return new Map((checks?.machine?.pendingAxes ?? []).map((entry) => [entry.axis, entry]))
+  } catch { return new Map() }
+})()
+const observeAxis = (axis, id, message) => {
+  const entry = axisRegister.get(axis)
+  if (entry !== undefined && familyVer !== undefined && versionReached(familyVer, entry.expiry)) {
+    problems.push(message + ' - the ' + axis + ' register expired at ' + entry.expiry + ' (reached by ' + familyVer + ')')
+    return
+  }
+  note(axis, id, message)
+}
   // (R4) falsifiability carrier: every row states how its green can be turned red (drillCmd), or
   // why it cannot be yet (noDrillReason). Neither means somebody forgot, which G6's gate-truth counts.
   if (typeof gate.drillCmd !== 'string' && typeof gate.noDrillReason !== 'string') {
-    note('falsifiability-carrier', gate.id, 'declares neither drillCmd nor noDrillReason - a green nobody can turn red is an F=0 candidate')
+    observeAxis('falsifiability-carrier', gate.id, 'declares neither drillCmd nor noDrillReason - a green nobody can turn red is an F=0 candidate')
   }
 }
 const CRITERIA = ['executability', 'no-placeholders', 'expiry-due', 'falsifiability-carrier']
