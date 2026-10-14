@@ -1319,6 +1319,19 @@
               "provenAt": "2026-10-14T08:25:43.657Z",
               "provenSha": "7ff64c87802b38028c797c64e6fddfb244f030c0c8027bbff9c901d09f1dbee4"
             }
+          ],
+          "gate-34": [
+            {
+              "mutate": {
+                "file": "packages/README.md",
+                "find": "| `evolution-core` | Shared pure stores/prompts/signals/constants plus the skill content history (`skill-history.ts`), the two named similarity questions (`quality.ts`) and the session-frame classification (`evidence.ts`); no main Cordis plugin entry (importing the package root is the only entry) |\n",
+                "replace": ""
+              },
+              "expect": "red",
+              "note": "one published package dropped from the Package map: the roster must list exactly the publishable packages in the tree, so a missing row is its subject (the README table is real content, not a comment)",
+              "provenAt": "2026-10-14T08:26:15.223Z",
+              "provenSha": "b0774e33db8c407f952d5dd1edb88bed19d7e5b7729e6df566ba479507d3b4f8"
+            }
           ]
         },
         "mutationExempt": {
