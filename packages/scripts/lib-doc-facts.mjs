@@ -384,6 +384,18 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     const vocabulary = Array.isArray(machine.forbidVocabulary) ? machine.forbidVocabulary : []
     if (vocabulary.length === 0) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' declares no forbid vocabulary - a per-tier ban list could name anything'); return out }
     const current = familyVersion(root)
+    // R28: the @tier header contract is DATA too - the marker, the window rule, the exactly-once
+    // requirement and the version from which a spec without a marker is red. This branch only
+    // compares; the taxonomy view is what counts specimens.
+    const header = machine.headerContract
+    if (header === null || typeof header !== 'object' || Array.isArray(header)) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' declares no headerContract - the @tier convention would have no carrier'); return out }
+    for (const field of ['marker', 'window', 'specGlob', 'requiredFrom', 'owner', 'reason']) {
+      if (typeof header[field] !== 'string' || header[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' headerContract is missing ' + field + ' - the marker would be a convention without a carrier')
+    }
+    if (header.exactlyOnce !== true) out.push(FACTS_ASSET + ': fact ' + fact.id + ' headerContract.exactlyOnce must be true - 0 markers and 2 markers are both red (R28: ambiguity is not a default)')
+    if (typeof header.membersFrom !== 'string' || machine[header.membersFrom] === undefined) out.push(FACTS_ASSET + ': fact ' + fact.id + ' headerContract.membersFrom names ' + String(header.membersFrom) + ', which is not a block of this fact - the member closed set has no home')
+    if (versionReached(current, header.requiredFrom) === null) out.push(FACTS_ASSET + ': fact ' + fact.id + ' headerContract.requiredFrom "' + String(header.requiredFrom) + '" is not a version - the dated requirement cannot be evaluated')
+
     if (current === undefined) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' cannot read the family version under ' + root + ' - a version-based exemption cannot be evaluated (a vacuum pass is not a pass)'); return out }
     for (const tier of tiers) {
       const entry = tierTable[tier] ?? {}

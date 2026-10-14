@@ -533,7 +533,17 @@
           "fast",
           "pre-tag",
           "full"
-        ]
+        ],
+        "headerContract": {
+          "marker": "@tier",
+          "window": "the leading run of comment/import/blank lines: ^\\s*(//|/\\*|\\*|import\\b|$)",
+          "exactlyOnce": true,
+          "membersFrom": "tiers",
+          "specGlob": "*/tests/**/*.spec.ts",
+          "requiredFrom": "0.26.0",
+          "owner": "scripts",
+          "reason": "the marker is a new convention (no spec carries it today); from requiredFrom a spec without one is red, and until then the taxonomy view prints the count as an observation (R28: an empty REQUIRED tier is red, an unrequired one prints requiredFrom)"
+        }
       }
     },
     {
