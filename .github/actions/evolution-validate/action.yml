@@ -194,7 +194,7 @@ runs:
       run: |
         # P0-prime: the family gate for skill see-also edges. Self-test form only:
         # the live-root form needs a skill root and is local/pre-tag only.
-        node packages/scripts/verify-graph-edges.mjs --self-test
+        node packages/evolution/scripts/verify-graph-edges.mjs --self-test
 
     - name: Pack scoped release
       shell: bash
