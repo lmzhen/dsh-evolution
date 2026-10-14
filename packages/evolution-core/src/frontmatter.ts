@@ -23,6 +23,7 @@
 // verdicts are unchanged.
 import { parse as parseYaml } from 'yaml'
 import { AUTHORING_DESCRIPTION_BAR, CONTENT_SPLIT_HINT, SKILL_NAME_RE } from './constants.ts'
+import { isRecord } from './guards.ts'
 import { DEFAULT_SKILL_LIMITS } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
 
@@ -210,8 +211,8 @@ function strictFrontmatterValues(block: string): StrictFrontmatterValues | null 
     if (typeof value === 'string') { values.set(key, value.trim()); continue }
     if (typeof value === 'number' || typeof value === 'boolean') { values.set(key, String(value)); continue }
     if (Array.isArray(value)) { values.set(key, `[${value.map(item => String(item)).join(', ')}]`); continue }
-    if (key === 'metadata' && value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      metadata = value as Record<string, unknown>
+    if (key === 'metadata' && isRecord(value)) {
+      metadata = value
       continue
     }
   }
@@ -552,9 +553,7 @@ export function relatedSkillNames(content: string, exclude?: string): string[] {
   // supported for legacy blocks; the nested array is folded into the same
   // delimited-name scan below, so the F-321 name-shape guard still applies.
   const nestedHost = parsed.metadata?.['hermes']
-  const nestedRaw = nestedHost && typeof nestedHost === 'object' && !Array.isArray(nestedHost)
-    ? (nestedHost as Record<string, unknown>)['related_skills']
-    : undefined
+  const nestedRaw = isRecord(nestedHost) ? nestedHost['related_skills'] : undefined
   const flat = parsed.frontmatter['related_skills']
   const raw = typeof flat === 'string'
     ? flat

@@ -122,7 +122,7 @@ gates.push({
   kind: 'script',
   tree: 'overlay',
   profiles: ['local', 'pre-tag'],
-  cmd: 'node packages/scripts/verify-graph-edges.mjs --report',
+  cmd: 'node packages/evolution/scripts/verify-graph-edges.mjs --report',
   noDrillReason: 'live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half',
   reason: 'live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)',
   expiry: '0.26.0',

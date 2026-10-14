@@ -51,7 +51,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all   # the DEFAULT full bund
 /evolution doctor
 ```
 
-You should see<!-- gen:install-counts --> 31 packages installed (the published list is 32; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the
+You should see<!-- gen:install-counts --> 32 packages installed (the published list is 33; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the
 rows it found. Verify without asking the model anything:
 
 ```bash
@@ -84,7 +84,7 @@ state onto an empty domain.
 |---|---|
 | Validated DSH platform line | **`0.2.0-rc.2`** (`PLATFORM_VERSION`; the pinned dev baseline is `UPSTREAM_SHA=fb2c4b9e…`) |
 | Declared dependency window | `^0.2.0-rc.1` on every `@deepseek-ai/dsh-*` dependency/peer (`PLATFORM_FLOOR`) |
-| Family version | `0.25.8` (this tree; the npm tag comes from the release tag — per-form status in `packages/INSTALL.md`) |
+| Family version | `0.25.9` (this tree; the npm tag comes from the release tag — per-form status in `packages/INSTALL.md`) |
 | Node | 22.19+ or 24+ (`engines`) |
 
 Two values answer two questions: `PLATFORM_FLOOR` is what the published range declares, `PLATFORM_VERSION` is
