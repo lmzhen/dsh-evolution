@@ -1191,6 +1191,19 @@
               "provenAt": "2026-10-14T07:58:58.267Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
+          ],
+          "gate-42": [
+            {
+              "mutate": {
+                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
+                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst TIMER_PROBE = setTimeout(fn, 5000)"
+              },
+              "expect": "red",
+              "note": "rule B of the one-lock-one-bound gate: a timer call carrying a BARE millisecond literal - the guard detector TIMER_CALL matches setTimeout(... 5000) exactly",
+              "provenAt": "2026-10-14T07:59:32.105Z",
+              "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
+            }
           ]
         },
         "mutationExempt": {
