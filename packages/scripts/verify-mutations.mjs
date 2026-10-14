@@ -83,6 +83,15 @@ function runRecord(id, record) {
   const file = resolvePath(HERE, '..', '..', record.mutate.file)
   const before = readBytes(file, 'utf8')
   const beforeSha = sha256(before)
+  // A red only counts when the check was GREEN before the mutation. Without this baseline a
+  // record whose argv cannot even run here (a missing module, a wrong tree) would read as a
+  // proven red for a reason that has nothing to do with the mutation - the exact false evidence
+  // this ledger exists to prevent.
+  const baseline = spawnSync(process.execPath, argv[0] === 'node' ? argv.slice(1) : argv, { cwd: resolvePath(HERE, '..', '..'), encoding: 'utf8' })
+  const baselineVerdict = VERDICT_OF_EXIT[baseline.status ?? 1] ?? 'red'
+  if (baselineVerdict !== 'green') {
+    return { status: 'NO GREEN BASELINE', detail: id + ': the check returned ' + baselineVerdict + ' BEFORE any mutation, so a red afterwards would prove nothing' }
+  }
   const occurrences = before.split(record.mutate.find).length - 1
   if (occurrences !== 1) return { status: 'PATCH NOT UNIQUE', detail: record.mutate.file + ': find occurs ' + occurrences + ' time(s)' }
   const equalValue = record.mutate.find === record.mutate.replace

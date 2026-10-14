@@ -1006,8 +1006,8 @@
               },
               "expect": "red",
               "note": "breaking one declaration id breaks the closure both ways, so the doc-facts gate must red: this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)",
-              "provenAt": "2026-10-14T07:42:48.792Z",
-              "provenSha": "abd1cabb6b5cb337a7f404f6ac6d28095743103808c350301c36a66b7412485f"
+              "provenAt": "2026-10-14T07:47:38.193Z",
+              "provenSha": "79ff502a725f4687a71498850c49cfaea5f83b801ad5126b67e52985fca16dda"
             }
           ],
           "gate-08": [
@@ -1019,7 +1019,7 @@
               },
               "expect": "red",
               "note": "renaming a listener leaves the emit unlistened, so the pairing guard must red; this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)",
-              "provenAt": "2026-10-14T07:42:49.893Z",
+              "provenAt": "2026-10-14T07:47:39.838Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
           ],
@@ -1032,7 +1032,7 @@
               },
               "expect": "red",
               "note": "a hand edit in a generated artifact must fail the four-channel parity guard before the byte-freshness check even runs; replacement evidence for the retired real-tree pass",
-              "provenAt": "2026-10-14T07:42:50.899Z",
+              "provenAt": "2026-10-14T07:47:41.380Z",
               "provenSha": "144ad133e417671b15001e42925999c5bf376c527b1d92de63f9b3a8d8c06b90"
             }
           ],
@@ -1045,7 +1045,7 @@
               },
               "expect": "red",
               "note": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)",
-              "provenAt": "2026-10-14T07:42:53.601Z",
+              "provenAt": "2026-10-14T07:47:44.113Z",
               "provenSha": "d445e2dace7e8023f77b8208b9682df02a826fbed5128f55aa57f90ff7cdf91a"
             }
           ],
@@ -1058,8 +1058,8 @@
               },
               "expect": "red",
               "note": "a registered axis count that disagrees with the live measurement: the ledger reports the drift and both numbers",
-              "provenAt": "2026-10-14T07:42:55.952Z",
-              "provenSha": "66f3b7509fc0bda804dfa6a3a1b93d725c64aeb15d081cc6fe8bba4fb5ab0da3"
+              "provenAt": "2026-10-14T07:47:46.726Z",
+              "provenSha": "cc1be28adaa3f5f07ecd97b36b25b2c21c3cedc10d72ee938a690d734405b231"
             }
           ],
           "gate-06": [
@@ -1071,7 +1071,7 @@
               },
               "expect": "red",
               "note": "one source import renamed to a package the manifest does not declare (the whole line is the anchor: the bare specifier occurs twice in this file and twice in the manifest)",
-              "provenAt": "2026-10-14T07:44:45.627Z",
+              "provenAt": "2026-10-14T07:47:49.873Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
           ],
@@ -1084,7 +1084,7 @@
               },
               "expect": "red",
               "note": "a DSH_HOME read introduced outside evolution-core/src: rule N1 is zero-tolerance, so the guard names the file and the line",
-              "provenAt": "2026-10-14T07:46:09.529Z",
+              "provenAt": "2026-10-14T07:47:58.989Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
           ]
