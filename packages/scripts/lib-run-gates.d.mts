@@ -36,4 +36,7 @@ export declare const ERRNO_CLASS: Record<string, string>
 export declare function classifyErrno(code: string): 'missing' | 'denied' | 'timeout' | 'unknown' | null
 export declare function isLegalCombination(kind: string, mode: string): boolean
 export declare function decideRequires(result: unknown, kind: string, mode: string): GateDecision
-export declare function createRunner(deps: { spawn: Function; now: () => number }): { run: Function }
+export declare function createRunner(deps: {
+  spawn: (...args: unknown[]) => unknown
+  now: () => number
+}): { run: (...args: unknown[]) => RunOutcome }
