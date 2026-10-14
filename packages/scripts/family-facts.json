@@ -1601,6 +1601,10 @@
           "health-admission": {
             "reason": "CANNOT-DECIDE BY DESIGN: run as registered it reports CANNOT DECIDE (user=46 platform=0) because a 0-hit count over an EMPTY corpus would admit every rule - the guard refuses rather than pass, so it has no green baseline a mutation could turn red; its enforcement branch is also empty by design (the policy inForce list is empty until a rule is measured on both corpora)",
             "expiry": "release gate: if a platform corpus is supplied in-tree and a rule is registered inForce, delete this exemption and prove it by making that rule fail admission on the baseline"
+          },
+          "gate-50": {
+            "reason": "PRODUCER ROW, NOT A CHECK: its registered argv carries no --check, and the script only READS the machine skill corpora and WRITES scripts/reports/health-baseline.json through the engine - it has no verdict to turn red, and its corpus is machine state (the reader that judges the artifact is health-admission, registered separately and cannot-decide without a platform corpus)",
+            "expiry": "release gate: if this row ever gains a --check form (the drift check the other generators carry), delete this exemption and prove it by hand-editing the artifact"
           }
         },
         "unmappedTier": [
