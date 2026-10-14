@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { LONG_RUNS, renderLongRunTable } from '../src/index.ts'
+import { LONG_RUNS } from '../src/index.ts'
 
 describe('long-run inventory (S4)', () => {
   it('every entry names an owner, a measured basis, a budget line and a result home', () => {
@@ -34,14 +34,7 @@ describe('long-run inventory (S4)', () => {
     }
   })
 
-  it('T-WD2 pattern: the README table equals the renderer, with no extra row after the block', () => {
-    const readme = readFileSync(fileURLToPath(new URL('../../README.md', import.meta.url)), 'utf8')
-    const rendered = renderLongRunTable().split('\n')
-    const lines = readme.split('\n')
-    const start = lines.findIndex(line => line === rendered[0])
-    if (start === -1) throw new Error(`README long-run table drifted: first row not found:\n${rendered[0]}`)
-    expect(lines.slice(start, start + rendered.length)).toEqual(rendered)
-    const after = lines[start + rendered.length]
-    expect(after === undefined || !after.startsWith('|'), `README carries an extra long-run row: ${after}`).toBe(true)
-  })
+  // G5 step 5 (audit F1/F2): the README-vs-renderer pin was retired with the renderer's last
+  // consumer - `renderLongRunTable` has no caller (the README is generated on the producing side),
+  // so both sides of that assertion sat off the production path.
 })

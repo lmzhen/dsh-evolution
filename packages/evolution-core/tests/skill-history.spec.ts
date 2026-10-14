@@ -507,25 +507,8 @@ describe('skill-history: which artifact a version holds (0.10.1)', () => {
       expect(grown.versions[0]?.summary).toBeUndefined()
     })
 
-    it('reduces a model answer to one line, or to nothing', () => {
-      expect(normalizeVersionSummary('  tighten the retention rule to 30 days.  ')).toBe('tighten the retention rule to 30 days')
-      expect(normalizeVersionSummary('"quoted"\nsecond line')).toBe('quoted')
-      expect(normalizeVersionSummary('   \n  ')).toBeUndefined()
-      const long = normalizeVersionSummary('x'.repeat(VERSION_SUMMARY_MAX_CHARS + 20))
-      expect(long?.length).toBe(VERSION_SUMMARY_MAX_CHARS)
-      expect(long?.endsWith('\u2026')).toBe(true)
-    })
-
-    it('pins the summarizer prompt to the skill, the cap and both bodies', () => {
-      const prompt = versionSummaryPrompt({ name: 'demo', action: 'patch', before: 'OLD BODY', after: 'NEW BODY' })
-      expect(prompt).toContain('demo')
-      expect(prompt).toContain('patch')
-      expect(prompt).toContain(String(VERSION_SUMMARY_MAX_CHARS))
-      expect(prompt).toContain('OLD BODY')
-      expect(prompt).toContain('NEW BODY')
-      const created = versionSummaryPrompt({ name: 'demo', action: 'create', before: null, after: 'NEW BODY' })
-      expect(created).toContain('did not exist')
-    })
+    // G5 step 5 (audit F1): the two summarizer helpers below this line were retired with their
+    // assertions - `normalizeVersionSummary` / `versionSummaryPrompt` have no non-test consumer.
   })
 
   it('splits the two chains, so the body keeps its content order when a support file shares the index', () => {
