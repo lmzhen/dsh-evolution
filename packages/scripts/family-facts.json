@@ -1139,6 +1139,19 @@
               "provenAt": "2026-10-14T07:55:16.394Z",
               "provenSha": "7f5f34f7e6fac9ab7ee7bf8716530e2f82752581bbfc4b9f5c48dd035ed27e66"
             }
+          ],
+          "gate-11": [
+            {
+              "mutate": {
+                "file": "packages/evolution-all/cordis.patch.yml",
+                "find": "# Full-functionality evolution bundle (DEFAULT install target).",
+                "replace": "# Full-functionality evolution bundle (DEFAULT install target!)"
+              },
+              "expect": "red",
+              "note": "a hand edit to one of the three GENERATED patches: by the guard its own header states, a hand edit of any patch is drift by definition, because bundle-rows.json is the single source and the generator --check proves currency",
+              "provenAt": "2026-10-14T07:57:12.619Z",
+              "provenSha": "d447171ff0cabe2852ee11da5f3012517c4fe41a5d46325c865ae7379b3df731"
+            }
           ]
         },
         "mutationExempt": {
