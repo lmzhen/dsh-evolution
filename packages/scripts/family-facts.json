@@ -972,6 +972,28 @@
               "expect": "red",
               "note": "breaking one declaration id breaks the closure both ways, so the doc-facts gate must red: this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)"
             }
+          ],
+          "gate-08": [
+            {
+              "mutate": {
+                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "find": "ctx.on('evolution/skill-mutated', () => {",
+                "replace": "ctx.on('evolution/skill-mutated-typo', () => {"
+              },
+              "expect": "red",
+              "note": "renaming a listener leaves the emit unlistened, so the pairing guard must red; this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)"
+            }
+          ],
+          "gate-12": [
+            {
+              "mutate": {
+                "file": "packages/PARAMETERS.md",
+                "find": "reviewSkillInterval",
+                "replace": "reviewSkillIntervals"
+              },
+              "expect": "red",
+              "note": "a hand edit in a generated artifact must fail the four-channel parity guard before the byte-freshness check even runs; replacement evidence for the retired real-tree pass"
+            }
           ]
         },
         "unmappedTier": [

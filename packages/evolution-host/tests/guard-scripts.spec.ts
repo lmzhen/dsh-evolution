@@ -121,8 +121,8 @@ describe('guard scripts (V4-30 sentry)', () => {
   })
 
   it('event pairing reports zero orphans on the real tree and flags an unlistened emit', async () => {
-    const ok = await run(process.execPath, [eventPairing, psRoot], { encoding: 'utf8' })
-    expect(ok.stdout).toContain('0 orphan')
+    // the real-tree pass belongs to gate-08; the FIXTURE half stays, and checkMutations[gate-08] proves the guard reds
+    // when a listener is renamed.
     const root = await tempRoot('guard-pairing-')
     const pkg = join(root, 'demo-pkg')
     await mkdir(join(pkg, 'src'), { recursive: true })
@@ -666,8 +666,8 @@ const paramParity = join(scripts, 'verify-param-channel-parity.mjs')
 
 describe('parameter channel parity guard (G5/S5.1 sentry)', () => {
   it('passes on the real tree and fails when the document renames a parameter', async () => {
-    const ok = await run(process.execPath, [paramParity, psRoot, '--strict'], { encoding: 'utf8' })
-    expect(ok.stdout).toContain('verify-param-channel-parity: OK')
+    // the real-tree pass belongs to gate-12; checkMutations[gate-12] proves it reds on a hand
+    // edit to a generated artifact.
     const root = await tempRoot('guard-parity-')
     await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
     await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval')]), 'utf8')
