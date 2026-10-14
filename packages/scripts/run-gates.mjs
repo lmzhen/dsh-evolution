@@ -78,15 +78,24 @@ const runner = createRunner({ spawn: spawnSync })
 // requires (R38/R42): the prerequisites each check declares. The FACT owns them (nothing else
 // does), the decision is the pure matrix in lib-run-gates, and this runner only supplies what it
 // observed. A prerequisite that does not pass aborts THIS row - no member verdict is invented.
-const declaredRequires = (() => {
+// The checks fact owns both the declared criterion (who judges this row) and the prerequisites.
+// The executor READS them; it never invents a criterion of its own (the old value was the
+// placeholder <id>-criterion, which named nothing a reader could follow).
+const declared = (() => {
   try {
     const asset = JSON.parse(readFileSync(join(HERE, 'family-facts.json'), 'utf8'))
     const fact = (asset.facts ?? []).find((entry) => entry?.machine?.kind === 'checks')
-    const map = new Map()
-    for (const row of fact?.machine?.declarations ?? []) if (Array.isArray(row.requires) && row.requires.length > 0) map.set(row.id, row.requires)
-    return map
-  } catch { return new Map() }
+    const criteria = new Map()
+    const requires = new Map()
+    for (const row of fact?.machine?.declarations ?? []) {
+      if (typeof row.criterion === 'string' && row.criterion.trim() !== '') criteria.set(row.id, row.criterion)
+      if (Array.isArray(row.requires) && row.requires.length > 0) requires.set(row.id, row.requires)
+    }
+    return { criteria, requires }
+  } catch { return { criteria: new Map(), requires: new Map() } }
 })()
+const declaredRequires = declared.requires
+const criterionOf = (id) => declared.criteria.get(id) ?? 'undeclared'
 const treeRootFor = (tree) => (tree === 'overlay' ? overlayRoot : MIRROR_ROOT)
 const evaluateRequires = (gate) => {
   for (const req of declaredRequires.get(gate.id) ?? []) {
@@ -106,7 +115,7 @@ const evaluateRequires = (gate) => {
 }
 const identity = identityFor(profile)
 const records = []
-const base = (g, extra) => ({ id: g.id, check: g.human, criterion: g.id + '-criterion', identity, subject: { kind: 'paths', count: 0 }, ...extra })
+const base = (g, extra) => ({ id: g.id, check: g.human, criterion: criterionOf(g.id), identity, subject: { kind: 'paths', count: 0 }, ...extra })
 
 for (const g of list) {
   // 1) static executability: a placeholder token or a non-command argv[0] cannot run a criterion at all
@@ -157,6 +166,25 @@ for (const g of list) {
   const status = observed.status ?? 1
   if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
   else records.push(base(g, { verdict: 'fail', criterionEvaluated: true, cause: { kind: 'non-zero-exit' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, next: 'read the failing script output above, then fix the gate or the tree it judges', evidence: script + ' exit=' + status }))
+}
+
+// A profile that selects nothing is NOT a pass (plan step 3's vacuum fixture): the run would
+// otherwise print pass=0 fail=0 and exit 0, which is exactly the F=0 shape this redesign hunts.
+if (records.length === 0) {
+  records.push({
+    id: 'profile:' + profile,
+    check: 'run-gates ' + profile,
+    criterion: 'profiles',
+    identity,
+    subject: { kind: 'paths', count: 0 },
+    path: MIRROR_ROOT,
+    verdict: 'cannot-decide',
+    criterionEvaluated: false,
+    cause: { kind: 'filter-no-match' },
+    missing: ['gates'],
+    next: 'the profile selects no runnable gate - register the rows or fix their profiles (an empty run is not a pass)',
+    evidence: MANIFEST + ' carries ' + manifest.gates.length + ' row(s), 0 runnable for profile ' + profile,
+  })
 }
 
 const c = counts(records)
