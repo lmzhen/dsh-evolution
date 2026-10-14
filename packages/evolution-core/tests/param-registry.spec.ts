@@ -120,9 +120,6 @@ describe('parameter registry (G1/S1.1)', () => {
   })
 
   it('keeps the parsed text and the runtime array in agreement', () => {
-    // `readRegistry`'s return type resolves to an ERROR type in this file's linter program (the
-    // module's declarations are opaque there); the call is exercised at runtime by this very test.
-    // oxlint-disable-next-line typescript/no-unsafe-call, typescript/no-unsafe-member-access
     const parsed = readRegistry(packagesRoot).entries as ParamExposure[]
     expect(parsed.length, 'entries found in the text').toBe(PARAM_EXPOSURE.length)
     expect(parsed).toEqual([...PARAM_EXPOSURE])
