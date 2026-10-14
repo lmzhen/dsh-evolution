@@ -1087,6 +1087,19 @@
               "provenAt": "2026-10-14T07:49:22.928Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
+          ],
+          "gate-43": [
+            {
+              "mutate": {
+                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
+                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst IO_DISCIPLINE_PROBE = writeFileSync('/tmp/nope', 'x')"
+              },
+              "expect": "red",
+              "note": "a raw writeFileSync call introduced outside the write facade: the io-discipline rule bans the raw disk write in domain src",
+              "provenAt": "2026-10-14T07:52:14.854Z",
+              "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
+            }
           ]
         },
         "mutationExempt": {
