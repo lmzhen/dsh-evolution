@@ -1136,6 +1136,18 @@
           "gate-33": {
             "reason": "this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven",
             "expiry": "release gate: either split the row into real argv rows or keep the exemption; the executability axis already counts it"
+          },
+          "gate-13": {
+            "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
+            "expiry": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
+          },
+          "gate-14": {
+            "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
+            "expiry": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
+          },
+          "gate-15": {
+            "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
+            "expiry": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
           }
         },
         "unmappedTier": [
