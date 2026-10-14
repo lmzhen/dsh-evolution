@@ -39,6 +39,8 @@ const notes = []
 // still fails the registry. A malformed table is a hard failure - 「no declarations」 would hide
 // exactly the rows the table exists to declare.
 let argsSources = {}
+let composites = {}
+try { composites = JSON.parse(readFileSync(join(root, 'scripts', 'args-sources.json'), 'utf8')).composites ?? {} } catch { composites = {} }
 const argsPath = join(root, 'scripts', 'args-sources.json')
 if (existsSync(argsPath)) {
   try { argsSources = JSON.parse(readFileSync(argsPath, 'utf8')).sources ?? {} }
@@ -227,7 +229,9 @@ for (const gate of manifestGates) {
   // (R1) executability: the row must declare ONE executable command, and the script it names must
   // exist in the tree the row declares. gate-34 (a composite prose cell: six commands in one row)
   // is the live specimen - its reason is named, not guessed.
-  if (argvRow === null || argvRow.length === 0) {
+  if (composites[gate.id] !== undefined) {
+    // a declared composite has no single argv by design - emit no observation
+  } else if (argvRow === null || argvRow.length === 0) {
     note('executability', gate.id, (gate.argvProblem === undefined ? 'declares no argv' : gate.argvProblem) + ' - declare one executable command (split the cell or add an argv with a value source)')
   } else if (argvRow[0].startsWith('-')) {
     note('executability', gate.id, 'argv[0]=' + JSON.stringify(argvRow[0]) + ' is not a command - name the script the row runs')

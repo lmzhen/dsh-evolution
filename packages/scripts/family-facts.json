@@ -959,15 +959,7 @@
             "owner": "scripts"
           }
         ],
-        "pendingAxes": [
-          {
-            "axis": "executability",
-            "rows": 1,
-            "reasonRef": "scripts/gate-manifest.json#gate-34 (composite table cell: six commands in one row)",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          }
-        ],
+        "pendingAxes": [],
         "checkMutations": {
           "gate-17": [
             {

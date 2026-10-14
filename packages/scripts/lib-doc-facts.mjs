@@ -521,7 +521,7 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     // (count + reason + expiry + owner). The registry compares these counts against the LIVE
     // observations; this branch only refuses a shapeless entry.
     const axes = Array.isArray(machine.pendingAxes) ? machine.pendingAxes : []
-    if (axes.length === 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' carries no pendingAxes register - a meta-gate gap would stand as a bare number')
+    if (!Array.isArray(machine.pendingAxes)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' carries no pendingAxes register - a meta-gate gap would stand as a bare number (an EMPTY array is the clean state: it means no debts)')
     const seenAxes = new Set()
     for (const entry of axes) {
       const label = String(entry?.axis ?? '(no axis)')

@@ -7,5 +7,10 @@
     "gate-29": {
       "<plane home>": "the plane home directory the run audits; the CI job supplies it as the checkout home and forwards --home"
     }
+  },
+  "composites": {
+    "gate-33": {
+      "reason": "composite-cell: its table row names six commands, so it has no single argv to run - the meta-gate own detail names the two acceptable resolutions (split the cell, or add an argv with a value source), and this declaration takes the second"
+    }
   }
 }
