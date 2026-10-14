@@ -38,7 +38,10 @@ describe('G1 标定：health-baseline 读数', () => {
   // (a lower line can only flag MORE), and the counts are printed for the record.
   it('soft line 40k vs 24k: prints the flagged counts and holds the containment invariant', () => {
     const at = (line: number): number =>
-      skills.filter((s: { facts: { dims: { bodyChars: number | null } } }) => s.facts.dims.bodyChars !== null && s.facts.dims.bodyChars >= line).length
+      skills.filter(
+        (s: { facts: { dims: { bodyChars: number | null } } }) =>
+          s.facts.dims.bodyChars !== null && s.facts.dims.bodyChars >= line,
+      ).length
     const at40 = at(40_000)
     const at24 = at(24_000)
     console.log('soft line: 40_000 flags ' + String(at40) + ' of ' + String(skills.length) + '; 24_000 flags ' + String(at24))
