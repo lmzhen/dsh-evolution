@@ -1,7 +1,5 @@
 // @tier pre-tag
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { COMMAND_ENTRIES, renderHelpText, renderHint } from '../src/registry.ts'
 
 describe('command registry (WD1, 0.3.55)', () => {
