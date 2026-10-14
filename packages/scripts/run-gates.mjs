@@ -35,12 +35,29 @@ byProfile['pre-tag'] = union(byProfile.local, byProfile.ci)
 
 const sha8 = (p) => { try { return createHash('sha256').update(readFileSync(p)).digest('hex').slice(0, 8) } catch { return 'absent' } }
 const gitHead = () => { const r = spawnSync('git', ['-C', MIRROR_ROOT, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }); return (r.stdout || 'unknown').trim() || 'unknown' }
+// policySha is the keep-list identity: a canonical projection of the facts asset, so the mutation
+// prover's own stamps (provenAt/provenSha) cannot churn it - those are data about proofs, not policy.
+// Sorted keys everywhere; volatile keys dropped; a real policy edit still moves the hash.
+const VOLATILE = new Set(['provenAt', 'provenSha'])
+const canonical = (value) => {
+  if (Array.isArray(value)) return value.map(canonical)
+  if (value !== null && typeof value === 'object') {
+    const out = {}
+    for (const key of Object.keys(value).sort()) {
+      if (VOLATILE.has(key)) continue
+      out[key] = canonical(value[key])
+    }
+    return out
+  }
+  return value
+}
+const policySha8 = (p) => { try { return createHash('sha256').update(JSON.stringify(canonical(JSON.parse(readFileSync(p, 'utf8'))))).digest('hex').slice(0, 8) } catch { return 'unknown' } }
 const identityFor = (lane) => ({
   face: 'unknown',
   channel: 'src',
   platformLine: 'unknown',
   adapterSha: sha8(join('D:', 'dsh', '_tools', 'lib-line.mjs')),
-  policySha: sha8(join(HERE, 'family-facts.json')),
+  policySha: policySha8(join(HERE, 'family-facts.json')),
   familyVersion: (() => { try { return JSON.parse(readFileSync(join(MIRROR_ROOT, 'package.json'), 'utf8')).version } catch { return 'unknown' } })(),
   readerSha: sha8(join(HERE, 'lib-param-registry.mjs')),
   scope: 'full',
