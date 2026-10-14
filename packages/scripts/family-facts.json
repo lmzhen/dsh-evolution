@@ -1113,6 +1113,19 @@
               "provenAt": "2026-10-14T07:52:44.113Z",
               "provenSha": "84a07c426afba8df3042bc7deaa61505bfb77ec98922192d4c226251d4b11b97"
             }
+          ],
+          "gate-41": [
+            {
+              "mutate": {
+                "file": "packages/evolution-commands/src/registry.ts",
+                "find": "  { readonly: true, usage: 'pending [--detail]', summary: '列出暂存的写入（--detail 显示参数）' },",
+                "replace": "  { readonly: true, usage: 'pending [--detail]', summary: '' },"
+              },
+              "expect": "red",
+              "note": "a registry entry whose summary is empty: the command-table rule requires every entry to carry a non-empty summary (C7 shape)",
+              "provenAt": "2026-10-14T07:53:21.655Z",
+              "provenSha": "4a38598ed694cb6924967c64c7236e4256d2689657a100d24341288d3dfd4582"
+            }
           ]
         },
         "mutationExempt": {
