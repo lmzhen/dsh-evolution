@@ -253,8 +253,18 @@ for (const gate of manifestGates) {
     const target = argvRow[1]
     const base = gate.tree === 'overlay' ? overlayRoot : repo
     const resolved = /^[A-Za-z]:[\\/]/.test(target) ? target : join(base, target)
+    // Registered rows are not gaps. gate-13/14/15 run audit scripts that exist only on the machine
+    // that owns them (MACHINE_LOCAL) and the local-runner rows are registered too (CI_NOT_EXECUTED);
+    // the overlay-tree rows declare a tree this layout does not carry. Their registration IS the
+    // machine-local / overlay declaration, so the executability axis must not count them again -
+    // otherwise CI reports a live gap for every row that is legitimately un-runnable there.
+    const registeredName = target.replace(/^.*[\\/]/, '')
+    const registeredElsewhere = MACHINE_LOCAL.some((entry) => entry.script === registeredName) || CI_NOT_EXECUTED.some((entry) => entry.script === registeredName)
+    const overlayAbsent = gate.tree === 'overlay' && !existsSync(base)
+    if (!registeredElsewhere && !overlayAbsent) {
     if (!existsSync(base)) note('executability', gate.id, 'the ' + String(gate.tree) + ' tree is not present at ' + base + ' - the script cannot be resolved (and that is not a pass)')
     else if (!existsSync(resolved)) note('executability', gate.id, 'runs ' + target + ', which does not exist at ' + resolved)
+    }
   }
   // (R2) no placeholders: a `<...>` in the EXECUTABLE form documents a shape and cannot run a
   // criterion. The scan is on the JOINED argv (not the tokenised array), so a multi-word
