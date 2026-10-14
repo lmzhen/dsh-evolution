@@ -1462,6 +1462,19 @@
               "provenAt": "2026-10-14T08:34:33.741Z",
               "provenSha": "91b4059538b725c08bb2a50e04b4ba6097678d01d92d75ae5532afbb9d60ca7c"
             }
+          ],
+          "gate-24": [
+            {
+              "mutate": {
+                "file": "packages/scripts/verify-arch-guards.mjs",
+                "find": "      { id: 'N9', armedWhen: 'path-exists', subjects: [CORE_SRC + '/threats.ts'] },",
+                "replace": "      { id: 'N9', armedWhen: 'path-exists', subjects: [CORE_SRC + '/threats-probe.ts'] },"
+              },
+              "expect": "red",
+              "note": "the single path-armed rule pointed at a file that does not exist: the arming audit re-checks these paths itself instead of trusting the report counters, because deleting a subject used to leave the family count above zero and the rule went silently unarmed",
+              "provenAt": "2026-10-14T08:37:13.545Z",
+              "provenSha": "e3de8de517159eb3500246cab38fa3b13d85b7c67491c8969695543fda04220f"
+            }
           ]
         },
         "mutationExempt": {
