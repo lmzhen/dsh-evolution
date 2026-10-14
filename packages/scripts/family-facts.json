@@ -414,6 +414,38 @@
         }
       ]
     }
+,
+    {
+      "id": "testing-policy",
+      "title": "the testing policy: leaf tiers, overrides, platform line and the resolver pin",
+      "home": "repo:CONTRIBUTING.md",
+      "must": [
+        {
+          "text": "--testTimeout=30000"
+        }
+      ],
+      "machine": {
+        "kind": "testing-policy",
+        "file": ".github/actions/evolution-validate/action.yml",
+        "tiers": ["fast", "pre-tag", "ci-only"],
+        "baselineParamOfTier": {
+          "fast": "timeout.spec.default",
+          "pre-tag": "timeout.spec.default",
+          "ci-only": "timeout.spec.default"
+        },
+        "adapter": {
+          "script": "lib-line.mjs",
+          "sha256": "e9c92046c2098fc6428665db01202f6d515a2812486c370969f86e04fd7d8c56",
+          "expectedLine": "0.2.0-rc.2",
+          "extendsExternal": {
+            "path": "D:/dsh/_tools/lib-line.mjs",
+            "sha256": "e9c92046c2098fc6428665db01202f6d515a2812486c370969f86e04fd7d8c56"
+          }
+        },
+        "overrides": [],
+        "testLines": []
+      }
+    }
   ],
   "checklists": {
     "docs": [

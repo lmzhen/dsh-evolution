@@ -361,6 +361,43 @@ function machineViolations(fact, root, docs, home, repoScope) {
     }
     return out
   }
+  if (machine.kind === 'testing-policy') {
+    // G0 S0.1: the testing policy is DATA — leaf tiers, per-tier budget param ids, the resolver pin
+    // and the exception registers. The gates may only compare (R84): no closed set is defined here,
+    // the leaf-tier list comes from the fact itself and full must never reappear as a tier.
+    const tiers = Array.isArray(machine.tiers) ? machine.tiers : []
+    if (tiers.length === 0) { out.push(`${FACTS_ASSET}: fact ${fact.id} declares no leaf tier — every check would be untiered`); return out }
+    // the full-lane ban is judged FIRST so the message names the real defect (R71), not its side effect
+    for (const forbidden of ['full']) {
+      if (tiers.includes(forbidden)) { out.push(`${FACTS_ASSET}: fact ${fact.id} lists ${forbidden} as a tier — full is an execution lane, never a declared tier (R71)`); return out }
+    }
+    const params = machine.baselineParamOfTier ?? {}
+    for (const tier of tiers) {
+      const id = params[tier]
+      if (typeof id !== 'string' || id.trim() === '') out.push(`${FACTS_ASSET}: fact ${fact.id} leaf tier ${tier} has no budget param id — the number must live in the param registry, not here`)
+    }
+    for (const key of Object.keys(params)) {
+      if (!tiers.includes(key)) out.push(`${FACTS_ASSET}: fact ${fact.id} declares a budget for ${key}, which is not a leaf tier`)
+    }
+    const adapter = machine.adapter ?? {}
+    if (typeof adapter.script !== 'string' || adapter.script.trim() === '') out.push(`${FACTS_ASSET}: fact ${fact.id} adapter names no script`)
+    if (!/^[0-9a-f]{64}$/.test(String(adapter.sha256 ?? ''))) out.push(`${FACTS_ASSET}: fact ${fact.id} adapter sha256 is not 64 hex — the pin is the bytes, not a label`)
+    if (typeof adapter.expectedLine !== 'string' || adapter.expectedLine.trim() === '') out.push(`${FACTS_ASSET}: fact ${fact.id} adapter has no expectedLine`)
+    const ext = adapter.extendsExternal
+    if (ext !== undefined) {
+      if (!/^[0-9a-f]{64}$/.test(String(ext.sha256 ?? ''))) out.push(`${FACTS_ASSET}: fact ${fact.id} extendsExternal sha256 is not 64 hex`)
+      if (ext.sha256 !== adapter.sha256) out.push(`${FACTS_ASSET}: fact ${fact.id} adapter sha256 and extendsExternal sha256 disagree — one fact, one value`)
+      if (String(ext.path ?? '').includes('packages/')) out.push(`${FACTS_ASSET}: fact ${fact.id} extendsExternal points inside the repo — that is the in-repo form, drop the block`)
+    }
+    for (const [kind, fields] of [["testLines", ["spec", "expectedLine", "reasonRef", "expiry", "owner"]], ["overrides", ["path", "reasonRef", "expiry", "owner"]]]) {
+      for (const entry of machine[kind] ?? []) {
+        for (const field of fields) {
+          if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') out.push(`${FACTS_ASSET}: fact ${fact.id} ${kind} entry is missing ${field}`)
+        }
+      }
+    }
+    return out
+  }
   if (machine.kind === 'skill-name-home') {
     // v46 S2.5b (finding T2-01): the family's canonical name is the DIRECTORY name, and the
     // validator is what makes that true — it refuses a frontmatter `name` that differs from the
