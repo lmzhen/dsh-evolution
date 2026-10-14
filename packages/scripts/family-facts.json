@@ -460,9 +460,9 @@
           }
         },
         "baselineParamOfTier": {
-          "fast": "timeout.spec.default",
-          "pre-tag": "timeout.spec.default",
-          "ci-only": "timeout.spec.default"
+          "fast": "timeout.specDefault",
+          "pre-tag": "timeout.specDefault",
+          "ci-only": "timeout.specDefault"
         },
         "adapter": {
           "script": "lib-line.mjs",
@@ -477,11 +477,11 @@
         "testLines": [],
         "timeouts": {
           "gate": {
-            "paramId": "timeout.gate.default",
+            "paramId": "timeout.gateDefault",
             "ms": 30000
           },
           "spec": {
-            "paramId": "timeout.spec.default",
+            "paramId": "timeout.specDefault",
             "ms": 30000
           },
           "overrides": [

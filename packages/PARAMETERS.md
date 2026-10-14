@@ -157,5 +157,5 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `install.basePreset` | E4 | restart | install | scripts | — | 无（install） | Agent-preset base the layered install composes from (--base). |
 | `install.home` | E4 | restart | install | scripts | — | 无（install） | Harness home the installer writes into (--home). |
 | `install.presetRowOverrides` | E4 | restart | install | scripts | — | 无（install） | Preset row overrides the installer injects (row-overrides.json). |
-| `timeout.gate.default` | E2 | none | install | scripts | — | 无（internal） | Gate budget: the vitest --testTimeout the gate table and the CI step carry (the number lives in testing-policy.timeouts). |
-| `timeout.spec.default` | E2 | none | install | scripts | — | 无（internal） | Local spec budget: the vitest testTimeout the family config generates per leaf tier (the number lives in testing-policy.timeouts). |
+| `timeout.gateDefault` | E2 | none | install | scripts | — | 无（internal） | Gate budget: the vitest --testTimeout the gate table and the CI step carry (the number lives in testing-policy.timeouts). |
+| `timeout.specDefault` | E2 | none | install | scripts | — | 无（internal） | Local spec budget: the vitest testTimeout the family config generates per leaf tier (the number lives in testing-policy.timeouts). |
