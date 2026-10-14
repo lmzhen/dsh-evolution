@@ -1267,6 +1267,19 @@
               "provenAt": "2026-10-14T08:17:17.775Z",
               "provenSha": "1a40671d172440fa69ff7247942cd9f0e4de2a541ffdc5b26861b5a9ca6657cd"
             }
+          ],
+          "gate-47": [
+            {
+              "mutate": {
+                "file": "packages/scripts/run-gates.mjs",
+                "find": "    cause: { kind: 'filter-no-match' },",
+                "replace": "    cause: { kind: 'invariant-violation' },"
+              },
+              "expect": "red",
+              "note": "the empty-profile guard stops declaring its own cause kind: the vacuum fixture asserts what an empty input must produce, so a wrong kind is a wrong verdict for it",
+              "provenAt": "2026-10-14T08:18:18.295Z",
+              "provenSha": "5dd6dc3b76f7b5b98096bd13cac2605cc59e99438db2579fd40ed4afaceb8e36"
+            }
           ]
         },
         "mutationExempt": {
