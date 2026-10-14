@@ -794,7 +794,16 @@
           {
             "id": "ci-only-01",
             "tier": "ci-only",
-            "criterion": "audit-release-tarballs"
+            "criterion": "audit-release-tarballs",
+            "requires": [
+              {
+                "script": "build-lib.mjs",
+                "mode": "present",
+                "path": "packages/evolution/dist",
+                "reason": "the tarball audit reads the built dist of the overlay; in CI the build step produces it, so its absence is cannot-decide rather than a failing audit",
+                "owner": "scripts"
+              }
+            ]
           },
           {
             "id": "ci-only-02",
@@ -869,7 +878,16 @@
           {
             "id": "line-identity-bed",
             "tier": "fast",
-            "criterion": "verify-line-identity"
+            "criterion": "verify-line-identity",
+            "requires": [
+              {
+                "script": "gen-line-manifest.mjs",
+                "mode": "present",
+                "path": "packages/scripts/files/line-manifest.json",
+                "reason": "the toothed form compares the bed manifest this producer writes; a missing product is not a broken check (the reviewer requires the path in the report)",
+                "owner": "scripts"
+              }
+            ]
           },
           {
             "id": "graph-edges-live",

@@ -470,6 +470,10 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     }
     const sentinelTier = machine.sentinel?.tier
     const sentinelCriterion = machine.sentinel?.criterion
+    // the member scripts of the manifest (a prerequisite that is also a row is worth saying out
+    // loud; a prerequisite that is the row's OWN script is a contradiction and fails below).
+    const memberScripts = new Set()
+    for (const gate of gates) for (const token of (Array.isArray(gate?.argv) ? gate.argv : [])) { const hit = /([A-Za-z0-9._-]+\.(?:mjs|cjs))$/.exec(String(token)); if (hit !== null) memberScripts.add(hit[1]) }
     const rows = Array.isArray(machine.declarations) ? machine.declarations : []
     const rowById = new Map()
     for (const row of rows) {
@@ -513,6 +517,29 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
         if (claim.length < 24) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim is ' + claim.length + ' chars - a claim is a sentence a reader can judge, not a label')
         if (claim.includes('TODO')) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim still carries a TODO marker - write the claim or drop the field and let pendingColumns register it')
         if (typeof reason === 'string' && claim === reason.trim()) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim copies the carrier reason - the claim states what the check asserts, the reason states why it exists')
+      }
+      // R38/R42: the declared prerequisites. Static half at declaration time: closed mode, an
+      // owner and a reason, the product path a `present` requirement must name, and an in-repo
+      // `run` script that exists. The runtime half is decideRequires' matrix.
+      const requires = Array.isArray(row.requires) ? row.requires : []
+      const ownScript = /([A-Za-z0-9._-]+\.(?:mjs|cjs))$/.exec(Array.isArray(row.criterion) ? '' : String(row.criterion))
+      const seenRequires = new Set()
+      for (const entry of requires) {
+        const label = id + '.requires[' + String(entry?.script ?? '?') + ']'
+        if (typeof entry?.script !== 'string' || entry.script.trim() === '') { out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + label + ' names no script'); continue }
+        if (seenRequires.has(entry.script)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + label + ' is declared twice - one entry per prerequisite')
+        seenRequires.add(entry.script)
+        if (!['run', 'present'].includes(entry.mode)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + label + '.mode must be run|present (got ' + String(entry.mode) + ') - an unlisted mode has no semantics')
+        for (const field of ['reason', 'owner']) if (typeof entry[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + label + ' has no ' + field + ' - an unowned prerequisite is nobody s job')
+        if (entry.mode === 'present') {
+          if (typeof entry.path !== 'string' || entry.path.trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + label + ' is mode=present and names no path - the report must say WHICH product is missing')
+        } else if (entry.mode === 'run') {
+          if (typeof entry.path === 'string' && entry.path.trim() !== '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + label + ' is mode=run and carries a path - run names a script, present names a product')
+          const candidates = /[\\/]/.test(entry.script) ? [join(root, entry.script)] : [join(root, entry.script), join(root, 'scripts', entry.script)]
+          if (!candidates.some((candidate) => existsSync(candidate))) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + label + ' runs a script this tree does not have (' + candidates[0] + ') - an in-repo prerequisite that is gone is red, not cannot-decide')
+        }
+        if (ownScript !== null && ownScript[1] === entry.script) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + label + ' requires the script that judges this very row - a step cannot be its own prerequisite')
+        else if (memberScripts.has(entry.script)) console.log('doc-facts: ' + fact.id + ' ' + id + ' requires ' + entry.script + ', which is also a manifest row - allowed (a producer row), and the tier must run it before this check')
       }
       const tier = row.tier
       if (typeof tier !== 'string' || tier === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier is missing - every check states the lane the policy requires it at')

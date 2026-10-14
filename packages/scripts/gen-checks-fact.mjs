@@ -88,14 +88,18 @@ function entryFor(id, extra) {
 function buildFact(carrier, asset) {
   const previous = (asset.facts === undefined ? [] : asset.facts).find((fact) => fact && fact.machine && fact.machine.kind === 'checks')
   const written = new Map()
+  const requiresOf = new Map()
   const rows = previous && previous.machine && Array.isArray(previous.machine.declarations) ? previous.machine.declarations : []
   for (const row of rows) {
     if (row && typeof row.claim === 'string' && row.claim.trim() !== '') written.set(row.id, row.claim)
+    // a prerequisite list is AUTHORED data (nothing else owns it) - regeneration must not drop it
+    if (row && Array.isArray(row.requires) && row.requires.length > 0) requiresOf.set(row.id, row.requires)
   }
   const gates = Array.isArray(carrier.gates) ? carrier.gates : []
   const declarations = gates.map((gate) => {
     const row = { id: gate.id, tier: tierOf(gate), criterion: criterionOf(gate) }
     if (written.has(gate.id)) row.claim = written.get(gate.id)
+    if (requiresOf.has(gate.id)) row.requires = requiresOf.get(gate.id)
     return row
   })
   const unwrittenClaims = declarations.filter((row) => row.claim === undefined).length

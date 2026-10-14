@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { validate, counts, render, actionBlock } from './lib-verdict.mjs'
-import { createRunner } from './lib-run-gates.mjs'
+import { createRunner, decideRequires } from './lib-run-gates.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MIRROR_ROOT = resolve(HERE, '..', '..')
@@ -75,6 +75,35 @@ if (only !== undefined) { list = list.filter((g) => g.id === only); if (list.len
 if (has('--list')) { emitList(list, profile); process.exit(0) }
 
 const runner = createRunner({ spawn: spawnSync })
+// requires (R38/R42): the prerequisites each check declares. The FACT owns them (nothing else
+// does), the decision is the pure matrix in lib-run-gates, and this runner only supplies what it
+// observed. A prerequisite that does not pass aborts THIS row - no member verdict is invented.
+const declaredRequires = (() => {
+  try {
+    const asset = JSON.parse(readFileSync(join(HERE, 'family-facts.json'), 'utf8'))
+    const fact = (asset.facts ?? []).find((entry) => entry?.machine?.kind === 'checks')
+    const map = new Map()
+    for (const row of fact?.machine?.declarations ?? []) if (Array.isArray(row.requires) && row.requires.length > 0) map.set(row.id, row.requires)
+    return map
+  } catch { return new Map() }
+})()
+const treeRootFor = (tree) => (tree === 'overlay' ? overlayRoot : MIRROR_ROOT)
+const evaluateRequires = (gate) => {
+  for (const req of declaredRequires.get(gate.id) ?? []) {
+    if (req.mode === 'present') {
+      const product = /^[A-Za-z]:[\\/]/.test(req.path) ? req.path : join(treeRootFor(gate.tree), req.path)
+      const decision = decideRequires({ present: existsSync(product), path: product }, 'in-repo', 'present')
+      if (decision.verdict !== 'pass') return { req, decision }
+      continue
+    }
+    const script = /[\\/]/.test(req.script) ? req.script : join(HERE, req.script)
+    if (!existsSync(script)) return { req, decision: decideRequires({ status: null, errorCode: 'ENOENT', path: script }, 'in-repo', 'run') }
+    const observed = runner.run([process.execPath, script], { cwd: treeRootFor(gate.tree), stdio: has('--json') ? 'pipe' : 'inherit' })
+    const decision = decideRequires({ status: observed.status, errorCode: observed.errorCode, killedBy: observed.killedBy, signal: observed.signal, ms: observed.ms, path: script }, 'in-repo', 'run')
+    if (decision.verdict !== 'pass') return { req, decision }
+  }
+  return null
+}
 const identity = identityFor(profile)
 const records = []
 const base = (g, extra) => ({ id: g.id, check: g.human, criterion: g.id + '-criterion', identity, subject: { kind: 'paths', count: 0 }, ...extra })
@@ -100,6 +129,12 @@ for (const g of list) {
   }
   if (argv[0].startsWith('-')) {
     records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: ['argv[0]'], path: 'UNRESOLVED', next: 'name a script as argv[0] (a bare flag is not a command) or register the step explicitly', evidence: MANIFEST + ':' + g.id + ' argv[0]=' + String(argv[0]) }))
+    continue
+  }
+  const blocked = evaluateRequires(g)
+  if (blocked !== null) {
+    if (!has('--json')) console.log('           requires: ' + blocked.req.script + ' (mode=' + blocked.req.mode + ', verdict=' + blocked.decision.verdict + ')')
+    records.push(base(g, { verdict: blocked.decision.verdict, criterionEvaluated: blocked.decision.criterionEvaluated, cause: blocked.decision.cause, missing: blocked.decision.missing, path: String(blocked.req.path ?? blocked.req.script), next: blocked.decision.next, evidence: blocked.decision.evidence }))
     continue
   }
   if (g.localSafe === false && !process.env.CI) {
