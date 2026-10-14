@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-io-fs",
   "description": "Platform ctx.fs IO provider (the seam's second backend)",
-  "version": "0.26.12",
+  "version": "0.26.13",
   "publishConfig": {
     "access": "public"
   },

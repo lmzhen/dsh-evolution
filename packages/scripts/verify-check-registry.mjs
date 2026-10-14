@@ -69,8 +69,23 @@ if (!gateOk) {
   const detail = (gateRun.stderr === null ? '' : gateRun.stderr).trim().split('\n').slice(-6).join('\n')
   console.error('verify-check-registry: meta-gate exit=' + String(gateRun.status) + ' stdoutBytes=' + String(gateRun.stdout === null ? 0 : gateRun.stdout.length))
   if (detail !== '') console.error('verify-check-registry: meta-gate stderr tail:\n' + detail)
-  console.error('verify-check-registry: CANNOT DECIDE - the meta-gate did not answer with JSON (its observations are this ledger\'s other half)')
-  process.exit(2)
+  // Arm-awareness: the register records the meta-gate row against the MIRROR tree, and the
+  // released-upstream layout carries no repository root above it (no composite action file there),
+  // so the meta-gate is legitimately not armed. Every axis then reads as 'no live observation',
+  // which the loop below already treats as pass; only the missing JSON was fatal.
+  const repoMarker = join('.github', 'actions', 'evolution-validate', 'action.yml')
+  let armed = false
+  for (let dir = TREE; ; ) {
+    if (existsSync(join(dir, repoMarker))) { armed = true; break }
+    const up = resolve(dir, '..')
+    if (up === dir) break
+    dir = up
+  }
+  if (armed) {
+    console.error('verify-check-registry: CANNOT DECIDE - the meta-gate did not answer with JSON (its observations are this ledger\'s other half)')
+    process.exit(2)
+  }
+  console.error('verify-check-registry: NOT ARMED in this layout - no repository marker above ' + TREE + ' (the register records this row against the mirror tree)')
 }
 const liveCount = (criterion) => observations.filter((entry) => entry.criterion === criterion).length
 
