@@ -973,20 +973,6 @@
             "reasonRef": "rows declare neither drillCmd nor noDrillReason: G6 gate-truth needs this number to fall",
             "expiry": "0.26.0",
             "owner": "scripts"
-          },
-          {
-            "axis": "mutation-coverage",
-            "rows": 0,
-            "reasonRef": "the mutation library (check-mutations) lands with G5; until then every check reads cannot-decide on this axis",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "axis": "producer-wiring",
-            "rows": 0,
-            "reasonRef": "inputProducer declarations land with G4 (a read of reports/** must name its writer); until then the axis reads cannot-decide",
-            "expiry": "0.26.0",
-            "owner": "scripts"
           }
         ],
         "checkMutations": {
