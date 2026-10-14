@@ -15,22 +15,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-// C1: the root is derived from THIS file, never from CWD — and it has to work in BOTH layouts:
-// the mirror keeps scripts at <root>/packages/scripts, the overlay at <root>/packages/evolution/scripts.
-// Walk up until a directory carries both the family CHANGELOG and a packages/ tree.
-const findRepoRoot = (start) => {
-  let dir = start;
-  for (let i = 0; i < 6; i += 1) {
-    if (existsSync(resolve(dir, "CHANGELOG.md")) && existsSync(resolve(dir, "packages"))) return dir;
-    const parent = resolve(dir, "..");
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return null;
-};
-const repoRoot = findRepoRoot(here);
-if (repoRoot === null) {
-  console.error("vitest.family.config: CANNOT DECIDE - no family root (CHANGELOG.md + packages/) above " + here);
+// C1/C2: the run root is the FAMILY TREE that holds this file (mirror: <root>/packages,
+// overlay: <root>/packages/evolution) — derived from this file, never from CWD. Because the
+// include pattern is relative to that tree, the same bytes scope the run to family specs only
+// and can never pick up the upstream packages/ the overlay also carries.
+const familyTree = resolve(here, "..");
+if (!existsSync(resolve(here, "..", ".."))) {
+  console.error("vitest.family.config: CANNOT DECIDE - the tree above " + here + " does not exist");
   process.exit(2);
 }
 const TIERS = ["fast", "pre-tag", "full"];
@@ -52,7 +43,7 @@ if (existsSync(ADAPTER)) {
     platformLine = String(p.line ?? p.platformLine ?? "unknown");
   } catch { platformLine = "unreadable"; }
 }
-console.log("vitest.family.config: root=" + repoRoot + " tier=" + tier + " platformLine=" + platformLine + " adapter=" + adapterSha);
+console.log("vitest.family.config: root=" + familyTree + " tier=" + tier + " platformLine=" + platformLine + " adapter=" + adapterSha);
 if (adapterSha === "absent" && process.env.FAMILY_ALLOW_ABSENT_ADAPTER !== "1") {
   console.error("vitest.family.config: CANNOT DECIDE - no pinned line resolver at " + ADAPTER + " (set FAMILY_ALLOW_ABSENT_ADAPTER=1 to run anyway)");
   process.exit(2);
@@ -60,8 +51,8 @@ if (adapterSha === "absent" && process.env.FAMILY_ALLOW_ABSENT_ADAPTER !== "1") 
 
 export default {
   test: {
-    root: repoRoot,
-    include: ["**/tests/**/*.spec.ts"],
+    root: familyTree,
+    include: ["*/tests/**/*.spec.ts"],
     exclude: ["**/node_modules/**"],
   },
 };
