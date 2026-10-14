@@ -98,7 +98,7 @@ Run from the two trees (never reorder or rename these steps):
 | 13 | `node D:/dsh/audit-v37/check-tsconfigs.cjs` | machine-local (outside this repo) |
 | 14 | `node D:/dsh/audit-v37/check-manifests.cjs` | machine-local (outside this repo) |
 | 15 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | `D:/dsh` (machine-local) |
-| 16 | `node packages/scripts/verify-profile-bundles.mjs` | mirror |
+| 16 | `node packages/scripts/verify-profile-bundles.mjs --self-test` | mirror |
 | 17 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
 | 18 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.2.0-rc.2` | mirror |
 | 19 | `node packages/scripts/verify-package-discovery.mjs packages --strict` | mirror |

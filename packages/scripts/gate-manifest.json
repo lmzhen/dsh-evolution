@@ -237,10 +237,11 @@
     {
       "id": "gate-16",
       "kind": "script",
-      "human": "`node packages/scripts/verify-profile-bundles.mjs`",
+      "human": "`node packages/scripts/verify-profile-bundles.mjs --self-test`",
       "argv": [
         "node",
-        "packages/scripts/verify-profile-bundles.mjs"
+        "packages/scripts/verify-profile-bundles.mjs",
+        "--self-test"
       ],
       "tree": "mirror",
       "profiles": [
