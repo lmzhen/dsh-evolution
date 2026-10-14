@@ -20,6 +20,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { familyGateRegisters } from './lib-doc-facts.mjs'
+import { familyVersion, versionReached } from './lib-family-version.mjs'
 
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
@@ -186,10 +187,60 @@ for (const row of tableRows) {
 }
 // P0-prime（迁移角）：不可证伪必须显式声明 —— 每条 script 要么有 drillCmd，要么写明 noDrillReason，
 // 两者皆无就是"忘了加"，不得沉默通过（与「没有对象名的绿＝红」同构）。
-for (const row of tableRows) {
-  const cmd = String(row.cmd || '')
-  if (!/verify-graph-edges\.mjs/.test(cmd)) continue
-  if (!/--self-test/.test(cmd)) continue
+// ── G2/M1 (report half): four meta-criteria over the MANIFEST (the execution surface).
+// They are computed and printed here, but they do NOT decide yet: step ① of the plan keeps this
+// gate's verdict unchanged through the observation period, and each criterion earns its enforcing
+// flip by its own mutation record at M5. This block is REAL CODE and not a comment precisely
+// because the previous revision of this spot was a comment: the rule above was stated in prose
+// and its loop body was empty, so `drillCmd-or-noDrillReason` had never been checked once.
+const report = argv.includes('--report')
+const overlayArg = (argv.find((entry) => entry.startsWith('--overlay=')) ?? '').slice('--overlay='.length)
+const overlayRoot = overlayArg === '' ? resolve(repo, '..', 'deepseek-harness') : resolve(overlayArg)
+const familyVer = familyVersion(root)
+const observations = []
+const note = (criterion, subject, detail) => observations.push({ criterion, subject, detail })
+const tokensOf = (command) => String(command).match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? []
+for (const gate of manifestGates) {
+  const command = String(gate.cmd ?? '')
+  // (R1) executability: the row must name a command, and the script it names must exist in the
+  // tree the row declares. gate-34's bare `--check` is the live specimen of a non-command row.
+  const argvRow = tokensOf(command)
+  if (argvRow.length === 0 || argvRow[0].startsWith('-')) {
+    note('executability', gate.id, 'argv[0]=' + JSON.stringify(argvRow[0] ?? '') + ' is not a command - name the script the row runs')
+  } else if (argvRow[0] === 'node' && argvRow.length > 1 && !argvRow[1].startsWith('-') && !argvRow[1].startsWith('<')) {
+    const target = argvRow[1]
+    const base = gate.tree === 'overlay' ? overlayRoot : repo
+    const resolved = /^[A-Za-z]:[\\/]/.test(target) ? target : join(base, target)
+    if (!existsSync(base)) note('executability', gate.id, 'the ' + String(gate.tree) + ' tree is not present at ' + base + ' - the script cannot be resolved (and that is not a pass)')
+    else if (!existsSync(resolved)) note('executability', gate.id, 'runs ' + target + ', which does not exist at ' + resolved)
+  }
+  // (R2) no placeholders: `<...>` documents a shape and cannot execute a criterion; the WHOLE
+  // token is named (R124) so the reader can find the row it belongs to.
+  for (const token of String(command).matchAll(/<[^>]*>/g)) {
+    note('no-placeholders', gate.id, 'cmd carries ' + token[0] + ' - declare the value (an args source) or register the row as pending')
+  }
+  // (R3) expiry due: a registered exemption the family version has reached is red, not permanent.
+  if (typeof gate.expiry === 'string' && gate.expiry.trim() !== '') {
+    const due = familyVer === undefined ? null : versionReached(familyVer, gate.expiry)
+    if (due === true) note('expiry-due', gate.id, 'expiry ' + gate.expiry + ' is reached by ' + String(familyVer) + ' - close the exemption or move it with a reason')
+  }
+  // (R4) falsifiability carrier: every row states how its green can be turned red (drillCmd), or
+  // why it cannot be yet (noDrillReason). Neither means somebody forgot, which G6's gate-truth counts.
+  if (typeof gate.drillCmd !== 'string' && typeof gate.noDrillReason !== 'string') {
+    note('falsifiability-carrier', gate.id, 'declares neither drillCmd nor noDrillReason - a green nobody can turn red is an F=0 candidate')
+  }
+}
+const CRITERIA = ['executability', 'no-placeholders', 'expiry-due', 'falsifiability-carrier']
+if (report) {
+  console.log('verify-gate-manifest [report] ' + manifestGates.length + ' manifest row(s), family version ' + String(familyVer) + ' - ' + observations.length + ' observation(s)')
+  for (const criterion of CRITERIA) {
+    const list = observations.filter((entry) => entry.criterion === criterion)
+    console.log('  ' + criterion + ': ' + list.length)
+    for (const entry of list.slice(0, 8)) console.log('    - ' + entry.subject + ': ' + entry.detail)
+    if (list.length > 8) console.log('    ... ' + (list.length - 8) + ' more')
+  }
+} else if (observations.length > 0) {
+  console.log('verify-gate-manifest: observation period - ' + observations.length + ' pending meta-item(s) over ' + CRITERIA.length + ' criterion(s); run --report for the list (the enforcing half lands with M5)')
 }
 if (problems.length > 0) {
   console.error('verify-gate-manifest: ' + problems.length + ' problem(s)')
