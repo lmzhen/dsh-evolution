@@ -961,7 +961,19 @@
             "owner": "scripts"
           }
         ],
-        "checkMutations": {},
+        "checkMutations": {
+          "gate-17": [
+            {
+              "mutate": {
+                "file": "packages/scripts/family-facts.json",
+                "find": "\"id\": \"gate-17\"",
+                "replace": "\"id\": \"gate-17x\""
+              },
+              "expect": "red",
+              "note": "breaking one declaration id breaks the closure both ways, so the doc-facts gate must red: this is the replacement evidence for the real-tree pass retired from guard-scripts.spec.ts (G5 step 3)"
+            }
+          ]
+        },
         "unmappedTier": [
           {
             "id": "gate-04",

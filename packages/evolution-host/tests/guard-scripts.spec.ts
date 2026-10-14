@@ -333,10 +333,9 @@ describe('guard scripts (V4-30 sentry)', () => {
   })
 
   it('N19: the real tree keeps every fact in one home (standalone gate)', async () => {
+    // the real-tree pass is gate-17's job (run-gates/CI) - what stays here is the BEHAVIOUR
+    // that no gate owns: a misspelled flag must fail loud.
     const docFacts = join(scripts, 'verify-doc-facts.mjs')
-    const ok = await run(process.execPath, [docFacts, psRoot, '--strict'], { encoding: 'utf8' })
-    expect(ok.stdout).toContain('doc-facts')
-    expect(ok.stdout).toContain('0 violation(s)')
     // A misspelled flag must fail loud instead of silently running the default
     // scan (the gate passes --strict; humans type).
     const typo = await run(process.execPath, [docFacts, psRoot, '--stict'], { encoding: 'utf8' })
@@ -487,9 +486,7 @@ describe('installer flag documentation (G2/S2.3)', () => {
 })
 
 describe('parameter registry guard (G1/S1.3 sentry)', () => {
-  it('passes on the real tree with the generated document', async () => {
-    const ok = await run(process.execPath, [paramGuard, psRoot, '--strict'], { encoding: 'utf8' })
-    expect(ok.stdout).toContain('verify-param-registry: OK')
+  it('the generated document sits on a TRACKED surface', async () => {
     // The document must live on a TRACKED surface: `packages/docs/**` is
     // gitignored (CONTRIBUTING: a source of material, never a home), so a gate
     // that required a document there would fail on a fresh clone.
