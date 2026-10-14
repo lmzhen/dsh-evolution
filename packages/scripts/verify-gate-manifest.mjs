@@ -72,6 +72,7 @@ function scriptOf(command) {
 }
 
 const machineLocalNames = new Set(MACHINE_LOCAL.map((entry) => entry.script))
+const GENERATOR_PRODUCERS = new Set(['gen-health-baseline.mjs', 'gen-install-counts.mjs'])
 for (const entry of [...MACHINE_LOCAL, ...CI_NOT_EXECUTED]) {
   for (const field of ['script', 'reason', 'expiry']) {
     if (typeof entry[field] !== 'string' || entry[field].trim() === '') problems.push('register entry ' + JSON.stringify(entry.script ?? '?') + ' has no ' + field)
@@ -85,6 +86,16 @@ for (const row of tableRows) {
   if (script === null) continue
   if (script.external && !isMachineLocal) problems.push('row ' + row.n + ' (' + row.line + ') runs an absolute script path but its working tree does not say machine-local: ' + row.command)
   if (!script.external && isMachineLocal) problems.push('row ' + row.n + ' (' + row.line + ') claims machine-local but runs an in-repo command: ' + row.command)
+  // A GENERATOR row registered as a gate must run in its CHECKING form: without --check it rewrites the
+  // artifact it publishes and exits 0, repairing the drift it was registered to report. The cell arrives
+  // with its Markdown code spans ALREADY UNWRAPPED (measured: spans=0 with backticks), so the command and
+  // the prose live in one string - the cell is split on non-ASCII runs and only the ASCII runs that name a
+  // generator are judged, which keeps a --check mentioned in the prose (or in another command) out of it.
+  const asciiRuns = String(row.command).split(new RegExp('[^\\x20-\\x7e]+'))
+  const bareGenerators = asciiRuns.filter((run) => /gen-[^\s/]*\.mjs/.test(run) && !run.includes('--check') && !GENERATOR_PRODUCERS.has((/([^\s/]*\.mjs)/.exec(run) ?? [])[1] ?? ''))
+  if (!script.external && bareGenerators.length > 0) {
+    problems.push('row ' + row.n + ' (' + row.line + ') runs a generator WITHOUT --check: ' + bareGenerators[0].trim().slice(0, 70))
+  }
   if (script.external && !machineLocalNames.has(script.name)) problems.push('row ' + row.n + ' (' + row.line + ') runs ' + script.name + ', which MACHINE_LOCAL does not register (name the reason and the expiry)')
   if (!script.external) declaredScripts.add(script.name)
 }
