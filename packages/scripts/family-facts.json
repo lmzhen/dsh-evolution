@@ -1423,6 +1423,19 @@
               "provenAt": "2026-10-14T08:32:58.637Z",
               "provenSha": "d028d0f02ef324e4ac0dd5d216237d17d23bc946041e932ee428e132a9bd27fb"
             }
+          ],
+          "gate-23": [
+            {
+              "mutate": {
+                "file": "packages/scripts/line-policy.json",
+                "find": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": \"closure pins 3.18.2 whose .volatile() is types-only; the profile hoist (3.18.4) is what the family’s volatile tests exercise\" },",
+                "replace": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": 0 },"
+              },
+              "expect": "red",
+              "note": "a profileHoist entry whose reason is not a string: in policy-only form the guard requires every hoist entry to carry a reason, so a non-string reason is its subject (kept valid JSON so the intended branch fires, not the parser)",
+              "provenAt": "2026-10-14T08:33:35.644Z",
+              "provenSha": "b2c6b521079b008d3ae4d70b52f8d150cab0305f41991f04f15f13fda6643eca"
+            }
           ]
         },
         "mutationExempt": {
