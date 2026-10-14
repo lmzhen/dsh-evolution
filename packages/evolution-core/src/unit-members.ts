@@ -32,6 +32,13 @@ export function candidateSkills(head: UnitHeadInput): string[] {
 }
 
 /** @param indexes - skill name -> that skill's index text, or null when the index file is absent. */
+/** The `path` of one manifest move, or the empty string when the record carries no string one.
+ *  Kept as a function so the read never stringifies an object (the linter refuses
+ *  `String(unknown)` for exactly that reason) and every call site reads the same way. */
+function movePath(move: unknown): string {
+  const raw = (move as { path?: unknown }).path
+  return typeof raw === 'string' ? raw : ''
+}
 export function resolveUnitMembersFromIndexes(
   head: UnitHeadInput,
   indexes: ReadonlyMap<string, string | null>,
@@ -53,12 +60,12 @@ export function resolveUnitMembersFromIndexes(
     for (const slice of members) {
       for (const entry of slice.entries) {
         for (const move of (entry.unitHead?.moves ?? [])) {
-          const path = String((move as { path?: unknown }).path ?? '')
+          const path = movePath(move)
           if (path !== '') shardPaths.push(path)
         }
       }
     }
-    const wanted = manifest.map(move => String((move as { path?: unknown }).path ?? '')).filter(p => p !== '')
+    const wanted = manifest.map(move => movePath(move)).filter(p => p !== '')
     for (const path of wanted) if (!shardPaths.includes(path)) conflicts.push({ kind: 'missing', path })
     for (const path of shardPaths) if (!wanted.includes(path)) conflicts.push({ kind: 'foreign', path })
     for (const path of wanted) if (shardPaths.filter(p => p === path).length > 1) conflicts.push({ kind: 'duplicated', path })

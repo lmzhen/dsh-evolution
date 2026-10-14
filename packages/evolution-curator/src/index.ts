@@ -1358,7 +1358,10 @@ export class EvolutionCurator extends Service {
         if (!isPresent(probe)) { indexes.set(name, null); continue }
         try { indexes.set(name, ((JSON.parse(probe.value) as RawIndex).versions) ?? null) } catch { indexes.set(name, null) }
       }
-      const detail = staleRouteStubs(indexes as never).map((stub: { skill: string; v: number; owner: string; reason: string }) => ({ skill: stub.skill, v: stub.v, owner: stub.owner, reason: stub.reason }))
+      const detail = staleRouteStubs(indexes as never).map(
+        (stub: { skill: string; v: number; owner: string; reason: string }) =>
+          ({ skill: stub.skill, v: stub.v, owner: stub.owner, reason: stub.reason }),
+      )
       return { skills: indexes.size, stubs: detail.length, reason: 'ok', detail }
     })()
     ;(report as { routeStubs?: typeof routeStubs }).routeStubs = routeStubs
@@ -2309,7 +2312,11 @@ export class EvolutionCurator extends Service {
     // The unit head lives on the version record; read it STRUCTURALLY so this call site does not
     // depend on which declaration of `SkillVersion` a local checkout resolves (a stale dist type
     // silently lacks the field). The shape is the frozen one: { moves?, sources?, skill? }.
-    type UnitHeadLike = { readonly moves?: readonly unknown[]; readonly sources?: readonly { readonly skill: string }[]; readonly skill?: string }
+    type UnitHeadLike = {
+      readonly moves?: readonly unknown[]
+      readonly sources?: readonly { readonly skill: string }[]
+      readonly skill?: string
+    }
     const head = members[0] as { unitHead?: UnitHeadLike } | undefined
     const headLike = head !== undefined && head.unitHead !== undefined ? head.unitHead : undefined
     const sources = headLike?.sources

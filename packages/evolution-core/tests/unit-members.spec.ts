@@ -64,7 +64,8 @@ describe('resolveUnitMembers', () => {
     const once = JSON.stringify(resolveUnitMembersFromIndexes(head, input, parse))
     const twice = JSON.stringify(resolveUnitMembersFromIndexes(head, input, parse))
     expect(once).toBe(twice)
-    expect(JSON.parse(once).members.map((m: { skill: string }) => m.skill)).toEqual(['head-skill', 'other-skill'])
+    const parsedOnce = JSON.parse(once) as { members: Array<{ skill: string }> }
+    expect(parsedOnce.members.map(m => m.skill)).toEqual(['head-skill', 'other-skill'])
   })
 
   it('A19.2：io 外壳只按已知 key 打开（索引不可读即 index-absent 并点名）', async () => {
