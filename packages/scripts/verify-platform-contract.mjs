@@ -541,6 +541,17 @@ const SEMANTIC_ASSERTIONS = [
 const CITATION_SKIP_DIRS = new Set(['node_modules', '.git', 'lib', 'dist', '.next'])
 
 /**
+ * Generated ledgers that are NOT a citation surface. family-test-lines.json is a ledger
+ * gen-test-lines.mjs writes and can replay; the paths inside it are bookkeeping for the
+ * line-identity checks, not prose citing platform APIs. Walking it made three mirror-layout
+ * family test paths (evolution-agent / evolution-host / evolution-preset) look like platform
+ * citations, and they reported missing wherever the checked-out tree carries no tests/ - the
+ * released-upstream job went red on them. The list is explicit on purpose: an exclusion is a
+ * judgement about the scan surface, so it names the files rather than widening a wildcard.
+ */
+const CITATION_SKIP_FILES = new Set(['family-test-lines.json'])
+
+/**
  * Walk the family tree and hand every non-excluded, non-binary file to `visit`;
  * citations live in comments, docs and manifests as often as in `.ts` sources.
  * @param dir - directory to walk.
@@ -554,7 +565,8 @@ function walkCitationSurface(dir, visit) {
     return
   }
   for (const entry of entries) {
-    if (CITATION_SKIP_DIRS.has(entry.name) || entry.name.startsWith('.release-staging')) continue
+    if (CITATION_SKIP_DIRS.has(entry.name) || CITATION_SKIP_FILES.has(entry.name)) continue
+    if (entry.name.startsWith('.release-staging')) continue
     const path = join(dir, entry.name)
     if (entry.isDirectory()) {
       walkCitationSurface(path, visit)
