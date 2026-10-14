@@ -78,7 +78,8 @@ const base = (g, extra) => ({ id: g.id, check: g.cmd, criterion: g.id + '-criter
 for (const g of list) {
   // 1) static executability: a placeholder token or a non-command argv[0] cannot run a criterion at all
   const argv = parts(g.cmd)
-  const placeholder = argv.find((t) => /<[^>]*>?/.test(t) && t.includes('<'))
+  // the placeholder is named from the RAW command: a multi-word one (<platform tree>) tokenises apart
+  const placeholder = (g.cmd.match(/<[^>]*>/) || [])[0]
   if (placeholder !== undefined) {
     records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [placeholder], path: 'UNRESOLVED', next: 'declare the placeholder value in the gate table (or register an args[] source) so the command is executable', evidence: MANIFEST + ':' + g.id + ' cmd contains ' + placeholder }))
     continue
