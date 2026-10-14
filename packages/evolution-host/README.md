@@ -5,6 +5,8 @@ family's automation without the memory/skill model tools.
 
 > ⚠️ **Mutually exclusive install target.** `dsh-evolution-host` is the infrastructure-only bundle: no memory/skill model tools (its single model-facing surface is the read-only `maintenance_probe` diagnostic), and it must be paired with the Evolution agent preset to expose `memory`/`skill_manage`. It shares its infrastructure rows with `@deepseek-ai/dsh-evolution-preset`; do **not** add both bundles to the same profile — pick host + the Evolution agent preset (layered), or the one-click preset bundle.
 
+**Compatibility.** Validated platform line: DSH `0.2.0-rc.2`; the `@deepseek-ai/dsh-*` dependency window is `^0.2.0-rc.1`. A prerelease range does not cross lines — install this bundle on that line only (family-level statement and history: the repository README's Compatibility section).
+
 ## Model surface
 
 - **Model-visible:** the read-only `maintenance_probe` tool schema (from the `evolution-maintenance/tools` row) is its one model-visible artifact; everything else model-visible is owned by the packages that consume these services, and that schema is the only token this package adds.

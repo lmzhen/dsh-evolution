@@ -226,6 +226,10 @@
  *       before the settings shell that provides the seat exists, so the row that activates first
  *       pins every card to the empty state for the life of its fiber — silently, because a missing
  *       seat is a legal state for an optional-service read.
+ *   N40. a client half styles FOCUS with `:focus-visible` (or `:focus-within`), never with a bare
+ *       `:focus`: the bare selector hands the keyboard user the same ring a pointer click leaves
+ *       behind, and — having no gate to live in — it is what made the two client halves hand-copy
+ *       the same assertion word for word (the audit's cross-package pair).
  *   N30. an observable source has ONE owner: `getSnapshot` may be defined only in
  *       `evolution-settings-ui/src/client/source.ts`, and a `hooks` compartment member must be a
  *       REFERENCE to what that module built. The renderer caches one hook binding per source object
@@ -924,6 +928,7 @@ const RULES = [
   { id: 'N27', title: 'client halves take geometry from the scale', incident: 'a literal padding, gap or size inside a client half', canonicalForm: 'geometry comes from the scale', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N28', title: 'client halves import no node builtin and write nothing (E1)', incident: 'a node builtin import or a write call inside a client half', canonicalForm: 'client halves stay pure: no builtins, no writes', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N29', title: 'a client entry reads a platform service through a callable probe', incident: 'a direct property read of a platform service in a client entry', canonicalForm: 'the read goes through a callable probe', vacuity: 'no client entry in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N40', title: 'a client half styles focus with :focus-visible, never a bare :focus', incident: 'a bare :focus in a client half: the ring a keyboard user needs is the one a pointer click leaves, which is why the two client halves hand-copied the same assertion', canonicalForm: 'focus styling uses :focus-visible (or :focus-within); a bare :focus carries the ring for every input', vacuity: 'no client half in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N30', title: 'an observable source has one owner; hooks carry references', incident: 'an inline source object built per render, or a hook returning a fresh reference', canonicalForm: 'one owner per source and stable references from hooks', vacuity: 'no observable source in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N34', title: 'the settings user layer is read once, in evolution-core', incident: 'a package reading the settings user layer itself and taking its key names, so one key resolves two ways', canonicalForm: 'userSetKeys(ctx, paramRowId(owner)) is the only reader; consumers pass their own row id', vacuity: 'no user-layer read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N35', title: 'a platform file:line citation is a frozen baseline', incident: 'a new citation of another repository line number, which no guard here can re-derive when that file moves', canonicalForm: 'platform references cite a symbol, not a line number; the frozen register only burns down', vacuity: 'no platform citation in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
@@ -1007,6 +1012,27 @@ const INTERACTIVE_SELECTOR = /:(hover|focus|focus-visible|focus-within|active)\b
  * @param text - the file's source.
  * @returns one finding per rule that borrows an interaction colour without being interactive.
  */
+/**
+ * N40 (G5 item 4): a client half must not style focus with a BARE `:focus`.
+ *
+ * The bare selector draws the ring for pointer and keyboard alike, so the ring a keyboard user
+ * needs is the same one a mouse click leaves behind - and it is what made the two client halves
+ * copy the same assertion by hand (the audit's cross-package word-for-word pair). `:focus-visible`
+ * and `:focus-within` are the canonical forms; the lookahead lets both through.
+ *
+ * @param text - the file's source.
+ * @returns every bare `:focus` occurrence as a line-numbered fragment; empty when the file is clean.
+ */
+function bareFocusSelectors(text) {
+  const stripped = stripComments(text)
+  const findings = []
+  for (const match of stripped.matchAll(/:focus(?![\w-])/g)) {
+    const line = stripped.slice(0, match.index ?? 0).split('\n').length
+    findings.push('line ' + line + ': ' + stripped.slice(match.index ?? 0, (match.index ?? 0) + 24).split('\n')[0].trim())
+  }
+  return findings
+}
+
 function interactionColourOffenders(text) {
   const stripped = withoutComments(text)
   const findings = []
@@ -1858,6 +1884,11 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
       && interactionColourOffenders("'.x[aria-current=true]{background:var(--dsw-alias-interactive-bg-active)}'").length === 0
       && interactionColourOffenders("'.card-button[data-primary=true]{background:var(--dsw-alias-button-primary-fill)}'").length === 0
       && interactionColourOffenders("'.x{background:var(--dsw-alias-bg-layer-2)}'").length === 0],
+    ['N40', () => bareFocusSelectors("'.x:focus{outline:2px solid var(--dsw-alias-border-l2)}'").length === 1
+      && bareFocusSelectors("'.x:focus-visible{outline:2px solid var(--dsw-alias-border-l2)}'").length === 0
+      && bareFocusSelectors("'.x:focus-within{background:var(--dsw-alias-bg-layer-2)}'").length === 0
+      && bareFocusSelectors('// :focus belongs to the keyboard, never to a click\\nconst x = 1').length === 0
+      && bareFocusSelectors("'.x:hover{background:var(--dsw-alias-interactive-bg-hover)}'").length === 0],
     ['N27', () => clientGeometryLiterals("'.x{padding:7px 8px}'").length === 1
       && clientGeometryLiterals("'.x{padding:var(--evo-space-6) var(--evo-space-8)}'").length === 0
       && clientGeometryLiterals("'.x{max-width:calc(var(--evo-measure-read) * 1.5)}'").length === 0
@@ -2143,6 +2174,10 @@ const scanCounts = { client: 0, live: 0, profiles: 0 }
         const colour = interactionColourOffenders(text)
         if (colour.length > 0) {
           violations.push(`static rule borrows an interaction colour (N26): ${file} — ${colour.slice(0, 4).join(' | ')} (a state takes a layer or a label token)`)
+        }
+        const bareFocus = bareFocusSelectors(text)
+        if (bareFocus.length > 0) {
+          violations.push(`client half styles focus with a bare :focus (N40): ${file} — ${bareFocus.slice(0, 4).join(' | ')} (use :focus-visible, or :focus-within where the container owns the ring)`)
         }
         const geometry = clientGeometryLiterals(text)
         if (geometry.length > 0) {

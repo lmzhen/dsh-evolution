@@ -5,6 +5,8 @@ tools profile-wide in one step.
 
 > ⚠️ **Mutually exclusive install target.** `dsh-evolution-preset` is the one-click bundle that exposes the model tools profile-wide. It shares its infrastructure rows with `@deepseek-ai/dsh-evolution-host`; do **not** add both bundles to the same profile — pick the layered host/agent layout (recommended) or this preset bundle.
 
+**Compatibility.** Validated platform line: DSH `0.2.0-rc.2`; the `@deepseek-ai/dsh-*` dependency window is `^0.2.0-rc.1`. A prerelease range does not cross lines — install this bundle on that line only (family-level statement and history: the repository README's Compatibility section).
+
 ## Model surface
 
 - **Model-visible:** the rows its `cordis.patch.yml` mounts directly — the `memory` tool (`tool-memory`), the `skill_manage` tool (`tool-skill-manage`), the session-search tool row (`tool-session-query`), the `ctx.skills` catalog provider (`evolution-skill-catalog`, which feeds the `skill` tool's catalog section) and the read-only `maintenance_probe` tool (`evolution-maintenance/tools`). Non-zero: these tools add their schemas to every session under this bundle, and the skill catalog adds its prompt section (populated from the library).

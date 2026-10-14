@@ -7,6 +7,8 @@
 dsh plugin --profile web add @lmzhen/dsh-evolution-all@<ver>
 ```
 
+**Compatibility.** Validated platform line: DSH `0.2.0-rc.2`; the `@deepseek-ai/dsh-*` dependency window is `^0.2.0-rc.1`. A prerelease range does not cross lines — install this bundle on that line only (family-level statement and history: the repository README's Compatibility section).
+
 ## Model surface
 
 - **Model-visible:** its profile-root rows (`memory`, `skill_manage`, `session_search`, the skill catalog (feeding the `skill` tool's catalog section), the SKILLS/MEMORY guidance injection, plus `maintenance_probe`) active in **every** session.
