@@ -1306,6 +1306,19 @@
               "provenAt": "2026-10-14T08:20:33.739Z",
               "provenSha": "2b609a0d6b33eeb6e55f5858b44f7a89b3b0d584635b6c61b72f94be4e41f96a"
             }
+          ],
+          "gate-31": [
+            {
+              "mutate": {
+                "file": "packages/evolution-core/src/errors.ts",
+                "find": "export const EVOLUTION_ERRORS = Object.freeze({",
+                "replace": "export const EVOLUTION_ERRORS = Object.freeze({\nconst CODE_PROBE = 'E-999'"
+              },
+              "expect": "red",
+              "note": "a code added to the SOURCE table as real code (anchored on the first export line, so the addition is not swallowed by a comment block) while the README documents no row for it",
+              "provenAt": "2026-10-14T08:25:43.657Z",
+              "provenSha": "7ff64c87802b38028c797c64e6fddfb244f030c0c8027bbff9c901d09f1dbee4"
+            }
           ]
         },
         "mutationExempt": {
