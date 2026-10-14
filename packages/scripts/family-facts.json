@@ -1152,6 +1152,19 @@
               "provenAt": "2026-10-14T07:57:12.619Z",
               "provenSha": "d447171ff0cabe2852ee11da5f3012517c4fe41a5d46325c865ae7379b3df731"
             }
+          ],
+          "gate-37": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-check-taxonomy.mjs",
+                "find": "#!/usr/bin/env node",
+                "replace": "#!/usr/bin/env node\nconst withoutComments = (text) => text"
+              },
+              "expect": "red",
+              "note": "a second comment stripper in the tooling: the guard bans any .mjs under scripts/ other than lib-source-text.mjs from defining one BY NAME (stripComments|withoutComments|stripBlockComments) or by the block-comment regex literal - my first attempt used a .ts file and an unlisted name, which is why it stayed green",
+              "provenAt": "2026-10-14T07:57:44.131Z",
+              "provenSha": "d18b358c9455589ab80a5dfccb288a063940fe43a5596b2cb0b8b71257da0cd2"
+            }
           ]
         },
         "mutationExempt": {
