@@ -1332,6 +1332,19 @@
               "provenAt": "2026-10-14T08:26:15.223Z",
               "provenSha": "b0774e33db8c407f952d5dd1edb88bed19d7e5b7729e6df566ba479507d3b4f8"
             }
+          ],
+          "gate-32": [
+            {
+              "mutate": {
+                "file": "README.md",
+                "find": "You should see<!-- gen:install-counts --> 32 packages installed (the published list is 33; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the",
+                "replace": "You should see<!-- gen:install-counts --> 31 packages installed (the published list is 33; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the"
+              },
+              "expect": "red",
+              "note": "a number changed INSIDE the marked install-counts region of README (one line carrying both markers): the generator owns exactly that region, and an earlier probe that edited the step count outside it was invisible",
+              "provenAt": "2026-10-14T08:27:34.003Z",
+              "provenSha": "d445e2dace7e8023f77b8208b9682df02a826fbed5128f55aa57f90ff7cdf91a"
+            }
           ]
         },
         "mutationExempt": {
