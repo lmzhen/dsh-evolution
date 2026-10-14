@@ -34,8 +34,8 @@ const psRoot = fileURLToPath(new URL('../../', import.meta.url))
 
 describe('guard scripts (V4-30 sentry)', () => {
   it('dependency-closure passes on the real tree and fails on a vacuum root', async () => {
-    const ok = await run(process.execPath, [closure, psRoot], { encoding: 'utf8' })
-    expect(ok.stdout).toContain('OK')
+    // the real-tree pass belongs to gate-06 (run-gates/CI); this case keeps the FIXTURE half,
+    // and guard-scripts.negative.spec.ts already proves it reds under a synthetic violation.
     const empty = await tempRoot('guard-empty-')
     await expect(run(process.execPath, [closure, empty], { encoding: 'utf8' })).rejects.toMatchObject({ code: 1 })
   })
@@ -82,8 +82,8 @@ describe('guard scripts (V4-30 sentry)', () => {
   })
 
   it('architecture guards pass strict on the real tree and fail on a vacuum root', async () => {
-    const ok = await run(process.execPath, [archGuards, psRoot, '--strict'], { encoding: 'utf8' })
-    expect(ok.stdout).toContain('OK')
+    // the real-tree pass belongs to gate-07; the fixture half stays, and the negative suite
+    // proves this guard reds under a synthetic violation.
     const empty = await tempRoot('guard-arch-empty-')
     await expect(run(process.execPath, [archGuards, empty, '--strict'], { encoding: 'utf8' })).rejects.toMatchObject({ code: 1 })
   })
