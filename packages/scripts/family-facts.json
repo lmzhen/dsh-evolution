@@ -1584,6 +1584,10 @@
           "gate-27": {
             "reason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mutation in this repo can red it without first building",
             "expiry": "release gate: if the row gains a source-level subject or dist becomes part of the reviewed tree, delete this exemption and prove it by mutation"
+          },
+          "health-admission": {
+            "reason": "CANNOT-DECIDE BY DESIGN: run as registered it reports CANNOT DECIDE (user=46 platform=0) because a 0-hit count over an EMPTY corpus would admit every rule - the guard refuses rather than pass, so it has no green baseline a mutation could turn red; its enforcement branch is also empty by design (the policy inForce list is empty until a rule is measured on both corpora)",
+            "expiry": "release gate: if a platform corpus is supplied in-tree and a rule is registered inForce, delete this exemption and prove it by making that rule fail admission on the baseline"
           }
         },
         "unmappedTier": [
