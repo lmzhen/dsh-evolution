@@ -1226,6 +1226,14 @@
           "gate-15": {
             "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
             "expiry": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
+          },
+          "gate-16": {
+            "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
+            "expiry": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation"
+          },
+          "gate-45": {
+            "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
+            "expiry": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation"
           }
         },
         "unmappedTier": [
