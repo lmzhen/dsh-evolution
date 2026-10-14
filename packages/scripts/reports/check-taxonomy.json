@@ -444,7 +444,6 @@
       ],
       "specs": [
         "evolution-agent::tests/agent-composition.spec.ts",
-        "evolution-agent::tests/dependency-contract.spec.ts",
         "evolution-agent::tests/row-contract.spec.ts",
         "evolution-all::tests/all.spec.ts",
         "evolution-commands::tests/commands.spec.ts",
@@ -466,7 +465,6 @@
         "evolution-host::tests/row-contract.spec.ts",
         "evolution-learning-graph::tests/graph.spec.ts",
         "evolution-maintenance::tests/orchestrate.spec.ts",
-        "evolution-preset::tests/dependency-contract.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
         "evolution-review::tests/anchored-smoke.spec.ts",
         "evolution-review::tests/approval-precheck.spec.ts",
@@ -851,7 +849,6 @@
         "evolution-activity::tests/activity-store.spec.ts",
         "evolution-activity::tests/activity-version-gate.spec.ts",
         "evolution-agent::tests/agent-composition.spec.ts",
-        "evolution-agent::tests/dependency-contract.spec.ts",
         "evolution-agent::tests/row-contract.spec.ts",
         "evolution-all::tests/all.spec.ts",
         "evolution-approval::tests/approval.spec.ts",
@@ -993,7 +990,6 @@
         "evolution-plan-validator::tests/validator.spec.ts",
         "evolution-policy::tests/policy.spec.ts",
         "evolution-policy::tests/protected-skills.spec.ts",
-        "evolution-preset::tests/dependency-contract.spec.ts",
         "evolution-preset::tests/environment-fallbacks.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
@@ -1148,7 +1144,7 @@
     },
     "ci-only": {
       "gates": 9,
-      "specs": 64
+      "specs": 62
     },
     "full(ci=off)": {
       "gates": 44,
@@ -1156,12 +1152,12 @@
     },
     "full(ci=on)": {
       "gates": 53,
-      "specs": 240
+      "specs": 238
     }
   },
   "specs": {
-    "total": 240,
-    "marked": 240,
+    "total": 238,
+    "marked": 238,
     "unmarked": 0
   }
 }
