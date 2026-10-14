@@ -1132,6 +1132,10 @@
           "gate-49": {
             "reason": "the ledger itself: its declared state is cannot-decide while records are missing, so a mutation cannot flip it to red",
             "expiry": "release gate: revisit when every other check carries a stamped record"
+          },
+          "gate-33": {
+            "reason": "this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven",
+            "expiry": "release gate: either split the row into real argv rows or keep the exemption; the executability axis already counts it"
           }
         },
         "unmappedTier": [
