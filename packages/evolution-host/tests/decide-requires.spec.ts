@@ -32,8 +32,8 @@ const CASES = [
   { name: 'an errno outside the map cannot judge either', result: { status: null, errorCode: 'EWHATEVER' }, kind: 'external', mode: 'run', verdict: 'cannot-decide', evaluated: false, cause: 'unknown-errno' },
   { name: 'a budget kill is fail even though nothing was judged', result: { status: null, killedBy: 'budget', budgetMs: 1, budgetFrom: 'tier' }, kind: 'in-repo', mode: 'run', verdict: 'fail', evaluated: false, cause: 'budget-timeout' },
   { name: 'an external signal cannot judge', result: { status: null, killedBy: 'external', signal: 'SIGTERM' }, kind: 'external', mode: 'run', verdict: 'cannot-decide', evaluated: false, cause: 'external-signal' },
-  { name: 'a present product proceeds', result: { present: true, path: 'packages/x/dist' }, kind: 'in-repo', mode: 'present', verdict: 'pass', evaluated: true },
-  { name: 'a missing product cannot judge', result: { present: false, path: 'packages/x/dist' }, kind: 'external', mode: 'present', verdict: 'cannot-decide', evaluated: false, cause: 'produced-missing' },
+  { name: 'a present product proceeds', result: { present: true, path: './x/dist' }, kind: 'in-repo', mode: 'present', verdict: 'pass', evaluated: true },
+  { name: 'a missing product cannot judge', result: { present: false, path: './x/dist' }, kind: 'external', mode: 'present', verdict: 'cannot-decide', evaluated: false, cause: 'produced-missing' },
 ]
 
 describe('decideRequires: (kind, mode) x observed result', () => {
