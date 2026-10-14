@@ -54,7 +54,7 @@ export function assertRunShape(run: GuardRun): void {
 /** Stage 1: the exit semantics. Stage 2: every judged object is NAMED in the output. */
 export function twoStage(run: GuardRun, expected: TwoStageExpectation): TwoStageResult {
   const output = run.stdout + run.stderr
-  const missingNames = expected.names.filter((name) => !output.includes(name))
+  const missingNames = expected.names.filter(name => !output.includes(name))
   const exitOk = run.code === expected.code
   return {
     exitOk,

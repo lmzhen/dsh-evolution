@@ -34,7 +34,7 @@ describe('dependency contract (one suite, three subjects)', () => {
       const manifest = JSON.parse(readFileSync(fileURLToPath(subject.manifestUrl), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
       const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {})])
       const patch = loadOverlayPatches('test', fileURLToPath(subject.patchUrl))
-      const names = subject.rows === 'inserted' ? insertedRows(patch).map((row) => rowName(row)) : cordisRows(patch).map((row) => rowName(row))
+      const names = subject.rows === 'inserted' ? insertedRows(patch).map(row => rowName(row)) : cordisRows(patch).map(row => rowName(row))
       for (const name of names) {
         if (!name.startsWith('@deepseek-ai/')) continue
         const declaredName = name.split('/').slice(0, 2).join('/')
@@ -43,7 +43,7 @@ describe('dependency contract (one suite, three subjects)', () => {
       for (const name of Object.values(subject.toolVector ?? {})) expect(declared.has(name), subject.id + ' must declare ' + name).toBe(true)
     })
   }
-  for (const subject of SUBJECTS.filter((entry) => entry.bundlePatch !== undefined)) {
+  for (const subject of SUBJECTS.filter(entry => entry.bundlePatch !== undefined)) {
     it(subject.id + ': declares the bundle patch entry for profile resolution', () => {
       const manifest = JSON.parse(readFileSync(fileURLToPath(subject.manifestUrl), 'utf8')) as { dsh?: { bundle?: { patch?: string } } }
       expect(manifest.dsh?.bundle?.patch).toBe(subject.bundlePatch)
