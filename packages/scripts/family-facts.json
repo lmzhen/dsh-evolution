@@ -1580,6 +1580,10 @@
           "line-identity-bed": {
             "reason": "ABSENT-LOCALLY SUBJECT: its argv names packages/scripts/line-manifest.json as the bed manifest, and that file does not exist in this repo (it is produced on the bed tree it describes, from machine state this repo does not carry), so no mutation inside the repo can change what it judges",
             "expiry": "release gate: if the manifest ever becomes a tracked file here, delete this exemption and prove it by mutation (the CI and policy-only rows on the same script are already proven by a non-string policy reason)"
+          },
+          "gate-27": {
+            "reason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mutation in this repo can red it without first building",
+            "expiry": "release gate: if the row gains a source-level subject or dist becomes part of the reviewed tree, delete this exemption and prove it by mutation"
           }
         },
         "unmappedTier": [
