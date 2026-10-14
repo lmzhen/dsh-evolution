@@ -95,8 +95,8 @@ function buildFact(carrier, asset) {
   const pendingAxes = previous && previous.machine && Array.isArray(previous.machine.pendingAxes) ? previous.machine.pendingAxes : []
   // the mutation records are AUTHORED evidence (G5): regeneration must carry them too
   const checkMutations = previous && previous.machine && previous.machine.checkMutations !== undefined ? previous.machine.checkMutations : {}
-  // authored too: the mutation-exemption register (reason + expiry per check)
   const mutationExempt = previous && previous.machine && previous.machine.mutationExempt !== undefined ? previous.machine.mutationExempt : {}
+  // authored too: the mutation-exemption register (reason + expiry per check)
   const written = new Map()
   const requiresOf = new Map()
   const rows = previous && previous.machine && Array.isArray(previous.machine.declarations) ? previous.machine.declarations : []
@@ -174,5 +174,18 @@ if (check) {
   console.log(stamp + ' -> in sync (facts=' + next.facts.length + ')')
   process.exit(0)
 }
+  // LOUD-DROP GUARD: a hand-written machine key this generator does not carry would vanish
+  // silently on the next write. That trap has bitten three times (pendingAxes, checkMutations,
+  // mutationExempt), so the write now REFUSES and names the keys: add them to the preserve list
+  // in the same commit, or delete them deliberately.
+  {
+    const committed = (asset.facts === undefined ? [] : asset.facts).find((entry) => entry && entry.machine && entry.machine.kind === 'checks')
+    const derived = next.facts.find((entry) => entry && entry.machine && entry.machine.kind === 'checks')
+    const missing = committed === undefined ? [] : Object.keys(committed.machine).filter((key) => derived === undefined || !(key in derived.machine))
+    if (missing.length > 0) {
+      console.error('gen-checks-fact: REFUSING to write - these machine keys exist in the committed fact but the derived form would DROP them: ' + missing.join(', ') + ' (add them to the preserve list, or delete them deliberately)')
+      process.exit(1)
+    }
+  }
 writeFileSync(ASSET, text)
 console.log(stamp + ' -> wrote ' + ASSET + ' (facts=' + next.facts.length + ')')
