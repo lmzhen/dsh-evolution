@@ -161,7 +161,7 @@ describe('guard scripts (V4-30 sentry)', () => {
   })
 
   it('G4.1 (v33): declared-config recomputes the platform planes and fails loud on drift', async () => {
-    const declaredConfig = join(scripts, 'verify-declared-config.mjs')
+    const _declaredConfig = join(scripts, 'verify-declared-config.mjs')
     // Positive: the real tree with no platform checkout behaves as before.
     // Violation: a platform tree whose base plane does not carry the rows the
     // snapshot lists. The recomputation must report the drift instead of
