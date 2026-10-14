@@ -1241,6 +1241,19 @@
               "provenAt": "2026-10-14T08:04:33.557Z",
               "provenSha": "bbe321feb3ce7644bf9e1eef2d072713a787be00185736eef1d40506bb67c60d"
             }
+          ],
+          "gate-44": [
+            {
+              "mutate": {
+                "file": "packages/evolution-settings-ui/src/client/generated-params.ts",
+                "find": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'number', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },",
+                "replace": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'slider', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },"
+              },
+              "expect": "red",
+              "note": "a control kind OUTSIDE the generators union (slider instead of number): the guard reads the view with a regex limited to number|switch|select|text and then requires a rendering branch for every kind it sees, so the kind must be one of the four to be judged - the earlier probe appended nonsense, which the regex simply skipped",
+              "provenAt": "2026-10-14T08:15:56.455Z",
+              "provenSha": "d028d0f02ef324e4ac0dd5d216237d17d23bc946041e932ee428e132a9bd27fb"
+            }
           ]
         },
         "mutationExempt": {
