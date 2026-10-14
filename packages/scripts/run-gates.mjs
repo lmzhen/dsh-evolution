@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
  * run-gates — 门禁清单的唯一执行器（G0-2）。只判不改。
+ * G1: every gate now emits a VerdictRecord; the runner renders, it does not decide by exit code alone.
  * 用法：node packages/scripts/run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--only <id>] [--drill <id>] [--overlay <path>]
- * 规则（契约 §5/§5b/§5c）：seed = CI ∪ 表；pre-tag = local ∪ ci；
- *   runner 只跑 kind=script|toolchain；kind=step|external 只登记不执行；
- *   tree=overlay 的门禁在 overlay 根下跑（默认同级目录，--overlay 或 EVOLUTION_OVERLAY_ROOT 覆盖）。
+ * 规则：seed = CI ∪ 表；pre-tag = local ∪ ci；runner 只跑 kind=script|toolchain；tree=overlay 的门禁在 overlay 根下跑。
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { validate, counts, render, actionBlock } from './lib-verdict.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MIRROR_ROOT = resolve(HERE, '..', '..')
@@ -29,8 +30,25 @@ const union = (a, b) => { const m = new Map(); for (const g of [...a, ...b]) m.s
 const byProfile = { local: ofProfile('local'), ci: ofProfile('ci') }
 byProfile['pre-tag'] = union(byProfile.local, byProfile.ci)
 
+const sha8 = (p) => { try { return createHash('sha256').update(readFileSync(p)).digest('hex').slice(0, 8) } catch { return 'absent' } }
+const gitHead = () => { const r = spawnSync('git', ['-C', MIRROR_ROOT, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }); return (r.stdout || 'unknown').trim() || 'unknown' }
+const identityFor = (lane) => ({
+  face: 'unknown',
+  channel: 'src',
+  platformLine: 'unknown',
+  adapterSha: sha8(join('D:', 'dsh', '_tools', 'lib-line.mjs')),
+  policySha: sha8(join(HERE, 'family-facts.json')),
+  familyVersion: (() => { try { return JSON.parse(readFileSync(join(MIRROR_ROOT, 'package.json'), 'utf8')).version } catch { return 'unknown' } })(),
+  readerSha: sha8(join(HERE, 'lib-param-registry.mjs')),
+  scope: 'full',
+  tree: gitHead(),
+  lane,
+  ci: process.env.CI ? 'on' : 'off',
+})
+
+const parts = (cmd) => (cmd.replace(/^node\s+/, '').match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [])
 const show = (list) => list.map((g) => g.id.padEnd(9) + g.tree.padEnd(8) + g.cmd)
-const emit = (list, label) => {
+const emitList = (list, label) => {
   if (has('--json')) { console.log(JSON.stringify({ profile: label, count: list.length, ids: list.map((g) => g.id) }, null, 2)); return }
   console.log('run-gates [' + label + '] ' + list.length + ' gate(s)')
   for (const line of show(list)) console.log('  ' + line)
@@ -40,9 +58,8 @@ if (has('--drill')) {
   const id = flag('--drill')
   const g = manifest.gates.find((x) => x.id === id)
   if (!g) { console.error('run-gates --drill: unknown gate ' + id); process.exit(2) }
-  if (!g.drillCmd) { console.error('run-gates --drill ' + id + ': this gate declares no drillCmd — its criterion source cannot yet be falsified (contract §5d)'); process.exit(1) }
-  // drillCmd 是命令串（与 gate cmd 同形）：按同一解析方式执行，不能当 JS 求值
-  const dParts = g.drillCmd.replace(/^node\s+/, '').match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || []
+  if (!g.drillCmd) { console.error('run-gates --drill ' + id + ': this gate declares no drillCmd — its criterion source cannot yet be falsified (contract 5c)'); process.exit(2) }
+  const dParts = parts(g.drillCmd)
   const [dScript, ...dRest] = dParts
   const r = spawnSync(process.execPath, [dScript, ...dRest], { cwd: g.tree === 'overlay' ? overlayRoot : MIRROR_ROOT, stdio: 'inherit' })
   process.exit(r.status ?? 1)
@@ -52,23 +69,49 @@ if (!profile) { console.error('run-gates: usage: run-gates.mjs <local|pre-tag|ci
 let list = byProfile[profile]
 const only = flag('--only')
 if (only !== undefined) { list = list.filter((g) => g.id === only); if (list.length === 0) { console.error('run-gates: --only ' + only + ' not in profile ' + profile); process.exit(2) } }
-if (has('--list') || has('--json')) { emit(list, profile); process.exit(0) }
+if (has('--list')) { emitList(list, profile); process.exit(0) }
 
-console.log('run-gates [' + profile + '] running ' + list.length + ' gate(s); overlay root = ' + overlayRoot)
-const skipped = []
-const failed = []
+const identity = identityFor(profile)
+const records = []
+const base = (g, extra) => ({ id: g.id, check: g.cmd, criterion: g.id + '-criterion', identity, subject: { kind: 'paths', count: 0 }, ...extra })
+
 for (const g of list) {
-  if (g.localSafe === false && !process.env.CI) { skipped.push(g.id + ' (' + (g.localSafeReason || 'CI-shaped command') + ')'); continue }
-  if (g.tree === 'overlay' && !existsSync(overlayRoot)) { skipped.push(g.id + ' (overlay root missing: ' + overlayRoot + ')'); continue }
+  // 1) static executability: a placeholder token or a non-command argv[0] cannot run a criterion at all
+  const argv = parts(g.cmd)
+  const placeholder = argv.find((t) => /<[^>]*>?/.test(t) && t.includes('<'))
+  if (placeholder !== undefined) {
+    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [placeholder], path: 'UNRESOLVED', next: 'declare the placeholder value in the gate table (or register an args[] source) so the command is executable', evidence: MANIFEST + ':' + g.id + ' cmd contains ' + placeholder }))
+    continue
+  }
+  if (argv.length === 0 || argv[0].startsWith('-')) {
+    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: ['argv[0]'], path: 'UNRESOLVED', next: 'name a script as argv[0] (a bare flag is not a command) or register the step explicitly', evidence: MANIFEST + ':' + g.id + ' argv[0]=' + String(argv[0]) }))
+    continue
+  }
+  if (g.localSafe === false && !process.env.CI) {
+    records.push(base(g, { verdict: 'skipped', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [g.localSafeReason || 'CI-shaped command'], path: 'UNRESOLVED' }))
+    continue
+  }
+  if (g.tree === 'overlay' && !existsSync(overlayRoot)) {
+    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, missing: [overlayRoot], path: overlayRoot, next: 'clone the overlay tree or pass --overlay <path>', evidence: 'overlay root missing: ' + overlayRoot }))
+    continue
+  }
   const cwd = g.tree === 'overlay' ? overlayRoot : MIRROR_ROOT
-  const parts = g.cmd.replace(/^node\s+/, '').match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || []
-  const [script, ...rest] = parts
+  const [script, ...rest] = argv
   const started = Date.now()
-  const r = spawnSync(process.execPath, [script, ...rest], { cwd, stdio: 'inherit' })
+  const r = spawnSync(process.execPath, [script, ...rest], { cwd, stdio: has('--json') ? 'pipe' : 'inherit' })
   const ms = Date.now() - started
-  if ((r.status ?? 1) === 0) console.log('  ok   ' + g.id + ' (' + ms + 'ms) ' + script)
-  else { console.log('  FAIL ' + g.id + ' (exit ' + (r.status ?? '?') + ') ' + script); failed.push(g.id) }
+  const status = r.status ?? 1
+  if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
+  else records.push(base(g, { verdict: 'fail', criterionEvaluated: true, cause: { kind: 'non-zero-exit' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, next: 'read the failing script output above, then fix the gate or the tree it judges', evidence: script + ' exit=' + status }))
 }
-console.log('run-gates [' + profile + '] done: ' + (list.length - failed.length - skipped.length) + ' ok, ' + failed.length + ' failed, ' + skipped.length + ' skipped')
-if (skipped.length > 0) console.log('  skipped: ' + skipped.join('; '))
-process.exit(failed.length > 0 ? 1 : 0)
+
+const c = counts(records)
+const violations = records.flatMap((r) => validate(r, r.id))
+if (has('--json')) {
+  console.log(JSON.stringify({ schema: 1, profile, counts: c, gates: records, violations }, null, 2))
+} else {
+  for (const r of records) { console.log(render(r)); for (const l of actionBlock(r)) console.log(l) }
+  console.log('run-gates [' + profile + '] counts: pass=' + c.pass + ' fail=' + c.fail + ' cannotDecide=' + c.cannotDecide + ' skipped=' + c.skipped)
+}
+if (violations.length > 0) { console.error('run-gates: record contract violations: ' + violations.slice(0, 3).join(' | ')); process.exit(2) }
+process.exit(c.fail > 0 ? 1 : c.cannotDecide > 0 ? 2 : 0)
