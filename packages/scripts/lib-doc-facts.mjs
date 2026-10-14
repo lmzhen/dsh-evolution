@@ -21,6 +21,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { familyVersion, versionReached } from './lib-family-version.mjs'
 
 export const FACTS_ASSET = join('scripts', 'family-facts.json')
 
@@ -366,11 +367,38 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     // G0 S0.1: the testing policy is DATA — leaf tiers, per-tier budget param ids, the resolver pin
     // and the exception registers. The gates may only compare (R84): no closed set is defined here,
     // the leaf-tier list comes from the fact itself and full must never reappear as a tier.
-    const tiers = Array.isArray(machine.tiers) ? machine.tiers : []
-    if (tiers.length === 0) { out.push(`${FACTS_ASSET}: fact ${fact.id} declares no leaf tier — every check would be untiered`); return out }
-    // the full-lane ban is judged FIRST so the message names the real defect (R71), not its side effect
-    for (const forbidden of ['full']) {
-      if (tiers.includes(forbidden)) { out.push(`${FACTS_ASSET}: fact ${fact.id} lists ${forbidden} as a tier — full is an execution lane, never a declared tier (R71)`); return out }
+    const tierTable = machine.tiers !== null && typeof machine.tiers === 'object' && !Array.isArray(machine.tiers) ? machine.tiers : {}
+    const tiers = Object.keys(tierTable)
+    if (tiers.length === 0) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' declares no leaf tier - every check would be untiered'); return out }
+    // R71: 'full' is an execution lane, never a declared tier. The ban is DERIVED from the data:
+    // the cumulative chain ends in a lane that is not a declared tier, so declaring that lane as a
+    // tier empties the chain's lane half and fails below - this branch keeps no name list.
+    const chain = Array.isArray(machine.cumulative) ? machine.cumulative : []
+    if (chain.length === 0) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' states no cumulative lane chain - the run lanes would be undefined'); return out }
+    const laneNames = chain.filter((lane) => !tiers.includes(lane))
+    if (laneNames.length === 0) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' cumulative [' + chain.join(', ') + '] names only declared tiers - the chain must name an execution lane, and full is never a declared tier (R71)'); return out }
+    // R28/R71: the per-tier body is data (required / requiredFrom / forbid) and this branch only
+    // compares. An empty tier has three states: required (a member count turns emptiness red),
+    // not required YET (needs requiredFrom + reason + expiry + owner, and it EXPIRES), or
+    // orthogonal (outside the chain, so it must say why it is not in it).
+    const vocabulary = Array.isArray(machine.forbidVocabulary) ? machine.forbidVocabulary : []
+    if (vocabulary.length === 0) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' declares no forbid vocabulary - a per-tier ban list could name anything'); return out }
+    const current = familyVersion(root)
+    if (current === undefined) { out.push(FACTS_ASSET + ': fact ' + fact.id + ' cannot read the family version under ' + root + ' - a version-based exemption cannot be evaluated (a vacuum pass is not a pass)'); return out }
+    for (const tier of tiers) {
+      const entry = tierTable[tier] ?? {}
+      if (typeof entry.required !== 'boolean') out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' does not state required (true|false) - an unstated requirement is how an empty tier passes')
+      const forbid = Array.isArray(entry.forbid) ? entry.forbid : null
+      if (forbid === null) out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' carries no forbid list - the ban list is part of the tier policy')
+      else for (const banned of forbid) if (!vocabulary.includes(banned)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' forbids "' + String(banned) + '", which is not in forbidVocabulary [' + vocabulary.join(', ') + '] - the vocabulary is data, not a per-tier invention')
+      const inChain = chain.includes(tier)
+      if (inChain && typeof entry.reason === 'string' && entry.reason.trim() !== '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' is in the cumulative chain and carries a reason - the reason marks an orthogonal tier, and a chain tier is not orthogonal (R71)')
+      if (!inChain) for (const field of ['reason', 'owner']) if (typeof entry[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' is outside the cumulative chain and has no ' + field + ' - an orthogonal tier states why it is not in the chain and who owns that')
+      if (entry.required !== false) continue
+      for (const field of ['requiredFrom', 'reason', 'expiry', 'owner']) if (typeof entry[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' is not required yet and has no ' + field + ' - an empty tier without requiredFrom/reason/expiry/owner is either instantly red or a permanent exemption (R28)')
+      const reached = versionReached(current, entry.requiredFrom)
+      if (reached === null) out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' requiredFrom "' + String(entry.requiredFrom) + '" is not a version - the exemption expiry cannot be evaluated')
+      else if (reached) out.push(FACTS_ASSET + ': fact ' + fact.id + ' tier ' + tier + ' is still not required although the family version ' + current + ' reached requiredFrom ' + String(entry.requiredFrom) + ' - an expired exemption is red, not permanent (R28; owner ' + String(entry.owner) + ')')
     }
     const params = machine.baselineParamOfTier ?? {}
     for (const tier of tiers) {
@@ -434,7 +462,8 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       return out
     }
     const tierFact = (asset?.facts ?? []).find((entry) => entry?.id === machine.tierSource)
-    const tiers = Array.isArray(tierFact?.machine?.tiers) ? tierFact.machine.tiers : []
+    const tierTable = tierFact?.machine?.tiers
+    const tiers = tierTable !== null && typeof tierTable === 'object' && !Array.isArray(tierTable) ? Object.keys(tierTable) : []
     if (tiers.length === 0) {
       out.push(FACTS_ASSET + ': fact ' + fact.id + ' names tierSource ' + String(machine.tierSource) + ', which is not the fact that owns the tier closed set - the tiers have no home to compare against')
       return out

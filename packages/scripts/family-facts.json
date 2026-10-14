@@ -426,11 +426,28 @@
       "machine": {
         "kind": "testing-policy",
         "file": "packages/scripts/vitest.family.config.mjs",
-        "tiers": [
-          "fast",
-          "pre-tag",
-          "ci-only"
-        ],
+        "tiers": {
+          "fast": {
+            "required": true,
+            "forbid": [
+              "spawn",
+              "realWait",
+              "wallClockAssert"
+            ]
+          },
+          "pre-tag": {
+            "required": true,
+            "forbid": [
+              "wallClockAssert"
+            ]
+          },
+          "ci-only": {
+            "required": true,
+            "forbid": [],
+            "reason": "runs only in the CI lane (full with ci=on): the platform-coupled and testkit specs cannot pass on a machine without the platform line (R71)",
+            "owner": "scripts"
+          }
+        },
         "baselineParamOfTier": {
           "fast": "timeout.spec.default",
           "pre-tag": "timeout.spec.default",
@@ -506,7 +523,17 @@
               "owner": "scripts"
             }
           ]
-        }
+        },
+        "forbidVocabulary": [
+          "spawn",
+          "realWait",
+          "wallClockAssert"
+        ],
+        "cumulative": [
+          "fast",
+          "pre-tag",
+          "full"
+        ]
       }
     },
     {

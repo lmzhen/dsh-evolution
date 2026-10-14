@@ -44,6 +44,34 @@ export function readChangelogHeadVersion(root) {
   } catch { return null; }
 }
 
+/** Parse the numeric core of a version: [major, minor, patch], or null. A suffix (rc/beta) is
+ * ignored on purpose: an exemption granted until 0.26.0 is due in 0.26.0-rc.1 too, because the
+ * release it guards against is already being built. */
+function parseVersion(text) {
+  if (typeof text !== 'string') return null;
+  const match = text.match(/^(\d+)\.(\d+)\.(\d+)/);
+  return match === null ? null : [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+/** Compare two versions numerically: -1, 0, 1; null when either side is not a version. */
+export function compareVersions(a, b) {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  if (left === null || right === null) return null;
+  for (let i = 0; i < 3; i += 1) {
+    const delta = left[i] - right[i];
+    if (delta !== 0) return delta < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
+/** Has `current` reached the version an exemption was granted until? null when either side is
+ * not a version (the caller reports that as unevaluable, never as not-due). */
+export function versionReached(current, until) {
+  const delta = compareVersions(current, until);
+  return delta === null ? null : delta >= 0;
+}
+
 /** The family version: the install tile under evolution-host wins, else the root package.json. */
 export function familyVersion(sourceRoot, root = sourceRoot) {
   try {
