@@ -508,6 +508,20 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       }
       return ids
     }
+    // the AXIS register: a non-zero gap in one of the meta-gate's axes is a registered debt
+    // (count + reason + expiry + owner). The registry compares these counts against the LIVE
+    // observations; this branch only refuses a shapeless entry.
+    const axes = Array.isArray(machine.pendingAxes) ? machine.pendingAxes : []
+    if (axes.length === 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' carries no pendingAxes register - a meta-gate gap would stand as a bare number')
+    const seenAxes = new Set()
+    for (const entry of axes) {
+      const label = String(entry?.axis ?? '(no axis)')
+      if (typeof entry?.axis !== 'string' || entry.axis.trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingAxes entry names no axis')
+      else if (seenAxes.has(entry.axis)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingAxes registers ' + entry.axis + ' twice - one entry per axis')
+      else seenAxes.add(entry.axis)
+      for (const field of ['reasonRef', 'expiry', 'owner']) if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingAxes ' + label + ' is missing ' + field)
+      if (!Number.isInteger(entry?.rows) || entry.rows < 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingAxes ' + label + ' carries no non-negative integer rows - the register must state the measured size of the gap')
+    }
     const pending = Array.isArray(machine.pendingColumns) ? machine.pendingColumns : []
     const unmappedIds = registerIds('unmappedTier')
     const unknownIds = registerIds('unknownCriterion')

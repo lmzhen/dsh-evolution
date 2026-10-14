@@ -236,6 +236,13 @@ for (const gate of manifestGates) {
   }
 }
 const CRITERIA = ['executability', 'no-placeholders', 'expiry-due', 'falsifiability-carrier']
+// G2/M5: the registry is a LEDGER over these observations. It consumes this object instead of
+// re-deriving them (a second implementation of a discovery is how two counts start to differ).
+if (argv.includes('--json')) {
+  console.log(JSON.stringify({ schema: 1, manifestRows: manifestGates.length, familyVersion: familyVer === undefined ? null : familyVer, tableRows: tableRows.length, criteria: CRITERIA, observations, problems, notes }, null, 2))
+  if (problems.length > 0) process.exit(1)
+  process.exit(0)
+}
 if (report) {
   console.log('verify-gate-manifest [report] ' + manifestGates.length + ' manifest row(s), family version ' + String(familyVer) + ' - ' + observations.length + ' observation(s)')
   for (const criterion of CRITERIA) {
