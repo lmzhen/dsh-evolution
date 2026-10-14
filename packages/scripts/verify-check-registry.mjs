@@ -109,6 +109,15 @@ for (const axis of ['mutation-coverage', 'producer-wiring']) {
   addAxis(axis, null, entry === undefined ? 'cannot-decide' : 'cannot-decide', entry === undefined ? 'no data source and no register entry' : 'no data source yet (registered until ' + entry.expiry + '): ' + entry.reasonRef)
 }
 for (const axis of axes) if (axis.state === 'fail') violations.push(axis.axis + ': ' + axis.detail)
+// Diagnosability: the axis line names a count, not the rows behind it, so a CI-only gap could
+// not be identified from the log. Print the observations of every failing axis (the meta-gate's
+// own entries, verbatim) so the next run names the rows instead of leaving a bare number.
+for (const axis of axes) {
+  if (axis.state !== 'fail') continue
+  const detailRows = observations.filter((entry) => entry.criterion === axis.axis).slice(0, 25)
+  console.error('verify-check-registry: ' + axis.axis + ' has ' + String(detailRows.length) + ' observation(s):')
+  for (const entry of detailRows) console.error('  ' + JSON.stringify(entry))
+}
 for (const id of missingDeclarations) violations.push('closure: ' + id + ' is a manifest row with no declaration')
 for (const id of staleDeclarations) violations.push('closure: ' + id + ' is a declaration with no manifest row')
 
