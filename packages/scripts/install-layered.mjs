@@ -15,6 +15,7 @@
  * bundle package.
  */
 
+import { familyVersion as familyVersionOf } from './lib-family-version.mjs'
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
@@ -85,35 +86,9 @@ const STAGING_DIR = join(PACKAGES_DIR, '.release-staging')
  * `packageSourceRoot()` (the no-argument form resolves the root through the
  * staging branch, which would recurse). */
 function familyVersion(sourceRoot = packageSourceRoot()) {
-  try {
-    const version = JSON.parse(readFileSync(join(sourceRoot, 'evolution-host', 'package.json'), 'utf8')).version
-    if (typeof version === 'string' && /^\d+\.\d+\.\d+/.test(version)) return version
-  } catch {
-    // fall through to the ancestor walk
-  }
-  return rootPackageVersion()
-}
-
-function rootPackageVersion() {
-  // The release version the current tree is building toward lives in the repo
-  // root package.json (the mirror root carries the real 0.3.x). Walk up from
-  // the package dir so both layout shapes (packages/scripts and the upstream
-  // overlay packages/evolution/scripts) reach it.
-  let dir = PACKAGES_DIR
-  while (true) {
-    const candidate = join(dir, 'package.json')
-    if (existsSync(candidate)) {
-      try {
-        const version = JSON.parse(readFileSync(candidate, 'utf8')).version
-        if (typeof version === 'string' && version) return version
-      } catch {
-        // fall through to the next ancestor
-      }
-    }
-    const parent = dirname(dir)
-    if (parent === dir) return ''
-    dir = parent
-  }
+  // one reader (G0/S0.4): the body lives in lib-family-version.mjs so the expiry evaluator,
+  // the pre-tag three-way check and this path cannot drift apart.
+  return familyVersionOf(sourceRoot, sourceRoot)
 }
 
 function packageSourceRoot() {

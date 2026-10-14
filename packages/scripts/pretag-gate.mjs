@@ -24,16 +24,12 @@ const results = []
 const record = (name, ok, detail) => { results.push({ name, ok, detail }); console.log((ok ? 'PASS ' : 'FAIL ') + name + (detail ? ' — ' + detail : '')) }
 
 // 1) version three-way
-const rootVersion = JSON.parse(fs.readFileSync(path.join(mirror, 'package.json'), 'utf8')).version
-const pkgVersions = new Map()
-for (const dir of fs.readdirSync(path.join(mirror, 'packages'))) {
-  const p = path.join(mirror, 'packages', dir, 'package.json')
-  if (fs.existsSync(p)) pkgVersions.set(dir, JSON.parse(fs.readFileSync(p, 'utf8')).version)
-}
-const head = fs.readFileSync(path.join(mirror, 'CHANGELOG.md'), 'utf8').split('\n').find((l) => l.startsWith('## '))
-const headVersion = (head.match(/^##\s+(\S+)/) || [])[1]
+const { readRootVersion, readPackageVersions, readChangelogHeadVersion } = await import('./lib-family-version.mjs')
+const rootVersion = readRootVersion(mirror)
+const pkgVersions = readPackageVersions(mirror)
+const headVersion = readChangelogHeadVersion(mirror)
 const strays = [...pkgVersions].filter(([, v]) => v !== rootVersion)
-record('version three-way', strays.length === 0 && headVersion === rootVersion, 'root=' + rootVersion + ' changelog=' + headVersion + ' packages=' + pkgVersions.size + (strays.length ? ' strays=' + strays.map(([n, v]) => n + '@' + v).join(',') : ''))
+record('version three-way', strays.length === 0 && headVersion === rootVersion, 'root=' + rootVersion + ' changelog=' + headVersion + (strays.length ? ' strays=' + strays.map(([d, v]) => d + '@' + v).join(',') : ''))
 
 // 2) lint through the overlay toolchain
 // The binary path is declared OUTSIDE the try: the catch has to re-run the probe, and a block-scoped
