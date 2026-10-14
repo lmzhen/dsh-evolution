@@ -959,7 +959,15 @@
             "owner": "scripts"
           }
         ],
-        "pendingAxes": [],
+        "pendingAxes": [
+      {
+        "axis": "expiry-due",
+        "rows": 19,
+        "reasonRef": "packages/scripts/gate-manifest.json",
+        "expiry": "0.27.0",
+        "owner": "release"
+      }
+    ],
         "checkMutations": {
           "gate-17": [
             {

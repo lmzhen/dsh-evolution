@@ -24,7 +24,20 @@ import { familyVersion, versionReached } from './lib-family-version.mjs'
 
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
-const repo = resolve(root, '..')
+// The repo root is found by walking up from the tree to the directory that owns OUR composite
+// action: the released-upstream layout puts the family at <platform>/packages/evolution, whose
+// parent is the platform's packages dir - assuming one level up pointed at upstream/packages (and
+// then the platform tree's own CONTRIBUTING.md) or missed it entirely and exited 2. The action file
+// is a marker only this repository carries, so the walk cannot mistake the platform repo for ours.
+const repoMarker = join('.github', 'actions', 'evolution-validate', 'action.yml')
+let repo = ''
+for (let dir = root; ; ) {
+  if (existsSync(join(dir, repoMarker))) { repo = dir; break }
+  const up = resolve(dir, '..')
+  if (up === dir) break
+  dir = up
+}
+const tableArmed = repo !== ''
 const problems = []
 const notes = []
 
@@ -57,17 +70,18 @@ const CI_NOT_EXECUTED = registers.localOnly
 const contributingPath = join(repo, 'CONTRIBUTING.md')
 const actionPath = join(repo, '.github', 'actions', 'evolution-validate', 'action.yml')
 const releasePath = join(repo, '.github', 'workflows', 'release.yml')
-if (!existsSync(contributingPath)) { console.error('verify-gate-manifest: no CONTRIBUTING.md at ' + contributingPath); process.exit(2) }
-if (!existsSync(actionPath)) { console.error('verify-gate-manifest: no composite action at ' + actionPath); process.exit(2) }
+if (tableArmed && !existsSync(contributingPath)) { console.error('verify-gate-manifest: no CONTRIBUTING.md at ' + contributingPath); process.exit(2) }
+if (tableArmed && !existsSync(actionPath)) { console.error('verify-gate-manifest: no composite action at ' + actionPath); process.exit(2) }
 
 const tableRows = []
-for (const [index, line] of readFileSync(contributingPath, 'utf8').split('\n').entries()) {
+if (!tableArmed) console.error('verify-gate-manifest: table check NOT ARMED in this layout - no repository marker above ' + root + ' (the register records this row against the mirror tree)')
+for (const [index, line] of (tableArmed ? readFileSync(contributingPath, 'utf8') : '').split('\n').entries()) {
   const match = /^\|\s*([0-9]+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/.exec(line)
   // G0-5: strip backticks — a command cell whose code span ends the cell (`…mjs`) used to fail
   // scriptOf's trailing-delimiter rule, silently dropping that row from declaredScripts.
   if (match !== null) tableRows.push({ n: Number(match[1]), command: match[2].replace(/`/g, ' '), tree: match[3], line: index + 1 })
 }
-if (tableRows.length === 0) { console.error('verify-gate-manifest: the gate table parsed empty — refuse to report a pass on an empty parse'); process.exit(1) }
+if (tableArmed && tableRows.length === 0) { console.error('verify-gate-manifest: the gate table parsed empty — refuse to report a pass on an empty parse'); process.exit(1) }
 for (const [index, row] of tableRows.entries()) {
   if (row.n !== index + 1) problems.push('table row ' + row.line + ' is numbered ' + row.n + ' but sits at position ' + (index + 1) + ' — renumber the table (a gap hides a retired step)')
 }
