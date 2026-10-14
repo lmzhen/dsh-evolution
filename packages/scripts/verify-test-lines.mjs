@@ -43,6 +43,16 @@ let tree = "unknown";
 try { tree = execFileSync("git", ["-C", ROOT, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim(); } catch {}
 const registryPath = join(ROOT, "packages", "scripts", "family-test-lines.json");
 const registry = existsSync(registryPath) ? JSON.parse(readFileSync(registryPath, "utf8")) : { testLines: [] };
+const STATUSES = ["pending", "expected", "ci-only"];
+const EXPECT_LINES = ["unknown", "local", "ci", "both"];
+const fieldViolations = [];
+for (const [i, e] of (registry.testLines ?? []).entries()) {
+  for (const f of ["spec", "id", "expectLine", "status", "reasonRef", "expiry", "owner"]) {
+    if (typeof e?.[f] !== "string" || e[f].trim() === "") fieldViolations.push({ index: i, spec: e?.spec ?? "?", field: f, why: "missing-or-empty" });
+  }
+  if (typeof e?.status === "string" && !STATUSES.includes(e.status)) fieldViolations.push({ index: i, spec: e.spec, field: "status", why: "not-in-closed-set:" + e.status });
+  if (typeof e?.expectLine === "string" && !EXPECT_LINES.includes(e.expectLine)) fieldViolations.push({ index: i, spec: e.spec, field: "expectLine", why: "not-in-closed-set:" + e.expectLine });
+}
 const declared = new Set((registry.testLines ?? []).map((e) => e.spec + "::" + e.id));
 const seen = new Set(candidates.map((c) => c.file + "::" + c.id));
 const actualOnly = candidates.filter((c) => !declared.has(c.file + "::" + c.id));
@@ -59,9 +69,11 @@ console.log(JSON.stringify({
   registered: declared.size,
   actualOnly: actualOnly.length,
   declaredOnly: declaredOnly.length,
+  fieldViolations: fieldViolations.length,
+  sampleFieldViolations: fieldViolations.slice(0, 5),
   mode: STRICT ? "strict" : "report",
   fullCandidates: process.argv.includes("--full") ? candidates : undefined,
   sampleActualOnly: actualOnly.slice(0, 5),
   sampleDeclaredOnly: declaredOnly.slice(0, 5),
 }, null, 2));
-if (STRICT && (actualOnly.length > 0 || declaredOnly.length > 0)) process.exit(1);
+if (STRICT && (actualOnly.length > 0 || declaredOnly.length > 0 || fieldViolations.length > 0)) process.exit(1);
