@@ -1336,6 +1336,10 @@
           "gate-45": {
             "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
             "expiry": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation"
+          },
+          "ci-only-08": {
+            "reason": "its TARGET path (upstream/tsconfig.base.json) exists only in the CI overlay job, never in this repo: the row injects alias lines into the upstream tree that the compat job checks out, so no mutation inside this repo can change what it judges",
+            "expiry": "release gate: if the row ever names an in-repo target, delete this exemption and prove it by mutation"
           }
         },
         "unmappedTier": [
