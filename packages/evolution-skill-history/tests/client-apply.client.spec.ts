@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 // @vitest-environment jsdom
 /**
  * What the bundle registers, and that all of it comes back.

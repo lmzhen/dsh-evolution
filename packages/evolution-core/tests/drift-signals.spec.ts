@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { resolveCitations } from '../src/citations.ts'
 import { bodyCost } from '../src/cost.ts'

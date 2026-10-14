@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 /**
  * G3a（PLAN-R6 §20.1）—— 今天的既有缺陷用 `it.fails` 钉住：一次 `restructure` 只给 SKILL.md 落版本，
  * 支撑文件被搬动却不产生版本条目，且版本之间没有任何组键（没有 `unitId`）⇒ 撤销无法把「一次结构变更」

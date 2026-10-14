@@ -434,11 +434,11 @@
               "realWait",
               "wallClockAssert"
             ],
-            "maxWallMs": 90000,
+            "maxWallMs": 60000,
             "budgetMeasured": {
-              "ms": 92290,
-              "where": "machine-local stale dev tree (D:/dsh/deepseek-harness), lane fast, 53 files / 282 tests, 2026-10-14",
-              "note": "the lane is green; the cost is module resolution (~1.7s per file, import 213.68s cumulative) rather than test time (41.12s). The design target is 60s: re-measure on a fresh overlay before pushing files down, and if it still exceeds, move the slowest measured files to pre-tag rather than raising this number silently"
+              "ms": 49100,
+              "where": "machine-local stale dev tree, lane fast, 45 files / 223 tests, 2026-10-14 (vitest Duration 43.56s)",
+              "note": "the design target is 60s and the lane meets it once fast is DEFINED BY MEASUREMENT: the wall cost is a per-file floor (about 1.2s per file; 8 workers moved 179s to 165s, so the lane is not parallelism-bound), hence fast = the cheapest 45 measured files rather than all-but-the-slowest. Raising the budget is not the lever; the file count is"
             }
           },
           "pre-tag": {

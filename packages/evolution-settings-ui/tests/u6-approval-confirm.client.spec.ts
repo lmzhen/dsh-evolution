@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 // @vitest-environment jsdom
 /**
  * U-6 (G5.13): the registry can put a NAMED confirmation in front of the destructive side.

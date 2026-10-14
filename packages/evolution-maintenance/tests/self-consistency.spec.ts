@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 /**
  * 011 §7 self-consistency suite — the compile-time tests that keep the template
  * vocabulary and the mechanical facts/probe layer aligned:

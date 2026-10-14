@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 // @vitest-environment jsdom
 /**
  * The tool face's vocabulary, RENDERED (G3).

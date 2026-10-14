@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { SkillLibrary } from '../src/skill-store.ts'
 

@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 /**
  * G3b / A19：单元成员解析的判据 M1-M5。纯函数 + 合成索引，不依赖真实 home。
  */

@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 /**
  * The cells one row shows (G1, §15 L1).
  *

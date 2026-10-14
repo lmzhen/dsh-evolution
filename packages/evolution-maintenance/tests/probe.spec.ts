@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { computeDriftSignals, resolveCitations, type DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS } from '../src/index.ts'

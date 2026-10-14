@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import type { EvolutionStateStorage } from '@deepseek-ai/dsh-evolution-state-storage'
 import { runStateProviderConsistency } from '@deepseek-ai/dsh-evolution-state-storage'

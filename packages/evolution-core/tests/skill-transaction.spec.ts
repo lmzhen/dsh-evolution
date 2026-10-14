@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 import { expect, it } from 'vitest'
 import { SkillLibrary, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { fakeIo } from '../../test-support/fake-io.ts'

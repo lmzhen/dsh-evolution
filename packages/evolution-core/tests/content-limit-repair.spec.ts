@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 /**
  * S1.2 (v37 P2-1): the content limit is judged on the bytes that land on disk,
  * and a NET SHRINK of an already-over-limit file is the repair path.

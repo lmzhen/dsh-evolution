@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'

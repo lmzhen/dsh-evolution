@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 /**
  * G3: the legacy-namespace migration.
  *

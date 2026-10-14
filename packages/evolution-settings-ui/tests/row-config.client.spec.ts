@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 // @vitest-environment jsdom
 /**
  * The Plugins page's per-row configuration entry (G2).

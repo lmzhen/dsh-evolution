@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { clampOnce, liveBool, liveEnum, liveNumber, liveString, unwrapLive } from '../src/live.ts'
 

@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionPolicy, { Config } from '../src/index.ts'

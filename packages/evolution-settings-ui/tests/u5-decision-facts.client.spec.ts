@@ -1,4 +1,4 @@
-// @tier fast
+// @tier pre-tag
 // @vitest-environment jsdom
 /**
  * U-5 (G5.7): the three decision facts the seat already knows, put on screen. `base` and `mode` are
