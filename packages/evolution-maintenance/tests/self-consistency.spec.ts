@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 /**
  * 011 §7 self-consistency suite — the compile-time tests that keep the template
  * vocabulary and the mechanical facts/probe layer aligned:

@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 import { expect, it } from 'vitest'
 import { buildCuratorRunReport, computeLifecycleTransitions, computeScopeView, CURATOR_PROMPT, foldCuratorFields, lifecycleCandidate, parseCuratorNominations, renderCuratorReportMarkdown, type UsageRecord } from '@deepseek-ai/dsh-evolution-core'
 

@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 /**
  * G4 ⑤: the write receipt carries what THIS write introduced (or made worse) — never the standing
  * backlog, and never a number for a rule whose threshold is not calibrated yet.

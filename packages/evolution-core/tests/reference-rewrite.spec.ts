@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 /**
  * 0.5.0 V1 (design §16.7): the re-home plan a refused consolidation reports.
  * Pure planning — the refusal still stands, so these cases assert the NUMBERS a

@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 import { expect, it } from 'vitest'
 import {
   PENDING_RESOLVED_CAP,

@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionPolicy from '../src/index.ts'

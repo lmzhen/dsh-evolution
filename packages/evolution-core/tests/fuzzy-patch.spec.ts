@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { fakeIo } from '../../test-support/fake-io.ts'

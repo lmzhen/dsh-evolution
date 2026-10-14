@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 /**
  * The cells one row shows (G1, §15 L1).
  *

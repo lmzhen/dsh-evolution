@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 /**
  * G5 (in-use protection): the reverse map the consolidation pool excludes on. It is pure, so it is
  * pinned directly rather than through a full curator run: the value is a Set of SOURCES (a refusal

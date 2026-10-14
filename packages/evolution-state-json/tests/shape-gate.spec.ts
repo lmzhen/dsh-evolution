@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
 import { tempRoot } from '../../test-support/temp-home.ts'

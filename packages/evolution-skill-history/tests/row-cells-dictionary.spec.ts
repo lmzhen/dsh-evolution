@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 /**
  * The seam between the cells the host package builds and the words THIS package owns (G1).
  *

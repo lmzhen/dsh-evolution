@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'

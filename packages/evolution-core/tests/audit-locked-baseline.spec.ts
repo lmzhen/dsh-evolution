@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 // @vitest-environment node
 /**
  * A7 (S5.5): the audit's `before` must be the bytes the operation actually replaced.

@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { isFileShapedPath, resolveCitations, scanBodyHooks } from '@deepseek-ai/dsh-evolution-core'
 

@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 import { expect, it } from 'vitest'
 import { isAbsent, isPresent, isUnknown, mapProbe, probeAbsent, probePresent, probeUnknown, valueOr } from '@deepseek-ai/dsh-evolution-core'
 

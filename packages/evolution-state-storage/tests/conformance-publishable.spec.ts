@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 /**
  * S3-2 (J-5): the conformance suite is PUBLISHED, so it must stay loadable from
  * the package entry without dragging a test runner into every consumer.

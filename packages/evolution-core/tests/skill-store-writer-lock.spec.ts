@@ -1,4 +1,4 @@
-// @tier ci-only
+// @tier fast
 /**
  * G2 S4: the family write-lock protocol is retired, so a `*.lock` file is USER CONTENT in every body
  * shape (empty, a bare pid, `pid:token`) — it never blocks a destructive mover, and the bytes ride
