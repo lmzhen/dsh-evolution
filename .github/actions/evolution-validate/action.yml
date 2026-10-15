@@ -420,7 +420,7 @@ runs:
         # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
         # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs
         # in the family's own gate against the mirror, where those files exist.
-        node packages/evolution/scripts/verify-doc-facts.mjs packages/evolution --strict --require-repo-docs
+        node packages/evolution/scripts/verify-doc-facts.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-package-discovery.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-family-tool-names.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-skill-roots.mjs packages/evolution --strict

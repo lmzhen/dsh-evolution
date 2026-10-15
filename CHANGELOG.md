@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.26 (patch) — 撤掉我给 verify-doc-facts 加的 --require-repo-docs（紧邻注释早就禁止它）
+
+> **现象**：0.26.25 的 validate 红在 Verify the family guard set，报 `verify-doc-facts: FAIL — repo-root documents (README.md / INSTALL.md / README.zh.md / CHANGELOG.md) are absent in this layout`，与我本机的读数一字不差。
+> **根因**：这条旗标是本批的 `4b8261e89` 加的（git blame），而 action.yml 的 420–422 行（2026-10-09 写下）原文就是"No --require-repo-docs here: the overlay carries packages/ only, so the repo-level docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs in the family own gate against the mirror, where those files exist." ⇒ 文件自己写明了不该加，而加的时候没有读那三行。上一轮我还把同一条读数误判成"本机独有"，白付一轮 CI。
+> **修复**：撤掉旗标，回到 `--strict`。
+> **验证**：全量审计本批对 action 的三处命令改动（git diff c1c854b2..HEAD）：dep-closure 加 `--strict`（安全）、doc-facts 加 `--require-repo-docs`（本次撤掉）、新增 `gen-check-taxonomy --check`（本机通过）；另有本批新增的一段"为何床清单门不在 CI"的注释。本机按 action 清单跑 39/39 通过（该读数在撤旗标前取得，本轮改动只影响 CI 侧的 `doc-facts` 一行）。
 ## 0.26.25 (patch) — 修 run-gates 的路径守卫回归；分类报告重生；并按 action 清单把整条链在本机跑通
 
 > **现象**：0.26.24 的 validate 红在 Verify the platform contract，报 `platform-citation family-facts.json:956: cites packages/EVOLUTION/`。
