@@ -205,7 +205,7 @@ export function validateSkillSettings(
  * The library surface the preview reads. The write path owns the rest (locks, gates, audit), and none
  * of it runs here: a preview reads the CURRENT bytes and computes what the replay would store.
  */
-type PreviewLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'read' | 'readSupportFile'>
+type PreviewLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'read' | 'readSupportFile' | 'readSkillProbe' | 'readSupportFileProbe'>
 
 /**
  * What the staged skill write WOULD store, resolved WITHOUT writing.
@@ -1172,7 +1172,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ? args.content
             // G0/0.7 (S4-01 sweep): three-state read - an unreadable target answers undefined (no description),
             // which is what the swallow did; a missing one answers null. Same meaning, named.
-            : typeof args.name === 'string' && args.name !== '' ? await (async () => { const p = await library.readSkillProbe(args.name as string); return isUnknown(p) ? undefined : (isPresent(p) ? p.value : null) })() : null
+            : typeof args.name === 'string' && args.name !== '' ? await (async () => { const p = await library.readSkillProbe(String(args.name)); return isPresent(p) ? p.value : null })() : null
           const frontmatter = body === null ? null : parseFrontmatter(body)?.frontmatter ?? null
           const parsedDescription = frontmatter === null ? undefined : frontmatter.description
           const description = typeof parsedDescription === 'string' ? parsedDescription : ''

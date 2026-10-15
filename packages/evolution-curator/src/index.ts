@@ -1304,7 +1304,9 @@ export class EvolutionCurator extends Service {
         return listed.find(entry => entry.name === name)?.content
       },
       writeSkill: async (name: string, content: string) => {
-        await this.skills.update(name, content, 'background_review', { expectation: 'exists-or-absent' })
+        // The fourth argument is the byte anchor, and its only shapes are { absent } and { sha256 }
+        // (WriteAnchor). An unconditional update is what this restore path always did.
+        await this.skills.update(name, content, 'background_review')
         void name
       },
       note: (text: string) => { this.ctx.logger.info('evolution-curator: ' + text) },

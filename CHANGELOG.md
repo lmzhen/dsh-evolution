@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.17 (patch) — 修掉 0.26.16 在 CI 暴露的八条类型错误（发布前本地类型线本该拦住）
+
+> **现象**：0.26.16 的 tag run 与 main run 都在 validate 阶段红，同一个 job 在 Linux 与 Windows 各报一遍同样的八条 TS 错误，全部落在本批改过的三个包里：curator 给 update 的第四参传了 `{ expectation: … }`（WriteAnchor 实际只有 `{ absent }` 与 `{ sha256 }`）；review 的一处三元把整个 `Probe` 当字符串返回、另一处只判了 `undefined` 而 `hashLibrary` 的类型是 `… | null`；tool-skill-manage 的 `PreviewLibrary` 是 `Pick<…, read | readSupportFile>`，两个新探针不在 Pick 里；同一文件的一处 IIFE 在 unknown 分支返回 `undefined` 而与周边的 `null` 契约不符。
+> **根因**：漏在"验证读数被我自己截断"这一步——本地类型线**报过这八条**，而那次输出 33 行、读了前 20 行，被砍掉的后 13 行正是它们。CI 与本地因此不同结论，不是仪器差异而是读数纪律差异。
+> **修复**：五处改回与类型契约一致（curator 去掉自造字段、review 用显式 IIFE 取值并判 null/undefined、Pick 补两个探针、IIFE 的 unknown 分支返回 null）。**读数纪律同时收紧：验证类命令的输出一律不截断——要么全打印，要么只过滤目标行。**
+> **验证**：类型线全量打印后，家族侧只剩 vendor/cordis、vendor/schemastery（平台两份副本）与 evolution-core/src/session-projection.ts 三处既有项，本批改过的包零错误；curator 106／review 123／tool-skill-manage 82／core 810 全绿；ARCH／META／DOC／REL 全 0。
 ## 0.26.16 (patch) — 按优化计划完成 G0–G4 全批，并在发布前独立复核中修掉三条判据自身的假绿
 
 > **现象**：这一批把家族插件按 design/00-optimization-plan.md 的分组做完（G0 元层判据含 0.7 假绿族逐条红证化、G1 写入路径 1.1–1.8、G2a 2a.1–2a.4、G2b 2b.1–2b.4、G3 3.1–3.4、G4 4.0–4.4）。收尾时三席独立复核（立场互相对撞、只读、变异在临时副本）判「无阻断，可以发布」，但钉出三条**判据自己**的假绿：CI 的 vitest 步骤不带 `-c` 家族配置（落平台根配置的 invariant harness，家族包没有对应文件，spec 在 setup 阶段全灭）；床清单产物内嵌宿主绝对路径且被 `.gitignore` 的裸 `files/` 忽略（本地绿、换机与全新检出红）；新增的床清单门禁在 CI 里是「先生成再检查同一份字节」的写后读自洽绿，且 `pin` 取 HEAD 又参与逐字比对（下一个提交即自失效）。
