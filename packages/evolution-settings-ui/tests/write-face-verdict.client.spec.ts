@@ -27,6 +27,6 @@ describe('G4/4.1: the write face reports the host verdict', () => {
 
   it('an accepted write reports true, and a missing seat reports false', async () => {
     expect(await writeFaceFor(probeOf(true), 'evolution-curator').mutateOnce([])).toBe(true)
-    expect(await writeFaceFor((() => undefined) as unknown as Probe, 'evolution-curator').mutateOnce([])).toBe(false)
+    expect(await writeFaceFor(() => undefined, 'evolution-curator').mutateOnce([])).toBe(false)
   })
 })

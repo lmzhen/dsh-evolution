@@ -95,7 +95,12 @@ export async function historyReachability(io: ReachabilityIo, historyRoot: strin
  * @param runIds - every run id the run records carry.
  * @param resultRefs - every explicit resultRef those records carry.
  */
-export async function reportsReachability(io: ReachabilityIo, reportsDir: string, runIds: readonly string[], resultRefs: readonly string[]): Promise<DomainReading> {
+export async function reportsReachability(
+  io: ReachabilityIo,
+  reportsDir: string,
+  runIds: readonly string[],
+  resultRefs: readonly string[],
+): Promise<DomainReading> {
   const listed = await probeList(io, reportsDir)
   if (isUnknown(listed)) {
     return { domain: 'reports.files', unit: 'files', total: 0, reachable: 0, unreachable: 0, baseline: REPORTS_BASELINE, unmeasured: 'the reports directory could not be listed; this domain was not measured' }
@@ -122,7 +127,11 @@ export async function reportsReachability(io: ReachabilityIo, reportsDir: string
  * @param backupsRoot - the snapshot root, passed in.
  * @param skillsPerSnapshot - the caller's manifest reading, one entry per snapshot directory.
  */
-export async function backupsReachability(io: ReachabilityIo, backupsRoot: string, skillsPerSnapshot: readonly number[]): Promise<DomainReading> {
+export async function backupsReachability(
+  io: ReachabilityIo,
+  backupsRoot: string,
+  skillsPerSnapshot: readonly number[],
+): Promise<DomainReading> {
   const listed = await probeList(io, backupsRoot)
   if (isUnknown(listed)) {
     return { domain: 'backups.trees', unit: 'files', total: 0, reachable: 0, unreachable: 0, baseline: BACKUPS_BASELINE, unmeasured: 'the snapshot root could not be listed; this domain was not measured' }

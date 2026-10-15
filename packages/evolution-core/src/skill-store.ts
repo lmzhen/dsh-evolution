@@ -1742,7 +1742,12 @@ export class SkillLibrary {
     }
   }
 
-  async update(rawName: string, content: string, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor): Promise<SkillActionResult> {
+  async update(
+    rawName: string,
+    content: string,
+    origin: WriteOrigin = this.authority.origin,
+    anchor?: WriteAnchor,
+  ): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→validate→write runs under the in-process serialize
@@ -2433,7 +2438,11 @@ export class SkillLibrary {
    * support-directory links is refused (those links' files stay behind in the
    * same package; the moved text belongs in references/ beside them).
    */
-  async restructure(rawName: string, moves: SkillRestructureMove[], origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+  async restructure(
+    rawName: string,
+    moves: SkillRestructureMove[],
+    origin: WriteOrigin = this.authority.origin,
+  ): Promise<SkillActionResult> {
     const name = rawName.trim()
     // F-208: the whole read→plan→write runs under the in-process serialize
     // queue so two concurrent restructures on one skill never interleave.
@@ -2857,7 +2866,13 @@ export class SkillLibrary {
     return { ok: true, message: `技能「${name}」已从 .archive 恢复。`, path: dest }
   }
 
-  async writeSupportFile(rawName: string, filePath: string, content: string, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor): Promise<SkillActionResult> {
+  async writeSupportFile(
+    rawName: string,
+    filePath: string,
+    content: string,
+    origin: WriteOrigin = this.authority.origin,
+    anchor?: WriteAnchor,
+  ): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→validate→write runs under the in-process serialize
@@ -2920,7 +2935,13 @@ export class SkillLibrary {
     }, anchor !== undefined ? () => anchorUnverifiable(name, filePath) : error => unreadableTarget(name + '/' + filePath, error))
   }
 
-  async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor, unitId?: string): Promise<SkillActionResult> {
+  async removeSupportFile(
+    rawName: string,
+    filePath: string,
+    origin: WriteOrigin = this.authority.origin,
+    anchor?: WriteAnchor,
+    unitId?: string,
+  ): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // P2-4 (v11): the exists/read/remove window runs under the serialize queue
@@ -3313,11 +3334,11 @@ export class SkillLibrary {
   private async snapshotRecoveryAvailability(): Promise<string> {
     const listed = await this.listSnapshots()
     if (isUnknown(listed)) {
-      return `快照目录读不出来（` + listed.reason + `）`
+      return '快照目录读不出来（' + listed.reason + '）'
     }
     const latest = isPresent(listed) ? listed.value[0] : undefined
-    if (!latest) return `当前没有可用快照`
-    return `最新快照 ` + latest.path
+    if (!latest) return '当前没有可用快照'
+    return '最新快照 ' + latest.path
   }
 
   private async retainSnapshots(keep: number): Promise<void> {

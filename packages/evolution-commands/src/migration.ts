@@ -149,7 +149,7 @@ export async function readLegacyDocumentState(run: LegacyDocumentRead): Promise<
 
   /** The doctor-facing state of ONE document, judged against the seat. */
   function stateOf(source: string, plan: ReturnType<typeof planNamespaceMigration>): LegacyDocumentState {
-   const read = (rowId: string): { readonly user?: Record<string, unknown> | undefined } | undefined =>
+    const read = (rowId: string): { readonly user?: Record<string, unknown> | undefined } | undefined =>
       settings?.describe?.({ redactSecrets: false }).find(entry => entry.ns === rowId)
     const decided = classifyNamespaceMigration(plan, read)
     return {

@@ -204,7 +204,7 @@ export function buildMaintainFacts(
   redact: ((text: string) => string) | undefined,
   /** G3/3.3: one reading per registered bounded store, produced at this run's reclamation point.
    * Optional so the preview and any older caller keep the exact block they had. */
-  footprint?: readonly StoreFootprint[] | undefined,
+  footprint?: readonly StoreFootprint[]  ,
 ): FactsBundle {
   const report = computeDriftSignals(
     snapshots.map(snapshot => ({ ...snapshot, usageObserved })),
@@ -332,7 +332,12 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       ...await reclamationFootprint(runtime.io),
       ...await reachabilityFootprint(runtime.io, runtime.skillRoot),
     ]
-    const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, enrichment?.usageObservedValue, options.redact, footprint)
+    const { facts, report, signalsVersion, signature } = buildMaintainFacts(
+      snapshots,
+      enrichment?.usageObservedValue,
+      options.redact,
+      footprint,
+    )
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
 
     // Persona carries the full template; the prompt carries ONLY the facts

@@ -48,12 +48,12 @@ it('G1/1.5: an operator restore does not wait for a pass parked in its whole-tre
   // The pass is parked. The operator acts now.
   const t0 = Date.now()
   const operator = (async () => {
-    for (let i = 0; i < 200 && !entered; i += 1) await new Promise((resolve) => setTimeout(resolve, 5))
+    for (let i = 0; i < 200 && !entered; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
     const result = await ctx.evolutionCurator.restore('restore-me')
     console.log('PROBE restore ok=' + String(result.ok) + ' ms=' + String(Date.now() - t0) + ' msg=' + String(result.message).slice(0, 90))
     return 'done' as const
   })()
-  const raced = await Promise.race([operator, new Promise<'waited'>((resolve) => setTimeout(() => resolve('waited'), 6000))])
+  const raced = await Promise.race([operator, new Promise<'waited'>(resolve => setTimeout(() => { resolve('waited') }, 6000))])
   expect(entered).toBe(true)
   expect(raced).toBe('done')
   openGate?.()

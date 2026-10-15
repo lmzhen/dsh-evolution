@@ -184,7 +184,7 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
       ? '- **Would prune (archiveRetention=report)**: unknown (archive listing unreadable)'
       : `- **Would prune (archiveRetention=report)**: ${report.wouldPrune.length}`],
     ...report.nominationsWarnings === undefined || report.nominationsWarnings.length === 0 ? [] : [`- **Nomination warnings**: ${report.nominationsWarnings.join('; ')}`],
-      ...report.scanWarnings === undefined || report.scanWarnings.length === 0 ? [] : report.scanWarnings.map((warning: string) => '- **Dedup scan**: ' + warning),
+    ...report.scanWarnings === undefined || report.scanWarnings.length === 0 ? [] : report.scanWarnings.map((warning: string) => '- **Dedup scan**: ' + warning),
   ]
   const section = (title: string, items: string[]): string[] => items.length === 0 ? [] : ['', `## ${title}`, '', ...items.map(item => `- ${item}`)]
   return [

@@ -1873,12 +1873,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const live = anchored !== null
             ? anchored
             // G0/0.7 (S4-01 sweep): named three-state read - `unknown` answers null exactly as the swallow did
-        // (both mean "cannot be verified here", and the caller refuses on null), so the behaviour is the same.
-        : await (async () => {
-          if (hashLibrary === null || hashLibrary === undefined) return null
-          const probed = await hashLibrary.readSkillProbe(opName)
-          return isPresent(probed) ? probed.value : null
-        })()
+          // (both mean "cannot be verified here", and the caller refuses on null), so the behaviour is the same.
+            : await (async () => {
+              if (hashLibrary === null || hashLibrary === undefined) return null
+              const probed = await hashLibrary.readSkillProbe(opName)
+              return isPresent(probed) ? probed.value : null
+            })()
           const preRun = preRunHashes.get(opName)
           if (live === null || (preRun !== undefined && contentHash(live) !== preRun)) {
             ok = false
@@ -1917,8 +1917,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (hashChecked) {
             // G0/0.7 (S4-01 sweep): explicit three-state read; `unknown` (and a missing library) leaves the
           // hash unrecorded, which is the behaviour this line already had.
-          const landedProbe = hashLibrary === null || hashLibrary === undefined ? undefined : await hashLibrary.readSkillProbe(opName)
-          const landed = landedProbe !== undefined && isPresent(landedProbe) ? landedProbe.value : null
+            const landedProbe = hashLibrary === null || hashLibrary === undefined ? undefined : await hashLibrary.readSkillProbe(opName)
+            const landed = landedProbe !== undefined && isPresent(landedProbe) ? landedProbe.value : null
             if (landed !== null) preRunHashes.set(opName, contentHash(landed))
           }
         }

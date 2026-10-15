@@ -250,7 +250,7 @@ async function mountReviewFixture(options: {
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
+  if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
   // G4: the review's turn window comes from the family's session projection, so the stub is
   // decorated into a foldable one (dense seq-stamped log) and appends announce themselves.
   const session = projectable({

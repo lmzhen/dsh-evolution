@@ -25,7 +25,7 @@ it('G3/3.3: one footprint line per registered store, UNKNOWN when nothing was me
 })
 
 it('G3/3.3: no footprint option leaves the block exactly as it was', () => {
-  const facts = renderFacts(emptyReport, { signalsVersion: "v0", signature: "sig" })
+  const facts = renderFacts(emptyReport, { signalsVersion: 'v0', signature: 'sig' })
   expect(facts).not.toContain('signal=store/')
   expect(facts).toContain('<<<END FACTS>>>')
 })

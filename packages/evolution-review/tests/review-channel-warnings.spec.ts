@@ -36,7 +36,7 @@ const LEDGER_MARK = 'NO evolution/plan-applied ledger entry'
 async function load(rowConfig: Record<string, unknown>, policyReviewMode?: 'inject' | 'subagent', user?: Record<string, unknown>) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
+  if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
   if (policyReviewMode !== undefined) ctx.provide('evolutionPolicy', { get: () => ({ reviewMode: policyReviewMode }) })
   if (user !== undefined) {
     // G1: the settings user layer reaches the plugin two ways — the VALUE through the

@@ -68,6 +68,6 @@ export interface ProcessScopeProbe {
 export function processScopeViolations(io: ProcessScopeProbe | undefined): readonly string[] {
   const backed = typeof io?.transact === 'function'
   return MEDIUM_PROCESS_DECLARATION
-    .filter((claim) => claim.scope === 'cross-process' && !backed)
-    .map((claim) => claim.record + ' claims cross-process (' + claim.because + ') but the mounted io exposes no transact lock')
+    .filter(claim => claim.scope === 'cross-process' && !backed)
+    .map(claim => claim.record + ' claims cross-process (' + claim.because + ') but the mounted io exposes no transact lock')
 }

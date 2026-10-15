@@ -184,22 +184,22 @@ describe('the pending card', () => {
       data: {
         available: true as const, linesAdded: 2, linesRemoved: 2, truncated: false,
         hunks: [
-          { path: "SKILL.md", oldText: "first-old", newText: "first-new" },
-          { path: "SKILL.md", oldText: "second-old", newText: "second-new" },
+          { path: 'SKILL.md', oldText: 'first-old', newText: 'first-new' },
+          { path: 'SKILL.md', oldText: 'second-old', newText: 'second-new' },
         ],
       },
     }))
     const errors: string[] = []
-    const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(" ")) })
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(' ')) })
     try {
       mount(face({ pending: windowStub([row()]), preview }))
-      await waitFor(() => { expect(screen.getByText(message("approvalPreview"))).toBeDefined() })
-      fireEvent.click(screen.getByText(message("approvalPreview")))
-      await screen.findByText("- first-old")
+      await waitFor(() => { expect(screen.getByText(message('approvalPreview'))).toBeDefined() })
+      fireEvent.click(screen.getByText(message('approvalPreview')))
+      await screen.findByText('- first-old')
       // Both hunks must be on screen: with index-only keys the second hunk reused the first row.
-      await screen.findByText("- second-old")
-      await screen.findByText("+ second-new")
+      await screen.findByText('- second-old')
+      await screen.findByText('+ second-new')
     } finally { spy.mockRestore() }
-    expect(errors.filter(line => line.includes("unique"))).toEqual([])
+    expect(errors.filter(line => line.includes('unique'))).toEqual([])
   })
 })

@@ -29,16 +29,16 @@ it('G1/1.5: sections over one queue never overlap, and the release runs when the
     }
   }
   const acquire = queue()
-  const section = async (label: string, fail = false): Promise<void> =>
+  const section = async (label: string, fail = false): Promise<void> => {
     await withTreeWrite(acquire, view(), async () => {
       depth += 1
       maxDepth = Math.max(maxDepth, depth)
-      await new Promise((resolve) => setTimeout(resolve, 5))
+      await new Promise(resolve => setTimeout(resolve, 5))
       depth -= 1
       if (fail) throw new Error(label + ' failed')
-    })
+    }) }
   const results = await Promise.allSettled([section('a'), section('b'), section('c', true), section('d')])
-  expect(results.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled', 'rejected', 'fulfilled'])
+  expect(results.map(r => r.status)).toEqual(['fulfilled', 'fulfilled', 'rejected', 'fulfilled'])
   expect(maxDepth).toBe(1)
   // Every section released, including the one that threw.
   expect(releases).toHaveLength(4)
@@ -47,7 +47,7 @@ it('G1/1.5: sections over one queue never overlap, and the release runs when the
 it('G1/1.5: the view is the only write a section gets - it mutates through writeSkill', async () => {
   const written: string[] = []
   const acquire = async () => () => {}
-  await withTreeWrite(acquire, view([], (name) => written.push(name)), async (v) => {
+  await withTreeWrite(acquire, view([], name => written.push(name)), async (v) => {
     await v.writeSkill('demo', 'body')
     v.note('one skill')
   })

@@ -40,7 +40,7 @@ interface Fixture {
 async function mount(labels: string[]): Promise<Fixture> {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
+  if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
   const delivered: string[] = []
   const errors: unknown[] = []
   const control = { throwInject: false }

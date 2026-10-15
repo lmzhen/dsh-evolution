@@ -307,7 +307,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     const key: MessageKey = snapshot.reason === 'seat-missing'
       ? 'seatMissing'
       : snapshot.reason === 'projection-failed' ? 'projectionFailed'
-      : snapshot.reason === 'session-memory' ? 'destMemory' : 'unavailable'
+        : snapshot.reason === 'session-memory' ? 'destMemory' : 'unavailable'
     return createElement('p', { className: 'evolution-param-note', role: 'status' }, t(key))
   }
   const user = isSection(snapshot.user) ? snapshot.user : {}

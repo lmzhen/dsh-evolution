@@ -117,7 +117,7 @@ describe('namespace migration command (G3)', () => {
 
   it('S1-06: an EMPTY first candidate does not answer for a second one holding the real sections', async () => {
     const home = 'C:/home'
-    const { writes, provider } = seat({})
+    const { writes: _writes, provider } = seat({})
     // `.imported` exists but carries no family section; `.yaml` carries it. The old loop returned on the
     // first document it could READ, so the real document was never opened and the caller was told there
     // was nothing to migrate.

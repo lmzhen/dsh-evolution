@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.19 (patch) — 修掉 CI 指出的 45 处风格违规；并把三条「本机不可复现」的仪器边界写清
+
+> **现象**：0.26.16 报八条类型错误，0.26.17 报本机适配器缺失，0.26.18 报 oxlint 的 45 处 @stylistic 违规（indent／quotes／arrow-parens／max-len／semi／no-trailing-spaces／no-unused-vars），全部落在本批改过的文件里。
+> **根因**：本机绿闸与 CI 步骤的集合不同。类型线跑了但输出被按行数截断（33 行读 20 行，8 条错误在被砍掉的尾部）；lint 这一条**根本没跑**；而 lint 本身在本机也有两条仪器边界——不带 `-c` 用平台根配置会因本机类型解析不到而产生成百条 "error typed" 噪声（CI 的类型解析正常，报的是 30 条风格错），家族 vitest 套件需要本机线适配器（不带 `-c` 落平台 invariant harness、带 `-c` 缺适配器 refuse），构建在本机又因平台与家族两棵树并存必红于既有的 session-projection.ts。
+> **修复**：①`oxlint --fix -c .oxlintrc-ci.json` 修掉可自动修的，其余 8 条 max-len 逐条折行、1 条未用解构手工去掉；②本机计数改用 `.oxlintrc.staged.json`（它 extends 主配置、只关 typeAware），风格子集与 CI 等价；③把三条仪器边界与「哪些本机读数能代表 CI」写进验证日志，避免再用不可复现的读数下结论。
+> **验证**：`-c .oxlintrc.staged.json packages/evolution` ⇒ 0 errors；ARCH／META／DOC／REL／COVERAGE／REGISTRY／LINEMANIFEST／LAYOUT 全 0；逐包 vitest（家族配置、CI=1）全绿；受影响三包（core 810／maintenance 101／learning-graph 26）在折行后复跑通过。
 ## 0.26.18 (patch) — 修掉 0.26.16 的八条类型错误；并撤回 0.26.17 那步把 CI 指向家族配置的改动（它把绿的步骤改成红的）
 
 > **现象**：0.26.16 两个 run 在 validate 报八条 TS 错误（curator 给 update 的第四参不是 WriteAnchor 的形状、review 一处三元返回了整个 Probe、另一处只判 undefined 而类型是 … | null、tool-skill-manage 的 PreviewLibrary Pick 缺两个探针、同文件一处 IIFE 的 unknown 分支返回 undefined 而周边契约是 null）。0.26.17 修掉它们之后仍红，这次是 `vitest.family.config: CANNOT DECIDE - no pinned line resolver at D:/_tools/lib-line.mjs`（exit 2）。

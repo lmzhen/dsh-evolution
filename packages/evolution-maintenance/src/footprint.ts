@@ -40,7 +40,7 @@ export async function reclamationFootprint(io: FootprintIo | undefined): Promise
       try {
         const names = await io.list(join(evolutionHome(), 'reports'))
         out.push({ id: store.id, unit: store.unit, bound: store.bound, used: names.length, lastSweep: 'see the curator run end', removed: undefined })
-      } catch (error) {
+      } catch {
         out.push({ id: store.id, unit: store.unit, bound: store.bound, skipped: 'the reports directory could not be listed' })
       }
       continue

@@ -33,7 +33,7 @@ describe('the renderer a module row carries', () => {
   it('S5-10: a plain object is not a component - the row degrades instead', () => {
     // The audit measured this: rendererOf({MarkdownText: {some: "namespace"}}) accepted the object,
     // and React then failed at mount with "Element type is invalid" instead of degrading to source.
-    expect(rendererOf({ MarkdownText: { some: "namespace" } })).toBeUndefined()
+    expect(rendererOf({ MarkdownText: { some: 'namespace' } })).toBeUndefined()
     expect(rendererOf({ MarkdownText: [1, 2] })).toBeUndefined()
   })
 })

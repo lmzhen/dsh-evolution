@@ -17,7 +17,7 @@ const ok = (data: unknown) => ({ ok: true, data })
 function racingApi() {
   let calls = 0
   let release: () => void = () => {}
-  const gate = new Promise<void>(resolve => { release = resolve })
+  const gate = new Promise<void>((resolve) => { release = resolve })
   // ONE load asks twice (waiting + executing), so two calls per load: calls 1-2 are the slow read,
   // calls 3-4 the fast one.
   const pending = async () => {
@@ -32,7 +32,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0))
 
 describe('G4/4.1: the pending window read is race-guarded', () => {
   it('a stale read that lands late does not replace the newer window', async () => {
-    const { api, release, calls } = racingApi()
+    const { api, release } = racingApi()
     const props = { t: formatText, api, confirmMode: () => 'auto' } as unknown as PendingCardFace
     const view = render(createElement(PendingCard, props))
     await tick()

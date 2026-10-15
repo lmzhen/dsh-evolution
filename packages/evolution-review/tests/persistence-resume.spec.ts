@@ -36,7 +36,7 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
     const root = await tempRoot('dsh-resume-e2e-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
     const fiber = await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
 
     // Plan-outcome consumers ride the cordis event bus (payload v2).
@@ -122,7 +122,7 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
     await fiber.dispose()
     const ctx2 = new Context()
     await mountAgentLoopTestDependencies(ctx2)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
     const fiber2 = await ctx2.plugin(JsonlSessionPersistence, { root, compression: 'none' })
     try {
       const reader = await ctx2.sessionPersistence.open(SessionId('evo-resume-e2e'), 'read')
@@ -144,7 +144,7 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
     const root = await tempRoot('dsh-resume-negative-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
     const fiber = await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
 
     const session = ctx.sessions.create(SessionId('evo-resume-negative'))
@@ -166,7 +166,7 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
 
     const ctx2 = new Context()
     await mountAgentLoopTestDependencies(ctx2)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
     const fiber2 = await ctx2.plugin(JsonlSessionPersistence, { root, compression: 'none' })
     try {
       // The refusal lands on the read path (open and/or read) — capture either.

@@ -313,7 +313,7 @@ describe('runMaintain', () => {
       parent: maintAgent(),
       subagents: {
         async start(_kind: 'spawn', options: SubagentStartRequestLike) {
-          capturedOptions = options as unknown as typeof capturedOptions
+          capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
       },
@@ -544,7 +544,7 @@ describe('runMaintain', () => {
       parent: maintAgent(),
       subagents: {
         async start(_kind: 'spawn', options: SubagentStartRequestLike) {
-          captured = options as unknown as typeof captured
+          captured = options
           return runStub({ text: 'x', structured: validResult })
         },
       },
@@ -573,7 +573,7 @@ describe('runMaintain', () => {
       tools: { get: (name: string) => name === 'maintenance_probe' ? { name } : undefined },
       subagents: {
         async start(_kind: 'spawn', options: SubagentStartRequestLike) {
-          captured = options as unknown as typeof captured
+          captured = options
           return runStub({ text: 'x', structured: validResult })
         },
       },
@@ -594,7 +594,7 @@ describe('runMaintain', () => {
       tools: { get: () => undefined },
       subagents: {
         async start(_kind: 'spawn', options: SubagentStartRequestLike) {
-          captured = options as unknown as typeof captured
+          captured = options
           return runStub({ text: 'x', structured: validResult })
         },
       },

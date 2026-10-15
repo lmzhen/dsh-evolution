@@ -25,7 +25,7 @@ describe('review approval pre-check (P1-9)', () => {
   it('executes directly when approval is enabled but no runner exists, staging nothing', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
 
     // The durable state exists (pending records would persist here) — and it
     // must stay empty: the pre-check routes the write to direct execution.

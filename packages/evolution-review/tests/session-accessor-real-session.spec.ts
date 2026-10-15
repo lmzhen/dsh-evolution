@@ -53,7 +53,7 @@ describe('G0.3: the migrated session accessor reads a real session log', () => {
     await tempHome('dsh-session-accessor-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：把投影服务注册到本 ctx（幂等）
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     const library = new SkillLibrary(undefined, nodeEvolutionIo())
@@ -187,7 +187,7 @@ describe('v37 P7a: the read credit over a PTC-only session log', () => {
     await tempHome('dsh-session-ptc-accessor-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：把投影服务注册到本 ctx（幂等）
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     const library = new SkillLibrary(undefined, nodeEvolutionIo())

@@ -373,15 +373,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
         // G1/1.2: the graph commands now pass the SAME write-admission sequence as the tool. The warn sink
-  // latches once per process, exactly like the tool's: what it reports (no question service, an
-  // unreadable session log) belongs to the deployment, not to one write.
-  let writeGateWarned = false
-  const warnWriteGateOnce = (message: string): void => {
-    if (writeGateWarned) return
-    writeGateWarned = true
-    ctx.logger?.warn?.(message)
-  }
-  const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
+        // latches once per process, exactly like the tool's: what it reports (no question service, an
+        // unreadable session log) belongs to the deployment, not to one write.
+        let writeGateWarned = false
+        const warnWriteGateOnce = (message: string): void => {
+          if (writeGateWarned) return
+          writeGateWarned = true
+          ctx.logger?.warn?.(message)
+        }
+        const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
         const memoryService = ctx.get('memory') as MemoryLike | undefined
         const ioService = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
         if (!usageService || !memoryService || !ioService) return err('skill-usage、memory 或 evolution-io 服务未挂载。')
@@ -601,11 +601,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // P1-13 (v37): the catch answers UNDEFINED (unreadable = no anchor),
               // so a missing target still reaches the 'absent' sentinel below.
               // G0/0.7 (S4-01 sweep): the three-state read, not an expression-form swallow. The MEANING is unchanged
-    // and deliberate - unreadable answers `undefined` (no anchor), a missing target answers `null` so it
-    // still reaches the absent sentinel below - but the distinction is now named by the library instead of
-    // re-derived from a thrown error at this call site.
-    const stageProbe = await withSkills().readSkillProbe(parsed.name)
-    const stageCurrent: string | null | undefined = isUnknown(stageProbe) ? undefined : (isPresent(stageProbe) ? stageProbe.value : null)
+              // and deliberate - unreadable answers `undefined` (no anchor), a missing target answers `null` so it
+              // still reaches the absent sentinel below - but the distinction is now named by the library instead of
+              // re-derived from a thrown error at this call site.
+              const stageProbe = await withSkills().readSkillProbe(parsed.name)
+              const stageCurrent: string | null | undefined = isUnknown(stageProbe)
+                ? undefined
+                : (isPresent(stageProbe) ? stageProbe.value : null)
               const decision = await approval.request({
                 kind: 'skill',
                 summary: `graph edit ${parsed.name}`,

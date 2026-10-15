@@ -18,18 +18,18 @@ const BODY = (name: string, text: string): string => '---\nname: ' + name + '\nd
 
 it('G1/1.4: the second instance reads what the first wrote (one queue per root)', async () => {
   const base = fakeIo()
-    const root = "/skills-g14-" + randomUUID()
-  const target = root + "/shared-root/SKILL.md"
+  const root = '/skills-g14-' + randomUUID()
+  const target = root + '/shared-root/SKILL.md'
   const seen: string[] = []
   const io = {
     ...base,
     async readText(path: string) {
       const value = await base.readText(path)
-      if (path.replaceAll('\\', "/") === target) seen.push(value ?? "null")
+      if (path.replaceAll('\\', '/') === target) seen.push(value ?? 'null')
       return value
     },
   }
-    // G1/1.4: the queue is PER ROOT and lives at module scope, so a spec that shares `/skills` with the
+  // G1/1.4: the queue is PER ROOT and lives at module scope, so a spec that shares `/skills` with the
   // rest of the package shares their queue too - and then the read order this test asserts depends on
   // what other specs left in it. A private root keeps the criterion about THIS pair of instances.
   const one = new SkillLibrary(root, io)

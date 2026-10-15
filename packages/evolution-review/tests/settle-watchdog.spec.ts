@@ -31,7 +31,7 @@ it('S2-6 (FLOW1-1): a handle that never settles is abandoned — flag reset, que
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
+  if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：把投影服务注册到本 ctx（幂等）
   // Each emitted turn must present NEW events: the cadence fold reads the
   // session snapshot, so a static array would count once and never fire again.
   const session = projectable({
@@ -110,7 +110,7 @@ it('PLAN S1.1 (2026-09-16): a run settling within the review timeout is consumed
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
+  if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：把投影服务注册到本 ctx（幂等）
   const session = projectable({
     id: SessionId('s1-1-real-latency'),
     seq: 1,
@@ -197,7 +197,7 @@ it('PLAN-R2 P2-1 (2026-09-16): a reviewTimeoutMs at the int32 timer ceiling stil
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
+  if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：把投影服务注册到本 ctx（幂等）
   const session = projectable({
     id: SessionId('p2-1-ceiling-budget'),
     seq: 1,
@@ -280,7 +280,7 @@ it('PLAN-R2 P2-2 (2026-09-16): a hung dispose is abandoned after the settle marg
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
+  if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：把投影服务注册到本 ctx（幂等）
   const session = projectable({
     id: SessionId('p2-2-hung-dispose'),
     seq: 1,

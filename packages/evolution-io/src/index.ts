@@ -175,14 +175,14 @@ export function preferProvider<T>(
   for (const name of names) {
     try {
       const resolved = registry.provider(name)
-      mediumObservations.set(registry as object, { requested: names, resolved: name, via: 'preference' })
+      mediumObservations.set(registry, { requested: names, resolved: name, via: 'preference' })
       return resolved
     } catch {
       // Not registered: this name is a preference, not a requirement (see the JSDoc).
     }
   }
   const fallback = registry.provider()
-  mediumObservations.set(registry as object, { requested: names, resolved: undefined, via: 'default' })
+  mediumObservations.set(registry, { requested: names, resolved: undefined, via: 'default' })
   return fallback
 }
 
