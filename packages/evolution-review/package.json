@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-review",
   "description": "Background review orchestration",
-  "version": "0.26.23",
+  "version": "0.26.24",
   "publishConfig": {
     "access": "public"
   },
@@ -38,7 +38,6 @@
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-subagent": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^"
   },
   "devDependencies": {
@@ -53,7 +52,6 @@
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:^",
-    "@deepseek-ai/dsh-subagent": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^"
   }
 }

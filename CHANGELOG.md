@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.24 (patch) — 清掉三处无人引用的依赖声明（退役与迁移留下的死声明）
+
+> **现象**：0.26.23 的 validate 红在 Verify dependency closure（G0.1 guard）：3 unreferenced declaration(s)。
+> **根因**：`evolution-commands` 仍挂着 `@deepseek-ai/dsh-evolution-io` 的 peer（该行是包内对它的唯一出现，退役后没人再导入）；`evolution-review` 的 `@deepseek-ai/dsh-subagent` 在 peer 与 dev 各留一处，而包内对它的引用同样只在这两行（S4-01 探针迁移后导入消失）。两者都是"声明还在、引用已走"的死声明。
+> **修复**：删掉这三行。逐包核对过引用面（`evolution-commands` 里匹配 `dsh-evolution-io` 的只有它自己的 package.json；`evolution-review` 里匹配 `dsh-subagent` 的只有它自己的两行）。
+> **验证**：按 CI 形态复现 —— `node packages/evolution/scripts/verify-dependency-closure.mjs packages/evolution --strict` ⇒ OK（0 undeclared import(s), 286 declaration(s) all referenced, across 32 package(s)）；受影响两包全绿（commands 151、review 123）；ARCH／META／DOC／REL／REGISTRY 全 0。
 ## 0.26.23 (patch) — 把床清单的新鲜度门移出 CI（它需要产物在那棵树里），改为 localOnly 登记
 
 > **现象**：0.26.22 的 validate 红在 `node packages/evolution/scripts/gen-line-manifest.mjs` ⇒ MODULE_NOT_FOUND（此前是 `packages/scripts/...` 路径）与 `git status --porcelain` 看到未跟踪产物。
