@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.22 (patch) — 清掉 CI 剩下的两类站点：不存在的类型名，与未收窄的 createElement
+
+> **现象**：0.26.21 仍红，站点集中在 maintenance/tests/orchestrate.spec.ts（10 处，no-unsafe-*）与 settings-ui/tests/pending-card-read-race.client.spec.ts:37（no-unsafe-argument／no-unsafe-call）。
+> **根因**：两类，都是**测试文件里的类型问题**。①orchestrate.spec.ts 从包入口导入的 SubagentRunLike／SubagentStartRequestLike **在全仓根本没有定义** —— 家族真正的名字是 MaintainSubagentRun／MaintainSubagentResult／MaintainSubagentStart（orchestrate.ts:45/:55/:58）；这条 import 至少自 1c96fabd 起就是错的，却一直没暴露，因为 **tsc 不检查 tests、vitest 只剥类型**，名字不存在在构建期与运行期都看不出来，只有类型感知 lint 会报。②pending-card-read-race 用了裸 createElement，而本包**没有 react 依赖**（自带的是一层最小 ambient 声明），所以渲染器参数类型在本包语境里是 error 类型 —— 同目录的 PendingCard.client.spec.ts 早已用 `const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]` 把它收窄一次。
+> **修复**：①17 处引用改成真名；②照抄既有惯用法引入同一个 h 收窄 helper 并在 :37 使用。
+> **验证**：staged lint 0 errors；两处站点的帧本地复筛均归零；maintenance 101、settings-ui 18 全绿。
 ## 0.26.21 (patch) — 清掉 CI 报的 9 个站点中的 8 个（类型感知规则的尾巴只能由 CI 判）
 
 > **现象**：0.26.20 的 validate 两个 job 都红，`gh run view`（不带 --log-failed）落盘后筛出 9 个站点：review/src/index.ts:1758/:1790/:1878/:1920、learning-graph/src/index.ts:382、maintenance/tests/orchestrate.spec.ts:85、core/tests/tree-write.spec.ts:28、core/tests/list-io-bound.spec.ts:29、tool-skill-manage/src/index.ts:1212。规则是 no-unnecessary-condition、restrict-plus-operands、no-unsafe-return、no-base-to-string —— **都是「能解析类型才会报」的规则**。

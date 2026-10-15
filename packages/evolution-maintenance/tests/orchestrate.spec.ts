@@ -1,7 +1,7 @@
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { renderMaintainTemplate, runMaintain, type MaintainRuntime, type SubagentRunLike, type SubagentStartRequestLike } from '../src/index.ts'
+import { renderMaintainTemplate, runMaintain, type MaintainRuntime, type MaintainSubagentRun, type MaintainSubagentStart } from '../src/index.ts'
 import { MAINTAIN_OUTPUT_INSTRUCTION, MAINTAIN_PROMPT, DRIFT_SIGNAL_NOUNS, PROMPT_BUNDLE } from '@deepseek-ai/dsh-evolution-core'
 
 /** I-5 (v37): a minimal platform Agent stand-in — the tightened MaintainRuntime.parent
@@ -12,16 +12,16 @@ function maintAgent(): Agent {
 
 /** I-5 (v37): the platform SubagentRun contract — `dispose` is required, so every stub
  * returns one through this helper instead of a bare { result }. */
-function runStub(result: unknown): SubagentRunLike {
+function runStub(result: unknown): MaintainSubagentRun {
   // The stub carries extra fields (text) the real platform result also has, so the
   // value crosses one unknown boundary instead of a wide index signature on the
   // contract type (which would stop the REAL platform result from assigning).
-  return { result: Promise.resolve(result), dispose: async () => {} } as unknown as SubagentRunLike
+  return { result: Promise.resolve(result), dispose: async () => {} } as unknown as MaintainSubagentRun
 }
 
 /** A spawner that must never be reached (the empty-library short-circuits), typed as
  * the platform start so a stub with a missing handle fails here instead of passing. */
-function neverStart(): (kind: 'spawn', options: unknown) => Promise<SubagentRunLike> {
+function neverStart(): (kind: 'spawn', options: unknown) => Promise<MaintainSubagentRun> {
   return (_kind, _options) => Promise.reject(new Error('should not be called'))
 }
 
@@ -78,7 +78,7 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           seenRequests.push(JSON.stringify(options))
           // Platform contract: the subagent channel wraps its output as
           // `{ structured }` (review precedent, evolution-review:254-262).
@@ -227,7 +227,7 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
@@ -312,7 +312,7 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
@@ -354,7 +354,7 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           depths.push((options as { maxDepth?: number }).maxDepth)
           return runStub({ text: 'x', structured: validResult })
         },
@@ -379,7 +379,7 @@ describe('runMaintain', () => {
       parent: maintAgent(),
       evolutionPolicy: { get() { return { curatorModel: 'policy-curator-model' } } },
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
@@ -396,7 +396,7 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
@@ -413,7 +413,7 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           const opts = options as { outputSchema?: typeof capturedOutputSchema }
           capturedOutputSchema = opts.outputSchema
           return runStub({ text: 'x', structured: validResult })
@@ -514,7 +514,7 @@ describe('runMaintain', () => {
   // future `run.dispose?.()` cannot silently stop awaiting it.
   it('I-5: a rejected subagent result still disposes the required handle exactly once', async () => {
     let disposed = 0
-    let observed: SubagentRunLike | undefined
+    let observed: MaintainSubagentRun | undefined
     const rejecting: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
@@ -543,7 +543,7 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           captured = options
           return runStub({ text: 'x', structured: validResult })
         },
@@ -572,7 +572,7 @@ describe('runMaintain', () => {
       parent: maintAgent(),
       tools: { get: (name: string) => name === 'maintenance_probe' ? { name } : undefined },
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           captured = options
           return runStub({ text: 'x', structured: validResult })
         },
@@ -593,7 +593,7 @@ describe('runMaintain', () => {
       // filter.
       tools: { get: () => undefined },
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           captured = options
           return runStub({ text: 'x', structured: validResult })
         },
@@ -712,7 +712,7 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
-        async start(_kind: 'spawn', options: SubagentStartRequestLike) {
+        async start(_kind: 'spawn', options: MaintainSubagentStart) {
           capturedPrompt = (options as unknown as { prompt?: Array<{ text: string }> }).prompt?.[0]?.text
           return runStub({ text: 'x', structured: validResult })
         },
