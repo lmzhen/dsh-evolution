@@ -85,7 +85,7 @@ Run from the two trees (never reorder or rename these steps):
 |---|---|---|
 | 1 | `node node_modules/typescript/lib/tsc.js -b tsconfig.host.json` | overlay |
 | 2 | `node node_modules/oxlint/bin/oxlint packages/evolution` | overlay |
-| 3 | `node node_modules/vitest/vitest.mjs run -c packages/evolution/scripts/vitest.family.config.mjs packages/evolution --maxWorkers=2 --testTimeout=30000` | overlay |
+| 3 | `node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000` | overlay |
 | 4 | `node packages/evolution/scripts/build-lib.mjs` | overlay |
 | 5 | `node packages/evolution/scripts/smoke-built-entries.mjs packages/evolution` | overlay |
 | 6 | `node packages/scripts/verify-dependency-closure.mjs packages --strict` | mirror |

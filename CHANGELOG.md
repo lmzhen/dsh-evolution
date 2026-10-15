@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.18 (patch) — 修掉 0.26.16 的八条类型错误；并撤回 0.26.17 那步把 CI 指向家族配置的改动（它把绿的步骤改成红的）
+
+> **现象**：0.26.16 两个 run 在 validate 报八条 TS 错误（curator 给 update 的第四参不是 WriteAnchor 的形状、review 一处三元返回了整个 Probe、另一处只判 undefined 而类型是 … | null、tool-skill-manage 的 PreviewLibrary Pick 缺两个探针、同文件一处 IIFE 的 unknown 分支返回 undefined 而周边契约是 null）。0.26.17 修掉它们之后仍红，这次是 `vitest.family.config: CANNOT DECIDE - no pinned line resolver at D:/_tools/lib-line.mjs`（exit 2）。
+> **根因**：两件事的根因不同。八条类型错误是**读数被截断**——本地类型线报过它们，而那次输出 33 行只读了前 20 行。CI 变红则是**分层错误**：家族配置是**本机仪器**，它没有机器线适配器时拒绝运行（`vitest.family.config.mjs:51` 把适配器路径硬编码成 `D:/_tools/lib-line.mjs`），而没有适配器时平台耦合 spec 也解析不到别名；把它指进 CI，等于要求 runner 拥有本机才有的线。
+> **修复**：①五处类型错误改回与契约一致；②CI 的 vitest 步骤恢复为不带 `-c` 的形态，并把 gate-03 的 argv/human 与 CONTRIBUTING 表第 3 行一并改回——**证据等级：CI 的运行结果高于本机复现**（v0.26.15 的同一形态是 green；本机不带 `-c` 之所以红，是因为本机存在平台树及其 invariant harness，而发布树不带它）。需要本机线的检查留在 local/pre-tag，CI 保留 policy 半边（`verify-line-identity --policy-only` 那一步）。③0.26.17 里与分层无关的那半保留：床清单门禁的三段式（生成 → `git status --porcelain` 判入库副本一致 → `--check`）与产物机器无关化都留着。
+> **验证**：ARCH／META／DOC／REL／COVERAGE／REGISTRY 全 0；curator 106／review 123／tool-skill-manage 82／core 810 全绿；类型线全量打印后家族侧只剩 vendor 两份副本与 session-projection.ts 两处既有项。
 ## 0.26.17 (patch) — 修掉 0.26.16 在 CI 暴露的八条类型错误（发布前本地类型线本该拦住）
 
 > **现象**：0.26.16 的 tag run 与 main run 都在 validate 阶段红，同一个 job 在 Linux 与 Windows 各报一遍同样的八条 TS 错误，全部落在本批改过的三个包里：curator 给 update 的第四参传了 `{ expectation: … }`（WriteAnchor 实际只有 `{ absent }` 与 `{ sha256 }`）；review 的一处三元把整个 `Probe` 当字符串返回、另一处只判了 `undefined` 而 `hashLibrary` 的类型是 `… | null`；tool-skill-manage 的 `PreviewLibrary` 是 `Pick<…, read | readSupportFile>`，两个新探针不在 Pick 里；同一文件的一处 IIFE 在 unknown 分支返回 `undefined` 而与周边的 `null` 契约不符。

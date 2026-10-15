@@ -41,13 +41,11 @@
     {
       "id": "gate-03",
       "kind": "toolchain",
-      "human": "`node node_modules/vitest/vitest.mjs run -c packages/evolution/scripts/vitest.family.config.mjs packages/evolution --maxWorkers=2 --testTimeout=30000`",
+      "human": "`node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000`",
       "argv": [
         "node",
         "node_modules/vitest/vitest.mjs",
         "run",
-        "-c",
-        "packages/evolution/scripts/vitest.family.config.mjs",
         "packages/evolution",
         "--maxWorkers=2",
         "--testTimeout=30000"

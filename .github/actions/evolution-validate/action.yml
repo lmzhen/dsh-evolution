@@ -162,13 +162,17 @@ runs:
         # job and on an immediate rerun. This is the same configuration the
         # release-time local gate uses (and has been green 10/10 repeatedly):
         # maxWorkers=2, testTimeout=30s.
-        # P0 (release review 2026-10-15): the family suite must run under the FAMILY config. Without `-c`
-        # vitest picks up the PLATFORM root config, whose setupFiles (scripts/test-invariants.ts) require
-        # every tested package to ship src/invariant.ts - a platform convention the family does not follow
-        # (0 such files). Every family spec then fails in setup, which is how this line read RED while the
-        # local gate read GREEN: the comment above claims this IS the local gate configuration, and with
-        # `-c` it now is. The load-sensitive step below already invokes a family script the same way.
-        node node_modules/vitest/vitest.mjs run -c packages/evolution/scripts/vitest.family.config.mjs packages/evolution --maxWorkers=2 --testTimeout=30000
+        # Why NOT `-c packages/evolution/scripts/vitest.family.config.mjs` here (tried on 2026-10-15 and
+        # reverted): the family config is a LOCAL instrument. It refuses to run without the machine line
+        # adapter (`D:/_tools/lib-line.mjs`, hard-coded at vitest.family.config.mjs:51) and exits 2 with
+        # CANNOT DECIDE, and without that adapter its platform-coupled specs cannot resolve their aliases
+        # either - the config says so in its own comment. On a runner there is no such line, so pointing CI
+        # at it turned a GREEN step (v0.26.15) RED. The local half of the same rule: without `-c` a machine
+        # WITH the platform tree present resolves the platform root config and its invariant harness rejects
+        # family specs; the released tree does not carry that harness, which is why the pre-2026-10-15 line
+        # was green here for every release up to v0.26.15. A check that needs "this machine has X" belongs
+        # to local/pre-tag (see the policy-only step below for the half that legitimately runs in CI).
+        node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000
         node node_modules/oxlint/bin/oxlint packages/evolution
 
     # G7 (0.17.0): the D-9 test-file typecheck step is GONE with the baseline job — it ran the
