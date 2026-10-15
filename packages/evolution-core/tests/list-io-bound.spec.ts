@@ -26,7 +26,7 @@ it('G1/1.7: one listing plus one read per skill, and no existence probe per entr
   }
   const skills = new SkillLibrary('/skills', io)
   const N = 5
-  for (let i = 0; i < N; i += 1) await skills.create('skill-' + i, BODY('skill-' + i), 'foreground')
+  for (let i = 0; i < N; i += 1) await skills.create(`skill-${i}`, BODY(`skill-${i}`), 'foreground')
   calls.exists = 0; calls.readText = 0; calls.list = 0; calls.rootLists = 0
   const listed = await skills.list({ withContent: true })
   expect(listed).toHaveLength(N)

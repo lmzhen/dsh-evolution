@@ -1,7 +1,7 @@
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { renderMaintainTemplate, runMaintain, type MaintainRuntime, type SubagentResultLike, type SubagentRunLike, type SubagentStartRequestLike } from '../src/index.ts'
+import { renderMaintainTemplate, runMaintain, type MaintainRuntime, type SubagentRunLike, type SubagentStartRequestLike } from '../src/index.ts'
 import { MAINTAIN_OUTPUT_INSTRUCTION, MAINTAIN_PROMPT, DRIFT_SIGNAL_NOUNS, PROMPT_BUNDLE } from '@deepseek-ai/dsh-evolution-core'
 
 /** I-5 (v37): a minimal platform Agent stand-in — the tightened MaintainRuntime.parent
@@ -16,7 +16,7 @@ function runStub(result: unknown): SubagentRunLike {
   // The stub carries extra fields (text) the real platform result also has, so the
   // value crosses one unknown boundary instead of a wide index signature on the
   // contract type (which would stop the REAL platform result from assigning).
-  return { result: Promise.resolve(result) as Promise<SubagentResultLike>, dispose: async () => {} }
+  return { result: Promise.resolve(result), dispose: async () => {} } as unknown as SubagentRunLike
 }
 
 /** A spawner that must never be reached (the empty-library short-circuits), typed as

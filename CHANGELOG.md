@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.21 (patch) — 清掉 CI 报的 9 个站点中的 8 个（类型感知规则的尾巴只能由 CI 判）
+
+> **现象**：0.26.20 的 validate 两个 job 都红，`gh run view`（不带 --log-failed）落盘后筛出 9 个站点：review/src/index.ts:1758/:1790/:1878/:1920、learning-graph/src/index.ts:382、maintenance/tests/orchestrate.spec.ts:85、core/tests/tree-write.spec.ts:28、core/tests/list-io-bound.spec.ts:29、tool-skill-manage/src/index.ts:1212。规则是 no-unnecessary-condition、restrict-plus-operands、no-unsafe-return、no-base-to-string —— **都是「能解析类型才会报」的规则**。
+> **根因**：这一批的写法在这棵树的类型下有多余条件与多余可选链。逐处读声明后定位：ctx.fiber 是非可选的（全家族 ctx.fiber?. 只有我这两处，ctx.fiber. 有 22 处），ctx.fiber.uid 的类型是 number | null 所以判 null 合法而 ?. 多余；hashLibrary 是 IIFE 返回值且已含 null，所以 === undefined 是不可能分支；ctx.logger.warn 是家族常态；两处 + 拼接与一处 no-base-to-string 是真缺陷（String(unknown) 对非原始值会打成 [object Object]，那行拒绝消息会带占位符）。
+> **修复**：上述八处逐条改掉（含把 runStub 的字面量改成显式跨 unknown 边界并去掉随之未用的导入）。
+> **验证**：staged lint 0 errors；review 123／learning-graph 26／core 810／maintenance 101 全绿。**剩一处 orchestrate.spec.ts:85（no-unsafe-return）本机判不了** —— 它是 type-aware 规则而本机解析不到该平台类型，只能由 CI 判；若 CI 仍报，则按「测试夹具不依赖平台包类型、改成本地结构类型」处理。
 ## 0.26.20 (patch) — 修掉 CI 的 no-unnecessary-type-conversion；并把类型感知规则纳入本地绿闸
 
 > **现象**：0.26.19 的 validate 两个 job 都红在 `typescript(no-unnecessary-type-conversion)`（This type conversion does not change the type or value of the expression），点名 evolution-host/tests/guard-scripts.spec.ts:176/189/202。

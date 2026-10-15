@@ -1209,7 +1209,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           try {
             stageCurrent = await library.read(args.name)
           } catch (error) {
-            const code = String((error as { code?: unknown } | undefined)?.code ?? 'IO 失败')
+            // no-base-to-string: `code` is unknown, and String(unknown) prints [object Object] for a
+            // non-primitive - the refusal message would then carry a placeholder instead of the errno.
+            const rawCode = (error as { code?: unknown } | undefined)?.code
+            const code = typeof rawCode === 'string' ? rawCode : 'IO 失败'
             return { ok: false, message: '目标当前读不到（' + code + '），无法核验暂存锚点 —— 先修好可读性再批准', skills: [] }
           }
           operation = { ...args, staged_from_sha256: stageCurrent === null ? 'absent' : contentHash(stageCurrent) }

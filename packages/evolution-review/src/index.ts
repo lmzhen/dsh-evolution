@@ -1755,7 +1755,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // boundary no longer depends on when the abort signal happens to arrive — the race that let
         // the second op land after an unload is closed. A context without a fiber keeps the old
         // signal-only behaviour.
-        if (ctx.fiber?.uid === null || signal?.aborted === true) {
+        if (ctx.fiber.uid === null || signal?.aborted === true) {
           const reason = 'the review was unloaded mid-plan'
           ctx.logger.warn(`dsh-evolution-review: executePlan stopped at an op boundary after ${actions.length} op(s): ${reason}`)
           return { actions, ok: false, failedOps, aborted: reason }
@@ -1787,7 +1787,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // boundary no longer depends on when the abort signal happens to arrive — the race that let
         // the second op land after an unload is closed. A context without a fiber keeps the old
         // signal-only behaviour.
-        if (ctx.fiber?.uid === null || signal?.aborted === true) {
+        if (ctx.fiber.uid === null || signal?.aborted === true) {
           const reason = 'the review was unloaded mid-plan'
           ctx.logger.warn(`dsh-evolution-review: executePlan stopped at an op boundary after ${actions.length} op(s): ${reason}`)
           return { actions, ok: false, failedOps, aborted: reason }
@@ -1875,7 +1875,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // G0/0.7 (S4-01 sweep): named three-state read - `unknown` answers null exactly as the swallow did
           // (both mean "cannot be verified here", and the caller refuses on null), so the behaviour is the same.
             : await (async () => {
-              if (hashLibrary === null || hashLibrary === undefined) return null
+              if (hashLibrary === null) return null
               const probed = await hashLibrary.readSkillProbe(opName)
               return isPresent(probed) ? probed.value : null
             })()
@@ -1917,7 +1917,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (hashChecked) {
             // G0/0.7 (S4-01 sweep): explicit three-state read; `unknown` (and a missing library) leaves the
           // hash unrecorded, which is the behaviour this line already had.
-            const landedProbe = hashLibrary === null || hashLibrary === undefined ? undefined : await hashLibrary.readSkillProbe(opName)
+            const landedProbe = hashLibrary === null ? undefined : await hashLibrary.readSkillProbe(opName)
             const landed = landedProbe !== undefined && isPresent(landedProbe) ? landedProbe.value : null
             if (landed !== null) preRunHashes.set(opName, contentHash(landed))
           }

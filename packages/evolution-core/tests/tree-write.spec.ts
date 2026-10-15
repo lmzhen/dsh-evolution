@@ -25,7 +25,7 @@ it('G1/1.5: sections over one queue never overlap, and the release runs when the
       let release!: () => void
       tail = new Promise<void>((resolve) => { release = resolve })
       await prev
-      return () => { releases.push('r' + order.length); release() }
+      return () => { releases.push(`r${order.length}`); release() }
     }
   }
   const acquire = queue()

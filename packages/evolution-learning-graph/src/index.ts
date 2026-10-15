@@ -379,7 +379,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const warnWriteGateOnce = (message: string): void => {
           if (writeGateWarned) return
           writeGateWarned = true
-          ctx.logger?.warn?.(message)
+          ctx.logger.warn(message)
         }
         const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
         const memoryService = ctx.get('memory') as MemoryLike | undefined
