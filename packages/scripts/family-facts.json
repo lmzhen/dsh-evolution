@@ -952,13 +952,13 @@
             {
               "mutate": {
                 "file": "packages/scripts/gen-line-manifest.mjs",
-                "find": "'packages/evolution/' + shortDir",
-                "replace": "'packages/EVOLUTION/' + shortDir"
+                "find": "mono: 'overlay'",
+                "replace": "mono: 'overlay-x'"
               },
               "expect": "red",
               "note": "the bed manifest is derived from the in-repo roster: changing the derived relPath root makes the committed artifact stale, so --check must red. The anchor is the generator source, not a count, so a future roster change cannot silently unhook it.",
-              "provenAt": "2026-10-15T05:15:38.066Z",
-              "provenSha": "2383399a40f2c50ef50feb40be4dcdf8c4a75ec23ce14db9fcaf50cb13f0a0d4"
+              "provenAt": "2026-10-15T08:52:31.426Z",
+              "provenSha": "f8f1d653869b4762238f8d9e090a092c247222bea63d88a850449c71a7e31d9e"
             }
           ],
           "gate-17": [

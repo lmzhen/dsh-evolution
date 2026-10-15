@@ -181,8 +181,13 @@ for (const g of list) {
   const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: 'pipe' })
   const ms = observed.ms
   const status = observed.status === undefined ? null : observed.status
-  const scriptPath = resolve(cwd, script)
-  if (!existsSync(scriptPath)) records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [script], next: 'the declared script is not on disk - fix the row, or register this check as cannot-decide on this machine', evidence: script + ' absent' }))
+  // G0-fix (2026-10-15): the on-disk check below is a PATH check, so it may only run when the token
+  // actually names a path. `node -e <script>` is a legal row form (the verdict fixture carries one as
+  // its healthy control) and its second token is a FLAG: checking `-e` on disk reported cannot-decide
+  // for a row that exits 0, which is the exact "a green path that can never be green" shape this
+  // fixture exists to catch. A token starting with `-` is an option, not a script.
+  const scriptPath = script.startsWith('-') ? null : resolve(cwd, script)
+  if (scriptPath !== null && !existsSync(scriptPath)) records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [script], next: 'the declared script is not on disk - fix the row, or register this check as cannot-decide on this machine', evidence: script + ' absent' }))
   else if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
   else if (status === 2) {
     // The family's CLI convention is 0 = pass / 1 = fail / 2 = CANNOT DECIDE. Collapsing 2 into

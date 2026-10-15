@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.25 (patch) — 修 run-gates 的路径守卫回归；分类报告重生；并按 action 清单把整条链在本机跑通
+
+> **现象**：0.26.24 的 validate 红在 Verify the platform contract，报 `platform-citation family-facts.json:956: cites packages/EVOLUTION/`。
+> **根因（三件，逐条读原文后定位）**：①那行是 gate-51 的**变异载荷**（翻转以证明 `--check` 变红），而该判据的引用面包含 manifests ⇒ 大写路径样字符串被误读为平台引用；②`check-taxonomy` 报分类报告陈旧 —— 0.26.23 往 `localOnly` 加了一条登记改变了门集成员视图，它排在平台契约之后被棘轮挡住；③`verify-verdict-records` 的健康对照（`argv: [node, -e, 0]`）被判 cannot-decide —— **blame 落在本批的发布提交**：我给执行器加的 `existsSync(scriptPath)` 守卫只想了"行指向缺文件"，没想到 `argv` 是**可执行 token 数组**，`node -e` 的第二个 token 是**旗标**不是脚本名，于是去找名为 `-e` 的文件，把一个 exit 0 的行判成 cannot-decide ⇒ 恰好构成"永远不可能变绿的健康路径"，而这条夹具存在的意义就是抓这种形状。
+> **修复**：①载荷改用非路径形状（翻 `bed.mono` 的值，`--check` 会比较 `bed` ⇒ 干净 red），并按 `verify-mutations --only gate-51` 重新证明盖章；②重生成 `reports/check-taxonomy.json`；③守卫只对看起来像路径的 token 生效（`script.startsWith('-') ? null : resolve(cwd, script)`），并加红证明（指向 `no-such-file.mjs` 的行仍判 cannot-decide/artifact-absent）。
+> **验证**：按 action 的步骤清单在本机**按序跑 44 条**（跳过 checkout／镜像注入与本机不可复现的两条），**39/39 全绿**；`verify-verdict-records` 报 OK（healthy-control => pass + exit 0）；`verify-mutations --coverage` 保持 recorded=37 unstamped=0 cannotDecide=0 redProven=36。
 ## 0.26.24 (patch) — 清掉三处无人引用的依赖声明（退役与迁移留下的死声明）
 
 > **现象**：0.26.23 的 validate 红在 Verify dependency closure（G0.1 guard）：3 unreferenced declaration(s)。
