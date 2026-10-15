@@ -170,6 +170,11 @@
               "script": "gen-health-baseline.mjs",
               "reason": "the health-baseline corpus is produced from the TARGET machine's user skills (the family maintains it per machine); the CI overlay carries no user skills, so a CI run would produce an empty corpus rather than the real one",
               "expiry": "release gate: the corpus is refreshed on the machine that owns it and its digest is recorded in the release readings; if a CI-side corpus is ever required, this row moves into the action"
+            },
+            {
+              "script": "gen-line-manifest.mjs",
+              "reason": "the bed manifest is generated from the MIRROR and ships from there; the validate job checks out the platform repo and copies only packages/evolution/**, so the committed artifact never reaches that tree (tried in CI on 2026-10-15: the generator derives ROOT from its own location, scanned packages/packages and died MODULE_NOT_FOUND; porcelain then saw the regenerated file as untracked)",
+              "expiry": "release gate: the three-part sequence (generate -> git status --porcelain -- **/files/line-manifest.json -> --check) runs in the mirror local/pre-tag gate; revisit if the release job ever ships the mirror packages/scripts tree into the checkout"
             }
           ],
           "machineLocal": [
@@ -523,7 +528,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "75832efd5551bda9fdc68e48f2f79a9fded35493c2adfdd8dad8075b8016510c",
+        "sha256": "2031437c850d88b29d3de7d68f3265e627a3b0eb69f936047785a22d48a007ba",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",

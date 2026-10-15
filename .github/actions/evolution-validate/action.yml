@@ -190,30 +190,16 @@ runs:
         # a known concurrency, and the runner also fails when a renamed case
         # drops out of the group (no vacuous pass).
         node packages/evolution/scripts/run-load-sensitive.mjs .
-    - name: Verify the line-manifest bed is current (G0/0.7)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # The bed manifest is a SHIPPED artifact (packages/scripts/files/line-manifest.json) listing the
-        # family source bed. io-fs was retired in 2b.2 and stayed listed for weeks because nothing ran its
-        # generator with --check: the consumer gate only compares identities, never freshness. This is the
-        # freshness half, in CI so the row in CONTRIBUTING is a gate rather than a claim.
-        # Two guards, one mechanism each: regenerate unconditionally (so the check never depends on the
-        # artifact being committed - the generator is machine-independent now), then require the committed
-        # copy to match. Without the generation half, a fresh checkout with no ignored artifact reports
-        # stale on a tree nobody touched; without the check half, drift goes unnoticed.
-        node packages/scripts/gen-line-manifest.mjs
-        # P1 (release review round 4): generate-then-check alone is a write-then-read of the SAME bytes, so
-        # the committed copy never took part in the verdict (measured: a corrupted artifact passed the whole
-        # sequence while --check alone reddened on it). The committed copy is what ships, so drift is judged
-        # by git against the commit, not by comparing the file the previous command just wrote.
-        # `git status --porcelain` is the right predicate, not `git diff`: an UNTRACKED artifact is
-        # invisible to diff, and "the file never made it into the commit" is exactly the failure this
-        # step exists for (measured: a corrupted-but-untracked copy passed generate+diff). Empty output
-        # means the committed copy and the regenerated one agree AND the file is tracked.
-        test -z "$(git status --porcelain -- packages/scripts/files/line-manifest.json)"
-        node packages/scripts/gen-line-manifest.mjs --check
-
+    # Why the line-manifest freshness gate is NOT here (tried on 2026-10-15, removed the same day):
+    # the bed manifest is generated from the MIRROR and ships from there; this job checks out the
+    # platform repo and copies only packages/evolution/**, so the committed artifact never reaches this
+    # tree. Both halves broke on contact for structural reasons, not for want of a path fix: the
+    # generator derives its ROOT from its own location (mirror: repo root; here: packages/), so it
+    # scanned packages/packages and died with MODULE_NOT_FOUND; and `git status --porcelain` saw the
+    # regenerated file as untracked because the committed copy is elsewhere. A check that needs "the
+    # artifact is in this tree" belongs to the layout that has it: the three-part sequence (generate ->
+    # porcelain proves the committed copy matches -> --check) runs in the mirror local/pre-tag gate,
+    # which is also what the header contract says: "真比对进 local/pre-tag；CI 保持 policy-only".
     - name: Verify dependency closure (G0.1 guard)
       shell: bash
       working-directory: upstream

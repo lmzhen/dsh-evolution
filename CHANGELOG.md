@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.23 (patch) — 把床清单的新鲜度门移出 CI（它需要产物在那棵树里），改为 localOnly 登记
+
+> **现象**：0.26.22 的 validate 红在 `node packages/evolution/scripts/gen-line-manifest.mjs` ⇒ MODULE_NOT_FOUND（此前是 `packages/scripts/...` 路径）与 `git status --porcelain` 看到未跟踪产物。
+> **根因（结构性，不是路径笔误）**：床清单**从镜像生成、也从镜像发**；validate job 检出平台仓、只把 `packages/evolution/**` 复制进去 ⇒ 提交的产物根本到不了那棵树。而生成器用 `ROOT = resolve(HERE, .., ..)` 再拼 `packages`：在镜像下 ROOT 是仓根（对），在 overlay 下 ROOT 是 `packages/` ⇒ 扫 `packages/packages` 而失败。⇒ **一个检查若需要「产物在这棵树里」，它属于拥有该产物的布局**。
+> **修复**：①该步从 action 移除，原位留一段说明（含两次实测的失败形态），免得下一个人再加回来；②登记进 family-facts.json 的 localOnly（reason 写明镜像侧生成本质与两次实测，expiry 写明三段式在镜像 local/pre-tag 跑以及何时重审）⇒ 表格行 51 与 action 的"声明了却没人跑"矛盾消解；③按序 gen-gate-manifest → gen-checks-fact 重生。
+> **验证**：ARCH／META／DOC／REL／REGISTRY 全 0；本机在 overlay 布局下复现该命令拿到 ENOENT（`packages\packages`）与未跟踪产物两条实测证据。
 ## 0.26.22 (patch) — 清掉 CI 剩下的两类站点：不存在的类型名，与未收窄的 createElement
 
 > **现象**：0.26.21 仍红，站点集中在 maintenance/tests/orchestrate.spec.ts（10 处，no-unsafe-*）与 settings-ui/tests/pending-card-read-race.client.spec.ts:37（no-unsafe-argument／no-unsafe-call）。
