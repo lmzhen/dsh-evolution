@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-review",
   "description": "Background review orchestration",
-  "version": "0.26.19",
+  "version": "0.26.20",
   "publishConfig": {
     "access": "public"
   },

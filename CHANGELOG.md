@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.20 (patch) — 修掉 CI 的 no-unnecessary-type-conversion；并把类型感知规则纳入本地绿闸
+
+> **现象**：0.26.19 的 validate 两个 job 都红在 `typescript(no-unnecessary-type-conversion)`（This type conversion does not change the type or value of the expression），点名 evolution-host/tests/guard-scripts.spec.ts:176/189/202。
+> **根因**：这条规则是 **type-aware** 的，而本批的本地 lint 计数仪器 `.oxlintrc.staged.json` 恰恰关掉了 typeAware（关它是因为本机类型解析不到会产生成百条 error-typed 噪声）⇒ 这类违规在本地**结构性不可见**。这是本批第四次撞上「本地仪器与 CI 仪器不是同一套」：不带 -c 的 lint 噪声、家族 vitest 需要本机线适配器、构建因两棵树并存必红，加上这一次的类型感知规则。
+> **修复**：①删掉 1.5 判据留在 tree-lock-scope.spec.ts:53 的探针行及其连带的 const t0 与 const result（restore 调用保留，它触发恢复）②guard-scripts 三处 String(error?.stderr ?? 空串) 去掉冗余转换 ③**本地绿闸新增一步：类型感知规则的本地复筛** —— 不带 -c 跑一次（接受噪声）只筛已知的 type-aware 规则名；本轮据此在本地筛出 7 处并全部修掉。
+> **验证**：staged lint ⇒ 5 warnings and 0 errors；不带 -c 复筛该规则 ⇒ 0；ARCH／META／DOC／REL／COVERAGE／REGISTRY／LINEMANIFEST／LAYOUT 全 0；curator 106、host 156 passed（其 2 红为登记既有项）。
 ## 0.26.19 (patch) — 修掉 CI 指出的 45 处风格违规；并把三条「本机不可复现」的仪器边界写清
 
 > **现象**：0.26.16 报八条类型错误，0.26.17 报本机适配器缺失，0.26.18 报 oxlint 的 45 处 @stylistic 违规（indent／quotes／arrow-parens／max-len／semi／no-trailing-spaces／no-unused-vars），全部落在本批改过的文件里。
