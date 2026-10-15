@@ -9,6 +9,7 @@ import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRoot } from '../../test-support/temp-home.ts'
@@ -249,6 +250,7 @@ async function mountReviewFixture(options: {
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
   // G4: the review's turn window comes from the family's session projection, so the stub is
   // decorated into a foldable one (dense seq-stamped log) and appends announce themselves.
   const session = projectable({

@@ -167,4 +167,30 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     expect(view.queryByText('loading')).toBeNull()
     expect(view.getByText(/empty.versions.failed/)).toBeTruthy()
   })
+
+  it('G4-4.2 lazy cache keyed by skill: beta at v=1 is not served from alpha at v=1', async () => {
+    const loadBody = vi.fn(async (name: string) => ({ v: 1, display: "# body-of-" + name, chars: 5, truncated: false }))
+    render(createElement(SkillHistoryPanel, makeFace({ loadBody })))
+    await openSkill("alpha")
+    const alphaPreviews = screen.getAllByRole("button", { name: /^preview/ })
+    fireEvent.click(alphaPreviews[0]!)
+    await screen.findByText("# body-of-alpha")
+    await openSkill("beta")
+    const betaPreviews = screen.getAllByRole("button", { name: /^preview/ })
+    fireEvent.click(betaPreviews[0]!)
+    await waitFor(() => { expect(loadBody).toHaveBeenCalledWith("beta", 1) })
+    await screen.findByText("# body-of-beta")
+  })
+
+
+  it('S5-07 default view has no keyless sibling (React key warning)', async () => {
+    const errors: string[] = []
+    const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(" ")) })
+    try {
+      render(createElement(SkillHistoryPanel, makeFace()))
+      await screen.findByText("empty.pick")
+      await new Promise(resolve => setTimeout(resolve, 10))
+    } finally { spy.mockRestore() }
+    expect(errors.filter(line => line.includes("unique"))).toEqual([])
+  })
 })

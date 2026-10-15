@@ -308,6 +308,10 @@
     "gate-50": {
       "noDrillReason": "PRODUCER ROW, NOT A CHECK: its registered argv carries no --check, and the script only READS the machine skill corpora and WRITES scripts/reports/health-baseline.json through the engine - it has no ve",
       "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-51": {
+      "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-51",
+      "evidence": "the bed manifest is roster-derived: breaking the derived relPath root makes the committed artifact stale and --check must red (the same mutation the checkMutations record pins; --only proves it and stamps provenAt/provenSha)."
     }
   }
 }

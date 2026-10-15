@@ -30,10 +30,61 @@ function allowRowCollisions(env                    = process.env)          {
   return env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS === ALLOW_ROW_COLLISIONS
 }
 
+// Inlined from evolution-core/src/package-identity.ts by the generator (G-04: the scope is derived,
+// never written, so a published scope needs no release-time text rewrite).
+/**
+ * G1/1.8 (G-04): the SCOPE this build was published under, DERIVED from a manifest instead of written as a
+ * literal in running code.
+ *
+ * The family used to hard-code `@deepseek-ai/dsh-...` names and let `prepare-release.mjs --scope @lmzhen`
+ * patch the text afterwards. A published install therefore depended on a release-time string rewrite
+ * reaching every copy, and the copies had already drifted (doctor.ts, index.ts, preset-composition.ts and
+ * its .mjs mirror each spelled the identity). The scope is knowable at runtime: it is the scope segment of
+ * the nearest `package.json` above the calling module. Nothing to rewrite, one owner of the answer.
+ *
+ * @module @deepseek-ai/dsh-evolution-core/package-identity
+ */
+
+
+
+
+/**
+ * The scope segment of the nearest `package.json` at or above `from`.
+ * @param from - the calling module URL (its own manifest is the answer).
+ * @returns the scope, e.g. `@deepseek-ai` or `@lmzhen`; an unscoped manifest yields an empty string.
+ */
+function scopeOfNearestManifest(from              )         {
+  let dir = dirname(from instanceof URL ? fileURLToPath(from) : fileURLToPath(new URL(from)))
+  for (let hops = 0; hops < 32; hops += 1) {
+    const manifest = join(dir, 'package.json')
+    if (existsSync(manifest)) {
+      const parsed = JSON.parse(readFileSync(manifest, 'utf8'))                      
+      const name = typeof parsed.name === 'string' ? parsed.name : ''
+      return name.startsWith('@') ? (name.split('/')[0] ?? '') : ''
+    }
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return ''
+}
+
+/**
+ * One family/platform package name under the RUNNING scope.
+ * @param bareName - the name without any scope, e.g. `dsh-agent-preset`.
+ * @param from - the calling module URL.
+ * @returns `scope/bareName`, or `bareName` when the manifest carries no scope.
+ */
+function scopedPackageName(bareName        , from              )         {
+  const scope = scopeOfNearestManifest(from)
+  return scope === '' ? bareName : scope + '/' + bareName
+}
+
 /* WC (0.3.56): the N-5 escape reads through the single env module. */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
 
 
 /**
@@ -232,7 +283,9 @@ export function compositionRowIds(composition        )              {
 }
 
 /** The platform package a DECLARATIVE preset row names (0.2.x replaced preset directories with it). */
-export const AGENT_PRESET_PACKAGE = '@deepseek-ai/dsh-agent-preset'
+// G-04: DERIVED from this package own manifest scope, so the published scope follows without any
+// release-time text rewrite (the .mjs mirror derives the same way).
+export const AGENT_PRESET_PACKAGE = scopedPackageName('dsh-agent-preset', import.meta.url)
 
 /** Identity and display metadata of one generated preset row. */
                                     

@@ -66,7 +66,11 @@ const PLATFORM_UI_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
 export function rendererOf(row: { MarkdownText?: unknown }): MarkdownTextComponent | undefined {
   const candidate = row.MarkdownText
   if (typeof candidate === 'function') return candidate as MarkdownTextComponent
-  if (typeof candidate === 'object' && candidate !== null) return candidate as MarkdownTextComponent
+  // S5-10: the domain is React element types, not "any object". A plain object (a namespace row, an
+  // array) used to be accepted, so the failure moved from the graceful source fallback into the
+  // render (measured by the audit: mount failed with "Element type is invalid"). React marks the
+  // objects it can mount with $$typeof; anything else belongs on the degrade path.
+  if (typeof candidate === 'object' && candidate !== null && (candidate as { $$typeof?: unknown }).$$typeof !== undefined) return candidate as MarkdownTextComponent
   return undefined
 }
 

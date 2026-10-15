@@ -69,7 +69,12 @@ export function sectionSnapshotOf(snapshot: ConfigFormSnapshotLike): ParamSectio
     // U-5: the two facts the reader needs and the projection used to drop.
     base: isSection(snapshot.base) ? snapshot.base : undefined,
     mode: snapshot.mode,
-    ...snapshot.status === 'unavailable' ? { reason: 'not-served' as const } : {},
+    // G4/4.3: the reason follows the PLATFORM's own fact, not the status alone. In memory mode the
+    // platform reports unavailable BY DESIGN (no persistent plane this session); calling that row
+    // not-served was a false claim about why the operator cannot see it.
+    ...snapshot.status === 'unavailable'
+      ? { reason: snapshot.mode === 'memory' ? 'session-memory' as const : 'not-served' as const }
+      : {},
   }
 }
 
@@ -203,14 +208,15 @@ export function writeFaceFor(probe: SeatProbe, namespace: string): {
     mutateOnce: async (ops) => {
       const seat = form()
       if (seat === undefined) return false
-      await seat.mutate(ops)
-      return true
+      // G4/4.1: forward the HOST verdict. The seat returns Promise<boolean> (seam.ts:106-107);
+      // this wrapper used to discard it and answer true, so a refusal the platform reported was
+      // recorded as an accepted write (measured: platform false -> mutateOnce true).
+      return await seat.mutate(ops)
     },
     clear: async (field) => {
       const seat = form()
       if (seat === undefined) return false
-      await seat.unset(field)
-      return true
+      return await seat.unset(field)
     },
   }
 }

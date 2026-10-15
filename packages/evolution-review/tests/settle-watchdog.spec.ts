@@ -17,6 +17,7 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { NATIVE_CALL_EVENT } from '@deepseek-ai/dsh-evolution-core'
@@ -30,6 +31,7 @@ it('S2-6 (FLOW1-1): a handle that never settles is abandoned — flag reset, que
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
   // Each emitted turn must present NEW events: the cadence fold reads the
   // session snapshot, so a static array would count once and never fire again.
   const session = projectable({
@@ -68,7 +70,10 @@ it('S2-6 (FLOW1-1): a handle that never settles is abandoned — flag reset, que
   emitEnd(2)
   // The second boundary arrived while the first run was in flight: it must be
   // queued, never a second concurrent run, and nothing may be delivered yet.
-  await vi.waitFor(() => { expect(starts).toBe(1) })
+  // G1 夹具加固: the assertion is "the run eventually starts", not an ordering promise — under
+  // parallel file scheduling the default 1s waitFor budget is too tight, so give it an explicit
+  // budget instead of letting scheduler load decide. It stays a wait, never a retry of a wrong value.
+  await vi.waitFor(() => { expect(starts).toBe(1) }, { timeout: 15_000 })
   expect(delivered).toHaveLength(0)
 
   await vi.waitFor(() => { expect(errors).toHaveLength(1) }, { timeout: 15_000 })
@@ -105,6 +110,7 @@ it('PLAN S1.1 (2026-09-16): a run settling within the review timeout is consumed
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
   const session = projectable({
     id: SessionId('s1-1-real-latency'),
     seq: 1,
@@ -191,6 +197,7 @@ it('PLAN-R2 P2-1 (2026-09-16): a reviewTimeoutMs at the int32 timer ceiling stil
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
   const session = projectable({
     id: SessionId('p2-1-ceiling-budget'),
     seq: 1,
@@ -273,6 +280,7 @@ it('PLAN-R2 P2-2 (2026-09-16): a hung dispose is abandoned after the settle marg
   }
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
   const session = projectable({
     id: SessionId('p2-2-hung-dispose'),
     seq: 1,

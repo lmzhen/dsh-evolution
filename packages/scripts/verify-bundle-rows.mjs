@@ -24,7 +24,7 @@
  *   --strict  accepted for uniformity with the other verifiers; this one always fails loud.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -35,13 +35,15 @@ const FORMS = ['all', 'host', 'preset']
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
 const problems = []
+/** G2a/2a.3: the roster is needed twice - for the form checks and for the orphan enumeration below. */
+let roster = null
 
 const rosterPath = join(root, 'scripts', 'bundle-rows.json')
 if (!existsSync(rosterPath)) {
   problems.push('missing row roster ' + rosterPath)
 } else {
   try {
-    const roster = JSON.parse(readFileSync(rosterPath, 'utf8'))
+    roster = JSON.parse(readFileSync(rosterPath, 'utf8'))
     for (const form of FORMS) {
       if (roster.forms === undefined || roster.forms[form] === undefined) problems.push('roster declares no form "' + form + '"')
     }
@@ -97,6 +99,28 @@ if (yaml === null) {
   }
   console.log('verify-bundle-rows: YAML semantics checked via ' + yamlSpec)
 }
+// G2a/2a.3 (reverse half of the roster check): the DELIVERED artifacts are whatever the roster declares -
+// `forms[form].target`, defaulting to the historical `evolution-<form>/cordis.patch.yml`. A delivered file
+// the roster does not declare is an ORPHAN: it would ship without anyone regenerating it, which is exactly
+// how the standalone composition drifted by hand before it was folded into the roster. Forward checks
+// (current + parseable) cannot see this - they only look at the files the roster already knows about.
+if (roster !== null && roster.forms !== undefined) {
+  const declared = new Set()
+  for (const [formName, spec] of Object.entries(roster.forms)) {
+    const target = spec.target ?? join('evolution-' + formName, 'cordis.patch.yml')
+    declared.add(resolve(root, target))
+  }
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith('evolution-')) continue
+    for (const name of ['cordis.yml', 'cordis.patch.yml']) {
+      const file = join(root, entry.name, name)
+      if (!existsSync(file)) continue
+      if (!declared.has(resolve(file))) {
+        form.push(file + ' is an ORPHAN artifact: no roster form declares it — add a form with this target, or remove the file')
+      }
+    }
+  }
+}
 problems.push(...form)
 
 if (problems.length === 0) {
@@ -116,5 +140,5 @@ if (problems.length > 0) {
   process.exit(1)
 }
 
-console.log('verify-bundle-rows: OK — the three bundle patches match scripts/bundle-rows.json'
+console.log('verify-bundle-rows: OK — ' + String(roster === null ? FORMS.length : Object.keys(roster.forms).length) + ' declared artifact(s) match scripts/bundle-rows.json'
   + (yaml === null ? ' (form checks only — no YAML parser resolvable in this layout)' : ''))

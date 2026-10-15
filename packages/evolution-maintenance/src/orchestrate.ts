@@ -26,41 +26,36 @@ import {
   type DriftSkillSnapshot,
 } from '@deepseek-ai/dsh-evolution-core'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { SubagentResult, SubagentRun, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
 import { enrichmentSnapshotOptions, type Enrichment } from './enrichment.ts'
-import { renderFacts } from './render-facts.ts'
+import { renderFacts, type StoreFootprint } from './render-facts.ts'
+import { reachabilityFootprint, reclamationFootprint, type FootprintIo } from './footprint.ts'
 import { validateAndNormalizeMaintainPlan, type MaintainPlanItem, type ValidationResult } from './validate-plan.ts'
 
-/** I-5 (v37): the platform's `SubagentStartRequest` fields this orchestrator sends.
- * Typed locally (not imported) because the platform type lives behind the subagent row this
- * package does not depend on; the required `parent` and `signal` mirror the platform. */
-export interface SubagentStartRequestLike {
-  readonly label: string
-  readonly prompt: readonly { readonly type: 'text'; readonly text: string }[]
-  readonly parent: Agent
-  readonly signal: AbortSignal
-  readonly maxDepth: number
-  readonly agentOptions: Record<string, string>
-  readonly persona: string
-  readonly toolFilter: { readonly allow: readonly string[] }
-  readonly outputSchema: Record<string, unknown>
+/**
+ * I-5 (v37), D-09 (G1/1.8): the platform types are IMPORTED, not copied. Each view below is DERIVED from
+ * the platform contract, so a field the platform renames fails the build here instead of drifting.
+ *
+ * The one thing this layer must add: `persona` and `toolFilter` are honoured at runtime (child-agent.ts
+ * installs a `deployment:persona` system-prompt section; the README documents toolFilter as applying the
+ * requested child tool restriction) but the CALLER-facing `SubagentStartRequest` does not declare them.
+ * They are therefore declared here, once, as an explicit extension instead of a hand-copied whole.
+ */
+export type MaintainSubagentStart = SubagentStartRequest & {
+  readonly persona?: string | undefined
+  readonly toolFilter?: { readonly allow: readonly string[] } | undefined
 }
 
-/** I-5 (v37): the platform's `SubagentResult` fields the outcome mapping reads. The
- * index signature keeps a REAL platform result assignable (the platform type is
- * wider than these three fields); the fields below are the ones this code relies on. */
-export interface SubagentResultLike {
-  readonly structured?: unknown
-  readonly diagnostic?: string
-  readonly stopReason: string
-}
+/** The `SubagentResult` fields the outcome mapping reads (the platform result is wider). */
+/** The `SubagentResult` fields the outcome mapping reads. `diagnostic` is OPTIONAL here on purpose: the
+ * platform type declares it required, but this layer reads it defensively (the mapped outcome must work
+ * for a result that carries none), so the view states that narrower truth instead of inheriting the
+ * platform requirement. */
+export type MaintainSubagentResult = Pick<SubagentResult, 'structured' | 'stopReason'> & { readonly diagnostic?: string | undefined }
 
-/** I-5 (v37): the platform's `SubagentRun` contract the orchestrator owns — `dispose` is
- * NOT optional (the platform declares it required and every exit path here awaits it). */
-export interface SubagentRunLike {
-  readonly result: Promise<SubagentResultLike>
-  dispose(): Promise<void>
-}
+/** The platform run handle the orchestrator owns (`dispose` is required and every exit path awaits it). */
+export type MaintainSubagentRun = SubagentRun
 
 export interface MaintainRuntime {
   /** SkillLibrary-like reader for snapshot assembly. */
@@ -70,7 +65,7 @@ export interface MaintainRuntime {
    * request from `unknown` and `dispose` from optional to the platform's
    * always-present handle, so a future miss fails `tsc` instead of a runtime TypeError. */
   subagents: {
-    start(kind: 'spawn', options: SubagentStartRequestLike): Promise<SubagentRunLike>
+    start(kind: 'spawn', options: MaintainSubagentStart): Promise<MaintainSubagentRun>
   }
   /** The spawning agent (platform `SubagentStartRequest.parent`, required: in-process
    * providers derive workspace, lineage and delegation depth from its durable session). */
@@ -95,6 +90,9 @@ export interface MaintainRuntime {
    * probe the scan keeps the previous empty-library answer. */
   rootExists?: (() => Promise<boolean>) | undefined
   /** V27 M-02: the root the probe above refers to, for the error message. */
+  /** G3/3.3: the runtime io the footprint reading needs. Optional: a caller without it gets UNKNOWN for
+   * every registered store instead of an invented zero. */
+  io?: FootprintIo | undefined
   skillRoot?: string | undefined
 }
 
@@ -204,13 +202,16 @@ export function buildMaintainFacts(
   snapshots: ReadonlyArray<DriftSkillSnapshot>,
   usageObserved: boolean | undefined,
   redact: ((text: string) => string) | undefined,
+  /** G3/3.3: one reading per registered bounded store, produced at this run's reclamation point.
+   * Optional so the preview and any older caller keep the exact block they had. */
+  footprint?: readonly StoreFootprint[] | undefined,
 ): FactsBundle {
   const report = computeDriftSignals(
     snapshots.map(snapshot => ({ ...snapshot, usageObserved })),
   )
   const signalsVersion = DRIFT_SIGNALS_VERSION
   const signature = jointSignature(MAINTAIN_PROMPT, signalsVersion)
-  const facts = renderFacts(report, { signalsVersion, signature, redact })
+  const facts = renderFacts(report, { signalsVersion, signature, redact, footprint })
   return { report, facts, signalsVersion, signature }
 }
 
@@ -321,7 +322,17 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       // Genuinely empty: no facts to review — do not spend a model call.
       return { ok: true, recommendationCount: 0, runId: options.runId ?? randomUUID(), verdict: 'no_issues', text: '维护扫描：技能库为空，无需处理。' }
     }
-    const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, enrichment?.usageObservedValue, options.redact)
+    // G3/3.3: the footprint is read at THIS run's reclamation point - one line per registered store,
+    // UNKNOWN when a store could not be measured. Removing this call removes every store line from the
+    // facts block (the visibility criterion 3.3 is proved by).
+    // G3/3.4: the footprint carries BOTH halves - the per-store readings and the three reachability
+    // readings. Removing either spread removes its lines from the facts block, which is the visibility
+    // criterion both items are proved by.
+    const footprint = [
+      ...await reclamationFootprint(runtime.io),
+      ...await reachabilityFootprint(runtime.io, runtime.skillRoot),
+    ]
+    const { facts, report, signalsVersion, signature } = buildMaintainFacts(snapshots, enrichment?.usageObservedValue, options.redact, footprint)
     const template = renderMaintainTemplate(MAINTAIN_PROMPT, PROMPT_BUNDLE_ID, signalsVersion, signature)
 
     // Persona carries the full template; the prompt carries ONLY the facts
@@ -455,7 +466,7 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     try {
       // I-5 (v37): the platform settles this promise with a result, never null —
       // the optional reads are gone so a future nullability change surfaces here.
-      const runResult: SubagentResultLike = await run.result
+      const runResult: MaintainSubagentResult = await run.result
       const raw = runResult.structured
       if (raw === undefined) {
         // 0.3.8: a CANCELLED run settles by RESOLVING (driver readResult) with

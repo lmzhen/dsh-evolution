@@ -648,7 +648,11 @@ function checklistViolations(root, repoRoot, asset, violations) {
     // names cited from a checklist must resolve under the scripts dir; names
     // preceded by a path (`node_modules/vitest/vitest.mjs`) or continuing into
     // a template suffix (`rule-snippet.mjs.tmpl`) are excluded.
-    for (const match of doc.text.matchAll(/(?<![/\w-])([a-z][a-z0-9-]*\.(?:mjs|cjs))(?!\.[a-z0-9])/g)) {
+    // G0/0.7 review fix: the lookbehind must also exclude `.`, or the TAIL of a multi-dot script name reads as
+    // a bare citation - `packages/evolution/scripts/vitest.family.config.mjs` produced a phantom guard named
+    // `config.mjs` and failed both this check and the arch guard on a correct CONTRIBUTING row. A name preceded
+    // by `/` was already excluded; `.` belongs in the same class (a path or a longer file name, not a citation).
+    for (const match of doc.text.matchAll(/(?<![/\w.-])([a-z][a-z0-9-]*\.(?:mjs|cjs))(?!\.[a-z0-9])/g)) {
       if (!existsSync(join(guardDir, match[1]))) violations.push(`${doc.rel}: cites guard \`${match[1]}\` which does not exist under ${config.guardDir}`)
     }
     for (const match of doc.text.matchAll(/\b(N\d+[a-z]?)\b/g)) {

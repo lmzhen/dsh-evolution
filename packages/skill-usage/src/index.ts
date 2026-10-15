@@ -3,10 +3,10 @@
  * @module @deepseek-ai/dsh-skill-usage
  */
 
+import type {} from '@deepseek-ai/dsh-evolution-io'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
-import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-session'
 import { evolutionIoAdapter, evolutionRoot, makeSerialQueue, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
@@ -93,7 +93,7 @@ export class SkillUsageRegistry extends Service {
     // P3-17 (v14): trim like resolveSkillsRoot/evolutionRoot — a whitespace-only
     // value is truthy and used to become a CWD-relative path.
     this.eventsHome = config.eventsHome?.trim() || evolutionRoot()
-    this.io = evolutionIoAdapter(() => preferProvider(ctx.evolutionIo, ['fs']))
+    this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     // A2 observation: `session/event` DISPATCH records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This
     // makes the sidecar's view counters live; names without a usage record are

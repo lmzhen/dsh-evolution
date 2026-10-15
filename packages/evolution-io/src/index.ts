@@ -139,18 +139,51 @@ export class EvolutionIoRegistry extends Service {
  * @typeParam T - the seam implementation type the caller works with (`EvolutionIo` or the wider
  *   `EvolutionIoLike`), so the same helper serves every consumer shape.
  */
+/**
+ * G2a/2a.1: which medium actually served a consumer.
+ *
+ * `preferProvider` is the ONE sanctioned place that turns a not-registered name into a fallback (see its
+ * JSDoc), so it is also the only place that can say what the fallback WAS. Recording here - and nowhere
+ * else - is what keeps this from becoming a second resolution path.
+ */
+interface MediumObservation {
+  readonly requested: readonly string[]
+  /** The preference that served it, or undefined when the registry default did (unknowable from here). */
+  readonly resolved: string | undefined
+  readonly via: 'preference' | 'default'
+}
+
+const mediumObservations = new WeakMap<object, MediumObservation>()
+
+/**
+ * The read-only face of the marker: what served THIS registry, without resolving anything.
+ * @param registry - the seam registry the caller already holds.
+ * @returns `known` with the observation, or `unknown` when nothing resolved through this registry yet.
+ */
+export function describeMedium(registry: object):
+  | { readonly state: 'known'; readonly requested: readonly string[]; readonly resolved: string | undefined; readonly via: string }
+  | { readonly state: 'unknown' } {
+  const observation = mediumObservations.get(registry)
+  if (observation === undefined) return { state: 'unknown' }
+  return { state: 'known', requested: observation.requested, resolved: observation.resolved, via: observation.via }
+}
+
 export function preferProvider<T>(
   registry: { provider(name?: string): T },
   names: readonly string[],
 ): T {
   for (const name of names) {
     try {
-      return registry.provider(name)
+      const resolved = registry.provider(name)
+      mediumObservations.set(registry as object, { requested: names, resolved: name, via: 'preference' })
+      return resolved
     } catch {
       // Not registered: this name is a preference, not a requirement (see the JSDoc).
     }
   }
-  return registry.provider()
+  const fallback = registry.provider()
+  mediumObservations.set(registry as object, { requested: names, resolved: undefined, via: 'default' })
+  return fallback
 }
 
 export default EvolutionIoRegistry

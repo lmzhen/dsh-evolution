@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto'
 // v43 FLOW2-1: the orphan criterion needs ONE liveness rule. G2 S4 retired the io write-lock
 // protocol this grammar was borrowed from, so the claim-id grammar and its pid probe live HERE —
 // the only remaining user — instead of keeping a lock parser alive in core for a non-lock caller.
-import { clampOnce } from '@deepseek-ai/dsh-evolution-core'
+import { clampOnce, type WriteConfirmMode } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
@@ -211,11 +211,12 @@ export interface Config {
    */
   pendingTtlMs?: Volatile<number>
   /**
-   * U-6: what the confirmation before an APPROVE does. The same three words `skillWriteConfirm` uses
-   * for a skill write (`tool-skill-manage/src/write-gates.ts:50`) — mirrored, not imported: the two
-   * packages do not depend on each other and this is a vocabulary, not behaviour.
+   * U-6: what the confirmation before an APPROVE does. The same three words the skill-write gate uses
+   * (`WriteConfirmMode`, whose home is `evolution-core/src/write-authority.ts` - moved there with the
+   * authority that carries it; the re-export from `write-gates.ts` was removed in G1/1.8) - and now the
+   * IMPORT below is what makes that true: without it the docblock claimed an import the file did not have.
    */
-  approvalConfirm?: Volatile<'auto' | 'ask' | 'timeout'>
+  approvalConfirm?: Volatile<WriteConfirmMode>
 }
 
 export class EvolutionApproval extends Service {

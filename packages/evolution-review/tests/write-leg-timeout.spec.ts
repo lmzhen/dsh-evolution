@@ -14,6 +14,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
@@ -21,6 +22,7 @@ import { emitSessionEvent, projectable } from '../../test-support/projection-ses
 it('S2-10 (FLOW1-6): an op that lands after the deadline is reported to the model', { timeout: 30_000 }, async () => {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
   const delivered: string[] = []
   const applied: unknown[] = []
   // G4: the review's turn window comes from the family's session projection, so the stub must be

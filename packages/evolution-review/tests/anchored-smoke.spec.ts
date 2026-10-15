@@ -5,6 +5,7 @@ import { createToolResultMessage, createUserMessage, ToolCallId } from '@deepsee
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -12,7 +13,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
-import { SkillLibrary, contentHash, loadUsage, nodeEvolutionIo, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { isPresent, SkillLibrary, contentHash, loadUsage, nodeEvolutionIo, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
 
 const anchoredEntry = fileURLToPath(new URL('../../test-support/anchored-standard/tool-bootstrap.mjs', import.meta.url))
@@ -24,6 +25,7 @@ describe('anchored-standard review smoke', () => {
   it('starts a review subagent with the anchored discovery tool set', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
     // Real anchored-standard bootstrap plugin: mounted first, as in its preset.
     await ctx.plugin(Anchored, {
       bootstrapTools: ['bash', 'str_replace_editor'],
@@ -117,6 +119,7 @@ describe('anchored-standard review smoke', () => {
     try {
       const ctx = new Context()
       await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
       await ctx.plugin(EvolutionIoRegistry)
       await ctx.plugin(NodeIo)
       // Real library: the review's executeSkillDirect archives against the
@@ -263,6 +266,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     try {
       const ctx = new Context()
       await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
       await ctx.plugin(EvolutionIoRegistry)
       await ctx.plugin(NodeIo)
       const library = new SkillLibrary(undefined, nodeEvolutionIo())
@@ -336,6 +340,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     try {
       const ctx = new Context()
       await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
       await ctx.plugin(EvolutionIoRegistry)
       await ctx.plugin(NodeIo)
       const library = new SkillLibrary(undefined, nodeEvolutionIo())
@@ -433,6 +438,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     try {
       const ctx = new Context()
       await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
       await ctx.plugin(EvolutionIoRegistry)
       await ctx.plugin(NodeIo)
       const library = new SkillLibrary(undefined, nodeEvolutionIo())
@@ -507,7 +513,8 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       let previousBytes: string | null = null
       await expect.poll(
         async () => {
-          const current = await library.read(name).catch(() => null)
+          const currentProbe = await library.readSkillProbe(name)
+        const current = isPresent(currentProbe) ? currentProbe.value : null
           const settled = current !== null && current !== first && current === previousBytes
           previousBytes = current
           return settled
@@ -525,7 +532,8 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
       await expect
         .poll(
           async () => {
-            settled = await library.read(name).catch(() => null)
+            const settledProbe = await library.readSkillProbe(name)
+        settled = isPresent(settledProbe) ? settledProbe.value : null
             const stable = settled !== null && settled === previousSettled
             previousSettled = settled
             return stable
@@ -575,6 +583,7 @@ describe('review tool filter probe (I-6)', () => {
   it('an unregistered allow-list tool is dropped with an explicit warn instead of failing the spawn', { timeout: 20_000 }, async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
     const warns: string[] = []
     const originalWarn = ctx.logger.warn.bind(ctx.logger)
     ctx.logger.warn = ((message: unknown) => { warns.push(String(message)); originalWarn(message) }) as typeof ctx.logger.warn

@@ -37,7 +37,7 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | Package | Role |
 |---|---|
 | `evolution-core` | Shared pure stores/prompts/signals/constants plus the skill content history (`skill-history.ts`), the two named similarity questions (`quality.ts`) and the session-frame classification (`evidence.ts`); no main Cordis plugin entry (importing the package root is the only entry) |
-| `evolution-io` / `evolution-io-node` / `evolution-io-fs` | File-tree IO seam registry + atomic node:fs provider + the ctx.fs (platform) provider |
+| `evolution-io` / `evolution-io-node` | File-tree IO seam registry + the atomic node:fs provider |
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
 | `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
 | `evolution-policy` | Immutable policy snapshot + native `tools.guard` denials |

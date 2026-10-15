@@ -26,6 +26,8 @@ export * from './record-contract.ts'
 // U-2 added an optional options bag (namespace, stamp, session ids) for a medium
 // that cannot use the in-tree literals.
 export * from './conformance.ts'
+export * from './medium-comparison.ts'
+export * from './medium-declaration.ts'
 
 /** 0.3.17 (S3.3): the claim lifecycle as ONE transition table — BOTH
  * providers (json/domain) must use these, never a hand-written copy (a second
@@ -236,6 +238,18 @@ export class EvolutionStateStorageRegistry extends Service {
    * provider has registered yet (mount order not settled). */
   hasProviders(): boolean {
     return this.providers.size > 0
+  }
+
+  /**
+   * G2b/2b.1: the registered provider names, in registration order.
+   *
+   * A consumer needs the COUNT to refuse an unpinned choice while more than one medium is mounted:
+   * this registry cannot make that call itself, because the pin lives in the consumer's config and the
+   * registry never sees it. Read-only, and it exists so the refusal can happen at mount instead of at the
+   * first read (where the state is already half-consumed and the message arrives too late to act on).
+   */
+  providerNames(): readonly string[] {
+    return [...this.providers.keys()]
   }
 
   provider(name?: string): EvolutionStateStorage {

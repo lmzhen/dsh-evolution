@@ -5,6 +5,7 @@ import { createToolResultMessage, createUserMessage, ToolCallId } from '@deepsee
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -33,6 +34,7 @@ describe('review direct-write usage accounting', () => {
     try {
       const ctx = new Context()
       await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
       await ctx.plugin(EvolutionIoRegistry)
       await ctx.plugin(NodeIo)
       const library = new SkillLibrary(undefined, nodeEvolutionIo())

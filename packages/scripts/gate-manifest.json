@@ -21,7 +21,7 @@
         "local"
       ],
       "reason": "declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "gate-02",
@@ -41,11 +41,13 @@
     {
       "id": "gate-03",
       "kind": "toolchain",
-      "human": "`node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000`",
+      "human": "`node node_modules/vitest/vitest.mjs run -c packages/evolution/scripts/vitest.family.config.mjs packages/evolution --maxWorkers=2 --testTimeout=30000`",
       "argv": [
         "node",
         "node_modules/vitest/vitest.mjs",
         "run",
+        "-c",
+        "packages/evolution/scripts/vitest.family.config.mjs",
         "packages/evolution",
         "--maxWorkers=2",
         "--testTimeout=30000"
@@ -205,7 +207,7 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "machine-local command outside this repo (table row 13)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "gate-14",
@@ -218,7 +220,7 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "machine-local command outside this repo (table row 14)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "gate-15",
@@ -232,7 +234,7 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "machine-local command outside this repo (table row 15)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "gate-16",
@@ -572,7 +574,7 @@
     {
       "id": "gate-37",
       "kind": "script",
-      "human": "`node packages/scripts/verify-source-text-single-source.mjs packages`（G7-3 份数=1：**全家族只许有一份注释剥离实现**（家＝`scripts/lib-source-text.mjs` ✓），任何探针再自带一份（按名字或按块注释正则）即红 ✓；判据实测从 **7 文件 → 1** ✓。drill：往 `verify-package-map.mjs` 塞一个 `withoutComments` ⇒ 必红并点名；撤回即绿 ✓）",
+      "human": "`node packages/scripts/verify-source-text-single-source.mjs packages`（G7-3 份数=1：**全家族只许有一份注释剥离实现**（家＝`scripts/lib-source-text.mjs` ✓），任何探针再自带一份（按名字即红；另有一条只覆盖特定拼法的正则网，其覆盖边界见 G0-0.3 记录）即红 ✓；判据实测从 **7 文件 → 1** ✓。drill：往 `verify-package-map.mjs` 塞一个 `withoutComments` ⇒ 必红并点名；撤回即绿 ✓）",
       "argv": [
         "node",
         "packages/scripts/verify-source-text-single-source.mjs",
@@ -662,7 +664,7 @@
     {
       "id": "gate-43",
       "kind": "script",
-      "human": "`node packages/scripts/verify-io-discipline.mjs packages`（G2.2/C4：**写门面是通往磁盘的唯一一道门**——域内 src 不得裸调 rmSync／unlinkSync／renameSync／copyFileSync／writeFileSync／mkdirSync 或裸异步 rm(／unlink(／rename(／copyFile(；**方法调用**（io().rename(、this.io.remove(）放行；介质＝evolution-core/src/io.ts ＋ evolution-io-fs＋evolution-io-node 的 src。drill：往域内注入一个 rmSync ⇒ 点名必红；撤回即绿）",
+      "human": "`node packages/scripts/verify-io-discipline.mjs packages`（G2.2/C4：**写门面是通往磁盘的唯一一道门**——域内 src 不得裸调 rmSync／unlinkSync／renameSync／copyFileSync／writeFileSync／mkdirSync 或裸异步 rm(／unlink(／rename(／copyFile(；**方法调用**（io().rename(、this.io.remove(）放行；介质＝evolution-core/src/io.ts ＋ evolution-io-node 的 src。drill：往域内注入一个 rmSync ⇒ 点名必红；撤回即绿）",
       "argv": [
         "node",
         "packages/scripts/verify-io-discipline.mjs",
@@ -781,6 +783,21 @@
       ]
     },
     {
+      "id": "gate-51",
+      "kind": "script",
+      "human": "`node packages/scripts/gen-line-manifest.mjs --check`（G0/0.7 复核：床清单必须与树一致 —— 生成物陈旧即红。这条是「退役包不得残留在在册交付件里」的守卫：io-fs 于 2b.2 退役后曾长期残留在 line-manifest.json 里，而当时没有任何档位以 --check 调用生成器。CI 形态是**三段**：`gen-line-manifest`（无条件重生成）→ `test -z \"$(git status --porcelain -- packages/scripts/files/line-manifest.json)\"`（入库副本必须与树一致；用 porcelain 而非 diff，因为未跟踪文件对 diff 不可见，而「根本没入库」正是这条门禁要抓的形态之一）→ `--check`。**产物格式**：`{ pin, bed: { mono }, entries: [{ id, kind, relPath }] }` —— entries 由**仓内名册**派生（`relPath` 相对 overlay 根），不含任何宿主绝对路径；`pin` 取 `git -C <root> rev-parse --short HEAD`，**不参与**逐字比对（身份是 id+kind，pin 随提交前进），`--check` 只断言它非 `unknown`，缺 pin ⇒ exit 2）",
+      "argv": [
+        "node",
+        "packages/scripts/gen-line-manifest.mjs",
+        "--check"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
@@ -798,7 +815,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-02",
@@ -815,7 +832,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-03",
@@ -832,7 +849,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-04",
@@ -849,7 +866,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-05",
@@ -866,7 +883,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-06",
@@ -883,7 +900,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-07",
@@ -900,7 +917,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-08",
@@ -915,7 +932,7 @@
       "tree": "mirror",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-09",
@@ -934,7 +951,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-10",
@@ -950,7 +967,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-11",
@@ -964,7 +981,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-12",
@@ -979,7 +996,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-13",
@@ -993,7 +1010,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "ci-only-14",
@@ -1010,7 +1027,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0",
+      "expiry": "0.27.0",
       "localSafe": false,
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
@@ -1064,7 +1081,7 @@
       ],
       "noDrillReason": "live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half",
       "reason": "live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)",
-      "expiry": "0.26.0"
+      "expiry": "0.27.0"
     },
     {
       "id": "health-admission",

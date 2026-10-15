@@ -103,6 +103,7 @@ export interface CuratorRunReport {
   llmReviewEnabled?: boolean
   /** V6-35 (0.3.36): lenient-parse shape notes from the LLM nomination block. */
   nominationsWarnings?: string[]
+  scanWarnings?: string[]
   /** 0.5.0 V1 (design §16.6-④): archived entries past the retention window that
    * the CURRENT policy keeps rather than deletes. Present (even empty) only when
    * the retention policy was `report`, so a report cannot read as "nothing
@@ -128,6 +129,7 @@ export interface CuratorReportInput {
   snapshotPath?: string
   llmReviewEnabled?: boolean
   nominationsWarnings?: readonly string[]
+  scanWarnings?: readonly string[]
   wouldPrune?: readonly string[] | null
 }
 
@@ -148,6 +150,7 @@ export function buildCuratorRunReport(input: CuratorReportInput): CuratorRunRepo
     ...input.snapshotPath === undefined ? {} : { snapshotPath: input.snapshotPath },
     ...input.llmReviewEnabled === undefined ? {} : { llmReviewEnabled: input.llmReviewEnabled },
     ...input.nominationsWarnings === undefined ? {} : { nominationsWarnings: [...input.nominationsWarnings] },
+    ...input.scanWarnings === undefined ? {} : { scanWarnings: [...input.scanWarnings] },
     ...input.wouldPrune === undefined ? {} : { wouldPrune: input.wouldPrune === null ? null : [...input.wouldPrune] },
   }
 }
@@ -181,6 +184,7 @@ export function renderCuratorReportMarkdown(report: CuratorRunReport): string {
       ? '- **Would prune (archiveRetention=report)**: unknown (archive listing unreadable)'
       : `- **Would prune (archiveRetention=report)**: ${report.wouldPrune.length}`],
     ...report.nominationsWarnings === undefined || report.nominationsWarnings.length === 0 ? [] : [`- **Nomination warnings**: ${report.nominationsWarnings.join('; ')}`],
+      ...report.scanWarnings === undefined || report.scanWarnings.length === 0 ? [] : report.scanWarnings.map((warning: string) => '- **Dedup scan**: ' + warning),
   ]
   const section = (title: string, items: string[]): string[] => items.length === 0 ? [] : ['', `## ${title}`, '', ...items.map(item => `- ${item}`)]
   return [

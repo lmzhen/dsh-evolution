@@ -57,17 +57,27 @@ try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) } catch (error) 
 const entries = Array.isArray(manifest.entries) ? manifest.entries : []
 if (entries.length === 0) { console.error('verify-line-identity: manifest carries no entries (a vacant manifest is not a pass)'); process.exit(2) }
 
+// P1-② (release review 2026-10-15): the family rule (lib-line-header) is that a green result may NOT be
+// claimed when the line is unknown. This gate used to SKIP its one substantive assertion in that case,
+// so a pin:"unknown" artifact passed vacuously. Unknown line is now cannot-decide (exit 2).
 const pin = manifest.pin
+if (pin === undefined || pin === 'unknown') {
+  console.error('verify-line-identity: CANNOT DECIDE - the manifest carries no line pin; a green result may not be claimed when the line is unknown')
+  process.exit(2)
+}
 const familyRoots = (policy.familyRoots ?? [MIRROR]).map((root) => resolve(root).toLowerCase())
 const underFamilyRoot = (path) => familyRoots.some((root) => resolve(path).toLowerCase().startsWith(root))
 for (const entry of entries) {
   const kind = String(entry.kind ?? '?')
   const id = String(entry.id ?? '?')
-  const path = String(entry.resolvedPath ?? '')
+  // P1-① (release review 2026-10-15): the artifact carries relPath (overlay-relative) now, so reading
+  // only resolvedPath made this constant empty and the containment check below unreachable.
+  const rel = String(entry.relPath ?? '')
+  const path = String(entry.resolvedPath ?? (rel === '' ? '' : rel))
   if (!allowed.has(kind)) { mismatch.push(id + ' resolved from ' + kind + ' which the policy does not allow'); continue }
   if (id.startsWith('@deepseek-ai/dsh-evolution-')) {
     if (!familyKinds.has(kind)) mismatch.push(id + ' is a FAMILY package but resolved from ' + kind + ' (' + path + ')')
-    else if (pin !== 'unknown' && !underFamilyRoot(path)) mismatch.push(id + ' resolved outside the pinned trees (' + familyRoots.join(' | ') + '): ' + path)
+    else if (rel !== '' ? !rel.startsWith('packages/evolution/') : !underFamilyRoot(path)) mismatch.push(id + ' resolved outside the pinned trees (' + familyRoots.join(' | ') + '): ' + path)
   }
   if (kind === 'profile-hoist') {
     const declared = hoist[id]

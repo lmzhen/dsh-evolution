@@ -162,7 +162,13 @@ runs:
         # job and on an immediate rerun. This is the same configuration the
         # release-time local gate uses (and has been green 10/10 repeatedly):
         # maxWorkers=2, testTimeout=30s.
-        node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000
+        # P0 (release review 2026-10-15): the family suite must run under the FAMILY config. Without `-c`
+        # vitest picks up the PLATFORM root config, whose setupFiles (scripts/test-invariants.ts) require
+        # every tested package to ship src/invariant.ts - a platform convention the family does not follow
+        # (0 such files). Every family spec then fails in setup, which is how this line read RED while the
+        # local gate read GREEN: the comment above claims this IS the local gate configuration, and with
+        # `-c` it now is. The load-sensitive step below already invokes a family script the same way.
+        node node_modules/vitest/vitest.mjs run -c packages/evolution/scripts/vitest.family.config.mjs packages/evolution --maxWorkers=2 --testTimeout=30000
         node node_modules/oxlint/bin/oxlint packages/evolution
 
     # G7 (0.17.0): the D-9 test-file typecheck step is GONE with the baseline job — it ran the
@@ -180,6 +186,29 @@ runs:
         # a known concurrency, and the runner also fails when a renamed case
         # drops out of the group (no vacuous pass).
         node packages/evolution/scripts/run-load-sensitive.mjs .
+    - name: Verify the line-manifest bed is current (G0/0.7)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The bed manifest is a SHIPPED artifact (packages/scripts/files/line-manifest.json) listing the
+        # family source bed. io-fs was retired in 2b.2 and stayed listed for weeks because nothing ran its
+        # generator with --check: the consumer gate only compares identities, never freshness. This is the
+        # freshness half, in CI so the row in CONTRIBUTING is a gate rather than a claim.
+        # Two guards, one mechanism each: regenerate unconditionally (so the check never depends on the
+        # artifact being committed - the generator is machine-independent now), then require the committed
+        # copy to match. Without the generation half, a fresh checkout with no ignored artifact reports
+        # stale on a tree nobody touched; without the check half, drift goes unnoticed.
+        node packages/scripts/gen-line-manifest.mjs
+        # P1 (release review round 4): generate-then-check alone is a write-then-read of the SAME bytes, so
+        # the committed copy never took part in the verdict (measured: a corrupted artifact passed the whole
+        # sequence while --check alone reddened on it). The committed copy is what ships, so drift is judged
+        # by git against the commit, not by comparing the file the previous command just wrote.
+        # `git status --porcelain` is the right predicate, not `git diff`: an UNTRACKED artifact is
+        # invisible to diff, and "the file never made it into the commit" is exactly the failure this
+        # step exists for (measured: a corrupted-but-untracked copy passed generate+diff). Empty output
+        # means the committed copy and the regenerated one agree AND the file is tracked.
+        test -z "$(git status --porcelain -- packages/scripts/files/line-manifest.json)"
+        node packages/scripts/gen-line-manifest.mjs --check
 
     - name: Verify dependency closure (G0.1 guard)
       shell: bash
@@ -187,7 +216,7 @@ runs:
       run: |
         # 0.3.26 (V4-03): F-105's guard was only run locally — wire it into the
         # chain before packing so a new undeclared cross-package import fails CI.
-        node packages/evolution/scripts/verify-dependency-closure.mjs packages/evolution
+        node packages/evolution/scripts/verify-dependency-closure.mjs packages/evolution --strict
     - name: Verify graph edges (P0-prime read path)
       shell: bash
       working-directory: upstream
@@ -401,7 +430,7 @@ runs:
         # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
         # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs
         # in the family's own gate against the mirror, where those files exist.
-        node packages/evolution/scripts/verify-doc-facts.mjs packages/evolution --strict
+        node packages/evolution/scripts/verify-doc-facts.mjs packages/evolution --strict --require-repo-docs
         node packages/evolution/scripts/verify-package-discovery.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-family-tool-names.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-skill-roots.mjs packages/evolution --strict

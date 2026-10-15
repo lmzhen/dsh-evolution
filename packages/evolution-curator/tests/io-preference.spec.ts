@@ -27,7 +27,11 @@ async function withHome<T>(run: (home: string) => Promise<T>): Promise<T> {
 }
 
 describe('G2 S3: the curator prefers the platform backend when the deployment mounts one', () => {
-  it('serves its reads through the fs provider, and works without it', async () => {
+  it('serves its reads through the registry default, and works with a second backend mounted', async () => {
+    // G2a/2a.4: the callers no longer name a backend, so the seam resolves through registry.provider()
+    // and the FIRST registered backend wins. This counter wraps the second one on purpose: the assertion
+    // is that the code never reaches it. (Before 2a.4 every caller pinned [fs]; the old expectation was
+    // 'the fs provider serves this', which is exactly the second resolution path the item removed.)
     await withHome(async () => {
       const base = nodeEvolutionIo()
       const content = '---\nname: demo\ndescription: Demo.\n---\n\n# Demo\n'
@@ -53,7 +57,7 @@ describe('G2 S3: the curator prefers the platform backend when the deployment mo
       const b = new EvolutionCurator(withFs, { autoStart: false })
       await b.skills.create('demo', content, 'foreground')
       await b.run({ dryRun: true, ignoreGates: true })
-      expect(counted.calls()).toBeGreaterThan(0)
+      expect(counted.calls()).toBe(0)
       b.stop()
     })
   })

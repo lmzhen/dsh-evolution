@@ -231,6 +231,7 @@
  *       behind, and — having no gate to live in — it is what made the two client halves hand-copy
  *       the same assertion word for word (the audit's cross-package pair).
  *   N30. an observable source has ONE owner: `getSnapshot` may be defined only in
+ *   N31. every bounded store is declared in ONE ledger (a cap constant no ledger entry names is red)
  *       `evolution-settings-ui/src/client/source.ts`, and a `hooks` compartment member must be a
  *       REFERENCE to what that module built. The renderer caches one hook binding per source object
  *       and compares the snapshot by reference, so a source built per render re-binds the hook and a
@@ -470,9 +471,14 @@ function swallowedReadSites(text) {
   return out
 }
 /** The read vocabulary whose failure must stay distinguishable from absence. */
-const READ_METHOD_RE = /\.(readText|readJson|readFile|size|list|mtime|exists|loadAll)\s*\(/
+// G0/0.7 review fix (2026-10-15): the vocabulary was missing the family OWN SKILL read, `read` - the very
+// method the three-state sweep (S4-01) exists for. With an EMPTY baseline ("an empty table is the class
+// closed"), every `library.read(...).catch(() => null)` was therefore invisible to this rule.
+const READ_METHOD_RE = /\.(readSkillProbe|readSupportFileProbe|readSupportFile|readText|readJson|readFile|size|list|mtime|exists|loadAll|read)\s*\(/
 /** The absent literals a swallowed read may answer with. */
-const ABSENT_CATCH_RE = /\.catch\s*\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*(?:null|undefined|false|\[\s*\]|''|"")\s*\)/
+// G0/0.7 review fix: an arrow may carry a RETURN TYPE (`( ): undefined => undefined`). The parameter
+// alternative stopped at the first `)`, so that shape - which hides the same swallow - never matched.
+const ABSENT_CATCH_RE = /\.catch\s*\(\s*(?:\([^)]*\)\s*(?::\s*[^=)]+)?|[A-Za-z_$][\w$]*)?\s*=>\s*(?:null|undefined|false|\[\s*\]|''|"")\s*\)/
 
 /** N36's frozen baseline: reviewed expression-form swallows per file. EMPTY since the group-5
  * three-state sweep (S5.6g, 2026) migrated every measured site to probeText/probeList/probeMtime — the
@@ -739,6 +745,8 @@ const MUTABLE_STATE = new Map([
   ['evolution-core/src/review-channel.ts :: markedSessions', 'WHY MODULE SCOPE (S4.4): the marker rides three FREE functions (markReviewChannel / clearReviewChannel / sweepReviewChannelSessions) that other packages call with a Session — there is no service instance in the picture, so an instance field would have no owner to live on. v37 S2.2: session.header.origin is a closed set (only \'subagent\'), so a plugin-driven turn cannot be attributed by the platform; evidence evolution-core/tests/review-channel.spec.ts; validity single-process.'],
   ['evolution-core/src/preset-composition.ts :: overridesCache', 'WHY MODULE SCOPE (S4.4): the override table is IMMUTABLE data read from disk, so process scope changes no behaviour; the cache is keyed by PATH because the plugin side and the generated installer port each resolve their own root (G6.1/M1), and re-parsing the table on every composition buys nothing.'],
   ['evolution-core/src/signals.ts :: dispatchLedgers', 'WHY MODULE SCOPE (S4.4): the store is keyed by the SIGNAL OBJECT through a WeakMap (entries die with the object) and is reached from the core fold, which has no service instance to hang it on; a per-instance store would have to be threaded through the whole fold for no ownership gain. v37 P7a: the platform writes ONE dispatch vocabulary per mounted runtime mode, and the fold needs per-turn state the TurnSignals value cannot carry; lifecycle normalizerForSignal (get-or-create) with weak keys; evidence evolution-core/tests/tool-dispatch.spec.ts; validity single-process.'],
+  ['evolution-core/src/skill-store.ts :: ROOT_SERIAL', 'WHY MODULE SCOPE (S4.4): the per-ROOT serial queue, shared by every SkillLibrary instance. Six services each build their own store over one skill tree, and the per-instance queue this replaced ordered nothing between them (S2-02/G1-1.4). The mutex cannot live on an instance because instances share nothing, and it cannot be a file lock because its job is to order in-process phases before the io transact layer. Keyed by resolved root so two roots stay independent.'],
+  ['evolution-io/src/index.ts :: mediumObservations', 'WHY MODULE SCOPE (S4.4): a WeakMap keyed by the registry object. The observation must stay readable AFTER preferProvider returns (a consumer asks later, from another call site) and its key IS the registry, so it cannot outlive the registry. Attaching it to the registry would mutate a caller-owned object; re-resolving per read would make the read face a second resolution path - and preferProvider documents itself as the ONE sanctioned place that turns not-registered into a fallback.'],
 ])
 // N13a (P5): must-execute payloads still on the non-waking primitive.
 const AGENT_INJECT_RE = /([A-Za-z_$][\w$.]*)\.inject\(/g
@@ -778,7 +786,7 @@ function wakeLocalKeys(text) {
 }
 // N14 (P5): a durable-read failure degraded to 'absent'. Key = 'try {<100 chars>} catch -> absent'.
 const CATCH_ABSENT_RE = /catch\s*(?:\([^)]*\))?\s*\{/g
-const DURABLE_READ_RE = /\b(?:readFile|readdir|statSync|readText|list|listFiles)\s*\(/
+const DURABLE_READ_RE = /\b(?:readSkillProbe|readSupportFileProbe|readSupportFile|readFile|readdir|statSync|readText|list|listFiles)\s*\(/
 // v41 phase-1 follow-up: the migration the entries below name has LANDED —
 // `evolution-core/src/probe.ts` exports the read three-state
 // (`Probe<T>` = present | absent | unknown{reason}) and its first real
@@ -885,6 +893,71 @@ function dispatchVocabularySites(text) {
     .replace(/(['"`])(?:\\.|(?!\1)[^\\\n])*\1/g, match => match.length <= 40 ? match : '""')
   return [...code.matchAll(DISPATCH_EVENT_TYPE_RE)].map(match => match[0])
 }
+/**
+ * N31 (G3/3.2): bounded stores live in ONE ledger, and the ledger may not lie.
+ *
+ * Pure over a reader so the startup self-test can prove it bites. Forward: every `named` declare must
+ * resolve to `export const <name>` in the module it names, and every `inline` declare must still match
+ * its snippet. Reverse (the direction that makes a new store red): a cap-shaped constant in a module
+ * the LEDGER names, referenced by no entry, is a bounded store nobody registered. The sweep stops at
+ * the ledger-named modules on purpose - a list of cap modules kept in the guard would be the second
+ * list this rule exists to prevent.
+ * @param reader - maps a repo-relative package path to its source, or null when absent.
+ * @returns every violation, as the message the guard prints.
+ */
+function storeLedgerViolations(reader) {
+  const violations = []
+  const ledgerText = reader("evolution-core/src/store-ledger.ts")
+  if (ledgerText === null) {
+    console.log('verify-arch-guards: N31 not armed: no evolution-core/src/store-ledger.ts in this tree (a synthetic fixture tree, not the family tree)')
+    return []
+  }
+  const ids = [...ledgerText.matchAll(/id: ['\"]([^'\"]+)['\"]/g)].map(match => match[1])
+  if (ids.length === 0) {
+    console.log('verify-arch-guards: N31 not armed: the store ledger in this tree declares no id')
+    return []
+  }
+  const named = [...ledgerText.matchAll(/kind: 'named', module: ['\"]([^'\"]+)['\"], name: ['\"]([^'\"]+)['\"]/g)].map(match => ({ module: match[1], name: match[2] }))
+  const inline = [...ledgerText.matchAll(/kind: 'inline', file: ['\"]([^'\"]+)['\"], contains: ['\"]([^'\"]+)['\"]/g)].map(match => ({ file: match[1], contains: match[2] }))
+  for (const item of named) {
+    const moduleText = reader(item.module)
+    if (moduleText === null || !moduleText.includes("export const " + item.name)) {
+      violations.push("verify-arch-guards (N31): the ledger names " + item.name + " in " + item.module + ", which does not export it")
+    }
+  }
+  for (const item of inline) {
+    const fileText = reader(item.file)
+    if (fileText === null || !fileText.includes(item.contains)) {
+      violations.push("verify-arch-guards (N31): the ledger matches " + item.contains + " in " + item.file + ", which no longer contains it")
+    }
+  }
+  const referenced = new Set(named.map(item => item.name))
+  // The sweep covers every module ANY declare names (named and inline alike): a store whose bound is
+  // declared inline still lives in a module, and that module is exactly where a NEW cap would appear.
+  const sweptModules = [...new Set([...named.map(item => item.module), ...inline.map(item => item.file)])]
+  for (const moduleRel of sweptModules) {
+    const moduleText = reader(moduleRel)
+    if (moduleText === null) continue
+    for (const match of moduleText.matchAll(/export const ([A-Z0-9_]+) =/g)) {
+      const name = match[1]
+      // Narrow on purpose: in this family MAX_* names a VALUE limit (a name length, a content size),
+      // not how many records a store keeps, so sweeping MAX_* reported 942 false positives. The blind
+      // spot - a store bounded by a MAX_* name - is declared in the rule's vacuity field instead of
+      // being guessed at here.
+      const bounded = /(_CAP|_KEEP|RETENTION_DAYS|RETAIN_ARCHIVES|RUN_RECORDS)$/.test(name)
+      if (bounded && !referenced.has(name)) {
+        violations.push(moduleRel + ": " + name + " is a bounded-store cap the ledger does not register - add it to STORE_LEDGER")
+      }
+    }
+  }
+  return violations
+}
+
+/** A synthetic reader for the N31 self-test: inline source per repo-relative path. */
+function sampleReader(files) {
+  return (relPath) => Object.prototype.hasOwnProperty.call(files, relPath) ? files[relPath] : null
+}
+
 /** Rule registry (append-only; --list-rules prints it and the docblock must match). */
 /** Rule registry (append-only; --list-rules prints it and the docblock must match).
  * Every entry carries its own contract: `incident` (the shape the rule exists for),
@@ -916,6 +989,7 @@ const RULES = [
   { id: 'N17', title: 'dispatch modality is read in registered sites only', incident: 'branching on dispatch.kind outside the registered sites', canonicalForm: 'the single vocabulary reader is consulted only where registered', vacuity: 'no modality branch in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N18', title: 'session/event consumers consult the opt-in gate', incident: 'a session/event consumer that never consults the audited gate', canonicalForm: 'the consumer consults sessionAudited before reading the stream', vacuity: 'no session/event consumer in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N19', title: 'one home per family fact (docs cite, never copy)', incident: 'a fact with no home, no must entry, or an empty table', canonicalForm: 'every fact carries id, home, must, and cites its machine owner', vacuity: 'an empty fact table is a VIOLATION and a fact without a home is too; the sample asserts both', sample: 'detector' },
+  { id: 'N40', title: 'a withTreeWrite callback touches no io/llm/this/ctx', incident: 'an LLM call or a tree copy written inside the typed critical section, so an operator undo waits for it', canonicalForm: 'the callback uses only its SnapshotView argument', vacuity: 'the startup self-test feeds it a callback that streams and one that only reads the view', sample: 'detector' },
   { id: 'N39', title: 'one owner for the <home>/profiles surface', incident: 'a second reader of <home>/profiles outside evolution-commands/src/profiles.ts (diagnostics and the write-path exclusion then share one answer)', canonicalForm: 'every profile-directory read lives in profiles.ts (scanProfiles is its only readdirSync)', vacuity: 'no package source scanned ⇒ the rule is NOT ARMED (printed, never silent); the design archive records a drill that injects a join(home, \'profiles\') and expects the file named', sample: 'detector' },
   { id: 'N20', title: 'declared persisted write sites match their writers', incident: 'a writer with the wrong serialization, or a claim nobody makes', canonicalForm: 'persisted-write-inventory.json matches the writers in the tree', vacuity: 'no write inventory under the root ⇒ the rule is NOT ARMED (printed, never silent); the sample carries the proof', sample: 'detector' },
   { id: 'N21', title: 'error codes are spelled once, in evolution-core/src/errors.ts', incident: 'a literal E-3xx string outside errors.ts', canonicalForm: 'codes come from errors.ts (errorText or the code table)', vacuity: 'no error-code literal outside errors.ts ⇒ pass; the sample carries the proof', sample: 'detector' },
@@ -933,6 +1007,7 @@ const RULES = [
   { id: 'N34', title: 'the settings user layer is read once, in evolution-core', incident: 'a package reading the settings user layer itself and taking its key names, so one key resolves two ways', canonicalForm: 'userSetKeys(ctx, paramRowId(owner)) is the only reader; consumers pass their own row id', vacuity: 'no user-layer read in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N35', title: 'a platform file:line citation is a frozen baseline', incident: 'a new citation of another repository line number, which no guard here can re-derive when that file moves', canonicalForm: 'platform references cite a symbol, not a line number; the frozen register only burns down', vacuity: 'no platform citation in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
   { id: 'N36', title: 'a promise-form swallow of a durable read is a frozen baseline', incident: 'await io.readText(p).catch(() => null): a read failure served as absent, invisible to the catch-block rule', canonicalForm: 'durable reads use the three-state probe; a reviewed expression-form swallow is listed and only burns down', vacuity: 'no expression-form swallow in the tree ⇒ pass; the sample carries the proof', sample: 'detector' },
+  { id: 'N31', title: 'every bounded store is declared in ONE ledger', incident: 'a cap constant (retention window, keep count, MAX_* key cap) sitting in code that no ledger entry names: the store is bounded, but no place can answer how long its records live (audit S1 4.3: eight rules across four packages, three of them inline)', canonicalForm: 'bounded stores are registered in evolution-core/src/store-ledger.ts, each entry naming the code that declares its bound', vacuity: 'the ledger file missing or holding no ids ⇒ the rule is NOT ARMED (printed, never silent); the reverse sweep only covers modules the ledger itself names', sample: 'detector' },
 ]
 
 /** Guards whose vacuum face is known and NOT yet handled: a registered, expiring debt.
@@ -1195,6 +1270,67 @@ function mutableStateBindings(text) {
   for (const match of text.matchAll(MUTABLE_STATE_RE)) {
     const name = match[1]
     if (new RegExp('\\b' + name + '\\.(?:add|set|delete|clear)\\(').test(text)) out.push(name)
+  }
+  return out
+}
+
+/**
+ * N40 (G1/1.5, S7-09): the callback of a withTreeWrite section must not reach for io / llm / this / ctx.
+ *
+ * The typed section hands the callback a SnapshotView and nothing else, which stops NEW code from having
+ * another entry - but a callback is a CLOSURE, so it can still reach the enclosing scope. TypeScript cannot
+ * refuse that, so the executable form of "an LLM call cannot be put inside the lock" is this source rule:
+ * any io / llm / this. / ctx. reference INSIDE the callback body is a violation.
+ *
+ * Pure over the source text so the startup self-test can prove it bites (same posture as N14/N36). The body
+ * is located by brace matching after the marker, because a line-based test would miss a multi-line body -
+ * which is exactly the shape the incident has.
+ * @param text - one source file.
+ * @returns the offending references, in source order.
+ */
+function treeWriteCallbackOffenders(text) {
+  const out = []
+  const marker = 'withTreeWrite('
+  let from = 0
+  for (;;) {
+    const at = text.indexOf(marker, from)
+    if (at < 0) break
+    from = at + marker.length
+    // `fn` is the LAST argument of the call, so its arrow is the LAST arrow inside the call span. The
+    // span itself must come from PAREN MATCHING - the first cut stopped at the first ')' and in the
+    // shape a probe uses (an inline 'async () => () => {}' acquire) that landed inside the empty
+    // parameter list, so the callback body was never read. The red proof caught it; the self-test now has
+    // that same shape so it would catch it first next time.
+    const openParen = text.indexOf('(', at)
+    if (openParen < 0) continue
+    let pdepth = 0
+    let closeParen = openParen
+    for (let i = openParen; i < text.length; i += 1) {
+      if (text[i] === '(') pdepth += 1
+      else if (text[i] === ')') {
+        pdepth -= 1
+        if (pdepth === 0) { closeParen = i; break }
+      }
+    }
+    const call = text.slice(openParen, closeParen + 1)
+    const arrow = call.lastIndexOf('=>')
+    if (arrow < 0) continue
+    const relOpen = call.indexOf('{', arrow)
+    if (relOpen < 0) continue
+    const open = openParen + relOpen
+    let depth = 0
+    let end = open
+    for (let i = open; i < closeParen; i += 1) {
+      if (text[i] === '{') depth += 1
+      else if (text[i] === '}') {
+        depth -= 1
+        if (depth === 0) { end = i; break }
+      }
+    }
+    const body = text.slice(open, end + 1)
+    for (const match of body.matchAll(/\b(?:this\.(?:io|llm|ctx)|ctx\.|llm\.|io\.)/g)) {
+      out.push(match[0])
+    }
   }
   return out
 }
@@ -1536,6 +1672,18 @@ function walk(dir) {
           }
         }
       }
+      // N31 (G3/3.2): bounded stores live in ONE ledger. Both directions live in the pure helper so
+      // the startup self-test can prove it bites (a re-spelled check witnesses nothing).
+      if (rel.includes("/src/")) {
+        const reader = (relPath) => {
+          // The ledger writes repo-friendly paths (packages/...), while this guard resolves against the
+          // packages root: normalize once here instead of forcing the ledger to know the guard's root.
+          const normalized = relPath.startsWith("packages/") ? relPath.slice("packages/".length) : relPath
+          const full = join(root, normalized)
+          return existsSync(full) ? readFileSync(full, "utf8") : null
+        }
+        for (const message of storeLedgerViolations(reader)) violations.push(message)
+      }
       // N13a (P5): a must-execute payload may not ride the non-waking primitive.
       if (rel.includes('/src/')) {
         for (const match of inertText(text).matchAll(AGENT_INJECT_RE)) {
@@ -1631,6 +1779,13 @@ function walk(dir) {
         const allowedSwallows = SWALLOWED_READ_BASELINE.get(rel) ?? 0
         if (swallowed.length > allowedSwallows) {
           violations.push(`${rel}: ${swallowed.length - allowedSwallows} NEW read failure(s) served as absent (line ${swallowed.join(', ')}) — a durable read's failure is not "absent" (rule N36); read it with probeText/probeList/probeMtime. Frozen baseline for this file: ${allowedSwallows}`)
+        }
+      }
+      // N40 (G1/1.5, S7-09): a typed tree-write section must not reach io/llm/this/ctx - see the docblock.
+      {
+        const offenders = treeWriteCallbackOffenders(text)
+        if (offenders.length > 0) {
+          violations.push(rel + ': ' + offenders.length + ' reference(s) inside a withTreeWrite callback reach outside the section (' + offenders.slice(0, 3).join(', ') + ') - the section sees only its SnapshotView (rule N40)')
         }
       }
       // N37 (6-2/A69): deprecated platform session-log accessors — see the docblock. PRODUCTION only:
@@ -1931,6 +2086,36 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
       && !profilesLineOffends('const files = readdirSync(skillsRoot)')
       && !profilesLineOffends("const root = join(home, 'agents')")
       && !profilesLineOffends("console.log('profiles-foreign: ' + name)")],
+    ['N40', () => treeWriteCallbackOffenders('await withTreeWrite(q, view, async (view) => { await llm.stream({ signal }) })').length === 1
+      && treeWriteCallbackOffenders('await withTreeWrite(q, view, async (view) => { view.note(text) })').length === 0
+      && treeWriteCallbackOffenders('await withTreeWrite(q, view, async (view) => { await this.io.writeText(p, c) })').length === 1
+      && treeWriteCallbackOffenders('const f = withTreeWrite(q, view, async (view) => view.read(name))').length === 0
+      // The probe shape: an arrow BEFORE the callback (a fake acquire). The first cut took the first
+      // arrow and read the empty inner body, so this sample is what failed to catch it.
+      && treeWriteCallbackOffenders('await withTreeWrite(async () => () => {}, view, async (v) => { await this.llm.stream({}) })').length === 1],
+    // N31: the incident (a cap constant no ledger entry names), the clean tree (every cap named), and
+    // the two forward shapes the ledger can lie with (a missing export, a vanished snippet).
+    ['N31', () => {
+      const clean = sampleReader({
+        "evolution-core/src/store-ledger.ts": "id: 'a', declare: [{ kind: 'named', module: 'evolution-core/src/constants.ts', name: 'SOME_CAP', value: 1 }]",
+        "evolution-core/src/constants.ts": "export const SOME_CAP = 1",
+      })
+      const unregistered = sampleReader({
+        "evolution-core/src/store-ledger.ts": "id: 'a', declare: [{ kind: 'named', module: 'evolution-core/src/constants.ts', name: 'SOME_CAP', value: 1 }]",
+        "evolution-core/src/constants.ts": "export const SOME_CAP = 1\nexport const NEWER_CAP = 2",
+      })
+      const missing = sampleReader({
+        "evolution-core/src/store-ledger.ts": "id: 'a', declare: [{ kind: 'named', module: 'evolution-core/src/constants.ts', name: 'GONE_CAP', value: 1 }]",
+        "evolution-core/src/constants.ts": "export const SOME_CAP = 1",
+      })
+      const unarmed = sampleReader({})
+      return storeLedgerViolations(clean).length === 0
+        && storeLedgerViolations(unregistered).length === 1
+        && storeLedgerViolations(missing).length >= 1
+        // NOT ARMED is a note, never a violation (see the N10b/N19/N20 convention): a synthetic tree
+        // without the shipped ledger is not the family tree, so the armed-failure signal is length 0 here.
+        && storeLedgerViolations(unarmed).length === 0
+    }],
   ]
   const broken = detectors.filter(([, probe]) => !probe()).map(([id]) => id)
   if (broken.length > 0) {

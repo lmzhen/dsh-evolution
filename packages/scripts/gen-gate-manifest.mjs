@@ -18,6 +18,18 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..', '..')
+// P2-③ (release review 2026-10-15): a row expiry and the axis register expiry were two numbers for one
+// window (rows said 0.26.0, the register said 0.27.0). One source: the register in family-facts.json,
+// falling back to the historical value when it is unreadable (the meta-gate then reports both, and
+// verify-gate-manifest owns the upgrade rule).
+const REGISTER_EXPIRY = (() => {
+  try {
+    const facts = JSON.parse(readFileSync(join(HERE, 'family-facts.json'), 'utf8'))
+    const checks = (facts.facts ?? []).find((f) => f?.machine?.kind === 'checks')
+    const row = (checks?.machine?.pendingAxes ?? []).find((a) => a.axis === 'expiry-due')
+    return typeof row?.expiry === 'string' ? row.expiry : '0.26.0'
+  } catch { return '0.26.0' }
+})()
 const OUT = join(HERE, 'gate-manifest.json')
 const check = process.argv.includes('--check')
 
@@ -63,7 +75,7 @@ for (const line of tableSrc) {
   }
   if (kind === 'external') {
     entry.reason = 'machine-local command outside this repo (table row ' + n + ')'
-    entry.expiry = '0.26.0'
+    entry.expiry = REGISTER_EXPIRY
   }
   gates.push(entry)
 }
@@ -121,7 +133,7 @@ for (const [i, name] of ciOnly.entries()) {
     tree: /packages\/evolution\/scripts/.test(verbatim || '') ? 'overlay' : 'mirror',
     profiles: isGate ? ['ci'] : [],
     reason: isGate ? 'CI-only gate with no table row yet — local slot pending (G0-1)' : 'mutating/helper step — registered, not run by run-gates (contract 5c)',
-    expiry: '0.26.0',
+    expiry: REGISTER_EXPIRY,
   })
 }
 
@@ -157,7 +169,7 @@ gates.push({
   cmd: graphEdgesLive,
   noDrillReason: 'live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half',
   reason: 'live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)',
-  expiry: '0.26.0',
+  expiry: REGISTER_EXPIRY,
 })
 // G0-5：tsc 行是**声明在本地跑**的检查 —— CI 注释（action.yml L168-171）写明 D-9 测试文件类型检查已随
 // baseline job 移除、`tsc -b tsconfig.host.json` 落在 **build line** 上 ⇒ 给该条目补 reason+expiry，
@@ -165,7 +177,7 @@ gates.push({
 for (const g of gates) {
   if (g.cmd.includes('typescript/lib/tsc.js') && g.reason === undefined) {
     g.reason = 'declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)'
-    g.expiry = '0.26.0'
+    g.expiry = REGISTER_EXPIRY
   }
 }
 

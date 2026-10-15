@@ -180,8 +180,10 @@ for (const g of list) {
   // the seam owns the spawn and reports killedBy explicitly; this file never infers it
   const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: 'pipe' })
   const ms = observed.ms
-  const status = observed.status ?? 1
-  if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
+  const status = observed.status === undefined ? null : observed.status
+  const scriptPath = resolve(cwd, script)
+  if (!existsSync(scriptPath)) records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [script], next: 'the declared script is not on disk - fix the row, or register this check as cannot-decide on this machine', evidence: script + ' absent' }))
+  else if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
   else if (status === 2) {
     // The family's CLI convention is 0 = pass / 1 = fail / 2 = CANNOT DECIDE. Collapsing 2 into
     // fail makes a missing input (an empty corpus, an absent bed, a reader that is not there)
@@ -223,4 +225,4 @@ if (has('--json')) {
   console.log('run-gates [' + profile + '] counts: pass=' + c.pass + ' fail=' + c.fail + ' cannotDecide=' + c.cannotDecide + ' skipped=' + c.skipped)
 }
 if (violations.length > 0) { console.error('run-gates: record contract violations: ' + violations.slice(0, 3).join(' | ')); process.exit(2) }
-process.exit(c.fail > 0 ? 1 : c.cannotDecide > 0 ? 2 : 0)
+process.exit(c.fail > 0 ? 1 : (c.cannotDecide > 0 || c.pass === 0) ? 2 : 0)

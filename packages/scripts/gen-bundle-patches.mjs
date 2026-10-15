@@ -24,24 +24,44 @@ import { join, resolve } from 'node:path'
  * @returns the file text, ending in exactly one newline.
  */
 function render(roster, form) {
-  const out = [...roster.forms[form].header, '- insert:']
+  const spec = roster.forms[form]
+  const prefix = spec.rowPrefix ?? "    "
+  const out = [...spec.header]
+  // G2a/2a.3: `insert` is declared, not assumed - the standalone composition is a plain row list and
+  // carries no `- insert:` line. Absent, it defaults to true and the three patch forms keep their byte
+  // identity.
+  if (spec.insert !== false) out.push("- insert:")
   let first = true
-  for (const group of roster.groups) {
-    const rows = roster.rows.filter((row) => row.group === group.id && row.forms.includes(form))
+  // G2a/2a.3: `layout` is declared per form, because a form's banner SEGMENTS are not the same thing as
+  // the roster's render groups: the standalone file splits two groups that the patches keep whole. Absent
+  // a layout, this is exactly the group iteration the patches have always used.
+  const layout = spec.layout ?? roster.groups.map((group) => ({ group: group.id }))
+  for (const segment of layout) {
+    const group = roster.groups.find((candidate) => candidate.id === segment.group)
+    // G2a/2a.3: a segment may name the rows it covers. The standalone file's banner segments do NOT line
+    // up with the roster's render groups (it splits two of them), so a group filter would silently DROP
+    // the rows the split moved - a declaration is the only faithful spelling.
+    const rows = segment.rows !== undefined
+      ? segment.rows.map((id) => roster.rows.find((row) => row.id === id)).filter((row) => row !== undefined && row.forms.includes(form))
+      : roster.rows.filter((row) => row.group === segment.group && row.forms.includes(form))
     if (rows.length === 0) continue
-    const banner = group.banners[form] ?? Object.values(group.banners).find((line) => typeof line === 'string')
-    if (typeof banner !== 'string') throw new Error('no banner for group ' + group.id + ' in form ' + form)
-    if (!first) out.push('')
-    out.push(banner)
+    const fallback = group === undefined ? undefined : (group.banners[form] ?? Object.values(group.banners).find((line) => typeof line === "string"))
+    const banner = segment.banner ?? fallback
+    const lines = Array.isArray(banner) ? banner : [banner]
+    if (lines.length === 0 || !lines.every((line) => typeof line === "string")) {
+      throw new Error("no banner for group " + segment.group + " in form " + form)
+    }
+    if (!first && spec.blankBetweenSegments !== false) out.push("")
+    out.push(...lines)
     first = false
     for (const row of rows) {
       out.push(...(row.leads !== undefined && row.leads[form] !== undefined ? row.leads[form] : row.lead))
-      out.push('    - id: ' + row.id)
+      out.push(prefix + "- id: " + row.id)
       out.push(...(row.bodies !== undefined && row.bodies[form] !== undefined ? row.bodies[form] : row.body))
     }
   }
-  out.push(...roster.forms[form].tail)
-  return out.join('\n') + '\n'
+  out.push(...(spec.tail ?? []))
+  return out.join("\n") + "\n"
 }
 
 const argv = process.argv.slice(2)
@@ -92,7 +112,14 @@ try {
 const forms = Object.keys(roster.forms)
 let stale = 0
 for (const form of forms) {
-  const target = join(root, 'evolution-' + form, 'cordis.patch.yml')
+  // G2a/2a.3: the form-to-artifact mapping is DECLARED, not derived. A derived path cannot see a delivered
+  // file that follows no form naming convention - the standalone composition is exactly that file, and an
+  // undeclared one is the orphan the reverse check reports.
+  // G2a/2a.3 fix: a DECLARED target is root-relative too. It used to be used as-is, so a declared
+  // "evolution-preset/cordis.yml" resolved against the process CWD (the repo root) and the standalone
+  // write landed outside the tree entirely (ENOENT). `resolve` keeps an absolute declaration working.
+  const declared = roster.forms[form].target
+  const target = declared === undefined ? join(root, "evolution-" + form, "cordis.patch.yml") : resolve(root, declared)
   const rendered = render(roster, form)
   if (!check) {
     writeFileSync(target, rendered)

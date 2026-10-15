@@ -14,7 +14,11 @@ import { countingIo } from '../../test-support/counting-io.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('G2 S3: skill-usage writes through the platform backend when mounted', () => {
-  it('serves record() through the fs provider, and works without it', async () => {
+  it('serves record() through the registry default, and works with a second backend mounted', async () => {
+    // G2a/2a.4: the callers no longer name a backend, so the seam resolves through registry.provider()
+    // and the FIRST registered backend wins. This counter wraps the second one on purpose: the assertion
+    // is that the code never reaches it. (Before 2a.4 every caller pinned [fs]; the old expectation was
+    // 'the fs provider serves this', which is exactly the second resolution path the item removed.)
     const root = await tempRoot('dsh-usage-fs-')
 
     const onlyNode = new Context()
@@ -36,6 +40,6 @@ describe('G2 S3: skill-usage writes through the platform backend when mounted', 
     await withFs.plugin(SkillUsageRegistry, { root })
     await withFs.skillUsage.record('demo', 'use')
     await new Promise(resolve => setTimeout(resolve, 20))
-    expect(counted.calls()).toBeGreaterThan(0)
+    expect(counted.calls()).toBe(0)
   })
 })

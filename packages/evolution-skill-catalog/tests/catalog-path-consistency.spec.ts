@@ -26,6 +26,7 @@ describe('catalog invalidation covers every write path (decision C)', () => {
     root: string
     library: SkillLibrary
     catalogOf: (name: string) => Promise<{ name: string; description: string } | undefined>
+    contentOf: (name: string) => Promise<string | undefined>
   }> {
     const root = await mkdtemp(join(tmpdir(), 'dsh-catalog-paths-'))
     const ctx = new Context()
@@ -36,11 +37,14 @@ describe('catalog invalidation covers every write path (decision C)', () => {
     const io = ctx.evolutionIo.provider('node')
     const library = new SkillLibrary(root, io, undefined, (event) => { ctx.emit('evolution/skill-mutated', event) })
     const catalogOf = async (name: string) => (await ctx.skills.snapshot()).skills.find(item => item.name === name)
-    return { root, library, catalogOf }
+    // S6-07: the published CONTENT is the body (catalog.spec.ts:41 V27 G5.3) - the only read that
+    // can tell a refreshed catalog from a stale one, since the summary carries no body.
+    const contentOf = async (name: string) => (await ctx.skills.get(name))?.content
+    return { root, library, catalogOf, contentOf }
   }
 
   it('content write paths (create / update / patch / write_file / remove_file) refresh the catalog', async () => {
-    const { root, library, catalogOf } = await setup()
+    const { root, library, catalogOf, contentOf } = await setup()
     expect(await catalogOf('alpha')).toBeUndefined()
 
     await library.create('alpha', skill('alpha', 'first description'), 'foreground')
@@ -51,6 +55,8 @@ describe('catalog invalidation covers every write path (decision C)', () => {
 
     await library.patch('alpha', 'Body of alpha.', 'Patched body.', '', false, 'foreground')
     expect(await catalogOf('alpha')).toBeDefined()
+    // S6-07: presence alone let a stale cache pass; the body must follow the write.
+    expect(await contentOf('alpha')).toContain('Patched body.')
 
     await library.writeSupportFile('alpha', 'references/note.md', '# note', 'foreground')
     await library.removeSupportFile('alpha', 'references/note.md', 'foreground')
@@ -60,7 +66,7 @@ describe('catalog invalidation covers every write path (decision C)', () => {
   })
 
   it('lifecycle write paths (archive / restore / consolidate / snapshot restore) refresh the catalog', async () => {
-    const { root, library, catalogOf } = await setup()
+    const { root, library, catalogOf, contentOf } = await setup()
     await library.create('bravo', skill('bravo', 'b'), 'foreground')
     await library.create('charlie', skill('charlie', 'c'), 'foreground')
     expect(await catalogOf('charlie')).toBeDefined()
@@ -70,6 +76,7 @@ describe('catalog invalidation covers every write path (decision C)', () => {
 
     await library.restoreFromArchive('charlie')
     expect(await catalogOf('charlie')).toBeDefined()
+    expect(await contentOf('charlie')).toContain('# charlie')
 
     await library.consolidate('bravo', ['charlie'], 'foreground')
     expect(await catalogOf('bravo')).toBeDefined()
@@ -80,6 +87,7 @@ describe('catalog invalidation covers every write path (decision C)', () => {
     expect(await catalogOf('bravo')).toBeUndefined()
     await library.restoreLatestSnapshot()
     expect(await catalogOf('bravo')).toBeDefined()
+    expect(await contentOf('bravo')).toContain('# bravo')
 
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })

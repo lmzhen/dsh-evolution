@@ -125,11 +125,16 @@ it('V26-01: a concurrent write landing inside the commit transact aborts the mer
   const fakeTransact: typeof transactIo = async (ioLike, path, task) => {
     if (!driftInjected && path.replaceAll('\\', '/') === targetPath) {
       driftInjected = true
-      // The competing instance has its own serial chain — exactly like
-      // tool-skill-manage vs curator in one process.
-      const other = new SkillLibrary('/skills', io)
-      const patch = await other.patch('cas-target', 'original body.', 'CONCURRENT EDIT.')
-      if (!patch.ok) throw new Error(`concurrent patch failed: ${patch.message}`)
+      // G1/1.4 (S2-02): this used to construct a SECOND SkillLibrary and let
+      // it patch — its own serial chain, "exactly like tool-skill-manage vs
+      // curator in one process". That was the defect: those two instances now
+      // share ONE per-root queue, so a queued writer can no longer land inside
+      // the commit transact (it would simply wait, and waiting for a writer
+      // the commit is waiting to detect is a cycle). The only writer that CAN
+      // land there is one below the queue — another process, which the io
+      // layer is what stands in for here.
+      const currentBytes = (await io.readText(targetPath))
+      await io.writeText(targetPath, currentBytes.replace('original body.', 'CONCURRENT EDIT.'))
     }
     const current = await ioLike.readText(path)
     const next = await task(current)

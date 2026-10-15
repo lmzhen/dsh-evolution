@@ -84,7 +84,7 @@ state onto an empty domain.
 |---|---|
 | Validated DSH platform line | **`0.2.0-rc.2`** (`PLATFORM_VERSION`; the pinned dev baseline is `UPSTREAM_SHA=fb2c4b9e…`) |
 | Declared dependency window | `^0.2.0-rc.1` on every `@deepseek-ai/dsh-*` dependency/peer (`PLATFORM_FLOOR`) |
-| Family version | `0.25.9` (this tree; the npm tag comes from the release tag — per-form status in `packages/INSTALL.md`) |
+| Family version | `0.26.16` (this tree; the npm tag comes from the release tag — per-form status in `packages/INSTALL.md`) |
 | Node | 22.19+ or 24+ (`engines`) |
 | Platform-line history | `0.17.0-rc.1` and later → `0.2.0-rc.2`; `0.3.70`–`0.16.1` → `0.1.5-rc.2`; `0.3.69` and earlier → `0.1.1-rc.2` |
 
@@ -265,7 +265,7 @@ The loops stop, your data does not: memory, skills, state, reports and approval 
 | [`packages/INSTALL.md`](./packages/INSTALL.md) | install-form semantics and the per-platform verification matrix |
 | [`packages/README.md`](./packages/README.md) | command reference, package map, environment/knob reference, layout notes |
 | [`CHANGELOG.md`](./CHANGELOG.md) | what changed in each version, with reasons and evidence |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact may live, the 50-step gate, house rules |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | where a fact may live, the 51-step gate, house rules |
 
 <details>
 <summary>For maintainers: upstream upgrade checklist</summary>

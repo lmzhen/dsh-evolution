@@ -16,6 +16,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { clearReviewChannel, isReviewChannelSession } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
@@ -35,6 +36,7 @@ async function fixture(options: {
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
   // G4: the review reads the turn window from the family's session projection, so the stub must be
   // foldable and every append must announce the event it appends.
   const session = projectable({

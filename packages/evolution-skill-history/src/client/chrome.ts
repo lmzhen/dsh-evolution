@@ -166,9 +166,12 @@ export function groupHeading(title: string, noteText: string | undefined): React
   ]
 }
 
-/** What the list shows when it has nothing to show. */
-export function emptyState(text: string): ReactNode {
-  return createElement('p', { className: 'evo-hist-empty' }, text)
+/** What the list shows when it has nothing to show.
+ * S5-07: the sites that render it as a SIBLING in an array must pass a key - a keyless sibling made
+ * React warn on every render of the default view (measured: one warning per render, captured by spy).
+ */
+export function emptyState(text: string, key?: string): ReactNode {
+  return createElement('p', { key, className: 'evo-hist-empty' }, text)
 }
 
 /** One notice about what just happened. */

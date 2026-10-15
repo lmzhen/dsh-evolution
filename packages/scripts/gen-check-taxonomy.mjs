@@ -20,6 +20,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { familyVersion, versionReached } from './lib-family-version.mjs'
+import { runnable, supersetPreTag, declaredPreTag, unknownProfiles } from './lib-gate-projection.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const TREE = resolve(HERE, '..')
@@ -40,11 +41,16 @@ const current = familyVersion(TREE)
 
 // --- source 1: the gate rows, by their profiles -------------------------------------------
 const manifest = existsSync(MANIFEST) ? readJson(MANIFEST) : { gates: [] }
+const __badProfiles = unknownProfiles(manifest.gates)
+if (__badProfiles.length > 0) {
+  console.error('profile literal outside the vocabulary (local/pre-tag/ci): ' + __badProfiles.map((e) => e.id + '=' + e.bad.join(',')).join(' '))
+  process.exit(2)
+}
 const gatesWith = (predicate) => manifest.gates.filter(predicate).map((gate) => gate.id).sort()
 // gates are keyed by the TIER their profiles express (R22': the manifest is the membership home)
 const laneGates = {
   fast: gatesWith((gate) => (gate.profiles ?? []).includes('local')),
-  'pre-tag': gatesWith((gate) => (gate.profiles ?? []).includes('pre-tag')),
+  'pre-tag': declaredPreTag(manifest.gates).map((gate) => gate.id).sort(),
   'ci-only': gatesWith((gate) => (gate.profiles ?? []).includes('ci') && !(gate.profiles ?? []).includes('local')),
 }
 

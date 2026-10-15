@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { allowRowCollisions } from './env.ts'
+import { scopedPackageName } from './package-identity.ts'
 
 /**
  * Build the user-root Evolution preset composition from the RUNTIME platform's
@@ -200,7 +201,9 @@ export function compositionRowIds(composition: string): Set<string> {
 }
 
 /** The platform package a DECLARATIVE preset row names (0.2.x replaced preset directories with it). */
-export const AGENT_PRESET_PACKAGE = '@deepseek-ai/dsh-agent-preset'
+// G-04: DERIVED from this package own manifest scope, so the published scope follows without any
+// release-time text rewrite (the .mjs mirror derives the same way).
+export const AGENT_PRESET_PACKAGE = scopedPackageName('dsh-agent-preset', import.meta.url)
 
 /** Identity and display metadata of one generated preset row. */
 export interface PresetRowIdentity {

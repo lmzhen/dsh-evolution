@@ -1,4 +1,10 @@
 # Changelog
+## 0.26.16 (patch) — 按优化计划完成 G0–G4 全批，并在发布前独立复核中修掉三条判据自身的假绿
+
+> **现象**：这一批把家族插件按 design/00-optimization-plan.md 的分组做完（G0 元层判据含 0.7 假绿族逐条红证化、G1 写入路径 1.1–1.8、G2a 2a.1–2a.4、G2b 2b.1–2b.4、G3 3.1–3.4、G4 4.0–4.4）。收尾时三席独立复核（立场互相对撞、只读、变异在临时副本）判「无阻断，可以发布」，但钉出三条**判据自己**的假绿：CI 的 vitest 步骤不带 `-c` 家族配置（落平台根配置的 invariant harness，家族包没有对应文件，spec 在 setup 阶段全灭）；床清单产物内嵌宿主绝对路径且被 `.gitignore` 的裸 `files/` 忽略（本地绿、换机与全新检出红）；新增的床清单门禁在 CI 里是「先生成再检查同一份字节」的写后读自洽绿，且 `pin` 取 HEAD 又参与逐字比对（下一个提交即自失效）。
+> **根因**：三处都是同一类——**判据的仪器与发布的仪器不是同一套**，或**判据比对的是它自己刚写下的东西**。前者让绿读数只在某个布局成立，后者让「陈旧即红」永远不成立。
+> **修复**：①CI 步骤改 `-c packages/evolution/scripts/vitest.family.config.mjs`，并把它登记为 gate-03（argv/human 与表第 3 行同步）；②床清单改为机器无关（`entries` 只存 `id`/`kind`/`relPath`，由仓内名册派生；`bed` 用逻辑值），`.gitignore` 把 `files/` 锚定为 `/files/` 并反忽略该产物（git 不能重新包含父目录被排除的文件，锚定是承重的那一半），CI 步骤改「先生成 → `test -z "$(git status --porcelain -- 产物)"` → `--check`」（porcelain 而非 diff：未跟踪文件对 diff 不可见，而「根本没入库」正是它要抓的形态），同批删掉 `_lab/line-manifest.json`（0.23.0 引入、106KB、368 处宿主路径的同名异物）；③`pin` 退出比对面（身份是 `id`+`kind`，`pin` 取 `git -C <root> rev-parse --short HEAD`，`--check` 只断言它非 `unknown`，缺则 exit 2）。另有 `read` 进 N36 读词表并迁移 7 处吞读、`--coverage` 增加「锚点可命中」判据（`anchorBroken`/`anchorUnchecked`）、19 行 expiry 与寄存器同源、两条无数据源轴登记为债。
+> **验证**：一次性快照（同一时刻取数）ARCH／META／DOC／REL／COVERAGE／REGISTRY／LINEMANIFEST（含换机模拟）／LINE_IDENTITY／LINE_IDENTITY_CI 十项全 0；32 个有 spec 的包逐包单跑全绿（`-c` 家族配置、`CI=1`）；类型线 15 项目只报既有的 `session-projection.ts` 与 vendor 两份副本。三条假绿的修法各自带红证：CI 缺 `-c` 时 30 红、补后 48 绿；产物篡改 `relPath` ⇒ `platform line mismatch` ＋点名 ＋exit 1；`git status --porcelain` 在产物未入库时为非零。
 
 ## 0.26.15 (patch) — 已登记的「本机／overlay 专属」行不再被可执行性判据重复计入
 

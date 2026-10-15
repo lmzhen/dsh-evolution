@@ -16,4 +16,9 @@ dist.previous/
 dist.next/
 .release-staging.previous/
 .release-staging.next/
-files/
+/files/
+# G0/0.7 review fix (2026-10-15): the bed manifest is a SHIPPED artifact (an in-register deliverable),
+# but the `files/` rule above ignored it, so a fresh CI checkout had no manifest at all and
+# `gen-line-manifest --check` reported stale on a tree nobody had touched. Un-ignore the ONE file;
+# the rule above stays as it is (tightening it is a separate repo-hygiene item). Anchoring is the load-bearing half: git cannot re-include a file whose PARENT DIRECTORY is excluded, so `files/` had to become `/files/` (root only) for this line to mean anything.
+!packages/scripts/files/line-manifest.json

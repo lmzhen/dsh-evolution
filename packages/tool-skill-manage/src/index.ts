@@ -19,6 +19,7 @@
  */
 
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+import { skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -225,7 +226,18 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
   if (name === '') return { available: false, reason: '这条暂存写入没有指明技能' }
   const filePath = typeof operation.file_path === 'string' && operation.file_path !== '' ? operation.file_path : null
   const path = filePath ?? 'SKILL.md'
-  const before = await (filePath === null ? library.read(name) : library.readSupportFile(name, filePath)).catch(() => null)
+  // S4-01 (G0/0.7): built on the library OWN three-state read (readSkillProbe/readSupportFileProbe),
+  // not on a local try/catch around an absorbing read. The library absorbs ENOENT/EISDIR and rethrows
+  // everything else by contract, and a rethrow read as "absent" let an unverifiable target pass the
+  // anchor - the downgrade the library docblock warns about. `unknown` now refuses the approval, and
+  // the three states are named once in the library instead of re-derived at each call site.
+  const probe = filePath === null
+    ? await library.readSkillProbe(name)
+    : await library.readSupportFileProbe(name, filePath)
+  if (isUnknown(probe)) {
+    return { available: false, reason: '目标当前读不到（' + probe.reason + '），无法核验暂存锚点 —— 先修好可读性再批准' }
+  }
+  const before: string | null = isPresent(probe) ? probe.value : null
   const staged = operation.staged_from_sha256
   const anchor: WriteAnchor | undefined = typeof staged === 'string' && staged !== ''
     ? staged === 'absent' ? { absent: true } : { sha256: staged }
@@ -396,13 +408,6 @@ function confirmedBy(
   return selected.includes(confirmLabel)
 }
 
-/** v30 REV-02: read the protected-skill list off the (optional) policy
- * snapshot through an `unknown` boundary — the Context augmentation types the
- * getter non-optionally, but at runtime the row can be absent. */
-function policySnapshotOf(source: unknown): ({ protectedSkillNames?: readonly string[] } & PolicyStageFields) | undefined {
-  return (source as { get?(): { protectedSkillNames?: readonly string[] } & PolicyStageFields } | undefined)?.get?.()
-}
-
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   // G1: suppress the platform's auto-generated settings page for this row (the
   // family renders its own card from the registry). Probed, not assumed: a host
@@ -454,8 +459,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   /** The policy snapshot's protected list, or `undefined` when the row is not mounted — read by
    * the write gates at BOTH points, through the one unknown-boundary helper above. */
-  const protectedSkillNamesOf = (): readonly string[] | undefined =>
-    policySnapshotOf(ctx.get('evolutionPolicy'))?.protectedSkillNames
   /**
    * The protected-skill line appended to the skills guidance (B4, design §4.3).
    *
@@ -468,7 +471,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   const protectedSkillsLine = (): string => {
     try {
-      const names = protectedSkillNamesOf() ?? []
+      const names = protectedSkillNamesOf(ctx.get('evolutionPolicy')) ?? []
       if (names.length === 0) return ''
       const shown = names.slice(0, PROTECTED_SKILLS_INLINE_MAX)
       const rest = names.length - shown.length
@@ -581,7 +584,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   const settings = (): SkillSettings => {
     const row = rowSettings()
-    const stages = policyStageLimits(policySnapshotOf(ctx.get('evolutionPolicy')))
+    const stages = policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.())
     const userSet = userSetKeys(ctx, paramRowId('tool-skill-manage'))
     // Only these two knobs have a policy stage; the rest end at the row.
     return {
@@ -611,13 +614,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // steady value, not a per-call one.
     versionKeep: limit('skillVersionKeep', rawConfig.skillVersionKeep, DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
   }
-  const library = newSkillLibrary({ config: rawConfig, io, limits: libraryLimits, ctx, threatExemptLabels: rawConfig.threatExemptLabels })
+  const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rawConfig, io, limits: libraryLimits, ctx, threatExemptLabels: rawConfig.threatExemptLabels })
   /** Write the CURRENT resolved settings into the library's live limits object. */
   const applyLimits = (): void => {
     const resolved = settings()
     // Read the deployment carriers at apply time too: a policy edit lands on the
     // next write without a restart, exactly like a user-layer edit does.
-    const stages = policyStageLimits(policySnapshotOf(ctx.get('evolutionPolicy')))
+    const stages = policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.())
     Object.assign(libraryLimits, {
       maxNameLength: resolved.maxSkillNameLength,
       maxDescriptionLength: resolved.maxDescriptionLength,
@@ -771,15 +774,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // record accepted under an older policy must not land on a skill the CURRENT policy protects
     // (v30 REV-02). The admission-only gates (read-before-write) stay at the tool path: their
     // verdict belongs to the writing session, which a replayed record does not have.
-    const refusal = await runWriteGates({
-      point: 'execution',
-      args,
-      origin,
-      protectedNames: protectedSkillNamesOf(),
-      readNames: undefined,
+    const refusal = await runWriteGates(skillWriteGateContext({
+      policy: ctx.get('evolutionPolicy'),
       confirm: undefined,
+      readNames: undefined,
       warn: warnWriteGateOnce,
-    })
+    }, { point: 'execution', args, origin }))
     if (refusal !== null) {
       return { ok: false, message: refusal, skills: [] }
     }
@@ -979,10 +979,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // below; computeDedupGroups itself is untouched.
     const contents = new Map<string, string>()
     let excludedBodies = 0
+    let unreadableBodies = 0
     for (let offset = 0; offset < list.length; offset += 16) {
       await Promise.all(list.slice(offset, offset + 16).map(async (summary) => {
-        const body = await library.read(summary.name).catch(() => null)
-        if (body === null || body.trim() === '') {
+        // G0/0.7 (S4-01 sweep): an UNREADABLE skill is not an empty one. The swallow folded both into
+        // `null`, so a transient read failure inflated the "excluded: empty body" count and silently
+        // removed that skill from the dedup input. The three-state read keeps them apart: unknown skips
+        // the skill and is counted on its own line, absent/present keep the old meaning.
+        const probe = await library.readSkillProbe(summary.name)
+        if (isUnknown(probe)) {
+          unreadableBodies += 1
+          return
+        }
+        const body = isPresent(probe) ? probe.value : ''
+        if (body.trim() === '') {
           excludedBodies += 1
           return
         }
@@ -999,9 +1009,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // grouping — a short group list must not read as "nothing similar was
     // checked". Same leading-newline style as warningLine; spliced in only
     // when non-empty so the no-exclusion output stays byte-identical.
+    // G0/0.7 (S4-01 sweep): the message used to say "unreadable/empty" over ONE counter, which is how a
+    // transient read failure read as an empty body. The two causes are reported apart now; both lines stay
+    // empty when both counters are zero, so the no-exclusion output remains byte-identical.
     const excludedLine = excludedBodies === 0
       ? ''
-      : `\n${excludedBodies} skill bodies were unreadable/empty and excluded from dedup grouping.`
+      : `\n${excludedBodies} skill bodies were empty and excluded from dedup grouping.`
+    const unreadableLine = unreadableBodies === 0
+      ? ''
+      : `\n${unreadableBodies} skills could not be read and were skipped in dedup grouping - fix readability and re-run the review.`
     const warned = list
       .filter(summary => warnedFlag(summary.name))
       .map(summary => summary.name)
@@ -1014,7 +1030,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const header = list.length === 0
       ? 'No skills yet. Create one with action=create, or it is safe to author a new class-level umbrella.'
       : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low) and protection.${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
-    return [header, '', ...lines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), warningLine].join('\n')
+    return [header, '', ...lines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), ...(unreadableBodies > 0 ? [unreadableLine] : []), warningLine].join('\n')
   }
 
   ctx.tools.register(defineTool({
@@ -1125,7 +1141,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         point: 'admission',
         args,
         origin: libraryOrigin,
-        protectedNames: protectedSkillNamesOf(),
+        protectedNames: protectedSkillNamesOf(ctx.get('evolutionPolicy')),
         readNames: sessionReadSkillNames(ctx, exec.agent?.session),
         confirm: async request => confirmSkillWrite(request, exec),
         // Read at the WRITE, not at apply: a settings edit lands on the next write with no restart.
@@ -1154,7 +1170,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             : 0
           const body = typeof args.content === 'string' && args.content !== ''
             ? args.content
-            : typeof args.name === 'string' && args.name !== '' ? await library.read(args.name).catch(() => null) : null
+            // G0/0.7 (S4-01 sweep): three-state read - an unreadable target answers undefined (no description),
+            // which is what the swallow did; a missing one answers null. Same meaning, named.
+            : typeof args.name === 'string' && args.name !== '' ? await (async () => { const p = await library.readSkillProbe(args.name as string); return isUnknown(p) ? undefined : (isPresent(p) ? p.value : null) })() : null
           const frontmatter = body === null ? null : parseFrontmatter(body)?.frontmatter ?? null
           const parsedDescription = frontmatter === null ? undefined : frontmatter.description
           const description = typeof parsedDescription === 'string' ? parsedDescription : ''
@@ -1183,7 +1201,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // instead of staying unanchored — an unanchored staging let a
           // concurrent change between staging and approval be overwritten
           // silently. A truly absent target anchors 'absent' identically.
-          const stageCurrent = await library.read(args.name).catch(() => null)
+          // S4-01 (G0/0.7): P2-04 chose "unreadable anchors as absent" over "unanchored" - a binary
+          // choice that never considered the third option: REFUSE the staging. The library rethrows
+          // anything but ENOENT/EISDIR by contract, so an unreadable 技能 now refuses instead of
+          // claiming it does not exist.
+          let stageCurrent: string | null
+          try {
+            stageCurrent = await library.read(args.name)
+          } catch (error) {
+            const code = String((error as { code?: unknown } | undefined)?.code ?? 'IO 失败')
+            return { ok: false, message: '目标当前读不到（' + code + '），无法核验暂存锚点 —— 先修好可读性再批准', skills: [] }
+          }
           operation = { ...args, staged_from_sha256: stageCurrent === null ? 'absent' : contentHash(stageCurrent) }
         }
         // v30 REV-03: the anchor extends to support-file writes/removes —
@@ -1192,7 +1220,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // likewise when the target is unreadable (P2-04: fail-closed, the
         // same posture as the skill anchor above).
         if ((args.action === 'write_file' || args.action === 'remove_file') && typeof args.name === 'string' && args.name !== '' && typeof args.file_path === 'string' && args.file_path !== '') {
-          const stageFile = await library.readSupportFile(args.name, args.file_path).catch(() => null)
+          // S4-01 (G0/0.7): the same three-state read as the preview above - P2-04 had chosen
+          // "unreadable anchors as absent" over "unanchored" without considering REFUSE; the library
+          // names the third state now, so this site reads it instead of re-deriving it from a throw.
+          const supportProbe = await library.readSupportFileProbe(args.name, args.file_path)
+          if (isUnknown(supportProbe)) {
+            return { ok: false, message: '目标当前读不到（' + supportProbe.reason + '），无法核验暂存锚点 —— 先修好可读性再批准', skills: [] }
+          }
+          const stageFile: string | null = isPresent(supportProbe) ? supportProbe.value : null
           operation = { ...args, staged_from_sha256: stageFile === null ? 'absent' : contentHash(stageFile) }
         }
         const decision = await approval.request({

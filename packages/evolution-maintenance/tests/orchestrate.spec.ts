@@ -69,13 +69,17 @@ const validResult = {
 }
 
 describe('runMaintain', () => {
+  /** G3/3.3: every request the run hands to the subagent channel, so a test can assert on the facts
+   * block the run actually produced (the run-level face of the footprint wiring). */
+  const seenRequests: string[] = []
+
   function runtime(result: unknown): MaintainRuntime {
     return {
       library: fakeLibrary(),
       parent: maintAgent(),
       subagents: {
         async start(_kind: 'spawn', options: SubagentStartRequestLike) {
-          void options
+          seenRequests.push(JSON.stringify(options))
           // Platform contract: the subagent channel wraps its output as
           // `{ structured }` (review precedent, evolution-review:254-262).
           return runStub({ text: 'x', structured: result })
@@ -92,6 +96,27 @@ describe('runMaintain', () => {
     expect(outcome.text ?? '').toContain('Maintenance scan')
     expect(outcome.text ?? '').toContain('[skill-level] fix-alignment-bad')
     expect(outcome.text ?? '').toContain('patch: 删除重复标题行')
+  })
+
+  it('G3/3.3: the run reads the footprint into the facts it hands to the subagent', async () => {
+    seenRequests.length = 0
+    const withIo: MaintainRuntime = {
+      ...runtime(validResult),
+      io: { list: async () => ['a.json', 'b.json'] },
+    }
+    const outcome = await runMaintain(withIo)
+    expect(outcome.ok).toBe(true)
+    const sent = seenRequests.join(' ')
+    expect(sent).toContain('signal=store/')
+    expect(sent).toContain('store/reports')
+  })
+
+  it('G3/3.4: the run also hands the three reachability readings to the subagent', async () => {
+    seenRequests.length = 0
+    const withIo: MaintainRuntime = { ...runtime(validResult), io: { list: async () => [] } }
+    const outcome = await runMaintain(withIo)
+    expect(outcome.ok).toBe(true)
+    expect(seenRequests.join(' ')).toContain('store/history.blobs')
   })
 
   it('fails closed when the subagent returns no structured payload', async () => {

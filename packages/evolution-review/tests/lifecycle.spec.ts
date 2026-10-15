@@ -5,6 +5,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as Review from '../src/index.ts'
 
 const REVIEWER = 'I prefer concise answers and want you to remember that preference. '.repeat(6)
@@ -13,6 +14,7 @@ describe('evolution-review lifecycle guards', () => {
   it('disposes the subagent run when its result rejects (P1-3)', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
 
     let disposed = 0
     ctx.provide('subagents', {

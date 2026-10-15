@@ -15,6 +15,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
@@ -35,6 +36,7 @@ const LEDGER_MARK = 'NO evolution/plan-applied ledger entry'
 async function load(rowConfig: Record<string, unknown>, policyReviewMode?: 'inject' | 'subagent', user?: Record<string, unknown>) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
   if (policyReviewMode !== undefined) ctx.provide('evolutionPolicy', { get: () => ({ reviewMode: policyReviewMode }) })
   if (user !== undefined) {
     // G1: the settings user layer reaches the plugin two ways — the VALUE through the

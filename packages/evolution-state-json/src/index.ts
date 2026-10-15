@@ -6,9 +6,9 @@
  * @module @deepseek-ai/dsh-evolution-state-json
  */
 
+import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
@@ -458,7 +458,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   // G2 S3 migration: prefer the platform backend when the deployment mounts one (this consumer is
   // write-heavy, so the CAS-backed transact matters here), else the default backend.
-  const io = () => preferProvider(ctx.evolutionIo, ['fs'])
+  const io = () => ctx.evolutionIo.provider()
   const pathOf = (file: string) => join(root, file)
   // N12/O-6 (S4.4): this PROVIDER INSTANCE owns the quarantine bookkeeping (warn-once sets and the
   // last `.corrupt` rewrite key). It used to be module scope, which the file itself documented as

@@ -35,4 +35,30 @@ describe('evolution-state', () => {
     await ctx.plugin(EvolutionState, { provider: 'typo' })
     expect(() => ctx.evolutionState.loadReviewState('s1')).toThrow(/provider "typo" is not registered/)
   })
+
+  it('G2b/2b.1: an UNPINNED row refuses at mount when two state providers are registered', async () => {
+    const home = await tempRoot('dsh-state-ambiguous-')
+    const ctx = await mountStateStack(home)
+    // Measure-of-record: two media with no pin means the effective one is registration order, which
+    // silently rebinds every state op to the second medium while the json state stays on disk.
+    const json = ctx.evolutionStateStorage.provider('json')
+    ctx.evolutionStateStorage.registerProvider({ ...json, name: 'domain' })
+    await expect(ctx.plugin(EvolutionState)).rejects.toThrow(/pins none/)
+  })
+
+  it('G2b/2b.1: one provider needs no pin, and a pin clears the refusal', async () => {
+    const home = await tempRoot('dsh-state-uniform-')
+    const ctx = await mountStateStack(home)
+    // One provider, no pin: mounts.
+    await ctx.plugin(EvolutionState)
+    expect(ctx.evolutionState).toBeDefined()
+    // Two providers WITH a pin: mounts too - the pin is the escape hatch the refusal names.
+    const json = ctx.evolutionStateStorage.provider('json')
+    ctx.evolutionStateStorage.registerProvider({ ...json, name: 'domain' })
+    const pinnedCtx = await mountStateStack(await tempRoot('dsh-state-pinned-'))
+    const pinnedJson = pinnedCtx.evolutionStateStorage.provider('json')
+    pinnedCtx.evolutionStateStorage.registerProvider({ ...pinnedJson, name: 'domain' })
+    await pinnedCtx.plugin(EvolutionState, { provider: 'json' })
+    expect(pinnedCtx.evolutionState).toBeDefined()
+  })
 })

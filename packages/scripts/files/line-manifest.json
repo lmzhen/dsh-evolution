@@ -1,0 +1,151 @@
+{
+  "pin": "499af95d",
+  "bed": {
+    "mono": "overlay"
+  },
+  "entries": [
+    {
+      "id": "@deepseek-ai/dsh-evolution-activity",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-activity"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-agent-preset",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-agent"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-all",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-all"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-approval",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-approval"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-commands",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-commands"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-core"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-curator",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-curator"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-feedback",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-feedback"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-host",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-host"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-io",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-io"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-io-node",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-io-node"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-learning-graph",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-learning-graph"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-maintenance",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-maintenance"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-plan-validator",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-plan-validator"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-policy",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-policy"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-preset",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-preset"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-replay",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-replay"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-review",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-review"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-settings-ui",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-settings-ui"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-skill-catalog",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-skill-catalog"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-skill-health",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-skill-health"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-skill-history",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-skill-history"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-state",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-state"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-state-domain",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-state-domain"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-state-json",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-state-json"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-state-storage",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-state-storage"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-threat",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-threat"
+    },
+    {
+      "id": "@deepseek-ai/dsh-tool-session-query",
+      "kind": "profile-hoist"
+    },
+    {
+      "id": "@deepseek-ai/schemastery",
+      "kind": "profile-hoist"
+    }
+  ]
+}

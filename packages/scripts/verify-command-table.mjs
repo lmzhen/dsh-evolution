@@ -34,20 +34,38 @@ for (const entry of COMMAND_ENTRIES) {
   if (typeof entry.readonly !== 'boolean') problems.push(entry.usage + ': carries no readonly flag (C7)')
 }
 
+
+// E-08: `entryName` is the table IDENTITY key and `flagsOf` looks an entry up with `.find(...)` - the
+// FIRST match. The key is hierarchical now, so this asserts what the fix rests on: no two entries may
+// derive the same key (before the fix: nine collisions across maintain and skill).
+const seenNames = new Map()
+for (const entry of COMMAND_ENTRIES) {
+  const name = entryName(entry)
+  const firstUsage = seenNames.get(name)
+  if (firstUsage !== undefined) {
+    problems.push('two table entries derive the same name "' + name + '": "' + firstUsage + '" and "' + entry.usage + '" — flagsOf would silently take the first (E-08)')
+  } else {
+    seenNames.set(name, entry.usage)
+  }
+}
+
 // B: the usage line reads as documentation FOR this entry: its first token is the name the table
 // derives, and every flag it mentions is well-formed (`--flag` or `--flag=<value>`). A usage string is
 // NOT a command line — brackets, <placeholders> and `|` variants are how the table talks to a reader.
 for (const entry of COMMAND_ENTRIES) {
   const first = entry.usage.split(' ')[0].split('|')[0]
   if (first === '' || !/^[a-z][a-z-]*$/.test(first)) problems.push(entry.usage + ': does not start with a subcommand name')
-  if (first !== entryName(entry)) problems.push(entry.usage + ': the table names it "' + entryName(entry) + '"')
+  // E-08: entryName is hierarchical, so B compares the FIRST token of the key against the usage head.
+  if (first !== entryName(entry).split(' ')[0]) problems.push(entry.usage + ': the table names it "' + entryName(entry) + '"')
   for (const flag of entryFlags(entry)) {
     if (!new RegExp('\\' + flag + '(=|\\s|\\]|$|\\|)').test(entry.usage)) problems.push(entry.usage + ': mentions ' + flag + ' in an unreadable form')
   }
 }
 
 // C: dispatch ↔ table, both directions.
-const tableNames = new Set(COMMAND_ENTRIES.map(entryName))
+// E-08: the DISPATCH speaks one token, so C compares the key FIRST token; the injectivity assertion
+// below is what covers the sub-level.
+const tableNames = new Set(COMMAND_ENTRIES.map((entry) => entryName(entry).split(' ')[0]))
 const dispatched = new Set()
 for (const match of source.matchAll(/([A-Za-z]+Parsed)\.name [!=]== '([a-z]+)'/g)) dispatched.add(match[2])
 for (const match of source.matchAll(/subcommandOf\(input, '([a-z]+)'/g)) dispatched.add(match[1])

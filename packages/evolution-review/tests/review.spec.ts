@@ -10,6 +10,7 @@ import * as Review from '../src/index.ts'
 import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
 import { mutableVol, plainValue, vol } from '../../test-support/volatile-config.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-review', () => {
@@ -21,6 +22,7 @@ describe('evolution-review', () => {
   it('loads with review disabled', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
     await ctx.plugin(Review, { reviewEnabled: false })
     expect(ctx.get('agents')).toBeDefined()
   })
@@ -639,6 +641,7 @@ async function mountReviewFixture(options: {
 } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
   const stateBox: { current: unknown } = { current: null }
   if (!options.noState) {
     let saveCalls = 0
@@ -1228,6 +1231,7 @@ it('P2-12 (v12): the completion channel delivers through the waking followup cha
 async function mountTwoSessions() {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
   // V26-07 fix-up: persist per-session review counters for the duration of the
   // fixture — the always-null loader reset them every turn, so Y's skill
   // counter never reached the interval-2 cadence threshold and the fixture

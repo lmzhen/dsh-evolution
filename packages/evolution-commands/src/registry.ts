@@ -24,12 +24,23 @@ export function flagsOf(name: string): string[] {
   return entry === undefined ? [] : entryFlags(entry)
 }
 
-/** C7 shape, DERIVED: the subcommand name is the first token of `usage` (variants use `|`). */
+/**
+ * C7 shape, DERIVED: the entry IDENTITY key, and it is HIERARCHICAL (E-08).
+ *
+ * The key used to be the first token alone, and `flagsOf` finds an entry with `.find(...)` - the FIRST
+ * match - so `maintain handoff` / `maintain cancel` and `skill restore` / `skill history` / `skill undo` /
+ * `skill pin` all derived the SAME key as their parent and every flag lookup silently saw the parent entry
+ * only (nine collisions). A bare parent (`maintain [--timeout]`) keeps its one-token key, so parent lookups
+ * still resolve: the one call site that named an entry by a name the key no longer produced was the preset
+ * dispatch branch, and it now asks for the entry own key (`preset install`).
+ */
 export function entryName(entry: CommandEntry): string {
   // `noUncheckedIndexedAccess` makes both index reads `string | undefined`; destructuring with a
   // default says the same thing without two casts (the CI build line proved it).
-  const [head = ''] = entry.usage.split(' ')
-  return head.split('|')[0] ?? ''
+  const [head = '', second = ''] = entry.usage.split(' ')
+  const name = head.split('|')[0] ?? ''
+  const secondIsName = /^[a-z][a-z-]*$/.test(second) && !second.startsWith('--')
+  return secondIsName ? name + ' ' + second : name
 }
 
 /** C7 shape, DERIVED: the flags a `usage` declares, in the form `--flag` (value flags keep their name). */

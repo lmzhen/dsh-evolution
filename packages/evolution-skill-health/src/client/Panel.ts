@@ -111,7 +111,11 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
     load()
       .then((outcome) => {
         if (!live) return
-        if (outcome.ok) setView({ ...face, rows: outcome.payload.rows, truncated: outcome.payload.truncated })
+        // G4/4.2: this is the ONLY read trigger in this card, so there is no stale-vs-fresh race to
+    // guard today (measured: one effect, no refresh, no focus listener). If a second trigger is
+    // ever added, it must take a read ticket exactly as skill-history/Panel.ts and
+    // settings-ui/PendingCard.ts do - a later-arriving older answer would otherwise overwrite it.
+    if (outcome.ok) setView({ ...face, rows: outcome.payload.rows, truncated: outcome.payload.truncated })
         else setFailed(outcome.message)
       })
       .catch((error: unknown) => { if (live) setFailed(String(error)) })

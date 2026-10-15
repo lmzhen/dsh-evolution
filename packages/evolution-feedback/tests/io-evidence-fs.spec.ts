@@ -19,7 +19,11 @@ import { tempHome } from '../../test-support/temp-home.ts'
 const settle = () => new Promise(resolve => setTimeout(resolve, 20))
 
 describe('G2 S3: feedback persists through the platform backend when the deployment mounts one', () => {
-  it('records with the fs provider mounted, and works without it', async () => {
+  it('records through the registry default, and works with a second backend mounted', async () => {
+    // G2a/2a.4: the callers no longer name a backend, so the seam resolves through registry.provider()
+    // and the FIRST registered backend wins. This counter wraps the second one on purpose: the assertion
+    // is that the code never reaches it. (Before 2a.4 every caller pinned [fs]; the old expectation was
+    // 'the fs provider serves this', which is exactly the second resolution path the item removed.)
     const home = await tempHome('dsh-feedback-io-')
 
     const onlyNode = new Context()
@@ -43,7 +47,7 @@ describe('G2 S3: feedback persists through the platform backend when the deploym
     // Isolate the plumbing first: the registered backend must be resolvable and its counter live.
     const registered = withFs.evolutionIo.provider('fs')
     await registered.writeText(join(home, 'probe.txt'), 'x')
-    expect(counted.calls()).toBeGreaterThan(0)
+    expect(counted.calls()).toBeGreaterThan(0) // the plumbing is live: this counter DID see the direct write below
     counted.reset()
 
     await withFs.plugin(Feedback)
@@ -51,6 +55,6 @@ describe('G2 S3: feedback persists through the platform backend when the deploym
     withFs.evolutionFeedback.record('demo', 'negative', undefined, 'skill')
     await withFs.evolutionFeedback.waitIdle()
     await settle()
-    expect(counted.calls()).toBeGreaterThan(0)
+    expect(counted.calls()).toBe(0)
   })
 })

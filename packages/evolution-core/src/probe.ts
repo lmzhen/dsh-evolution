@@ -11,6 +11,13 @@
  */
 import type { EvolutionIoLike } from './io.ts'
 
+/**
+ * The io surface the three-state probes actually use: three READS. Narrowing it here is deliberate -
+ * a probe cannot write, and typing these parameters as the full `EvolutionIoLike` made every read-only
+ * caller (e.g. reachability.ts) fail to compile for a capability it must not have.
+ */
+export type ProbeIo = Pick<EvolutionIoLike, 'list' | 'readText' | 'mtime'>
+
 export type Probe<T> =
   | { kind: 'present'; value: T }
   | { kind: 'absent' }
@@ -71,7 +78,7 @@ export function isMissingPath(error: unknown): boolean {
  * reads as absent, an EACCES/EIO reads as unknown — where a bare
  * `catch { return [] }` served a broken store as an empty one (the N14 class).
  */
-export async function probeList(io: EvolutionIoLike, dir: string): Promise<Probe<string[]>> {
+export async function probeList(io: ProbeIo, dir: string): Promise<Probe<string[]>> {
   try {
     return probePresent(await io.list(dir))
   } catch (error) {
@@ -89,7 +96,7 @@ export async function probeList(io: EvolutionIoLike, dir: string): Promise<Probe
  * @param path - the file to read.
  * @returns the probe.
  */
-export async function probeText(io: EvolutionIoLike, path: string): Promise<Probe<string>> {
+export async function probeText(io: ProbeIo, path: string): Promise<Probe<string>> {
   try {
     const value = await io.readText(path)
     return value === null ? probeAbsent() : probePresent(value)
@@ -103,7 +110,7 @@ export async function probeText(io: EvolutionIoLike, path: string): Promise<Prob
  * backend has no mtime probe" — the seam cannot tell those apart, so consumers
  * that must know say so in their own log line. A stat that FAILS is unknown.
  */
-export async function probeMtime(io: EvolutionIoLike, path: string): Promise<Probe<number>> {
+export async function probeMtime(io: ProbeIo, path: string): Promise<Probe<number>> {
   try {
     const value = (await io.mtime?.(path)) ?? null
     return value === null ? probeAbsent() : probePresent(value)

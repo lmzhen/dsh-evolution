@@ -23,7 +23,11 @@ import { countingIo } from '../../test-support/counting-io.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('G2 S1: the reader prefers the platform backend when the deployment mounts one', () => {
-  it('serves catalog reads through the fs provider, and falls back to the default without it', async () => {
+  it('serves catalog reads through the registry default, with a second backend mounted', async () => {
+    // G2a/2a.4: the callers no longer name a backend, so the seam resolves through registry.provider()
+    // and the FIRST registered backend wins. This counter wraps the second one on purpose: the assertion
+    // is that the code never reaches it. (Before 2a.4 every caller pinned [fs]; the old expectation was
+    // 'the fs provider serves this', which is exactly the second resolution path the item removed.)
     const root = await tempRoot('dsh-skill-catalog-fs-')
     const base = nodeEvolutionIo()
     const content = '---\nname: demo\ndescription: Demo skill.\n---\n\n# Demo\n'
@@ -48,6 +52,6 @@ describe('G2 S1: the reader prefers the platform backend when the deployment mou
     const skill = await withFs.skills.get('demo')
     expect(skill?.name).toBe('demo')
     // Observable evidence: the migrated reader resolved \`fs\`, not the default backend.
-    expect(counted.calls()).toBeGreaterThan(0)
+    expect(counted.calls()).toBe(0)
   })
 })

@@ -9,7 +9,7 @@
  * actions so any finding carries its next step.
  */
 import { readFileSync, existsSync } from 'node:fs'
-import { asRecord } from '@deepseek-ai/dsh-evolution-core'
+import { scopedPackageName, asRecord } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { composePresetEntry, evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, presetRowBlock, presetRowBody, presetRowId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
@@ -397,7 +397,9 @@ function memoryInterpolationIssues(home: string): string[] {
  * "unknown" — the doctor never throws.
  * Platform anchor: `packages/boot/app-boot/src/profile.ts` — a family preset is a ROW in the
  * profile's own patch layer there (`PROFILE_PATCH_FILENAME`), never a preset directory. */
-const AGENT_PRESET_PACKAGE = '@deepseek-ai/dsh-evolution-agent-preset'
+// G-04: DERIVED, never written. The literal that used to stand here was patched by the release script, so a
+// published install depended on that rewrite reaching this copy.
+const AGENT_PRESET_PACKAGE = scopedPackageName('dsh-evolution-agent-preset', import.meta.url)
 
 /** Resolve one asset the package declares in its exports map.
  * @param asset - bases.json or agent.cordis.yml.

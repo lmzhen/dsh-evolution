@@ -163,7 +163,7 @@ export type MessageKey = keyof typeof zh
 /**
  * Resolve one message without the locale seat (tests and the fallback path).
  * @param key - the message key.
- * @param language - which dictionary to read; defaults to Chinese.
+ * @param language - which dictionary to read; defaults to English (the platform FALLBACK_LOCALE).
  * @returns the copy this bundle carries.
  */
 export function message(key: MessageKey, language: 'zh' | 'en' = 'en'): string {

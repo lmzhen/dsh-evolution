@@ -11,8 +11,8 @@
  *   A. NO BARE MUTATION CALL outside the medium. A file under a package's `src/` may not call
  *      `rmSync / unlinkSync / renameSync / copyFileSync / writeFileSync / mkdirSync` nor the bare async
  *      `rm( / unlink( / rename( / copyFile( /`; a METHOD call (`io().rename(...)`, `this.io.remove(...)`)
- *      is the facade and stays allowed. The medium = `evolution-core/src/io.ts`, `evolution-io-fs/src/**`,
- *      `evolution-io-node/src/**` (plus the provider files that implement the seam).
+ *      is the facade and stays allowed. The medium = `evolution-core/src/io.ts` and `evolution-io-node/src/**`
+ *      (plus the provider files that implement the seam).
  *   B. THE SEAM IS IMPORTED, NOT REBUILT. A package whose src only mentions `node:fs` mutation verbs is
  *      already covered by A; this rule reports a package that hand-rolls its own `writeFileSync` wrapper
  *      module (a second door) by name, so the decision is visible.
@@ -27,7 +27,7 @@ import { stripComments } from './lib-source-text.mjs'
 
 const root = process.argv[2] ?? 'packages'
 /** The medium: these files ARE the disk surface, so they may call the raw APIs. */
-const MEDIUM = [/(^|[\\/])evolution-core[\\/]src[\\/]io\.ts$/, /evolution-io-fs[\\/]src[\\/]/, /evolution-io-node[\\/]src[\\/]/]
+const MEDIUM = [/(^|[\\/])evolution-core[\\/]src[\\/]io\.ts$/, /evolution-io-node[\\/]src[\\/]/]
 /** sync verbs, and the async frees — but NOT a method call (`.rename(`, `.remove(`). */
 const SYNC_VERB = /(?<![.\w])(rmSync|unlinkSync|renameSync|copyFileSync|writeFileSync|mkdirSync|appendFileSync)\s*\(/
 const ASYNC_FREE = /(?<![.\w])(rm|unlink|rename|copyFile)\s*\(/

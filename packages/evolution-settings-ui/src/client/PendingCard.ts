@@ -92,9 +92,19 @@ export function PendingCard(props: PendingCardFace): ReactNode {
    * answers are ordered the way the CLI orders them (waiting first); either one failing fails the
    * read, because a half-list would read as a complete window.
    */
+  // G4/4.1 (second half): the read ticket skill-history/Panel.ts already uses for the same hazard.
+  // Without it a slow read that lands after a newer one writes its stale window over the fresh one
+  // (measured: the focused re-read resolved first, then the mount read landed and replaced the rows).
+  const readTicket = useRef(0)
+
   const load = async (): Promise<void> => {
     apply(loading)
+    const ticket = readTicket.current + 1
+    readTicket.current = ticket
     const [waiting, running] = await Promise.all([api.pending(), api.pending('executing')])
+    // Only the newest read may write state: an older answer is a fact about a window that has
+    // already been replaced.
+    if (readTicket.current !== ticket) return
     if (!waiting.ok) {
       apply(current => failed(current, waiting.message))
       return
@@ -168,14 +178,18 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       ...view.answer.truncated ? [createElement('span', { className: 'evolution-param-fact', key: 'cut' }, t('approvalDiffCut'))] : [],
     ]
     const lines: ReactNode[] = []
-    for (const hunk of view.answer.hunks) {
+    // C-11: the row key is scoped to its HUNK, exactly as document.ts does it. A per-hunk index
+    // restarts at 0, so with two hunks the second old-0 collided with the first and React reused
+    // the wrong node (a line of one hunk shown in place of another). The data source returns at
+    // most one hunk today, so this is a consistency debt being paid before it can bite.
+    for (const [hunkIndex, hunk] of view.answer.hunks.entries()) {
       for (const [index, line] of hunk.oldText.split('\n').entries()) {
         if (hunk.oldText === '' && line === '') continue
-        lines.push(createElement('div', { key: 'old-' + String(index), className: 'evolution-param-line-del' }, '- ' + line))
+        lines.push(createElement('div', { key: 'old-' + String(hunkIndex) + '-' + String(index), className: 'evolution-param-line-del' }, '- ' + line))
       }
       for (const [index, line] of hunk.newText.split('\n').entries()) {
         if (hunk.newText === '' && line === '') continue
-        lines.push(createElement('div', { key: 'new-' + String(index), className: 'evolution-param-line-add' }, '+ ' + line))
+        lines.push(createElement('div', { key: 'new-' + String(hunkIndex) + '-' + String(index), className: 'evolution-param-line-add' }, '+ ' + line))
       }
     }
     return createElement('div', null,

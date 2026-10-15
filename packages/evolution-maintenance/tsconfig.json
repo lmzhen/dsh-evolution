@@ -1,10 +1,23 @@
 {
   "extends": "../tsconfig.pkg.json",
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../evolution-core" },
-    { "path": "../../core/tools" },
-    { "path": "../../core/agent" },
-    { "path": "../../../vendor/schemastery" }
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../evolution-core"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../subagent/subagent"
+    }
   ]
 }

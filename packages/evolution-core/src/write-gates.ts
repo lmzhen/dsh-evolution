@@ -1,0 +1,442 @@
+/**
+ * The write-admission sequence: ONE ordered table of the reasons a skill write is refused.
+ *
+ * Two points read this table (design `dsh-evolution-write-gate-design.md` §3). The ADMISSION
+ * point (`execute`, BEFORE the approval seam) runs every gate that applies to `'admission'`, so a
+ * write that is refused is never staged and never spends the operator's attention twice. The
+ * EXECUTION point (the `executeCore` funnel, reached by the direct path and by the approval
+ * replay) runs the gates that apply to `'execution'`: the stored plan of a replayed write passed
+ * no schema, and the protected list can change while a record sits pending, so those verdicts are
+ * re-decided at the bytes.
+ *
+ * Order is part of the contract: a gate that can only refuse comes before one that needs a round
+ * trip with the operator, so a write that is refused anyway never asks anything.
+ *
+ * A gate decides whether a write may be ATTEMPTED. The library decides whether it can be
+ * PERFORMED — its own structured refusals (a restructure element that is not an object, a patch
+ * anchor that no longer matches, an `absorbed_into` that does not exist) stay where the bytes are
+ * read.
+ *
+ * Rule bodies live in `evolution-core` (the read-before-write rule in `skill-reads`, the
+ * required-argument table in `SKILL_ACTION_REQUIRED_FIELDS`); this module owns the ORDER and the
+ * applicability of each gate, which is an execution-point fact of this tool.
+ * @module @deepseek-ai/dsh-evolution-core/write-gates
+ */
+import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, type WriteConfirm, type WriteConfirmMode } from './write-authority.ts'
+import type { ConfirmContext } from './write-authority.ts'
+import { SKILL_ACTION_REQUIRED_FIELDS, errorText, isUnreadWrite, type WriteOrigin } from './index.ts'
+
+/** The point whose verdict is being taken. */
+export type WriteGatePoint = 'admission' | 'execution'
+
+/** The confirm question's stable id — one question per write, so an answer to an earlier prompt
+ * can never be read as the answer to a later one. */
+const CONFIRM_QUESTION_ID = 'evolution-skill-write'
+
+/** The cancel label every confirm question offers. */
+const CANCEL_LABEL = '取消'
+
+/** What a `timeout`-mode deadline settles with: comparable by identity against the seam's
+ * boolean, so the two outcomes stay distinguishable without a mutable flag (which a linter
+ * cannot follow through a timer callback, and a reader cannot either). */
+const CONFIRM_TIMED_OUT = 'confirm-timed-out' as const
+
+/**
+ * How the ONE confirmation behaves (registry `skillWriteConfirm`).
+ *
+ * `auto` writes without asking — the default, because an unattended run (a background pass, a
+ * scheduled review, a headless session) must not park a tool call on a question nobody will answer.
+ * `ask` waits for as long as it takes, which is the deployment that wants the gate in the loop.
+ * `timeout` asks and cancels the write on its own deadline.
+ */
+// G1/1.1: the confirm vocabulary lives in write-authority.ts with the authority that carries it.
+// D-09 follow-up: this file used to RE-EXPORT it for compatibility, which made index.ts export the same
+// name from two modules (TS2308: WriteConfirmMode/WriteConfirmRequest/DEFAULT_WRITE_CONFIRM_MODE).
+// The names stay reachable through the package root via write-authority - one owner, no second export.
+
+/** A usable deadline: the configured value when it is a positive finite number, else the default. */
+function timeoutSecondsOf(configured: number | undefined): number {
+  return configured !== undefined && Number.isFinite(configured) && configured >= 1
+    ? Math.floor(configured)
+    : DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS
+}
+
+
+
+
+/** The scalar fields the tool schema types as strings; the replay channel has no schema.
+ * `action` is one of them: a non-string action used to fall through to the library as "Unknown
+ * action" while the read gate re-defaulted it to `patch` and refused with E-318 (review
+ * 2026-09-26, P2), so the shape gate refuses it by name instead. */
+const SCALAR_ARG_FIELDS = ['action', 'name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'] as const
+
+/** The scalar fields the tool schema types as BOOLEANS; the replay channel has no schema either.
+ * T2-V3/A28: `args.replace_all === true` answered "false" for anything else, so a staged
+ * `replace_all: 'yes'` silently patched only the FIRST occurrence — a wrong count with no signal.
+ * The plan channel already refuses a non-boolean `replace_all` by name (S1-C1); this is the same
+ * rule on the replay channel, so the two channels cannot disagree about one flag. */
+const FLAG_ARG_FIELDS = ['replace_all'] as const
+
+/** What every gate reads. */
+/**
+ * G1/1.2: the policy snapshot's protected list, read through an `unknown` boundary.
+ *
+ * This used to be package-private to tool-skill-manage, which is why the graph commands could not ask
+ * the same question and ended up enforcing nothing. It lives here so every write entry point reads the
+ * SAME list from the SAME place; the `unknown` boundary stays because the Context augmentation types the
+ * getter non-optionally while at runtime the policy row may be absent.
+ * @param policy - `ctx.get('evolutionPolicy')`, or anything else when the row is not mounted.
+ * @returns the protected names, or undefined when no policy snapshot is readable.
+ */
+/**
+ * G1/1.2: what a write entry point must supply for the shared admission sequence.
+ *
+ * The gates need policy, confirm, the session's read set and a warn sink; every caller can obtain those
+ * from its own `ctx`, but assembling them into a valid `WriteGateContext` is the seam's business, not each
+ * caller's. Without this, "all five entry points call the same entry" means five hand-built contexts and
+ * five chances to leave `protectedNames` out - which is exactly how the graph commands ended up enforcing
+ * nothing.
+ */
+export interface SkillWriteGateServices {
+  /** `ctx.get('evolutionPolicy')`, or anything else when the row is not mounted. */
+  readonly policy: unknown
+  /** The human confirm seam; `undefined` refuses to ask (the gates then refuse the write). */
+  readonly confirm: WriteConfirm | undefined
+  /** Names this session read successfully; `undefined` when the session log is not readable. */
+  readonly readNames: ReadonlySet<string> | undefined
+  /** Report a degraded gate; must not throw. */
+  readonly warn: (message: string) => void
+  /** The registry's `skillWriteConfirm`; `auto` (the default) skips the question. */
+  readonly confirmMode?: WriteConfirmMode
+  /** The registry's `skillWriteConfirmTimeoutSeconds`, read only in `timeout` mode. */
+  readonly confirmTimeoutSeconds?: number
+  /** Lazily read the target's own words for the confirmation card. */
+  readonly describeTarget?: (() => Promise<ConfirmContext | undefined>) | undefined
+}
+
+/**
+ * Assemble a gate context from a caller's services. The protected list is read HERE, so no caller can
+ * forget it or read it from a second place.
+ * @param services - the four required services plus the optional registry knobs.
+ * @param request - the point asking, the arguments under test, and the write origin.
+ * @returns a context the shared sequence accepts.
+ */
+export function skillWriteGateContext(
+  services: SkillWriteGateServices,
+  request: { readonly point: WriteGatePoint; readonly args: unknown; readonly origin: WriteOrigin },
+): WriteGateContext {
+  return {
+    point: request.point,
+    args: request.args,
+    origin: request.origin,
+    protectedNames: protectedSkillNamesOf(services.policy),
+    readNames: services.readNames,
+    confirm: services.confirm,
+    ...(services.confirmMode === undefined ? {} : { confirmMode: services.confirmMode }),
+    ...(services.confirmTimeoutSeconds === undefined ? {} : { confirmTimeoutSeconds: services.confirmTimeoutSeconds }),
+    ...(services.describeTarget === undefined ? {} : { describeTarget: services.describeTarget }),
+    warn: services.warn,
+  }
+}
+
+export function protectedSkillNamesOf(policy: unknown): readonly string[] | undefined {
+  const snapshot = (policy as { get?(): { protectedSkillNames?: readonly string[] } } | undefined)?.get?.()
+  return snapshot?.protectedSkillNames
+}
+
+export interface WriteGateContext {
+  /** The point asking: the tool's admission of a call, or its execution at the bytes. */
+  readonly point: WriteGatePoint
+  /** The parsed (admission) or stored (replay) arguments — unvalidated, hence the shape gate. */
+  readonly args: unknown
+  /** The library write origin: `foreground` is the operator's own session. */
+  readonly origin: WriteOrigin
+  /** The policy snapshot's protected list; `undefined` when no policy row is mounted. */
+  readonly protectedNames: readonly string[] | undefined
+  /** Names this session read successfully; `undefined` when the session log is not readable. */
+  readonly readNames: ReadonlySet<string> | undefined
+  /** The human confirm seam — read only by the gates that apply to `'admission'`. */
+  readonly confirm: WriteConfirm | undefined
+  /** The registry's `skillWriteConfirm`: `auto` (the default) skips the question entirely. */
+  readonly confirmMode?: WriteConfirmMode
+  /** The registry's `skillWriteConfirmTimeoutSeconds`, read only in `timeout` mode. */
+  readonly confirmTimeoutSeconds?: number
+  /** Read the target's own words for the confirmation card. LAZY on purpose: a write that is not
+   * asked about must not pay a read for a question nobody sees. Absent means "say nothing extra". */
+  readonly describeTarget?: (() => Promise<ConfirmContext | undefined>) | undefined
+  /** Report a degraded gate; must not throw. The implementation decides how often it speaks — the
+   * shipped seam latches once per PROCESS, because the conditions it reports (no question service,
+   * an unreadable session log) belong to the deployment, not to one write. */
+  readonly warn: (message: string) => void
+}
+
+/** The arguments a gate reads, with the string-valued ones narrowed once by the runner. */
+interface GateArgs {
+  /** The action as the caller sent it (`undefined` when absent or not a string). */
+  readonly action: string | undefined
+  /** The skill name, or `''` when the caller sent none. */
+  readonly name: string
+  /** `delete` with this set is a merge into an umbrella, not a bare archive. */
+  readonly absorbedInto: string | undefined
+  /** The raw arguments object, for the scalar shape gate. */
+  readonly scalars: Record<string, unknown>
+}
+
+/** What a gate runs against: the caller's context plus the arguments narrowed once. */
+interface WriteGateInput extends WriteGateContext {
+  readonly view: GateArgs
+}
+
+interface WriteGate {
+  readonly id: string
+  /** The points whose verdicts this gate can change; every other point skips it. */
+  readonly appliesTo: readonly WriteGatePoint[]
+  /** @returns the refusal message, or null to let the write continue. */
+  run(input: WriteGateInput): Promise<string | null> | string | null
+}
+
+/**
+ * Narrow the arguments once for every gate.
+ *
+ * The admission point reaches the gates AFTER the schema, the replay channel BEFORE any
+ * validation, so a gate reads only what it can prove: anything else counts as absent, exactly as
+ * the missing-argument check already treated a non-string action.
+ * @param args - the arguments as the caller sent them.
+ * @returns the narrowed view.
+ */
+function gateArgsOf(args: unknown): GateArgs {
+  const scalars = (typeof args === 'object' && args !== null ? args : {}) as Record<string, unknown>
+  const action = scalars.action
+  const name = scalars.name
+  const absorbedInto = scalars.absorbed_into
+  return {
+    action: typeof action === 'string' ? action : undefined,
+    name: typeof name === 'string' ? name : '',
+    // A BLANK absorbed_into is absent: the plan validator reads it the same way
+    // (`!(op.absorbed_into ?? '').trim()`), and the archive call itself is truthiness-based
+    // (`args.absorbed_into ? { absorbedInto } : {}`) — so `''` performs a BARE archive and must not
+    // borrow the merge exemption (review 2026-09-26, P1).
+    absorbedInto: typeof absorbedInto === 'string' && absorbedInto.trim() !== '' ? absorbedInto : undefined,
+    scalars,
+  }
+}
+
+/**
+ * The scalar arguments must be strings before any other gate reads them as names.
+ *
+ * v20 (D-1, V8-09 sibling): the schema does not strictly guarantee scalar shapes (the F-07 class
+ * of garbage that slipped past it), and a non-string scalar used to escape as a bare TypeError
+ * from SkillLibrary (`name.trim()` / `md.includes(...)`). Family posture: a STRUCTURED refusal.
+ * Absent is legal — the branches that need a value have their own remedies.
+ */
+const ARGUMENT_SHAPE: WriteGate = {
+  id: 'argument-shape',
+  appliesTo: ['admission', 'execution'],
+  run: ({ view }) => {
+    for (const field of SCALAR_ARG_FIELDS) {
+      const value = view.scalars[field]
+      if (value === undefined || value === null || typeof value === 'string') continue
+      return `skill_manage: "${field}" must be a string (got ${typeof value}); refusing the write.`
+    }
+    // T2-V3/A28: the FLAGS are shapes too. A non-boolean `replace_all` used to mean "false" at the
+    // patch site, so the write landed with a different count than the caller asked for.
+    for (const field of FLAG_ARG_FIELDS) {
+      const value = view.scalars[field]
+      if (value === undefined || value === null || typeof value === 'boolean') continue
+      return `skill_manage: "${field}" must be a boolean (got ${typeof value}); refusing the write.`
+    }
+    return null
+  },
+}
+
+/**
+ * V27 G5.1 (v27 T-2) / OPT-05 (2026-09): name the missing per-action arguments before anything is
+ * read or written. The table comes from core (the plan validator reads the same rows), and the
+ * OWN-property narrowing is required because a plain-object index resolves inherited members
+ * (`constructor`, `toString`, …) to truthy functions. An EMPTY string is deliberately NOT
+ * missing: it reaches the library, whose branch messages carry the more specific remedy.
+ */
+const MISSING_ARGS: WriteGate = {
+  id: 'missing-args',
+  appliesTo: ['admission', 'execution'],
+  run: ({ view }) => {
+    const action = view.action
+    const required = action === undefined || !Object.hasOwn(SKILL_ACTION_REQUIRED_FIELDS, action)
+      ? []
+      : SKILL_ACTION_REQUIRED_FIELDS[action] ?? []
+    const missing = required.filter(field => view.scalars[field] === undefined || view.scalars[field] === null)
+    if (missing.length === 0) return null
+    return `skill_manage ${action} requires ${missing.join(', ')}; the tool description lists the arguments per action.`
+  },
+}
+
+/**
+ * v30 REV-02: the immutable policy's protected list is enforced at plan validation, but the
+ * replay channel executes STORED plans — one accepted under an older policy must not land on a
+ * skill the CURRENT policy protects. Foreground (operator) writes are deliberately not gated by
+ * this list, and a deployment without the policy row keeps the previous behavior.
+ */
+const POLICY_PROTECTION: WriteGate = {
+  id: 'policy-protection',
+  appliesTo: ['admission', 'execution'],
+  run: ({ view, origin, protectedNames }) => {
+    if (origin === 'foreground') return null
+    if (view.name === '' || !protectedNames?.includes(view.name)) return null
+    return `skill_manage: "${view.name}" is protected by the current policy (protectedSkillNames); replayed/autonomous writes are refused.`
+  },
+}
+
+/**
+ * Read-before-write (design §4.2): a non-foreground write must have read its target in the
+ * session that authored it, so a subagent or the review's own model cannot blind-overwrite a body
+ * it never saw. The read set comes from `collectReadSkillNames`, which counts only a read that did
+ * not fail — a failed or timed-out read does not pass this gate.
+ *
+ * Admission only. The reads belong to the WRITING session, and the replayed record has none: it
+ * passed this gate at its own staging point, or the review's plan filter on the plan path.
+ *
+ * An unreadable session log is NOT an empty read set: the write proceeds with one warning, the
+ * same soft-probe posture as the cross-source check, because a deployment whose sessions expose no
+ * log must not refuse every autonomous write.
+ */
+const READ_BEFORE_WRITE: WriteGate = {
+  id: 'read-before-write',
+  appliesTo: ['admission'],
+  run: ({ view, origin, readNames, warn }) => {
+    if (origin === 'foreground') return null
+    if (readNames === undefined) {
+      warn('skill_manage: the read-before-write check could not run for this call — the session log is not readable here, so the write is allowed.')
+      return null
+    }
+    // A missing action is NOT this gate's business: the tool schema requires one, so an absent
+    // action is a malformed call whose refusal the LIBRARY owns ("Unknown action") — answering
+    // E-318 would send the model to read a skill for a call that cannot work (review 2026-09-26,
+    // P2). The rule's default-to-`patch` (V6-26) stays where it belongs, on the plan path.
+    if (view.action === undefined) return null
+    if (!isUnreadWrite({ action: view.action, name: view.name }, readNames)) return null
+    return errorText('e-318-skill-write-without-a-read', { a1: view.name })
+  },
+}
+
+/**
+ * The confirm gate (design §4.1): a foreground create, or a bare foreground delete, is
+ * irreversible and gets ONE question. Admission only — a replayed record already carries the human
+ * release that staged it, so asking there would be the second interruption for one write.
+ *
+ * `delete` with `absorbed_into` is exempt: that is the merge protocol (an umbrella absorbs the source),
+ * and asking once per absorbed skill would turn one merge into N questions. A BARE delete is the
+ * destructive primitive the plan layer reserves for a human — a review may only delete into an
+ * umbrella (core's `SKILL_ACTION_REQUIRED_FIELDS` docblock).
+ *
+ * The gate is UX, not a security door (those are policy protection and read-before-write): the seam
+ * is required to be total, so an unmounted question service or a caller that is not the live root
+ * agent PROCEEDS — the operator's own session is the authority that asked for the write.
+ *
+ * Whether the question is put at all is CONFIGURED (`skillWriteConfirm`): `auto` writes without
+ * asking, `ask` waits for an answer indefinitely (what this gate did before the knob existed), and
+ * `timeout` asks but cancels the write on its own deadline. `auto` is the default because an
+ * unattended run — a background pass, a scheduled review, a headless session — must not park a tool
+ * call on a question nobody will answer.
+ */
+const HUMAN_CONFIRM: WriteGate = {
+  id: 'human-confirm',
+  appliesTo: ['admission'],
+  run: async ({ view, origin, confirm, warn, confirmMode, confirmTimeoutSeconds, describeTarget }) => {
+    const action = view.action
+    if (action === undefined || origin !== 'foreground' || view.name === '') return null
+    const destructive = action === 'create' || (action === 'delete' && view.absorbedInto === undefined)
+    if (!destructive) return null
+    const mode = confirmMode ?? DEFAULT_WRITE_CONFIRM_MODE
+    if (mode === 'auto') return null
+    if (confirm === undefined) {
+      warn('skill_manage: no confirmation channel is mounted, so the write proceeds unconfirmed.')
+      return null
+    }
+    const confirmLabel = action === 'create' ? '创建' : '删除'
+    const seconds = timeoutSecondsOf(confirmTimeoutSeconds)
+    const cancel = new AbortController()
+    // The deadline is enforced HERE, not only carried by the signal: the signal lets the client
+    // take the card down, while the race guarantees the call returns even if nothing is listening
+    // to it — a prompt that outlives its deadline is the parked tool call this mode exists to
+    // prevent.
+    let timer: NodeJS.Timeout | undefined
+    const deadline = mode === 'timeout'
+      ? new Promise<typeof CONFIRM_TIMED_OUT>((resolve) => {
+        timer = setTimeout(() => {
+          cancel.abort()
+          resolve(CONFIRM_TIMED_OUT)
+        }, seconds * 1000)
+        // Never hold the process open: a one-shot CLI run must not linger for the rest of the
+        // window after the write already returned. A server keeps the loop alive anyway, which is
+        // where the deadline does its work.
+        timer.unref()
+      })
+      : undefined
+    // The question says what the OPERATOR needs: the consequence, then the target in its own words.
+    // Asking for a decision by name alone is asking someone to authorize an unknown artifact.
+    const context = await describeTarget?.()
+    const details = [
+      context?.description === undefined || context.description === '' ? null : '功能：' + context.description,
+      context?.versions === undefined ? null : '已记录的内容版本数：' + String(context.versions),
+    ].filter((line): line is string => line !== null)
+    const consequence = action === 'create'
+      ? `创建技能 "${view.name}"？会在家族目录树里新建一个技能目录。`
+      : `删除技能 "${view.name}"？它会被归档到 .archive 并离开目录。`
+    const asked = confirm({
+      action,
+      name: view.name,
+      confirmLabel,
+      question: {
+        id: CONFIRM_QUESTION_ID,
+        header: '确认',
+        // ONE line: the platform's question composer does not preserve newlines, so a multi-line
+        // question arrives as a run-on sentence. The facts are separated instead.
+        question: details.length === 0 ? consequence : consequence + ' ' + details.join(' · '),
+        options: [{ label: confirmLabel }, { label: CANCEL_LABEL }],
+      },
+      ...mode === 'timeout' ? { signal: cancel.signal } : {},
+    })
+    let outcome: boolean | typeof CONFIRM_TIMED_OUT
+    try {
+      outcome = deadline === undefined ? await asked : await Promise.race([asked, deadline])
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
+    }
+    if (outcome === true) return null
+    // Running out of time is not the same answer as being declined: the write was cancelled
+    // because nobody was there to decide, and the refusal names the knob that changes that. Which
+    // promise the race returned first is a microtask-order detail — a platform that answers the
+    // abort with its own dismissal can settle `asked` first — so the case is decided by the
+    // deadline's signal, which only this gate aborts.
+    if (outcome === CONFIRM_TIMED_OUT || cancel.signal.aborted) {
+      return errorText('e-319-skill-write-confirm-timed-out', {
+        a1: view.name,
+        a2: action === 'create' ? '创建' : '删除',
+        a3: String(seconds),
+      })
+    }
+    return errorText('e-317-skill-write-not-confirmed', {
+      a1: view.name,
+      a2: action === 'create' ? '创建' : '删除',
+    })
+  },
+}
+
+/** The sequence, in order. A gate whose `appliesTo` omits the asking point is skipped. */
+const GATES: readonly WriteGate[] = [ARGUMENT_SHAPE, MISSING_ARGS, POLICY_PROTECTION, READ_BEFORE_WRITE, HUMAN_CONFIRM]
+
+/**
+ * Run the sequence for one write attempt.
+ * @param context - the asking point, the write, and the seams the human-facing gate needs.
+ * @returns the FIRST refusal, or null when every applicable gate passed. Both points return the
+ *   message as the tool result unchanged, so the two entries refuse with identical wording.
+ */
+export async function runWriteGates(context: WriteGateContext): Promise<string | null> {
+  const input: WriteGateInput = { ...context, view: gateArgsOf(context.args) }
+  for (const gate of GATES) {
+    if (!gate.appliesTo.includes(context.point)) continue
+    const refusal = await gate.run(input)
+    if (refusal !== null) return refusal
+  }
+  return null
+}

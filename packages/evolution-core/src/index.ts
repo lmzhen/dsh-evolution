@@ -33,6 +33,11 @@
  */
 
 export * from './citations.ts'
+// G1/1.1: the ONE authority behind a write (its type and the authorityFrom builder).
+export * from './tree-write.ts'
+export * from './package-identity.ts'
+export * from './write-authority.ts'
+export * from './write-gates.ts'
 export * from './reference-rewrite.ts'
 export * from './cost.ts'
 export * from './skill-lint.ts'
@@ -75,6 +80,8 @@ export * from './drift-signals.ts'
 export * from './skill-history.ts'
 export * from './unit-members.ts'
 export * from './skill-store.ts'
+export * from './store-ledger.ts'
+export * from './reachability.ts'
 export * from './state-store.ts'
 export * from './threats.ts'
 export * from './tool-dispatch.ts'

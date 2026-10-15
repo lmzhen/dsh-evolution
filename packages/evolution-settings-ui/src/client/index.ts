@@ -60,9 +60,10 @@ export { PENDING_CARD_KEY }
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
-  // The stylesheet goes in first: the section renders as soon as the shell mounts
-  // it, and an unstyled pass would flash before a later injection.
-  injectStyles()
+  // The stylesheet goes in first, inside an EFFECT: cordis runs the body at apply time, so the
+  // injection still precedes the first render (no unstyled flash), and the disposer it returns now
+  // travels back to the fiber - the same ownership skill-history gives its own stylesheet (S5-08).
+  ctx.effect(() => injectStyles(), 'evolution-settings-ui: styles')
   const seam = ctx as unknown as ClientSeam
   // The dictionary registration is an EFFECT, not a bare call: cordis disposes it
   // when this bundle unloads (a hot reload or the row being switched off), which is

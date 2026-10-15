@@ -12,6 +12,7 @@ import { createElement } from 'react'
 import { CLIENT_PARAM_SECTIONS } from '../src/client/generated-params.ts'
 import { formatText, type MessageKey } from '../src/client/messages.ts'
 import { RowConfigCard } from '../src/client/RowConfigCard.ts'
+import { sectionSnapshotOf } from '../src/client/source.ts'
 
 const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string => formatText(key, values)
 const section = CLIENT_PARAM_SECTIONS.find(candidate => candidate.namespace === 'evolution-curator')
@@ -20,10 +21,12 @@ const fields = section.fields
 const FIELD = fields[0]!
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
-function page(options: { user?: Record<string, unknown>; base?: Record<string, unknown>; mode?: 'host' | 'memory' }) {
+function page(options: { user?: Record<string, unknown>; base?: Record<string, unknown>; mode?: 'host' | 'memory'; status?: 'ready' | 'unavailable' }) {
   const user = options.user ?? {}
   const base = options.base ?? {}
-  const state = { status: 'ready', value: { ...base, ...user }, base, user, revision: 7, writable: true, mode: options.mode ?? 'host' }
+  // G4/4.3: the status is a parameter now - the platform really does report 'unavailable' in memory
+  // mode, and a fixture that hardcodes 'ready' never reaches the branch that speaks about it.
+  const state = { status: options.status ?? 'ready', value: { ...base, ...user }, base, user, revision: 7, writable: true, mode: options.mode ?? 'host' }
   const view = render(h(RowConfigCard, { namespace: 'evolution-curator', fields, t, view: 'page', form: { state, mutate: async () => true } }))
   fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
   return view
@@ -37,6 +40,14 @@ describe('U-5: where the value comes from, and where a save goes', () => {
     cleanup()
   })
 
+  it('G4/4.3: memory mode is not an absent row - the platform reports it unavailable ON PURPOSE', () => {
+    const snap = (mode: 'host' | 'memory') => ({ status: 'unavailable', mode }) as unknown as Parameters<typeof sectionSnapshotOf>[0]
+    // The defect this pins: reason used to follow status alone, so a memory-mode row was announced
+    // as not-served while its value simply lives in this session memory.
+    expect(sectionSnapshotOf(snap('memory')).reason).not.toBe('not-served')
+    // Counter-case: a host row the seat really does not serve must KEEP saying so.
+    expect(sectionSnapshotOf(snap('host')).reason).toBe('not-served')
+  })
   it('names the value a reset would restore (the seat base)', () => {
     const view = page({ base: { [FIELD.id]: 42 }, user: { [FIELD.id]: 7 } })
     expect(view.container.textContent).toContain(t('resetTo', { value: 42 }))

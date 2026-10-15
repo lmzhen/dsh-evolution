@@ -4,6 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { Config } from '../src/index.ts'
 import * as Review from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { DEFAULT_REVIEW_MEMORY_INTERVAL } from '@deepseek-ai/dsh-evolution-core'
 import { vol } from '../../test-support/volatile-config.ts'
 
@@ -30,6 +31,7 @@ describe('evolution-review G3.1 numeric clamping', () => {
   it('assembly applies a NaN numeric config without crashing (clamped to defaults)', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
     // NaN passes the schema (the `.min(1)` guard only rejects 0/negative), so
     // the assembly clamp is what corrects it; the plugin must still mount.
     await ctx.plugin(Review, { reviewEnabled: false, memoryInterval: NaN, reviewMaxDepth: NaN, skillReviewCompletionMinToolCalls: NaN })

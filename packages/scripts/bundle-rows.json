@@ -242,6 +242,186 @@
         "  config:",
         "    catalogDescriptionMaxLength: 60"
       ]
+    },
+    "standalone": {
+      "target": "evolution-preset/cordis.yml",
+      "header": [
+        "# Recommended composition for the native dsh-evolution family.",
+        "#",
+        "# Every medium dependency is behind a provider seam:",
+        "#   ctx.evolutionIo            -> node:fs provider (evolution-io-node)",
+        "#   ctx.evolutionStateStorage  -> domain KV provider as the PRIMARY medium",
+        "#                                (explicitly pinned on the `evolution-state`",
+        "#                                row below); the JSON provider is mounted too",
+        "#                                but is an explicitly selectable alternative",
+        "#                                only — a profile overlay re-pins",
+        "#                                `provider: json`. There is NO automatic",
+        "#                                fallback: registry `provider()` returns the",
+        "#                                first-registered provider when unpinned, so",
+        "#                                both rows are listed for resolution, not for",
+        "#                                failover.",
+        "#",
+        "# Row-set differences from the layered / one-click flows (G5.1 decision).",
+        "# This STANDALONE file is a hand-composed evolution row set, and it",
+        "# deliberately omits the rows the platform or the host bundle already",
+        "# provides, so it is NOT a faithful superset of the full composition:",
+        "#   - storage ownership (D-30): the storage stack (`storage`, `storage-json`,",
+        "#     `storage-domain`) is HOST-plane in DSH — a preset must not own it. This",
+        "#     STANDALONE composition lists it only because a hand-composed file has no",
+        "#     host bundle behind it; the overlay form (cordis.patch.yml) relies on the",
+        "#     host providing the facility and therefore does not list these rows. When",
+        "#     composing manually, include the host storage rows yourself (or use the",
+        "#     patch overlay on a host that already provides them).",
+        "#   - `tool-session-query` is carried by the agent/one-click delta (the layered",
+        "#     flow gets it from the Evolution agent preset), so it is not repeated",
+        "#     here; a fully self-sufficient manual compose should add it (plus the",
+        "#     host's `session-query-sqlite` index override) for cross-session recall.",
+        "#   - `evolution-maintenance-tools` is listed by the overlay form and the host",
+        "#     bundle but deliberately NOT by this STANDALONE file (H-01) — a standalone",
+        "#     compose that wants maintenance_probe / `/evolution maintain` must add the",
+        "#     row (`name: '@deepseek-ai/dsh-evolution-maintenance/tools'`) itself. The",
+        "#     package.json dependency on `dsh-evolution-maintenance` exists so that",
+        "#     added row resolves without also editing dependencies. The standalone file",
+        "#     likewise carries no `session-query-sqlite` override; the overlay form",
+        "#     carries it (overriding the platform row the DSH profile already has).",
+        "#   - the `tool-skill` 60-char catalog cap override is carried by the one-click",
+        "#     patch (V10-14) and by the host bundle as the identical root-level row;",
+        "#     this STANDALONE file does not list it — a manual compose wanting the cap",
+        "#     adds the override itself, and preset-scope sessions need the",
+        "#     install-layered injection (V10-14) regardless. `host` and the preset are",
+        "#     ALTERNATIVE install targets: never install both (either form), or shared",
+        "#     rows would mount twice (E-33).",
+        "#   - `evolution-capability` was retired in 0.3.66 (source removed): approval",
+        "#     that does not gate execution is only a log, and the dynamic-package",
+        "#     lifecycle belongs to the platform Creator mode.",
+        "#",
+        "# The legacy `@deepseek-ai/dsh-evolution` facade was retired from publishing",
+        "# after the v0.1.0-rc.18 release tag (see docs/codebase-audit-rc16.md); this",
+        "# composition uses the smaller native packages instead."
+      ],
+      "insert": false,
+      "rowPrefix": "",
+      "layout": [
+        {
+          "group": "evolution-policy",
+          "banner": [
+            "",
+            "# ── control plane (immutable policy, deterministic plan validation) ────────"
+          ],
+          "rows": [
+            "evolution-policy"
+          ]
+        },
+        {
+          "group": "evolution-io",
+          "banner": [
+            "",
+            "# ── IO seam: one registry, one node:fs provider ─────────────────────────────"
+          ],
+          "rows": [
+            "evolution-io",
+            "evolution-io-node"
+          ]
+        },
+        {
+          "group": "storage-host",
+          "banner": [
+            "",
+            "# ── durable state: DSH storage-domain KV is the primary provider ────────────"
+          ],
+          "rows": [
+            "storage",
+            "storage-json",
+            "storage-domain",
+            "evolution-state-storage",
+            "evolution-state-domain",
+            "evolution-state-json",
+            "evolution-state"
+          ]
+        },
+        {
+          "group": "memory",
+          "banner": [
+            "",
+            "# ── memory: registry, provider, model-facing tool ───────────────────────────"
+          ],
+          "rows": [
+            "memory",
+            "memory-files",
+            "tool-memory"
+          ]
+        },
+        {
+          "group": "skill-usage",
+          "banner": [
+            "",
+            "# ── skills: usage telemetry, model-facing management tool ───────────────────",
+            "# S1-A1: the standalone form carries NO `sessionScoped: true` on the",
+            "# skill-usage/review rows — unlike the host/all/preset-patch forms where every",
+            "# session carries the model tools anyway. This is INTENTIONAL (see",
+            "# evolution-core/src/opt-in.ts): a bare mount keeps observing every session,",
+            "# so the observation scope matches the every-session tool reach of this",
+            "# one-click form. It is NOT byte-consistent with the patch forms' rows, and",
+            "# must not be \"synced\" to them."
+          ],
+          "rows": [
+            "skill-usage",
+            "tool-skill-manage"
+          ]
+        },
+        {
+          "group": "skill-usage",
+          "banner": [
+            "# S3-1 (G-3) LAYER SEMANTICS: this row files into the PRESET layer, which is the",
+            "# NEAREST layer for a session running this preset — it wins duplicate skill names",
+            "# outright, regardless of rank. `includeSkillNames` / `excludeSkillNames` set here",
+            "# are therefore the ones that govern a preset session; the same row in",
+            "# evolution-all (global layer) governs only sessions WITHOUT the preset."
+          ],
+          "rows": [
+            "evolution-skill-catalog"
+          ]
+        },
+        {
+          "group": "evolution-approval",
+          "banner": [
+            "",
+            "# ── write admission: staged approval (off by default) + threat guard ────────"
+          ],
+          "rows": [
+            "evolution-approval"
+          ]
+        },
+        {
+          "group": "evolution-approval",
+          "banner": [
+            "# Retired (0.3.66): `evolution-capability` was removed — approval that does not",
+            "# gate execution is only a log, and the dynamic-package lifecycle belongs to the",
+            "# platform Creator mode."
+          ],
+          "rows": [
+            "evolution-threat"
+          ]
+        },
+        {
+          "group": "evolution-review",
+          "banner": [
+            "",
+            "# ── review / curator / observability / human controls ───────────────────────"
+          ],
+          "rows": [
+            "evolution-review",
+            "evolution-curator",
+            "evolution-commands",
+            "evolution-activity",
+            "evolution-feedback",
+            "evolution-learning-graph",
+            "evolution-replay"
+          ]
+        }
+      ],
+      "tail": [],
+      "blankBetweenSegments": false
     }
   },
   "groups": [
@@ -259,6 +439,14 @@
         "all": "    # ── IO seam: one registry, one node:fs provider ─────────────────────────",
         "host": "    # ── IO seam: one registry, one node:fs provider ─────────────────────────",
         "preset": "    # ── IO seam: one registry, one node:fs provider ─────────────────────────"
+      }
+    },
+    {
+      "id": "storage-host",
+      "banners": {
+        "standalone": [
+          "# ── durable state: DSH storage-domain KV is the primary provider ────────────"
+        ]
       }
     },
     {
@@ -327,12 +515,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-policy'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-policy'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-io",
@@ -340,12 +537,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-io'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-io'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-io-node",
@@ -353,12 +559,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-io-node'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-io-node'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-state-storage",
@@ -366,12 +581,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-state-storage'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-state-storage'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-state-domain",
@@ -379,7 +603,8 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
@@ -389,7 +614,15 @@
         "      # and evolution-state-json remains the active portable backend. Enable it",
         "      # explicitly in a profile overlay only when storage-domain is mounted.",
         "      disabled: true"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-state-domain'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-state-json",
@@ -397,12 +630,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-state-json'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-state-json'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-state",
@@ -410,7 +652,8 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
@@ -455,7 +698,21 @@
           "      # switch the family's state medium to an empty domain.",
           "      config:",
           "        provider: json"
+        ],
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-state'",
+          "  # P2-6 (V10-16): explicit provider pin. The storage registry's `provider()`",
+          "  # has NO fallback logic — unpinned, the effective provider is whichever row",
+          "  # registered first (fragile yml row order). `domain` is the primary medium;",
+          "  # the json provider above stays mountable as an explicitly selectable",
+          "  # alternative (an overlay re-pins `provider: json`), never an automatic",
+          "  # failover. Both provider rows remain listed so the pinned name resolves.",
+          "  config:",
+          "    provider: domain"
         ]
+      },
+      "leads": {
+        "standalone": []
       }
     },
     {
@@ -464,12 +721,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-memory'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-memory'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "memory-files",
@@ -477,24 +743,42 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-memory-files'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-memory-files'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "tool-memory",
       "group": "memory",
       "forms": [
         "all",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-tool-memory'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-tool-memory'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "skill-usage",
@@ -502,7 +786,8 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [
         "    # `sessionScoped: true` is shared with evolution-host/preset (byte-identical",
@@ -536,6 +821,12 @@
           "    # `sessionScoped: true` is shared with evolution-host/all (this row must stay",
           "    # byte-identical across the bundles — bundle-mutual-exclusion.spec). Here the",
           "    # model rows are mounted at profile root, so every session carries them."
+        ],
+        "standalone": []
+      },
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-skill-usage'"
         ]
       }
     },
@@ -544,12 +835,21 @@
       "group": "skill-usage",
       "forms": [
         "all",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-tool-skill-manage'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-tool-skill-manage'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "tool-session-query",
@@ -568,7 +868,8 @@
       "group": "skill-usage",
       "forms": [
         "all",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [
         "    # S3-1 (G-3) LAYER SEMANTICS: this row files into the GLOBAL layer (profile",
@@ -598,7 +899,13 @@
           "    # install ONE form (doctor flags all + layered preset as a double-mount).",
           "    # tests/rank-contract.spec.ts pins both halves mechanically."
         ],
-        "preset": []
+        "preset": [],
+        "standalone": []
+      },
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-skill-catalog'"
+        ]
       }
     },
     {
@@ -607,7 +914,8 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
@@ -615,7 +923,18 @@
         "      config:",
         "        enabled: false",
         "        stageForeground: true"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-approval'",
+          "  config:",
+          "    enabled: false",
+          "    stageForeground: true"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-threat",
@@ -623,7 +942,8 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [
         "    # Retired (0.3.66): `evolution-capability` source was removed — approval that",
@@ -644,7 +964,13 @@
           "    # does not gate execution is only a log, and the dynamic-package lifecycle",
           "    # belongs to the platform Creator mode."
         ],
-        "preset": []
+        "preset": [],
+        "standalone": []
+      },
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-threat'"
+        ]
       }
     },
     {
@@ -653,7 +979,8 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
@@ -707,7 +1034,19 @@
           "        # Shared with every bundle (byte-identical row): with the model rows at",
           "        # profile root every session carries them, so the probe passes for all.",
           "        sessionScoped: true"
+        ],
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-review'",
+          "  # V5-24 (0.3.32): the tool allow-list narrows review subagents to the plain",
+          "  # `skill` tool (the DSH catalog exposes it only). S1-A1: unlike the",
+          "  # host/all/preset-patch rows, this row deliberately omits",
+          "  # `sessionScoped: true` — see the skill-usage note above.",
+          "  config:",
+          "    reviewToolAllow: [skill]"
         ]
+      },
+      "leads": {
+        "standalone": []
       }
     },
     {
@@ -716,12 +1055,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-curator'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-curator'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-commands",
@@ -729,12 +1077,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-commands'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-commands'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-maintenance-tools",
@@ -755,12 +1112,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-activity'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-activity'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-feedback",
@@ -768,12 +1134,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-feedback'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-feedback'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-learning-graph",
@@ -781,12 +1156,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-learning-graph'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-learning-graph'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-replay",
@@ -794,12 +1178,21 @@
       "forms": [
         "all",
         "host",
-        "preset"
+        "preset",
+        "standalone"
       ],
       "lead": [],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-replay'"
-      ]
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-replay'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     },
     {
       "id": "evolution-settings-ui",
@@ -850,6 +1243,71 @@
         "      name: '@deepseek-ai/dsh-evolution-skill-health'",
         "      disabled: true"
       ]
+    },
+    {
+      "id": "storage",
+      "group": "storage-host",
+      "forms": [
+        "standalone"
+      ],
+      "lead": [],
+      "body": [
+        "  name: '@deepseek-ai/dsh-storage'"
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-storage'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
+    },
+    {
+      "id": "storage-json",
+      "group": "storage-host",
+      "forms": [
+        "standalone"
+      ],
+      "lead": [],
+      "body": [
+        "  name: '@deepseek-ai/dsh-storage-json'",
+        "  config:",
+        "    root: !!js dshHomePath('evolution', 'storage')"
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-storage-json'",
+          "  config:",
+          "    root: !!js dshHomePath('evolution', 'storage')"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
+    },
+    {
+      "id": "storage-domain",
+      "group": "storage-host",
+      "forms": [
+        "standalone"
+      ],
+      "lead": [],
+      "body": [
+        "  name: '@deepseek-ai/dsh-storage-domain'",
+        "  config:",
+        "    backend: json"
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-storage-domain'",
+          "  config:",
+          "    backend: json"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     }
   ]
 }

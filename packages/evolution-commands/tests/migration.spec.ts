@@ -115,6 +115,23 @@ describe('namespace migration command (G3)', () => {
     expect(writes).toEqual([])
   })
 
+  it('S1-06: an EMPTY first candidate does not answer for a second one holding the real sections', async () => {
+    const home = 'C:/home'
+    const { writes, provider } = seat({})
+    // `.imported` exists but carries no family section; `.yaml` carries it. The old loop returned on the
+    // first document it could READ, so the real document was never opened and the caller was told there
+    // was nothing to migrate.
+    const outcome = await runNamespaceMigration({
+      home,
+      io: io({ [IMPORTED(home)]: 'ui-chat:\n  transcriptView: standard\n', [PLAIN(home)]: LEGACY }) as never,
+      settings: provider,
+      warn: vi.fn(),
+    })
+    expect(outcome.source).toBe(PLAIN(home))
+    expect(outcome.plan.entries.length).toBeGreaterThan(0)
+    expect(outcome.report).toBeDefined()
+  })
+
   it('reports an already-migrated document as consistent and writes nothing', async () => {
     const home = 'C:/home'
     const { writes, provider } = seat({ memoryChars: 2200 })

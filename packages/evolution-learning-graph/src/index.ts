@@ -11,6 +11,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { isPresent, isUnknown, authorityFrom, runWriteGates, skillWriteGateContext, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
@@ -306,6 +307,40 @@ export function capRenderedLines(lines: string[]): string {
   return [...lines.slice(0, GRAPH_RENDER_LINE_CAP), `…${lines.length - GRAPH_RENDER_LINE_CAP} more`].join('\n')
 }
 
+/**
+ * G1/1.2: the graph commands' write-admission call, as a NAMED function.
+ *
+ * The gates run at the execution point: these commands write at the bytes, exactly like the tool's
+ * execution path, so the read-before-write gate does not apply and a missing session read set is not a
+ * refusal. `delete` archives (reversible) and is allowed through by the protection gate by design;
+ * `update` is what a protected skill is refused for.
+ *
+ * Named rather than inlined because the wiring it represents - "this command passes the SAME sequence" -
+ * has to be provable by a case that fails when the call disappears.
+ * @param services - the policy source and the warn sink, both from the command's own context.
+ * @param request - the action, the target name, the new body for an update, and the library write origin.
+ * @returns the refusal message, or null when the write may proceed.
+ */
+export async function graphWriteGate(
+  services: { readonly policy: unknown; readonly warn: (message: string) => void },
+  request: { readonly action: 'update' | 'delete'; readonly name: string; readonly content?: string | undefined; readonly origin: WriteOrigin },
+): Promise<string | null> {
+  // MEASURED: the protection gate only runs at the ADMISSION point. Wiring both actions at `execution`
+  // let /graph edit rewrite a protected skill - the policy list was read and then never consulted. The
+  // edit branch reads the target first (it stages the old body), so an admission read set naming it is
+  // truthful; the archive branch does not read it, and archive is reversible, so it stays at execution.
+  const isUpdate = request.action === 'update'
+  const args = isUpdate
+    ? { action: 'update', name: request.name, content: request.content ?? '' }
+    : { action: 'delete', name: request.name }
+  return runWriteGates(skillWriteGateContext({
+    policy: services.policy,
+    confirm: undefined,
+    readNames: isUpdate ? new Set([request.name]) : undefined,
+    warn: services.warn,
+  }, { point: isUpdate ? 'admission' : 'execution', args, origin: request.origin }))
+}
+
 export function apply(ctx: Context, rawConfig: Config = {}): void {
   // V10-11 (P2-7): single root resolution for every graph skill read/edit —
   // empty config falls through to the shared default root inside the resolver.
@@ -337,7 +372,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       run: async (invocation: CommandInvocation): Promise<CommandResult> => {
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
-        const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
+        // G1/1.2: the graph commands now pass the SAME write-admission sequence as the tool. The warn sink
+  // latches once per process, exactly like the tool's: what it reports (no question service, an
+  // unreadable session log) belongs to the deployment, not to one write.
+  let writeGateWarned = false
+  const warnWriteGateOnce = (message: string): void => {
+    if (writeGateWarned) return
+    writeGateWarned = true
+    ctx.logger?.warn?.(message)
+  }
+  const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
         const memoryService = ctx.get('memory') as MemoryLike | undefined
         const ioService = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
         if (!usageService || !memoryService || !ioService) return err('skill-usage、memory 或 evolution-io 服务未挂载。')
@@ -488,7 +532,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // V10-11 (P2-7): the resolver now reads THIS package's Config.root
           // (empty = the shared default root), so a custom-root deployment no
           // longer has the graph edit/delete write the wrong tree.
-          return newSkillLibrary({
+          return newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
             config: rawConfig,
             io: evolutionIoAdapter(() => io.provider()),
             ctx,
@@ -556,7 +600,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // and approval (same contract as the tool/review stagings).
               // P1-13 (v37): the catch answers UNDEFINED (unreadable = no anchor),
               // so a missing target still reaches the 'absent' sentinel below.
-              const stageCurrent: string | null | undefined = await withSkills().read(parsed.name).catch((): undefined => undefined)
+              // G0/0.7 (S4-01 sweep): the three-state read, not an expression-form swallow. The MEANING is unchanged
+    // and deliberate - unreadable answers `undefined` (no anchor), a missing target answers `null` so it
+    // still reaches the absent sentinel below - but the distinction is now named by the library instead of
+    // re-derived from a thrown error at this call site.
+    const stageProbe = await withSkills().readSkillProbe(parsed.name)
+    const stageCurrent: string | null | undefined = isUnknown(stageProbe) ? undefined : (isPresent(stageProbe) ? stageProbe.value : null)
               const decision = await approval.request({
                 kind: 'skill',
                 summary: `graph edit ${parsed.name}`,
@@ -580,6 +629,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               })
               if (decision.action === 'staged') return ok(decision.message)
             }
+            // G1/1.2: same admission sequence, same protected list as tool-skill-manage. Before this, the graph
+            // commands went through approval and then wrote straight to the library - the write-admission gates
+            // (protected names, caps, read-before-write) never ran on this path at all.
+            const graphRefusal = await graphWriteGate(
+              { policy: ctx.get('evolutionPolicy'), warn: warnWriteGateOnce },
+              { action: 'update', name: parsed.name, content, origin: resolveExecOrigins(invocationAgent && { agent: invocationAgent }).library },
+            )
+            if (graphRefusal !== null) return err(graphRefusal)
             const result = await withSkills().update(parsed.name, content, origins.library)
             // E-26: a graph edit is a content patch — bump the patch counter
             // exactly as skill_manage does (previously graph edits never
@@ -673,6 +730,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               })
               if (decision.action === 'staged') return ok(decision.message)
             }
+            // G1/1.2: same admission sequence, same protected list as tool-skill-manage. Before this, the graph
+            // commands went through approval and then wrote straight to the library - the write-admission gates
+            // (protected names, caps, read-before-write) never ran on this path at all.
+            const graphRefusal = await graphWriteGate(
+              { policy: ctx.get('evolutionPolicy'), warn: warnWriteGateOnce },
+              { action: 'delete', name: parsed.name, origin: resolveExecOrigins(invocationAgent && { agent: invocationAgent }).library },
+            )
+            if (graphRefusal !== null) return err(graphRefusal)
             const result = await withSkills().archive(parsed.name)
             if (result.ok) {
               const usageRegistry = usageService as unknown as { markArchived?(name: string): Promise<void> } | undefined

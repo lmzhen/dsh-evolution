@@ -18,6 +18,7 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { NATIVE_CALL_EVENT } from '@deepseek-ai/dsh-evolution-core'
@@ -40,6 +41,7 @@ interface WindowFixture {
 async function mountWindow(options: { seededTurn?: unknown[] } = {}): Promise<WindowFixture> {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
   const delivered: string[] = []
   const scheduled: Array<{ kind?: string; channel?: string }> = []
   const logs: string[] = []
@@ -230,6 +232,7 @@ it('C: the turn that claims our notice is not counted, and the window reopens af
 it('C: a host without an inbox has no queue events to wait for — delivery still settles the window', { timeout: 30_000 }, async () => {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
   const delivered: unknown[] = []
   // G4: same as the first fixture — the window is folded from announced frames.
   const session = projectable({

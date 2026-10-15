@@ -9,6 +9,7 @@
  * recordVersions skips only when BOTH sides are null - so the removed bytes are the entry's content.
  */
 import { describe, expect, it } from 'vitest'
+import { authorityFrom } from '../src/index.ts'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -24,7 +25,7 @@ describe('a removed support file stays visible in the version chain', () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-support-remove-'))
     try {
       const io = nodeEvolutionIo()
-      const library = newSkillLibrary({ config: { root: join(root, 'skills') }, io, limits: DEFAULT_SKILL_LIMITS })
+      const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: join(root, 'skills') }, io, limits: DEFAULT_SKILL_LIMITS })
       expect((await library.create('probe-skill', BODY, 'foreground')).ok).toBe(true)
       expect((await library.writeSupportFile('probe-skill', 'references/note.md', SUPPORT, 'foreground')).ok).toBe(true)
       expect((await library.removeSupportFile('probe-skill', 'references/note.md', 'foreground')).ok).toBe(true)

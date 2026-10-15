@@ -23,7 +23,6 @@
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionIoAdapter, evolutionRoot, isPresent, isUnknown, listEventArchives, parseEvolutionEvents, probeText, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
@@ -865,7 +864,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // G2 S3 migration: prefer the platform backend when the deployment mounts one (this consumer both
     // reads on restore and writes through transact), else the default backend.
     const ioRegistry = (ioCtx as unknown as { evolutionIo: { provider(name?: string): EvolutionIoLike } }).evolutionIo
-    const io = evolutionIoAdapter(() => preferProvider(ioRegistry, ['fs']))
+    const io = evolutionIoAdapter(() => ioRegistry.provider())
     feedback.attachIo(io)
     void feedback.restore(io).catch((error: unknown) => {
       ioCtx.logger.warn(error)

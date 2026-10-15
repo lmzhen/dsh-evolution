@@ -161,50 +161,48 @@ describe('guard scripts (V4-30 sentry)', () => {
   })
 
   it('G4.1 (v33): declared-config recomputes the platform planes and fails loud on drift', async () => {
-    const _declaredConfig = join(scripts, 'verify-declared-config.mjs')
-    // Positive: the real tree with no platform checkout behaves as before.
-    // Violation: a platform tree whose base plane does not carry the rows the
-    // snapshot lists. The recomputation must report the drift instead of
-    // accepting a partial (or empty) plane as agreement.
+    const declaredConfig = join(scripts, 'verify-declared-config.mjs')
+    const familyRoot = psRoot
     const tree = await tempRoot('guard-declared-')
     const plane = join(tree, 'packages', 'bundle', 'base')
     await mkdir(plane, { recursive: true })
-    await writeFile(
-      join(plane, 'cordis.patch.yml'),
-      "- id: timer\n  name: '@deepseek-ai/dsh-timer'\n- id: skill-badge\n  name: '@deepseek-ai/dsh-skill-badge'\n  disabled: true\n",
-      'utf8',
-    )
-      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    const nl = String.fromCharCode(10)
+    const partial = ['- id: timer', "  name: '@deepseek-ai/dsh-timer'", '- id: skill-badge', "  name: '@deepseek-ai/dsh-skill-badge'", '  disabled: true', ''].join(nl)
+    await writeFile(join(plane, 'cordis.patch.yml'), partial, 'utf8')
+    const error = await run(process.execPath, [declaredConfig, familyRoot, '--upstream', tree, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string; stdout?: string })
+    expect(error, 'vacancy sentry: a partial platform plane must not be accepted as agreement').not.toBeNull()
+    expect(error?.code).not.toBe(0)
+    const said = String(error?.stderr ?? '') + String(error?.stdout ?? '')
+    expect(said, 'the recomputation must report the drift, not merely refuse for another reason').toMatch(/drift/)
+    await rm(tree, { recursive: true, force: true })
   })
 
   it('G4.2 (v33): platform-contract names the recorded anchors an empty tree lacks', async () => {
-    const _contract = join(scripts, 'verify-platform-contract.mjs')
-    // Vacuity sentry: with no platform tree present, every recorded anchor is
-    // reported by name — the probe can never pass by finding nothing.
-    const _empty = await tempRoot('guard-contract-')
-      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
-    // The dispatch writer set is measured, not assumed: on a tree that has none
-    // of it, every recorded site must be named — the check may not pass by
-    // finding nothing (the same vacuity sentry the anchors get).
+    const contract = join(scripts, 'verify-platform-contract.mjs')
+    const familyRoot = psRoot
+    const empty = await tempRoot('guard-contract-')
+    const error = await run(process.execPath, [contract, familyRoot, '--upstream', empty], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string; stdout?: string })
+    expect(error, 'vacuity sentry: the probe must not pass by finding nothing').not.toBeNull()
+    expect(error?.code).not.toBe(0)
+    const said = String(error?.stderr ?? '') + String(error?.stdout ?? '')
+    expect(said).toContain('session-format-version-is-4')
+    await rm(empty, { recursive: true, force: true })
   })
 
   it('G2 (v42): platform-contract names the semantic assertions and citations an empty tree lacks', async () => {
-    const _contract = join(scripts, 'verify-platform-contract.mjs')
-    // Vacuity sentry, extended to the v42 G2 dimensions: a tree with no platform
-    // in it must name every semantic assertion (a patch item's own disabled
-    // block, the scope doc line, the session format facts) and every platform
-    // citation the scan recognized — the discipline the anchors already get.
-    const _empty = await tempRoot('guard-contract-g2-')
+    const contract = join(scripts, 'verify-platform-contract.mjs')
+    const familyRoot = psRoot
+    const empty = await tempRoot('guard-contract-g2-')
+    const error = await run(process.execPath, [contract, familyRoot, '--upstream', empty], { encoding: 'utf8' })
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string; stdout?: string })
-    // The anchor id follows the recorded format version: the 0.2.x line is v4, so the id is -is-4
-    // (the sentry names the id, not the value, to stay independent of the number itself).
-    // The citation scan reads comments, docs and manifests, not just sources: a
-    // recognized citation must be reported with the path it cites.
-    // The summary line carries the new counts on the run that fails too.
-    // 0.3.78 compat job: the family's citations to its OWN docs (`packages/docs`,
-    // gitignored, so absent from a CI checkout) must never be read as platform
-    // anchors — against dsh-v0.1.1-rc.2 they were reported broken while the
-    // baseline job resolved them against the platform's own docs directory.
+    expect(error, 'vacuity sentry: an empty tree must not pass by finding nothing').not.toBeNull()
+    expect(error?.code).not.toBe(0)
+    const said = String(error?.stderr ?? '') + String(error?.stdout ?? '')
+    expect(said).toContain('session-format-version-is-4')
+    expect(said, 'a named citation must carry the path it cites').toMatch(/[\w@./-]+\.(ts|mjs|md|json|yml)\b/)
+    await rm(empty, { recursive: true, force: true })
   })
 
   it('N17: architecture guards reject a consumer that branches on the dispatch modality', async () => {

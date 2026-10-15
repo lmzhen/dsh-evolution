@@ -18,6 +18,7 @@
  *   --strict  accepted for uniformity; this one always fails loud.
  */
 import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { familyGateRegisters } from './lib-doc-facts.mjs'
 import { familyVersion, versionReached } from './lib-family-version.mjs'
@@ -39,6 +40,17 @@ for (let dir = root; ; ) {
 }
 const tableArmed = repo !== ''
 const problems = []
+
+// G0-0.2: the manifest generator own --check had NO execution point in the tree (F-15). Wiring it
+// here makes it run wherever this meta gate runs (gate-22: local + ci) - one owner, no second
+// drift detector. Measured: gen-gate-manifest.mjs:199 exits 1 when the manifest is stale.
+if (process.env.SKIP_MANIFEST_FRESHNESS !== '1') {
+  const probe = spawnSync(process.execPath, [join(root, 'scripts', 'gen-gate-manifest.mjs'), '--check'], { encoding: 'utf8' })
+  if (probe.status !== 0) {
+    const tail = String(probe.stderr || probe.stdout || '').split('\n').filter((l) => l.trim() !== '').slice(-1)[0] || '(no output)'
+    problems.push('gate-manifest.json is stale: rerun gen-gate-manifest.mjs then gen-checks-fact.mjs (that order) - ' + tail)
+  }
+}
 const notes = []
 
 // v46 S2.4 (finding T7-05): both exception registers have ONE home — the `gate-set` fact in
@@ -236,7 +248,26 @@ const overlayArg = (argv.find((entry) => entry.startsWith('--overlay=')) ?? '').
 const overlayRoot = overlayArg === '' ? resolve(repo, '..', 'deepseek-harness') : resolve(overlayArg)
 const familyVer = familyVersion(root)
 const observations = []
-const note = (criterion, subject, detail) => observations.push({ criterion, subject, detail })
+const axisRegister = (() => {
+  try {
+    const facts = JSON.parse(readFileSync(join(root, 'scripts', 'family-facts.json'), 'utf8'))
+    const checks = (facts.facts ?? []).find((fact) => fact.id === 'checks')
+    return new Map((checks?.machine?.pendingAxes ?? []).map((entry) => [entry.axis, entry]))
+  } catch { return new Map() }
+})()
+
+const note = (criterion, subject, detail) => {
+  // G0/0.7 F-04: the register gate lives in the ONE sink, so EVERY axis is covered by
+  // construction. It used to sit in observeAxis, which exactly one axis called - so a
+  // registered expiry never fired for the other six (measured: expiry set to the current
+  // version still exited 0). Keeping one path also means a new axis cannot miss the gate.
+  const entry = axisRegister.get(criterion)
+  if (entry !== undefined && familyVer !== undefined && versionReached(familyVer, entry.expiry)) {
+    problems.push((detail === undefined ? '' : detail) + ' - the ' + criterion + ' register expired at ' + entry.expiry + ' (reached by ' + familyVer + ')')
+    return
+  }
+  observations.push({ criterion, subject, detail })
+}
 for (const gate of manifestGates) {
   const human = String(gate.human ?? '')
   const argvRow = Array.isArray(gate.argv) ? gate.argv : null
@@ -293,21 +324,6 @@ if (existsSync(drillPath)) {
   try { drillDeclarations = JSON.parse(readFileSync(drillPath, 'utf8')).drills ?? {} }
   catch (error) { console.error('verify-gate-manifest: ' + drillPath + ' is unreadable (' + (error instanceof Error ? error.message : String(error)) + ') - fix the declaration table'); process.exit(2) }
 }
-const axisRegister = (() => {
-  try {
-    const facts = JSON.parse(readFileSync(join(root, 'scripts', 'family-facts.json'), 'utf8'))
-    const checks = (facts.facts ?? []).find((fact) => fact.id === 'checks')
-    return new Map((checks?.machine?.pendingAxes ?? []).map((entry) => [entry.axis, entry]))
-  } catch { return new Map() }
-})()
-const observeAxis = (axis, id, message) => {
-  const entry = axisRegister.get(axis)
-  if (entry !== undefined && familyVer !== undefined && versionReached(familyVer, entry.expiry)) {
-    problems.push(message + ' - the ' + axis + ' register expired at ' + entry.expiry + ' (reached by ' + familyVer + ')')
-    return
-  }
-  note(axis, id, message)
-}
   // (R4) falsifiability carrier: every row states how its green can be turned red (drillCmd), or
   // why it cannot be yet (noDrillReason). Neither means somebody forgot, which G6's gate-truth counts.
   const declaredDrill = drillDeclarations[gate.id]
@@ -315,10 +331,46 @@ const observeAxis = (axis, id, message) => {
     if (declaredDrill !== undefined && (typeof declaredDrill.drillCmd === 'string' || typeof declaredDrill.noDrillReason === 'string')) {
       // a declared drill satisfies the carrier axis: emit NO observation for this row
     } else
-    observeAxis('falsifiability-carrier', gate.id, 'declares neither drillCmd nor noDrillReason - a green nobody can turn red is an F=0 candidate')
+    // G0/0.7 review fix: this call site still named `observeAxis`, the helper the F-04 refactor removed
+    // when it moved the register gate into the ONE sink (`note`). The shape was unreachable until a gate
+    // with neither drillCmd nor noDrillReason was registered - the 51st row (gen-line-manifest --check)
+    // was the first, and it crashed the whole meta-gate with ReferenceError instead of reporting. The
+    // comment above `note` claims "a new axis cannot miss the gate"; a new ROW could still miss the sink.
+    note('falsifiability-carrier', gate.id, 'declares neither drillCmd nor noDrillReason - a green nobody can turn red is an F=0 candidate')
   }
 }
-const CRITERIA = ['executability', 'no-placeholders', 'expiry-due', 'falsifiability-carrier']
+const CRITERIA = [
+  'argv-ci-parity', 'executability', 'no-placeholders', 'expiry-due', 'falsifiability-carrier']
+// G0-0.4 report-only stage (inserted BEFORE the problems exit, i.e. on every non-json run):
+// the manifest argv is the CLAIM about how a gate runs, the composite action is the FACT.
+const ACTION_CI_TEXT = readFileSync(actionPath, 'utf8').split(String.fromCharCode(92) + String.fromCharCode(10)).join(String.fromCharCode(32))
+const ACTION_CI_LINES = ACTION_CI_TEXT.split(String.fromCharCode(10))
+let parityChecked = 0
+// Substitution table (G0-0.4 stage 2): flags the composite action legitimately adds or swaps,
+// each with the reason it is NOT drift. A mismatch outside this table still fires.
+const ARGV_CI_SUBSTITUTIONS = {
+  'gate-25': 'ci adds --upstream: it additionally requires upstream alignment',
+  'gate-27': 'ci adds --our-scope: it narrows the platform range check further',
+  'gate-28': 'ci runs the --self-test form of the same verifier',
+  'line-identity-bed': 'ci runs --policy-only (the step is Verify the line-identity policy)',
+  'graph-edges-live': 'ci runs --self-test; the manifest form is the local read-only one',
+}
+let paritySubstituted = 0
+for (const gate of manifestGates) {
+  const row = Array.isArray(gate.argv) ? gate.argv : null
+  if (row === null || row.length < 2 || String(row[0]).startsWith('-')) continue
+  const script = String(row[1]).split('/').pop()
+  if (!script.endsWith('.mjs')) continue
+  const ciLines = ACTION_CI_LINES.filter((line) => line.includes(script))
+  if (ciLines.length === 0) continue
+  parityChecked += 1
+  const flagsOf = (text) => text.split(String.fromCharCode(32)).filter((t) => t.startsWith('-') && t.length > 1).sort().join(String.fromCharCode(32))
+  const mf = flagsOf(row.join(String.fromCharCode(32)))
+  const ciSets = ciLines.map((line) => flagsOf(line))
+  if (ARGV_CI_SUBSTITUTIONS[gate.id] !== undefined) { paritySubstituted += 1; continue }
+  if (!ciSets.includes(mf)) note('argv-ci-parity', gate.id, 'flag mismatch: manifest [' + mf + '] vs action.yml ' + JSON.stringify(ciSets) + ' for ' + script)
+}
+if (!argv.includes('--json')) console.log('argv-ci-parity: compared ' + parityChecked + ' gate(s) also invoked by the composite action; ' + paritySubstituted + ' registered substitution(s); mismatches are observations (report-only)')
 // G2/M5: the registry is a LEDGER over these observations. It consumes this object instead of
 // re-deriving them (a second implementation of a discovery is how two counts start to differ).
 if (argv.includes('--json')) {

@@ -50,6 +50,27 @@ const exemptionOf = (id) => {
   const valid = typeof entry.reason === 'string' && entry.reason.trim().length > 0 && typeof entry.expiry === 'string' && entry.expiry.trim().length > 0
   return valid ? entry : null
 }
+// G0/0.7 review fix (2026-10-15): redProven used to count a record whose anchor no longer occurs
+// in its file - "recording is not reproducibility". Measured: two records anchored on a COUNT went
+// to 0 occurrences after a step count changed, and coverage still reported them as proven. Mirror-
+// tree records are checked here; overlay-tree records cannot be (their mutation lands in a tree
+// this run does not read - the rule --only states as TREE MISMATCH), so they are counted apart.
+const REPO_ROOT = resolvePath(HERE, '..', '..')
+const anchorState = (gate) => {
+  const list = Array.isArray(records[gate.id]) ? records[gate.id] : []
+  if (list.length === 0) return 'none'
+  if (gate.tree === 'overlay') return 'unchecked'
+  for (const record of list) {
+    const find = record?.mutate?.find
+    const rel = record?.mutate?.file
+    if (typeof find !== 'string' || typeof rel !== 'string') return 'broken'
+    let text
+    try { text = readFileSync(resolvePath(REPO_ROOT, rel), 'utf8') } catch { return 'broken' }
+    if (text.split(find).length - 1 !== 1) return 'broken'
+  }
+  return 'ok'
+}
+
 const entries = []
 for (const gate of gates) {
   const list = Array.isArray(records[gate.id]) ? records[gate.id] : []
@@ -59,9 +80,12 @@ for (const gate of gates) {
     entries.push({ id: gate.id, records: list.length, status: 'exempt', why: exempt.reason + ' (expires: ' + exempt.expiry + ')' })
     continue
   }
-  entries.push({ id: gate.id, records: list.length, status: complete ? 'recorded' : 'cannot-decide', why: complete ? '' : (list.length === 0 ? 'no mutation record' : 'a record is missing expect|mutate.file|mutate.find|mutate.replace') })
+  const anchor = complete ? anchorState(gate) : 'none'
+  entries.push({ id: gate.id, records: list.length, status: complete ? (anchor === 'broken' ? 'cannot-decide' : 'recorded') : 'cannot-decide', anchor, why: complete ? (anchor === 'broken' ? 'the mutation anchor no longer occurs exactly once in its file - recording is not reproducibility' : '') : (list.length === 0 ? 'no mutation record' : 'a record is missing expect|mutate.file|mutate.find|mutate.replace') })
 }
 const counts = {
+  anchorBroken: entries.filter((e) => e.anchor === 'broken').length,
+  anchorUnchecked: entries.filter((e) => e.anchor === 'unchecked').length,
   recorded: entries.filter((e) => e.status === 'recorded').length,
   cannotDecide: entries.filter((e) => e.status === 'cannot-decide').length,
   exempt: entries.filter((e) => e.status === 'exempt').length,

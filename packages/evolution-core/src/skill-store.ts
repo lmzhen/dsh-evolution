@@ -34,11 +34,12 @@
  */
 
 import { basename, dirname, join, resolve } from 'node:path'
+import { authorityFrom, type WriteAuthority } from './write-authority.ts'
 import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
 import { isCommittedWarning, nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
-import { isAbsent, isPresent, isUnknown, probeAbsent, probeList, probeMtime, probePresent, probeText, type Probe } from './probe.ts'
+import { isAbsent, isPresent, isUnknown, probeAbsent, probeList, probeMtime, probePresent, probeReason, probeText, probeUnknown, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
 import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
@@ -53,6 +54,17 @@ import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionConten
 import { suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
+
+/**
+ * The CLASS boundary default authority (G1/1.1, Stage 2).
+ *
+ * The FACTORY (newSkillLibrary) requires an explicit authority and the v35 A6 register pins every
+ * production construction, so a production caller cannot omit one. The class is the INTERNAL
+ * boundary: arch rule N7 forbids constructing it directly in production, while ~200 test fixtures do
+ * exactly that and ARE the operator, so an omitted authority reads as foreground here - named and
+ * stated instead of silent.
+ */
+const CLASS_DEFAULT_AUTHORITY: WriteAuthority = authorityFrom({ origin: 'foreground' })
 
 /** 0.3.16 (S1.13, T-6): the pointer-line prefix written into a body when a
  * section is moved to references/ — single literal, both restructure and
@@ -667,6 +679,29 @@ interface SingleWriteOutcome {
   event?: EvolutionSkillMutatedEvent
 }
 
+/**
+ * WHY MODULE SCOPE (S4.4): the serial queue must be shared ACROSS SkillLibrary instances. Six services
+ * each build their own store over the SAME skill root (tool face / curator face / review face), and a
+ * per-instance queue - which is what `this.serial = makeSerialQueue()` was - let two of them run
+ * read->plan->commit against one tree at the same time. The mutex cannot live on an instance because
+ * instances share nothing (S2-02, G1/1.4); it cannot be a file lock either, because the point is to
+ * order IN-PROCESS phases before the io transact layer sees them. Keyed by root: two roots are
+ * independent trees and must not wait on each other.
+ */
+const ROOT_SERIAL = new Map<string, ReturnType<typeof makeSerialQueue>>()
+
+/** The ONE queue for a skill root, created on first use (module scope, see above).
+ * @param root - the resolved skill root; the key, so two spellings of one directory share a queue.
+ * @returns the queue every instance over this root serializes through.
+ */
+function serialForRoot(root: string): ReturnType<typeof makeSerialQueue> {
+  const key = resolve(root)
+  const existing = ROOT_SERIAL.get(key)
+  if (existing !== undefined) return existing
+  const created = makeSerialQueue()
+  ROOT_SERIAL.set(key, created)
+  return created
+}
 export class SkillLibrary {
   readonly root: string
   readonly limits: SkillLimits
@@ -685,6 +720,9 @@ export class SkillLibrary {
   /** V10-03 (P2-18): see the constructor's threatExemptLabels. Empty by
    * default — the strict ANY-hit-blocks policy is unchanged. */
   private readonly threatExemptLabels: readonly string[]
+  /** G1/1.1: default authority; a call may override (origin is per-invocation). */
+  /** G1/1.1/Stage 2: the ONE default every mutator reads. Per-call overrides still win. */
+  private readonly authority: WriteAuthority
   /** skill-history.ts: the content history is best-effort, so a failure must not be SILENT —
    * but it is a deployment condition, not a per-write event, so it warns once per instance. */
   private historyWarned = false
@@ -696,12 +734,14 @@ export class SkillLibrary {
     onMutation?: (event: EvolutionSkillMutatedEvent) => void,
     transact?: typeof transactIo,
     threatExemptLabels?: readonly string[],
+    authority: WriteAuthority = CLASS_DEFAULT_AUTHORITY,
   ) {
     this.root = root
     this.io = io
     this.limits = limits
     this.onMutation = onMutation
     this.threatExemptLabels = threatExemptLabels ?? []
+    this.authority = authority
     // V4-20: bind the IO backend's own transact by default. Explicit injection
     // stays first; a backend WITHOUT transact keeps the old plain read→write
     // (the in-process serial chain is the second layer). The wrapper adapts the
@@ -714,7 +754,9 @@ export class SkillLibrary {
         return t ? t(path, task) : transactIo(ioLike, path, task)
       }
       : undefined)
-    this.serial = makeSerialQueue()
+    // G1/1.4 (S2-02): the queue is per ROOT and shared by every instance (see ROOT_SERIAL above); a
+    // per-instance queue ordered nothing across the six services that write this tree.
+    this.serial = serialForRoot(this.root)
   }
 
   /**
@@ -878,6 +920,35 @@ export class SkillLibrary {
    * a swallowed error would silently downgrade the anchor to
    * last-writer-wins.
    */
+  /**
+   * S4-01 (G0/0.7): the ONE three-state read the staging/replay anchors use.
+   *
+   * The two absorbing reads below absorb ENOENT/EISDIR and rethrow everything else, and the callers then
+   * each wrote their own try/catch to turn a rethrow into a decision - three near-copies of one posture,
+   * and the newest of them silently dropped the anchor instead of refusing. A read failure is its own
+   * state, so it gets its own name here: `unknown` with the reason, next to `present` and `absent`.
+   * Failing closed is then the CALLER decision (they refuse on unknown), not something each call site has
+   * to re-derive from a thrown error.
+   */
+  async readSkillProbe(rawName: string): Promise<Probe<string>> {
+    return await this.probeOf(() => this.read(rawName))
+  }
+
+  /** The support-file face of {@link readSkillProbe}. */
+  async readSupportFileProbe(rawName: string, filePath: string): Promise<Probe<string>> {
+    return await this.probeOf(() => this.readSupportFile(rawName, filePath))
+  }
+
+  /** One place that turns the absorbing reads into three states. `null` is absent; a throw is unknown. */
+  private async probeOf(read: () => Promise<string | null>): Promise<Probe<string>> {
+    try {
+      const value = await read()
+      return value === null ? probeAbsent() : probePresent(value)
+    } catch (error) {
+      return probeUnknown(probeReason(error))
+    }
+  }
+
   async readSupportFile(name: string, filePath: string): Promise<string | null> {
     const bad = this.badName(name, { allowReserved: true })
     if (bad) throw new Error(bad)
@@ -920,7 +991,13 @@ export class SkillLibrary {
 
   async list(options: { withContent?: boolean; withFrontmatter?: boolean } = {}): Promise<SkillSummary[]> {
     const summaries: SkillSummary[] = []
-    for (const name of await listNames(this.root, this.io)) {
+    // G1/1.7 (S7-01): ONE listing plus ONE read per skill. The loop used to go through `listNames`,
+    // which probes `exists(SKILL.md)` for every entry - so every name cost an existence call AND then a
+    // read of the same file. Existence IS the read here: a missing SKILL.md answers null and the entry is
+    // skipped, exactly as the probe-then-read pair did (a real read failure still throws, unchanged).
+    for (const entry of await this.io.list(this.root)) {
+      if (entry.startsWith('.')) continue
+      const name = entry
       const dir = this.dirOf(name)
       // v29 LIST-01 + v30 REG-01: ONLY the EISDIR shape is absorbed (a
       // directory squatting on the SKILL.md path — the E-43 form `read()`
@@ -1066,7 +1143,7 @@ export class SkillLibrary {
    * (P1-1/v14 — the name guard lives HERE as well as at every entry point, so
    * no caller can build a path from an unvalidated name).
    */
-  async writeProtection(rawName: string, origin: WriteOrigin = 'foreground'): Promise<string | null> {
+  async writeProtection(rawName: string, origin: WriteOrigin = this.authority.origin): Promise<string | null> {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
@@ -1428,7 +1505,7 @@ export class SkillLibrary {
    * protective mutation, so the autonomous pipeline may never call it. The
    * marker write is the only state change; content is untouched.
    */
-  async setPinned(name: string, pinned: boolean, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async setPinned(name: string, pinned: boolean, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
     // A1-14 (v18): pin/unpin is a protection mutation and must be ordered with
     // the other single-file mutators on the in-process serial chain — a
     // concurrent update could otherwise pass its protection check before the
@@ -1496,7 +1573,7 @@ export class SkillLibrary {
     }
   }
 
-  async create(name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async create(name: string, content: string, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
     const normalized = name.trim()
     // P2-3 (v11): the exists-probe → write window runs under the in-process
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
@@ -1665,7 +1742,7 @@ export class SkillLibrary {
     }
   }
 
-  async update(rawName: string, content: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor): Promise<SkillActionResult> {
+  async update(rawName: string, content: string, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→validate→write runs under the in-process serialize
@@ -1728,7 +1805,7 @@ export class SkillLibrary {
     }, anchor !== undefined ? () => anchorUnverifiable(name, null) : error => unreadableTarget(name, error))
   }
 
-  async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→patch→write runs under the in-process serialize
@@ -1935,7 +2012,7 @@ export class SkillLibrary {
       && basename(name) === name
   }
 
-  async archive(rawName: string, options: ArchiveOptions = {}): Promise<SkillActionResult> {
+  async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
@@ -2043,7 +2120,7 @@ export class SkillLibrary {
     } catch {
       // Same posture as .archive-reason: metadata only, never abort the archive.
     }
-    await this.audit(name, 'archive', md, null, reason)
+    await this.audit(name, 'archive', md, null, reason, undefined, undefined, undefined, origin)
     this.notifyMutation({ action: 'archive', name, archivedPath: dest })
     return { ok: true, message: `技能「${name}」已归档到 .archive。`, path: dest }
   }
@@ -2123,7 +2200,7 @@ export class SkillLibrary {
   async consolidate(
     target: string,
     sources: string[],
-    origin: WriteOrigin = 'foreground',
+    origin: WriteOrigin = this.authority.origin,
     options: { mode?: 'append' | 'reference' } = {},
   ): Promise<SkillActionResult> {
     // Names normalize before validation (rc.42 audit P2-5): the trimmed form
@@ -2356,7 +2433,7 @@ export class SkillLibrary {
    * support-directory links is refused (those links' files stay behind in the
    * same package; the moved text belongs in references/ beside them).
    */
-  async restructure(rawName: string, moves: SkillRestructureMove[], origin: WriteOrigin = 'foreground'): Promise<SkillActionResult> {
+  async restructure(rawName: string, moves: SkillRestructureMove[], origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
     const name = rawName.trim()
     // F-208: the whole read→plan→write runs under the in-process serialize
     // queue so two concurrent restructures on one skill never interleave.
@@ -2593,7 +2670,7 @@ export class SkillLibrary {
       }
       const reason = error instanceof Error ? error.message : String(error)
       if (stuck.length === 0) return { ok: false, message: `目录树变更失败，已回滚：${reason}` }
-      return { ok: false, message: `目录树变更失败：${reason}。回滚无法恢复 ${stuck.join(', ')}：请从 .backups 快照恢复这些目标（或重新应用这次变更）。` }
+      return { ok: false, message: `目录树变更失败：${reason}。回滚无法恢复 ${stuck.join(', ')}：可恢复性由当前快照决定：${await this.snapshotRecoveryAvailability()} —— 若上面不是「最新快照」，请重新应用这次变更。` }
     }
     // A7: both sides come from the KERNEL's own pre-read of the SKILL.md target — the baseline the
     // CAS write compared against and the bytes the rollback restores — instead of the earlier `md`
@@ -2648,7 +2725,7 @@ export class SkillLibrary {
    * recoverability: archival never deletes, and this is the control-plane
    * path back. The `.archive-reason` marker is dropped on restore.
    */
-  async restoreFromArchive(rawName: string): Promise<SkillActionResult> {
+  async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
     const name = rawName.trim()
     // P2-2 (v11): the inline regex + hand-written message bypassed badName()
     // (C-12 single source — the regex carries no length bound, so a >64-char
@@ -2730,7 +2807,7 @@ export class SkillLibrary {
       return {
         ok: false,
         message: `.archive 里没有「${name}」对应的 frontmatter 名，但有 ${unreadable.length} 个名字相似的归档项：${unreadable.join(', ')}。`
-          + '这些归档项没有可读的 SKILL.md（或名字对不上），按名字恢复无法区分它们：请把目录改成技能名后再次恢复，或改用快照恢复。',
+          + `这些归档项没有可读的 SKILL.md（或名字对不上），按名字恢复无法区分它们：请把目录改成技能名后再次恢复；快照这条路的当前状态是：${await this.snapshotRecoveryAvailability()}。`,
       }
     }
     const source = join(archiveRoot, chosen)
@@ -2775,12 +2852,12 @@ export class SkillLibrary {
     if (isUnknown(restoredProbe)) {
       console.warn(`evolution-skill-store: the restored SKILL.md of "${name}" could not be read back (${restoredProbe.reason}); the restore is recorded without after-bytes`)
     }
-    await this.audit(name, 'restore', null, isPresent(restoredProbe) ? restoredProbe.value : null, `restored from ${source}`)
+    await this.audit(name, 'restore', null, isPresent(restoredProbe) ? restoredProbe.value : null, `restored from ${source}`, undefined, undefined, undefined, origin)
     this.notifyMutation({ action: 'restore', name, skillDir: dest })
     return { ok: true, message: `技能「${name}」已从 .archive 恢复。`, path: dest }
   }
 
-  async writeSupportFile(rawName: string, filePath: string, content: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor): Promise<SkillActionResult> {
+  async writeSupportFile(rawName: string, filePath: string, content: string, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→validate→write runs under the in-process serialize
@@ -2843,7 +2920,7 @@ export class SkillLibrary {
     }, anchor !== undefined ? () => anchorUnverifiable(name, filePath) : error => unreadableTarget(name + '/' + filePath, error))
   }
 
-  async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = 'foreground', anchor?: WriteAnchor, unitId?: string): Promise<SkillActionResult> {
+  async removeSupportFile(rawName: string, filePath: string, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor, unitId?: string): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // P2-4 (v11): the exists/read/remove window runs under the serialize queue
@@ -3224,6 +3301,25 @@ export class SkillLibrary {
   }
 
   /** Keep only the newest N snapshots (Hermes keep=5 parity); older ones are removed outright. */
+  /**
+   * G3/3.4: can a snapshot actually be used right now?
+   *
+   * The recovery messages used to promise "restore it from a snapshot" without asking whether a usable
+   * snapshot exists (audit S1-01: the message promised recoverability from a chain that is five deep and
+   * whose newest member held 9 of 35 skills). Three states, like every other reading here: a fragment
+   * naming the usable snapshot, a fragment saying there is none, or a fragment saying the directory could
+   * not be read - the caller embeds whichever it gets, so the sentence is generated by the capability.
+   */
+  private async snapshotRecoveryAvailability(): Promise<string> {
+    const listed = await this.listSnapshots()
+    if (isUnknown(listed)) {
+      return `快照目录读不出来（` + listed.reason + `）`
+    }
+    const latest = isPresent(listed) ? listed.value[0] : undefined
+    if (!latest) return `当前没有可用快照`
+    return `最新快照 ` + latest.path
+  }
+
   private async retainSnapshots(keep: number): Promise<void> {
     const listed = await this.listSnapshots()
     // N14: an UNREADABLE .backups is not "no snapshots". Pruning nothing is the
@@ -3484,12 +3580,22 @@ export class SkillLibrary {
     // the snapshot is rolled back with it — the correct rollback semantics).
     // A1-7 (v18): lock files are protocol state, never snapshot content; the
     // clear skips them (a live one was refused above, a dead one swept).
-    for (const entry of rootEntries) {
-      if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json') continue
-      // Content history is real history (like the mutation audit) — a whole-tree restore must not
-      // erase the versions a rollback itself might need.
-      if (entry === HISTORY_DIR) continue
-      if (entry === '.curator-suppressed.json' && restoresSuppressed) continue
+    // G3/3.1 (audit 3.1 + 1.6): the clear set is DERIVED and it is REPORTED before anything is removed.
+    // Until this guard the loop walked the LIVE root and removed whatever the snapshot did not declare,
+    // so "what will this restore delete" was stated nowhere; the only protection was the completeness
+    // gate above. `doomed` is the derived difference: live entries minus the survival set minus every
+    // name the manifest declares. It is warned about here and then used as the loop itself.
+    const declared = new Set<string>([...manifest.skills, ...manifest.sidecars])
+    const doomed = rootEntries.filter((entry) => {
+      if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json') return false
+      if (entry === HISTORY_DIR) return false
+      if (entry === '.curator-suppressed.json' && restoresSuppressed) return false
+      return !declared.has(entry)
+    })
+    if (doomed.length > 0) {
+      console.warn('skill-store: snapshot restore will delete ' + String(doomed.length) + ' live entr(y|ies) the snapshot does not declare: ' + doomed.join(', '))
+    }
+    for (const entry of doomed) {
       await this.io.remove(join(this.root, entry))
     }
     // P2-3 (v19): `manifest` is non-null here — the refusal above precedes the
@@ -3548,10 +3654,12 @@ export interface NewSkillLibraryOptions {
   ctx?: SkillMutationSink | undefined
   transact?: typeof transactIo | undefined
   threatExemptLabels?: readonly string[] | undefined
+  /** G1/1.1: WHO writes through this library. Required: no call site can omit it. */
+  authority: WriteAuthority
 }
 
 export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
-  const { config, io, limits, ctx, transact, threatExemptLabels } = options
+  const { config, io, limits, ctx, transact, threatExemptLabels, authority } = options
   return new SkillLibrary(
     resolveSkillsRoot(config ?? {}),
     io,
@@ -3561,6 +3669,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     // Copied once, here: the library holds the array for its lifetime and must
     // not alias a config object the caller still owns.
     [...(threatExemptLabels ?? [])],
+    authority,
   )
 }
 

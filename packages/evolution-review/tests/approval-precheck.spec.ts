@@ -5,6 +5,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state'
 import * as Review from '../src/index.ts'
@@ -24,6 +25,7 @@ describe('review approval pre-check (P1-9)', () => {
   it('executes directly when approval is enabled but no runner exists, staging nothing', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：投影服务注册到本 ctx（幂等）
 
     // The durable state exists (pending records would persist here) — and it
     // must stay empty: the pre-check routes the write to direct execution.

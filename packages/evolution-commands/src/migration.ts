@@ -70,11 +70,20 @@ export async function runNamespaceMigration(run: NamespaceMigrationRun): Promise
     await settings.update(rowId, patch)
   }
   if (settings.describe === undefined || settings.update === undefined) return NOTHING
+  // S1-06: an EMPTY first candidate used to END the search (it returned with no report), so a second
+  // candidate holding the real sections was never read. The loop now takes the first candidate with
+  // something to migrate - but it REMEMBERS the first document it saw, because "a document exists and has
+  // no family section" and "there is no document at all" are different answers and the caller prints
+  // different text for them.
+  let seen: { readonly source: string; readonly plan: ReturnType<typeof planNamespaceMigration> } | undefined
   for (const source of legacySettingsPaths(run.home)) {
     const text = await run.io.readText(source)
     if (text === null) continue
     const plan = planNamespaceMigration(text)
-    if (plan.entries.length === 0) return { source, plan, report: undefined }
+    if (plan.entries.length === 0) {
+      seen ??= { source, plan }
+      continue
+    }
     const report = await applyNamespaceMigration(plan, {
       // The receiver matters: the platform's describe/write read `this`.
       read,
@@ -83,7 +92,7 @@ export async function runNamespaceMigration(run: NamespaceMigrationRun): Promise
     })
     return { source, plan, report }
   }
-  return NOTHING
+  return seen === undefined ? NOTHING : { source: seen.source, plan: seen.plan, report: undefined }
 }
 
 /** What the legacy document still holds, and what a row already answers for. */
@@ -120,13 +129,28 @@ export interface LegacyDocumentRead {
 export async function readLegacyDocumentState(run: LegacyDocumentRead): Promise<LegacyDocumentState | undefined> {
   const settings = run.settings
   if (settings?.describe === undefined) return undefined
+  // S1-06 (the same shape as the migrate loop): the state read must describe the first document that
+  // HAS sections, not merely the first one that could be read - otherwise an empty `.imported` hides the
+  // real `.yaml`. The first readable document is still remembered, because "a document exists and carries
+  // no family section" (`none`) and "there is no document" (`absent`) are different doctor answers.
+  let seen: { readonly source: string; readonly plan: ReturnType<typeof planNamespaceMigration> } | undefined
   for (const source of legacySettingsPaths(run.home)) {
     const text = await run.io.readText(source)
     if (text === null) continue
     const plan = planNamespaceMigration(text)
+    if (plan.entries.length === 0) {
+      seen ??= { source, plan }
+      continue
+    }
     // The receiver matters here too: `describe` reads `this`.
-    const read = (rowId: string): { readonly user?: Record<string, unknown> | undefined } | undefined =>
-      settings.describe?.({ redactSecrets: false }).find(entry => entry.ns === rowId)
+    return stateOf(source, plan)
+  }
+  return seen === undefined ? undefined : stateOf(seen.source, seen.plan)
+
+  /** The doctor-facing state of ONE document, judged against the seat. */
+  function stateOf(source: string, plan: ReturnType<typeof planNamespaceMigration>): LegacyDocumentState {
+   const read = (rowId: string): { readonly user?: Record<string, unknown> | undefined } | undefined =>
+      settings?.describe?.({ redactSecrets: false }).find(entry => entry.ns === rowId)
     const decided = classifyNamespaceMigration(plan, read)
     return {
       source,
@@ -138,7 +162,6 @@ export async function readLegacyDocumentState(run: LegacyDocumentRead): Promise<
       ],
     }
   }
-  return undefined
 }
 
 /** The context members the migration reads, structurally, so a spec needs no host. */

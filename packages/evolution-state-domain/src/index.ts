@@ -554,3 +554,5 @@ export function apply(ctx: Context): void {
     }
   }, 'evolution-state-domain.provider')
 }
+
+export * from './compatibility.ts'

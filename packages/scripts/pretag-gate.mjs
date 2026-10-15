@@ -13,6 +13,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
+import { STATES } from './lib-verdict.mjs'
 
 const argv = process.argv.slice(2)
 const arg = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : dflt }
@@ -21,7 +22,14 @@ const overlay = path.resolve(arg('--overlay', 'D:/dsh/deepseek-harness'))
 const profile = path.resolve(arg('--profile', 'D:/dsh-homes/web/profiles/web'))
 const fix = argv.includes('--fix')
 const results = []
-const record = (name, ok, detail) => { results.push({ name, ok, detail }); console.log((ok ? 'PASS ' : 'FAIL ') + name + (detail ? ' — ' + detail : '')) }
+const record = (name, outcome, detail) => {
+  const verdict = outcome === true ? 'pass' : outcome === false ? 'fail' : String(outcome)
+  if (!STATES.includes(verdict)) throw new Error('pretag-gate: unknown verdict ' + verdict + ' for ' + name)
+  results.push({ name, verdict, detail })
+  console.log((verdict === 'pass' ? 'PASS ' : verdict === 'fail' ? 'FAIL ' : verdict.toUpperCase() + ' ') + name + ' - ' + detail)
+}
+/** An unpublished version is an EXPECTED state before tagging; anything else is a failure to verify. */
+const notPublished = (error) => /\bE404\b|404 Not Found|is not in this registry/i.test(String((error && error.stdout) || '') + String((error && error.stderr) || '') + String((error && error.message) || ''))
 
 // 1) version three-way
 const { readRootVersion, readPackageVersions, readChangelogHeadVersion } = await import('./lib-family-version.mjs')
@@ -116,12 +124,13 @@ try {
   const published = fs.readFileSync(path.join(tmp, 'package/cordis.patch.yml'))
   const live = fs.existsSync(installed) ? fs.readFileSync(installed) : Buffer.alloc(0)
   const equal = Buffer.compare(published, live) === 0
-  if (!equal && fix) { fs.writeFileSync(installed, published); record('installed == published', true, 'REPAIRED: wrote ' + published.length + ' published bytes over ' + live.length) }
+  if (!equal && fix) { fs.writeFileSync(installed, published); record('installed == published', 'cannot-decide', 'REPAIRED: wrote ' + published.length + ' published bytes over ' + live.length) }
   else record('installed == published', equal, equal ? 'bytes=' + published.length : 'published=' + published.length + ' installed=' + live.length + ' (run with --fix to repair)')
   fs.rmSync(tmp, { recursive: true, force: true })
-} catch (error) { record('installed == published', true, 'SKIPPED: ' + rootVersion + ' is not on the registry yet (' + String(error.message).slice(0, 60) + ')') }
+} catch (error) { record('installed == published', 'cannot-decide', 'NOT VERIFIED: ' + rootVersion + (notPublished(error) ? ' is not on the registry yet' : ' could not be packed (no cache or registry reachable)') + ' - the post-publish check owns this criterion (' + String(error.stdout || error.message).split('\n').filter((l) => l.trim() !== '').slice(-1)[0] + ')') }
 
-const failed = results.filter((r) => !r.ok)
+const failed = results.filter((r) => r.verdict === 'fail')
+const undecided = results.filter((r) => r.verdict === 'cannot-decide')
 console.log('')
-console.log(failed.length === 0 ? 'pre-tag gate: ALL GREEN (' + results.length + ' checks) — safe to tag v' + rootVersion : 'pre-tag gate: ' + failed.length + ' FAILED of ' + results.length + ' — do NOT tag')
-process.exit(failed.length === 0 ? 0 : 1)
+console.log(failed.length === 0 && undecided.length === 0 ? 'pre-tag gate: ALL GREEN (' + results.length + ' checks) - safe to tag v' + rootVersion : failed.length > 0 ? 'pre-tag gate: RED (' + failed.length + ' failed)' : 'pre-tag gate: NOT VERIFIED - ' + undecided.map((r) => r.name).join(', ') + ' could not be decided')
+process.exit(failed.length > 0 ? 1 : undecided.length > 0 ? 2 : 0)

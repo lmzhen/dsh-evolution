@@ -4,6 +4,7 @@
  */
 
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+import { isPresent, isUnknown, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { createHash, randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
@@ -1099,6 +1100,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * window silently downgrades that review's writes to foreground attribution. */
   const markReviewChannelForDelivery = (agent: import('@deepseek-ai/dsh-agent').Agent, inbox: InboxLike | undefined): void => {
     if (humanQueuedAhead(inbox)) {
+
       if (!channelMarkSuppressedWarned) {
         channelMarkSuppressedWarned = true
         ctx.logger.warn('dsh-evolution-review: the review prompt was delivered BEHIND queued human input — the review-channel mark stays unset for this window, so this review\u2019s writes are attributed foreground and the .pinned/.hermes-managed protection does not cover them')
@@ -1288,7 +1290,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const hashes = new Map<string, string>()
     const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
     if (!io) return hashes
-    const library = newSkillLibrary({ config: rootConfig, io: evolutionIoAdapter(() => io.provider()) })
+    const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rootConfig, io: evolutionIoAdapter(() => io.provider()) })
     // v35 C3(a)/C11: the listing already reads every SKILL.md, so ask it for the
     // bodies instead of re-reading each skill just to hash it (the pre-run
     // snapshot ran once per review, for both kinds).
@@ -1730,7 +1732,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const hashLibrary = (() => {
       const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
       if (!io) return null
-      return newSkillLibrary({ config: rootConfig, io: evolutionIoAdapter(() => io.provider()) })
+      return newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rootConfig, io: evolutionIoAdapter(() => io.provider()) })
     })()
     // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
     const origins = resolveOrigins(undefined, true)
@@ -1748,7 +1750,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // message; the failure dimension now surfaces on the event AND a warn.
     try {
       for (const op of plan.memoryOps ?? []) {
-        if (signal?.aborted === true) {
+        // T3-09/A37 (root fix): the owner is checked SYNCHRONOUSLY as well as through the signal.
+        // A disposed fiber reports uid === null (cordis fiber.d.ts: null once disposed), so the
+        // boundary no longer depends on when the abort signal happens to arrive — the race that let
+        // the second op land after an unload is closed. A context without a fiber keeps the old
+        // signal-only behaviour.
+        if (ctx.fiber?.uid === null || signal?.aborted === true) {
           const reason = 'the review was unloaded mid-plan'
           ctx.logger.warn(`dsh-evolution-review: executePlan stopped at an op boundary after ${actions.length} op(s): ${reason}`)
           return { actions, ok: false, failedOps, aborted: reason }
@@ -1775,7 +1782,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       for (const op of plan.skillOps ?? []) {
         // T3-09/A37: the same op-boundary stop as the memory loop — one check per op, no partial
         // plan continuing to write after its owner is gone.
-        if (signal?.aborted === true) {
+        // T3-09/A37 (root fix): the owner is checked SYNCHRONOUSLY as well as through the signal.
+        // A disposed fiber reports uid === null (cordis fiber.d.ts: null once disposed), so the
+        // boundary no longer depends on when the abort signal happens to arrive — the race that let
+        // the second op land after an unload is closed. A context without a fiber keeps the old
+        // signal-only behaviour.
+        if (ctx.fiber?.uid === null || signal?.aborted === true) {
           const reason = 'the review was unloaded mid-plan'
           ctx.logger.warn(`dsh-evolution-review: executePlan stopped at an op boundary after ${actions.length} op(s): ${reason}`)
           return { actions, ok: false, failedOps, aborted: reason }
@@ -1799,14 +1811,32 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // 'absent' sentinel exactly like the tool channel (see the attach below).
         let stagedBytes: string | null | undefined
         if ((args.action === 'update' || args.action === 'edit') && hashLibrary && typeof args.name === 'string' && args.name !== '') {
-          stagedBytes = await hashLibrary.read(args.name).catch(() => undefined)
+          // S4-01 (G0/0.7): REFUSE, do not silently drop the anchor. Anchoring `absent` would be a false
+          // claim about bytes nobody read - that part of the old rationale stands - but "no anchor at all"
+          // is weaker than refusing: the replay guard then has nothing to compare against, so a plan that
+          // ran while the live content changed can still be replayed. An unreadable target fails this op.
+          const probe = await hashLibrary.readSkillProbe(args.name)
+          if (isUnknown(probe)) {
+            ok = false
+            failedOps.push(`skill ${args.action} ${args.name}: target is unreadable (${probe.reason}); refusing to stage an unverifiable anchor`)
+            continue
+          }
+          stagedBytes = isPresent(probe) ? probe.value : null
         }
         // v30 REV-03: support-file ops carry the same anchor — the staged sha
         // covers the file's current bytes (or the 'absent' sentinel), which
         // the tool-side replay guard verifies before overwriting.
         if ((args.action === 'write_file' || args.action === 'remove_file') && hashLibrary && typeof args.name === 'string' && args.name !== '' && typeof args.file_path === 'string' && args.file_path !== '') {
-          const stageFile = await hashLibrary.readSupportFile(args.name, args.file_path).catch(() => undefined)
-          if (stageFile !== undefined) (args as { staged_from_sha256?: string }).staged_from_sha256 = stageFile === null ? 'absent' : contentHash(stageFile)
+          // S4-01 (G0/0.7): same posture as the skill read above - an unreadable support file REFUSES the
+          // op; a truly absent one anchors 'absent' (null).
+          const supportProbe = await hashLibrary.readSupportFileProbe(args.name, args.file_path)
+          if (isUnknown(supportProbe)) {
+            ok = false
+            failedOps.push(`file ${args.action} ${args.name}/${args.file_path}: target is unreadable (${supportProbe.reason}); refusing to stage an unverifiable anchor`)
+            continue
+          }
+          const stageFile: string | null = isPresent(supportProbe) ? supportProbe.value : null
+          ;(args as { staged_from_sha256?: string }).staged_from_sha256 = stageFile === null ? 'absent' : contentHash(stageFile)
         }
         // v32 REV-06(b): pre-run hash comparison — the plan was authored
         // against the run-start snapshot; a skill whose live hash differs now
@@ -1842,7 +1872,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // bytes fresh (a null reads as drift and refuses, fail-closed).
           const live = anchored !== null
             ? anchored
-            : (hashLibrary ? await hashLibrary.read(opName).catch(() => null) : null)
+            // G0/0.7 (S4-01 sweep): named three-state read - `unknown` answers null exactly as the swallow did
+        // (both mean "cannot be verified here", and the caller refuses on null), so the behaviour is the same.
+        : (hashLibrary ? (isPresent(await hashLibrary.readSkillProbe(opName)) ? (await hashLibrary.readSkillProbe(opName)) : null) : null)
           const preRun = preRunHashes.get(opName)
           if (live === null || (preRun !== undefined && contentHash(live) !== preRun)) {
             ok = false
@@ -1879,7 +1911,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // and let it overwrite them. A concurrent write landing between ops
           // still mismatches the landed baseline and is refused.
           if (hashChecked) {
-            const landed = await hashLibrary?.read(opName).catch(() => null) ?? null
+            // G0/0.7 (S4-01 sweep): explicit three-state read; `unknown` (and a missing library) leaves the
+          // hash unrecorded, which is the behaviour this line already had.
+          const landedProbe = hashLibrary === undefined ? undefined : await hashLibrary.readSkillProbe(opName)
+          const landed = landedProbe !== undefined && isPresent(landedProbe) ? landedProbe.value : null
             if (landed !== null) preRunHashes.set(opName, contentHash(landed))
           }
         }
@@ -1965,7 +2000,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // ran on DEFAULT_SKILL_LIMITS, so the approval-disabled autonomous
       // channel wrote up to 10x the configured tool limit.
       const policySnapshot = policySnapshotOf(ctx.get('evolutionPolicy'))
-      const library = newSkillLibrary({
+      // G1/1.3 (S3-02): this is the review pipeline BACKGROUND WRITE, and it used to declare itself
+      // `foreground` - the one value that switches POLICY_PROTECTION, read-before-write, the .pinned
+      // guard, the authorship mark and staging off. The authority now comes from the SAME resolver the
+      // ops loop above uses (its own comment: "the review pipeline IS the review channel on both
+      // surfaces"), so there is no second answer and no literal to keep in step.
+      const library = newSkillLibrary({ authority: authorityFrom({ origin: resolveOrigins(undefined, true).library }),
         config: rootConfig,
         io: evolutionIoAdapter(() => io.provider()),
         limits: {

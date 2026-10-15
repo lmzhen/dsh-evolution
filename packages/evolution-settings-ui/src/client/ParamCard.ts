@@ -267,38 +267,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   // The field whose reset is in flight (T5-05/A60): the button says so and the controls lock, the
   // same posture the save path takes while its write is outstanding.
   const [clearing, setClearing] = useState<string | null>(null)
-  if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('loading'))
-  // Three different absences, told apart on screen because the operator's next move differs:
-  // this UI has no settings seat (compose the settings surface), the seat serves no such row
-  // (compose the row), or projecting that row failed (read the log). They must never read the
-  // same, and none of them may be a blank card.
-  if (snapshot.status === 'unavailable') {
-    const key: MessageKey = snapshot.reason === 'seat-missing'
-      ? 'seatMissing'
-      : snapshot.reason === 'projection-failed' ? 'projectionFailed' : 'unavailable'
-    return createElement('p', { className: 'evolution-param-note', role: 'status' }, t(key))
-  }
-  const user = isSection(snapshot.user) ? snapshot.user : {}
-  const value = isSection(snapshot.value) ? snapshot.value : {}
-  const disabled = !snapshot.writable
-  // Controls lock while a write is in flight: the drafts this save staged are the ones
-  // the settling effect clears, so typing over them would lose the newer text. A reset in
-  // flight locks them too — there is ONE pending batch per card, so a second click would
-  // replace the batch the first click is still waiting on a verdict for (T5-05/A60).
-  const locked = disabled || busy || clearing !== null
-  const titleKey = NAMESPACE_TITLES[namespace] as MessageKey | undefined
-  const title = titleKey === undefined ? namespace : t(titleKey)
-  const changed = fields.filter(field => Object.hasOwn(user, field.id)).length
-  const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[field.id])
-  const dirty = fields.filter(field => draft[field.id] !== undefined && draft[field.id] !== format(value[field.id]))
-  // U-4 constraint-first: an unacceptable value blocks the save instead of being staged and refused.
-  const peerTextOf = (field: ClientParamField): string | undefined => {
-    if (field.atLeast === '') return undefined
-    const related = fields.find(candidate => candidate.id === field.atLeast)
-    return related === undefined ? undefined : textOf(related)
-  }
-  const blocked = fields.some(field => invalidReason(field, textOf(field), peerTextOf(field)) !== null)
-  const change = (id: string, next: string): void => { setDraft({ ...draft, [id]: next }) }
+  // hooks 区：所有 hook 无条件先跑；条件分支只决定输出（G4/4.0 S5-01 根治）
   /**
    * Settle a staged write against the Host's answer.
    *
@@ -329,6 +298,39 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     }
     if (!pending.resets) setDraft({})
   }, [pending, snapshot.user, t])
+  if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('loading'))
+  // Three different absences, told apart on screen because the operator's next move differs:
+  // this UI has no settings seat (compose the settings surface), the seat serves no such row
+  // (compose the row), or projecting that row failed (read the log). They must never read the
+  // same, and none of them may be a blank card.
+  if (snapshot.status === 'unavailable') {
+    const key: MessageKey = snapshot.reason === 'seat-missing'
+      ? 'seatMissing'
+      : snapshot.reason === 'projection-failed' ? 'projectionFailed'
+      : snapshot.reason === 'session-memory' ? 'destMemory' : 'unavailable'
+    return createElement('p', { className: 'evolution-param-note', role: 'status' }, t(key))
+  }
+  const user = isSection(snapshot.user) ? snapshot.user : {}
+  const value = isSection(snapshot.value) ? snapshot.value : {}
+  const disabled = !snapshot.writable
+  // Controls lock while a write is in flight: the drafts this save staged are the ones
+  // the settling effect clears, so typing over them would lose the newer text. A reset in
+  // flight locks them too — there is ONE pending batch per card, so a second click would
+  // replace the batch the first click is still waiting on a verdict for (T5-05/A60).
+  const locked = disabled || busy || clearing !== null
+  const titleKey = NAMESPACE_TITLES[namespace] as MessageKey | undefined
+  const title = titleKey === undefined ? namespace : t(titleKey)
+  const changed = fields.filter(field => Object.hasOwn(user, field.id)).length
+  const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[field.id])
+  const dirty = fields.filter(field => draft[field.id] !== undefined && draft[field.id] !== format(value[field.id]))
+  // U-4 constraint-first: an unacceptable value blocks the save instead of being staged and refused.
+  const peerTextOf = (field: ClientParamField): string | undefined => {
+    if (field.atLeast === '') return undefined
+    const related = fields.find(candidate => candidate.id === field.atLeast)
+    return related === undefined ? undefined : textOf(related)
+  }
+  const blocked = fields.some(field => invalidReason(field, textOf(field), peerTextOf(field)) !== null)
+  const change = (id: string, next: string): void => { setDraft({ ...draft, [id]: next }) }
   /**
    * Restore one field's deployment default (T5-05/A60).
    *

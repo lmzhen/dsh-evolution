@@ -3,7 +3,9 @@
  * @module @deepseek-ai/dsh-evolution-curator
  */
 
+import type {} from '@deepseek-ai/dsh-evolution-io'
 import { Context, Service } from '@deepseek-ai/cordis'
+import { authorityFrom, withTreeWrite, type SnapshotView } from '@deepseek-ai/dsh-evolution-core'
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
@@ -18,7 +20,6 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import z from '@deepseek-ai/schemastery'
-import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SKILL_NAME_RE, newSkillLibrary, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SkillLibrary, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
 
 /** Shape of one history index file (only the field this reading needs). */
@@ -364,10 +365,10 @@ export class EvolutionCurator extends Service {
     }
     // G2 S3: prefer the platform backend when the deployment mounts it (this covers the reads AND the
     // CAS-backed RMW transact); fall back to the default backend otherwise — contract C2 degradation.
-    this.io = evolutionIoAdapter(() => preferProvider(ctx.evolutionIo, ['fs']))
+    this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
     // honour the same deployment-selected stages as every other writer.
-    this.skills = newSkillLibrary({
+    this.skills = newSkillLibrary({ authority: authorityFrom({ origin: 'background_review' }),
       config,
       io: this.io,
       ctx: this.ctx,
@@ -937,22 +938,28 @@ export class EvolutionCurator extends Service {
         skipped: 'instance-held',
       }
     }
-    if (this.mutexDepth > 0) {
+    // G1/1.5 (S7-09): the mutex is no longer taken here, so `mutexDepth` alone no longer answers this
+    // question at this point - it stays 0 until the mutation block. `runClaim` is the synchronous claim
+    // (set below, cleared in the finally) that keeps the answer honest, and `mutexDepth` still covers the
+    // case the docblock describes: a run arriving behind a QUEUED restore/consolidate.
+    if (this.runClaim || this.mutexDepth > 0) {
       return {
         stale: [], archived: [], errors: [],
         report: this.skippedReport('already-running', new Date().toISOString()),
         skipped: 'already-running',
       }
     }
-    const release = await this.acquireMutex()
+    this.runClaim = true
+    // G1/1.5 (S7-09): the mutex no longer wraps the whole pass. It is taken INSIDE runCore, around the
+    // mutation block only (see the withTreeWrite call there), so an LLM call, a whole-tree snapshot and
+    // every skip return path are outside it - an operator undo/restore no longer waits for a review that
+    // is merely thinking. The release still happens before retention (P3 v17).
     try {
       return await this.runCore(options)
     } finally {
-      // P3 (v17): release FIRST — everything after it (retention, logging)
-      // must not be able to hold the mutex hostage (a synchronous throw from
-      // logger.warn would otherwise leave mutexDepth permanently elevated and
-      // silently kill the whole control plane).
-      release()
+      // G1/1.5: release the synchronous claim FIRST, so a run arriving while retention works is not
+      // answered `already-running` for work that has already finished.
+      this.runClaim = false
       // V4-22: recycle the report history on EVERY run end (success or failure).
       // Previously retention only ran on the successful report-write path, so a
       // host that kept throwing accumulated curator-error-*.json unbounded.
@@ -989,6 +996,11 @@ export class EvolutionCurator extends Service {
    * the one realistic interleave window — documented, accepted (plan v20
    * C-3①). The same statement lives on evolution-review's `reviewInFlight`.
    */
+  /** G1/1.5 (S7-09): the synchronous run claim. The mutex is taken later now (around the mutation only),
+   * so this is what makes the `already-running` answer atomic with respect to other entrants. It is a
+   * CLAIM, not a wait: no polling, so it cannot reintroduce the v15 micro-task starvation the promise
+   * chain replaced. */
+  private runClaim = false
   private mutexDepth = 0
   private mutexTail: Promise<void> = Promise.resolve()
 
@@ -1150,10 +1162,14 @@ export class EvolutionCurator extends Service {
     const { bundledNames, treeNames, resetToActive } = await this.seedBaseline(usage)
     // P2-5: near-duplicate groups join the recommendation candidate pool —
     // the deterministic scanner sees idle names, only the LLM sees overlap.
+    // G1/1.7 (S7-01): ONE listing for names AND contents. This loop used to read every skill a second
+    // time (`skills.read(name)`) right after the listing that produced `treeNames`, and the pair of
+    // listings below read the same directories again. `list({withContent: true})` answers both at once,
+    // so the recommend phase stops paying a read per skill on top of the listing it already did.
+    const listed = await this.skills.list({ withContent: true })
     const contents = new Map<string, string>()
-    for (const name of treeNames) {
-      const text = await this.skills.read(name)
-      if (text) contents.set(name, text)
+    for (const summary of listed) {
+      if (summary.content) contents.set(summary.name, summary.content)
     }
     // G5: a skill that other skills POINT AT must not be nominated either — the F-331 reasoning one
     // step further: archiving a referenced skill breaks its referrers.
@@ -1164,10 +1180,14 @@ export class EvolutionCurator extends Service {
     // noise — M-3 narrowed the PRUNING pool; this is the consolidation
     // counterpart.
     const protectedNames = await this.protectedNameMap()
+    // S7-05 (G0/0.7): the scan is budget-bounded (quality.ts:203). Its result carries a truncation
+    // flag; reading only `.groups` treated a PARTIAL sweep as a complete one - and because the
+    // budget is spent in name order, what goes missing is the tail, not a random sample. The
+    // candidate pool still consumes the same groups (behaviour unchanged); the flag now travels
+    // into the run report so a reader cannot mistake "not found" for "does not exist".
+    const dedupScan = computeDedupGroups({ contents })
     const dedupMembers = [...new Set(
-      // PLAN-R2 P2-8 (2026-09-16): the scan result now carries a truncation
-      // flag; the candidate pool consumes the same `groups`.
-      computeDedupGroups({ contents }).groups.filter(group => group.length >= 2).flat(),
+      dedupScan.groups.filter(group => group.length >= 2).flat(),
     )].filter(name => !protectedNames.has(name) && !referencedBy.has(name))
     // Score BEFORE the lifecycle transitions (rc.42 audit P1-2): the transition
     // engine reads `quality_warn` to apply the shorter quality-warn stale
@@ -1272,7 +1292,24 @@ export class EvolutionCurator extends Service {
         skipped: 'active-session',
       }
     }
-    const { archivedSkills, errors, consolidated } = await this.applyMutations({
+    // G1/1.5 (S7-09): the typed critical section. `apply` is bound OUT HERE, so the callback body never
+    // names `this` / io / llm (rule N40 checks exactly that), and only this block holds the control-plane
+    // mutex. Everything above it - the scan, the recommendation LLM call, the whole-tree snapshot - runs
+    // unlocked, which is what the item is about.
+    const apply = this.applyMutations.bind(this)
+    const sectionView: SnapshotView = {
+      names: [...treeNames],
+      read: async (name: string) => {
+        const listed = await this.skills.list({ withContent: true })
+        return listed.find(entry => entry.name === name)?.content
+      },
+      writeSkill: async (name: string, content: string) => {
+        await this.skills.update(name, content, 'background_review', { expectation: 'exists-or-absent' })
+        void name
+      },
+      note: (text: string) => { this.ctx.logger.info('evolution-curator: ' + text) },
+    }
+    const { archivedSkills, errors, consolidated } = await withTreeWrite(() => this.acquireMutex(), sectionView, async () => apply({
       dryRun,
       archiveCandidates,
       nominations: gatedNominations,
@@ -1294,7 +1331,7 @@ export class EvolutionCurator extends Service {
       // A2-4 (v18): the CAS basis for the lifecycle fold (see runStartStates).
       runStartStates,
       failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
-    })
+    }))
     // v28 G4.1 (CUR-01): a disposed mid-run must not anchor the durable
     // schedule as if the pass had completed — the aborted-run bookkeeping used
     // to push lastRunAt a full intervalHours (default 168h) into the future,
@@ -1344,6 +1381,7 @@ export class EvolutionCurator extends Service {
       // V6-35 (0.3.36): lenient-parse notes (mis-placed mode / section flip)
       // surface in the run report instead of a silent shape change.
       ...gatedNominations.warnings.length > 0 ? { nominationsWarnings: gatedNominations.warnings } : {},
+      ...dedupScan.truncated ? { scanWarnings: ['dedup scan truncated at the pair-comparison budget - the candidate pool is a PARTIAL result: the budget is spent in name order, so the tail was never examined'] } : {},
     })
     // G3b: cross-index orphan landmarks -- a REPORT-ONLY reading (no gate, no verdict). Jumpable
     // <=> the owner skill exists AND its index still holds the unit id. Indexes load from the

@@ -37,6 +37,13 @@ const envSource = strip(readFileSync(join(coreDir, 'env.ts'), 'utf8'))
   .replace(/^export /gm, '')
   .trim()
 
+// G-04: the identity helper the composer derives its package name from. Inlined with the same rules as
+// env.ts — the port carries no relative imports, so the helper must arrive as source.
+const identitySource = strip(readFileSync(join(coreDir, 'package-identity.ts'), 'utf8'))
+  .replace(/^import .*$/gm, '')
+  .replace(/^export /gm, '')
+  .trim()
+
 /**
  * The composer source, with its single relative import satisfied in place.
  *
@@ -49,6 +56,7 @@ const ROW_OVERRIDES_ANCHOR = "const ROW_OVERRIDES_URL = new URL('../row-override
 const PORT_ROW_OVERRIDES = "const ROW_OVERRIDES_URL = new URL('../evolution-core/row-overrides.json', import.meta.url) // PORT PATH: this file lives in scripts/"
 const stripped = strip(readFileSync(join(coreDir, 'preset-composition.ts'), 'utf8'))
   .replace(/^import \{ allowRowCollisions \} from '\.\/env\.ts'$/m, '')
+  .replace(/^import \{ scopedPackageName \} from '\.\/package-identity\.ts'$/m, '')
   .replace(/^import .*? from 'node:.*'$/gm, (line) => line)
 if (stripped.split(ROW_OVERRIDES_ANCHOR).length !== 2) {
   console.error('gen-composer-port: the row-overrides anchor moved in preset-composition.ts — re-point the rewrite')
@@ -63,6 +71,10 @@ const body = [
   '',
   '// Inlined from evolution-core/src/env.ts by the generator (the port carries no relative imports).',
   envSource,
+  '',
+  '// Inlined from evolution-core/src/package-identity.ts by the generator (G-04: the scope is derived,',
+  '// never written, so a published scope needs no release-time text rewrite).',
+  identitySource,
   '',
   composer.trim(),
   '',

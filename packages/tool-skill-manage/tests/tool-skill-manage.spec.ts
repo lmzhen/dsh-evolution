@@ -989,7 +989,7 @@ it('P2-7: a patch missing new_string is refused before the approval seam — app
 // list() (tree-sourced names, unvalidated on purpose) still reports them but
 // read() returns null — the exact no-body shape the old `body ?? ''` turned
 // into '' (a caught read error feeds the same null through .catch).
-it('P2-5: unreadable skill bodies are excluded from review dedup grouping and counted in the output', async () => {
+it('P2-5: skills whose body cannot be read are excluded from review dedup grouping and counted in the output', async () => {
   const { ctx, root, previousHome } = await setup()
   // A real exact-duplicate pair pins the normal path: genuine groups survive.
   const shared = '---\nname: shared-body\ndescription: real near-duplicate pair.\n---\n\nShared body for the dedup pin.\n'
@@ -997,7 +997,11 @@ it('P2-5: unreadable skill bodies are excluded from review dedup grouping and co
     await mkdir(join(root, 'skills', name), { recursive: true })
     await writeFile(join(root, 'skills', name, 'SKILL.md'), shared)
   }
-  // Two no-body skills: tree-visible, but the library yields no body.
+  // Two tree-visible skills the library yields NO body for. The mechanism is the NAME: `Ghost_C`/`Ghost_D`
+  // carry uppercase, core rejects them at the read boundary (skill-store read → badName → null), so this is
+  // the ABSENT side of the three-state read, not the unreadable one - the empty-body line below is the
+  // truthful assertion for it (before G0/0.7 the message said "unreadable/empty" over one counter, which is
+  // exactly the conflation that let an unreadable body read as an empty one).
   for (const name of ['Ghost_C', 'Ghost_D']) {
     await mkdir(join(root, 'skills', name), { recursive: true })
     await writeFile(join(root, 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: unreadable body probe.\n---\n\nBody.\n`)
@@ -1019,7 +1023,7 @@ it('P2-5: unreadable skill bodies are excluded from review dedup grouping and co
   // direction (an order-sensitive check would miss the reverse rendering).
   expect(message).not.toMatch(/Ghost_[CD] ~|~ Ghost_[CD]/)
   // ... and the exclusion is visible instead of silent.
-  expect(message).toContain('2 skill bodies were unreadable/empty and excluded from dedup grouping.')
+  expect(message).toContain('2 skill bodies were empty and excluded from dedup grouping.')
   expect(message).toContain('Near-duplicate groups (1)')
   if (previousHome === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = previousHome

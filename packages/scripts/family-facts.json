@@ -201,7 +201,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 50 steps",
+          "text": "all 51 steps",
           "unique": true
         }
       ],
@@ -440,6 +440,7 @@
               "wallClockAssert"
             ],
             "maxWallMs": 60000,
+            "enforced": false,
             "budgetMeasured": {
               "ms": 49100,
               "where": "machine-local overlay, lane fast(ci=off), 45 files / 223 tests, 2026-10-14 (vitest Duration 43.56s)",
@@ -456,7 +457,8 @@
             "required": true,
             "forbid": [],
             "reason": "runs only in the CI lane (full with ci=on): the platform-coupled and testkit specs cannot pass on a machine without the platform line (R71)",
-            "owner": "scripts"
+            "owner": "scripts",
+            "executionPoints": []
           }
         },
         "baselineParamOfTier": {
@@ -484,56 +486,7 @@
             "paramId": "timeout.specDefault",
             "ms": 30000
           },
-          "overrides": [
-            {
-              "path": "packages/evolution-core/tests/io.spec.ts",
-              "key": "testTimeout",
-              "ms": 30000,
-              "reasonRef": "packages/evolution-core/tests/io.spec.ts:4",
-              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-              "owner": "scripts"
-            },
-            {
-              "path": "packages/evolution-host/tests/guard-scripts.spec.ts",
-              "key": "testTimeout",
-              "ms": 30000,
-              "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:4",
-              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-              "owner": "scripts"
-            },
-            {
-              "path": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-              "key": "testTimeout",
-              "ms": 60000,
-              "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:15",
-              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-              "owner": "scripts"
-            },
-            {
-              "path": "packages/evolution-host/tests/layout-sync.spec.ts",
-              "key": "testTimeout",
-              "ms": 30000,
-              "reasonRef": "packages/evolution-host/tests/layout-sync.spec.ts:4",
-              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-              "owner": "scripts"
-            },
-            {
-              "path": "packages/evolution-host/tests/platform-range.spec.ts",
-              "key": "testTimeout",
-              "ms": 30000,
-              "reasonRef": "packages/evolution-host/tests/platform-range.spec.ts:3",
-              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-              "owner": "scripts"
-            },
-            {
-              "path": "packages/evolution-state-domain/tests/domain-state.spec.ts",
-              "key": "testTimeout",
-              "ms": 30000,
-              "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:13",
-              "expiry": "G3/M2a: family config lands the leaf-tier baseline, then this override is removed",
-              "owner": "scripts"
-            }
-          ]
+          "overrides": []
         },
         "forbidVocabulary": [
           "spawn",
@@ -570,7 +523,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "a941d3afb2f8d62cf9e6975feec45b665dd958842afe962444eb5401a6496d66",
+        "sha256": "3c59731332b00384eeb7aa06135a6d9b4aa1f71cb94407ae05c37dbf8131c118",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -833,6 +786,11 @@
             "criterion": "gen-health-baseline"
           },
           {
+            "id": "gate-51",
+            "tier": "fast",
+            "criterion": "gen-line-manifest"
+          },
+          {
             "id": "ci-only-01",
             "tier": "ci-only",
             "criterion": "audit-release-tarballs",
@@ -953,22 +911,51 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 68,
+            "rowsWithoutIt": 69,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
           }
         ],
         "pendingAxes": [
-      {
-        "axis": "expiry-due",
-        "rows": 19,
-        "reasonRef": "packages/scripts/gate-manifest.json",
-        "expiry": "0.27.0",
-        "owner": "release"
-      }
-    ],
+          {
+            "axis": "expiry-due",
+            "rows": 19,
+            "reasonRef": "packages/scripts/gate-manifest.json",
+            "expiry": "0.27.0",
+            "owner": "release"
+          },
+          {
+            "axis": "mutation-coverage",
+            "rows": 0,
+            "reasonRef": "packages/scripts/verify-check-registry.mjs",
+            "expiry": "0.27.0",
+            "owner": "release",
+            "reason": "no data source yet: the axis is measured by nothing, so it can never become a failing number. Registered so it is a debt with an owner and an expiry instead of a silent cannot-decide."
+          },
+          {
+            "axis": "producer-wiring",
+            "rows": 0,
+            "reasonRef": "packages/scripts/verify-check-registry.mjs",
+            "expiry": "0.27.0",
+            "owner": "release",
+            "reason": "no data source yet: the axis is measured by nothing, so it can never become a failing number. Registered so it is a debt with an owner and an expiry instead of a silent cannot-decide."
+          }
+        ],
         "checkMutations": {
+          "gate-51": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-line-manifest.mjs",
+                "find": "'packages/evolution/' + shortDir",
+                "replace": "'packages/EVOLUTION/' + shortDir"
+              },
+              "expect": "red",
+              "note": "the bed manifest is derived from the in-repo roster: changing the derived relPath root makes the committed artifact stale, so --check must red. The anchor is the generator source, not a count, so a future roster change cannot silently unhook it.",
+              "provenAt": "2026-10-15T05:15:38.066Z",
+              "provenSha": "2383399a40f2c50ef50feb40be4dcdf8c4a75ec23ce14db9fcaf50cb13f0a0d4"
+            }
+          ],
           "gate-17": [
             {
               "mutate": {
@@ -1012,26 +999,26 @@
             {
               "mutate": {
                 "file": "README.md",
-                "find": "50-step",
+                "find": "51-step",
                 "replace": "49-step"
               },
               "expect": "red",
               "note": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)",
-              "provenAt": "2026-10-14T07:49:05.991Z",
-              "provenSha": "d445e2dace7e8023f77b8208b9682df02a826fbed5128f55aa57f90ff7cdf91a"
+              "provenAt": "2026-10-15T05:15:51.054Z",
+              "provenSha": "06f8f998504b7fba217d6f1523af29bddbfe87b44a394cf5bc6a71266639a0f7"
             }
           ],
           "gate-48": [
             {
               "mutate": {
                 "file": "packages/scripts/family-facts.json",
-                "find": "\"rows\": 65",
+                "find": "\"kind\": \"checks\"",
                 "replace": "\"rows\": 60"
               },
-              "expect": "red",
-              "note": "a registered axis count that disagrees with the live measurement: the ledger reports the drift and both numbers",
-              "provenAt": "2026-10-14T07:49:09.220Z",
-              "provenSha": "6cbaeca3cc2b0cf9aa63a430212f3e7a1817880d91cf48826221f4c3a001ffb4"
+              "expect": "cannot-decide",
+              "note": "corrupting the checks fact kind leaves the ledger unable to read its own register: the honest verdict is cannot-decide and NOT green (a green here would be the defect). Measured 2026-10-15: the check returns cannot-decide that disagrees with the live measurement: the ledger reports the drift and both numbers",
+              "provenAt": "2026-10-15T05:15:54.284Z",
+              "provenSha": "34b4dd4370b79c69984ea06b8a5965ed5b40a7fcb5a5f04ce6f6bf83abbca432"
             }
           ],
           "gate-06": [
@@ -1051,8 +1038,8 @@
             {
               "mutate": {
                 "file": "packages/evolution-skill-catalog/src/index.ts",
-                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
-                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst DSH_HOME_PROBE = process.env.DSH_HOME"
+                "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
+                "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst DSH_HOME_PROBE = process.env.DSH_HOME"
               },
               "expect": "red",
               "note": "a DSH_HOME read introduced outside evolution-core/src: rule N1 is zero-tolerance, so the guard names the file and the line",
@@ -1064,8 +1051,8 @@
             {
               "mutate": {
                 "file": "packages/evolution-skill-catalog/src/index.ts",
-                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
-                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst IO_DISCIPLINE_PROBE = writeFileSync('/tmp/nope', 'x')"
+                "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
+                "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst IO_DISCIPLINE_PROBE = writeFileSync('/tmp/nope', 'x')"
               },
               "expect": "red",
               "note": "a raw writeFileSync call introduced outside the write facade: the io-discipline rule bans the raw disk write in domain src",
@@ -1077,8 +1064,8 @@
             {
               "mutate": {
                 "file": "packages/evolution-skill-catalog/src/index.ts",
-                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
-                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst ATOMIC_PROBE = renameSync('.tmp/probe', 'probe')"
+                "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
+                "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst ATOMIC_PROBE = renameSync('.tmp/probe', 'probe')"
               },
               "expect": "red",
               "note": "renameSync co-occurring with a .tmp staging name outside the one atomic-write implementation: that co-occurrence IS the rule",
@@ -1142,8 +1129,8 @@
             {
               "mutate": {
                 "file": "packages/evolution-skill-catalog/src/index.ts",
-                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
-                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst PLAIN_PROBE = typeof v === 'object' && v !== null && !Array.isArray(v)"
+                "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
+                "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst PLAIN_PROBE = typeof v === 'object' && v !== null && !Array.isArray(v)"
               },
               "expect": "red",
               "note": "the plain-object clause inlined into a plugin TypeScript source: rule A allows it only in the home or in a GENERATED file naming the home (the .mjs tooling files are a declared exception, so the probe goes into src)",
@@ -1155,8 +1142,8 @@
             {
               "mutate": {
                 "file": "packages/evolution-skill-catalog/src/index.ts",
-                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
-                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst READONLY_PROBE = action !== 'list' && action !== 'unpin'"
+                "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
+                "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst READONLY_PROBE = action !== 'list' && action !== 'unpin'"
               },
               "expect": "red",
               "note": "an inline enumeration of the read-only actions (!== list && !== unpin) instead of consulting the single criterion - the mutation satisfies the guard detector constant INLINE exactly",
@@ -1168,8 +1155,8 @@
             {
               "mutate": {
                 "file": "packages/evolution-skill-catalog/src/index.ts",
-                "find": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'",
-                "replace": "import { preferProvider } from '@deepseek-ai/dsh-evolution-io'\nconst TIMER_PROBE = setTimeout(fn, 5000)"
+                "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
+                "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst TIMER_PROBE = setTimeout(fn, 5000)"
               },
               "expect": "red",
               "note": "rule B of the one-lock-one-bound gate: a timer call carrying a BARE millisecond literal - the guard detector TIMER_CALL matches setTimeout(... 5000) exactly",

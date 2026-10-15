@@ -170,3 +170,14 @@ jobs:
           # hard-coded --tag latest broke prerelease tags and the 0.3.18
           # incident's hardcoded default was the root cause.
           node packages/evolution/scripts/publish-scoped.mjs
+
+      - name: Verify the published bytes are the bytes we packed (post-publish)
+        shell: bash
+        run: |
+          # 0.4b: the pre-tag gate cannot compare against the registry - the version is not
+          # published yet - so it records cannot-decide and NAMES this check as the owner of
+          # that criterion. This is that owner: fetch what the registry now serves and compare
+          # sha256 with the dist bytes this job just published. Exit 1 = a real byte difference
+          # (named); exit 2 = could not decide (never counted as a pass).
+          node packages/evolution/scripts/verify-published-bytes.mjs \
+            packages/evolution/dist --version "${RELEASE_VERSION#v}"

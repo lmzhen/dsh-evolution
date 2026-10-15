@@ -37,6 +37,17 @@ try { walk(scriptsDir) } catch (error) {
 }
 
 const problems = []
+
+// G0-0.3 self-proof: this judge must be able to fire. Two samples, one per net:
+// the name net. (A regex-shape net exists too, but its exact supported spelling could NOT be
+// reproduced from reasoning in the G0-0.3 session - two candidate spellings both missed - so it is
+// deliberately NOT self-proved here; the manifest claim was narrowed to what is actually checked.)
+const SELF_PROOF = [
+  { net: NAME_RE, sample: String.fromCharCode(99, 111, 110, 115, 116) + " withoutComments = (t) => t" },
+]
+for (const proof of SELF_PROOF) {
+  if (!proof.net.test(proof.sample)) problems.push("self-proof FAILED: the " + (proof.net === NAME_RE ? "name" : "spelling") + " net no longer matches its own sample")
+}
 let importers = 0
 for (const file of files) {
   const text = stripComments(readFileSync(file, 'utf8'))

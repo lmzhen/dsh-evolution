@@ -5,6 +5,7 @@ import { createToolResultMessage, createUserMessage, ToolCallId } from '@deepsee
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { foldTurnEvents, nodeEvolutionIo, sessionTurnSignals, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
@@ -52,6 +53,7 @@ describe('G0.3: the migrated session accessor reads a real session log', () => {
     await tempHome('dsh-session-accessor-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     const library = new SkillLibrary(undefined, nodeEvolutionIo())
@@ -185,6 +187,7 @@ describe('v37 P7a: the read credit over a PTC-only session log', () => {
     await tempHome('dsh-session-ptc-accessor-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx as never) // 夹具：把投影服务注册到本 ctx（幂等）
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     const library = new SkillLibrary(undefined, nodeEvolutionIo())

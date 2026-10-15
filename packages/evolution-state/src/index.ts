@@ -61,6 +61,20 @@ export class EvolutionState extends Service {
     if (this.providerName && ctx.evolutionStateStorage.hasProviders()) {
       ctx.evolutionStateStorage.provider(this.providerName)
     }
+    // G2b/2b.1: the UNPINNED case, refused at MOUNT. Two media with no pin means the effective one is
+    // registration order — enabling the domain row in an overlay rebinds every state op to an empty medium
+    // while all json state stays on disk, invisible (/evolution pending shows nothing, approve misses).
+    // That used to be a warn-once at the first state access; the judgement is that it belongs here, because
+    // after the first read the deployment has already operated on the wrong medium. The pin is THIS row
+    // config, which is exactly why the registry cannot make this call itself — it never sees the pin.
+    if (this.providerName === '' && ctx.evolutionStateStorage.providerNames().length > 1) {
+      const names = ctx.evolutionStateStorage.providerNames().join(', ')
+      throw new Error(
+        'evolution-state: ' + String(ctx.evolutionStateStorage.providerNames().length) + ' state providers are registered (' + names
+        + ') and this row pins none, so the effective medium would be registration order — a silent'
+        + ' rebind that leaves existing state on disk and unreadable. Pin one: provider: <name>.',
+      )
+    }
   }
 
   private storage(): EvolutionStateStorage {

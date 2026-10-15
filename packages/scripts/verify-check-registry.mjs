@@ -106,10 +106,13 @@ for (const [axis, criterion] of [['executability', 'executability'], ['no-placeh
 }
 for (const axis of ['mutation-coverage', 'producer-wiring']) {
   const entry = registeredOf(axis)
-  addAxis(axis, null, entry === undefined ? 'cannot-decide' : 'cannot-decide', entry === undefined ? 'no data source and no register entry' : 'no data source yet (registered until ' + entry.expiry + '): ' + entry.reasonRef)
+  // P2-③ (release review 2026-10-15): both branches used to answer cannot-decide, so an axis with a
+  // REGISTERED owner and expiry was indistinguishable from one nobody had looked at - it could never
+  // become a debt. Registered now reads as registered (owner + expiry), unregistered stays cannot-decide.
+  const state = entry === undefined ? 'cannot-decide' : 'registered'
+  const why = entry === undefined ? 'no data source and no register entry' : 'no data source; registered until ' + entry.expiry + ' (owner ' + entry.owner + ')'
+  addAxis(axis, entry === undefined ? null : entry.rows, state, why)
 }
-for (const axis of axes) if (axis.state === 'fail') violations.push(axis.axis + ': ' + axis.detail)
-// Diagnosability: the axis line names a count, not the rows behind it, so a CI-only gap could
 // not be identified from the log. Print the observations of every failing axis (the meta-gate's
 // own entries, verbatim) so the next run names the rows instead of leaving a bare number.
 for (const axis of axes) {

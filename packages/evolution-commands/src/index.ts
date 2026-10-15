@@ -4,6 +4,7 @@
  */
 
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+import { scopedPackageName, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
@@ -20,7 +21,6 @@ declare module '@deepseek-ai/dsh-llm' {
 import {
   errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, composePresetEntry, DEFAULT_SKILL_LIMITS, elapsedSince, mergePresetRow, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, presetPatchText, presetRowId, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary, type MaintainRuntime } from '@deepseek-ai/dsh-evolution-maintenance'
-import { preferProvider } from '@deepseek-ai/dsh-evolution-io'
 import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { PROFILE_PATCH_FILENAME, baseRefusalReason, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
@@ -314,7 +314,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const ioRegistry = ioCtx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
     if (!ioRegistry) return
     const registry = newRunRegistry({
-      io: preferProvider(ioRegistry, ['fs']),
+      io: ioRegistry.provider(),
       home: evolutionHome(),
       warn: (message) => { ctx.logger.warn(message) },
     })
@@ -699,9 +699,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // The write-side library is built exactly like restructure's: one construction recipe. The
           // limits ride along because the name guard reads them, so a deployment that raised the
           // name cap can still pin such a skill.
-          const library = newSkillLibrary({
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
             config: { root: skillsRootValue },
-            io: preferProvider(ioRegistry, ['fs']),
+            io: ioRegistry.provider(),
             ctx,
             limits: {
               ...DEFAULT_SKILL_LIMITS,
@@ -829,7 +829,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // disagree with the scan it previews.
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：维护事实不可用。')
-          const library = newSkillLibrary({ config: { root: skillsRootValue }, io: preferProvider(ioRegistry, ['fs']) })
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider() })
           const enrichment = await buildEnrichment(ctx, library)
           const readFailures: string[] = []
           const snapshots = await snapshotFromLibrary(library, {
@@ -849,7 +849,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             return err(`维护扫描读不出 ${readFailures.length} 个已登记技能（${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}），且一个技能都没读到：技能库未被审计。请修好读不出的技能（或它们的目录名）后重新扫描`)
           }
           if (snapshots.length === 0 && skillsRootValue !== ''
-            && !(await preferProvider(ioRegistry, ['fs']).exists(skillsRootValue))) {
+            && !(await ioRegistry.provider().exists(skillsRootValue))) {
             return err(`维护扫描发现技能库为空，但配置的技能根目录不存在（${skillsRootValue}）：请把 skillsRoot 指向真实目录（字面量 \`~\` 不会被展开），然后重新扫描`)
           }
           // PLAN-R2 P2-10 (2026-09-16): cause 3 — no read failures and the
@@ -965,7 +965,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // could never fire first).
           void (async (): Promise<void> => {
             try {
-              const library = newSkillLibrary({ config: { root: skillsRootValue }, io: preferProvider(ioRegistry, ['fs']) })
+              const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider() })
               const enrichment = await buildEnrichment(ctx, library)
               const outcome = await runMaintain(
                 {
@@ -986,7 +986,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                   // v30 LIST-02: the probe runs ONLY when the operator CONFIGURED
                   // a root — `exists('')` is ENOENT, which would report every default
                   // deployment's empty library as "the root does not exist".
-                  rootExists: skillsRootValue === '' ? undefined : () => preferProvider(ioRegistry, ['fs']).exists(skillsRootValue),
+                  rootExists: skillsRootValue === '' ? undefined : () => ioRegistry.provider().exists(skillsRootValue),
                   skillRoot: skillsRootValue,
                 },
                 {
@@ -1004,7 +1004,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 },
               )
               const endedAt = Date.now()
-              const resultRef = await writeMaintainReport(preferProvider(ioRegistry, ['fs']), {
+              const resultRef = await writeMaintainReport(ioRegistry.provider(), {
                 runId: handle.id,
                 ...(outcome.ok
                   ? {
@@ -1030,7 +1030,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 ...(outcome.ok ? {} : { failure: handle.signal.aborted ? 'cancelled: the scan was stopped before it settled' : (outcome.error ?? 'Maintenance scan failed.') }),
               })
               if (outcome.ok) {
-                void appendEvolutionEvent(preferProvider(ioRegistry, ['fs']), eventsFile(runRoot), {
+                void appendEvolutionEvent(ioRegistry.provider(), eventsFile(runRoot), {
                   type: 'maintain',
                   source: 'manual',
                   runId: handle.id,
@@ -1151,7 +1151,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
-          const probed = await readRunReport(preferProvider(ioRegistry, ['fs']), record)
+          const probed = await readRunReport(ioRegistry.provider(), record)
           // "no result" and "an unreadable result" must not look alike (the
           // three-state rule the rest of the family follows).
           if (probed.kind === 'missing') {
@@ -1216,7 +1216,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法交付报告。')
-          const probed = await readRunReport(preferProvider(ioRegistry, ['fs']), record)
+          const probed = await readRunReport(ioRegistry.provider(), record)
           if (probed.kind === 'missing') {
             return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
           }
@@ -1261,7 +1261,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const presetParsed = parseSubcommand(input)
         const presetInstall = isParseFailure(presetParsed) || presetParsed.name !== 'preset'
           ? null
-          : (presetParsed.positionals[0] === 'install' && presetParsed.positionals.length === 1 && [...presetParsed.flags.keys()].every(flag => flagsOf('preset').includes('--' + flag)) ? presetParsed : false)
+          : (presetParsed.positionals[0] === 'install' && presetParsed.positionals.length === 1 && [...presetParsed.flags.keys()].every(flag => flagsOf('preset install').includes('--' + flag)) ? presetParsed : false)
         if (presetInstall !== null && presetInstall !== false) {
           // 0.3.75 (v41 §6.1): this path knew `standard` only, so an
           // npm-installed family could not reach the ptc variant at all. The
@@ -1482,9 +1482,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // field is named `threatExemptLabels` (P2-18 core batch; the field
           // name is the linkage contract, keep in sync). Empty/omitted keeps
           // the strict scan unchanged.
-          const library = newSkillLibrary({
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
             config: { root: skillsRootValue },
-            io: preferProvider(ioRegistry, ['fs']),
+            io: ioRegistry.provider(),
             ctx,
             threatExemptLabels: config.threatExemptLabels,
             // 0.5.0 (§16.7): the write-behind stages are deployment policy, so the
@@ -1828,7 +1828,9 @@ function resolveAgentPresetDir(importMetaUrl: string): string {
   const overlayCandidate = join(dir, '..', '..', 'evolution-agent')
   if (existsSync(join(overlayCandidate, 'agent.cordis.yml')) && existsSync(join(overlayCandidate, 'bases.json'))) return overlayCandidate
   try {
-    return dirname(createRequire(importMetaUrl).resolve('@deepseek-ai/dsh-evolution-agent-preset/package.json'))
+    // G-04: the name is DERIVED from the running manifest, not a literal a release rewrite must patch.
+    const agentPresetPackage = scopedPackageName('dsh-evolution-agent-preset', importMetaUrl)
+    return dirname(createRequire(importMetaUrl).resolve(agentPresetPackage + '/package.json'))
   } catch {
     // S6.6-1 (E-64): last-resort overlay path; the caller's existsSync guard
     // turns a wrong path into a clean error.
