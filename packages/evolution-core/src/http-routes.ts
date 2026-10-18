@@ -210,11 +210,69 @@ export function hostSurface(ctx: Context): HostSurface {
   return { available: true, allowsRemoteAuthorities: allows }
 }
 
+interface ConnectionFetchLike {
+  register(route: ConnectionFetchRouteLike): () => Promise<void>
+}
+
+interface ConnectionServiceLike {
+  readonly allowsRemoteAuthorities?: boolean
+  readonly fetch?: ConnectionFetchLike
+}
+
+interface InjectingContext {
+  inject(names: readonly string[], run: (scope: Context) => void): void
+  effect(run: () => () => void, label?: string): unknown
+}
+
+/**
+ * Register the family host surface on the platform's exact-route carrier.
+ *
+ * The platform owns admission (Host/Origin hygiene + browserAuth + exact-route owner peer) and the
+ * disposer is bound to the CALLING fiber, not the connection service: the connection service can
+ * outlive a reloaded family fiber, so the family must release its own registrations on dispose.
+ * Routes carry the audit snapshot taken at registration time (deployment-level facts only — the
+ * exact-route handler receives a Request, not the peer identity).
+ */
 export function registerHostRoutes(
-  _owner: Context,
-  _build: (audit: DecisionAudit) => readonly ConnectionFetchRouteLike[],
+  owner: Context,
+  build: (audit: DecisionAudit) => readonly ConnectionFetchRouteLike[],
 ): void {
-  throw new Error('registerHostRoutes is not implemented until G4')
+  const injecting = owner as unknown as Partial<InjectingContext>
+  if (typeof injecting.inject !== 'function') throw new Error('E-325: host routes require a context that owns inject()')
+  injecting.inject(['connection'], (scope: Context) => {
+    const connection = (scope as unknown as { connection?: ConnectionServiceLike }).connection
+    if (connection === undefined || connection.fetch === undefined || typeof connection.fetch.register !== 'function') {
+      throw new Error('E-325: connection service is mounted without fetch.register()')
+    }
+    const register = connection.fetch.register.bind(connection.fetch)
+    const audit: DecisionAudit = {
+      channel: 'connection.fetch',
+      principal: 'owner',
+      deploymentAllowsRemote: connection.allowsRemoteAuthorities === true,
+    }
+    const routes = build(audit)
+    for (const route of routes) {
+      if (!route.path.startsWith('/api/dsh-evolution/')) {
+        throw new Error('E-325: host route path must carry the /api/dsh-evolution/ prefix: ' + route.path)
+      }
+    }
+    const effect = (scope as unknown as { effect?: InjectingContext['effect'] }).effect
+    if (typeof effect !== 'function') throw new Error('E-325: connection scope has no effect() to own the registration')
+    effect.call(scope, () => {
+      const disposers: Array<() => Promise<void>> = []
+      try {
+        for (const route of routes) disposers.push(register(route))
+      } catch (error) {
+        for (const dispose of disposers) { try { void dispose() } catch { /* best-effort rollback */ } }
+        throw error
+      }
+      return () => {
+        for (const dispose of disposers) {
+          try { void dispose() } catch { /* a failed disposer must not mask the others */ }
+        }
+      }
+    }, 'evolution-host-routes')
+  })
 }
 
 export function json(status: number, body: unknown): Response {
