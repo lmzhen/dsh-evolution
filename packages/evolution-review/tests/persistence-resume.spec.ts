@@ -6,7 +6,9 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+// 0.2.1: the persistence backend is a function plugin (`apply`), no default export — the family's
+// defect-pattern list names this exact class. Mounting the named apply keeps the same test subject.
+import { apply as JsonlSessionPersistence } from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { SessionFormatUnsupportedError } from '@deepseek-ai/dsh-session-persistence'
 import type { EvolutionPlanAppliedEvent, EvolutionReviewScheduledEvent } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
