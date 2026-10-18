@@ -2,8 +2,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { allowRowCollisions } from './env.ts'
-import { scopedPackageName } from './package-identity.ts'
+import { allowRowCollisions } from '../env.ts'
+import { scopedPackageName } from '../package-identity.ts'
 
 /**
  * Build the user-root Evolution preset composition from the RUNTIME platform's
@@ -87,7 +87,7 @@ interface RowOverride {
  * happened to stay byte-identical, which is exactly the kind of agreement no
  * test can keep — the entries are now data, and a divergence is impossible.
  */
-const ROW_OVERRIDES_URL = new URL('../row-overrides.json', import.meta.url)
+const ROW_OVERRIDES_URL = new URL('../../row-overrides.json', import.meta.url)
 /** One cache per PATH: the installer reads the same file through its own root, and a single-slot
  * cache would hand the second caller the first caller's bytes. */
 const overridesCache = new Map<string, RowOverride[]>()

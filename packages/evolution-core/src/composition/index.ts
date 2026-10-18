@@ -1,7 +1,6 @@
 // Composition subpath: the ONE preset-composer surface plus the restricted-preset contract.
-// G2-S1 physically moves ../preset-composition.ts into ./composer.ts; until then this file
-// re-exports the single implementation so no second composer exists.
-export * from '../preset-composition.ts'
+// G2-S1: the physical home of the ONE composer implementation (no generated twin, no second copy).
+export * from './composer.ts'
 
 import type { Context } from '@deepseek-ai/cordis'
 

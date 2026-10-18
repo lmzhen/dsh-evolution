@@ -24,7 +24,7 @@
  *   IO-seam consumer), `memory-store.ts`, `usage.ts`, `curator.ts`,
  *   `quality.ts`, `signals.ts`, `skill-reads.ts` (the read-before-write rule, shared by the
  *   tool path and the review's plan path), `drift-signals.ts`, `skill-health.ts`,
- *   `preset-composition.ts`, `prompts.ts`, `learn-prompt.ts`,
+ *   `composition/composer.ts`, `prompts.ts`, `learn-prompt.ts`,
  *   `evolution-events.ts`, `evidence.ts` (which session frames count as content, for the plan
  *   path's evidence-class report), `session-projection.ts` (the live per-session units the family's
  *   log-shaped readers read instead of re-reading the session log), `io.ts` (the ctx.evolutionIo

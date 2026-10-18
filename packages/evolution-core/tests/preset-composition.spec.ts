@@ -18,7 +18,7 @@ import {
   presetRowBlock,
   removePresetRow,
   resolveBasePresetPatch,
-} from '@deepseek-ai/dsh-evolution-core'
+} from '@deepseek-ai/dsh-evolution-core/composition'
 
 const run = promisify(execFile)
 
@@ -123,7 +123,7 @@ describe('the shared row-override table (0.3.77, G1 single-source)', () => {
     const standard = '- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
     const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
     const composed = composePresetComposition(standard, delta)
-    const { loadRowOverrides } = await import('@deepseek-ai/dsh-evolution-core')
+    const { loadRowOverrides } = await import('@deepseek-ai/dsh-evolution-core/composition')
     const table = loadRowOverrides()
     expect(table.length).toBeGreaterThan(0)
     for (const override of table) {
@@ -143,7 +143,7 @@ describe('the shared row-override table (0.3.77, G1 single-source)', () => {
 
     // Neither implementation may inline the table again: the distinctive config
     // line exists in the JSON and nowhere else.
-    for (const file of ['../src/preset-composition.ts', '../../scripts/install-layered.mjs']) {
+    for (const file of ['../src/composition/composer.ts', '../../scripts/install-layered.mjs']) {
       expect(readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8'), file).not.toContain('catalogDescriptionMaxLength')
     }
     // ...and the JSON is the table the package SHIPS (files + exports), or an

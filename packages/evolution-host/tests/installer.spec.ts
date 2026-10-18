@@ -237,7 +237,7 @@ describe('layered installer', () => {
   }, 20_000)
 
   it('core composePresetComposition and installer generateAgentPreset agree byte-for-byte (0.3.15 single-source pin)', async () => {
-    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
+    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core/composition')
     // 0.3.53: the fixture carries a standard-sourced tool-skill row so the
     // parity pin also covers the V10-14 cap injection — a one-sided composer
     // forgetting the injection would fail HERE, not in the power/idempotent
@@ -266,7 +266,7 @@ describe('layered installer', () => {
     // indentation. The standard fragment carries an INDENTED row: both sides
     // must see the same id set, pass the nested lines through verbatim, keep
     // the top-level tool-skill injection parity, and stay byte-identical.
-    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
+    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core/composition')
     const standard = '# runtime standard\ngroups:\n  - id: persona\n    name: "@deepseek-ai/dsh-persona"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n\n'
     const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
     const script = [
@@ -287,7 +287,7 @@ describe('layered installer', () => {
     // group must be caught by the installer AND the core composer alike —
     // before the fix both were blind to the indented row and the duplicate
     // mounted twice with every guard green.
-    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
+    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core/composition')
     const standard = '# runtime standard\ngroups:\n  - id: tool-session-query\n    name: "@deepseek-ai/dsh-tool-session-query"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n\n'
     const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n\n- id: tool-session-query\n'
     expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-session-query/)
@@ -367,7 +367,7 @@ describe('layered installer', () => {
   }, 30_000)
 
   it('core composePresetComposition honors the DSH_EVOLUTION_ALLOW_ROW_COLLISIONS escape (0.3.25 collision-path pin)', async () => {
-    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core')
+    const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core/composition')
     const standard = '- id: persona\n- id: tool-session-query\n'
     const delta = '- id: tool-memory\n- id: tool-session-query\n'
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
