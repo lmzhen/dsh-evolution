@@ -12,6 +12,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isRecord } from './guards.ts'
+import type { Context } from '@deepseek-ai/cordis'
 
 /** Largest request body a family route accepts; a bigger one reads as "no body" (400 from the handler). */
 export const MAX_REQUEST_BODY_BYTES = 64 * 1024
@@ -94,7 +95,7 @@ export function writeJson(res: ServerResponse, status: number, value: unknown): 
 export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Uint8Array[] = []
   let size = 0
-  for await (const chunk of req) {
+  for await (const chunk of req as IncomingMessage) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
     size += buffer.byteLength
     if (size > MAX_REQUEST_BODY_BYTES) return null
@@ -111,12 +112,121 @@ export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 /**
  * Read one JSON request body that must be an OBJECT.
  *
- * The three route surfaces all take named fields, so "array or scalar" is a bad request rather than a
- * shape each handler has to re-check.
+ * Accepts the legacy Node request (existing family routes) and the platform ConnectionFetchRoute
+ * Request (G4 migration), so both surfaces share one bounded reader.
  * @param req - the request.
+ * @param maxBytes - the body bound (defaults to MAX_REQUEST_BODY_BYTES).
  * @returns the body as a plain object, or null when it is absent, oversized, not JSON, or not an object.
  */
-export async function readJsonObject(req: IncomingMessage): Promise<Record<string, unknown> | null> {
-  const body = await readJsonBody(req)
+export async function readJsonObject(
+  req: IncomingMessage | Request,
+  maxBytes: number = MAX_REQUEST_BODY_BYTES,
+): Promise<Record<string, unknown> | null> {
+  const body = await readJsonPayload(req, maxBytes)
   return isRecord(body) ? body : null
+}
+
+async function readJsonPayload(req: IncomingMessage | Request, maxBytes: number): Promise<unknown> {
+  if (typeof Request !== 'undefined' && req instanceof Request) {
+    const buffer = await req.arrayBuffer()
+    if (buffer.byteLength > maxBytes || buffer.byteLength === 0) return null
+    try {
+      return JSON.parse(Buffer.from(buffer).toString('utf8'))
+    } catch {
+      return null
+    }
+  }
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for await (const chunk of req as IncomingMessage) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    size += buffer.byteLength
+    if (size > maxBytes) return null
+    chunks.push(buffer)
+  }
+  if (size === 0) return null
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Host data-plane contract (G0 freeze; G4 implements registration and the three-package migration).
+// ---------------------------------------------------------------------------------------------------
+
+export type HttpMethod = 'GET' | 'HEAD' | 'POST'
+
+export type HostRoutePath = `/api/dsh-evolution/${string}`
+
+export interface HostRouteSpec {
+  readonly path: HostRoutePath
+  readonly methods: readonly HttpMethod[]
+  readonly requestBody: 'buffered' | 'streaming'
+}
+
+export interface ConnectionFetchRouteLike extends HostRouteSpec {
+  fetch(request: Request): Promise<Response>
+}
+
+export interface DecisionAudit {
+  readonly channel: 'connection.fetch' | 'command'
+  readonly principal: 'owner'
+  readonly deploymentAllowsRemote: boolean
+}
+
+export const HOST_ROUTES = {
+  approval: {
+    pending: '/api/dsh-evolution/approval/pending',
+    preview: '/api/dsh-evolution/approval/preview',
+    approve: '/api/dsh-evolution/approval/approve',
+    reject: '/api/dsh-evolution/approval/reject',
+  },
+  skillHistory: {
+    skills: '/api/dsh-evolution/skill-history/skills',
+    versions: '/api/dsh-evolution/skill-history/versions',
+    diff: '/api/dsh-evolution/skill-history/versions/diff',
+    body: '/api/dsh-evolution/skill-history/versions/body',
+    undo: '/api/dsh-evolution/skill-history/undo',
+    health: '/api/dsh-evolution/skill-history/health',
+  },
+  skillHealth: {
+    rows: '/api/dsh-evolution/skill-health/rows',
+  },
+  diagnostics: {
+    view: '/api/dsh-evolution/diagnostics',
+  },
+} as const
+
+export type HostSurface =
+  | { readonly available: true; readonly allowsRemoteAuthorities: boolean }
+  | { readonly available: false; readonly code: 'E-325'; readonly reason: 'connection-missing' | 'service-absent' }
+
+export function hostSurface(ctx: Context): HostSurface {
+  const connection = (ctx as unknown as { get(name: string): unknown }).get('connection')
+  if (connection === undefined) return { available: false, code: 'E-325', reason: 'connection-missing' }
+  const allows = (connection as { readonly allowsRemoteAuthorities?: boolean }).allowsRemoteAuthorities === true
+  return { available: true, allowsRemoteAuthorities: allows }
+}
+
+export function registerHostRoutes(
+  _owner: Context,
+  _build: (audit: DecisionAudit) => readonly ConnectionFetchRouteLike[],
+): void {
+  throw new Error('registerHostRoutes is not implemented until G4')
+}
+
+export function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8' },
+  })
+}
+
+export function methodNotAllowed(allowed: readonly HttpMethod[]): Response {
+  return new Response(JSON.stringify({ error: 'method-not-allowed' }), {
+    status: 405,
+    headers: { 'content-type': 'application/json; charset=utf-8', allow: allowed.join(', ') },
+  })
 }

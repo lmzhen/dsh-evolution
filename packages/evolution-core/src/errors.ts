@@ -1,5 +1,5 @@
 /**
- * THE error-code table: E-301…E-322 with the exact text each one emits (E-317…E-319 are the
+ * THE error-code table: E-301…E-325 with the exact text each one emits (E-317…E-319 are the
  * write-admission gates' own refusals).
  *
  * The codes used to be spelled out at 33 call sites across two packages, so one
@@ -70,6 +70,12 @@ export const EVOLUTION_ERRORS = Object.freeze({
     'E-321: 没有挂载 evolution-io 提供方，因此无法读取旧设置文档。请挂载 evolution-io 行（evolution-host/evolution-all）后重试。',
   'e-319-skill-write-confirm-timed-out':
     'E-319: 技能 "%a1%" 未被%a2% —— 确认提示在 %a3% 秒内无人应答，因此该写入被取消。没有人在场决定：把 `skillWriteConfirm` 设为 `auto` 可免提示直接写入，保留 `ask` 则一直等到有人应答，或提高 `skillWriteConfirmTimeoutSeconds`。',
+  'e-323-subagent-channel-unavailable':
+    'E-323: 子代理通道不可用：缺少 subagents/agentPresets 服务，或 spawn provider 不支持 agentPreset 能力。审阅/维护会明确标记为不可用，不会静默退回 inject。运行 /evolution doctor 查看原因与修复指引。',
+  'e-324-restricted-preset-unavailable':
+    'E-324: 受限 preset 创建失败（读取父 preset、解析、注册或限制器挂载任一步失败）：%a1%。审阅/维护通道不可用；运行 /evolution doctor 查看 preset id、allow 集合与失败原因。',
+  'e-325-host-data-plane-unavailable':
+    'E-325: Host 数据面不可用：没有挂载 connection 服务，面板与审批路由不会注册。改用 /evolution pending、approve、reject 命令面完成同等操作；运行 /evolution doctor 查看详情。',
 } as const)
 
 /** One table key. */

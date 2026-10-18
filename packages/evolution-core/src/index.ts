@@ -94,3 +94,21 @@ export * from './numeric.ts'
 export * from './opt-in.ts'
 export * from './payload.ts'
 export * from './fold-untrusted.ts'
+
+// G0 contract surface: /subagent types + state probe, /composition preset constants.
+export * from './subagent/index.ts'
+export {
+  EVOLUTION_PRESET_IDS,
+  REVIEWER_PRESET_ID,
+  MAINTAINER_PRESET_ID,
+  RESTRICTED_TOOLS_ROW_ID,
+  RESTRICTOR_MODULE,
+  RESTRICTED_PRESET_DISPLAY,
+} from './composition/index.ts'
+export type {
+  RestrictedPresetKind,
+  RestrictedPresetDisplay,
+  RestrictedPresetRequest,
+  RestrictedPresetState,
+} from './composition/index.ts'
+export * from './diagnostics.ts'

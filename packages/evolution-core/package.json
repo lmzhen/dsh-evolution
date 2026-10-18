@@ -18,12 +18,28 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./composition": {
+      "types": "./lib/types/composition/index.d.ts",
+      "default": "./lib/composition/index.js"
+    },
+    "./subagent": {
+      "types": "./lib/types/subagent/index.d.ts",
+      "default": "./lib/subagent/index.js"
+    },
+    "./http-routes": {
+      "types": "./lib/types/http-routes.d.ts",
+      "default": "./lib/http-routes.js"
+    },
+    "./restrictor": {
+      "types": "./lib/types/restrictor.d.ts",
+      "default": "./lib/restrictor.js"
+    },
     "./package.json": "./package.json",
     "./row-overrides.json": "./row-overrides.json",
     "./persisted-write-inventory.json": "./persisted-write-inventory.json"
   },
   "files": [
-    "lib/*.js",
+    "lib/**/*.js",
     "lib/types/**/*.d.ts",
     "row-overrides.json",
     "persisted-write-inventory.json"
@@ -37,12 +53,24 @@
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-scope": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-session-projection": "workspace:^"
+    "@deepseek-ai/dsh-session-projection": "workspace:^",
+    "@deepseek-ai/dsh-agent": "workspace:^",
+    "@deepseek-ai/dsh-agent-preset-registry": "workspace:^",
+    "@deepseek-ai/dsh-client-connection": "workspace:^",
+    "@deepseek-ai/dsh-subagent": "workspace:^",
+    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/cordis-plugin-include": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-scope": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-session-projection": "workspace:^"
+    "@deepseek-ai/dsh-session-projection": "workspace:^",
+    "@deepseek-ai/dsh-agent": "workspace:^",
+    "@deepseek-ai/dsh-agent-preset-registry": "workspace:^",
+    "@deepseek-ai/dsh-client-connection": "workspace:^",
+    "@deepseek-ai/dsh-subagent": "workspace:^",
+    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/cordis-plugin-include": "workspace:^"
   }
 }

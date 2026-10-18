@@ -1,8 +1,32 @@
 {
   "extends": "../tsconfig.pkg.json",
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../core/session" },
-    { "path": "../../session/session-projection" }
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../client/connection/tsconfig.host.json"
+    },
+    {
+      "path": "../../preset/agent-preset-registry"
+    },
+    {
+      "path": "../../../vendor/include"
+    }
   ]
 }
