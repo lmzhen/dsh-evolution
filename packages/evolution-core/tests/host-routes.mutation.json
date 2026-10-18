@@ -1,0 +1,12 @@
+{
+  "probe": "beh-host-route-registration",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/http-routes.ts",
+      "find": "deploymentAllowsRemote: connection.allowsRemoteAuthorities === true,",
+      "replace": "deploymentAllowsRemote: false,"
+    }
+  ],
+  "expect": "red",
+  "note": "dropping the deployment-level audit fact must fail the registration spec"
+}

@@ -1,0 +1,72 @@
+{
+  "$comment": "G7-S1: the ONE hand-authored probe registry. gen-gate-manifest merges this into gate-manifest.probes (the generated artifact stays the single runtime registry). Each probe is a test/spec that can go RED; the mutation field names a same-directory fixture (the verify-mutations half is still pending).",
+  "probes": [
+    {
+      "id": "decl-platform-line-grid",
+      "kind": "decl",
+      "owner": "pm-01",
+      "files": [
+        "packages/evolution-core/tests/platform-line.spec.ts",
+        "packages/scripts/lib-platform-line.mjs"
+      ],
+      "mutation": "packages/evolution-core/tests/platform-line.mutation.json",
+      "evidence": "A",
+      "note": "derived anchors/peers/engines + 9-row window grid frozen against platform-line.json"
+    },
+    {
+      "id": "decl-contracts-surface",
+      "kind": "decl",
+      "owner": "architect-01",
+      "files": [
+        "packages/evolution-core/tests/contracts.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/contracts.mutation.json",
+      "evidence": "A",
+      "note": "4 subpaths / HOST_ROUTES 4x12 / DiagnosticsView 7+8 / E-323..325 / preset ids frozen"
+    },
+    {
+      "id": "decl-composer-single-source",
+      "kind": "decl",
+      "owner": "architect-01",
+      "files": [
+        "packages/scripts/verify-composer-single-source.mjs"
+      ],
+      "mutation": "packages/scripts/composer.mutation.json",
+      "evidence": "A",
+      "note": "one composer implementation; installer imports built core lib; runtime-only restricted presets"
+    },
+    {
+      "id": "beh-subagent-channel-outcomes",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-core/tests/subagent-channel.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/subagent-channel.mutation.json",
+      "evidence": "A",
+      "note": "Channel four outcomes / E-323 / E-324 / evidence-before-dispose / dispose-once"
+    },
+    {
+      "id": "beh-restricted-preset-lifecycle",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-core/tests/restricted-preset.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/restricted-preset.mutation.json",
+      "evidence": "A",
+      "note": "parent rows cloned, restrictor last, single-flight ensure, failure terminal E-324"
+    },
+    {
+      "id": "beh-host-route-registration",
+      "kind": "beh",
+      "owner": "client-frontend-01",
+      "files": [
+        "packages/evolution-core/tests/host-routes.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/host-routes.mutation.json",
+      "evidence": "A",
+      "note": "connection.fetch registration + caller-fiber disposer + audit snapshot + E-325"
+    }
+  ]
+}

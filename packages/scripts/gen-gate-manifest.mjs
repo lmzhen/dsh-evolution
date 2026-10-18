@@ -198,11 +198,25 @@ gates.push({
 // part of the schema (a third name for the same bytes is how a second source starts).
 for (const gate of gates) delete gate.cmd
 
+// G7-S1: probes are hand-authored (probes.json) and merged here; gate-manifest.probes is the ONE
+// generated registry consumers read (verify-probes / verify-mutations / traceability).
+const probesFile = join(HERE, 'probes.json')
+let probes = []
+try {
+  const parsed = JSON.parse(readFileSync(probesFile, 'utf8'))
+  probes = Array.isArray(parsed.probes) ? parsed.probes : []
+} catch { probes = [] }
+if (probes.length === 0) {
+  console.error('gen-gate-manifest: probes.json is missing or empty — a probe registry with nothing in it is a silent gate')
+  process.exit(1)
+}
+
 const out = {
   version: 1,
   generatedBy: 'packages/scripts/gen-gate-manifest.mjs',
-  sources: ['CONTRIBUTING.md (gate table)', '.github/actions/evolution-validate/action.yml (CI run steps)'],
+  sources: ['CONTRIBUTING.md (gate table)', '.github/actions/evolution-validate/action.yml (CI run steps)', 'packages/scripts/probes.json (probe registry)'],
   gates,
+  probes,
 }
 const text = JSON.stringify(out, null, 2) + '\n'
 

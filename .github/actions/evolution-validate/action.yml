@@ -395,6 +395,8 @@ runs:
         node packages/evolution/scripts/gen-about.mjs packages/evolution --check
         # G2-S2: the composer has ONE implementation (core); the installer imports the built lib.
         node packages/evolution/scripts/verify-composer-single-source.mjs packages/evolution
+        # G7-S1: the hand-authored probe registry must match its generated artifact (empty = silent gate).
+        node packages/evolution/scripts/verify-probes.mjs packages/evolution
         node packages/evolution/scripts/verify-profile-bundles.mjs --self-test
         # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
         # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs

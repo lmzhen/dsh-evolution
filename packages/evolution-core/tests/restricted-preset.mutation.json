@@ -1,0 +1,12 @@
+{
+  "probe": "beh-restricted-preset-lifecycle",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/composition/restricted-preset.ts",
+      "find": "plugins: [...rows, restrictorRow],",
+      "replace": "plugins: [restrictorRow, ...rows],"
+    }
+  ],
+  "expect": "red",
+  "note": "the restrictor must stay LAST (row-order risk reviewed in W4)"
+}

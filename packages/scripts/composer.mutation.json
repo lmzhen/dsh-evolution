@@ -1,0 +1,12 @@
+{
+  "probe": "decl-composer-single-source",
+  "edits": [
+    {
+      "file": "packages/scripts/install-layered.mjs",
+      "find": "const COMPOSER_LIB_URL = new URL('../evolution-core/lib/composition/index.js', import.meta.url)",
+      "replace": "const COMPOSER_LIB_URL = new URL('./lib-preset-composition.mjs', import.meta.url)"
+    }
+  ],
+  "expect": "red",
+  "note": "the installer regressing to the retired generated twin must fail the single-source gate"
+}

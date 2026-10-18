@@ -3,7 +3,8 @@
   "generatedBy": "packages/scripts/gen-gate-manifest.mjs",
   "sources": [
     "CONTRIBUTING.md (gate table)",
-    ".github/actions/evolution-validate/action.yml (CI run steps)"
+    ".github/actions/evolution-validate/action.yml (CI run steps)",
+    "packages/scripts/probes.json (probe registry)"
   ],
   "gates": [
     {
@@ -1025,6 +1026,22 @@
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
     {
+      "id": "ci-only-15",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-probes.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.27.0"
+    },
+    {
       "id": "line-identity-ci",
       "kind": "script",
       "tree": "mirror",
@@ -1090,6 +1107,75 @@
         "packages/scripts/verify-health-admission.mjs"
       ],
       "reason": "needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass"
+    }
+  ],
+  "probes": [
+    {
+      "id": "decl-platform-line-grid",
+      "kind": "decl",
+      "owner": "pm-01",
+      "files": [
+        "packages/evolution-core/tests/platform-line.spec.ts",
+        "packages/scripts/lib-platform-line.mjs"
+      ],
+      "mutation": "packages/evolution-core/tests/platform-line.mutation.json",
+      "evidence": "A",
+      "note": "derived anchors/peers/engines + 9-row window grid frozen against platform-line.json"
+    },
+    {
+      "id": "decl-contracts-surface",
+      "kind": "decl",
+      "owner": "architect-01",
+      "files": [
+        "packages/evolution-core/tests/contracts.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/contracts.mutation.json",
+      "evidence": "A",
+      "note": "4 subpaths / HOST_ROUTES 4x12 / DiagnosticsView 7+8 / E-323..325 / preset ids frozen"
+    },
+    {
+      "id": "decl-composer-single-source",
+      "kind": "decl",
+      "owner": "architect-01",
+      "files": [
+        "packages/scripts/verify-composer-single-source.mjs"
+      ],
+      "mutation": "packages/scripts/composer.mutation.json",
+      "evidence": "A",
+      "note": "one composer implementation; installer imports built core lib; runtime-only restricted presets"
+    },
+    {
+      "id": "beh-subagent-channel-outcomes",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-core/tests/subagent-channel.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/subagent-channel.mutation.json",
+      "evidence": "A",
+      "note": "Channel four outcomes / E-323 / E-324 / evidence-before-dispose / dispose-once"
+    },
+    {
+      "id": "beh-restricted-preset-lifecycle",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-core/tests/restricted-preset.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/restricted-preset.mutation.json",
+      "evidence": "A",
+      "note": "parent rows cloned, restrictor last, single-flight ensure, failure terminal E-324"
+    },
+    {
+      "id": "beh-host-route-registration",
+      "kind": "beh",
+      "owner": "client-frontend-01",
+      "files": [
+        "packages/evolution-core/tests/host-routes.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/host-routes.mutation.json",
+      "evidence": "A",
+      "note": "connection.fetch registration + caller-fiber disposer + audit snapshot + E-325"
     }
   ]
 }

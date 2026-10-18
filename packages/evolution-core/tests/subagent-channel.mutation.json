@@ -1,0 +1,12 @@
+{
+  "probe": "beh-subagent-channel-outcomes",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/subagent/channel.ts",
+      "find": "if (stopReason === 'aborted') return { kind: 'aborted' }",
+      "replace": "if (stopReason === 'aborted') return { kind: 'no-structured', childId: activation.childId, stopReason: 'aborted' }"
+    }
+  ],
+  "expect": "red",
+  "note": "collapsing aborted into no-structured must fail the outcome matrix"
+}

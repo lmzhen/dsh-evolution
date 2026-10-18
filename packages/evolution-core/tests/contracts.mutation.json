@@ -1,0 +1,12 @@
+{
+  "probe": "decl-contracts-surface",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/http-routes.ts",
+      "find": "rows: '/api/dsh-evolution/skill-health/rows'",
+      "replace": "rows: '/api/dsh-evolution/skill-health/row'"
+    }
+  ],
+  "expect": "red",
+  "note": "a renamed endpoint breaks the 4x12 route freeze"
+}
