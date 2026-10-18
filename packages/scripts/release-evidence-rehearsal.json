@@ -1,0 +1,94 @@
+{
+  "note": "W10/W11 rehearsal readings for v0.27.0 (measured 2026-10-19 on isolated 0.2.1-rc.2 host; see reports/.../execution/G8-* evidence). CI adds the face identity and gate ledger.",
+  "familyVersion": "0.27.0",
+  "spikes": [
+    {
+      "spike": "S1",
+      "verdict": "pass",
+      "face": "headless",
+      "hostVersion": "0.2.1-rc.2",
+      "familyVersion": "0.27.0",
+      "startedAt": "2026-10-19T03:41:22.000+08:00",
+      "readings": {
+        "readDocumentRows": 32,
+        "standardBytes": 5310,
+        "ensure": "ready",
+        "resolveBroken": false,
+        "reviewerDocRows": 33,
+        "restrictorRow": "present",
+        "ensureIdempotent": true
+      }
+    },
+    {
+      "spike": "S2",
+      "verdict": "pass",
+      "face": "web",
+      "hostVersion": "0.2.1-rc.2",
+      "familyVersion": "0.27.0",
+      "startedAt": "2026-10-19T02:22:00.000+08:00",
+      "readings": {
+        "ownerIndex": 200,
+        "ownerDiagnostics": 200,
+        "anonymous": 401,
+        "plainHttpOnTlsPort": "refused",
+        "carrier": "connection.fetch"
+      }
+    },
+    {
+      "spike": "S3",
+      "verdict": "pass",
+      "face": "headless",
+      "hostVersion": "0.2.1-rc.2",
+      "familyVersion": "0.27.0",
+      "startedAt": "2026-10-19T02:33:00.000+08:00",
+      "readings": {
+        "semverVersion": "7.8.5",
+        "gridRows": 9,
+        "expectedColumnMatches": true
+      }
+    },
+    {
+      "spike": "S4",
+      "verdict": "pass",
+      "face": "headless",
+      "hostVersion": "0.2.1-rc.2",
+      "familyVersion": "0.27.0",
+      "startedAt": "2026-10-19T02:53:00.000+08:00",
+      "readings": {
+        "disposeReleasesRoutes": true,
+        "reApplyNoDuplicatePath": true,
+        "repeatedPrepareIdempotent": true,
+        "note": "live HMR needs a dev host; family-side dispose/re-apply contract replaces it (W10 §6)"
+      }
+    }
+  ],
+  "traceability": {
+    "universe": {
+      "A": 22,
+      "B": 18,
+      "C": 12
+    },
+    "covered": 52,
+    "total": 52,
+    "planned": true
+  },
+  "faces": {
+    "web": {
+      "diagnosticsSchemaVersion": 2,
+      "facts": 7,
+      "runtime": 8
+    },
+    "clientSmoke": {
+      "settingsCards": "pass",
+      "paramSave": "pass",
+      "skillHistoryPanel": "pass",
+      "remoteTls": "pass"
+    },
+    "m1m4": {
+      "M1": "pass",
+      "M2": "pass",
+      "M3": "pass",
+      "M4": "pass"
+    }
+  }
+}

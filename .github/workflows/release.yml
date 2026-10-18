@@ -158,6 +158,14 @@ jobs:
           # script resolves it — \`packages/evolution/node_modules\` is on that path.
           npm install --prefix packages/evolution --no-save --no-package-lock --ignore-scripts --no-audit --no-fund tar@7
 
+      - name: Check the release evidence before publishing
+        shell: bash
+        run: |
+          # W3: the tag run is the only place `--release` applies — every plane must be present and
+          # S1-S4 must be PASS (blocked is an environment gap, never a pass). A failure here stops
+          # the publish before npm receives a byte.
+          node packages/evolution/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json --release
+
       - name: Audit the artifacts about to be published
         shell: bash
 

@@ -405,6 +405,22 @@ runs:
         node packages/evolution/scripts/gen-client-seam.mjs packages/evolution --check
         # G7/W11: the 52-item traceability universe is complete and honest (planned mode until W9 registers the probes).
         node packages/evolution/scripts/verify-traceability.mjs packages/evolution --planned
+    - name: Assemble the release evidence planes (W10/W11)
+      shell: bash
+      working-directory: upstream
+      env:
+        CI_FACE_REF: ${{ github.workflow_ref || github.ref_name }}
+        CI_OS: ${{ runner.os }}
+      run: |
+        # G8: the pack wrote the schema-2 skeleton; the REHEARSAL readings (S1-S4 spikes, W11
+        # traceability) are the snapshot checked in beside the scripts; the gate ledger is the set
+        # of manifest rows this compat-check job just executed (the step runs only on success), and
+        # the face identity comes from the workflow. `--release` is applied by the publish job.
+        node packages/evolution/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json \
+          --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json \
+          --gates-from-manifest ci \
+          --ci-face "$CI_FACE_REF" --os "$CI_OS"
+
         # G8/W2: the staging release-evidence is schema v2 and agrees with the ONE platform line.
         node packages/evolution/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json
         node packages/evolution/scripts/verify-profile-bundles.mjs --self-test

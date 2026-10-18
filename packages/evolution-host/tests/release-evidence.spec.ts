@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest'
 vi.setConfig({ testTimeout: 30_000 })
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -24,6 +24,7 @@ import {
 
 const run = promisify(execFile)
 const script = fileURLToPath(new URL('../../scripts/verify-release-evidence.mjs', import.meta.url))
+const assembleScript = fileURLToPath(new URL('../../scripts/assemble-release-evidence.mjs', import.meta.url))
 const PLATFORM_LINE = { version: '0.2.1-rc.2', floor: '0.2.1-rc.1', peersRange: '^0.2.1-rc.1', enginesRange: '>=0.2.1-rc.1 <0.2.2-0', upstreamRef: 'dsh-v0.2.1-rc.2' }
 
 function spike(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -111,5 +112,53 @@ describe('release-evidence schema v2', () => {
     const missing = await run(process.execPath, [script, join(tmpdir(), 'does-not-exist-release-evidence.json')], { encoding: 'utf8' })
       .then(() => ({ code: 0 })).catch(error => ({ code: error.code ?? 1 }))
     expect(missing.code).toBe(2)
+  })
+})
+
+async function runAssemble(staging: unknown, inputs: unknown, extra: string[] = []): Promise<{ code: number; stdout: string; stderr: string; doc?: any }> {
+  const dir = await mkdtemp(join(tmpdir(), 'assemble-evidence-'))
+  const evidencePath = join(dir, 'release-evidence.json')
+  const inputsPath = join(dir, 'rehearsal.json')
+  await writeFile(evidencePath, JSON.stringify(staging), 'utf8')
+  await writeFile(inputsPath, JSON.stringify(inputs), 'utf8')
+  try {
+    const result = await run(process.execPath, [assembleScript, evidencePath, '--rehearsal', inputsPath, ...extra], { encoding: 'utf8' })
+      .then(out => ({ code: 0, stdout: out.stdout, stderr: out.stderr }))
+      .catch(error => ({ code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }))
+    const doc = JSON.parse(await readFile(evidencePath, 'utf8'))
+    return { ...result, doc }
+  } finally { await rm(dir, { recursive: true, force: true }) }
+}
+
+describe('release-evidence assembly (W3 injection)', () => {
+  const rehearsalInputs = () => ({
+    spikes: SPIKE_IDS.map(id => spike(id)),
+    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52 },
+  })
+  it('merges the rehearsal planes, the CI face and the manifest gate ledger', async () => {
+    const result = await runAssemble(staging(), rehearsalInputs(), ['--gates-from-manifest', 'ci', '--ci-face', 'release.yml@refs/tags/v0.27.0', '--os', 'linux'])
+    expect(result.code).toBe(0)
+    expect(result.doc.spikes).toHaveLength(4)
+    expect(result.doc.gates.length).toBeGreaterThan(0)
+    expect(result.doc.ciFace).toEqual({ os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' })
+    expect(result.doc.traceability.covered).toBe(52)
+    expect(validateReleaseEvidence(result.doc, { release: true })).toEqual([])
+  })
+  it('refuses a rehearsal snapshot that is not release-complete', async () => {
+    const inputs = rehearsalInputs()
+    inputs.spikes.pop()
+    const result = await runAssemble(staging(), inputs, ['--gates-from-manifest', 'ci', '--ci-face', 'release.yml@refs/tags/v0.27.0', '--os', 'linux', '--release'])
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain('missing spike S4')
+  })
+  it('cannot decide without the rehearsal inputs', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assemble-missing-'))
+    try {
+      const evidencePath = join(dir, 'release-evidence.json')
+      await writeFile(evidencePath, JSON.stringify(staging()), 'utf8')
+      const result = await run(process.execPath, [assembleScript, evidencePath, '--rehearsal', join(dir, 'absent.json')], { encoding: 'utf8' })
+        .then(() => ({ code: 0 })).catch(error => ({ code: error.code ?? 1 }))
+      expect(result.code).toBe(2)
+    } finally { await rm(dir, { recursive: true, force: true }) }
   })
 })

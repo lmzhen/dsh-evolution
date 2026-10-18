@@ -869,6 +869,29 @@
       ]
     },
     {
+      "id": "gate-57",
+      "kind": "script",
+      "human": "`node packages/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json --gates-from-manifest ci --ci-face ci --os ci`（W3/W10 发布证据装配：把 pack 写出的 schema-2 骨架与本仓演练快照（S1–S4 spike 证据 + W11 52 项 traceability）合并，并写入 CI face 与本次 compat-check 已执行的 gate 台账；`--release` 在 publish 前复验；缺输入/不合格→exit 1/2）",
+      "argv": [
+        "node",
+        "packages/scripts/assemble-release-evidence.mjs",
+        "packages/evolution/dist/release-evidence.json",
+        "--rehearsal",
+        "packages/evolution/scripts/release-evidence-rehearsal.json",
+        "--gates-from-manifest",
+        "ci",
+        "--ci-face",
+        "ci",
+        "--os",
+        "ci"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",

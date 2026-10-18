@@ -20,7 +20,7 @@ stale side must never be copied back over this one.
    `D:/dsh/deepseek-harness` checkout is the stale former dev tree and is never
    a source to copy from.
 3. **Run the gate**. `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` executes
-   all 56 steps and writes one log per step plus a summary (§The gate has
+   all 57 steps and writes one log per step plus a summary (§The gate has
    the table and says which step runs in which tree).
 4. **Decide where your words live**. §Where a fact is allowed to live is the
    rule that fails a conclusion stated in two documents (N19).
@@ -53,7 +53,7 @@ cite the home (`cites`), and the machine owner that re-derives the value
 
 - Run it: `node packages/scripts/verify-doc-facts.mjs packages --strict`
 - It is also architecture rule **N19** inside `verify-arch-guards.mjs`, so the
-  56-step gate runs it on every batch; a second copy fails and names both files.
+  57-step gate runs it on every batch; a second copy fails and names both files.
 - `packages/docs/**` is gitignored: it is a source of material, never a home.
   Move the conclusion into a tracked document before citing it.
 
@@ -139,6 +139,7 @@ Run from the two trees (never reorder or rename these steps):
 | 54 | `node packages/scripts/gen-client-seam.mjs packages --check`（G5/W7 客户端生成物：`routes/route-client/contracts/fallbacks/states.generated.ts` 共 15 个生成物由 core `HOST_ROUTES`/`COMMAND_FALLBACKS`/`diagnostics.ts` 与 5 个模板渲染到 3 个 UI 包；`--check` 断言入库生成物=生成器输出（陈旧即红）；**生成器优先读构建后 core lib（R13），mirror 无 lib 时按约束静态读 HOST_ROUTES 字面量；找不到 HOST_ROUTES ⇒ exit 2**） | mirror |
 | 55 | `node packages/scripts/verify-traceability.mjs packages --planned`（G7/W11 追账：52 项 universe（A-22/B-18/C-12）必须逐条覆盖；缺行/重复/未知 id/乱序/adopted 缺落点证据/deferred 无 trigger→**exit 1**，空矩阵→**exit 2**；`--planned` 只校验 schema/覆盖/顺序（探针注册归 W9，strict 模式另查 files/probes/gates 存在与预算实测）） | mirror |
 | 56 | `node packages/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json`（W2/W3/W10/W11 发布证据：schemaVersion=2、platformLine 与 platform-line.json 逐字、manifests 范围一致；`--release` 时另要求 ciFace/gates/S1–S4 全 pass/52 项 traceability 全覆——blocked 不算 pass。缺文件/不可解析→**exit 2**） | mirror |
+| 57 | `node packages/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json --gates-from-manifest ci --ci-face ci --os ci`（W3/W10 发布证据装配：把 pack 写出的 schema-2 骨架与本仓演练快照（S1–S4 spike 证据 + W11 52 项 traceability）合并，并写入 CI face 与本次 compat-check 已执行的 gate 台账；`--release` 在 publish 前复验；缺输入/不合格→exit 1/2） | mirror |
 
 The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
 writes one log per step plus a summary, and prints the step names it ran, so a

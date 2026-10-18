@@ -206,7 +206,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 56 steps",
+          "text": "all 57 steps",
           "unique": true
         }
       ],
@@ -594,7 +594,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "4a18dd1259fe8b0fc9a0b1eda81f2f6b8977fc07113fc4e7bf5195fcb0a0ff67",
+        "sha256": "53239bde4cf2c12ce951ace472fe6c807ca2dc67ef8ed3d47ed438a625870dbb",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -887,6 +887,11 @@
             "criterion": "verify-release-evidence"
           },
           {
+            "id": "gate-57",
+            "tier": "fast",
+            "criterion": "assemble-release-evidence"
+          },
+          {
             "id": "ci-only-01",
             "tier": "ci-only",
             "criterion": "audit-release-tarballs",
@@ -1012,7 +1017,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 75,
+            "rowsWithoutIt": 76,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
