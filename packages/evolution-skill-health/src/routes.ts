@@ -1,17 +1,18 @@
-import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 /**
  * The panel's ONE read-only route: the health rows the browser half renders.
  *
- * Read-only by construction: it never writes a skill, a marker or a config. It also carries the
- * house rule down to the client — a rule whose threshold is NOT calibrated yet is reported with
- * `countIsMeaningful: false`, so the panel can name it without printing a number we do not have.
+ * W6/G4: exact FetchRoute on the platform Host connection data plane — trust/auth/owner admission are
+ * the platform's, so there is no fence here. Read-only by construction: it never writes a skill, a
+ * marker or a config. It also carries the house rule down to the client — a rule whose threshold is
+ * NOT calibrated yet is reported with `countIsMeaningful: false`, so the panel can name it without
+ * printing a number we do not have.
  * @module @deepseek-ai/dsh-evolution-skill-health
  */
+import { HOST_ROUTES, json, methodNotAllowed } from '@deepseek-ai/dsh-evolution-core/http-routes'
+import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 
-/** Where the panel asks for its rows. */
-export const ROUTES = {
-  rows: '/api/dsh-evolution/skill-health/rows',
-} as const
+/** Where the panel asks for its rows. The ONE declaration lives in core (W1). */
+export const ROUTES = HOST_ROUTES.skillHealth
 
 /** Rules whose threshold is not calibrated yet: named on screen, never counted. */
 export const UNCALIBRATED_RULES: readonly string[] = ['references-sprawl']
@@ -46,22 +47,26 @@ export function toRouteRows(rows: ReadonlyArray<{
 }
 
 /**
- * Build the panel's routes, in the platform shape: `{ path, handler(req, res) }` — the same objects
- * `ctx.webServer.register` takes for every other row in this family.
+ * Build the panel's route in the platform's exact FetchRoute shape.
  * @param deps - a getter for the curator service (absent until the profile mounts it).
+ * @param _audit - the registration audit (read-only surface: nothing to record).
  * @returns one GET route; with no curator it answers an EMPTY row list plus `truncated: true`, which
  *   the panel shows as "cannot decide right now" rather than as a pass.
  */
-export function makeSkillHealthRoutes(deps: { getCurator: () => { healthView?: () => Promise<unknown> } | undefined }): WebRoute[] {
+export function makeSkillHealthRoutes(
+  deps: { getCurator: () => { healthView?: () => Promise<unknown> } | undefined },
+  _audit: DecisionAudit,
+): ConnectionFetchRouteLike[] {
   return [{
-    kind: 'exact',
     path: ROUTES.rows,
-    handler: async (_req, res) => {
+    methods: ['GET'],
+    requestBody: 'buffered',
+    fetch: async (request) => {
+      if (request.method !== 'GET') return methodNotAllowed(['GET'])
       const curator = deps.getCurator()
       const view = curator?.healthView === undefined ? undefined : await curator.healthView()
       const rows = Array.isArray(view) ? toRouteRows(view as Parameters<typeof toRouteRows>[0]) : []
-      res.writeHead(200, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ rows, truncated: view === undefined }))
+      return json(200, { rows, truncated: view === undefined })
     },
   }]
 }

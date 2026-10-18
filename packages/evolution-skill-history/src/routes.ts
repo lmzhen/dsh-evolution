@@ -1,5 +1,10 @@
 /**
- * The skill-history HTTP surface: six loopback routes over the curator's read/write seam (five reads plus the one write).
+ * The skill-history HTTP surface: six exact Fetch routes over the curator's read/write seam (five
+ * reads plus the one write).
+ *
+ * W6/G4: the carrier is the platform's Host connection data plane — the fence, browser auth and
+ * owner-only admission are applied by the platform BEFORE `fetch(request)` runs, so this module has
+ * no 403/401 branch. The wire envelope the browser half reads is unchanged.
  *
  * Layering: this module maps a route to a USE CASE and does nothing else. "Which artifact does this
  * version hold" and "how do the two chains split" live in evolution-core; the only write is
@@ -7,21 +12,14 @@
  * @module @deepseek-ai/dsh-evolution-skill-history/routes
  */
 
-import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { undoableFor, unitUndoableFlags } from './unit-undoable.ts'
-import { contentHash, displayBodyOf, elapsedSince, errorText, isLoopbackRequest, latestVersionAt, partitionVersions, readJsonObject, skillRowCells, textDiffFacts, versionActionKind, versionRowCells, writeJson } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, displayBodyOf, elapsedSince, errorText, latestVersionAt, partitionVersions, skillRowCells, textDiffFacts, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
+import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
+import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 
-/** Route paths. The client bundle mirrors these literals; a spec asserts the two sides agree. */
-export const SKILL_HISTORY_ROUTES = {
-  skills: '/api/dsh-evolution/skill-history/skills',
-  versions: '/api/dsh-evolution/skill-history/versions',
-  diff: '/api/dsh-evolution/skill-history/versions/diff',
-  body: '/api/dsh-evolution/skill-history/versions/body',
-  undo: '/api/dsh-evolution/skill-history/undo',
-  health: '/api/dsh-evolution/skill-history/health',
-} as const
+/** Route paths: the ONE declaration lives in core (W1); the client constants are generated from it. */
+export const SKILL_HISTORY_ROUTES = HOST_ROUTES.skillHistory
 
 /**
  * How much of one version's body the read route hands back. A bound on the ANSWER, not on what the
@@ -46,37 +44,28 @@ export interface RouteServices {
 /**
  * Build the six routes over the curator seam.
  * @param services - the host services the handlers read.
- * @returns the route list for ctx.webServer.register.
+ * @param _audit - the registration audit (read routes record nothing; undo's decision stays the
+ *   curator's own — W6 keeps the ledger to the approval surface).
+ * @returns the route list for `registerHostRoutes`.
  */
-export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
+export function makeSkillHistoryRoutes(services: RouteServices, _audit: DecisionAudit): ConnectionFetchRouteLike[] {
   /** Run one handler body with the curator, or answer the family's E-302 sentence when it is absent. */
-  const withCurator = async (res: ServerResponse, run: (curator: CuratorFace) => Promise<void>): Promise<void> => {
+  const withCurator = async (run: (curator: CuratorFace) => Promise<Response>): Promise<Response> => {
     const curator = services.getCurator()
     if (curator === undefined) {
-      writeJson(res, 200, { ok: false, code: 'curator-not-mounted', message: errorText('e-302-curator-service-not-mounted') })
-      return
+      return json(200, { ok: false, code: 'curator-not-mounted', message: errorText('e-302-curator-service-not-mounted') })
     }
-    await run(curator)
+    return await run(curator)
   }
-  /** Guard: trust fence, then method. Every refusal is a JSON body, never an empty response. */
-  const guard = (req: IncomingMessage, res: ServerResponse, method: string): boolean => {
-    if (!isLoopbackRequest(req)) {
-      writeJson(res, 403, { ok: false, code: 'forbidden', message: '禁止访问：仅限回环地址' })
-      return false
-    }
-    if (req.method !== method) {
-      writeJson(res, 405, { ok: false, code: 'method-not-allowed', message: '方法不允许：' + (req.method ?? '') })
-      return false
-    }
-    return true
-  }
+
   return [
     {
-      kind: 'exact',
       path: SKILL_HISTORY_ROUTES.skills,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'GET')) return
-        await withCurator(res, async (curator) => {
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: (request) => {
+        if (request.method !== 'GET') return Promise.resolve(methodNotAllowed(['GET']))
+        return withCurator(async (curator) => {
           const listed = await curator.skills.list()
           // The row carries what the LISTING already holds: the description and the two marker facts
           // cost no extra read, and they are what makes a left column answer "what is this" rather
@@ -118,21 +107,19 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
             // build keeps every `@deepseek-ai/*` specifier external — so the cells travel with the row.
             withHistory.push({ ...row, cells: skillRowCells(row) })
           }
-          writeJson(res, 200, { ok: true, data: withHistory })
+          return json(200, { ok: true, data: withHistory })
         })
       },
     },
     {
-      kind: 'exact',
       path: SKILL_HISTORY_ROUTES.versions,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'GET')) return
-        const name = new URL(req.url ?? '/', 'http://loopback').searchParams.get('name')?.trim() ?? ''
-        if (name === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 name' })
-          return
-        }
-        await withCurator(res, async (curator) => {
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: (request) => {
+        if (request.method !== 'GET') return Promise.resolve(methodNotAllowed(['GET']))
+        const name = new URL(request.url).searchParams.get('name')?.trim() ?? ''
+        if (name === '') return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '缺少 name' }))
+        return withCurator(async (curator) => {
           const versions = await curator.history(name)
           // The PANEL must not own the classification: core decides which entries hold the body
           // (partitionVersions) and the live bytes decide which one is already current, so the row
@@ -170,29 +157,28 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
             const row = decorate(entry, index, groups.support, false)
             return { ...row, cells: versionRowCells(row) }
           })
-          writeJson(res, 200, { ok: true, data: { content, support, liveHash } })
+          return json(200, { ok: true, data: { content, support, liveHash } })
         })
       },
     },
     {
-      kind: 'exact',
       path: SKILL_HISTORY_ROUTES.diff,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'GET')) return
-        const params = new URL(req.url ?? '/', 'http://loopback').searchParams
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: (request) => {
+        if (request.method !== 'GET') return Promise.resolve(methodNotAllowed(['GET']))
+        const params = new URL(request.url).searchParams
         const name = params.get('name')?.trim() ?? ''
         const rawV = params.get('v')?.trim() ?? ''
         const v = Number.parseInt(rawV, 10)
         if (name === '' || !/^\d+$/.test(rawV) || !Number.isInteger(v) || v < 1) {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: '需要 name 与正整数 v' })
-          return
+          return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '需要 name 与正整数 v' }))
         }
-        await withCurator(res, async (curator) => {
+        return withCurator(async (curator) => {
           const groups = partitionVersions(await curator.history(name))
           const index = groups.content.findIndex(entry => entry.v === v)
           if (index === -1) {
-            writeJson(res, 404, { ok: false, code: 'not-found', message: '该版本不在「' + name + '」的记录历史里' })
-            return
+            return json(404, { ok: false, code: 'not-found', message: '该版本不在「' + name + '」的记录历史里' })
           }
           const entry = groups.content[index]
           // `beforeHash` is the AUTHORITATIVE predecessor (core computes it from the bytes a write lock
@@ -208,34 +194,30 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
           const after = entry === undefined ? null : await curator.skills.readVersion(name, v)
           const before = previous === undefined ? '' : await curator.skills.readVersion(name, previous.v)
           if (after === null || before === null) {
-            writeJson(res, 404, { ok: false, code: 'not-found', message: '该版本的存储内容读不出来' })
-            return
+            return json(404, { ok: false, code: 'not-found', message: '该版本的存储内容读不出来' })
           }
           const facts = textDiffFacts(before, after, 'SKILL.md')
-          writeJson(res, 200, { ok: true, data: { v, against: previous?.v ?? null, ...facts } })
+          return json(200, { ok: true, data: { v, against: previous?.v ?? null, ...facts } })
         })
       },
     },
     {
-      kind: 'exact',
       path: SKILL_HISTORY_ROUTES.body,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'GET')) return
-        const params = new URL(req.url ?? '/', 'http://loopback').searchParams
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: (request) => {
+        if (request.method !== 'GET') return Promise.resolve(methodNotAllowed(['GET']))
+        const params = new URL(request.url).searchParams
         const name = params.get('name')?.trim() ?? ''
         const rawV = params.get('v')?.trim() ?? ''
         const v = Number.parseInt(rawV, 10)
         if (name === '' || !/^\d+$/.test(rawV) || !Number.isInteger(v) || v < 1) {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: '需要 name 与正整数 v' })
-          return
+          return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '需要 name 与正整数 v' }))
         }
-        await withCurator(res, async (curator) => {
+        return withCurator(async (curator) => {
           // The same read the undo path and the diff route use, so a version has ONE reader.
           const text = await curator.skills.readVersion(name, v)
-          if (text === null) {
-            writeJson(res, 404, { ok: false, code: 'not-found', message: '该版本的存储内容读不出来' })
-            return
-          }
+          if (text === null) return json(404, { ok: false, code: 'not-found', message: '该版本的存储内容读不出来' })
           const truncated = text.length > MAX_BODY_CHARS
           const head = truncated ? text.slice(0, MAX_BODY_CHARS) : text
           // What the version SAYS, not the bytes it stores: the frontmatter block is metadata the row
@@ -243,7 +225,7 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
           // setext underline, which made the metadata line the document's biggest heading (W19). The
           // exact bytes stay one route away, in the diff. Core owns the policy (`displayBodyOf`), and
           // a browser half cannot import core at runtime, so the host applies it.
-          writeJson(res, 200, {
+          return json(200, {
             ok: true,
             data: { v, display: displayBodyOf(head), chars: text.length, truncated },
           })
@@ -251,35 +233,35 @@ export function makeSkillHistoryRoutes(services: RouteServices): WebRoute[] {
       },
     },
     {
-      kind: 'exact',
       path: SKILL_HISTORY_ROUTES.undo,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'POST')) return
-        const payload = await readJsonObject(req)
-        const name = typeof payload?.name === 'string' ? payload.name.trim() : ''
-        if (name === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 name' })
-          return
-        }
-        const raw = payload?.v
-        if (raw !== undefined && (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1)) {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'v 必须是正整数' })
-          return
-        }
-        await withCurator(res, async (curator) => {
-          const result = raw === undefined ? await curator.undo(name) : await curator.undo(name, raw)
-          // A refusal is a BUSINESS answer, not a transport failure: the body carries the curator's own
-          // sentence (the same one the slash command prints), so the two faces cannot drift.
-          writeJson(res, 200, result.ok ? { ok: true, data: result } : { ok: false, code: 'undo-refused', message: result.message })
-        })
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: (request) => {
+        if (request.method !== 'POST') return Promise.resolve(methodNotAllowed(['POST']))
+        return (async () => {
+          const payload = await readJsonObject(request)
+          const name = typeof payload?.name === 'string' ? payload.name.trim() : ''
+          if (name === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 name' })
+          const raw = payload?.v
+          if (raw !== undefined && (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1)) {
+            return json(400, { ok: false, code: 'bad-request', message: 'v 必须是正整数' })
+          }
+          return withCurator(async (curator) => {
+            const result = raw === undefined ? await curator.undo(name) : await curator.undo(name, raw)
+            // A refusal is a BUSINESS answer, not a transport failure: the body carries the curator's own
+            // sentence (the same one the slash command prints), so the two faces cannot drift.
+            return json(200, result.ok ? { ok: true, data: result } : { ok: false, code: 'undo-refused', message: result.message })
+          })
+        })()
       },
     },
     {
-      kind: 'exact',
       path: SKILL_HISTORY_ROUTES.health,
-      handler: (req, res) => {
-        if (!guard(req, res, 'GET')) return
-        writeJson(res, 200, { ok: true, data: { surface: 'skill-history' } })
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: (request) => {
+        if (request.method !== 'GET') return Promise.resolve(methodNotAllowed(['GET']))
+        return Promise.resolve(json(200, { ok: true, data: { surface: 'skill-history' } }))
       },
     },
   ]

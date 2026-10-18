@@ -9,9 +9,6 @@
     },
     {
       "path": "../evolution-curator"
-    },
-    {
-      "path": "../../host/webserver"
     }
   ]
 }

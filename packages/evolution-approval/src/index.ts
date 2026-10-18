@@ -28,6 +28,8 @@ import z from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
 import { makeApprovalRoutes } from './routes.ts'
+import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
+import type { DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 
 /** A claim id carries its holder pid as `<pid>:<hex token>` (minted by `newClaimId()`). */
 const CLAIM_ID_RE = /^(\d+):[0-9a-f]*$/
@@ -277,14 +279,10 @@ export class EvolutionApproval extends Service {
       const disposer = settings.configure({ auto: false }, this.ctx.fiber)
       if (typeof disposer === 'function') this.ctx.effect(() => disposer as () => void, 'evolution-approval: settings presentation')
     })
-    this.ctx.inject(['webServer'], (scope) => {
-      scope.effect(() => {
-        const disposers = makeApprovalRoutes(this).map(route => scope.webServer.register(route))
-        return () => {
-          for (const dispose of disposers) dispose()
-        }
-      }, 'evolution-approval: routes')
-    })
+    // W6/G4: the platform's Host connection data plane is the ONLY admission path (trust, browser
+    // auth, owner-only). registerHostRoutes waits on `connection` via inject and owns the route
+    // effect; the audit snapshot is taken where the connection service is known.
+    registerHostRoutes(this.ctx, (audit) => makeApprovalRoutes(this, audit))
   }
 
   private state(): EvolutionState {
@@ -458,8 +456,8 @@ export class EvolutionApproval extends Service {
     return await this.state().listPending(status)
   }
 
-  async approve(id: string): Promise<{ ok: boolean; message: string }> {
-    return await this.dedupe(`approve:${id}`, () => this.doApprove(id))
+  async approve(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }> {
+    return await this.dedupe(`approve:${id}`, () => this.doApprove(id, audit))
   }
 
   /** S2-P2-22 (0.3.80): return an ORPHANED executing record to the pending
@@ -536,7 +534,7 @@ export class EvolutionApproval extends Service {
     }
   }
 
-  async reject(id: string): Promise<{ ok: boolean; message: string }> {
+  async reject(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }> {
     return await this.dedupe(`reject:${id}`, async () => {
       // Reject claims the record like approve does, so a pending write resolves
       // on a single gate (F-204). The executing-rescue branch below does NOT
@@ -580,6 +578,7 @@ export class EvolutionApproval extends Service {
         await this.state().releasePendingClaim(id, claimId)
         return { ok: false, message: `待批准写入「${id}」已不在待批准状态（已了结或不存在）。` }
       }
+      await this.recordDecision(resolution.record, audit)
       return { ok: true, message: `已拒绝 ${resolution.record.kind} 写入「${id}」。` }
     })
   }
@@ -626,7 +625,20 @@ export class EvolutionApproval extends Service {
     return run
   }
 
-  private async doApprove(id: string): Promise<{ ok: boolean; message: string }> {
+  /** W6: attach the platform's admission decision to a resolved record (read-tolerant; absent on
+   * records resolved by expiry or before 0.2.1). */
+  private async recordDecision(record: PendingRecord | null, audit: DecisionAudit): Promise<void> {
+    if (record === null) return
+    try {
+      await this.state().savePending({ ...record, decidedBy: audit })
+    } catch (error) {
+      // The decision itself already landed; an audit-attachment failure must not turn a successful
+      // approve/reject into a refusal. It is logged, never silent.
+      this.ctx.logger.warn('evolution-approval: could not attach decidedBy audit: ' + (error instanceof Error ? error.message : String(error)))
+    }
+  }
+
+  private async doApprove(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }> {
     const claimId = this.newClaimId()
     const record = await this.state().claimPending(id, claimId)
     if (!record) {
@@ -665,6 +677,7 @@ export class EvolutionApproval extends Service {
           if (rejected) return { ok: false, message: `能力「${id}」已获批准，但记录被并发地了结为「rejected」：没有代码运行，也无需重放；重新提交前请先核验。` }
           return { ok: false, message: `待批准写入「${id}」已被另一个写入方了结。` }
         }
+        await this.recordDecision(resolution.record, audit)
         return { ok: true, message: '能力已批准，可在 Creator 模式下手动激活（未执行任何代码）。' }
       }
       await this.state().releasePendingClaim(id, claimId)
@@ -740,6 +753,7 @@ export class EvolutionApproval extends Service {
     }
     // 0.3.17 (E-61): the success message names what was approved, not just
     // the kind — a reviewer acting on several batches can tell them apart.
+    await this.recordDecision(resolution.record, audit)
     return { ok: true, message: `已批准 ${record.kind} 写入「${id}」（${record.summary}）。` }
   }
 }

@@ -1,30 +1,29 @@
 /**
- * The approval HTTP surface: four loopback routes over the write gate's pending window.
+ * The approval HTTP surface: four exact Fetch routes over the write gate's pending window.
+ *
+ * W6/G4: the carrier is the platform's Host connection data plane (`connection.fetch`) — the trust
+ * fence, browser auth and owner-only admission are applied by the platform BEFORE `fetch(request)`
+ * runs, so this module has no fence and no 403/401 branch. It still answers the same JSON envelope
+ * the browser half reads; the loopback f-string that used to live here was a SECOND admission path
+ * (the S2 spike showed it could diverge from the platform's).
  *
  * Layering: this module maps a route to a USE CASE and does nothing else. The pending window itself
  * (ids, statuses, claim/resolve rules, the replay runners) lives in this package's service and in
  * `evolution-state-storage`; the routes only read the window and forward the two decisions, so the
  * console command face (`/evolution pending`, `approve <id>`) and this one cannot drift — both call
  * the same methods.
- *
- * The browser half never touches the state medium: it lists, it approves, it rejects.
  * @module @deepseek-ai/dsh-evolution-approval/routes
  */
 
-import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { PENDING_STATUSES } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
-import { elapsedSince, isLoopbackRequest, readJsonObject, textDiffFacts, writeJson } from '@deepseek-ai/dsh-evolution-core'
+import { elapsedSince, textDiffFacts } from '@deepseek-ai/dsh-evolution-core'
+import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
+import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { WritePreview } from './index.ts'
 
-/** Route paths. The browser half mirrors these literals; a spec asserts the two sides agree. */
-export const APPROVAL_ROUTES = {
-  pending: '/api/dsh-evolution/approval/pending',
-  approve: '/api/dsh-evolution/approval/approve',
-  reject: '/api/dsh-evolution/approval/reject',
-  preview: '/api/dsh-evolution/approval/preview',
-} as const
+/** Route paths: the ONE declaration lives in core (W1) and the browser half is generated from it. */
+export const APPROVAL_ROUTES = HOST_ROUTES.approval
 
 // S2.9/1-10: the statuses a caller may ask for are the SEAM'S own list (`PENDING_STATUSES` from
 // evolution-state-storage), in the order the window moves through them — a literal here was the
@@ -46,76 +45,66 @@ export interface PendingRow {
 /**
  * The slice of the approval service these routes read.
  *
- * Structural on purpose: a spec fixture implements it without constructing the service, and the
- * routes stay usable from any host that exposes the same three methods.
+ * W6: approve/reject take the DecisionAudit captured at registration (channel/principal/
+ * deploymentAllowsRemote). The audit rides the service call so the ledger records the ONE admission
+ * decision the platform already made — the route never re-derives it.
  */
 export interface ApprovalFace {
   list(status?: PendingStatus): Promise<PendingRecord[]>
-  approve(id: string): Promise<{ ok: boolean; message: string }>
-  reject(id: string): Promise<{ ok: boolean; message: string }>
+  approve(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }>
+  reject(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }>
   /** The preview the replayer of that kind registered, when it registered one. */
   previewOf(kind: PendingKind): WritePreview | undefined
 }
 
 /**
- * Build the four routes over the approval service.
- * @param approval - the host's approval face (the service instance, or a spec fixture).
- * @returns the route list for `ctx.webServer.register`.
+ * Run one decision against the service.
+ *
+ * A refusal is a BUSINESS answer, not a transport failure: the body carries the service's own
+ * sentence — the same one the console command prints — so the two faces cannot drift. A throw is
+ * reported the same way rather than escaping as an empty 500, because the operator's next step
+ * ("reject it", "retry") is only actionable if the reason is visible.
  */
-export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
-  /** Guard: trust fence, then method. Every refusal is a JSON body, never an empty response. */
-  const guard = (req: IncomingMessage, res: ServerResponse, method: string): boolean => {
-    if (!isLoopbackRequest(req)) {
-      writeJson(res, 403, { error: '禁止访问：仅限回环地址' })
-      return false
-    }
-    if (req.method !== method) {
-      writeJson(res, 405, { error: '方法不允许：' + method })
-      return false
-    }
-    return true
+async function decide(
+  run: (id: string) => Promise<{ ok: boolean; message: string }>,
+  id: string,
+): Promise<Response> {
+  try {
+    const result = await run(id)
+    return json(200, result.ok ? { ok: true, data: result } : { ok: false, code: 'approval-refused', message: result.message })
+  } catch (error) {
+    return json(200, {
+      ok: false,
+      code: 'approval-failed',
+      message: error instanceof Error ? error.message : String(error),
+    })
   }
+}
 
-  /**
-   * Run one decision against the service.
-   *
-   * A refusal is a BUSINESS answer, not a transport failure: the body carries the service's own
-   * sentence — the same one the console command prints — so the two faces cannot drift. A throw is
-   * reported the same way rather than escaping as an empty 500, because the operator's next step
-   * ("reject it", "retry") is only actionable if the reason is visible.
-   */
-  const decide = async (
-    res: ServerResponse,
-    run: (id: string) => Promise<{ ok: boolean; message: string }>,
-    id: string,
-  ): Promise<void> => {
-    try {
-      const result = await run(id)
-      writeJson(res, 200, result.ok ? { ok: true, data: result } : { ok: false, code: 'approval-refused', message: result.message })
-    } catch (error) {
-      writeJson(res, 200, {
-        ok: false,
-        code: 'approval-failed',
-        message: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
+/** The one shape a decision route accepts: a non-empty string id. */
+export function idOf(payload: Record<string, unknown> | null): string {
+  return typeof payload?.id === 'string' ? payload.id.trim() : ''
+}
 
-  /** The one shape a decision route accepts: a non-empty string id. */
-  const idOf = (payload: Record<string, unknown> | null): string => typeof payload?.id === 'string' ? payload.id.trim() : ''
-
+/**
+ * Build the four exact Fetch routes over the approval service.
+ * @param approval - the host's approval face (the service instance, or a spec fixture).
+ * @param audit - the DecisionAudit captured where the connection service is known (registration).
+ * @returns the route list for `registerHostRoutes`.
+ */
+export function makeApprovalRoutes(approval: ApprovalFace, audit: DecisionAudit): ConnectionFetchRouteLike[] {
   return [
     {
-      kind: 'exact',
       path: APPROVAL_ROUTES.pending,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'GET')) return
-        const params = new URL(req.url ?? '/', 'http://loopback').searchParams
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        if (request.method !== 'GET') return methodNotAllowed(['GET'])
+        const params = new URL(request.url).searchParams
         const raw = params.get('status')?.trim() ?? ''
         const status = raw === '' ? 'pending' : raw
         if (!(PENDING_STATUSES as readonly string[]).includes(status)) {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: 'status 必须是以下之一：' + PENDING_STATUSES.join(', ') })
-          return
+          return json(400, { ok: false, code: 'bad-request', message: 'status 必须是以下之一：' + PENDING_STATUSES.join(', ') })
         }
         try {
           const records = await approval.list(status as PendingStatus)
@@ -128,9 +117,9 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
             status: record.status,
             ...record.claimedBy === undefined ? {} : { claimedBy: record.claimedBy },
           }))
-          writeJson(res, 200, { ok: true, data: rows })
+          return json(200, { ok: true, data: rows })
         } catch (error) {
-          writeJson(res, 200, {
+          return json(200, {
             ok: false,
             code: 'approval-failed',
             message: error instanceof Error ? error.message : String(error),
@@ -139,42 +128,35 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
       },
     },
     {
-      kind: 'exact',
       path: APPROVAL_ROUTES.preview,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'GET')) return
-        const params = new URL(req.url ?? '/', 'http://loopback').searchParams
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        if (request.method !== 'GET') return methodNotAllowed(['GET'])
+        const params = new URL(request.url).searchParams
         const id = params.get('id')?.trim() ?? ''
-        if (id === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 id' })
-          return
-        }
+        if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
         try {
           // Both statuses: a record whose replay is already running is exactly when a reader asks.
           const staged = [...await approval.list('pending'), ...await approval.list('executing')]
           const record = staged.find(candidate => candidate.id === id)
           if (record === undefined) {
-            writeJson(res, 200, { ok: false, code: 'not-found', message: '没有 id 为「' + id + '」的待批准写入' })
-            return
+            return json(200, { ok: false, code: 'not-found', message: '没有 id 为「' + id + '」的待批准写入' })
           }
           const preview = approval.previewOf(record.kind)
           if (preview === undefined) {
             // Not an error: plenty of staged writes have no bytes worth showing, and the reader is owed
             // the reason rather than an empty diff.
-            writeJson(res, 200, { ok: true, data: { available: false, reason: '类型 "' + record.kind + '" 的写入没有可预览内容' } })
-            return
+            return json(200, { ok: true, data: { available: false, reason: '类型 "' + record.kind + '" 的写入没有可预览内容' } })
           }
           const answer = await preview(record.args)
-          if (!answer.available) {
-            writeJson(res, 200, { ok: true, data: { available: false, reason: answer.reason } })
-            return
-          }
+          if (!answer.available) return json(200, { ok: true, data: { available: false, reason: answer.reason } })
           // The diff facts come from core's ONE implementation, the same one the history panel's diff
           // route uses: the two faces describe a change with the same numbers.
           const facts = textDiffFacts(answer.before ?? '', answer.after ?? '', answer.path)
-          writeJson(res, 200, { ok: true, data: { available: true, path: answer.path, ...facts } })
+          return json(200, { ok: true, data: { available: true, path: answer.path, ...facts } })
         } catch (error) {
-          writeJson(res, 200, {
+          return json(200, {
             ok: false,
             code: 'approval-failed',
             message: error instanceof Error ? error.message : String(error),
@@ -183,29 +165,25 @@ export function makeApprovalRoutes(approval: ApprovalFace): WebRoute[] {
       },
     },
     {
-      kind: 'exact',
       path: APPROVAL_ROUTES.approve,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'POST')) return
-        const id = idOf(await readJsonObject(req))
-        if (id === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 id' })
-          return
-        }
-        await decide(res, current => approval.approve(current), id)
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        if (request.method !== 'POST') return methodNotAllowed(['POST'])
+        const id = idOf(await readJsonObject(request))
+        if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
+        return await decide(current => approval.approve(current, audit), id)
       },
     },
     {
-      kind: 'exact',
       path: APPROVAL_ROUTES.reject,
-      handler: async (req, res) => {
-        if (!guard(req, res, 'POST')) return
-        const id = idOf(await readJsonObject(req))
-        if (id === '') {
-          writeJson(res, 400, { ok: false, code: 'bad-request', message: '缺少 id' })
-          return
-        }
-        await decide(res, current => approval.reject(current), id)
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        if (request.method !== 'POST') return methodNotAllowed(['POST'])
+        const id = idOf(await readJsonObject(request))
+        if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
+        return await decide(current => approval.reject(current, audit), id)
       },
     },
   ]

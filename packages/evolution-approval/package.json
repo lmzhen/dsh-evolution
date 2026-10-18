@@ -31,14 +31,13 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-host-webserver": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state": "workspace:^"
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-state": "workspace:^",
+    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-host-webserver": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state": "workspace:^"
+    "@deepseek-ai/dsh-evolution-state": "workspace:^",
+    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
   }
 }

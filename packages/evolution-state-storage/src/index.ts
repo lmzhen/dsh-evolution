@@ -147,6 +147,11 @@ export interface PendingRecord {
    * which session — kept so resolved audit history is attributable. */
   origin?: string | undefined
   sessionId?: string | undefined
+  /** W6/G4: the platform's admission decision that resolved this record (channel/principal/
+   * deploymentAllowsRemote). Optional and read-tolerant: records resolved before 0.2.1 (or by TTL
+   * expiry, which has no request) carry none — readers must never backfill it. Structural shape
+   * (not an import) keeps the storage domain independent of core's http-routes module. */
+  decidedBy?: { readonly channel: 'connection.fetch' | 'command'; readonly principal: 'owner'; readonly deploymentAllowsRemote: boolean } | undefined
 }
 
 export interface PendingResolution {
