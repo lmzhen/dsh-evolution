@@ -55,7 +55,7 @@ export function composeRestrictedPresetDefinition(
   if (allow.length === 0) throw new Error('E-324: restricted preset needs a non-empty allow set')
   const rows = parsePresetRows(source.content)
   const display = RESTRICTED_PRESET_DISPLAY[req.kind]
-  const restrictorRow = { id: RESTRICTED_TOOLS_ROW_ID, name: RESTRICTOR_MODULE, config: { allow } }
+  const restrictorRow = { id: RESTRICTED_TOOLS_ROW_ID, name: RESTRICTOR_MODULE, config: { allow, presetId: restrictedPresetId(req.kind) } }
   return {
     id: restrictedPresetId(req.kind),
     name: display.name,

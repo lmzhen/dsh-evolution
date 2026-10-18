@@ -29,7 +29,7 @@ describe('real 0.2.1 parent preset composition (S1 spike, A-level fixture)', () 
     const last = definition.plugins[definition.plugins.length - 1] as Record<string, unknown>
     expect(last['id']).toBe(RESTRICTED_TOOLS_ROW_ID)
     expect(last['name']).toBe(RESTRICTOR_MODULE)
-    expect(last['config']).toEqual({ allow: ['skill'] })
+    expect(last['config']).toEqual({ allow: ['skill'], presetId: restrictedPresetId('reviewer') })
   })
 
   it('refuses an empty allow set (E-324) instead of composing an unrestricted clone', () => {

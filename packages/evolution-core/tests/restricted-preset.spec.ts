@@ -64,7 +64,7 @@ describe('restricted preset definition (G2-S4)', () => {
     expect(definition.plugins).toHaveLength(3)
     expect(definition.plugins[0]).toEqual({ id: 'persona', name: '@deepseek-ai/dsh-persona' })
     expect(definition.plugins[1]).toMatchObject({ id: 'tool-skill', config: { catalogDescriptionMaxLength: 60 } })
-    expect(definition.plugins[2]).toEqual({ id: RESTRICTED_TOOLS_ROW_ID, name: expect.stringContaining('/dsh-evolution-core/restrictor'), config: { allow: ['tool-skill'] } })
+    expect(definition.plugins[2]).toEqual({ id: RESTRICTED_TOOLS_ROW_ID, name: expect.stringContaining('/dsh-evolution-core/restrictor'), config: { allow: ['tool-skill'], presetId: REVIEWER_PRESET_ID } })
   })
 
   it('uses the maintainer identity/order for the maintenance channel', () => {
