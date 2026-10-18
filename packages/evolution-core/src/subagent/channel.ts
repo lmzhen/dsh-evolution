@@ -104,7 +104,10 @@ export function createSubagentChannel(ctx: Context): SubagentChannel {
           }
         }
         const stopReason = result.stopReason
-        if (stopReason === 'completed') {
+        // W5 §3: OK requires BOTH a completed stop and a structured payload; a completed run that
+        // produced nothing must stay a no-structured outcome so the business layer cannot treat an
+        // empty result as a plan.
+        if (stopReason === 'completed' && result.structured !== undefined && result.structured !== null) {
           return {
             kind: 'ok',
             structured: result.structured,

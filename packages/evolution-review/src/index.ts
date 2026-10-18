@@ -24,6 +24,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, evolutionIoAdapter, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampOnce, pickWithPolicy, userSetKeys, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
 import type { LiveValue, SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 // v37 P7a: the platform dispatch vocabulary is read in ONE place —
 // evolution-core's tool-dispatch module, which owns the event types, the
@@ -69,9 +70,7 @@ function emitReviewScheduled(ctx: Context, event: EvolutionReviewScheduledEvent)
  * 2026-09-16) and caps the sum at the timer ceiling (PLAN-R2 P2-1). The
  * `run.dispose` arm point counts this margin ALONE — its clock starts after
  * the result settled, not at the review timeout (PLAN-R2 P2-2, 2026-09-16). */
-const REVIEW_SETTLE_MARGIN_MS = 5_000
 /** Error name marking the S2-6 watchdog expiry (see the catch in trySubagentReview). */
-const REVIEW_SETTLE_TIMEOUT = 'ReviewSettleTimeout'
 
 export const name = 'evolution-review'
 export const inject = ['agents']
@@ -242,60 +241,6 @@ export const REVIEW_OUTPUT_SCHEMA = {
  * so a defineTool DSL value like `'json'` fails at the type surface instead
  * of silently rejecting every spawn at runtime (the historical defect the
  * mock-based tests and the previous `unknown` request type could not see). */
-interface ReviewOutputSchemaLike {
-  type: 'object'
-  additionalProperties?: boolean
-  properties?: Record<string, {
-    type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null'
-    items?: { type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null' }
-    properties?: Record<string, { type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null' }>
-  }>
-}
-
-interface SubagentStartRequestLike {
-  label?: string
-  prompt?: unknown
-  parent?: unknown
-  signal?: unknown
-  maxDepth?: number
-  agentOptions?: Record<string, string>
-  persona?: unknown
-  toolFilter?: { allow?: string[] }
-  outputSchema?: ReviewOutputSchemaLike
-  [key: string]: unknown
-}
-
-/** I-5 (v37): the platform `SubagentResult` fields the review pipeline reads —
- * `stopReason`/`diagnostic` carry the failure taxonomy the no-structured-plan branch
- * logs, so the type states them instead of the branch re-asserting the shape. */
-interface SubagentResultLike {
-  structured?: unknown
-  diagnostic?: string
-  stopReason: string
-}
-
-interface SubagentLike {
-  /** I-5 (v37): `spawn` is the one provider this pipeline starts (platform default). */
-  start(name: 'spawn', request: SubagentStartRequestLike): Promise<{
-    result: Promise<SubagentResultLike>
-    /** I-5 (v37): required, as the platform declares it — every exit path awaits it. */
-    dispose(): Promise<void>
-    /** The published in-process child when the provider runs locally (own session). */
-    localAgent?: { session: Session }
-  }>
-}
-
-// P3 (v16): the interface was accidentally declared TWICE (verbatim copies —
-// TS declaration merging silently allowed it). Merged back to one. The
-// v15 "use the real upstream type" intent stays a documented anchor instead:
-// the upstream `SubagentRun.localAgent` type is not importable from the
-// mirror's pinned tree, so this structural view remains.
-// P2-13 (v15) VERSION ANCHOR: `localAgent` is upstream `SubagentRun.localAgent`
-// (subagent/src/types.ts) narrowed from `Agent | undefined` to
-// `{ session: Session } | undefined` — we read only `.session`. Upstream
-// documents "local runs always carry a session"; if a future upstream allows a
-// session-less local handle, this type will NOT catch it (re-verify on every
-// upstream bump).
 interface MemoryLike {
   applyBatch(target: 'memory' | 'user', operations: unknown[]): Promise<{ ok: boolean; message: string }>
 }
@@ -454,6 +399,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     throw new Error('dsh-evolution prompt bundle integrity check failed; refusing to schedule review work')
   }
   const config = clampReviewConfig(rawConfig, ctx)
+  // W5 G3-S3: ONE execution path for both review channels; the channel is fiber-owned (HMR safe).
+  const reviewChannel = createSubagentChannel(ctx)
   // E-7 (v18) → V27 G2.4 (M-08): canonical `root` only; the expired
   // `skillsRoot` alias fails the load instead of being silently ignored.
   assertSkillsRootAliasRetired(rawConfig)
@@ -524,6 +471,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // the rollback path. Accepted + documented (plan v20 C-3①); the same
   // statement lives on evolution-curator's acquireMutex.
   let reviewInFlight = false
+  /** W5 G3-S3: capability-missing is warned once per plugin instance (the error signal is per trigger). */
+  let channelUnavailableWarned = false
   const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
   /**
@@ -1169,63 +1118,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // abandoned op may still land WITHOUT any record, and the fallback inject
   // re-opens the concurrent-writer window until its IO settles (bounded by
   // the underlying IO error handling). The catch below warns explicitly.
-  // S2-6 (FLOW1-1): the platform's abort is not guaranteed to settle the run
-  // handle. `run.result` / `run.dispose` used to be awaited WITHOUT a bound, so
-  // a handle that never settles after the abort left `reviewInFlight` set for
-  // the process lifetime: every later turn deferred instead of reviewing, the
-  // deferred queue never drained, and nothing said so. The watchdog gives the
-  // handle one more margin — capped by the review timeout, so a short test
-  // budget stays short — and its rejection carries REVIEW_SETTLE_TIMEOUT so the
-  // catch below can emit review-error for exactly this case.
-  // PLAN S1.1 (2026-09-16): the budget used to be min(reviewTimeoutMs,
-  // REVIEW_SETTLE_MARGIN_MS) armed AT the watchdog call — the grace began
-  // immediately, so under the default 120s timeout every real review slower
-  // than 5s was killed as unsettled and the whole subagent channel degraded to
-  // inject. The run's deadline is the `AbortSignal.timeout(reviewTimeoutMs)`
-  // handed to `subagents.start` below, which starts counting at that call —
-  // the same anchor the `run.result` watchdog arms at (right after start()
-  // resolves) — so the result budget must cover the full timeout FIRST and
-  // only then the grace.
-  // PLAN-R2 P2-2 (2026-09-16): the two arm points no longer share one budget.
-  // `run.dispose` arms AFTER the result settled — the review timeout is
-  // already behind it — so its budget is the grace ALONE
-  // (min(REVIEW_SETTLE_MARGIN_MS, reviewTimeoutMs)). The SHARED budget of this
-  // batch's FIRST S1.1 revision re-armed a fresh timeout+grace window at dispose
-  // time, and a hung dispose held the single-flight flag for ~two minutes under
-  // the default timeout. That intermediate form never shipped: 0.3.82's
-  // released form was already the 5s margin alone, so relative to the published
-  // baseline this branch only corrects the error message (review D6);
-  // its error message also dropped the "after the review timeout" anchor,
-  // which is false at that arm point.
-  // PLAN-R2 P2-1 (2026-09-16): the result budget is capped at Node's 32-bit
-  // timer ceiling — a reviewTimeoutMs in (MAX_TIMER_DELAY_MS - margin,
-  // MAX_TIMER_DELAY_MS] passes both the schema and the assembly clamp, and
-  // the uncapped sum folds setTimeout to 1ms, killing EVERY review as
-  // unsettled the moment the watchdog armed. The cap arms at the ceiling and
-  // warns once per mount.
-  let settleBudgetCapWarned = false
-  const resultSettleBudgetMs = (): number => {
-    const budget = config.reviewTimeoutMs + Math.min(REVIEW_SETTLE_MARGIN_MS, config.reviewTimeoutMs)
-    if (budget <= MAX_TIMER_DELAY_MS) return budget
-    if (!settleBudgetCapWarned) {
-      settleBudgetCapWarned = true
-      ctx.logger.warn(`dsh-evolution-review: reviewTimeoutMs ${config.reviewTimeoutMs}ms plus the settle margin exceeds the 32-bit timer delay ceiling (${MAX_TIMER_DELAY_MS}ms) — the settle watchdog arms at the ceiling`)
-    }
-    return MAX_TIMER_DELAY_MS
-  }
-  const disposeSettleBudgetMs = (): number => Math.min(REVIEW_SETTLE_MARGIN_MS, config.reviewTimeoutMs)
-  const withSettleWatchdog = <T>(promise: Promise<T>, label: string, budgetMs: number, overdue: (totalMs: number) => string): Promise<T> =>
-    new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        const error = new Error(`dsh-evolution-review: ${label} ${overdue(budgetMs)} — abandoning the handle`)
-        error.name = REVIEW_SETTLE_TIMEOUT
-        reject(error)
-      }, budgetMs)
-      promise.then(
-        (value) => { clearTimeout(timer); resolve(value) },
-        (error: unknown) => { clearTimeout(timer); reject(error instanceof Error ? error : new Error(String(error))) },
-      )
-    })
 
   /**
    * T3-09/A37: the ONE abort channel for this fiber's long work.
@@ -1310,8 +1202,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
   async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean | 'deferred' | 'dropped'> {
     if (params().reviewMode === 'inject') return false
-    const subagents = ctx.get('subagents') as SubagentLike | undefined
-    if (!subagents) return false
+    // W5 G3-S3: explicit capability gate. Unavailable is NOT silently swallowed: the operator
+    // gets one warn per plugin instance plus the durable review-error signal, and the caller
+    // falls back to the synchronous inject path.
+    const channelState = reviewChannel.state
+    if (channelState.kind !== 'available') {
+      if (!channelUnavailableWarned) {
+        channelUnavailableWarned = true
+        ctx.logger.warn('dsh-evolution-review: subagent channel unavailable (' + channelState.code + ': ' + channelState.reason + ') — reviews fall back to the inject path until the capability returns')
+      }
+      try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
+        ctx.logger.warn('dsh-evolution-review: review-error emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
+      }
+      return false
+    }
     // 0.3.18 (E-19) single-flight: another review is running (the window can
     // be 120s). The review still happens on THIS turn, just never concurrently
     // with a subagent.
@@ -1383,18 +1287,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // only place the answer exists, so the list is passed through unchanged;
       // a name the child cannot restrict is the platform's own rejection and
       // the caller's existing fallback owns it.
-      const registry = ctx.get('tools') as { get(name: string): unknown } | undefined
+      // W5 G3-S3: no scope-less tool probing — the CHILD preset owns the visible surface and
+      // the restricted-preset/restrictor path validates the allow set where it is actually applied.
       const requestedReviewTools = config.reviewToolAllow ?? []
-      if (requestedReviewTools.length > 0) {
-        if (registry === undefined) {
-          ctx.logger.warn('dsh-evolution-review: tools service not mounted — the review subagent tool allow-list was not probed; passing it through unchanged')
-        } else {
-          const notInGlobalLayer = requestedReviewTools.filter(name => registry.get(name) == null)
-          if (notInGlobalLayer.length > 0) {
-            ctx.logger.warn(`dsh-evolution-review: reviewToolAllow name(s) ${notInGlobalLayer.map(name => `"${name}"`).join(', ')} are absent from the GLOBAL tool layer — passing them through unchanged (a preset-mounted tool is invisible to a scope-less lookup)`)
-          }
-        }
-      }
       // v32 REV-06(b): snapshot the tree hashes BEFORE the subagent runs —
       // the plan is authored against this state; executePlan refuses a
       // full-content update whose target drifted while the review ran.
@@ -1413,66 +1308,61 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // 0.2.x: the boundary complement comes from the family's evolutionEvidence projection
       // (evidence.ts keeps the pure reader and the one classification table both paths share).
       const substantiveEvidenceSeqs = sessionEvidenceIndex(ctx, session)
-      const run = await subagents.start('spawn', {
-        label: 'dsh-evolution-review',
-        prompt: [{ type: 'text', text: reviewText }],
+      // W5 G3-S3: ONE execution path. The channel owns the capability self-check, the restricted
+      // preset ensure/registration, activation, the timeout/abort composition and exactly-one
+      // dispose; this pipeline only maps the OUTCOME (no watchdog, no localAgent probe, no
+      // legacy subagents.start fallback).
+      const outcome = await reviewChannel.run<Set<string>>({
         parent: agent,
-        // T3-09/A37: the deadline AND this fiber's lifetime — an unloaded plugin must not keep a
-        // subagent running against a session nobody owns any more.
-        signal: AbortSignal.any([AbortSignal.timeout(config.reviewTimeoutMs), fiberAbort.signal]),
+        label: 'dsh-evolution-review',
+        // C-07: the plan-persona text moves into the task prompt (the 0.2.1 request plane no
+        // longer carries persona; the restricted preset is the tool/authority carrier).
+        promptText: reviewText + '\n\n' + reviewPrompt(kind, 'plan'),
+        kind: 'reviewer',
+        allow: requestedReviewTools,
+        outputSchema: REVIEW_OUTPUT_SCHEMA,
         maxDepth: config.reviewMaxDepth,
         agentOptions,
-        // M-2 (v3 audit): the subagent channel mounts only the read-only
-        // `skill` tool — the plan variant of the persona states the channel
-        // limit (deliverable = plan, never narrated actions) instead of the
-        // operative wording that contradicts the tool filter.
-        persona: reviewPrompt(kind, 'plan'),
-        toolFilter: { allow: requestedReviewTools },
-        // (v33 R3-F2: the plan prompt's CHANNEL note hardcodes 'read-only skill
-        // tool, no skill_manage/memory' — keep reviewToolAllow aligned with
-        // that claim or the persona contradicts the actual mount.)
-        // V8-01 (0.3.45): the single-sourced constant — `'json'` DSL values
-        // in items would be rejected by the upstream raw-schema boundary.
-        outputSchema: REVIEW_OUTPUT_SCHEMA,
+        timeoutMs: config.reviewTimeoutMs,
+        signal: fiberAbort.signal,
+        // Read-before-write evidence window: the child session is readable after the result
+        // settles and before the channel disposes the activation.
+        afterResult: (child) => {
+          const childSession = (child as { session?: Session }).session
+          return childSession === undefined ? new Set<string>() : new Set<string>(sessionReadNames(ctx, childSession) ?? [])
+        },
       })
-      // Read-before-write must see what the REVIEW subagent itself loaded: it
-      // runs in its own session, and the parent session's events never contain
-      // its `skill` calls. Read the child session after the run settles, while
-      // the try/finally below still owns it (the disposer runs in the finally,
-      // so capture MUST precede every disposal path).
-      // Everything after start() sits in a try/finally so the child run is
-      // disposed on every exit path (success, timeout, validation throw).
-      try {
-        const result = await withSettleWatchdog(run.result, 'subagent review result', resultSettleBudgetMs(), total =>
-          `did not settle within ${Math.max(0, total - config.reviewTimeoutMs)}ms after the review timeout (watchdog total ${total}ms)`)
-        if (!result.structured) {
-          // E-59c: a started subagent that produced no structured plan is NOT a
-          // success — the review never happened, so surface review-error and
-          // fall through to the synchronous inject path (caller sees false).
-          // V5-19 (0.3.31): the error signal is inside a protection domain — a
-          // throwing listener must not escape the failure path itself.
-          try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
-            ctx.logger.warn(`dsh-evolution-review: review-error emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-          }
-          // OPT-17 (2026-09): carry the upstream failure taxonomy — a refusal
-          // or a token-ceiling stop is a different operator problem from a
-          // schema miss, and this failure path always falls through to the
-          // synchronous inject re-review (a second full review), so the log
-          // must say WHY the child produced nothing.
-          // I-5 (v37): stopReason/diagnostic are on the declared result type now, so the
-          // failure taxonomy needs no second assertion; the typeof test still guards the
-          // runtime value (a non-string from an out-of-process provider must not print raw).
-          const stopDetail = typeof result.stopReason === 'string' ? result.stopReason : undefined
-          const diagDetail = typeof result.diagnostic === 'string' ? result.diagnostic : undefined
-          ctx.logger.warn(`dsh-evolution-review: review subagent returned no structured plan${stopDetail !== undefined ? ` (stopReason=${stopDetail}${diagDetail !== undefined ? `; diagnostic=${diagDetail}` : ''})` : ''}`)
-          return false
+      if (outcome.kind === 'aborted') {
+        // A timeout/fiber abort loses this turn's review; the caller falls back to inject, so the
+        // observable signal is the same one the removed watchdog used to emit.
+        try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
+          ctx.logger.warn('dsh-evolution-review: review-error emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
         }
-        // v3-round self-check: collect AFTER the subagent finished so its own
-        // `skill` reads are visible to read-before-write (session events of
-        // the child never reach the parent; the child session must be read
-        // before dispose).
-        const childReads = run.localAgent ? (sessionReadNames(ctx, run.localAgent.session) ?? new Set<string>()) : new Set<string>()
-        const plan: unknown = result.structured
+        return false
+      }
+      if (outcome.kind === 'unavailable') {
+        if (!channelUnavailableWarned) {
+          channelUnavailableWarned = true
+          ctx.logger.warn('dsh-evolution-review: subagent channel unavailable (' + outcome.code + ': ' + outcome.reason + ') — reviews fall back to the inject path until the capability returns')
+        }
+        try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
+          ctx.logger.warn('dsh-evolution-review: review-error emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
+        }
+        return false
+      }
+      if (outcome.kind === 'no-structured') {
+        try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
+          ctx.logger.warn('dsh-evolution-review: review-error emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
+        }
+        const stopDetail = typeof outcome.stopReason === 'string' ? outcome.stopReason : undefined
+        const diagDetail = typeof outcome.diagnostic === 'string' ? outcome.diagnostic : undefined
+        ctx.logger.warn('dsh-evolution-review: review subagent returned no structured plan' + (stopDetail !== undefined ? ' (stopReason=' + stopDetail + (diagDetail !== undefined ? '; ' + diagDetail : '') + ')' : ''))
+        return false
+      }
+      // v3-round self-check: the channel captured the child session before disposal (session
+      // events of the child never reach the parent, so this is the only evidence window).
+      const childReads = outcome.evidence ?? new Set<string>()
+      const plan: unknown = outcome.structured
         const policyFingerprint = fingerprintPolicy(snapshot)
         const validation = validateEvolutionPlan(plan as EvolutionPlan, {
           sessionSeq: sessionSeqAtPlanTime,
@@ -1622,45 +1512,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             : executed.failedOps[0] !== undefined ? { executionError: executed.failedOps[0] } : {},
         })
         return true
-      } finally {
-        // Dispose on EVERY exit (rc.42 audit P1-3): a timed-out / aborted run
-        // (result rejects via the start signal) previously skipped dispose and
-        // leaked the child session. Dispose failures stay observable without
-        // masking the pipeline error that caused the exit.
-        try {
-          // S2-6: bounded too — a dispose that never settles would hang the
-          // finally itself and leave reviewInFlight set.
-          // PLAN-R2 P2-2 (2026-09-16): grace-ONLY budget — this arm point
-          // starts after the result settled, so the review timeout is already
-          // behind it and the result budget would re-arm a fresh
-          // timeout+grace window here (~two minutes held at the default).
-          await withSettleWatchdog(run.dispose(), 'subagent dispose', disposeSettleBudgetMs(), total =>
-            `did not settle within ${total}ms`)
-        } catch (disposeError) {
-          ctx.logger.warn(`dsh-evolution-review: subagent dispose failed: ${disposeError instanceof Error ? disposeError.message : String(disposeError)}`)
-        }
-      }
+
     } catch (error) {
       // A review pipeline failure must not crash the turn, but it should be
       // visible. Log the reason so a silent "review never fires" is debuggable,
       // and fall through to the synchronous inject path (caller returns false).
       ctx.logger.warn(`dsh-evolution-review: subagent review failed: ${error instanceof Error ? error.message : String(error)}`)
-      // S2-6 (FLOW1-1): the watchdog path is the one failure that must be
-      // visible as a review-error — the platform never settled the handle, so
-      // this turn's review is lost and the caller falls back to inject.
-      if (error instanceof Error && error.name === REVIEW_SETTLE_TIMEOUT) {
-        try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
-          ctx.logger.warn(`dsh-evolution-review: review-error emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-        }
-      }
-      // v21 (R-1): a plan-execution timeout abandons the write leg mid-flight —
-      // the result notice and plan-applied emit live AFTER the awaited call
-      // and never run for it. Say so: the abandoned op may still land WITHOUT
-      // an audit record while the fallback inject (caller side) is already
-      // writing; reconcile by hand if late writes show up.
-      if (error instanceof Error && error.message.includes('plan execution timed out')) {
-        ctx.logger.warn('dsh-evolution-review: plan execution abandoned on timeout — late writes ARE reported to the model as they land (S2-10) but still have NO plan-applied record and race the fallback inject; inspect the skill tree and usage sidecar')
-      }
+      // W5 G3-S3: watchdog-specific failure handling is gone — the channel maps timeout/abort
+      // and no-structured before returning; whatever still throws here is a pipeline defect.
       return false
     } finally {
       reviewInFlight = false

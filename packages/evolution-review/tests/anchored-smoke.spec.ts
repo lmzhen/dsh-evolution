@@ -15,6 +15,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import { isPresent, SkillLibrary, contentHash, loadUsage, nodeEvolutionIo, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 const anchoredEntry = fileURLToPath(new URL('../../test-support/anchored-standard/tool-bootstrap.mjs', import.meta.url))
 const Anchored = await import(pathToFileURL(anchoredEntry).href) as { apply(ctx: Context, config?: unknown): Promise<void> | void }
@@ -34,7 +35,7 @@ describe('anchored-standard review smoke', () => {
     })
 
     let capturedRequest: unknown
-    ctx.provide('subagents', {
+    const channelFixture = provideChannel(ctx, {
       start: async (_name: string, request: unknown) => {
         capturedRequest = request
         return {
@@ -86,7 +87,14 @@ describe('anchored-standard review smoke', () => {
     // own inheritable set). Dropping the name here is what produced a tool-less review.
     const registry = ctx.get('tools') as { get(name: string): unknown } | undefined
     expect(registry?.get('skill') == null).toBe(true)
-    expect(request?.toolFilter).toEqual({ allow: ['skill'] })
+    // W5 G3-S3: the request no longer carries persona/toolFilter; the restricted-preset row carries
+    // the allow set and the child selects it by id. The legacy skip-plan check stays.
+    expect(request?.agentPreset).toBe('evolution-reviewer-readonly')
+    expect(Object.hasOwn(request ?? {}, 'toolFilter')).toBe(false)
+    expect(Object.hasOwn(request ?? {}, 'persona')).toBe(false)
+    const reviewerDefinition = channelFixture.registered.find((value) => (value as { id?: string }).id === 'evolution-reviewer-readonly')
+    const restrictorRow = (reviewerDefinition as { plugins?: Array<{ config?: unknown }> } | undefined)?.plugins?.at(-1)
+    expect(restrictorRow?.config).toEqual({ allow: ['skill'], presetId: 'evolution-reviewer-readonly' })
     // No reviewProvider config: the subagent inherits the deployment default
     // route instead of a hardcoded provider name.
     expect((request?.agentOptions as Record<string, unknown> | undefined)?.provider).toBeUndefined()
@@ -140,7 +148,7 @@ describe('anchored-standard review smoke', () => {
       }]]), nodeEvolutionIo())
 
       let capturedRequest: unknown
-      ctx.provide('subagents', {
+      provideChannel(ctx, {
         start: async (_name: string, request: unknown) => {
           capturedRequest = request
           return {
@@ -283,7 +291,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
           evidence: [{ event_seq: 1 }],
         }],
       }
-      ctx.provide('subagents', {
+      provideChannel(ctx, {
         // v32 REV-06(b): the stub plays the CONCURRENT WRITER —while the
         // review subagent "runs", it edits the target skill. The plan (authored
         // against the pre-run snapshot) must then be refused as stale.
@@ -359,7 +367,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
             : { maxOpsPerPlan: 10, protectedSkillNames: ['guarded-skill'] as readonly string[], skillContentChars: 100_000 }
         },
       })
-      ctx.provide('subagents', {
+      provideChannel(ctx, {
         start: async () => {
           return {
             result: Promise.resolve({
@@ -457,7 +465,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
           { action: 'update', name, content: second, evidence: [{ event_seq: 1 }] },
         ],
       }
-      ctx.provide('subagents', {
+      provideChannel(ctx, {
         start: async (_n: string, request: unknown) => {
           capturedRequest = request
           // The concurrent writer lands while the review subagent is "running"
@@ -579,8 +587,8 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
 // I-6 (v37): the platform rejects a `tools.restrict()` naming a tool the registry does
 // not hold, and that rejection used to demote the whole review to the inject channel
 // with only a generic pipeline warning. The allow list is probed before it is listed.
-describe('review tool filter probe (I-6)', () => {
-  it('an unregistered allow-list tool is dropped with an explicit warn instead of failing the spawn', { timeout: 20_000 }, async () => {
+describe('review allow-list transport (I-6 -> W5 G3-S3)', () => {
+  it('the configured allow list is carried unchanged into the restricted preset row', { timeout: 20_000 }, async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
     if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
@@ -597,7 +605,7 @@ describe('review tool filter probe (I-6)', () => {
       output: { schema: { type: 'object', properties: {} }, render: () => [] },
     } as unknown as Parameters<typeof registry.register>[0])
     let capturedRequest: unknown
-    ctx.provide('subagents', {
+    const channelFixture = provideChannel(ctx, {
       start: async (_name: string, request: unknown) => {
         capturedRequest = request
         return { result: Promise.resolve({ structured: null }), dispose: async () => {} }
@@ -625,13 +633,15 @@ describe('review tool filter probe (I-6)', () => {
       await new Promise(resolve => setTimeout(resolve, 25))
     }
     expect(capturedRequest).toBeDefined()
-    const filter = (capturedRequest as { toolFilter?: { allow?: string[] } }).toolFilter
-    // I-6 correction (v39): the spawn carries the CONFIGURED list unchanged — neither
-    // name is dropped (a scope-less probe cannot prove either is un-restrictable), and
-    // the name missing from the global layer is reported with a warn that names it.
-    expect(filter?.allow).toEqual(['skill', 'not-a-registered-tool'])
-    expect(warns.some(line => line.includes('GLOBAL tool layer'))).toBe(true)
-    expect(warns.some(line => line.includes('not-a-registered-tool'))).toBe(true)
+    // W5 G3-S3: no scope-less tool probing exists any more. The configured allow set is carried
+    // UNCHANGED into the restricted preset row (the child scope is the only place the platform
+    // evaluates it); a name the child cannot satisfy is rejected there as E-324, never silently
+    // dropped by a global-layer probe.
+    const request = capturedRequest as Record<string, unknown>
+    expect(Object.hasOwn(request, 'toolFilter')).toBe(false)
+    const composed = channelFixture.registered.find((value) => (value as { id?: string }).id === 'evolution-reviewer-readonly')
+    const restrictorRow = (composed as { plugins?: Array<{ config?: unknown }> } | undefined)?.plugins?.at(-1)
+    expect(restrictorRow?.config).toEqual({ allow: ['not-a-registered-tool', 'skill'], presetId: 'evolution-reviewer-readonly' })
     disposeKnown()
   })
 })

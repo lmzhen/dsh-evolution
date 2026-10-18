@@ -11,6 +11,7 @@ import { SessionFormatUnsupportedError } from '@deepseek-ai/dsh-session-persiste
 import type { EvolutionPlanAppliedEvent, EvolutionReviewScheduledEvent } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 /**
  * A-line P0-1 acceptance (rc.42): evolution review activity must never enter
@@ -46,7 +47,7 @@ describe('review events never poison the session log (P0-1, rc.42)', () => {
     ctx.on('evolution/plan-applied', (event) => { applied.push(event) })
 
     ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {

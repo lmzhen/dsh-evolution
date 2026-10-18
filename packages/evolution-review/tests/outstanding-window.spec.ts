@@ -23,6 +23,7 @@ import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { NATIVE_CALL_EVENT } from '@deepseek-ai/dsh-evolution-core'
 import { emitTurnBoundary, projectable } from '../../test-support/projection-session.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 interface WindowFixture {
   rows: { turn: unknown[]; step: unknown[] }
@@ -86,7 +87,7 @@ async function mountWindow(options: { seededTurn?: unknown[] } = {}): Promise<Wi
     inject: (message: unknown): void => { rows.step.push(message); collect(message); emitQueue('agent/inbox/inserted', { message }) },
   } as unknown as Agent
   await ctx.agents.register(agent)
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async () => ({
       result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'ok' } }),
       dispose: async () => {},

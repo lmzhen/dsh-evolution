@@ -7,6 +7,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as Review from '../src/index.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 const REVIEWER = 'I prefer concise answers and want you to remember that preference. '.repeat(6)
 
@@ -17,7 +18,7 @@ describe('evolution-review lifecycle guards', () => {
     if (ctx.get('sessionProjections') === undefined) new SessionProjectionRegistry(ctx) // 夹具：投影服务注册到本 ctx（幂等）
 
     let disposed = 0
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         // Emulates a timed-out / aborted child: the run result rejects.
         result: Promise.reject(new Error('simulated review timeout')),

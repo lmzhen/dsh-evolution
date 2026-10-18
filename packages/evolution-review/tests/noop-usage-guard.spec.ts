@@ -14,6 +14,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import { SkillLibrary, loadUsage, nodeEvolutionIo, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 import * as Review from '../src/index.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 // v43 audit (FLOW4-2 / D-1): the review's approval-disabled DIRECT write path
 // called skillUsage.record(name, 'patch') on any ok result — including a NO-OP
@@ -51,7 +52,7 @@ describe('review direct-write usage accounting', () => {
       }]))
       await saveUsage(library.root, seed as never, nodeEvolutionIo())
 
-      ctx.provide('subagents', {
+      provideChannel(ctx, {
         start: async () => ({
           result: Promise.resolve({
             structured: {

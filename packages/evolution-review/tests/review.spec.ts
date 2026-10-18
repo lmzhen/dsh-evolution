@@ -12,6 +12,7 @@ import { mutableVol, plainValue, vol } from '../../test-support/volatile-config.
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-evolution-core'
+import { provideChannel } from './support/channel-fixture.ts'
 
 describe('evolution-review', () => {
   it('defaults review subagent tools to the plain skill tool only (E-59e: no discovery pair on this platform)', () => {
@@ -73,7 +74,7 @@ describe('evolution-review', () => {
   it('E-19: a deferred review spawns once per completed boundary and never concurrently (0.3.18 + 0.3.39)', async () => {
     const { ctx, emitEnd, releaseStart } = await mountReviewFixture()
     let starts = 0
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => {
         starts += 1
         await new Promise<void>((resolve) => { releaseStart.current = resolve })
@@ -140,7 +141,7 @@ describe('evolution-review', () => {
     const scheduled: string[] = []
     ctx.on('evolution/review-error', event => errors.push(event.sessionId))
     ctx.on('evolution/review-scheduled', event => scheduled.push(event.sessionId))
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({ structured: null }),
         dispose: async () => {},
@@ -169,7 +170,7 @@ describe('evolution-review', () => {
     const { ctx, emitEnd } = await mountReviewFixture({ skillArguments: 'null' })
     const applied: string[] = []
     ctx.on('evolution/plan-applied', event => applied.push(event.sessionId))
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'no-op' } }),
         dispose: async () => {},
@@ -189,7 +190,7 @@ describe('evolution-review', () => {
     const { ctx, session, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
     const scheduled: Array<{ sessionId: string; channel?: string | undefined }> = []
     ctx.on('evolution/review-scheduled', event => scheduled.push(event))
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => { throw new Error('subagent spawn failed') },
     })
     ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
@@ -220,7 +221,7 @@ describe('evolution-review', () => {
         injected.push(text)
       },
     })
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => {
         starts += 1
         throw new Error('subagent spawn failed')
@@ -244,7 +245,7 @@ describe('evolution-review', () => {
   it('T3-09/A37: the review subagent runs under the fiber abort channel — unloading aborts it', async () => {
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
     let captured: AbortSignal | undefined
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async (_kind: string, options: { signal?: AbortSignal }) => {
         captured = options.signal
         // Never resolves: the leg stays in flight so the abort can be observed on it.
@@ -281,7 +282,7 @@ describe('evolution-review', () => {
       vi.spyOn(fixture.ctx.logger, 'warn').mockImplementation((...args: unknown[]) => { logs.push(args.map(value => String(value)).join(' ')) })
       let release: (value: unknown) => void = () => {}
       const held = new Promise((resolve) => { release = resolve })
-      fixture.ctx.provide('subagents', { start: async () => ({ result: held, dispose: async () => {} }) })
+      provideChannel(fixture.ctx, { start: async () => ({ result: held, dispose: async () => {} }) })
       fixture.ctx.provide('memory', {
         applyBatch: async () => {
           writes.push('memory')
@@ -332,7 +333,7 @@ describe('evolution-review', () => {
     const errors: string[] = []
     ctx.on('evolution/plan-applied', event => applied.push(event.sessionId))
     ctx.on('evolution/review-error', event => errors.push(event.sessionId))
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {
@@ -370,7 +371,7 @@ describe('evolution-review', () => {
   ): Promise<Array<Record<string, unknown>>> => {
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
     const applied: Array<Record<string, unknown>> = []
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {
@@ -413,7 +414,7 @@ describe('evolution-review', () => {
     const applied: Array<{ memoryApplied: number; skillApplied: number; executionError?: string; executionFailures?: number }> = []
     const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
     ctx.on('evolution/plan-applied', event => applied.push(event as never))
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {
@@ -494,7 +495,7 @@ describe('evolution-review', () => {
       // V5-19: the event carries the execution-failure dimension (abort reason).
       appliedEvents.push(event as unknown as { executionFailures?: number; executionError?: string })
     })
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {
@@ -578,7 +579,7 @@ describe('evolution-review', () => {
     const { ctx, emitEnd } = await mountReviewFixture()
     let disposed = 0
     let starts = 0
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => {
         starts += 1
         // Turn 1 aborts; turn 2 succeeds — a stale in-flight guard would block
@@ -817,7 +818,7 @@ it('V6-24: a zero-landing plan still notifies the model with the reasons (0.3.36
       injected.push(text)
     },
   })
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async () => ({
       result: Promise.resolve({
         structured: {
@@ -907,7 +908,7 @@ it('0.3.74: the DEFAULT review mode injects into the parent instead of spawning 
     ],
   })
   // A recording subagents service proves the default path never spawns a child.
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async (kind: string) => {
       spawns.push(kind)
       return { result: Promise.resolve({}) }
@@ -1094,7 +1095,7 @@ it('0.3.48: a throwing review-scheduled listener cannot skip the counter reset (
   })
   ctx.on('evolution/review-scheduled', () => { throw new Error('listener boom') })
   const warnSpy = vi.spyOn(ctx.logger, 'warn')
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async () => ({
       result: Promise.resolve({
         structured: { memoryOps: [{ target: 'memory', action: 'add', facts: 'f', evidence: [{ event_seq: 0 }] }], skillOps: [], summary: 'ok' },
@@ -1125,7 +1126,7 @@ it('0.3.42: subagent-success result notice wakes via followup, not inject (V7-03
     onFollowup: (message) => { followups.push(message) },
     onInject: (message) => { injects.push(message) },
   })
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async () => ({
       result: Promise.resolve({
         structured: { memoryOps: [{ target: 'memory', action: 'add', facts: 'f1', evidence: [{ event_seq: 0 }] }], skillOps: [], summary: 'ok' },
@@ -1289,7 +1290,7 @@ async function mountTwoSessions() {
 
   let releaseY!: (value: { text: string; structured: null }) => void
   const yResult = new Promise<{ text: string; structured: null }>((resolve) => { releaseY = resolve })
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async () => ({ result: yResult, dispose: async () => {} }),
   })
 
@@ -1385,7 +1386,7 @@ it('D (phase 1): evidence citing only a bookkeeping frame is REPORTED — the pl
   const { ctx, emitEnd } = await mountReviewFixture({ seq: 3, events })
   const applied: Array<{ evidenceClassReports?: number | undefined; memoryApplied: number }> = []
   ctx.on('evolution/plan-applied', event => applied.push(event))
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async () => ({
       result: Promise.resolve({
         structured: {
@@ -1422,7 +1423,7 @@ it('D: a log whose frames carry no seq leaves the class rule silent (cannot clas
   const { ctx, emitEnd } = await mountReviewFixture({ events: [{ type: 'turn/start', data: { turn: 1 } }] })
   const applied: Array<{ evidenceClassReports?: number | undefined; memoryApplied: number }> = []
   ctx.on('evolution/plan-applied', event => applied.push(event))
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async () => ({
       result: Promise.resolve({
         structured: {

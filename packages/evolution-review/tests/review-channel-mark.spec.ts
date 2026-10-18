@@ -21,6 +21,7 @@ import { clearReviewChannel, isReviewChannelSession } from '@deepseek-ai/dsh-evo
 import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 /** Default thresholds (3 tool calls / 200 user chars) reached by the fixture. */
 const SURFACE = [
@@ -114,7 +115,7 @@ describe('review channel mark (S2.2, v37 P1-2)', () => {
   it('the subagent path delivers a result NOTICE, which never marks', async () => {
     const delivered: unknown[] = []
     const { ctx, session, emitEnd } = await fixture({ reviewMode: 'subagent', onDelivery: message => delivered.push(message) })
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'no-op' }, stopReason: 'completed' }),
         dispose: async () => {},

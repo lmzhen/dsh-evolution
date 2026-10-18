@@ -13,6 +13,7 @@ import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 /**
  * V10-10 (P2-11) + V10-13 (P2-9) regression pins:
@@ -209,7 +210,7 @@ describe('V10-11 (P2-7): review skillsRoot config channel', () => {
   it('a review skill create lands in the configured skillsRoot, not the default tree', async () => {
     const skillsRoot = await tempRoot('v10-review-root-')
     const { ctx, emitEnd } = await mountReviewFixture()
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {

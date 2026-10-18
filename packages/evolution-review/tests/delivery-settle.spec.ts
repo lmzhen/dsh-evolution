@@ -26,6 +26,7 @@ import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 interface Fixture {
   ctx: Context
@@ -82,7 +83,7 @@ async function mount(labels: string[]): Promise<Fixture> {
   }
   let starts = 0
   const hangingRun = { result: new Promise(() => {}), dispose: async () => {} }
-  ctx.provide('subagents', { start: async () => { starts += 1; return hangingRun } })
+  provideChannel(ctx, { start: async () => { starts += 1; return hangingRun } })
   ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
   ctx.provide('evolutionPolicy', {
     get: () => ({

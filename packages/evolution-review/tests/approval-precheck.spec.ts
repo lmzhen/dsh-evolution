@@ -9,6 +9,7 @@ import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state'
 import * as Review from '../src/index.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 /**
  * P1-9 (rc.44 plan) — CORRECTED wording (P2-13, v11): with approval ENABLED
@@ -50,7 +51,7 @@ describe('review approval pre-check (P1-9)', () => {
         return { ok: true, message: 'ok' }
       },
     })
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {

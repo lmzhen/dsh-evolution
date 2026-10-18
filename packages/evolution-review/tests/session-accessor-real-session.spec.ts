@@ -14,6 +14,7 @@ import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import EvolutionCurator from '@deepseek-ai/dsh-evolution-curator'
 import * as Review from '../src/index.ts'
 import { tempHome } from '../../test-support/temp-home.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 /**
  * G0.3 (v33, platform 0.1.5): the accessor migration needs a case that reads a
@@ -79,7 +80,7 @@ describe('G0.3: the migrated session accessor reads a real session log', () => {
     const applied: EvolutionPlanAppliedEvent[] = []
     ctx.on('evolution/plan-applied', (event) => { applied.push(event) })
     ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {
@@ -200,7 +201,7 @@ describe('v37 P7a: the read credit over a PTC-only session log', () => {
     const applied: EvolutionPlanAppliedEvent[] = []
     ctx.on('evolution/plan-applied', (event) => { applied.push(event) })
     ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-    ctx.provide('subagents', {
+    provideChannel(ctx, {
       start: async () => ({
         result: Promise.resolve({
           structured: {

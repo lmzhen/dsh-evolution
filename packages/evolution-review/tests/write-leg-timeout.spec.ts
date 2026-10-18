@@ -18,6 +18,7 @@ import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as Review from '../src/index.ts'
 // G4: hand-driven specs must present a session the projection registry can fold.
 import { emitSessionEvent, projectable } from '../../test-support/projection-session.ts'
+import { provideChannel } from './support/channel-fixture.ts'
 
 it('S2-10 (FLOW1-6): an op that lands after the deadline is reported to the model', { timeout: 30_000 }, async () => {
   const ctx = new Context()
@@ -41,7 +42,7 @@ it('S2-10 (FLOW1-6): an op that lands after the deadline is reported to the mode
   const agent = { id: session.id, session, inject: collect } as unknown as Agent
   ;(agent as { followup: unknown }).followup = collect
   await ctx.agents.register(agent)
-  ctx.provide('subagents', {
+  provideChannel(ctx, {
     start: async () => ({
       result: Promise.resolve({
         structured: {
