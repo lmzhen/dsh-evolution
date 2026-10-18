@@ -16,8 +16,5 @@
     {
       "path": "../../../vendor/schemastery"
     },
-    {
-      "path": "../../subagent/subagent"
-    }
   ]
 }

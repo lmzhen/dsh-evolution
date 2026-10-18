@@ -514,7 +514,7 @@ describe('runMaintain', () => {
   // future `run.dispose?.()` cannot silently stop awaiting it.
   it('I-5: a rejected subagent result still disposes the required handle exactly once', async () => {
     let disposed = 0
-    let observed: MaintainSubagentRun | undefined
+    let observed: { result: Promise<unknown>; dispose: () => Promise<void> } | undefined
     const rejecting: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),

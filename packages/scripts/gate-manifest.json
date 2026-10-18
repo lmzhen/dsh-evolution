@@ -792,6 +792,21 @@
       ]
     },
     {
+      "id": "gate-52",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-subagent-single-source.mjs packages`（G3-S6 架构守卫：家族只有**一条**子代理执行路径——业务源码不得再出现 `subagents.start(spawn)`／`withSettleWatchdog`／`.localAgent`／`toolFilter:`／`persona:`／`MaintainSubagent*`，`startActivation` 只允许在 `evolution-core/src/subagent/channel.ts`；测试夹具的 legacy 适配器不在扫描范围）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-subagent-single-source.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
