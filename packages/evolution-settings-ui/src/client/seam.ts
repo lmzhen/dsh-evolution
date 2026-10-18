@@ -43,6 +43,9 @@ export function rowConfigKey(bundle: string, rowId: string): string {
  */
 export const PENDING_CARD_KEY = 'approval-pending'
 
+/** The diagnostics card's slot key: read-only, no settings namespace (its data comes from HOST_ROUTES.diagnostics). */
+export const DIAGNOSTICS_CARD_KEY = 'diagnostics'
+
 /** Snapshot of one settings row, as the client seat reports it. */
 export interface ParamSectionSnapshot {
   status: 'loading' | 'ready' | 'unavailable'

@@ -11,7 +11,7 @@
 import { createElement, type ReactNode } from 'react'
 import { FAMILY_VERSION, PACKAGE_PURPOSE } from './generated-about.ts'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
-import { CARD_SLOT, PENDING_CARD_KEY, type SectionFace } from './seam.ts'
+import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type SectionFace } from './seam.ts'
 
 /**
  * Render the section.
@@ -37,6 +37,13 @@ export function SettingsSection(face: SectionFace): ReactNode {
       'div',
       { key: PENDING_CARD_KEY, className: 'evolution-params-group' },
       face.renderSlot(CARD_SLOT, {}, { entryKey: PENDING_CARD_KEY }),
+    ),
+    // G5/W7 S7: the diagnostics card (read-only; same view the CLI prints) sits after the staged-write
+    // window and before the parameter cards.
+    createElement(
+      'div',
+      { key: DIAGNOSTICS_CARD_KEY, className: 'evolution-params-group' },
+      face.renderSlot(CARD_SLOT, {}, { entryKey: DIAGNOSTICS_CARD_KEY }),
     ),
     ...CLIENT_PARAM_SECTIONS.map(section_ =>
       createElement(

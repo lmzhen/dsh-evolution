@@ -30,10 +30,13 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createApprovalApi } from './api.ts'
 import { CLIENT_PARAM_SECTIONS, CLIENT_ROW_SEATS } from './generated-params.ts'
 import { PendingCard, confirmModeFrom, type PendingCardFace } from './PendingCard.ts'
+import { DiagnosticsCard, type DiagnosticsCardFace } from './DiagnosticsCard.ts'
+import { createDiagnosticsApi } from './diagnostics-state.ts'
+import { FALLBACKS } from './fallbacks.generated.ts'
 import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
 import { ParamCard, type ParamCardFace } from './ParamCard.ts'
 import { RowConfigCard, type RowConfigFace } from './RowConfigCard.ts'
-import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey, type ClientSeam, type ConfigFormsSeat, type ParamSectionSource } from './seam.ts'
+import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey, type ClientSeam, type ConfigFormsSeat, type ParamSectionSource } from './seam.ts'
 import { SettingsSection } from './SettingsSection.ts'
 import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
 import { injectStyles } from './styles.ts'
@@ -166,8 +169,15 @@ export function apply(ctx: ClientContext): void {
       key: PENDING_CARD_KEY,
       inject: (): PendingCardFace => ({ t, api, confirmMode }),
     }, PendingCard)
+    // G5/W7 S7: the read-only diagnostics card — the SAME view the CLI/--json prints, fetched
+    // through the generated route client; the command face is the fallback when the data plane is absent.
+    const diagApi = createDiagnosticsApi((input, init) => fetch(input, init))
+    yield seam.slots.register({
+      name: CARD_SLOT,
+      key: DIAGNOSTICS_CARD_KEY,
+      inject: (): DiagnosticsCardFace => ({ t, api: diagApi, fallback: FALLBACKS.diagnostics }),
+    }, DiagnosticsCard)
   })
-
   // G2: the platform's per-row configuration page. Its ledger keys an entry by
   // `<bundle package name>#<row id>`, and the pairs come from the generated table (the
   // bundle roster x the registry's rows) — no hand list here. A key whose bundle is not
