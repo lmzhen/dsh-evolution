@@ -8,6 +8,7 @@
  */
 import { ROUTES } from './routes.generated.ts'
 import { failureMessage, requestJson } from './route-client.generated.ts'
+import type { RouteFailure } from './route-client.generated.ts'
 
 /** Route paths: the generated mirror of the host's HOST_ROUTES (one declaration in core). */
 export const HOST_ROUTES = ROUTES['skill-history']
@@ -134,8 +135,19 @@ export interface SkillHistoryApi {
   readonly body: (name: string, v: number) => Promise<VersionBodyRow>
 }
 
-/** A refusal the host reported, carrying its own sentence (the curator's, not ours). */
-export class SkillHistoryRefusal extends Error {}
+/**
+ * A refusal the host reported, carrying its own sentence (the curator's, not ours) and the classified
+ * four-state failure so the panel can render the shared failure block (G5/W7 S6b).
+ */
+export class SkillHistoryRefusal extends Error {
+  readonly failure: RouteFailure
+
+  constructor(failure: RouteFailure) {
+    super(failureMessage(failure))
+    this.name = 'SkillHistoryRefusal'
+    this.failure = failure
+  }
+}
 
 /**
  * Build the panel's face over one fetch implementation.
@@ -145,7 +157,7 @@ export class SkillHistoryRefusal extends Error {}
 export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHistoryApi {
   const request = async (path: string, init?: RequestInit): Promise<unknown> => {
     const answer = await requestJson<unknown>(fetchImpl, path, init)
-    if (!answer.ok) throw new SkillHistoryRefusal(failureMessage(answer.failure))
+    if (!answer.ok) throw new SkillHistoryRefusal(answer.failure)
     return answer.data
   }
   return {

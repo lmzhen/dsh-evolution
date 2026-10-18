@@ -12,7 +12,10 @@
 import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { emptyState, groupHeading, notice, panelHead, searchField, skillLine, versionRow, type Copy, type OpenKind } from './chrome.ts'
 import { DiffBody, PreviewBody, type BodyState, type DiffState } from './document.ts'
-import type { SkillRow, VersionBodyRow, VersionDiffRow, VersionsPayload, VersionRow } from './api.ts'
+import { SkillHistoryRefusal, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
+import type { RouteFailure } from './route-client.generated.ts'
+import { FailureBlock } from './states.generated.ts'
+import { FALLBACKS } from './fallbacks.generated.ts'
 import type { MarkdownWords } from './markdown.ts'
 
 /** What the panel is handed: the dictionary seat, the renderer's words, and the host's callbacks. */
@@ -37,11 +40,31 @@ interface OpenRow {
  * @param face - copy plus the data callbacks.
  * @returns the panel element.
  */
+/** Fill the generated block's `{slot}` copies with this bundle's dictionary. */
+function fillCopy(template: string, values: Readonly<Record<string, string | number>>): string {
+  return template.replace(/\{(\w+)\}/g, (match, slot: string) => {
+    const value = values[slot]
+    return value === undefined ? match : String(value)
+  })
+}
+
+/** The shared four-state failure block, spoken through this bundle's keys. */
+function failureBlock(t: (key: string) => string, failure: RouteFailure): ReactNode {
+  const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => {
+    const text = t(key)
+    return values === undefined ? text : fillCopy(text, values)
+  }
+  return FailureBlock({ failure, t: translate, fallback: FALLBACKS['skill-history'] })
+}
+
 export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const [skills, setSkills] = useState<readonly SkillRow[]>([])
   // Whether the first list read has LANDED. Without it an empty list renders the empty state while the
   // answer is still in flight, and a reader cannot tell "nothing recorded" from "not read yet" (E7).
   const [skillsLoaded, setSkillsLoaded] = useState(false)
+  // G5/W7 S6b: the panel-level failure as the classified four-state object (rendered with the shared
+  // block + the command fallback). Row-level read failures keep their inline sentences.
+  const [failure, setFailure] = useState<RouteFailure | undefined>(undefined)
   const [selected, setSelected] = useState<string | undefined>(undefined)
   const [payload, setPayload] = useState<VersionsPayload | undefined>(undefined)
   // T5-09 (S3.4): the version read needs a FAILED state of its own. `payload === undefined` covered
@@ -64,6 +87,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     setNoteError(true)
     setNoteText(face.t('error.hint') + '\n' + face.t('error') + ': '
       + (error instanceof Error ? error.message : String(error)))
+    setFailure(error instanceof SkillHistoryRefusal ? error.failure : { kind: 'server', status: 0 })
   }
 
   const succeeded = (message: string): void => {
@@ -236,6 +260,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     createElement('div', { className: 'evo-hist-main' },
       panelHead(face, refresh),
       notice(noteText, noteError),
+      failure === undefined ? null : createElement('div', { className: 'evo-hist-failure' }, failureBlock(face.t, failure)),
       // The explanation is for the screen that has nothing else on it (W12): a reader who can see
       // versions does not need to be told what a version is.
       selected === undefined
