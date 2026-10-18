@@ -214,15 +214,15 @@ describe('approval routes: the preview', () => {
 
 describe('approval routes: the browser half mirrors the host table', () => {
   it('declares the same four literals under the same keys', async () => {
-    // Read as SOURCE on purpose: the browser half cannot import this package at runtime, so the only
-    // way a rename can be caught in CI is by comparing the two textual tables (the generated client
-    // constant is the G5 artifact; until then the settings-ui copy is the mirror under test).
-    const source = readFileSync(new URL('../../evolution-settings-ui/src/client/approval-routes.ts', import.meta.url), 'utf8')
+    // Read as SOURCE on purpose: the browser half cannot import this package at runtime, so the
+    // generated client table (G5) is the shipping mirror; this spec pins it to the host table.
+    const source = readFileSync(new URL('../../evolution-settings-ui/src/client/routes.generated.ts', import.meta.url), 'utf8')
+    // The generated table is JSON-shaped (double-quoted), so compare the PATHS, not one quote style.
     for (const [key, path] of Object.entries(APPROVAL_ROUTES)) {
-      expect(source, 'the browser half has no "' + key + '" path').toContain("'" + path + "'")
+      expect(source, 'the generated client table has no "' + key + '" path').toContain(path)
     }
-    const literals = [...source.matchAll(/'\/api\/dsh-evolution\/approval\/[a-z]+'/g)].map(match => match[0].slice(1, -1))
+    const literals = [...source.matchAll(/"\/api\/dsh-evolution\/approval\/[a-z]+"/g)].map(match => match[0].slice(1, -1))
     const published = new Set<string>(Object.values(APPROVAL_ROUTES))
-    for (const literal of literals) expect(published.has(literal), 'the browser half invented ' + literal).toBe(true)
+    for (const literal of literals) expect(published.has(literal), 'the generated client table invented ' + literal).toBe(true)
   })
 })

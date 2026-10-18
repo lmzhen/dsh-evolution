@@ -66,7 +66,9 @@ export function makeSkillHealthRoutes(
       const curator = deps.getCurator()
       const view = curator?.healthView === undefined ? undefined : await curator.healthView()
       const rows = Array.isArray(view) ? toRouteRows(view as Parameters<typeof toRouteRows>[0]) : []
-      return json(200, { rows, truncated: view === undefined })
+      // W6 §3: every family route answers the SAME envelope (the shared client route-client
+      // classifies 2xx as {ok,data}); the old bare {rows,truncated} body was a second wire shape.
+      return json(200, { ok: true, data: { rows, truncated: view === undefined } })
     },
   }]
 }

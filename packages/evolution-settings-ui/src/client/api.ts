@@ -6,7 +6,8 @@
  * same way, because a refusal is a business answer the card shows as a sentence, not a transport error.
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/api
  */
-import { APPROVAL_CLIENT_ROUTES } from './approval-routes.ts'
+import { ROUTES } from './routes.generated.ts'
+import { failureMessage, requestJson, type RouteAnswer } from './route-client.generated.ts'
 
 /** One staged write, as the pending route hands it over (never the staged args). */
 export interface PendingRow {
@@ -68,17 +69,9 @@ export interface ApprovalApi {
   preview: (id: string) => Promise<ApprovalAnswer<PreviewAnswer>>
 }
 
-/** Read one JSON answer, mapping every failure onto the same refusal shape. */
-async function read<T>(doFetch: typeof fetch, path: string, init?: RequestInit): Promise<ApprovalAnswer<T>> {
-  try {
-    const response = await doFetch(path, init)
-    if (!response.ok) return { ok: false, message: 'HTTP ' + String(response.status) }
-    const body = await response.json() as { ok?: unknown; data?: unknown; message?: unknown }
-    if (body.ok === true) return { ok: true, data: body.data as T }
-    return { ok: false, message: typeof body.message === 'string' && body.message !== '' ? body.message : '宿主拒绝了该请求' }
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) }
-  }
+/** Flatten the shared four-state answer onto this card's historical {ok,message} surface. */
+function unwrap<T>(answer: RouteAnswer<T>): ApprovalAnswer<T> {
+  return answer.ok ? { ok: true, data: answer.data } : { ok: false, message: failureMessage(answer.failure) }
 }
 
 /**
@@ -87,15 +80,15 @@ async function read<T>(doFetch: typeof fetch, path: string, init?: RequestInit):
  * @returns the three calls the pending card makes.
  */
 export function createApprovalApi(doFetch: typeof fetch): ApprovalApi {
-  const post = (path: string, id: string): Promise<ApprovalAnswer<unknown>> =>
-    read(doFetch, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
+  const post = async (path: string, id: string): Promise<ApprovalAnswer<unknown>> =>
+    unwrap(await requestJson(doFetch, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) }))
   return {
-    pending: async status => await read<readonly PendingRow[]>(
+    pending: async status => unwrap(await requestJson<readonly PendingRow[]>(
       doFetch,
-      status === undefined ? APPROVAL_CLIENT_ROUTES.pending : APPROVAL_CLIENT_ROUTES.pending + '?status=' + status,
-    ),
-    approve: async id => await post(APPROVAL_CLIENT_ROUTES.approve, id),
-    reject: async id => await post(APPROVAL_CLIENT_ROUTES.reject, id),
-    preview: async id => await read<PreviewAnswer>(doFetch, APPROVAL_CLIENT_ROUTES.preview + '?id=' + encodeURIComponent(id)),
+      status === undefined ? ROUTES.approval.pending : ROUTES.approval.pending + '?status=' + status,
+    )),
+    approve: async id => await post(ROUTES.approval.approve, id),
+    reject: async id => await post(ROUTES.approval.reject, id),
+    preview: async id => unwrap(await requestJson<PreviewAnswer>(doFetch, ROUTES.approval.preview + '?id=' + encodeURIComponent(id))),
   }
 }

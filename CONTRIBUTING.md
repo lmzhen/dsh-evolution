@@ -20,7 +20,7 @@ stale side must never be copied back over this one.
    `D:/dsh/deepseek-harness` checkout is the stale former dev tree and is never
    a source to copy from.
 3. **Run the gate**. `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` executes
-   all 53 steps and writes one log per step plus a summary (§The gate has
+   all 54 steps and writes one log per step plus a summary (§The gate has
    the table and says which step runs in which tree).
 4. **Decide where your words live**. §Where a fact is allowed to live is the
    rule that fails a conclusion stated in two documents (N19).
@@ -53,7 +53,7 @@ cite the home (`cites`), and the machine owner that re-derives the value
 
 - Run it: `node packages/scripts/verify-doc-facts.mjs packages --strict`
 - It is also architecture rule **N19** inside `verify-arch-guards.mjs`, so the
-  53-step gate runs it on every batch; a second copy fails and names both files.
+  54-step gate runs it on every batch; a second copy fails and names both files.
 - `packages/docs/**` is gitignored: it is a source of material, never a home.
   Move the conclusion into a tracked document before citing it.
 
@@ -136,6 +136,7 @@ Run from the two trees (never reorder or rename these steps):
 | 51 | `node packages/scripts/gen-line-manifest.mjs --check`（G0/0.7 复核：床清单必须与树一致 —— 生成物陈旧即红。这条是「退役包不得残留在在册交付件里」的守卫：io-fs 于 2b.2 退役后曾长期残留在 line-manifest.json 里，而当时没有任何档位以 --check 调用生成器。CI 形态是**三段**：`gen-line-manifest`（无条件重生成）→ `test -z "$(git status --porcelain -- packages/scripts/files/line-manifest.json)"`（入库副本必须与树一致；用 porcelain 而非 diff，因为未跟踪文件对 diff 不可见，而「根本没入库」正是这条门禁要抓的形态之一）→ `--check`。**产物格式**：`{ pin, bed: { mono }, entries: [{ id, kind, relPath }] }` —— entries 由**仓内名册**派生（`relPath` 相对 overlay 根），不含任何宿主绝对路径；`pin` 取 `git -C <root> rev-parse --short HEAD`，**不参与**逐字比对（身份是 id+kind，pin 随提交前进），`--check` 只断言它非 `unknown`，缺 pin ⇒ exit 2） | mirror |
 | 52 | `node packages/scripts/verify-subagent-single-source.mjs packages`（G3-S6 架构守卫：家族只有**一条**子代理执行路径——业务源码不得再出现 `subagents.start(spawn)`／`withSettleWatchdog`／`.localAgent`／`toolFilter:`／`persona:`／`MaintainSubagent*`，`startActivation` 只允许在 `evolution-core/src/subagent/channel.ts`；测试夹具的 legacy 适配器不在扫描范围） | mirror |
 | 53 | `node packages/scripts/verify-host-routes.mjs packages`（G4/W6 宿主数据面守卫：`HOST_ROUTES` 是 `/api/dsh-evolution/**` 路径的唯一家（4 surface/12 endpoint）；业务 `src` 不得出现 loopback fence／`webServer.register`／手抄路由 path；三包 must import `HOST_ROUTES`；G5 生成器落地后移除 client 豁免。**空扫描 exit 2**） | mirror |
+| 54 | `node packages/scripts/gen-client-seam.mjs packages --check`（G5/W7 客户端生成物：`routes.generated.ts`/`route-client.generated.ts` 由 core `HOST_ROUTES` 与模板渲染到 3 个 UI 包；`--check` 断言入库生成物=生成器输出（陈旧即红）；**生成器优先读构建后 core lib（R13），mirror 无 lib 时按约束静态读 HOST_ROUTES 字面量；找不到 HOST_ROUTES ⇒ exit 2**） | mirror |
 
 The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
 writes one log per step plus a summary, and prints the step names it ran, so a

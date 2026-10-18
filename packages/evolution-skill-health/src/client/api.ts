@@ -1,18 +1,17 @@
 /**
  * The host route this bundle reads, and the ONE place a request is made.
  *
- * The path mirrors the host half's `ROUTES.rows` in `src/routes.ts` (a spec asserts the two sides
- * agree). A refusal arrives as `ok:false` with the host's own sentence, so the panel shows what the
- * route actually said instead of inventing a second vocabulary.
+ * G5/W7: the path comes from the generated client route table (rendered from evolution-core
+ * HOST_ROUTES) and the transport is the shared generated route-client. A refusal arrives classified
+ * with the host's own sentence, so the panel shows what the route actually said.
  * @module @deepseek-ai/dsh-evolution-skill-health/client
  */
-
+import { ROUTES } from './routes.generated.ts'
+import { failureMessage, requestJson } from './route-client.generated.ts'
 import type { HealthRow } from './Panel.ts'
 
-/** Route paths, mirrored from the host half. */
-export const HOST_ROUTES = {
-  rows: '/api/dsh-evolution/skill-health/rows',
-} as const
+/** Route paths: the generated mirror of the host's HOST_ROUTES (one declaration in core). */
+export const HOST_ROUTES = ROUTES['skill-health']
 
 /** One scan result, as the route reports it. */
 export interface HealthPayload {
@@ -29,12 +28,7 @@ export type HealthOutcome = { ok: true; payload: HealthPayload } | { ok: false; 
  * @returns the payload, or the host's own refusal sentence.
  */
 export async function rows(): Promise<HealthOutcome> {
-  try {
-    const response = await fetch(HOST_ROUTES.rows, { headers: { accept: 'application/json' } })
-    const body = await response.json() as { message?: string } & Partial<HealthPayload>
-    if (!response.ok) return { ok: false, message: body.message ?? 'skill-health: the route refused the request' }
-    return { ok: true, payload: { rows: body.rows ?? [], truncated: body.truncated === true } }
-  } catch (error) {
-    return { ok: false, message: 'skill-health: ' + String(error) }
-  }
+  const answer = await requestJson<HealthPayload>(fetch, HOST_ROUTES.rows, { headers: { accept: 'application/json' } })
+  if (!answer.ok) return { ok: false, message: failureMessage(answer.failure) }
+  return { ok: true, payload: { rows: answer.data.rows ?? [], truncated: answer.data.truncated === true } }
 }

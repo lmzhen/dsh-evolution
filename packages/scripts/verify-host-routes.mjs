@@ -56,9 +56,6 @@ function walk(dir, rel) {
     if (!/\.(?:ts|mts|mjs)$/.test(entry.name)) continue
     const relToRoot = relative(root, full).split(/[\\/]/).join('/')
     if (!relToRoot.includes('/src/')) continue
-    // G5 scope: the three client halves still carry their own path literals until the generated
-    // route-client artifacts land (W6 R8); this guard covers the HOST face only until then.
-    if (relToRoot.includes('/src/client/')) continue
     // platform-services.ts is a capability-claim table: it NAMES webServer as a platform service, it
     // does not register a route on it.
     if (relToRoot === 'evolution-core/src/platform-services.ts') continue

@@ -9,7 +9,7 @@ import { createApprovalApi, type PendingRow } from '../src/client/api.ts'
 import {
   beginAction, collapsed, endAction, expanded, failed, INITIAL_PENDING_STATE, loaded, loading, noticed, previewArrived,
 } from '../src/client/pending-state.ts'
-import { APPROVAL_CLIENT_ROUTES } from '../src/client/approval-routes.ts'
+import { ROUTES } from '../src/client/routes.generated.ts'
 
 const row = (over: Partial<PendingRow> = {}): PendingRow => ({
   id: 'p-1',
@@ -44,10 +44,10 @@ describe('the approval api maps every answer onto one shape', () => {
     await api.preview('p-3')
     expect(pending).toMatchObject({ ok: true, data: [{ id: 'p-1' }] })
     expect(calls).toEqual([
-      { url: APPROVAL_CLIENT_ROUTES.pending, method: 'GET' },
-      { url: APPROVAL_CLIENT_ROUTES.approve, method: 'POST', body: JSON.stringify({ id: 'p-1' }) },
-      { url: APPROVAL_CLIENT_ROUTES.reject, method: 'POST', body: JSON.stringify({ id: 'p-2' }) },
-      { url: APPROVAL_CLIENT_ROUTES.preview + '?id=p-3', method: 'GET' },
+      { url: ROUTES.approval.pending, method: 'GET' },
+      { url: ROUTES.approval.approve, method: 'POST', body: JSON.stringify({ id: 'p-1' }) },
+      { url: ROUTES.approval.reject, method: 'POST', body: JSON.stringify({ id: 'p-2' }) },
+      { url: ROUTES.approval.preview + '?id=p-3', method: 'GET' },
     ])
   })
 

@@ -1,0 +1,72 @@
+{{HEADER}}
+
+/**
+ * The four-state transport classifier every family client shares (W7 §2). The platform owns
+ * admission (401/403/404 are its answers, not ours), so the client reads the STATUS only for those
+ * three and never tries to interpret a platform body. Everything the family route itself answers
+ * keeps its business envelope: 2xx + {ok:true,data} or 2xx + {ok:false,code,message}.
+ */
+export type RouteFailure =
+  | { readonly kind: 'unauthenticated'; readonly status: 401 }
+  | { readonly kind: 'forbidden'; readonly status: 403 }
+  | { readonly kind: 'unmounted'; readonly status: 404 }
+  | { readonly kind: 'server'; readonly status: number; readonly detail?: string }
+  | { readonly kind: 'refused'; readonly code: string; readonly message: string }
+
+/** One route answer: the data, or the classified failure. */
+export type RouteAnswer<T> = { readonly ok: true; readonly data: T } | { readonly ok: false; readonly failure: RouteFailure }
+
+/** Classify a non-2xx status: 401/403/404 keep their own kind, everything else is a server answer. */
+export function classify(status: number): RouteFailure {
+  if (status === 401) return { kind: 'unauthenticated', status: 401 }
+  if (status === 403) return { kind: 'forbidden', status: 403 }
+  if (status === 404) return { kind: 'unmounted', status: 404 }
+  return { kind: 'server', status }
+}
+
+/**
+ * One request, no retries and no body parsing for the platform's admission answers.
+ * @param doFetch - the fetch in use (the browser's, or a spec's stub).
+ * @param path - the exact route path from the generated ROUTES table.
+ * @param init - standard RequestInit.
+ * @returns the data, or the classified failure (network/parse failures read as 'server').
+ */
+export async function requestJson<T>(doFetch: typeof fetch, path: string, init?: RequestInit): Promise<RouteAnswer<T>> {
+  let response: Response
+  try {
+    response = await doFetch(path, init)
+  } catch (error) {
+    return { ok: false, failure: { kind: 'server', status: 0, detail: error instanceof Error ? error.message : String(error) } }
+  }
+  if (!response.ok) return { ok: false, failure: classify(response.status) }
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    return { ok: false, failure: { kind: 'server', status: response.status } }
+  }
+  if (typeof body === 'object' && body !== null) {
+    const record = body as { ok?: unknown; data?: unknown; code?: unknown; message?: unknown }
+    if (record.ok === true) return { ok: true, data: record.data as T }
+    if (record.ok === false && typeof record.message === 'string' && record.message !== '') {
+      return {
+        ok: false,
+        failure: { kind: 'refused', code: typeof record.code === 'string' && record.code !== '' ? record.code : 'refused', message: record.message },
+      }
+    }
+  }
+  return { ok: false, failure: { kind: 'server', status: response.status } }
+}
+
+/** The one-sentence rendering legacy callers attach to a classified failure. */
+export function failureMessage(failure: RouteFailure): string {
+  switch (failure.kind) {
+    case 'refused': return failure.message
+    case 'server': return failure.status === 0
+      ? (failure.detail === undefined || failure.detail === '' ? '网络错误：无法连接宿主' : failure.detail)
+      : 'HTTP ' + String(failure.status)
+    case 'unauthenticated': return 'HTTP 401'
+    case 'forbidden': return 'HTTP 403'
+    case 'unmounted': return 'HTTP 404'
+  }
+}

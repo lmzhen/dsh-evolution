@@ -822,6 +822,22 @@
       ]
     },
     {
+      "id": "gate-54",
+      "kind": "script",
+      "human": "`node packages/scripts/gen-client-seam.mjs packages --check`（G5/W7 客户端生成物：`routes.generated.ts`/`route-client.generated.ts` 由 core `HOST_ROUTES` 与模板渲染到 3 个 UI 包；`--check` 断言入库生成物=生成器输出（陈旧即红）；**生成器优先读构建后 core lib（R13），mirror 无 lib 时按约束静态读 HOST_ROUTES 字面量；找不到 HOST_ROUTES ⇒ exit 2**）",
+      "argv": [
+        "node",
+        "packages/scripts/gen-client-seam.mjs",
+        "packages",
+        "--check"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",

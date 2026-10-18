@@ -1,20 +1,16 @@
 /**
  * The host routes this bundle calls, and the ONE place a request is made.
  *
- * The paths mirror the host half's `SKILL_HISTORY_ROUTES` (a spec asserts the two sides agree). Every
- * refusal arrives as `ok:false` plus the curator's own sentence, so the panel shows the same words the
- * slash command prints instead of inventing a second vocabulary.
+ * G5/W7: the paths come from the generated client route table (rendered from evolution-core
+ * HOST_ROUTES), and the transport classifier is the shared generated route-client — the browser half
+ * can no longer drift from the host table or grow a second HTTP vocabulary.
  * @module @deepseek-ai/dsh-evolution-skill-history/client
  */
+import { ROUTES } from './routes.generated.ts'
+import { failureMessage, requestJson } from './route-client.generated.ts'
 
-/** Route paths, mirrored from the host half. */
-export const HOST_ROUTES = {
-  skills: '/api/dsh-evolution/skill-history/skills',
-  versions: '/api/dsh-evolution/skill-history/versions',
-  diff: '/api/dsh-evolution/skill-history/versions/diff',
-  body: '/api/dsh-evolution/skill-history/versions/body',
-  undo: '/api/dsh-evolution/skill-history/undo',
-} as const
+/** Route paths: the generated mirror of the host's HOST_ROUTES (one declaration in core). */
+export const HOST_ROUTES = ROUTES['skill-history']
 
 /** One changed region, as the host reports it (the platform diff card's own shape). */
 export interface DiffHunkRow {
@@ -148,11 +144,9 @@ export class SkillHistoryRefusal extends Error {}
  */
 export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHistoryApi {
   const request = async (path: string, init?: RequestInit): Promise<unknown> => {
-    const response = await fetchImpl(path, init)
-    if (!response.ok) throw new SkillHistoryRefusal('HTTP ' + String(response.status))
-    const body = await response.json() as { ok?: boolean; data?: unknown; message?: string }
-    if (body.ok !== true) throw new SkillHistoryRefusal(body.message ?? 'request refused')
-    return body.data
+    const answer = await requestJson<unknown>(fetchImpl, path, init)
+    if (!answer.ok) throw new SkillHistoryRefusal(failureMessage(answer.failure))
+    return answer.data
   }
   return {
     skills: async () => await request(HOST_ROUTES.skills) as readonly SkillRow[],

@@ -1,0 +1,12 @@
+{{HEADER}}
+
+/** One host data-plane surface the browser half can call. */
+export type SurfaceId = {{SURFACE_UNION}}
+
+/**
+ * Every family host path, generated from evolution-core's HOST_ROUTES (the ONE declaration).
+ * A browser half cannot import the host package at runtime (client bundles keep @deepseek-ai/*
+ * external), so the table is mirrored here mechanically; a rename in core regenerates all three
+ * client copies, and the generator's --check makes a stale copy red.
+ */
+export const ROUTES = {{ROUTES_BODY}} as const satisfies Readonly<Record<SurfaceId, Readonly<Record<string, string>>>>
