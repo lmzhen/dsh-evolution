@@ -14,7 +14,7 @@
  */
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveBasePresetPatch } from '@deepseek-ai/dsh-evolution-core'
+import { resolveBasePresetPatch } from '@deepseek-ai/dsh-evolution-core/composition'
 
 /** The launcher-owned profile facts a preset write needs. */
 export interface PresetProfileTarget {

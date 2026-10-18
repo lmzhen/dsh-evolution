@@ -1,7 +1,8 @@
 // @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { emptyRecord, markerEntryName, newSkillLibrary, nodeEvolutionIo, presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core'
+import { emptyRecord, markerEntryName, newSkillLibrary, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import * as Commands from '../src/index.ts'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'

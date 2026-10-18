@@ -8,6 +8,7 @@ import {
 } from '../src/composition/index.ts'
 import { createSubagentChannel, subagentChannelState } from '../src/subagent/index.ts'
 import { EVOLUTION_ERRORS, errorText } from '../src/errors.ts'
+import * as coreRoot from '../src/index.ts'
 import {
   DIAGNOSTICS_FACT_KEYS,
   DIAGNOSTICS_RUNTIME_KEYS,
@@ -43,6 +44,10 @@ describe('G0 frozen contracts', () => {
     const fakeCtx = { get: () => undefined }
     expect(createSubagentChannel(fakeCtx as never).state).toMatchObject({ kind: 'unavailable', code: 'E-323' })
     expect(subagentChannelState(fakeCtx as never, 'reviewer')).toMatchObject({ kind: 'unavailable', code: 'E-323' })
+  })
+
+  it('keeps the composer off the package root (single source is /composition)', () => {
+    expect('composePresetEntry' in coreRoot).toBe(false)
   })
 
   it('freezes the diagnostics view key set (7 facts + 8 runtime rows, schemaVersion 2)', () => {

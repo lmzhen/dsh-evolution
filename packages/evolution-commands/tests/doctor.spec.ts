@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import { composePresetEntry, mergePresetRow, PLATFORM_SERVICE_PROBES, presetRowId, removePresetRow, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
+import { PLATFORM_SERVICE_PROBES, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
+import { composePresetEntry, mergePresetRow, presetRowId, removePresetRow } from '@deepseek-ai/dsh-evolution-core/composition'
 import { collectEvolutionBundles, diagnose, renderDoctorText } from '../src/doctor.ts'
 
 const stub = { get: () => undefined }
