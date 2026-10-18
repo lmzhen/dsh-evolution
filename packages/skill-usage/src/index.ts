@@ -10,7 +10,7 @@ import type Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-session'
 import { evolutionIoAdapter, evolutionRoot, makeSerialQueue, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
-import { DEFAULT_SUPPORT_READ_TOOL_NAMES, ToolDispatchNormalizer, isReviewChannelSession, sessionAudited, skillReadNameOf, supportFileReadOf } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SUPPORT_READ_TOOL_NAMES, ToolDispatchNormalizer, classifySessionEvent, isReviewChannelSession, sessionAudited, skillReadNameOf, supportFileReadOf } from '@deepseek-ai/dsh-evolution-core'
 import { bumpPatch, bumpSupportRead, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 
@@ -122,6 +122,11 @@ export class SkillUsageRegistry extends Service {
         // sessions that mounted the family (a deployment without session scoping
         // is unchanged: sessionScoped stays false there).
         if (!sessionAudited(ctx, session.id, config.sessionScoped)) return
+        // G6-S2/W8 fold: plugin records are tolerated READ-ONLY — never interpreted as a read, never
+        // counted. `classifySessionEvent` is the ONE classifier (core session-fold); this consumer
+        // does not grow a second vocabulary (unknown frames fall through to the normalizer, which
+        // answers null for anything that is not a dispatch).
+        if (classifySessionEvent(event) === 'plugin-record') return
         // E-65: an external emitter can inject a malformed dispatch — `data`
         // absent, `name` missing, or `name` not a string. None of these is a
         // read this listener can attribute, so the normalizer answers `null`

@@ -176,15 +176,21 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   }
 
   if (systemPrompt && !memoryDisabled) {
+    // G6-S2/W8: the guidance and the snapshot are LITERAL text contributions — a memory entry may
+    // contain the platform's `{{name}}` prompt syntax, and the platform throws on unknown references.
+    // interpolate:false keeps every brace verbatim (no escaping, no substitution) for BOTH the static
+    // guidance and the user-authored snapshot.
     ctx.effect(() => systemPrompt.section({
       name: 'evolution:memory-guidance',
       order: MEMORY_GUIDANCE_SECTION_ORDER,
       text: MEMORY_GUIDANCE,
+      interpolate: false,
     }), 'tool-memory.memory-guidance')
     ctx.effect(() => systemPrompt.context({
       name: 'evolution:memory-snapshot',
       order: 150,
       text: () => snapshotText,
+      interpolate: false,
     }), 'tool-memory.memory-snapshot')
     // P2 fix: the snapshot refresh moved to the write sink (MemoryRegistry
     // emits evolution/memory-applied after ANY successful write). Bypass paths —

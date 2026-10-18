@@ -8,7 +8,7 @@
  * services are actually mounted in this runtime. Always ends with suggested
  * actions so any finding carries its next step.
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { scopedPackageName, asRecord } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -255,12 +255,6 @@ export interface DoctorReport {
   foreignProfiles: string[]
   conflicts: string[]
   envIssues: string[]
-  /** S0.2 (v37 P0-1): memory files carrying the platform's `{{` prompt-variable
-   * syntax. Residual-risk detector — current builds neutralize the INJECTED text
-   * (`MemoryStore.renderContext`), but a still-running older build fails every
-   * pre-step of every session under this home, and an operator may want to clean
-   * the file regardless. */
-  memoryIssues: string[]
   /** S4/P-1+P-2 (platform gap, family mitigation): the session-query corpus
    * listing failed — reported verbatim, with the isolation recipe. Empty when the
    * service is absent or answering. */
@@ -359,36 +353,6 @@ function envIssues(): string[] {
   const query = process.env.DSH_EVOLUTION_SESSION_QUERY
   if (query && !SESSION_QUERY_MODES.has(query)) {
     issues.push(`DSH_EVOLUTION_SESSION_QUERY="${query}" is not one of startup|first-search|never — the patch normalizes it to 'startup' silently; set it to a listed mode.`)
-  }
-  return issues
-}
-
-/** S0.2 (v37 P0-1): memory files that still carry the platform's `{{` prompt
- * variable syntax. The platform interpolates EVERY `systemPrompt.context` text
- * once per model step and throws on an unknown/malformed reference, so one such
- * entry used to fail every turn of every session under this home. Current
- * builds neutralize the injected text (`MemoryStore.renderContext`), which is
- * why this is a residual-risk report instead of a hard failure: an older
- * still-running process is still bricked, and an operator may prefer to clean
- * the file. Read-only; an unreadable file is skipped (the doctor never throws).
- * @param home - resolved DSH_HOME.
- * @returns one message per affected memory file.
- */
-function memoryInterpolationIssues(home: string): string[] {
-  const issues: string[] = []
-  for (const file of ['MEMORY.md', 'USER.md']) {
-    const path = join(home, 'memories', file)
-    if (!existsSync(path)) continue
-    let raw: string
-    try {
-      raw = readFileSync(path, 'utf8')
-    } catch {
-      continue
-    }
-    const hits = raw.split('{{').length - 1
-    if (hits > 0) {
-      issues.push(`${file}: ${hits} "{{" occurrence(s) — the platform interpolates this syntax in prompt context and throws on an unknown reference, so a build without the render-time neutralization fails every later turn; rewrite the affected entries`)
-    }
   }
   return issues
 }
@@ -856,14 +820,12 @@ export async function diagnose(
   if (legacy.state === 'pending') {
     actions.push(`The legacy settings document still holds ${legacy.pending.length} family value(s) — /evolution migrate moves them onto their rows (the document itself is left alone, so nothing is lost)`)
   }
-  const memoryIssues = memoryInterpolationIssues(home)
   const budgetIssues = memoryBudgetIssues(ctx)
   const paramIssues = paramDivergences(platform)
   const queryIssues = await sessionQueryIssues(ctx)
   if (queryIssues.length > 0) actions.push('Session search is degraded: isolate the session named above (or wait for the platform fix described in the family maintenance notes) before retrying the same query')
   if (paramIssues.length > 0) actions.push('Review the parameter divergences above: /evolution params shows every row with its source, /evolution policy set writes a user value, and a declared-but-unreachable row needs its owning plugin row mounted in this profile.')
   if (budgetIssues.length > 0) actions.push('Align the memory budget: leave memory-files memoryCharLimit/userCharLimit UNSET so the store follows evolution-policy, or set both surfaces to the same value (the review plans against the policy value while the store enforces its own)')
-  if (memoryIssues.length > 0) actions.push('Rewrite the memory entries listed above (or run a build with the render-time neutralization) — they broke prompt assembly on older builds.')
   // S0-4 (v43 G-1 / J-1): the one state a user cannot see for themselves. The gate
   // answers per session BY DESIGN, so an all-false process looks exactly like a
   // deployment where every session is an original-preset session; only the row
@@ -889,7 +851,7 @@ export async function diagnose(
     .filter(({ profile, dir }) => mounted === undefined || (profile !== mounted.profile && dir !== mounted.dir))
     .map(({ profile }) => profile)
   return {
-    installForm, deploymentForm, bundles, foreignProfiles, conflicts, envIssues: env, memoryIssues, budgetIssues,
+    installForm, deploymentForm, bundles, foreignProfiles, conflicts, envIssues: env, budgetIssues,
     paramIssues, queryIssues, services, capabilityAbsence,
     pendingCount, executingCount, presetFreshness, scopedProbe, legacy,
     runtimeBundles: runtimeBundles ?? null,
@@ -1094,7 +1056,6 @@ export function renderDoctorText(report: DoctorReport): string {
   }
   if (report.conflicts.length > 0) lines.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
-  if (report.memoryIssues.length > 0) lines.push('memory:', ...report.memoryIssues.map(line => `  ! ${line}`))
   if (report.budgetIssues.length > 0) lines.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
   if (report.paramIssues.length > 0) lines.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
   if (report.queryIssues.length > 0) lines.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))

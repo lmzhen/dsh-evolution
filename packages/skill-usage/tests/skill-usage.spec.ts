@@ -74,6 +74,26 @@ describe('skill-usage', () => {
     expect(record?.view_count ?? 0).toBe(0)
   })
 
+  it('G6-S2/W8 fold: a plugin record and an unknown frame are tolerated read-only (never counted)', async () => {
+    const root = await tempRoot('dsh-usage-fold-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.record('demo', 'use')
+    // A plugin record whose DATA looks exactly like a dispatch pair: the classifier (not the payload
+    // shape) decides — plugin records are read-only noise and must never move a counter.
+    const callPayload = { turn: 1, step: 1, callId: 'p1', name: 'skill', arguments: '{"name":"demo"}' }
+    ctx.emit('session/event', { id: 's1' } as never, { type: 'plugin:evolution.review', ignorable: true, data: callPayload } as never)
+    ctx.emit('session/event', { id: 's1' } as never, { type: 'plugin:evolution.review', ignorable: true, data: { callId: 'p1', ok: true, result: '{}' } } as never)
+    // Unknown frames (not model, not plugin records) are tolerated too: the listener must not throw.
+    ctx.emit('session/event', { id: 's1' } as never, { type: 'turn/end', data: {} } as never)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const record = (await ctx.skillUsage.report()).get('demo')
+    expect(record?.view_count ?? 0).toBe(0)
+    expect(record?.support_reads).toBeUndefined()
+  })
+
   it('V6-43: the telemetry listener is registered through an effect (HMR disposal ownership, 0.3.37)', async () => {
     const root = await tempRoot('dsh-usage-dispose-')
     const ctx = new Context()

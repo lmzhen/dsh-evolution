@@ -30,7 +30,7 @@ import type { LiveValue, SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { paramRowId, readDispatchSignal, sessionAudited, sessionEvidenceIndex, sessionReadNames, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
+import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, sessionEvidenceIndex, sessionReadNames, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
 import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
 import { filterUnreadSkillOps, foldUntrustedLines, payloadText } from '@deepseek-ai/dsh-evolution-core'
@@ -579,6 +579,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // original preset — the family acting on a session that never opted in.
     // A deployment that declares no session scoping is unaffected by construction.
     if (!sessionAudited(ctx, session.id, config.sessionScoped)) return
+    // G6-S2/W8 fold: a plugin record is not evidence and not a turn boundary — it is tolerated
+    // read-only and never enters the dispatch digest (one classifier: core session-fold).
+    if (classifySessionEvent(event) === 'plugin-record') return
     appendDispatchFrame(dispatchDigest, session.id, event)
     // S2.2 (v37): `{ kind: 'user' }` is the platform's attestation of human
     // input and ends the review window; plugin notices (our prompt included)

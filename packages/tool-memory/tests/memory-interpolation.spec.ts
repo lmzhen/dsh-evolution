@@ -1,13 +1,11 @@
 // @tier ci-only
 /**
- * S0.1 (v37 P0-1): prompt-variable neutralization for the memory snapshot.
+ * G6-S2/W8: prompt-variable LITERALS for the memory snapshot.
  *
- * A stored memory entry containing the platform's `{{name}}` syntax used to make
- * `systemPrompt` assembly THROW on every later model step of every session under
- * the same DSH_HOME (the platform interpolates every context text and rejects an
- * unknown/malformed reference), while a registered name such as `{{cwd}}` was
- * silently substituted into the memory the model reads. The fix neutralizes the
- * INJECTED text only — the stored entry keeps its original bytes.
+ * tool-memory registers both its guidance section and the memory snapshot with `interpolate: false`,
+ * so stored memory text reaches the model verbatim: a `{{...}}` expression (CI/Jinja/Helm, a doc
+ * placeholder) neither throws prompt assembly nor gets substituted with a registered variable such
+ * as `{{cwd}}`. The stored bytes were never rewritten; the registration flag is the whole fix.
  */
 import { describe, expect, it } from 'vitest'
 import { readFile } from 'node:fs/promises'
@@ -42,20 +40,21 @@ async function snapshotText(ctx: Context): Promise<string> {
   return renderContextSections(assembly).find(section => section.name === 'evolution:memory-snapshot')?.text ?? ''
 }
 
-describe('tool-memory · prompt-variable neutralization (S0.1, v37 P0-1)', () => {
-  it('mount-time snapshot: {{...}} neither throws assembly nor reaches the model verbatim', async () => {
+describe('tool-memory · literal prompt variables (G6-S2/W8)', () => {
+  it('mount-time snapshot: {{...}} neither throws assembly nor is substituted', async () => {
     const root = await tempRoot('dsh-evolution-tmp-')
     const writer = await mountMemorySeam(root, false)
     await writer.memory.applyBatch('memory', [{ action: 'add', facts: POISON }])
     const ctx = await mountMemorySeam(root, true)
     const text = await snapshotText(ctx)
-    expect(text).toContain('Deploy template')
-    expect(text).not.toContain('{{')
-    // Registered variables must not be substituted into stored knowledge.
+    // The literal text arrives as written — including the registered name {{cwd}} (NOT resolved to
+    // the working directory): a memory entry is data, never a prompt template.
+    expect(text).toContain('Deploy template: {{APP_NAME}} on port {{PORT}}')
+    expect(text).toContain('{{cwd}}')
     expect(text).not.toContain(root)
   })
 
-  it('refresh path: an entry written after mount is neutralized too, and the file keeps its bytes', async () => {
+  it('refresh path: an entry written after mount stays literal, and the file keeps its bytes', async () => {
     const root = await tempRoot('dsh-evolution-tmp-')
     const ctx = await mountMemorySeam(root, true)
     await ctx.memory.applyBatch('memory', [{ action: 'add', facts: POISON }])
@@ -64,8 +63,8 @@ describe('tool-memory · prompt-variable neutralization (S0.1, v37 P0-1)', () =>
       await new Promise(resolve => setTimeout(resolve, 20))
       text = await snapshotText(ctx)
     }
-    expect(text).toContain('Deploy template')
-    expect(text).not.toContain('{{')
+    expect(text).toContain('Deploy template: {{APP_NAME}}')
+    expect(text).toContain('{{cwd}}')
     // `memory-files`' root IS the memories directory (MemoryStore root).
     const raw = await readFile(join(root, 'MEMORY.md'), 'utf8')
     expect(raw).toContain('{{APP_NAME}}')
