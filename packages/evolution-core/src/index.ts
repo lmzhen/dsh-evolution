@@ -111,3 +111,4 @@ export type {
   RestrictedPresetState,
 } from './composition/index.ts'
 export * from './diagnostics.ts'
+export * from './platform-line.generated.ts'
