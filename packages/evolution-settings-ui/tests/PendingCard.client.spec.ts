@@ -171,7 +171,7 @@ describe('the pending card', () => {
   })
 
   it('shows the host sentence when a decision is refused', async () => {
-    const approve = vi.fn(async () => ({ ok: false as const, message: 'not in the pending window' }))
+    const approve = vi.fn(async () => ({ ok: false as const, failure: { kind: 'refused' as const, code: 'approval-refused', message: 'not in the pending window' } }))
     mount(face({ pending: windowStub([row()]), approve }))
     await waitFor(() => { expect(screen.getByText(message('approvalApprove'))).toBeDefined() })
     fireEvent.click(screen.getByText(message('approvalApprove')))

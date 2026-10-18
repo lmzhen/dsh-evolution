@@ -53,11 +53,13 @@ describe('the approval api maps every answer onto one shape', () => {
 
   it('keeps the host sentence of a refusal, and names a transport failure', async () => {
     const refused = createApprovalApi(async () => answer(200, { ok: false, code: 'approval-refused', message: 'not in the pending window' }))
-    expect(await refused.approve('gone')).toEqual({ ok: false, message: 'not in the pending window' })
+    // G5/W7 S4: the api answers the GENERATED four-state RouteAnswer — a business refusal keeps the
+    // host sentence; transport/platform answers are classified by the shared route-client.
+    expect(await refused.approve('gone')).toEqual({ ok: false, failure: { kind: 'refused', code: 'approval-refused', message: 'not in the pending window' } })
     const broken = createApprovalApi(async () => { throw new Error('offline') })
-    expect(await broken.pending()).toEqual({ ok: false, message: 'offline' })
+    expect(await broken.pending()).toMatchObject({ ok: false, failure: { kind: 'server', status: 0, detail: 'offline' } })
     const http = createApprovalApi(async () => answer(500, {}))
-    expect(await http.pending()).toEqual({ ok: false, message: 'HTTP 500' })
+    expect(await http.pending()).toEqual({ ok: false, failure: { kind: 'server', status: 500 } })
   })
 })
 
@@ -73,7 +75,7 @@ describe('the pending card state machine', () => {
   })
 
   it('keeps the reason of a failed read and the sentence of a refusal', () => {
-    expect(failed(INITIAL_PENDING_STATE, 'state medium is unreadable').view).toEqual({ kind: 'failed', message: 'state medium is unreadable' })
+    expect(failed(INITIAL_PENDING_STATE, { kind: 'server', status: 500 }).view).toEqual({ kind: 'failed', failure: { kind: 'server', status: 500 } })
     const refused = noticed(beginAction(INITIAL_PENDING_STATE, 'p-1'), 'not in the pending window')
     expect(refused.notice).toBe('not in the pending window')
     expect(endAction(refused, 'p-1').busy).toEqual([])

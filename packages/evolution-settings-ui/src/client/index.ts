@@ -167,7 +167,7 @@ export function apply(ctx: ClientContext): void {
     yield seam.slots.register({
       name: CARD_SLOT,
       key: PENDING_CARD_KEY,
-      inject: (): PendingCardFace => ({ t, api, confirmMode }),
+      inject: (): PendingCardFace => ({ t, api, confirmMode, fallback: FALLBACKS.approval }),
     }, PendingCard)
     // G5/W7 S7: the read-only diagnostics card — the SAME view the CLI/--json prints, fetched
     // through the generated route client; the command face is the fallback when the data plane is absent.

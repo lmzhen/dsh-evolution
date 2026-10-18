@@ -7,7 +7,7 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/api
  */
 import { ROUTES } from './routes.generated.ts'
-import { failureMessage, requestJson, type RouteAnswer } from './route-client.generated.ts'
+import { requestJson, type RouteAnswer } from './route-client.generated.ts'
 
 /** One staged write, as the pending route hands it over (never the staged args). */
 export interface PendingRow {
@@ -43,10 +43,8 @@ export type PreviewAnswer =
   }
   | { readonly available: false; readonly reason: string }
 
-/** What one call answered: the data, or the reason it could not be carried out. */
-export type ApprovalAnswer<T> =
-  | { readonly ok: true; readonly data: T }
-  | { readonly ok: false; readonly message: string }
+/** What one call answered: the generated four-state RouteAnswer (no local failure vocabulary). */
+export type ApprovalAnswer<T> = RouteAnswer<T>
 
 /**
  * Which window the pending route is asked for. The host route has always taken `?status=` (the CLI
@@ -69,11 +67,6 @@ export interface ApprovalApi {
   preview: (id: string) => Promise<ApprovalAnswer<PreviewAnswer>>
 }
 
-/** Flatten the shared four-state answer onto this card's historical {ok,message} surface. */
-function unwrap<T>(answer: RouteAnswer<T>): ApprovalAnswer<T> {
-  return answer.ok ? { ok: true, data: answer.data } : { ok: false, message: failureMessage(answer.failure) }
-}
-
 /**
  * Build the approval face over one fetch implementation.
  * @param doFetch - the fetch to use (the platform's global in the browser, a fake in a spec).
@@ -81,14 +74,14 @@ function unwrap<T>(answer: RouteAnswer<T>): ApprovalAnswer<T> {
  */
 export function createApprovalApi(doFetch: typeof fetch): ApprovalApi {
   const post = async (path: string, id: string): Promise<ApprovalAnswer<unknown>> =>
-    unwrap(await requestJson(doFetch, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) }))
+    await requestJson(doFetch, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
   return {
-    pending: async status => unwrap(await requestJson<readonly PendingRow[]>(
+    pending: async status => await requestJson<readonly PendingRow[]>(
       doFetch,
       status === undefined ? ROUTES.approval.pending : ROUTES.approval.pending + '?status=' + status,
-    )),
+    ),
     approve: async id => await post(ROUTES.approval.approve, id),
     reject: async id => await post(ROUTES.approval.reject, id),
-    preview: async id => unwrap(await requestJson<PreviewAnswer>(doFetch, ROUTES.approval.preview + '?id=' + encodeURIComponent(id))),
+    preview: async id => await requestJson<PreviewAnswer>(doFetch, ROUTES.approval.preview + '?id=' + encodeURIComponent(id)),
   }
 }

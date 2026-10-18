@@ -30,7 +30,7 @@ function racingApi() {
     if (calls <= 2) { await gate; return ok([row('SLOW-STALE')]) }
     return ok([row('FAST-FRESH')])
   }
-  const api = { pending, approve: async () => ok({}), reject: async () => ok({}), preview: async () => ({ ok: false, message: 'n/a' }) }
+  const api = { pending, approve: async () => ok({}), reject: async () => ok({}), preview: async () => ({ ok: false, failure: { kind: 'server', status: 200 } }) }
   return { api, release: () => { release() }, calls: () => calls }
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))

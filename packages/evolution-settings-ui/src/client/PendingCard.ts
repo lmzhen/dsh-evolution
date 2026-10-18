@@ -13,6 +13,8 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/PendingCard
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
+import type { FallbackHint } from './contracts.generated.ts'
+import { FailureBlock, failureText } from './states.generated.ts'
 import type { ApprovalApi, PendingRow } from './api.ts'
 import type { MessageKey } from './messages.ts'
 import {
@@ -29,6 +31,8 @@ export interface PendingCardFace {
    * captured once would pin the gate for the life of the fiber. Absent ⇒ the shipped default `auto`.
    */
   confirmMode?: () => 'auto' | 'ask' | 'timeout'
+  /** G5/W7 S4: the command-face fallback rendered with an unreachable/unauthenticated failure. */
+  fallback?: FallbackHint | undefined
 }
 
 
@@ -67,6 +71,8 @@ const KIND_KEYS: Readonly<Record<PendingRow['kind'], MessageKey>> = Object.freez
  */
 export function PendingCard(props: PendingCardFace): ReactNode {
   const { t, api } = props
+  // The shared failure renderer speaks key-STRING; this card's keys stay typed at this one boundary.
+  const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => t(key as MessageKey, values as never)
   // U-6: which entry is ARMED for a second click. `auto` (the default) never arms: an approval batch
   // must not be interrupted by a confirmation nobody asked for (31 号 §U-6 的风险行).
   const confirmMode = props.confirmMode?.() ?? 'auto'
@@ -106,11 +112,11 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     // already been replaced.
     if (readTicket.current !== ticket) return
     if (!waiting.ok) {
-      apply(current => failed(current, waiting.message))
+      apply(current => failed(current, waiting.failure))
       return
     }
     if (!running.ok) {
-      apply(current => failed(current, running.message))
+      apply(current => failed(current, running.failure))
       return
     }
     apply(current => loaded(current, [...waiting.data, ...running.data]))
@@ -133,7 +139,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     void (async () => {
       const answer = action === 'approve' ? await api.approve(id) : await api.reject(id)
       if (!answer.ok) {
-        apply(current => noticed(endAction(current, id), answer.message))
+        apply(current => noticed(endAction(current, id), failureText(answer.failure, translate)))
         return
       }
       apply(current => noticed(endAction(current, id), null))
@@ -154,7 +160,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     const answer = await api.preview(id)
     const view: PreviewView = answer.ok
       ? answer.data.available ? { kind: 'ready', answer: answer.data } : { kind: 'unavailable', reason: answer.data.reason }
-      : { kind: 'failed', message: answer.message }
+      : { kind: 'failed', failure: answer.failure }
     apply(current => previewArrived(current, id, view))
   }
 
@@ -170,7 +176,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   /** The facts line, then the source view: the same shape the history panel's diff uses. */
   const preview = (view: PreviewView): ReactNode => {
     if (view.kind === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalPreviewReading'))
-    if (view.kind === 'failed') return createElement('p', { className: 'evolution-param-error', role: 'status' }, view.message)
+    if (view.kind === 'failed') return createElement('p', { className: 'evolution-param-error', role: 'status' }, failureText(view.failure, translate))
     if (view.kind === 'unavailable') return createElement('p', { className: 'evolution-param-error', role: 'status' }, t('approvalPreviewNone') + view.reason)
     const facts: ReactNode[] = [
       createElement('span', { className: 'evolution-param-fact', key: 'added' }, t('approvalDiffAdded', { n: view.answer.linesAdded })),
@@ -275,8 +281,10 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     if (state.view.kind === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalLoading'))
     if (state.view.kind === 'empty') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalEmpty'))
     if (state.view.kind === 'failed') {
+      // G5/W7 S4: the shared four-state failure block (401/403/404 sentence + command fallback when the
+      // data plane is absent), then the card's own retry control.
       return createElement('div', { className: 'evolution-param-actions' },
-        createElement('p', { className: 'evolution-param-error', role: 'status' }, t('approvalFailed') + ': ' + state.view.message),
+        FailureBlock({ failure: state.view.failure, t: translate, fallback: props.fallback }),
         createElement('button', { className: 'evolution-param-button', type: 'button', onClick: () => { void load() } }, t('approvalRetry')))
     }
     return createElement('div', null,

@@ -8,20 +8,21 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/pending-state
  */
 import type { PendingRow, PreviewAnswer } from './api.ts'
+import type { RouteFailure } from './route-client.generated.ts'
 
 /** What one row's preview is showing while it is open. */
 export type PreviewView =
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly answer: Extract<PreviewAnswer, { available: true }> }
   | { readonly kind: 'unavailable'; readonly reason: string }
-  | { readonly kind: 'failed'; readonly message: string }
+  | { readonly kind: 'failed'; readonly failure: RouteFailure }
 
 /** What the card is showing right now. */
 export type PendingView =
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly rows: readonly PendingRow[] }
   | { readonly kind: 'empty' }
-  | { readonly kind: 'failed'; readonly message: string }
+  | { readonly kind: 'failed'; readonly failure: RouteFailure }
 
 /** The whole card state: the view, the ids with an action in flight, and the last refusal line. */
 export interface PendingState {
@@ -67,9 +68,9 @@ export function loaded(state: PendingState, rows: readonly PendingRow[]): Pendin
   return { ...state, view: rows.length === 0 ? { kind: 'empty' } : { kind: 'ready', rows } }
 }
 
-/** The list could not be read: the reason stays on screen next to a retry control. */
-export function failed(state: PendingState, message: string): PendingState {
-  return { ...state, view: { kind: 'failed', message } }
+/** The list could not be read: the classified failure stays on screen next to a retry control. */
+export function failed(state: PendingState, failure: RouteFailure): PendingState {
+  return { ...state, view: { kind: 'failed', failure } }
 }
 
 /** Mark one record as having an action in flight (its buttons are disabled until it ends). */
