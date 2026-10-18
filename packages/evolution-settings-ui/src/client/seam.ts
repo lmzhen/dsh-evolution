@@ -55,14 +55,12 @@ export interface ParamSectionSnapshot {
   writable: boolean
   /** U-5: the composition layer a cleared field reverts to (platform `base`, previously dropped). */
   base: Record<string, unknown> | undefined
-  /** U-5: where a save lands — `memory` means this session only (platform `mode`, previously dropped). */
-  mode: 'host' | 'memory'
   /**
    * Why an `unavailable` snapshot is unavailable: this bundle found no settings seat at
    * all, or the seat is there and serves no such row. The two read differently to the
    * operator (one is the UI's own gap, the other is a row that is not composed).
    */
-  reason?: 'seat-missing' | 'not-served' | 'projection-failed' | 'session-memory'
+  reason?: 'seat-missing' | 'not-served' | 'projection-failed'
 }
 
 /** The reactive source the renderer binds to a `use<Name>` seat. */
@@ -98,7 +96,6 @@ export interface ConfigFormSnapshotLike<T = Record<string, unknown>> {
   user: unknown
   revision: number | undefined
   writable: boolean
-  mode: 'host' | 'memory'
 }
 
 /** One row's client write face (0.2.x `configForms`). */

@@ -55,7 +55,7 @@ function fakeSeat(): { get: (id: string) => unknown } {
       const existing = forms.get(id)
       if (existing !== undefined) return existing
       const form = {
-        getSnapshot: () => ({ status: 'ready', value: {}, base: undefined, user: {}, revision: 1, writable: true, mode: 'host' }),
+        getSnapshot: () => ({ status: 'ready', value: {}, base: undefined, user: {}, revision: 1, writable: true }),
         subscribe: () => () => {},
         set: async () => true,
         unset: async () => true,

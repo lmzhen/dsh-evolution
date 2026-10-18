@@ -30,10 +30,7 @@ export const SEAT_MISSING: ParamSectionSnapshot = Object.freeze({
   value: undefined,
   user: undefined,
   writable: false,
-  // U-5 added `base`/`mode` to the snapshot: a constant that predates them must still carry them,
-  // or the type says so (the CI build line did).
   base: undefined,
-  mode: 'host',
   reason: 'seat-missing',
 })
 
@@ -46,7 +43,6 @@ export const PROJECTION_FAILED: ParamSectionSnapshot = Object.freeze({
   user: undefined,
   writable: false,
   base: undefined,
-  mode: 'host',
   reason: 'projection-failed',
 })
 
@@ -66,15 +62,11 @@ export function sectionSnapshotOf(snapshot: ConfigFormSnapshotLike): ParamSectio
     value: isSection(snapshot.value) ? snapshot.value : undefined,
     user: snapshot.user,
     writable: snapshot.writable,
-    // U-5: the two facts the reader needs and the projection used to drop.
+    // U-5: the composition layer a cleared field reverts to (the platform's `base`).
     base: isSection(snapshot.base) ? snapshot.base : undefined,
-    mode: snapshot.mode,
-    // G4/4.3: the reason follows the PLATFORM's own fact, not the status alone. In memory mode the
-    // platform reports unavailable BY DESIGN (no persistent plane this session); calling that row
-    // not-served was a false claim about why the operator cannot see it.
-    ...snapshot.status === 'unavailable'
-      ? { reason: snapshot.mode === 'memory' ? 'session-memory' as const : 'not-served' as const }
-      : {},
+    // G5/W7 S5: the platform's `mode` is no longer modelled — every family row writes the host
+    // configuration (the card states that once, as a fixed line). An unavailable row is not-served.
+    ...snapshot.status === 'unavailable' ? { reason: 'not-served' as const } : {},
   }
 }
 

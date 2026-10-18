@@ -1,10 +1,12 @@
 // @tier pre-tag
 // @vitest-environment jsdom
 /**
- * U-5 (G5.7): the three decision facts the seat already knows, put on screen. `base` and `mode` are
- * declared by the platform snapshot and were simply DROPPED by the card's projection, so a reader could
- * not tell where the value they see comes from, where a save goes, or what "restore default" would
- * restore. The two judges below are the ones the UI seat asked for on this half.
+ * G5/W7 S5: the decision facts the card shows after the platform `mode` was retired.
+ *
+ * The family has ONE write target — the host configuration, for every session — so the card states
+ * it as a fixed line instead of modelling a session-memory mode. `base` is still the seat fact a
+ * "restore default" names, and an unavailable row keeps saying it is not served (it is no longer
+ * excused as "session memory").
  */
 import { describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
@@ -21,33 +23,34 @@ const fields = section.fields
 const FIELD = fields[0]!
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
-function page(options: { user?: Record<string, unknown>; base?: Record<string, unknown>; mode?: 'host' | 'memory'; status?: 'ready' | 'unavailable' }) {
+function page(options: { user?: Record<string, unknown>; base?: Record<string, unknown>; status?: 'ready' | 'unavailable' } = {}) {
   const user = options.user ?? {}
   const base = options.base ?? {}
-  // G4/4.3: the status is a parameter now - the platform really does report 'unavailable' in memory
-  // mode, and a fixture that hardcodes 'ready' never reaches the branch that speaks about it.
-  const state = { status: options.status ?? 'ready', value: { ...base, ...user }, base, user, revision: 7, writable: true, mode: options.mode ?? 'host' }
+  const state = { status: options.status ?? 'ready', value: { ...base, ...user }, base, user, revision: 7, writable: true }
   const view = render(h(RowConfigCard, { namespace: 'evolution-curator', fields, t, view: 'page', form: { state, mutate: async () => true } }))
   fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
   return view
 }
 
-describe('U-5: where the value comes from, and where a save goes', () => {
-  it('says a memory-mode row is this session only, and never reads as a refusal', () => {
-    const view = page({ mode: 'memory' })
-    expect(view.container.textContent).toContain(t('destMemory'))
+describe('U-5/S5: where the value comes from, and where a save goes', () => {
+  it('states the ONE write target on every render — host configuration, all sessions — and never as a refusal', () => {
+    const view = page()
+    expect(view.container.textContent).toContain(t('writeTargetHost'))
     expect(view.container.textContent).not.toContain(t('refused'))
     cleanup()
   })
 
-  it('G4/4.3: memory mode is not an absent row - the platform reports it unavailable ON PURPOSE', () => {
-    const snap = (mode: 'host' | 'memory') => ({ status: 'unavailable', mode }) as unknown as Parameters<typeof sectionSnapshotOf>[0]
-    // The defect this pins: reason used to follow status alone, so a memory-mode row was announced
-    // as not-served while its value simply lives in this session memory.
-    expect(sectionSnapshotOf(snap('memory')).reason).not.toBe('not-served')
-    // Counter-case: a host row the seat really does not serve must KEEP saying so.
-    expect(sectionSnapshotOf(snap('host')).reason).toBe('not-served')
+  it('works on a snapshot without any mode field (the platform fact is gone, the write face is not)', () => {
+    const view = page({ user: { [FIELD.id]: 'x' } })
+    expect(view.container.textContent).toContain(t('writeTargetHost'))
+    cleanup()
   })
+
+  it('an unavailable row is not-served, never excused as session memory', () => {
+    const snap = { status: 'unavailable' } as unknown as Parameters<typeof sectionSnapshotOf>[0]
+    expect(sectionSnapshotOf(snap).reason).toBe('not-served')
+  })
+
   it('names the value a reset would restore (the seat base)', () => {
     const view = page({ base: { [FIELD.id]: 42 }, user: { [FIELD.id]: 7 } })
     expect(view.container.textContent).toContain(t('resetTo', { value: 42 }))

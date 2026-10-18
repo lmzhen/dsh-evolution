@@ -306,8 +306,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   if (snapshot.status === 'unavailable') {
     const key: MessageKey = snapshot.reason === 'seat-missing'
       ? 'seatMissing'
-      : snapshot.reason === 'projection-failed' ? 'projectionFailed'
-        : snapshot.reason === 'session-memory' ? 'destMemory' : 'unavailable'
+      : snapshot.reason === 'projection-failed' ? 'projectionFailed' : 'unavailable'
     return createElement('p', { className: 'evolution-param-note', role: 'status' }, t(key))
   }
   const user = isSection(snapshot.user) ? snapshot.user : {}
@@ -382,8 +381,8 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     },
     createElement('span', { className: 'evolution-param-card-title' }, title),
     changed === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('changed', { n: changed })),
-    // U-5 judge ①: where a save lands. `memory` is this session only; saying so is not a refusal.
-    createElement('span', { className: 'evolution-param-dest' }, snapshot.mode === 'memory' ? t('destMemory') : t('destHost')),
+    // G5/W7 S5: one fixed line — every family row writes the HOST configuration, for every session.
+    createElement('span', { className: 'evolution-param-dest' }, t('writeTargetHost')),
     createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼'),
     ),
     open

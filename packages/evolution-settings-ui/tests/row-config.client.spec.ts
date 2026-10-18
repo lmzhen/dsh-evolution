@@ -55,7 +55,7 @@ function resetButton(container: HTMLElement): Element {
 
 /** One page-side state, as `formFor()` builds it from the settings seat. */
 function state(user: Record<string, unknown>): Record<string, unknown> {
-  return { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true, mode: 'host' }
+  return { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true }
 }
 
 describe('the per-row configuration entry', () => {

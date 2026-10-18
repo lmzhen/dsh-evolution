@@ -27,7 +27,7 @@ const h = createElement as unknown as (type: unknown, props: unknown) => Paramet
 
 /** One page-side state, as the entry's own `form` seat builds it from the settings seat. */
 function state(user: Record<string, unknown>) {
-  return { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true, mode: 'host' }
+  return { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true }
 }
 
 const card = (mutate: unknown, user: Record<string, unknown>) =>

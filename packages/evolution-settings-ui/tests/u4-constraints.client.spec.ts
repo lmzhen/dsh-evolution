@@ -63,7 +63,7 @@ describe('U-4: what the card accepts, and what it refuses to stage', () => {
     const mutate = vi.fn(async () => true)
     const state = {
       // BOTH maps carry it: `value` is what the control renders, `user` is what marks it overridden.
-      status: 'ready', value: { [SELECT.id]: 'legacy-mode' }, base: {}, revision: 7, writable: true, mode: 'host',
+      status: 'ready', value: { [SELECT.id]: 'legacy-mode' }, base: {}, revision: 7, writable: true,
       user: { [SELECT.id]: 'legacy-mode' },
     }
     const view = render(h(RowConfigCard, { namespace: section.namespace, fields, t, view: 'page', form: { state, mutate } }))
@@ -86,7 +86,7 @@ describe('U-4: what the card accepts, and what it refuses to stage', () => {
 
   it('a card with acceptable values still saves in ONE call (the anchor)', () => {
     const mutate = vi.fn(async () => true)
-    const state = { status: 'ready', value: {}, base: {}, user: {}, revision: 7, writable: true, mode: 'host' }
+    const state = { status: 'ready', value: {}, base: {}, user: {}, revision: 7, writable: true }
     const view = render(h(RowConfigCard, { namespace: section.namespace, fields, t, view: 'page', form: { state, mutate } }))
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
     fireEvent.change(view.container.querySelector('[id="evolution-param-' + NUMBER.id + '"]') as HTMLElement, { target: { value: '9' } })

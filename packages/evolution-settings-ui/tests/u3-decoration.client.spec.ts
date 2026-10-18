@@ -20,7 +20,7 @@ const fields = section.fields
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
 function page(user: Record<string, unknown>) {
-  const state = { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true, mode: 'host' }
+  const state = { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true }
   const view = render(h(RowConfigCard, { namespace: 'evolution-curator', fields, t, view: 'page', form: { state, mutate: async () => true } }))
   fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
   return view

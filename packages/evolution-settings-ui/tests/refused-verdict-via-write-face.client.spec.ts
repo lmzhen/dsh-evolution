@@ -25,7 +25,7 @@ if (FIELD === undefined) throw new Error('the memory-files row lost its numeric 
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
 function state(user: Record<string, unknown>) {
-  return { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true, mode: 'host' }
+  return { status: 'ready', value: { ...user }, base: undefined, user, revision: 7, writable: true }
 }
 /** The section path: the card write face comes from writeFaceFor, over a seat stub with this verdict. */
 const seat = (verdict: boolean) => ({
