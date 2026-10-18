@@ -22,7 +22,7 @@
         "local"
       ],
       "reason": "declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "gate-02",
@@ -206,7 +206,7 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "machine-local command outside this repo (table row 13)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "gate-14",
@@ -219,7 +219,7 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "machine-local command outside this repo (table row 14)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "gate-15",
@@ -233,7 +233,7 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "machine-local command outside this repo (table row 15)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "gate-16",
@@ -909,7 +909,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-02",
@@ -926,7 +926,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-03",
@@ -943,7 +943,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-04",
@@ -960,7 +960,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-05",
@@ -977,7 +977,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-06",
@@ -994,7 +994,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-07",
@@ -1011,7 +1011,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-08",
@@ -1026,7 +1026,7 @@
       "tree": "mirror",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-09",
@@ -1045,7 +1045,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-10",
@@ -1061,7 +1061,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-11",
@@ -1075,7 +1075,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-12",
@@ -1090,7 +1090,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-13",
@@ -1104,7 +1104,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "ci-only-14",
@@ -1121,7 +1121,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0",
+      "expiry": "0.28.0",
       "localSafe": false,
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
@@ -1139,7 +1139,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "line-identity-ci",
@@ -1191,7 +1191,7 @@
       ],
       "noDrillReason": "live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half",
       "reason": "live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)",
-      "expiry": "0.27.0"
+      "expiry": "0.28.0"
     },
     {
       "id": "health-admission",

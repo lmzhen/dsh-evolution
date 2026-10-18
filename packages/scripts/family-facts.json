@@ -594,7 +594,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "53239bde4cf2c12ce951ace472fe6c807ca2dc67ef8ed3d47ed438a625870dbb",
+        "sha256": "615d04af6b2985fd37535e87086869b437d5ac0a6311c1eeda4f11f67fbd44b3",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1028,8 +1028,9 @@
             "axis": "expiry-due",
             "rows": 19,
             "reasonRef": "packages/scripts/gate-manifest.json",
-            "expiry": "0.27.0",
-            "owner": "release"
+            "expiry": "0.28.0",
+            "owner": "release",
+            "reason": "0.27.0 是平台 0.2.1 迁移的产品发布轮：本 register 的 19 行是工具链债务（14 条 ci-only 无表行 + machine-local 外部脚本 + build-line tsc 行），不在产品面；迁移轮关闭它们会引入新的 CI 面变更风险。按「move it with a reason」把窗口移到 0.28.0，owner=release，行数保持登记，下一轮逐行补表/换仓内脚本。"
           },
           {
             "axis": "mutation-coverage",

@@ -1,4 +1,10 @@
 # Changelog
+## 0.27.0 (minor) — 适配 DSH 0.2.1-rc.2：家族宿主面/客户端/诊断/发布证据全面迁移收口
+
+> **范围**：平台兼容线抬到 `0.2.1-rc.2`（floor `0.2.1-rc.1`，upstream `dsh-v0.2.1-rc.2`）。这不是一次 patch：子代理通道换到新的 `connection.fetch`/`subagent` 面（E-323/E-324/E-325 三码归位）、宿主数据面收敛为 `HOST_ROUTES` 单源（4 surface / 12 endpoint，删 loopback fence 与 `webServer.register`）、三包宿主面与命令兜底落地、客户端生成接缝（15 个生成物）与四态包络/失败块/诊断卡/参数卡上线、doctor `--json` 与诊断路由同源为 `schemaVersion=2`（7 facts + 8 runtime）、W11 追账门禁（52 项 universe）与 W2/W3 release-evidence v2（spikes/faces/traceability/gates 四平面）落地。
+> **兼容与安装**：`peerDependencies`/`engines.dsh` 由 `platform-line.json` 单一来源派生（`^0.2.1-rc.1` / `>=0.2.1-rc.1 <0.2.2-0`）；`dsh-evolution-all`/`host`/`preset` 与 preset 变体保持原安装形态，M1–M4 四形态隔离面均通过冷启动与诊断读数。
+> **客户端与验收**：参数卡字段键修正为 settings namespace 相对键（canonical 注册表 id 与平台 user/ops 键不一致曾使保存被判 not volatile、读取恒空）；UI smoke 以 headless-Chrome+CDP 取证，settings 卡片/待批卡/参数保存/技能历史面板/远程 TLS 全绿；0.2.0 冻结线（`v0.26.26`）不受影响，升级顺序仍为平台→家族。
+> **验证**：269 个测试文件 / 2213 例全绿；隔离面 S1–S4 证据齐（S1 preset 克隆+受限注册、S2 owner 200/匿名 401、S3 semver 7.8.5 双谓词网格、S4 dispose→re-apply）；发布证据 schema v2 端到端 `pack→assemble→verify --release` 通过；在役旧宿主未改动。
 ## 0.26.26 (patch) — 撤掉我给 verify-doc-facts 加的 --require-repo-docs（紧邻注释早就禁止它）
 
 > **现象**：0.26.25 的 validate 红在 Verify the family guard set，报 `verify-doc-facts: FAIL — repo-root documents (README.md / INSTALL.md / README.zh.md / CHANGELOG.md) are absent in this layout`，与我本机的读数一字不差。
