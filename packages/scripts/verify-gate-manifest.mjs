@@ -139,13 +139,27 @@ for (const row of tableRows) {
   if (!script.external) declaredScripts.add(script.name)
 }
 
-// (3) the upstream target line has ONE source: release.yml's PLATFORM_VERSION.
+// (3) the upstream target line has ONE source: platform-line.json at the repository root (G1-S7).
+// release.yml reads it through the `platform-line` job outputs and must not duplicate the values.
+const platformLinePath = join(repo, 'platform-line.json')
 let platformVersion = null
-if (existsSync(releasePath)) {
-  const match = /^\s*PLATFORM_VERSION:\s*(\S+)\s*$/m.exec(readFileSync(releasePath, 'utf8'))
-  if (match !== null) platformVersion = match[1]
+if (!existsSync(platformLinePath)) {
+  problems.push('platform-line.json is missing at the repository root — the upstream target line has no single source')
+} else {
+  try {
+    const line = JSON.parse(readFileSync(platformLinePath, 'utf8'))
+    if (typeof line.version !== 'string' || typeof line.floor !== 'string') problems.push('platform-line.json must declare version and floor strings')
+    else platformVersion = line.version
+  } catch { problems.push('platform-line.json is not valid JSON') }
 }
-if (platformVersion === null) problems.push('release.yml declares no PLATFORM_VERSION — the upstream target line has no single source')
+if (existsSync(releasePath)) {
+  const workflow = readFileSync(releasePath, 'utf8')
+  if (/^\s*PLATFORM_VERSION:\s*\S+/m.test(workflow) || /^\s*PLATFORM_FLOOR:\s*\S+/m.test(workflow)) {
+    problems.push('release.yml still duplicates the platform line (PLATFORM_VERSION/PLATFORM_FLOOR env) — consume the platform-line job outputs instead')
+  }
+  if (!workflow.includes('needs.platform-line.outputs')) problems.push('release.yml does not consume the platform-line job outputs (the JSON must drive the jobs)')
+}
+if (platformVersion === null) problems.push('the upstream target line cannot be read from platform-line.json — it has no single source')
 else {
   for (const row of tableRows) {
     for (const match of row.command.matchAll(/--upstream\s+([^\s`]+)/g)) {

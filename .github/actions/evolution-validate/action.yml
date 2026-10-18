@@ -12,23 +12,6 @@ inputs:
   upstream_ref:
     description: Upstream commit or tag to validate against
     required: true
-  platform_version:
-    description: >-
-      PLATFORM_VERSION the family targets (npm version of the released
-      upstream, e.g. 0.1.1-rc.2). ONE definition point: the pack step rewrites
-      every @deepseek-ai/dsh-* range to ^<this> and the N-2 guard asserts the
-      staged manifests actually carry it (N-2). The compat job calls it with
-      the same version as its upstream_ref (`dsh-v<platform_version>`).
-    required: true
-  platform_floor:
-    description: >-
-      PLATFORM_FLOOR the published peer ranges declare (the earliest rc of the
-      validated line, e.g. ^0.2.0-rc.1 while platform_version is 0.2.0-rc.2).
-      Empty means the same as platform_version (single-line releases that ship
-      one rc). The floor is what prepare-release writes into every
-      @deepseek-ai/dsh-* range and what the range guard asserts (G7 §2.1).
-    required: false
-    default: ''
   install_smoke:
     description: >-
       'true' additionally installs the packed family into a throwaway
@@ -80,6 +63,9 @@ runs:
           upstream/tsconfig.base.json \
           tsconfig.base.json
         cp -r packages/. upstream/packages/evolution/
+        # G1-S7: the ONE platform line travels with the overlay (prepare-release / range guard read it
+        # from the overlay root; no workflow env carries version/floor).
+        cp platform-line.json upstream/platform-line.json
         rm -rf upstream/packages/evolution/node_modules \
                upstream/packages/evolution/lib \
                upstream/packages/evolution/dist
@@ -219,8 +205,6 @@ runs:
       shell: bash
       working-directory: upstream
       env:
-        PLATFORM_VERSION: ${{ inputs.platform_version }}
-        PLATFORM_FLOOR: ${{ inputs.platform_floor }}
         NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
         # A tag packs its own semver; a main push packs the dev placeholder
@@ -237,9 +221,6 @@ runs:
     - name: Audit the packed tarballs (what a user installs)
       shell: bash
       working-directory: upstream
-      env:
-        PLATFORM_FLOOR: ${{ inputs.platform_floor }}
-        PLATFORM_VERSION: ${{ inputs.platform_version }}
       run: |
         # The pack step proves pnpm can produce tarballs and the range guard reads their
         # MANIFESTS; neither one opens a tarball. This reads the payloads: every entry file a
@@ -247,7 +228,9 @@ runs:
         # ranges are exactly the floor, no @deepseek-ai/dsh-evolution- literal survived the
         # rescope, each browser half carries lib/client.js plus dsh.client, and no test /
         # node_modules / tarball residue rode along.
-        RANGE="${PLATFORM_FLOOR:-$PLATFORM_VERSION}"
+        # G1-S7: the floor comes from the overlay platform-line.json (the same file prepare-release and
+        # the range guard read) — not from an action input that could drift.
+        RANGE="$(node -p \"require('./platform-line.json').floor\")"
         node packages/evolution/scripts/audit-release-tarballs.mjs \
           packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^$RANGE"
 

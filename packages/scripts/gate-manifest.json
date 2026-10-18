@@ -269,13 +269,13 @@
     {
       "id": "gate-18",
       "kind": "script",
-      "human": "`node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.2.0-rc.2`",
+      "human": "`node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.2.1-rc.2`",
       "argv": [
         "node",
         "packages/scripts/verify-platform-contract.mjs",
         "packages",
         "--upstream",
-        "D:/dsh/dsh-upstream-0.2.0-rc.2"
+        "D:/dsh/dsh-upstream-0.2.1-rc.2"
       ],
       "tree": "mirror",
       "profiles": [
