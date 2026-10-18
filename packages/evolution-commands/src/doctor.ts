@@ -14,6 +14,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, presetRowBlock, presetRowBody, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
+import type { DiagnosticsView } from '@deepseek-ai/dsh-evolution-core'
+import { assembleDoctorInputs, buildDoctorView } from './doctor-view.ts'
 import { readLegacyDocumentState } from './migration.ts'
 import { readPlatformView } from './platform-view.ts'
 import type { PlatformPlugin, PlatformPreset, PlatformView } from './platform-view.ts'
@@ -302,6 +304,9 @@ export interface DoctorReport {
   /** G5: where the review row's presence came from: the live entry, or the aggregate inference. */
   serviceSource: 'platform' | 'bundles'
   actions: string[]
+  /** G6/W8 tail: the frozen DiagnosticsView (7 facts + 8 runtime rows) — the SAME object the
+   * diagnostics route and the client card render; `--json` emits it and the text renderer prints it. */
+  readonly view: DiagnosticsView
 }
 
 /** Profile bundle rows for evolution-family packages across all profiles.
@@ -847,6 +852,8 @@ export async function diagnose(
   // G3: which profiles under this home are NOT this plane. Read from the same owner module as the
   // rest of the profile surface; the mounted identity is handed in by the caller (one probe for it
   // exists in preset-source.ts — doctor must not add a second).
+  // G6/W8 tail: one view for every doctor face (text / --json / diagnostics route / client card).
+  const view = buildDoctorView(await assembleDoctorInputs(ctx as unknown as Parameters<typeof assembleDoctorInputs>[0]))
   const foreignProfiles = homeProfiles(home)
     .filter(({ profile, dir }) => mounted === undefined || (profile !== mounted.profile && dir !== mounted.dir))
     .map(({ profile }) => profile)
@@ -860,6 +867,7 @@ export async function diagnose(
     dormantBundles,
     serviceSource: reviewRow === undefined ? 'bundles' : 'platform',
     actions,
+    view,
   }
 }
 
@@ -1061,4 +1069,28 @@ export function renderDoctorText(report: DoctorReport): string {
   if (report.queryIssues.length > 0) lines.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) lines.push('next steps:', ...report.actions.map(line => `  → ${line}`))
   return lines.filter((line): line is string => line !== null).join('\n')
+}
+
+/**
+ * G6/W8 tail: render the frozen DiagnosticsView as the doctor's diagnostics section.
+ *
+ * This is the ONE text face of the 7+8 rows: the same object `--json` and the diagnostics route
+ * answer, so the three readers cannot disagree. Legacy install/conflict sections keep their own
+ * renderer until the remaining W8-S7 rewrite lands.
+ * @param view - the assembled view.
+ * @returns the section text (ends with a newline).
+ */
+export function renderDiagnosticsText(view: DiagnosticsView): string {
+  const lines: string[] = []
+  lines.push('诊断（schema v' + String(view.schemaVersion) + '，生成于 ' + view.generatedAt + '）：')
+  lines.push('  事实：')
+  for (const fact of view.facts) lines.push('  - ' + fact.label + '：' + fact.value + '（出处：' + fact.home + '）')
+  lines.push('  运行时：')
+  for (const row of view.runtime) {
+    const status = row.status === 'ok' ? '正常' : row.status === 'warn' ? '注意' : row.status === 'fail' ? '异常' : '未知'
+    const detail = row.detail === undefined ? '' : '：' + row.detail
+    const remedy = row.remedy === undefined ? '' : '；下一步：' + row.remedy
+    lines.push('  - [' + status + '] ' + row.label + detail + remedy)
+  }
+  return lines.join('\n') + '\n'
 }

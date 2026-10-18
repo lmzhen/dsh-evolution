@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { PLATFORM_SERVICE_PROBES, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetRowId, removePresetRow } from '@deepseek-ai/dsh-evolution-core/composition'
-import { collectEvolutionBundles, diagnose, renderDoctorText } from '../src/doctor.ts'
+import { DIAGNOSTICS_FACT_KEYS, DIAGNOSTICS_RUNTIME_KEYS } from '@deepseek-ai/dsh-evolution-core'
+import { collectEvolutionBundles, diagnose, renderDiagnosticsText, renderDoctorText } from '../src/doctor.ts'
 
 const stub = { get: () => undefined }
 
@@ -1040,3 +1041,32 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
   })
 })
 
+
+describe('G6/W8 tail: diagnose carries the frozen DiagnosticsView', () => {
+  it('every doctor call carries the same 7+8 view as the route/client', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-view-'))
+    try {
+      const report = await diagnose(stub, { home })
+      expect(report.view.schemaVersion).toBe(2)
+      expect(report.view.facts.map(fact => fact.key)).toEqual([...DIAGNOSTICS_FACT_KEYS].sort())
+      expect(report.view.runtime.map(row => row.key)).toEqual([...DIAGNOSTICS_RUNTIME_KEYS].sort())
+      // A stub context mounts nothing: the view names that instead of inventing health.
+      const host = report.view.runtime.find(row => row.key === 'host-surface')
+      expect(host?.status).toBe('warn')
+      expect(host?.detail).toContain('E-325')
+    } finally { await rm(home, { recursive: true, force: true }) }
+  })
+
+  it('renders the view as the doctor diagnostics section (one text face for the 7+8 rows)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-view-text-'))
+    try {
+      const report = await diagnose(stub, { home })
+      const text = renderDiagnosticsText(report.view)
+      expect(text).toContain('诊断（schema v2')
+      expect(text).toContain('事实：')
+      expect(text).toContain('运行时：')
+      expect(text).toContain(report.view.facts[0]?.label ?? '')
+      expect(text).toContain(report.view.runtime[0]?.label ?? '')
+    } finally { await rm(home, { recursive: true, force: true }) }
+  })
+})
