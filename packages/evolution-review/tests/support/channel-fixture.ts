@@ -7,9 +7,9 @@ import type { Context } from '@deepseek-ai/cordis'
 export const PARENT_PRESET_DOC = {
   agentPreset: 'standard',
   content: [
-    "- id: persona",
+    '- id: persona',
     "  name: '@deepseek-ai/dsh-persona'",
-    "- id: tool-skill",
+    '- id: tool-skill',
     "  name: '@deepseek-ai/dsh-tool-skill'",
     '',
   ].join('\n'),
@@ -36,7 +36,7 @@ export function provideChannel(ctx: Context, legacy: LegacySubagents): { registe
     startActivation: async (spec: { label?: string; request: Record<string, unknown>; signal?: AbortSignal }) => {
       started += 1
       const run = await legacy.start('spawn', { ...spec.request, label: spec.label, signal: spec.signal })
-      const childId = 'legacy-child-' + started
+      const childId = 'legacy-child-' + String(started)
       if (run.localAgent !== undefined && run.localAgent !== null) children.set(childId, run.localAgent)
       const normalized = run.result.then((value) => {
         const record = typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
@@ -51,7 +51,7 @@ export function provideChannel(ctx: Context, legacy: LegacySubagents): { registe
         spec.signal?.addEventListener('abort', onAbort, { once: true })
       })
       const settled = Promise.race([normalized, aborted])
-      return { childId, result: settled, dispose: run.dispose }
+      return { childId, result: settled, dispose: () => run.dispose() }
     },
   })
   // The Channel's capability probe + restricted-preset ensure both need this service. Tests that

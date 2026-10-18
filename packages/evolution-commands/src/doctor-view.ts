@@ -107,7 +107,7 @@ function factsOf(inputs: DoctorInputs): DocFactRow[] {
     'upgrade-order': '先升平台 → 再升家族 → 最后发布（见 INSTALL runbook）',
     'fallback-map': Object.keys(COMMAND_FALLBACKS).join('、') + '（每面的命令见 INSTALL 命令兜底表）',
   }
-  const rows: DocFactRow[] = DIAGNOSTICS_FACT_KEYS.map((key) => ({
+  const rows: DocFactRow[] = DIAGNOSTICS_FACT_KEYS.map(key => ({
     key,
     label: FACT_LABELS[key] ?? key,
     value: values[key] ?? 'unknown',
@@ -117,11 +117,13 @@ function factsOf(inputs: DoctorInputs): DocFactRow[] {
 }
 
 function channelRow(channels: DoctorInputs['channels']): DiagnosticRow {
-  const unavailable = [channels.review, channels.maintenance].filter(state => state.kind === 'unavailable')
+  const unavailable = [channels.review, channels.maintenance].filter(
+    (state): state is Extract<ChannelState, { kind: 'unavailable' }> => state.kind === 'unavailable',
+  )
   if (unavailable.length === 0) {
     return { key: 'subagent-channel', label: RUNTIME_LABELS['subagent-channel'] ?? '子代理通道', status: 'ok', detail: 'reviewer/maintainer 通道均可用（spawn provider + agentPreset 能力）' }
   }
-  const reasons = unavailable.map(state => state.kind === 'unavailable' ? state.code + ': ' + state.reason : '').filter(text => text !== '')
+  const reasons = unavailable.map(state => state.code + ': ' + state.reason)
   return {
     key: 'subagent-channel',
     label: RUNTIME_LABELS['subagent-channel'] ?? '子代理通道',
@@ -149,7 +151,14 @@ function presetRow(presets: DoctorInputs['presets']): DiagnosticRow {
 
 function hostRow(host: DoctorInputs['host'], count: DoctorInputs['hostRouteCount']): DiagnosticRow {
   if (!host.mounted) {
-    return { key: 'host-surface', label: RUNTIME_LABELS['host-surface'] ?? 'Host 数据面', status: 'warn', detail: 'E-325: connection 不可用（' + String(host.reason ?? 'unknown') + '），面板与审批路由未注册。', remedy: '改用命令面完成同等操作：' + COMMAND_FALLBACKS.approval.command.split(' … ')[0] + ' 等；运行 /evolution doctor 查看已挂载服务。' }
+    const fallback = COMMAND_FALLBACKS.approval.command.split(' … ')[0] ?? ''
+    return {
+      key: 'host-surface',
+      label: RUNTIME_LABELS['host-surface'] ?? 'Host 数据面',
+      status: 'warn',
+      detail: 'E-325: connection 不可用（' + (host.reason ?? 'unknown') + '），面板与审批路由未注册。',
+      remedy: '改用命令面完成同等操作：' + fallback + ' 等；运行 /evolution doctor 查看已挂载服务。',
+    }
   }
   const remote = host.deploymentAllowsRemote === true ? '允许远程权限（平台准入策略原样报告）' : '仅本机权限（平台准入策略原样报告）'
   const mounted = count === undefined ? '已挂载' : '已挂载 ' + String(count.mounted) + '/' + String(count.total)
@@ -209,9 +218,14 @@ export function buildDoctorView(inputs: DoctorInputs): DiagnosticsView {
 
 /** A safe view for a host whose inputs could not be assembled: every row names the failure. */
 export function unavailableDoctorView(now: Date, reason: string): DiagnosticsView {
-  const facts: DocFactRow[] = DIAGNOSTICS_FACT_KEYS.map((key) => ({ key, label: FACT_LABELS[key] ?? key, value: 'unknown', home: FACT_HOMES[key] ?? 'README.md' }))
-  const runtime: DiagnosticRow[] = DIAGNOSTICS_RUNTIME_KEYS.map((key) => ({ key, label: RUNTIME_LABELS[key] ?? key, status: 'unknown', detail: '无法装配 doctor 输入：' + reason, remedy: '运行 /evolution doctor 重试；若持续失败，检查宿主日志。' }))
-  return { schemaVersion: DIAGNOSTICS_VIEW_SCHEMA_VERSION, generatedAt: now.toISOString(), facts: facts.sort((a, b) => a.key.localeCompare(b.key)), runtime: runtime.sort((a, b) => a.key.localeCompare(b.key)) }
+  const facts: DocFactRow[] = DIAGNOSTICS_FACT_KEYS.map(key => ({ key, label: FACT_LABELS[key] ?? key, value: 'unknown', home: FACT_HOMES[key] ?? 'README.md' }))
+  const runtime: DiagnosticRow[] = DIAGNOSTICS_RUNTIME_KEYS.map(key => ({ key, label: RUNTIME_LABELS[key] ?? key, status: 'unknown', detail: '无法装配 doctor 输入：' + reason, remedy: '运行 /evolution doctor 重试；若持续失败，检查宿主日志。' }))
+  return {
+    schemaVersion: DIAGNOSTICS_VIEW_SCHEMA_VERSION,
+    generatedAt: now.toISOString(),
+    facts: facts.sort((a, b) => a.key.localeCompare(b.key)),
+    runtime: runtime.sort((a, b) => a.key.localeCompare(b.key)),
+  }
 }
 
 /** The family version this build carries (nearest package.json above the running module). */
@@ -241,7 +255,7 @@ function hostRuntimeVersion(): string | undefined {
     try {
       const require = createRequire(import.meta.url)
       const manifest = require.resolve(packageName + '/package.json')
-      const parsed = JSON.parse(readFileSync(manifest, 'utf8'))
+      const parsed = JSON.parse(readFileSync(manifest, 'utf8')) as { version?: unknown }
       if (typeof parsed.version === 'string' && parsed.version !== '') return parsed.version
     } catch { /* try the next manifest */ }
   }
@@ -325,7 +339,11 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
     probes: { agentPresets: get('agentPresets') !== undefined, connection: get('connection') !== undefined },
     channels: { review, maintenance },
     presets: { reviewer: presetOf(REVIEWER_PRESET_ID), maintainer: presetOf(MAINTAINER_PRESET_ID) },
-    host: { mounted: hostMounted, ...(hostMounted || host.reason === undefined ? {} : { reason: host.reason }), ...(host.available ? { deploymentAllowsRemote: host.allowsRemoteAuthorities } : {}) },
+    host: {
+      mounted: hostMounted,
+      ...(hostMounted ? {} : { reason: host.reason }),
+      ...(host.available ? { deploymentAllowsRemote: host.allowsRemoteAuthorities } : {}),
+    },
     runs: extras.runs ?? { running: 0, orphaned: 0 },
     missingServices,
     sessionFoldClassifierPresent: typeof classifySessionEvent === 'function',

@@ -28,8 +28,8 @@ interface AgentPresetsServiceLike {
   composedPreset(ctx: Context): string | undefined
 }
 
-function serviceOf<T>(ctx: Context, name: string): T | undefined {
-  return (ctx as unknown as { get(service: string): unknown }).get(name) as T | undefined
+function serviceOf(ctx: Context, name: string): unknown {
+  return (ctx as unknown as { get(service: string): unknown }).get(name)
 }
 
 function messageOf(error: unknown): string {
@@ -42,19 +42,19 @@ export function createSubagentChannel(ctx: Context): SubagentChannel {
     get state(): ChannelState {
       return probeChannelState(ctx, lastKind)
     },
-    async prepare(spec): Promise<ChannelState> {
+    prepare(spec): Promise<ChannelState> {
       lastKind = spec.kind
       const state = probeChannelState(ctx, spec.kind)
-      if (state.kind === 'unavailable') return state
-      if (spec.allow.length === 0) return { kind: 'unavailable', code: 'E-324', reason: 'allow set is empty' }
-      return state
+      if (state.kind === 'unavailable') return Promise.resolve(state)
+      if (spec.allow.length === 0) return Promise.resolve({ kind: 'unavailable', code: 'E-324', reason: 'allow set is empty' })
+      return Promise.resolve(state)
     },
     async run<T = undefined>(spec: ChannelSpec<T>): Promise<ChannelOutcome<T>> {
       lastKind = spec.kind
       const probe = probeChannelState(ctx, spec.kind)
       if (probe.kind === 'unavailable') return probe
-      const subagents = serviceOf<SubagentsServiceLike>(ctx, 'subagents')
-      const presets = serviceOf<AgentPresetsServiceLike>(ctx, 'agentPresets')
+      const subagents = serviceOf(ctx, 'subagents') as SubagentsServiceLike | undefined
+      const presets = serviceOf(ctx, 'agentPresets') as AgentPresetsServiceLike | undefined
       if (subagents === undefined || presets === undefined) {
         return { kind: 'unavailable', code: 'E-323', reason: 'subagents/agentPresets service unavailable' }
       }
@@ -96,7 +96,7 @@ export function createSubagentChannel(ctx: Context): SubagentChannel {
         let evidence: T | undefined
         if (spec.afterResult !== undefined) {
           try {
-            const agents = serviceOf<{ get(childId: SessionId): unknown }>(ctx, 'agents')
+            const agents = serviceOf(ctx, 'agents') as { get(childId: SessionId): unknown } | undefined
             const child = agents?.get(activation.childId)
             if (child !== undefined) evidence = spec.afterResult(child as never)
           } catch {

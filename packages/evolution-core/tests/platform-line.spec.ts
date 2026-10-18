@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { PLATFORM_LINE } from '../src/platform-line.generated.ts'
-import { parsePlatformLine, windowRows, OUTPUT_KEYS } from '../../scripts/lib-platform-line.mjs'
+import { parsePlatformLine as parseLine, windowRows as rowsOf, OUTPUT_KEYS as OUTPUT_KEYS_RAW } from '../../scripts/lib-platform-line.mjs'
+
+/** The script modules are plain .mjs (no declarations); pin the two shapes this spec exercises. */
+type GridRow = { version: string; peersAdmits: boolean; enginesAdmits: boolean; expected: boolean; note: string }
+const windowRows = rowsOf as (line: typeof PLATFORM_LINE) => GridRow[]
+const parsePlatformLine = parseLine as (raw: string, source: string) => unknown
+const OUTPUT_KEYS = OUTPUT_KEYS_RAW as Record<string, string>
 
 const raw = readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')
 void raw

@@ -282,7 +282,7 @@ export class EvolutionApproval extends Service {
     // W6/G4: the platform's Host connection data plane is the ONLY admission path (trust, browser
     // auth, owner-only). registerHostRoutes waits on `connection` via inject and owns the route
     // effect; the audit snapshot is taken where the connection service is known.
-    registerHostRoutes(this.ctx, (audit) => makeApprovalRoutes(this, audit))
+    registerHostRoutes(this.ctx, audit => makeApprovalRoutes(this, audit))
   }
 
   private state(): EvolutionState {

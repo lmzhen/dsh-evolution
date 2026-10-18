@@ -10,9 +10,9 @@ import type { Context } from '@deepseek-ai/cordis'
 export const PARENT_PRESET_DOC = {
   agentPreset: 'standard',
   content: [
-    "- id: persona",
+    '- id: persona',
     "  name: '@deepseek-ai/dsh-persona'",
-    "- id: tool-skill",
+    '- id: tool-skill',
     "  name: '@deepseek-ai/dsh-tool-skill'",
     '',
   ].join('\n'),
@@ -86,7 +86,7 @@ export function legacyChannel(legacy: LegacySubagents) {
       // adapter emulates that contract (timeout/abort -> aborted outcome) before mapping.
       try {
         const settled = await Promise.race([
-          run.result.then((value) => ({ done: true as const, value })),
+          run.result.then(value => ({ done: true as const, value })),
           abortPromise.then(() => ({ done: false as const })),
         ])
         if (spec.signal?.aborted === true || aborted || settled.done === false) return { kind: 'aborted' as const }
@@ -128,7 +128,7 @@ export function provideChannel(ctx: Context, legacy: LegacySubagents): { registe
       const run = await legacy.start('spawn', { ...spec.request, label: spec.label, signal: spec.signal })
       const childId = 'legacy-child-' + started
       if (run.localAgent !== undefined && run.localAgent !== null) children.set(childId, run.localAgent)
-      const normalized = run.result.then((value) => normalize(value))
+      const normalized = run.result.then(value => normalize(value))
       const aborted = new Promise<never>((_resolve, reject) => {
         const onAbort = (): void => { reject(new Error('legacy fixture aborted')) }
         if (spec.signal?.aborted === true) { onAbort(); return }

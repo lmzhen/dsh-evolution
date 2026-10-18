@@ -103,7 +103,7 @@ async function mount(options: { handoff?: boolean; live?: boolean } = {}) {
       // The stub answers the FAMILY's consumer, which reads `outcome.text`; the platform's
       // `SubagentResult` declares `output`/`structured` instead — the drift verify-platform-contract
       // tracks. The cast states the mismatch here rather than bending the fixture's runtime shape.
-      return { result: new Promise((resolve) => { releaseOutcome = () => { resolve({ text: 'x', structured: STRUCTURED_PLAN } as unknown as Parameters<typeof resolve>[0]) } }) }
+      return { result: new Promise((resolve) => { releaseOutcome = () => { resolve({ text: 'x', structured: STRUCTURED_PLAN }) } }) }
     },
   }))
   const plain = { root, maintainCooldownMs: 0, ...(options.handoff === undefined ? {} : { maintainHandoffOnSettle: options.handoff }) }

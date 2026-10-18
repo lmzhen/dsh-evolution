@@ -10,12 +10,12 @@ import { MAINTAINER_PRESET_ID, REVIEWER_PRESET_ID, RESTRICTED_TOOLS_ROW_ID } fro
 const PARENT: PresetDocumentLike = {
   agentPreset: 'standard',
   content: [
-    "- id: persona",
+    '- id: persona',
     "  name: '@deepseek-ai/dsh-persona'",
-    "- id: tool-skill",
+    '- id: tool-skill',
     "  name: '@deepseek-ai/dsh-tool-skill'",
-    "  config:",
-    "    catalogDescriptionMaxLength: 60",
+    '  config:',
+    '    catalogDescriptionMaxLength: 60',
     '',
   ].join('\n'),
 }
@@ -64,7 +64,8 @@ describe('restricted preset definition (G2-S4)', () => {
     expect(definition.plugins).toHaveLength(3)
     expect(definition.plugins[0]).toEqual({ id: 'persona', name: '@deepseek-ai/dsh-persona' })
     expect(definition.plugins[1]).toMatchObject({ id: 'tool-skill', config: { catalogDescriptionMaxLength: 60 } })
-    expect(definition.plugins[2]).toEqual({ id: RESTRICTED_TOOLS_ROW_ID, name: expect.stringContaining('/dsh-evolution-core/restrictor'), config: { allow: ['tool-skill'], presetId: REVIEWER_PRESET_ID } })
+    expect(definition.plugins[2]).toMatchObject({ id: RESTRICTED_TOOLS_ROW_ID, config: { allow: ['tool-skill'], presetId: REVIEWER_PRESET_ID } })
+    expect((definition.plugins[2] as { name: string }).name).toContain('/dsh-evolution-core/restrictor')
   })
 
   it('uses the maintainer identity/order for the maintenance channel', () => {

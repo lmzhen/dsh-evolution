@@ -92,7 +92,7 @@ describe('anchored-standard review smoke', () => {
     expect(request?.agentPreset).toBe('evolution-reviewer-readonly')
     expect(Object.hasOwn(request ?? {}, 'toolFilter')).toBe(false)
     expect(Object.hasOwn(request ?? {}, 'persona')).toBe(false)
-    const reviewerDefinition = channelFixture.registered.find((value) => (value as { id?: string }).id === 'evolution-reviewer-readonly')
+    const reviewerDefinition = channelFixture.registered.find(value => (value as { id?: string }).id === 'evolution-reviewer-readonly')
     const restrictorRow = (reviewerDefinition as { plugins?: Array<{ config?: unknown }> } | undefined)?.plugins?.at(-1)
     expect(restrictorRow?.config).toEqual({ allow: ['skill'], presetId: 'evolution-reviewer-readonly' })
     // No reviewProvider config: the subagent inherits the deployment default
@@ -639,7 +639,7 @@ describe('review allow-list transport (I-6 -> W5 G3-S3)', () => {
     // dropped by a global-layer probe.
     const request = capturedRequest as Record<string, unknown>
     expect(Object.hasOwn(request, 'toolFilter')).toBe(false)
-    const composed = channelFixture.registered.find((value) => (value as { id?: string }).id === 'evolution-reviewer-readonly')
+    const composed = channelFixture.registered.find(value => (value as { id?: string }).id === 'evolution-reviewer-readonly')
     const restrictorRow = (composed as { plugins?: Array<{ config?: unknown }> } | undefined)?.plugins?.at(-1)
     expect(restrictorRow?.config).toEqual({ allow: ['not-a-registered-tool', 'skill'], presetId: 'evolution-reviewer-readonly' })
     disposeKnown()

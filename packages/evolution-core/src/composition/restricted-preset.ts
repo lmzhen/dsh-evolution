@@ -14,7 +14,7 @@ const JsExpr = new yaml.Type('tag:yaml.org,2002:js', {
   kind: 'scalar',
   resolve: (data: string) => typeof data === 'string',
   construct: (data: string) => ({ __jsExpr: data }),
-  represent: (data) => (data as { __jsExpr: string }).__jsExpr,
+  represent: data => (data as { __jsExpr: string }).__jsExpr,
 })
 export const entryListSchema = yaml.JSON_SCHEMA.extend(JsExpr)
 import {

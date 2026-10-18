@@ -37,7 +37,10 @@ describe('diagnostics route', () => {
   it('answers the family envelope with schemaVersion 2 and the frozen key sets', async () => {
     const ctx = new Context()
     const host = await mountHostRoutes(ctx, () => makeDiagnosticsRoutes(async () => inputs()))
-    const answer = await host.json<{ ok: boolean; data: { schemaVersion: number; facts: Array<{ key: string }>; runtime: Array<{ key: string }> } }>(HOST_ROUTES.diagnostics.view)
+    const answer = await host.json<{
+      ok: boolean
+      data: { schemaVersion: number; facts: Array<{ key: string }>; runtime: Array<{ key: string }> }
+    }>(HOST_ROUTES.diagnostics.view)
     expect(answer.status).toBe(200)
     expect(answer.body.ok).toBe(true)
     expect(answer.body.data.schemaVersion).toBe(2)
@@ -48,7 +51,9 @@ describe('diagnostics route', () => {
   it('turns a failed input assembly into an all-unknown view (doctor never throws)', async () => {
     const ctx = new Context()
     const host = await mountHostRoutes(ctx, () => makeDiagnosticsRoutes(async () => { throw new Error('probe boom') }))
-    const answer = await host.json<{ ok: boolean; data: { runtime: Array<{ status: string; detail?: string }> } }>(HOST_ROUTES.diagnostics.view)
+    const answer = await host.json<{ ok: boolean; data: { runtime: Array<{ status: string; detail?: string }> } }>(
+      HOST_ROUTES.diagnostics.view,
+    )
     expect(answer.status).toBe(200)
     expect(answer.body.ok).toBe(true)
     expect(answer.body.data.runtime.every(entry => entry.status === 'unknown')).toBe(true)

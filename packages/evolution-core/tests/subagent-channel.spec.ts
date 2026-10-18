@@ -42,7 +42,9 @@ function harness(options: Options = {}) {
   }
   const agentPresets = {
     composedPreset: () => (options.parentPreset === null ? undefined : (options.parentPreset ?? 'standard')),
+    // oxlint-disable-next-line typescript/unbound-method -- fixture delegates to the fake registry; neither method uses `this`
     readDocument: registry.readDocument,
+    // oxlint-disable-next-line typescript/unbound-method -- fixture delegates to the fake registry; neither method uses `this`
     register: registry.register,
   }
   const agents = { get: () => (options.childMissing === true ? undefined : { id: 'child-1' }) }
@@ -86,7 +88,9 @@ describe('subagent channel (G3-S1/S2)', () => {
     const weak = harness({ capability: false })
     expect(await createSubagentChannel(weak.ctx as never).run({ parent, label: 'r', promptText: 't', kind: 'reviewer', allow: ['tool-skill'], timeoutMs: 1_000 })).toMatchObject({ kind: 'unavailable', code: 'E-323' })
     const noPreset = harness({ parentPreset: null })
-    expect(await createSubagentChannel(noPreset.ctx as never).run({ parent, label: 'r', promptText: 't', kind: 'reviewer', allow: ['tool-skill'], timeoutMs: 1_000 })).toMatchObject({ kind: 'unavailable', code: 'E-323', reason: expect.stringContaining('parent preset') })
+    const noPresetOutcome = await createSubagentChannel(noPreset.ctx as never).run({ parent, label: 'r', promptText: 't', kind: 'reviewer', allow: ['tool-skill'], timeoutMs: 1_000 })
+    expect(noPresetOutcome).toMatchObject({ kind: 'unavailable', code: 'E-323' })
+    expect((noPresetOutcome as { reason?: string }).reason).toContain('parent preset')
     expect(missingProvider.calls).toHaveLength(0)
   })
 

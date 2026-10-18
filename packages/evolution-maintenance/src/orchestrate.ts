@@ -444,28 +444,28 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     }
     const raw = outcome.structured
     const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
-      if (!validated.ok) {
-        return {
-          ok: false,
-          recommendationCount: 0,
-          error: `维护计划被校验器拒绝：${validated.errors.slice(0, 5).join('; ')}`,
-        }
-      }
-      const runId = options.runId ?? randomUUID()
+    if (!validated.ok) {
       return {
-        ok: true,
-        runId,
-        verdict: validated.plan.verdict,
-        forcedHuman: validated.forcedHuman,
-        // The ledger: literally the array the rendered [n] ids were numbered from.
-        items: validated.plan.plan,
-        notes: validated.plan.notes,
-        needsHumanCount: validated.plan.plan.filter(item => item.needs_human).length,
-        // V10-09 (F-05): the structured plan length IS the recommendation
-        // count — consumers read this instead of parsing the rendered text.
-        recommendationCount: validated.plan.plan.length,
-        text: formatPlan(validated, runId),
+        ok: false,
+        recommendationCount: 0,
+        error: `维护计划被校验器拒绝：${validated.errors.slice(0, 5).join('; ')}`,
       }
+    }
+    const runId = options.runId ?? randomUUID()
+    return {
+      ok: true,
+      runId,
+      verdict: validated.plan.verdict,
+      forcedHuman: validated.forcedHuman,
+      // The ledger: literally the array the rendered [n] ids were numbered from.
+      items: validated.plan.plan,
+      notes: validated.plan.notes,
+      needsHumanCount: validated.plan.plan.filter(item => item.needs_human).length,
+      // V10-09 (F-05): the structured plan length IS the recommendation
+      // count — consumers read this instead of parsing the rendered text.
+      recommendationCount: validated.plan.plan.length,
+      text: formatPlan(validated, runId),
+    }
   } catch (error) {
     // 0.3.3/0.3.8/0.3.14: translate platform abort results instead of surfacing
     // the raw `Error: This operation was aborted`. Primary evidence is our own

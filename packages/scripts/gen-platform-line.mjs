@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
+import { tsLiteral } from './lib-ts-literal.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const EVOLUTION_ROOT = dirname(HERE)
@@ -20,7 +21,7 @@ const generated = [
   '// GENERATED FILE — do not edit. Source: ' + relativeJson + ' (generator: packages/scripts/gen-platform-line.mjs).',
   '// Regenerate with: node packages/scripts/gen-platform-line.mjs',
   '/** The frozen platform line this release targets (peers/engines/anchors derived from version+floor). */',
-  'export const PLATFORM_LINE = ' + JSON.stringify(platformLine, null, 2) + ' as const',
+  'export const PLATFORM_LINE = ' + tsLiteral(platformLine) + ' as const',
   '',
 ].join('\n')
 

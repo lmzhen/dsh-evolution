@@ -23,6 +23,8 @@ const rootArg = argv.find((arg) => !arg.startsWith('--')) ?? 'packages'
 const root = resolve(rootArg)
 const CHECK = argv.includes('--check')
 const JSON_OUT = argv.includes('--json')
+import { tsLiteral } from './lib-ts-literal.mjs'
+
 const HERE = resolve(new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const scriptsDir = existsSync(join(root, 'scripts')) ? join(root, 'scripts') : HERE
 const templates = join(scriptsDir, 'templates', 'client')
@@ -71,7 +73,7 @@ function renderRoutes(hostRoutes) {
   return template
     .replace('{{HEADER}}', header)
     .replace('{{SURFACE_UNION}}', union)
-    .replace('{{ROUTES_BODY}}', JSON.stringify(body, null, 2))
+    .replace('{{ROUTES_BODY}}', tsLiteral(body))
 }
 
 /** Read COMMAND_FALLBACKS: built commands lib first, constrained source fallback. */
@@ -169,7 +171,7 @@ function renderFallbacks(surfaceUnion, fallbacks) {
   return readFileSync(join(templates, 'fallbacks.ts.tmpl'), 'utf8')
     .replace('{{HEADER}}', header)
     .replace('{{SURFACE_UNION}}', surfaceUnion)
-    .replace('{{FALLBACKS_BODY}}', JSON.stringify(fallbacks, null, 2))
+    .replace('{{FALLBACKS_BODY}}', tsLiteral(fallbacks))
 }
 
 function renderRouteClient() {

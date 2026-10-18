@@ -8,17 +8,17 @@ import type { FallbackHint } from './contracts.generated.ts'
  * panels render this hint instead of a bare HTTP failure — same use case, command face.
  */
 export const FALLBACKS: Readonly<Record<'approval' | 'skill-history' | 'skill-health' | 'diagnostics', FallbackHint>> = {
-  "approval": {
-    "command": "/evolution pending … /evolution approve <id> … /evolution reject <id> … /evolution release <id>"
+  approval: {
+    command: '/evolution pending … /evolution approve <id> … /evolution reject <id> … /evolution release <id>',
   },
-  "skill-history": {
-    "command": "/evolution restore <name> [v]（查看：/evolution skills history <name>）"
+  'skill-history': {
+    command: '/evolution restore <name> [v]（查看：/evolution skills history <name>）',
   },
-  "skill-health": {
-    "command": "/evolution skills refresh（健康行：/evolution doctor）"
+  'skill-health': {
+    command: '/evolution skills refresh（健康行：/evolution doctor）',
   },
-  "diagnostics": {
-    "command": "/evolution doctor",
-    "platformCli": "dsh --json /evolution doctor"
-  }
+  diagnostics: {
+    command: '/evolution doctor',
+    platformCli: 'dsh --json /evolution doctor',
+  },
 }

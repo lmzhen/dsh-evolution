@@ -14,8 +14,8 @@ interface SubagentsLike {
   getProvider(name: string): ProviderLike | undefined
 }
 
-function serviceOf<T>(ctx: Context, name: string): T | undefined {
-  return (ctx as unknown as { get(service: string): unknown }).get(name) as T | undefined
+function serviceOf(ctx: Context, name: string): unknown {
+  return (ctx as unknown as { get(service: string): unknown }).get(name)
 }
 
 function kindOf(kind: ChannelKind): RestrictedPresetKind {
@@ -24,7 +24,7 @@ function kindOf(kind: ChannelKind): RestrictedPresetKind {
 
 /** Pure derivation (no side effects): the doctor reads this, the channel re-probes on every run. */
 export function probeChannelState(ctx: Context, kind: ChannelKind): ChannelState {
-  const subagents = serviceOf<SubagentsLike>(ctx, 'subagents')
+  const subagents = serviceOf(ctx, 'subagents') as SubagentsLike | undefined
   if (subagents === undefined || typeof subagents.getProvider !== 'function') {
     return { kind: 'unavailable', code: 'E-323', reason: 'subagents service unavailable' }
   }
@@ -36,7 +36,7 @@ export function probeChannelState(ctx: Context, kind: ChannelKind): ChannelState
   if (provider.inheritsParentContext === true) {
     return { kind: 'unavailable', code: 'E-323', reason: 'spawn provider inherits the parent context (independent preset required)' }
   }
-  const agentPresets = serviceOf<{ readDocument?: unknown; register?: unknown }>(ctx, 'agentPresets')
+  const agentPresets = serviceOf(ctx, 'agentPresets') as { readDocument?: unknown; register?: unknown } | undefined
   if (agentPresets === undefined || typeof agentPresets.readDocument !== 'function' || typeof agentPresets.register !== 'function') {
     return { kind: 'unavailable', code: 'E-323', reason: 'agentPresets service unavailable or incomplete' }
   }

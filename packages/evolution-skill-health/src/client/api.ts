@@ -31,5 +31,5 @@ export type HealthOutcome = { ok: true; payload: HealthPayload } | { ok: false; 
 export async function rows(): Promise<HealthOutcome> {
   const answer = await requestJson<HealthPayload>(fetch, HOST_ROUTES.rows, { headers: { accept: 'application/json' } })
   if (!answer.ok) return { ok: false, failure: answer.failure }
-  return { ok: true, payload: { rows: answer.data.rows ?? [], truncated: answer.data.truncated === true } }
+  return { ok: true, payload: { rows: answer.data.rows, truncated: answer.data.truncated } }
 }

@@ -19,20 +19,26 @@ const run = promisify(execFile)
 const script = fileURLToPath(new URL('../../scripts/verify-traceability.mjs', import.meta.url))
 const ledgerPath = fileURLToPath(new URL('../../scripts/traceability.json', import.meta.url))
 
-async function fixture(asset) {
+interface TraceItem { id: string; note?: string; trigger?: string; [key: string]: unknown }
+interface TraceLedger { items: TraceItem[]; budget: Record<string, unknown>; [key: string]: unknown }
+
+async function fixture(asset: TraceLedger): Promise<string> {
   const root = await tempRoot('traceability-')
   await mkdir(join(root, 'scripts'), { recursive: true })
   await writeFile(join(root, 'scripts', 'traceability.json'), JSON.stringify(asset, null, 2), 'utf8')
   return root
 }
 
-async function runGate(root, args = ['--planned']) {
+async function runGate(root: string, args: string[] = ['--planned']): Promise<{ code: number; stdout: string; stderr: string }> {
   return await run(process.execPath, [script, root, ...args], { encoding: 'utf8' })
-    .then((out) => ({ code: 0, stdout: out.stdout, stderr: out.stderr }))
-    .catch((error) => ({ code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }))
+    .then(out => ({ code: 0, stdout: out.stdout, stderr: out.stderr }))
+    .catch((error: unknown) => {
+      const failure = error as { code?: number; stdout?: string; stderr?: string }
+      return { code: failure.code ?? 1, stdout: failure.stdout ?? '', stderr: failure.stderr ?? '' }
+    })
 }
 
-const real = JSON.parse(readFileSync(ledgerPath, 'utf8'))
+const real = JSON.parse(readFileSync(ledgerPath, 'utf8')) as TraceLedger
 
 describe('verify-traceability: the ledger can fail', () => {
   it('passes the real 52-item ledger in planned mode', async () => {
@@ -45,7 +51,7 @@ describe('verify-traceability: the ledger can fail', () => {
   })
 
   it('a dropped item is a missing universe entry', async () => {
-    const asset = { ...real, items: real.items.filter((item) => item.id !== 'A-01') }
+    const asset = { ...real, items: real.items.filter(item => item.id !== 'A-01') }
     const root = await fixture(asset)
     try {
       const result = await runGate(root)
@@ -78,8 +84,10 @@ describe('verify-traceability: the ledger can fail', () => {
   it('an empty matrix cannot decide (exit 2), and a disposition without a reason is a violation', async () => {
     const rootA = await fixture({ ...real, items: [] })
     try { expect((await runGate(rootA)).code).toBe(2) } finally { await rm(rootA, { recursive: true, force: true }) }
-    const asset = { ...real, items: real.items.map((item) => item.id === 'B-06' ? { ...item, trigger: undefined } : item) }
-    delete asset.items.find((item) => item.id === 'B-06').note
+    const asset = { ...real, items: real.items.map(item => item.id === 'B-06' ? { ...item, trigger: undefined } : item) }
+    const target = asset.items.find(item => item.id === 'B-06')
+    if (target === undefined) throw new Error('fixture: B-06 is missing')
+    delete target.note
     const rootB = await fixture(asset)
     try {
       const result = await runGate(rootB)

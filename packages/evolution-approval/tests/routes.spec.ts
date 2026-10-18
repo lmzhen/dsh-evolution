@@ -68,7 +68,7 @@ function makeFace(): Face {
 
 async function mount(face: Face) {
   const ctx = new Context()
-  return await mountHostRoutes(ctx, (audit) => makeApprovalRoutes(face, audit))
+  return await mountHostRoutes(ctx, audit => makeApprovalRoutes(face, audit))
 }
 
 describe('approval routes: the platform carrier selects by exact path', () => {
@@ -83,7 +83,7 @@ describe('approval routes: the platform carrier selects by exact path', () => {
   it('never sees a non-owner principal: the platform refuses before fetch (403)', async () => {
     const face = makeFace()
     const ctx = new Context()
-    const host = await mountHostRoutes(ctx, (audit) => makeApprovalRoutes(face, audit), { principal: 'other' })
+    const host = await mountHostRoutes(ctx, audit => makeApprovalRoutes(face, audit), { principal: 'other' })
     const { status } = await host.json(APPROVAL_ROUTES.pending)
     expect(status).toBe(403)
     expect(face.calls).toEqual([])
@@ -138,7 +138,7 @@ describe('approval routes: the two decisions', () => {
   it('reports deploymentAllowsRemote truthfully when the carrier allows remote authorities', async () => {
     const face = makeFace()
     const ctx = new Context()
-    const host = await mountHostRoutes(ctx, (audit) => makeApprovalRoutes(face, audit), { allowsRemoteAuthorities: true })
+    const host = await mountHostRoutes(ctx, audit => makeApprovalRoutes(face, audit), { allowsRemoteAuthorities: true })
     await host.call(APPROVAL_ROUTES.approve, { method: 'POST', body: { id: 'p-1' } })
     expect(face.audits[0]?.deploymentAllowsRemote).toBe(true)
   })

@@ -39,7 +39,7 @@ interface PresetRegistryLike {
 }
 
 function normalize(names: readonly string[] | undefined): readonly string[] {
-  return [...new Set((names ?? []).map((value) => value.trim()).filter((value) => value !== ''))].sort()
+  return [...new Set((names ?? []).map(value => value.trim()).filter(value => value !== ''))].sort()
 }
 
 function failure(detail: string): Error {
@@ -67,7 +67,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   // `composedPreset` narrows it to the agents actually composed with this restricted preset.
   on.call(ctx, 'agent/created', (payload) => {
     const agent = payload.agent
-    if (agent === undefined || agent.ctx === undefined) return
+    if (agent === undefined) return
     if (presets.composedPreset(agent.ctx) !== presetId) return
     const tools = (agent.ctx as unknown as { tools?: ToolsServiceLike }).tools
     if (tools === undefined || typeof tools.restrict !== 'function') {

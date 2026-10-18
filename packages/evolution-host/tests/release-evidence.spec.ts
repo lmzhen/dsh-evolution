@@ -14,13 +14,21 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import {
-  EVIDENCE_SCHEMA_VERSION,
-  SPIKE_IDS,
-  TRACEABILITY_UNIVERSE,
-  releaseEvidenceSkeleton,
-  validateReleaseEvidence,
-  validateSpikeEvidence,
+  EVIDENCE_SCHEMA_VERSION as EVIDENCE_SCHEMA_VERSION_RAW,
+  SPIKE_IDS as SPIKE_IDS_RAW,
+  TRACEABILITY_UNIVERSE as TRACEABILITY_UNIVERSE_RAW,
+  releaseEvidenceSkeleton as releaseEvidenceSkeletonRaw,
+  validateReleaseEvidence as validateReleaseEvidenceRaw,
+  validateSpikeEvidence as validateSpikeEvidenceRaw,
 } from '../../scripts/lib-release-evidence.mjs'
+
+// The library is a plain .mjs script (no declarations); pin the shapes this spec drives.
+const EVIDENCE_SCHEMA_VERSION = EVIDENCE_SCHEMA_VERSION_RAW as number
+const SPIKE_IDS = SPIKE_IDS_RAW as Array<'S1' | 'S2' | 'S3' | 'S4'>
+const TRACEABILITY_UNIVERSE = TRACEABILITY_UNIVERSE_RAW as { A: number; B: number; C: number }
+const releaseEvidenceSkeleton = releaseEvidenceSkeletonRaw as (v1: Record<string, unknown>) => Record<string, unknown>
+const validateReleaseEvidence = validateReleaseEvidenceRaw as (doc: unknown, options?: { release?: boolean }) => string[]
+const validateSpikeEvidence = validateSpikeEvidenceRaw as (spike: unknown, where?: string) => string[]
 
 const run = promisify(execFile)
 const script = fileURLToPath(new URL('../../scripts/verify-release-evidence.mjs', import.meta.url))
@@ -54,6 +62,19 @@ function releasable(): Record<string, unknown> {
   }
 }
 
+interface EvidenceDoc {
+  schemaVersion: number
+  spikes: unknown[]
+  gates: unknown[]
+  ciFace?: { workflowRef: string }
+  traceability?: { covered: number }
+}
+
+interface ExecFailure { code?: number; stdout?: string; stderr?: string }
+
+/** execFile rejects with the error object; pin its shape instead of flowing `any` through the spec. */
+function execFailure(error: unknown): ExecFailure { return error as ExecFailure }
+
 async function runGuard(doc: unknown): Promise<{ code: number; stdout: string; stderr: string }> {
   const dir = await mkdtemp(join(tmpdir(), 'release-evidence-'))
   const file = join(dir, 'release-evidence.json')
@@ -61,7 +82,7 @@ async function runGuard(doc: unknown): Promise<{ code: number; stdout: string; s
   try {
     return await run(process.execPath, [script, file, '--release'], { encoding: 'utf8' })
       .then(out => ({ code: 0, stdout: out.stdout, stderr: out.stderr }))
-      .catch(error => ({ code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }))
+      .catch((error: unknown) => { const failure = execFailure(error); return { code: failure.code ?? 1, stdout: failure.stdout ?? '', stderr: failure.stderr ?? '' } })
   } finally { await rm(dir, { recursive: true, force: true }) }
 }
 
@@ -78,13 +99,13 @@ describe('release-evidence schema v2', () => {
   it('the complete release shape passes, and every acceptance plane can refuse', () => {
     expect(validateReleaseEvidence(releasable(), { release: true })).toEqual([])
     const cases: Array<[string, (doc: Record<string, unknown>) => void]> = [
-      ['missing spike', doc => { (doc.spikes as unknown[]).pop() }],
-      ['blocked spike', doc => { (doc.spikes as Array<Record<string, unknown>>)[1]!.verdict = 'blocked' }],
-      ['failed spike without signature', doc => { (doc.spikes as Array<Record<string, unknown>>)[2]!.verdict = 'fail' }],
-      ['missing ci face', doc => { doc.ciFace = null }],
-      ['empty gate ledger', doc => { doc.gates = [] }],
-      ['short traceability', doc => { (doc.traceability as Record<string, unknown>).covered = 51 }],
-      ['wrong universe', doc => { (doc.traceability as Record<string, unknown>).universe = { A: 22, B: 18, C: 11 } }],
+      ['missing spike', (doc) => { (doc.spikes as unknown[]).pop() }],
+      ['blocked spike', (doc) => { (doc.spikes as Array<Record<string, unknown>>)[1]!.verdict = 'blocked' }],
+      ['failed spike without signature', (doc) => { (doc.spikes as Array<Record<string, unknown>>)[2]!.verdict = 'fail' }],
+      ['missing ci face', (doc) => { doc.ciFace = null }],
+      ['empty gate ledger', (doc) => { doc.gates = [] }],
+      ['short traceability', (doc) => { (doc.traceability as Record<string, unknown>).covered = 51 }],
+      ['wrong universe', (doc) => { (doc.traceability as Record<string, unknown>).universe = { A: 22, B: 18, C: 11 } }],
     ]
     for (const [label, mutate] of cases) {
       const doc = releasable()
@@ -110,12 +131,16 @@ describe('release-evidence schema v2', () => {
     expect(refused.code).toBe(1)
     expect(refused.stderr).toContain('missing spike S4')
     const missing = await run(process.execPath, [script, join(tmpdir(), 'does-not-exist-release-evidence.json')], { encoding: 'utf8' })
-      .then(() => ({ code: 0 })).catch(error => ({ code: error.code ?? 1 }))
+      .then(() => ({ code: 0 })).catch((error: unknown) => ({ code: execFailure(error).code ?? 1 }))
     expect(missing.code).toBe(2)
   })
 })
 
-async function runAssemble(staging: unknown, inputs: unknown, extra: string[] = []): Promise<{ code: number; stdout: string; stderr: string; doc?: any }> {
+async function runAssemble(
+  staging: unknown,
+  inputs: unknown,
+  extra: string[] = [],
+): Promise<{ code: number; stdout: string; stderr: string; doc: EvidenceDoc }> {
   const dir = await mkdtemp(join(tmpdir(), 'assemble-evidence-'))
   const evidencePath = join(dir, 'release-evidence.json')
   const inputsPath = join(dir, 'rehearsal.json')
@@ -124,8 +149,11 @@ async function runAssemble(staging: unknown, inputs: unknown, extra: string[] = 
   try {
     const result = await run(process.execPath, [assembleScript, evidencePath, '--rehearsal', inputsPath, ...extra], { encoding: 'utf8' })
       .then(out => ({ code: 0, stdout: out.stdout, stderr: out.stderr }))
-      .catch(error => ({ code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }))
-    const doc = JSON.parse(await readFile(evidencePath, 'utf8'))
+      .catch((error: unknown) => {
+        const failure = execFailure(error)
+        return { code: failure.code ?? 1, stdout: failure.stdout ?? '', stderr: failure.stderr ?? '' }
+      })
+    const doc = JSON.parse(await readFile(evidencePath, 'utf8')) as EvidenceDoc
     return { ...result, doc }
   } finally { await rm(dir, { recursive: true, force: true }) }
 }
@@ -157,7 +185,7 @@ describe('release-evidence assembly (W3 injection)', () => {
       const evidencePath = join(dir, 'release-evidence.json')
       await writeFile(evidencePath, JSON.stringify(staging()), 'utf8')
       const result = await run(process.execPath, [assembleScript, evidencePath, '--rehearsal', join(dir, 'absent.json')], { encoding: 'utf8' })
-        .then(() => ({ code: 0 })).catch(error => ({ code: error.code ?? 1 }))
+        .then(() => ({ code: 0 })).catch((error: unknown) => ({ code: execFailure(error).code ?? 1 }))
       expect(result.code).toBe(2)
     } finally { await rm(dir, { recursive: true, force: true }) }
   })

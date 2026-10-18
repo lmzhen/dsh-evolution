@@ -28,5 +28,5 @@ export function restrictedPresetId(kind: RestrictedPresetKind): string {
 
 /** Trim, drop blanks, de-duplicate and sort: ONE spelling for an allow/deny set. */
 export function normalizeAllow(names: readonly string[]): readonly string[] {
-  return [...new Set(names.map((name) => name.trim()).filter((name) => name !== ''))].sort()
+  return [...new Set(names.map(name => name.trim()).filter(name => name !== ''))].sort()
 }

@@ -1366,34 +1366,34 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // events of the child never reach the parent, so this is the only evidence window).
       const childReads = outcome.evidence ?? new Set<string>()
       const plan: unknown = outcome.structured
-        const policyFingerprint = fingerprintPolicy(snapshot)
-        const validation = validateEvolutionPlan(plan as EvolutionPlan, {
-          sessionSeq: sessionSeqAtPlanTime,
-          // Batch D phase 1: the report-only dimension. `reports` never enters `ok`, so this
-          // changes no verdict — it makes the observation window readable in the operator log.
-          substantiveEvidenceSeqs,
-          maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
-          protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
-          maxMemoryChars: snapshot?.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
-          maxUserChars: snapshot?.userChars ?? DEFAULT_USER_CHAR_LIMIT,
-          maxSkillContentChars: snapshot?.skillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS,
-        })
-        // Batch D (phase 1): the EVIDENCE_CLASS findings, said out loud and nowhere else. The
-        // model's notice is deliberately untouched — this dimension is not yet a decision, and a
-        // model-visible line would make it one (design §3D, §5.5).
-        if (validation.reports.length > 0) {
-          ctx.logger.warn(`dsh-evolution-review: ${validation.reports.length} op(s) cite only bookkeeping frames as evidence: ${validation.reports.map(report => report.reason).join('; ')}`)
-        }
-        // F19: the background review may only patch skills it read this session
-        // (read-before-write, matching the original Hermes background guard).
-        // Union of the PARENT session's reads and the review SUBAGENT's own reads.
-        const acceptedSkillOps = validation.accepted.skillOps ?? []
-        // The projection answers the parent's reads; `undefined` (an unfoldable view) falls back to
-        // the child's own reads alone, the same "cannot classify" posture the tool gate documents.
-        const readNames = new Set<string>([...(sessionReadNames(ctx, session) ?? new Set<string>()), ...childReads])
-        const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
-        const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
-          .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
+      const policyFingerprint = fingerprintPolicy(snapshot)
+      const validation = validateEvolutionPlan(plan as EvolutionPlan, {
+        sessionSeq: sessionSeqAtPlanTime,
+        // Batch D phase 1: the report-only dimension. `reports` never enters `ok`, so this
+        // changes no verdict — it makes the observation window readable in the operator log.
+        substantiveEvidenceSeqs,
+        maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
+        protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
+        maxMemoryChars: snapshot?.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
+        maxUserChars: snapshot?.userChars ?? DEFAULT_USER_CHAR_LIMIT,
+        maxSkillContentChars: snapshot?.skillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS,
+      })
+      // Batch D (phase 1): the EVIDENCE_CLASS findings, said out loud and nowhere else. The
+      // model's notice is deliberately untouched — this dimension is not yet a decision, and a
+      // model-visible line would make it one (design §3D, §5.5).
+      if (validation.reports.length > 0) {
+        ctx.logger.warn(`dsh-evolution-review: ${validation.reports.length} op(s) cite only bookkeeping frames as evidence: ${validation.reports.map(report => report.reason).join('; ')}`)
+      }
+      // F19: the background review may only patch skills it read this session
+      // (read-before-write, matching the original Hermes background guard).
+      // Union of the PARENT session's reads and the review SUBAGENT's own reads.
+      const acceptedSkillOps = validation.accepted.skillOps ?? []
+      // The projection answers the parent's reads; `undefined` (an unfoldable view) falls back to
+      // the child's own reads alone, the same "cannot classify" posture the tool gate documents.
+      const readNames = new Set<string>([...(sessionReadNames(ctx, session) ?? new Set<string>()), ...childReads])
+      const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
+      const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
+        .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
         // V27 G4.3: ONE exit for the plan-outcome event. The payload used to be
         // built inline at the very end of the happy path, so a write leg that
         // TIMED OUT emitted nothing at all: replay and activity saw a review that
@@ -1403,118 +1403,118 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // ops that really landed before the deadline. A synchronous throwing
         // listener stays contained (V5-19③: it must not flip `started` and
         // re-trigger the review).
-        type AppliedReport = { actions: readonly string[]; failedOps?: readonly string[]; executionError?: string | undefined }
-        const emitApplied = (report: AppliedReport): void => {
-          try {
-            ctx.emit('evolution/plan-applied', {
-              sessionId: session.id,
-              planId: randomUUID(),
-              policyFingerprint,
-              memoryApplied: report.actions.filter(action => action.startsWith('Memory')).length,
-              skillApplied: report.actions.filter(action => action.startsWith('Skill ')).length,
-              rejectedOps: validation.rejected.length,
-              // V27 R-03: "the plan named a skill this session never read" is its
-              // own dimension. Reporting it inside `rejectedOps` broke that field's
-              // stated contract (validation rejects only) and made the replay
-              // leaderboard penalize one refusal twice (rejectedOps weight AND the
-              // executionFailures dimension).
-              ...skippedUnread > 0 ? { skippedUnread } : {},
-              ...validation.reports.length > 0 ? { evidenceClassReports: validation.reports.length } : {},
-              executionFailures: report.failedOps?.length ?? 0,
-              ...report.executionError !== undefined ? { executionError: report.executionError } : {},
-              evidenceQuotes,
-              estimatedInputChars: reviewText.length,
-            })
-          } catch (emitError) {
-            ctx.logger.warn(`dsh-evolution-review: plan-applied emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-          }
-        }
-        // v20 (C-2): the write leg gets the same deadline class as the
-        // subagent leg (config value is schema-clamped ≤ 2^31-1). A timeout
-        // rejects into the pipeline catch below — the single-flight flag is
-        // reset in the finally either way, so the channel recovers instead of
-        // silently degrading to inject for the process lifetime.
-        const landed: string[] = []
-        // S2-10 (FLOW1-6): the deadline does NOT stop the abandoned write leg.
-        // An op can land AFTER the timeout, when the model has already been told
-        // the review failed — "the model thinks nothing landed while it actually
-        // did" is the most misleading outcome for later decisions. Every landing
-        // is recorded (the list is never discarded) and a late one is reported to
-        // the model as it happens; the plan's own op list bounds the notices.
-        let deadlineMissed = false
-        const lateLandings: string[] = []
-        const noteLanded = (action: string): void => {
-          landed.push(action)
-          if (!deadlineMissed) return
-          lateLandings.push(action)
-          const before = landed.length - lateLandings.length
-          const earlier = before > 0 ? ` (${before} other op(s) had landed before the deadline)` : ''
-          const count = lateLandings.length === 1 ? 'landed AFTER the review timed out' : `landed after the timeout (${lateLandings.length} late so far)`
-          deliverMessage(agent, `\u{1F4BE} Self-improvement review: ${action} ${count}${earlier} \u2014 reconcile before re-requesting the same change.`, 'self-improvement review late landing')
-        }
-        let executed: { actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }
+      type AppliedReport = { actions: readonly string[]; failedOps?: readonly string[]; executionError?: string | undefined }
+      const emitApplied = (report: AppliedReport): void => {
         try {
-          executed = await withTimeout(
-            executePlan(validation.accepted, session, noteLanded, preRunHashes, fiberAbort.signal),
-            config.reviewTimeoutMs,
-            'review plan execution',
-          )
-        } catch (error) {
-          // V27 G4.3: the deadline hit mid-write. Everything in `landed` is a
-          // durable write that already happened, so it is recorded before the
-          // failure propagates (the review itself still fails loud).
-          deadlineMissed = true
-          emitApplied({
-            actions: landed,
-            executionError: `execution timed out after ${config.reviewTimeoutMs}ms`,
+          ctx.emit('evolution/plan-applied', {
+            sessionId: session.id,
+            planId: randomUUID(),
+            policyFingerprint,
+            memoryApplied: report.actions.filter(action => action.startsWith('Memory')).length,
+            skillApplied: report.actions.filter(action => action.startsWith('Skill ')).length,
+            rejectedOps: validation.rejected.length,
+            // V27 R-03: "the plan named a skill this session never read" is its
+            // own dimension. Reporting it inside `rejectedOps` broke that field's
+            // stated contract (validation rejects only) and made the replay
+            // leaderboard penalize one refusal twice (rejectedOps weight AND the
+            // executionFailures dimension).
+            ...skippedUnread > 0 ? { skippedUnread } : {},
+            ...validation.reports.length > 0 ? { evidenceClassReports: validation.reports.length } : {},
+            executionFailures: report.failedOps?.length ?? 0,
+            ...report.executionError !== undefined ? { executionError: report.executionError } : {},
+            evidenceQuotes,
+            estimatedInputChars: reviewText.length,
           })
-          throw error
+        } catch (emitError) {
+          ctx.logger.warn(`dsh-evolution-review: plan-applied emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
         }
-        const actions = executed.actions
-        if (actions.length > 0) {
-          const applied = actions.join(' · ')
-          // E-59d: on partial failure the model must know which ops already
-          // landed so it does not repeat them; the applied list stays explicit.
-          const failedNote = executed.failedOps.length > 0 ? ` 失败 ${executed.failedOps.length} 个：${executed.failedOps.join('；')}。` : ''
-          const note = executed.ok ? '' : `\n部分操作失败。${failedNote}以上操作已应用，请勿重复执行。`
-          // G4.4 (F-334): the result-notice inject is NOT a review-failure — the
-          // plan already landed in memory/skill, so a notification error must not
-          // fall through to the outer "review failed" catch and flip started to
-          // false (which would re-trigger a review inject → double review).
-          // 0.3.73: deliverMessage reports and warns on its own and never throws,
-          // so the separation is structural; the durable plan-applied emit below
-          // still records the execution truth.
-          deliverMessage(agent, `💾 Self-improvement review: ${applied}${note}`, 'self-improvement review')
-        } else {
-          // V6-24 (0.3.36): a zero-landing plan must not be silent — the model
-          // asked for a review and needs to know that nothing landed and WHY
-          // (staged by approval, rejected by validation, skipped as unread, or
-          // failed at execution). Same notification channel and budget as the
-          // applied notice (≤500 chars).
-          // 0.3.73: no try/catch — deliverMessage never throws and warns itself.
-          const reasons: string[] = []
-          if (validation.rejected.length > 0) reasons.push(`${validation.rejected.length} op(s) rejected by validation`)
-          if (skippedUnread > 0) reasons.push(`${skippedUnread} op(s) skipped (skill not read this session)`)
-          if (executed.failedOps.length > 0) reasons.push(`${executed.failedOps.length} op(s) failed at execution: ${executed.failedOps.join('; ')}`)
-          if (executed.aborted !== undefined) reasons.push(`execution aborted: ${executed.aborted}`)
-          if (reasons.length === 0) reasons.push('the review plan contained nothing executable')
-          let text = `💾 Self-improvement review: 0 ops landed. ${reasons.join(' ')}`
-          if (text.length > 500) text = `${text.slice(0, 497)}…`
-          deliverMessage(agent, text, 'self-improvement review')
-        }
-        // Process event, payload v2 (sessionId) — plan-outcome durability is the
-        // evolution-activity store's job; the session log stays native-only.
-        // Emitted AFTER the result-notice inject (E-41 ordering: record the
-        // outcome only once the model was told what landed) through the single
-        // `emitApplied` exit defined above (V27 G4.3).
+      }
+      // v20 (C-2): the write leg gets the same deadline class as the
+      // subagent leg (config value is schema-clamped ≤ 2^31-1). A timeout
+      // rejects into the pipeline catch below — the single-flight flag is
+      // reset in the finally either way, so the channel recovers instead of
+      // silently degrading to inject for the process lifetime.
+      const landed: string[] = []
+      // S2-10 (FLOW1-6): the deadline does NOT stop the abandoned write leg.
+      // An op can land AFTER the timeout, when the model has already been told
+      // the review failed — "the model thinks nothing landed while it actually
+      // did" is the most misleading outcome for later decisions. Every landing
+      // is recorded (the list is never discarded) and a late one is reported to
+      // the model as it happens; the plan's own op list bounds the notices.
+      let deadlineMissed = false
+      const lateLandings: string[] = []
+      const noteLanded = (action: string): void => {
+        landed.push(action)
+        if (!deadlineMissed) return
+        lateLandings.push(action)
+        const before = landed.length - lateLandings.length
+        const earlier = before > 0 ? ` (${before} other op(s) had landed before the deadline)` : ''
+        const count = lateLandings.length === 1 ? 'landed AFTER the review timed out' : `landed after the timeout (${lateLandings.length} late so far)`
+        deliverMessage(agent, `\u{1F4BE} Self-improvement review: ${action} ${count}${earlier} \u2014 reconcile before re-requesting the same change.`, 'self-improvement review late landing')
+      }
+      let executed: { actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }
+      try {
+        executed = await withTimeout(
+          executePlan(validation.accepted, session, noteLanded, preRunHashes, fiberAbort.signal),
+          config.reviewTimeoutMs,
+          'review plan execution',
+        )
+      } catch (error) {
+        // V27 G4.3: the deadline hit mid-write. Everything in `landed` is a
+        // durable write that already happened, so it is recorded before the
+        // failure propagates (the review itself still fails loud).
+        deadlineMissed = true
         emitApplied({
-          actions,
-          failedOps: executed.failedOps,
-          ...executed.aborted !== undefined
-            ? { executionError: executed.aborted }
-            : executed.failedOps[0] !== undefined ? { executionError: executed.failedOps[0] } : {},
+          actions: landed,
+          executionError: `execution timed out after ${config.reviewTimeoutMs}ms`,
         })
-        return true
+        throw error
+      }
+      const actions = executed.actions
+      if (actions.length > 0) {
+        const applied = actions.join(' · ')
+        // E-59d: on partial failure the model must know which ops already
+        // landed so it does not repeat them; the applied list stays explicit.
+        const failedNote = executed.failedOps.length > 0 ? ` 失败 ${executed.failedOps.length} 个：${executed.failedOps.join('；')}。` : ''
+        const note = executed.ok ? '' : `\n部分操作失败。${failedNote}以上操作已应用，请勿重复执行。`
+        // G4.4 (F-334): the result-notice inject is NOT a review-failure — the
+        // plan already landed in memory/skill, so a notification error must not
+        // fall through to the outer "review failed" catch and flip started to
+        // false (which would re-trigger a review inject → double review).
+        // 0.3.73: deliverMessage reports and warns on its own and never throws,
+        // so the separation is structural; the durable plan-applied emit below
+        // still records the execution truth.
+        deliverMessage(agent, `💾 Self-improvement review: ${applied}${note}`, 'self-improvement review')
+      } else {
+        // V6-24 (0.3.36): a zero-landing plan must not be silent — the model
+        // asked for a review and needs to know that nothing landed and WHY
+        // (staged by approval, rejected by validation, skipped as unread, or
+        // failed at execution). Same notification channel and budget as the
+        // applied notice (≤500 chars).
+        // 0.3.73: no try/catch — deliverMessage never throws and warns itself.
+        const reasons: string[] = []
+        if (validation.rejected.length > 0) reasons.push(`${validation.rejected.length} op(s) rejected by validation`)
+        if (skippedUnread > 0) reasons.push(`${skippedUnread} op(s) skipped (skill not read this session)`)
+        if (executed.failedOps.length > 0) reasons.push(`${executed.failedOps.length} op(s) failed at execution: ${executed.failedOps.join('; ')}`)
+        if (executed.aborted !== undefined) reasons.push(`execution aborted: ${executed.aborted}`)
+        if (reasons.length === 0) reasons.push('the review plan contained nothing executable')
+        let text = `💾 Self-improvement review: 0 ops landed. ${reasons.join(' ')}`
+        if (text.length > 500) text = `${text.slice(0, 497)}…`
+        deliverMessage(agent, text, 'self-improvement review')
+      }
+      // Process event, payload v2 (sessionId) — plan-outcome durability is the
+      // evolution-activity store's job; the session log stays native-only.
+      // Emitted AFTER the result-notice inject (E-41 ordering: record the
+      // outcome only once the model was told what landed) through the single
+      // `emitApplied` exit defined above (V27 G4.3).
+      emitApplied({
+        actions,
+        failedOps: executed.failedOps,
+        ...executed.aborted !== undefined
+          ? { executionError: executed.aborted }
+          : executed.failedOps[0] !== undefined ? { executionError: executed.failedOps[0] } : {},
+      })
+      return true
 
     } catch (error) {
       // A review pipeline failure must not crash the turn, but it should be

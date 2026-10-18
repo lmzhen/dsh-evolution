@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MODEL_SESSION_EVENTS, classifySessionEvent, isIgnorableEvent } from '../src/session-fold.ts'
 
-const modelEvents = ['user/message', 'assistant/message', 'tool/call', 'tool/result'].map((type) => ({ type }))
+const modelEvents = ['user/message', 'assistant/message', 'tool/call', 'tool/result'].map(type => ({ type }))
 const pluginRecord = { type: 'plugin:evolution.test', ignorable: true }
 
 describe('session event fold (G6-S1)', () => {

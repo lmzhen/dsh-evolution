@@ -206,7 +206,7 @@ describe('evolution-commands', () => {
       private record(message: unknown): void { followed.push(message) }
     }
     const agent = new PlatformLikeAgent()
-    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'learn capture the wake-path lesson', agent })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'learn capture the wake-path lesson', agent })
     expect(result.text).toContain('请现在执行')
     expect(followed).toHaveLength(1)
     expect(agent.injected).toHaveLength(0)
@@ -431,13 +431,13 @@ describe('evolution-commands', () => {
     let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     await ctx.plugin(Commands)
-    const noIo = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const noIo = await captured!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(noIo.kind).toBe('error')
     expect(noIo.text).toContain('未挂载 evolution-io 注册表')
-    const badRestructure = await captured!.handler({ agent: { ctx } as never, rawInput: 'restructure bad-syntax' })
+    const badRestructure = await captured!.handler({ agent: { ctx }, rawInput: 'restructure bad-syntax' })
     expect(badRestructure.kind).toBe('error')
     expect(badRestructure.text).toContain('用法：')
-    const badToFile = await captured!.handler({ agent: { ctx } as never, rawInput: 'restructure demo "Log" scripts/log.sh' })
+    const badToFile = await captured!.handler({ agent: { ctx }, rawInput: 'restructure demo "Log" scripts/log.sh' })
     expect(badToFile.kind).toBe('error')
     expect(badToFile.text).toContain('references/')
   })
@@ -454,7 +454,7 @@ describe('evolution-commands', () => {
     // The command constructs SkillLibrary over the default skills root; use a
     // guaranteed-absent skill name so the path resolves to an error without
     // touching real content.
-    const missingSkill = await captured!.handler({ agent: { ctx } as never, rawInput: 'restructure evo-nonexistent-skill "Log" references/log.md' })
+    const missingSkill = await captured!.handler({ agent: { ctx }, rawInput: 'restructure evo-nonexistent-skill "Log" references/log.md' })
     expect(missingSkill.kind).toBe('error')
   })
 
@@ -485,7 +485,7 @@ describe('evolution-commands', () => {
     // Config.root is the command-facing root (A7 alignment) — the
     // temp root keeps the mutation off the real library.
     await ctx.plugin(Commands, { root: root })
-    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'restructure demo-skill "Log" references/log.md' })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'restructure demo-skill "Log" references/log.md' })
     expect(result.kind).toBe('success')
     expect(mutatedEvent).toEqual(expect.objectContaining({ action: 'restructure', name: 'demo-skill' }))
     expect(usageRecords).toEqual([['demo-skill', 'patch']])
@@ -515,17 +515,17 @@ describe('evolution-commands', () => {
     const marker = join(skillDir, markerEntryName('pinned'))
     const library = newSkillLibrary({ config: { root }, io })
     expect(await library.isPinned('demo-skill'), 'a fresh skill is not pinned').toBe(false)
-    const pinned = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill pin demo-skill' })
+    const pinned = await captured!.handler({ agent: { ctx }, rawInput: 'skill pin demo-skill' })
     expect(pinned.kind).toBe('success')
     expect(pinned.text).toContain('已固定')
     expect(existsSync(marker), 'the marker lands in the skill directory').toBe(true)
     expect(await library.isPinned('demo-skill')).toBe(true)
-    const unpinned = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill unpin demo-skill' })
+    const unpinned = await captured!.handler({ agent: { ctx }, rawInput: 'skill unpin demo-skill' })
     expect(unpinned.kind).toBe('success')
     expect(unpinned.text).toContain('已取消固定')
     expect(existsSync(marker)).toBe(false)
     expect(await library.isPinned('demo-skill')).toBe(false)
-    const usage = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill pin' })
+    const usage = await captured!.handler({ agent: { ctx }, rawInput: 'skill pin' })
     expect(usage.kind).toBe('error')
     expect(usage.text).toContain('用法：/evolution skill pin <name>')
   })
@@ -549,14 +549,14 @@ describe('evolution-commands', () => {
     const usageRecords: Array<[string, string]> = []
     ctx.provide('skillUsage', { record: async (name: string, kind: string) => { usageRecords.push([name, kind]) } })
     await ctx.plugin(Commands, { root })
-    const first = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill pin demo-skill' })
+    const first = await captured!.handler({ agent: { ctx }, rawInput: 'skill pin demo-skill' })
     expect(first.kind).toBe('success')
-    const again = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill pin demo-skill' })
+    const again = await captured!.handler({ agent: { ctx }, rawInput: 'skill pin demo-skill' })
     expect(again.kind).toBe('success')
     expect(again.text).toContain('已被固定')
-    const twiceOff = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill unpin demo-skill' })
+    const twiceOff = await captured!.handler({ agent: { ctx }, rawInput: 'skill unpin demo-skill' })
     expect(twiceOff.kind).toBe('success')
-    const loose = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill unpin demo-skill' })
+    const loose = await captured!.handler({ agent: { ctx }, rawInput: 'skill unpin demo-skill' })
     expect(loose.kind).toBe('success')
     expect(loose.text).toContain('未被固定')
     expect(mutations, 'a lifecycle flag is not a content mutation').toEqual([])
@@ -608,12 +608,12 @@ describe('evolution-commands', () => {
       },
     }))
     await ctx.plugin(Commands, { root: root })
-    const started = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const started = await captured!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(started.kind).toBe('success')
     expect(started.text).toContain('keeps running after this reply')
     const runId = await settleMaintain(captured!, started)
     // The plan lives in the run's REPORT (the command only points at it).
-    const report = await captured!.handler({ agent: { ctx } as never, rawInput: `maintain report ${runId}` })
+    const report = await captured!.handler({ agent: { ctx }, rawInput: `maintain report ${runId}` })
     expect(report.kind).toBe('success')
     // Enriched facts: the unlinked support file is reported as a real over,
     // never a fabricated pass/unknown.
@@ -648,10 +648,10 @@ describe('evolution-commands', () => {
     // and an earlier test already ran `maintain` (would block this run and
     // skip the subagent call, leaving the signal capture undefined).
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-    const bad = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain --timeout 0' })
+    const bad = await captured!.handler({ agent: { ctx }, rawInput: 'maintain --timeout 0' })
     expect(bad.kind).toBe('error')
     expect(bad.text).toContain('--timeout 值不合法')
-    const good = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain --timeout 600000' })
+    const good = await captured!.handler({ agent: { ctx }, rawInput: 'maintain --timeout 600000' })
     expect(good.kind).toBe('success')
     // The spawn happens inside the detached run: wait for it instead of assuming
     // the command awaited it.
@@ -691,26 +691,26 @@ describe('evolution-commands', () => {
         },
       }))
       await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-      const started = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' }) // answers immediately now; the scan stays in flight
+      const started = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' }) // answers immediately now; the scan stays in flight
       // 0.3.14 (P2-1): the flag is set BEFORE the first await, so a second
       // trigger racing inside the enrich window must already see "running" —
       // the old code exposed two spawns in this window.
       // V10-08 (F-04): the refusal is now kind:'error' (a refused scan is not
       // a successful scan).
-      const concurrent = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+      const concurrent = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
       expect(concurrent.kind).toBe('error')
       expect(concurrent.text).toContain('已经在进行中')
       expect(starts).toBe(0) // first has NOT spawned yet — the window stayed closed
       await spawned // deterministic: wait for the spawn instead of a fixed sleep
       expect(starts).toBe(1)
-      const second = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+      const second = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
       expect(second.kind).toBe('error')
       expect(second.text).toContain('已经在进行中')
       expect(starts).toBe(1) // no second spawn
       resolveRun!()
       await settleMaintain(handler!, started)
       // After the run settles the same invocation may run again.
-      const third = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+      const third = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
       expect(third.kind).toBe('success')
       for (let attempt = 0; attempt < 500 && starts < 2; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
       expect(starts).toBe(2)
@@ -740,15 +740,15 @@ describe('evolution-commands', () => {
     // 0.19.0 (S2): the command answers before the scan runs, so the failure is in
     // the RUN (readable later), not in the command's result — the shape that left
     // the single-flight flag stuck in 0.3.14 is structurally gone.
-    const started = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const started = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(started.kind).toBe('success')
     const runId = await settleMaintain(handler!, started)
-    const status = await handler!.handler({ agent: { ctx } as never, rawInput: `maintain status ${runId}` })
+    const status = await handler!.handler({ agent: { ctx }, rawInput: `maintain status ${runId}` })
     expect(status.text).toContain('failed')
     expect(status.text).toContain('Maintenance scan failed')
     // No report was written (the run died before the plan): the reader says
     // "no result" instead of rendering an empty plan (three-state honesty).
-    const report = await handler!.handler({ agent: { ctx } as never, rawInput: `maintain report ${runId}` })
+    const report = await handler!.handler({ agent: { ctx }, rawInput: `maintain report ${runId}` })
     expect(report.kind).toBe('error')
     // The fixture's io cannot even answer a read, so the reader lands on the
     // "unreadable" branch rather than "no result" — what matters is that NEITHER
@@ -757,7 +757,7 @@ describe('evolution-commands', () => {
     // The flag was reset (no "already running") AND the failure updated the
     // cooldown (E-39) — the second trigger is cooldown-blocked, not
     // in-flight-blocked. V10-08 (F-04): cooldown-blocked is kind:'error'.
-    const second = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const second = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(second.kind).toBe('error')
     expect(second.text).toContain('冷却中')
   })
@@ -777,17 +777,17 @@ describe('evolution-commands', () => {
       },
     }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-    const unknown = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain --foo' })
+    const unknown = await handler!.handler({ agent: { ctx }, rawInput: 'maintain --foo' })
     expect(unknown.kind).toBe('error')
     expect(unknown.text).toContain('未知的 maintain 参数')
     // F-03: the `=` spelling and multi-space separators pass the
     // grammar now (previously "Unknown maintain arguments" rejections).
-    const equals = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain --timeout=600000' })
+    const equals = await handler!.handler({ agent: { ctx }, rawInput: 'maintain --timeout=600000' })
     expect(equals.kind).toBe('success')
     // Each trigger now starts a RUN: let it settle before the next one, or the
     // next call is refused as "already running" (which is its own test).
     await settleMaintain(handler!, equals)
-    const spaced = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain   --timeout 600000' })
+    const spaced = await handler!.handler({ agent: { ctx }, rawInput: 'maintain   --timeout 600000' })
     expect(spaced.kind).toBe('success')
   })
 
@@ -813,7 +813,7 @@ describe('evolution-commands', () => {
       },
     })
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-lock-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install' })
     expect(result.kind).toBe('success')
     expect(calls).toBe(1)
     expect(existedInside).toBe(true)
@@ -830,7 +830,7 @@ describe('evolution-commands', () => {
     const patchPath = profilePatchPath(profileDir)
     ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-nolock-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install' })
     expect(result.kind).toBe('success')
     expect(existsSync(patchPath)).toBe(true)
   })
@@ -855,7 +855,7 @@ describe('evolution-commands', () => {
     const patchPath = profilePatchPath(profileDir)
     ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install' })
     expect(result.kind).toBe('success')
     expect(result.text).toContain(patchPath)
     const patch = readFileSync(patchPath, 'utf8')
@@ -900,7 +900,7 @@ describe('evolution-commands', () => {
     await seedPlatformBase(profileDir, 'standard', G3_STANDARD_FIXTURE)
     ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install' })
     expect(result.kind).toBe('success')
   })
 
@@ -915,7 +915,7 @@ describe('evolution-commands', () => {
     // The platform's startedBundles say this plane really runs the all bundle.
     ctx.provide('profileContext', { ...profileContext('web', profileDir), startedBundles: ['@lmzhen/dsh-evolution-all'] })
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install' })
     expect(result.kind).toBe('error')
     expect(result.text).toContain('本 profile 里已安装')
   })
@@ -929,7 +929,7 @@ describe('evolution-commands', () => {
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
     await seedPlatformBase(profileDir, 'standard', G3_STANDARD_FIXTURE)
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install' })
     expect(result.kind).toBe('error')
     expect(result.text).toContain('本进程没有挂载 profile')
   })
@@ -949,7 +949,7 @@ describe('evolution-commands', () => {
     const patchPath = profilePatchPath(profileDir)
     ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install --base ptc' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install --base ptc' })
     expect(result.kind).toBe('success')
     const patch = readFileSync(patchPath, 'utf8')
     // The ptc variant is its OWN row id, composed from the ptc base patch.
@@ -963,7 +963,7 @@ describe('evolution-commands', () => {
     // no second filename to disagree about.
     const ptc = familyBase('ptc')
     expect(patch).toContain(`        id: evolution-ptc\n        name: ${JSON.stringify(ptc.display.name)}\n        description: ${JSON.stringify(ptc.display.description)}\n        order: ${ptc.display.order}`)
-    const unknown = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install --base nonsense' })
+    const unknown = await handler!.handler({ agent: { ctx }, rawInput: 'preset install --base nonsense' })
     expect(unknown.kind).toBe('error')
     expect(unknown.text).toContain('bases.json')
   })
@@ -986,7 +986,7 @@ describe('evolution-commands', () => {
     const patchPath = profilePatchPath(profileDir)
     ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-multi-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install --base standard,ptc' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install --base standard,ptc' })
     expect(result.kind).toBe('success')
     const patch = readFileSync(patchPath, 'utf8')
     // Each variant composes ITS OWN platform base patch, in table order.
@@ -1000,7 +1000,7 @@ describe('evolution-commands', () => {
     // Every name is resolved before anything is written: the typo aborts the
     // whole request and the two healthy rows stay exactly as they were.
     const before = readFileSync(patchPath, 'utf8')
-    const typo = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install --base standard,ptc,nonsense' })
+    const typo = await handler!.handler({ agent: { ctx }, rawInput: 'preset install --base standard,ptc,nonsense' })
     expect(typo.kind).toBe('error')
     expect(typo.text).toContain('nonsense')
     expect(readFileSync(patchPath, 'utf8')).toBe(before)
@@ -1024,14 +1024,14 @@ describe('evolution-commands', () => {
     const patchPath = profilePatchPath(profileDir)
     ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-ability-skills-')) })
-    const unsupported = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install --base minimal' })
+    const unsupported = await handler!.handler({ agent: { ctx }, rawInput: 'preset install --base minimal' })
     expect(unsupported.kind).toBe('error')
     expect(unsupported.text).toContain('UNSUPPORTED')
-    const missing = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install --base cordis' })
+    const missing = await handler!.handler({ agent: { ctx }, rawInput: 'preset install --base cordis' })
     expect(missing.kind).toBe('error')
     expect(missing.text).toContain('dynamicCordisRunner')
     ctx.provide('dynamicCordisRunner', {})
-    const allowed = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install --base cordis' })
+    const allowed = await handler!.handler({ agent: { ctx }, rawInput: 'preset install --base cordis' })
     expect(allowed.kind).toBe('success')
     expect(readFileSync(patchPath, 'utf8')).toContain('    - id: preset-evolution-cordis\n')
   })
@@ -1049,7 +1049,7 @@ describe('evolution-commands', () => {
     const patchPath = profilePatchPath(profileDir)
     ctx.provide('profileContext', profileContext('web', profileDir))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-preset-skills-')) })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install' })
     expect(result.kind).toBe('error')
     expect(result.text).toContain('collide')
     // The refusal happens before any write: a refused install leaves no artifact behind.
@@ -1075,14 +1075,14 @@ describe('evolution-commands', () => {
       },
     }))
     await ctx.plugin(Commands, { root: root })
-    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain --facts' })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'maintain --facts' })
     expect(result.kind).toBe('success')
     expect(result.text).toContain('MECHANICAL_FACTS')
     expect(result.text).toContain('signal=description_chars')
     expect(result.text).toContain('END FACTS')
     expect(subagentStarts).toBe(0)
     // Cooldown is a scan-command guard; a second facts preview must not hit it.
-    const second = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain --facts' })
+    const second = await captured!.handler({ agent: { ctx }, rawInput: 'maintain --facts' })
     expect(second.kind).toBe('success')
     expect(second.text).toContain('MECHANICAL_FACTS')
   })
@@ -1105,7 +1105,7 @@ describe('evolution-commands', () => {
       report: async () => new Map([['demo-skill', { ...emptyRecord(), view_count: 1, created_at: old, last_used_at: old }]]),
     })
     await ctx.plugin(Commands, { root })
-    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain --facts' })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'maintain --facts' })
     expect(result.kind).toBe('success')
     expect(result.text).toContain('never read: references/dead.md')
     // T3-02/A30: the facts block is the reference answer the probe must match; before the shared
@@ -1128,7 +1128,7 @@ describe('evolution-commands', () => {
     // `skills` is deliberately never created: root points at a directory that
     // does not exist.
     await ctx.plugin(Commands, { root: join(dir, 'skills') })
-    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain --facts' })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'maintain --facts' })
     expect(result.kind).toBe('error')
     expect(result.text).toContain('配置的技能根目录不存在')
     expect(result.text).toContain(join(dir, 'skills'))
@@ -1149,7 +1149,7 @@ describe('evolution-commands', () => {
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
     await ctx.plugin(Commands, { root })
-    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain --facts' })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'maintain --facts' })
     expect(result.kind).toBe('success')
     expect(result.text).toBe('维护扫描：技能库为空，无需处理。')
     expect(result.text).not.toContain('MECHANICAL_FACTS')
@@ -1178,7 +1178,7 @@ describe('evolution-commands', () => {
       },
     }))
     await ctx.plugin(Commands, { maintainCooldownMs: 60_000, root: root })
-    const first = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const first = await captured!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(first.kind).toBe('success')
     // The cooldown window starts when a run SETTLES (registry), so the first run
     // must finish before the second trigger can be cooldown-blocked rather than
@@ -1186,7 +1186,7 @@ describe('evolution-commands', () => {
     await settleMaintain(captured!, first)
     expect(starts).toBe(1)
     // V10-08 (F-04): the cooldown refusal is kind:'error' now.
-    const second = await captured!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const second = await captured!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(second.kind).toBe('error')
     expect(second.text).toContain('冷却')
     expect(starts).toBe(1)
@@ -1207,24 +1207,24 @@ describe('evolution-commands', () => {
       async start() { return { result: new Promise((resolve) => { release = () => { resolve(plan) } }) } },
     }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-    const started = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const started = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
     expect(id).toBeTruthy()
     // In flight: both the list form and the by-id form say so.
-    const live = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain status' })
+    const live = await handler!.handler({ agent: { ctx }, rawInput: 'maintain status' })
     expect(live.text).toContain(id)
     expect(live.text).toContain('running')
     // The spawn happens inside the detached run: wait for it before releasing it.
     for (let attempt = 0; attempt < 500 && release === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     release!()
     await settleMaintain(handler!, started)
-    const settled = await handler!.handler({ agent: { ctx } as never, rawInput: `maintain status ${id}` })
+    const settled = await handler!.handler({ agent: { ctx }, rawInput: `maintain status ${id}` })
     expect(settled.text).toContain('succeeded')
-    const report = await handler!.handler({ agent: { ctx } as never, rawInput: `maintain report ${id}` })
+    const report = await handler!.handler({ agent: { ctx }, rawInput: `maintain report ${id}` })
     expect(report.kind).toBe('success')
     expect(report.text).toContain('verdict=no_issues')
     // An id nobody knows is NAMED, not silently empty.
-    const unknown = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain status nope' })
+    const unknown = await handler!.handler({ agent: { ctx }, rawInput: 'maintain status nope' })
     expect(unknown.kind).toBe('error')
     expect(unknown.text).toContain('本 home 里没有 nope')
   })
@@ -1248,16 +1248,16 @@ describe('evolution-commands', () => {
       },
     }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-    const started = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const started = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
     for (let attempt = 0; attempt < 500 && capturedSignal === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
-    const cancelled = await handler!.handler({ agent: { ctx } as never, rawInput: `maintain cancel ${id}` })
+    const cancelled = await handler!.handler({ agent: { ctx }, rawInput: `maintain cancel ${id}` })
     expect(cancelled.kind).toBe('success')
     expect(capturedSignal?.aborted, 'cancel aborts the run, not the request').toBe(true)
-    const status = await handler!.handler({ agent: { ctx } as never, rawInput: `maintain status ${id}` })
+    const status = await handler!.handler({ agent: { ctx }, rawInput: `maintain status ${id}` })
     expect(status.text).toContain('cancelled')
     // One terminal state: cancelling again reports that, instead of a success.
-    const again = await handler!.handler({ agent: { ctx } as never, rawInput: `maintain cancel ${id}` })
+    const again = await handler!.handler({ agent: { ctx }, rawInput: `maintain cancel ${id}` })
     expect(again.kind).toBe('error')
     expect(again.text).toContain('已经是 cancelled')
     release?.()
@@ -1306,7 +1306,7 @@ describe('evolution-commands', () => {
       ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
       ctx.provide('profileContext', profileContext('web', profileDir))
       await ctx.plugin(Commands, { root: skillsRoot })
-      const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'preset install' })
+      const result = await handler!.handler({ agent: { ctx }, rawInput: 'preset install' })
       expect(result.kind).toBe('error')
       expect(result.text).toContain('预设安装失败')
       // The previous patch is untouched — no half-updated artifact — and the commit
@@ -1417,7 +1417,7 @@ describe('evolution-commands', () => {
         },
       }))
       await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-      const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+      const result = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
       expect(result.kind).toBe('success')
       // The append is fire-and-forget; poll for the locked RMW to land.
       const eventPath = join(home, 'evolution', 'events.json')
@@ -1563,7 +1563,7 @@ describe('evolution-commands', () => {
       },
     } as never)
     await ctx.plugin(Commands)
-    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'restructure demo "## Heading" references/heading.md' })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'restructure demo "## Heading" references/heading.md' })
     expect(result.kind).toBe('error')
     expect(result.text).toContain('E-306')
     expect(result.text).toContain('restructure')
@@ -1606,7 +1606,7 @@ describe('evolution-commands', () => {
     const io = nodeEvolutionIo()
     ctx.provide('evolutionIo', { provider: () => io })
     await ctx.plugin(Commands, { root: root, threatExemptLabels: ['ssh_backdoor'] })
-    const result = await handler!.handler({ agent: { ctx } as never, rawInput: 'restructure demo-skill "Log" references/log.md' })
+    const result = await handler!.handler({ agent: { ctx }, rawInput: 'restructure demo-skill "Log" references/log.md' })
     expect(result.kind).toBe('success')
     const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
     expect(support).toContain('old detail')
@@ -1815,15 +1815,15 @@ describe('evolution-commands', () => {
     let starts = 0
     provideChannel(ctx, ({ async start() { starts += 1; return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-    const refused = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const refused = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(refused.kind).toBe('error')
     expect(refused.text).toContain('已经在进行中')
     expect(refused.text).toContain('other-plane-run')
     expect(starts, 'no second scan was spawned').toBe(0)
-    const status = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain status' })
+    const status = await handler!.handler({ agent: { ctx }, rawInput: 'maintain status' })
     expect(status.text, 'status sees the other plane in flight').toContain('other-plane-run')
     expect(status.text).toContain('running')
-    const cancel = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain cancel other-plane-run' })
+    const cancel = await handler!.handler({ agent: { ctx }, rawInput: 'maintain cancel other-plane-run' })
     expect(cancel.kind).toBe('error')
     expect(cancel.text).toContain('另一个进程')
     // The refresh is what makes this work for a run that appears AFTER this plane mounted.
@@ -1834,7 +1834,7 @@ describe('evolution-commands', () => {
         { id: 'started-later', kind: 'maintain', state: 'running', startedAt: Date.now(), pid: process.pid },
       ],
     }), 'utf8')
-    const refusedAgain = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const refusedAgain = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(refusedAgain.kind).toBe('error')
     expect(refusedAgain.text).toContain('started-later')
     expect(starts, 'still no scan of our own').toBe(0)
@@ -1852,7 +1852,7 @@ describe('evolution-commands', () => {
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
     provideChannel(ctx, ({ async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-    const status = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain status' })
+    const status = await handler!.handler({ agent: { ctx }, rawInput: 'maintain status' })
     expect(status.kind).toBe('error')
     expect(status.text).toContain('读不出来')
     expect(status.text).toContain('「不是」没有运行')
@@ -1870,12 +1870,12 @@ describe('evolution-commands', () => {
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
     provideChannel(ctx, ({ async start() { return { result: Promise.resolve({ text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
-    const started = await handler!.handler({ agent: { ctx } as never, rawInput: 'maintain' })
+    const started = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(started.kind).toBe('success')
     const runId = await settleMaintain(handler!, started)
     await rm(join(dir, 'evolution', 'reports', `maintain-${runId}.json`), { force: true })
     await rm(join(dir, 'evolution', 'reports', `maintain-${runId}.md`), { force: true })
-    const report = await handler!.handler({ agent: { ctx } as never, rawInput: `maintain report ${runId}` })
+    const report = await handler!.handler({ agent: { ctx }, rawInput: `maintain report ${runId}` })
     expect(report.kind).toBe('error')
     expect(report.text).toContain('没有结果')
     expect(report.text, 'the unreadable branch must not answer this').not.toContain('读不出来')

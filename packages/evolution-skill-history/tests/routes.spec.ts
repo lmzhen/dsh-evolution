@@ -23,7 +23,7 @@ import { tempHome } from '../../test-support/temp-home.ts'
 describe('skill-history routes: the curator seam', () => {
   it('answers the family\'s E-302 sentence when the curator is not mounted', async () => {
     const ctx = new Context()
-    const host = await mountHostRoutes(ctx, (audit) => makeSkillHistoryRoutes({ getCurator: () => undefined }, audit))
+    const host = await mountHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => undefined }, audit))
     const { status, body } = await host.json(SKILL_HISTORY_ROUTES.skills)
     expect(status).toBe(200)
     expect(body).toMatchObject({ ok: false, code: 'curator-not-mounted' })
@@ -43,7 +43,7 @@ describe('skill-history routes: the read/write surface', () => {
     await library.create('panel-skill', body('One.'))
     await library.update('panel-skill', body('Two.'))
     await library.writeSupportFile('panel-skill', 'references/notes.md', '# notes\n')
-    const host = await mountHostRoutes(ctx, (audit) => makeSkillHistoryRoutes({ getCurator: () => ctx.evolutionCurator }, audit))
+    const host = await mountHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => ctx.evolutionCurator }, audit))
     // Health: the probe the client uses before it claims a route family exists.
     const health = await host.json(SKILL_HISTORY_ROUTES.health)
     expect(health.status).toBe(200)

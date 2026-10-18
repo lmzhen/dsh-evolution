@@ -16,7 +16,7 @@ const ENGINES = '>=0.2.1-rc.1 <0.2.2-0'
 async function stagedDir(packages: Array<Record<string, unknown>>) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-platform-range-'))
   for (const [index, pkg] of packages.entries()) {
-    const dir = join(root, 'pkg-' + index)
+    const dir = join(root, 'pkg-' + String(index))
     await mkdir(dir)
     await writeFile(join(dir, 'package.json'), JSON.stringify(pkg))
   }
@@ -37,7 +37,7 @@ function manifest(extra: Record<string, unknown> = {}) {
 
 async function runGuard(args: string[]) {
   return run(process.execPath, [guard, ...args], { encoding: 'utf8' })
-    .then((result) => ({ code: 0, stdout: result.stdout, stderr: result.stderr }), (caught: unknown) => {
+    .then(result => ({ code: 0, stdout: result.stdout, stderr: result.stderr }), (caught: unknown) => {
       const error = caught as { code?: number; stdout?: string; stderr?: string }
       return { code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }
     })

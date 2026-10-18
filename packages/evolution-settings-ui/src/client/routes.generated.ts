@@ -10,24 +10,24 @@ export type SurfaceId = 'approval' | 'skill-history' | 'skill-health' | 'diagnos
  * client copies, and the generator's --check makes a stale copy red.
  */
 export const ROUTES = {
-  "approval": {
-    "pending": "/api/dsh-evolution/approval/pending",
-    "preview": "/api/dsh-evolution/approval/preview",
-    "approve": "/api/dsh-evolution/approval/approve",
-    "reject": "/api/dsh-evolution/approval/reject"
+  approval: {
+    pending: '/api/dsh-evolution/approval/pending',
+    preview: '/api/dsh-evolution/approval/preview',
+    approve: '/api/dsh-evolution/approval/approve',
+    reject: '/api/dsh-evolution/approval/reject',
   },
-  "skill-history": {
-    "skills": "/api/dsh-evolution/skill-history/skills",
-    "versions": "/api/dsh-evolution/skill-history/versions",
-    "diff": "/api/dsh-evolution/skill-history/versions/diff",
-    "body": "/api/dsh-evolution/skill-history/versions/body",
-    "undo": "/api/dsh-evolution/skill-history/undo",
-    "health": "/api/dsh-evolution/skill-history/health"
+  'skill-history': {
+    skills: '/api/dsh-evolution/skill-history/skills',
+    versions: '/api/dsh-evolution/skill-history/versions',
+    diff: '/api/dsh-evolution/skill-history/versions/diff',
+    body: '/api/dsh-evolution/skill-history/versions/body',
+    undo: '/api/dsh-evolution/skill-history/undo',
+    health: '/api/dsh-evolution/skill-history/health',
   },
-  "skill-health": {
-    "rows": "/api/dsh-evolution/skill-health/rows"
+  'skill-health': {
+    rows: '/api/dsh-evolution/skill-health/rows',
   },
-  "diagnostics": {
-    "view": "/api/dsh-evolution/diagnostics"
-  }
+  diagnostics: {
+    view: '/api/dsh-evolution/diagnostics',
+  },
 } as const satisfies Readonly<Record<SurfaceId, Readonly<Record<string, string>>>>

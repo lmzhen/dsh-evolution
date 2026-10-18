@@ -72,7 +72,7 @@ const KIND_KEYS: Readonly<Record<PendingRow['kind'], MessageKey>> = Object.freez
 export function PendingCard(props: PendingCardFace): ReactNode {
   const { t, api } = props
   // The shared failure renderer speaks key-STRING; this card's keys stay typed at this one boundary.
-  const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => t(key as MessageKey, values as never)
+  const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => t(key as MessageKey, values)
   // U-6: which entry is ARMED for a second click. `auto` (the default) never arms: an approval batch
   // must not be interrupted by a confirmation nobody asked for (31 号 §U-6 的风险行).
   const confirmMode = props.confirmMode?.() ?? 'auto'
