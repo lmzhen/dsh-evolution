@@ -16,7 +16,7 @@
  * with ENOENT by design (see README G5.5).
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -36,6 +36,13 @@ function run(command, args, cwd) {
   if (result.error) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
+
+// R-81: tsdown keeps hash-named chunks from a previous build in outDir, so a rebuild could silently
+// retain a stale chunk that imports a dependency the source no longer uses (observed during the
+// v0.27.0 include decoupling: two old `ensure-<hash>.js` chunks kept importing the platform include
+// package after the source stopped). A fresh CI checkout has no such chunks, so the local build must
+// start from the same clean state or local and CI artifacts diverge.
+for (const name of packages) rmSync(join(evolutionRoot, name, 'lib'), { recursive: true, force: true })
 
 const projects = packages.map(name => join(evolutionRoot, name, 'tsconfig.json'))
 run(tsc, ['-b', ...projects, '--force'], repoRoot)

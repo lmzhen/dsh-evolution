@@ -18,9 +18,6 @@
     },
     {
       "path": "../../core/tools"
-    },
-    {
-      "path": "../../../vendor/include"
     }
   ]
 }
