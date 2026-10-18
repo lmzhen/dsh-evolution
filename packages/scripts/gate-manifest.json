@@ -838,6 +838,22 @@
       ]
     },
     {
+      "id": "gate-55",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-traceability.mjs packages --planned`（G7/W11 追账：52 项 universe（A-22/B-18/C-12）必须逐条覆盖；缺行/重复/未知 id/乱序/adopted 缺落点证据/deferred 无 trigger→**exit 1**，空矩阵→**exit 2**；`--planned` 只校验 schema/覆盖/顺序（探针注册归 W9，strict 模式另查 files/probes/gates 存在与预算实测））",
+      "argv": [
+        "node",
+        "packages/scripts/verify-traceability.mjs",
+        "packages",
+        "--planned"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",

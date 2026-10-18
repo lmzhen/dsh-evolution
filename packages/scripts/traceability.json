@@ -1,0 +1,859 @@
+{
+  "version": 1,
+  "note": "W11 traceability ledger — the 52-item universe (A-01..A-22, B-01..B-18, C-01..C-12). One home for coverage, dispositions and the concept budget; verify-traceability re-derives counts and existence.",
+  "items": [
+    {
+      "id": "A-01",
+      "disposition": "adopted",
+      "design": [
+        "W5"
+      ],
+      "files": [
+        "evolution-core/src/subagent/channel.ts",
+        "evolution-review/src/index.ts"
+      ],
+      "probes": [
+        "beh-channel-settle"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-02",
+      "disposition": "adopted",
+      "design": [
+        "W5"
+      ],
+      "files": [
+        "evolution-review/src/index.ts",
+        "evolution-maintenance/src/orchestrate.ts"
+      ],
+      "probes": [
+        "beh-channel-settle"
+      ],
+      "gates": [
+        "gate-03",
+        "gate-52"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-03",
+      "disposition": "adopted",
+      "design": [
+        "W5"
+      ],
+      "files": [
+        "evolution-core/src/subagent/channel.ts"
+      ],
+      "probes": [
+        "beh-channel-settle"
+      ],
+      "gates": [
+        "gate-52"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-04",
+      "disposition": "adopted",
+      "design": [
+        "W5"
+      ],
+      "files": [
+        "evolution-core/src/tool-dispatch.ts"
+      ],
+      "probes": [
+        "beh-inbox-notify-order"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "B"
+    },
+    {
+      "id": "A-05",
+      "disposition": "adopted",
+      "design": [
+        "W7"
+      ],
+      "files": [
+        "evolution-settings-ui/src/client/seam.ts",
+        "evolution-settings-ui/src/client/source.ts"
+      ],
+      "probes": [
+        "decl-configforms-nomode"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-06",
+      "disposition": "adopted",
+      "design": [
+        "W8"
+      ],
+      "files": [
+        "evolution-core/src/params.ts"
+      ],
+      "probes": [
+        "decl-bundleinfo-semantics"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "B"
+    },
+    {
+      "id": "A-07",
+      "disposition": "adopted-min",
+      "design": [
+        "W8"
+      ],
+      "files": [
+        "packages/scripts/verify-dependency-closure.mjs"
+      ],
+      "probes": [
+        "verify-dependency-closure"
+      ],
+      "gates": [
+        "gate-06"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-08",
+      "disposition": "adopted",
+      "design": [
+        "W8"
+      ],
+      "files": [
+        "evolution-core/src/errors.ts",
+        "INSTALL.md"
+      ],
+      "probes": [
+        "doc-facts"
+      ],
+      "gates": [
+        "gate-17"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-09",
+      "disposition": "adopted",
+      "design": [
+        "W2"
+      ],
+      "files": [
+        "evolution-core/src/platform-line.generated.ts"
+      ],
+      "probes": [
+        "verify-platform-ranges"
+      ],
+      "gates": [
+        "gate-11"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-10",
+      "disposition": "adopted",
+      "design": [
+        "W3"
+      ],
+      "files": [
+        "packages/scripts/verify-platform-contract.mjs"
+      ],
+      "probes": [
+        "verify-platform-contract"
+      ],
+      "gates": [
+        "gate-12"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-11",
+      "disposition": "adopted",
+      "design": [
+        "W8",
+        "W9"
+      ],
+      "files": [
+        "evolution-review/src/index.ts",
+        "skill-usage/src/index.ts"
+      ],
+      "probes": [
+        "beh-fold-ignore-pluginrecord"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-12",
+      "disposition": "adopted",
+      "design": [
+        "W9"
+      ],
+      "files": [
+        "evolution-core/src/tool-dispatch.ts"
+      ],
+      "probes": [
+        "beh-inbox-notify-order"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "B"
+    },
+    {
+      "id": "A-13",
+      "disposition": "adopted",
+      "design": [
+        "W6"
+      ],
+      "files": [
+        "evolution-approval/src/index.ts",
+        "packages/scripts/verify-host-routes.mjs"
+      ],
+      "probes": [
+        "beh-hostroute-owner-only"
+      ],
+      "gates": [
+        "gate-53"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-14",
+      "disposition": "no-action",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "B",
+      "note": "webServer host 家族不在本迁移面（W6 §7 记录）"
+    },
+    {
+      "id": "A-15",
+      "disposition": "adopted",
+      "design": [
+        "W9"
+      ],
+      "files": [
+        "packages/scripts/verify-host-routes.mjs"
+      ],
+      "probes": [
+        "beh-hmr-apply-idempotent"
+      ],
+      "gates": [
+        "gate-53"
+      ],
+      "evidence": "B"
+    },
+    {
+      "id": "A-16",
+      "disposition": "adopted",
+      "design": [
+        "W10"
+      ],
+      "files": [
+        "packages/scripts/install-layered.mjs"
+      ],
+      "probes": [
+        "S2-spike"
+      ],
+      "gates": [
+        "gate-04"
+      ],
+      "evidence": "C"
+    },
+    {
+      "id": "A-17",
+      "disposition": "adopted",
+      "design": [
+        "W5",
+        "W7"
+      ],
+      "files": [
+        "packages/test-support/host-route-harness.ts"
+      ],
+      "probes": [
+        "beh-channel-settle"
+      ],
+      "gates": [
+        "gate-01",
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-18",
+      "disposition": "adopted",
+      "design": [
+        "W3",
+        "W8"
+      ],
+      "files": [
+        "packages/scripts/verify-doc-facts.mjs"
+      ],
+      "probes": [
+        "doc-facts"
+      ],
+      "gates": [
+        "gate-17"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-19",
+      "disposition": "adopted",
+      "design": [
+        "W9"
+      ],
+      "files": [
+        "evolution-core/src/subagent/readiness.ts"
+      ],
+      "probes": [
+        "beh-channel-settle"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "B"
+    },
+    {
+      "id": "A-20",
+      "disposition": "adopted",
+      "design": [
+        "W9"
+      ],
+      "files": [
+        "evolution-core/src/session-fold.ts"
+      ],
+      "probes": [
+        "beh-fold-ignore-pluginrecord",
+        "beh-inbox-notify-order"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-21",
+      "disposition": "adopted",
+      "design": [
+        "W7",
+        "W10"
+      ],
+      "files": [
+        "packages/scripts/gen-client-seam.mjs"
+      ],
+      "probes": [
+        "decl-client-artifacts"
+      ],
+      "gates": [
+        "gate-54"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "A-22",
+      "disposition": "adopted",
+      "design": [
+        "W3",
+        "W10"
+      ],
+      "files": [
+        "packages/scripts/install-layered.mjs"
+      ],
+      "probes": [
+        "install-matrix"
+      ],
+      "gates": [
+        "gate-04"
+      ],
+      "evidence": "C"
+    },
+    {
+      "id": "B-01",
+      "disposition": "adopted",
+      "design": [
+        "W5"
+      ],
+      "files": [
+        "evolution-core/src/subagent/channel.ts"
+      ],
+      "probes": [
+        "beh-channel-settle"
+      ],
+      "gates": [
+        "gate-52"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "B-02",
+      "disposition": "adopted",
+      "design": [
+        "W8"
+      ],
+      "files": [
+        "evolution-review/src/index.ts",
+        "skill-usage/src/index.ts"
+      ],
+      "probes": [
+        "beh-fold-ignore-pluginrecord"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "B-03",
+      "disposition": "adopted",
+      "design": [
+        "W8"
+      ],
+      "files": [
+        "tool-memory/src/index.ts",
+        "evolution-core/src/memory-store.ts"
+      ],
+      "probes": [
+        "beh-prompt-literal"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "B-04",
+      "disposition": "adopted",
+      "design": [
+        "W7"
+      ],
+      "files": [
+        "evolution-settings-ui/src/client/ParamCard.ts"
+      ],
+      "probes": [
+        "decl-configforms-nomode"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "B-05",
+      "disposition": "adopted",
+      "design": [
+        "W6"
+      ],
+      "files": [
+        "evolution-core/src/http-routes.ts"
+      ],
+      "probes": [
+        "beh-hostroute-owner-only"
+      ],
+      "gates": [
+        "gate-53"
+      ],
+      "evidence": "B"
+    },
+    {
+      "id": "B-06",
+      "disposition": "deferred",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "B",
+      "note": "workingDirectory；触发=平台稳定且子代理 cwd 有需求"
+    },
+    {
+      "id": "B-07",
+      "disposition": "rejected",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "A",
+      "note": "jobs 零接入；C-05 单所有者"
+    },
+    {
+      "id": "B-08",
+      "disposition": "adopted",
+      "design": [
+        "W8"
+      ],
+      "files": [
+        "evolution-commands/src/doctor-view.ts"
+      ],
+      "probes": [
+        "diagnostics-route"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "B-09",
+      "disposition": "adopted",
+      "design": [
+        "W2"
+      ],
+      "files": [
+        "evolution-core/package.json"
+      ],
+      "probes": [
+        "decl-engines-window"
+      ],
+      "gates": [
+        "gate-11"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "B-10",
+      "disposition": "deferred",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "B",
+      "note": "hmr.reconcileProfile；触发=preset install 需提交阶段"
+    },
+    {
+      "id": "B-11",
+      "disposition": "deferred",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "B",
+      "note": "getOrigin/protocol；触发=远程 origin 需求"
+    },
+    {
+      "id": "B-12",
+      "disposition": "deferred",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "B",
+      "note": "review 事件驱动；触发=W5 结算稳定后"
+    },
+    {
+      "id": "B-13",
+      "disposition": "deferred",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "B",
+      "note": "llm controls；触发=provider 控制需求"
+    },
+    {
+      "id": "B-14",
+      "disposition": "rejected",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "A",
+      "note": "11 新槽扩张；C-08 零新槽"
+    },
+    {
+      "id": "B-15",
+      "disposition": "rejected",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "A",
+      "note": "无关服务/导出；无功能映射"
+    },
+    {
+      "id": "B-16",
+      "disposition": "deferred",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "C",
+      "note": "app-boot 安装器 API；触发=profile 重组合"
+    },
+    {
+      "id": "B-17",
+      "disposition": "deferred",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "B",
+      "note": "deprecated 访问器迁移；触发=平台删除计划"
+    },
+    {
+      "id": "B-18",
+      "disposition": "rejected",
+      "design": [],
+      "files": [],
+      "probes": [],
+      "gates": [],
+      "evidence": "A",
+      "note": "job/plugin-market/cwd 事件；无功能映射"
+    },
+    {
+      "id": "C-01",
+      "disposition": "adopted",
+      "design": [
+        "W2",
+        "W3"
+      ],
+      "files": [
+        "packages/scripts/verify-platform-ranges.mjs"
+      ],
+      "probes": [
+        "verify-platform-ranges"
+      ],
+      "gates": [
+        "gate-11"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-02",
+      "disposition": "adopted",
+      "design": [
+        "W4",
+        "W5"
+      ],
+      "files": [
+        "evolution-core/src/composition/restricted-preset.ts",
+        "evolution-core/src/restrictor.ts"
+      ],
+      "probes": [
+        "beh-restricted-preset-allowset"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-03",
+      "disposition": "adopted",
+      "design": [
+        "W8",
+        "W9"
+      ],
+      "files": [
+        "evolution-core/src/session-fold.ts"
+      ],
+      "probes": [
+        "beh-fold-ignore-pluginrecord"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-04",
+      "disposition": "adopted",
+      "design": [
+        "W6"
+      ],
+      "files": [
+        "evolution-core/src/http-routes.ts"
+      ],
+      "probes": [
+        "beh-hostroute-owner-only"
+      ],
+      "gates": [
+        "gate-53"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-05",
+      "disposition": "adopted",
+      "design": [
+        "W5",
+        "W8"
+      ],
+      "files": [
+        "evolution-core/src/run-registry.ts"
+      ],
+      "probes": [
+        "orphan-run"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "B"
+    },
+    {
+      "id": "C-06",
+      "disposition": "adopted",
+      "design": [
+        "W2",
+        "W3"
+      ],
+      "files": [
+        "evolution-core/src/platform-line.generated.ts"
+      ],
+      "probes": [
+        "decl-engines-window"
+      ],
+      "gates": [
+        "gate-11"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-07",
+      "disposition": "adopted",
+      "design": [
+        "W8"
+      ],
+      "files": [
+        "evolution-core/src/memory-store.ts"
+      ],
+      "probes": [
+        "beh-prompt-literal"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-08",
+      "disposition": "adopted",
+      "design": [
+        "W7"
+      ],
+      "files": [
+        "evolution-settings-ui/src/client/index.ts"
+      ],
+      "probes": [
+        "decl-client-seats"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-09",
+      "disposition": "adopted",
+      "design": [
+        "W8",
+        "W9"
+      ],
+      "files": [
+        "evolution-core/src/diagnostics.ts"
+      ],
+      "probes": [
+        "diagnostics-route"
+      ],
+      "gates": [
+        "gate-03"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-10",
+      "disposition": "adopted",
+      "design": [
+        "W6",
+        "W7"
+      ],
+      "files": [
+        "evolution-core/src/http-routes.ts"
+      ],
+      "probes": [
+        "beh-hostroute-owner-only"
+      ],
+      "gates": [
+        "gate-53"
+      ],
+      "evidence": "B"
+    },
+    {
+      "id": "C-11",
+      "disposition": "adopted",
+      "design": [
+        "W9"
+      ],
+      "files": [
+        "packages/scripts/verify-probes.mjs",
+        "packages/scripts/verify-mutations.mjs"
+      ],
+      "probes": [
+        "verify-probes",
+        "verify-mutations"
+      ],
+      "gates": [
+        "gate-42"
+      ],
+      "evidence": "A"
+    },
+    {
+      "id": "C-12",
+      "disposition": "adopted",
+      "design": [
+        "W3",
+        "W10"
+      ],
+      "files": [
+        "packages/scripts/install-layered.mjs"
+      ],
+      "probes": [
+        "install-matrix"
+      ],
+      "gates": [
+        "gate-04"
+      ],
+      "evidence": "C"
+    }
+  ],
+  "budget": {
+    "newPackages": 0,
+    "newProfileRows": 0,
+    "newSlots": 0,
+    "newPersistence": 0,
+    "newSubpaths": 4,
+    "newErrorCodes": [
+      "E-323",
+      "E-324",
+      "E-325"
+    ],
+    "newScripts": [
+      "lib-platform-line.mjs",
+      "print-platform-line.mjs",
+      "gen-platform-line.mjs",
+      "gen-client-seam.mjs",
+      "verify-host-routes.mjs",
+      "verify-session-fold.mjs",
+      "verify-probes.mjs",
+      "verify-traceability.mjs"
+    ],
+    "newDeps": [
+      "semver",
+      "@deepseek-ai/cordis-plugin-loader"
+    ]
+  }
+}
