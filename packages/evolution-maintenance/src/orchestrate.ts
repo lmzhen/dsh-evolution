@@ -26,7 +26,7 @@ import {
   type DriftSkillSnapshot,
 } from '@deepseek-ai/dsh-evolution-core'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { SubagentResult, SubagentRun, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
+import type { SubagentChannel } from '@deepseek-ai/dsh-evolution-core'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
 import { enrichmentSnapshotOptions, type Enrichment } from './enrichment.ts'
 import { renderFacts, type StoreFootprint } from './render-facts.ts'
@@ -34,41 +34,18 @@ import { reachabilityFootprint, reclamationFootprint, type FootprintIo } from '.
 import { validateAndNormalizeMaintainPlan, type MaintainPlanItem, type ValidationResult } from './validate-plan.ts'
 
 /**
- * I-5 (v37), D-09 (G1/1.8): the platform types are IMPORTED, not copied. Each view below is DERIVED from
- * the platform contract, so a field the platform renames fails the build here instead of drifting.
- *
- * The one thing this layer must add: `persona` and `toolFilter` are honoured at runtime (child-agent.ts
- * installs a `deployment:persona` system-prompt section; the README documents toolFilter as applying the
- * requested child tool restriction) but the CALLER-facing `SubagentStartRequest` does not declare them.
- * They are therefore declared here, once, as an explicit extension instead of a hand-copied whole.
+ * W5 G3-S4: execution goes through evolution-core's Channel (the 0.2.1 startActivation contract +
+ * restricted preset). The former local views of the platform subagent request/result are gone — a
+ * structural copy would be the second definition the contract freeze forbids.
  */
-export type MaintainSubagentStart = SubagentStartRequest & {
-  readonly persona?: string | undefined
-  readonly toolFilter?: { readonly allow: readonly string[] } | undefined
-}
-
-/** The `SubagentResult` fields the outcome mapping reads (the platform result is wider). */
-/** The `SubagentResult` fields the outcome mapping reads. `diagnostic` is OPTIONAL here on purpose: the
- * platform type declares it required, but this layer reads it defensively (the mapped outcome must work
- * for a result that carries none), so the view states that narrower truth instead of inheriting the
- * platform requirement. */
-export type MaintainSubagentResult = Pick<SubagentResult, 'structured' | 'stopReason'> & { readonly diagnostic?: string | undefined }
-
-/** The platform run handle the orchestrator owns (`dispose` is required and every exit path awaits it). */
-export type MaintainSubagentRun = SubagentRun
 
 export interface MaintainRuntime {
   /** SkillLibrary-like reader for snapshot assembly. */
   library: SkillLibraryLike
-  /** Subagent spawner (platform `subagents` service — the request fields this
-   * orchestrator sends, typed as the platform requires them: I-5 (v37) tightened the
-   * request from `unknown` and `dispose` from optional to the platform's
-   * always-present handle, so a future miss fails `tsc` instead of a runtime TypeError. */
-  subagents: {
-    start(kind: 'spawn', options: MaintainSubagentStart): Promise<MaintainSubagentRun>
-  }
-  /** The spawning agent (platform `SubagentStartRequest.parent`, required: in-process
-   * providers derive workspace, lineage and delegation depth from its durable session). */
+  /** W5 G3-S4: the ONE execution path (capability probe, restricted preset, timeout/abort and
+   * exactly-one dispose live in the channel; this orchestrator only maps the outcome). */
+  channel: SubagentChannel
+  /** The spawning agent (0.2.1 `SubagentStartRequest.parent`). */
   parent: Agent
   /** Optional logger for dispose-failure traces; when absent the failure is
    * swallowed without surfacing (the orchestrator is a pure function). */
@@ -270,8 +247,6 @@ function formatPlan(validated: ValidationResult, runId: string): string {
 
 /** Run one maintenance scan and return display text plus validation metadata. */
 export async function runMaintain(runtime: MaintainRuntime, options: MaintainOptions = {}): Promise<MaintainOutcome> {
-  // Hoisted so the catch can consult the abort signal (0.3.14 P3-6).
-  let abortSignal: AbortSignal | undefined
   try {
     // Template integrity is a hard gate on the maintenance link (011 §7):
     // the bundle digest covers the FULL template; the joint signature adds
@@ -373,15 +348,6 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMER_DELAY_MS) {
       return { ok: false, recommendationCount: 0, error: `maintain：--timeout 必须是以毫秒为单位的正整数，最大 ${MAX_TIMER_DELAY_MS}；收到 ${String(timeoutMs)}` }
     }
-    // 0.3.14 (P3-6): the signal object is the authoritative abort evidence —
-    // hoisted so the catch can consult `signal.aborted` (our own timeout)
-    // instead of matching error text. The narrow literals remain only for the
-    // platform's unstructured leak of a parent-cancelled run.
-    // E-6 (v18): honor BOTH the scan timeout and the caller's cancel signal.
-    const signal = options.signal !== undefined
-      ? AbortSignal.any([AbortSignal.timeout(timeoutMs), options.signal])
-      : AbortSignal.timeout(timeoutMs)
-    abortSignal = signal
     // 0.3.11 (E-55): route off the same policy as the curator
     // (`evolutionPolicy.get().curatorModel`) instead of a hard-coded maintain
     // model — a missing policy service keeps the documented default. The `?.`
@@ -394,22 +360,22 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     const model = options.model ?? runtime.evolutionPolicy?.get()?.curatorModel ?? DEFAULT_CURATOR_MODEL
     const agentOptions: Record<string, string> = { model }
     if (options.provider) agentOptions.provider = options.provider
-    const run = await runtime.subagents.start('spawn', {
-      label: 'dsh-evolution-maintain',
-      prompt: [{ type: 'text', text: prompt }],
+    // W5 G3-S4: ONE execution path. The template rides in the prompt (0.2.1 has no persona on the
+    // request plane); the restricted preset is the tool/authority carrier.
+    const outcome = await runtime.channel.run({
       parent: runtime.parent,
-      signal,
-      // maxDepth is the ABSOLUTE cap of the subagent's own depth (platform
-      // resolveChildDepth: childDepth = parentDepth+1). 1 = subagent allowed,
-      // nesting denied (2 > 1); 0 = spawn itself rejected (0.3.1 defect).
-      // V8-23⑩ (0.3.49): guard the exported option — a NaN/Infinity depth would
-      // fold into the platform's own rejection; V9-12 (0.3.51) extends the
-      // guard below 1 (negative depths pass `Number.isFinite` yet are equally
-      // outside the documented domain) — anything invalid falls back to 1.
+      label: 'dsh-evolution-maintain',
+      promptText: template + '\n\n' + prompt,
+      kind: 'maintainer',
+      allow: [...toolAllow],
+      // maxDepth is the ABSOLUTE cap of the subagent's own depth (platform resolveChildDepth:
+      // childDepth = parentDepth+1). 1 = subagent allowed, nesting denied (2 > 1); 0 = spawn rejected.
+      // V8-23⑩ / V9-12 (0.3.49/0.3.51): a NaN/Infinity/negative depth would fold into the platform's
+      // own rejection — anything invalid falls back to 1.
       maxDepth: typeof options.maxDepth === 'number' && Number.isFinite(options.maxDepth) && options.maxDepth >= 1 ? options.maxDepth : 1,
       agentOptions,
-      persona: template,
-      toolFilter: { allow: [...toolAllow] },
+      timeoutMs,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
       outputSchema: {
         type: 'object',
         additionalProperties: false,
@@ -464,29 +430,20 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
       },
     })
 
-    // G4.1 (F-102): dispose the subagent run on every exit path after a
-    // successful startup — success, the abort settle, the no-plan settle and
-    // the validator-rejected path all route through this finally. Aligns the
-    // maintain orchestrator with the review subagent's rc.42 P1-3 treatment.
-    try {
-      // I-5 (v37): the platform settles this promise with a result, never null —
-      // the optional reads are gone so a future nullability change surfaces here.
-      const runResult: MaintainSubagentResult = await run.result
-      const raw = runResult.structured
-      if (raw === undefined) {
-        // 0.3.8: a CANCELLED run settles by RESOLVING (driver readResult) with
-        // structured=undefined and stopReason="aborted" — distinguish that from
-        // "the model produced no structured plan" instead of reporting a bare
-        // error (evidence: command retry cancels the previous invocation, which
-        // surfaced as both "This operation was aborted" and the no-plan text).
-        if (runResult.stopReason === 'aborted') {
-          return { ok: false, recommendationCount: 0, error: '维护扫描已中止（在子智能体产出计划之前运行被取消）：请在会话空闲时重试；并发重交会取消上一次扫描。' }
-        }
-        // Platform contract: the subagent channel wraps its output as
-        // `{ structured }` — a missing structured payload means no usable plan.
-        return { ok: false, recommendationCount: 0, error: '维护子智能体没有返回结构化计划（模型没有产出结构化计划，或运行在产出前结束）：请重试；若反复出现，请提高 --timeout 或检查模型的输出结构。' }
-      }
-      const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
+    // W5 G3-S4: the channel already disposed the activation; map its outcome and return the SAME
+    // operator-facing taxonomy the local result view used to produce.
+    if (outcome.kind === 'unavailable') {
+      return { ok: false, recommendationCount: 0, error: `维护扫描不可用（${outcome.code}）：${outcome.reason}。请在已挂载 agentPresets/subagents 的宿主会话中重试。` }
+    }
+    if (outcome.kind === 'aborted') {
+      // A cancelled run settles as aborted: distinguish it from 'the model produced no plan'.
+      return { ok: false, recommendationCount: 0, error: '维护扫描已中止（取消或超时），计划尚未产出 —— 在技能多、库大的场景下，请重试或提高超时（evolution-commands maintainTimeoutMs）。' }
+    }
+    if (outcome.kind === 'no-structured') {
+      return { ok: false, recommendationCount: 0, error: '维护子智能体没有返回结构化计划（模型没有产出结构化计划，或运行在产出前结束）：请重试；若反复出现，请提高 --timeout 或检查模型的输出结构。' }
+    }
+    const raw = outcome.structured
+    const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
       if (!validated.ok) {
         return {
           ok: false,
@@ -509,15 +466,6 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
         recommendationCount: validated.plan.plan.length,
         text: formatPlan(validated, runId),
       }
-    } finally {
-      // Dispose failures stay observable without masking the outcome that
-      // caused the exit (rc.42 P1-3 parity with the review subagent).
-      try {
-        await run.dispose()
-      } catch (disposeError) {
-        runtime.logger?.warn(`dsh-evolution-maintenance: subagent dispose failed: ${disposeError instanceof Error ? disposeError.message : String(disposeError)}`)
-      }
-    }
   } catch (error) {
     // 0.3.3/0.3.8/0.3.14: translate platform abort results instead of surfacing
     // the raw `Error: This operation was aborted`. Primary evidence is our own
@@ -525,7 +473,7 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // unstructured parent-cancel leak (plain Error with that exact message).
     const name = typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : undefined
     const message = error instanceof Error ? error.message : String(error)
-    const aborted = abortSignal?.aborted === true || name === 'AbortError' || message === 'This operation was aborted'
+    const aborted = options.signal?.aborted === true || name === 'AbortError' || message === 'This operation was aborted'
     return {
       ok: false,
       recommendationCount: 0,

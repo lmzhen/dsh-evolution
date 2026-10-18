@@ -131,7 +131,10 @@ export function createSubagentChannel(ctx: Context): SubagentChannel {
         clearTimeout(timer)
         spec.signal?.removeEventListener('abort', onAbort)
         if (activation !== undefined) {
-          try { await activation.dispose() } catch { /* teardown failure must not replace the captured outcome */ }
+          try { await activation.dispose() } catch (error) {
+            // W5 §6: teardown failures are observable but must NOT replace the captured outcome.
+            try { ctx.logger.warn('subagent channel: activation dispose failed: ' + messageOf(error)) } catch { /* logging must not mask teardown */ }
+          }
         }
       }
     },

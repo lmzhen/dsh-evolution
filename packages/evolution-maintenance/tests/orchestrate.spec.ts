@@ -1,8 +1,9 @@
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { renderMaintainTemplate, runMaintain, type MaintainRuntime, type MaintainSubagentRun, type MaintainSubagentStart } from '../src/index.ts'
+import { renderMaintainTemplate, runMaintain, type MaintainRuntime } from '../src/index.ts'
 import { MAINTAIN_OUTPUT_INSTRUCTION, MAINTAIN_PROMPT, DRIFT_SIGNAL_NOUNS, PROMPT_BUNDLE } from '@deepseek-ai/dsh-evolution-core'
+import { legacyChannel } from '../../test-support/fake-channel-services.ts'
 
 /** I-5 (v37): a minimal platform Agent stand-in — the tightened MaintainRuntime.parent
  * now requires one, and the orchestrator only forwards it to the spawn request. */
@@ -12,16 +13,16 @@ function maintAgent(): Agent {
 
 /** I-5 (v37): the platform SubagentRun contract — `dispose` is required, so every stub
  * returns one through this helper instead of a bare { result }. */
-function runStub(result: unknown): MaintainSubagentRun {
+function runStub(result: unknown) {
   // The stub carries extra fields (text) the real platform result also has, so the
   // value crosses one unknown boundary instead of a wide index signature on the
   // contract type (which would stop the REAL platform result from assigning).
-  return { result: Promise.resolve(result), dispose: async () => {} } as unknown as MaintainSubagentRun
+  return { result: Promise.resolve(result), dispose: async () => {} }
 }
 
 /** A spawner that must never be reached (the empty-library short-circuits), typed as
  * the platform start so a stub with a missing handle fails here instead of passing. */
-function neverStart(): (kind: 'spawn', options: unknown) => Promise<MaintainSubagentRun> {
+function neverStart(): (kind: 'spawn', options: unknown) => Promise<{ result: Promise<unknown>; dispose: () => Promise<void> }> {
   return (_kind, _options) => Promise.reject(new Error('should not be called'))
 }
 
@@ -77,14 +78,14 @@ describe('runMaintain', () => {
     return {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           seenRequests.push(JSON.stringify(options))
           // Platform contract: the subagent channel wraps its output as
           // `{ structured }` (review precedent, evolution-review:254-262).
           return runStub({ text: 'x', structured: result })
         },
-      },
+      }),
     }
   }
 
@@ -123,11 +124,11 @@ describe('runMaintain', () => {
     const empty: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
+      channel: legacyChannel({
         async start() {
           return runStub({ text: 'nothing here' })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(empty)
     expect(outcome.ok).toBe(false)
@@ -137,7 +138,7 @@ describe('runMaintain', () => {
   it('short-circuits an empty library without spending a model call', async () => {
     const emptyLibrary: MaintainRuntime = {
       library: { async list() { return [] }, async read() { return undefined } },
-      subagents: { start: neverStart() },
+      channel: legacyChannel({ start: neverStart() }),
       parent: maintAgent(),
     }
     const outcome = await runMaintain(emptyLibrary)
@@ -161,11 +162,11 @@ describe('runMaintain', () => {
     const failing: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
+      channel: legacyChannel({
         async start() {
           return runStub(Promise.reject(new Error('spawn bum')))
         },
-      },
+      }),
     }
     const outcome = await runMaintain(failing)
     expect(outcome.ok).toBe(false)
@@ -176,13 +177,13 @@ describe('runMaintain', () => {
     const aborting: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
+      channel: legacyChannel({
         async start() {
           const abort = new Error('This operation was aborted')
           abort.name = 'AbortError'
           return runStub(Promise.reject(abort))
         },
-      },
+      }),
     }
     const outcome = await runMaintain(aborting)
     expect(outcome.ok).toBe(false)
@@ -194,11 +195,11 @@ describe('runMaintain', () => {
     const aborting: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
+      channel: legacyChannel({
         async start() {
           return runStub(Promise.reject(new Error('This operation was aborted')))
         },
-      },
+      }),
     }
     const outcome = await runMaintain(aborting)
     expect(outcome.ok).toBe(false)
@@ -210,11 +211,11 @@ describe('runMaintain', () => {
     const cancelled: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
+      channel: legacyChannel({
         async start() {
           return runStub({ text: 'x', stopReason: 'aborted' })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(cancelled)
     expect(outcome.ok).toBe(false)
@@ -222,32 +223,32 @@ describe('runMaintain', () => {
   })
 
   it('passes the caller-specified timeout to the subagent start (0.3.3)', async () => {
-    let capturedOptions: { signal?: AbortSignal } | undefined
+    let capturedOptions: { timeoutMs?: number } | undefined
     const runtimeWithTimeout: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeWithTimeout, { timeoutMs: 240_000 })
     expect(outcome.ok).toBe(true)
-    // AbortSignal.timeout(240_000) — the deadline rides the signal.
-    expect(capturedOptions?.signal).toBeTruthy()
+    // 0.2.1: the deadline rides the channel spec's timeoutMs (the channel composes the signal).
+    expect(capturedOptions?.timeoutMs).toBe(240_000)
   })
 
   it('V6-29: a timeout above the AbortSignal domain is rejected explicitly, never spawned (0.3.36)', async () => {
     const never: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
+      channel: legacyChannel({
         async start() {
           throw new Error('should not be reached')
         },
-      },
+      }),
     }
     // AbortSignal.timeout throws a synchronous RangeError above 2^32-1; the
     // guard rejects the value up front with a readable message.
@@ -306,23 +307,26 @@ describe('runMaintain', () => {
     expect(text).toContain('> Notes: (inside the field above)')
   })
 
-  it('persona carries the template once; the prompt carries facts only (v11 P3-4)', async () => {
-    let capturedOptions: { persona?: string; prompt?: Array<{ text: string }> } | undefined
+  it('the template rides the SAME task prompt as the facts (0.2.1 has no persona plane)', async () => {
+    let capturedOptions: { prompt?: Array<{ text: string }> } | undefined
     const runtimeWithCapture: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeWithCapture)
     expect(outcome.ok).toBe(true)
-    expect(capturedOptions?.persona).toContain('## 角色')
-    expect(capturedOptions?.prompt?.[0]?.text ?? '').not.toContain('## 角色')
-    expect(capturedOptions?.prompt?.[0]?.text ?? '').toContain('MECHANICAL_FACTS')
+    const promptText = capturedOptions?.prompt?.[0]?.text ?? ''
+    // One copy of the template, followed by the facts block (W5 G3-S4: the persona text moved
+    // into promptText; the restricted preset is the tool/authority carrier).
+    expect(promptText).toContain('## 角色')
+    expect(promptText.split('## 角色')).toHaveLength(2)
+    expect(promptText).toContain('MECHANICAL_FACTS')
   })
 
   // G1 (0.20.0): the plan travels as a ledger — same array and order as the rendered [n]
@@ -353,12 +357,12 @@ describe('runMaintain', () => {
     const captureRuntime = (): MaintainRuntime => ({
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           depths.push((options as { maxDepth?: number }).maxDepth)
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     })
     await runMaintain(captureRuntime(), { maxDepth: Number.NaN })
     await runMaintain(captureRuntime(), { maxDepth: Number.POSITIVE_INFINITY })
@@ -378,12 +382,12 @@ describe('runMaintain', () => {
       library: fakeLibrary(),
       parent: maintAgent(),
       evolutionPolicy: { get() { return { curatorModel: 'policy-curator-model' } } },
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeWithPolicy)
     expect(outcome.ok).toBe(true)
@@ -395,12 +399,12 @@ describe('runMaintain', () => {
     const runtimeDefault: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           capturedOptions = options
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeDefault)
     expect(outcome.ok).toBe(true)
@@ -412,13 +416,13 @@ describe('runMaintain', () => {
     const runtimeWithSchema: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           const opts = options as { outputSchema?: typeof capturedOutputSchema }
           capturedOutputSchema = opts.outputSchema
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeWithSchema)
     expect(outcome.ok).toBe(true)
@@ -445,35 +449,31 @@ describe('runMaintain', () => {
     const okRuntime: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
+      channel: legacyChannel({
         async start() {
           return { result: runStub({ text: 'x', structured: validResult }).result, dispose: async () => { disposed += 1 } }
         },
-      },
+      }),
     }
     const outcome = await runMaintain(okRuntime)
     expect(outcome.ok).toBe(true)
     expect(disposed).toBe(1)
   })
 
-  it('warns on dispose failure without masking the success outcome (G4.1)', async () => {
-    const warns: string[] = []
+  it('a dispose failure never masks the success outcome (G4.1 / W5 §6)', async () => {
     const failingDisposeRuntime: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      logger: { warn: (message: string) => { warns.push(message) } },
-      subagents: {
+      channel: legacyChannel({
         async start() {
           return { result: runStub({ text: 'x', structured: validResult }).result, dispose: async () => { throw new Error('dispose boom') } }
         },
-      },
+      }),
     }
     const outcome = await runMaintain(failingDisposeRuntime)
+    // The channel owns teardown and warns on its own logger; the scan result stays authoritative.
     expect(outcome.ok).toBe(true)
     expect(outcome.verdict).toBe('issues')
-    expect(warns).toHaveLength(1)
-    expect(warns[0] ?? '').toContain('dispose failed')
-    expect(warns[0] ?? '').toContain('dispose boom')
   })
 
   it('I-5: the spawn request carries the platform Agent as parent and the run is always disposed', async () => {
@@ -483,12 +483,12 @@ describe('runMaintain', () => {
     const runtimeI5: MaintainRuntime = {
       library: fakeLibrary(),
       parent,
-      subagents: {
+      channel: legacyChannel({
         async start(_kind: 'spawn', options) {
           captured = options
           return { result: Promise.reject(new Error('spawn bum')), dispose: async () => { disposed += 1 } }
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeI5)
     expect(outcome.ok).toBe(false)
@@ -518,12 +518,12 @@ describe('runMaintain', () => {
     const rejecting: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
+      channel: legacyChannel({
         async start() {
           observed = { result: Promise.reject(new Error('spawn bum')), dispose: async () => { disposed += 1 } }
           return observed
         },
-      },
+      }),
     }
     const outcome = await runMaintain(rejecting)
     expect(outcome.ok).toBe(false)
@@ -538,21 +538,21 @@ describe('runMaintain', () => {
   // orchestrator soft-probes the registry before the spawn and degrades to
   // `skill`-only when the tool is absent, instead of failing the spawn.
   it('F-02: an unregistered maintenance_probe degrades the toolFilter to skill and declares it', async () => {
-    let captured: { toolFilter?: { allow?: string[] }; prompt?: Array<{ text: string }> } | undefined
+    let captured: { allow?: string[]; prompt?: Array<{ text: string }> } | undefined
     const runtimeNoTools: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           captured = options
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     // No tools accessor at all (tools service not mounted) — same degradation.
     const outcome = await runMaintain(runtimeNoTools)
     expect(outcome.ok).toBe(true)
-    expect(captured?.toolFilter?.allow).toEqual(['skill'])
+    expect(captured?.allow).toEqual(['skill'])
     const promptText = captured?.prompt?.[0]?.text ?? ''
     expect(promptText).toContain('maintenance_probe is not registered')
     expect(promptText).toContain('degrades to the `skill` tool only')
@@ -562,46 +562,46 @@ describe('runMaintain', () => {
       tools: { get: () => undefined },
     }
     await runMaintain(runtimeEmptyRegistry)
-    expect(captured?.toolFilter?.allow).toEqual(['skill'])
+    expect(captured?.allow).toEqual(['skill'])
   })
 
   it('F-02: a registered maintenance_probe keeps the two-tool default and adds no degradation note', async () => {
-    let captured: { toolFilter?: { allow?: string[] }; prompt?: Array<{ text: string }> } | undefined
+    let captured: { allow?: string[]; prompt?: Array<{ text: string }> } | undefined
     const runtimeWithProbe: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
       tools: { get: (name: string) => name === 'maintenance_probe' ? { name } : undefined },
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           captured = options
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeWithProbe)
     expect(outcome.ok).toBe(true)
-    expect(captured?.toolFilter?.allow).toEqual(['skill', 'maintenance_probe'])
+    expect(captured?.allow).toEqual(['skill', 'maintenance_probe'])
     expect(captured?.prompt?.[0]?.text ?? '').not.toContain('not registered')
   })
 
   it('F-02: an explicit toolAllow option is an informed override — passed through untouched', async () => {
-    let captured: { toolFilter?: { allow?: string[] } } | undefined
+    let captured: { allow?: string[]; prompt?: Array<{ text: string }> } | undefined
     const runtimeOverride: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
       // Even a registry WITHOUT the probe must not rewrite a caller-provided
       // filter.
       tools: { get: () => undefined },
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           captured = options
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeOverride, { toolAllow: ['skill', 'bash'] })
     expect(outcome.ok).toBe(true)
-    expect(captured?.toolFilter?.allow).toEqual(['skill', 'bash'])
+    expect(captured?.allow).toEqual(['skill', 'bash'])
   })
 
   // V10-09 (F-05): the recommendation count travels as a structured outcome
@@ -629,13 +629,13 @@ describe('runMaintain', () => {
     const noPlan = await runMaintain({
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: { async start() { return runStub({ text: 'nothing here' }) } },
+      channel: legacyChannel({ async start() { return runStub({ text: 'nothing here' }) } }),
     })
     expect(noPlan.ok).toBe(false)
     expect(noPlan.recommendationCount).toBe(0)
     const emptyLibrary = await runMaintain({
       library: { async list() { return [] }, async read() { return undefined } },
-      subagents: { start: neverStart() },
+      channel: legacyChannel({ start: neverStart() }),
       parent: maintAgent(),
     })
     expect(emptyLibrary.ok).toBe(true)
@@ -667,7 +667,7 @@ describe('runMaintain', () => {
         async list() { return [{ name: 'ghost-a' }, { name: 'ghost-b' }] },
         async read() { return null },
       },
-      subagents: { start: neverStart() },
+      channel: legacyChannel({ start: neverStart() }),
       parent: maintAgent(),
     })
     expect(outcome.ok).toBe(false)
@@ -678,7 +678,7 @@ describe('runMaintain', () => {
   it('V27 M-02: a missing skill root is reported as a configuration error, not an empty library', async () => {
     const outcome = await runMaintain({
       library: { async list() { return [] }, async read() { return undefined } },
-      subagents: { start: neverStart() },
+      channel: legacyChannel({ start: neverStart() }),
       parent: maintAgent(),
       rootExists: async () => false,
       skillRoot: '~/my-skills',
@@ -690,7 +690,7 @@ describe('runMaintain', () => {
     // The probe answering "it exists" keeps the genuine empty-library path.
     const empty = await runMaintain({
       library: { async list() { return [] }, async read() { return undefined } },
-      subagents: { start: neverStart() },
+      channel: legacyChannel({ start: neverStart() }),
       parent: maintAgent(),
       rootExists: async () => true,
     })
@@ -711,12 +711,12 @@ describe('runMaintain', () => {
     const runtimeWithCapture: MaintainRuntime = {
       library: fakeLibrary(),
       parent: maintAgent(),
-      subagents: {
-        async start(_kind: 'spawn', options: MaintainSubagentStart) {
+      channel: legacyChannel({
+        async start(_kind: 'spawn', options: Record<string, unknown>) {
           capturedPrompt = (options as unknown as { prompt?: Array<{ text: string }> }).prompt?.[0]?.text
           return runStub({ text: 'x', structured: validResult })
         },
-      },
+      }),
     }
     const outcome = await runMaintain(runtimeWithCapture)
     expect(outcome.ok).toBe(true)

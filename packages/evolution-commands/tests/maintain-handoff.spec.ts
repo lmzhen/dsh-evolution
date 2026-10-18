@@ -12,6 +12,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tempHome } from '../../test-support/temp-home.ts'
 import { captureCommands } from '../../test-support/commands-stub.ts'
+import { provideChannel } from '../../test-support/fake-channel-services.ts'
 
 type Result = { kind: 'success' | 'error'; text: string }
 type Handler = { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<Result> }
@@ -96,7 +97,7 @@ async function mount(options: { handoff?: boolean; live?: boolean } = {}) {
   ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
   let releaseOutcome: (() => void) | undefined
   let starts = 0
-  ctx.provide('subagents', {
+  provideChannel(ctx, ({
     async start() {
       starts += 1
       // The stub answers the FAMILY's consumer, which reads `outcome.text`; the platform's
@@ -104,7 +105,7 @@ async function mount(options: { handoff?: boolean; live?: boolean } = {}) {
       // tracks. The cast states the mismatch here rather than bending the fixture's runtime shape.
       return { result: new Promise((resolve) => { releaseOutcome = () => { resolve({ text: 'x', structured: STRUCTURED_PLAN } as unknown as Parameters<typeof resolve>[0]) } }) }
     },
-  })
+  }))
   const plain = { root, maintainCooldownMs: 0, ...(options.handoff === undefined ? {} : { maintainHandoffOnSettle: options.handoff }) }
   // `ctx.plugin` validates the INPUT config, and a live reference is not a boolean, so the "live" bed
   // parses the config with the plugin's own schema — the same object cordis hands `apply` — and calls
