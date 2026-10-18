@@ -1,3 +1,4 @@
+// @tier pre-tag
 // A-level spike regression: the parent document is REAL content captured from the installed
 // @deepseek-ai/dsh@0.2.1-rc.2 app via `agentPresets.readDocument('standard')` (isolated home,
 // probe boot on 19399). The fixture pins the exact YAML dialect the platform serves, so a

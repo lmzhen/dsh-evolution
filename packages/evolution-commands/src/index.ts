@@ -5,9 +5,9 @@
 
 // platform-declaration anchor: the optional platform seats this file probes (`settings`, `tools`,
 // `hmr`, `skillUsage`) are declared by the platform, not by this family: settings by
-// packages/settings/src/index.ts, tools by packages/core/tools/src/index.ts, hmr by vendor/hmr and
-// the usage counters by the skill package. The probes are capability checks — absence degrades a
-// feature and `/evolution doctor` reports it.
+// `packages/settings/settings/src/index.ts`, tools by `packages/core/tools/src/index.ts` and hmr
+// by `vendor/hmr/src/index.ts`. The probes are capability checks — absence degrades a feature and
+// `/evolution doctor` reports it.
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { createSubagentChannel, scopedPackageName, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'

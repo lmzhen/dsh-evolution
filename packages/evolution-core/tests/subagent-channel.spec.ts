@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { createSubagentChannel } from '../src/subagent/channel.ts'
 import { probeChannelState } from '../src/subagent/readiness.ts'

@@ -33,10 +33,16 @@ export function probeProblems(root, probes) {
     if (!PROBE_EVIDENCE.includes(probe.evidence)) problems.push(where + ': evidence must be A or B')
     if (typeof probe.owner !== 'string' || probe.owner === '') problems.push(where + ': owner is required')
     if (typeof probe.note !== 'string' || probe.note === '') problems.push(where + ': note is required')
+    // The registry is written ROOT-relative in the mirror (`packages/<pkg>/...`) and copied verbatim
+    // into the CI overlay, where the same file lives at `packages/evolution/<pkg>/...`. Resolve
+    // against the tree the script was pointed at first, then against the mirror-style root the
+    // caller may have passed (`<root>/../<file>`); both layouts must judge the SAME registry.
+    const layoutCandidates = (file) => [join(root, file.replace(/^packages\//, '')), join(root, '..', file)]
+    const existsInLayout = (file) => layoutCandidates(file).some((candidate) => existsSync(candidate))
     if (!Array.isArray(probe.files) || probe.files.length === 0) problems.push(where + ': files[] is required (the specs/scripts that prove the claim)')
-    else for (const file of probe.files) if (!existsSync(join(root, '..', file))) problems.push(where + ': missing ' + file)
+    else for (const file of probe.files) if (!existsInLayout(file)) problems.push(where + ': missing ' + file)
     if (typeof probe.mutation !== 'string' || probe.mutation === '') problems.push(where + ': mutation fixture is required (a probe without a red direction is not a probe)')
-    else if (!existsSync(join(root, '..', probe.mutation))) problems.push(where + ': missing mutation fixture ' + probe.mutation)
+    else if (!existsInLayout(probe.mutation)) problems.push(where + ': missing mutation fixture ' + probe.mutation)
   }
   return problems
 }

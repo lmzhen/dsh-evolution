@@ -94,11 +94,11 @@ const PROFILE_PLANES = {
  */
 const UPSTREAM_PLANES = {
   base: {
-    // 0.2.x re-record: `hmr` is mounted ENABLED now (the 0.1.5 table disabled it), and
-    // `tool-plugin-manager` / `tool-ralph` joined the disabled set.
-    disabled: ['tool-plugin-manager', 'skill-badge', 'tool-ralph'],
+    // 0.2.1-rc.2 re-record (`--upstream` recompute): `hmr` stays mounted ENABLED; the base plane
+    // disables `tool-plugin-manager` ONLY — `skill-badge` and `tool-ralph` are mounted enabled again.
+    disabled: ['tool-plugin-manager'],
     mounted: ['session-query-sqlite', 'tool-skill'],
-    source: 'packages/bundle/base/cordis.patch.yml (session-query-sqlite and tool-skill mounted; tool-plugin-manager, skill-badge and tool-ralph disabled:true)',
+    source: 'packages/bundle/base/cordis.patch.yml (session-query-sqlite and tool-skill mounted; tool-plugin-manager disabled:true)',
   },
   'web-app': {
     // 0.2.x re-record: `ui-schedule` and `workflow-worker-thread` are mounted ENABLED now,
@@ -124,13 +124,12 @@ const UPSTREAM_PLANES = {
       'tool-subagent-fork',
       'workflow-ptc',
       'tool-workflow',
-      'tool-ralph',
       'agent-instructions',
       'tool-todo',
       'tool-web',
     ],
     mounted: [],
-    source: 'packages/bundle/web-app/cordis.patch.yml (skill-filesystem and tool-skill disabled:true — the platform moves the per-agent skill rows into presets)',
+    source: 'packages/bundle/web-app/cordis.patch.yml (skill-filesystem and tool-skill disabled:true — the platform moves the per-agent skill rows into presets; tool-ralph is enabled again in 0.2.1-rc.2)',
   },
 }
 

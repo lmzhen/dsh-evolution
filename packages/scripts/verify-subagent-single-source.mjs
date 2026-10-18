@@ -30,7 +30,9 @@ let scanned = 0
 
 function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === 'lib' || entry.name === 'dist' || entry.name === 'tests') continue
+    // `.release-staging*` is the pack staging copy of this same tree (prepare-release runs before this
+    // guard set in CI): scanning it would report every owner-local call as a foreign copy of itself.
+    if (entry.name === 'node_modules' || entry.name === 'lib' || entry.name === 'dist' || entry.name === 'tests' || entry.name.startsWith('.release-staging')) continue
     if (dir === root && (entry.name === 'scripts' || entry.name === 'test-support')) continue
     const full = join(dir, entry.name)
     if (entry.isDirectory()) { walk(full); continue }

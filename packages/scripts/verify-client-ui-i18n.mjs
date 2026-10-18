@@ -24,6 +24,15 @@ const DECLARED_CHILDREN = new Map([
 
 /** Cross-face instructions: a GUI reader may not be sent to another surface. */
 const CROSS_FACE = ['dsh web', '/evolution ']
+/**
+ * Declared exemptions, by file basename. The W7 fallback row is the ONE deliberate cross-face hint:
+ * when the connection carrier is absent (E-325) the panel renders the command-face fallback from the
+ * generated `COMMAND_FALLBACKS` table instead of a bare HTTP failure — that table is the feature,
+ * not copy, and it is machine-generated (gen-client-seam.mjs --check keeps it in sync).
+ */
+const CROSS_FACE_EXEMPT = new Map([
+  ['fallbacks.generated.ts', 'W7/E-325 fallback row — the command face IS the degraded UI choice (generated data)'],
+])
 
 const NL = String.fromCharCode(10)
 const lines = (text) => text.split(NL)
@@ -97,8 +106,9 @@ for (const half of halves) {
         problems.push(path + ':' + lines(text.slice(0, hit.at)).length + ' renders an undeclared literal child ' + JSON.stringify(hit.literal))
       }
       lines(text).forEach((line, index) => {
+        const exempt = CROSS_FACE_EXEMPT.get(path.split(/[\\/]/).pop() ?? '')
         for (const phrase of CROSS_FACE) {
-          if (line.includes(phrase)) problems.push(path + ':' + (index + 1) + ' carries the cross-face instruction ' + JSON.stringify(phrase))
+          if (!exempt && line.includes(phrase)) problems.push(path + ':' + (index + 1) + ' carries the cross-face instruction ' + JSON.stringify(phrase))
         }
       })
     })

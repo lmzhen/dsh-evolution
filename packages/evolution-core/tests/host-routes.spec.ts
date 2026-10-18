@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { HOST_ROUTES, hostSurface, registerHostRoutes, type DecisionAudit } from '../src/http-routes.ts'
 

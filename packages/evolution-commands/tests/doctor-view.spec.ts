@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { Context } from '@deepseek-ai/cordis'
 import {
   DIAGNOSTICS_FACT_KEYS,

@@ -85,14 +85,14 @@ const CONTRACT_ANCHORS = [
   {
     id: 'tool-presentation-mode',
     file: 'packages/core/tools/src/index.ts',
-    anchor: "export type ToolPresentationMode = 'native' | 'ptc' | 'both'",
+    anchor: "export type ToolPresentationMode = 'native' | 'ptc'",
     consumer: 'the `tools` row config contract the family bundles document',
     finding: 'P2-A1',
   },
   {
     id: 'tool-presentation-mode-schema',
     file: 'packages/core/tools/src/index.ts',
-    anchor: "mode: z.union(['native', 'ptc', 'both'] as const).default('native'),",
+    anchor: "mode: z.union(['native', 'ptc'] as const).default('native'),",
     consumer: 'the `tools` row config contract (default value)',
     finding: 'P2-A1',
   },

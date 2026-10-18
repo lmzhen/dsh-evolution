@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { MODEL_SESSION_EVENTS, classifySessionEvent, isIgnorableEvent } from '../src/session-fold.ts'
 
