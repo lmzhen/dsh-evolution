@@ -32,6 +32,7 @@ import { execFileSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadSemver, readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
+import { vendoredRangeFor } from './lib-vendored-ranges.mjs'
 
 /** Every .yml/.yaml under one staged package copy, tests/node_modules already
  * filtered out by the cpSync that produced it. */
@@ -114,12 +115,8 @@ const devBuild = argv.includes('--dev-build')
 // smoke-built-entries.mjs fails on. `^3.18.1` published a range that resolves the builds the
 // family's own smoke guard rejects. verify-platform-ranges.mjs --upstream now asserts the pairing;
 // the cordis value below is a registered exception (see VENDORED_FLOOR_EXCEPTIONS there).
-const VENDORED_CORDIS_RANGE = '^4.0.1'
-// G2: the restrictor plugin imports the platform's Loader YAML dialect (`entryListSchema`) from
-// cordis-plugin-include; like cordis/schemastery this vendored framework range is pinned to the
-// validated upstream tree, not to our release version.
-const VENDORED_INCLUDE_RANGE = '^1.0.10'
-const VENDORED_SCHEMASTRY_RANGE = '^3.18.4'
+// G1-S6: vendored framework ranges live in ONE table (lib-vendored-ranges.mjs) shared with
+// verify-platform-ranges; a new @deepseek-ai/* non-dsh dependency must be added there.
 
 // R-05: the workspace protocols the rewrite understands. A literal
 // `workspace:` spec that does not match must fail loud — silently shipping the
@@ -160,9 +157,8 @@ function scopedPackageName(name) {
 
 function releaseSpec(name, ourNames, protocol = '^') {
   if (ourNames.has(name)) return `${protocol === '~' ? '~' : '^'}${releaseVersion}`
-  if (name === '@deepseek-ai/cordis') return VENDORED_CORDIS_RANGE
-  if (name === '@deepseek-ai/schemastery') return VENDORED_SCHEMASTRY_RANGE
-  if (name === '@deepseek-ai/cordis-plugin-include') return VENDORED_INCLUDE_RANGE
+  const vendoredRange = vendoredRangeFor(name)
+  if (vendoredRange !== undefined) return vendoredRange
   // Platform packages range against the published upstream version, NOT the
   // development baseline — CI guards manifest parity with the compat anchor
   // (verify-platform-ranges.mjs, N-2).

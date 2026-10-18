@@ -1,332 +1,136 @@
 #!/usr/bin/env node
 /**
- * N-2 platform-range guard (second-round audit §5.2): every manifest staged
- * for publish must declare each non-family `@deepseek-ai/dsh-*` dependency /
- * peer / dev / optional range as exactly `^<platform-version>` — the same
- * platform version the released-upstream compat gate validates against
- * (`dsh-v<platform-version>` git tag). A drift between the release metadata
- * and the compat anchor repeats the rc.54 defect: `^0.1.0-rc.6` does not
- * match `0.1.1-rc.2` under semver prerelease rules, so the declared support
- * range silently diverges from the validated platform.
+ * G1-S6 platform-range guard: the release metadata must agree with the ONE platform line.
  *
- * Support-window statement, and why this gate IS that statement: `^<version>`
- * is not a range that grows into later platform lines. Under node-semver's
- * prerelease-admission rule a prerelease version satisfies a range only
- * through a comparator carrying the SAME major.minor.patch, so `^0.1.1-rc.2`
- * rejects `0.1.5-rc.2` while admitting stable `0.1.5`. The declared window is
- * therefore exactly one anchor plus the stable releases below the caret's
- * upper bound — never a family of anchors. That rule is asserted below
- * (`assertSupportWindow`) rather than described here: widening the window
- * requires a second validated CI line, not a looser range.
- *
- * Family-scoped packages (`<our-scope>/dsh-*`, e.g. `@lmzhen/dsh-*` after
- * the publish scope rewrite) are exempt: they range against the family's own
- * `RELEASE_VERSION`.
+ * The platform line (version/floor/peers/engines/window) comes from platform-line.json through
+ * lib-platform-line.mjs — this guard owns NO version literal and NO hand-written semver model.
+ * Three assertion classes:
+ *   (a) every staged manifest's @deepseek-ai/dsh-* range == platformLine.peersRange;
+ *   (b) every staged manifest carries engines.dsh == platformLine.enginesRange (and no workspace:
+ *       literal survives);
+ *   (c) the admission grid (peers predicate vs engines predicate, 9 versions) is printed with the
+ *       policy expected column, so a range change that reshapes the window is visible in the log.
+ * Vendored @deepseek-ai/* non-dsh ranges are pinned by lib-vendored-ranges.mjs (unknown ones fail).
  *
  * Usage:
- *   node packages/scripts/verify-platform-ranges.mjs \
- *     --platform-version 0.1.5-rc.2 \
- *     --manifest-dir packages/evolution/dist \
- *     [--our-scope @lmzhen] \
- *     [--previous-anchor 0.1.1-rc.2]
+ *   node packages/scripts/verify-platform-ranges.mjs --manifest-dir packages/evolution/.release-staging
+ *     [--platform-line-root <repo root>] [--our-scope @lmzhen] [--upstream <checkout root>]
  */
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { loadSemver, readPlatformLine, resolvePlatformLineRoot, windowRows } from './lib-platform-line.mjs'
+import { VENDORED_DIRS, vendoredRangeFor } from './lib-vendored-ranges.mjs'
 
 const argv = process.argv.slice(2)
-
 function arg(name, fallback = '') {
   const index = argv.indexOf(name)
-  return index >= 0 ? argv[index + 1] : fallback
+  const value = index >= 0 ? argv[index + 1] : undefined
+  if (value === undefined || value.startsWith('--')) return fallback
+  return value
 }
-
 function requireArg(name) {
   const value = arg(name)
-  if (!value) throw new Error(`verify-platform-ranges: missing required ${name}`)
+  if (!value) { console.error('verify-platform-ranges: missing required ' + name); process.exit(2) }
   return value
 }
 
-const platformVersion = requireArg('--platform-version')
-const upstream = arg('--upstream', '')
-const manifestDir = requireArg('--manifest-dir')
+const manifestDir = resolve(requireArg('--manifest-dir'))
 const ourScope = arg('--our-scope', '@lmzhen')
-const familyPrefixes = arg('--family-prefixes', `${ourScope}/dsh-`)
-const expected = `^${platformVersion}`
-
-/** Vendored frameworks whose published range must not admit a version below the validated tree's. */
-const VENDORED = [
-  { name: '@deepseek-ai/schemastery', dir: 'schemastery' },
-  { name: '@deepseek-ai/cordis', dir: 'cordis' },
-]
-
-/**
- * Ranges allowed to sit BELOW the validated tree's vendored version, each with its reason and the
- * step that closes the debt (all fields required — the S1.1 register discipline). v46 S2.2: no
- * capability floor is proven for cordis, and raising its floor would narrow what the release admits
- * without evidence, so the debt is recorded rather than hidden.
- */
-const VENDORED_FLOOR_EXCEPTIONS = [
-  {
-    name: '@deepseek-ai/cordis',
-    allowedFloor: '4.0.1',
-    reason: 'no capability floor is proven for cordis; the validated tree ships 4.0.4 while the range keeps the historical floor',
-    expiry: 'a batch that proves a cordis capability floor (then raise both together)',
-  },
-]
-
-/**
- * The lower bound a caret/tilde/plain range starts at (`^3.18.1` → `3.18.1`).
- * @param range - the declared range.
- * @returns the floor as a version string.
- */
-function rangeFloor(range) {
-  return range.replace(/^[\^~]/, '').trim().split(' ')[0]
-}
-
-// M-7 (v3 audit): when the publish scope IS the platform scope, family and
-// platform packages are indistinguishable by prefix — the guard would exempt
-// everything and go silent. Fail loud instead of vacuous-passing.
-if (ourScope === '@deepseek-ai') {
+const familyPrefixes = arg('--family-prefixes', ourScope + '/dsh-')
+const upstream = arg('--upstream', '')
+const lineRoot = arg('--platform-line-root', '')
+if (ourScope === '@deepseek-ai' && familyPrefixes === '@deepseek-ai/dsh-') {
   console.error('verify-platform-ranges: --our-scope @deepseek-ai cannot distinguish family from platform deps; pass --family-prefixes (e.g. @lmzhen/dsh-)')
   process.exit(1)
 }
 
-/** Parse `major.minor.patch[-prerelease]`; `null` for anything else.
- * @param text - a version string.
- * @returns the parsed fields, or `null` when the text is not a semver version. */
-function parseVersion(text) {
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(text)
-  if (match === null) return null
-  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]), prerelease: match[4] ?? null }
-}
+const platformLine = readPlatformLine(lineRoot === '' ? resolvePlatformLineRoot(import.meta.url) : resolve(lineRoot))
+const { semver, version: semverVersion } = loadSemver(lineRoot === '' ? resolvePlatformLineRoot(import.meta.url) : resolve(lineRoot))
+const peersRange = platformLine.peersRange
+const enginesRange = platformLine.enginesRange
 
-/** Order two prerelease identifiers per semver §11.4 (numeric < alphanumeric).
- * @param a - one dotted prerelease field.
- * @param b - the other dotted prerelease field.
- * @returns negative, zero or positive, like a comparator. */
-function comparePrereleaseIdentifier(a, b) {
-  const numericA = /^\d+$/.test(a)
-  const numericB = /^\d+$/.test(b)
-  if (numericA && numericB) return Number(a) - Number(b)
-  if (numericA !== numericB) return numericA ? -1 : 1
-  return a < b ? -1 : a > b ? 1 : 0
-}
-
-/** Order two parsed versions, prerelease-aware.
- * @param a - a parsed version.
- * @param b - the other parsed version.
- * @returns negative, zero or positive, like a comparator. */
-function compareVersions(a, b) {
-  for (const field of ['major', 'minor', 'patch']) {
-    if (a[field] !== b[field]) return a[field] - b[field]
-  }
-  if (a.prerelease === null || b.prerelease === null) {
-    return a.prerelease === null && b.prerelease === null ? 0 : a.prerelease === null ? 1 : -1
-  }
-  const left = a.prerelease.split('.')
-  const right = b.prerelease.split('.')
-  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-    if (left[index] === undefined) return -1
-    if (right[index] === undefined) return 1
-    const order = comparePrereleaseIdentifier(left[index], right[index])
-    if (order !== 0) return order
-  }
-  return 0
-}
-
-/** The caret's exclusive upper bound (semver: `^0.1.5` ↦ `<0.2.0`).
- * @param anchor - a parsed version.
- * @returns the exclusive upper bound as a parsed version. */
-function caretUpperBound(anchor) {
-  if (anchor.major > 0) return { major: anchor.major + 1, minor: 0, patch: 0, prerelease: null }
-  if (anchor.minor > 0) return { major: 0, minor: anchor.minor + 1, patch: 0, prerelease: null }
-  return { major: 0, minor: 0, patch: anchor.patch + 1, prerelease: null }
-}
-
-/** Whether `^<anchor>` admits `candidate`.
- *
- * Covers exactly the two facts this gate asserts and no more: node-semver's
- * prerelease-admission rule (a prerelease candidate needs a comparator with the
- * same major.minor.patch, so it is admitted only from the anchor's own tuple)
- * and the caret's upper bound for stable candidates. A full range evaluator is
- * deliberately absent — the gate accepts one range form, `^<version>`.
- *
- * @param anchor - the platform version the release metadata pins.
- * @param candidate - the version to test for admission.
- * @returns whether the anchor's caret range admits the candidate.
- */
-function caretAdmits(anchor, candidate) {
-  const target = parseVersion(anchor)
-  const version = parseVersion(candidate)
-  if (target === null || version === null) return false
-  if (version.prerelease !== null) {
-    const sameTuple = version.major === target.major && version.minor === target.minor && version.patch === target.patch
-    return sameTuple && compareVersions(version, target) >= 0
-  }
-  return compareVersions(version, caretUpperBound(target)) < 0 && compareVersions(version, target) >= 0
-}
-
-/** Recorded semver outcomes (audit v33 §P1-1, measured against semver@7.8.5).
- * The predicate above must reproduce every one of them; a mismatch means this
- * gate's model of the support window no longer matches npm's, and the
- * "declared range == validated anchor" claim is unverified. */
-const ADMISSION_CASES = [
-  { range: '^0.1.1-rc.2', version: '0.1.5-rc.2', admits: false },
-  { range: '^0.1.1-rc.2', version: '0.1.5', admits: true },
-  { range: '^0.1.1-rc.2', version: '0.1.1-rc.3', admits: true },
-  { range: '^0.1.5-rc.2', version: '0.1.5-rc.2', admits: true },
-]
-
-/** The preceding-patch prerelease of a prerelease anchor (`0.1.5-rc.2` ↦
- * `0.1.4-rc.2`) — the immediately older anchor line, derived so the cross-anchor
- * assertion needs no hand-copied predecessor.
- * @param anchor - the platform version.
- * @returns the derived predecessor, or `null` when the anchor is stable. */
-function precedingAnchor(anchor) {
-  const parsed = parseVersion(anchor)
-  if (parsed === null || parsed.prerelease === null || parsed.patch === 0) return null
-  return `${parsed.major}.${parsed.minor}.${parsed.patch - 1}-${parsed.prerelease}`
-}
-
-/** Assert the support-window rule this gate exists to declare (G1.2).
- *
- * Fails loud when: the predicate disagrees with a recorded semver outcome; the
- * anchor is not inside its own range; a derived predecessor anchor is admitted
- * (the window grew silently); or `--previous-anchor` is admitted — that last
- * check is the cross-anchor fact `^0.1.1-rc.2` rejects `0.1.5-rc.2`, applied to
- * the pair this release actually moves between.
- *
- * @param anchor - the platform version the release metadata pins.
- */
-function assertSupportWindow(anchor) {
-  const range = `^${anchor}`
-  const problems = []
-  for (const item of ADMISSION_CASES) {
-    const actual = caretAdmits(item.range.slice(1), item.version)
-    if (actual !== item.admits) {
-      problems.push(`predicate says ${item.range} vs ${item.version} = ${actual}, semver@7.8.5 measured ${item.admits}`)
-    }
-  }
-  if (!caretAdmits(anchor, anchor)) problems.push(`${range} does not admit its own anchor ${anchor}`)
-  const predecessor = precedingAnchor(anchor)
-  if (predecessor !== null && caretAdmits(anchor, predecessor)) {
-    problems.push(`${range} admits the preceding anchor ${predecessor} — the declared window spans more than one anchor`)
-  }
-  const previous = arg('--previous-anchor')
-  if (previous !== '') {
-    if (!caretAdmits(anchor, previous)) {
-      console.log(`verify-platform-ranges: support window — ${range} rejects the previous anchor ${previous} (prerelease-admission rule; the declared window is exactly this anchor)`)
-    } else {
-      problems.push(`${range} admits the previous anchor ${previous} — declared and validated platform lines overlap`)
-    }
-  }
-  if (problems.length > 0) {
-    console.error(`verify-platform-ranges: ${problems.length} support-window assertion(s) failed for ${anchor}:`)
-    console.error(problems.join('\n'))
-    process.exit(1)
-  }
-}
-
-assertSupportWindow(platformVersion)
-
-/**
- * v46 S2.2 (finding T7-04): a published vendored-framework range may not admit a version BELOW the
- * one the family was validated against — otherwise a consumer resolves a build the family's own
- * smoke guard rejects (schemastery 3.18.2 has no `.volatile()`). Reads the vendored version from
- * the tree the release was validated against (`--upstream`).
- * @returns failure messages; empty when every range is honest or the tree was not given.
- */
-function vendoredFloorFailures(upstreamRoot) {
-  const failures = []
-  if (upstreamRoot === '') return failures
-  for (const vendor of VENDORED) {
-    const manifestPath = join(upstreamRoot, 'vendor', vendor.dir, 'package.json')
-    let version
-    try { version = JSON.parse(readFileSync(manifestPath, 'utf8')).version } catch { version = undefined }
-    if (typeof version !== 'string') {
-      failures.push(`${manifestPath}: no readable version — the vendored floor for ${vendor.name} cannot be re-derived`)
-      continue
-    }
-    const exception = VENDORED_FLOOR_EXCEPTIONS.find(entry => entry.name === vendor.name)
-    for (const dir of readdirSync(manifestDir, { withFileTypes: true })) {
-      if (!dir.isDirectory()) continue
-      const file = join(manifestDir, dir.name, 'package.json')
-      let manifest
-      try { manifest = JSON.parse(readFileSync(file, 'utf8')) } catch { continue }
-      for (const section of ['dependencies', 'peerDependencies']) {
-        const range = manifest[section]?.[vendor.name]
-        if (typeof range !== 'string') continue
-        const floor = rangeFloor(range)
-        const floorVersion = parseVersion(floor)
-        const validatedVersion = parseVersion(version)
-        if (floorVersion === null || validatedVersion === null) {
-          failures.push(`${manifest.name}: cannot compare ${range} against the vendored ${version} — one of them is not a semver version`)
-          continue
-        }
-        // compareVersions orders PARSED versions, not strings (parseVersion is the door).
-        if (compareVersions(floorVersion, validatedVersion) >= 0) continue
-        const ceiling = exception === undefined ? null : parseVersion(exception.allowedFloor)
-        if (ceiling !== null && compareVersions(floorVersion, ceiling) >= 0) continue
-        failures.push(`${manifest.name}: ${section}.${vendor.name} = ${range} admits versions below the validated ${version} (${manifestPath}) — a consumer can resolve a build the family's own smoke guard rejects${exception === undefined ? '' : ` (the registered exception allows down to ${exception.allowedFloor}; this floor is lower)`}`)
-      }
-    }
-  }
-  return failures
-}
-
-const failures = []
-let checked = 0
+const problems = []
 let scanned = 0
+let platformRanges = 0
 
-function isPlatformDep(name) {
-  return name.startsWith('@deepseek-ai/dsh-') && !name.startsWith(familyPrefixes)
+function isFamilyDep(name) {
+  return name.startsWith(familyPrefixes) || (name.startsWith(ourScope + '/') && !name.startsWith('@deepseek-ai/'))
 }
+function field(section, name) { return section + '.' + name }
 
-for (const dir of readdirSync(manifestDir, { withFileTypes: true })) {
-  if (!dir.isDirectory()) continue
-  const manifestPath = join(manifestDir, dir.name, 'package.json')
+let entries = []
+try { entries = readdirSync(manifestDir, { withFileTypes: true }) } catch {
+  console.error('verify-platform-ranges: cannot read manifest dir ' + manifestDir)
+  process.exit(1)
+}
+for (const entry of entries) {
+  if (!entry.isDirectory()) continue
+  const manifestPath = join(manifestDir, entry.name, 'package.json')
+  if (!existsSync(manifestPath)) continue
   let manifest
-  try {
-    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  } catch {
+  try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) } catch {
+    problems.push(manifestPath + ': not valid JSON')
     continue
   }
   scanned += 1
-  for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
-    for (const [name, range] of Object.entries(manifest[section] ?? {})) {
-      if (!isPlatformDep(name)) continue
-      checked += 1
-      if (range !== expected) {
-        failures.push(`${manifest.name}: ${section}.${name} = ${range} (expected ${expected})`)
+  const pkgName = typeof manifest.name === 'string' ? manifest.name : entry.name
+  for (const sectionName of ['dependencies', 'peerDependencies', 'optionalDependencies', 'devDependencies']) {
+    const section = manifest[sectionName] ?? {}
+    for (const [name, spec] of Object.entries(section)) {
+      if (typeof spec !== 'string') continue
+      if (spec.includes('workspace:')) problems.push(pkgName + ' ' + field(sectionName, name) + ': workspace literal survived into the staged manifest (' + spec + ')')
+      if (name.startsWith('@deepseek-ai/dsh-')) {
+        if (isFamilyDep(name)) continue
+        platformRanges += 1
+        if (spec !== peersRange) problems.push(pkgName + ' ' + field(sectionName, name) + ': ' + spec + ' != ' + peersRange + ' (platform peers range)')
+        continue
       }
+      if (!name.startsWith('@deepseek-ai/')) continue
+      const vendored = vendoredRangeFor(name)
+      if (vendored === undefined) {
+        problems.push(pkgName + ' ' + field(sectionName, name) + ': no vendored range rule — add it to packages/scripts/lib-vendored-ranges.mjs')
+        continue
+      }
+      if (spec !== vendored) problems.push(pkgName + ' ' + field(sectionName, name) + ': ' + spec + ' != ' + vendored + ' (vendored range)')
     }
+  }
+  const enginesDsh = manifest.engines && typeof manifest.engines === 'object' ? manifest.engines.dsh : undefined
+  if (enginesDsh === undefined) problems.push(pkgName + ' engines.dsh: missing (every staged manifest declares the platform window)')
+  else if (enginesDsh !== enginesRange) problems.push(pkgName + ' engines.dsh: ' + String(enginesDsh) + ' != ' + enginesRange)
+}
+
+if (scanned === 0) {
+  console.error('verify-platform-ranges: no package manifest found under ' + manifestDir + ' (0 directories with a readable package.json) — checked 0 packages, the guard would be silent')
+  process.exit(1)
+}
+if (platformRanges === 0) {
+  console.error('verify-platform-ranges: ' + scanned + ' manifest(s) scanned under ' + manifestDir + ' but 0 @deepseek-ai/dsh-* platform dependency ranges found — nothing to verify')
+  process.exit(1)
+}
+
+// (c) the admission grid, two predicates: peers (npm default) vs engines (includePrerelease).
+const rows = windowRows(platformLine)
+const peerAdmits = rows.filter((row) => row.peersAdmits)
+const engineAdmits = rows.filter((row) => row.enginesAdmits)
+console.log('platform peers   (' + peersRange + '): ' + rows.filter((row) => row.peersAdmits).map((row) => row.version).join(', '))
+console.log('platform engines (' + enginesRange + '): ' + engineAdmits.map((row) => row.version).join(', '))
+console.log('window grid (' + semverVersion + '): ' + rows.map((row) => row.version + '=' + (row.expected ? 'admit' : 'deny')).join(' '))
+void semver
+void peerAdmits
+
+if (upstream !== '') {
+  for (const [name, dir] of Object.entries(VENDORED_DIRS)) {
+    const manifestPath = join(upstream, 'vendor', dir, 'package.json')
+    if (!existsSync(manifestPath)) { problems.push('upstream vendor manifest missing: ' + manifestPath); continue }
+    const upstreamVersion = JSON.parse(readFileSync(manifestPath, 'utf8')).version
+    const expected = '^' + upstreamVersion
+    if (vendoredRangeFor(name) !== expected) problems.push(name + ': pinned ' + vendoredRangeFor(name) + ' != validated upstream ' + expected + ' (update lib-vendored-ranges.mjs)')
   }
 }
 
-// F-103: a flat tarball dir (or a missing path) has no package.json subdirs, so
-// the old guard scanned `packages/evolution/dist` and counted 0 ranges —
-// a vacuous pass that never validated anything. Fail loud when no manifest was
-// actually scanned rather than letting an unvalidated build go green.
-if (scanned === 0) {
-  console.error(`verify-platform-ranges: no package manifest found under ${manifestDir} (0 directories with a readable package.json) — checked 0 packages and the guard would pass vacuously. Point --manifest-dir at the staged per-package tree (e.g. ${manifestDir}/../.release-staging) that actually holds one package.json per package.`)
+if (problems.length > 0) {
+  console.error('verify-platform-ranges: ' + problems.length + ' problem(s)')
+  for (const problem of problems) console.error('  - ' + problem)
   process.exit(1)
 }
-
-// P3 (v15): the sibling of the F-103 vacuous pass — manifests exist but NONE
-// carries a @deepseek-ai/dsh-* platform dependency (e.g. every dependency
-// rewritten away upstream). "OK — 0 range(s)" would validate nothing.
-if (checked === 0) {
-  console.error(`verify-platform-ranges: ${scanned} manifest(s) scanned under ${manifestDir} but 0 @deepseek-ai/dsh-* platform dependency ranges found — nothing to verify (vacuous pass); check the staged tree.`)
-  process.exit(1)
-}
-
-const vendored = vendoredFloorFailures(upstream)
-if (upstream === '') console.log('verify-platform-ranges: vendored-floor check NOT executed (no --upstream)')
-failures.push(...vendored)
-
-if (failures.length > 0) {
-  console.error(`verify-platform-ranges: ${failures.length} platform dependency range(s) drifted from ^${platformVersion}:`)
-  console.error(failures.join('\n'))
-  process.exit(1)
-}
-console.log(`verify-platform-ranges: OK — scanned ${scanned} package manifest(s), ${checked} @deepseek-ai/dsh-* platform range(s) all ^${platformVersion}`)
+console.log('verify-platform-ranges: OK — ' + scanned + ' manifest(s), ' + platformRanges + ' platform range(s) == ' + peersRange + ', engines.dsh == ' + enginesRange + ', grid ' + rows.length + ' rows (semver ' + semverVersion + ')')

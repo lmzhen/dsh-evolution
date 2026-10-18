@@ -255,18 +255,14 @@ runs:
       shell: bash
       working-directory: upstream
       env:
-        PLATFORM_VERSION: ${{ inputs.platform_version }}
-        PLATFORM_FLOOR: ${{ inputs.platform_floor }}
         NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
         # R-10: --our-scope is passed EXPLICITLY from the same scope the pack
         # rewrite used — the guard's '@lmzhen' default is no longer an
         # independent second definition that can silently drift.
-        # G7 §2.1: the guard asserts the FLOOR (what the ranges must admit), not the tested
-        # line — passing the tested line here was how a range could exclude its own line's rc.
-        RANGE_FLOOR="${PLATFORM_FLOOR:-$PLATFORM_VERSION}"
+        # G1-S6: the platform line is NOT a flag anymore — the guard reads platform-line.json
+        # (version/floor/peers/engines/grid) through lib-platform-line.mjs.
         node packages/evolution/scripts/verify-platform-ranges.mjs \
-          --platform-version "$RANGE_FLOOR" \
           --manifest-dir packages/evolution/.release-staging \
           --our-scope "$NPM_SCOPE"
 

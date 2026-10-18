@@ -109,7 +109,7 @@ Run from the two trees (never reorder or rename these steps):
 | 24 | `node packages/scripts/verify-arming.mjs --packages packages --strict`（第二个元门禁：每条规则的扫描族在真实树必须 >0；接线类由 doc-facts 拥有） | mirror |
 | 25 | `node packages/scripts/verify-client-seats.mjs packages --strict`（客户端半的座位读取与平台席位一致性） | mirror |
 | 26 | `node packages/scripts/verify-client-tokens.mjs packages --strict`（客户端 token 使用） | mirror |
-| 27 | `node packages/scripts/verify-platform-ranges.mjs --platform-version <platform version> --manifest-dir packages/evolution/dist`（**发布期**：判已铺好的 dist 里每个 manifest 的平台区间） | mirror |
+| 27 | `node packages/scripts/verify-platform-ranges.mjs --manifest-dir packages/evolution/.release-staging`（**发布期**：每个 staged manifest 的 `@deepseek-ai/dsh-*` 必须逐字等于 platform-line.json 派生的 peers 范围、`engines.dsh` 必须等于 engines 窗口；vendored 范围由 `lib-vendored-ranges.mjs` 单源钉住；同时打印双谓词窗口网格两表读数 ✓） | mirror |
 | 28 | `node packages/scripts/verify-release-artifacts.mjs .github --strict`（发布面产物：CI 工作流与发布脚本的一致性） | mirror |
 | 29 | `node packages/scripts/verify-write-inventory.mjs packages --strict --home <plane home>`（写清单落地：**CI 形态**用 `$RUNNER_TEMP/plane-home`） | mirror |
 | 30 | `node packages/scripts/verify-client-ui-i18n.mjs packages`（U-8/G5.9：客户端半的可见文案必须走字典——① 不许把裸字符串当子节点（任何实参位）；② 不许在字符串里写跨面指令 `dsh web`／`/evolution …`；注释先行剥离且**保留行号**。drill：注入一个第 4 实参裸串＋一个跨面串 ⇒ 必红，撤回即绿 ✓） | mirror |

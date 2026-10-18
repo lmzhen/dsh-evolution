@@ -415,15 +415,12 @@
     {
       "id": "gate-27",
       "kind": "script",
-      "human": "`node packages/scripts/verify-platform-ranges.mjs --platform-version <platform version> --manifest-dir packages/evolution/dist`（**发布期**：判已铺好的 dist 里每个 manifest 的平台区间）",
+      "human": "`node packages/scripts/verify-platform-ranges.mjs --manifest-dir packages/evolution/.release-staging`（**发布期**：每个 staged manifest 的 `@deepseek-ai/dsh-*` 必须逐字等于 platform-line.json 派生的 peers 范围、`engines.dsh` 必须等于 engines 窗口；vendored 范围由 `lib-vendored-ranges.mjs` 单源钉住；同时打印双谓词窗口网格两表读数 ✓）",
       "argv": [
         "node",
         "packages/scripts/verify-platform-ranges.mjs",
-        "--platform-version",
-        "<platform",
-        "version>",
         "--manifest-dir",
-        "packages/evolution/dist"
+        "packages/evolution/.release-staging"
       ],
       "tree": "mirror",
       "profiles": [
