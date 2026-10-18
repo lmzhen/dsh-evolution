@@ -33,15 +33,15 @@ describe('skill-health client api (HOST_ROUTES.rows)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => answer({ ok: false, code: 'curator-refused', message: 'curator: 未标定的规则不报数字' })))
     const outcome = await rows()
     expect(outcome.ok).toBe(false)
-    if (!outcome.ok) expect(outcome.message).toBe('curator: 未标定的规则不报数字')
+    if (!outcome.ok) expect(outcome.failure).toEqual({ kind: 'refused', code: 'curator-refused', message: 'curator: 未标定的规则不报数字' })
   })
 
   it('classifies the platform admission answers (401/403/404) without reading their bodies', async () => {
-    for (const [status, expected] of [[401, 'HTTP 401'], [403, 'HTTP 403'], [404, 'HTTP 404']] as const) {
+    for (const [status, kind] of [[401, 'unauthenticated'], [403, 'forbidden'], [404, 'unmounted']] as const) {
       vi.stubGlobal('fetch', vi.fn(async () => answer('forbidden', status)))
       const outcome = await rows()
       expect(outcome.ok).toBe(false)
-      if (!outcome.ok) expect(outcome.message).toBe(expected)
+      if (!outcome.ok) expect(outcome.failure).toMatchObject({ kind, status })
     }
   })
 
@@ -49,6 +49,6 @@ describe('skill-health client api (HOST_ROUTES.rows)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('socket closed') }))
     const outcome = await rows()
     expect(outcome.ok).toBe(false)
-    if (!outcome.ok) expect(outcome.message).toContain('socket closed')
+    if (!outcome.ok) expect(outcome.failure).toMatchObject({ kind: 'server', status: 0, detail: 'socket closed' })
   })
 })

@@ -12,6 +12,9 @@ import { createElement, useEffect, useState, type ReactNode } from 'react'
 // The stylesheet is scoped to this class; without it on the root element the panel renders unstyled.
 import { CSS_TAG_ID } from './styles.ts'
 import type { HealthOutcome } from './api.ts'
+import type { RouteFailure } from './route-client.generated.ts'
+import { FailureBlock } from './states.generated.ts'
+import { FALLBACKS } from './fallbacks.generated.ts'
 
 /** One finding, as the host reports it: `line` is null when the position cannot be named. */
 export interface HealthFinding {
@@ -98,12 +101,29 @@ function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
  * @param props - the face (`{ rows, truncated, openHistory? }`) and the locale seat's translator.
  * @returns the panel body.
  */
+/** Fill the generated block's `{slot}` copies with this bundle's dictionary. */
+function fillCopy(template: string, values: Readonly<Record<string, string | number>>): string {
+  return template.replace(/\{(\w+)\}/g, (match, slot: string) => {
+    const value = values[slot]
+    return value === undefined ? match : String(value)
+  })
+}
+
+/** The shared four-state failure block, spoken through this bundle's keys. */
+function failureBlock(t: (key: string) => string, failure: RouteFailure): ReactNode {
+  const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => {
+    const text = t(key)
+    return values === undefined ? text : fillCopy(text, values)
+  }
+  return FailureBlock({ failure, t: translate, fallback: FALLBACKS['skill-health'] })
+}
+
 export function SkillHealthPanel(face: HealthFace): ReactNode {
   const t = face.t
   // The face seeds the first paint; the host route replaces it once read. A refusal keeps the seed
   // (so the counts stay a lower bound) and reports the host's own sentence instead of a verdict.
   const [view, setView] = useState<HealthFace>(face)
-  const [failed, setFailed] = useState<string | undefined>(undefined)
+  const [failed, setFailed] = useState<RouteFailure | undefined>(undefined)
   useEffect(() => {
     const load = face.loadRows
     if (load === undefined) return
@@ -116,9 +136,9 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
         // ever added, it must take a read ticket exactly as skill-history/Panel.ts and
         // settings-ui/PendingCard.ts do - a later-arriving older answer would otherwise overwrite it.
         if (outcome.ok) setView({ ...face, rows: outcome.payload.rows, truncated: outcome.payload.truncated })
-        else setFailed(outcome.message)
+        else setFailed(outcome.failure)
       })
-      .catch((error: unknown) => { if (live) setFailed(String(error)) })
+      .catch(() => { if (live) setFailed({ kind: 'server', status: 0 }) })
     return () => { live = false }
   }, [face])
   const counts = new Map(KINDS.map(kind => [kind, view.rows.filter((row: HealthRow) => row.verdict === kind).length]))
@@ -135,7 +155,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
     createElement('p', { 'data-role': 'hint' }, t('hint')),
     stats,
     view.truncated ? createElement('p', { 'data-role': 'note' }, t('loading.failed')) : null,
-    failed === undefined ? null : createElement('p', { 'data-role': 'note' }, t('read.failed') + ' ' + failed),
+    failed === undefined ? null : createElement('div', { 'data-role': 'note' }, failureBlock(t, failed)),
     view.rows.length === 0 ? createElement('p', { 'data-role': 'note' }, t('empty.noneReported')) : null,
     createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')),
     ruleTable(view, t),

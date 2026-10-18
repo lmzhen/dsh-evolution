@@ -7,7 +7,8 @@
  * @module @deepseek-ai/dsh-evolution-skill-health/client
  */
 import { ROUTES } from './routes.generated.ts'
-import { failureMessage, requestJson } from './route-client.generated.ts'
+import { requestJson } from './route-client.generated.ts'
+import type { RouteFailure } from './route-client.generated.ts'
 import type { HealthRow } from './Panel.ts'
 
 /** Route paths: the generated mirror of the host's HOST_ROUTES (one declaration in core). */
@@ -20,8 +21,8 @@ export interface HealthPayload {
   truncated: boolean
 }
 
-/** Either the payload or the host's refusal sentence — never a thrown error the panel must guess at. */
-export type HealthOutcome = { ok: true; payload: HealthPayload } | { ok: false; message: string }
+/** Either the payload or the classified four-state failure — never a thrown error the panel must guess at. */
+export type HealthOutcome = { ok: true; payload: HealthPayload } | { ok: false; failure: RouteFailure }
 
 /**
  * Read the scan result.
@@ -29,6 +30,6 @@ export type HealthOutcome = { ok: true; payload: HealthPayload } | { ok: false; 
  */
 export async function rows(): Promise<HealthOutcome> {
   const answer = await requestJson<HealthPayload>(fetch, HOST_ROUTES.rows, { headers: { accept: 'application/json' } })
-  if (!answer.ok) return { ok: false, message: failureMessage(answer.failure) }
+  if (!answer.ok) return { ok: false, failure: answer.failure }
   return { ok: true, payload: { rows: answer.data.rows ?? [], truncated: answer.data.truncated === true } }
 }

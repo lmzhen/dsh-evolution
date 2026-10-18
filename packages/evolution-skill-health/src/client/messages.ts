@@ -36,6 +36,11 @@ export const zh: Record<string, string> = {
   'unreadable.note': '读不到内容，因此无法判断（不是「通过」）。',
   'loading.failed': '读取失败——现在判断不了；点「刷新」重试。',
   'read.failed': '这次没读到数据（下面一行是原始信息）：',
+  'failure.unauthorized': '需要登录：重新打开这个页面完成登录后再试。',
+  'failure.forbidden': '平台拒绝了这个请求（身份不是 owner）。',
+  'failure.unmounted': '该功能没有挂载。',
+  'failure.server': '读取失败，可以重试。',
+  'fallback.hint': '可以改用命令：{command}',
 }
 
 /** English dictionary. */
@@ -63,4 +68,9 @@ export const en: Record<string, string> = {
   'line.unknown': 'line: UNKNOWN',
   'unreadable.note': 'The content could not be read, so this cannot be judged (it is not a pass).',
   'loading.failed': 'Reading failed — this cannot be judged right now; press Refresh to retry.',
+  'failure.unauthorized': 'Sign-in is required: reopen this page and sign in, then retry.',
+  'failure.forbidden': 'The platform refused this request (not the owner principal).',
+  'failure.unmounted': 'This feature is not mounted.',
+  'failure.server': 'The read failed; you can retry.',
+  'fallback.hint': 'Command fallback: {command}',
 }
