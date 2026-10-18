@@ -32,6 +32,9 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     // 0.25.0: the skill-health panel. Its Host half mounts ONE read-only route and its browser
     // half the sidebar row that reads it; like the two surfaces above it adds no infra row.
     '@deepseek-ai/dsh-evolution-skill-health',
+    // G2-S6: resolver dependency — the generated restricted preset mounts the core restrictor
+    // subpath at runtime, so the bundle must ship core even though no source file imports it.
+    '@deepseek-ai/dsh-evolution-core',
   ]
   for (const dep of expected) {
     expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe('workspace:^')
