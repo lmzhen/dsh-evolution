@@ -112,3 +112,4 @@ export type {
 } from './composition/index.ts'
 export * from './diagnostics.ts'
 export * from './platform-line.generated.ts'
+export * from './session-fold.ts'
