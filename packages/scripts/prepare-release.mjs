@@ -6,10 +6,9 @@
  *   - workspace:^ is converted to real semver ranges
  *   - --scope renames our packages, YAML rows, repository metadata and
  *     removes unpublished ./src/* export shims
- *   - --version pins the release version; --platform-version pins the
- *     published upstream platform the tree is VALIDATED against (it also
- *     drives the compat gate's upstream_ref), while --platform-floor pins
- *     what the dsh-* ranges require (defaults to --platform-version)
+ *   - --version pins the release version. The platform line (version/floor/peers/engines/
+ *     upstreamRef) is NOT a flag: it comes from the repository-root platform-line.json
+ *     (one home shared by print/gen/gates; see lib-platform-line.mjs).
  *   - tarballs are validated before manifest/smoke artifacts are written
  *
  * Version single-source (M4 §5.3): the release workflow's environment is the
@@ -20,7 +19,7 @@
  * Usage:
  *   node packages/scripts/build-lib.mjs
  *   node packages/scripts/prepare-release.mjs \
- *     --scope @lmzhen --version 0.1.0-rc.NN --platform-version 0.1.1-rc.NN
+ *     --scope @lmzhen --version 0.1.0-rc.NN
  *
  * `--dev-build` marks a NON-RELEASE pack: a main-branch CI push packs with the
  * dev placeholder `RELEASE_VERSION` (see release.yml) so the pack step and the
@@ -32,6 +31,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, r
 import { execFileSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadSemver, readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
 
 /** Every .yml/.yaml under one staged package copy, tests/node_modules already
  * filtered out by the cpSync that produced it. */
@@ -68,12 +68,12 @@ function requireArg(name) {
 
 const scope = requireArg('--scope')
 const releaseVersion = requireArg('--version')
-const platformVersion = requireArg('--platform-version')
-// G7 §2.1: the FLOOR the published ranges declare. It is a separate value because the tested
-// line and the admitted line differ inside one line: ^0.2.0-rc.1 admits 0.2.0-rc.2, while
-// ^0.2.0-rc.2 would refuse the earlier rc of the very line the range is supposed to support.
-// Omitting the flag keeps the historical single-value behavior for one-rc releases.
-const platformFloor = arg('--platform-floor', platformVersion)
+// G1-S5: the platform line is NOT a CLI input anymore. version/floor/peers/engines/upstreamRef
+// all derive from the repository-root platform-line.json (one home; print/gen/gates read the same).
+const platformLineRoot = resolvePlatformLineRoot(import.meta.url)
+const platformLine = readPlatformLine(platformLineRoot)
+const platformVersion = platformLine.version
+const platformFloor = platformLine.floor
 // Explicit non-release pack (main-branch CI): never inferred from the version
 // string, so a real release that passes a wrong --version still fails below.
 const devBuild = argv.includes('--dev-build')
@@ -115,6 +115,10 @@ const devBuild = argv.includes('--dev-build')
 // family's own smoke guard rejects. verify-platform-ranges.mjs --upstream now asserts the pairing;
 // the cordis value below is a registered exception (see VENDORED_FLOOR_EXCEPTIONS there).
 const VENDORED_CORDIS_RANGE = '^4.0.1'
+// G2: the restrictor plugin imports the platform's Loader YAML dialect (`entryListSchema`) from
+// cordis-plugin-include; like cordis/schemastery this vendored framework range is pinned to the
+// validated upstream tree, not to our release version.
+const VENDORED_INCLUDE_RANGE = '^1.0.10'
 const VENDORED_SCHEMASTRY_RANGE = '^3.18.4'
 
 // R-05: the workspace protocols the rewrite understands. A literal
@@ -158,11 +162,12 @@ function releaseSpec(name, ourNames, protocol = '^') {
   if (ourNames.has(name)) return `${protocol === '~' ? '~' : '^'}${releaseVersion}`
   if (name === '@deepseek-ai/cordis') return VENDORED_CORDIS_RANGE
   if (name === '@deepseek-ai/schemastery') return VENDORED_SCHEMASTRY_RANGE
+  if (name === '@deepseek-ai/cordis-plugin-include') return VENDORED_INCLUDE_RANGE
   // Platform packages range against the published upstream version, NOT the
   // development baseline — CI guards manifest parity with the compat anchor
   // (verify-platform-ranges.mjs, N-2).
   if (name.startsWith('@deepseek-ai/dsh-')) {
-    return `^${platformFloor}`
+    return platformLine.peersRange
   }
   // D-7 (v18): the `npm view` registry lookup that used to sit here was dead
   // for the current dependency set — all 16 external workspace deps hit a
@@ -174,6 +179,9 @@ function releaseSpec(name, ourNames, protocol = '^') {
 
 function rewritePackage(pkg, ourNames, sourceDir) {
   pkg.version = releaseVersion
+  // G1-S5: the host-side support window, derived from the same platform line (peers=^floor is the
+  // instance-sharing anchor; engines.dsh is the declared window for `npm`/installers).
+  pkg.engines = { ...(pkg.engines ?? {}), dsh: platformLine.enginesRange }
   for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
     for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
       let rewritten = name
@@ -610,6 +618,26 @@ writeFileSync(join(distNext, 'publish-order.json'), JSON.stringify(publishGroups
 // repo (workflows, scripts, docs) ever read it; it was residue of a
 // historical manual smoke-install flow. `publish-order.json` above stays:
 // the publish step consumes it.
+
+// G1-S5 (W2): release-evidence records WHAT this staging was validated against. The CI gates
+// (verify-platform-ranges, release workflow) append/assert against it; `ciFace` stays null here
+// and is filled by the workflow, while `platformLine` is never re-spelled by hand.
+const { version: semverVersion } = loadSemver(platformLineRoot)
+writeFileSync(join(distNext, 'release-evidence.json'), JSON.stringify({
+  schemaVersion: 1,
+  familyVersion: releaseVersion,
+  platformLine,
+  semverVersion,
+  ciFace: null,
+  manifests: {
+    count: tarballs.length,
+    enginesRange: platformLine.enginesRange,
+    peerRange: platformLine.peersRange,
+  },
+  gates: [],
+  frozenLines: ['0.2.0'],
+  generatedAt: new Date().toISOString(),
+}, null, 2) + '\n')
 
 // Atomic swap: only now that the whole build (and its guard) passed do the
 // live `.release-staging` and `dist` replace their `.next` siblings. A failed

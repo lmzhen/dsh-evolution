@@ -28,15 +28,22 @@ function semverFrom(rootDir) {
   if (typeof process.env.PLATFORM_LINE_SEMVER_ROOT === 'string' && process.env.PLATFORM_LINE_SEMVER_ROOT !== '') candidates.push(join(process.env.PLATFORM_LINE_SEMVER_ROOT, 'package.json'))
   candidates.push(join(process.cwd(), 'package.json'), import.meta.url)
   for (const candidate of candidates) {
-    try { return createRequire(candidate)('semver') } catch { /* try next */ }
+    const require = createRequire(candidate)
+    try {
+      const semver = require('semver')
+      // SEMVER_SPEC_VERSION is the RANGE SPEC version (2.0.0), not the package version the
+      // evidence must record; read the installed manifest instead.
+      const version = JSON.parse(readFileSync(require.resolve('semver/package.json'), 'utf8')).version
+      return { semver, version }
+    } catch { /* try next */ }
   }
   die('cannot resolve the semver package from ' + rootDir + ' (run `pnpm install` in the repository root; no hand-written fallback)')
 }
 
 export function loadSemver(rootDir) {
-  const semver = semverFrom(rootDir)
+  const { semver, version } = semverFrom(rootDir)
   if (typeof semver.valid !== 'function' || typeof semver.satisfies !== 'function') die('the resolved semver package lacks valid()/satisfies()')
-  return { semver, version: semver.SEMVER_SPEC_VERSION ?? semver.version ?? 'unknown' }
+  return { semver, version }
 }
 
 function sameTuple(semver, a, b) {
@@ -63,7 +70,7 @@ export function parsePlatformLine(raw, sourcePath = '<inline>') {
   for (const field of ['version', 'floor']) {
     if (typeof parsed[field] !== 'string' || parsed[field].trim() === '') die(sourcePath + ' is missing the ' + field + ' string')
   }
-  const semver = semverFrom(dirname(sourcePath === '<inline>' ? process.cwd() + '/package.json' : resolve(sourcePath)))
+  const { semver } = semverFrom(dirname(sourcePath === '<inline>' ? process.cwd() + '/package.json' : resolve(sourcePath)))
   if (semver.valid(parsed.version) === null) die('version is not a valid semver: ' + parsed.version)
   if (semver.valid(parsed.floor) === null) die('floor is not a valid semver: ' + parsed.floor)
   if (!sameTuple(semver, parsed.version, parsed.floor)) die('version and floor must share one major.minor.patch tuple (single-line anchor); got ' + parsed.version + ' / ' + parsed.floor)

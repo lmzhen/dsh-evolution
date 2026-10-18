@@ -227,10 +227,10 @@ runs:
         # `RELEASE_VERSION`, which deliberately does not match the manifests —
         # `--dev-build` declares that (v21 S-4 reconciliation is skipped there,
         # and that staging is never published: the publish job is tag-gated).
-        ARGS=(--scope "$NPM_SCOPE" --version "${RELEASE_VERSION#v}" --platform-version "$PLATFORM_VERSION")
+        ARGS=(--scope "$NPM_SCOPE" --version "${RELEASE_VERSION#v}")
         # G7 §2.1: the FLOOR is a separate input — it is what the published ranges declare, so
         # omitting it would publish ^<tested-line> and refuse the line's earlier rc.
-        if [[ -n "$PLATFORM_FLOOR" ]]; then ARGS+=(--platform-floor "$PLATFORM_FLOOR"); fi
+        # G1-S5: platform version/floor are read from platform-line.json, not passed as flags.
         if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then ARGS+=(--dev-build); fi
         node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}"
 
