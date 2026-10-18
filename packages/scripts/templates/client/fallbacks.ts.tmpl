@@ -1,0 +1,10 @@
+{{HEADER}}
+
+import type { FallbackHint } from './contracts.generated.ts'
+
+/**
+ * The command-face fallback for every Host surface, generated from evolution-commands'
+ * COMMAND_FALLBACKS (the ONE home). When the platform's connection carrier is absent (E-325) the
+ * panels render this hint instead of a bare HTTP failure — same use case, command face.
+ */
+export const FALLBACKS: Readonly<Record<{{SURFACE_UNION}}, FallbackHint>> = {{FALLBACKS_BODY}}
