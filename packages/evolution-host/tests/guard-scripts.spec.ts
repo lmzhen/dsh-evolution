@@ -305,6 +305,48 @@ describe('guard scripts (V4-30 sentry)', () => {
     expect(empty?.stderr).toContain('zero facts registered')
   })
 
+  it('N19 (G6/W8): the new machine kinds catch drifted values (preset ids, runbook order, fallback map)', async () => {
+    const root = await tempRoot('guard-arch-n19-machines-')
+    await mkdir(join(root, 'evolution-core', 'src', 'composition'), { recursive: true })
+    await mkdir(join(root, 'evolution-commands', 'src'), { recursive: true })
+    await writeFile(join(root, 'evolution-core', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-evolution-core', version: '0.0.0' }), 'utf8')
+    await writeFile(join(root, 'evolution-core', 'src', 'index.ts'), 'export const armed = true\n', 'utf8')
+    await writeFile(join(root, 'evolution-core', 'src', 'composition', 'preset-ids.ts'),
+      "export const EVOLUTION_PRESET_IDS = ['evolution'] as const\n" +
+      "export const REVIEWER_PRESET_ID = 'evolution-reviewer-readonly' as const\n" +
+      "export const MAINTAINER_PRESET_ID = 'evolution-maintainer-readonly' as const\n", 'utf8')
+    await writeFile(join(root, 'evolution-commands', 'src', 'command-fallback.ts'),
+      "export const COMMAND_FALLBACKS = {\n  approval: {\n    command: '/evolution pending',\n  },\n  diagnostics: {\n    // no command on purpose\n  },\n}\n", 'utf8')
+    await mkdir(join(root, 'scripts'), { recursive: true })
+    const scan = { repoDocs: [], reasonLayer: [], treeDocSkip: ['node_modules'] }
+    const runDoc = async () => await run(process.execPath, [join(scripts, 'verify-doc-facts.mjs'), root, '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    // 1) A preset id present in code but absent from the fact home fails (the id set moved).
+    await writeFile(join(root, 'scripts', 'family-facts.json'), JSON.stringify({ version: 1, scan, facts: [
+      { id: 'preset-ids', home: 'INSTALL.md', must: [{ text: 'canonical' }], machine: { kind: 'preset-ids', file: 'evolution-core/src/composition/preset-ids.ts' } },
+    ] }), 'utf8')
+    await writeFile(join(root, 'INSTALL.md'), 'canonical\n', 'utf8')
+    const ids = await runDoc()
+    expect(ids?.code).toBe(1)
+    expect(ids?.stderr).toContain('evolution-reviewer-readonly')
+    // 2) A reversed upgrade runbook fails even though its sentence is present.
+    await writeFile(join(root, 'scripts', 'family-facts.json'), JSON.stringify({ version: 1, scan, facts: [
+      { id: 'upgrade-order', home: 'INSTALL.md', must: [{ text: 'canonical' }], machine: { kind: 'upgrade-order' } },
+    ] }), 'utf8')
+    await writeFile(join(root, 'INSTALL.md'), 'canonical\nfamily first upgrade, then platform, publish last\n', 'utf8')
+    const order = await runDoc()
+    expect(order?.code).toBe(1)
+    expect(order?.stderr).toContain('not platform → family → publish')
+    // 3) A surface with no command-face answer fails (the map must be total).
+    await writeFile(join(root, 'scripts', 'family-facts.json'), JSON.stringify({ version: 1, scan, facts: [
+      { id: 'fallback-map', home: 'INSTALL.md', must: [{ text: 'canonical' }], machine: { kind: 'fallback-map', file: 'evolution-commands/src/command-fallback.ts' } },
+    ] }), 'utf8')
+    await writeFile(join(root, 'INSTALL.md'), 'canonical approval diagnostics\n', 'utf8')
+    const fallback = await runDoc()
+    expect(fallback?.code).toBe(1)
+    expect(fallback?.stderr).toContain('every surface needs one command-face answer')
+  })
+
   it('N19: the real tree keeps every fact in one home (standalone gate)', async () => {
     // the real-tree pass is gate-17's job (run-gates/CI) - what stays here is the BEHAVIOUR
     // that no gate owns: a misspelled flag must fail loud.

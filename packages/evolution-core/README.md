@@ -105,3 +105,15 @@ Symptom → next step; the exact text of every code (`E-301`–`E-325`) is store
 - 成员解析与孤路标判定在 src/unit-members.ts：candidateSkills（代表片首位、去重保序）、resolveUnitMembersFromIndexes（只按已知 key、三向校验）、landmarkVerdict 与 staleRouteStubs（可跳 ⟺ 目标存在 ∧ 其索引仍持该 unitId；输出按 skill/version/owner 确定性排序）。
 - 写作端的硬规则：kind 判 previous === null（不是 undefined）；path 抄循环里既有的 rel；同一目标写两次时清单保留最后一次写入的 afterRef。
 - 面向读者的完整说明见仓库 docs/units-and-undo.md。
+
+## Restricted preset ids
+
+The review and maintenance channels run under two internally generated restricted presets (they are
+NOT user-facing preset picker entries):
+
+- `evolution-reviewer-readonly` — the review channel's child preset;
+- `evolution-maintainer-readonly` — the maintenance channel's child preset.
+
+The family's own agent-preset ids (`EVOLUTION_PRESET_IDS`) are `evolution`, `evolution-ptc`,
+`evolution-cordis` and `evolution-minimal`. The two id sets are deliberately separate: a restricted
+preset is created at runtime from a parent preset, never installed or selected.

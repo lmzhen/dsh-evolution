@@ -283,7 +283,11 @@
           "scope": "tree",
           "text": "INSTALL.md"
         }
-      ]
+      ],
+      "machine": {
+        "kind": "install-forms",
+        "file": "scripts/bundle-rows.json"
+      }
     },
     {
       "id": "preset-bases",
@@ -513,6 +517,68 @@
           "owner": "scripts",
           "reason": "the marker is a new convention (no spec carries it today); from requiredFrom a spec without one is red, and until then the taxonomy view prints the count as an observation (R28: an empty REQUIRED tier is red, an unrequired one prints requiredFrom)"
         }
+      }
+    },
+    {
+      "id": "preset-ids",
+      "home": "evolution-core/README.md",
+      "must": [
+        {
+          "text": "evolution-reviewer-readonly"
+        },
+        {
+          "text": "evolution-maintainer-readonly"
+        }
+      ],
+      "forbid": [],
+      "cites": [],
+      "machine": {
+        "kind": "preset-ids",
+        "file": "evolution-core/src/composition/preset-ids.ts"
+      }
+    },
+    {
+      "id": "readonly-contract",
+      "home": "evolution-review/README.md",
+      "must": [
+        {
+          "text": "reviewToolAllow"
+        }
+      ],
+      "forbid": [],
+      "cites": [],
+      "machine": {
+        "kind": "readonly-contract",
+        "file": "evolution-review/src/index.ts"
+      }
+    },
+    {
+      "id": "upgrade-order",
+      "home": "INSTALL.md",
+      "must": [
+        {
+          "text": "Upgrade runbook (platform first)"
+        }
+      ],
+      "forbid": [],
+      "cites": [],
+      "machine": {
+        "kind": "upgrade-order"
+      }
+    },
+    {
+      "id": "fallback-map",
+      "home": "INSTALL.md",
+      "must": [
+        {
+          "text": "Command fallbacks"
+        }
+      ],
+      "forbid": [],
+      "cites": [],
+      "machine": {
+        "kind": "fallback-map",
+        "file": "evolution-commands/src/command-fallback.ts"
       }
     },
     {

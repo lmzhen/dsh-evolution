@@ -184,6 +184,108 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     }
     return out
   }
+  if (machine.kind === 'preset-ids') {
+    // The restricted-preset id SET is re-derived from composition/preset-ids.ts: a renamed or added
+    // id must reach the ONE home (evolution-core README) or this fails. The ids are internally
+    // generated names (.agent-preset ids), never a user-facing preset picker entry.
+    const idsOwner = readMachineText(root, machine)
+    if (idsOwner === null) {
+      if (repoScope) { console.log('doc-facts: fact "' + fact.id + '" not armed in this layout — no ' + machine.file); return out }
+      out.push(machine.file + ': fact ' + fact.id + ' names a machine owner that does not exist — the id set cannot be re-derived')
+      return out
+    }
+    const ids = [...idsOwner.text.matchAll(/(?:REVIEWER_PRESET_ID|MAINTAINER_PRESET_ID)\s*=\s*'([^']+)'/g)].map((match) => match[1])
+    const familyMatch = /EVOLUTION_PRESET_IDS\s*=\s*\[([^\]]*)\]/.exec(idsOwner.text)
+    const familyIds = familyMatch === null ? [] : [...familyMatch[1].matchAll(/'([^']+)'/g)].map((match) => match[1])
+    if (ids.length !== 2) out.push(machine.file + ': expected exactly two restricted preset ids, found ' + ids.length + ' — the doc fact cannot lock a moving set')
+    for (const id of [...ids, ...familyIds]) {
+      if (!home.includes(id)) out.push(fact.home + ': the preset id "' + id + '" (' + machine.file + ') is not stated in the fact home — the doc and the ids disagree')
+    }
+    return out
+  }
+  if (machine.kind === 'readonly-contract') {
+    // The review subagent's authority is a RESTRICTED preset whose tool surface is the caller's
+    // reviewToolAllow (schema default [skill]). Re-derive the default list and the read-only stance.
+    const contractOwner = readMachineText(root, machine)
+    if (contractOwner === null) {
+      if (repoScope) { console.log('doc-facts: fact "' + fact.id + '" not armed in this layout — no ' + machine.file); return out }
+      out.push(machine.file + ': fact ' + fact.id + ' names a machine owner that does not exist — the readonly contract cannot be re-derived')
+      return out
+    }
+    const allowMatch = /reviewToolAllow:[^\n]*\.default\(\[([^\]]*)\]\)/.exec(contractOwner.text)
+    const allow = allowMatch === null ? [] : [...allowMatch[1].matchAll(/'([^']+)'/g)].map((match) => match[1])
+    if (allow.length === 0) out.push(machine.file + ': no reviewToolAllow default found — the read-only contract cannot be re-derived')
+    if (!home.includes('reviewToolAllow')) out.push(fact.home + ': the home does not name reviewToolAllow — a reader cannot tell where the tool surface is configured')
+    if (!/read-only|restricted preset|只读/i.test(home)) out.push(fact.home + ': the home does not state that review runs under a read-only restricted preset')
+    for (const tool of allow) {
+      if (!home.includes(tool)) out.push(fact.home + ': the review default tool "' + tool + '" is not stated in the home')
+    }
+    return out
+  }
+  if (machine.kind === 'install-forms') {
+    // The install-form matrix is re-derived from the bundle roster (the ONE source the three patch
+    // files are generated from). A form added/removed in the roster must reach the install home.
+    const rosterOwner = readMachineText(root, machine)
+    if (rosterOwner === null) {
+      if (repoScope) { console.log('doc-facts: fact "' + fact.id + '" not armed in this layout — no ' + machine.file); return out }
+      out.push(machine.file + ': fact ' + fact.id + ' names a machine owner that does not exist — the install forms cannot be re-derived')
+      return out
+    }
+    let roster
+    try { roster = JSON.parse(rosterOwner.text) } catch (error) {
+      out.push(machine.file + ': unreadable bundle roster (' + (error instanceof Error ? error.message : String(error)) + ') — the install-form fact cannot be re-derived')
+      return out
+    }
+    const forms = Object.keys(roster.forms ?? {})
+    if (forms.length === 0) out.push(machine.file + ': the roster carries zero install forms — a vacuum matrix is not a pass')
+    for (const form of forms) {
+      // A form whose roster target is a preset composition ships inside another bundle (standalone →
+      // evolution-preset/cordis.yml); only form keys that ARE published bundles get a package name.
+      const target = typeof roster.forms[form]?.target === 'string' ? roster.forms[form].target : ''
+      const token = target === '' ? 'dsh-evolution-' + form : target.split('/')[0]
+      if (!home.includes(token)) out.push(fact.home + ': the install form "' + form + '" (' + token + ') is not stated in the install home')
+    }
+    return out
+  }
+  if (machine.kind === 'upgrade-order') {
+    // The upgrade runbook's ORDER is the claim: the platform line first, the family second, the
+    // release last. Re-derive it from the home's own runbook section and refuse a reversed claim
+    // elsewhere (a family upgrade before the platform upgrade is the failure this fact exists for).
+    const positions = ['platform', 'family', 'publish'].map((token) => home.indexOf(token))
+    if (positions.some((position) => position < 0)) {
+      out.push(fact.home + ': the upgrade runbook does not name all three steps (platform · family · publish)')
+    } else if (!(positions[0] < positions[1] && positions[1] < positions[2])) {
+      out.push(fact.home + ': the upgrade runbook order is not platform → family → publish — the reader would upgrade the wrong layer first')
+    }
+    const reversed = /family[^\n.]{0,80}\b(before|then earlier than)\b[^\n.]{0,40}platform/i
+    for (const doc of docs) {
+      if (doc.rel === fact.home || doc.reasonLayer) continue
+      if (reversed.test(doc.text)) out.push(doc.label + ': claims the family is upgraded before the platform — the runbook home states the opposite order')
+    }
+    return out
+  }
+  if (machine.kind === 'fallback-map') {
+    // The fallback surface list and each surface's command are re-derived from the command-side
+    // table; a surface that ships without a command-line answer (or a home that forgets one) fails.
+    const fallbackOwner = readMachineText(root, machine)
+    if (fallbackOwner === null) {
+      if (repoScope) { console.log('doc-facts: fact "' + fact.id + '" not armed in this layout — no ' + machine.file); return out }
+      out.push(machine.file + ': fact ' + fact.id + ' names a machine owner that does not exist — the fallback map cannot be re-derived')
+      return out
+    }
+    const surfaces = [...fallbackOwner.text.matchAll(/\n  '?([a-z-]+)'?:\s*\{/g)].map((match) => match[1])
+    const commands = [...fallbackOwner.text.matchAll(/command:\s*'([^']+)'/g)].map((match) => match[1])
+    if (surfaces.length === 0) out.push(machine.file + ': no fallback surface found — the command-face map cannot be re-derived (a vacuum pass is not a pass)')
+    if (commands.length !== surfaces.length) out.push(machine.file + ': ' + surfaces.length + ' surface(s) but ' + commands.length + ' command(s) — every surface needs one command-face answer')
+    for (const surface of surfaces) {
+      if (!home.includes(surface)) out.push(fact.home + ': the fallback surface "' + surface + '" (' + machine.file + ') is not stated in the install home')
+    }
+    const tokens = [...new Set(commands.map((command) => (/\/evolution\s+[a-z-]+/.exec(command) ?? [])[0]).filter((token) => token !== undefined))]
+    for (const token of tokens) {
+      if (!home.includes(token)) out.push(fact.home + ': the fallback command "' + token + '" is not stated in the install home')
+    }
+    return out
+  }
   const owner = readMachineText(root, machine)
   const text = owner === null ? null : owner.text
   if (text === null) {

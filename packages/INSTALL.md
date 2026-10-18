@@ -385,3 +385,31 @@ install that used it (≤0.3.65) stay readable: they still appear in
 `/evolution pending`, where approve records intent and reject drops them.
 Capability-shaped work belongs either in Creator mode or, when the durable
 artifact is knowledge rather than code, in `memory` and `skills`.
+
+## Upgrade runbook (platform first)
+
+The upgrade order is fixed: the platform line comes first, the family second, the publish step last.
+
+1. **Upgrade the platform** to a version inside the family's declared window (see the compatibility
+   section at the top of this document) and restart the host.
+2. **Upgrade the family** (`dsh plugin add @lmzhen/dsh-evolution-all@<version>`, or the matching
+   layered rows) and reload the profile.
+3. **Publish/release evidence last** — a family release records the platform line it was validated
+   against; publishing before the platform is upgraded records a target nobody runs.
+
+Reverse order (family before platform) is not supported: the family's peer ranges and anchors are
+derived from the frozen platform line.
+
+## Command fallbacks
+
+When the platform's Host connection carrier is absent (E-325), the browser panels cannot answer.
+Every surface has the SAME use case on the command face; use it instead of retrying the panel:
+
+| Surface | Command |
+|---|---|
+| approval | `/evolution pending`, `/evolution approve <id>`, `/evolution reject <id>`, `/evolution release <id>` |
+| skill-history | `/evolution restore <name> [v]` (see `/evolution skills`) |
+| skill-health | `/evolution skills refresh` |
+| diagnostics | `/evolution doctor` |
+
+The table is generated from the command-side fallback map; the INSTALL home is its single source.
