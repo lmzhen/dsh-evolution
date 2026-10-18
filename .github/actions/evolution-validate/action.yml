@@ -230,7 +230,7 @@ runs:
         # node_modules / tarball residue rode along.
         # G1-S7: the floor comes from the overlay platform-line.json (the same file prepare-release and
         # the range guard read) — not from an action input that could drift.
-        RANGE="$(node -p \"require('./platform-line.json').floor\")"
+        RANGE="$(node -p "require('./platform-line.json').floor")"
         node packages/evolution/scripts/audit-release-tarballs.mjs \
           packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^$RANGE"
 
