@@ -180,6 +180,18 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     }
   })
 
+  it('detects M4 when the host bundle plus the family agent preset are installed', async () => {
+    const ctx = new Context()
+    ctx.provide('agentPresets', {
+      list: async () => [{ id: 'evolution' }, { id: REVIEWER_PRESET_ID }],
+      composedPreset: () => 'standard',
+    })
+    ctx.provide('subagents', {})
+    ctx.provide('pluginManager', { listBundles: async () => [{ name: '@deepseek-ai/dsh-evolution-host' }] })
+    const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z') })
+    expect(assembled.form).toMatchObject({ id: 'M4', confidence: 'declared' })
+  })
+
   it('stays a named view when nothing is mounted (no throw, no invented health)', async () => {
     const ctx = new Context()
     const assembled = await assembleDoctorInputs(ctx)

@@ -302,10 +302,15 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
   const hasAll = bundles.some(name => name.endsWith('dsh-evolution-all'))
   const hasPreset = bundles.some(name => name.endsWith('dsh-evolution-preset'))
   const hasHost = bundles.some(name => name.endsWith('dsh-evolution-host'))
+  // M4 (host + generated family preset): the preset row is installed into the profile patch and the
+  // registry reports the family preset id; a host-only face (M3) does not.
+  const hasFamilyPreset = listed.some(entry => typeof entry.id === 'string' && EVOLUTION_PRESET_IDS.includes(entry.id as never))
   const detectedForm: DoctorInputs['form'] = hasAll || hasPreset
     ? { id: 'M1', evidence: [hasAll ? 'bundle dsh-evolution-all installed' : 'bundle dsh-evolution-preset installed'], confidence: 'declared' }
     : hasHost
-      ? { id: 'M3', evidence: ['bundle dsh-evolution-host installed'], confidence: 'declared' }
+      ? hasFamilyPreset
+        ? { id: 'M4', evidence: ['bundle dsh-evolution-host installed', 'family agent preset registered'], confidence: 'declared' }
+        : { id: 'M3', evidence: ['bundle dsh-evolution-host installed'], confidence: 'declared' }
       : { id: 'M3', evidence: ['no family bundle was reported by the platform manager'], confidence: 'inferred' }
   const platformVersion = hostRuntimeVersion()
   const missingServices = SERVICES_PROBED.filter(name => get(name) === undefined)
