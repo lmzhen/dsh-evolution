@@ -648,6 +648,11 @@ const evidence = releaseEvidenceSkeleton({
 })
 writeFileSync(join(distNext, 'release-evidence.json'), JSON.stringify(evidence, null, 2) + '\n')
 
+// G8/W3: the publish job downloads ONLY the dist/scripts artifacts (no checkout), so the ONE
+// platform line must travel WITH the evidence — the strict evidence check resolves it beside the
+// file instead of walking up a tree the publish runner does not have.
+writeFileSync(join(distNext, 'platform-line.json'), JSON.stringify(platformLine, null, 2) + '\n')
+
 // Atomic swap: only now that the whole build (and its guard) passed do the
 // live `.release-staging` and `dist` replace their `.next` siblings. A failed
 // build never disturbs a previously good dist or a previously fresh staging.

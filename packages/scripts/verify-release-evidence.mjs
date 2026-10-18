@@ -10,7 +10,7 @@
  * Exit: 0 pass · 1 violation · 2 cannot decide (missing/unreadable/unsupported file).
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { EVIDENCE_SCHEMA_VERSION, validateReleaseEvidence } from './lib-release-evidence.mjs'
 import { readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
 
@@ -25,8 +25,11 @@ let evidence
 try { evidence = JSON.parse(readFileSync(path, 'utf8')) } catch (error) { console.error('verify-release-evidence: unreadable evidence (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
 const problems = validateReleaseEvidence(evidence, { release })
 // W3: the evidence's platform line must agree with the ONE platform-line.json, never a hand copy.
+// In the publish job there is no checkout (only the dist/scripts artifacts), so prepare-release ships
+// platform-line.json next to the evidence — prefer that sibling and fall back to resolving the tree.
 try {
-  const line = readPlatformLine(resolvePlatformLineRoot(import.meta.url))
+  const sibling = join(dirname(path), 'platform-line.json')
+  const line = existsSync(sibling) ? JSON.parse(readFileSync(sibling, 'utf8')) : readPlatformLine(resolvePlatformLineRoot(import.meta.url))
   for (const key of ['version', 'floor', 'peersRange', 'enginesRange', 'upstreamRef']) {
     if (evidence?.platformLine?.[key] !== line[key]) problems.push('platformLine.' + key + ' differs from platform-line.json')
   }
