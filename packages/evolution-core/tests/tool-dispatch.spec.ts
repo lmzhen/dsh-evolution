@@ -16,6 +16,9 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { TOOL_RUNTIME_SCHEDULER, ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+// 0.2.1: an agent-owned run_code resolves its working directory through the `workingDirectory`
+// service before it may dispatch; the platform testkit owns the canonical fixture.
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcRunRequest, PtcRunResult, PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
 import {
@@ -76,6 +79,7 @@ const asLog = (events: readonly { type: string; data?: unknown }[]): LoggedEvent
 /** The platform's own PTC log: real ToolRuntime in \`mode: 'ptc'\`, real bridge. */
 async function ptcLog(): Promise<LoggedEvent[]> {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ProbePtcRuntime)
