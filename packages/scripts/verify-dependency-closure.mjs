@@ -181,7 +181,9 @@ for (const dir of readdirSync(root)) {
   }
   inspected += 1
   for (const [name, usage] of seen) {
-    if (!has.has(name)) offenders.push({ pkg: dir, name, kind: usage.value ? 'value' : 'type-only' })
+    // A subpath (`@scope/pkg/sub`) is the same fact as the parent declaration.
+    const covered = has.has(name) || [...has].some(dep => name.startsWith(dep + '/'))
+    if (!covered) offenders.push({ pkg: dir, name, kind: usage.value ? 'value' : 'type-only' })
   }
   // Forward: scan every code/config file in the package, minus its own
   // manifest (self-mention would make every declaration look used).
@@ -217,9 +219,14 @@ for (const dir of readdirSync(root)) {
     }
   }
   const haystack = referenceText.join('\n')
+  // Resolver dependencies (G2-S6): a bundle can carry a package ONLY so the runtime can resolve a
+  // preset row (the restrictor subpath mounted from the agent preset). There is no source import to
+  // reference, so the manifest names them explicitly under dsh.resolverDependencies.
+  const resolverDeps = new Set(Array.isArray(manifest.dsh?.resolverDependencies) ? manifest.dsh.resolverDependencies : [])
   for (const section of ['dependencies', 'peerDependencies', 'optionalDependencies', 'devDependencies']) {
     for (const name of Object.keys(manifest[section] ?? {})) {
       declarationCount += 1
+      if (resolverDeps.has(name)) continue
       if (referenceSubjects(name).some(subject => referenced(haystack, subject))) continue
       unreferenced.push({ pkg: dir, name, section })
     }

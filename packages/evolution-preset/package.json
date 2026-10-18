@@ -24,7 +24,10 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    }
+    },
+    "resolverDependencies": [
+      "@deepseek-ai/dsh-evolution-core"
+    ]
   },
   "dependencies": {
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
@@ -53,7 +56,8 @@
     "@deepseek-ai/dsh-evolution-feedback": "workspace:^",
     "@deepseek-ai/dsh-evolution-learning-graph": "workspace:^",
     "@deepseek-ai/dsh-evolution-replay": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^"
+    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
   },
   "exports": {
     ".": {

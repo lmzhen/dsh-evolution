@@ -16,7 +16,10 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    }
+    },
+    "resolverDependencies": [
+      "@deepseek-ai/dsh-evolution-core"
+    ]
   },
   "exports": {
     ".": {
@@ -41,6 +44,7 @@
     "@deepseek-ai/dsh-evolution-agent-preset": "workspace:^",
     "@deepseek-ai/dsh-evolution-settings-ui": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-history": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-health": "workspace:^"
+    "@deepseek-ai/dsh-evolution-skill-health": "workspace:^",
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
   }
 }

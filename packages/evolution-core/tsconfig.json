@@ -20,12 +20,6 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../../client/connection/tsconfig.host.json"
-    },
-    {
-      "path": "../../preset/agent-preset-registry"
-    },
-    {
       "path": "../../../vendor/include"
     }
   ]
