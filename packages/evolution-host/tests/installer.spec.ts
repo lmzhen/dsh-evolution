@@ -203,39 +203,6 @@ describe('layered installer', () => {
     // needs the same budget as its siblings — 20s flaked under full-suite load.
   }, 60_000)
 
-  it('V10-14: cap injection is idempotent and warns when the standard row is absent', async () => {
-    // The installer script ships no type declarations, so the function runs in
-    // a fresh node subprocess (base64 stdout, no lint-visible any) — the same
-    // pattern as the byte-parity pin below.
-    const cases = {
-      plain: "- id: persona\n- id: tool-skill\n  name: '@deepseek-ai/dsh-tool-skill'\n",
-      configured: "- id: tool-skill\n  name: '@deepseek-ai/dsh-tool-skill'\n  config:\n    custom: 1\n",
-      absent: '- id: persona\n  name: x\n',
-    }
-    const script = [
-      `import { injectToolSkillCap } from ${JSON.stringify(new URL('../../scripts/install-layered.mjs', import.meta.url).href)}`,
-      `const cases = ${JSON.stringify(cases)}`,
-      'const warns = []',
-      'const originalWarn = console.warn',
-      'console.warn = (message) => warns.push(String(message))',
-      'const out = Object.fromEntries(Object.entries(cases).map(([key, value]) => [key, injectToolSkillCap(value)]))',
-      'console.warn = originalWarn',
-      'process.stdout.write(Buffer.from(JSON.stringify({ out, warns }), "utf8").toString("base64"))',
-    ].join('\n')
-    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
-    const { out, warns } = JSON.parse(Buffer.from(stdout, 'base64').toString('utf8')) as { out: Record<string, string>; warns: string[] }
-    // A plain standard row gains the config block plus the marker comment.
-    expect(out.plain).toContain('config:')
-    expect(out.plain).toContain('catalogDescriptionMaxLength: 60')
-    expect(out.plain).toContain('V10-14')
-    // Idempotent: an already-configured row is left byte-identical (no doubled
-    // config key on a re-install).
-    expect(out.configured).toBe(cases.configured)
-    // No tool-skill row: composition unchanged, but the missed cap is loud.
-    expect(out.absent).toBe(cases.absent)
-    expect(warns.join('\n')).toContain('tool-skill')
-  }, 20_000)
-
   it('core composePresetComposition and installer generateAgentPreset agree byte-for-byte (0.3.15 single-source pin)', async () => {
     const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core/composition')
     // 0.3.53: the fixture carries a standard-sourced tool-skill row so the
@@ -619,6 +586,13 @@ describe('layered installer', () => {
     // (never a silent fallback to a hand-kept copy).
     await mkdir(join(tree, 'packages', 'evolution', 'evolution-core'), { recursive: true })
     await cp(fileURLToPath(new URL('../../evolution-core/row-overrides.json', import.meta.url)), join(tree, 'packages', 'evolution', 'evolution-core', 'row-overrides.json'))
+    // A shipped package carries its manifest too: the composer resolves `row-overrides.json` beside
+    // the nearest package.json (bundler-safe anchor), so the fixture must be a real package shape.
+    await cp(fileURLToPath(new URL('../../evolution-core/package.json', import.meta.url)), join(tree, 'packages', 'evolution', 'evolution-core', 'package.json'))
+    // G2-S2: the installer consumes the BUILT core composer (one implementation), so a real
+    // source checkout ships build-lib's output too. Copy the built lib into the overlay: the
+    // fixture represents 'a source checkout that ran build-lib', which is what CI/tests do.
+    await cp(fileURLToPath(new URL('../../evolution-core/lib', import.meta.url)), join(tree, 'packages', 'evolution', 'evolution-core', 'lib'), { recursive: true })
     await run(process.execPath, [
       join(scripts, 'install-layered.mjs'), '--mode', 'agent', '--profile', 'g21', '--home', home,
     ], { env: { ...process.env, DSH_EVOLUTION_DELTA_PATH: delta } })

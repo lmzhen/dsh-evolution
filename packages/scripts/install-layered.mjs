@@ -43,11 +43,15 @@ function deploymentFormOf(mode) {
 // let a new package be published while the installer silently ignored it.
 import { EVOLUTION_BUNDLE_TAILS, EVOLUTION_PREFIXES } from './lib-family-packages.mjs'
 
-// G6.1/M1: the installer used to carry its own copies of the core composer. The port is generated
-// from evolution-core/src/preset-composition.ts (gen-composer-port.mjs --check gates it).
-// The override table is read through loadRowOverrides(ROW_OVERRIDES_PATH): the port sits in
-// scripts/, so the module-relative default would look for scripts/../row-overrides.json.
-import {
+// G2-S2: the ONE composer lives in evolution-core. The source installer consumes the BUILT
+// artifact (CI runs build-lib before tests/publish); a missing build fails loud with the fix.
+const COMPOSER_LIB_URL = new URL('../evolution-core/lib/composition/index.js', import.meta.url)
+if (!existsSync(fileURLToPath(COMPOSER_LIB_URL))) {
+  console.error('install-layered: evolution-core build is missing (' + fileURLToPath(COMPOSER_LIB_URL) + '). Run: node packages/scripts/build-lib.mjs')
+  process.exit(1)
+}
+const composer = await import(COMPOSER_LIB_URL.href)
+const {
   presetRowId,
   listDirectories,
   probeDesktopScope,
@@ -66,7 +70,8 @@ import {
   rowSiblingEnd,
   loadRowOverrides,
   compositionRowIds,
-} from './lib-preset-composition.mjs'
+  composePresetComposition,
+} = composer
 const PACKAGES_DIR = fileURLToPath(new URL('../', import.meta.url))
 const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || '@deepseek-ai'
 const BUNDLES = {
@@ -902,26 +907,11 @@ export {
   presetPatchText,
   mergePresetRow,
   removePresetRow,
-} from './lib-preset-composition.mjs'
+}
 
 export function generateAgentPreset(standardComposition, deltaComposition) {
-  const standardIds = compositionRowIds(standardComposition)
-  const deltaIds = compositionRowIds(deltaComposition)
-  const collisions = [...deltaIds].filter(id => standardIds.has(id)).sort()
-  if (collisions.length > 0 && process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS !== '1') {
-    throw new Error(
-      `install-layered: evolution delta rows collide with runtime standard rows: ${collisions.join(', ')}. `
-      + 'Remove them from the delta, or set DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1 to keep both (the row will mount twice).',
-    )
-  }
-  if (collisions.length > 0) {
-    console.warn(`install-layered: warning — delta rows collide with standard rows (${collisions.join(', ')}); keeping both (DSH_EVOLUTION_ALLOW_ROW_COLLISIONS=1)`)
-  }
-  // V10-14 / 0.3.53 (P1-2): the cap injection is PART of the generation
-  // contract — core composePresetComposition applies the byte-identical rule
-  // (installer.spec pins the parity), so `/evolution preset install` and this
-  // source installer can never diverge on the preset-scope tool-skill cap.
-  return injectToolSkillCap(`${standardComposition.replace(/\s+$/, '')}\n\n${deltaComposition.trim()}\n`)
+  // G2-S2: one implementation only — the installer delegates to the core composer (built lib).
+  return composePresetComposition(standardComposition, deltaComposition)
 }
 
 /**
@@ -945,53 +935,6 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
  *     one-time warning (a renamed platform row must not brick the install,
  *     but the missed cap must be observable).
  */
-/** The override table, read from the SAME file core's composer reads. The
- * installer is a source-tree tool: it reads the JSON directly rather than
- * importing the built core package, so no build is needed to install. */
-const ROW_OVERRIDES_PATH = join(PACKAGES_DIR, 'evolution-core', 'row-overrides.json')
-
-
-export function injectToolSkillCap(composition) {
-  let lines = composition.split('\n')
-  // One table, two generation paths (0.3.77): before this, both sides kept their
-  // own copy of the entries below and stayed byte-identical only by hand.
-  for (const override of loadRowOverrides(ROW_OVERRIDES_PATH)) {
-    lines = applyRowOverride(lines, override)
-  }
-  return lines.join('\n')
-}
-
-function applyRowOverride(lines, override) {
-  const rowRe = new RegExp('^- id:\\s*' + override.row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$')
-  let found = false
-  for (let i = 0; i < lines.length; i += 1) {
-    if (!rowRe.test(lines[i] ?? '')) continue
-    found = true
-    // Walk the item's continuation lines (indented) up to the next item or
-    // top-level line; a blank line terminates the item block.
-    let end = i
-    let hasKey = false
-    for (let j = i + 1; j < lines.length; j += 1) {
-      const next = lines[j] ?? ''
-      if (next.trim() === '') break
-      if (!/^\s/.test(next)) break
-      // v22 (PRE-3): anchor the child key to the item's own child indent (two
-      // spaces) — byte-identical with core's applyOneOverride. The old `\s+`
-      // form matched the key at any depth, silently skipping the injection when
-      // a platform preset grew nested maps.
-      if (new RegExp('^ {2}' + override.key + ':(\\s|$)').test(next)) hasKey = true
-      end = j
-    }
-    if (hasKey) continue
-    lines.splice(end + 1, 0, ...override.lines)
-    i = end + override.lines.length
-  }
-  if (!found) {
-    console.warn('install-layered: warning — ' + override.missingReason)
-  }
-  return lines
-}
-
 /** The delta fragment a run composes: the packaged `evolution-agent/agent.cordis.yml`, or the
  * `DSH_EVOLUTION_DELTA_PATH` override tests and one-off builds use. */
 function agentDeltaPath() {

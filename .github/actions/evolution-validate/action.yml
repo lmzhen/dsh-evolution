@@ -414,8 +414,8 @@ runs:
         node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check
         node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check
         node packages/evolution/scripts/gen-about.mjs packages/evolution --check
-        # G6.1/M1: the installer-side composer port is generated from core, never hand-edited.
-        node packages/evolution/scripts/gen-composer-port.mjs packages/evolution --check
+        # G2-S2: the composer has ONE implementation (core); the installer imports the built lib.
+        node packages/evolution/scripts/verify-composer-single-source.mjs packages/evolution
         node packages/evolution/scripts/verify-profile-bundles.mjs --self-test
         # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
         # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs

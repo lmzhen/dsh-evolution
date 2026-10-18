@@ -528,7 +528,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "2031437c850d88b29d3de7d68f3265e627a3b0eb69f936047785a22d48a007ba",
+        "sha256": "1c3623730dfa366ffcdd6516a360c2f7821d7e2930ea96039c0d4e02591c1975",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -713,7 +713,7 @@
           {
             "id": "gate-35",
             "tier": "fast",
-            "criterion": "gen-composer-port"
+            "criterion": "verify-composer-single-source"
           },
           {
             "id": "gate-36",
@@ -1326,14 +1326,12 @@
           "gate-35": [
             {
               "mutate": {
-                "file": "packages/scripts/lib-preset-composition.mjs",
-                "find": "// GENERATED FILE — do not edit. Source: evolution-core/src/preset-composition.ts",
-                "replace": "// GENERATED FILE — do not edit. Source: evolution-core/src/preset-composition.ts // HAND-EDIT PROBE"
+                "file": "packages/scripts/install-layered.mjs",
+                "find": "const COMPOSER_LIB_URL = new URL('../evolution-core/lib/composition/index.js', import.meta.url)",
+                "replace": "const COMPOSER_LIB_URL = new URL('./lib-preset-composition.mjs', import.meta.url)"
               },
               "expect": "red",
-              "note": "a hand edit to the generated installer-side port: the gate exists exactly to fail when the port is edited by hand instead of regenerated from the TypeScript source",
-              "provenAt": "2026-10-14T08:28:45.162Z",
-              "provenSha": "9fcc72f41e290751845718e56d1f02b3327332f8dcb2064fe10499dec89610f4"
+              "note": "the installer regressed to the retired generated twin: gate-35 fails because the built-core import is gone"
             }
           ],
           "gate-30": [

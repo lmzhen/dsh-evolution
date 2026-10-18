@@ -87,7 +87,23 @@ interface RowOverride {
  * happened to stay byte-identical, which is exactly the kind of agreement no
  * test can keep — the entries are now data, and a divergence is impossible.
  */
-const ROW_OVERRIDES_URL = new URL('../../row-overrides.json', import.meta.url)
+/**
+ * Locate row-overrides.json beside the nearest package manifest above this module.
+ * A fixed ../ hop is WRONG once the module is bundled: tsdown may emit the composer body into
+ * lib/composition/index.js or flatten it into lib/<chunk>.js, so the caller-relative depth varies.
+ * The manifest anchor is stable in every shape (src/, lib/, lib/composition/, chunk files).
+ */
+function rowOverridesPath(): string {
+  let dir = dirname(fileURLToPath(import.meta.url))
+  for (let hops = 0; hops < 8; hops += 1) {
+    const candidate = join(dir, 'row-overrides.json')
+    if (existsSync(candidate) && existsSync(join(dir, 'package.json'))) return candidate
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  throw new Error('evolution-core: row-overrides.json not found beside the package manifest (bundled path?)')
+}
 /** One cache per PATH: the installer reads the same file through its own root, and a single-slot
  * cache would hand the second caller the first caller's bytes. */
 const overridesCache = new Map<string, RowOverride[]>()
@@ -102,7 +118,7 @@ const overridesCache = new Map<string, RowOverride[]>()
  * that silently skipped an entry would ship a preset running the platform
  * default while nothing downstream reported it.
  */
-export function loadRowOverrides(path: string = fileURLToPath(ROW_OVERRIDES_URL)): RowOverride[] {
+export function loadRowOverrides(path: string = rowOverridesPath()): RowOverride[] {
   const cached = overridesCache.get(path)
   if (cached !== undefined) return cached
   const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))

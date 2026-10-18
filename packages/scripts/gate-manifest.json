@@ -541,12 +541,11 @@
     {
       "id": "gate-35",
       "kind": "script",
-      "human": "`node packages/scripts/gen-composer-port.mjs packages --check`（G6.1/M1：preset 组合器**只有一个作者**——安装器侧那份端口由 core 的 `preset-composition.ts` **机械派生**（平台自带 `stripTypeScriptTypes` 剥类型 ＋ 内联 `env.ts`），手改端口即红 ✓。drill：把生成物首行的注释改一个字 ⇒ 必红（\"the port is STALE\"），重跑生成器即还原 ✓）",
+      "human": "`node packages/scripts/verify-composer-single-source.mjs packages`（G2-S2：preset 组合器**只有一个实现**——core `composition/composer.ts`；安装器 import 构建产物 `evolution-core/lib/composition/index.js`。安装器侧生成双胞胎、其生成器与本地注入逻辑均已退场；任何一件回来即红 ✓）",
       "argv": [
         "node",
-        "packages/scripts/gen-composer-port.mjs",
-        "packages",
-        "--check"
+        "packages/scripts/verify-composer-single-source.mjs",
+        "packages"
       ],
       "tree": "mirror",
       "profiles": [
