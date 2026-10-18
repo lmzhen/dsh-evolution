@@ -10,6 +10,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { existsSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -234,6 +235,33 @@ export function familyVersion(): string {
 /** The soft service probe list for the platform-services row. */
 const SERVICES_PROBED: readonly string[] = ['connection', 'agentPresets', 'subagents', 'commands', 'settings']
 
+/** The host's own version, read from the installed platform manifest (soft: absent = unknown). */
+function hostRuntimeVersion(): string | undefined {
+  for (const packageName of ['@deepseek-ai/dsh-app-boot', '@deepseek-ai/dsh']) {
+    try {
+      const require = createRequire(import.meta.url)
+      const manifest = require.resolve(packageName + '/package.json')
+      const parsed = JSON.parse(readFileSync(manifest, 'utf8'))
+      if (typeof parsed.version === 'string' && parsed.version !== '') return parsed.version
+    } catch { /* try the next manifest */ }
+  }
+  return undefined
+}
+
+/** The family bundles the platform reports (soft probe: a host without the manager answers []). */
+async function installedFamilyBundles(ctx: Context): Promise<readonly string[]> {
+  const manager = (ctx as unknown as { get(service: string): unknown }).get('pluginManager')
+  const listed = await (manager as { listBundles?(): unknown } | undefined)?.listBundles?.()
+  if (!Array.isArray(listed)) return []
+  const names: string[] = []
+  for (const entry of listed) {
+    if (typeof entry !== 'object' || entry === null) continue
+    const name = (entry as { name?: unknown }).name
+    if (typeof name === 'string' && name.includes('dsh-evolution-')) names.push(name)
+  }
+  return names
+}
+
 /**
  * Assemble the view inputs through the live Context's soft probes.
  *
@@ -261,7 +289,7 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
   const presetsService = get('agentPresets') as { list?(): unknown } | undefined
   let listed: readonly { id?: unknown; broken?: unknown }[] = []
   try {
-    const value = presetsService?.list?.()
+    const value = await presetsService?.list?.()
     if (Array.isArray(value)) listed = value as readonly { id?: unknown; broken?: unknown }[]
   } catch { listed = [] }
   const presetOf = (id: string): PresetFacts | undefined => {
@@ -270,6 +298,16 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
     if (entry === undefined) return { id, registered: false }
     return { id, registered: true, ...(typeof entry.broken === 'string' ? { broken: entry.broken } : {}) }
   }
+  const bundles = await installedFamilyBundles(ctx)
+  const hasAll = bundles.some(name => name.endsWith('dsh-evolution-all'))
+  const hasPreset = bundles.some(name => name.endsWith('dsh-evolution-preset'))
+  const hasHost = bundles.some(name => name.endsWith('dsh-evolution-host'))
+  const detectedForm: DoctorInputs['form'] = hasAll || hasPreset
+    ? { id: 'M1', evidence: [hasAll ? 'bundle dsh-evolution-all installed' : 'bundle dsh-evolution-preset installed'], confidence: 'declared' }
+    : hasHost
+      ? { id: 'M3', evidence: ['bundle dsh-evolution-host installed'], confidence: 'declared' }
+      : { id: 'M3', evidence: ['no family bundle was reported by the platform manager'], confidence: 'inferred' }
+  const platformVersion = hostRuntimeVersion()
   const missingServices = SERVICES_PROBED.filter(name => get(name) === undefined)
   const host = hostSurface(ctx)
   const hostMounted = host.available
@@ -277,8 +315,8 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
     now: extras.now ?? new Date(),
     platformLine: { version: PLATFORM_LINE.version, floor: PLATFORM_LINE.floor },
     familyVersion: familyVersion(),
-    hostVersion: extras.hostVersion,
-    form: extras.form ?? { id: 'M3', evidence: ['未读到 profile 声明，按无平台管理面推断'], confidence: 'inferred' },
+    hostVersion: extras.hostVersion ?? platformVersion,
+    form: extras.form ?? detectedForm,
     probes: { agentPresets: get('agentPresets') !== undefined, connection: get('connection') !== undefined },
     channels: { review, maintenance },
     presets: { reviewer: presetOf(REVIEWER_PRESET_ID), maintainer: presetOf(MAINTAINER_PRESET_ID) },
@@ -286,6 +324,6 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
     runs: extras.runs ?? { running: 0, orphaned: 0 },
     missingServices,
     sessionFoldClassifierPresent: typeof classifySessionEvent === 'function',
-    platformPairing: extras.platformPairing ?? 'unknown',
+    platformPairing: extras.platformPairing ?? (platformVersion === undefined ? 'unknown' : platformVersion === PLATFORM_LINE.version ? 'in-window' : 'host-newer'),
   }
 }

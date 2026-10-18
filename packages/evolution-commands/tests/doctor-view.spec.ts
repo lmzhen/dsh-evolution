@@ -1,3 +1,4 @@
+import { Context } from '@deepseek-ai/cordis'
 import {
   DIAGNOSTICS_FACT_KEYS,
   DIAGNOSTICS_RUNTIME_KEYS,
@@ -8,7 +9,7 @@ import {
 } from '@deepseek-ai/dsh-evolution-core'
 import type { ChannelState } from '@deepseek-ai/dsh-evolution-core'
 import { describe, expect, it } from 'vitest'
-import { buildDoctorView, unavailableDoctorView, type DoctorInputs } from '../src/doctor-view.ts'
+import { assembleDoctorInputs, buildDoctorView, unavailableDoctorView, type DoctorInputs } from '../src/doctor-view.ts'
 
 const AVAILABLE: ChannelState = { kind: 'available', provider: 'spawn' }
 const UNAVAILABLE: ChannelState = { kind: 'unavailable', code: 'E-323', reason: 'agentPresets not mounted' }
@@ -150,5 +151,42 @@ describe('unavailableDoctorView: the safe all-unknown answer', () => {
       expect(entry.detail).toContain('probe boom')
     }
     expect(view.facts.every(fact => fact.value === 'unknown')).toBe(true)
+  })
+})
+
+describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0.2.1 face)', () => {
+  it('awaits the agentPresets list (a promise) and derives the installed bundle form', async () => {
+    const ctx = new Context()
+    ctx.provide('agentPresets', {
+      list: async () => [{ id: REVIEWER_PRESET_ID }, { id: MAINTAINER_PRESET_ID }],
+      composedPreset: () => 'standard',
+    })
+    ctx.provide('subagents', { getProvider: () => undefined })
+    ctx.provide('commands', {})
+    ctx.provide('settings', {})
+    ctx.provide('connection', { allowsRemoteAuthorities: false, fetch: { register: async () => async () => {} } })
+    ctx.provide('pluginManager', { listBundles: async () => [{ name: '@deepseek-ai/dsh-evolution-all' }] })
+    const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z'), runs: { running: 0, orphaned: 0 } })
+    // The preset probe: a NOT-awaited promise used to leave this row permanently unknown.
+    expect(assembled.presets.reviewer).toMatchObject({ id: REVIEWER_PRESET_ID, registered: true })
+    expect(assembled.form).toMatchObject({ id: 'M1', confidence: 'declared' })
+    expect(assembled.probes.agentPresets).toBe(true)
+    expect(assembled.host.mounted).toBe(true)
+    // The host version is a soft probe: when the platform manifest resolves it must agree with the line.
+    if (assembled.hostVersion !== undefined) {
+      expect(assembled.platformPairing).toBe(assembled.hostVersion === PLATFORM_LINE.version ? 'in-window' : 'host-newer')
+    } else {
+      expect(assembled.platformPairing).toBe('unknown')
+    }
+  })
+
+  it('stays a named view when nothing is mounted (no throw, no invented health)', async () => {
+    const ctx = new Context()
+    const assembled = await assembleDoctorInputs(ctx)
+    expect(assembled.host.mounted).toBe(false)
+    expect(assembled.missingServices.length).toBeGreaterThan(0)
+    expect(assembled.form.confidence).toBe('inferred')
+    const view = buildDoctorView(assembled)
+    expect(view.runtime.find(row => row.key === 'host-surface')?.status).toBe('warn')
   })
 })
