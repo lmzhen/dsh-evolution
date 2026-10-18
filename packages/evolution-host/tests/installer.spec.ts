@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, mkdir, cp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, cp, readdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -593,6 +593,22 @@ describe('layered installer', () => {
     // source checkout ships build-lib's output too. Copy the built lib into the overlay: the
     // fixture represents 'a source checkout that ran build-lib', which is what CI/tests do.
     await cp(fileURLToPath(new URL('../../evolution-core/lib', import.meta.url)), join(tree, 'packages', 'evolution', 'evolution-core', 'lib'), { recursive: true })
+    // 0.2.1: the built composer/ensure chunks import their runtime dependencies (`js-yaml` for the
+    // loader dialect, `cordis-plugin-include` + loader/cordis for the preset schema). A shipped
+    // package installs those from npm; this fixture is a bare copy, so it carries the same minimal
+    // runtime closure the built lib actually loads (dereferenced: the overlay uses pnpm symlinks).
+    // Junction SYMLINKS (not copies): copying the pnpm symlink tree with dereference pulled the
+    // whole 200MB platform closure into the fixture and blew the test timeout. A junction keeps the
+    // fixture small and the child process resolves each package's own dependencies at its real path.
+    const coreSourceDir = fileURLToPath(new URL('../../evolution-core/', import.meta.url))
+    const fixtureModules = join(tree, 'packages', 'evolution', 'evolution-core', 'node_modules')
+    for (const dep of ['js-yaml', 'argparse', '@deepseek-ai/cordis', '@deepseek-ai/cosmokit', '@deepseek-ai/cordis-plugin-loader', '@deepseek-ai/cordis-plugin-include']) {
+      const source = join(coreSourceDir, 'node_modules', ...dep.split('/'))
+      if (!existsSync(source)) continue
+      const destination = join(fixtureModules, ...dep.split('/'))
+      await mkdir(join(destination, '..'), { recursive: true })
+      await symlink(source, destination, 'junction')
+    }
     await run(process.execPath, [
       join(scripts, 'install-layered.mjs'), '--mode', 'agent', '--profile', 'g21', '--home', home,
     ], { env: { ...process.env, DSH_EVOLUTION_DELTA_PATH: delta } })
