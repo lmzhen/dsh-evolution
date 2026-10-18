@@ -807,6 +807,21 @@
       ]
     },
     {
+      "id": "gate-53",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-host-routes.mjs packages`（G4/W6 宿主数据面守卫：`HOST_ROUTES` 是 `/api/dsh-evolution/**` 路径的唯一家（4 surface/12 endpoint）；业务 `src` 不得出现 loopback fence／`webServer.register`／手抄路由 path；三包 must import `HOST_ROUTES`；G5 生成器落地后移除 client 豁免。**空扫描 exit 2**）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-host-routes.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",

@@ -1,17 +1,18 @@
 // @tier pre-tag
 /**
- * The approval route surface, driven through a REAL loopback http server (the fence reads the socket, so
- * a fabricated request cannot exercise it) plus one source tripwire for the browser half's copy of the
- * path literals.
+ * The approval route surface on the platform's exact Fetch carrier (W6/G4).
  *
- * The decisions are business answers: a refusal keeps HTTP 200 and carries the service's own sentence,
- * which is what makes the card and the console command show the same words.
+ * The trust fence, browser auth and owner-only admission are the PLATFORM's now; this spec exercises
+ * the family's own contract through the carrier harness: exact path + method selection, the business
+ * envelope (a refusal stays HTTP 200 with the service sentence), the DecisionAudit rolled into
+ * approve/reject, and the preview diff facts.
  */
-import { createServer, request } from 'node:http'
 import { readFileSync } from 'node:fs'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
 import type { PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
-import { isLoopbackRequest, type FenceRequest } from '@deepseek-ai/dsh-evolution-core'
+import type { DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
+import { mountHostRoutes } from '../../test-support/host-route-harness.ts'
 import { APPROVAL_ROUTES, makeApprovalRoutes, type ApprovalFace } from '../src/routes.ts'
 import type { WritePreview } from '../src/index.ts'
 
@@ -30,17 +31,16 @@ function record(overrides: Partial<PendingRecord> = {}): PendingRecord {
 
 interface Face extends ApprovalFace {
   readonly calls: string[]
-  /** Make the next approve/reject throw, to exercise the transport-failure answer. */
+  readonly audits: DecisionAudit[]
   failNext: boolean
-  /** Answer a decision with a refusal (the service's business "no"). */
   refuseNext: boolean
-  /** The preview this kind's replayer registered, when the test registers one. */
   preview: WritePreview | undefined
 }
 
 function makeFace(): Face {
   const face: Face = {
     calls: [],
+    audits: [],
     failNext: false,
     refuseNext: false,
     preview: undefined,
@@ -50,13 +50,15 @@ function makeFace(): Face {
       const all = [record(), record({ id: 'p-2', status: 'approved', summary: 'memory op' })]
       return all.filter(candidate => candidate.status === status)
     },
-    approve: async (id: string) => {
+    approve: async (id: string, audit: DecisionAudit) => {
       face.calls.push('approve:' + id)
+      face.audits.push(audit)
       if (face.failNext) throw new Error('state medium is unreadable')
       return face.refuseNext ? { ok: false, message: 'pending record "x" is not in the pending window' } : { ok: true, message: 'approved ' + id }
     },
-    reject: async (id: string) => {
+    reject: async (id: string, audit: DecisionAudit) => {
       face.calls.push('reject:' + id)
+      face.audits.push(audit)
       if (face.failNext) throw new Error('state medium is unreadable')
       return face.refuseNext ? { ok: false, message: 'nothing to reject' } : { ok: true, message: 'rejected ' + id }
     },
@@ -64,64 +66,25 @@ function makeFace(): Face {
   return face
 }
 
-/** One real host over the real routes: a bare http server dispatching by exact path. */
-async function startHost(face: ApprovalFace): Promise<{ origin: string; close: () => Promise<void> }> {
-  const routes = makeApprovalRoutes(face)
-  const server = createServer((req, res) => {
-    const path = (req.url ?? '').split('?')[0]
-    const route = routes.find(candidate => candidate.kind === 'exact' && candidate.path === path)
-    if (route === undefined) {
-      res.writeHead(404)
-      res.end()
-      return
-    }
-    void route.handler(req, res)
-  })
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  const port = typeof address === 'object' && address !== null ? address.port : 0
-  return {
-    origin: 'http://127.0.0.1:' + String(port),
-    close: async () => {
-      await new Promise<void>((resolve, reject) => server.close((error) => {
-        if (error === undefined) resolve()
-        else reject(error)
-      }))
-    },
-  }
+async function mount(face: Face) {
+  const ctx = new Context()
+  return await mountHostRoutes(ctx, (audit) => makeApprovalRoutes(face, audit))
 }
 
-const hosts: Array<{ close: () => Promise<void> }> = []
-afterEach(async () => {
-  for (const host of hosts.splice(0)) await host.close()
-})
-
-async function mount(face: Face): Promise<string> {
-  const host = await startHost(face)
-  hosts.push(host)
-  return host.origin
-}
-
-describe('approval routes: the loopback fence', () => {
-  it('admits only a loopback socket with a loopback Host and no cross-site marker', () => {
-    const loopback: FenceRequest = { headers: { host: '127.0.0.1:3080' }, socket: { remoteAddress: '127.0.0.1' } }
-    expect(isLoopbackRequest(loopback)).toBe(true)
-    expect(isLoopbackRequest({ ...loopback, socket: { remoteAddress: '10.0.0.9' } })).toBe(false)
-    expect(isLoopbackRequest({ ...loopback, headers: { host: 'evil.example' } })).toBe(false)
-    expect(isLoopbackRequest({ ...loopback, headers: { host: '127.0.0.1:3080', 'sec-fetch-site': 'cross-site' } })).toBe(false)
-  })
-
-  it('refuses a rebound Host with 403 rather than answering the window', async () => {
+describe('approval routes: the platform carrier selects by exact path', () => {
+  it('answers 404 for a path that is not registered (the shared RPC fall-through)', async () => {
     const face = makeFace()
-    const origin = await mount(face)
-    const status = await new Promise<number>((resolve, reject) => {
-      const call = request(origin + APPROVAL_ROUTES.pending, { headers: { host: 'evil.example' } }, (response) => {
-        response.resume()
-        resolve(response.statusCode ?? 0)
-      })
-      call.on('error', reject)
-      call.end()
-    })
+    const host = await mount(face)
+    const { status } = await host.json('/api/dsh-evolution/approval/unknown')
+    expect(status).toBe(404)
+    expect(face.calls).toEqual([])
+  })
+
+  it('never sees a non-owner principal: the platform refuses before fetch (403)', async () => {
+    const face = makeFace()
+    const ctx = new Context()
+    const host = await mountHostRoutes(ctx, (audit) => makeApprovalRoutes(face, audit), { principal: 'other' })
+    const { status } = await host.json(APPROVAL_ROUTES.pending)
     expect(status).toBe(403)
     expect(face.calls).toEqual([])
   })
@@ -130,8 +93,9 @@ describe('approval routes: the loopback fence', () => {
 describe('approval routes: the pending window', () => {
   it('lists the pending records by default and hands the browser half rows, not raw records', async () => {
     const face = makeFace()
-    const origin = await mount(face)
-    const body = await (await fetch(origin + APPROVAL_ROUTES.pending)).json() as { ok: boolean; data: Array<Record<string, unknown>> }
+    const host = await mount(face)
+    const { status, body } = await host.json<{ ok: boolean; data: Array<Record<string, unknown>> }>(APPROVAL_ROUTES.pending)
+    expect(status).toBe(200)
     expect(face.calls).toEqual(['list:pending'])
     expect(body.ok).toBe(true)
     expect(body.data).toHaveLength(1)
@@ -146,69 +110,67 @@ describe('approval routes: the pending window', () => {
 
   it('passes an explicit status through and refuses an unknown one', async () => {
     const face = makeFace()
-    const origin = await mount(face)
-    const approved = await (await fetch(origin + APPROVAL_ROUTES.pending + '?status=approved')).json() as { data: Array<{ id: string }> }
+    const host = await mount(face)
+    const approved = await host.json<{ data: Array<{ id: string }> }>(APPROVAL_ROUTES.pending + '?status=approved')
     expect(face.calls).toEqual(['list:approved'])
-    expect(approved.data.map(row => row.id)).toEqual(['p-2'])
-    const bad = await fetch(origin + APPROVAL_ROUTES.pending + '?status=bogus')
+    expect(approved.body.data.map(row => row.id)).toEqual(['p-2'])
+    const bad = await host.json(APPROVAL_ROUTES.pending + '?status=bogus')
     expect(bad.status).toBe(400)
-    expect(await bad.json()).toMatchObject({ ok: false, code: 'bad-request' })
+    expect(bad.body).toMatchObject({ ok: false, code: 'bad-request' })
   })
 })
 
 describe('approval routes: the two decisions', () => {
-  it('forwards approve and reject, and answers with the service sentence', async () => {
+  it('forwards approve and reject with the registration audit, and answers with the service sentence', async () => {
     const face = makeFace()
-    const origin = await mount(face)
-    const approve = await (await fetch(origin + APPROVAL_ROUTES.approve, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id: 'p-1' }),
-    })).json() as { ok: boolean; data?: { message: string } }
-    await fetch(origin + APPROVAL_ROUTES.reject, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id: 'p-2' }),
-    })
+    const host = await mount(face)
+    const approve = await host.json<{ ok: boolean; data?: { message: string } }>(APPROVAL_ROUTES.approve, { method: 'POST', body: { id: 'p-1' } })
+    await host.call(APPROVAL_ROUTES.reject, { method: 'POST', body: { id: 'p-2' } })
     expect(face.calls).toEqual(['approve:p-1', 'reject:p-2'])
-    expect(approve).toMatchObject({ ok: true, data: { message: 'approved p-1' } })
+    expect(approve.body).toMatchObject({ ok: true, data: { message: 'approved p-1' } })
+    // W6: the decision carries the platform's OWN admission facts, captured where connection is known.
+    expect(face.audits).toEqual([
+      { channel: 'connection.fetch', principal: 'owner', deploymentAllowsRemote: false },
+      { channel: 'connection.fetch', principal: 'owner', deploymentAllowsRemote: false },
+    ])
+  })
+
+  it('reports deploymentAllowsRemote truthfully when the carrier allows remote authorities', async () => {
+    const face = makeFace()
+    const ctx = new Context()
+    const host = await mountHostRoutes(ctx, (audit) => makeApprovalRoutes(face, audit), { allowsRemoteAuthorities: true })
+    await host.call(APPROVAL_ROUTES.approve, { method: 'POST', body: { id: 'p-1' } })
+    expect(face.audits[0]?.deploymentAllowsRemote).toBe(true)
   })
 
   it('keeps a business refusal at HTTP 200 with the service wording', async () => {
     const face = makeFace()
     face.refuseNext = true
-    const origin = await mount(face)
-    const response = await fetch(origin + APPROVAL_ROUTES.approve, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id: 'gone' }),
-    })
-    expect(response.status).toBe(200)
-    const refusal = await response.json() as { ok?: unknown; code?: unknown; message?: unknown }
-    expect(refusal.ok).toBe(false)
-    expect(refusal.code).toBe('approval-refused')
-    expect(String(refusal.message)).toContain('pending window')
+    const host = await mount(face)
+    const { status, body } = await host.json<{ ok?: unknown; code?: unknown; message?: unknown }>(APPROVAL_ROUTES.approve, { method: 'POST', body: { id: 'gone' } })
+    expect(status).toBe(200)
+    expect(body.ok).toBe(false)
+    expect(body.code).toBe('approval-refused')
+    expect(String(body.message)).toContain('pending window')
   })
 
   it('reports a service throw as an answer instead of an empty 500', async () => {
     const face = makeFace()
     face.failNext = true
-    const origin = await mount(face)
-    expect(await (await fetch(origin + APPROVAL_ROUTES.reject, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id: 'p-1' }),
-    })).json()).toMatchObject({ ok: false, code: 'approval-failed', message: 'state medium is unreadable' })
+    const host = await mount(face)
+    const { body } = await host.json(APPROVAL_ROUTES.reject, { method: 'POST', body: { id: 'p-1' } })
+    expect(body).toMatchObject({ ok: false, code: 'approval-failed', message: 'state medium is unreadable' })
   })
 
-  it('requires an id, the right method, and a JSON object body', async () => {
+  it('requires an id and a JSON object body; undeclared methods never reach the route', async () => {
     const face = makeFace()
-    const origin = await mount(face)
-    const noId = await fetch(origin + APPROVAL_ROUTES.approve, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) })
+    const host = await mount(face)
+    const noId = await host.json(APPROVAL_ROUTES.approve, { method: 'POST', body: {} })
     expect(noId.status).toBe(400)
-    const wrongMethod = await fetch(origin + APPROVAL_ROUTES.approve)
-    expect(wrongMethod.status).toBe(405)
-    const noBody = await fetch(origin + APPROVAL_ROUTES.reject, { method: 'POST' })
+    // The platform falls through for a method the exact route did not declare (the route lists POST).
+    const wrongMethod = await host.json(APPROVAL_ROUTES.approve)
+    expect(wrongMethod.status).toBe(404)
+    const noBody = await host.json(APPROVAL_ROUTES.reject, { method: 'POST' })
     expect(noBody.status).toBe(400)
     expect(face.calls).toEqual([])
   })
@@ -218,42 +180,43 @@ describe('approval routes: the preview', () => {
   it('resolves one staged write into the same diff facts the history diff route uses', async () => {
     const face = makeFace()
     face.preview = async () => ({ available: true, path: 'SKILL.md', before: 'a\nb\n', after: 'a\nc\n' })
-    const origin = await mount(face)
-    const body = await (await fetch(origin + APPROVAL_ROUTES.preview + '?id=p-1')).json() as { ok: boolean; data: Record<string, unknown> }
-    expect(body.ok).toBe(true)
-    expect(body.data).toMatchObject({ available: true, path: 'SKILL.md', linesAdded: 1, linesRemoved: 1 })
-    expect(Array.isArray(body.data.hunks)).toBe(true)
+    const host = await mount(face)
+    const body = await host.json<{ ok: boolean; data: Record<string, unknown> }>(APPROVAL_ROUTES.preview + '?id=p-1')
+    expect(body.body.ok).toBe(true)
+    expect(body.body.data).toMatchObject({ available: true, path: 'SKILL.md', linesAdded: 1, linesRemoved: 1 })
+    expect(Array.isArray(body.body.data.hunks)).toBe(true)
   })
 
   it('passes a refusal through as an answer, and says so when the kind has no preview', async () => {
     const refusing = makeFace()
     refusing.preview = async () => ({ available: false, reason: 'the target changed after it was staged' })
-    const origin = await mount(refusing)
-    expect(await (await fetch(origin + APPROVAL_ROUTES.preview + '?id=p-1')).json())
+    const refusingHost = await mount(refusing)
+    expect((await refusingHost.json(APPROVAL_ROUTES.preview + '?id=p-1')).body)
       .toMatchObject({ ok: true, data: { available: false, reason: 'the target changed after it was staged' } })
 
     const bare = makeFace()
-    const bareOrigin = await mount(bare)
-    const bareBody = await (await fetch(bareOrigin + APPROVAL_ROUTES.preview + '?id=p-1')).json() as { ok?: unknown; data?: { available?: unknown; reason?: unknown } }
-    expect(bareBody.ok).toBe(true)
-    expect(bareBody.data?.available).toBe(false)
-    expect(String(bareBody.data?.reason)).toContain('没有可预览内容')
+    const bareHost = await mount(bare)
+    const bareBody = await bareHost.json<{ ok?: unknown; data?: { available?: unknown; reason?: unknown } }>(APPROVAL_ROUTES.preview + '?id=p-1')
+    expect(bareBody.body.ok).toBe(true)
+    expect(bareBody.body.data?.available).toBe(false)
+    expect(String(bareBody.body.data?.reason)).toContain('没有可预览内容')
   })
 
   it('answers an unknown id as a business miss, and a missing id as a bad request', async () => {
     const face = makeFace()
-    const origin = await mount(face)
-    const unknown = await fetch(origin + APPROVAL_ROUTES.preview + '?id=nope')
+    const host = await mount(face)
+    const unknown = await host.json(APPROVAL_ROUTES.preview + '?id=nope')
     expect(unknown.status).toBe(200)
-    expect(await unknown.json()).toMatchObject({ ok: false, code: 'not-found' })
-    expect((await fetch(origin + APPROVAL_ROUTES.preview)).status).toBe(400)
+    expect(unknown.body).toMatchObject({ ok: false, code: 'not-found' })
+    expect((await host.json(APPROVAL_ROUTES.preview)).status).toBe(400)
   })
 })
 
 describe('approval routes: the browser half mirrors the host table', () => {
-  it('declares the same four literals under the same keys', () => {
+  it('declares the same four literals under the same keys', async () => {
     // Read as SOURCE on purpose: the browser half cannot import this package at runtime, so the only
-    // way a rename can be caught in CI is by comparing the two textual tables.
+    // way a rename can be caught in CI is by comparing the two textual tables (the generated client
+    // constant is the G5 artifact; until then the settings-ui copy is the mirror under test).
     const source = readFileSync(new URL('../../evolution-settings-ui/src/client/approval-routes.ts', import.meta.url), 'utf8')
     for (const [key, path] of Object.entries(APPROVAL_ROUTES)) {
       expect(source, 'the browser half has no "' + key + '" path').toContain("'" + path + "'")

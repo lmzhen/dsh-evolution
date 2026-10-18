@@ -399,6 +399,8 @@ runs:
         node packages/evolution/scripts/verify-probes.mjs packages/evolution
         # G3-S6: ONE subagent execution path — business sources must not reach for the removed 0.2.1 APIs.
         node packages/evolution/scripts/verify-subagent-single-source.mjs packages/evolution
+        # G4/W6: ONE host path table + ONE carrier — no fence, no webServer registration, no hand-copied paths.
+        node packages/evolution/scripts/verify-host-routes.mjs packages/evolution
         node packages/evolution/scripts/verify-profile-bundles.mjs --self-test
         # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
         # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs
