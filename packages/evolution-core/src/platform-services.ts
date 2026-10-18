@@ -1,7 +1,7 @@
 /**
  * Every platform service the family reaches for with `ctx.get`, and what degrades without it.
  *
- * O-2 (v46 audit): the family probes 28 platform services optionally — the platform has no
+ * O-2 (v46 audit): the family probes 25 platform services optionally — the platform has no
  * formalized "optional dependency", so an ABSENT service is a silent downgrade and the diagnostic
  * surface is the only place a reader can learn about it. `/evolution doctor` used to judge six of
  * them; this table is the single source it judges the rest from, and the arch guard cross-checks it
@@ -22,7 +22,7 @@ export interface PlatformServiceProbe {
   readonly side: 'host' | 'client'
 }
 
-/** The 28 probes, in service-name order (the guard checks this list against the tree). */
+/** The 25 probes, in service-name order (the guard checks this list against the tree). */
 export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.freeze([
   { service: 'agents', feature: 'review and curator subagent wake-ups', side: 'host' },
   { service: 'approval', feature: 'the platform approval policy the approval row shadows', side: 'host' },
@@ -47,10 +47,8 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'skillUsage', feature: 'usage counters feeding the curator and the review planner', side: 'host' },
   { service: 'skills', feature: 'the platform skill catalog the skill tool writes through', side: 'host' },
   { service: 'storageDomain', feature: 'the storage-domain state provider', side: 'host' },
-  { service: 'subagents', feature: 'spawning review and maintenance subagents', side: 'host' },
   { service: 'systemPrompt', feature: 'the protected-skills prompt variable', side: 'host' },
   { service: 'tools', feature: 'tool registration and the guard seam', side: 'host' },
-  { service: 'webServer', feature: 'the skill-history panel routes', side: 'host' },
 ])
 
 /**

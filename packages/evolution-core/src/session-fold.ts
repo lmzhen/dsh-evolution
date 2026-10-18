@@ -13,9 +13,11 @@
 export type SessionEventClass = 'model' | 'plugin-record' | 'unknown'
 
 /** Frames the model authored/saw (the only frames evidence, reads and usage accounting may consume). */
-export const MODEL_SESSION_EVENTS = Object.freeze(['user/message', 'assistant/message', 'tool/call', 'tool/result'] as const)
+import { MODEL_SESSION_EVENT_TYPES } from './tool-dispatch.ts'
 
-const MODEL_EVENT_TYPES: ReadonlySet<string> = new Set(MODEL_SESSION_EVENTS)
+export { MODEL_SESSION_EVENT_TYPES as MODEL_SESSION_EVENTS }
+
+const MODEL_EVENT_TYPES: ReadonlySet<string> = new Set<string>(MODEL_SESSION_EVENT_TYPES)
 
 /** Classify one session event WITHOUT interpreting it (pure). */
 export function classifySessionEvent(event: { readonly type?: unknown; readonly ignorable?: unknown }): SessionEventClass {

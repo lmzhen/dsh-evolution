@@ -737,6 +737,8 @@ const MUTABLE_STATE_RE = /^const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*new\s+(?:
 // scope ("dedup across instances and roots keyed by file NAME only"), and the module function that
 // needed them now takes the memory as an argument.
 const MUTABLE_STATE = new Map([
+  ['evolution-core/src/composition/composer.ts :: overridesCache', 'WHY MODULE SCOPE (S4.4): the cache is an immutable-data memo keyed by the manifest PATH, shared by every composition caller; process scope changes no behaviour and threading it through callers would buy nothing (same rationale as the former preset-composition.ts entry this refactor replaced). Lifecycle: lazy get-or-set on first read, replaced when its source manifest is re-read; evidence evolution-core/tests/real-preset-composition.spec.ts; validity single-process cache over on-disk data.'],
+  ['evolution-core/src/composition/ensure.ts :: SLOTS', 'WHY MODULE SCOPE (S4.4): the single-flight registration table is keyed by Context through a WeakMap, so a disposed fiber\'s slots die with it; lazy ensureRestrictedPreset calls for the same context must share it (a per-instance table would register the same preset twice), and the WeakMap key is exactly the lifecycle owner. Lifecycle: get-or-create per kind, release via ctx.effect on dispose; evidence evolution-core/tests/subagent-channel.spec.ts and evolution-host/tests/subagent-restrictor.spec.ts; validity single-process.'],
   // The "validity single-process" tail of every row is the assumption N20 makes
   // explicit: evolution-core/persisted-write-inventory.json declares, per write
   // site, what keeps two writers apart (transact / write-lock / instance claim),

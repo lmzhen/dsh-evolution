@@ -2,6 +2,7 @@
 // single restrictor row. The parent rows are read through agentPresets.readDocument (the Loader's
 // own YAML dialect), so the child keeps every base row the parent had.
 import * as yaml from 'js-yaml'
+import { errorText } from '../errors.ts'
 
 // The Loader's entry-list YAML dialect: `JSON_SCHEMA` plus one `!!js` scalar tag whose node keeps
 // the source text for activation-time evaluation. It is DEFINED here rather than imported from the
@@ -57,7 +58,7 @@ export type RestrictedPresetState =
 
 export function parsePresetRows(content: string): readonly unknown[] {
   const parsed = yaml.load(content, { schema: entryListSchema })
-  if (!Array.isArray(parsed)) throw new Error('E-324: parent preset composition is not a top-level list')
+  if (!Array.isArray(parsed)) throw new Error(errorText('e-324-restricted-preset-unavailable', { a1: 'parent preset composition is not a top-level list' }))
   return parsed as readonly unknown[]
 }
 
@@ -66,7 +67,7 @@ export function composeRestrictedPresetDefinition(
   req: RestrictedPresetRequest,
 ): RestrictedPresetDefinition {
   const allow = normalizeAllow(req.allow)
-  if (allow.length === 0) throw new Error('E-324: restricted preset needs a non-empty allow set')
+  if (allow.length === 0) throw new Error(errorText('e-324-restricted-preset-unavailable', { a1: 'restricted preset needs a non-empty allow set' }))
   const rows = parsePresetRows(source.content)
   const display = RESTRICTED_PRESET_DISPLAY[req.kind]
   const restrictorRow = { id: RESTRICTED_TOOLS_ROW_ID, name: RESTRICTOR_MODULE, config: { allow, presetId: restrictedPresetId(req.kind) } }

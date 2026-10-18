@@ -124,11 +124,11 @@ export function registerHostRoutes(
   build: (audit: DecisionAudit) => readonly ConnectionFetchRouteLike[],
 ): void {
   const injecting = owner as unknown as Partial<InjectingContext>
-  if (typeof injecting.inject !== 'function') throw new Error('E-325: host routes require a context that owns inject()')
+  if (typeof injecting.inject !== 'function') throw new Error('host routes require a context that owns inject()')
   injecting.inject(['connection'], (scope: Context) => {
     const connection = (scope as unknown as { connection?: ConnectionServiceLike }).connection
     if (connection === undefined || connection.fetch === undefined || typeof connection.fetch.register !== 'function') {
-      throw new Error('E-325: connection service is mounted without fetch.register()')
+      throw new Error('connection service is mounted without fetch.register()')
     }
     const register = connection.fetch.register.bind(connection.fetch)
     const audit: DecisionAudit = {
@@ -139,11 +139,11 @@ export function registerHostRoutes(
     const routes = build(audit)
     for (const route of routes) {
       if (!route.path.startsWith('/api/dsh-evolution/')) {
-        throw new Error('E-325: host route path must carry the /api/dsh-evolution/ prefix: ' + route.path)
+        throw new Error('host route path must carry the /api/dsh-evolution/ prefix: ' + route.path)
       }
     }
     const effect = (scope as unknown as { effect?: InjectingContext['effect'] }).effect
-    if (typeof effect !== 'function') throw new Error('E-325: connection scope has no effect() to own the registration')
+    if (typeof effect !== 'function') throw new Error('connection scope has no effect() to own the registration')
     effect.call(scope, () => {
       const disposers: Array<() => Promise<void>> = []
       try {

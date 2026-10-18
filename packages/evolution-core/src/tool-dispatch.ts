@@ -69,6 +69,12 @@ export const DISPATCH_EVENT_TYPES: readonly string[] = [
 ]
 
 /**
+ * Model-visible session frames: the message types plus the ONE dispatch vocabulary above.
+ * Consumers classify through this list instead of naming event literals (rule N11).
+ */
+export const MODEL_SESSION_EVENT_TYPES: readonly string[] = ['user/message', 'assistant/message', ...DISPATCH_EVENT_TYPES]
+
+/**
  * One normalized tool dispatch.
  *
  * Every field is derived from a platform event payload; the record is mutable

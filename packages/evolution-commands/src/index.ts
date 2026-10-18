@@ -3,6 +3,11 @@
  * @module @deepseek-ai/dsh-evolution-commands
  */
 
+// platform-declaration anchor: the optional platform seats this file probes (`settings`, `tools`,
+// `hmr`, `skillUsage`) are declared by the platform, not by this family: settings by
+// packages/settings/src/index.ts, tools by packages/core/tools/src/index.ts, hmr by vendor/hmr and
+// the usage counters by the skill package. The probes are capability checks — absence degrades a
+// feature and `/evolution doctor` reports it.
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { createSubagentChannel, scopedPackageName, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
@@ -22,7 +27,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import {
-  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDiagnosticsText, renderDoctorText } from './doctor.ts'
@@ -1038,11 +1043,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // W5 G3-S4: a settle that names a resultRef must be readable NOW — otherwise the
               // terminal record points at a file a reader/replay cannot open (write/io race).
               if (resultRef !== undefined) {
-                const readable = await ioRegistry.provider().exists(resultRef).catch(() => false)
+                const readable = isPresent(await probeMtime(ioRegistry.provider(), resultRef))
                 if (!readable) {
                   await registry.settle(handle.id, {
                     state: 'failed',
-                    failure: 'E-324: the maintain report file is missing at settle time (write/io race) — the scan result was not persisted.',
+                    failure: 'the maintain report file is missing at settle time (write/io race) — the scan result was not persisted.',
                   })
                   return
                 }

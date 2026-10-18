@@ -6,6 +6,7 @@
 // Function plugin (no default export): inject waits for the registry that identifies which child
 // belongs to this restricted preset; the restriction effect is owned by the child scope.
 import type { Context } from '@deepseek-ai/cordis'
+import { errorText } from './errors.ts'
 
 export const name = 'evolution-restrictor'
 export const inject = ['agentPresets'] as const
@@ -43,7 +44,7 @@ function normalize(names: readonly string[] | undefined): readonly string[] {
 }
 
 function failure(detail: string): Error {
-  return new Error('E-324: evolution restrictor ' + detail)
+  return new Error(errorText('e-324-restricted-preset-unavailable', { a1: 'evolution restrictor ' + detail }))
 }
 
 export function apply(ctx: Context, config: Config = {}): void {

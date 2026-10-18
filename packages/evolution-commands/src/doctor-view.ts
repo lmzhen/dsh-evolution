@@ -23,6 +23,7 @@ import {
   REVIEWER_PRESET_ID,
   classifySessionEvent,
   createSubagentChannel,
+  errorText,
   hostSurface,
   type ChannelState,
   type DiagnosticRow,
@@ -141,7 +142,7 @@ function presetRow(presets: DoctorInputs['presets']): DiagnosticRow {
   const broken = entries.filter((entry): entry is PresetFacts => entry !== undefined && entry.broken !== undefined)
   const missing = entries.filter(entry => entry === undefined || !entry.registered)
   if (broken.length > 0) {
-    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'fail', detail: 'E-324: ' + broken.map(entry => entry.broken ?? '').join('；'), remedy: '重载插件行使 ensureRestrictedPreset 重新注册；运行 /evolution doctor 查看 preset id 与 allow 集合。' }
+    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'fail', detail: errorText('e-324-restricted-preset-unavailable', { a1: broken.map(entry => entry.broken ?? '').join('；') }), remedy: '重载插件行使 ensureRestrictedPreset 重新注册；运行 /evolution doctor 查看 preset id 与 allow 集合。' }
   }
   if (missing.length > 0) {
     return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'warn', detail: '受限 preset 尚未注册（首次显式子代理运行时创建）。', remedy: '运行一次审阅/维护，或在挂载后运行 /evolution doctor。' }
@@ -156,7 +157,7 @@ function hostRow(host: DoctorInputs['host'], count: DoctorInputs['hostRouteCount
       key: 'host-surface',
       label: RUNTIME_LABELS['host-surface'] ?? 'Host 数据面',
       status: 'warn',
-      detail: 'E-325: connection 不可用（' + (host.reason ?? 'unknown') + '），面板与审批路由未注册。',
+      detail: errorText('e-325-host-data-plane-unavailable') + '（' + (host.reason ?? 'unknown') + '）',
       remedy: '改用命令面完成同等操作：' + fallback + ' 等；运行 /evolution doctor 查看已挂载服务。',
     }
   }
