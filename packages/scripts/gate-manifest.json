@@ -854,6 +854,21 @@
       ]
     },
     {
+      "id": "gate-56",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json`（W2/W3/W10/W11 发布证据：schemaVersion=2、platformLine 与 platform-line.json 逐字、manifests 范围一致；`--release` 时另要求 ciFace/gates/S1–S4 全 pass/52 项 traceability 全覆——blocked 不算 pass。缺文件/不可解析→**exit 2**）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-release-evidence.mjs",
+        "packages/evolution/dist/release-evidence.json"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",

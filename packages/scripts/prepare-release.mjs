@@ -32,6 +32,7 @@ import { execFileSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadSemver, readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
+import { releaseEvidenceSkeleton } from './lib-release-evidence.mjs'
 import { vendoredRangeFor } from './lib-vendored-ranges.mjs'
 
 /** Every .yml/.yaml under one staged package copy, tests/node_modules already
@@ -631,8 +632,7 @@ writeFileSync(join(distNext, 'publish-order.json'), JSON.stringify(publishGroups
 // (verify-platform-ranges, release workflow) append/assert against it; `ciFace` stays null here
 // and is filled by the workflow, while `platformLine` is never re-spelled by hand.
 const { version: semverVersion } = loadSemver(platformLineRoot)
-writeFileSync(join(distNext, 'release-evidence.json'), JSON.stringify({
-  schemaVersion: 1,
+const evidence = releaseEvidenceSkeleton({
   familyVersion: releaseVersion,
   platformLine,
   semverVersion,
@@ -645,7 +645,8 @@ writeFileSync(join(distNext, 'release-evidence.json'), JSON.stringify({
   gates: [],
   frozenLines: ['0.2.0'],
   generatedAt: new Date().toISOString(),
-}, null, 2) + '\n')
+})
+writeFileSync(join(distNext, 'release-evidence.json'), JSON.stringify(evidence, null, 2) + '\n')
 
 // Atomic swap: only now that the whole build (and its guard) passed do the
 // live `.release-staging` and `dist` replace their `.next` siblings. A failed

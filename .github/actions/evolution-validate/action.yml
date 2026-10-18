@@ -405,6 +405,8 @@ runs:
         node packages/evolution/scripts/gen-client-seam.mjs packages/evolution --check
         # G7/W11: the 52-item traceability universe is complete and honest (planned mode until W9 registers the probes).
         node packages/evolution/scripts/verify-traceability.mjs packages/evolution --planned
+        # G8/W2: the staging release-evidence is schema v2 and agrees with the ONE platform line.
+        node packages/evolution/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json
         node packages/evolution/scripts/verify-profile-bundles.mjs --self-test
         # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
         # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs
