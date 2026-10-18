@@ -164,6 +164,28 @@ describe('the per-row configuration entry', () => {
     cleanup()
   })
 
+  it('G8 regression: canonical registry ids are translated to NAMESPACE-RELATIVE keys', async () => {
+    const approval = CLIENT_PARAM_SECTIONS.find(candidate => candidate.namespace === 'evolution-approval')
+    if (approval === undefined) throw new Error('the generated view lost the evolution-approval row')
+    const approvalFields = approval.fields
+    const numberField = approvalFields.find(field => field.control === 'number')
+    // The registry spells the id in its canonical (namespace-prefixed) form; the seat speaks the
+    // namespace's own field keys. Sending the canonical id made the Host refuse every save
+    // ('Config field evolution-approval.pendingTtlMs is not volatile', measured on the isolated face).
+    expect(numberField?.id).toBe('evolution-approval.pendingTtlMs')
+    const mutate = vi.fn(async () => true)
+    const summary = render(h(RowConfigCard, { namespace: 'evolution-approval', fields: approvalFields, t, view: 'summary', form: { state: state({ pendingTtlMs: 5 }), mutate } }))
+    expect(summary.container.textContent).toBe(t('changed').replace('{n}', '1'))
+    cleanup()
+    const view = render(h(RowConfigCard, { namespace: 'evolution-approval', fields: approvalFields, t, view: 'page', form: { state: state({ pendingTtlMs: 5 }), mutate } }))
+    fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
+    const input = view.container.querySelector('[id="evolution-param-evolution-approval.pendingTtlMs"]') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '600000' } })
+    fireEvent.click(view.container.querySelector('[data-primary="true"]') as Element)
+    await vi.waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(mutate.mock.calls[0]?.[0]).toEqual([{ op: 'set', path: ['pendingTtlMs'], value: 600000 }])
+    cleanup()
+  })
   it('states the missing settings seat instead of drawing dead controls', () => {
     const page = render(card({ view: 'page' }))
     expect(page.container.textContent).toBe(t('seatMissing'))

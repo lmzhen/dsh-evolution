@@ -11,7 +11,7 @@
 import { createElement, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import type { MessageKey } from './messages.ts'
-import { ParamCardView } from './ParamCard.ts'
+import { fieldKeyOf, ParamCardView } from './ParamCard.ts'
 import { isSection, sectionSnapshotOf } from './source.ts'
 import type { RowConfigViewProps } from './seam.ts'
 
@@ -32,9 +32,9 @@ export type RowConfigCardProps = RowConfigViewProps & RowConfigFace
  * @param fields - the row's fields.
  * @returns how many of them the user overrode.
  */
-function overridden(user: unknown, fields: readonly ClientParamField[]): number {
+function overridden(user: unknown, fields: readonly ClientParamField[], namespace: string): number {
   const layer = isSection(user) ? user : {}
-  return fields.filter(field => Object.hasOwn(layer, field.id)).length
+  return fields.filter(field => Object.hasOwn(layer, fieldKeyOf(namespace, field))).length
 }
 
 /**
@@ -49,7 +49,7 @@ export function RowConfigCard(props: RowConfigCardProps): ReactNode {
     // not compose the settings surface, so the page view says so instead of drawing dead controls.
     return view === 'summary' ? null : createElement('p', { className: 'evolution-param-note', role: 'status' }, t('seatMissing'))
   }
-  const changed = overridden(form.state.user, fields)
+  const changed = overridden(form.state.user, fields, namespace)
   if (view === 'summary') {
     return changed === 0 ? null : createElement('span', null, t('changed', { n: changed }))
   }

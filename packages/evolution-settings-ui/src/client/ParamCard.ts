@@ -56,6 +56,24 @@ export type ParamCardProps = Omit<ParamCardFace, 'hooks'> & {
 /** The op list a save hands to the seat — the seam's own shape, never a second vocabulary. */
 export type SettingsParamOp = SettingsPathOpLike
 
+/**
+ * The NAMESPACE-RELATIVE key of one registry field.
+ *
+ * The E3 registry writes family ids in canonical form (`evolution-approval.pendingTtlMs`),
+ * while the platform settings seat speaks a namespace's own field keys (`pendingTtlMs`) —
+ * its snapshot user layer, its base and its op paths are all relative to the namespace. Sending
+ * the canonical id as an op path makes the Host refuse the write
+ * ("Config field evolution-approval.pendingTtlMs is not volatile", measured 2026-10-19), so the
+ * card translates once, here, and every read/write goes through it.
+ * @param namespace - the settings namespace (Loader row id) the card writes.
+ * @param field - one generated field.
+ * @returns the field's key inside that namespace.
+ */
+export function fieldKeyOf(namespace: string, field: ClientParamField): string {
+  const prefix = namespace + '.'
+  return field.id.startsWith(prefix) ? field.id.slice(prefix.length) : field.id
+}
+
 /** One cell's text: absent reads as an empty control, containers as JSON. */
 function format(value: unknown): string {
   if (value === undefined) return ''
@@ -319,9 +337,10 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const locked = disabled || busy || clearing !== null
   const titleKey = NAMESPACE_TITLES[namespace] as MessageKey | undefined
   const title = titleKey === undefined ? namespace : t(titleKey)
-  const changed = fields.filter(field => Object.hasOwn(user, field.id)).length
-  const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[field.id])
-  const dirty = fields.filter(field => draft[field.id] !== undefined && draft[field.id] !== format(value[field.id]))
+  const keyOf = (field: ClientParamField): string => fieldKeyOf(namespace, field)
+  const changed = fields.filter(field => Object.hasOwn(user, keyOf(field))).length
+  const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[keyOf(field)])
+  const dirty = fields.filter(field => draft[field.id] !== undefined && draft[field.id] !== format(value[keyOf(field)]))
   // U-4 constraint-first: an unacceptable value blocks the save instead of being staged and refused.
   const peerTextOf = (field: ClientParamField): string | undefined => {
     if (field.atLeast === '') return undefined
@@ -344,7 +363,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     void (async () => {
       let accepted: boolean
       try {
-        accepted = await clear(field)
+        accepted = await clear(fieldKeyOf(namespace, { id: field } as ClientParamField))
       } catch (caught) {
         setClearing(null)
         setError(caught instanceof Error && caught.message !== '' ? caught.message : t('resetRefused'))
@@ -361,7 +380,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
         // T5-01/A56: EVERY dirty field travels in ONE call. The old loop sent one write per field,
         // which the Plugins page fenced with the render-time revision — the second field was then
         // refused by the host and its change silently did not land.
-        const ops: SettingsParamOp[] = dirty.map(field => ({ op: 'set', path: [field.id], value: parseFor(field.control, textOf(field)) }))
+        const ops: SettingsParamOp[] = dirty.map(field => ({ op: 'set', path: [keyOf(field)], value: parseFor(field.control, textOf(field)) }))
         const accepted = await mutateOnce(ops)
         setPending({ accepted, resets: false })
       } catch (caught) {
@@ -400,11 +419,11 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
               key: field.id,
               field,
               text: textOf(field),
-              overridden: Object.hasOwn(user, field.id),
+              overridden: Object.hasOwn(user, keyOf(field)),
               disabled: locked,
               clearing: clearing === field.id,
               // U-5: primitives only — a nested object is not a reader-facing value.
-              resetTo: resetToOf(snapshot.base?.[field.id]),
+              resetTo: resetToOf(snapshot.base?.[keyOf(field)]),
               invalid: invalidReason(field, textOf(field), peerTextOf(field)),
               t,
               onChange: change,
