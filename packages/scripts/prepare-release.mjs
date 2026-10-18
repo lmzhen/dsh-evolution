@@ -407,8 +407,20 @@ for (const dir of sourceDirs) {
         if (sourceModules.has(module)) continue
         // tsdown code-splits shared modules into `<name>-<hash>.js` (`enrichment-CjZmhRI9`), so a
         // trailing hash segment is not a source name: retry with it stripped before calling it stale.
-        const stem = module.replace(/-[A-Za-z0-9_]{6,}$/, '')
-        if (stem !== module && sourceModules.has(stem)) continue
+        // The hash may itself contain a hyphen (`ensure-DEWwc877`, `composition-DE6-ZDaq`), so the
+        // strip pattern has to accept `-` inside the segment.
+        // tsdown code-splits shared modules into `<module>-<hash>.js`. The hash may contain
+        // hyphens (`composition-DE6-ZDaq`, `http-routes-CB80sVnx`), so a suffix regex cannot
+        // separate them reliably: strip against the SOURCE name instead — a chunk is valid when
+        // its module starts with a known source module and the remainder is hash-shaped.
+        const hashShaped = (remainder) => /^-[A-Za-z0-9_-]{4,}$/.test(remainder)
+        if ([...sourceModules].some((candidate) => module.startsWith(candidate + '-') && hashShaped(module.slice(candidate.length)))) continue
+        // A code-split chunk may also be named after the SOURCE BASENAME only
+        // (`ensure-DEWwc877.js` for `src/composition/ensure.ts`). Resolve a unique basename match;
+        // an ambiguous or missing basename stays an orphan (never silently accepted).
+        const stem = module.slice(0, module.indexOf('-') > 0 ? module.indexOf('-') : undefined)
+        const basenameMatches = [...sourceModules].filter((candidate) => candidate === stem || candidate.endsWith('/' + stem))
+        if (basenameMatches.length === 1) continue
         orphans.push(`lib/${raw}`)
       }
     }
