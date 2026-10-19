@@ -82,6 +82,37 @@ export const CSS = [
   '.evolution-param-diff{margin:0;padding:var(--evo-space-12) var(--evo-space-16);max-height:var(--evo-cap-block);overflow:auto;border:var(--evo-hairline-width) solid var(--dsw-alias-border-l1);border-radius:var(--evo-radius-surface);background:var(--dsw-alias-markdown-code-block);color:var(--dsw-alias-label-primary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap}',
   '.evolution-param-line-add{color:var(--evo-tone-success)}',
   '.evolution-param-line-del{color:var(--evo-tone-danger)}',
+  // W7 tail (0.27.1 feedback): the diagnostics card used `evo-diag-*` classes with no rules at all,
+  // so facts/runtime rows collapsed into one inline run and the card had no body inset. These rules
+  // give it the SAME geometry as the parameter cards (head 12/14, body 0 14 12, group h3) and a
+  // label-above-value reading order; the status tone is the platform alias, always paired with text.
+  '.evolution-param-loading{margin:var(--evo-space-12) 0 0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  '.evo-diag-badge{display:inline-flex;align-items:center;height:var(--evo-space-20);padding:0 var(--evo-space-8);border-radius:var(--evo-radius-chip);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-space-20);flex:none}',
+  '.evo-diag-badge[data-status="ok"]{color:var(--dsw-alias-state-success-primary)}',
+  '.evo-diag-badge[data-status="warn"]{color:var(--dsw-alias-state-warn-primary)}',
+  '.evo-diag-badge[data-status="fail"]{color:var(--dsw-alias-state-error-primary)}',
+  '.evo-diag-badge[data-status="unknown"]{color:var(--dsw-alias-state-idle-primary)}',
+  '.evo-diag-list{display:flex;flex-direction:column}',
+  '.evo-diag-item{padding:var(--evo-space-12) 0}',
+  '.evo-diag-item+.evo-diag-item{border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
+  '.evo-diag-label{display:block;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  '.evo-diag-value{display:block;margin:var(--evo-space-2) 0 0;color:var(--dsw-alias-label-primary);font-size:var(--evo-type-sm);line-height:var(--evo-leading-base);overflow-wrap:anywhere}',
+  '.evo-diag-row-head{display:flex;align-items:baseline;gap:var(--evo-space-6);flex-wrap:wrap}',
+  '.evo-diag-dot{width:var(--evo-space-6);height:var(--evo-space-6);border-radius:var(--evo-radius-pill);background:var(--evo-diag-tone,var(--dsw-alias-state-idle-primary));flex:none}',
+  '.evo-diag-status{color:var(--evo-diag-tone,var(--dsw-alias-state-idle-primary));font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  '.evo-diag-item[data-status="ok"]{--evo-diag-tone:var(--dsw-alias-state-success-primary)}',
+  '.evo-diag-item[data-status="warn"]{--evo-diag-tone:var(--dsw-alias-state-warn-primary)}',
+  '.evo-diag-item[data-status="fail"]{--evo-diag-tone:var(--dsw-alias-state-error-primary)}',
+  '.evo-diag-item[data-status="unknown"]{--evo-diag-tone:var(--dsw-alias-state-idle-primary)}',
+  '.evo-diag-detail{display:block;margin:var(--evo-space-2) 0 0;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base);overflow-wrap:anywhere}',
+  '.evo-diag-remedy{display:block;margin:var(--evo-space-4) 0 0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  '.evo-diag-meta{margin:var(--evo-space-12) 0 0;padding-top:var(--evo-space-8);border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  '.evo-diag-meta>summary{cursor:pointer;user-select:none;padding:var(--evo-space-4) 0}',
+  '.evo-diag-meta-body{display:flex;flex-direction:column;gap:var(--evo-space-2);padding:var(--evo-space-4) 0 0}',
+  '.evo-diag-sources-title{padding-top:var(--evo-space-6)}',
+  '.evo-diag-source{display:flex;justify-content:space-between;gap:var(--evo-space-8);overflow-wrap:anywhere}',
+  '.evo-diag-source-label{flex:none}',
+  '.evo-diag-source-home{text-align:right;overflow-wrap:anywhere}',
 ].join('\n')
 
 /** The slice of the DOM the injection touches (this package typechecks without DOM lib). */

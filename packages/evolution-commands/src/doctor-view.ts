@@ -81,32 +81,51 @@ const FACT_LABELS: Readonly<Record<string, string>> = {
   'platform-line': '平台兼容线',
   'family-version': '家族版本',
   'install-form': '安装形态',
-  'preset-ids': '受限 preset id',
-  'readonly-contract': '只读契约',
+  'preset-ids': '受限预设',
+  'readonly-contract': '只读说明',
   'upgrade-order': '升级顺序',
   'fallback-map': '命令兜底',
 }
 
 const RUNTIME_LABELS: Readonly<Record<string, string>> = {
   'subagent-channel': '子代理通道',
-  'restricted-preset': '受限 preset',
-  'host-surface': 'Host 数据面',
-  'session-fold': '会话事件 fold 单入口',
-  'platform-services': '平台服务探测',
+  'restricted-preset': '受限预设',
+  'host-surface': '数据面连接',
+  'session-fold': '会话事件读取',
+  'platform-services': '平台服务',
   runs: '运行登记',
-  'platform-pairing': '平台/家族配对',
+  'platform-pairing': '版本兼容',
   'install-form-detected': '实际安装形态',
 }
 
+/**
+ * The install form in reader-facing words. The M1..M4 ids stay internal (the runtime rows and
+ * --json keep them); a settings reader sees what the deployment is FOR, not the code name.
+ */
+const FORM_WORDS: Readonly<Record<InstallFormId, string>> = Object.freeze({
+  M1: '完整功能包',
+  M2: '后台自动化包',
+  M3: '会话预设包',
+  M4: '分层安装',
+})
+
+/**
+ * Build the seven documentation facts. Values are READER-FACING prose: the CLI text, --json and
+ * the settings card all print the same strings, so internal codes, raw evidence paths and
+ * "declared/inferred" jargon stay out of the value (the runtime rows and the per-fact home carry
+ * the technical half).
+ * @param inputs - assembled doctor inputs.
+ * @returns the ordered fact rows.
+ */
 function factsOf(inputs: DoctorInputs): DocFactRow[] {
   const values: Record<string, string> = {
-    'platform-line': inputs.platformLine.version + '（floor ' + inputs.platformLine.floor + '）',
+    'platform-line': inputs.platformLine.version + '（最低兼容 ' + inputs.platformLine.floor + '）',
     'family-version': inputs.familyVersion,
-    'install-form': inputs.form.id + '（' + inputs.form.confidence + '；证据：' + inputs.form.evidence.join('、') + '）',
-    'preset-ids': REVIEWER_PRESET_ID + ' / ' + MAINTAINER_PRESET_ID + '（家族 preset 集合：' + EVOLUTION_PRESET_IDS.join(', ') + '）',
-    'readonly-contract': REVIEWER_PRESET_ID + ' 的工具集由 restrictor allow 集合决定；维护行同构（' + MAINTAINER_PRESET_ID + '）',
-    'upgrade-order': '先升平台 → 再升家族 → 最后发布（见 INSTALL runbook）',
-    'fallback-map': Object.keys(COMMAND_FALLBACKS).join('、') + '（每面的命令见 INSTALL 命令兜底表）',
+    'install-form': FORM_WORDS[inputs.form.id] + '（' + (inputs.form.confidence === 'declared' ? '安装内容已声明' : '按已安装内容推断') + '）',
+    'preset-ids': '审阅 / 维护两个受限只读预设（' + REVIEWER_PRESET_ID + ' / ' + MAINTAINER_PRESET_ID + '）；另可选用 ' + String(EVOLUTION_PRESET_IDS.length) + ' 个基础预设',
+    'readonly-contract': '受限预设只读：可用工具由该预设声明的 allow 集合决定（审阅与维护同构）',
+    'upgrade-order': '先升平台，再升家族，最后发布（详见 INSTALL 的升级说明）',
+    'fallback-map': String(Object.keys(COMMAND_FALLBACKS).length) + ' 个功能面板各有命令兜底（详见 INSTALL 命令兜底表）',
   }
   const rows: DocFactRow[] = DIAGNOSTICS_FACT_KEYS.map(key => ({
     key,
@@ -122,7 +141,7 @@ function channelRow(channels: DoctorInputs['channels']): DiagnosticRow {
     (state): state is Extract<ChannelState, { kind: 'unavailable' }> => state.kind === 'unavailable',
   )
   if (unavailable.length === 0) {
-    return { key: 'subagent-channel', label: RUNTIME_LABELS['subagent-channel'] ?? '子代理通道', status: 'ok', detail: 'reviewer/maintainer 通道均可用（spawn provider + agentPreset 能力）' }
+    return { key: 'subagent-channel', label: RUNTIME_LABELS['subagent-channel'] ?? '子代理通道', status: 'ok', detail: '审阅与维护两条子代理通道均可用。' }
   }
   const reasons = unavailable.map(state => state.code + ': ' + state.reason)
   return {
@@ -142,10 +161,10 @@ function presetRow(presets: DoctorInputs['presets']): DiagnosticRow {
   const broken = entries.filter((entry): entry is PresetFacts => entry !== undefined && entry.broken !== undefined)
   const missing = entries.filter(entry => entry === undefined || !entry.registered)
   if (broken.length > 0) {
-    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'fail', detail: errorText('e-324-restricted-preset-unavailable', { a1: broken.map(entry => entry.broken ?? '').join('；') }), remedy: '重载插件行使 ensureRestrictedPreset 重新注册；运行 /evolution doctor 查看 preset id 与 allow 集合。' }
+    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'fail', detail: errorText('e-324-restricted-preset-unavailable', { a1: broken.map(entry => entry.broken ?? '').join('；') }), remedy: '重新加载家族插件；若仍失败，运行 /evolution doctor 查看详情。' }
   }
   if (missing.length > 0) {
-    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'warn', detail: '受限 preset 尚未注册（首次显式子代理运行时创建）。', remedy: '运行一次审阅/维护，或在挂载后运行 /evolution doctor。' }
+    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'warn', detail: '受限的只读模式尚未初始化（首次使用审阅或维护时自动创建）。', remedy: '运行一次审阅或维护，或稍后重新检查。' }
   }
   return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'ok', detail: REVIEWER_PRESET_ID + ' / ' + MAINTAINER_PRESET_ID + ' 均已注册' }
 }
@@ -188,8 +207,8 @@ function runtimeOf(inputs: DoctorInputs): DiagnosticRow[] {
     presetRow(inputs.presets),
     hostRow(inputs.host, inputs.hostRouteCount),
     fold
-      ? { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件 fold 单入口', status: 'ok', detail: 'classifySessionEvent/isIgnorableEvent 存在：model 消费，plugin-record/unknown 忽略。' }
-      : { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件 fold 单入口', status: 'fail', detail: '分类器缺失，无法证明单一 fold 入口。', remedy: '升级家族（classifySessionEvent 是 core 根导出）。' },
+      ? { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件 fold 单入口', status: 'ok', detail: '事件读取通道正常：对话内容会被读取，其余记录忽略。' }
+      : { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件 fold 单入口', status: 'fail', detail: '事件读取组件缺失，无法确认读取通道正常。', remedy: '重新安装完整功能包（evolution-all）。' },
     missing.length === 0
       ? { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务探测', status: 'ok', detail: '探测表中的服务均已挂载' }
       : { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务探测', status: 'warn', detail: '缺少：' + missing.join('、'), remedy: '安装行（evolution-host/evolution-all）或检查 profile 行。' },
@@ -198,8 +217,8 @@ function runtimeOf(inputs: DoctorInputs): DiagnosticRow[] {
       : { key: 'runs', label: RUNTIME_LABELS.runs ?? '运行登记', status: 'ok', detail: 'running=' + String(inputs.runs.running) + '，orphaned=0' },
     pairingRow(inputs),
     inputs.form.confidence === 'declared'
-      ? { key: 'install-form-detected', label: RUNTIME_LABELS['install-form-detected'] ?? '实际安装形态', status: 'ok', detail: inputs.form.id + '（声明）' }
-      : { key: 'install-form-detected', label: RUNTIME_LABELS['install-form-detected'] ?? '实际安装形态', status: 'warn', detail: inputs.form.id + '（推断：' + inputs.form.evidence.join('、') + '）', remedy: '在 profile 里显式声明安装行，核对 INSTALL 的形态表。' },
+      ? { key: 'install-form-detected', label: RUNTIME_LABELS['install-form-detected'] ?? '实际安装形态', status: 'ok', detail: FORM_WORDS[inputs.form.id] + '（已声明）' }
+      : { key: 'install-form-detected', label: RUNTIME_LABELS['install-form-detected'] ?? '实际安装形态', status: 'warn', detail: FORM_WORDS[inputs.form.id] + '（按已安装内容推断：' + inputs.form.evidence.join('、') + '）', remedy: '在 profile 里显式声明安装行，核对 INSTALL 的形态表。' },
   ]
   return rows.sort((a, b) => a.key.localeCompare(b.key))
 }

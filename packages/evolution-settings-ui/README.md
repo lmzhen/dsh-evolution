@@ -63,6 +63,13 @@ escaping as an unhandled rejection. `settle.ts` holds that one verdict function 
 uses; an unavailable preview prints the host's reason. A late answer for a row the reader already left is
 dropped rather than painted under another row's heading.
 
+## The diagnostics card
+
+One card in the same section is the read-only **self-check** (`data-card="diagnostics"`): it renders the Host's one `DiagnosticsView` — the same object the CLI and `/api/dsh-evolution/diagnostics` answer — and owns no key list and no status vocabulary.
+
+It leads with a plain-language verdict derived from the frozen runtime statuses (`运行正常` / `{n} 项需要注意` / `{n} 项异常` / `{n} 项待确认`, decided fail > warn > unknown > ok), then groups the view as **环境信息** (fact label above value) and **运行状态** (status dot and word, detail line, remedy line). The raw material — view schema, check time and each fact's source home — sits behind one **技术详情** disclosure, so the default reading path carries no identifiers.
+
+The card is collapsible with the same `.evolution-param-head` button and body inset as the parameter cards; Refresh is an explicit control in the body (one read on mount, one per click), and a failed read renders the shared failure block with the `/evolution doctor` command fallback.
 ## A seat that arrives late revives the card
 
 The seat is probed lazily (never captured at apply time), but probing alone only answers the NEXT read —
