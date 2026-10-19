@@ -14,7 +14,7 @@
  *
  * Usage: node gen-about.mjs <evolution-root> [--check]
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -29,7 +29,16 @@ const RELATIVE = 'evolution-settings-ui/src/client/generated-about.ts'
  * @returns the directory, or null when the tree does not carry one.
  */
 function repoRoot() {
-  for (const candidate of [join(HERE, '..', '..'), join(HERE, '..'), join(HERE, '..', '..', '..')]) {
+  for (const candidate of [
+    join(HERE, '..', '..'),
+    join(HERE, '..'),
+    join(HERE, '..', '..', '..'),
+    // CI overlay: <family-checkout>/upstream/packages/evolution/scripts; the family root is the
+    // workspace checkout, one level ABOVE the platform `upstream/` tree. Without this candidate the
+    // guard said "not armed" on exactly the layout that packs the release, so a stale constant could
+    // ship (measured: the 0.24.0 constant shipped through 0.27.2).
+    join(HERE, '..', '..', '..', '..'),
+  ]) {
     const file = join(candidate, 'package.json')
     if (!existsSync(file)) continue
     // The FAMILY root, not whatever repository happens to sit above the overlay: a CI build inside the
@@ -83,23 +92,35 @@ export function renderAbout(root) {
   ].join(String.fromCharCode(10))
 }
 
-const argv = process.argv.slice(2)
-const check = argv.includes('--check')
-const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
-const target = join(root, RELATIVE)
-const rendered = renderAbout(root)
-if (rendered === null) {
-  console.log('gen-about: not armed in this layout — no repository package.json above ' + HERE)
-  process.exit(0)
-}
-if (check) {
-  const current = existsSync(target) ? readFileSync(target, 'utf8') : ''
-  if (current !== rendered) {
-    console.error('gen-about: ' + target + ' is STALE (rerun without --check)')
-    process.exit(1)
+function main() {
+  const argv = process.argv.slice(2)
+  const check = argv.includes('--check')
+  const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
+  const target = join(root, RELATIVE)
+  const rendered = renderAbout(root)
+  if (rendered === null) {
+    console.log('gen-about: not armed in this layout — no repository package.json above ' + HERE)
+    process.exit(0)
   }
-  console.log('gen-about: OK — the client summary matches the repository version and the package description')
-  process.exit(0)
+  if (check) {
+    const current = existsSync(target) ? readFileSync(target, 'utf8') : ''
+    if (current !== rendered) {
+      console.error('gen-about: ' + target + ' is STALE (rerun without --check)')
+      process.exit(1)
+    }
+    console.log('gen-about: OK — the client summary matches the repository version and the package description')
+    process.exit(0)
+  }
+  writeFileSync(target, rendered)
+  console.log('gen-about: wrote ' + target)
 }
-writeFileSync(target, rendered)
-console.log('gen-about: wrote ' + target)
+
+// Import-safe: normalize-mirror imports renderAbout to regenerate the constant on a version bump.
+// realpath both sides: a CI workspace enters through a junction/symlink, so the invoked path and the
+// module URL differ while pointing at the same script. Keep main() OUTSIDE the try: a failure in the
+// guard check must not swallow a real error from the work.
+let invoked = false
+if (process.argv[1] !== undefined) {
+  try { invoked = realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url)) } catch { invoked = false }
+}
+if (invoked) main()

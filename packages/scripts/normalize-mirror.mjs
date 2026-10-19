@@ -28,6 +28,7 @@ import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { changelogHead } from './lib-changelog.mjs'
+import { renderAbout } from './gen-about.mjs'
 
 const packagesRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -98,3 +99,14 @@ if (failures.length > 0) {
 }
 
 console.log(`normalize-mirror: ${changed} manifest(s) aligned to ${VERSION}`)
+
+// A version bump is also a change to the GENERATED client constant (the settings about line).
+// Regenerating here keeps the bump one command; the CI guard (gen-about --check) stays the judge.
+const aboutTarget = join(packagesRoot, 'evolution-settings-ui/src/client/generated-about.ts')
+const about = renderAbout(packagesRoot)
+if (about === null) {
+  console.log('normalize-mirror: generated-about not armed in this layout — nothing to regenerate')
+} else if (!existsSync(aboutTarget) || readFileSync(aboutTarget, 'utf8') !== about) {
+  writeFileSync(aboutTarget, about)
+  console.log('normalize-mirror: regenerated generated-about.ts')
+}
