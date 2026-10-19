@@ -1,4 +1,9 @@
 # Changelog
+## 0.27.1 (patch) — doctor 文本面单源化（view-first）+ 遗留清理工具链
+
+> **范围**：0.27.0 发布后登记的六项遗留全部闭环，只有一项触及已发布包运行代码——`evolution-commands` 的 doctor 文本面改为 **view-first**：先输出 schema v2 诊断视图（7 facts + 8 runtime，与 `--json`、diagnostics 路由同一对象），再输出「补充检查」段承载 view 未覆盖的运行时事实（跨 profile bundles、服务推断、capability absence、scoped probe、legacy 设置文档、pending/executing、preset 新鲜度、冲突/环境/预算/参数/会话检索与 next steps）；删除与 view 重复的 install-form 旧行（单源渲染一次）。doctor/doctor-view/diagnostics-route 三 spec 60/60。
+> **工具链与证据（不发 npm 语义，随本次版本一并携带）**：W9 两轴补数据源（`verify-mutations --probes` 6/6 PROVEN RED + 签名台账，`verify-check-registry` 两轴实测）；expiry-due 20 行清零（gate-set `ciOnly`/`machineLocal` 永久登记，manifest 带 expiry 行=0）；S1 子会话工具集 A 级取证（真实 0.2.1 宿主 startActivation + 受限 preset，继承全局工具 ⊆ allow）；环境夹具可移植化（`lib-env.mjs`/`verify-env.mjs`，`env → workspace 候选 → 平台布局父级 → 文档默认`，默认值实证 alias 1006/1006、doctor.spec 42/42、sync copied=14）；客户端缺口闭环（plugins 行入口复测为安装形态差异：M1 bundle 形态在 Plugins 页 bundle 详情「配置 …」共 7 个行入口；新增 headless CDP console 取证工具，真实 3080 读数 consoleErrors=0/exceptions=0/logErrors=0）。
+> **验证**：本地 pre-tag 门禁（G0-6 清单）与 CI validate 全绿；doctor 三 spec 60/60；在役桌面面未改动。
 ## 0.27.0 (minor) — 适配 DSH 0.2.1-rc.2：家族宿主面/客户端/诊断/发布证据全面迁移收口
 
 > **范围**：平台兼容线抬到 `0.2.1-rc.2`（floor `0.2.1-rc.1`，upstream `dsh-v0.2.1-rc.2`）。这不是一次 patch：子代理通道换到新的 `connection.fetch`/`subagent` 面（E-323/E-324/E-325 三码归位）、宿主数据面收敛为 `HOST_ROUTES` 单源（4 surface / 12 endpoint，删 loopback fence 与 `webServer.register`）、三包宿主面与命令兜底落地、客户端生成接缝（15 个生成物）与四态包络/失败块/诊断卡/参数卡上线、doctor `--json` 与诊断路由同源为 `schemaVersion=2`（7 facts + 8 runtime）、W11 追账门禁（52 项 universe）与 W2/W3 release-evidence v2（spikes/faces/traceability/gates 四平面）落地。
