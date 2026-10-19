@@ -97,6 +97,8 @@ cells are the checklist for their own first real 0.1.5 install.
 
 ### What `/evolution doctor` reports
 
+文本面是 **view-first** 的：先给出诊断视图（schema v2：7 条文档事实 + 8 条运行时行，与 `--json`、`/api/dsh-evolution/diagnostics` 同一对象），随后是「补充检查」段，列出视图尚未覆盖的运行时事实（跨 profile 的 bundle、服务推断、capability absence、scoped-row 探针、legacy 设置文档、pending/executing、preset 新鲜度、冲突/环境/预算/参数/会话检索发现与 next steps）。`--json` 只输出该视图。
+
 | `deployment:` | Form | What a session gets |
 |---|---|---|
 | `variant` | ① layered (`host` + the generated Evolution preset) | family behaviour only in sessions that selected the family preset |

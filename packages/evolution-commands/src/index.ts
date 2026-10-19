@@ -30,7 +30,7 @@ import {
   errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
-import { diagnose, renderDiagnosticsText, renderDoctorText } from './doctor.ts'
+import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { PROFILE_PATCH_FILENAME, baseRefusalReason, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
 // G3: the write-path exclusion asks the ONE owner of <home>/profiles about THIS plane only.
@@ -1680,7 +1680,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // the diagnostics route/client card consume.
           if (input === 'doctor --json') return ok(JSON.stringify(report.view, null, 2))
           // G6/W8 tail: the text face ends with the SAME 7+8 view the diagnostics route answers.
-          return ok(renderDoctorText(report) + '\n' + renderDiagnosticsText(report.view))
+          return ok(renderDoctorText(report))
         }
         // T4-03 (P2): an UNMATCHED subcommand is an error. The old fallback answered
         // `kind: 'success'` with the full help text, so `/evolution approve` (no id),

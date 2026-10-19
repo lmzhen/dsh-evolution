@@ -488,9 +488,25 @@ describe('doctor (WB2, 0.3.55)', () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-render-'))
     try {
       const text = renderDoctorText(await diagnose(stub, { home }))
-      expect(text).toContain('install form: none')
+      expect(text).toContain('安装形态：')
       expect(text).toContain('next steps:')
       expect(text).toContain('dsh plugin --profile web add @lmzhen/dsh-evolution-all')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('W8-S7: the text face is view-first and the install form renders exactly once', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'doctor-view-first-'))
+    try {
+      const text = renderDoctorText(await diagnose(stub, { home }))
+      // The frozen view is the first section; the legacy facts follow as supplement.
+      expect(text.startsWith('诊断（schema v2')).toBe(true)
+      expect(text).toContain('补充检查（view 未覆盖的运行时事实）：')
+      // The legacy duplicate install-form line is gone; the view fact is its only text home.
+      expect(text).not.toContain('Evolution doctor — install form:')
+      // The view fact line is the only '安装形态：' home; the runtime row is '实际安装形态：'.
+      expect(text.split('  - 安装形态：').length - 1).toBe(1)
     } finally {
       await rm(home, { recursive: true, force: true })
     }

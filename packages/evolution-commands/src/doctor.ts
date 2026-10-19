@@ -1015,40 +1015,46 @@ function legacyLine(row: LegacyMigrationRow): string {
   return `legacy settings: ${row.pending.length} family value(s) still on ${row.source ?? '(unknown)'}: ${shown}${more} — /evolution migrate moves them`
 }
 
+/**
+ * W8-S7: the doctor's text face, VIEW-FIRST.
+ *
+ * The frozen DiagnosticsView (7 facts + 8 runtime rows) is the single text source for everything
+ * it carries — install form, platform services, runs, channel/preset/host/pairing. The legacy
+ * report now contributes only the facts the view does not represent yet: cross-profile bundles,
+ * the family service inference, capability absence, the scoped-row probe, the legacy settings
+ * document, pending/executing audit records, preset freshness, and the conflict/env/budget/
+ * parameter/session-search findings + next steps. This is the W8-S7 rewrite branch: the text face
+ * has real consumers (the `/evolution doctor` command, README/INSTALL, doctor.spec), so the legacy
+ * rendering was rewritten instead of deleted — but every fact the view owns renders from the view
+ * exactly once (the legacy install-form line is gone).
+ * @param report - the assembled report (view + legacy findings).
+ * @returns the text face.
+ */
 export function renderDoctorText(report: DoctorReport): string {
-  // `null` marks a line this report does not carry (a fact that is not true here); the join drops it.
-  const lines: (string | null)[] = [
-    `Evolution doctor — install form: ${report.installForm} (deployment: ${report.deploymentForm}; from ${report.formSource === 'platform' ? "this runtime's bundle surface" : 'the cross-profile aggregate'})`,
-    // G5: the RUNNING profile's own bundle list, from the platform. `unknown` is a verdict, not
-    // an empty list: a trimmed base without `pluginManager` must not read as "no bundles".
-    report.runtimeBundles === null
-      ? 'runtime bundles: unknown — the platform bundle surface (pluginManager.listBundles) is not mounted here'
-      : `runtime bundles (this profile): ${report.runtimeBundles.length > 0 ? report.runtimeBundles.join(', ') : '(none)'}`,
-    report.dormantBundles.length === 0
-      ? null
-      : `installed but not selected: ${report.dormantBundles.join(', ')} — the Plugins page lists them; this runtime mounts neither`,
-    `bundles (all profiles): ${report.bundles.length > 0 ? report.bundles.join(', ') : '(none)'}`,
-    // v29 DOC-01: `review` is INFERRED from installed bundles across all
-    // profiles (no runtime probe exists) — the render now says so, per the
-    // docblock's promise, so a multi-profile machine cannot pass disk evidence
-    // off as a mounted service.
-    `services: review=${report.services.review} (${report.serviceSource === 'platform' ? 'the live row, this runtime' : 'inferred from bundles, all profiles'}) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`,
-    // S0-4 (v43 G-1 / J-1): appended beside the service line it qualifies; the
-    // existing lines keep their order and wording.
-    // O-2 (S3.4/A99): one line, only when a capability the family uses is missing. Each entry names
-    // the feature that goes quiet, because "service X is absent" alone does not tell a reader what
-    // they are losing.
-    report.capabilityAbsence.length === 0
-      ? null
-      : `capability absence (${report.capabilityAbsence.length}): ${report.capabilityAbsence.map(entry => `${entry.service} — ${entry.feature}`).join('; ')}`,
-    scopedProbeLine(report.scopedProbe),
-    legacyLine(report.legacy),
-    `pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`,
-    `executing: ${report.executingCount === null ? 'unknown' : report.executingCount}`,
-  ]
-  // G3-② (B2): one line per variant that EXISTS. `absent` rows are omitted —
-  // every base this deployment does not install would otherwise claim a line
-  // about a variant nobody chose; the report data keeps them for --json.
+  const extras: string[] = []
+  // G5: the RUNNING profile's own bundle list, from the platform. `unknown` is a verdict, not
+  // an empty list: a trimmed base without `pluginManager` must not read as "no bundles".
+  extras.push(report.runtimeBundles === null
+    ? 'runtime bundles: unknown — the platform bundle surface (pluginManager.listBundles) is not mounted here'
+    : `runtime bundles (this profile): ${report.runtimeBundles.length > 0 ? report.runtimeBundles.join(', ') : '(none)'}`)
+  if (report.dormantBundles.length > 0) extras.push(`installed but not selected: ${report.dormantBundles.join(', ')} — the Plugins page lists them; this runtime mounts neither`)
+  extras.push(`bundles (all profiles): ${report.bundles.length > 0 ? report.bundles.join(', ') : '(none)'}`)
+  // v29 DOC-01: `review` is INFERRED from installed bundles across all profiles (no runtime probe
+  // exists) — the render says so, so a multi-profile machine cannot pass disk evidence off as a
+  // mounted service. The view's platform-services row only names MISSING probed services, not this
+  // family-specific inference, so the line stays here.
+  extras.push(`services: review=${report.services.review} (${report.serviceSource === 'platform' ? 'the live row, this runtime' : 'inferred from bundles, all profiles'}) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`)
+  // O-2 (S3.4/A99): one line, only when a capability the family uses is missing. Each entry names
+  // the feature that goes quiet, because "service X is absent" alone does not tell a reader what
+  // they are losing.
+  if (report.capabilityAbsence.length > 0) extras.push(`capability absence (${report.capabilityAbsence.length}): ${report.capabilityAbsence.map(entry => `${entry.service} — ${entry.feature}`).join('; ')}`)
+  extras.push(scopedProbeLine(report.scopedProbe))
+  extras.push(legacyLine(report.legacy))
+  extras.push(`pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`)
+  extras.push(`executing: ${report.executingCount === null ? 'unknown' : report.executingCount}`)
+  // G3-② (B2): one line per variant that EXISTS. `absent` rows are omitted — every base this
+  // deployment does not install would otherwise claim a line about a variant nobody chose; the
+  // report data keeps them for programmatic readers.
   for (const row of report.presetFreshness) {
     if (row.status === 'absent') continue
     const verdict = row.status === 'fresh'
@@ -1056,27 +1062,24 @@ export function renderDoctorText(report: DoctorReport): string {
       : row.status === 'differs'
         ? 'DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate'
         : `unknown — a fresh generation could not be recomputed (${row.detail ?? 'reason not recorded'})`
-    lines.push(`preset:   ${row.base} → ${row.destination}  ${verdict}`)
+    extras.push(`preset:   ${row.base} → ${row.destination}  ${verdict}`)
   }
-  if (report.presetIssues.length > 0) lines.push('agent presets:', ...report.presetIssues.map(line => `  ! ${line}`))
-  if (report.foreignProfiles.length > 0) {
-    lines.push('profiles-foreign: ' + report.foreignProfiles.join(', ') + ' — not part of this plane: /evolution preset install ignores them, while the bundles (all profiles) line above counts them')
-  }
-  if (report.conflicts.length > 0) lines.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
-  if (report.envIssues.length > 0) lines.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
-  if (report.budgetIssues.length > 0) lines.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
-  if (report.paramIssues.length > 0) lines.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
-  if (report.queryIssues.length > 0) lines.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
-  if (report.actions.length > 0) lines.push('next steps:', ...report.actions.map(line => `  → ${line}`))
-  return lines.filter((line): line is string => line !== null).join('\n')
+  if (report.presetIssues.length > 0) extras.push('agent presets:', ...report.presetIssues.map(line => `  ! ${line}`))
+  if (report.foreignProfiles.length > 0) extras.push('profiles-foreign: ' + report.foreignProfiles.join(', ') + ' — not part of this plane: /evolution preset install ignores them, while the bundles (all profiles) line above counts them')
+  if (report.conflicts.length > 0) extras.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
+  if (report.envIssues.length > 0) extras.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
+  if (report.budgetIssues.length > 0) extras.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
+  if (report.paramIssues.length > 0) extras.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
+  if (report.queryIssues.length > 0) extras.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
+  if (report.actions.length > 0) extras.push('next steps:', ...report.actions.map(line => `  → ${line}`))
+  return renderDiagnosticsText(report.view).trimEnd() + '\n\n补充检查（view 未覆盖的运行时事实）：\n' + extras.join('\n')
 }
-
 /**
  * G6/W8 tail: render the frozen DiagnosticsView as the doctor's diagnostics section.
  *
  * This is the ONE text face of the 7+8 rows: the same object `--json` and the diagnostics route
- * answer, so the three readers cannot disagree. Legacy install/conflict sections keep their own
- * renderer until the remaining W8-S7 rewrite lands.
+ * answer, so the three readers cannot disagree. The legacy report only adds the facts this frozen
+ * view does not carry yet (see renderDoctorText).
  * @param view - the assembled view.
  * @returns the section text (ends with a newline).
  */

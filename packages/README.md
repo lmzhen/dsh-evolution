@@ -137,7 +137,7 @@ pins the equality).
 | `/evolution approve <id>` | 执行一条已批准的写入 |
 | `/evolution reject <id>` | 丢弃一条暂存写入，不执行 |
 | `/evolution release <id>` | 把卡在执行中的写入放回待批窗口（先确认效果再批准或驳回） |
-| `/evolution doctor [--json]` | 只读自检：安装形态、冲突、环境、服务（--json 供脚本用） |
+| `/evolution doctor [--json]` | 只读自检：view-first（schema v2 诊断视图 + 补充检查：安装形态、冲突、环境、服务）；`--json` 只输出诊断视图 |
 | `/evolution curator run\|pause\|resume\|status\|report\|scope` | 立即运行一次自动整理，或暂停／恢复／查看状态 |
 | `/evolution mutations` | 列出技能改动记录 |
 | `/evolution restore` | 从最近的快照恢复技能 |
