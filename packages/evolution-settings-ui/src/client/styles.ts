@@ -96,7 +96,6 @@ export const CSS = [
   '.evo-diag-item{padding:var(--evo-space-12) 0}',
   '.evo-diag-item+.evo-diag-item{border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
   '.evo-diag-label{display:block;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
-  '.evo-diag-value{display:block;margin:var(--evo-space-2) 0 0;color:var(--dsw-alias-label-primary);font-size:var(--evo-type-sm);line-height:var(--evo-leading-base);overflow-wrap:anywhere}',
   '.evo-diag-row-head{display:flex;align-items:baseline;gap:var(--evo-space-6);flex-wrap:wrap}',
   '.evo-diag-dot{width:var(--evo-space-6);height:var(--evo-space-6);border-radius:var(--evo-radius-pill);background:var(--evo-diag-tone,var(--dsw-alias-state-idle-primary));flex:none}',
   '.evo-diag-status{color:var(--evo-diag-tone,var(--dsw-alias-state-idle-primary));font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
@@ -106,13 +105,6 @@ export const CSS = [
   '.evo-diag-item[data-status="unknown"]{--evo-diag-tone:var(--dsw-alias-state-idle-primary)}',
   '.evo-diag-detail{display:block;margin:var(--evo-space-2) 0 0;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base);overflow-wrap:anywhere}',
   '.evo-diag-remedy{display:block;margin:var(--evo-space-4) 0 0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
-  '.evo-diag-meta{margin:var(--evo-space-12) 0 0;padding-top:var(--evo-space-8);border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
-  '.evo-diag-meta>summary{cursor:pointer;user-select:none;padding:var(--evo-space-4) 0}',
-  '.evo-diag-meta-body{display:flex;flex-direction:column;gap:var(--evo-space-2);padding:var(--evo-space-4) 0 0}',
-  '.evo-diag-sources-title{padding-top:var(--evo-space-6)}',
-  '.evo-diag-source{display:flex;justify-content:space-between;gap:var(--evo-space-8);overflow-wrap:anywhere}',
-  '.evo-diag-source-label{flex:none}',
-  '.evo-diag-source-home{text-align:right;overflow-wrap:anywhere}',
 ].join('\n')
 
 /** The slice of the DOM the injection touches (this package typechecks without DOM lib). */

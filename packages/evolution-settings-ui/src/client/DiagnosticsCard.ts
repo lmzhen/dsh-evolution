@@ -1,13 +1,13 @@
 /**
- * The diagnostics card (W7 S7): the browser face of the SAME DiagnosticsView the CLI and the
+ * The diagnostics card (W7 S7): the settings face of the SAME DiagnosticsView the CLI and the
  * `/api/dsh-evolution/diagnostics` route answer.
  *
  * Read-only by construction: it fetches once on mount and only refetches on an explicit Refresh; a
- * failed read renders the shared FailureBlock with the command-face fallback. The client still owns
- * no key list and no status vocabulary: it renders the host view's own order, groups the two
- * sections the view carries (environment facts / runtime rows) and gives a plain-language summary
- * from the frozen status set. Raw identifiers, source paths and the view schema live behind the
- * one `技术详情` disclosure, not in the main reading path.
+ * failed read renders the shared FailureBlock with the command-face fallback. The client owns no
+ * key list and no status vocabulary: it renders the host view's frozen runtime rows and leads with
+ * a plain-language summary. The view's documentation facts are a CLI/JSON concern and are
+ * deliberately NOT rendered here (0.27.2 real-machine feedback: a settings page is not a spec
+ * sheet; the runtime window is the whole reading).
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/DiagnosticsCard
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -50,13 +50,6 @@ function summaryOf(rows: readonly DiagnosticRow[]): { status: DiagnosticRow['sta
   return { status: 'ok', count: 0 }
 }
 
-/** A locally formatted check time; an unparseable stamp stays visible instead of becoming NaN. */
-function checkedAt(iso: string): string {
-  try {
-    const at = new Date(iso)
-    return Number.isNaN(at.getTime()) ? iso : at.toLocaleString()
-  } catch { return iso }
-}
 
 /**
  * Render the card.
@@ -104,17 +97,6 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   }, t(SUMMARY_KEYS[summary.status], summary.count === 0 ? undefined : { n: summary.count })),
   createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼'),
   )
-  const facts = (view: DiagnosticsView): ReactNode => view.facts.length === 0 ? null : createElement('div', {},
-    createElement('h3', { className: 'evolution-param-group' }, t('diagFactsTitle')),
-    createElement('div', { className: 'evo-diag-list' }, ...view.facts.map(fact => createElement('div', {
-      key: 'fact-' + fact.key,
-      className: 'evo-diag-item',
-      'data-kind': 'fact',
-    },
-    createElement('span', { className: 'evo-diag-label' }, fact.label),
-    createElement('span', { className: 'evo-diag-value' }, fact.value),
-    ))),
-  )
   const runtime = (view: DiagnosticsView): ReactNode => view.runtime.length === 0 ? null : createElement('div', {},
     createElement('h3', { className: 'evolution-param-group' }, t('diagRuntimeTitle')),
     createElement('div', { className: 'evo-diag-list' }, ...view.runtime.map(row => createElement('div', {
@@ -132,18 +114,6 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
     row.remedy === undefined ? null : createElement('span', { className: 'evo-diag-remedy' }, t('diagRemedy') + row.remedy),
     ))),
   )
-  const details = (view: DiagnosticsView): ReactNode => createElement('details', { className: 'evo-diag-meta' },
-    createElement('summary', {}, t('diagDetails')),
-    createElement('div', { className: 'evo-diag-meta-body' },
-      createElement('span', {}, t('diagCheckedAt', { at: checkedAt(view.generatedAt) })),
-      createElement('span', {}, t('diagSchema', { n: view.schemaVersion })),
-      view.facts.length === 0 ? null : createElement('span', { className: 'evo-diag-sources-title' }, t('diagSourcesTitle')),
-      ...view.facts.map(fact => createElement('span', { key: 'source-' + fact.key, className: 'evo-diag-source' },
-        createElement('span', { className: 'evo-diag-source-label' }, fact.label),
-        createElement('span', { className: 'evo-diag-source-home' }, fact.home),
-      )),
-    ),
-  )
   const body = (): ReactNode => {
     if (state.phase === 'loading') return createElement('p', { className: 'evolution-param-loading' }, t('stateLoading'))
     if (state.phase === 'failed') return FailureBlock({ failure: state.failure, t: translate, fallback: props.fallback })
@@ -153,9 +123,8 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
       createElement('div', { className: 'evolution-param-actions' },
         createElement('button', { type: 'button', className: 'evolution-param-button', onClick: refresh, 'data-action': 'diag-refresh' }, t('diagRefresh')),
       ),
-      facts(view),
       runtime(view),
-      details(view),
+      view.runtime.length === 0 ? createElement('p', { className: 'evolution-param-note' }, t('diagNoRows')) : null,
     )
   }
   return createElement('section', { className: 'evolution-param-card', 'data-card': 'diagnostics' }, header,

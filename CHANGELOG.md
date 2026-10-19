@@ -1,4 +1,8 @@
 # Changelog
+## 0.27.3 (patch) — 设置页诊断卡只留运行状态（环境信息退出 UI）+ 设置页版本行修复
+
+> **范围**：①**设置面收紧**（0.27.2 真机反馈）：诊断卡不再渲染 `DiagnosticsView` 的 facts（命令兜底/家族版本/安装形态/平台兼容线/受限预设/只读说明/升级顺序），只保留运行状态（摘要徽标 + 运行状态行 + 刷新）；这些事实仍由 CLI `doctor`、`doctor --json` 与 diagnostics 路由承载，属审计材料而非设置页内容。随 facts 一起移除「技术详情」折叠及对应文案/样式；空 runtime 显式给「没有可显示的运行状态」，加载/失败/刷新行为不变。②**设置页版本行修复**：`generated-about.ts` 自 0.24.0 起未再生，且 CI 的 `gen-about --check` 在发布 overlay 布局误判 not armed，使 0.24.0→0.27.2 的设置页 about 行一直显示旧版本；修复为探针识别 workspace 根、入口 import-safe（realpath 比较，main 在 try 外）、`normalize-mirror` 在 bump 时同步重生成该常量（忠实 CI 布局验证：新树 check 通过、篡改常量后 exit 1）。
+> **验证**：settings-ui 21 files / 80 tests 与 commands doctor 系列 60 tests 全绿；`verify-client-ui-i18n`（42 client source files）、`verify-client-tokens`、`build-lib` 全绿；本地 pre-tag 门禁按 CI action 步骤逐条复跑（`bash -e -o pipefail`）全绿；真机验收：web 3080 升级 0.27.3 后设置页诊断卡只显示运行状态，about 行版本与本版一致。
 ## 0.27.2 (patch) — 诊断卡重设计（普通读者可读、与同节卡片对齐）+ 宿主视图值白话化
 
 > **范围**：0.27.1 用户反馈的两条界面缺陷。①**对齐与可读性**：`evolution-settings-ui` 的诊断卡头用了 stylesheet 中不存在的 `.evolution-param-card-head`，且 `evo-diag-*` 没有任何规则，事实/运行时行退化为裸 inline（标签、值、`出处：path` 连成一行，body 无内缩）；重建为与参数卡/待批卡同构的折叠头（标题 + 摘要徽标 + chevron）与 body 内缩，事实改「标签上、值下」，运行态改「状态点 + 状态词 / 详情 / 建议」，原始材料（schema、检查时间、每条数据来源）收进「技术详情」折叠。②**普通读者可接受性**：`evolution-commands` 的 7 条诊断事实值与 8 条运行时标签改为白话（`M1` → `完整功能包（安装内容已声明）`、`floor` → `最低兼容`、preset id 串 → `审阅 / 维护两个受限只读预设`；推断态保留证据串），CLI/JSON/浏览器三面同源更新；卡片先给结论（运行正常 / N 项需要注意 / N 项异常 / N 项待确认），状态色用平台 alias 且始终配文字。

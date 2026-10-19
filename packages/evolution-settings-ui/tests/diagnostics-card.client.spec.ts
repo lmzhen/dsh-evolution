@@ -2,12 +2,12 @@
 // @vitest-environment jsdom
 /**
  * G5/W7 S7: the diagnostics card RENDERED. It is read-only and renders the Host's ONE view:
- * loading says so, a ready view leads with a plain-language summary and groups the facts
- * (environment) and runtime rows (status word + detail + remedy), a failed read uses the shared
- * FailureBlock + the command fallback, and Refresh is the only thing that reads again.
+ * loading says so, a ready view leads with a plain-language runtime summary, a failed read uses the
+ * shared FailureBlock + the command fallback, and Refresh is the only thing that reads again.
  *
- * The technical material (schema version, check time, per-fact source paths) sits behind the
- * `Technical details` disclosure so the default reading path carries no raw identifiers.
+ * The view's documentation facts are a CLI/JSON concern: the settings face carries the runtime
+ * window only (0.27.2 real-machine feedback — a settings page is not a spec sheet). The fixture
+ * still carries facts so the test proves they are deliberately not rendered.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -40,28 +40,25 @@ afterEach(() => {
 })
 
 describe('diagnostics card', () => {
-  it('renders loading first, then a summary plus the grouped environment and runtime readings', async () => {
+  it('renders loading first, then a summary plus the runtime rows — and never the view facts', async () => {
     let resolve: ((answer: RouteAnswer<DiagnosticsView>) => void) | undefined
     const api = { view: vi.fn(() => new Promise<RouteAnswer<DiagnosticsView>>((done) => { resolve = done })) }
     render(createElement(DiagnosticsCard, { t, api, fallback: FALLBACKS.diagnostics }))
     expect(screen.getByText('reading…')).toBeTruthy()
     await act(async () => { resolve?.(ok(view)) })
-    await waitFor(() => { expect(screen.getByText('Environment')).toBeTruthy() })
-    // The card leads with the plain-language verdict, not with the raw view envelope.
+    await waitFor(() => { expect(screen.getByText('Runtime status')).toBeTruthy() })
+    // The card leads with the plain-language verdict.
     expect(screen.getByText('1 need attention')).toBeTruthy()
-    // Facts: label above value, grouped under Environment.
-    // The label appears twice by design: once in the reading, once in the source list behind details.
-    expect(screen.getAllByText('平台兼容线')).toHaveLength(2)
-    expect(screen.getByText('0.2.1-rc.2（floor 0.2.1-rc.1）')).toBeTruthy()
-    // Runtime: frozen status words and a warn row's remedy.
-    expect(screen.getByText('Runtime status')).toBeTruthy()
+    // Runtime rows: frozen status words, detail lines and a warn row's remedy.
     expect(screen.getByText('needs attention')).toBeTruthy()
+    expect(screen.getByText('orphaned=1')).toBeTruthy()
     expect(screen.getByText('Suggested: /evolution runs')).toBeTruthy()
-    // The raw identifiers live behind the one disclosure: schema + source paths + check time.
-    expect(screen.getByText('Technical details')).toBeTruthy()
-    expect(screen.getByText('data version v2')).toBeTruthy()
-    expect(screen.getByText('README.md（兼容线声明）')).toBeTruthy()
-    expect(screen.getByText(/^Checked: /)).toBeTruthy()
+    // The documentation facts (labels, values, homes) stay off the settings face.
+    expect(screen.queryByText('Environment')).toBeNull()
+    expect(screen.queryByText('平台兼容线')).toBeNull()
+    expect(screen.queryByText('0.2.1-rc.2（floor 0.2.1-rc.1）')).toBeNull()
+    expect(screen.queryByText('README.md（兼容线声明）')).toBeNull()
+    expect(screen.queryByText('Technical details')).toBeNull()
   })
 
   it('renders an all-healthy summary when every runtime row is ok', async () => {
@@ -72,6 +69,12 @@ describe('diagnostics card', () => {
     const api = { view: vi.fn(async () => ok(healthy)) }
     render(createElement(DiagnosticsCard, { t, api, fallback: FALLBACKS.diagnostics }))
     await waitFor(() => { expect(screen.getByText('All healthy')).toBeTruthy() })
+  })
+
+  it('says so when the view carries no runtime row', async () => {
+    const api = { view: vi.fn(async () => ok({ ...view, runtime: [] })) }
+    render(createElement(DiagnosticsCard, { t, api, fallback: FALLBACKS.diagnostics }))
+    await waitFor(() => { expect(screen.getByText('no runtime status to show')).toBeTruthy() })
   })
 
   it('renders a failed read as the shared failure block with the command fallback', async () => {
