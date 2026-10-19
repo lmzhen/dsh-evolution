@@ -92,27 +92,32 @@
     },
     "clientConsole": {
       "face": "web",
-      "version": "0.27.1",
+      "version": "0.27.2",
       "host": "127.0.0.1:3080",
       "chrome": "Chrome/155.0.8059.82",
       "steps": [
         "home",
         "settings-evolution",
-        "plugins-bundle-detail"
+        "diagnostics-card"
       ],
       "consoleErrors": 0,
       "exceptions": 0,
-      "logErrors": 0,
       "diagnostics": {
         "schemaVersion": 2,
         "facts": 7,
         "runtime": 8
       },
-      "familyVersionFact": "0.27.1",
-      "installForm": "M1（declared）",
+      "familyVersionFact": "0.27.2",
+      "installForm": "完整功能包（安装内容已声明）",
+      "diagnosticsCard": {
+        "badge": "1 项需要注意",
+        "technicalDetails": "技术详情",
+        "oldSchemaOrSourcePresent": false,
+        "refreshWorks": true
+      },
       "rowConfigEntries": 7,
-      "evidence": "execution/assets/client-console-3080-0.27.1.json",
-      "evidenceScript": "packages/scripts/capture-client-console.mjs"
+      "evidence": "execution/assets/real-machine-0.27.2/real-machine-0.27.2.json",
+      "evidenceScript": "real-machine verification script (CDP): diagnostics API + settings card render/refresh"
     }
   }
 }
