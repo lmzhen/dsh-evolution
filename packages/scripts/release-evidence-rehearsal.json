@@ -89,6 +89,29 @@
       "M2": "pass",
       "M3": "pass",
       "M4": "pass"
+    },
+    "clientConsole": {
+      "face": "web",
+      "version": "0.27.0",
+      "host": "127.0.0.1:3080",
+      "chrome": "Chrome/155.0.8059.82",
+      "steps": [
+        "home",
+        "settings-evolution",
+        "plugins-bundle-detail"
+      ],
+      "consoleErrors": 0,
+      "exceptions": 0,
+      "logErrors": 0,
+      "diagnostics": {
+        "schemaVersion": 2,
+        "facts": 7,
+        "runtime": 8
+      },
+      "installForm": "M1（declared）",
+      "rowConfigEntries": 7,
+      "evidence": "execution/assets/client-console-3080-2026-10-19.json",
+      "evidenceScript": "packages/scripts/capture-client-console.mjs"
     }
   }
 }
