@@ -24,6 +24,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { probeSignature } from './lib-probes.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const TREE = resolve(HERE, '..')
@@ -104,15 +105,61 @@ for (const [axis, criterion] of [['executability', 'executability'], ['no-placeh
   if (entry.rows !== live) { addAxis(axis, live, 'fail', 'the register says ' + entry.rows + ' row(s), the live observation says ' + live + ' (drift: the debt changed size)'); continue }
   addAxis(axis, live, 'registered', 'registered until ' + entry.expiry + ' (owner ' + entry.owner + ')')
 }
-for (const axis of ['mutation-coverage', 'producer-wiring']) {
+// ── measured axes (W9 S4): both now have a data source, so a live gap is a debt, not prose ──
+const addMeasuredAxis = (axis, live, detail) => {
   const entry = registeredOf(axis)
-  // P2-③ (release review 2026-10-15): both branches used to answer cannot-decide, so an axis with a
-  // REGISTERED owner and expiry was indistinguishable from one nobody had looked at - it could never
-  // become a debt. Registered now reads as registered (owner + expiry), unregistered stays cannot-decide.
-  const state = entry === undefined ? 'cannot-decide' : 'registered'
-  const why = entry === undefined ? 'no data source and no register entry' : 'no data source; registered until ' + entry.expiry + ' (owner ' + entry.owner + ')'
-  addAxis(axis, entry === undefined ? null : entry.rows, state, why)
+  if (live === 0) { addAxis(axis, 0, 'pass', detail); return }
+  if (entry === undefined) { addAxis(axis, live, 'fail', detail + ' — the gap is not registered (a bare number is not a debt)'); return }
+  if (entry.rows !== live) { addAxis(axis, live, 'fail', 'the register says ' + entry.rows + ' row(s), the live observation says ' + live + ' — ' + detail); return }
+  addAxis(axis, live, 'registered', 'registered until ' + entry.expiry + ' (owner ' + entry.owner + '): ' + detail)
 }
+// mutation-coverage: the probe registry is covered when every probe's current bytes (spec set +
+// fixture) are named by a ledger record proven red by `verify-mutations --probes`. A record whose
+// signature no longer matches is stale evidence, exactly like a moved mutation anchor.
+const ledgerPath = join(HERE, 'reports', 'mutation-coverage.json')
+let ledgerRecords = []
+let ledgerProblem = null
+try {
+  const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'))
+  ledgerRecords = Array.isArray(ledger.records) ? ledger.records : []
+  if (ledgerRecords.length === 0) ledgerProblem = 'ledger ' + ledgerPath + ' has no records - run verify-mutations --probes'
+} catch (error) { ledgerProblem = 'ledger unreadable (' + (error instanceof Error ? error.message : String(error)) + ') - run verify-mutations --probes' }
+const probeRegistry = Array.isArray(manifest.probes) ? manifest.probes : []
+const PROBE_ROOT = resolve(HERE, '..')
+const ledgerByProbe = new Map(ledgerRecords.filter((record) => record !== null && typeof record === 'object').map((record) => [record.probe, record]))
+const uncoveredProbes = probeRegistry.filter((probe) => {
+  const record = ledgerByProbe.get(probe.id)
+  if (record === undefined || typeof record.signature !== 'string') return true
+  try { return probeSignature(PROBE_ROOT, probe) !== record.signature } catch { return true }
+})
+addMeasuredAxis('mutation-coverage', ledgerProblem === null ? uncoveredProbes.length : probeRegistry.length,
+  ledgerProblem === null
+    ? 'ledger signatures match ' + String(probeRegistry.length - uncoveredProbes.length) + '/' + String(probeRegistry.length) + ' probe(s)' + (uncoveredProbes.length === 0 ? '' : ' — stale/missing: ' + uncoveredProbes.map((probe) => probe.id).slice(0, 8).join(','))
+    : ledgerProblem)
+// producer-wiring: every `requires` producer a check declaration names must be wired somewhere a
+// reader can find it — a manifest row (producer row) or the CI action that runs before the check.
+const actionText = (() => {
+  for (let dir = TREE; ; ) {
+    const candidate = join(dir, '.github', 'actions', 'evolution-validate', 'action.yml')
+    if (existsSync(candidate)) return readFileSync(candidate, 'utf8')
+    const up = resolve(dir, '..')
+    if (up === dir) return null
+    dir = up
+  }
+})()
+const wiredScripts = new Set()
+for (const row of rows) for (const text of [row.human, row.reason, Array.isArray(row.argv) ? row.argv.join(' ') : '']) if (typeof text === 'string') for (const match of text.matchAll(/[A-Za-z0-9._-]+\.mjs/g)) wiredScripts.add(match[0])
+if (actionText !== null) for (const match of actionText.matchAll(/[A-Za-z0-9._-]+\.mjs/g)) wiredScripts.add(match[0])
+const unwiredProducers = []
+for (const declaration of declarations) for (const requirement of Array.isArray(declaration.requires) ? declaration.requires : []) {
+  if (typeof requirement?.script !== 'string' || requirement.script === '') continue
+  const scriptName = requirement.script.split('/').pop()
+  if (!wiredScripts.has(scriptName)) unwiredProducers.push(declaration.id + ':' + scriptName)
+}
+addMeasuredAxis('producer-wiring', unwiredProducers.length,
+  unwiredProducers.length === 0
+    ? 'every requires-producer is wired by a manifest row or the CI action'
+    : 'unwired producers: ' + unwiredProducers.slice(0, 10).join(','))
 // not be identified from the log. Print the observations of every failing axis (the meta-gate's
 // own entries, verbatim) so the next run names the rows instead of leaving a bare number.
 for (const axis of axes) {

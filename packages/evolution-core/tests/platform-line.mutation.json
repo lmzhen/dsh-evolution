@@ -3,8 +3,8 @@
   "edits": [
     {
       "file": "packages/evolution-core/src/platform-line.generated.ts",
-      "find": "\"peersRange\": \"^0.2.1-rc.1\"",
-      "replace": "\"peersRange\": \"^0.2.2-rc.1\""
+      "find": "peersRange: '^0.2.1-rc.1',",
+      "replace": "peersRange: '^0.2.2-rc.1',"
     }
   ],
   "expect": "red",

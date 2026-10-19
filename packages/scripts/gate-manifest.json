@@ -736,7 +736,7 @@
     {
       "id": "gate-48",
       "kind": "script",
-      "human": "`node packages/scripts/verify-check-registry.mjs packages --strict`（七轴总账：闭包／可执行性／到期／mutation 覆盖／生产者接线／真空证伪／占位符——**在册的轴计数与实测不符即红**，到期项未施加亦红）",
+      "human": "`node packages/scripts/verify-check-registry.mjs packages --strict`（七轴总账：闭包／可执行性／到期／**mutation 覆盖（读 reports/mutation-coverage.json 的签名台账，6 探针逐条）**／**生产者接线（每条 check.requires 的 producer 必须有 manifest 行或 CI action 执行）**／真空证伪／占位符——在册的轴计数与实测不符即红，闭包破了即红）",
       "argv": [
         "node",
         "packages/scripts/verify-check-registry.mjs",
@@ -752,7 +752,7 @@
     {
       "id": "gate-49",
       "kind": "script",
-      "human": "`node packages/scripts/verify-mutations.mjs --coverage`（G5/1 变异库：每条 check 需 `checkMutations` 记录，缺／残 ⇒ **cannot-decide ＋ exit 2**；`--only <id>` 现场打补丁→跑→断言语义→**还原并校验哈希**，`--self-test` 必须抓出等值 mutation 与矛盾期望）",
+      "human": "`node packages/scripts/verify-mutations.mjs --coverage`（G5/1 变异库：每条 check 需 `checkMutations` 记录，缺／残 ⇒ cannot-decide；`--only <id>` 现场打补丁→跑→断言语义→还原并校验哈希；`--self-test` 必须抓出等值 mutation 与矛盾期望，抓出即 **exit 0**；`--probes [--only <probe>] [--list] [--ledger <path>] [--no-stamp]` 逐条执行 `probes.json` 的 mutation fixture：快照→应用→探针必红→还原校验→写 `reports/mutation-coverage.json` 签名台账）",
       "argv": [
         "node",
         "packages/scripts/verify-mutations.mjs",

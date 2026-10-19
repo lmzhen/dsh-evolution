@@ -3,10 +3,10 @@
   "edits": [
     {
       "file": "packages/evolution-core/src/http-routes.ts",
-      "find": "rows: '/api/dsh-evolution/skill-health/rows'",
-      "replace": "rows: '/api/dsh-evolution/skill-health/row'"
+      "find": "rows: '/api/dsh-evolution/skill-health/rows',",
+      "replace": "rows: '/dsh-evolution/skill-health/rows',"
     }
   ],
   "expect": "red",
-  "note": "a renamed endpoint breaks the 4x12 route freeze"
+  "note": "a host route that loses the /api/dsh-evolution/ prefix breaks the 4x12 route freeze"
 }

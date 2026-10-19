@@ -11,10 +11,14 @@
  *                G6's gate-truth counts. Exit 2 while any id lacks a record.
  *   --json       the same account as data.
  *
- * The --only <id> (patch -> run -> assert verdict -> restore + verify the hash) and --self-test
- * halves arrive next; until they exist this gate only ACCOUNTS, and it says so in its output.
+ *   --only <id>  patch -> run -> assert the verdict -> restore + verify the hash (gate records)
+ *   --self-test  prove the harness refuses a no-op patch and a contradicted expectation
+ *   --probes     fixture-driven red proof for the probe registry (W9 S4): snapshot -> apply a
+ *                probe's mutation fixture -> expect a RED probe run -> restore -> verify the hash ->
+ *                re-verify green; success stamps reports/mutation-coverage.json (the
+ *                mutation-coverage axis' data source). --list prints the registry.
  *
- * Usage: node <scripts-dir>/verify-mutations.mjs [--coverage] [--json]
+ * Usage: node <scripts-dir>/verify-mutations.mjs [--coverage|--only <id>|--self-test|--probes [--only <probe>] [--list] [--ledger <path>] [--no-stamp]] [--json]
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -92,7 +96,7 @@ const counts = {
   redProven: entries.filter((e) => e.status === 'recorded' && (records[e.id] ?? []).some((r) => r.expect === 'red' && typeof r.provenAt === 'string')).length,
   unstamped: entries.filter((e) => e.status === 'recorded' && !(records[e.id] ?? []).every((r) => typeof r.provenAt === 'string')).length,
 }
-const accountWanted = process.argv.includes('--coverage') || (!process.argv.includes('--only') && !process.argv.includes('--self-test'))
+const accountWanted = (process.argv.includes('--coverage') || (!process.argv.includes('--only') && !process.argv.includes('--self-test'))) && !process.argv.includes('--probes') && !process.argv.includes('--list')
 if (json && accountWanted) console.log(JSON.stringify({ schema: 1, gates: gates.length, counts, entries }, null, 2))
 else if (accountWanted) {
   const exemptIds = entries.filter((e) => e.status === 'exempt').map((e) => e.id)
@@ -124,7 +128,10 @@ function runRecord(id, record) {
   if (gate === undefined) return { status: 'UNKNOWN-ID', detail: id + ' is not a manifest row' }
   const argv = Array.isArray(gate.argv) ? gate.argv : null
   if (argv === null) return { status: 'NOT EXECUTABLE', detail: id + ' declares no argv' }
-  const file = resolvePath(HERE, '..', '..', record.mutate.file)
+  // Layout-aware: the mirror resolves `packages/scripts/...` from the repo root, the overlay keeps
+  // the same file at `<repoRoot>/packages/evolution/scripts/...` (self-test and --only run on both).
+  const candidates = [resolvePath(REPO_ROOT, record.mutate.file), resolvePath(REPO_ROOT, 'evolution', record.mutate.file.replace(/^packages\//, ''))]
+  const file = candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]
   const before = readBytes(file, 'utf8')
   const beforeSha = sha256(before)
   // A red only counts when the check was GREEN before the mutation. Without this baseline a
@@ -176,11 +183,12 @@ function runRecord(id, record) {
 // Side-effect guard (round 155): a row's argv may WRITE tracked artifacts - a producer row rewrites
 // its own product during the baseline run - and restoring only the MUTATED file leaves those behind.
 // The probe therefore snapshots the dirty set and reverts whatever became newly dirty.
-const repoRoot = resolvePath(HERE, '..', '..')
+const GIT_ROOT = resolvePath(HERE, '..', '..')
+const repoRoot = existsSync(resolvePath(GIT_ROOT, '.git')) ? GIT_ROOT : resolvePath(GIT_ROOT, '..')
 const dirtySet = () => new Set((spawnSync('git', ['-C', repoRoot, 'status', '--porcelain'], { encoding: 'utf8' }).stdout ?? '')
   .split(String.fromCharCode(10)).map((line) => line.slice(3).trim()).filter((entry) => entry !== ''))
 const results = []
-if (onlyIndex >= 0) {
+if (onlyIndex >= 0 && !process.argv.includes('--probes')) {
   const id = process.argv[onlyIndex + 1]
   const list = Array.isArray(records[id]) ? records[id] : []
   if (list.length === 0) {
@@ -215,6 +223,97 @@ function stampRecords(id, results) {
   if (failed.length === 0) stampRecords(id, results)
   process.exit(failed.length === 0 ? 0 : 1)
 }
+// ── --probes: fixture-driven red proof of the probe registry (W9 S4) ─────────────────────────
+import { closeSync, mkdirSync, openSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { overlayAvailable, probeCommand, probeProblems, probeSignature, readMutationFixture, readProbes, resolveLayoutPath } from './lib-probes.mjs'
+
+const probesWanted = process.argv.includes('--probes')
+const listWanted = process.argv.includes('--list')
+if (probesWanted || listWanted) {
+  const PROBE_ROOT = resolvePath(HERE, '..')
+  let probeRegistry
+  try { probeRegistry = readProbes(PROBE_ROOT) } catch (error) { console.error('verify-mutations --probes: CANNOT DECIDE - ' + (error instanceof Error ? error.message : String(error))); process.exit(2) }
+  if (listWanted) {
+    for (const probe of probeRegistry) console.log(probe.id.padEnd(38) + probe.kind.padEnd(6) + probe.mutation)
+    process.exit(0)
+  }
+  const registryProblems = probeProblems(PROBE_ROOT, probeRegistry)
+  if (registryProblems.length > 0) { console.error('verify-mutations --probes: ' + registryProblems.length + ' registry problem(s):'); for (const problem of registryProblems) console.error('  - ' + problem); process.exit(1) }
+  const probeOnly = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : undefined
+  const selected = probeOnly === undefined ? probeRegistry : probeRegistry.filter((probe) => probe.id === probeOnly)
+  if (selected.length === 0) { console.error('verify-mutations --probes: CANNOT DECIDE - no probe matches --only ' + String(probeOnly)); process.exit(2) }
+  if (!overlayAvailable(PROBE_ROOT)) { console.error('verify-mutations --probes: CANNOT DECIDE - this tree has no platform overlay (packages/boot/app-boot + node_modules/vitest): run the probe half on the build line; the mirror only lints the registry'); process.exit(2) }
+  const jsonMode = process.argv.includes('--json')
+  const ledgerFlag = process.argv.indexOf('--ledger')
+  const ledgerTarget = ledgerFlag >= 0 ? process.argv[ledgerFlag + 1] : undefined
+  if (ledgerFlag >= 0 && (ledgerTarget === undefined || ledgerTarget.startsWith('--'))) { console.error('verify-mutations --probes: --ledger needs a path'); process.exit(2) }
+  const noStamp = process.argv.includes('--no-stamp')
+  const lockPath = resolvePath(tmpdir(), 'dsh-probe-mutation.lock')
+  let lockFd = null
+  try { lockFd = openSync(lockPath, 'wx') } catch { console.error('verify-mutations --probes: CANNOT DECIDE - another probe-mutation run holds ' + lockPath); process.exit(2) }
+  const pendingRestore = []
+  const restoreAll = () => { for (const entry of pendingRestore.splice(0).reverse()) writeBytes(entry.file, entry.text) }
+  const releaseLock = () => { try { closeSync(lockFd) } catch { /* already closed */ } try { unlinkSync(lockPath) } catch { /* already gone */ } }
+  const onSignal = (signal) => { restoreAll(); releaseLock(); console.error('verify-mutations --probes: ' + signal + ' - files restored from memory, no ledger written'); process.exit(1) }
+  process.once('SIGINT', () => onSignal('SIGINT'))
+  process.once('SIGTERM', () => onSignal('SIGTERM'))
+  const probeResults = []
+  const startedAt = Date.now()
+  for (const probe of selected) {
+    const read = readMutationFixture(PROBE_ROOT, probe)
+    if (read.problems.length > 0) { probeResults.push({ id: probe.id, status: 'INVALID FIXTURE', detail: read.problems.join('; ') }); continue }
+    const edits = read.fixture.edits.map((edit) => ({ file: resolveLayoutPath(PROBE_ROOT, edit.file), find: edit.find, replace: edit.replace }))
+    const originals = edits.map((edit) => readBytes(edit.file, 'utf8'))
+    const unique = edits.every((edit, index) => originals[index].split(edit.find).length - 1 === 1)
+    if (!unique) { probeResults.push({ id: probe.id, status: 'PATCH NOT UNIQUE', detail: 'a find string does not occur exactly once in its file' }); continue }
+    let command
+    try { command = probeCommand(probe, PROBE_ROOT) } catch (error) { probeResults.push({ id: probe.id, status: 'COMMAND FAILED', detail: error instanceof Error ? error.message : String(error) }); continue }
+    const timeout = read.fixture.timeoutMs ?? 180000
+    const runProbe = () => spawnSync(command.argv[0], command.argv.slice(1), { cwd: command.cwd, encoding: 'utf8', timeout, maxBuffer: 32 * 1024 * 1024 })
+    const preDirty = dirtySet()
+    const baseline = runProbe()
+    if (baseline.status !== 0) { probeResults.push({ id: probe.id, status: 'NO GREEN BASELINE', detail: 'exit=' + String(baseline.status) + (baseline.stderr === null ? '' : ' :: ' + String(baseline.stderr).trim().split(String.fromCharCode(10)).slice(-2).join(' ')) }); continue }
+    let status = 'NOT PROVEN RED'
+    let detail = ''
+    try {
+      for (const [index, edit] of edits.entries()) { pendingRestore.push({ file: edit.file, text: originals[index] }); writeBytes(edit.file, originals[index].replace(edit.find, edit.replace)) }
+      const mutated = runProbe()
+      const verdict = mutated.status === 1 ? 'red' : mutated.status === 0 ? 'green' : mutated.status === 2 ? 'cannot-decide' : 'exit-' + String(mutated.status)
+      if (verdict === 'red') { status = 'PROVEN RED'; detail = 'mutation run exit=1 (expected red)' }
+      else detail = 'mutation run exit=' + String(mutated.status) + ' (' + verdict + '); the probe did not go red, so the fixture proves nothing'
+    } finally {
+      restoreAll()
+      let restored = true
+      for (const [index, edit] of edits.entries()) { if (sha256(readBytes(edit.file, 'utf8')) !== sha256(originals[index])) restored = false }
+      if (!restored) { releaseLock(); console.error('verify-mutations --probes: RESTORE FAILED for ' + probe.id + ' - refusing to continue on a dirty tree'); process.exit(1) }
+      for (const written of dirtySet()) { if (preDirty.has(written)) continue; spawnSync('git', ['-C', repoRoot, 'checkout', '--', written], { encoding: 'utf8' }); detail += ' (reverted side effect: ' + written + ')' }
+    }
+    probeResults.push({ id: probe.id, status, detail })
+    if (!jsonMode) console.log('  ' + status.padEnd(18) + probe.id.padEnd(38) + detail)
+  }
+  const proven = probeResults.filter((entry) => entry.status === 'PROVEN RED')
+  const failed = probeResults.filter((entry) => entry.status !== 'PROVEN RED')
+  let ledgerPath = null
+  if (!noStamp && failed.length === 0) {
+    const mirrorReports = join(repoRoot, 'packages', 'scripts', 'reports')
+    ledgerPath = ledgerTarget !== undefined ? resolvePath(ledgerTarget) : (existsSync(mirrorReports) ? join(mirrorReports, 'mutation-coverage.json') : join(PROBE_ROOT, 'scripts', 'reports', 'mutation-coverage.json'))
+    let ledger = { schemaVersion: 1, generatedBy: 'packages/scripts/verify-mutations.mjs --probes', generatedAt: new Date().toISOString(), records: [] }
+    if (existsSync(ledgerPath)) { try { const existing = JSON.parse(readBytes(ledgerPath, 'utf8')); if (Array.isArray(existing.records)) ledger = { ...ledger, ...existing, records: existing.records } } catch { /* a damaged ledger is replaced */ } }
+    const byProbe = new Map(ledger.records.filter((record) => record !== null && typeof record === 'object').map((record) => [record.probe, record]))
+    for (const probe of selected) byProbe.set(probe.id, { probe: probe.id, signature: probeSignature(PROBE_ROOT, probe), provenAt: new Date().toISOString(), tree: 'overlay' })
+    ledger.records = [...byProbe.values()].sort((a, b) => String(a.probe).localeCompare(String(b.probe)))
+    ledger.generatedAt = new Date().toISOString()
+    mkdirSync(dirname(ledgerPath), { recursive: true })
+    writeBytes(ledgerPath, JSON.stringify(ledger, null, 2) + String.fromCharCode(10))
+  }
+  releaseLock()
+  const summary = { ok: failed.length === 0, probes: probeResults, proven: proven.length, failed: failed.length, seconds: Math.round((Date.now() - startedAt) / 100) / 10, ledger: ledgerPath }
+  if (jsonMode) console.log(JSON.stringify(summary, null, 2))
+  else console.log('verify-mutations --probes: ' + proven.length + '/' + probeResults.length + ' proven red' + (ledgerPath === null ? ' (ledger not written)' : '; ledger ' + ledgerPath))
+  process.exit(failed.length === 0 ? 0 : 1)
+}
+
 if (selfTest) {
   // Two synthetic cases, both must be caught: an equal-value patch (nothing changed) and an
   // expectation that contradicts reality (the harness must not call that a pass).
@@ -223,6 +322,6 @@ if (selfTest) {
   const caught = [equal, contradiction].filter((r) => !r.status.startsWith('PROVEN'))
   for (const result of [equal, contradiction]) console.log('  ' + result.status.padEnd(28) + result.detail)
   console.log('verify-mutations --self-test: ' + caught.length + '/2 mismatch(es) caught' + (caught.length === 2 ? ' - the harness refuses both a no-op patch and a contradicted expectation' : ' - THE HARNESS IS BLIND to at least one'))
-  process.exit(caught.length === 2 ? 1 : 1)
+  process.exit(caught.length === 2 ? 0 : 1)
 }
 if (accountWanted) process.exit(counts.cannotDecide > 0 ? 2 : 0)

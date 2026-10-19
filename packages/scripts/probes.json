@@ -1,5 +1,5 @@
 {
-  "$comment": "G7-S1: the ONE hand-authored probe registry. gen-gate-manifest merges this into gate-manifest.probes (the generated artifact stays the single runtime registry). Each probe is a test/spec that can go RED; the mutation field names a same-directory fixture (the verify-mutations half is still pending).",
+  "$comment": "G7-S1: the ONE hand-authored probe registry. gen-gate-manifest merges it into gate-manifest.probes (the generated artifact stays the single runtime registry). Each probe is a test file set (or a guard script) that can go RED; verify-mutations --probes applies each same-directory mutation fixture, proves the probe red, restores the bytes and stamps reports/mutation-coverage.json (the mutation-coverage axis' data source).",
   "probes": [
     {
       "id": "decl-platform-line-grid",
