@@ -92,7 +92,7 @@
     },
     "clientConsole": {
       "face": "web",
-      "version": "0.27.2",
+      "version": "0.27.3",
       "host": "127.0.0.1:3080",
       "chrome": "Chrome/155.0.8059.82",
       "steps": [
@@ -107,17 +107,18 @@
         "facts": 7,
         "runtime": 8
       },
-      "familyVersionFact": "0.27.2",
+      "familyVersionFact": "0.27.3",
       "installForm": "完整功能包（安装内容已声明）",
+      "aboutLine": "0.27.3 · Web settings cards for the evolution family's parameter namespaces",
       "diagnosticsCard": {
         "badge": "1 项需要注意",
-        "technicalDetails": "技术详情",
-        "oldSchemaOrSourcePresent": false,
+        "environmentFactsRendered": false,
+        "technicalDetailsRendered": false,
+        "runtimeRows": 8,
         "refreshWorks": true
       },
-      "rowConfigEntries": 7,
-      "evidence": "execution/assets/real-machine-0.27.2/real-machine-0.27.2.json",
-      "evidenceScript": "real-machine verification script (CDP): diagnostics API + settings card render/refresh"
+      "evidence": "execution/assets/real-machine-0.27.3/real-machine-0.27.3.json",
+      "evidenceScript": "real-machine verification script (CDP): diagnostics API + settings card scope/refresh + about line"
     }
   }
 }
