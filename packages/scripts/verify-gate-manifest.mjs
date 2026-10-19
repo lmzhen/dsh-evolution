@@ -22,7 +22,7 @@ import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { familyGateRegisters } from './lib-doc-facts.mjs'
 import { familyVersion, versionReached } from './lib-family-version.mjs'
-import { requireOverlay } from './lib-env.mjs'
+import { softOverlay } from './lib-env.mjs'
 
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
@@ -268,7 +268,7 @@ for (const row of tableRows) {
 // and its loop body was empty, so `drillCmd-or-noDrillReason` had never been checked once.
 const report = argv.includes('--report')
 const overlayArg = (argv.find((entry) => entry.startsWith('--overlay=')) ?? '').slice('--overlay='.length)
-const overlayRoot = overlayArg === '' ? requireOverlay() : resolve(overlayArg)
+const overlayRoot = overlayArg === '' ? softOverlay() : resolve(overlayArg)
 const familyVer = familyVersion(root)
 const observations = []
 const axisRegister = (() => {

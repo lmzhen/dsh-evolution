@@ -101,5 +101,14 @@ function requireNamed(kind, value, envVar, candidates) {
   throw new Error("cannot resolve " + kind + ": set " + envVar + " — candidates: " + candidates.join(", "))
 }
 export function requireOverlay(env = process.env) { return requireNamed("the platform overlay", resolveOverlay(env), "EVOLUTION_OVERLAY_ROOT", overlayCandidates(env)) }
+
+/**
+ * Soft resolution for callers that tolerate an ABSENT platform tree: returns the resolved tree,
+ * else the first documented candidate path (which may not exist). Executors such as run-gates turn
+ * a missing overlay into a `cannot-decide` record with cause artifact-absent — throwing at import
+ * time would kill the JSON envelope (0.27.1 vacuum fixture caught exactly that).
+ */
+export function softOverlay(env = process.env) { return resolveOverlay(env) ?? overlayCandidates(env)[0] }
+export function softProfile(env = process.env) { return resolveProfile(env) ?? profileCandidates(env)[0] }
 export function requireProfile(env = process.env) { return requireNamed("the test-bed profile", resolveProfile(env), "EVOLUTION_PROFILE", profileCandidates(env)) }
 export function requireAdapter(env = process.env) { return requireNamed("the line resolver adapter", resolveAdapter(env), "FAMILY_LINE_ADAPTER", adapterCandidates(env)) }

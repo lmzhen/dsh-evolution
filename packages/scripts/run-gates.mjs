@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { validate, counts, render, actionBlock } from './lib-verdict.mjs'
 import { createRunner, decideRequires } from './lib-run-gates.mjs'
-import { requireOverlay } from './lib-env.mjs'
+import { softOverlay } from './lib-env.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MIRROR_ROOT = resolve(HERE, '..', '..')
@@ -24,7 +24,7 @@ const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? (args[i +
 const has = (name) => args.includes(name)
 const profile = args.find((a) => ['local', 'pre-tag', 'ci'].includes(a))
 // 遗留⑤: the platform tree is a fixture, not a repo fact — resolve it portably (env first).
-const overlayRoot = flag('--overlay') || requireOverlay()
+const overlayRoot = flag('--overlay') || softOverlay()
 
 if (!existsSync(MANIFEST)) { console.error('run-gates: missing gate-manifest.json — run gen-gate-manifest.mjs'); process.exit(2) }
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
