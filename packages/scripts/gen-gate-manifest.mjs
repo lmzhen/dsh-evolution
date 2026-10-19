@@ -3,8 +3,9 @@
  * gen-gate-manifest — 由两份事实源生成仓内门禁清单（G0-1）。
  * 源 1：CONTRIBUTING.md 的门禁表（编号 | Command | Working tree）
  * 源 2：.github/actions/evolution-validate/action.yml 的 run 步骤（CI 实际执行集）
- * 规则：种子 = 表 ∪ CI；CI 独有者补登记（profiles:[ci] + reason + expiry）；
- *       external（表第三列 machine-local / 命令指向 D:/dsh/ 仓外）必带 reason + expiry。
+ * 规则：种子 = 表 ∪ CI；CI 独有者补登记（profiles:[ci] + reason + expiry；若已进 gate-set 的
+ *       ciOnly/machineLocal 永久登记则只带 reason+owner，不再有到期窗口）；
+ *       external（表第三列 machine-local / 命令指向 D:/dsh/ 仓外）同样：已登记=永久，未登记=reason+expiry。
  * M2（契约 §2.2，cmd 拆两层）：每条门禁声明 TWO forms ——
  *   human：表里的原样描述（允许占位符与注解，给人读）
  *   argv ：可执行 token 数组（一个格子只允许一条命令；多条 ⇒ argv=null ＋ argvProblem，交给
@@ -29,6 +30,21 @@ const REGISTER_EXPIRY = (() => {
     const row = (checks?.machine?.pendingAxes ?? []).find((a) => a.axis === 'expiry-due')
     return typeof row?.expiry === 'string' ? row.expiry : '0.26.0'
   } catch { return '0.26.0' }
+})()
+// W9/遗留② (2026-10-19): the gate-set fact carries PERMANENT registers. A script registered in
+// `ciOnly` (the CI action executes it, but it is not a table gate) or `machineLocal` (its command
+// lives outside this repo) is closed as a registration with an owner — it stops carrying a semver
+// `expiry` (a due window is for unresolved debts). Unregistered scripts keep the temporary shape.
+const GATE_REGISTERS = (() => {
+  try {
+    const facts = JSON.parse(readFileSync(join(HERE, 'family-facts.json'), 'utf8'))
+    const set = (facts.facts ?? []).find((f) => f?.machine?.kind === 'gate-set')
+    const registers = set?.machine?.registers ?? {}
+    return {
+      ciOnly: new Map((registers.ciOnly ?? []).map((entry) => [entry.script, entry])),
+      machineLocal: new Map((registers.machineLocal ?? []).map((entry) => [entry.script, entry])),
+    }
+  } catch { return { ciOnly: new Map(), machineLocal: new Map() } }
 })()
 const OUT = join(HERE, 'gate-manifest.json')
 const check = process.argv.includes('--check')
@@ -74,8 +90,15 @@ for (const line of tableSrc) {
     entry.reason = 'mutating/helper step — registered, not run by run-gates (contract 5c)'
   }
   if (kind === 'external') {
-    entry.reason = 'machine-local command outside this repo (table row ' + n + ')'
-    entry.expiry = REGISTER_EXPIRY
+    const externalName = (/([A-Za-z0-9._-]+\.(?:mjs|cjs|js))/.exec(cmd) || [])[1] ?? ''
+    const registered = GATE_REGISTERS.machineLocal.get(externalName)
+    if (registered !== undefined) {
+      entry.reason = registered.reason
+      entry.owner = registered.owner ?? 'toolchain'
+    } else {
+      entry.reason = 'machine-local command outside this repo (table row ' + n + ')'
+      entry.expiry = REGISTER_EXPIRY
+    }
   }
   gates.push(entry)
 }
@@ -124,6 +147,7 @@ for (const [i, name] of ciOnly.entries()) {
   const isGate = /^(verify|audit|gen)-/.test(name)
   const verbatim = ciCmdFor(name)
   const ciHuman = verbatim || 'node packages/scripts/' + name
+  const ciRegistered = GATE_REGISTERS.ciOnly.get(name)
   gates.push({
     id: 'ci-only-' + String(i + 1).padStart(2, '0'),
     kind: isGate ? 'script' : 'step',
@@ -132,8 +156,9 @@ for (const [i, name] of ciOnly.entries()) {
     cmd: ciHuman,
     tree: /packages\/evolution\/scripts/.test(verbatim || '') ? 'overlay' : 'mirror',
     profiles: isGate ? ['ci'] : [],
-    reason: isGate ? 'CI-only gate with no table row yet — local slot pending (G0-1)' : 'mutating/helper step — registered, not run by run-gates (contract 5c)',
-    expiry: REGISTER_EXPIRY,
+    ...(ciRegistered !== undefined
+      ? { reason: ciRegistered.reason, owner: ciRegistered.owner ?? 'ci' }
+      : { reason: isGate ? 'CI-only gate with no table row yet — local slot pending (G0-1)' : 'mutating/helper step — registered, not run by run-gates (contract 5c)', expiry: REGISTER_EXPIRY }),
   })
 }
 
@@ -169,7 +194,7 @@ gates.push({
   cmd: graphEdgesLive,
   noDrillReason: 'live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half',
   reason: 'live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)',
-  expiry: REGISTER_EXPIRY,
+  owner: 'toolchain',
 })
 // G0-5：tsc 行是**声明在本地跑**的检查 —— CI 注释（action.yml L168-171）写明 D-9 测试文件类型检查已随
 // baseline job 移除、`tsc -b tsconfig.host.json` 落在 **build line** 上 ⇒ 给该条目补 reason+expiry，
@@ -177,7 +202,7 @@ gates.push({
 for (const g of gates) {
   if (g.cmd.includes('typescript/lib/tsc.js') && g.reason === undefined) {
     g.reason = 'declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)'
-    g.expiry = REGISTER_EXPIRY
+    g.owner = 'build-line'
   }
 }
 

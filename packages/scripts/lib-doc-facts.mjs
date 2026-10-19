@@ -432,13 +432,17 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     // below — and two consumers: this re-derivation and verify-gate-manifest.mjs, which used to
     // carry its own copies. The registers are configuration, so every entry must be complete.
     const registers = machine.registers ?? {}
-    for (const kind of ['localOnly', 'machineLocal']) {
+    for (const kind of ['localOnly', 'machineLocal', 'ciOnly']) {
       for (const entry of registers[kind] ?? []) {
-        for (const field of ['script', 'reason', 'expiry']) {
+        for (const field of ['script', 'reason']) {
           if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') {
-            out.push(`${FACTS_ASSET}: fact ${fact.id} register ${kind} has an entry without ${field} — name the script, the reason and the expiry`)
+            out.push(`${FACTS_ASSET}: fact ${fact.id} register ${kind} has an entry without ${field} — name the script and the reason`)
           }
         }
+        // A debt names how it ends (expiry) or who owns the permanent exception (owner).
+        const expiring = typeof entry?.expiry === 'string' && entry.expiry.trim() !== ''
+        const owned = typeof entry?.owner === 'string' && entry.owner.trim() !== ''
+        if (!expiring && !owned) out.push(`${FACTS_ASSET}: fact ${fact.id} register ${kind} entry ${JSON.stringify(entry?.script ?? '?')} has neither expiry nor owner`)
       }
     }
     const executed = new Set([...text.matchAll(/scripts\/([A-Za-z0-9._-]+\.mjs)/g)].map(match => match[1]))
@@ -453,6 +457,9 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     }
     const localOnly = new Set((registers.localOnly ?? []).map(entry => entry.script))
     const machineLocal = new Set((registers.machineLocal ?? []).map(entry => entry.script))
+    for (const entry of registers.ciOnly ?? []) {
+      if (!executed.has(entry.script)) out.push(`${FACTS_ASSET}: fact ${fact.id} registers ${entry.script} as ciOnly, but ${machine.file} does not execute it — stale register entry (${entry.owner ?? '?'})`)
+    }
     for (const script of declared) {
       if (executed.has(script) || localOnly.has(script)) continue
       out.push(`${fact.home}: declares ${script}, which neither ${machine.file} executes nor the localOnly register covers — a declared check nobody runs`)

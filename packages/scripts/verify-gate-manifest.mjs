@@ -78,6 +78,7 @@ if (registers === null) {
 }
 const MACHINE_LOCAL = registers.machineLocal
 const CI_NOT_EXECUTED = registers.localOnly
+const CI_ONLY = Array.isArray(registers.ciOnly) ? registers.ciOnly : []
 
 const contributingPath = join(repo, 'CONTRIBUTING.md')
 const actionPath = join(repo, '.github', 'actions', 'evolution-validate', 'action.yml')
@@ -112,10 +113,14 @@ function scriptOf(command) {
 
 const machineLocalNames = new Set(MACHINE_LOCAL.map((entry) => entry.script))
 const GENERATOR_PRODUCERS = new Set(['gen-health-baseline.mjs', 'gen-install-counts.mjs'])
-for (const entry of [...MACHINE_LOCAL, ...CI_NOT_EXECUTED]) {
-  for (const field of ['script', 'reason', 'expiry']) {
+for (const entry of [...MACHINE_LOCAL, ...CI_NOT_EXECUTED, ...CI_ONLY]) {
+  for (const field of ['script', 'reason']) {
     if (typeof entry[field] !== 'string' || entry[field].trim() === '') problems.push('register entry ' + JSON.stringify(entry.script ?? '?') + ' has no ' + field)
   }
+  // A debt names how it ends (semver expiry) OR who owns the permanent exception (owner).
+  const expiring = typeof entry.expiry === 'string' && entry.expiry.trim() !== ''
+  const owned = typeof entry.owner === 'string' && entry.owner.trim() !== ''
+  if (!expiring && !owned) problems.push('register entry ' + JSON.stringify(entry.script ?? '?') + ' has neither an expiry nor an owner — a permanent exception must name its owner')
 }
 
 const declaredScripts = new Set()
@@ -179,6 +184,9 @@ else {
 // precedent). Block-scalar comments inside `run: |` are line comments too, so one filter covers both.
 const actionText = readFileSync(actionPath, 'utf8')
   .split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n')
+for (const entry of CI_ONLY) {
+  if (!actionText.includes(entry.script)) problems.push('the ciOnly register names ' + entry.script + ', which the CI action does not execute — stale register entry')
+}
 for (const script of declaredScripts) {
   if (actionText.includes(script)) continue
   if (CI_NOT_EXECUTED.some((entry) => entry.script === script)) { notes.push(script + ' is local-runner only (registered)'); continue }

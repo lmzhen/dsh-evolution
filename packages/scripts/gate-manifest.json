@@ -22,7 +22,7 @@
         "local"
       ],
       "reason": "declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)",
-      "expiry": "0.28.0"
+      "owner": "build-line"
     },
     {
       "id": "gate-02",
@@ -205,8 +205,8 @@
       ],
       "tree": "machine-local",
       "profiles": [],
-      "reason": "machine-local command outside this repo (table row 13)",
-      "expiry": "0.28.0"
+      "reason": "tsconfig registration for the overlay layout",
+      "owner": "toolchain"
     },
     {
       "id": "gate-14",
@@ -218,8 +218,8 @@
       ],
       "tree": "machine-local",
       "profiles": [],
-      "reason": "machine-local command outside this repo (table row 14)",
-      "expiry": "0.28.0"
+      "reason": "manifest version uniformity across the two trees",
+      "owner": "toolchain"
     },
     {
       "id": "gate-15",
@@ -232,8 +232,8 @@
       ],
       "tree": "machine-local",
       "profiles": [],
-      "reason": "machine-local command outside this repo (table row 15)",
-      "expiry": "0.28.0"
+      "reason": "mirror <-> overlay parity check",
+      "owner": "toolchain"
     },
     {
       "id": "gate-16",
@@ -908,8 +908,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0"
+      "reason": "payload audit of the packed dist — only meaningful after prepare-release has staged the release job's inputs",
+      "owner": "ci"
     },
     {
       "id": "ci-only-02",
@@ -925,8 +925,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0"
+      "reason": "repo-root about manifest; the overlay carries no repository package.json above it (the action itself reports 'not armed')",
+      "owner": "ci"
     },
     {
       "id": "ci-only-03",
@@ -942,8 +942,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0"
+      "reason": "generated bundle-patch freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-04",
@@ -959,8 +959,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0"
+      "reason": "generated client-guard copy freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-05",
@@ -976,8 +976,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0"
+      "reason": "generated client-token copy freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-06",
@@ -993,8 +993,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0"
+      "reason": "generated param client-view freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-07",
@@ -1010,8 +1010,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0"
+      "reason": "generated param docs freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-08",
@@ -1025,8 +1025,8 @@
       ],
       "tree": "mirror",
       "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.28.0"
+      "reason": "workflow plumbing: injects the mirror alias paths into the released upstream tsconfig (overlay setup, not a family check)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-09",
@@ -1044,8 +1044,8 @@
       ],
       "tree": "overlay",
       "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.28.0"
+      "reason": "Windows install smoke — needs a throwaway DSH_HOME and the packed staging tarballs",
+      "owner": "ci"
     },
     {
       "id": "ci-only-10",
@@ -1060,8 +1060,8 @@
       ],
       "tree": "overlay",
       "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.28.0"
+      "reason": "line-header policy check (--ci form) over the overlay tree",
+      "owner": "ci"
     },
     {
       "id": "ci-only-11",
@@ -1074,8 +1074,8 @@
       ],
       "tree": "overlay",
       "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.28.0"
+      "reason": "the pack step itself (a build product, not a check)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-12",
@@ -1089,8 +1089,8 @@
       ],
       "tree": "overlay",
       "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.28.0"
+      "reason": "publish dry-run of the staged tarballs",
+      "owner": "ci"
     },
     {
       "id": "ci-only-13",
@@ -1103,8 +1103,8 @@
       ],
       "tree": "overlay",
       "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.28.0"
+      "reason": "load-sensitive lock group runner (local-runner registered; the action runs it at pinned concurrency)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-14",
@@ -1120,8 +1120,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0",
+      "reason": "mirror↔overlay script/version parity; needs the mirror checkout beside the overlay",
+      "owner": "ci",
       "localSafe": false,
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
@@ -1138,8 +1138,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.28.0"
+      "reason": "probe registry schema lint; the CI job executes it, the mirror local lane has no platform overlay",
+      "owner": "ci"
     },
     {
       "id": "line-identity-ci",
@@ -1191,7 +1191,7 @@
       ],
       "noDrillReason": "live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half",
       "reason": "live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)",
-      "expiry": "0.28.0"
+      "owner": "toolchain"
     },
     {
       "id": "health-admission",

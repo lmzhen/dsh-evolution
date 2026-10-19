@@ -181,22 +181,103 @@
             {
               "script": "check-tsconfigs.cjs",
               "reason": "tsconfig registration for the overlay layout",
-              "expiry": "S1.8 follow-up: port into packages/scripts"
+              "expiry": "S1.8 follow-up: port into packages/scripts",
+              "owner": "toolchain"
             },
             {
               "script": "check-manifests.cjs",
               "reason": "manifest version uniformity across the two trees",
-              "expiry": "S1.8 follow-up: port into packages/scripts"
+              "expiry": "S1.8 follow-up: port into packages/scripts",
+              "owner": "toolchain"
             },
             {
               "script": "mirror-sync.mjs",
               "reason": "mirror <-> overlay parity check",
-              "expiry": "S1.8 follow-up: port into packages/scripts"
+              "expiry": "S1.8 follow-up: port into packages/scripts",
+              "owner": "toolchain"
             },
             {
               "script": "run-baseline.mjs",
               "reason": "the canonical local runner that executes this table",
-              "expiry": "S1.8 follow-up: port into packages/scripts"
+              "expiry": "S1.8 follow-up: port into packages/scripts",
+              "owner": "toolchain"
+            }
+          ],
+          "ciOnly": [
+            {
+              "script": "audit-release-tarballs.mjs",
+              "reason": "payload audit of the packed dist — only meaningful after prepare-release has staged the release job's inputs",
+              "owner": "ci"
+            },
+            {
+              "script": "gen-about.mjs",
+              "reason": "repo-root about manifest; the overlay carries no repository package.json above it (the action itself reports 'not armed')",
+              "owner": "ci"
+            },
+            {
+              "script": "gen-bundle-patches.mjs",
+              "reason": "generated bundle-patch freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+              "owner": "ci"
+            },
+            {
+              "script": "gen-client-guards.mjs",
+              "reason": "generated client-guard copy freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+              "owner": "ci"
+            },
+            {
+              "script": "gen-client-tokens.mjs",
+              "reason": "generated client-token copy freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+              "owner": "ci"
+            },
+            {
+              "script": "gen-param-client-view.mjs",
+              "reason": "generated param client-view freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+              "owner": "ci"
+            },
+            {
+              "script": "gen-param-docs.mjs",
+              "reason": "generated param docs freshness --check (generator writes in the mirror; CI verifies the committed copy)",
+              "owner": "ci"
+            },
+            {
+              "script": "inject-evolution-paths.mjs",
+              "reason": "workflow plumbing: injects the mirror alias paths into the released upstream tsconfig (overlay setup, not a family check)",
+              "owner": "ci"
+            },
+            {
+              "script": "install-layered.mjs",
+              "reason": "Windows install smoke — needs a throwaway DSH_HOME and the packed staging tarballs",
+              "owner": "ci"
+            },
+            {
+              "script": "lib-line-header.mjs",
+              "reason": "line-header policy check (--ci form) over the overlay tree",
+              "owner": "ci"
+            },
+            {
+              "script": "prepare-release.mjs",
+              "reason": "the pack step itself (a build product, not a check)",
+              "owner": "ci"
+            },
+            {
+              "script": "publish-scoped.mjs",
+              "reason": "publish dry-run of the staged tarballs",
+              "owner": "ci"
+            },
+            {
+              "script": "run-load-sensitive.mjs",
+              "reason": "load-sensitive lock group runner (local-runner registered; the action runs it at pinned concurrency)",
+              "owner": "ci"
+            },
+            {
+              "script": "verify-layout-sync.mjs",
+              "reason": "mirror↔overlay script/version parity; needs the mirror checkout beside the overlay",
+              "owner": "ci"
+            },
+            {
+              "script": "verify-probes.mjs",
+              "reason": "probe registry schema lint; the CI job executes it, the mirror local lane has no platform overlay",
+              "owner": "ci"
             }
           ]
         }
@@ -594,7 +675,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "4eeb623d203c30065859b7164fe56a57ad0c5a7f0960d1387773df552cf4cd9c",
+        "sha256": "78fddbd585f1e0afd442441e9b3332c077bc24ea56bf778ecdbe627b8c2f629f",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1023,16 +1104,7 @@
             "owner": "scripts"
           }
         ],
-        "pendingAxes": [
-          {
-            "axis": "expiry-due",
-            "rows": 19,
-            "reasonRef": "packages/scripts/gate-manifest.json",
-            "expiry": "0.28.0",
-            "owner": "release",
-            "reason": "0.27.0 是平台 0.2.1 迁移的产品发布轮：本 register 的 19 行是工具链债务（14 条 ci-only 无表行 + machine-local 外部脚本 + build-line tsc 行），不在产品面；迁移轮关闭它们会引入新的 CI 面变更风险。按「move it with a reason」把窗口移到 0.28.0，owner=release，行数保持登记，下一轮逐行补表/换仓内脚本。"
-          }
-        ],
+        "pendingAxes": [],
         "checkMutations": {
           "gate-51": [
             {
