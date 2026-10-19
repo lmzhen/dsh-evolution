@@ -23,18 +23,27 @@
  *   S1_CORE_LIB        built evolution-core index (…/evolution-core/lib/index.js)
  *   S1_COMPOSITION_LIB built composition index (…/evolution-core/lib/composition/index.js)
  *   S1_SCOPE_LIB       platform dsh-scope lib (inside the global dsh install's node_modules)
- *   S1_LOG             evidence log path
+ *   S1_BUILD_LINE      disposable build line (default: portable resolver -> D:/dsh/harness-0.2.1)
+ *   S1_CHILD_CWD       temp cwd for the probe agent (default: <tmpdir>/s1-child-cwd)
+ *   S1_LOG             evidence log path (default: <tmpdir>/s1-child-toolset.log)
  * Readings (2026-10-19, real 0.2.1-rc.2 host, isolated DSH_HOME m6): composedPreset=
  * evolution-reviewer-readonly, preset broken=null, restrictor module active, inherited globals
  * visible=[memory] (allow=[memory]), non-allowed globals absent, scope-local preset tools=[subagent].
  */
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { npmGlobalRoot, resolveOverlay } from './lib-env.mjs'
 
-const CORE_LIB = process.env.S1_CORE_LIB ?? 'file:///D:/dsh/harness-0.2.1/packages/evolution/evolution-core/lib/index.js'
-const COMPOSITION_LIB = process.env.S1_COMPOSITION_LIB ?? 'file:///D:/dsh/harness-0.2.1/packages/evolution/evolution-core/lib/composition/index.js'
-const SCOPE_LIB = process.env.S1_SCOPE_LIB ?? 'file:///C:/Users/limengzhen/AppData/Roaming/npm/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-scope/lib/index.js'
-const LOG = process.env.S1_LOG ?? 'D:/dsh/tmp/s1-child-toolset.log'
+// 遗留⑤: every default is derived (env -> portable resolver -> tmpdir), never a user path.
+const BUILD_LINE = process.env.S1_BUILD_LINE ?? resolveOverlay() ?? 'D:/dsh/harness-0.2.1'
+const fileUrl = (...parts) => 'file:///' + join(...parts).replace(/\\/g, '/')
+const CORE_LIB = process.env.S1_CORE_LIB ?? fileUrl(BUILD_LINE, 'packages', 'evolution', 'evolution-core', 'lib', 'index.js')
+const COMPOSITION_LIB = process.env.S1_COMPOSITION_LIB ?? fileUrl(BUILD_LINE, 'packages', 'evolution', 'evolution-core', 'lib', 'composition', 'index.js')
+const SCOPE_LIB = process.env.S1_SCOPE_LIB ?? fileUrl(npmGlobalRoot(), '@deepseek-ai', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-scope', 'lib', 'index.js')
+const LOG = process.env.S1_LOG ?? join(tmpdir(), 's1-child-toolset.log')
+const CHILD_CWD = process.env.S1_CHILD_CWD ?? join(tmpdir(), 's1-child-cwd')
 const log = (...parts) => appendFileSync(LOG, parts.map(x => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ') + String.fromCharCode(10))
 export const name = 's1-child-toolset'
 export function apply(ctx) {
@@ -56,8 +65,8 @@ export function apply(ctx) {
           if (state.kind !== 'ready') { log('S1 CHILD TOOLSET RESULT: blocked (ensure ' + state.kind + ')'); return }
           const resolved = await child.agentPresets.resolve(core.REVIEWER_PRESET_ID).catch(error => ({ broken: String(error && error.message) }))
           log('resolve broken:', resolved && resolved.broken === undefined ? 'undefined' : String(resolved && resolved.broken))
-          mkdirSync('D:/dsh/tmp/s1-child-cwd', { recursive: true })
-          const parentHandle = await child.agents.create({ sessionId: 'session-' + randomUUID(), meta: { cwd: 'D:/dsh/tmp/s1-child-cwd' }, agentOptions: {} })
+          mkdirSync(CHILD_CWD, { recursive: true })
+          const parentHandle = await child.agents.create({ sessionId: 'session-' + randomUUID(), meta: { cwd: CHILD_CWD }, agentOptions: {} })
           const parent = parentHandle.agent
           log('parent agent:', String(parent.id))
           const controller = new AbortController()

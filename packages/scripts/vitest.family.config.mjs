@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { adapterCandidates, resolveAdapter } from "./lib-env.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // C1/C2: the run root is the FAMILY TREE that holds this file (mirror: <root>/packages,
@@ -48,7 +49,10 @@ if (!LANES.includes(tier)) {
 // policy fact owns (adapter.expectedLine), never a human sentence - and the resolver pin (sha8).
 // A missing expected line is CANNOT DECIDE: "unknown" cannot be compared, and a reading nobody
 // can compare is not a pass. The comparison itself is verify-line-identity's判决, not this line.
-const ADAPTER = "D:/dsh/_tools/lib-line.mjs";
+// 遗留⑤: never a machine path — env FAMILY_LINE_ADAPTER first, then the workspace sibling;
+// the loader below still refuses by name when none exists (FAMILY_ALLOW_ABSENT_ADAPTER=1 keeps the
+// old escape hatch for a deliberate replay without the adapter).
+const ADAPTER = resolveAdapter() ?? adapterCandidates()[0];
 const platformLine = policyFact?.machine?.adapter?.expectedLine;
 if (typeof platformLine !== "string" || platformLine.trim() === "") {
   console.error("vitest.family.config: CANNOT DECIDE - the testing-policy fact states no adapter.expectedLine (" + policyPath + ")");

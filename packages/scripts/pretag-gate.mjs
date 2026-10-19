@@ -14,12 +14,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { STATES } from './lib-verdict.mjs'
+import { REPO_ROOT, requireOverlay, requireProfile } from './lib-env.mjs'
 
 const argv = process.argv.slice(2)
 const arg = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : dflt }
-const mirror = path.resolve(arg('--mirror', 'D:/dsh/dsh-evolution-mirror'))
-const overlay = path.resolve(arg('--overlay', 'D:/dsh/deepseek-harness'))
-const profile = path.resolve(arg('--profile', 'D:/dsh-homes/web/profiles/web'))
+const mirror = path.resolve(arg('--mirror', REPO_ROOT))
+const overlay = path.resolve(arg('--overlay') ?? requireOverlay())
+const profile = path.resolve(arg('--profile') ?? requireProfile())
 const fix = argv.includes('--fix')
 const results = []
 const record = (name, outcome, detail) => {

@@ -3,7 +3,7 @@
   "allowedKinds": ["evo-src", "upstream", "closure", "mono", "store", "profile-hoist"],
   "familyKinds": ["evo-src"],
   "machineStateKinds": ["profile-hoist", "closure", "mono"],
-  "familyRoots": ["D:/dsh/deepseek-harness/packages/evolution", "D:/dsh/dsh-evolution-mirror"],
+  "familyRoots": ["D:/dsh/harness-0.2.1/packages/evolution", "D:/dsh/deepseek-harness/packages/evolution", "D:/dsh/dsh-evolution-mirror"],
   "profileHoist": {
     "@deepseek-ai/schemastery": { "status": "declared", "reason": "closure pins 3.18.2 whose .volatile() is types-only; the profile hoist (3.18.4) is what the family’s volatile tests exercise" },
     "@deepseek-ai/dsh-tool-session-query": { "status": "necessary", "reason": "only present in the profile; the closure does not ship it" }

@@ -23,6 +23,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { requireOverlay } from './lib-env.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MANIFEST = join(HERE, 'gate-manifest.json')
@@ -157,7 +158,7 @@ function runRecord(id, record) {
   const occurrences = before.split(record.mutate.find).length - 1
   if (occurrences !== 1) return { status: 'PATCH NOT UNIQUE', detail: record.mutate.file + ': find occurs ' + occurrences + ' time(s)' }
   const equalValue = record.mutate.find === record.mutate.replace
-  const cwd = gate.tree === 'overlay' ? resolvePath(HERE, '..', '..', '..', 'deepseek-harness') : resolvePath(HERE, '..', '..')
+  const cwd = gate.tree === 'overlay' ? requireOverlay() : resolvePath(HERE, '..', '..')
   try {
     writeBytes(file, before.replace(record.mutate.find, record.mutate.replace))
     console.log('[probe] sha-after-write=' + sha256(readBytes(file, 'utf8')).slice(0, 10))

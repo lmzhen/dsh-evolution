@@ -558,11 +558,11 @@
         },
         "adapter": {
           "script": "lib-line.mjs",
-          "sha256": "e9c92046c2098fc6428665db01202f6d515a2812486c370969f86e04fd7d8c56",
+          "sha256": "1931db3d233c642d15bb2994408e917a70819800fa876cbe03446566bf12dbcb",
           "expectedLine": "0.2.0-rc.2",
           "extendsExternal": {
             "path": "D:/dsh/_tools/lib-line.mjs",
-            "sha256": "e9c92046c2098fc6428665db01202f6d515a2812486c370969f86e04fd7d8c56"
+            "sha256": "1931db3d233c642d15bb2994408e917a70819800fa876cbe03446566bf12dbcb"
           }
         },
         "overrides": [],

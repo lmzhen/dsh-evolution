@@ -5,8 +5,9 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { execFileSync } from "node:child_process";
+import { REPO_ROOT } from "./lib-env.mjs";
 
-const ROOT = process.argv[2] ?? "D:/dsh/dsh-evolution-mirror";
+const ROOT = process.argv[2] ?? REPO_ROOT;
 const KEYS = ["testTimeout", "hookTimeout", "maxConcurrency", "sequence", "retry", "teardownTimeout"];
 const files = [];
 const walk = (dir) => {

@@ -17,8 +17,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { REPO_ROOT } from './lib-env.mjs'
 
-const MIRROR = resolve(process.env.FAMILY_LINE_MIRROR ?? 'D:/dsh/dsh-evolution-mirror')
+const MIRROR = resolve(process.env.FAMILY_LINE_MIRROR ?? REPO_ROOT)
 const argv = process.argv.slice(2)
 const flag = (name) => { const at = argv.indexOf(name); return at >= 0 ? argv[at + 1] : undefined }
 const strict = argv.includes('--strict')

@@ -9,8 +9,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { execFileSync } from "node:child_process";
+import { REPO_ROOT } from "./lib-env.mjs";
 
-const ROOT = process.argv[2] ?? "D:/dsh/dsh-evolution-mirror";
+const ROOT = process.argv[2] ?? REPO_ROOT;
 const STRICT = process.argv.includes("--strict");
 const FAMILY = /^@deepseek-ai\/dsh-evolution-/;
 const PLATFORM = /^@deepseek-ai\/dsh-(?!evolution-)/;

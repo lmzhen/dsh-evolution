@@ -5,8 +5,9 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { REPO_ROOT } from "./lib-env.mjs";
 
-const ROOT = process.argv[2] ?? "D:/dsh/dsh-evolution-mirror";
+const ROOT = process.argv[2] ?? REPO_ROOT;
 const raw = execFileSync("node", [join(ROOT, "packages", "scripts", "verify-test-lines.mjs"), ROOT, "--full"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const reading = JSON.parse(raw.slice(raw.indexOf("{")));
 const EXPIRY = "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing";

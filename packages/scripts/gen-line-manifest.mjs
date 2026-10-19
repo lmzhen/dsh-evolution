@@ -11,14 +11,15 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { formatLineHeader, readLineHeader } from './lib-line-header.mjs'
+import { REPO_ROOT, requireOverlay, requireProfile } from './lib-env.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const ROOT = resolve(HERE, '..', '..')
+const ROOT = REPO_ROOT
 const args = process.argv.slice(2)
 const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined }
 const policy = JSON.parse(readFileSync(join(HERE, 'line-policy.json'), 'utf8'))
-const overlay = resolve(flag('--overlay') ?? process.env.EVOLUTION_OVERLAY_ROOT ?? 'D:/dsh/deepseek-harness')
-const profile = resolve(flag('--profile') ?? process.env.EVOLUTION_PROFILE ?? 'D:/dsh-homes/web/profiles/web')
+const overlay = resolve(flag('--overlay') ?? requireOverlay())
+const profile = resolve(flag('--profile') ?? requireProfile())
 // P1-② (release review 2026-10-15): a line with no pin is a line nobody can name, and the family rule
 // (lib-line-header) is explicit: a green result may not be claimed when the line is unknown. Take the
 // real short SHA - the same source formatCiLineHeader uses in CI - and keep `unknown` as the fallback
