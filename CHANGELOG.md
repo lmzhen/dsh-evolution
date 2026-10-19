@@ -1,4 +1,8 @@
 # Changelog
+## 0.27.2 (patch) — 诊断卡重设计（普通读者可读、与同节卡片对齐）+ 宿主视图值白话化
+
+> **范围**：0.27.1 用户反馈的两条界面缺陷。①**对齐与可读性**：`evolution-settings-ui` 的诊断卡头用了 stylesheet 中不存在的 `.evolution-param-card-head`，且 `evo-diag-*` 没有任何规则，事实/运行时行退化为裸 inline（标签、值、`出处：path` 连成一行，body 无内缩）；重建为与参数卡/待批卡同构的折叠头（标题 + 摘要徽标 + chevron）与 body 内缩，事实改「标签上、值下」，运行态改「状态点 + 状态词 / 详情 / 建议」，原始材料（schema、检查时间、每条数据来源）收进「技术详情」折叠。②**普通读者可接受性**：`evolution-commands` 的 7 条诊断事实值与 8 条运行时标签改为白话（`M1` → `完整功能包（安装内容已声明）`、`floor` → `最低兼容`、preset id 串 → `审阅 / 维护两个受限只读预设`；推断态保留证据串），CLI/JSON/浏览器三面同源更新；卡片先给结论（运行正常 / N 项需要注意 / N 项异常 / N 项待确认），状态色用平台 alias 且始终配文字。
+> **验证**：settings-ui 21 files / 79 tests 与 commands doctor-view/doctor/diagnostics-route 60 tests 全绿；`verify-client-ui-i18n`（42 client source files，无硬编码文案）、`verify-client-tokens`、`build-lib`、`verify-doc-facts` 全绿；真实组件 + 包内样式渲染的设计预览与在役 3080 热装 CDP 读数一致（head 摘要、两组、技术详情；旧 `schema v2` / `出处：` 消失；console errors=0）；桌面 19387 未改动。
 ## 0.27.1 (patch) — doctor 文本面单源化（view-first）+ 遗留清理工具链
 
 > **范围**：0.27.0 发布后登记的六项遗留全部闭环，只有一项触及已发布包运行代码——`evolution-commands` 的 doctor 文本面改为 **view-first**：先输出 schema v2 诊断视图（7 facts + 8 runtime，与 `--json`、diagnostics 路由同一对象），再输出「补充检查」段承载 view 未覆盖的运行时事实（跨 profile bundles、服务推断、capability absence、scoped probe、legacy 设置文档、pending/executing、preset 新鲜度、冲突/环境/预算/参数/会话检索与 next steps）；删除与 view 重复的 install-form 旧行（单源渲染一次）。doctor/doctor-view/diagnostics-route 三 spec 60/60。
