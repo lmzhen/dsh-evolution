@@ -92,7 +92,7 @@
     },
     "clientConsole": {
       "face": "web",
-      "version": "0.27.0",
+      "version": "0.27.1",
       "host": "127.0.0.1:3080",
       "chrome": "Chrome/155.0.8059.82",
       "steps": [
@@ -108,9 +108,10 @@
         "facts": 7,
         "runtime": 8
       },
+      "familyVersionFact": "0.27.1",
       "installForm": "M1（declared）",
       "rowConfigEntries": 7,
-      "evidence": "execution/assets/client-console-3080-2026-10-19.json",
+      "evidence": "execution/assets/client-console-3080-0.27.1.json",
       "evidenceScript": "packages/scripts/capture-client-console.mjs"
     }
   }
