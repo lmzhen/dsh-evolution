@@ -61,6 +61,28 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
   return {
     async execute(command, context?: MergeCommandContext) {
       const parent = context?.parent ?? deps.parent
+      if (command.verb === 'pair') {
+        const signal = new AbortController().signal
+        const cards = await deps.cards(signal)
+        const pair = [{ a: command.a, b: command.b }]
+        const result = await runScanCommand({
+          ...common,
+          approval: deps.params.mergeApproval,
+          makePorts: runId => createChannelScanPorts({
+            io: deps.io, home: deps.home, runId, cards,
+            screening: async () => pair,
+            channel: deps.channel, parent, allow: deps.allow,
+            ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
+            timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
+            approval: deps.params.mergeApproval,
+            commitPort: skillLibraryPort(deps.skills), now: deps.now,
+            ...(deps.stage === undefined ? {} : { onChild: context => deps.stage!.bind(context), onChildClosed: childId => deps.stage!.unbind(childId) }),
+          }),
+        })
+        return result.ok
+          ? { ok: true, text: 'merge pair 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
+          : { ok: false, text: result.message }
+      }
       if (command.verb === 'scan') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
