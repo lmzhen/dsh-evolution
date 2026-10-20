@@ -40,7 +40,7 @@ import { executeUnitUndo, planUnitUndoAcross, type UnitUndoMember, type UnitUndo
 import { historyIndexFile, parseHistoryIndex, resolveUnitMembers, unitMembersAreComplete, staleRouteStubs } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, blobPath, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, acquireTreeWriteLock, blobPath, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -1005,6 +1005,19 @@ export class EvolutionCurator extends Service {
   private mutexDepth = 0
   private mutexTail: Promise<void> = Promise.resolve()
 
+  /** Cross-process tree lock shared with merge runs; curator mutations take it only around apply. */
+  private async withMergeTreeLock<T>(body: () => Promise<T>): Promise<T> {
+    const acquired = await acquireTreeWriteLock({ io: this.io, home: evolutionHome() })
+    if (!acquired.ok) {
+      throw new Error('evolution-curator: merge tree lock unavailable (' + acquired.reason + ')' + (acquired.holder === undefined ? '' : '; holder pid ' + String(acquired.holder.pid)))
+    }
+    try {
+      return await body()
+    } finally {
+      await acquired.lock.release()
+    }
+  }
+
   private acquireMutex(): Promise<() => void> {
     this.mutexDepth += 1
     const prev = this.mutexTail
@@ -1312,7 +1325,7 @@ export class EvolutionCurator extends Service {
       },
       note: (text: string) => { this.ctx.logger.info('evolution-curator: ' + text) },
     }
-    const { archivedSkills, errors, consolidated } = await withTreeWrite(() => this.acquireMutex(), sectionView, async () => apply({
+    const { archivedSkills, errors, consolidated } = await withTreeWrite(() => this.acquireMutex(), sectionView, async () => this.withMergeTreeLock(() => apply({
       dryRun,
       archiveCandidates,
       nominations: gatedNominations,
@@ -1334,7 +1347,7 @@ export class EvolutionCurator extends Service {
       // A2-4 (v18): the CAS basis for the lifecycle fold (see runStartStates).
       runStartStates,
       failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
-    }))
+    })))
     // v28 G4.1 (CUR-01): a disposed mid-run must not anchor the durable
     // schedule as if the pass had completed — the aborted-run bookkeeping used
     // to push lastRunAt a full intervalHours (default 168h) into the future,
