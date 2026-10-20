@@ -6,7 +6,8 @@ import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { loadMergeState } from './state.ts'
 import { runScanCommand } from './scan-command.ts'
 import { withMergeRun, type MergeRegistryPort, type WithMergeRunResult } from './run-shell.ts'
-import type { ScanPorts } from './scan-run.ts'
+import type { ScanPorts, ScanRound2Outcome } from './scan-run.ts'
+import type { MergeDecision, MergeRow } from './contracts.ts'
 import { recordRound2Outcome } from './round2-outcome.ts'
 
 export interface RunResumeCommandOptions {
@@ -14,6 +15,8 @@ export interface RunResumeCommandOptions {
   readonly home: string
   readonly registry: MergeRegistryPort
   readonly ports: ScanPorts
+  /** Optional new-child authoring port (approve-after-pending path). */
+  readonly round2WithRun?: (row: MergeRow, decision: MergeDecision, signal: AbortSignal, runId: string) => Promise<ScanRound2Outcome>
   readonly rowId: string
   readonly platformWrite: boolean
   readonly timeoutMinutes?: number
@@ -42,7 +45,9 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       await ctx.stage('author', { done: 0, total: 1 })
       let outcome
       try {
-        outcome = await options.ports.round2(row, decision, ctx.signal)
+        outcome = options.round2WithRun === undefined
+          ? await options.ports.round2(row, decision, ctx.signal)
+          : await options.round2WithRun(row, decision, ctx.signal, ctx.runId)
       } catch (error) {
         outcome = { kind: 'failed' as const, failure: { stage: 'author' as const, code: 'merge-failed', message: error instanceof Error ? error.message : String(error), retryable: true, retryFrom: 'agent2' as const } }
       }

@@ -11,7 +11,7 @@ import type { ScanRound2Outcome } from './scan-run.ts'
 import { recordRound2Outcome } from './round2-outcome.ts'
 
 export interface ApprovePorts {
-  round2(row: MergeRow, decision: MergeDecision, signal: AbortSignal): Promise<ScanRound2Outcome>
+  round2(row: MergeRow, decision: MergeDecision, signal: AbortSignal, runId: string): Promise<ScanRound2Outcome>
 }
 
 export interface RunApproveCommandOptions {
@@ -42,7 +42,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
       await stage('author')
       let outcome: ScanRound2Outcome
       try {
-        outcome = await options.ports.round2(row, decision, ctx.signal)
+        outcome = await options.ports.round2(row, decision, ctx.signal, ctx.runId)
       } catch (error) {
         outcome = { kind: 'failed', failure: { stage: 'author', code: 'merge-failed', message: error instanceof Error ? error.message : String(error), retryable: true, retryFrom: 'agent2' } }
       }

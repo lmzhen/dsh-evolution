@@ -76,3 +76,7 @@ export async function runNewChildAuthoring(
     try { await options.channel.dispose(opened.childId) } catch { /* teardown must not replace the outcome */ }
   }
 }
+
+export function createNewChildRound2(options: Omit<NewChildAuthoringOptions, 'runId'>): (row: MergeRow, decision: MergeDecision, signal: AbortSignal, runId: string) => Promise<ScanRound2Outcome> {
+  return (row, decision, signal, runId) => runNewChildAuthoring({ ...options, runId }, row, decision, signal)
+}
