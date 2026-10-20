@@ -132,6 +132,8 @@ export interface MergeRow {
   readonly state: MergePairState
   readonly queue: MergeQueue
   readonly failure?: MergeFailure
+  /** Round-1 decision, persisted for the later approve round. */
+  readonly decision?: MergeDecision
   readonly runId?: string
   readonly unitId?: string
   readonly origin?: 'agent' | 'human'

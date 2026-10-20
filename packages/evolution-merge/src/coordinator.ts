@@ -9,6 +9,7 @@ import {
   pairKey,
   queueOf,
   rowIdOf,
+  type MergeDecision,
   type MergeFailure,
   type MergeRow,
 } from './contracts.ts'
@@ -16,7 +17,7 @@ import {
 export type MergeEvent =
   | { readonly type: 'candidate'; readonly a: string; readonly b: string; readonly at: string }
   | { readonly type: 'round1-keep'; readonly at: string }
-  | { readonly type: 'round1-merge'; readonly approval: 'on' | 'off'; readonly at: string }
+  | { readonly type: 'round1-merge'; readonly approval: 'on' | 'off'; readonly decision?: MergeDecision; readonly at: string }
   | { readonly type: 'round1-fail'; readonly failure: MergeFailure; readonly at: string }
   | { readonly type: 'approve'; readonly runId?: string; readonly at: string }
   | { readonly type: 'reject'; readonly at: string }
@@ -51,6 +52,7 @@ function base(row: MergeRow, at: string): Omit<MergeRow, 'failure'> {
     ...(row.runId === undefined ? {} : { runId: row.runId }),
     ...(row.unitId === undefined ? {} : { unitId: row.unitId }),
     ...(row.origin === undefined ? {} : { origin: row.origin }),
+    ...(row.decision === undefined ? {} : { decision: row.decision }),
     ...(row.attempts === undefined ? {} : { attempts: row.attempts }),
   }
 }
@@ -94,7 +96,9 @@ export function transition(current: MergeRow | undefined, event: MergeEvent): Tr
       return current.state === 'verify' ? next(current, event.at, 'skipped', { origin: 'agent' }) : invalid(event, current.state)
     case 'round1-merge':
       if (current.state !== 'verify') return invalid(event, current.state)
-      return event.approval === 'on' ? next(current, event.at, 'pending') : next(current, event.at, 'fuse')
+      return event.approval === 'on'
+        ? next(current, event.at, 'pending', event.decision === undefined ? {} : { decision: event.decision })
+        : next(current, event.at, 'fuse', event.decision === undefined ? {} : { decision: event.decision })
     case 'round1-fail':
       return current.state === 'verify'
         ? next(current, event.at, 'verify', { failure: event.failure, attempts: (current.attempts ?? 0) + 1 })

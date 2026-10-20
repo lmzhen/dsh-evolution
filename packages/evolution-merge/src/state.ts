@@ -65,6 +65,7 @@ function parseState(raw: string | null): ParsedState {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       ...(row.failure === undefined ? {} : { failure: row.failure }),
+      ...(row.decision === undefined ? {} : { decision: row.decision }),
       ...(typeof row.runId === 'string' ? { runId: row.runId } : {}),
       ...(typeof row.unitId === 'string' ? { unitId: row.unitId } : {}),
       ...(row.origin === 'agent' || row.origin === 'human' ? { origin: row.origin } : {}),

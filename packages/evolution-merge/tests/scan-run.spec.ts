@@ -52,5 +52,6 @@ it('approval on stops at pending without calling round2', async () => {
   expect(draft.totals).toMatchObject({ pending: 1, kept: 1 })
   expect(round2).toBe(0)
   const rows = (await loadMergeState(io, home)).state.rows
-  expect(rows.some(row => row.state === 'pending')).toBe(true)
+  const pending = rows.find(row => row.state === 'pending')
+  expect(pending?.decision).toEqual(DECISION)
 })
