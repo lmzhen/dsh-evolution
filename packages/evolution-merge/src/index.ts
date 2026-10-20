@@ -11,6 +11,7 @@ import { lexicalCandidates } from './screening.ts'
 import { subagentChannelAdapter } from './adapters/channel.ts'
 import { StageToolRegistry } from './stage-tool-registry.ts'
 import { createMergeStageTool } from './merge-tool.ts'
+import { supersedeMergeRuns } from './supersede.ts'
 
 /** E3 knobs are volatile (user layer); the E2 pair timeout is deployment-only. */
 export const Config = z.object({
@@ -83,6 +84,7 @@ export * from './merge-routes.ts'
 export * from './merge-command.ts'
 export * from './params.ts'
 export * from './doctor.ts'
+export * from './supersede.ts'
 export * from './runtime.ts'
 
 export const inject: string[] = []
@@ -99,7 +101,14 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const home = evolutionHome()
     const runs = newRunRegistry({ io, home, warn: message => { ctx.logger.warn(message) } })
     void runs.load()
-    const skills = newSkillLibrary({ io, authority: authorityFrom({ origin: 'subagent' }) })
+    ctx.effect(() => {
+      const on = (ctx as unknown as { on(name: string, listener: (event: { action?: string }) => void): () => void }).on
+      if (typeof on !== 'function') return () => {}
+      return on.call(ctx, 'evolution/skill-mutated', event => {
+        if (event.action === 'restore') void supersedeMergeRuns(runs)
+      })
+    }, 'evolution-merge: restore supersede')
+    const skills = newSkillLibrary({ io, ctx: ctx as never, authority: authorityFrom({ origin: 'subagent' }) })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()
     source = {
