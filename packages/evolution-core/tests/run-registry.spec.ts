@@ -70,6 +70,21 @@ describe('core run registry (S2)', () => {
     expect(registry.find(merge.id)?.supersededAt).toBe(first)
   })
 
+  it('supersedes a foreign merge row through the shared index (cross-process restore)', async () => {
+    const dir = await home()
+    const owner = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
+    await owner.load()
+    const merge = await owner.begin('merge', { command: 'scan' })
+    await owner.settle(merge.id, { state: 'succeeded' })
+    const restorePlane = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
+    await restorePlane.load()
+    expect(restorePlane.find(merge.id)?.supersededAt).toBeUndefined()
+    expect(await restorePlane.supersedeKind('merge')).toBe(1)
+    const observed = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
+    await observed.load()
+    expect(typeof observed.find(merge.id)?.supersededAt).toBe('number')
+  })
+
   it('caps terminal history per kind', async () => {
     const dir = await home()
     const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir, maxRecords: 1 })

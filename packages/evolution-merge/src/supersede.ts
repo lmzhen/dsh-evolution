@@ -9,6 +9,8 @@ export function mergeRunIdsToSupersede(runs: readonly RunRecord[]): readonly str
 }
 
 export async function supersedeMergeRuns(registry: RunRegistry): Promise<number> {
+  const shared = (registry as { supersedeKind?: (kind: 'merge') => Promise<number> }).supersedeKind
+  if (typeof shared === 'function') return await shared.call(registry, 'merge')
   const ids = mergeRunIdsToSupersede(registry.runs())
   if (ids.length === 0) return 0
   await registry.supersede(ids)

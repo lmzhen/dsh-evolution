@@ -128,6 +128,8 @@ export interface RunRegistry {
   stage(id: string, stage: RunStage, progress?: RunProgress): Promise<void>
   /** Mark runs as superseded by a tree restore; idempotent. */
   supersede(ids: readonly string[]): Promise<void>
+  /** Mark every run of a kind in the SHARED index (including foreign rows); returns the count. */
+  supersedeKind(kind: RunKind): Promise<number>
   /** The live run, optionally filtered by kind. */
   inFlight(kind?: RunKind): RunRecord | undefined
   /** When the newest terminal run of a kind ended (`undefined` when none). */
@@ -440,6 +442,26 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         changed = true
       }
       if (changed) await persist()
+    },
+
+    async supersedeKind(kind) {
+      let marked = 0
+      await transactIo(options.io, path, (current) => {
+        const onDisk = parseIndex(current)
+        const merged = new Map<string, RunRecord>()
+        for (const row of onDisk.records) merged.set(row.id, row)
+        for (const [id, row] of owned) merged.set(id, row)
+        for (const row of merged.values()) {
+          if (row.kind !== kind || row.supersededAt !== undefined) continue
+          row.supersededAt = now()
+          marked += 1
+        }
+        const kept = capped([...merged.values()])
+        const live = kept.filter(row => row.state === 'running')
+        const done = kept.filter(row => TERMINAL.has(row.state))
+        return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done, ...onDisk.foreign] }, null, 2)
+      })
+      return marked
     },
 
     async settle(id, outcome) {
