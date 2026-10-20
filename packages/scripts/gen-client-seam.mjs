@@ -34,6 +34,7 @@ const SURFACE_IDS = {
   approval: 'approval',
   skillHistory: 'skill-history',
   skillHealth: 'skill-health',
+  merge: 'merge',
   diagnostics: 'diagnostics',
 }
 
