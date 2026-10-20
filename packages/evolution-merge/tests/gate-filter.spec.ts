@@ -23,6 +23,7 @@ it('keeps a candidate that reaches L2 merge', async () => {
     facts, model: levelModel({ L0: 1, L1: 0, L2: 1 }), modelName: 'm', signal, runSeed: 'seed',
   })
   expect(result.kept).toHaveLength(1)
+  expect(result.kept[0]?.candidate.gate).toMatchObject({ level: 'L2', verdict: 1 })
   expect(result.dropped).toHaveLength(0)
   expect(result.calls).toBe(3)
 })
@@ -39,6 +40,7 @@ it('drops L0 keep and keeps an audited override', async () => {
   })
   expect(audited.kept).toHaveLength(1)
   expect(audited.kept[0]?.auditOverride).toBe(true)
+  expect(audited.kept[0]?.candidate.gate).toMatchObject({ level: 'L2', verdict: 1, auditOverride: true })
   expect(audited.calls).toBe(2)
 })
 

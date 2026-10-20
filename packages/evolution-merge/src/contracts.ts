@@ -58,12 +58,21 @@ export interface MergeFailure {
 }
 
 /** One persisted pair. The id is stable for the UI; the pairKey is the natural key. */
+export interface MergeGateFact {
+  readonly level: 'L0' | 'L1' | 'L2'
+  readonly verdict: 1 | 0 | -1
+  readonly reason: string
+  readonly cached?: boolean
+  readonly auditOverride?: boolean
+}
+
 export interface MergeCandidate {
   readonly a: string
   readonly b: string
   readonly score?: number
   readonly arms?: readonly string[]
   readonly reason?: string
+  readonly gate?: MergeGateFact
   readonly source?: 'lexical' | 'proposed'
 }
 
@@ -99,6 +108,7 @@ export interface MergeReportPair {
   readonly b: string
   readonly queue: MergeQueue
   readonly candidate?: MergeCandidate
+  readonly gate?: MergeGateFact
   readonly decision?: MergeDecision
   readonly outcome: 'merged' | 'kept' | 'pending' | 'failed' | 'cancelled'
   readonly target?: { readonly requested: string; readonly actual: string; readonly created: boolean }

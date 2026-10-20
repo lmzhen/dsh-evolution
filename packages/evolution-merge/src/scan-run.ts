@@ -70,6 +70,7 @@ function pairOf(row: MergeRow, candidate: MergeCandidate, outcome: MergeReportPa
     b: row.b,
     queue: row.queue,
     candidate,
+    ...(candidate.gate === undefined ? {} : { gate: candidate.gate }),
     outcome,
     archived: [],
     ...extra,

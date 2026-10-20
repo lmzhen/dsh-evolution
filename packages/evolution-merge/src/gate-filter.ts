@@ -29,6 +29,21 @@ export interface GateFilterResult {
   readonly calls: number
 }
 
+function withGate(candidate: MergeCandidate, verdicts: readonly GateVerdict[], auditOverride: boolean): MergeCandidate {
+  const last = verdicts[verdicts.length - 1]
+  if (last === undefined) return candidate
+  return {
+    ...candidate,
+    gate: {
+      level: last.level,
+      verdict: last.verdict,
+      reason: last.reason,
+      ...(last.cached ? { cached: true } : {}),
+      ...(auditOverride ? { auditOverride: true } : {}),
+    },
+  }
+}
+
 export async function filterCandidates(candidates: readonly MergeCandidate[], options: GateFilterOptions): Promise<GateFilterResult> {
   const kept: GateDecision[] = []
   const dropped: GateDecision[] = []
@@ -46,7 +61,7 @@ export async function filterCandidates(candidates: readonly MergeCandidate[], op
       continue
     }
     if (first.route !== 'keep' || first.droppedAt !== 'L0') {
-      if (first.route === 'merge' || first.route === 'undecided') kept.push({ candidate, verdicts: first.verdicts, auditOverride: false })
+      if (first.route === 'merge' || first.route === 'undecided') kept.push({ candidate: withGate(candidate, first.verdicts, false), verdicts: first.verdicts, auditOverride: false })
       else dropped.push({ candidate, verdicts: first.verdicts, auditOverride: false })
       continue
     }
@@ -61,7 +76,8 @@ export async function filterCandidates(candidates: readonly MergeCandidate[], op
     })
     calls += audit.calls
     if (audit.route === 'merge' || audit.route === 'undecided') {
-      kept.push({ candidate, verdicts: [...first.verdicts, ...audit.verdicts], auditOverride: true })
+      const all = [...first.verdicts, ...audit.verdicts]
+      kept.push({ candidate: withGate(candidate, all, true), verdicts: all, auditOverride: true })
     } else if (audit.route === 'error') {
       errors.push({ candidate, message: audit.error ?? 'audit gate error' })
     } else {
