@@ -340,6 +340,35 @@ export interface ArchiveOptions {
   reason?: string
   /** Permit archiving a bundled skill (curator prune-builtins only; hub-installed and pinned stay protected). */
   allowBundled?: boolean
+  /** Unit shared with the rest of a multi-skill transaction (merge). */
+  unitId?: string
+  /** Cross-skill landmark for the unit; a merge source names the target. */
+  unitHead?: UnitHead
+}
+
+/** One multi-skill merge commit: target body + support files, with the source names it absorbs. */
+export interface CommitMergePlan {
+  readonly target: string
+  /** Whether the target already exists. The caller planned this; commit re-checks it. */
+  readonly targetExists: boolean
+  readonly sources: readonly string[]
+  readonly body: string
+  readonly supportFiles: readonly { readonly path: string; readonly content: string }[]
+  /** Plan-time target body; null for a create. */
+  readonly expectedTargetBody: string | null
+  readonly expectedSourceBodies: readonly { readonly name: string; readonly body: string }[]
+  readonly origin: WriteOrigin
+  readonly summary: string
+}
+
+export interface CommitMergeResult {
+  readonly ok: boolean
+  readonly message: string
+  readonly unitId?: string
+  readonly targetPath?: string
+  readonly archived?: readonly string[]
+  /** One per skill written: target + each source. */
+  readonly mutations?: number
 }
 
 export function skillsRoot(env: NodeJS.ProcessEnv = process.env): string {
@@ -624,6 +653,8 @@ interface TreeChangePlan {
   // plan it composes, so the entries they record are pruned and undone as one unit. Absent ⇒ the
   // tree change mints its own (a single-write operation is a unit of one).
   unitId?: string
+  /** Override the kernel-computed head (a merge names both the target and every archived source). */
+  unitHead?: UnitHead
 }
 
 function planRestructureSections(body: string, moves: SkillRestructureMove[]): RestructurePlan {
@@ -1573,16 +1604,26 @@ export class SkillLibrary {
     }
   }
 
-  async create(name: string, content: string, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+  async create(
+    name: string,
+    content: string,
+    origin: WriteOrigin = this.authority.origin,
+    options: { unitId?: string; unitHead?: UnitHead } = {},
+  ): Promise<SkillActionResult> {
     const normalized = name.trim()
     // P2-3 (v11): the exists-probe → write window runs under the in-process
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
     // create calls for one name used to both pass exists() and double-write
     // (double audit, double mutation event).
-    return await this.serial(() => this.createCore(normalized, content, origin))
+    return await this.serial(() => this.createCore(normalized, content, origin, options))
   }
 
-  private async createCore(normalized: string, content: string, origin: WriteOrigin): Promise<SkillActionResult> {
+  private async createCore(
+    normalized: string,
+    content: string,
+    origin: WriteOrigin,
+    options: { unitId?: string; unitHead?: UnitHead } = {},
+  ): Promise<SkillActionResult> {
     // C-12 (v10 audit): the inline badName() copy is gone (see setPinned).
     const bad = this.badName(normalized)
     if (bad) return { ok: false, message: bad }
@@ -1726,7 +1767,7 @@ export class SkillLibrary {
         return { ok: false, message: `创建过程中技能「${normalized}」被并发归档；残留标记已移除：等搬运完成后重试一次。` }
       }
     }
-    await this.audit(normalized, 'create', null, onDisk, 'created')
+    await this.audit(normalized, 'create', null, onDisk, 'created', undefined, options.unitId, options.unitHead)
     this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
     // Both warnings ride the normal success path (audit/event included) — a
     // durability warning must never skip the accounting.
@@ -2125,9 +2166,204 @@ export class SkillLibrary {
     } catch {
       // Same posture as .archive-reason: metadata only, never abort the archive.
     }
-    await this.audit(name, 'archive', md, null, reason, undefined, undefined, undefined, origin)
+    await this.audit(name, 'archive', md, null, reason, undefined, options.unitId, options.unitHead, origin)
     this.notifyMutation({ action: 'archive', name, archivedPath: dest })
     return { ok: true, message: `技能「${name}」已归档到 .archive。`, path: dest }
+  }
+
+  /**
+   * Commit one merge plan as a single multi-skill transaction.
+   *
+   * Existing target: archive every source first, then write the target through the
+   * tree-change kernel. Create target: create the target with its final body first
+   * (so absorbedInto can see it), then archive sources and write support files.
+   * Every failure rolls back what already landed; a rollback failure names the
+   * unrestored skills instead of claiming success.
+   */
+  async commitMerge(plan: CommitMergePlan): Promise<CommitMergeResult> {
+    const target = plan.target.trim()
+    const sources = [...new Set(plan.sources.map(name => name.trim()))].filter(name => name !== target)
+    if (sources.length === 0) return { ok: false, message: '合并至少需要一个互不相同的来源技能。' }
+    for (const name of [target, ...sources]) {
+      const bad = this.badName(name)
+      if (bad) return { ok: false, message: bad }
+    }
+    return await this.serial(async (): Promise<CommitMergeResult> => {
+      const dir = this.dirOf(target)
+      const targetPath = join(dir, 'SKILL.md')
+      const currentTarget = await this.io.readText(targetPath)
+      if (plan.targetExists !== (currentTarget !== null)) {
+        return { ok: false, message: plan.targetExists ? `目标技能「${target}」不存在。` : `目标技能「${target}」已存在。` }
+      }
+      if (currentTarget !== plan.expectedTargetBody) {
+        return { ok: false, message: `目标技能「${target}」在计划之后被改过；拒绝提交（未写入任何内容）。` }
+      }
+      const targetProtection = await this.writeProtection(target, plan.origin)
+      if (targetProtection) return { ok: false, message: `技能「${target}」受保护（${targetProtection}）。` }
+      const expectedSources = new Map(plan.expectedSourceBodies.map(entry => [entry.name.trim(), entry.body]))
+      const sourceBodies = new Map<string, string>()
+      for (const source of sources) {
+        const protection = await this.deleteProtection(source)
+        if (protection) return { ok: false, message: `技能「${source}」受保护（${protection}）。` }
+        const body = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+        if (body === null) return { ok: false, message: `来源技能「${source}」不存在。` }
+        const expected = expectedSources.get(source)
+        if (expected === undefined) return { ok: false, message: `来源技能「${source}」缺少计划字节；拒绝提交。` }
+        if (body !== expected) return { ok: false, message: `来源技能「${source}」在计划之后被改过；拒绝提交（未写入任何内容）。` }
+        sourceBodies.set(source, body)
+      }
+      const validation = validateFrontmatter(plan.body, target, this.limits)
+      if (validation) return { ok: false, message: validation }
+      const supportPaths = new Set<string>()
+      const supportPrevious = new Map<string, string | null>()
+      for (const file of plan.supportFiles) {
+        const badPath = validateSupportPath(file.path)
+        if (badPath) return { ok: false, message: badPath }
+        if (supportPaths.has(file.path)) return { ok: false, message: `支撑文件重复：${file.path}` }
+        supportPaths.add(file.path)
+        if (Buffer.byteLength(file.content, 'utf8') > this.limits.maxSkillFileBytes) return { ok: false, message: `支撑文件超过 ${this.limits.maxSkillFileBytes} 字节：${file.path}` }
+        const threat = this.contentThreatBlock(file.content)
+        if (threat) return { ok: false, message: threat }
+        const previous = await this.io.readText(join(dir, ...file.path.replace(/\\/g, '/').split('/').filter(Boolean)))
+        supportPrevious.set(file.path, previous)
+      }
+      for (const ref of supportRefs(plan.body)) {
+        if (supportPaths.has(ref)) continue
+        const existing = plan.targetExists
+          ? await this.io.exists(join(dir, ...ref.replace(/\\/g, '/').split('/').filter(Boolean)))
+          : false
+        if (!existing) return { ok: false, message: `正文引用了未提供的支撑文件「${ref}」；拒绝提交。` }
+      }
+      const unitId = 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
+      const supportMoves = plan.supportFiles.map((file) => {
+        const previous = supportPrevious.get(file.path) ?? null
+        return {
+          path: file.path,
+          kind: previous === null ? 'created' : 'moved',
+          to: file.path,
+          ...(previous === null ? {} : { beforeRef: contentHash(previous) }),
+          afterRef: contentHash(file.content),
+        }
+      })
+      const unitHead: UnitHead = {
+        moves: supportMoves,
+        sources: [{ skill: target }, ...sources.map(source => ({ skill: source }))],
+      }
+      const archived: string[] = []
+      const rollbackSources = async (): Promise<string[]> => {
+        const stuck: string[] = []
+        for (const source of [...archived].reverse()) {
+          try {
+            const restored = await this.restoreFromArchive(source, plan.origin)
+            if (!restored.ok) stuck.push(source)
+          } catch {
+            stuck.push(source)
+          }
+        }
+        return stuck
+      }
+      const rollbackMessage = (reason: string, stuck: readonly string[]): CommitMergeResult => ({
+        ok: false,
+        message: stuck.length === 0
+          ? `合并失败，已回滚：${reason}`
+          : `合并失败（${reason}）；已回滚，但以下未回滚：${stuck.join(', ')}：它们仍在 .archive 里，请用 /evolution skill restore 恢复。`,
+      })
+
+      if (plan.targetExists) {
+        for (const source of sources) {
+          const fresh = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+          if (fresh !== sourceBodies.get(source)) {
+            const stuck = await rollbackSources()
+            return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
+          }
+          const result = await this.archive(source, {
+            absorbedInto: target,
+            unitId,
+            unitHead: { skill: target },
+            reason: `Merged into ${target}`,
+          }, plan.origin)
+          if (!result.ok) {
+            const stuck = await rollbackSources()
+            return rollbackMessage(result.message, stuck)
+          }
+          archived.push(source)
+        }
+        const writes: TreeChangeWrite[] = [
+          { target: targetPath, content: plan.body.trimEnd() + '\n', expected: plan.expectedTargetBody },
+          ...plan.supportFiles.map(file => ({
+            target: join(dir, ...file.path.replace(/\\/g, '/').split('/').filter(Boolean)),
+            content: file.content,
+            expected: supportPrevious.get(file.path) ?? null,
+          })),
+        ]
+        const result = await this.applyTreeChange({
+          name: target,
+          origin: plan.origin,
+          protection: 'write',
+          writes,
+          auditAction: 'merge',
+          auditSummary: plan.summary,
+          eventAction: 'merge',
+          unitId,
+          unitHead,
+        })
+        if (!result.ok) {
+          const stuck = await rollbackSources()
+          return rollbackMessage(result.message, stuck)
+        }
+        return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
+      }
+
+      const created = await this.createCore(target, plan.body, plan.origin, { unitId, unitHead })
+      if (!created.ok) return { ok: false, message: created.message }
+      for (const source of sources) {
+        const fresh = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+        if (fresh !== sourceBodies.get(source)) {
+          const stuck = await rollbackSources()
+          const targetRollback = await this.archive(target, { reason: 'merge rolled back' }, plan.origin)
+          if (!targetRollback.ok) stuck.push(target)
+          return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
+        }
+        const result = await this.archive(source, {
+          absorbedInto: target,
+          unitId,
+          unitHead: { skill: target },
+          reason: `Merged into ${target}`,
+        }, plan.origin)
+        if (!result.ok) {
+          const stuck = await rollbackSources()
+          const targetRollback = await this.archive(target, { reason: 'merge rolled back' }, plan.origin)
+          if (!targetRollback.ok) stuck.push(target)
+          return rollbackMessage(result.message, stuck)
+        }
+        archived.push(source)
+      }
+      if (plan.supportFiles.length > 0) {
+        const writes: TreeChangeWrite[] = plan.supportFiles.map(file => ({
+          target: join(dir, ...file.path.replace(/\\/g, '/').split('/').filter(Boolean)),
+          content: file.content,
+          expected: supportPrevious.get(file.path) ?? null,
+        }))
+        const result = await this.applyTreeChange({
+          name: target,
+          origin: plan.origin,
+          protection: 'write',
+          writes,
+          auditAction: 'merge',
+          auditSummary: plan.summary,
+          eventAction: 'merge',
+          unitId,
+          unitHead,
+        })
+        if (!result.ok) {
+          const stuck = await rollbackSources()
+          const targetRollback = await this.archive(target, { reason: 'merge rolled back' }, plan.origin)
+          if (!targetRollback.ok) stuck.push(target)
+          return rollbackMessage(result.message, stuck)
+        }
+      }
+      return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
+    })
   }
 
   /**
@@ -2693,25 +2929,27 @@ export class SkillLibrary {
       const isBody = land.target.split(/[\\/]/).pop() === 'SKILL.md'
       const rel = isBody ? undefined : land.target.slice(dir.length + 1).split('\\').join('/')
       // G3b（A22）：代表片＝第一条 landing；kind 判 null（previous 的取值域只有 string/null）。
-      const unitHead = land === landing[0] ? {
-        moves: landing
-          .filter(l => l.target.split(/[\\/]/).pop() !== 'SKILL.md')
-          .map((l) => {
-            const p = l.target.slice(dir.length + 1).split(String.fromCharCode(92)).join(String.fromCharCode(47))
-            return {
-              path: p,
-              kind: l.previous === null ? 'created' : 'moved',
-              to: p,
-              ...l.previous === null ? {} : { beforeRef: contentHash(l.previous) },
-              afterRef: contentHash(l.content),
-            }
+      const unitHead = land === landing[0]
+        ? (plan.unitHead ?? {
+            moves: landing
+              .filter(l => l.target.split(/[\\/]/).pop() !== 'SKILL.md')
+              .map((l) => {
+                const p = l.target.slice(dir.length + 1).split(String.fromCharCode(92)).join(String.fromCharCode(47))
+                return {
+                  path: p,
+                  kind: l.previous === null ? 'created' : 'moved',
+                  to: p,
+                  ...l.previous === null ? {} : { beforeRef: contentHash(l.previous) },
+                  afterRef: contentHash(l.content),
+                }
+              })
+              // F1 (independent review, 2026-10-14): when one plan writes the SAME path twice, keep the
+              // LAST write -- first-wins left `afterRef` describing the earlier bytes (stale). `beforeRef`
+              // and `kind` are unaffected: both come from the same per-path pre-read.
+              .filter((m, idx, all) => all.map(x => x.path).lastIndexOf(m.path) === idx),
+            sources: [{ skill: name }],
           })
-          // F1 (independent review, 2026-10-14): when one plan writes the SAME path twice, keep the
-          // LAST write -- first-wins left `afterRef` describing the earlier bytes (stale). `beforeRef`
-          // and `kind` are unaffected: both come from the same per-path pre-read.
-          .filter((m, idx, all) => all.map(x => x.path).lastIndexOf(m.path) === idx),
-        sources: [{ skill: name }],
-      } : undefined
+        : undefined
       // A22: previous is string | null (a read failure rejects the whole plan), so the old
       // `=== undefined ? md : previous` was an unreachable branch -- the type is the truth.
       const auditedBefore = land.previous

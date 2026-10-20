@@ -176,7 +176,7 @@ export type VersionTarget = 'content' | 'support' | 'other'
 const SUPPORT_ACTIONS: readonly string[] = ['write_file', 'remove_file']
 
 /** The actions that record the skill's own SKILL.md body. */
-const CONTENT_ACTIONS: readonly string[] = ['create', 'update', 'patch', 'consolidate', 'restructure', 'restore']
+const CONTENT_ACTIONS: readonly string[] = ['create', 'update', 'patch', 'consolidate', 'restructure', 'restore', 'merge']
 
 /**
  * Which artifact one recorded version holds, from the action that produced it.
@@ -702,7 +702,7 @@ export async function recordVersions(
 /** What kind of change one recorded version carries, as a CLOSED set. */
 export type VersionActionKind =
   | 'baseline' | 'create' | 'patch' | 'update' | 'restore' | 'delete' | 'archive'
-  | 'consolidate' | 'restructure' | 'support-write' | 'support-remove' | 'other'
+  | 'consolidate' | 'restructure' | 'merge' | 'support-write' | 'support-remove' | 'other'
 
 /**
  * Classify one version action for display. Fail-closed like {@link versionTarget}: an action this
@@ -723,6 +723,7 @@ export function versionActionKind(action: string): VersionActionKind {
     case 'archive': return 'archive'
     case 'consolidate': return 'consolidate'
     case 'restructure': return 'restructure'
+    case 'merge': return 'merge'
     case 'write_file': return 'support-write'
     case 'remove_file': return 'support-remove'
     default: return 'other'
