@@ -15,4 +15,6 @@ it('counts and formats the three queues', () => {
   expect(formatQueue(rows, 'pending')).toContain('c + d')
   expect(formatQueue(rows, 'retry')).toContain('a + b')
   expect(formatQueue([], 'skipped')).toBe('merge skipped: empty')
+  const decided: MergeRow = { ...row('i', 'j', 'pending'), decision: { shouldMerge: true, mode: 'merge-into-existing', target: 'umbrella', sources: ['i', 'j'], rationale: 'same' } }
+  expect(formatStatus([decided])).toContain('→ umbrella')
 })

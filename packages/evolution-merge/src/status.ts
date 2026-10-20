@@ -19,7 +19,8 @@ export function countRows(rows: readonly MergeRow[]): MergeCounts {
 
 function describe(row: MergeRow): string {
   const stage = stageOf(row.state)
-  return row.a + ' + ' + row.b + ' [' + row.state + (stage === null ? '' : '/' + stage) + ']' + (row.failure === undefined ? '' : ' — ' + row.failure.message)
+  const target = row.decision?.shouldMerge === true ? ' → ' + row.decision.target : ''
+  return row.a + ' + ' + row.b + ' [' + row.state + (stage === null ? '' : '/' + stage) + ']' + target + (row.failure === undefined ? '' : ' — ' + row.failure.message)
 }
 
 export function formatStatus(rows: readonly MergeRow[]): string {
