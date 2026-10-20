@@ -10,7 +10,9 @@ export interface RunScanCommandOptions {
   readonly io: EvolutionIoLike
   readonly home: string
   readonly registry: MergeRegistryPort
-  readonly ports: ScanPorts
+  readonly ports?: ScanPorts
+  /** Build per-run ports when staging needs the runId (channel authoring). */
+  readonly makePorts?: (runId: string) => ScanPorts
   readonly approval: boolean
   readonly platformWrite: boolean
   readonly timeoutMinutes?: number
@@ -26,13 +28,15 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
     approval: { platformWrite: options.platformWrite, mergeApproval: options.approval },
     now: options.now,
     async body(ctx) {
+      const ports = options.makePorts === undefined ? options.ports : options.makePorts(ctx.runId)
+      if (ports === undefined) throw new Error('scan requires ports or makePorts')
       return await runScan({
         io: options.io,
         home: options.home,
         now: options.now,
         signal: ctx.signal,
         approval: options.approval,
-        ports: options.ports,
+        ports,
         stage: ctx.stage,
         startedAt: ctx.startedAt,
         ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
