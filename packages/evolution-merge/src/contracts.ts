@@ -63,6 +63,7 @@ export interface MergeCandidate {
   readonly b: string
   readonly score?: number
   readonly arms?: readonly string[]
+  readonly reason?: string
   readonly source?: 'lexical' | 'proposed'
 }
 
