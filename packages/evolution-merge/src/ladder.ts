@@ -53,6 +53,19 @@ export class GateCache {
   get(key: string): GateVerdict | undefined { return this.entries.get(key) }
   put(key: string, value: GateVerdict): void { this.entries.set(key, value) }
   get size(): number { return this.entries.size }
+  toObject(): Record<string, GateVerdict> { return Object.fromEntries(this.entries) }
+  static fromObject(value: unknown): GateCache {
+    const cache = new GateCache()
+    if (typeof value !== 'object' || value === null) return cache
+    for (const [key, entry] of Object.entries(value)) {
+      if (typeof entry !== 'object' || entry === null) continue
+      const verdict = entry as Partial<GateVerdict>
+      if (verdict.verdict === 1 || verdict.verdict === 0 || verdict.verdict === -1) {
+        cache.put(key, { level: verdict.level === 'L0' || verdict.level === 'L1' || verdict.level === 'L2' ? verdict.level : 'L2', verdict: verdict.verdict, reason: typeof verdict.reason === 'string' ? verdict.reason : '', evidence: Array.isArray(verdict.evidence) ? verdict.evidence : [], cached: true })
+      }
+    }
+    return cache
+  }
 }
 
 export function gateCacheKey(level: GateLevel, payload: string, model: string): string {
@@ -129,13 +142,21 @@ export interface RunLadderOptions {
   readonly modelName: string
   readonly signal: AbortSignal
   readonly cache?: GateCache
+  /** Audit path starts at L2 after an L0 keep. */
+  readonly startLevel?: GateLevel
+}
+
+/** Deterministic 10% L0 audit selection from the run seed + pair key. */
+export function selectedForAudit(pairKey: string, seed: string, rate = 0.1): boolean {
+  const digest = createHash('sha256').update(seed + '\u0000' + pairKey).digest()
+  return digest[0] !== undefined && digest[0] < Math.round(Math.max(0, Math.min(1, rate)) * 256)
 }
 
 export async function runLadder(options: RunLadderOptions): Promise<LadderResult> {
   const facts = new Map(options.facts.map(fact => [fact.name, fact]))
   const verdicts: GateVerdict[] = []
   let calls = 0
-  let level: GateLevel = 'L0'
+  let level: GateLevel = options.startLevel ?? 'L0'
   for (;;) {
     let payload: string
     try {
