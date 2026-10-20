@@ -3,16 +3,11 @@
  * handlers only project. A missing merge service answers 503 instead of pretending empty.
  */
 import type { RunRecord } from '@deepseek-ai/dsh-evolution-core'
-import { json, methodNotAllowed, type ConnectionFetchRouteLike, type DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
+import { HOST_ROUTES, json, methodNotAllowed, type ConnectionFetchRouteLike, type DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { MergeQueue, MergeRow } from './contracts.ts'
 import { buildMergeView, pageQueue, toRunFact } from './routes.ts'
 
-export const MERGE_ROUTES = {
-  view: '/api/dsh-evolution/merge/view',
-  rows: '/api/dsh-evolution/merge/rows',
-  run: '/api/dsh-evolution/merge/run',
-  runs: '/api/dsh-evolution/merge/runs',
-} as const
+export const MERGE_ROUTES = HOST_ROUTES.merge
 
 export interface MergeRouteSource {
   rows(): Promise<readonly MergeRow[]>

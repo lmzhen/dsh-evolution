@@ -12,11 +12,12 @@ const HOST_SURFACE_IDS: Readonly<Record<string, string>> = {
   approval: 'approval',
   skillHistory: 'skill-history',
   skillHealth: 'skill-health',
+  merge: 'merge',
   diagnostics: 'diagnostics',
 }
 
 describe('COMMAND_FALLBACKS', () => {
-  it('covers exactly the four HOST_ROUTES surfaces', () => {
+  it('covers exactly the Host route surfaces', () => {
     const hostSurfaces = Object.keys(HOST_ROUTES).map(key => HOST_SURFACE_IDS[key]).sort()
     expect([...COMMAND_FALLBACK_SURFACES].sort()).toEqual(hostSurfaces)
     expect(Object.keys(COMMAND_FALLBACKS).sort()).toEqual(hostSurfaces)

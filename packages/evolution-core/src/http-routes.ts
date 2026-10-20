@@ -80,6 +80,12 @@ export const HOST_ROUTES = {
   skillHealth: {
     rows: '/api/dsh-evolution/skill-health/rows',
   },
+  merge: {
+    view: '/api/dsh-evolution/merge/view',
+    rows: '/api/dsh-evolution/merge/rows',
+    run: '/api/dsh-evolution/merge/run',
+    runs: '/api/dsh-evolution/merge/runs',
+  },
   diagnostics: {
     view: '/api/dsh-evolution/diagnostics',
   },
