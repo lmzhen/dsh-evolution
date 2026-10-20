@@ -15,6 +15,9 @@ import { runScanCommand } from './scan-command.ts'
 import { runApproveCommand } from './approve-command.ts'
 import { runResumeCommand } from './resume-command.ts'
 import { loadMergeState } from './state.ts'
+import { readCommitReceipt } from './commit-receipt.ts'
+import { undoMergeReceipt } from './undo-merge.ts'
+import { skillLibraryUndoPort } from './adapters/undo.ts'
 import { createChannelScanPorts } from './scan-ports.ts'
 import { createNewChildRound2 } from './new-child-authoring.ts'
 import { skillLibraryPort } from './adapters/library.ts'
@@ -75,6 +78,12 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         return result.ok
           ? { ok: true, text: 'merge scan 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
           : { ok: false, text: result.message }
+      }
+      if (command.verb === 'undo') {
+        const receipt = await readCommitReceipt(deps.io, deps.home, command.run)
+        if (receipt === null) return { ok: false, text: 'merge run has no commit receipt: ' + command.run }
+        const result = await undoMergeReceipt(receipt, skillLibraryUndoPort(deps.skills))
+        return { ok: result.ok, text: result.message }
       }
       if (command.verb === 'resume') {
         const loaded = await loadMergeState(deps.io, deps.home)
