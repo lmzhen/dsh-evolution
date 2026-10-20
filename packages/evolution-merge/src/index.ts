@@ -122,7 +122,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       async rows() { return (await loadMergeState(io, home)).state.rows },
       async run(id: string): Promise<RunRecord | undefined> { return runs.runs().find(record => record.id === id) },
       async runs() { return runs.runs() },
-      commands() { return ['merge scan', 'merge status', 'merge pending', 'merge skipped', 'merge report', 'merge runs', 'merge cancel'] },
+      commands() { return ['merge scan', 'merge doctor', 'merge status', 'merge pending', 'merge skipped', 'merge report', 'merge runs', 'merge cancel'] },
     }
     const commands = scope.get('commands') as { register(definition: unknown): () => void } | undefined
     if (commands === undefined) return
