@@ -9,6 +9,9 @@ import { createMergeRuntime } from './runtime.ts'
 import { resolveMergeParams } from './params.ts'
 import { lexicalCandidates } from './screening.ts'
 import { subagentChannelAdapter } from './adapters/channel.ts'
+import { createModelPort } from './adapters/model.ts'
+import { createScreeningForRun } from './screening-port.ts'
+import { loadGateCache, saveGateCache } from './gate-cache.ts'
 import { StageToolRegistry } from './stage-tool-registry.ts'
 import { createMergeStageTool } from './merge-tool.ts'
 import { supersedeMergeRuns } from './supersede.ts'
@@ -111,6 +114,9 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const skills = newSkillLibrary({ io, ctx: ctx as never, authority: authorityFrom({ origin: 'subagent' }) })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()
+    const llm = (ctx as unknown as { get(name: string): unknown }).get('llm') as { stream?: (options: Record<string, unknown>) => AsyncIterable<{ type: string; text?: string; reason?: { kind?: string; failure?: { message?: string } } }> } | undefined
+    const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
+    const modelPort = llm === undefined || defaultModel === undefined ? undefined : createModelPort(llm, () => defaultModel.currentSelection())
     source = {
       async rows() { return (await loadMergeState(io, home)).state.rows },
       async run(id: string): Promise<RunRecord | undefined> { return runs.runs().find(record => record.id === id) },
@@ -128,6 +134,19 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         return listed.map(item => ({ name: item.name, description: item.description, body: item.content ?? '' }))
       },
       async screening(cards) { return lexicalCandidates(cards).candidates },
+      ...(modelPort === undefined ? {} : {
+        async screeningForRun(cards, runId, signal) {
+          const cache = await loadGateCache(io, home)
+          const screening = createScreeningForRun({
+            cards, runSeed: runId,
+            propose: { model: modelPort },
+            gate: { model: modelPort, modelName: defaultModel?.currentSelection().model ?? '', runSeed: runId, cache: cache.cache },
+          })
+          const candidates = await screening(signal)
+          await saveGateCache(io, home, cache.cache).catch(() => {})
+          return candidates
+        },
+      }),
       stage: { bind: context => stage.bind(context.childId, context), unbind: childId => stage.unbind(childId) },
     })
     const command = createMergeCommand(runtime)
