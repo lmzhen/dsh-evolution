@@ -44,6 +44,8 @@ export interface MergeRuntimeDeps {
   readonly timeoutMinutes: number
   readonly cards: (signal: AbortSignal) => Promise<readonly SkillCard[]>
   readonly screening: (cards: readonly SkillCard[], signal: AbortSignal) => Promise<readonly MergeCandidate[]>
+  /** Run-scoped screening (lexical/C3/gate with a runId-seeded audit); preferred when present. */
+  readonly screeningForRun?: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
   readonly stage?: MergeStageBindingPort
 }
 
@@ -66,7 +68,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           approval: deps.params.mergeApproval,
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
-            screening: turnSignal => deps.screening(cards, turnSignal),
+            screening: turnSignal => deps.screeningForRun === undefined ? deps.screening(cards, turnSignal) : deps.screeningForRun(cards, runId, turnSignal),
             channel: deps.channel, parent, allow: deps.allow,
             ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
             timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
