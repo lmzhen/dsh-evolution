@@ -1,10 +1,14 @@
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
-import { evolutionHome, evolutionIoAdapter, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, type EvolutionIoLike, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
-import { createMergeCommand, createReadOnlyMergeService } from './merge-command.ts'
+import { createMergeCommand } from './merge-command.ts'
+import { createMergeRuntime } from './runtime.ts'
+import { resolveMergeParams } from './params.ts'
+import { lexicalCandidates } from './screening.ts'
+import { subagentChannelAdapter } from './adapters/channel.ts'
 
 /** E3 knobs are volatile (user layer); the E2 pair timeout is deployment-only. */
 export const Config = z.object({
@@ -79,8 +83,9 @@ export * from './runtime.ts'
 
 export const inject: string[] = []
 
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): void {
   configureMergePresentation(ctx as unknown as MergePresentationContext)
+  const params = resolveMergeParams(rawConfig)
   let source: MergeRouteSource | undefined
   registerHostRoutes(ctx, audit => makeMergeRoutes({ getSource: () => source }, audit))
   ctx.inject(['commands', 'evolutionIo'], (scope) => {
@@ -88,15 +93,30 @@ export function apply(ctx: Context): void {
     if (registry === undefined) return
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
+    const runs = newRunRegistry({ io, home, warn: message => { ctx.logger.warn(message) } })
+    void runs.load()
+    const skills = newSkillLibrary({ io, authority: authorityFrom({ origin: 'subagent' }) })
+    const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     source = {
       async rows() { return (await loadMergeState(io, home)).state.rows },
-      async run() { return undefined },
-      async runs() { return [] },
-      commands() { return ['merge status', 'merge pending', 'merge skipped'] },
+      async run(id: string): Promise<RunRecord | undefined> { return runs.runs().find(record => record.id === id) },
+      async runs() { return runs.runs() },
+      commands() { return ['merge scan', 'merge status', 'merge pending', 'merge skipped'] },
     }
     const commands = scope.get('commands') as { register(definition: unknown): () => void } | undefined
     if (commands === undefined) return
-    const command = createMergeCommand(createReadOnlyMergeService(io, home))
+    const runtime = createMergeRuntime({
+      io, home, registry: runs, skills, now: () => Date.now(), params, platformWrite: true,
+      channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: params.mergeRunTimeoutMinutes,
+      async cards(signal) {
+        const listed = await skills.list({ withContent: true })
+        if (signal.aborted) return []
+        return listed.map(item => ({ name: item.name, description: item.description, body: item.content ?? '' }))
+      },
+      async screening(cards) { return lexicalCandidates(cards).candidates },
+    })
+    const command = createMergeCommand(runtime)
     scope.effect(() => commands.register(command), 'evolution-merge: command')
+    scope.effect(() => () => { runs.cancelAll() }, 'evolution-merge: runs')
   })
 }
