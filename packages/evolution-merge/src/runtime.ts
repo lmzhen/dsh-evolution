@@ -14,7 +14,7 @@ import { handleReadOnlyMergeCommand } from './read-commands.ts'
 import { runScanCommand } from './scan-command.ts'
 import { runApproveCommand } from './approve-command.ts'
 import { runResumeCommand } from './resume-command.ts'
-import { loadMergeState } from './state.ts'
+import { dropRow, loadMergeState } from './state.ts'
 import { readCommitReceipt } from './commit-receipt.ts'
 import { undoMergeReceipt } from './undo-merge.ts'
 import { skillLibraryUndoPort } from './adapters/undo.ts'
@@ -107,7 +107,20 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const result = await undoMergeReceipt(receipt, skillLibraryUndoPort(deps.skills))
         return { ok: result.ok, text: result.message }
       }
+      if (command.verb === 'skipped' && command.restore !== undefined) {
+        const loaded = await loadMergeState(deps.io, deps.home)
+        const row = loaded.state.rows.find(item => item.id === command.restore)
+        if (row === undefined || row.state !== 'skipped') return { ok: false, text: 'skipped row not found: ' + command.restore }
+        await dropRow(deps.io, deps.home, deps.now, row.id)
+        return { ok: true, text: '已恢复参与筛选：' + row.id }
+      }
       if (command.verb === 'resume') {
+        if (command.clear !== undefined) {
+          const cleared = (await loadMergeState(deps.io, deps.home)).state.rows.find(item => item.id === command.clear)
+          if (cleared === undefined) return { ok: false, text: 'merge row not found: ' + command.clear }
+          await dropRow(deps.io, deps.home, deps.now, cleared.id)
+          return { ok: true, text: '已清除合并行：' + cleared.id }
+        }
         const loaded = await loadMergeState(deps.io, deps.home)
         const row = command.id === undefined
           ? loaded.state.rows.find(item => item.state === 'fuse' || item.state === 'verify')

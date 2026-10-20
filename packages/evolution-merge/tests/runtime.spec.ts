@@ -4,7 +4,7 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { createMergeRuntime, type MergeRuntimeDeps } from '../src/index.ts'
+import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, upsertRow, type MergeRow, type MergeRuntimeDeps } from '../src/index.ts'
 
 it('serves read-only verbs through the runtime', async () => {
   const home = await tempRoot('dsh-merge-runtime-')
@@ -42,4 +42,21 @@ it('serves report/runs/cancel from the run registry', async () => {
   expect(await runtime.execute({ verb: 'report', id: 'r1' })).toEqual({ ok: true, text: '{"ok":true}' })
   expect(await runtime.execute({ verb: 'runs' })).toMatchObject({ ok: true })
   expect(await runtime.execute({ verb: 'cancel', id: 'r1' })).toMatchObject({ ok: true })
+})
+
+it('restores a skipped row and clears a resume row', async () => {
+  const home = await tempRoot('dsh-merge-runtime-clear-')
+  const io = nodeEvolutionIo()
+  const key = pairKey('alpha-skill', 'beta-skill')
+  const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'alpha-skill', b: 'beta-skill', state: 'skipped', queue: 'skipped', createdAt: 'x', updatedAt: 'x' }
+  await upsertRow(io, home, () => 1, row)
+  const deps: MergeRuntimeDeps = {
+    io, home, registry: {} as MergeRuntimeDeps['registry'], skills: {} as SkillLibrary, now: () => 1,
+    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
+    parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screening: async () => [],
+  }
+  const runtime = createMergeRuntime(deps)
+  expect(await runtime.execute({ verb: 'skipped', restore: row.id })).toMatchObject({ ok: true })
+  expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })
