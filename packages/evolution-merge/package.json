@@ -1,0 +1,34 @@
+{
+  "name": "@deepseek-ai/dsh-evolution-merge",
+  "description": "Skill auto-merge domain: screening, two-round authoring, queues and commit orchestration",
+  "version": "0.27.3",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lmzhen/dsh-evolution.git",
+    "directory": "packages/evolution-merge"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
+  }
+}
