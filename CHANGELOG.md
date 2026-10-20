@@ -1,4 +1,8 @@
 # Changelog
+## 0.28.0 (minor) — 技能自动合并：候选筛选、两轮授权、审批/重跑、设置卡与只读面板
+
+> **范围**：新增 `@lmzhen/dsh-evolution-merge` 与 `@lmzhen/dsh-evolution-merge-ui`。host 侧落地词面/C3/L0–L2 候选、10% 抽检、gate cache、两轮子代理（同 child / 审批后新 child）、staging→规则门→commit receipt、undone 跨技能回退；命令面 `/merge scan|pair|status|report|runs|cancel|pending|approve|reject|resume|skipped|undo` 与四条只读路由（view/rows/run/runs）接入 `HOST_ROUTES`；参数 `mergeApproval`、`mergeSkippedTtlDays`、`mergeRunTimeoutMinutes`（E3）与 `mergePairTimeoutMinutes`（E2），设置卡“技能自动合并”；client 包提供三 tab 只读面板。restore 通过 `RunRegistry.supersedeKind` 跨进程标记旧 merge run。
+> **验证**：merge + merge-ui 49 文件 / 103 测试；两包 `tsc` 与 `build-lib` 通过；`prepare-release --scope @lmzhen --version 0.28.0` 打包 34 包；`publish-scoped --dry-run` 列出全部 34 包且不发布。
 ## 0.27.3 (patch) — 设置页诊断卡只留运行状态（环境信息退出 UI）+ 设置页版本行修复
 
 > **范围**：①**设置面收紧**（0.27.2 真机反馈）：诊断卡不再渲染 `DiagnosticsView` 的 facts（命令兜底/家族版本/安装形态/平台兼容线/受限预设/只读说明/升级顺序），只保留运行状态（摘要徽标 + 运行状态行 + 刷新）；这些事实仍由 CLI `doctor`、`doctor --json` 与 diagnostics 路由承载，属审计材料而非设置页内容。随 facts 一起移除「技术详情」折叠及对应文案/样式；空 runtime 显式给「没有可显示的运行状态」，加载/失败/刷新行为不变。②**设置页版本行修复**：`generated-about.ts` 自 0.24.0 起未再生，且 CI 的 `gen-about --check` 在发布 overlay 布局误判 not armed，使 0.24.0→0.27.2 的设置页 about 行一直显示旧版本；修复为探针识别 workspace 根、入口 import-safe（realpath 比较，main 在 try 外）、`normalize-mirror` 在 bump 时同步重生成该常量（忠实 CI 布局验证：新树 check 通过、篡改常量后 exit 1）。
