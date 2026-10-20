@@ -19,6 +19,12 @@ import { createChannelScanPorts } from './scan-ports.ts'
 import { createNewChildRound2 } from './new-child-authoring.ts'
 import { skillLibraryPort } from './adapters/library.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
+import type { StageToolContext } from './stage-tool.ts'
+
+export interface MergeStageBindingPort {
+  bind(context: StageToolContext): void
+  unbind(childId: string): void
+}
 
 export interface MergeRuntimeDeps {
   readonly io: EvolutionIoLike
@@ -35,6 +41,7 @@ export interface MergeRuntimeDeps {
   readonly timeoutMinutes: number
   readonly cards: (signal: AbortSignal) => Promise<readonly SkillCard[]>
   readonly screening: (cards: readonly SkillCard[], signal: AbortSignal) => Promise<readonly MergeCandidate[]>
+  readonly stage?: MergeStageBindingPort
 }
 
 export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService {
@@ -62,6 +69,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
             approval: deps.params.mergeApproval,
             commitPort: skillLibraryPort(deps.skills), now: deps.now,
+            ...(deps.stage === undefined ? {} : { onChild: context => deps.stage!.bind(context), onChildClosed: childId => deps.stage!.unbind(childId) }),
           }),
         })
         return result.ok
@@ -96,6 +104,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             allow: deps.allow, ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
             timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
             commitPort: skillLibraryPort(deps.skills), now: deps.now,
+            ...(deps.stage === undefined ? {} : { onChild: context => deps.stage!.bind(context), onChildClosed: childId => deps.stage!.unbind(childId) }),
           }),
         })
         return result.ok

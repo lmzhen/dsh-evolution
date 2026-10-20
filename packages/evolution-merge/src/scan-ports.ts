@@ -11,6 +11,7 @@ import { pairKey } from './contracts.ts'
 import type { SkillCard } from './screening.ts'
 import { runRound1OverChannel, type ChannelRound1Result, type ConversationChannelLike } from './channel-port.ts'
 import type { CommitPort } from './commit-execute.ts'
+import type { StageToolContext } from './stage-tool.ts'
 import { runAuthoring } from './authoring-flow.ts'
 import type { ScanPorts, ScanRound2Outcome } from './scan-run.ts'
 
@@ -28,6 +29,8 @@ export interface CreateScanPortsOptions {
   readonly approval: boolean
   readonly commitPort: CommitPort
   readonly now: () => number
+  readonly onChild?: (context: StageToolContext) => void
+  readonly onChildClosed?: (childId: string) => void
 }
 
 export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPorts {
@@ -45,7 +48,12 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
       }, candidate, signal)
       if (result.outcome.kind === 'merge') {
         if (options.approval) await result.dispose()
-        else sessions.set(pairKey(candidate.a, candidate.b), result)
+        else {
+          sessions.set(pairKey(candidate.a, candidate.b), result)
+          if (result.childId !== undefined) {
+            options.onChild?.({ runId: options.runId, childId: result.childId, expectedChildId: result.childId, phase: 'author' })
+          }
+        }
       }
       return result.outcome
     },
@@ -83,6 +91,7 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
         }
       } finally {
         await session.dispose()
+        if (session.childId !== undefined) options.onChildClosed?.(session.childId)
       }
     },
   }

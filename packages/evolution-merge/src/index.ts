@@ -9,6 +9,8 @@ import { createMergeRuntime } from './runtime.ts'
 import { resolveMergeParams } from './params.ts'
 import { lexicalCandidates } from './screening.ts'
 import { subagentChannelAdapter } from './adapters/channel.ts'
+import { StageToolRegistry } from './stage-tool-registry.ts'
+import { createMergeStageTool } from './merge-tool.ts'
 
 /** E3 knobs are volatile (user layer); the E2 pair timeout is deployment-only. */
 export const Config = z.object({
@@ -98,6 +100,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     void runs.load()
     const skills = newSkillLibrary({ io, authority: authorityFrom({ origin: 'subagent' }) })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
+    const stage = new StageToolRegistry()
     source = {
       async rows() { return (await loadMergeState(io, home)).state.rows },
       async run(id: string): Promise<RunRecord | undefined> { return runs.runs().find(record => record.id === id) },
@@ -115,9 +118,16 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         return listed.map(item => ({ name: item.name, description: item.description, body: item.content ?? '' }))
       },
       async screening(cards) { return lexicalCandidates(cards).candidates },
+      stage: { bind: context => stage.bind(context.childId, context), unbind: childId => stage.unbind(childId) },
     })
     const command = createMergeCommand(runtime)
     scope.effect(() => commands.register(command), 'evolution-merge: command')
+    ctx.inject(['tools'], (toolScope) => {
+      const tools = toolScope.get('tools') as { register(definition: unknown): () => void } | undefined
+      if (tools === undefined) return
+      const tool = createMergeStageTool(io, home, exec => stage.resolve(exec))
+      toolScope.effect(() => tools.register(tool), 'evolution-merge: merge_stage')
+    })
     scope.effect(() => () => { runs.cancelAll() }, 'evolution-merge: runs')
   })
 }

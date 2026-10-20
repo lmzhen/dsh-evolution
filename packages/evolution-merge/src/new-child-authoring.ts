@@ -11,6 +11,7 @@ import { createStaging } from './staging.ts'
 import { readStagedTree } from './staged-tree.ts'
 import { validateStagedTree, hasBlockingFinding } from './rules.ts'
 import { commitStagedRun, type CommitPort } from './commit-execute.ts'
+import type { StageToolContext } from './stage-tool.ts'
 import type { ScanRound2Outcome } from './scan-run.ts'
 
 export interface NewChildAuthoringOptions {
@@ -25,6 +26,8 @@ export interface NewChildAuthoringOptions {
   readonly timeoutMs: number
   readonly commitPort: CommitPort
   readonly now: () => number
+  readonly onChild?: (context: StageToolContext) => void
+  readonly onChildClosed?: (childId: string) => void
 }
 
 export async function runNewChildAuthoring(
@@ -55,6 +58,7 @@ export async function runNewChildAuthoring(
   if (opened.kind !== 'ok') {
     return { kind: 'failed', failure: { stage: 'author', code: opened.kind, message: opened.kind === 'unavailable' ? opened.reason : 'round2 aborted', retryable: opened.kind !== 'aborted', retryFrom: opened.kind === 'aborted' ? 'none' : 'agent2' } }
   }
+  options.onChild?.({ runId: options.runId, childId: opened.childId, expectedChildId: opened.childId, phase: 'author' })
   try {
     if (opened.turn.stopReason !== 'completed') {
       return { kind: 'failed', failure: { stage: 'author', code: opened.turn.stopReason, message: 'round2 did not complete', retryable: true, retryFrom: 'agent2' } }
@@ -74,6 +78,7 @@ export async function runNewChildAuthoring(
     }
   } finally {
     try { await options.channel.dispose(opened.childId) } catch { /* teardown must not replace the outcome */ }
+    options.onChildClosed?.(opened.childId)
   }
 }
 
