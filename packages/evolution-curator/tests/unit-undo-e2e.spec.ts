@@ -57,6 +57,60 @@ it('R-G3a-4：追加型搬移必须写回旧字节、不得删文件', async () 
   } finally { await rm(home, { recursive: true, force: true }) }
 })
 
+
+const USABLE = (name: string, extra = '') => ['---', 'name: ' + name, 'description: ' + name + ' fixture', '---', '', '# ' + name, '', 'Body of ' + name + '.', extra, ''].join(stamp)
+
+it('R-G3a-5：merge 已有目标的 unit 整体撤销，源从归档恢复', async () => {
+  const { home, curator, lib } = await setup()
+  try {
+    await lib.create('target-skill', USABLE('target-skill'), 'foreground')
+    await lib.create('src-a', USABLE('src-a'), 'foreground')
+    const targetBody = (await lib.read('target-skill')) ?? ''
+    const sourceBody = (await lib.read('src-a')) ?? ''
+    const commit = await lib.commitMerge({
+      target: 'target-skill',
+      targetExists: true,
+      sources: ['src-a'],
+      body: USABLE('target-skill', '## Merged'),
+      supportFiles: [],
+      expectedTargetBody: targetBody,
+      expectedSourceBodies: [{ name: 'src-a', body: sourceBody }],
+      origin: 'foreground',
+      summary: 'e2e merge',
+    })
+    expect(commit.ok, commit.message).toBe(true)
+    expect(commit.unitId).toBeDefined()
+    const undone = await curator.undoUnit('target-skill', commit.unitId)
+    expect(undone.ok, undone.message).toBe(true)
+    expect(await lib.read('target-skill')).toBe(targetBody)
+    expect(await lib.read('src-a')).toBe(sourceBody)
+  } finally { await rm(home, { recursive: true, force: true }) }
+})
+
+it('R-G3a-6：merge 新建目标的 unit 撤销时归档目标并恢复源', async () => {
+  const { home, curator, lib } = await setup()
+  try {
+    await lib.create('src-a', USABLE('src-a'), 'foreground')
+    const sourceBody = (await lib.read('src-a')) ?? ''
+    const commit = await lib.commitMerge({
+      target: 'umbrella',
+      targetExists: false,
+      sources: ['src-a'],
+      body: USABLE('umbrella'),
+      supportFiles: [],
+      expectedTargetBody: null,
+      expectedSourceBodies: [{ name: 'src-a', body: sourceBody }],
+      origin: 'foreground',
+      summary: 'e2e create merge',
+    })
+    expect(commit.ok, commit.message).toBe(true)
+    const undone = await curator.undoUnit('umbrella', commit.unitId)
+    expect(undone.ok, undone.message).toBe(true)
+    expect(await lib.read('umbrella')).toBeNull()
+    expect(await lib.read('src-a')).toBe(sourceBody)
+  } finally { await rm(home, { recursive: true, force: true }) }
+})
+
 it('R-G3a-3：支撑文件被手改过 ⇒ 零写拒绝，文件原样保留', async () => {
   const { home, curator, lib } = await setup()
   try {

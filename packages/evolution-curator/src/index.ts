@@ -36,6 +36,7 @@ import {
   usageObserved,
 } from '@deepseek-ai/dsh-evolution-core'
 import { newestUnitId, planUnitUndo } from './unit-undo-plan.ts'
+import { executeUnitUndo, planUnitUndoAcross, type UnitUndoMember, type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core'
 import { historyIndexFile, parseHistoryIndex, resolveUnitMembers, unitMembersAreComplete, staleRouteStubs } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
@@ -2372,7 +2373,33 @@ export class EvolutionCurator extends Service {
         return { ok: false, message: '单元 ' + unit + ' 的成员没解析齐：' + missing + (conflicts === '' ? '' : '；冲突：' + conflicts) + ' —— 拒绝用剩余片段拼一个撤销。' }
       }
       if (resolved.members.length > 1) {
-        return { ok: false, message: '单元 ' + unit + ' 跨 ' + String(resolved.members.length) + ' 个技能（' + resolved.members.map((m: { skill: string }) => m.skill).join('、') + '）—— 跨技能整体撤销尚未接线，拒绝只撤销其中一片。' }
+        const crossMembers: UnitUndoMember[] = []
+        for (const slice of resolved.members) {
+          const live = await this.skills.read(slice.skill)
+          crossMembers.push({
+            skill: slice.skill,
+            entries: slice.entries,
+            status: live === null ? 'archived' : 'live',
+            ...(live === null ? { archivedPath: 'archive' } : {}),
+            ...(slice.skill === name && slice.entries.some(entry => entry.action === 'create') ? { createdInUnit: true } : {}),
+          })
+        }
+        const plan = planUnitUndoAcross(crossMembers)
+        const sink: UnitUndoSink = {
+          readSkill: skill => this.skills.read(skill),
+          readSupport: (skill, path) => this.skills.readSupportFile(skill, path),
+          readBlob: async (hash) => {
+            const probe = await probeText(this.io, blobPath(this.skills.root, hash))
+            return isPresent(probe) ? probe.value : null
+          },
+          restoreFromArchive: skill => this.skills.restoreFromArchive(skill, 'foreground'),
+          archive: (skill, reason) => this.skills.archive(skill, { reason }, 'foreground'),
+          updateSkill: (skill, body, anchor) => this.skills.update(skill, body, 'foreground', anchor),
+          writeSupportFile: (skill, path, body, anchor) => this.skills.writeSupportFile(skill, path, body, 'foreground', anchor),
+          removeSupportFile: (skill, path, anchor) => this.skills.removeSupportFile(skill, path, 'foreground', anchor),
+        }
+        const result = await executeUnitUndo(plan, sink)
+        return { ok: result.ok, message: result.message }
       }
     }
     const blobOf = async (hash: string | undefined): Promise<string | null> => {
