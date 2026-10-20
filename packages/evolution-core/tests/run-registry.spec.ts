@@ -32,6 +32,61 @@ describe('core run registry (S2)', () => {
     expect(typeof registry.lastSettledAt()).toBe('number')
   })
 
+  it('tracks merge command/stage/progress and filters by kind', async () => {
+    const dir = await home()
+    const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
+    await registry.load()
+    const maintain = await registry.begin('maintain')
+    const merge = await registry.begin('merge', { command: 'scan', total: 3, parentRunId: 'parent-1' })
+    expect(merge.kind).toBe('merge')
+    expect(merge.command).toBe('scan')
+    expect(merge.parentRunId).toBe('parent-1')
+    expect(registry.inFlight('merge')?.id).toBe(merge.id)
+    expect(registry.inFlight('maintain')?.id).toBe(maintain.id)
+    await registry.stage(merge.id, 'decide', { done: 1, total: 3 })
+    expect(registry.find(merge.id)).toMatchObject({
+      command: 'scan',
+      stage: 'decide',
+      progress: { done: 1, total: 3 },
+      parentRunId: 'parent-1',
+    })
+    await registry.settle(merge.id, { state: 'succeeded' })
+    await registry.settle(maintain.id, { state: 'succeeded' })
+    expect(registry.runs('merge').map(row => row.id)).toEqual([merge.id])
+    expect(registry.runs('maintain').map(row => row.id)).toEqual([maintain.id])
+    expect(typeof registry.lastSettledAt('merge')).toBe('number')
+  })
+
+  it('supersedes a settled merge run idempotently', async () => {
+    const dir = await home()
+    const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
+    await registry.load()
+    const merge = await registry.begin('merge', { command: 'pair' })
+    await registry.settle(merge.id, { state: 'succeeded' })
+    await registry.supersede([merge.id, merge.id])
+    const first = registry.find(merge.id)?.supersededAt
+    expect(typeof first).toBe('number')
+    await registry.supersede([merge.id])
+    expect(registry.find(merge.id)?.supersededAt).toBe(first)
+  })
+
+  it('caps terminal history per kind', async () => {
+    const dir = await home()
+    const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir, maxRecords: 1 })
+    await registry.load()
+    const m1 = await registry.begin('maintain')
+    const g1 = await registry.begin('merge', { command: 'scan' })
+    await registry.settle(m1.id, { state: 'succeeded' })
+    await registry.settle(g1.id, { state: 'succeeded' })
+    const m2 = await registry.begin('maintain')
+    const g2 = await registry.begin('merge', { command: 'pair' })
+    await registry.settle(m2.id, { state: 'succeeded' })
+    await registry.settle(g2.id, { state: 'succeeded' })
+    expect(registry.runs('maintain').map(row => row.id)).toEqual([m2.id])
+    expect(registry.runs('merge').map(row => row.id)).toEqual([g2.id])
+    expect(registry.runs()).toHaveLength(2)
+  })
+
   it('one terminal state: a settle after a cancel cannot flip the answer the operator read', async () => {
     const dir = await home()
     const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })

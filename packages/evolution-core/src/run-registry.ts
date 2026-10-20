@@ -1,7 +1,7 @@
 /**
  * 0.19.0 (S2) / 0.19.3 (restructure): the family's run-lifecycle owner.
  *
- * A "run" is work that can outlive one interaction — today the maintenance scan.
+ * A "run" is work that can outlive one interaction — the maintenance scan and merge workflows.
  * Before this module the only record of such work was the requesting invocation:
  * `lastMaintainAt` / `lastMaintainRunId` / `maintainInFlightSince` were
  * module-scope globals in evolution-commands, and the plan text existed ONLY in
@@ -44,8 +44,20 @@ import { clampedNumber } from './numeric.ts'
 import { isProcessAlive, transactIo } from './io.ts'
 import type { EvolutionIoLike } from './io.ts'
 
-/** The kinds of long-running work the registry tracks. Extend as rows gain runs. */
-export type RunKind = 'maintain'
+/** The kinds of long-running work the registry tracks. */
+export type RunKind = 'maintain' | 'merge'
+
+/** Which merge command opened a run. `kind` stays the work family; this is the command. */
+export type RunCommand = 'scan' | 'pair' | 'approve' | 'resume'
+
+/** Coarse, user-visible stage of a run. */
+export type RunStage = 'screening' | 'decide' | 'author' | 'commit' | 'settle'
+
+/** Progress of a run's current stage. */
+export interface RunProgress {
+  readonly done: number
+  readonly total: number
+}
 
 /** The four terminal-or-live states of a run. */
 export type RunState = 'running' | 'succeeded' | 'failed' | 'cancelled'
@@ -56,6 +68,11 @@ export interface RunRecord {
   kind: RunKind
   state: RunState
   startedAt: number
+  /** The merge command that opened this run, when the kind is merge. */
+  command?: RunCommand | undefined
+  /** The stage the owner last reported. */
+  stage?: RunStage | undefined
+  progress?: RunProgress | undefined
   /** The process that owns a RUNNING record. Required to tell an in-flight run of
    * another plane (both planes share one DSH_HOME) from the orphan of a dead one;
    * absent means the owner cannot be named, which is treated as gone. */
@@ -65,6 +82,10 @@ export interface RunRecord {
   resultRef?: string | undefined
   /** Why the run did not succeed (an abort reason, a validation failure). */
   failure?: string | undefined
+  /** Set when a tree restore made this run's effects un-undoable. */
+  supersededAt?: number | undefined
+  /** The run this run was spawned from (approve/resume after an earlier command). */
+  parentRunId?: string | undefined
 }
 
 /** What a started run gets: its id and the signal its work must honour. */
@@ -74,6 +95,8 @@ export interface RunHandle {
   readonly signal: AbortSignal
   /** When the run was registered — the same instant the record carries. */
   readonly startedAt: number
+  readonly command?: RunCommand | undefined
+  readonly parentRunId?: string | undefined
 }
 
 /** How a run ended, as reported by its owner. */
@@ -98,15 +121,19 @@ export interface RunRegistry {
    * lifetime starts when the caller answers "started", so a plane that reads that answer
    * must find the run. The cost is one local index write on the ack path (milliseconds).
    */
-  begin(kind: RunKind): Promise<RunHandle>
+  begin(kind: RunKind, seed?: { command?: RunCommand; total?: number; parentRunId?: string }): Promise<RunHandle>
   /** Record a run's terminal state (first writer wins). */
   settle(id: string, outcome: RunOutcome): Promise<void>
-  /** The live run, when there is one (one kind today — see the implementation note). */
-  inFlight(): RunRecord | undefined
-  /** When the newest terminal run ended (`undefined` when none). */
-  lastSettledAt(): number | undefined
+  /** Record the current stage/progress of a running run. */
+  stage(id: string, stage: RunStage, progress?: RunProgress): Promise<void>
+  /** Mark runs as superseded by a tree restore; idempotent. */
+  supersede(ids: readonly string[]): Promise<void>
+  /** The live run, optionally filtered by kind. */
+  inFlight(kind?: RunKind): RunRecord | undefined
+  /** When the newest terminal run of a kind ended (`undefined` when none). */
+  lastSettledAt(kind?: RunKind): number | undefined
   /** Every tracked run, newest first (retained history: cap applied). */
-  runs(): readonly RunRecord[]
+  runs(kind?: RunKind): readonly RunRecord[]
   /** One run by id, converged view included. */
   find(id: string): RunRecord | undefined
   /** Ask a running run to stop; it settles as `cancelled`. @returns whether it was running. */
@@ -129,7 +156,7 @@ export interface RunRegistryOptions {
 }
 
 /** Current index schema. Bump only for a structural change. */
-export const RUNS_SCHEMA_VERSION = 1
+export const RUNS_SCHEMA_VERSION = 2
 
 /** Retained run records, newest first. */
 export const DEFAULT_RUN_RECORDS = 50
@@ -181,10 +208,19 @@ function parseIndex(raw: string | null): { ok: boolean; records: RunRecord[]; fo
       kind: record.kind,
       state: record.state,
       startedAt: record.startedAt,
+      ...(typeof record.command === 'string' ? { command: record.command as RunCommand } : {}),
+      ...(typeof record.stage === 'string' ? { stage: record.stage as RunStage } : {}),
+      ...(typeof record.progress === 'object' && record.progress !== null
+        && typeof (record.progress as RunProgress).done === 'number'
+        && typeof (record.progress as RunProgress).total === 'number'
+        ? { progress: { done: (record.progress as RunProgress).done, total: (record.progress as RunProgress).total } }
+        : {}),
       ...(typeof record.pid === 'number' ? { pid: record.pid } : {}),
       ...(typeof record.endedAt === 'number' ? { endedAt: record.endedAt } : {}),
       ...(typeof record.resultRef === 'string' ? { resultRef: record.resultRef } : {}),
       ...(typeof record.failure === 'string' ? { failure: record.failure } : {}),
+      ...(typeof record.supersededAt === 'number' ? { supersededAt: record.supersededAt } : {}),
+      ...(typeof record.parentRunId === 'string' ? { parentRunId: record.parentRunId } : {}),
     })
   }
   return { ok: true, records, foreign, ...(notes.length > 0 ? { note: notes.join('; ') } : {}) }
@@ -218,14 +254,19 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
   /** Every row this process knows, newest first. ALL reads go through here. */
   const view = (): RunRecord[] => [...owned.values(), ...foreign.values()].sort((a, b) => b.startedAt - a.startedAt)
 
-  /** Retained history: every running row plus the newest terminal ones (one cap, both planes). */
+  /** Retained history: every running row plus the newest terminal rows per kind. */
   const capped = (rows: readonly RunRecord[]): RunRecord[] => {
     const live = rows.filter(row => row.state === 'running')
     const done = rows
       .filter(row => TERMINAL.has(row.state))
       .sort((a, b) => (b.endedAt ?? b.startedAt) - (a.endedAt ?? a.startedAt))
-      .slice(0, maxRecords)
-    return [...live, ...done].sort((a, b) => b.startedAt - a.startedAt)
+    const perKind = new Map<RunKind, RunRecord[]>()
+    for (const row of done) {
+      const kept = perKind.get(row.kind) ?? []
+      if (kept.length < maxRecords) kept.push(row)
+      perKind.set(row.kind, kept)
+    }
+    return [...live, ...[...perKind.values()].flat()].sort((a, b) => b.startedAt - a.startedAt)
   }
 
   /**
@@ -246,9 +287,14 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
     }
     if (TERMINAL.has(existing.state) && !TERMINAL.has(row.state)) return true
     // Clear what the new row dropped, so nothing is inherited from the previous view.
+    delete existing.command
+    delete existing.stage
+    delete existing.progress
     delete existing.endedAt
     delete existing.resultRef
     delete existing.failure
+    delete existing.supersededAt
+    delete existing.parentRunId
     Object.assign(existing, row)
     return false
   }
@@ -347,18 +393,53 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       return { ok: true, ...(notes.length > 0 ? { note: notes.join('; ') } : {}) }
     },
 
-    async begin(kind) {
+    async begin(kind, seed) {
       const id = randomUUID()
       const startedAt = now()
       const controller = new AbortController()
       controllers.set(id, controller)
       // The pid is what lets ANOTHER process tell this live run from an orphan.
-      owned.set(id, { id, kind, state: 'running', startedAt, pid: process.pid })
+      owned.set(id, {
+        id,
+        kind,
+        state: 'running',
+        startedAt,
+        pid: process.pid,
+        ...(seed?.command !== undefined ? { command: seed.command } : {}),
+        ...(seed?.parentRunId !== undefined ? { parentRunId: seed.parentRunId } : {}),
+        ...(seed?.total !== undefined ? { progress: { done: 0, total: seed.total } } : {}),
+      })
       // Write-through (0.19.1, review P2): answering "started" promises a run another
       // plane can read, so the row reaches the index before this resolves. `persist()`
       // warns instead of throwing, so an unwritable home cannot withhold the handle.
       await persist()
-      return { id, kind, signal: controller.signal, startedAt }
+      return {
+        id,
+        kind,
+        signal: controller.signal,
+        startedAt,
+        ...(seed?.command !== undefined ? { command: seed.command } : {}),
+        ...(seed?.parentRunId !== undefined ? { parentRunId: seed.parentRunId } : {}),
+      }
+    },
+
+    async stage(id, stage, progress) {
+      const row = owned.get(id)
+      if (row === undefined || row.state !== 'running') return
+      row.stage = stage
+      if (progress !== undefined) row.progress = { done: progress.done, total: progress.total }
+      await persist()
+    },
+
+    async supersede(ids) {
+      let changed = false
+      for (const id of new Set(ids)) {
+        const row = owned.get(id)
+        if (row === undefined || row.supersededAt !== undefined) continue
+        row.supersededAt = now()
+        changed = true
+      }
+      if (changed) await persist()
     },
 
     async settle(id, outcome) {
@@ -374,19 +455,16 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       await persist()
     },
 
-    // The registry tracks ONE kind today (`RunKind` = 'maintain'), so these reads take no
-    // kind filter — a comparison the type system already knows is true. Re-add the
-    // parameter (and the filter) together with the second `RunKind` member.
-    inFlight() {
-      return view().find(row => row.state === 'running')
+    inFlight(kind) {
+      return view().find(row => row.state === 'running' && (kind === undefined || row.kind === kind))
     },
 
-    lastSettledAt() {
-      return view().find(row => TERMINAL.has(row.state))?.endedAt
+    lastSettledAt(kind) {
+      return view().find(row => TERMINAL.has(row.state) && (kind === undefined || row.kind === kind))?.endedAt
     },
 
-    runs() {
-      return capped(view())
+    runs(kind) {
+      return kind === undefined ? capped(view()) : capped(view().filter(row => row.kind === kind))
     },
 
     find(id) {
