@@ -506,6 +506,12 @@
       "banners": {
         "all": "    # ── skill health: the sidebar panel over the linter's findings ───────────"
       }
+    },
+    {
+      "id": "evolution-merge",
+      "banners": {
+        "all": "    # ── skill merge: the merged-pair queues and the read-only panel ─────────────"
+      }
     }
   ],
   "rows": [
@@ -1242,6 +1248,35 @@
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-skill-health'",
         "      disabled: true"
+      ]
+    },
+    {
+      "id": "evolution-merge",
+      "group": "evolution-merge",
+      "forms": [
+        "all"
+      ],
+      "lead": [
+        "    # Host half mounts four read-only routes under /api/dsh-evolution/merge/*",
+        "    # and the /merge command; run engine and staging tool mount from the same row.",
+        "    # The browser half is evolution-merge-ui; this row owns the permission/Config row."
+      ],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-merge'"
+      ]
+    },
+    {
+      "id": "evolution-merge-ui",
+      "group": "evolution-merge",
+      "forms": [
+        "all"
+      ],
+      "lead": [
+        "    # Browser half: the left-sidebar merge panel over the four read-only routes.",
+        "    # Disabling this row removes the panel and changes no host-side behaviour."
+      ],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-merge-ui'"
       ]
     },
     {

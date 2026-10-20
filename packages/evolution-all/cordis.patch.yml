@@ -151,6 +151,17 @@
       name: '@deepseek-ai/dsh-evolution-skill-health'
       disabled: true
 
+    # ── skill merge: the merged-pair queues and the read-only panel ─────────────
+    # Host half mounts four read-only routes under /api/dsh-evolution/merge/*
+    # and the /merge command; run engine and staging tool mount from the same row.
+    # The browser half is evolution-merge-ui; this row owns the permission/Config row.
+    - id: evolution-merge
+      name: '@deepseek-ai/dsh-evolution-merge'
+    # Browser half: the left-sidebar merge panel over the four read-only routes.
+    # Disabling this row removes the panel and changes no host-side behaviour.
+    - id: evolution-merge-ui
+      name: '@deepseek-ai/dsh-evolution-merge-ui'
+
 # ── cross-session recall: enable the native session-query index ─────────────
 # `tool-session-query` (above) exposes `session_search`; this overlay
 # enables the backing SQLite full-text index so that search actually works.

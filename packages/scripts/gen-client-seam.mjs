@@ -28,7 +28,7 @@ import { tsLiteral } from './lib-ts-literal.mjs'
 const HERE = resolve(new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const scriptsDir = existsSync(join(root, 'scripts')) ? join(root, 'scripts') : HERE
 const templates = join(scriptsDir, 'templates', 'client')
-const PACKAGES = ['evolution-settings-ui', 'evolution-skill-history', 'evolution-skill-health']
+const PACKAGES = ['evolution-settings-ui', 'evolution-skill-history', 'evolution-skill-health', 'evolution-merge-ui']
 
 const SURFACE_IDS = {
   approval: 'approval',
