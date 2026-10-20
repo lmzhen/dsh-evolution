@@ -11,12 +11,18 @@ export interface MergeCommandResult {
   readonly text: string
 }
 
+export interface MergeCommandContext {
+  /** The invoking agent, when a command (not a route) initiated the run. */
+  readonly parent?: unknown
+}
+
 export interface MergeCommandService {
-  execute(command: MergeCliCommand): Promise<MergeCommandResult>
+  execute(command: MergeCliCommand, context?: MergeCommandContext): Promise<MergeCommandResult>
 }
 
 export interface CommandInvocationLike {
   readonly rawInput: string
+  readonly agent?: unknown
 }
 
 export interface CommandResultLike {
@@ -54,7 +60,7 @@ export function createMergeCommand(service: MergeCommandService): MergeCommandDe
       if (!parsed.ok) return { kind: 'error', text: parsed.message }
       if (parsed.help === true) return { kind: 'success', text: mergeUsage() }
       try {
-        const result = await service.execute(parsed.command)
+        const result = await service.execute(parsed.command, { ...(invocation.agent === undefined ? {} : { parent: invocation.agent }) })
         return { kind: result.ok ? 'success' : 'error', text: result.text }
       } catch (error) {
         return { kind: 'error', text: 'merge 命令失败：' + (error instanceof Error ? error.message : String(error)) + '\n运行 /merge status 查看状态。' }

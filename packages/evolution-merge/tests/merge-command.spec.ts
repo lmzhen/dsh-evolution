@@ -17,3 +17,12 @@ it('dispatches read-only verbs and rejects missing ones', async () => {
   expect((await command.handler({ rawInput: 'pair only-one' })).kind).toBe('error')
   expect((await command.handler({ rawInput: '' })).text).toContain('merge scan')
 })
+
+it('passes the invoking agent through to the service', async () => {
+  let seen: unknown
+  const command = createMergeCommand({
+    async execute(_command, context) { seen = context; return { ok: true, text: 'ok' } },
+  })
+  await command.handler({ rawInput: 'scan', agent: { session: 's1' } })
+  expect(seen).toEqual({ parent: { session: 's1' } })
+})

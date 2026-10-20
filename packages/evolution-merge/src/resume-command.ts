@@ -15,6 +15,8 @@ export interface RunResumeCommandOptions {
   readonly home: string
   readonly registry: MergeRegistryPort
   readonly ports: ScanPorts
+  /** Per-run ports for the verify branch (staging needs the new runId). */
+  readonly makePorts?: (runId: string) => ScanPorts
   /** Optional new-child authoring port (approve-after-pending path). */
   readonly round2WithRun?: (row: MergeRow, decision: MergeDecision, signal: AbortSignal, runId: string) => Promise<ScanRound2Outcome>
   readonly rowId: string
@@ -31,7 +33,9 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
     return await runScanCommand({
       io: options.io, home: options.home, registry: options.registry,
       approval: true, platformWrite: options.platformWrite, now: options.now,
-      ports: { ...options.ports, screening: async () => [{ a: row.a, b: row.b }] },
+      ...(options.makePorts === undefined
+        ? { ports: { ...options.ports, screening: async () => [{ a: row.a, b: row.b }] } }
+        : { makePorts: runId => ({ ...options.makePorts!(runId), screening: async () => [{ a: row.a, b: row.b }] }) }),
       ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
     })
   }
