@@ -3,7 +3,7 @@
  * Plugin wiring supplies the channel, model and library; this module keeps the orchestration
  * out of apply() and makes the mutating verbs testable with fakes.
  */
-import type { EvolutionIoLike, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike, RunRegistry, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeCandidate } from './contracts.ts'
 import type { MergeParams } from './params.ts'
 import type { SkillCard } from './screening.ts'
@@ -80,6 +80,26 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         return result.ok
           ? { ok: true, text: 'merge scan 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
           : { ok: false, text: result.message }
+      }
+      if (command.verb === 'report' || command.verb === 'runs' || command.verb === 'cancel') {
+        const registry = deps.registry as unknown as RunRegistry
+        if (command.verb === 'runs') {
+          const mergeRuns = registry.runs('merge')
+          return { ok: true, text: mergeRuns.length === 0 ? 'merge runs: empty' : ['merge runs: ' + String(mergeRuns.length)].concat(mergeRuns.map(run => '- ' + run.id + ' [' + run.state + ']' + (run.resultRef === undefined ? '' : ' ' + run.resultRef))).join('\n') }
+        }
+        if (command.verb === 'cancel') {
+          if (command.id !== undefined) {
+            const cancelled = registry.cancel(command.id)
+            return { ok: cancelled, text: cancelled ? '已请求取消 ' + command.id : '没有可取消的 run: ' + command.id }
+          }
+          const count = registry.cancelAll()
+          return { ok: true, text: '已请求取消 ' + String(count) + ' 个运行' }
+        }
+        const run = command.id === undefined ? registry.runs('merge')[0] : registry.find(command.id)
+        if (run === undefined) return { ok: false, text: 'merge run not found: ' + (command.id ?? '(latest)') }
+        if (run.resultRef === undefined) return { ok: false, text: 'merge run has no report yet: ' + run.id }
+        const text = await deps.io.readText(run.resultRef).catch(() => null)
+        return text === null ? { ok: false, text: 'report is missing: ' + run.resultRef } : { ok: true, text: text.slice(0, 12000) }
       }
       if (command.verb === 'undo') {
         const receipt = await readCommitReceipt(deps.io, deps.home, command.run)
