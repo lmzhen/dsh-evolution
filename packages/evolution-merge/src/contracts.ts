@@ -39,6 +39,16 @@ export function pairKey(a: string, b: string): string {
   return a < b ? a + '\u0000' + b : b + '\u0000' + a
 }
 
+/** Deterministic, URL-safe id derived from the pair key (FNV-1a 32). */
+export function rowIdOf(key: string): string {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return 'mr_' + hash.toString(36).padStart(7, '0')
+}
+
 export interface MergeFailure {
   readonly stage: 'screening' | 'decide' | 'author' | 'validate' | 'commit'
   readonly code: string

@@ -23,16 +23,6 @@ export function mergeStatePath(home: string): string {
   return join(home, 'merge', 'merge-state.json')
 }
 
-/** Deterministic, URL-safe id derived from the pair key (FNV-1a 32). */
-export function rowIdOf(pairKey: string): string {
-  let hash = 0x811c9dc5
-  for (const byte of Buffer.from(pairKey, 'utf8')) {
-    hash ^= byte
-    hash = Math.imul(hash, 0x01000193) >>> 0
-  }
-  return 'mr_' + hash.toString(36).padStart(7, '0')
-}
-
 interface ParsedState {
   readonly ok: boolean
   readonly rows: MergeRow[]
