@@ -4,7 +4,8 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import type { EvolutionIoLike, RunRegistry, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
-import type { MergeCandidate } from './contracts.ts'
+import { pairKey, type MergeCandidate } from './contracts.ts'
+import { skippedPairKeys } from './skipped.ts'
 import type { MergeParams } from './params.ts'
 import type { SkillCard } from './screening.ts'
 import type { MergeRegistryPort } from './run-shell.ts'
@@ -87,12 +88,16 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'scan') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
+        const skipped = skippedPairKeys((await loadMergeState(deps.io, deps.home)).state.rows, deps.params.mergeSkippedTtlDays, deps.now())
         const result = await runScanCommand({
           ...common,
           approval: deps.params.mergeApproval,
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
-            screening: turnSignal => deps.screeningForRun === undefined ? deps.screening(cards, turnSignal) : deps.screeningForRun(cards, runId, turnSignal),
+            screening: async turnSignal => {
+              const raw = deps.screeningForRun === undefined ? await deps.screening(cards, turnSignal) : await deps.screeningForRun(cards, runId, turnSignal)
+              return raw.filter(candidate => !skipped.has(pairKey(candidate.a, candidate.b)))
+            },
             channel: deps.channel, parent, allow: deps.allow,
             ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
             timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
