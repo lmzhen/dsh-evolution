@@ -58,6 +58,72 @@ export interface MergeFailure {
 }
 
 /** One persisted pair. The id is stable for the UI; the pairKey is the natural key. */
+export interface MergeCandidate {
+  readonly a: string
+  readonly b: string
+  readonly score?: number
+  readonly arms?: readonly string[]
+  readonly source?: 'lexical' | 'proposed'
+}
+
+export interface MergeDecision {
+  readonly shouldMerge: boolean
+  readonly mode: 'merge-into-existing' | 'create-umbrella' | 'keep'
+  readonly target: string
+  readonly sources: readonly string[]
+  readonly rationale: string
+  readonly confidence?: number
+}
+
+export interface MergeUsage {
+  readonly inputTokens?: number
+  readonly outputTokens?: number
+  readonly totalTokens?: number
+  readonly costCny?: number
+}
+
+export interface MergeTiming {
+  readonly screeningMs?: number
+  readonly gateMs?: number
+  readonly agentMs?: number
+  readonly commitMs?: number
+}
+
+export type MergeRunCommand = MergeCommand
+
+export interface MergeReportPair {
+  readonly id: string
+  readonly pairKey: string
+  readonly a: string
+  readonly b: string
+  readonly queue: MergeQueue
+  readonly candidate?: MergeCandidate
+  readonly decision?: MergeDecision
+  readonly outcome: 'merged' | 'kept' | 'pending' | 'failed' | 'cancelled'
+  readonly target?: { readonly requested: string; readonly actual: string; readonly created: boolean }
+  readonly archived: readonly string[]
+  readonly unitId?: string
+  readonly failure?: MergeFailure
+  readonly usage?: MergeUsage
+  readonly timing?: MergeTiming
+}
+
+export interface MergeReport {
+  readonly schemaVersion: 1
+  readonly runId: string
+  readonly kind: 'merge'
+  readonly command: MergeRunCommand
+  readonly startedAt: number
+  readonly endedAt: number
+  readonly stopReason: 'completed' | 'failed' | 'cancelled' | 'timeout'
+  readonly approval: { readonly platformWrite: boolean; readonly mergeApproval: boolean }
+  readonly scope: { readonly candidatePairs: number; readonly queueBefore: Record<MergeQueue, number> }
+  readonly pairs: readonly MergeReportPair[]
+  readonly totals: Record<'merged' | 'kept' | 'pending' | 'failed', number>
+  readonly notes: readonly string[]
+  readonly remaining?: readonly { readonly pairKey: string; readonly queue: MergeQueue }[]
+}
+
 export interface MergeRow {
   readonly id: string
   readonly pairKey: string
