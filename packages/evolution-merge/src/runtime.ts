@@ -14,7 +14,8 @@ import { handleReadOnlyMergeCommand } from './read-commands.ts'
 import { runScanCommand } from './scan-command.ts'
 import { runApproveCommand } from './approve-command.ts'
 import { runResumeCommand } from './resume-command.ts'
-import { dropRow, loadMergeState } from './state.ts'
+import { dropRow, loadMergeState, upsertRow } from './state.ts'
+import { transition } from './coordinator.ts'
 import { readCommitReceipt } from './commit-receipt.ts'
 import { undoMergeReceipt } from './undo-merge.ts'
 import { skillLibraryUndoPort } from './adapters/undo.ts'
@@ -81,6 +82,15 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           ? { ok: true, text: 'merge scan 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
           : { ok: false, text: result.message }
       }
+      if (command.verb === 'reject') {
+        const loaded = await loadMergeState(deps.io, deps.home)
+        const row = loaded.state.rows.find(item => item.id === command.id)
+        if (row === undefined) return { ok: false, text: 'merge row not found: ' + command.id }
+        const next = transition(row, { type: 'reject', at: new Date(deps.now()).toISOString() })
+        if (!next.ok || next.row === null) return { ok: false, text: 'merge row is not pending: ' + command.id }
+        await upsertRow(deps.io, deps.home, deps.now, next.row)
+        return { ok: true, text: '已拒绝合并：' + command.id }
+      }
       if (command.verb === 'report' || command.verb === 'runs' || command.verb === 'cancel') {
         const registry = deps.registry as unknown as RunRegistry
         if (command.verb === 'runs') {
@@ -104,6 +114,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'undo') {
         const receipt = await readCommitReceipt(deps.io, deps.home, command.run)
         if (receipt === null) return { ok: false, text: 'merge run has no commit receipt: ' + command.run }
+        if (receipt.target !== command.target) return { ok: false, text: 'receipt target is ' + receipt.target + ', not ' + command.target }
         const result = await undoMergeReceipt(receipt, skillLibraryUndoPort(deps.skills))
         return { ok: result.ok, text: result.message }
       }
