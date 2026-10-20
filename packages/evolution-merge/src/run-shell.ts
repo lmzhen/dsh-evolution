@@ -22,6 +22,7 @@ export interface MergeRegistryPort {
 
 export interface MergeRunBodyContext {
   readonly runId: string
+  readonly startedAt: number
   readonly signal: AbortSignal
   readonly stage: (stage: RunStage, progress?: { done: number; total: number }) => Promise<void>
 }
@@ -70,7 +71,7 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
   await stage('screening', options.total === undefined ? undefined : { done: 0, total: options.total })
   let draft: MergeRunReportDraft
   try {
-    draft = await options.body({ runId: handle.id, signal: handle.signal, stage })
+    draft = await options.body({ runId: handle.id, startedAt, signal: handle.signal, stage })
   } catch (error) {
     draft = emptyDraft('run body failed: ' + (error instanceof Error ? error.message : String(error)))
   }
