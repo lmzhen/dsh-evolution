@@ -34,9 +34,9 @@ export function stageOf(state: MergePairState): MergeStage | null {
   }
 }
 
-/** Stable pair identity; skill names are lowercase-hyphenated, so '|' is safe. */
+/** Stable pair identity; NUL cannot appear in a skill name. */
 export function pairKey(a: string, b: string): string {
-  return a < b ? a + '|' + b : b + '|' + a
+  return a < b ? a + '\u0000' + b : b + '\u0000' + a
 }
 
 export interface MergeFailure {
@@ -47,29 +47,34 @@ export interface MergeFailure {
   readonly retryFrom: 'agent1' | 'agent2' | 'none'
 }
 
-export interface MergePairRecord {
+/** One persisted pair. The id is stable for the UI; the pairKey is the natural key. */
+export interface MergeRow {
+  readonly id: string
   readonly pairKey: string
   readonly a: string
   readonly b: string
   readonly state: MergePairState
+  readonly queue: MergeQueue
   readonly failure?: MergeFailure
   readonly runId?: string
   readonly unitId?: string
   readonly origin?: 'agent' | 'human'
+  readonly attempts?: number
+  readonly createdAt: string
   readonly updatedAt: string
 }
 
 export interface MergeState {
   readonly schemaVersion: typeof MERGE_STATE_VERSION
-  readonly pairs: Record<string, MergePairRecord>
+  readonly rows: readonly MergeRow[]
 }
 
 export function emptyMergeState(): MergeState {
-  return { schemaVersion: MERGE_STATE_VERSION, pairs: {} }
+  return { schemaVersion: MERGE_STATE_VERSION, rows: [] }
 }
 
 /** One record can be retried only when the failure says so and names a stage. */
-export function canRetry(record: MergePairRecord): boolean {
+export function canRetry(record: Pick<MergeRow, 'state' | 'failure'>): boolean {
   if (record.state === 'skipped') return false
   if (record.failure === undefined) return record.state !== 'pending'
   return record.failure.retryable && record.failure.retryFrom !== 'none'

@@ -7,7 +7,7 @@ import {
   pairKey,
   queueOf,
   stageOf,
-  type MergePairRecord,
+  type MergeRow,
 } from '../src/index.ts'
 
 describe('merge contracts', () => {
@@ -22,11 +22,11 @@ describe('merge contracts', () => {
   })
 
   it('starts empty with the current schema', () => {
-    expect(emptyMergeState()).toEqual({ schemaVersion: 1, pairs: {} })
+    expect(emptyMergeState()).toEqual({ schemaVersion: 1, rows: [] })
   })
 
   it('allows retry only when the failure is retryable and names a stage', () => {
-    const base: MergePairRecord = { pairKey: 'a|b', a: 'a', b: 'b', state: 'fuse', updatedAt: '2026-10-20T00:00:00.000Z' }
+    const base: MergeRow = { id: 'mr_a', pairKey: 'a|b', a: 'a', b: 'b', state: 'fuse', queue: 'retry', createdAt: '2026-10-20T00:00:00.000Z', updatedAt: '2026-10-20T00:00:00.000Z' }
     expect(canRetry(base)).toBe(true)
     expect(canRetry({ ...base, state: 'pending' })).toBe(false)
     expect(canRetry({ ...base, state: 'skipped' })).toBe(false)
