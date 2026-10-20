@@ -50,7 +50,7 @@ function operation(args: Record<string, unknown>): StageToolOp | StageToolResult
 export function createMergeStageTool(
   io: EvolutionIoLike,
   home: string,
-  context: () => StageToolContext,
+  context: (exec: unknown) => StageToolContext | undefined,
 ): ToolDefinitionLike {
   return {
     name: MERGE_STAGE_TOOL_NAME,
@@ -73,10 +73,12 @@ export function createMergeStageTool(
       schema: { type: 'string' },
       render: (_args, value) => [{ type: 'text', text: value }],
     },
-    async execute(args) {
+    async execute(args, exec) {
       const op = operation(args)
       if ('ok' in op) return JSON.stringify(op)
-      return JSON.stringify(await applyStageTool(io, home, context(), op))
+      const ctx = context(exec)
+      if (ctx === undefined) return JSON.stringify({ ok: false, code: 'not-merge-child', message: 'merge_stage is only available to an active merge child' })
+      return JSON.stringify(await applyStageTool(io, home, ctx, op))
     },
   }
 }
