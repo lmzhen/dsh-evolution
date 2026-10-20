@@ -25,6 +25,17 @@ it('returns raw model text and passes route/temperature', async () => {
   expect(config).toMatchObject({ provider: 'deepseek-official', model: 'deepseek-flash', maxTokens: 100, temperature: 0 })
 })
 
+it('uses the current llm.stream shape', async () => {
+  const llm: LlmServiceLike = {
+    async *stream() {
+      yield { type: 'text-delta', text: 'hello' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    },
+  }
+  const port = createModelPort(llm, () => ({ provider: 'p', model: 'm' }))
+  expect(await port.callJson({ system: 's', user: 'u', maxTokens: 10, signal })).toBe('hello')
+})
+
 it('throws on a finish error', async () => {
   const llm: LlmServiceLike = {
     async prepareCall() {
