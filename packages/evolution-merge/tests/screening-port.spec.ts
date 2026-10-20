@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { buildScreeningCandidates, type GateModelPort, type ModelPort, type SkillCard } from '../src/index.ts'
+import { buildScreeningCandidates, createScreeningForRun, type GateModelPort, type ModelPort, type SkillCard } from '../src/index.ts'
 
 const cards: SkillCard[] = [
   { name: 'alpha-skill', description: 'same description', body: 'same body' },
@@ -30,4 +30,17 @@ it('filters through the gate and carries the gate fact', async () => {
   expect(result.stats.dropped).toBe(0)
   expect(result.stats.kept).toBeGreaterThan(0)
   expect(result.candidates[0]?.gate).toMatchObject({ level: 'L2', verdict: 1 })
+})
+
+it('builds a run-scoped screening function with the gate seed', async () => {
+  const gate: GateModelPort = {
+    async callJson(request) {
+      const payload = JSON.parse(request.user) as { level: string }
+      return { verdict: payload.level === 'L1' ? 0 : 1, reason: payload.level }
+    },
+  }
+  const run = createScreeningForRun({ cards, runSeed: 'run-seed', gate: { model: gate, modelName: 'm', runSeed: 'old' } })
+  const candidates = await run(signal)
+  expect(candidates.length).toBeGreaterThan(0)
+  expect(candidates[0]?.gate).toMatchObject({ level: 'L2', verdict: 1 })
 })

@@ -8,6 +8,10 @@ import { proposePairs, type ModelPort } from './propose.ts'
 import { filterCandidates } from './gate-filter.ts'
 import type { GateCache, GateFacts, GateModelPort } from './ladder.ts'
 
+export interface ScreeningForRunOptions extends Omit<BuildScreeningOptions, 'signal'> {
+  readonly runSeed: string
+}
+
 export interface BuildScreeningOptions {
   readonly cards: readonly SkillCard[]
   readonly signal: AbortSignal
@@ -107,4 +111,16 @@ export async function buildScreeningCandidates(options: BuildScreeningOptions): 
     },
     degraded,
   }
+}
+
+/** Build the run-scoped screening function; the run id seeds the 10% audit. */
+export function createScreeningForRun(options: ScreeningForRunOptions): (signal: AbortSignal) => Promise<readonly MergeCandidate[]> {
+  const gate = options.gate === undefined ? undefined : { ...options.gate, runSeed: options.runSeed }
+  return async signal => (await buildScreeningCandidates({
+    cards: options.cards,
+    signal,
+    ...(options.lexical === undefined ? {} : { lexical: options.lexical }),
+    ...(options.propose === undefined ? {} : { propose: options.propose }),
+    ...(gate === undefined ? {} : { gate }),
+  })).candidates
 }
