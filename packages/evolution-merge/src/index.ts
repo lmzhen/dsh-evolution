@@ -73,6 +73,7 @@ export * from './routes.ts'
 export * from './merge-routes.ts'
 export * from './merge-command.ts'
 export * from './params.ts'
+export * from './doctor.ts'
 
 export const inject: string[] = []
 
