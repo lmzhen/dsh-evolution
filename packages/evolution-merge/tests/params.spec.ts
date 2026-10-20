@@ -15,4 +15,9 @@ it('accepts overrides and rejects bad shapes loudly', () => {
   expect(() => resolveMergeParams({ mergeSkippedTtlDays: -1 })).toThrow('non-negative')
   expect(() => resolveMergeParams({ unknown: 1 })).toThrow('unknown')
   expect(() => resolveMergeParams({ mergeApproval: 1 })).toThrow('boolean')
+  expect(resolveMergeParams({
+    mergeApproval: { get: () => true },
+    mergeSkippedTtlDays: { get: () => 3 },
+    mergeRunTimeoutMinutes: { get: () => 9 },
+  })).toEqual({ mergeApproval: true, mergeSkippedTtlDays: 3, mergeRunTimeoutMinutes: 9, mergePairTimeoutMinutes: 15 })
 })
