@@ -6,6 +6,7 @@ it('parses the command surface', () => {
   expect(parseMergeCommand([])).toMatchObject({ ok: true, help: true })
   expect(parseMergeCommand(['pair', 'a', 'b'])).toEqual({ ok: true, command: { verb: 'pair', a: 'a', b: 'b' } })
   expect(parseMergeCommand(['status'])).toEqual({ ok: true, command: { verb: 'status' } })
+  expect(parseMergeCommand(['doctor'])).toEqual({ ok: true, command: { verb: 'doctor' } })
   expect(parseMergeCommand(['resume', 'mr_1', '--clear', 'mr_2'])).toEqual({ ok: true, command: { verb: 'resume', id: 'mr_1', clear: 'mr_2' } })
   expect(parseMergeCommand(['skipped', '--restore', 'mr_1'])).toEqual({ ok: true, command: { verb: 'skipped', restore: 'mr_1' } })
   expect(parseMergeCommand(['undo', 'umbrella', '--run', 'run-1'])).toEqual({ ok: true, command: { verb: 'undo', target: 'umbrella', run: 'run-1' } })

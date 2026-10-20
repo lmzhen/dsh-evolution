@@ -9,6 +9,7 @@ export type MergeCliCommand =
   | { readonly verb: 'report'; readonly id?: string }
   | { readonly verb: 'cancel'; readonly id?: string }
   | { readonly verb: 'runs' }
+  | { readonly verb: 'doctor' }
   | { readonly verb: 'pending' }
   | { readonly verb: 'approve'; readonly id: string }
   | { readonly verb: 'reject'; readonly id: string }
@@ -20,7 +21,7 @@ export type ParseMergeCommandResult =
   | { readonly ok: true; readonly command: MergeCliCommand; readonly help?: boolean }
   | { readonly ok: false; readonly code: 'usage'; readonly message: string }
 
-const USAGE = 'usage: merge scan | pair <a> <b> | status [id] | report [id] | cancel [id] | runs | pending | approve <id> | reject <id> | resume [id] [--clear <id>] | skipped [--restore <id>] | undo <target> --run <id>'
+const USAGE = 'usage: merge scan | pair <a> <b> | status [id] | report [id] | cancel [id] | runs | doctor | pending | approve <id> | reject <id> | resume [id] [--clear <id>] | skipped [--restore <id>] | undo <target> --run <id>'
 
 function flags(args: readonly string[], allowed: readonly string[]): { values: Map<string, string>; error?: string } {
   const values = new Map<string, string>()
@@ -52,6 +53,7 @@ export function parseMergeCommand(argv: readonly string[]): ParseMergeCommandRes
     case 'report': return pos.length <= 1 ? { ok: true, command: { verb: 'report', ...(pos[0] === undefined ? {} : { id: pos[0] }) } } : { ok: false, code: 'usage', message: USAGE }
     case 'cancel': return pos.length <= 1 ? { ok: true, command: { verb: 'cancel', ...(pos[0] === undefined ? {} : { id: pos[0] }) } } : { ok: false, code: 'usage', message: USAGE }
     case 'runs': return pos.length === 0 ? { ok: true, command: { verb: 'runs' } } : { ok: false, code: 'usage', message: USAGE }
+    case 'doctor': return pos.length === 0 ? { ok: true, command: { verb: 'doctor' } } : { ok: false, code: 'usage', message: USAGE }
     case 'pending': return pos.length === 0 ? { ok: true, command: { verb: 'pending' } } : { ok: false, code: 'usage', message: USAGE }
     case 'approve': return pos.length === 1 ? { ok: true, command: { verb: 'approve', id: pos[0] as string } } : { ok: false, code: 'usage', message: USAGE }
     case 'reject': return pos.length === 1 ? { ok: true, command: { verb: 'reject', id: pos[0] as string } } : { ok: false, code: 'usage', message: USAGE }

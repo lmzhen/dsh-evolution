@@ -19,6 +19,7 @@ import { transition } from './coordinator.ts'
 import { readCommitReceipt } from './commit-receipt.ts'
 import { undoMergeReceipt } from './undo-merge.ts'
 import { skillLibraryUndoPort } from './adapters/undo.ts'
+import { mergeDoctor } from './doctor.ts'
 import { createChannelScanPorts } from './scan-ports.ts'
 import { createNewChildRound2 } from './new-child-authoring.ts'
 import { skillLibraryPort } from './adapters/library.ts'
@@ -112,6 +113,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (!next.ok || next.row === null) return { ok: false, text: 'merge row is not pending: ' + command.id }
         await upsertRow(deps.io, deps.home, deps.now, next.row)
         return { ok: true, text: '已拒绝合并：' + command.id }
+      }
+      if (command.verb === 'doctor') {
+        const rows = await mergeDoctor(deps.io, deps.home)
+        return { ok: true, text: rows.map(row => row.key + ' [' + row.status + '] ' + row.label + '：' + row.detail).join('\n') }
       }
       if (command.verb === 'report' || command.verb === 'runs' || command.verb === 'cancel') {
         const registry = deps.registry as unknown as RunRegistry

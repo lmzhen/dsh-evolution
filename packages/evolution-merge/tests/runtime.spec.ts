@@ -19,6 +19,7 @@ it('serves read-only verbs through the runtime', async () => {
   }
   const runtime = createMergeRuntime(deps)
   expect(await runtime.execute({ verb: 'status' })).toMatchObject({ ok: true })
+  expect(await runtime.execute({ verb: 'doctor' })).toMatchObject({ ok: true })
   expect((await runtime.execute({ verb: 'resume', id: 'mr_x' })).ok).toBe(false)
 })
 
