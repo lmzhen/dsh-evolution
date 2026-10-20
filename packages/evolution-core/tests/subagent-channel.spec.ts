@@ -13,6 +13,8 @@ interface Options {
   readonly resultError?: boolean
   readonly startThrow?: boolean
   readonly childMissing?: boolean
+  readonly round2Text?: string
+  readonly round2Stop?: string
 }
 
 function harness(options: Options = {}) {
@@ -28,6 +30,7 @@ function harness(options: Options = {}) {
     capabilities: { agentPreset: options.capability !== false },
     inheritsParentContext: options.inherits === true,
   }
+  const listeners = new Map<string, Set<(info: Record<string, unknown>) => void>>()
   const subagents = {
     getProvider: () => (options.providerMissing === true ? undefined : provider),
     async startActivation(spec: Record<string, unknown>) {
@@ -40,6 +43,16 @@ function harness(options: Options = {}) {
         async dispose() { log.push('dispose'); disposed += 1 },
       }
     },
+    async sendMessage(_sender: unknown, targetId: string) {
+      log.push('send')
+      const info = {
+        id: targetId,
+        stopReason: options.round2Stop ?? 'completed',
+        lastAssistantMessage: [{ type: 'text', text: options.round2Text ?? 'round-2' }],
+      }
+      for (const listener of listeners.get('subagent/end') ?? []) listener(info)
+      return { accepted: true }
+    },
   }
   const agentPresets = {
     composedPreset: () => (options.parentPreset === null ? undefined : (options.parentPreset ?? 'standard')),
@@ -51,6 +64,12 @@ function harness(options: Options = {}) {
   const agents = { get: () => (options.childMissing === true ? undefined : { id: 'child-1' }) }
   const ctx = {
     get: (name: string) => ({ subagents, agentPresets, agents } as Record<string, unknown>)[name],
+    on: (event: string, listener: (info: Record<string, unknown>) => void) => {
+      const set = listeners.get(event) ?? new Set()
+      set.add(listener)
+      listeners.set(event, set)
+      return () => { set.delete(listener) }
+    },
     effect: (run: () => () => void) => { run(); return () => {} },
   }
   return { ctx, calls, log, disposed: () => disposed }
@@ -115,6 +134,36 @@ describe('subagent channel (G3-S1/S2)', () => {
     const outcome = await createSubagentChannel(h.ctx as never).run({ parent, label: 'r', promptText: 't', kind: 'reviewer', allow: ['tool-skill'], timeoutMs: 1_000 })
     expect(outcome).toMatchObject({ kind: 'unavailable', code: 'E-323', reason: 'start-boom' })
     expect(h.disposed()).toBe(0)
+  })
+
+  it('opens one child, continues one turn, and disposes idempotently', async () => {
+    const h = harness({
+      result: { output: [{ type: 'text', text: 'round-1' }], stopReason: 'completed' },
+      round2Text: 'round-2',
+    })
+    const channel = createSubagentChannel(h.ctx as never)
+    const opened = await channel.open!({
+      parent,
+      label: 'merge-author',
+      promptText: 'decide',
+      kind: 'reviewer',
+      allow: ['tool-skill'],
+      cwd: 'D:/dsh/tmp/staging-probe',
+      timeoutMs: 1_000,
+    })
+    expect(opened).toMatchObject({ kind: 'ok', childId: 'child-1', turn: { text: 'round-1', stopReason: 'completed' } })
+    expect((h.calls[0] as { request: Record<string, unknown> }).request).toMatchObject({
+      agentPreset: REVIEWER_PRESET_ID,
+      cwd: 'D:/dsh/tmp/staging-probe',
+      prompt: [{ type: 'text', text: 'decide' }],
+    })
+    const childId = (opened as { childId: string }).childId
+    const second = await channel.continueTurn!(childId, 'author', { timeoutMs: 1_000 })
+    expect(second).toMatchObject({ kind: 'ok', childId, turn: { text: 'round-2', stopReason: 'completed' } })
+    await channel.dispose!(childId)
+    await channel.dispose!(childId)
+    expect(h.disposed()).toBe(1)
+    expect(await channel.continueTurn!(childId, 'after-dispose')).toMatchObject({ kind: 'unavailable', code: 'E-324' })
   })
 
   it('probes availability and reflects the registry status', async () => {
