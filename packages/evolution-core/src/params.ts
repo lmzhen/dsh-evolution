@@ -87,7 +87,7 @@ export function readParam(carrier: object | undefined, id: string): unknown {
  * belongs to, the tier says who may change it. `internal` here is a group id with no rows today;
  * the `why: 'internal'` a non-E3 row carries is a different value on the other axis (the reason it
  * has no settings card) — the shared spelling is a coincidence, not a routing rule. */
-export type ParamGroup = 'library' | 'write-caps' | 'review' | 'memory' | 'curator' | 'deployment' | 'internal'
+export type ParamGroup = 'library' | 'write-caps' | 'review' | 'memory' | 'curator' | 'deployment' | 'merge' | 'internal'
 
 /**
  * Chinese display name per group, one entry per line (the scripts read this block
@@ -101,6 +101,7 @@ export const PARAM_GROUP_LABELS: Readonly<Record<ParamGroup, string>> = Object.f
   memory: '记忆',
   curator: '技能整理',
   deployment: '安装配置',
+  merge: '技能合并',
   internal: '内部',
 })
 
@@ -295,6 +296,10 @@ export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
   { id: 'install.presetRowOverrides', group: 'deployment', tier: 'E4', authority: 'install', owner: 'scripts', applies: 'restart', docAnchor: 'PARAMETERS.md#deployment', summary: 'Preset row overrides the installer injects (row-overrides.json).', why: 'install' },
   { id: 'timeout.gateDefault', group: 'deployment', tier: 'E2', authority: 'install', owner: 'scripts', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Gate budget: the vitest --testTimeout the gate table and the CI step carry (the number lives in testing-policy.timeouts).', why: 'internal' },
   { id: 'timeout.specDefault', group: 'deployment', tier: 'E2', authority: 'install', owner: 'scripts', applies: 'none', docAnchor: 'PARAMETERS.md#deployment', summary: 'Local spec budget: the vitest testTimeout the family config generates per leaf tier (the number lives in testing-policy.timeouts).', why: 'internal' },
+  { id: 'mergeApproval', group: 'merge', tier: 'E3', authority: 'cordis', owner: 'evolution-merge', applies: 'live', docAnchor: 'PARAMETERS.md#merge', summary: 'Pause after round 1 and put the pair in the pending queue instead of authoring round 2 automatically.', label: '合并审批', hint: '开启后，第一轮判定完先停下、进入待批准清单；关闭则直接进入第二轮合并。', control: 'switch', unit: '', values: '', card: 'evolution-merge' },
+  { id: 'mergeSkippedTtlDays', group: 'merge', tier: 'E3', authority: 'cordis', owner: 'evolution-merge', applies: 'live', docAnchor: 'PARAMETERS.md#merge', summary: 'Days a skipped pair stays out of screening; 0 means it never expires.', label: '无需合并保留天数', hint: '判定无需合并的对，多少天内不再参与筛选；0 表示一直保留。', control: 'number', unit: '天', values: '', card: 'evolution-merge' },
+  { id: 'mergeRunTimeoutMinutes', group: 'merge', tier: 'E3', authority: 'cordis', owner: 'evolution-merge', applies: 'live', docAnchor: 'PARAMETERS.md#merge', summary: 'Wall-clock budget of one merge run; 0 means no limit.', label: '单次运行上限', hint: '一次合并运行最多持续多少分钟；0 表示不设上限。', control: 'number', unit: '分钟', values: '', card: 'evolution-merge' },
+  { id: 'mergePairTimeoutMinutes', group: 'merge', tier: 'E2', authority: 'cordis', owner: 'evolution-merge', applies: 'none', docAnchor: 'PARAMETERS.md#merge', summary: 'Wall-clock budget of one pair round (a stuck child guard).', why: 'internal' },
 ])
 
 /** The settings namespace each OWNER PACKAGE registers (design §7.2).
@@ -316,6 +321,7 @@ export const PARAM_NAMESPACES: Readonly<Record<string, string>> = Object.freeze(
   // 0.21.0 (G3): the commands row's handoff switch is E3 — same reason as the entry above: the card
   // and `/evolution params set` both resolve their settings namespace through this map.
   'evolution-commands': 'evolution-commands',
+  'evolution-merge': 'evolution-merge',
 })
 
 /**

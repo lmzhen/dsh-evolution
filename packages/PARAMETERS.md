@@ -159,3 +159,12 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `install.presetRowOverrides` | E4 | restart | install | scripts | — | 无（install） | Preset row overrides the installer injects (row-overrides.json). |
 | `timeout.gateDefault` | E2 | none | install | scripts | — | 无（internal） | Gate budget: the vitest --testTimeout the gate table and the CI step carry (the number lives in testing-policy.timeouts). |
 | `timeout.specDefault` | E2 | none | install | scripts | — | 无（internal） | Local spec budget: the vitest testTimeout the family config generates per leaf tier (the number lives in testing-policy.timeouts). |
+
+## merge（技能合并）
+
+| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
+|---|---|---|---|---|---|---|---|
+| `mergeApproval` | E3 | live | cordis | evolution-merge | — | 卡：evolution-merge | Pause after round 1 and put the pair in the pending queue instead of authoring round 2 automatically. |
+| `mergeSkippedTtlDays` | E3 | live | cordis | evolution-merge | — | 卡：evolution-merge | Days a skipped pair stays out of screening; 0 means it never expires. |
+| `mergeRunTimeoutMinutes` | E3 | live | cordis | evolution-merge | — | 卡：evolution-merge | Wall-clock budget of one merge run; 0 means no limit. |
+| `mergePairTimeoutMinutes` | E2 | none | cordis | evolution-merge | — | 无（internal） | Wall-clock budget of one pair round (a stuck child guard). |

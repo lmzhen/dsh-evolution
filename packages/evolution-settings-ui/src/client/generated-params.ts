@@ -73,6 +73,15 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
     ],
   },
   {
+    namespace: 'evolution-merge',
+    seatKey: 'evolution-merge',
+    fields: [
+      { id: 'mergeApproval', group: 'merge', doc: 'Pause after round 1 and put the pair in the pending queue instead of authoring round 2 automatically.', label: '合并审批', hint: '开启后，第一轮判定完先停下、进入待批准清单；关闭则直接进入第二轮合并。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
+      { id: 'mergeSkippedTtlDays', group: 'merge', doc: 'Days a skipped pair stays out of screening; 0 means it never expires.', label: '无需合并保留天数', hint: '判定无需合并的对，多少天内不再参与筛选；0 表示一直保留。', control: 'number', unit: '天', values: [], valueLabels: [], atLeast: '' },
+      { id: 'mergeRunTimeoutMinutes', group: 'merge', doc: 'Wall-clock budget of one merge run; 0 means no limit.', label: '单次运行上限', hint: '一次合并运行最多持续多少分钟；0 表示不设上限。', control: 'number', unit: '分钟', values: [], valueLabels: [], atLeast: '' },
+    ],
+  },
+  {
     namespace: 'evolution-review',
     seatKey: 'evolution-review',
     fields: [
@@ -133,7 +142,7 @@ export interface ClientRowSeat {
 
 /** Every (bundle, row) pair the Plugins page can open a configuration page for. */
 export const CLIENT_ROW_SEATS: readonly ClientRowSeat[] = [
-  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
+  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-merge', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
   { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files'] },
   { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
 ]
