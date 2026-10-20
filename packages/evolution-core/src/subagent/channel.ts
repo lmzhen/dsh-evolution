@@ -11,7 +11,6 @@ import type {
   ConversationOpenSpec,
   ConversationOutcome,
   ConversationTurn,
-  ConversationTurnOptions,
   SubagentChannel,
 } from './types.ts'
 

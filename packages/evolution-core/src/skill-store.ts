@@ -548,7 +548,7 @@ export function validateRestructureTarget(filePath: string): string | null {
   return null
 }
 
-function validateSupportPath(filePath: string): string | null {
+export function validateSupportPath(filePath: string): string | null {
   const normalized = filePath.replace(/\\/g, '/')
   if (normalized.includes('..')) return '不允许路径穿越。'
   const parts = normalized.split('/').filter(Boolean)
@@ -608,7 +608,7 @@ type RestructurePlan = { error: string } | { body: string; sections: PlannedRest
  * a fresh link to a file written in the same plan). `..` traversal is a
  * different defect class (path validation owns it) and is not a support link.
  */
-function supportRefs(content: string): string[] {
+export function supportRefs(content: string): string[] {
   const refs: string[] = []
   for (const match of content.matchAll(/\b(?:references|templates|scripts|assets)\/[A-Za-z0-9._/-]+/g)) {
     const ref = match[0]

@@ -83,7 +83,7 @@ async function tryAcquire(io: EvolutionIoLike, home: string, now: () => number):
     token = randomUUID()
     return JSON.stringify({ token, pid: process.pid, startedAt: now() })
   })
-  return token === undefined ? { holder } : { token }
+  return token === undefined ? (holder === undefined ? {} : { holder }) : { token }
 }
 
 /**
