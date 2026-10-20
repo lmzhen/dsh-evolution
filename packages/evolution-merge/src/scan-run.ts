@@ -42,6 +42,8 @@ export interface RunScanOptions {
   readonly now: () => number
   readonly signal: AbortSignal
   readonly approval: boolean
+  readonly timeoutMinutes?: number
+  readonly startedAt?: number
   readonly ports: ScanPorts
   readonly stage?: (stage: RunStage, progress?: { done: number; total: number }) => Promise<void>
 }
@@ -80,6 +82,8 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
   const queueBefore = { pending: 0, retry: 0, skipped: 0 }
   for (const row of before.state.rows) queueBefore[row.queue] += 1
   const candidates = await options.ports.screening(options.signal)
+  const startedAt = options.startedAt ?? options.now()
+  const timeoutMs = (options.timeoutMinutes ?? 0) > 0 ? (options.timeoutMinutes as number) * 60_000 : 0
   const pairs: MergeReportPair[] = []
   const totals = { merged: 0, kept: 0, pending: 0, failed: 0 }
   const remaining: { pairKey: string; queue: ReturnType<typeof queueOf> }[] = []
@@ -88,6 +92,11 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
   for (let index = 0; index < candidates.length; index += 1) {
     if (options.signal.aborted) {
       stopReason = 'cancelled'
+      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'retry' as const })))
+      break
+    }
+    if (timeoutMs > 0 && options.now() - startedAt >= timeoutMs) {
+      stopReason = 'timeout'
       remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'retry' as const })))
       break
     }

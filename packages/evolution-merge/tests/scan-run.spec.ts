@@ -29,6 +29,18 @@ it('runs merge then keep, dropping the committed row and keeping the skipped row
   expect(rows.map(row => row.state)).toEqual(['skipped'])
 })
 
+it('stops with remaining when the time budget is already exhausted', async () => {
+  const home = await tempRoot('dsh-merge-scan-timeout-')
+  const io = nodeEvolutionIo()
+  const draft = await runScan({
+    io, home, now: () => 10_000_000, startedAt: 0, timeoutMinutes: 1,
+    signal: new AbortController().signal, approval: false, ports: ports(),
+  })
+  expect(draft.stopReason).toBe('timeout')
+  expect(draft.remaining).toHaveLength(2)
+  expect(draft.totals).toEqual({ merged: 0, kept: 0, pending: 0, failed: 0 })
+})
+
 it('approval on stops at pending without calling round2', async () => {
   const home = await tempRoot('dsh-merge-scan-approval-')
   const io = nodeEvolutionIo()
