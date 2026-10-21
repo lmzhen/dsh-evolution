@@ -14,6 +14,8 @@ import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 export interface CommitAssemblyPort {
   /** Current SKILL.md body, or null when the skill is not live. */
   readSkill(name: string): Promise<string | null>
+  /** Whether the name is already occupied by an archived (tombstoned) skill. */
+  isArchived?(name: string): Promise<boolean>
 }
 
 export interface CommitAssemblyOptions {
@@ -39,11 +41,12 @@ export async function assembleStagedCommit(
   const requested = staging.value.manifest.target
   let target = requested
   let targetCurrent = await port.readSkill(requested)
-  if (staging.value.manifest.mode === 'create-umbrella' && targetCurrent !== null) {
+  const requestedArchived = targetCurrent === null && await port.isArchived?.(requested) === true
+  if (staging.value.manifest.mode === 'create-umbrella' && (targetCurrent !== null || requestedArchived)) {
     target = requested
     for (let suffix = 2; suffix <= 99; suffix += 1) {
       const candidate = requested + '-v' + String(suffix)
-      if (await port.readSkill(candidate) === null) { target = candidate; targetCurrent = null; break }
+      if (await port.readSkill(candidate) === null && await port.isArchived?.(candidate) !== true) { target = candidate; targetCurrent = null; break }
     }
     if (target === requested) return { ok: false, message: 'no free umbrella target for ' + requested }
   }

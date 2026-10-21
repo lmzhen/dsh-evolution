@@ -45,3 +45,15 @@ it('refuses when a source is no longer live', async () => {
   if (result.ok) return
   expect(result.message).toContain('source skill is not live')
 })
+it('skips an archived target name for create-umbrella', async () => {
+  const home = await tempRoot('dsh-merge-commit-assembly-tombstone-')
+  const io = nodeEvolutionIo()
+  expect((await createStaging(io, home, { ...input('run-1'), mode: 'create-umbrella' })).ok).toBe(true)
+  expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
+  const result = await assembleStagedCommit(io, home, 'run-1', {
+    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async isArchived(name) { return name === 'umbrella' },
+  }, { origin: 'foreground', summary: 'merge' })
+  expect(result.ok, result.ok ? '' : result.message).toBe(true)
+  if (result.ok) expect(result.plan.target).toBe('umbrella-v2')
+})

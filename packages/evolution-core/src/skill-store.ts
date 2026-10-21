@@ -3282,6 +3282,13 @@ export class SkillLibrary {
    * @returns the expired entry names ([] when the backend has no mtime probe,
    *   because an unknown age must never read as expired).
    */
+  /** Names currently in .archive, for target occupancy; unknown listing is null. */
+  async archivedNames(): Promise<string[] | null> {
+    const listed = await probeList(this.io, join(this.root, '.archive'))
+    if (isUnknown(listed)) return null
+    return isPresent(listed) ? listed.value.slice() : []
+  }
+
   async expiredArchives(): Promise<string[] | null> {
     const archiveRoot = join(this.root, '.archive')
     // Three-state read (N14), the same helper every other listing uses: a
