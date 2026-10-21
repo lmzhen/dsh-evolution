@@ -135,7 +135,7 @@ export function parseVerdict(level: GateLevel, raw: unknown, cached = false): Ga
   const evidence: GateEvidence[] = Array.isArray(record.evidence)
     ? record.evidence
       .filter(item => typeof item === 'object' && item !== null)
-      .map(item => {
+      .map((item) => {
         const entry = item as { path?: unknown; line?: unknown; quote?: unknown }
         return { path: typeof entry.path === 'string' ? entry.path : '', line: typeof entry.line === 'number' ? entry.line : -1, quote: typeof entry.quote === 'string' ? entry.quote.slice(0, 120) : '' }
       })

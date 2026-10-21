@@ -53,7 +53,7 @@ const MIN_NAME_ENTROPY = 1.5
 const MIN_NAME_LENGTH = 6
 
 export function prefilter(cards: readonly SkillCard[]): readonly SkillCard[] {
-  return cards.filter(card => {
+  return cards.filter((card) => {
     const name = card.name.trim()
     if (name.length < MIN_NAME_LENGTH) return false
     if (nameEntropy(name) < MIN_NAME_ENTROPY) return false

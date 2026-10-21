@@ -36,12 +36,12 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       ...(options.makePorts === undefined
         ? { ports: { ...options.ports, screening: () => Promise.resolve([{ a: row.a, b: row.b }]) } }
         : {
-            makePorts: (runId) => {
-              const makePorts = options.makePorts
-              if (makePorts === undefined) throw new Error('resume makePorts disappeared')
-              return { ...makePorts(runId), screening: () => Promise.resolve([{ a: row.a, b: row.b }]) }
-            },
-          }),
+          makePorts: (runId) => {
+            const makePorts = options.makePorts
+            if (makePorts === undefined) throw new Error('resume makePorts disappeared')
+            return { ...makePorts(runId), screening: () => Promise.resolve([{ a: row.a, b: row.b }]) }
+          },
+        }),
       ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
     })
   }

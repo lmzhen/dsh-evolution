@@ -19,12 +19,12 @@ export interface CommitStagedOptions {
 
 export type CommitStagedResult =
   | {
-      readonly ok: true
-      readonly plan: CommitMergePlan
-      readonly result: CommitMergeResult
-      readonly receipt?: CommitReceipt
-      readonly warning?: string
-    }
+    readonly ok: true
+    readonly plan: CommitMergePlan
+    readonly result: CommitMergeResult
+    readonly receipt?: CommitReceipt
+    readonly warning?: string
+  }
   | { readonly ok: false; readonly message: string; readonly plan?: CommitMergePlan }
 
 export async function commitStagedRun(

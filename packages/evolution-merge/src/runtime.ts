@@ -99,7 +99,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           approval: deps.params.mergeApproval,
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
-            screening: async turnSignal => {
+            screening: async (turnSignal) => {
               const raw = deps.screeningForRun === undefined
                 ? await deps.screening(cards, turnSignal)
                 : await deps.screeningForRun(cards, runId, turnSignal)
