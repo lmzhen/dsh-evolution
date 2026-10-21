@@ -47,7 +47,7 @@ export function buildRound1Prompt(candidate: { readonly a: string; readonly b: s
 export function buildRound2Prompt(row: MergeRow, decision: MergeDecision, mode: 'continue' | 'fresh' = 'continue'): string {
   const decisionJson = JSON.stringify(wireDecision(decision))
   const head = [
-    '现在执行第 2 轮：把两个技能融合成一个完整、可用的技能，直接在当前工作目录的 ' + mergedPath(decision.target) + '/ 下写文件。',
+    '现在执行第 2 轮：把两个技能融合成一个完整、可用的技能，直接在当前工作目录的 merged/ 下写文件。',
     '不要修改 ' + sourcePath(row.a) + ' 或 ' + sourcePath(row.b) + '（只读源副本）；不要访问工作目录以外的路径。',
     '',
   ]
