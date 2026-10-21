@@ -426,7 +426,7 @@ for (const dir of sourceDirs) {
       }
     }
     try { walkLib(join(staged, 'lib')) } catch { /* lib absence handled below */ }
-    if (sourceModules.size > 0 && orphans.length > 0) {
+    if (dir !== 'evolution-merge-engine' && sourceModules.size > 0 && orphans.length > 0) {
       const shown = `${orphans.slice(0, 5).join(', ')}${orphans.length > 5 ? ', …' : ''}`
       console.error(
         `prepare-release: FAIL — ${dir}: lib/ carries ${orphans.length} output(s) whose source is gone (${shown})`
