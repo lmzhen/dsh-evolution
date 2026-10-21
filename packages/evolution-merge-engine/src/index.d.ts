@@ -5,3 +5,4 @@ export declare function runScan(input: Record<string, unknown>): Promise<unknown
 export declare function screen(input: import('./types.ts').ScreenInput): Promise<import('./types.ts').ScreenResult>;
 export declare function probe(cfg?: import('./types.ts').EngineCfg): { models: 'ok' | 'missing' | 'partial'; judge: string; ranker: string; onnx: boolean };
 export declare function ensureModels(): Promise<never>;
+export declare function selectCandidates(report: Record<string, unknown>): unknown;

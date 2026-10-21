@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
 import { screen as engineScreen, selectCandidates } from '@deepseek-ai/dsh-evolution-merge-engine'
-import { createEngineScreening } from './adapters/engine-screen.ts'
+import { createEngineScreening, type CandidateSelection, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type LlmServiceLike } from './adapters/model-runner.ts'
 import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
@@ -149,7 +149,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
     const runner = llm === undefined || defaultModel === undefined ? undefined : createEngineRunner(llm, () => defaultModel.currentSelection())
     const engineScreening = createEngineScreening({
-        io, home, engine: { screen: engineScreen }, select: selectCandidates,
+        io, home, engine: { screen: engineScreen as unknown as EngineScreenPort['screen'] }, select: selectCandidates as unknown as (report: Record<string, unknown>) => CandidateSelection,
         ...(engineConfig === undefined ? {} : { cfg: engineConfig }),
         ...(runner === undefined ? {} : { runner }),
         async onSelection(selection) {
