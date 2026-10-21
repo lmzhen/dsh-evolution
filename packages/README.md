@@ -59,6 +59,8 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
 | `evolution-skill-history` | Browser-only sidebar panel (技能历史): the skills that recorded content versions, the body chain and the support-file chain apart, and one restore per body version — its Host half mounts the four loopback routes the panel reads |
 | `evolution-skill-health` | Browser-only sidebar panel (技能健康) — **name claimed, content pending**: what the linter found aggregated by rule, four states (healthy / warn / needs-restructure / **unreadable, never folded into healthy**), and the line it was measured on |
+| `evolution-merge` | Skill auto-merge Host/command surface: candidate screening, two-round child authoring, pending approvals, staging/commit receipts and unit undo — mounts `/merge` and four read-only routes |
+| `evolution-merge-ui` | Browser-only sidebar panel (技能合并): pending / retry / skipped queues, read-only row projection from the merge routes; commands stay CLI text |
 | `evolution-settings-ui` | Browser-only settings section (自进化): one card per parameter namespace, Chinese card titles / field labels / hints typed from the registry (plus optional `valueLabels` for enum options), styles injected at runtime |
 
 ## Installation

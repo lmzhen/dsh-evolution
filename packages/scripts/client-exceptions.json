@@ -7,6 +7,11 @@
       "owner": "G5"
     },
     {
+      "fieldId": "mergeApproval",
+      "reason": "switch — the platform field spec offers number/text only; the merge approval gate is a family switch (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
       "fieldId": "minIdleFailOpen",
       "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
       "owner": "G5"
