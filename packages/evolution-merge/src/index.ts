@@ -3,6 +3,7 @@ import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
 import { screen as engineScreen, selectCandidates } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { createEngineScreening } from './adapters/engine-screen.ts'
+import { createEngineRunner, type LlmServiceLike } from './adapters/model-runner.ts'
 import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState, upsertRow } from './state.ts'
@@ -76,6 +77,7 @@ export * from './commit-receipt.ts'
 export * from './commit-execute.ts'
 export * from './undo-merge.ts'
 export * from './adapters/library.ts'
+export * from './adapters/model-runner.ts'
 export * from './adapters/channel.ts'
 export * from './adapters/engine-screen.ts'
 export * from './adapters/undo.ts'
@@ -143,8 +145,11 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()
     const engineConfig = engineConfigFromEnv(params.mergeModelsRoot)
+    const llm = (ctx as unknown as { get(name: string): unknown }).get('llm') as LlmServiceLike | undefined
+    const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
+    const runner = llm === undefined || defaultModel === undefined ? undefined : createEngineRunner(llm, () => defaultModel.currentSelection())
     const engineScreening = createEngineScreening({
-        io, home, engine: { screen: engineScreen }, select: selectCandidates, cfg: engineConfig,
+        io, home, engine: { screen: engineScreen }, select: selectCandidates, cfg: engineConfig, runner,
         async onSelection(selection) {
           const loaded = await loadMergeState(io, home)
           const at = new Date().toISOString()
