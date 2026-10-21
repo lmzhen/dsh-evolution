@@ -29,7 +29,10 @@ export interface CandidateSelection {
   readonly candidates: readonly MergeCandidate[]
   readonly skipped: readonly { readonly pairKey: string; readonly a: string; readonly b: string; readonly reason?: string }[]
   readonly reportOnly: number
+  readonly candidatePairs?: number
 }
+
+export type ScreeningCandidates = readonly MergeCandidate[] & { readonly candidatePairs?: number }
 
 export interface EngineScreeningDeps {
   readonly io: EvolutionIoLike
@@ -71,6 +74,6 @@ export function createEngineScreening(deps: EngineScreeningDeps) {
     }
     const selection = deps.select(result.report)
     if (deps.onSelection !== undefined) await deps.onSelection(selection, runId)
-    return selection.candidates
+    return Object.assign(selection.candidates.slice(), selection.candidatePairs === undefined ? {} : { candidatePairs: selection.candidatePairs })
   }
 }

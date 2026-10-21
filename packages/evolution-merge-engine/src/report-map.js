@@ -90,5 +90,6 @@ export function selectCandidates(report) {
     }
     reportOnly.push(row)
   }
-  return { candidates, skipped, reportOnly, reportFallback: fallback }
+  const candidatePairs = doc.stage2_candidates && typeof doc.stage2_candidates.candidate_pairs === 'number' ? doc.stage2_candidates.candidate_pairs : rows.length
+  return { candidates, skipped, reportOnly, reportFallback: fallback, candidatePairs }
 }

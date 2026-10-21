@@ -108,10 +108,12 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
                 : deps.screening === undefined
                   ? (() => { throw new Error('engine screening is required') })()
                   : await deps.screening(cards, turnSignal)
-              return raw.filter(candidate => {
+              const filtered = raw.filter(candidate => {
                 const key = pairKey(candidate.a, candidate.b)
                 return !skipped.has(key) && !held.has(key)
               })
+              const candidatePairs = (raw as readonly MergeCandidate[] & { readonly candidatePairs?: number }).candidatePairs
+              return candidatePairs === undefined ? filtered : Object.assign(filtered, { candidatePairs })
             },
             channel: deps.channel, parent, allow: deps.allow,
             ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
