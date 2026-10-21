@@ -93,7 +93,9 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'scan') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
-        const skipped = skippedPairKeys((await loadMergeState(deps.io, deps.home)).state.rows, deps.params.mergeSkippedTtlDays, deps.now())
+        const loadedState = await loadMergeState(deps.io, deps.home)
+        const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
+        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse').map(row => row.pairKey))
         const result = await runScanCommand({
           ...common,
           approval: deps.params.mergeApproval,
@@ -103,7 +105,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
               const raw = deps.screeningForRun === undefined
                 ? await deps.screening(cards, turnSignal)
                 : await deps.screeningForRun(cards, runId, turnSignal)
-              return raw.filter(candidate => !skipped.has(pairKey(candidate.a, candidate.b)))
+              return raw.filter(candidate => {
+                const key = pairKey(candidate.a, candidate.b)
+                return !skipped.has(key) && !held.has(key)
+              })
             },
             channel: deps.channel, parent, allow: deps.allow,
             ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
