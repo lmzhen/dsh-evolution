@@ -29,7 +29,6 @@
   "dependencies": {
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-merge-engine": "workspace:^",
-    "@deepseek-ai/dsh-evolution-merge-ui": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
