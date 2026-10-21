@@ -29,7 +29,11 @@ function channel(text: string): ConversationChannelLike & { disposed: number; co
 it('opens standby, binds, sends round1 and exposes same-child author', async () => {
   const fake = channel(mergeText)
   let bound = 0
-  const result = await runRound1OverChannel({ channel: fake, parent: {}, cards, allow: [], timeoutMs: 1000, onChildOpened: () => { bound += 1 } }, candidate, signal)
+  const result = await runRound1OverChannel(
+    { channel: fake, parent: {}, cards, allow: [], timeoutMs: 1000, onChildOpened: () => { bound += 1 } },
+    candidate,
+    signal,
+  )
   expect(result.outcome).toMatchObject({ kind: 'merge', decision: { shouldMerge: true } })
   expect(result.childId).toBe('child-1')
   expect(bound).toBe(1)

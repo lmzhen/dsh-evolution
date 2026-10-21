@@ -1,7 +1,10 @@
 {
   "extends": "../tsconfig.pkg.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "declaration": false,
+    "composite": false,
+    "emitDeclarationOnly": false
   },
   "include": [
     "src/index.d.ts"
