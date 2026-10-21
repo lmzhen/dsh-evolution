@@ -162,7 +162,12 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       async cards(signal) {
         const listed = await skills.list({ withContent: true })
         if (signal.aborted) return []
-        return listed.map(item => ({ name: item.name, description: item.description, body: item.content ?? '' }))
+        return Promise.all(listed.map(async item => {
+          const probe = await skills.listSupportFiles(item.name)
+          const paths = probe.kind === 'present' ? probe.value : []
+          const files = await Promise.all(paths.map(async path => ({ path, content: await skills.readSupportFile(item.name, path) ?? '' })))
+          return { name: item.name, description: item.description, body: item.content ?? '', files }
+        }))
       },
       screeningForRun: engineScreening,
       stage: {

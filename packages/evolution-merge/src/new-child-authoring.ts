@@ -7,7 +7,7 @@ import type { MergeDecision, MergeRow } from './contracts.ts'
 import type { SkillCard } from './skill-card.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
 import { buildRound2Prompt } from './prompts.ts'
-import { createStaging, readStaging, setStagingTarget, stageKeyOf } from './staging.ts'
+import { createStaging, readStaging, setStagingTarget, stageKeyOf, stagingRoot } from './staging.ts'
 import { pairKey } from './contracts.ts'
 import { readStagedTree } from './staged-tree.ts'
 import { validateStagedTree, hasBlockingFinding } from './rules.ts'
@@ -45,8 +45,8 @@ export async function runNewChildAuthoring(
     const staging = await createStaging(options.io, options.home, {
       runId: stageKey,
       target: decision.target,
-      sources: options.cards.filter(card => card.name === row.a || card.name === row.b).map(card => ({ name: card.name, body: card.body, files: [] })),
-      promptVersion: 'merge-b/v1',
+      sources: options.cards.filter(card => card.name === row.a || card.name === row.b).map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
+      promptVersion: 'merge-pair/v1',
       ttlDays: 7,
       now: options.now,
     })
@@ -55,10 +55,10 @@ export async function runNewChildAuthoring(
   const opened = await options.channel.open({
     parent: options.parent,
     label: 'merge-round2',
-    promptText: buildRound2Prompt(row, decision, 'fresh'),
+    promptText: buildRound2Prompt(row, decision),
     kind: 'maintainer',
     allow: options.allow,
-    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    cwd: stagingRoot(options.home, stageKey),
     timeoutMs: options.timeoutMs,
     signal,
   })

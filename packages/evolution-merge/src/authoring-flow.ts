@@ -37,8 +37,8 @@ export async function runAuthoring(options: RunAuthoringOptions): Promise<Author
     const created = await createStaging(options.io, options.home, {
       runId: stageKey,
       target: options.target,
-      sources: options.cards.map(card => ({ name: card.name, body: card.body, files: [] })),
-      promptVersion: 'merge-b/v1',
+      sources: options.cards.map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
+      promptVersion: 'merge-pair/v1',
       ttlDays: 7,
       now: options.now,
     })
