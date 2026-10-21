@@ -79,10 +79,10 @@ function pairOf(row: MergeRow, candidate: MergeCandidate, outcome: MergeReportPa
 
 export async function runScan(options: RunScanOptions): Promise<MergeRunReportDraft> {
   const stage = options.stage ?? (async () => {})
+  const candidates = await options.ports.screening(options.signal)
   const before = await loadMergeState(options.io, options.home)
   const queueBefore = { pending: 0, retry: 0, skipped: 0 }
   for (const row of before.state.rows) queueBefore[row.queue] += 1
-  const candidates = await options.ports.screening(options.signal)
   const startedAt = options.startedAt ?? options.now()
   const timeoutMs = (options.timeoutMinutes ?? 0) > 0 ? (options.timeoutMinutes as number) * 60_000 : 0
   const pairs: MergeReportPair[] = []
