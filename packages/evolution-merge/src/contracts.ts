@@ -83,6 +83,8 @@ export interface MergeDecision {
   readonly sources: readonly string[]
   readonly rationale: string
   readonly confidence?: number
+  readonly aSummary?: string
+  readonly bSummary?: string
 }
 
 export interface MergeUsage {

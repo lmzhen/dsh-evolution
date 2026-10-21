@@ -46,7 +46,7 @@ export async function requestJson<T>(doFetch: typeof fetch, path: string, init?:
     return { ok: false, failure: { kind: 'server', status: response.status } }
   }
   if (typeof body === 'object' && body !== null) {
-    const record = body as { ok?: unknown; data?: unknown; code?: unknown; message?: unknown }
+    const record = body as { ok?: unknown; data?: unknown; code?: unknown; message?: unknown; error?: unknown }
     if (record.ok === true) return { ok: true, data: record.data as T }
     const nested = record.error
     const errorRecord = typeof nested === 'object' && nested !== null ? nested as { code?: unknown; message?: unknown } : undefined

@@ -27,7 +27,7 @@ export interface RunAuthoringOptions {
 }
 
 export type AuthoringResult =
-  | { readonly ok: true; readonly tree: StagedTree; readonly commit: CommitStagedResult }
+  | { readonly ok: true; readonly tree: StagedTree; readonly commit: Extract<CommitStagedResult, { readonly ok: true }> }
   | { readonly ok: false; readonly message: string; readonly findings?: readonly RuleFinding[] }
 
 export async function runAuthoring(options: RunAuthoringOptions): Promise<AuthoringResult> {

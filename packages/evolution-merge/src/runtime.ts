@@ -94,7 +94,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const cards = await deps.cards(signal)
         const loadedState = await loadMergeState(deps.io, deps.home)
         const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
-        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse' || !canRetry(row)).map(row => row.pairKey))
+        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || !canRetry(row)).map(row => row.pairKey))
         const result = await runScanCommand({
           ...common,
           approval: deps.params.mergeApproval,

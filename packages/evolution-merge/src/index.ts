@@ -149,13 +149,15 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
     const runner = llm === undefined || defaultModel === undefined ? undefined : createEngineRunner(llm, () => defaultModel.currentSelection())
     const engineScreening = createEngineScreening({
-        io, home, engine: { screen: engineScreen }, select: selectCandidates, cfg: engineConfig, runner,
+        io, home, engine: { screen: engineScreen }, select: selectCandidates,
+        ...(engineConfig === undefined ? {} : { cfg: engineConfig }),
+        ...(runner === undefined ? {} : { runner }),
         async onSelection(selection) {
           const loaded = await loadMergeState(io, home)
           const at = new Date().toISOString()
           for (const skipped of selection.skipped) {
             if (loaded.state.rows.some(row => row.pairKey === skipped.pairKey)) continue
-            const next = transition(undefined, { type: 'gate-keep', a: skipped.a, b: skipped.b, reason: skipped.reason, at })
+            const next = transition(undefined, { type: 'gate-keep', a: skipped.a, b: skipped.b, ...(skipped.reason === undefined ? {} : { reason: skipped.reason }), at })
             if (next.ok && next.row !== null) await upsertRow(io, home, () => Date.now(), next.row)
           }
         },
