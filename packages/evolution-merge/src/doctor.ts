@@ -4,7 +4,7 @@
  * operator can act on. This module never repairs or writes.
  */
 import { join } from 'node:path'
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { probeList, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { loadMergeState } from './state.ts'
 import { countRows } from './status.ts'
 import { loadGateCache } from './gate-cache.ts'
@@ -37,12 +37,14 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string): Promise<re
     detail: cache.note ?? String(cache.cache.size) + ' 条',
   })
   const runsDir = join(home, 'merge', 'runs')
-  const listed = await io.list(runsDir).catch(() => null)
+  const listed = await probeList(io, runsDir)
   rows.push({
     key: 'staging',
     label: '暂存树',
-    status: listed === null ? 'unknown' : 'ok',
-    detail: listed === null ? '无法列出 ' + runsDir : String(listed.length) + ' 个 run 目录',
+    status: listed.kind === 'unknown' ? 'unknown' : 'ok',
+    detail: listed.kind === 'unknown'
+      ? '无法列出 ' + runsDir + '：' + listed.reason
+      : listed.kind === 'absent' ? '0 个 run 目录' : String(listed.value.length) + ' 个 run 目录',
   })
   rows.push({
     key: 'staging-path',

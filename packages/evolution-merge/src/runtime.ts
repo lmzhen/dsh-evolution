@@ -3,7 +3,7 @@
  * Plugin wiring supplies the channel, model and library; this module keeps the orchestration
  * out of apply() and makes the mutating verbs testable with fakes.
  */
-import type { EvolutionIoLike, RunRegistry, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { probeText, type EvolutionIoLike, type RunRegistry, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { pairKey, type MergeCandidate } from './contracts.ts'
 import { skippedPairKeys } from './skipped.ts'
 import type { MergeParams } from './params.ts'
@@ -147,8 +147,11 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const run = command.id === undefined ? registry.runs('merge')[0] : registry.find(command.id)
         if (run === undefined) return { ok: false, text: 'merge run not found: ' + (command.id ?? '(latest)') }
         if (run.resultRef === undefined) return { ok: false, text: 'merge run has no report yet: ' + run.id }
-        const text = await deps.io.readText(run.resultRef).catch(() => null)
-        return text === null ? { ok: false, text: 'report is missing: ' + run.resultRef } : { ok: true, text: text.slice(0, 12000) }
+        const report = await probeText(deps.io, run.resultRef)
+        if (report.kind === 'unknown') return { ok: false, text: 'report is unreadable: ' + run.resultRef + '：' + report.reason }
+        return report.kind === 'absent'
+          ? { ok: false, text: 'report is missing: ' + run.resultRef }
+          : { ok: true, text: report.value.slice(0, 12000) }
       }
       if (command.verb === 'undo') {
         const receipt = await readCommitReceipt(deps.io, deps.home, command.run)

@@ -6,6 +6,7 @@
  */
 import { join } from 'node:path'
 import {
+  probeList,
   probeUnknown,
   type EvolutionIoLike,
   type Probe,
@@ -24,14 +25,11 @@ async function walkFiles(io: EvolutionIoLike, root: string, rel = ''): Promise<s
     const text = await io.readText(abs)
     if (text !== null) return [rel]
   } catch { /* a directory read throws; fall through to list */ }
-  let entries: string[]
-  try {
-    entries = await io.list(abs)
-  } catch {
-    return []
-  }
+  const listed = await probeList(io, abs)
+  if (listed.kind === 'unknown') throw new Error('cannot list ' + abs + ': ' + listed.reason)
+  if (listed.kind === 'absent') return []
   const out: string[] = []
-  for (const entry of entries) {
+  for (const entry of listed.value) {
     if (entry === '' || entry === '.' || entry === '..') continue
     const child = rel === '' ? entry : rel + '/' + entry
     if (!safeRelative(child)) continue

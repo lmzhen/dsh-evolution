@@ -213,8 +213,14 @@ node packages/scripts/install-layered.mjs \
   --profile web --mode host
 ```
 
-Sessions get background evolution automation, approval, review, curator, and
-observability, but no `memory`/`skill_manage` tools.
+Sessions get background evolution automation, approval, review, curator, merge,
+and observability, but no `memory`/`skill_manage` tools.
+
+## 2a. Merge surface
+
+The host and one-click bundles also mount the **merge** surface: `/merge` in a
+Session, or the command-face fallback `/evolution merge status / pending / approve
+<id> / report` when the browser panel is unavailable.
 
 ## 3. Agent-only install
 

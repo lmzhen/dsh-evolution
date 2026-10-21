@@ -171,6 +171,42 @@
       "marker": "transactIo(io(), pathOf(PENDING_ARCHIVE_FILE)",
       "state": [],
       "note": "The resolved-pending archive (the legacy merge target). The store already declared its record map; v46 S1.12 declared the archive append as well — the second site in one file is exactly what the reverse scan exists to find."
+    },
+    {
+      "id": "merge-state",
+      "path": "<evolutionHome>/merge/merge-state.json",
+      "writer": "evolution-merge/src/state.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, mergeStatePath(home)",
+      "state": [],
+      "note": "The merge rows and their persisted round-one decisions. One transaction per mutation; reads stay pure projections."
+    },
+    {
+      "id": "merge-gate-cache",
+      "path": "<evolutionHome>/merge/gate-cache.json",
+      "writer": "evolution-merge/src/gate-cache.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, gateCachePath(home)",
+      "state": [],
+      "note": "The L0-L2 gate cache. A cache is still a durable write and goes through the same transaction seam."
+    },
+    {
+      "id": "merge-tree-lock-acquire",
+      "path": "<evolutionHome>/merge/.tree-lock",
+      "writer": "evolution-core/src/tree-lock.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, path",
+      "state": [],
+      "note": "The cooperative merge/curator tree lock create/replace. Two processes must not both win; the transaction is the lock."
+    },
+    {
+      "id": "merge-tree-lock-release",
+      "path": "<evolutionHome>/merge/.tree-lock",
+      "writer": "evolution-core/src/tree-lock.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(options.io, path",
+      "state": [],
+      "note": "The release half of the same lock: delete only when the recorded token still matches."
     }
   ]
 }
