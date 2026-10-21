@@ -87,7 +87,11 @@ export async function runRound1OverChannel(
     return { outcome: { kind: 'failed', failure: { stage: 'decide', code: opened.turn.stopReason, message: 'standby did not complete', retryable: true, retryFrom: 'agent1' } }, dispose }
   }
   try { options.onChildOpened?.(opened.childId) } catch (error) { await dispose(); return { outcome: { kind: 'failed', failure: { stage: 'decide', code: 'child-bind', message: String(error), retryable: true, retryFrom: 'agent1' } }, dispose } }
-  const round1 = await options.channel.continueTurn(opened.childId, buildRound1Prompt(candidate, options.cards), { timeoutMs: options.timeoutMs, signal })
+  const round1 = await options.channel.continueTurn(
+    opened.childId,
+    buildRound1Prompt(candidate, options.cards),
+    { timeoutMs: options.timeoutMs, signal },
+  )
   if (round1.kind !== 'ok') {
     await dispose()
     return { outcome: { kind: 'failed', failure: { stage: 'decide', code: round1.kind, message: round1.kind === 'unavailable' ? round1.reason : 'round1 aborted', retryable: round1.kind !== 'aborted', retryFrom: round1.kind === 'aborted' ? 'none' : 'agent1' } }, dispose }

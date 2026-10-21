@@ -110,7 +110,7 @@ export function MergePanel(face: MergeFace): ReactNode {
           createElement('div', { 'data-role': 'row-actions' }, (row.actions ?? []).filter(action => view.approval !== false || !action.includes('/evolution merge approve')).map(action =>
             createElement('button', {
               key: action, type: 'button', 'data-role': 'row-action', title: action,
-              onClick: () => { void navigator.clipboard?.writeText(action) },
+              onClick: () => { void navigator.clipboard.writeText(action) },
             }, t('row.copy')),
           )),
         ),

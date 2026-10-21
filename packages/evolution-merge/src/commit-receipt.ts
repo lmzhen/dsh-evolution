@@ -28,7 +28,8 @@ export function durableReceiptDir(home: string, parentRunId: string): string {
 }
 
 export function durableReceiptPath(home: string, parentRunId: string, stageKey: string): string {
-  return join(durableReceiptDir(home, parentRunId), stageKey.split('/').pop() + '.json')
+  const leaf = stageKey.split('/').pop() ?? stageKey
+  return join(durableReceiptDir(home, parentRunId), leaf + '.json')
 }
 
 function parseReceipt(raw: string | null): CommitReceipt | null {

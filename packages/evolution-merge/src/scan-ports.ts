@@ -43,7 +43,9 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
       const staged = await ensureStaging(options.io, options.home, {
         runId: stageKey,
         target: candidate.a + '-' + candidate.b,
-        sources: options.cards.filter(card => card.name === candidate.a || card.name === candidate.b).map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
+        sources: options.cards
+          .filter(card => card.name === candidate.a || card.name === candidate.b)
+          .map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
         promptVersion: 'merge-b/v1',
         ttlDays: 7,
         now: options.now,
@@ -56,11 +58,11 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
         allow: options.allow,
         cwd: stagingRoot(options.home, stageKey),
         timeoutMs: options.timeoutMs,
-        onChildOpened: (childId) => options.onChild?.({ runId: stageKey, childId, expectedChildId: childId, phase: 'decide' }),
+        onChildOpened: childId => options.onChild?.({ runId: stageKey, childId, expectedChildId: childId, phase: 'decide' }),
       }, candidate, signal)
       if (result.outcome.kind !== 'merge') {
         await dropStaging(options.io, options.home, stageKey)
-      } else if (result.outcome.kind === 'merge') {
+      } else {
         if (options.approval) await result.dispose()
         else {
           sessions.set(pairKey(candidate.a, candidate.b), { result, stageKey })

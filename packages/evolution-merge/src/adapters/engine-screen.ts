@@ -77,6 +77,9 @@ export function createEngineScreening(deps: EngineScreeningDeps) {
     }
     const selection = deps.select(result.report)
     if (deps.onSelection !== undefined) await deps.onSelection(selection, runId)
-    return Object.assign(selection.candidates.slice(), selection.candidatePairs === undefined ? {} : { candidatePairs: selection.candidatePairs })
+    return Object.assign(
+      selection.candidates.slice(),
+      selection.candidatePairs === undefined ? {} : { candidatePairs: selection.candidatePairs },
+    )
   }
 }
