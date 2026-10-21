@@ -20,6 +20,8 @@ export interface ScanRound1Outcome {
   readonly kind: 'keep' | 'merge' | 'failed'
   readonly decision?: MergeDecision
   readonly failure?: MergeFailure
+  readonly stagingRef?: string
+  readonly stagingExpiresAt?: number
 }
 
 export interface ScanRound2Outcome {
@@ -144,14 +146,14 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       continue
     }
     if (options.approval) {
-      const next = transition(row, { type: 'round1-merge', approval: 'on', decision: round1.decision, at: at(options.now) })
+      const next = transition(row, { type: 'round1-merge', approval: 'on', decision: round1.decision, stagingRef: round1.stagingRef, stagingExpiresAt: round1.stagingExpiresAt, at: at(options.now) })
       if (next.ok && next.row !== null) { row = next.row; await upsertRow(options.io, options.home, options.now, row) }
       pairs.push(pairOf(row, candidate, 'pending', { decision: round1.decision }))
       totals.pending += 1
       continue
     }
 
-    const fuse = transition(row, { type: 'round1-merge', approval: 'off', decision: round1.decision, at: at(options.now) })
+    const fuse = transition(row, { type: 'round1-merge', approval: 'off', decision: round1.decision, stagingRef: round1.stagingRef, stagingExpiresAt: round1.stagingExpiresAt, at: at(options.now) })
     if (!fuse.ok || fuse.row === null) {
       pairs.push(pairOf(row, candidate, 'failed', { decision: round1.decision, failure: failureOf('decide', 'cannot enter fuse') }))
       totals.failed += 1

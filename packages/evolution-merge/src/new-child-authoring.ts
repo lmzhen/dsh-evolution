@@ -7,7 +7,8 @@ import type { MergeDecision, MergeRow } from './contracts.ts'
 import type { SkillCard } from './skill-card.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
 import { buildRound2Prompt } from './prompts.ts'
-import { createStaging } from './staging.ts'
+import { createStaging, readStaging, setStagingTarget, stageKeyOf } from './staging.ts'
+import { pairKey } from './contracts.ts'
 import { readStagedTree } from './staged-tree.ts'
 import { validateStagedTree, hasBlockingFinding } from './rules.ts'
 import { commitStagedRun, type CommitPort } from './commit-execute.ts'
@@ -36,15 +37,21 @@ export async function runNewChildAuthoring(
   decision: MergeDecision,
   signal: AbortSignal,
 ): Promise<ScanRound2Outcome> {
-  const staging = await createStaging(options.io, options.home, {
-    runId: options.runId,
-    target: decision.target,
-    sources: options.cards.map(card => ({ name: card.name, body: card.body, files: [] })),
-    promptVersion: 'merge-pair/v1',
-    ttlDays: 7,
-    now: options.now,
-  })
-  if (!staging.ok) return { kind: 'failed', failure: { stage: 'author', code: 'staging-create', message: staging.message, retryable: true, retryFrom: 'agent2' } }
+  const stageKey = row.stagingRef ?? stageKeyOf(options.runId, pairKey(row.a, row.b))
+  const existing = await readStaging(options.io, options.home, stageKey)
+  if (existing.kind === 'present') {
+    await setStagingTarget(options.io, options.home, stageKey, decision.target)
+  } else {
+    const staging = await createStaging(options.io, options.home, {
+      runId: stageKey,
+      target: decision.target,
+      sources: options.cards.filter(card => card.name === row.a || card.name === row.b).map(card => ({ name: card.name, body: card.body, files: [] })),
+      promptVersion: 'merge-pair/v1',
+      ttlDays: 7,
+      now: options.now,
+    })
+    if (!staging.ok) return { kind: 'failed', failure: { stage: 'author', code: 'staging-create', message: staging.message, retryable: true, retryFrom: 'agent2' } }
+  }
   const opened = await options.channel.open({
     parent: options.parent,
     label: 'merge-round2',
@@ -63,11 +70,11 @@ export async function runNewChildAuthoring(
     if (opened.turn.stopReason !== 'completed') {
       return { kind: 'failed', failure: { stage: 'author', code: opened.turn.stopReason, message: 'round2 did not complete', retryable: true, retryFrom: 'agent2' } }
     }
-    const tree = await readStagedTree(options.io, options.home, options.runId)
+    const tree = await readStagedTree(options.io, options.home, stageKey)
     if (tree.kind !== 'present') return { kind: 'failed', failure: { stage: 'author', code: 'staging-missing', message: tree.kind === 'unknown' ? tree.reason : 'staged tree absent', retryable: true, retryFrom: 'agent2' } }
     const findings = validateStagedTree(tree.value)
     if (hasBlockingFinding(findings)) return { kind: 'failed', failure: { stage: 'validate', code: 'rule-gate', message: 'staged tree failed the rule gate', retryable: true, retryFrom: 'agent2' } }
-    const commit = await commitStagedRun(options.io, options.home, options.runId, options.commitPort, { origin: 'subagent', summary: 'merge ' + row.a + ' + ' + row.b, now: options.now })
+    const commit = await commitStagedRun(options.io, options.home, stageKey, options.commitPort, { origin: 'subagent', summary: 'merge ' + row.a + ' + ' + row.b, now: options.now })
     if (!commit.ok) return { kind: 'failed', failure: { stage: 'commit', code: 'commit-failed', message: commit.message, retryable: true, retryFrom: 'agent2' } }
     const receipt = commit.receipt
     return {

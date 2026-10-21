@@ -68,7 +68,9 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           }
         }
       }
-      return result.outcome
+      return result.outcome.kind === 'merge'
+        ? { ...result.outcome, stagingRef: stageKey, stagingExpiresAt: options.now() + 7 * 86_400_000 }
+        : result.outcome
     },
     async round2(row: MergeRow, decision: MergeDecision, signal: AbortSignal): Promise<ScanRound2Outcome> {
       const key = pairKey(row.a, row.b)
