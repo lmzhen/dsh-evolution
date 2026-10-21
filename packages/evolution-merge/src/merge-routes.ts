@@ -14,6 +14,7 @@ export interface MergeRouteSource {
   run(id: string): Promise<RunRecord | undefined>
   runs(cursor?: string, limit?: number): Promise<readonly RunRecord[]>
   commands(): readonly string[]
+  approval?(): boolean
 }
 
 export function makeMergeRoutes(
@@ -34,7 +35,7 @@ export function makeMergeRoutes(
         const source = deps.getSource()
         if (source === undefined) return absent()
         const runs = await source.runs(undefined, 1)
-        return json(200, { ok: true, data: buildMergeView(await source.rows(), source.commands(), runs[0] === undefined ? undefined : toRunFact(runs[0])) })
+        return json(200, { ok: true, data: buildMergeView(await source.rows(), source.commands(), runs[0] === undefined ? undefined : toRunFact(runs[0]), source.approval?.()) })
       },
     },
     {

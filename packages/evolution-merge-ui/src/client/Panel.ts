@@ -100,7 +100,7 @@ export function MergePanel(face: MergeFace): ReactNode {
         ),
         createElement('div', null,
           createElement('div', { 'data-role': 'row-meta' }, row.updatedAt),
-          createElement('div', { 'data-role': 'row-actions' }, (row.actions ?? []).map(action =>
+          createElement('div', { 'data-role': 'row-actions' }, (row.actions ?? []).filter(action => view.approval !== false || !action.includes('/evolution merge approve')).map(action =>
             createElement('button', {
               key: action, type: 'button', 'data-role': 'row-action', title: action,
               onClick: () => { void navigator.clipboard?.writeText(action) },
@@ -112,6 +112,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const uiState = loading ? 'loading' : failed !== undefined ? 'failed' : rows.length === 0 ? 'empty' : 'ready'
   return createElement('section', { className: CSS_TAG_ID, 'data-state': uiState },
     createElement('p', { 'data-role': 'hint' }, t('hint')),
+    view.approval === undefined ? null : createElement('p', { 'data-role': 'approval' }, t(view.approval ? 'approval.on' : 'approval.off')),
     runStrip,
     stats,
     tabs,

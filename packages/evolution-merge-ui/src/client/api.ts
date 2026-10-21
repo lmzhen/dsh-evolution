@@ -30,6 +30,7 @@ export interface MergeViewPayload {
   tabs: { queue: MergeQueue; count: number }[]
   commands: string[]
   latestRun?: MergeRunView
+  approval?: boolean
 }
 
 export interface MergeRowView {

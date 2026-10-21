@@ -159,6 +159,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       rows() { return loadMergeState(io, home).then(loaded => loaded.state.rows) },
       run(id: string): Promise<RunRecord | undefined> { return Promise.resolve(runs.runs().find(record => record.id === id)) },
       runs() { return Promise.resolve(runs.runs()) },
+      approval() { return params.mergeApproval },
       commands() {
         return ['merge scan', 'merge doctor', 'merge status', 'merge pending', 'merge skipped', 'merge report', 'merge runs', 'merge cancel']
       },
