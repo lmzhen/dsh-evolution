@@ -32,6 +32,7 @@ export const HOST_ROW_IDS = [
   'evolution-feedback',
   'evolution-learning-graph',
   'evolution-replay',
+  'evolution-merge',
 ] as const
 
 export const HOST_ROW_NAMES = {
@@ -55,6 +56,7 @@ export const HOST_ROW_NAMES = {
   'evolution-feedback': scoped('@deepseek-ai/dsh-evolution-feedback'),
   'evolution-learning-graph': scoped('@deepseek-ai/dsh-evolution-learning-graph'),
   'evolution-replay': scoped('@deepseek-ai/dsh-evolution-replay'),
+  'evolution-merge': scoped('@deepseek-ai/dsh-evolution-merge'),
 } as const
 
 export const AGENT_EVOLUTION_ROW_IDS = [

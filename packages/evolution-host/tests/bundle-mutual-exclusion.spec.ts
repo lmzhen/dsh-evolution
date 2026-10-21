@@ -60,7 +60,7 @@ const CLIENT_ONLY_ROWS = ['evolution-settings-ui', 'evolution-skill-history', 'e
 
 /** 0.28.0: the merge host row is all-only — it is infra for the full bundle but
  * deliberately stays out of the host-only and preset bundles. */
-const ALL_EXTRA_INFRA = ['evolution-merge']
+const ALL_EXTRA_INFRA: string[] = []
 
 describe('host/preset dual-bundle mutual exclusion (S7.2, E-33)', () => {
   it('overlaps only on shared infra rows, not the full composition', () => {
