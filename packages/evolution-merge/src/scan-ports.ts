@@ -13,6 +13,7 @@ import { runRound1OverChannel, type ChannelRound1Result, type ConversationChanne
 import type { CommitPort } from './commit-execute.ts'
 import type { StageToolContext } from './stage-tool.ts'
 import { runAuthoring } from './authoring-flow.ts'
+import { ensureStaging, stageKeyOf } from './staging.ts'
 import type { ScanPorts, ScanRound2Outcome } from './scan-run.ts'
 
 export interface CreateScanPortsOptions {
@@ -34,10 +35,20 @@ export interface CreateScanPortsOptions {
 }
 
 export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPorts {
-  const sessions = new Map<string, ChannelRound1Result>()
+  const sessions = new Map<string, { result: ChannelRound1Result; stageKey: string }>()
   return {
     screening: options.screening,
     async round1(candidate: MergeCandidate, signal: AbortSignal) {
+      const stageKey = stageKeyOf(options.runId, pairKey(candidate.a, candidate.b))
+      const staged = await ensureStaging(options.io, options.home, {
+        runId: stageKey,
+        target: candidate.a + '-' + candidate.b,
+        sources: options.cards.filter(card => card.name === candidate.a || card.name === candidate.b).map(card => ({ name: card.name, body: card.body, files: [] })),
+        promptVersion: 'merge-pair/v1',
+        ttlDays: 7,
+        now: options.now,
+      })
+      if (!staged.ok) return { kind: 'failed', failure: { stage: 'decide', code: 'staging-create', message: staged.message, retryable: true, retryFrom: 'agent1' } }
       const result = await runRound1OverChannel({
         channel: options.channel,
         parent: options.parent,
@@ -49,7 +60,7 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
       if (result.outcome.kind === 'merge') {
         if (options.approval) await result.dispose()
         else {
-          sessions.set(pairKey(candidate.a, candidate.b), result)
+          sessions.set(pairKey(candidate.a, candidate.b), { result, stageKey })
           if (result.childId !== undefined) {
             options.onChild?.({ runId: options.runId, childId: result.childId, expectedChildId: result.childId, phase: 'author' })
           }
@@ -59,8 +70,8 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
     },
     async round2(row: MergeRow, decision: MergeDecision, signal: AbortSignal): Promise<ScanRound2Outcome> {
       const key = pairKey(row.a, row.b)
-      const session = sessions.get(key)
-      if (session === undefined) {
+      const entry = sessions.get(key)
+      if (entry === undefined) {
         return { kind: 'failed', failure: { stage: 'author', code: 'no-session', message: 'no same-child round2 session; approve must open a new child', retryable: false, retryFrom: 'none' } }
       }
       sessions.delete(key)
@@ -69,13 +80,15 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           io: options.io,
           home: options.home,
           runId: options.runId,
+          stageKey: entry.stageKey,
+          reuseStaging: true,
           target: decision.target,
           cards: options.cards,
           commitPort: options.commitPort,
           now: options.now,
           summary: 'merge ' + row.a + ' + ' + row.b,
           author: async () => {
-            await session.author?.(row, decision, signal)
+            await entry.result.author?.(row, decision, signal)
             return 'authored'
           },
         })
@@ -90,8 +103,8 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           target: { requested: decision.target, actual: decision.target, created: receipt?.create ?? false },
         }
       } finally {
-        await session.dispose()
-        if (session.childId !== undefined) options.onChildClosed?.(session.childId)
+        await entry.result.dispose()
+        if (entry.result.childId !== undefined) options.onChildClosed?.(entry.result.childId)
       }
     },
   }
