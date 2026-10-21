@@ -25,9 +25,7 @@ function wireDecision(decision: MergeDecision): Record<string, unknown> {
 }
 
 export function buildRound1Prompt(candidate: { readonly a: string; readonly b: string }, cards: readonly SkillCard[]): string {
-  const byName = new Map(cards.map(card => [card.name, card]))
-  const a = byName.get(candidate.a)
-  const b = byName.get(candidate.b)
+  void cards
   return [
     '你是技能合并决策 agent。第 1 轮只做判断，不要写文件、不要修改任何源目录。',
     '',
@@ -43,9 +41,6 @@ export function buildRound1Prompt(candidate: { readonly a: string; readonly b: s
     '',
     '只输出一个 JSON（不要 markdown 围栏）：',
     '{"should_merge":true|false,"mode":"merge-into-existing|create-umbrella|keep","target":"kebab-case","sources":["源技能名"],"rationale":"<=150字","confidence":0.0,"a_summary":"A 的一句话摘要","b_summary":"B 的一句话摘要"}',
-    '',
-    'A 的摘要：' + (a?.description ?? ''),
-    'B 的摘要：' + (b?.description ?? ''),
   ].join('\n')
 }
 
