@@ -44,7 +44,7 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
         runId: stageKey,
         target: candidate.a + '-' + candidate.b,
         sources: options.cards.filter(card => card.name === candidate.a || card.name === candidate.b).map(card => ({ name: card.name, body: card.body, files: [] })),
-        promptVersion: 'merge-pair/v1',
+        promptVersion: 'merge-b/v1',
         ttlDays: 7,
         now: options.now,
       })

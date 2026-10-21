@@ -46,7 +46,7 @@ export async function runNewChildAuthoring(
       runId: stageKey,
       target: decision.target,
       sources: options.cards.filter(card => card.name === row.a || card.name === row.b).map(card => ({ name: card.name, body: card.body, files: [] })),
-      promptVersion: 'merge-pair/v1',
+      promptVersion: 'merge-b/v1',
       ttlDays: 7,
       now: options.now,
     })
@@ -55,7 +55,7 @@ export async function runNewChildAuthoring(
   const opened = await options.channel.open({
     parent: options.parent,
     label: 'merge-round2',
-    promptText: buildRound2Prompt(row, decision),
+    promptText: buildRound2Prompt(row, decision, 'fresh'),
     kind: 'maintainer',
     allow: options.allow,
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
