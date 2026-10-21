@@ -13,7 +13,7 @@ import { runRound1OverChannel, type ChannelRound1Result, type ConversationChanne
 import type { CommitPort } from './commit-execute.ts'
 import type { StageToolContext } from './stage-tool.ts'
 import { runAuthoring } from './authoring-flow.ts'
-import { ensureStaging, stageKeyOf } from './staging.ts'
+import { dropStaging, ensureStaging, stageKeyOf } from './staging.ts'
 import type { ScanPorts, ScanRound2Outcome } from './scan-run.ts'
 
 export interface CreateScanPortsOptions {
@@ -57,7 +57,9 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
         ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
         timeoutMs: options.timeoutMs,
       }, candidate, signal)
-      if (result.outcome.kind === 'merge') {
+      if (result.outcome.kind !== 'merge') {
+        await dropStaging(options.io, options.home, stageKey)
+      } else if (result.outcome.kind === 'merge') {
         if (options.approval) await result.dispose()
         else {
           sessions.set(pairKey(candidate.a, candidate.b), { result, stageKey })
