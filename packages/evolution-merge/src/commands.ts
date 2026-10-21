@@ -21,7 +21,7 @@ export type ParseMergeCommandResult =
   | { readonly ok: true; readonly command: MergeCliCommand; readonly help?: boolean }
   | { readonly ok: false; readonly code: 'usage'; readonly message: string }
 
-const USAGE = 'usage: merge scan | pair <a> <b> | status [id] | report [id] | cancel [id] | runs | doctor | pending | approve <id> | reject <id> | resume [id] [--clear <id>] | skipped [--restore <id>] | undo <target> --run <id>'
+const USAGE = 'usage: /evolution merge scan | pair <a> <b> | status [id] | report [id] | cancel [id] | runs | doctor | pending | approve <id> | reject <id> | resume [id] [--clear <id>] | skipped [--restore <id>] | undo <target> --run <id>'
 
 function flags(args: readonly string[], allowed: readonly string[]): { values: Map<string, string>; error?: string } {
   const values = new Map<string, string>()

@@ -48,23 +48,28 @@ export function createReadOnlyMergeService(io: EvolutionIoLike, home: string): M
   }
 }
 
+export async function runMergeCommand(service: MergeCommandService, rawInput: string, invocation?: { readonly agent?: unknown }): Promise<MergeCommandResult> {
+  const tokens = rawInput.trim().split(/\s+/).filter(Boolean)
+  if (tokens[0] === 'merge' || tokens[0] === '/merge' || tokens[0] === 'evolution' || tokens[0] === '/evolution') tokens.shift()
+  if (tokens[0] === 'merge') tokens.shift()
+  const parsed = parseMergeCommand(tokens)
+  if (!parsed.ok) return { ok: false, text: parsed.message }
+  if (parsed.help === true) return { ok: true, text: mergeUsage() }
+  try {
+    return await service.execute(parsed.command, invocation?.agent === undefined ? {} : { parent: invocation.agent })
+  } catch (error) {
+    return { ok: false, text: 'merge 命令失败：' + (error instanceof Error ? error.message : String(error)) + '\n运行 /evolution merge status 查看状态。' }
+  }
+}
+
 export function createMergeCommand(service: MergeCommandService): MergeCommandDefinitionLike {
   return {
     name: 'merge',
-    description: '技能自动合并：扫描、待批准、重跑、报告与 undo',
+    description: '技能自动合并：扫描、待批准、重跑、报告与 undo（兼容别名；请用 /evolution merge）',
     input: { hint: mergeUsage() },
     async handler(invocation) {
-      const tokens = invocation.rawInput.trim().split(/\s+/).filter(Boolean)
-      if (tokens[0] === 'merge' || tokens[0] === '/merge') tokens.shift()
-      const parsed = parseMergeCommand(tokens)
-      if (!parsed.ok) return { kind: 'error', text: parsed.message }
-      if (parsed.help === true) return { kind: 'success', text: mergeUsage() }
-      try {
-        const result = await service.execute(parsed.command, { ...(invocation.agent === undefined ? {} : { parent: invocation.agent }) })
-        return { kind: result.ok ? 'success' : 'error', text: result.text }
-      } catch (error) {
-        return { kind: 'error', text: 'merge 命令失败：' + (error instanceof Error ? error.message : String(error)) + '\n运行 /merge status 查看状态。' }
-      }
+      const result = await runMergeCommand(service, invocation.rawInput, invocation)
+      return { kind: result.ok ? 'success' : 'error', text: result.text }
     },
   }
 }

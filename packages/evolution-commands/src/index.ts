@@ -397,6 +397,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const input = rawInputTrimmed.replace(/\s+/g, ' ')
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
+        // G5.3: merge owns its parser and semantics; this surface only owns the
+        // /evolution namespace. Forward the RAW input so merge flags survive.
+        if (input === 'merge' || input.startsWith('merge ')) {
+          const merge = ctx.get('evolutionMerge') as undefined | { run(input: string, invocation?: { agent?: unknown }): Promise<{ ok: boolean; text: string }> }
+          if (merge === undefined) return err('merge 未挂载：当前安装形态没有 evolution-merge 行（安装形态与命令可用性见 INSTALL.md），或先运行 /evolution doctor。')
+          const result = await merge.run(rawInputTrimmed, { agent: invocation.agent })
+          return result.ok ? ok(result.text) : err(result.text)
+        }
         // 0.3.80 functional check: branches that deliver into the session (or
         // attribute a write to it) dereferenced `invocation.agent` unguarded, so
         // a session-less caller (a script, a headless probe) got a raw TypeError

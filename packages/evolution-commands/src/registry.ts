@@ -53,6 +53,7 @@ export function entryFlags(entry: CommandEntry): string[] {
 }
 
 export const COMMAND_ENTRIES: CommandEntry[] = [
+  { readonly: false, usage: 'merge <subcommand> [<args>]', summary: '技能自动合并（扫描/待批准/重跑/报告/撤销）' },
   { readonly: true, usage: 'pending [--detail]', summary: '列出暂存的写入（--detail 显示参数）' },
   { readonly: false, usage: 'approve <id>', summary: '执行一条已批准的写入' },
   { readonly: false, usage: 'reject <id>', summary: '丢弃一条暂存写入，不执行' },

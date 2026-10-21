@@ -8,7 +8,7 @@ import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState, upsertRow } from './state.ts'
 import { transition } from './coordinator.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
-import { createMergeCommand } from './merge-command.ts'
+import { createMergeCommand, runMergeCommand, type MergeCommandResult } from './merge-command.ts'
 import { createMergeRuntime } from './runtime.ts'
 import { resolveMergeParams } from './params.ts'
 import { subagentChannelAdapter } from './adapters/channel.ts'
@@ -111,6 +111,14 @@ export const inject: string[] = []
 export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): void {
   configureMergePresentation(ctx as unknown as MergePresentationContext)
   const params = resolveMergeParams(rawConfig)
+  let mergeRun: ((rawInput: string, invocation?: { readonly agent?: unknown }) => Promise<MergeCommandResult>) | undefined
+  const mergeService = {
+    async run(rawInput: string, invocation?: { readonly agent?: unknown }): Promise<MergeCommandResult> {
+      return mergeRun === undefined ? { ok: false, text: 'merge 未就绪：evolutionIo 尚未挂载' } : mergeRun(rawInput, invocation)
+    },
+  }
+  const provide = (ctx as unknown as { provide?: (name: string, value: unknown) => void }).provide
+  if (typeof provide === 'function') provide.call(ctx, 'evolutionMerge', mergeService)
   let source: MergeRouteSource | undefined
   registerHostRoutes(ctx, audit => makeMergeRoutes({ getSource: () => source }, audit))
   ctx.inject(['commands', 'evolutionIo'], (scope) => {
@@ -176,6 +184,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         unbind: (childId) => { stage.unbind(childId) },
       },
     })
+    mergeRun = (rawInput, invocation) => runMergeCommand(runtime, rawInput, invocation)
     const command = createMergeCommand(runtime)
     scope.effect(() => commands.register(command), 'evolution-merge: command')
     ctx.inject(['tools'], (toolScope) => {
