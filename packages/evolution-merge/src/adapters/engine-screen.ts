@@ -27,7 +27,7 @@ export interface EngineScreenPort {
 
 export interface CandidateSelection {
   readonly candidates: readonly MergeCandidate[]
-  readonly skipped: readonly { readonly pairKey: string; readonly reason?: string }[]
+  readonly skipped: readonly { readonly pairKey: string; readonly a: string; readonly b: string; readonly reason?: string }[]
   readonly reportOnly: number
 }
 
@@ -37,6 +37,7 @@ export interface EngineScreeningDeps {
   readonly engine: EngineScreenPort
   readonly select: (report: Record<string, unknown>) => CandidateSelection
   readonly cfg?: Record<string, unknown>
+  readonly onSelection?: (selection: CandidateSelection, runId: string) => Promise<void>
 }
 
 function safeName(name: string, index: number): string {
@@ -68,6 +69,8 @@ export function createEngineScreening(deps: EngineScreeningDeps) {
     if (!result.ok) {
       throw new Error('engine screen failed: ' + result.error.code + (result.error.stage === undefined ? '' : ' @' + result.error.stage) + (result.error.detail === undefined ? '' : ': ' + result.error.detail))
     }
-    return deps.select(result.report).candidates
+    const selection = deps.select(result.report)
+    if (deps.onSelection !== undefined) await deps.onSelection(selection, runId)
+    return selection.candidates
   }
 }

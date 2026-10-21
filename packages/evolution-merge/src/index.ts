@@ -5,7 +5,8 @@ import { screen as engineScreen, selectCandidates } from '@deepseek-ai/dsh-evolu
 import { createEngineScreening } from './adapters/engine-screen.ts'
 import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
-import { loadMergeState } from './state.ts'
+import { loadMergeState, upsertRow } from './state.ts'
+import { transition } from './coordinator.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
 import { createMergeCommand } from './merge-command.ts'
 import { createMergeRuntime } from './runtime.ts'
@@ -150,7 +151,18 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const engineConfig = engineConfigFromEnv()
     const engineScreening = engineConfig === undefined
       ? undefined
-      : createEngineScreening({ io, home, engine: { screen: engineScreen }, select: selectCandidates, cfg: engineConfig })
+      : createEngineScreening({
+        io, home, engine: { screen: engineScreen }, select: selectCandidates, cfg: engineConfig,
+        async onSelection(selection) {
+          const loaded = await loadMergeState(io, home)
+          const at = new Date().toISOString()
+          for (const skipped of selection.skipped) {
+            if (loaded.state.rows.some(row => row.pairKey === skipped.pairKey)) continue
+            const next = transition(undefined, { type: 'gate-keep', a: skipped.a, b: skipped.b, reason: skipped.reason, at })
+            if (next.ok && next.row !== null) await upsertRow(io, home, () => Date.now(), next.row)
+          }
+        },
+      })
     source = {
       rows() { return loadMergeState(io, home).then(loaded => loaded.state.rows) },
       run(id: string): Promise<RunRecord | undefined> { return Promise.resolve(runs.runs().find(record => record.id === id)) },

@@ -85,7 +85,7 @@ export function selectCandidates(report) {
       continue
     }
     if (row.verdict_id === -1 && row.level === 'L2') {
-      skipped.push({ pairKey: pairKeyOf(row.a, row.b), reason: row.reason })
+      skipped.push({ pairKey: pairKeyOf(row.a, row.b), a: row.a, b: row.b, reason: row.reason })
       continue
     }
     reportOnly.push(row)

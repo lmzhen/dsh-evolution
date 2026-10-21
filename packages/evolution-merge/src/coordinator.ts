@@ -25,6 +25,7 @@ export type MergeEvent =
   | { readonly type: 'round2-success'; readonly unitId?: string; readonly at: string }
   | { readonly type: 'restore'; readonly at: string }
   | { readonly type: 'source-gone'; readonly at: string }
+  | { readonly type: 'gate-keep'; readonly a: string; readonly b: string; readonly reason?: string; readonly at: string }
 
 export type TransitionResult =
   | { readonly ok: true; readonly row: MergeRow | null }
@@ -88,6 +89,24 @@ export function transition(current: MergeRow | undefined, event: MergeEvent): Tr
     }
   }
   if (event.type === 'source-gone') return { ok: true, row: null }
+  if (event.type === 'gate-keep') {
+    if (current !== undefined) return { ok: true, row: current }
+    const key = pairKey(event.a, event.b)
+    return {
+      ok: true,
+      row: {
+        id: rowIdOf(key),
+        pairKey: key,
+        a: event.a,
+        b: event.b,
+        state: 'skipped',
+        queue: 'skipped',
+        origin: 'agent',
+        createdAt: event.at,
+        updatedAt: event.at,
+      },
+    }
+  }
   if (current === undefined) return invalid(event, undefined)
   switch (event.type) {
     case 'round1-keep':
