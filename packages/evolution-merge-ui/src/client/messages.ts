@@ -16,6 +16,16 @@ export const zh: Record<string, string> = {
   'stage.author': '合并',
   'stage.validate': '检查',
   'stage.commit': '提交',
+  'row.target': '目标',
+  'row.confidence': '置信度',
+  'row.attempts': '尝试',
+  'row.origin': '来源',
+  'row.expires': '暂存到期',
+  'row.failure': '失败',
+  'row.noRetry': '不可重试',
+  'row.copy': '复制命令',
+  'origin.agent': '自动',
+  'origin.human': '人工',
 }
 
 export const en: Record<string, string> = {
@@ -34,4 +44,14 @@ export const en: Record<string, string> = {
   'stage.author': 'Author',
   'stage.validate': 'Validate',
   'stage.commit': 'Commit',
+  'row.target': 'Target',
+  'row.confidence': 'Confidence',
+  'row.attempts': 'Attempts',
+  'row.origin': 'Origin',
+  'row.expires': 'Staging expires',
+  'row.failure': 'Failure',
+  'row.noRetry': 'not retryable',
+  'row.copy': 'Copy command',
+  'origin.agent': 'auto',
+  'origin.human': 'human',
 }

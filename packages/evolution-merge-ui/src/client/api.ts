@@ -16,6 +16,7 @@ export interface MergeCounts {
 }
 
 export interface MergeViewPayload {
+  schemaVersion?: number
   counts: MergeCounts
   tabs: { queue: MergeQueue; count: number }[]
   commands: string[]
@@ -31,6 +32,14 @@ export interface MergeRowView {
   stage: string | null
   label: string
   updatedAt: string
+  createdAt?: string
+  target?: string
+  confidence?: number
+  failure?: { stage: string; code: string; message: string; retryable: boolean }
+  attempts?: number
+  origin?: 'agent' | 'human'
+  stagingExpiresAt?: number
+  actions?: string[]
 }
 
 export interface QueuePage {

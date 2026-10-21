@@ -17,6 +17,14 @@ export interface MergeRowView {
   readonly stage: string | null
   readonly label: string
   readonly updatedAt: string
+  readonly createdAt: string
+  readonly target?: string
+  readonly confidence?: number
+  readonly failure?: { readonly stage: string; readonly code: string; readonly message: string; readonly retryable: boolean }
+  readonly attempts?: number
+  readonly origin?: 'agent' | 'human'
+  readonly stagingExpiresAt?: number
+  readonly actions: readonly string[]
 }
 
 export function toRowView(row: MergeRow): MergeRowView {
@@ -30,6 +38,18 @@ export function toRowView(row: MergeRow): MergeRowView {
     stage: stageOf(row.state),
     label: row.a + ' + ' + row.b,
     updatedAt: row.updatedAt,
+    createdAt: row.createdAt,
+    ...(row.decision?.target === undefined ? {} : { target: row.decision.target }),
+    ...(row.decision?.confidence === undefined ? {} : { confidence: row.decision.confidence }),
+    ...(row.failure === undefined ? {} : { failure: { stage: row.failure.stage, code: row.failure.code, message: row.failure.message, retryable: row.failure.retryable } }),
+    ...(row.attempts === undefined ? {} : { attempts: row.attempts }),
+    ...(row.origin === undefined ? {} : { origin: row.origin }),
+    ...(row.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: row.stagingExpiresAt }),
+    actions: row.state === 'pending'
+      ? ['/evolution merge approve ' + row.id, '/evolution merge reject ' + row.id]
+      : row.state === 'skipped'
+        ? ['/evolution merge skipped --restore ' + row.id]
+        : ['/evolution merge resume ' + row.id],
   }
 }
 

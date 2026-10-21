@@ -36,7 +36,10 @@ export function MergePanel(face: MergeFace): ReactNode {
     if (load === undefined) return
     setLoading(true)
     load(queue).then((outcome) => {
-      if (outcome.ok) { setRows(outcome.payload.items); setFailed(undefined) }
+      if (outcome.ok) {
+        setRows([...outcome.payload.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+        setFailed(undefined)
+      }
       else setFailed(outcome.failure)
     }).catch(() => { setFailed({ kind: 'server', status: 0 }) }).finally(() => { setLoading(false) })
   }
@@ -44,7 +47,13 @@ export function MergePanel(face: MergeFace): ReactNode {
   const loadView = (): void => {
     const load = face.loadView
     if (load === undefined) return
-    load().then((outcome) => { if (outcome.ok) setView(outcome.payload) }).catch(() => {})
+    load().then((outcome) => {
+      if (!outcome.ok) { setFailed(outcome.failure); return }
+      if (outcome.payload.schemaVersion !== undefined && outcome.payload.schemaVersion !== 1) {
+        setFailed({ kind: 'server', status: 0 }); return
+      }
+      setView(outcome.payload)
+    }).catch(() => { setFailed({ kind: 'server', status: 0 }) })
   }
 
   useEffect(() => { loadView(); loadRows('pending') }, [face])
@@ -57,22 +66,42 @@ export function MergePanel(face: MergeFace): ReactNode {
       createElement('div', { 'data-role': 'stat-label' }, t('tab.' + queue)),
     ),
   ))
-  const tabs = createElement('div', { 'data-role': 'tabs' }, QUEUES.map(queue =>
+  const tabs = createElement('div', { 'data-role': 'tabs', role: 'tablist' }, QUEUES.map(queue =>
     createElement('button', {
-      key: queue, type: 'button', 'data-role': 'tab', 'data-active': tab === queue ? 'true' : 'false',
+      key: queue, type: 'button', role: 'tab', 'aria-selected': tab === queue ? 'true' : 'false', 'data-role': 'tab', 'data-active': tab === queue ? 'true' : 'false',
       onClick: () => { setTab(queue) },
     }, t('tab.' + queue) + ' ' + String(counts[queue])),
   ))
   const list = rows.length === 0
     ? createElement('p', { 'data-role': 'note' }, t('empty.' + tab))
-    : createElement('div', { 'data-role': 'rows' }, rows.map(row => createElement('div', { key: row.id, 'data-role': 'row' },
-      createElement('div', null,
-        createElement('div', { 'data-role': 'row-label' }, row.label),
-        createElement('div', { 'data-role': 'row-meta' }, row.state + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage))),
-      ),
-      createElement('div', { 'data-role': 'row-meta' }, row.updatedAt),
-    )))
-  return createElement('section', { className: CSS_TAG_ID },
+    : createElement('div', { 'data-role': 'rows' }, rows.map(row => {
+      const facts = [
+        row.target === undefined ? undefined : t('row.target') + ' ' + row.target,
+        row.confidence === undefined ? undefined : t('row.confidence') + ' ' + row.confidence.toFixed(2),
+        row.attempts === undefined ? undefined : t('row.attempts') + ' ' + String(row.attempts),
+        row.origin === undefined ? undefined : t('row.origin') + ' ' + t('origin.' + row.origin),
+        row.stagingExpiresAt === undefined ? undefined : t('row.expires') + ' ' + new Date(row.stagingExpiresAt).toLocaleString(),
+        row.failure === undefined ? undefined : t('row.failure') + ' ' + row.failure.message + (row.failure.retryable ? '' : ' · ' + t('row.noRetry')),
+      ].filter((value): value is string => value !== undefined).join(' · ')
+      return createElement('div', { key: row.id, 'data-role': 'row' },
+        createElement('div', null,
+          createElement('div', { 'data-role': 'row-label' }, row.label),
+          createElement('div', { 'data-role': 'row-meta' }, row.state + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage))),
+          facts === '' ? null : createElement('div', { 'data-role': 'row-facts' }, facts),
+        ),
+        createElement('div', null,
+          createElement('div', { 'data-role': 'row-meta' }, row.updatedAt),
+          createElement('div', { 'data-role': 'row-actions' }, (row.actions ?? []).map(action =>
+            createElement('button', {
+              key: action, type: 'button', 'data-role': 'row-action', title: action,
+              onClick: () => { void navigator.clipboard?.writeText(action) },
+            }, t('row.copy')),
+          )),
+        ),
+      )
+    }))
+  const uiState = loading ? 'loading' : failed !== undefined ? 'failed' : rows.length === 0 ? 'empty' : 'ready'
+  return createElement('section', { className: CSS_TAG_ID, 'data-state': uiState },
     createElement('p', { 'data-role': 'hint' }, t('hint')),
     stats,
     tabs,
