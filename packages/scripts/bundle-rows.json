@@ -1254,7 +1254,9 @@
       "id": "evolution-merge",
       "group": "evolution-merge",
       "forms": [
-        "all"
+        "all",
+        "host",
+        "preset"
       ],
       "lead": [
         "    # Host half mounts four read-only routes under /api/dsh-evolution/merge/*",

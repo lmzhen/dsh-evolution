@@ -102,6 +102,13 @@
     - id: evolution-replay
       name: '@deepseek-ai/dsh-evolution-replay'
 
+    # ── skill merge: the merged-pair queues and the read-only panel ─────────────
+    # Host half mounts four read-only routes under /api/dsh-evolution/merge/*
+    # and the /merge command; run engine and staging tool mount from the same row.
+    # The browser half is evolution-merge-ui; this row owns the permission/Config row.
+    - id: evolution-merge
+      name: '@deepseek-ai/dsh-evolution-merge'
+
 # ── cross-session recall: enable the native session-query index ─────────────
 # Mirrors evolution-host: this is an OVERRIDE of the base `session-query-sqlite`
 # row (never an insert) so it sits OUTSIDE the `- insert:` block. Parameterized
