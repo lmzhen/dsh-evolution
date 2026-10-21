@@ -37,6 +37,8 @@ export async function runNewChildAuthoring(
   decision: MergeDecision,
   signal: AbortSignal,
 ): Promise<ScanRound2Outcome> {
+  const targetCard = options.cards.find(card => card.name === decision.target)
+  if (targetCard?.protectionUnknown === true || targetCard?.protectedBy === 'pinned') return { kind: 'failed', failure: { stage: 'author', code: 'target-pinned', message: 'target is pinned: ' + decision.target, retryable: false, retryFrom: 'none' } }
   const stageKey = row.stagingRef ?? stageKeyOf(options.runId, pairKey(row.a, row.b))
   const existing = await readStaging(options.io, options.home, stageKey)
   if (existing.kind === 'present') {

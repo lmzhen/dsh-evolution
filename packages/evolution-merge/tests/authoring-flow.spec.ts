@@ -48,3 +48,14 @@ it('refuses when the author fails or leaves a blocking tree', async () => {
   if (blocking.ok) return
   expect(blocking.findings?.some(finding => finding.rule === 'frontmatter')).toBe(true)
 })
+it('refuses a pinned target before authoring', async () => {
+  const home = await tempRoot('dsh-merge-authoring-pinned-')
+  const io = nodeEvolutionIo()
+  const pinned: SkillCard[] = [{ ...cards[0]!, protectedBy: 'pinned' }]
+  const result = await runAuthoring({
+    io, home, runId: 'run-1', target: 'alpha-skill', cards: pinned, commitPort: port(), now: () => 200, summary: 'merge',
+    async author() { throw new Error('must not author') },
+  })
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.message).toContain('pinned')
+})

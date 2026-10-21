@@ -31,6 +31,8 @@ export type AuthoringResult =
   | { readonly ok: false; readonly message: string; readonly findings?: readonly RuleFinding[] }
 
 export async function runAuthoring(options: RunAuthoringOptions): Promise<AuthoringResult> {
+  const targetCard = options.cards.find(card => card.name === options.target)
+  if (targetCard?.protectionUnknown === true || targetCard?.protectedBy === 'pinned') return { ok: false, message: 'target is pinned: ' + options.target }
   const stageKey = options.stageKey ?? options.runId
   if (options.reuseStaging === true) {
     if (!await setStagingTarget(options.io, options.home, stageKey, options.target, options.mode)) return { ok: false, message: 'staging missing or unreadable: ' + stageKey }
