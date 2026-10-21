@@ -24,7 +24,7 @@ export const Config = z.object({
   mergeSkippedTtlDays: z.number().min(0).default(0).volatile(),
   mergeRunTimeoutMinutes: z.number().min(0).default(0).volatile(),
   mergePairTimeoutMinutes: z.number().min(1).default(15),
-  mergeModelsRoot: z.string().default('').volatile(),
+  mergeModelsRoot: z.string().default(''),
 })
 
 export interface MergePresentationScope {
