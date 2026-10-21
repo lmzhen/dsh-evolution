@@ -538,7 +538,7 @@ const SEMANTIC_ASSERTIONS = [
 ]
 
 /** Directories never worth scanning at the platform-anchor surface. */
-const CITATION_SKIP_DIRS = new Set(['node_modules', '.git', 'lib', 'dist', '.next'])
+const CITATION_SKIP_DIRS = new Set(['node_modules', '.git', 'lib', 'dist', '.next', 'vendor'])
 
 /**
  * Generated ledgers that are NOT a citation surface. family-test-lines.json is a ledger
