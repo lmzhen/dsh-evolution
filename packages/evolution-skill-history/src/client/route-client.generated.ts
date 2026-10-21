@@ -48,11 +48,12 @@ export async function requestJson<T>(doFetch: typeof fetch, path: string, init?:
   if (typeof body === 'object' && body !== null) {
     const record = body as { ok?: unknown; data?: unknown; code?: unknown; message?: unknown }
     if (record.ok === true) return { ok: true, data: record.data as T }
-    if (record.ok === false && typeof record.message === 'string' && record.message !== '') {
-      return {
-        ok: false,
-        failure: { kind: 'refused', code: typeof record.code === 'string' && record.code !== '' ? record.code : 'refused', message: record.message },
-      }
+    const nested = record.error
+    const errorRecord = typeof nested === 'object' && nested !== null ? nested as { code?: unknown; message?: unknown } : undefined
+    const code = typeof record.code === 'string' && record.code !== '' ? record.code : typeof errorRecord?.code === 'string' ? errorRecord.code : undefined
+    const message = typeof record.message === 'string' && record.message !== '' ? record.message : typeof errorRecord?.message === 'string' ? errorRecord.message : undefined
+    if (record.ok === false && code !== undefined && message !== undefined && message !== '') {
+      return { ok: false, failure: { kind: 'refused', code, message } }
     }
   }
   return { ok: false, failure: { kind: 'server', status: response.status } }

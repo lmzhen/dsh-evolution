@@ -21,6 +21,11 @@ describe('merge-ui client api', () => {
     expect(fetchMock).toHaveBeenCalledWith(HOST_ROUTES.view, { headers: { accept: 'application/json' } })
   })
 
+  it('keeps a nested host error envelope', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => answer({ ok: false, error: { code: 'bad-queue', message: 'queue must be pending/retry/skipped' } })))
+    expect(await view()).toMatchObject({ ok: false, failure: { kind: 'refused', code: 'bad-queue', message: 'queue must be pending/retry/skipped' } })
+  })
+
   it('passes queue/cursor to rows and keeps a host refusal', async () => {
     const fetchMock = vi.fn(async () => answer({ ok: false, code: 'service-absent', message: 'merge service is not mounted' }))
     vi.stubGlobal('fetch', fetchMock)
