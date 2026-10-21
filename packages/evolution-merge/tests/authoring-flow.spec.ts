@@ -59,3 +59,13 @@ it('refuses a pinned target before authoring', async () => {
   expect(result.ok).toBe(false)
   if (!result.ok) expect(result.message).toContain('pinned')
 })
+it('archives only the non-target source when merging into an existing target', async () => {
+  const home = await tempRoot('dsh-merge-authoring-archive-')
+  const io = nodeEvolutionIo()
+  const result = await runAuthoring({
+    io, home, runId: 'run-1', target: 'alpha-skill', cards, commitPort: port(), now: () => 200, summary: 'merge',
+    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('alpha-skill')) },
+  })
+  expect(result.ok, result.ok ? '' : result.message).toBe(true)
+  if (result.ok) expect(result.commit.ok && result.commit.result.archived).toEqual(['beta-skill'])
+})
