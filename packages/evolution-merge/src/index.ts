@@ -31,7 +31,7 @@ export interface MergePresentationScope {
   settings?: { configure?: (presentation: { auto?: boolean }, owner?: unknown) => unknown }
 }
 
-function engineConfigFromEnv(configuredRoot?: string): Record<string, unknown> | undefined {
+export function engineConfigFromEnv(configuredRoot?: string): Record<string, unknown> | undefined {
   const root = configuredRoot !== undefined && configuredRoot !== '' ? configuredRoot : process.env.SKILL_MERGE_MODELS_ROOT
   if (root === undefined || root === '') return undefined
   return {
