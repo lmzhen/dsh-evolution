@@ -73,7 +73,7 @@ export interface MergeCandidate {
   readonly arms?: readonly string[]
   readonly reason?: string
   readonly gate?: MergeGateFact
-  readonly source?: 'lexical' | 'proposed'
+  readonly source?: 'lexical' | 'proposed' | 'engine'
 }
 
 export interface MergeDecision {
