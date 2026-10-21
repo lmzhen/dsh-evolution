@@ -1325,29 +1325,32 @@ export class EvolutionCurator extends Service {
       },
       note: (text: string) => { this.ctx.logger.info('evolution-curator: ' + text) },
     }
-    const { archivedSkills, errors, consolidated } = await withTreeWrite(() => this.acquireMutex(), sectionView, async () => this.withMergeTreeLock(() => apply({
-      dryRun,
-      archiveCandidates,
-      nominations: gatedNominations,
-      treeNames,
-      usage,
-      bundledNames,
-      suppressedNames,
-      root,
-      recommendPool: new Set(recommendPool),
-      // rc.72 H-1: the lifecycle pair folds only for names this run changed —
-      // the transitions engine mutates the snapshot (state='stale'/'archived'/
-      // 'active'), and a concurrent curator run's archive/restore must never be
-      // reverted by a stale snapshot.
-      // v31 SNAP-02: the seedBaseline archived→active resets are THIS run's
-      // durable changes — folding them (CAS expected 'archived' == disk
-      // 'archived') makes the stranding self-heal reach the sidecar instead
-      // of dying with the run's memory.
-      stateOwned: new Set([...result.transitions.map(t => t.name), ...archiveCandidates, ...resetToActive]),
-      // A2-4 (v18): the CAS basis for the lifecycle fold (see runStartStates).
-      runStartStates,
-      failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
-    })))
+    const { archivedSkills, errors, consolidated } = await withTreeWrite(
+      () => this.acquireMutex(),
+      sectionView,
+      async () => this.withMergeTreeLock(() => apply({
+        dryRun,
+        archiveCandidates,
+        nominations: gatedNominations,
+        treeNames,
+        usage,
+        bundledNames,
+        suppressedNames,
+        root,
+        recommendPool: new Set(recommendPool),
+        // rc.72 H-1: the lifecycle pair folds only for names this run changed —
+        // the transitions engine mutates the snapshot (state='stale'/'archived'/
+        // 'active'), and a concurrent curator run's archive/restore must never be
+        // reverted by a stale snapshot.
+        // v31 SNAP-02: the seedBaseline archived→active resets are THIS run's
+        // durable changes — folding them (CAS expected 'archived' == disk
+        // 'archived') makes the stranding self-heal reach the sidecar instead
+        // of dying with the run's memory.
+        stateOwned: new Set([...result.transitions.map(t => t.name), ...archiveCandidates, ...resetToActive]),
+        // A2-4 (v18): the CAS basis for the lifecycle fold (see runStartStates).
+        runStartStates,
+        failedFrom: new Map(result.transitions.filter(t => t.to === 'archived').map(t => [t.name, t.from as 'active' | 'stale'])),
+      })))
     // v28 G4.1 (CUR-01): a disposed mid-run must not anchor the durable
     // schedule as if the pass had completed — the aborted-run bookkeeping used
     // to push lastRunAt a full intervalHours (default 168h) into the future,

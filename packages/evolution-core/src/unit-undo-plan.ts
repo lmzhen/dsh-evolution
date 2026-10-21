@@ -111,7 +111,13 @@ export function planUnitUndoAcross(members: readonly UnitUndoMember[]): UnitUndo
     for (const [path, slot] of support) {
       if (slot.newest === undefined) continue
       const preUnitHash = slot.baseline !== undefined ? slot.baseline.hash : slot.oldest?.beforeHash
-      ops.push({ skill: member.skill, path, remove: preUnitHash === undefined, ...(preUnitHash === undefined ? {} : { preUnitHash }), expectedHash: slot.newest.hash })
+      ops.push({
+        skill: member.skill,
+        path,
+        remove: preUnitHash === undefined,
+        ...(preUnitHash === undefined ? {} : { preUnitHash }),
+        expectedHash: slot.newest.hash,
+      })
     }
     if (body.newest !== undefined) {
       const preUnitHash = body.baseline !== undefined ? body.baseline.hash : body.oldest?.beforeHash

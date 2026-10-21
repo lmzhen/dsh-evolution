@@ -61,14 +61,17 @@ function textOfValue(value: unknown): string {
   if (!Array.isArray(value)) return ''
   return value
     .filter(block => typeof block === 'object' && block !== null && (block as { type?: unknown }).type === 'text')
-    .map(block => String((block as { text?: unknown }).text ?? ''))
+    .map((block) => {
+      const text = (block as { text?: unknown }).text
+      return typeof text === 'string' ? text : ''
+    })
     .join('')
 }
 
 function abortLink(signal: AbortSignal | undefined, timeoutMs: number): { controller: AbortController; cleanup: () => void } {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(new Error('subagent turn timeout')), timeoutMs)
-  const onAbort = (): void => controller.abort(signal?.reason)
+  const timer = setTimeout(() => { controller.abort(new Error('subagent turn timeout')) }, timeoutMs)
+  const onAbort = (): void => { controller.abort(signal?.reason) }
   signal?.addEventListener('abort', onAbort, { once: true })
   return {
     controller,
@@ -95,16 +98,16 @@ function waitForSubagentEnd(
     }
     const eventCtx = ctx as unknown as EventContextLike
     const off = typeof eventCtx.on === 'function'
-      ? eventCtx.on('subagent/end', info => {
-          if (info?.id !== childId) return
-          finish(() => resolve(info))
-        })
+      ? eventCtx.on('subagent/end', (info) => {
+        if (info.id !== childId) return
+        finish(() => { resolve(info) })
+      })
       : () => {}
     const timer = setTimeout(() => {
-      finish(() => reject(new Error('timed out waiting for subagent/end: ' + childId)))
+      finish(() => { reject(new Error('timed out waiting for subagent/end: ' + childId)) })
     }, timeoutMs)
     const onAbort = (): void => {
-      finish(() => reject(signal.reason instanceof Error ? signal.reason : new Error('conversation turn aborted')))
+      finish(() => { reject(signal.reason instanceof Error ? signal.reason : new Error('conversation turn aborted')) })
     }
     signal.addEventListener('abort', onAbort, { once: true })
     function cleanup(): void {

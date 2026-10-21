@@ -132,7 +132,10 @@ export async function acquireTreeWriteLock(options: TreeLockOptions): Promise<Tr
 }
 
 /** Acquire, run, release; the lock is released even when the body throws. */
-export async function withTreeWriteLock<T>(options: TreeLockOptions, body: (lock: TreeLock) => Promise<T>): Promise<{ ok: true; value: T } | Exclude<TreeLockAcquireResult, { ok: true }>> {
+export async function withTreeWriteLock<T>(
+  options: TreeLockOptions,
+  body: (lock: TreeLock) => Promise<T>,
+): Promise<{ ok: true; value: T } | Exclude<TreeLockAcquireResult, { ok: true }>> {
   const acquired = await acquireTreeWriteLock(options)
   if (!acquired.ok) return acquired
   try {

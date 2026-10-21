@@ -38,7 +38,7 @@ export function MergePanel(face: MergeFace): ReactNode {
     load(queue).then((outcome) => {
       if (outcome.ok) { setRows(outcome.payload.items); setFailed(undefined) }
       else setFailed(outcome.failure)
-    }).catch(() => setFailed({ kind: 'server', status: 0 })).finally(() => setLoading(false))
+    }).catch(() => { setFailed({ kind: 'server', status: 0 }) }).finally(() => { setLoading(false) })
   }
 
   const loadView = (): void => {
@@ -60,7 +60,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const tabs = createElement('div', { 'data-role': 'tabs' }, QUEUES.map(queue =>
     createElement('button', {
       key: queue, type: 'button', 'data-role': 'tab', 'data-active': tab === queue ? 'true' : 'false',
-      onClick: () => setTab(queue),
+      onClick: () => { setTab(queue) },
     }, t('tab.' + queue) + ' ' + String(counts[queue])),
   ))
   const list = rows.length === 0

@@ -210,13 +210,11 @@ function parseIndex(raw: string | null): { ok: boolean; records: RunRecord[]; fo
       kind: record.kind,
       state: record.state,
       startedAt: record.startedAt,
-      ...(typeof record.command === 'string' ? { command: record.command as RunCommand } : {}),
-      ...(typeof record.stage === 'string' ? { stage: record.stage as RunStage } : {}),
-      ...(typeof record.progress === 'object' && record.progress !== null
-        && typeof (record.progress as RunProgress).done === 'number'
-        && typeof (record.progress as RunProgress).total === 'number'
-        ? { progress: { done: (record.progress as RunProgress).done, total: (record.progress as RunProgress).total } }
-        : {}),
+      ...(record.command === undefined ? {} : { command: record.command }),
+      ...(record.stage === undefined ? {} : { stage: record.stage }),
+      ...(record.progress === undefined
+        ? {}
+        : { progress: { done: record.progress.done, total: record.progress.total } }),
       ...(typeof record.pid === 'number' ? { pid: record.pid } : {}),
       ...(typeof record.endedAt === 'number' ? { endedAt: record.endedAt } : {}),
       ...(typeof record.resultRef === 'string' ? { resultRef: record.resultRef } : {}),

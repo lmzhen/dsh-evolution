@@ -2931,24 +2931,24 @@ export class SkillLibrary {
       // G3b（A22）：代表片＝第一条 landing；kind 判 null（previous 的取值域只有 string/null）。
       const unitHead = land === landing[0]
         ? (plan.unitHead ?? {
-            moves: landing
-              .filter(l => l.target.split(/[\\/]/).pop() !== 'SKILL.md')
-              .map((l) => {
-                const p = l.target.slice(dir.length + 1).split(String.fromCharCode(92)).join(String.fromCharCode(47))
-                return {
-                  path: p,
-                  kind: l.previous === null ? 'created' : 'moved',
-                  to: p,
-                  ...l.previous === null ? {} : { beforeRef: contentHash(l.previous) },
-                  afterRef: contentHash(l.content),
-                }
-              })
-              // F1 (independent review, 2026-10-14): when one plan writes the SAME path twice, keep the
-              // LAST write -- first-wins left `afterRef` describing the earlier bytes (stale). `beforeRef`
-              // and `kind` are unaffected: both come from the same per-path pre-read.
-              .filter((m, idx, all) => all.map(x => x.path).lastIndexOf(m.path) === idx),
-            sources: [{ skill: name }],
-          })
+          moves: landing
+            .filter(l => l.target.split(/[\\/]/).pop() !== 'SKILL.md')
+            .map((l) => {
+              const p = l.target.slice(dir.length + 1).split(String.fromCharCode(92)).join(String.fromCharCode(47))
+              return {
+                path: p,
+                kind: l.previous === null ? 'created' : 'moved',
+                to: p,
+                ...l.previous === null ? {} : { beforeRef: contentHash(l.previous) },
+                afterRef: contentHash(l.content),
+              }
+            })
+            // F1 (independent review, 2026-10-14): when one plan writes the SAME path twice, keep the
+            // LAST write -- first-wins left `afterRef` describing the earlier bytes (stale). `beforeRef`
+            // and `kind` are unaffected: both come from the same per-path pre-read.
+            .filter((m, idx, all) => all.map(x => x.path).lastIndexOf(m.path) === idx),
+          sources: [{ skill: name }],
+        })
         : undefined
       // A22: previous is string | null (a read failure rejects the whole plan), so the old
       // `=== undefined ? md : previous` was an unreachable branch -- the type is the truth.
