@@ -1,42 +1,42 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-10-19T01:05:08.341Z",
+  "generatedAt": "2026-10-21T01:55:20.910Z",
   "records": [
     {
       "probe": "beh-host-route-registration",
       "signature": "f763826887b1f1bdb3bc7d6b9b71e3892ff5aa7fa46d3c256961150703f51ebd",
-      "provenAt": "2026-10-19T01:05:08.334Z",
+      "provenAt": "2026-10-21T01:55:20.887Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-restricted-preset-lifecycle",
       "signature": "f4c5c2dc920833b0fa3d2e918134928aa7c0dc64911f3e64aa9e8e7b30560809",
-      "provenAt": "2026-10-19T01:05:08.333Z",
+      "provenAt": "2026-10-21T01:55:20.885Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-subagent-channel-outcomes",
-      "signature": "f68b0bd081fcf8312382fbeefc7b1e877666f7a2a098fe2716293f91be48a7d9",
-      "provenAt": "2026-10-19T01:05:08.333Z",
+      "signature": "ac6f43a3487c86facdcd746b9882376252ec596df2a723bf76804dcf78a36d5b",
+      "provenAt": "2026-10-21T01:55:20.883Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-composer-single-source",
       "signature": "0919b817e0022db265fbd6327c58a12667c0d0dc0118c7be5ae850552e95d577",
-      "provenAt": "2026-10-19T01:05:08.332Z",
+      "provenAt": "2026-10-21T01:55:20.880Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-contracts-surface",
-      "signature": "49e85c472ad72be8eae22523a63194e32bf53002c7c558cc9dd936d27ee33dba",
-      "provenAt": "2026-10-19T01:05:08.331Z",
+      "signature": "bad2a425e35df29cb249c3202e8e2917e14e5f44ada4466bf37d201b545c07b6",
+      "provenAt": "2026-10-21T01:55:20.878Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-platform-line-grid",
       "signature": "4f5e6a1cfe2c8e8f9d3c613ecc0769076e4d34ac14443c87e75f6a89be47c4a6",
-      "provenAt": "2026-10-19T01:05:08.330Z",
+      "provenAt": "2026-10-21T01:55:20.876Z",
       "tree": "overlay"
     }
   ]
