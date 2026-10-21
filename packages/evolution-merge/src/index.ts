@@ -119,8 +119,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       return mergeRun === undefined ? { ok: false, text: 'merge 未就绪：evolutionIo 尚未挂载' } : mergeRun(rawInput, invocation)
     },
   }
-  const provide = (ctx as unknown as { provide?: (name: string, value: unknown) => void }).provide
-  if (typeof provide === 'function') provide.call(ctx, 'evolutionMerge', mergeService)
+  ;(ctx as unknown as { provide(name: string, value: unknown): void }).provide('evolutionMerge', mergeService)
   let source: MergeRouteSource | undefined
   registerHostRoutes(ctx, audit => makeMergeRoutes({ getSource: () => source }, audit))
   ctx.inject(['commands', 'evolutionIo'], (scope) => {
