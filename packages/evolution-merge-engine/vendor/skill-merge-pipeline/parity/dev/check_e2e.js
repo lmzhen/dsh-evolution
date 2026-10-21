@@ -1,0 +1,12 @@
+"use strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(__dirname, "..", "..", "..");
+const load = rel => JSON.parse(fs.readFileSync(path.join(root, "out", rel, "report.json"), "utf8"));
+const a = load(process.argv[2] || "node_natural");
+const b = load(process.argv[3] || "cli_e2e");
+const k = x => x.pairs_final.map(q => [q.a, q.b, q.verdict_id].join("|")).sort().join(";");
+console.log("③=" + b.stage3_lexical.passed_lexical + " ④=" + b.stage4_semantic.selected + " ⑤=" + b.pairs_final.length);
+console.log("一致: ③=" + (a.stage3_lexical.passed_lexical === b.stage3_lexical.passed_lexical) + " ④=" + (a.stage4_semantic.selected === b.stage4_semantic.selected) + " ⑤=" + (k(a) === k(b)));

@@ -1,0 +1,34 @@
+"use strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { performance } from "node:perf_hooks";
+import { Tokenizer } from "../../src/text/tokenizer.js";
+import { makeConfig } from "../../src/config.js";
+import * as corpus from "../../src/corpus.js";
+import * as prefilter from "../../src/screening/prefilter.js";
+const MODEL = "D:/dsh/skill-merge/models/potion-multilingual-128M-int8/tokenizer.json";
+const CORPUS = process.env.SKILL_MERGE_CORPUS || "C:/Users/limengzhen/.dsh/skills";
+const CACHE = path.join(os.tmpdir(), "dsh-bench-tok-cache");
+fs.rmSync(CACHE, { recursive: true, force: true });
+const cfg = makeConfig();
+const [skills] = corpus.loadCorpus([CORPUS]);
+corpus.stripBoilerplate(skills, cfg);
+const [kept] = prefilter.prefilter(skills, cfg);
+const texts = [];
+for (const s of kept) { texts.push(s.body_core || s.body); texts.push(s.summary); }
+function ms(fn) { const t = performance.now(); const out = fn(); return { out, ms: performance.now() - t }; }
+const cold = ms(() => new Tokenizer(MODEL, { cache: false }));
+const first = ms(() => new Tokenizer(MODEL, { cacheDir: CACHE }));
+const warm = ms(() => new Tokenizer(MODEL, { cacheDir: CACHE }));
+const encCold = ms(() => cold.out.encodeBatch(texts));
+const encWarm = ms(() => warm.out.encodeBatch(texts));
+let same = 0;
+for (let i = 0; i < texts.length; i += 1) if (JSON.stringify(encCold.out[i]) === JSON.stringify(encWarm.out[i])) same += 1;
+const cacheFile = path.join(CACHE, fs.readdirSync(CACHE)[0]);
+console.log("冷解析+构建 = " + Math.round(cold.ms) + "ms");
+console.log("首次（构建+写缓存）= " + Math.round(first.ms) + "ms | 派生物 " + (fs.statSync(cacheFile).size / 1024 / 1024).toFixed(1) + "MB");
+console.log("热加载（命中）= " + Math.round(warm.ms) + "ms");
+console.log("encode 全语料: 冷=" + Math.round(encCold.ms) + "ms 热=" + Math.round(encWarm.ms) + "ms | ids 一致 " + same + "/" + texts.length);
+console.log("二次启动总耗时（加载+encode）= " + Math.round(warm.ms + encWarm.ms) + "ms");
+if (same !== texts.length) process.exit(1);

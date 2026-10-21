@@ -1,0 +1,13 @@
+"use strict";
+import * as corpus from "../../src/corpus.js";
+import { makeConfig } from "../../src/config.js";
+import fs from "node:fs";
+const cfg = makeConfig();
+const [skills] = corpus.loadCorpus(["C:/Users/limengzhen/.dsh/skills"]);
+const bp = corpus.stripBoilerplate(skills, cfg);
+import * as ref from "../golden/ref_stages.json";
+console.log("当前 skills=" + skills.length + " | ref.skills=" + ref.skills.length);
+console.log("当前 bp=" + JSON.stringify(bp));
+console.log("golden bp=" + JSON.stringify(ref.boilerplate));
+console.log("当前前 5 技能名: " + skills.slice(0, 5).map(s => s.name).join(", "));
+console.log("ref 前 5 技能名: " + ref.skills.slice(0, 5).map(s => s.name || s).join(", "));

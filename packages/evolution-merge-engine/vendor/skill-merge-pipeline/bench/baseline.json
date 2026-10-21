@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-17T11:24:52.737Z",
+  "node": "v26.4.0",
+  "corpus": "parity/fixtures/corpus",
+  "model": "D:/dsh/skill-merge/models/potion-multilingual-128M-int8",
+  "metrics": {
+    "load_ms": 68,
+    "encode_ms": 576.9,
+    "total_ms": 644.9
+  }
+}

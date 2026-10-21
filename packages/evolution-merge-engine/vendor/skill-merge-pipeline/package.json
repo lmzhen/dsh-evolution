@@ -1,0 +1,59 @@
+{
+  "name": "skill-merge-pipeline",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Node 版 skill 合并流水线：①预过滤→②LSH候选→③词面→④向量→④.5精排→⑤三级判决；零运行时依赖、可复现、与 Python oracle 同口径",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./merge": "./src/merge/index.js",
+    "./pipeline": "./src/pipeline/index.js",
+    "./cli": "./src/cli.js",
+    "./screening": "./src/screening/index.js",
+    "./contracts": "./src/contracts.js",
+    "./contracts/report": "./src/contracts/report.js",
+    "./contracts/stage": "./src/contracts/stage.js",
+    "./contracts/merge": "./src/contracts/merge.js"
+  },
+  "scripts": {
+    "run": "node src/run.js",
+    "doctor": "node tools/doctor.js",
+    "test": "node --test \"test/*.test.js\" && node bench/run.js",
+    "parity": "node parity/run.js",
+    "bench": "node bench/run.js",
+    "rank-server": "node tools/rank-server.js",
+    "golden:manifest": "node parity/dev/gen_manifest.js",
+    "parity:verify": "node parity/dev/verify_governance.js",
+    "bench:update": "node bench/run.js --update",
+    "release:check": "node tools/release-check.js",
+    "merge-plan": "node tools/merge-plan.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "optionalDependencies": {
+    "onnxruntime-node": "^1.20.1"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "skill",
+    "merge",
+    "dedupe",
+    "minhash",
+    "lsh",
+    "embedding",
+    "model2vec",
+    "pipeline",
+    "cli"
+  ],
+  "bin": {
+    "skill-merge": "./bin/skill-merge.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "models/registry.json",
+    "models/pca64/",
+    "README.md"
+  ]
+}

@@ -1,0 +1,25 @@
+skill-merge NOTICE
+
+1. Source code
+   The original skill-merge Node pipeline under `node/` was distributed in this
+   repository with package.json license "UNLICENSED". The copyright holder has
+   authorized this repository and the vendored `evolution-merge-engine` package
+   to redistribute it under the MIT License (see LICENSE). The vendored source
+   is byte-identical to the pinned upstream tree; no algorithm or configuration
+   was changed.
+
+2. Model-derived assets
+   `node/models/pca64/proj.f32` is a PCA-64 projection matrix derived from
+   potion-multilingual-128M (minishlab/potion-multilingual-128M). It is
+   redistributed as a model-derived asset; the upstream model card and its
+   terms apply in addition to this repository's MIT-licensed code. See
+   `node/models/registry.json` (artifact pca64-proj / recipe pca-project-int8).
+
+3. Generated parameter table
+   `node/src/data/minhash_params.json` is a generated 199-point LSH parameter
+   table (datasketch `_optimal_param` results), not a hand-tuned model.
+
+4. Runtime downloads
+   Large model weights are not committed; `models ensure` downloads them under
+   their own upstream terms. The engine package's `NOTICE` must be included in
+   published tarballs.

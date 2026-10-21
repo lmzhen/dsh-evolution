@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "modelsRoot": "models",
+  "recipes": {
+    "fp16-cast": {
+      "builderVer": 1,
+      "description": "把 FP32 静态表分块转为 FP16（每块 40000 行），更新 config.embedding_dtype=float16",
+      "params": {
+        "sourceDtype": "F32",
+        "targetDtype": "F16",
+        "step": 40000,
+        "configPatch": {
+          "embedding_dtype": "float16"
+        }
+      }
+    },
+    "int8-per-row": {
+      "builderVer": 1,
+      "description": "逐行对称 int8 量化：scale=max_abs(row)/127（0→1e-8），q=clip(round_half_even(x/scale),-127,127)",
+      "params": {
+        "dtype": "I8",
+        "scalesFile": "scales.f32",
+        "scalesDtype": "F32",
+        "maxQ": 127,
+        "minQ": -127,
+        "scaleFormula": "max_abs/127",
+        "zeroScale": 1e-8,
+        "rounding": "half-even",
+        "configPatch": {
+          "embedding_dtype": "int8",
+          "quantization": "per_row_symmetric",
+          "scales_file": "scales.f32",
+          "source_model": "potion-multilingual-128M-F16"
+        }
+      }
+    },
+    "pca-project-int8": {
+      "builderVer": 1,
+      "description": "PCA 投影到 64 维后逐行 int8：采样 step=rows//50000，cov=X^T X(double)，eigh 取 top64，proj=x@U，再 int8-per-row",
+      "params": {
+        "dims": 64,
+        "sampleStepFormula": "rows//50000",
+        "covariance": "double",
+        "eigen": "eigh",
+        "quantize": "int8-per-row",
+        "scalesFile": "scales.f32",
+        "configPatch": {
+          "hidden_dim": 64,
+          "embedding_dtype": "int8",
+          "quantization": "per_row_symmetric",
+          "scales_file": "scales.f32",
+          "pca_proj_file": "pca_proj.f32",
+          "pca_dims": 64,
+          "orig_hidden_dim": 256,
+          "source_model": "potion-multilingual-128M-F16",
+          "pca_fit": "50k evenly-spaced rows, torch covariance"
+        }
+      }
+    }
+  },
+  "artifacts": [
+    {
+      "id": "potion-base-f32",
+      "kind": "source",
+      "origin": "hf",
+      "repo": "minishlab/potion-multilingual-128M",
+      "description": "HF 原始 fp32 静态表（embedding 512,361,560 B）",
+      "target": "potion-multilingual-128M-fp32",
+      "files": [
+        {
+          "path": "model.safetensors",
+          "sha256": "14b5eb39cb4ce5666da8ad1f3dc6be4346e9b2d601c073302fa0a31bf7943397",
+          "bytes": 512361560,
+          "lfs": true
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "19f1909063da3cfe3bd83a782381f040dccea475f4816de11116444a73e1b6a1",
+          "bytes": 18616131,
+          "lfs": true
+        },
+        {
+          "path": "config.json",
+          "sha256": "595e4cab2093732efd5dbe084fd5c1826b5eea693b73b4c1fd971672867d2e54",
+          "bytes": 271
+        }
+      ]
+    },
+    {
+      "id": "potion-base-f16",
+      "kind": "derived",
+      "recipe": "fp16-cast",
+      "base": "potion-base-f32",
+      "target": "potion-multilingual-fp16",
+      "manifest": {
+        "dtype": "F16",
+        "dim": 256,
+        "rows": 500353,
+        "tokenizerSha": "19f1909063da3cfe3bd83a782381f040dccea475f4816de11116444a73e1b6a1",
+        "builderVer": 1
+      },
+      "files": [
+        {
+          "path": "model.safetensors",
+          "sha256": "ccc3e2a930029660672855dc4936dadef9fdfb778729ffb11c6d6c6dc2a33f58",
+          "bytes": 256180824
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "19f1909063da3cfe3bd83a782381f040dccea475f4816de11116444a73e1b6a1",
+          "bytes": 18616131
+        },
+        {
+          "path": "config.json",
+          "sha256": "e73c9e4782048819e3488c294edbd8f36ba3d5c043e19aac3fa271609b328fb0",
+          "bytes": 292
+        }
+      ]
+    },
+    {
+      "id": "pca64-proj",
+      "kind": "source",
+      "origin": "repo",
+      "description": "PCA-64 投影矩阵（256×64 F32，随仓库分发；Node 不做特征分解）",
+      "target": "pca64",
+      "files": [
+        {
+          "path": "proj.f32",
+          "sha256": "28cbc252208d3ee6767de33f88da60de056a602d0e939e48e3e44ebf72400668",
+          "bytes": 65536
+        }
+      ]
+    },
+    {
+      "id": "local:int8-256",
+      "kind": "derived",
+      "recipe": "int8-per-row",
+      "base": "potion-base-f16",
+      "target": "potion-multilingual-128M-int8",
+      "manifest": {
+        "dtype": "I8",
+        "dim": 256,
+        "rows": 500353,
+        "tokenizerSha": "19f1909063da3cfe3bd83a782381f040dccea475f4816de11116444a73e1b6a1",
+        "scalesDtype": "F32",
+        "builderVer": 1
+      },
+      "files": [
+        {
+          "path": "model.safetensors",
+          "sha256": "7f4be8f9a3410990204b0dd56358bdd041ec5062448fa9edd7bacbca62e5ed12",
+          "bytes": 128090456
+        },
+        {
+          "path": "scales.f32",
+          "sha256": "0a3b1b1a20bc3bafcbaba71b20915337d0726e7bd8aa53f3a3ba1200abb16771",
+          "bytes": 2001412
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "19f1909063da3cfe3bd83a782381f040dccea475f4816de11116444a73e1b6a1",
+          "bytes": 18616131
+        },
+        {
+          "path": "config.json",
+          "sha256": "040d017a12f0a65e7544cef3b78f4aa98d990b65a62288d7a11429bc0e33b497",
+          "bytes": 412
+        }
+      ]
+    },
+    {
+      "id": "local:pca64-int8",
+      "kind": "derived",
+      "recipe": "pca-project-int8",
+      "base": "potion-base-f16",
+      "proj": "pca64-proj",
+      "target": "potion-multilingual-128M-pca64-int8",
+      "manifest": {
+        "dtype": "I8",
+        "dim": 64,
+        "rows": 500353,
+        "tokenizerSha": "19f1909063da3cfe3bd83a782381f040dccea475f4816de11116444a73e1b6a1",
+        "scalesDtype": "F32",
+        "projSha": "28cbc252208d3ee6767de33f88da60de056a602d0e939e48e3e44ebf72400668",
+        "builderVer": 1,
+        "reproducibility": "numeric"
+      },
+      "files": [
+        {
+          "path": "model.safetensors",
+          "sha256": "09a3b11f1da69b0f54a08b2bfaec6eee42eedd9226777a56dc15b12f84bccf81",
+          "bytes": 32022680
+        },
+        {
+          "path": "scales.f32",
+          "sha256": "a65761f9e2ecaa1c80cf1124e7b5267fe9e8c76f92672a6b48e4ce9f26dc163b",
+          "bytes": 2001412
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "19f1909063da3cfe3bd83a782381f040dccea475f4816de11116444a73e1b6a1",
+          "bytes": 18616131
+        },
+        {
+          "path": "config.json",
+          "sha256": "fb5117bf741e618e521113b70172979ece3f0fa99c81c2a5c168b2d704a8dd95",
+          "bytes": 551
+        }
+      ]
+    },
+    {
+      "id": "ranker:startlux-0.8b",
+      "kind": "source",
+      "origin": "hf",
+      "optional": true,
+      "repo": "startlux-models/StartLux-Decision-v1-0.8B-Q8_0-GGUF",
+      "description": "可选：本地精排（llama-server）GGUF；首启不下载，按需 npm run fetch-models -- --include ranker",
+      "target": "startlux",
+      "files": [
+        {
+          "path": "StartLux-Decision-0.8B-Q8_0.gguf",
+          "sha256": "dd2bcf3ca81737c5a22e9a781c46e5389fc572a015ce7f36227722da0ba21457",
+          "bytes": 811843200,
+          "lfs": true
+        }
+      ]
+    },
+    {
+      "id": "onnx:e5-small",
+      "kind": "source",
+      "origin": "hf",
+      "optional": true,
+      "repo": "Xenova/multilingual-e5-small",
+      "description": "可选：ONNX 本机 embedding 后端（G7.1；需 onnxruntime-node 可选依赖，默认不下载）",
+      "target": "onnx/e5-small",
+      "files": [
+        {
+          "path": "onnx/model_quantized.onnx",
+          "sha256": "f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193",
+          "bytes": 118308185,
+          "lfs": true
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+          "bytes": 17082730,
+          "lfs": true
+        }
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "qwen3-embedding-8b",
+      "provider": "siliconflow",
+      "compute": "api",
+      "overrideField": "embed_primary",
+      "transport": {
+        "kind": "openai-embeddings",
+        "model": "Qwen/Qwen3-Embedding-8B"
+      },
+      "floors": {
+        "body": 0.75,
+        "summary": 0.85
+      },
+      "price": {
+        "cnyPerKtok": 0.00028
+      }
+    },
+    {
+      "id": "bge-m3",
+      "provider": "siliconflow",
+      "compute": "api",
+      "overrideField": "embed_fallback",
+      "transport": {
+        "kind": "openai-embeddings",
+        "model": "BAAI/bge-m3"
+      },
+      "floors": {
+        "body": 0.8,
+        "summary": 0.6
+      },
+      "price": {
+        "cnyPerKtok": 0
+      }
+    },
+    {
+      "id": "local:int8-256",
+      "provider": "local",
+      "compute": "local-static",
+      "artifactRef": "local:int8-256",
+      "overrideField": "embedder_model",
+      "floors": {
+        "body": 0.95,
+        "summary": 0.6
+      }
+    },
+    {
+      "id": "local:pca64-int8",
+      "provider": "local",
+      "compute": "local-static",
+      "artifactRef": "local:pca64-int8",
+      "overrideField": "embedder_model_last",
+      "floors": {
+        "body": 0.95,
+        "summary": 0.6
+      }
+    }
+  ],
+  "tiers": [
+    {
+      "id": "qwen3-embedding-8b",
+      "modelRef": "qwen3-embedding-8b",
+      "floorPreset": "qwen3-embedding-8b"
+    },
+    {
+      "id": "bge-m3",
+      "modelRef": "bge-m3",
+      "floorPreset": "bge-m3"
+    },
+    {
+      "id": "local:int8-256",
+      "modelRef": "local:int8-256",
+      "floorPreset": "local:int8-256"
+    },
+    {
+      "id": "local:pca64-int8",
+      "modelRef": "local:pca64-int8",
+      "floorPreset": "local:pca64-int8"
+    }
+  ],
+  "calibration": null
+}

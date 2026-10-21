@@ -1,0 +1,568 @@
+{
+ "stage4": {
+  "pairs_in": 132,
+  "top_n": 10,
+  "body_floor": 0.95,
+  "summary_floor": 0.6,
+  "embedder": "model2vec-stream",
+  "model": "D:/dsh/skill-merge/models/potion-multilingual-128M-int8",
+  "per_projection": {
+   "body_core": {
+    "top_n_count": 10,
+    "floor_count": 8,
+    "union_count": 10,
+    "floor": 0.95,
+    "cutoff_cosine": 0.9459
+   },
+   "summary": {
+    "top_n_count": 10,
+    "floor_count": 5,
+    "union_count": 10,
+    "floor": 0.6,
+    "cutoff_cosine": 0.4991
+   }
+  },
+  "floors_used": {
+   "tier": "local",
+   "body": 0.95,
+   "summary": 0.6
+  },
+  "selected": 17
+ },
+ "stage4_rows": [
+  {
+   "a": "agent-team-design-synthesis",
+   "b": "dsh-plugin-compatibility",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\agent-team-design-synthesis\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-compatibility\\SKILL.md",
+   "body_core_cosine": 0.9459,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_top"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "agent-team-design-synthesis",
+   "b": "dsh-plugin-extension-design",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\agent-team-design-synthesis\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-extension-design\\SKILL.md",
+   "body_core_cosine": 0.9514,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "agent-team-design-synthesis",
+   "b": "gate-mutation-probing",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\agent-team-design-synthesis\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\gate-mutation-probing\\SKILL.md",
+   "body_core_cosine": 0.9682,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "capability-claim-audit",
+   "b": "capability-replication-audit",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\capability-claim-audit\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\capability-replication-audit\\SKILL.md",
+   "body_core_cosine": 0.9582,
+   "summary_cosine": 0.679,
+   "arms": [
+    "body_core_floor",
+    "summary_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "codebase-defect-audit",
+   "b": "codebase-inventory-survey",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\codebase-defect-audit\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\codebase-inventory-survey\\SKILL.md",
+   "body_core_cosine": 0.9513,
+   "summary_cosine": 0.4991,
+   "arms": [
+    "body_core_floor",
+    "summary_top"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "docx-layout-and-figures",
+   "b": "officecli-docx",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\docx-layout-and-figures\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\officecli-docx\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.6404,
+   "arms": [
+    "summary_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-context-visibility",
+   "b": "dsh-plugin-compatibility",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-context-visibility\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-compatibility\\SKILL.md",
+   "body_core_cosine": 0.949,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_top"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-context-visibility",
+   "b": "dsh-plugin-extension-design",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-context-visibility\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-extension-design\\SKILL.md",
+   "body_core_cosine": 0.9673,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-desktop-source-build",
+   "b": "windows-computer-use",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-desktop-source-build\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\windows-computer-use\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.5369,
+   "arms": [
+    "summary_top"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-evolution-defect-patterns",
+   "b": "dsh-evolution-gates",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-defect-patterns\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-gates\\SKILL.md",
+   "body_core_cosine": 0.972,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-evolution-gates",
+   "b": "dsh-evolution-release",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-gates\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-release\\SKILL.md",
+   "body_core_cosine": 0.9665,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-evolution-maintenance",
+   "b": "dsh-evolution-release",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-maintenance\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-release\\SKILL.md",
+   "body_core_cosine": 0.9585,
+   "summary_cosine": 0.5014,
+   "arms": [
+    "body_core_floor",
+    "summary_top"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-plugin-compatibility",
+   "b": "dsh-plugin-discovery",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-compatibility\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-discovery\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.6829,
+   "arms": [
+    "summary_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-plugin-compatibility",
+   "b": "platform-plugin-port-verification",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-compatibility\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\platform-plugin-port-verification\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.6516,
+   "arms": [
+    "summary_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-plugin-discovery",
+   "b": "dsh-plugin-extension-design",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-discovery\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-extension-design\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.6708,
+   "arms": [
+    "summary_floor"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "dsh-plugin-discovery",
+   "b": "platform-plugin-port-verification",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-discovery\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\platform-plugin-port-verification\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.5849,
+   "arms": [
+    "summary_top"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  },
+  {
+   "a": "literature-artifact-triage",
+   "b": "research-artifact-dependency-audit",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\literature-artifact-triage\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\research-artifact-dependency-audit\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.5514,
+   "arms": [
+    "summary_top"
+   ],
+   "rank_score": null,
+   "rank_arms": null,
+   "rank_source": null
+  }
+ ],
+ "stage45": {
+  "mode_requested": "vec",
+  "mode_used": "vec",
+  "degraded": false,
+  "reason": "显式指定 vec",
+  "n_in": 17,
+  "n_out": 17,
+  "n": 20,
+  "cap": 5000,
+  "vec_topk": 10,
+  "checkpoint": false,
+  "secs": 0.0
+ },
+ "stage45_rows": [
+  {
+   "a": "dsh-evolution-defect-patterns",
+   "b": "dsh-evolution-gates",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-defect-patterns\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-gates\\SKILL.md",
+   "body_core_cosine": 0.972,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": 0.972,
+   "rank_arms": [
+    "body_core_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "agent-team-design-synthesis",
+   "b": "gate-mutation-probing",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\agent-team-design-synthesis\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\gate-mutation-probing\\SKILL.md",
+   "body_core_cosine": 0.9682,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": 0.9682,
+   "rank_arms": [
+    "body_core_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-context-visibility",
+   "b": "dsh-plugin-extension-design",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-context-visibility\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-extension-design\\SKILL.md",
+   "body_core_cosine": 0.9673,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": 0.9673,
+   "rank_arms": [
+    "body_core_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-evolution-gates",
+   "b": "dsh-evolution-release",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-gates\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-release\\SKILL.md",
+   "body_core_cosine": 0.9665,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": 0.9665,
+   "rank_arms": [
+    "body_core_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-evolution-maintenance",
+   "b": "dsh-evolution-release",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-maintenance\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-evolution-release\\SKILL.md",
+   "body_core_cosine": 0.9585,
+   "summary_cosine": 0.5014,
+   "arms": [
+    "body_core_floor",
+    "summary_top"
+   ],
+   "rank_score": 0.9585,
+   "rank_arms": [
+    "body_core_top",
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "capability-claim-audit",
+   "b": "capability-replication-audit",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\capability-claim-audit\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\capability-replication-audit\\SKILL.md",
+   "body_core_cosine": 0.9582,
+   "summary_cosine": 0.679,
+   "arms": [
+    "body_core_floor",
+    "summary_floor"
+   ],
+   "rank_score": 0.9582,
+   "rank_arms": [
+    "body_core_top",
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "agent-team-design-synthesis",
+   "b": "dsh-plugin-extension-design",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\agent-team-design-synthesis\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-extension-design\\SKILL.md",
+   "body_core_cosine": 0.9514,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_floor"
+   ],
+   "rank_score": 0.9514,
+   "rank_arms": [
+    "body_core_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "codebase-defect-audit",
+   "b": "codebase-inventory-survey",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\codebase-defect-audit\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\codebase-inventory-survey\\SKILL.md",
+   "body_core_cosine": 0.9513,
+   "summary_cosine": 0.4991,
+   "arms": [
+    "body_core_floor",
+    "summary_top"
+   ],
+   "rank_score": 0.9513,
+   "rank_arms": [
+    "body_core_top",
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-context-visibility",
+   "b": "dsh-plugin-compatibility",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-context-visibility\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-compatibility\\SKILL.md",
+   "body_core_cosine": 0.949,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_top"
+   ],
+   "rank_score": 0.949,
+   "rank_arms": [
+    "body_core_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "agent-team-design-synthesis",
+   "b": "dsh-plugin-compatibility",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\agent-team-design-synthesis\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-compatibility\\SKILL.md",
+   "body_core_cosine": 0.9459,
+   "summary_cosine": null,
+   "arms": [
+    "body_core_top"
+   ],
+   "rank_score": 0.9459,
+   "rank_arms": [
+    "body_core_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-plugin-compatibility",
+   "b": "dsh-plugin-discovery",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-compatibility\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-discovery\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.6829,
+   "arms": [
+    "summary_floor"
+   ],
+   "rank_score": 0.6829,
+   "rank_arms": [
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-plugin-discovery",
+   "b": "dsh-plugin-extension-design",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-discovery\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-extension-design\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.6708,
+   "arms": [
+    "summary_floor"
+   ],
+   "rank_score": 0.6708,
+   "rank_arms": [
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-plugin-compatibility",
+   "b": "platform-plugin-port-verification",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-compatibility\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\platform-plugin-port-verification\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.6516,
+   "arms": [
+    "summary_floor"
+   ],
+   "rank_score": 0.6516,
+   "rank_arms": [
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "docx-layout-and-figures",
+   "b": "officecli-docx",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\docx-layout-and-figures\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\officecli-docx\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.6404,
+   "arms": [
+    "summary_floor"
+   ],
+   "rank_score": 0.6404,
+   "rank_arms": [
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-plugin-discovery",
+   "b": "platform-plugin-port-verification",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-plugin-discovery\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\platform-plugin-port-verification\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.5849,
+   "arms": [
+    "summary_top"
+   ],
+   "rank_score": 0.5849,
+   "rank_arms": [
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "literature-artifact-triage",
+   "b": "research-artifact-dependency-audit",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\literature-artifact-triage\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\research-artifact-dependency-audit\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.5514,
+   "arms": [
+    "summary_top"
+   ],
+   "rank_score": 0.5514,
+   "rank_arms": [
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  },
+  {
+   "a": "dsh-desktop-source-build",
+   "b": "windows-computer-use",
+   "a_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\dsh-desktop-source-build\\SKILL.md",
+   "b_path": "D:\\dsh\\skill-merge\\node\\parity\\fixtures\\corpus\\windows-computer-use\\SKILL.md",
+   "body_core_cosine": null,
+   "summary_cosine": 0.5369,
+   "arms": [
+    "summary_top"
+   ],
+   "rank_score": 0.5369,
+   "rank_arms": [
+    "summary_top"
+   ],
+   "rank_source": "vec_top10"
+  }
+ ]
+}

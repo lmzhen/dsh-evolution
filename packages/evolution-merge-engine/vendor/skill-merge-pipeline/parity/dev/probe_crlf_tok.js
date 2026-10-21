@@ -1,0 +1,16 @@
+import fs from "node:fs";
+import * as corpus from "../src/corpus.js";
+import { makeConfig } from "../src/config.js";
+import { Tokenizer } from "../src/tokenizer.js";
+import { fileURLToPath } from "node:url";
+import { dirname as _pathDirname } from "node:path";
+const __dirname = _pathDirname(fileURLToPath(import.meta.url));
+const REF = JSON.parse(fs.readFileSync(__dirname + "/ref_crlf_tok.json", "utf8"));
+const cfg = makeConfig();
+const [skills] = corpus.loadCorpus(["C:/Users/limengzhen/.dsh/skills"]);
+corpus.stripBoilerplate(skills, cfg);
+const s = skills.find(x => x.name === "flyai");
+const tk = new Tokenizer("D:/dsh/skill-merge/models/potion-multilingual-128M-int8/tokenizer.json");
+const ids = tk.encode(s.body_core);
+console.log("  Node flyai: body含CR=" + (s.body.match(/\r/g) || []).length + " body_core_len=" + s.body_core.length + " ids=" + ids.length);
+console.log("  Python body_crlf=" + REF.body_crlf + " ids_len=" + REF.ids_len + " | ids前12 node=" + JSON.stringify(ids.slice(0, 12)) + " py=" + JSON.stringify(REF.ids_head));

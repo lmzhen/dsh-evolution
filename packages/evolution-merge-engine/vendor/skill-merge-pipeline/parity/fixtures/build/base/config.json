@@ -1,0 +1,13 @@
+{
+  "model_type": "model2vec",
+  "architectures": [
+    "StaticModel"
+  ],
+  "tokenizer_name": "test/tok",
+  "apply_pca": null,
+  "apply_zipf": null,
+  "sif_coefficient": null,
+  "hidden_dim": 4,
+  "seq_length": 1000000,
+  "normalize": true
+}
