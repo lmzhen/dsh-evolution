@@ -14,10 +14,6 @@
   },
   "files": [
     "lib/",
-    "vendor/",
-    "src/",
-    "scripts/",
-    "README.md",
     "LICENSE",
     "NOTICE",
     "UPSTREAM.json"
