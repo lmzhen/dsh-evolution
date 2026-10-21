@@ -22,8 +22,7 @@
   },
   "files": [
     "lib/*.js",
-    "lib/types/**/*.d.ts",
-    "cordis.patch.yml"
+    "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
   "dependencies": {
@@ -33,10 +32,5 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"
-  },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    }
   }
 }
