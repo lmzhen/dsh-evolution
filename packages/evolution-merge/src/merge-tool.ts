@@ -54,7 +54,7 @@ export function createMergeStageTool(
 ): ToolDefinitionLike {
   return {
     name: MERGE_STAGE_TOOL_NAME,
-    description: 'Read source copies and write the merged skill into the staging tree. Write/copy are only allowed in the author phase.',
+    description: 'Read source copies and write the merged skill into the staging tree. list/read use area=sources|merged plus source (for sources); write/copy paths are relative to merged/<target> (for example path=SKILL.md, from=SKILL.md, to=references/x.md). Write/copy are only allowed in the author phase.',
     parameters: {
       type: 'object',
       properties: {
