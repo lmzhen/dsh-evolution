@@ -28,6 +28,15 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string): Promise<re
     status: loaded.note === undefined ? 'ok' : 'warn',
     detail: loaded.note ?? 'pairs ' + String(loaded.state.rows.length) + '；pending ' + String(counts.pending) + ' / retry ' + String(counts.retry) + ' / skipped ' + String(counts.skipped),
   })
+  const modelRoot = process.env.SKILL_MERGE_MODELS_ROOT
+  if (modelRoot === undefined || modelRoot === '') {
+    rows.push({ key: 'models', label: '合并模型', status: 'warn', detail: '未设置 SKILL_MERGE_MODELS_ROOT；合并扫描会 fail loud' })
+  } else {
+    const int8 = join(modelRoot, 'potion-multilingual-128M-int8')
+    const pca = join(modelRoot, 'potion-multilingual-128M-pca64-int8')
+    const ok = await io.exists(int8) && await io.exists(pca)
+    rows.push({ key: 'models', label: '合并模型', status: ok ? 'ok' : 'warn', detail: ok ? modelRoot : '缺少 int8/pca64：' + modelRoot })
+  }
   const runsDir = join(home, 'merge', 'runs')
   const listed = await probeList(io, runsDir)
   rows.push({

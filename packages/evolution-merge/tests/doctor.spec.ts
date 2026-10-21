@@ -14,7 +14,7 @@ it('reports empty, populated and unreadable state without writing', async () => 
   const home = await tempRoot('dsh-merge-doctor-')
   const io = nodeEvolutionIo()
   const empty = await mergeDoctor(io, home)
-  expect(empty.map(item => item.key)).toEqual(['state', 'staging', 'staging-path'])
+  expect(empty.map(item => item.key)).toEqual(['state', 'models', 'staging', 'staging-path'])
   expect(empty[0]).toMatchObject({ status: 'ok' })
   await upsertRow(io, home, () => Date.parse(AT), row('alpha-skill', 'beta-skill', 'pending'))
   const rows = await mergeDoctor(io, home)
