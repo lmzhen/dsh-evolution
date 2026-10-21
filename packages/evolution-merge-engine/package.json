@@ -14,6 +14,7 @@
   },
   "files": [
     "lib/",
+    "data/",
     "LICENSE",
     "NOTICE",
     "UPSTREAM.json"
