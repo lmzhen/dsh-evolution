@@ -5,6 +5,7 @@
  * marker is the last write inside the partial. A directory without that marker is a
  * half-created artifact and reads as unknown, never as "empty".
  */
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import {
   isPresent,
@@ -17,6 +18,10 @@ import {
 } from '@deepseek-ai/dsh-evolution-core'
 
 export const STAGING_SCHEMA_VERSION = 1
+
+export function stageKeyOf(runId: string, pairKey: string): string {
+  return runId + '/pairs/' + createHash('sha256').update(pairKey).digest('hex').slice(0, 16)
+}
 
 export function stagingRoot(home: string, runId: string): string {
   return join(home, 'merge', 'runs', runId)
@@ -124,3 +129,22 @@ export async function readStaging(io: EvolutionIoLike, home: string, runId: stri
     return probeUnknown('staging manifest is not JSON: ' + (error instanceof Error ? error.message : String(error)))
   }
 }
+
+export async function ensureStaging(io: EvolutionIoLike, home: string, input: CreateStagingInput): Promise<CreateStagingResult> {
+  const existing = await readStaging(io, home, input.runId)
+  if (existing.kind === 'present') return { ok: true, path: stagingRoot(home, input.runId), manifest: existing.value.manifest }
+  return createStaging(io, home, input)
+}
+
+export async function setStagingTarget(io: EvolutionIoLike, home: string, stageKey: string, target: string): Promise<boolean> {
+  const view = await readStaging(io, home, stageKey)
+  if (view.kind !== 'present') return false
+  const manifest = Object.assign({}, view.value.manifest, { target })
+  await io.writeText(join(stagingRoot(home, stageKey), 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
+  return true
+}
+
+export async function dropStaging(io: EvolutionIoLike, home: string, stageKey: string): Promise<void> {
+  await io.remove(stagingRoot(home, stageKey))
+}
+

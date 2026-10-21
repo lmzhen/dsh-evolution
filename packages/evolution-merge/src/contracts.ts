@@ -149,6 +149,8 @@ export interface MergeRow {
   readonly unitId?: string
   readonly origin?: 'agent' | 'human'
   readonly attempts?: number
+  readonly stagingRef?: string
+  readonly stagingExpiresAt?: number
   readonly createdAt: string
   readonly updatedAt: string
 }

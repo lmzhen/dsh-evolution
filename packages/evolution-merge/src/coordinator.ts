@@ -55,6 +55,8 @@ function base(row: MergeRow, at: string): Omit<MergeRow, 'failure'> {
     ...(row.origin === undefined ? {} : { origin: row.origin }),
     ...(row.decision === undefined ? {} : { decision: row.decision }),
     ...(row.attempts === undefined ? {} : { attempts: row.attempts }),
+    ...(row.stagingRef === undefined ? {} : { stagingRef: row.stagingRef }),
+    ...(row.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: row.stagingExpiresAt }),
   }
 }
 
