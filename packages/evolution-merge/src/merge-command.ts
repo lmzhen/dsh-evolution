@@ -48,7 +48,11 @@ export function createReadOnlyMergeService(io: EvolutionIoLike, home: string): M
   }
 }
 
-export async function runMergeCommand(service: MergeCommandService, rawInput: string, invocation?: { readonly agent?: unknown }): Promise<MergeCommandResult> {
+export async function runMergeCommand(
+  service: MergeCommandService,
+  rawInput: string,
+  invocation?: { readonly agent?: unknown },
+): Promise<MergeCommandResult> {
   const tokens = rawInput.trim().split(/\s+/).filter(Boolean)
   if (tokens[0] === 'merge' || tokens[0] === '/merge' || tokens[0] === 'evolution' || tokens[0] === '/evolution') tokens.shift()
   if (tokens[0] === 'merge') tokens.shift()

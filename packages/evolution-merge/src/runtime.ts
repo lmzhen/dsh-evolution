@@ -102,7 +102,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             io: deps.io, home: deps.home, runId, cards,
             screening: async (turnSignal) => {
               const raw = await deps.screeningForRun(cards, runId, turnSignal)
-              const filtered = raw.filter(candidate => {
+              const filtered = raw.filter((candidate) => {
                 const key = pairKey(candidate.a, candidate.b)
                 return !skipped.has(key) && !held.has(key)
               })

@@ -48,7 +48,9 @@ export async function runNewChildAuthoring(
       runId: stageKey,
       target: decision.target,
       mode: decision.mode,
-      sources: options.cards.filter(card => card.name === row.a || card.name === row.b).map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
+      sources: options.cards
+        .filter((card) => card.name === row.a || card.name === row.b)
+        .map((card) => ({ name: card.name, body: card.body, files: card.files ?? [] })),
       promptVersion: 'merge-b/v1',
       ttlDays: 7,
       now: options.now,

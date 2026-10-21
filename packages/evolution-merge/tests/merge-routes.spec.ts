@@ -25,8 +25,14 @@ const fetchPath = async (path: string, method = 'GET') => {
 }
 
 it('serves view/rows/run/runs', async () => {
-  const view = await (await fetchPath(MERGE_ROUTES.view)).json() as { ok: boolean; data: { counts: unknown; latestRun?: { id: string }; approval?: boolean } }
-  expect(view).toMatchObject({ ok: true, data: { counts: { pending: 1, retry: 1, skipped: 0 }, latestRun: { id: 'r1' }, approval: true } })
+  const view = await (await fetchPath(MERGE_ROUTES.view)).json() as {
+    ok: boolean
+    data: { counts: unknown; latestRun?: { id: string }; approval?: boolean }
+  }
+  expect(view).toMatchObject({
+    ok: true,
+    data: { counts: { pending: 1, retry: 1, skipped: 0 }, latestRun: { id: 'r1' }, approval: true },
+  })
   const rows = await (await fetchPath(MERGE_ROUTES.rows + '?queue=pending')).json() as { data: { items: unknown[] } }
   expect(rows.data.items).toHaveLength(1)
   const one = await (await fetchPath(MERGE_ROUTES.run + '?id=r1')).json() as { data: { id: string } }

@@ -189,7 +189,10 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
 
   return {
     stopReason,
-    scope: { candidatePairs: (candidates as readonly MergeCandidate[] & { readonly candidatePairs?: number }).candidatePairs ?? candidates.length, queueBefore },
+    scope: {
+      candidatePairs: (candidates as readonly MergeCandidate[] & { readonly candidatePairs?: number }).candidatePairs ?? candidates.length,
+      queueBefore,
+    },
     pairs,
     totals,
     notes: [],

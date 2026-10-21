@@ -16,7 +16,13 @@ export interface LlmChunkLike {
 
 export interface LlmServiceLike {
   stream?(options: Record<string, unknown>): AsyncIterable<LlmChunkLike>
-  prepareCall?(config: Record<string, unknown>, signal?: AbortSignal): Promise<{ readonly config: Record<string, unknown>; stream(input: Record<string, unknown>): AsyncIterable<LlmChunkLike> }>
+  prepareCall?(
+    config: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly config: Record<string, unknown>
+    stream(input: Record<string, unknown>): AsyncIterable<LlmChunkLike>
+  }>
 }
 
 function append(chunk: LlmChunkLike, text: string): string {
