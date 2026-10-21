@@ -49,3 +49,46 @@ export function mapReport(report, runId = 'engine') {
     scope: { candidatePairs: doc.stage2_candidates ? doc.stage2_candidates.candidate_pairs : pairs.length, queueBefore: { pending: 0, retry: 0, skipped: 0 } }
   }
 }
+export function toEngineCandidate(p, fallback = '') {
+  const level = p.level === 'L2(audit)' ? 'L2' : p.level
+  return {
+    a: p.a,
+    b: p.b,
+    score: p.rank_score ?? p.score,
+    arms: Array.isArray(p.arms) ? p.arms : (Array.isArray(p.arm) ? p.arm : []),
+    reason: fallback || p.reason,
+    source: 'engine',
+    gate: {
+      level,
+      verdict: p.verdict_id,
+      reason: p.reason,
+      heuristic: p.heuristic === true,
+      auditOverride: p.level === 'L2(audit)'
+    }
+  }
+}
+
+export function selectCandidates(report) {
+  const doc = report.reportDoc ?? report
+  const rows = Array.isArray(doc.pairs_final) ? doc.pairs_final : []
+  const fallback = doc.stage5_judge && doc.stage5_judge.fallback ? String(doc.stage5_judge.fallback) : ''
+  const candidates = []
+  const skipped = []
+  const reportOnly = []
+  for (const row of rows) {
+    if (fallback || row.action === 'UNJUDGED') {
+      candidates.push(toEngineCandidate(row, fallback || row.reason))
+      continue
+    }
+    if (row.verdict_id === 1 || row.verdict_id === 0) {
+      candidates.push(toEngineCandidate(row))
+      continue
+    }
+    if (row.verdict_id === -1 && row.level === 'L2') {
+      skipped.push({ pairKey: pairKeyOf(row.a, row.b), reason: row.reason })
+      continue
+    }
+    reportOnly.push(row)
+  }
+  return { candidates, skipped, reportOnly, reportFallback: fallback }
+}

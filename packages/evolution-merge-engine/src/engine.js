@@ -74,7 +74,8 @@ export async function screen(input) {
   if (!corpusDir || !outDir) return { ok: false, error: { code: 'BAD_INPUT', detail: 'corpusDir/outDir required' } }
   const cfg = makeConfig(input.cfg ?? {})
   try {
-    if (cfg.judge === 'deepseek') {
+    const resolvedJudge = resolveJudge(cfg, process.env)
+    if (resolvedJudge.mode === 'deepseek') {
       if (!runner) return { ok: false, error: { code: 'RUNNER_REQUIRED', stage: 'judge', retryable: false } }
       const scan = await runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner })
       if (!scan.ok) return { ok: false, error: { code: 'SCAN_FAILED', stage: 'pipeline', detail: String(scan.error ?? ''), exitCode: scan.exitCode } }
