@@ -46,10 +46,8 @@ export interface MergeRuntimeDeps {
   readonly cwd?: string
   readonly timeoutMinutes: number
   readonly cards: (signal: AbortSignal) => Promise<readonly SkillCard[]>
-  /** Test-only/legacy fallback; production index always supplies screeningForRun. */
-  readonly screening?: (cards: readonly SkillCard[], signal: AbortSignal) => Promise<readonly MergeCandidate[]>
   /** Run-scoped engine screening. */
-  readonly screeningForRun?: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
+  readonly screeningForRun: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
   readonly stage?: MergeStageBindingPort
 }
 
@@ -103,11 +101,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
             screening: async (turnSignal) => {
-              const raw = deps.screeningForRun !== undefined
-                ? await deps.screeningForRun(cards, runId, turnSignal)
-                : deps.screening === undefined
-                  ? (() => { throw new Error('engine screening is required') })()
-                  : await deps.screening(cards, turnSignal)
+              const raw = await deps.screeningForRun(cards, runId, turnSignal)
               const filtered = raw.filter(candidate => {
                 const key = pairKey(candidate.a, candidate.b)
                 return !skipped.has(key) && !held.has(key)

@@ -32,7 +32,7 @@ it('runs a scan through the runtime registry/channel/commit path', async () => {
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: [], timeoutMinutes: 0,
     cards: async () => cards,
-    screening: async () => [{ a: 'alpha-skill', b: 'beta-skill' }],
+    screeningForRun: async () => [{ a: 'alpha-skill', b: 'beta-skill' }],
   }
   const result = await createMergeRuntime(deps).execute({ verb: 'scan' })
   expect(result.ok, result.text).toBe(true)

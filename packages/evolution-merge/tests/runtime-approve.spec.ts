@@ -34,7 +34,7 @@ it('approves a pending row through a new child and drops it after commit', async
     io, home, registry, skills, now: () => 200,
     params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: [], timeoutMinutes: 0,
-    cards: async () => cards, screening: async () => [],
+    cards: async () => cards, screeningForRun: async () => [],
   }
   const result = await createMergeRuntime(deps).execute({ verb: 'approve', id: row.id })
   expect(result.ok, result.text).toBe(true)

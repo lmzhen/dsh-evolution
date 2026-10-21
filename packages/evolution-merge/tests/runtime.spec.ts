@@ -15,7 +15,7 @@ it('serves read-only verbs through the runtime', async () => {
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0,
-    cards: async () => [], screening: async () => [],
+    cards: async () => [], screeningForRun: async () => [],
   }
   const runtime = createMergeRuntime(deps)
   expect(await runtime.execute({ verb: 'status' })).toMatchObject({ ok: true })
@@ -37,7 +37,7 @@ it('serves report/runs/cancel from the run registry', async () => {
     io, home, registry, skills: {} as SkillLibrary, now: () => 1,
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
-    parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screening: async () => [],
+    parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
   }
   const runtime = createMergeRuntime(deps)
   expect(await runtime.execute({ verb: 'report', id: 'r1' })).toEqual({ ok: true, text: '{"ok":true}' })
@@ -55,7 +55,7 @@ it('rejects a pending row into the skipped queue', async () => {
     io, home, registry: {} as MergeRuntimeDeps['registry'], skills: {} as SkillLibrary, now: () => 1,
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
-    parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screening: async () => [],
+    parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
   }
   const runtime = createMergeRuntime(deps)
   expect(await runtime.execute({ verb: 'reject', id: row.id })).toMatchObject({ ok: true })
@@ -72,7 +72,7 @@ it('restores a skipped row and clears a resume row', async () => {
     io, home, registry: {} as MergeRuntimeDeps['registry'], skills: {} as SkillLibrary, now: () => 1,
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
-    parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screening: async () => [],
+    parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
   }
   const runtime = createMergeRuntime(deps)
   expect(await runtime.execute({ verb: 'skipped', restore: row.id })).toMatchObject({ ok: true })
