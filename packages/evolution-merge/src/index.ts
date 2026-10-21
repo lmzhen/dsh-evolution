@@ -1,5 +1,8 @@
+import { join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
+import { screen as engineScreen, selectCandidates } from '@deepseek-ai/dsh-evolution-merge-engine'
+import { createEngineScreening } from './adapters/engine-screen.ts'
 import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
@@ -28,6 +31,19 @@ export const Config = z.object({
 export interface MergePresentationScope {
   effect(run: () => () => void, label?: string): unknown
   settings?: { configure?: (presentation: { auto?: boolean }, owner?: unknown) => unknown }
+}
+
+function engineConfigFromEnv(): Record<string, unknown> | undefined {
+  const root = process.env.SKILL_MERGE_MODELS_ROOT
+  if (root === undefined || root === '') return undefined
+  return {
+    models_dir: '',
+    offline: true,
+    auto_provision: false,
+    embed_backend: 'local',
+    embedder_model: join(root, 'potion-multilingual-128M-int8'),
+    embedder_model_last: join(root, 'potion-multilingual-128M-pca64-int8'),
+  }
 }
 
 export interface MergePresentationContext {
@@ -131,6 +147,10 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const modelPort = llm === undefined || defaultModel === undefined
       ? undefined
       : createModelPort(llm, () => defaultModel.currentSelection())
+    const engineConfig = engineConfigFromEnv()
+    const engineScreening = engineConfig === undefined
+      ? undefined
+      : createEngineScreening({ io, home, engine: { screen: engineScreen }, select: selectCandidates, cfg: engineConfig })
     source = {
       rows() { return loadMergeState(io, home).then(loaded => loaded.state.rows) },
       run(id: string): Promise<RunRecord | undefined> { return Promise.resolve(runs.runs().find(record => record.id === id)) },
@@ -150,19 +170,21 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         return listed.map(item => ({ name: item.name, description: item.description, body: item.content ?? '' }))
       },
       screening(cards) { return Promise.resolve(lexicalCandidates(cards).candidates) },
-      ...(modelPort === undefined ? {} : {
-        async screeningForRun(cards, runId, signal) {
-          const cache = await loadGateCache(io, home)
-          const screening = createScreeningForRun({
-            cards, runSeed: runId,
-            propose: { model: modelPort },
-            gate: { model: modelPort, modelName: defaultModel?.currentSelection().model ?? '', runSeed: runId, cache: cache.cache },
-          })
-          const candidates = await screening(signal)
-          await saveGateCache(io, home, cache.cache).catch(() => {})
-          return candidates
-        },
-      }),
+      ...(engineScreening === undefined
+        ? modelPort === undefined ? {} : {
+          async screeningForRun(cards, runId, signal) {
+            const cache = await loadGateCache(io, home)
+            const screening = createScreeningForRun({
+              cards, runSeed: runId,
+              propose: { model: modelPort },
+              gate: { model: modelPort, modelName: defaultModel?.currentSelection().model ?? '', runSeed: runId, cache: cache.cache },
+            })
+            const candidates = await screening(signal)
+            await saveGateCache(io, home, cache.cache).catch(() => {})
+            return candidates
+          },
+        }
+        : { screeningForRun: engineScreening }),
       stage: {
         bind: (context: StageToolContext) => { stage.bind(context.childId, context) },
         unbind: (childId) => { stage.unbind(childId) },
