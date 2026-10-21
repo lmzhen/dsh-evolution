@@ -42,7 +42,10 @@ export function MergePanel(face: MergeFace): ReactNode {
     load(queue, cursor).then((outcome) => {
       if (token !== request.current) return
       if (outcome.ok) {
-        setRows(current => [...(cursor === 0 ? [] : current), ...outcome.payload.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+        setRows(current => [
+          ...(cursor === 0 ? [] : current),
+          ...outcome.payload.items,
+        ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
         setNextCursor(outcome.payload.nextCursor)
         setFailed(undefined)
       }
@@ -87,7 +90,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   ))
   const list = rows.length === 0
     ? createElement('p', { 'data-role': 'note' }, t('empty.' + tab))
-    : createElement('div', { 'data-role': 'rows' }, rows.map(row => {
+    : createElement('div', { 'data-role': 'rows' }, rows.map((row) => {
       const facts = [
         row.target === undefined ? undefined : t('row.target') + ' ' + row.target,
         row.confidence === undefined ? undefined : t('row.confidence') + ' ' + row.confidence.toFixed(2),

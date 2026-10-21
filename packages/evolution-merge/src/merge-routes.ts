@@ -36,7 +36,15 @@ export function makeMergeRoutes(
         if (source === undefined) return absent()
         const runs = await source.runs(undefined, 20)
         const latestMerge = runs.find(run => run.kind === 'merge')
-        return json(200, { ok: true, data: buildMergeView(await source.rows(), source.commands(), latestMerge === undefined ? undefined : toRunFact(latestMerge), source.approval?.()) })
+        return json(200, {
+          ok: true,
+          data: buildMergeView(
+            await source.rows(),
+            source.commands(),
+            latestMerge === undefined ? undefined : toRunFact(latestMerge),
+            source.approval?.(),
+          ),
+        })
       },
     },
     {
