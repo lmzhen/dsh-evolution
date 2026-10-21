@@ -7,6 +7,7 @@ export interface MergeParams {
   readonly mergeSkippedTtlDays: number
   readonly mergeRunTimeoutMinutes: number
   readonly mergePairTimeoutMinutes: number
+  readonly mergeModelsRoot: string
 }
 
 export const MERGE_PARAM_DEFAULTS: MergeParams = {
@@ -14,6 +15,7 @@ export const MERGE_PARAM_DEFAULTS: MergeParams = {
   mergeSkippedTtlDays: 0,
   mergeRunTimeoutMinutes: 0,
   mergePairTimeoutMinutes: 15,
+  mergeModelsRoot: '',
 }
 
 const KEYS = new Set(Object.keys(MERGE_PARAM_DEFAULTS))
@@ -41,6 +43,11 @@ export function resolveMergeParams(input: unknown = {}): MergeParams {
     mergeApproval: approval,
     mergeSkippedTtlDays: record.mergeSkippedTtlDays === undefined ? MERGE_PARAM_DEFAULTS.mergeSkippedTtlDays : nonNegative('mergeSkippedTtlDays', record.mergeSkippedTtlDays),
     mergeRunTimeoutMinutes: record.mergeRunTimeoutMinutes === undefined ? MERGE_PARAM_DEFAULTS.mergeRunTimeoutMinutes : nonNegative('mergeRunTimeoutMinutes', record.mergeRunTimeoutMinutes),
+    mergeModelsRoot: record.mergeModelsRoot === undefined ? MERGE_PARAM_DEFAULTS.mergeModelsRoot : (() => {
+      const value = materialize(record.mergeModelsRoot)
+      if (typeof value !== 'string') throw new Error('mergeModelsRoot must be a string')
+      return value
+    })(),
     mergePairTimeoutMinutes: record.mergePairTimeoutMinutes === undefined ? MERGE_PARAM_DEFAULTS.mergePairTimeoutMinutes : (() => {
       const value = nonNegative('mergePairTimeoutMinutes', record.mergePairTimeoutMinutes)
       if (value === 0) throw new Error('mergePairTimeoutMinutes must be > 0')

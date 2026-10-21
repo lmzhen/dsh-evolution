@@ -23,6 +23,7 @@ export const Config = z.object({
   mergeSkippedTtlDays: z.number().min(0).default(0).volatile(),
   mergeRunTimeoutMinutes: z.number().min(0).default(0).volatile(),
   mergePairTimeoutMinutes: z.number().min(1).default(15),
+  mergeModelsRoot: z.string().default('').volatile(),
 })
 
 export interface MergePresentationScope {
@@ -30,8 +31,8 @@ export interface MergePresentationScope {
   settings?: { configure?: (presentation: { auto?: boolean }, owner?: unknown) => unknown }
 }
 
-function engineConfigFromEnv(): Record<string, unknown> | undefined {
-  const root = process.env.SKILL_MERGE_MODELS_ROOT
+function engineConfigFromEnv(configuredRoot?: string): Record<string, unknown> | undefined {
+  const root = configuredRoot !== undefined && configuredRoot !== '' ? configuredRoot : process.env.SKILL_MERGE_MODELS_ROOT
   if (root === undefined || root === '') return undefined
   return {
     models_dir: '',
@@ -133,7 +134,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()
-    const engineConfig = engineConfigFromEnv()
+    const engineConfig = engineConfigFromEnv(params.mergeModelsRoot)
     const engineScreening = createEngineScreening({
         io, home, engine: { screen: engineScreen }, select: selectCandidates, cfg: engineConfig,
         async onSelection(selection) {

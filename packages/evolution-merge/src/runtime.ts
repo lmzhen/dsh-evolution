@@ -131,7 +131,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         return { ok: true, text: '已拒绝合并：' + command.id }
       }
       if (command.verb === 'doctor') {
-        const rows = await mergeDoctor(deps.io, deps.home)
+        const rows = await mergeDoctor(deps.io, deps.home, deps.params.mergeModelsRoot)
         return { ok: true, text: rows.map(row => row.key + ' [' + row.status + '] ' + row.label + '：' + row.detail).join('\n') }
       }
       if (command.verb === 'report' || command.verb === 'runs' || command.verb === 'cancel') {

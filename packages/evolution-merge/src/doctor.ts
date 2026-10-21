@@ -18,7 +18,7 @@ export interface MergeDoctorRow {
   readonly detail: string
 }
 
-export async function mergeDoctor(io: EvolutionIoLike, home: string): Promise<readonly MergeDoctorRow[]> {
+export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredRoot?: string): Promise<readonly MergeDoctorRow[]> {
   const rows: MergeDoctorRow[] = []
   const loaded = await loadMergeState(io, home)
   const counts = countRows(loaded.state.rows)
@@ -28,7 +28,7 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string): Promise<re
     status: loaded.note === undefined ? 'ok' : 'warn',
     detail: loaded.note ?? 'pairs ' + String(loaded.state.rows.length) + '；pending ' + String(counts.pending) + ' / retry ' + String(counts.retry) + ' / skipped ' + String(counts.skipped),
   })
-  const modelRoot = process.env.SKILL_MERGE_MODELS_ROOT
+  const modelRoot = configuredRoot !== undefined && configuredRoot !== '' ? configuredRoot : process.env.SKILL_MERGE_MODELS_ROOT
   if (modelRoot === undefined || modelRoot === '') {
     rows.push({ key: 'models', label: '合并模型', status: 'warn', detail: '未设置 SKILL_MERGE_MODELS_ROOT；合并扫描会 fail loud' })
   } else {
