@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runScan } from '../vendor/skill-merge-pipeline/src/scan.js'
 import { makeConfig } from '../vendor/skill-merge-pipeline/src/config.js'
@@ -15,7 +15,7 @@ import * as report from '../vendor/skill-merge-pipeline/src/report.js'
 import { assessDegradation } from '../vendor/skill-merge-pipeline/src/degrade.js'
 import path from 'node:path'
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url))
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const VERSION = '0.29.0'
 
 function registrySha() {
