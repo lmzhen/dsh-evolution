@@ -68,7 +68,11 @@ export async function proposePairs(cards: readonly SkillCard[], port: ModelPort,
     try {
       const raw = await port.callJson({
         system: SYSTEM,
-        user: JSON.stringify(shard.map(card => ({ name: card.name, description: card.description.slice(0, 400), body: card.body.slice(0, 600) }))),
+        user: JSON.stringify(shard.map(card => ({
+          name: card.name,
+          description: card.description.slice(0, 400),
+          body: card.body.slice(0, 600),
+        }))),
         maxTokens: 1200,
         signal: options.signal,
       })

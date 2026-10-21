@@ -42,7 +42,7 @@ async function walkFiles(io: EvolutionIoLike, root: string, rel = ''): Promise<s
 
 export async function readStagedTree(io: EvolutionIoLike, home: string, runId: string): Promise<Probe<StagedTree>> {
   const staging = await readStaging(io, home, runId)
-  if (!staging || staging.kind === 'absent') return { kind: 'absent' }
+  if (staging.kind === 'absent') return { kind: 'absent' }
   if (staging.kind === 'unknown') return probeUnknown(staging.reason)
   const target = staging.value.manifest.target
   const root = join(stagingRoot(home, runId), 'merged', target)

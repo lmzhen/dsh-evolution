@@ -13,6 +13,7 @@ import { createModelPort } from './adapters/model.ts'
 import { createScreeningForRun } from './screening-port.ts'
 import { loadGateCache, saveGateCache } from './gate-cache.ts'
 import { StageToolRegistry } from './stage-tool-registry.ts'
+import type { StageToolContext } from './stage-tool.ts'
 import { createMergeStageTool } from './merge-tool.ts'
 import { supersedeMergeRuns } from './supersede.ts'
 
@@ -24,8 +25,13 @@ export const Config = z.object({
   mergePairTimeoutMinutes: z.number().min(1).default(15),
 })
 
+export interface MergePresentationScope {
+  effect(run: () => () => void, label?: string): unknown
+  settings?: { configure?: (presentation: { auto?: boolean }, owner?: unknown) => unknown }
+}
+
 export interface MergePresentationContext {
-  inject(names: string[], run: (scope: { effect(run: () => () => void, label?: string): unknown; settings?: { configure?: (presentation: { auto?: boolean }, owner?: unknown) => unknown } }) => void): void
+  inject(names: string[], run: (scope: MergePresentationScope) => void): void
   readonly fiber?: unknown
 }
 
@@ -103,30 +109,34 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     if (registry === undefined) return
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
-    const runs = newRunRegistry({ io, home, warn: message => { ctx.logger.warn(message) } })
+    const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) } })
     void runs.load()
     ctx.effect(() => {
-      const on = (ctx as unknown as { on(name: string, listener: (event: { action?: string }) => void): () => void }).on
-      if (typeof on !== 'function') return () => {}
-      return on.call(ctx, 'evolution/skill-mutated', event => {
+      const host = ctx as unknown as { on(name: string, listener: (event: { action?: string }) => void): () => void }
+      if (typeof host.on !== 'function') return () => {}
+      return host.on('evolution/skill-mutated', (event) => {
         if (event.action === 'restore') void supersedeMergeRuns(runs)
       })
     }, 'evolution-merge: restore supersede')
     const policySnapshot = (ctx as unknown as { get(name: string): unknown }).get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined
     const skills = newSkillLibrary({
-      io, ctx: ctx as never, authority: authorityFrom({ origin: 'subagent' }),
+      io, ctx, authority: authorityFrom({ origin: 'subagent' }),
       limits: { ...DEFAULT_SKILL_LIMITS, ...policyStageLimits(policySnapshot?.get?.()) },
     })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()
     const llm = (ctx as unknown as { get(name: string): unknown }).get('llm') as { stream?: (options: Record<string, unknown>) => AsyncIterable<{ type: string; text?: string; reason?: { kind?: string; failure?: { message?: string } } }> } | undefined
     const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
-    const modelPort = llm === undefined || defaultModel === undefined ? undefined : createModelPort(llm, () => defaultModel.currentSelection())
+    const modelPort = llm === undefined || defaultModel === undefined
+      ? undefined
+      : createModelPort(llm, () => defaultModel.currentSelection())
     source = {
-      async rows() { return (await loadMergeState(io, home)).state.rows },
-      async run(id: string): Promise<RunRecord | undefined> { return runs.runs().find(record => record.id === id) },
-      async runs() { return runs.runs() },
-      commands() { return ['merge scan', 'merge doctor', 'merge status', 'merge pending', 'merge skipped', 'merge report', 'merge runs', 'merge cancel'] },
+      rows() { return loadMergeState(io, home).then(loaded => loaded.state.rows) },
+      run(id: string): Promise<RunRecord | undefined> { return Promise.resolve(runs.runs().find(record => record.id === id)) },
+      runs() { return Promise.resolve(runs.runs()) },
+      commands() {
+        return ['merge scan', 'merge doctor', 'merge status', 'merge pending', 'merge skipped', 'merge report', 'merge runs', 'merge cancel']
+      },
     }
     const commands = scope.get('commands') as { register(definition: unknown): () => void } | undefined
     if (commands === undefined) return
@@ -138,7 +148,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         if (signal.aborted) return []
         return listed.map(item => ({ name: item.name, description: item.description, body: item.content ?? '' }))
       },
-      async screening(cards) { return lexicalCandidates(cards).candidates },
+      screening(cards) { return Promise.resolve(lexicalCandidates(cards).candidates) },
       ...(modelPort === undefined ? {} : {
         async screeningForRun(cards, runId, signal) {
           const cache = await loadGateCache(io, home)
@@ -152,7 +162,10 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
           return candidates
         },
       }),
-      stage: { bind: context => stage.bind(context.childId, context), unbind: childId => stage.unbind(childId) },
+      stage: {
+        bind: (context: StageToolContext) => { stage.bind(context.childId, context) },
+        unbind: (childId) => { stage.unbind(childId) },
+      },
     })
     const command = createMergeCommand(runtime)
     scope.effect(() => commands.register(command), 'evolution-merge: command')

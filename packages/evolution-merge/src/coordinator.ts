@@ -87,9 +87,7 @@ export function transition(current: MergeRow | undefined, event: MergeEvent): Tr
       },
     }
   }
-  if (event.type === 'source-gone') {
-    return current === undefined ? { ok: true, row: null } : { ok: true, row: null }
-  }
+  if (event.type === 'source-gone') return { ok: true, row: null }
   if (current === undefined) return invalid(event, undefined)
   switch (event.type) {
     case 'round1-keep':

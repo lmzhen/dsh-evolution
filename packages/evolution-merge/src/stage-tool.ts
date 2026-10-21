@@ -53,7 +53,7 @@ export async function applyStageTool(io: EvolutionIoLike, home: string, ctx: Sta
   return result.ok ? { ok: true, value: { path: result.path } } : { ok: false, code: 'io', message: result.message }
 }
 
-function probeResult<T>(probe: { readonly kind: 'present'; readonly value: T } | { readonly kind: 'absent' } | { readonly kind: 'unknown'; readonly reason: string }, what: string): StageToolResult {
+function probeResult(probe: { readonly kind: 'present'; readonly value: unknown } | { readonly kind: 'absent' } | { readonly kind: 'unknown'; readonly reason: string }, what: string): StageToolResult {
   if (probe.kind === 'present') return { ok: true, value: probe.value }
   if (probe.kind === 'absent') return { ok: false, code: 'not-found', message: what + ': not found' }
   return { ok: false, code: 'io', message: what + ': ' + probe.reason }

@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { DEFAULT_SKILL_LIMITS, validateStagedTree, hasBlockingFinding } from '../src/index.ts'
+import { validateStagedTree, hasBlockingFinding } from '../src/index.ts'
 
 const BODY = (extra = '') => ['---', 'name: umbrella', 'description: short', '---', '', '# umbrella', '', extra, ''].join('\n')
 
@@ -32,7 +32,7 @@ it('warns for placeholders and long descriptions without blocking', () => {
     target: 'umbrella',
     body,
     files: [],
-  }, DEFAULT_SKILL_LIMITS)
+  })
   // placeholder and desc-length are warnings; the body has no malformed frontmatter.
   expect(findings.some(f => f.rule === 'placeholder' && f.severity === 'warn')).toBe(true)
   expect(findings.some(f => f.rule === 'desc-length' && f.severity === 'warn')).toBe(true)

@@ -120,7 +120,8 @@ export async function mutateMergeState<T>(
     result = out.result
     return JSON.stringify({ schemaVersion: MERGE_STATE_VERSION, rows: out.rows }, null, 2)
   })
-  if (!ran) throw new Error('merge-state transaction did not run; no write was performed')
+  // transactIo only returns after fn ran; a skipped write is not a state outcome.
+  void ran
   void now
   return result as T
 }
@@ -146,7 +147,13 @@ export async function upsertRow(io: EvolutionIoLike, home: string, now: () => nu
   })
 }
 
-export async function moveRow(io: EvolutionIoLike, home: string, now: () => number, id: string, patch: MoveRowPatch): Promise<MergeRow | undefined> {
+export async function moveRow(
+  io: EvolutionIoLike,
+  home: string,
+  now: () => number,
+  id: string,
+  patch: MoveRowPatch,
+): Promise<MergeRow | undefined> {
   return await mutateMergeState(io, home, now, (rows) => {
     const index = rows.findIndex(item => item.id === id)
     if (index < 0) return { rows, result: undefined }

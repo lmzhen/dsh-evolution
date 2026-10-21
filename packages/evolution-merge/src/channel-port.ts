@@ -30,7 +30,11 @@ export interface ConversationChannelLike {
     readonly timeoutMs: number
     readonly signal?: AbortSignal
   }): Promise<ChannelTurnOutcome>
-  continueTurn(childId: string, promptText: string, options?: { readonly timeoutMs?: number; readonly signal?: AbortSignal }): Promise<ChannelTurnOutcome>
+  continueTurn(
+    childId: string,
+    promptText: string,
+    options?: { readonly timeoutMs?: number; readonly signal?: AbortSignal },
+  ): Promise<ChannelTurnOutcome>
   dispose(childId: string): Promise<void>
 }
 
@@ -96,7 +100,11 @@ export async function runRound1OverChannel(
     childId: child,
     dispose,
     async author(row, decision, turnSignal) {
-      const turn = await options.channel.continueTurn(child, buildRound2Prompt(row, decision), { timeoutMs: options.timeoutMs, signal: turnSignal })
+      const turn = await options.channel.continueTurn(
+        child,
+        buildRound2Prompt(row, decision),
+        { timeoutMs: options.timeoutMs, signal: turnSignal },
+      )
       if (turn.kind !== 'ok') throw new Error(turn.kind === 'unavailable' ? turn.reason : 'round2 aborted')
       if (turn.turn.stopReason !== 'completed') throw new Error('round2 did not complete: ' + turn.turn.stopReason)
       return turn.turn.text

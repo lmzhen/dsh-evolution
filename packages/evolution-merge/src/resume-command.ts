@@ -34,8 +34,14 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       io: options.io, home: options.home, registry: options.registry,
       approval: true, platformWrite: options.platformWrite, now: options.now,
       ...(options.makePorts === undefined
-        ? { ports: { ...options.ports, screening: async () => [{ a: row.a, b: row.b }] } }
-        : { makePorts: runId => ({ ...options.makePorts!(runId), screening: async () => [{ a: row.a, b: row.b }] }) }),
+        ? { ports: { ...options.ports, screening: () => Promise.resolve([{ a: row.a, b: row.b }]) } }
+        : {
+            makePorts: (runId) => {
+              const makePorts = options.makePorts
+              if (makePorts === undefined) throw new Error('resume makePorts disappeared')
+              return { ...makePorts(runId), screening: () => Promise.resolve([{ a: row.a, b: row.b }]) }
+            },
+          }),
       ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
     })
   }

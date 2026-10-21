@@ -4,7 +4,7 @@
  */
 import type { RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { HOST_ROUTES, json, methodNotAllowed, type ConnectionFetchRouteLike, type DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
-import type { MergeQueue, MergeRow } from './contracts.ts'
+import type { MergeRow } from './contracts.ts'
 import { buildMergeView, pageQueue, toRunFact } from './routes.ts'
 
 export const MERGE_ROUTES = HOST_ROUTES.merge
@@ -21,7 +21,7 @@ export function makeMergeRoutes(
   _audit: DecisionAudit,
 ): ConnectionFetchRouteLike[] {
   const absent = () => json(503, { ok: false, error: { code: 'merge-service-absent', message: 'merge service is not mounted' } })
-  const get = async (request: Request): Promise<Response | null> => (request.method === 'GET' ? null : methodNotAllowed(['GET']))
+  const get = (request: Request): Response | null => (request.method === 'GET' ? null : methodNotAllowed(['GET']))
   const url = (request: Request): URL => new URL(request.url, 'http://local')
   return [
     {
@@ -29,7 +29,7 @@ export function makeMergeRoutes(
       methods: ['GET'],
       requestBody: 'buffered',
       fetch: async (request) => {
-        const denied = await get(request)
+        const denied = get(request)
         if (denied !== null) return denied
         const source = deps.getSource()
         if (source === undefined) return absent()
@@ -41,7 +41,7 @@ export function makeMergeRoutes(
       methods: ['GET'],
       requestBody: 'buffered',
       fetch: async (request) => {
-        const denied = await get(request)
+        const denied = get(request)
         if (denied !== null) return denied
         const source = deps.getSource()
         if (source === undefined) return absent()
@@ -52,7 +52,10 @@ export function makeMergeRoutes(
         }
         const cursor = Number.parseInt(query.get('cursor') ?? '0', 10)
         const limit = Number.parseInt(query.get('limit') ?? '50', 10)
-        return json(200, { ok: true, data: pageQueue(await source.rows(), queue as MergeQueue, Number.isFinite(cursor) ? cursor : 0, Number.isFinite(limit) ? limit : 50) })
+        return json(200, {
+          ok: true,
+          data: pageQueue(await source.rows(), queue, Number.isFinite(cursor) ? cursor : 0, Number.isFinite(limit) ? limit : 50),
+        })
       },
     },
     {
@@ -60,7 +63,7 @@ export function makeMergeRoutes(
       methods: ['GET'],
       requestBody: 'buffered',
       fetch: async (request) => {
-        const denied = await get(request)
+        const denied = get(request)
         if (denied !== null) return denied
         const source = deps.getSource()
         if (source === undefined) return absent()
@@ -77,7 +80,7 @@ export function makeMergeRoutes(
       methods: ['GET'],
       requestBody: 'buffered',
       fetch: async (request) => {
-        const denied = await get(request)
+        const denied = get(request)
         if (denied !== null) return denied
         const source = deps.getSource()
         if (source === undefined) return absent()

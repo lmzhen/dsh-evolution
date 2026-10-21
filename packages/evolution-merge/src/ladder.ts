@@ -35,7 +35,12 @@ export interface GateVerdict {
 }
 
 export interface GateModelPort {
-  callJson(request: { readonly system: string; readonly user: string; readonly maxTokens: number; readonly signal: AbortSignal }): Promise<unknown>
+  callJson(request: {
+    readonly system: string
+    readonly user: string
+    readonly maxTokens: number
+    readonly signal: AbortSignal
+  }): Promise<unknown>
 }
 
 export type LadderRoute = 'merge' | 'undecided' | 'keep' | 'error'
@@ -84,7 +89,11 @@ function payloadFor(level: GateLevel, candidate: GateCandidate, facts: Map<strin
     schema: { verdict: '1 | 0 | -1', reason: '<=80 chars' },
   }
   if (level === 'L0') return JSON.stringify(base)
-  const withHead = { ...base, skill_a: { ...base.skill_a, head: a.body.slice(0, 2400) }, skill_b: { ...base.skill_b, head: b.body.slice(0, 2400) } }
+  const withHead = {
+    ...base,
+    skill_a: { ...base.skill_a, head: a.body.slice(0, 2400) },
+    skill_b: { ...base.skill_b, head: b.body.slice(0, 2400) },
+  }
   if (level === 'L1') return JSON.stringify(withHead)
   return JSON.stringify({
     ...withHead,

@@ -27,7 +27,15 @@ it('mounts routes, command and merge_stage with a minimal host context', async (
   const ctx = {
     inject(names: string[], run: (value: typeof scope & { connection?: unknown }) => void) {
       if (names.includes('connection')) {
-        run({ ...scope, connection: { fetch: { register: (route: { path: string; fetch: (request: Request) => Promise<Response> }) => { routes.push(route); return async () => {} } } } })
+        const connection = {
+          fetch: {
+            register: (route: { path: string; fetch: (request: Request) => Promise<Response> }) => {
+              routes.push(route)
+              return async () => {}
+            },
+          },
+        }
+        run({ ...scope, connection })
         return
       }
       if (names.includes('settings')) return
@@ -38,7 +46,7 @@ it('mounts routes, command and merge_stage with a minimal host context', async (
     emit: () => {},
     on: () => () => {},
     fiber: {},
-    get: scope.get,
+    get: (name: string) => scope.get(name),
   }
   try {
     apply(ctx as never, {})

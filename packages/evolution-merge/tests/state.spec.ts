@@ -62,8 +62,8 @@ it('reads without writing and normalizes a queue from state', async () => {
   let writes = 0
   const io = {
     ...base,
-    writeText: async (path: string, content: string) => { writes += 1; return await base.writeText(path, content) },
-    remove: async (path: string) => { writes += 1; return await base.remove(path) },
+    writeText: async (path: string, content: string) => { writes += 1; await base.writeText(path, content) },
+    remove: async (path: string) => { writes += 1; await base.remove(path) },
   }
   await base.writeText(mergeStatePath(home), JSON.stringify({
     schemaVersion: 1,
@@ -78,5 +78,5 @@ it('reads without writing and normalizes a queue from state', async () => {
   expect(loaded.state.rows).toHaveLength(1)
   expect(loaded.state.rows[0]).toMatchObject({ state: 'pending', queue: 'pending' })
   expect(loaded.note).toContain('invalid row')
-  expect(base.readText).toBeDefined()
+  expect(typeof base.readText).toBe('function')
 })

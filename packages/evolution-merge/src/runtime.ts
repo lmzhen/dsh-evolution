@@ -21,11 +21,11 @@ import { readCommitReceipt } from './commit-receipt.ts'
 import { undoMergeReceipt } from './undo-merge.ts'
 import { skillLibraryUndoPort } from './adapters/undo.ts'
 import { mergeDoctor } from './doctor.ts'
+import type { StageToolContext } from './stage-tool.ts'
 import { createChannelScanPorts } from './scan-ports.ts'
 import { createNewChildRound2 } from './new-child-authoring.ts'
 import { skillLibraryPort } from './adapters/library.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
-import type { StageToolContext } from './stage-tool.ts'
 
 export interface MergeStageBindingPort {
   bind(context: StageToolContext): void
@@ -60,6 +60,11 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
     platformWrite: deps.platformWrite, now: deps.now,
     ...(timeout === undefined ? {} : { timeoutMinutes: timeout }),
   }
+  const stage = deps.stage
+  const stageHooks = stage === undefined ? {} : {
+    onChild: (context: StageToolContext) => { stage.bind(context) },
+    onChildClosed: (childId: string) => { stage.unbind(childId) },
+  }
   return {
     async execute(command, context?: MergeCommandContext) {
       const parent = context?.parent ?? deps.parent
@@ -72,13 +77,13 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           approval: deps.params.mergeApproval,
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
-            screening: async () => pair,
+            screening: () => Promise.resolve(pair),
             channel: deps.channel, parent, allow: deps.allow,
             ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
             timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
             approval: deps.params.mergeApproval,
             commitPort: skillLibraryPort(deps.skills), now: deps.now,
-            ...(deps.stage === undefined ? {} : { onChild: context => deps.stage!.bind(context), onChildClosed: childId => deps.stage!.unbind(childId) }),
+            ...stageHooks,
           }),
         })
         return result.ok
@@ -95,7 +100,9 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
             screening: async turnSignal => {
-              const raw = deps.screeningForRun === undefined ? await deps.screening(cards, turnSignal) : await deps.screeningForRun(cards, runId, turnSignal)
+              const raw = deps.screeningForRun === undefined
+                ? await deps.screening(cards, turnSignal)
+                : await deps.screeningForRun(cards, runId, turnSignal)
               return raw.filter(candidate => !skipped.has(pairKey(candidate.a, candidate.b)))
             },
             channel: deps.channel, parent, allow: deps.allow,
@@ -103,7 +110,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
             approval: deps.params.mergeApproval,
             commitPort: skillLibraryPort(deps.skills), now: deps.now,
-            ...(deps.stage === undefined ? {} : { onChild: context => deps.stage!.bind(context), onChildClosed: childId => deps.stage!.unbind(childId) }),
+            ...stageHooks,
           }),
         })
         return result.ok
@@ -171,11 +178,15 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (row === undefined) return { ok: false, text: 'merge row not found: ' + (command.id ?? '(auto)') }
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
-        const pair = async () => [{ a: row.a, b: row.b }]
+        const pair = () => Promise.resolve([{ a: row.a, b: row.b }])
+        const failed = (stage: 'decide' | 'author', code: string, message: string) => Promise.resolve({
+          kind: 'failed' as const,
+          failure: { stage, code, message, retryable: false, retryFrom: 'none' as const },
+        })
         const basePorts = {
           screening: pair,
-          round1: async () => ({ kind: 'failed' as const, failure: { stage: 'decide' as const, code: 'resume-needs-ports', message: 'verify resume needs makePorts', retryable: false, retryFrom: 'none' as const } }),
-          round2: async () => ({ kind: 'failed' as const, failure: { stage: 'author' as const, code: 'resume-needs-child', message: 'fuse resume needs a new child', retryable: false, retryFrom: 'none' as const } }),
+          round1: () => failed('decide', 'resume-needs-ports', 'verify resume needs makePorts'),
+          round2: () => failed('author', 'resume-needs-child', 'fuse resume needs a new child'),
         }
         const result = await runResumeCommand({
           ...common, rowId: row.id, ports: basePorts,
@@ -191,7 +202,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             allow: deps.allow, ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
             timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
             commitPort: skillLibraryPort(deps.skills), now: deps.now,
-            ...(deps.stage === undefined ? {} : { onChild: context => deps.stage!.bind(context), onChildClosed: childId => deps.stage!.unbind(childId) }),
+            ...stageHooks,
           }),
         })
         return result.ok

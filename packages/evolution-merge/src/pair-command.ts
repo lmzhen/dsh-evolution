@@ -29,7 +29,7 @@ export async function runPairCommand(options: RunPairCommandOptions): Promise<Wi
     now: options.now,
     ports: {
       ...options.ports,
-      screening: async () => [{ a: options.a, b: options.b }],
+      screening: () => Promise.resolve([{ a: options.a, b: options.b }]),
     },
     ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
   }

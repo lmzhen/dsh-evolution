@@ -74,7 +74,10 @@ export async function buildScreeningCandidates(options: BuildScreeningOptions): 
       })
     }
   }
-  let candidates = [...merged.values()].sort((left, right) => (right.score ?? 0) - (left.score ?? 0) || left.a.localeCompare(right.a) || left.b.localeCompare(right.b))
+  let candidates = [...merged.values()].sort((left, right) =>
+    (right.score ?? 0) - (left.score ?? 0)
+    || left.a.localeCompare(right.a)
+    || left.b.localeCompare(right.b))
   let kept = candidates.length
   let dropped = 0
   let gateCalls = 0
