@@ -12,7 +12,7 @@ import { readRegistry } from '../../scripts/lib-param-registry.mjs'
  * the one-entry-per-line text the generators parse must describe exactly this
  * array. A registry edit that breaks either side fails here.
  */
-const GROUPS = ['library', 'write-caps', 'review', 'memory', 'curator', 'deployment', 'internal']
+const GROUPS = ['library', 'write-caps', 'review', 'memory', 'curator', 'merge', 'deployment', 'internal']
 const TIERS = ['E0', 'E1', 'E2', 'E3', 'E4']
 const AUTHORITIES = ['code', 'cordis', 'install']
 const APPLIES = ['live', 'restart', 'none']

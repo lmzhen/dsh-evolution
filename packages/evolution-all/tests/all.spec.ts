@@ -18,6 +18,9 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
   expect(manifest.name).toBe('@deepseek-ai/dsh-evolution-all')
   const expected = [
     '@deepseek-ai/dsh-evolution-host',
+    // 0.28.0: the merge host row and its browser half.
+    '@deepseek-ai/dsh-evolution-merge',
+    '@deepseek-ai/dsh-evolution-merge-ui',
     '@deepseek-ai/dsh-tool-memory',
     '@deepseek-ai/dsh-tool-skill-manage',
     '@deepseek-ai/dsh-tool-session-query',

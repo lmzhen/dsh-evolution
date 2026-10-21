@@ -1,6 +1,6 @@
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
-import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, type EvolutionIoLike, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
@@ -112,7 +112,11 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         if (event.action === 'restore') void supersedeMergeRuns(runs)
       })
     }, 'evolution-merge: restore supersede')
-    const skills = newSkillLibrary({ io, ctx: ctx as never, authority: authorityFrom({ origin: 'subagent' }) })
+    const policySnapshot = (ctx as unknown as { get(name: string): unknown }).get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined
+    const skills = newSkillLibrary({
+      io, ctx: ctx as never, authority: authorityFrom({ origin: 'subagent' }),
+      limits: { ...DEFAULT_SKILL_LIMITS, ...policyStageLimits(policySnapshot?.get?.()) },
+    })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()
     const llm = (ctx as unknown as { get(name: string): unknown }).get('llm') as { stream?: (options: Record<string, unknown>) => AsyncIterable<{ type: string; text?: string; reason?: { kind?: string; failure?: { message?: string } } }> } | undefined
