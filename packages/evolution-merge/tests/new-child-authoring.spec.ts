@@ -44,3 +44,19 @@ it('fails when the child writes no staging', async () => {
   const result = await runNewChildAuthoring({ io, home, runId: 'run-2', cards, channel, parent: {}, allow: [], timeoutMs: 1000, commitPort: commitPort(), now: () => 200 }, row, decision, new AbortController().signal)
   expect(result).toMatchObject({ kind: 'failed', failure: { stage: 'author' } })
 })
+it('resolves a free actual target for create-umbrella', async () => {
+  const home = await tempRoot('dsh-merge-new-child-v2-')
+  const io = nodeEvolutionIo()
+  const stageKey = stageKeyOf('run-3', pairKey('alpha-skill', 'beta-skill'))
+  const channel: ConversationChannelLike = {
+    async open() { return { kind: 'ok', childId: 'child-3', turn: { text: 'standby', stopReason: 'completed' } } },
+    async continueTurn() {
+      expect((await writeStagedFile(io, home, stageKey, 'SKILL.md', BODY('alpha-skill'))).ok).toBe(true)
+      return { kind: 'ok', childId: 'child-3', turn: { text: 'written', stopReason: 'completed' } }
+    },
+    async dispose() {},
+  }
+  const umbrella = { ...decision, mode: 'create-umbrella' as const, target: 'alpha-skill' }
+  const result = await runNewChildAuthoring({ io, home, runId: 'run-3', cards, channel, parent: {}, allow: [], timeoutMs: 1000, commitPort: commitPort(), now: () => 300 }, row, umbrella, new AbortController().signal)
+  expect(result).toMatchObject({ kind: 'merged', target: { requested: 'alpha-skill', actual: 'alpha-skill-v2' } })
+})

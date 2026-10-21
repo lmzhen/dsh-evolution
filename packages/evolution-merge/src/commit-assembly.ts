@@ -36,7 +36,17 @@ export async function assembleStagedCommit(
   if (!isPresent(staging)) return { ok: false, message: 'staging is not present for run ' + runId }
   const tree = await readStagedTree(io, home, runId)
   if (!isPresent(tree)) return { ok: false, message: 'merged tree is not readable for run ' + runId }
-  const targetCurrent = await port.readSkill(staging.value.manifest.target)
+  const requested = staging.value.manifest.target
+  let target = requested
+  let targetCurrent = await port.readSkill(requested)
+  if (staging.value.manifest.mode === 'create-umbrella' && targetCurrent !== null) {
+    target = requested
+    for (let suffix = 2; suffix <= 99; suffix += 1) {
+      const candidate = requested + '-v' + String(suffix)
+      if (await port.readSkill(candidate) === null) { target = candidate; targetCurrent = null; break }
+    }
+    if (target === requested) return { ok: false, message: 'no free umbrella target for ' + requested }
+  }
   const sources: { name: string; body: string }[] = []
   for (const name of staging.value.manifest.sources) {
     const body = await port.readSkill(name)
@@ -44,7 +54,7 @@ export async function assembleStagedCommit(
     sources.push({ name, body })
   }
   return buildCommitPlan({
-    target: staging.value.manifest.target,
+    target,
     create: targetCurrent === null,
     mergedBody: tree.value.body,
     mergedFiles: tree.value.files,

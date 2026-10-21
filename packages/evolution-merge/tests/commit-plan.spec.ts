@@ -52,3 +52,8 @@ it('refuses create/target disagreement and empty sources', () => {
     sourceBodies: [], origin: 'foreground', summary: 'x',
   })).toMatchObject({ ok: false })
 })
+it('drops the target itself from sources', () => {
+  const result = buildCommitPlan({ target: 'alpha', create: false, mergedBody: BODY('alpha'), mergedFiles: [], targetCurrent: BODY('alpha'), sourceBodies: [{ name: 'alpha', body: BODY('alpha') }, { name: 'beta', body: BODY('beta') }], origin: 'foreground', summary: 'x' })
+  expect(result.ok).toBe(true)
+  if (result.ok) expect(result.plan.sources).toEqual(['beta'])
+})

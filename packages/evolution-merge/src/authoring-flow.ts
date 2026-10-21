@@ -18,6 +18,7 @@ export interface RunAuthoringOptions {
   readonly stageKey?: string
   readonly reuseStaging?: boolean
   readonly target: string
+  readonly mode?: 'merge-into-existing' | 'create-umbrella' | 'keep'
   readonly cards: readonly SkillCard[]
   readonly author: (staging: { readonly home: string; readonly runId: string }) => Promise<string>
   readonly commitPort: CommitPort
@@ -32,11 +33,12 @@ export type AuthoringResult =
 export async function runAuthoring(options: RunAuthoringOptions): Promise<AuthoringResult> {
   const stageKey = options.stageKey ?? options.runId
   if (options.reuseStaging === true) {
-    if (!await setStagingTarget(options.io, options.home, stageKey, options.target)) return { ok: false, message: 'staging missing or unreadable: ' + stageKey }
+    if (!await setStagingTarget(options.io, options.home, stageKey, options.target, options.mode)) return { ok: false, message: 'staging missing or unreadable: ' + stageKey }
   } else {
     const created = await createStaging(options.io, options.home, {
       runId: stageKey,
       target: options.target,
+      ...(options.mode === undefined ? {} : { mode: options.mode }),
       sources: options.cards.map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
       promptVersion: 'merge-b/v1',
       ttlDays: 7,

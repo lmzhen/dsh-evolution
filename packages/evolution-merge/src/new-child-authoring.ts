@@ -40,11 +40,12 @@ export async function runNewChildAuthoring(
   const stageKey = row.stagingRef ?? stageKeyOf(options.runId, pairKey(row.a, row.b))
   const existing = await readStaging(options.io, options.home, stageKey)
   if (existing.kind === 'present') {
-    await setStagingTarget(options.io, options.home, stageKey, decision.target)
+    await setStagingTarget(options.io, options.home, stageKey, decision.target, decision.mode)
   } else {
     const staging = await createStaging(options.io, options.home, {
       runId: stageKey,
       target: decision.target,
+      mode: decision.mode,
       sources: options.cards.filter(card => card.name === row.a || card.name === row.b).map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
       promptVersion: 'merge-b/v1',
       ttlDays: 7,
@@ -86,7 +87,7 @@ export async function runNewChildAuthoring(
       kind: 'merged',
       ...(receipt?.unitId === undefined ? {} : { unitId: receipt.unitId }),
       archived: receipt?.archived ?? [],
-      target: { requested: decision.target, actual: decision.target, created: receipt?.create ?? false },
+      target: { requested: decision.target, actual: commit.plan.target, created: receipt?.create ?? false },
     }
   } finally {
     try { await options.channel.dispose(opened.childId) } catch { /* teardown must not replace the outcome */ }

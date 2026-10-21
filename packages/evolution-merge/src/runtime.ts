@@ -4,7 +4,7 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import { probeText, type EvolutionIoLike, type RunRegistry, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
-import { pairKey, type MergeCandidate } from './contracts.ts'
+import { canRetry, pairKey, type MergeCandidate } from './contracts.ts'
 import { skippedPairKeys } from './skipped.ts'
 import type { MergeParams } from './params.ts'
 import type { SkillCard } from './skill-card.ts'
@@ -94,7 +94,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const cards = await deps.cards(signal)
         const loadedState = await loadMergeState(deps.io, deps.home)
         const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
-        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse').map(row => row.pairKey))
+        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse' || !canRetry(row)).map(row => row.pairKey))
         const result = await runScanCommand({
           ...common,
           approval: deps.params.mergeApproval,

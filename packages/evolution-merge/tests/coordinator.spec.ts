@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { transition, type MergeEvent, type MergeRow, type MergeFailure } from '../src/index.ts'
+import { canRetry, transition, type MergeEvent, type MergeRow, type MergeFailure } from '../src/index.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const failure: MergeFailure = { stage: 'author', code: 'E', message: 'boom', retryable: true, retryFrom: 'agent2' }
@@ -50,4 +50,10 @@ it('restores a skipped row and refuses an invalid transition', () => {
   const refused = transition(skipped, { type: 'approve', at: AT })
   expect(refused).toMatchObject({ ok: false, code: 'invalid-transition' })
   expect(transition(undefined, { type: 'approve', at: AT })).toMatchObject({ ok: false, code: 'invalid-transition' })
+})
+it('stops retrying after the attempt cap', () => {
+  const row: MergeRow = { id: 'mr_x', pairKey: 'a\u0000b', a: 'a', b: 'b', state: 'verify', queue: 'retry', attempts: 2, createdAt: 'x', updatedAt: 'x' }
+  const result = transition(row, { type: 'round1-fail', failure: { stage: 'decide', code: 'invalid', message: 'bad', retryable: true, retryFrom: 'agent1' }, at: 'y' })
+  expect(result.ok).toBe(true)
+  if (result.ok && result.row) expect(canRetry(result.row)).toBe(false)
 })

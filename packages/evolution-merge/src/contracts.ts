@@ -165,8 +165,11 @@ export function emptyMergeState(): MergeState {
 }
 
 /** One record can be retried only when the failure says so and names a stage. */
-export function canRetry(record: Pick<MergeRow, 'state' | 'failure'>): boolean {
+export const MERGE_MAX_ATTEMPTS = 3
+
+export function canRetry(record: Pick<MergeRow, 'state' | 'failure' | 'attempts'>): boolean {
   if (record.state === 'skipped') return false
+  if ((record.attempts ?? 0) >= MERGE_MAX_ATTEMPTS) return false
   if (record.failure === undefined) return record.state !== 'pending'
   return record.failure.retryable && record.failure.retryFrom !== 'none'
 }

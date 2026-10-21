@@ -88,6 +88,7 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           stageKey: entry.stageKey,
           reuseStaging: true,
           target: decision.target,
+          mode: decision.mode,
           cards: options.cards,
           commitPort: options.commitPort,
           now: options.now,
@@ -100,12 +101,12 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
         if (!authored.ok) {
           return { kind: 'failed', failure: { stage: 'author', code: 'authoring-failed', message: authored.message, retryable: true, retryFrom: 'agent2' } }
         }
-        const receipt = authored.commit.ok ? authored.commit.receipt : undefined
+        const receipt = authored.commit.receipt
         return {
           kind: 'merged',
           ...(receipt?.unitId === undefined ? {} : { unitId: receipt.unitId }),
           archived: receipt?.archived ?? [],
-          target: { requested: decision.target, actual: decision.target, created: receipt?.create ?? false },
+          target: { requested: decision.target, actual: authored.commit.plan.target, created: receipt?.create ?? false },
         }
       } finally {
         await entry.result.dispose()

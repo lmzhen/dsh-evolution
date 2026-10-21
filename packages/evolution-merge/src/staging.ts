@@ -37,6 +37,7 @@ export interface StagingManifest {
   readonly schemaVersion: typeof STAGING_SCHEMA_VERSION
   readonly runId: string
   readonly target: string
+  readonly mode?: 'merge-into-existing' | 'create-umbrella' | 'keep'
   readonly sources: readonly string[]
   readonly promptVersion: string
   readonly createdAt: number
@@ -46,6 +47,7 @@ export interface StagingManifest {
 export interface CreateStagingInput {
   readonly runId: string
   readonly target: string
+  readonly mode?: 'merge-into-existing' | 'create-umbrella' | 'keep'
   readonly sources: readonly StagingSource[]
   readonly promptVersion: string
   readonly ttlDays: number
@@ -92,6 +94,7 @@ export async function createStaging(io: EvolutionIoLike, home: string, input: Cr
       schemaVersion: STAGING_SCHEMA_VERSION,
       runId: input.runId,
       target: input.target,
+      ...(input.mode === undefined ? {} : { mode: input.mode }),
       sources: input.sources.map(source => source.name),
       promptVersion: input.promptVersion,
       createdAt: at,
@@ -136,10 +139,10 @@ export async function ensureStaging(io: EvolutionIoLike, home: string, input: Cr
   return createStaging(io, home, input)
 }
 
-export async function setStagingTarget(io: EvolutionIoLike, home: string, stageKey: string, target: string): Promise<boolean> {
+export async function setStagingTarget(io: EvolutionIoLike, home: string, stageKey: string, target: string, mode?: 'merge-into-existing' | 'create-umbrella' | 'keep'): Promise<boolean> {
   const view = await readStaging(io, home, stageKey)
   if (view.kind !== 'present') return false
-  const manifest = Object.assign({}, view.value.manifest, { target })
+  const manifest = Object.assign({}, view.value.manifest, { target }, mode === undefined ? {} : { mode })
   await io.writeText(join(stagingRoot(home, stageKey), 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
   return true
 }

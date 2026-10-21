@@ -59,18 +59,19 @@ export type BuildCommitPlanResult =
 
 export function buildCommitPlan(input: BuildCommitPlanInput): BuildCommitPlanResult {
   if (input.create !== (input.targetCurrent === null)) return { ok: false, message: 'create flag disagrees with the live target' }
-  if (input.sourceBodies.length === 0) return { ok: false, message: 'a merge needs at least one source' }
+  const sources = input.sourceBodies.filter(source => source.name !== input.target)
+  if (sources.length === 0) return { ok: false, message: 'a merge needs at least one source different from the target' }
   const body = rewriteFrontmatterName(input.mergedBody, input.target)
   return {
     ok: true,
     plan: {
       target: input.target,
       targetExists: !input.create,
-      sources: input.sourceBodies.map(source => source.name),
+      sources: sources.map(source => source.name),
       body,
       supportFiles: input.mergedFiles,
       expectedTargetBody: input.targetCurrent,
-      expectedSourceBodies: input.sourceBodies,
+      expectedSourceBodies: sources,
       origin: input.origin,
       summary: input.summary,
     },
