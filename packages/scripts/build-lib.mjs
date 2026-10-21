@@ -48,6 +48,10 @@ const projects = packages.map(name => join(evolutionRoot, name, 'tsconfig.json')
 run(tsc, ['-b', ...projects, '--force'], repoRoot)
 for (const name of packages) {
   console.log(`build: ${name}`)
+  if (name === 'evolution-merge-engine') {
+    run(join(evolutionRoot, name, 'scripts', 'build.mjs'), [], join(evolutionRoot, name))
+    continue
+  }
   run(tsdown, ['--config', config], join(evolutionRoot, name))
 }
 // G4/S4.4: the BROWSER halves. A package declaring `dsh.client` ships a loader
