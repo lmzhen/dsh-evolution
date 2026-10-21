@@ -2,7 +2,7 @@
  * The merge panel body: three queues, counts, and a read-only row list. Actions are
  * intentionally copied commands, not buttons that write from the browser.
  */
-import { createElement, useEffect, useState, type ReactNode } from 'react'
+import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
 import type { MergeOutcome, MergeQueue, MergeRowView, MergeViewPayload, QueuePage } from './api.ts'
 import type { RouteFailure } from './route-client.generated.ts'
@@ -28,15 +28,19 @@ export function MergePanel(face: MergeFace): ReactNode {
   const [view, setView] = useState<MergeViewPayload>(face.view)
   const [tab, setTab] = useState<MergeQueue>('pending')
   const [rows, setRows] = useState<MergeRowView[]>(face.rows)
-  const [loading, setLoading] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(face.loadRows !== undefined || face.loadView !== undefined)
   const [failed, setFailed] = useState<RouteFailure | undefined>(undefined)
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
+  const request = useRef(0)
 
   const loadRows = (queue: MergeQueue, cursor = 0): void => {
     const load = face.loadRows
     if (load === undefined) return
+    const token = request.current + 1
+    request.current = token
     setLoading(true)
     load(queue, cursor).then((outcome) => {
+      if (token !== request.current) return
       if (outcome.ok) {
         setRows(current => [...(cursor === 0 ? [] : current), ...outcome.payload.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
         setNextCursor(outcome.payload.nextCursor)
@@ -95,7 +99,7 @@ export function MergePanel(face: MergeFace): ReactNode {
       return createElement('div', { key: row.id, 'data-role': 'row' },
         createElement('div', null,
           createElement('div', { 'data-role': 'row-label' }, row.label),
-          createElement('div', { 'data-role': 'row-meta' }, row.state + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage))),
+          createElement('div', { 'data-role': 'row-meta' }, t('state.' + row.state) + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage))),
           facts === '' ? null : createElement('div', { 'data-role': 'row-facts' }, facts),
         ),
         createElement('div', null,

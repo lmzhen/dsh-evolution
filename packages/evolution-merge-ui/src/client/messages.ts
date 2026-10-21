@@ -29,6 +29,10 @@ export const zh: Record<string, string> = {
   'row.copy': '复制命令',
   'origin.agent': '自动',
   'origin.human': '人工',
+  'state.verify': '待判定',
+  'state.pending': '待批准',
+  'state.fuse': '待融合',
+  'state.skipped': '已跳过',
 }
 
 export const en: Record<string, string> = {
@@ -60,4 +64,8 @@ export const en: Record<string, string> = {
   'row.copy': 'Copy command',
   'origin.agent': 'auto',
   'origin.human': 'human',
+  'state.verify': 'Unverified',
+  'state.pending': 'Pending approval',
+  'state.fuse': 'Ready to fuse',
+  'state.skipped': 'Skipped',
 }

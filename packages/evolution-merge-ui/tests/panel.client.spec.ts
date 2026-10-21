@@ -26,4 +26,9 @@ it('renders counts, tabs and the pending row read-only', () => {
   expect(html).toContain('data-role="run-strip"')
   expect(html).toContain('approval.on')
   expect(html).toContain('data-role="row-action"')
+  expect(html).toContain('state.pending')
+})
+it('shows loading on the first render when a loader exists', () => {
+  const html = renderToStaticMarkup(createElement(MergePanel, { ...face, loadRows: async () => ({ ok: true, payload: { queue: 'pending' as const, items: [] } }) }))
+  expect(html).toContain('data-state="loading"')
 })
