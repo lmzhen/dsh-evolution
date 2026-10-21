@@ -218,9 +218,13 @@ and observability, but no `memory`/`skill_manage` tools.
 
 ## 2a. Merge surface
 
-The host and one-click bundles also mount the **merge** surface: `/merge` in a
-Session, or the command-face fallback `/evolution merge status / pending / approve
-<id> / report` when the browser panel is unavailable.
+The host and one-click bundles also mount the **merge** surface: `/evolution merge` in a
+Session (`/merge` remains a 0.29 compatibility alias). The same command face answers
+`/evolution merge status / pending / approve <id> / report` when the browser panel is
+unavailable. The browser panel (`evolution-merge-ui`) is mounted in the `all` bundle only.
+The engine needs local `potion-multilingual-128M-int8` and `potion-multilingual-128M-pca64-int8`
+directories under `mergeModelsRoot` (or `SKILL_MERGE_MODELS_ROOT`); `/evolution doctor`
+warns when they are missing. There is no auto provisioning.
 
 ## 3. Agent-only install
 
