@@ -1,5 +1,5 @@
 {
-  "name": "@lmzhen/dsh-evolution-merge-engine",
+  "name": "@deepseek-ai/dsh-evolution-merge-engine",
   "description": "Vendored skill-merge Node pipeline engine (byte-identical upstream) for DSH evolution-merge",
   "version": "0.29.0",
   "type": "module",

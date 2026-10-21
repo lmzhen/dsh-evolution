@@ -1,5 +1,5 @@
 {
-  "name": "@lmzhen/dsh-evolution-merge-ui",
+  "name": "@deepseek-ai/dsh-evolution-merge-ui",
   "description": "Web surface for skill merge: pending, retry and skipped queues",
   "dsh": {
     "client": {
@@ -41,7 +41,7 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.5",
+    "@deepseek-ai/cordis": "workspace:^",
     "react": "^18.2.0"
   }
 }

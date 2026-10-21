@@ -1,5 +1,5 @@
 {
-  "name": "@lmzhen/dsh-evolution-merge",
+  "name": "@deepseek-ai/dsh-evolution-merge",
   "description": "Skill auto-merge domain: screening, two-round authoring, queues and commit orchestration",
   "version": "0.29.0",
   "publishConfig": {
@@ -27,13 +27,13 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@lmzhen/dsh-evolution-core": "^0.28.0",
-    "@lmzhen/dsh-evolution-merge-engine": "^0.29.0",
-    "@deepseek-ai/schemastery": "^3.18.1",
-    "@lmzhen/dsh-evolution-merge-ui": "^0.29.0"
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-merge-engine": "workspace:^",
+    "@deepseek-ai/dsh-evolution-merge-ui": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.5"
+    "@deepseek-ai/cordis": "workspace:^"
   },
   "dsh": {
     "bundle": {
