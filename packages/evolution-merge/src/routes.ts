@@ -58,9 +58,10 @@ export interface MergeView {
   readonly counts: MergeCounts
   readonly tabs: readonly { readonly queue: MergeQueue; readonly count: number }[]
   readonly commands: readonly string[]
+  readonly latestRun?: MergeRunFact
 }
 
-export function buildMergeView(rows: readonly MergeRow[], commands: readonly string[]): MergeView {
+export function buildMergeView(rows: readonly MergeRow[], commands: readonly string[], latestRun?: MergeRunFact): MergeView {
   const counts = countRows(rows)
   return {
     schemaVersion: 1,
@@ -71,6 +72,7 @@ export function buildMergeView(rows: readonly MergeRow[], commands: readonly str
       { queue: 'skipped', count: counts.skipped },
     ],
     commands,
+    ...(latestRun === undefined ? {} : { latestRun }),
   }
 }
 

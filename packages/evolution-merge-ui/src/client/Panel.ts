@@ -30,14 +30,16 @@ export function MergePanel(face: MergeFace): ReactNode {
   const [rows, setRows] = useState<MergeRowView[]>(face.rows)
   const [loading, setLoading] = useState<boolean>(false)
   const [failed, setFailed] = useState<RouteFailure | undefined>(undefined)
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
 
-  const loadRows = (queue: MergeQueue): void => {
+  const loadRows = (queue: MergeQueue, cursor = 0): void => {
     const load = face.loadRows
     if (load === undefined) return
     setLoading(true)
-    load(queue).then((outcome) => {
+    load(queue, cursor).then((outcome) => {
       if (outcome.ok) {
-        setRows([...outcome.payload.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+        setRows(current => [...(cursor === 0 ? [] : current), ...outcome.payload.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+        setNextCursor(outcome.payload.nextCursor)
         setFailed(undefined)
       }
       else setFailed(outcome.failure)
@@ -57,7 +59,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   }
 
   useEffect(() => { loadView(); loadRows('pending') }, [face])
-  useEffect(() => { loadRows(tab) }, [tab])
+  useEffect(() => { setNextCursor(undefined); loadRows(tab, 0) }, [tab])
 
   const counts = view.counts
   const stats = createElement('div', { 'data-role': 'stats' }, QUEUES.map(queue =>
@@ -66,6 +68,13 @@ export function MergePanel(face: MergeFace): ReactNode {
       createElement('div', { 'data-role': 'stat-label' }, t('tab.' + queue)),
     ),
   ))
+  const latest = view.latestRun
+  const runStrip = latest === undefined ? null : createElement('div', { 'data-role': 'run-strip' },
+    createElement('span', { 'data-role': 'run-id' }, latest.id),
+    createElement('span', { 'data-role': 'run-state' }, latest.state),
+    latest.stage === undefined ? null : createElement('span', { 'data-role': 'run-stage' }, t('stage.' + latest.stage)),
+    latest.progress === undefined ? null : createElement('span', { 'data-role': 'run-progress' }, String(latest.progress.done) + '/' + String(latest.progress.total)),
+  )
   const tabs = createElement('div', { 'data-role': 'tabs', role: 'tablist' }, QUEUES.map(queue =>
     createElement('button', {
       key: queue, type: 'button', role: 'tab', 'aria-selected': tab === queue ? 'true' : 'false', 'data-role': 'tab', 'data-active': tab === queue ? 'true' : 'false',
@@ -103,11 +112,13 @@ export function MergePanel(face: MergeFace): ReactNode {
   const uiState = loading ? 'loading' : failed !== undefined ? 'failed' : rows.length === 0 ? 'empty' : 'ready'
   return createElement('section', { className: CSS_TAG_ID, 'data-state': uiState },
     createElement('p', { 'data-role': 'hint' }, t('hint')),
+    runStrip,
     stats,
     tabs,
     loading ? createElement('p', { 'data-role': 'note' }, t('loading')) : null,
     failed === undefined ? null : createElement('div', { 'data-role': 'note' }, failure(t, failed)),
     list,
-    createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { loadView(); loadRows(tab) } }, t('refresh')),
+    nextCursor === undefined ? null : createElement('button', { type: 'button', 'data-role': 'load-more', onClick: () => { loadRows(tab, Number(nextCursor)) } }, t('loadMore')),
+    createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { loadView(); loadRows(tab, 0) } }, t('refresh')),
   )
 }

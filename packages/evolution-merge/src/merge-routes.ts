@@ -33,7 +33,8 @@ export function makeMergeRoutes(
         if (denied !== null) return denied
         const source = deps.getSource()
         if (source === undefined) return absent()
-        return json(200, { ok: true, data: buildMergeView(await source.rows(), source.commands()) })
+        const runs = await source.runs(undefined, 1)
+        return json(200, { ok: true, data: buildMergeView(await source.rows(), source.commands(), runs[0] === undefined ? undefined : toRunFact(runs[0])) })
       },
     },
     {

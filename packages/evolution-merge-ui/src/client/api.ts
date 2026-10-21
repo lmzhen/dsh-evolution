@@ -15,11 +15,21 @@ export interface MergeCounts {
   skipped: number
 }
 
+export interface MergeRunView {
+  id: string
+  state: string
+  command?: string
+  stage?: string
+  progress?: { done: number; total: number }
+  startedAt: number
+}
+
 export interface MergeViewPayload {
   schemaVersion?: number
   counts: MergeCounts
   tabs: { queue: MergeQueue; count: number }[]
   commands: string[]
+  latestRun?: MergeRunView
 }
 
 export interface MergeRowView {
