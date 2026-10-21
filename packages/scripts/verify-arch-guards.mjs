@@ -651,7 +651,7 @@ const DEPRECATED_LOG_ACCESSOR_REGISTER = new Map([
 ])
 
 const APPROVAL_SRC = 'evolution-approval/src'
-const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown'])
+const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous', '.release-staging', '.git', '.next', '.release-staging.next', '.release-staging.previous', 'tsdown', 'vendor'])
 const DSH_HOME_RE = /process\.env\.DSH_HOME|process\.env\[['\"]DSH_HOME['\"]\]/
 const COPY_RE = /interface\s+ApprovalPolicyLike|function\s+effectiveSessionPolicy/
 // N5 (v39): family package imports — L0 seams are the only ones the kernel
