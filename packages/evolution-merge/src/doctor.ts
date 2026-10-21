@@ -7,7 +7,6 @@ import { join } from 'node:path'
 import { probeList, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { loadMergeState } from './state.ts'
 import { countRows } from './status.ts'
-import { loadGateCache } from './gate-cache.ts'
 import { stagingRoot } from './staging.ts'
 
 export const MERGE_DOCTOR_SCHEMA_VERSION = 3
@@ -28,13 +27,6 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string): Promise<re
     label: '合并状态',
     status: loaded.note === undefined ? 'ok' : 'warn',
     detail: loaded.note ?? 'pairs ' + String(loaded.state.rows.length) + '；pending ' + String(counts.pending) + ' / retry ' + String(counts.retry) + ' / skipped ' + String(counts.skipped),
-  })
-  const cache = await loadGateCache(io, home)
-  rows.push({
-    key: 'gate-cache',
-    label: '闸门缓存',
-    status: cache.note === undefined ? 'ok' : 'warn',
-    detail: cache.note ?? String(cache.cache.size) + ' 条',
   })
   const runsDir = join(home, 'merge', 'runs')
   const listed = await probeList(io, runsDir)
