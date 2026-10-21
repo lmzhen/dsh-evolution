@@ -13,11 +13,7 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/",
-    "vendor/",
-    "LICENSE",
-    "NOTICE",
-    "UPSTREAM.json"
+    "**/*"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
