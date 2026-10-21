@@ -158,7 +158,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           : { ok: true, text: report.value.slice(0, 12000) }
       }
       if (command.verb === 'undo') {
-        const receipt = await readCommitReceipt(deps.io, deps.home, command.run)
+        const receipt = await readCommitReceipt(deps.io, deps.home, command.run, command.target)
         if (receipt === null) return { ok: false, text: 'merge run has no commit receipt: ' + command.run }
         if (receipt.target !== command.target) return { ok: false, text: 'receipt target is ' + receipt.target + ', not ' + command.target }
         const result = await undoMergeReceipt(receipt, skillLibraryUndoPort(deps.skills))

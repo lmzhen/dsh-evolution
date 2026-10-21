@@ -41,6 +41,7 @@ export async function commitStagedRun(
   if (result.unitId === undefined) return { ok: true, plan: assembled.plan, result, warning: 'commit landed without a unitId; receipt not written' }
   const receipt: CommitReceipt = {
     runId,
+    parentRunId: runId.split('/pairs/')[0] ?? runId,
     unitId: result.unitId,
     target: assembled.plan.target,
     create: !assembled.plan.targetExists,
