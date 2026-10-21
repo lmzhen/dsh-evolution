@@ -1,4 +1,9 @@
 # Changelog
+## 0.29.0 (minor) — 整模块重接收口：本地源码 Web 验收、面板样式与 run strip 修复、命令面测试
+
+> **范围**：merge 整模块重接到 `@deepseek-ai/dsh-evolution-merge` host；panel 补 family client token，修复统计卡/间距/边框；run strip 只显示 merge run，跳过 maintenance；`merge-command` 只读分派测试覆盖 help/scan/status；本地源码 web（3081）完成 host 路由 200 与隔离 CUA 面板验收。
+> **验证**：merge 路由 2/2、UI client 6/6、merge-command 3/3、本地源码 web 3081 路由 200、面板真机通过。
+
 ## 0.28.0 (minor) — 技能自动合并：候选筛选、两轮授权、审批/重跑、设置卡与只读面板
 
 > **范围**：新增 `@lmzhen/dsh-evolution-merge` 与 `@lmzhen/dsh-evolution-merge-ui`。host 侧落地词面/C3/L0–L2 候选、10% 抽检、gate cache、两轮子代理（同 child / 审批后新 child）、staging→规则门→commit receipt、undone 跨技能回退；命令面 `/merge scan|pair|status|report|runs|cancel|pending|approve|reject|resume|skipped|undo` 与四条只读路由（view/rows/run/runs）接入 `HOST_ROUTES`；参数 `mergeApproval`、`mergeSkippedTtlDays`、`mergeRunTimeoutMinutes`（E3）与 `mergePairTimeoutMinutes`（E2），设置卡“技能自动合并”；client 包提供三 tab 只读面板。restore 通过 `RunRegistry.supersedeKind` 跨进程标记旧 merge run。

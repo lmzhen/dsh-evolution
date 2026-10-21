@@ -1,0 +1,5 @@
+- insert:
+    - id: evolution-merge
+      name: '@lmzhen/dsh-evolution-merge'
+    - id: evolution-merge-ui
+      name: '@lmzhen/dsh-evolution-merge-ui'
