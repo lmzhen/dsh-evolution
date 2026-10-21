@@ -9,7 +9,7 @@
 import { join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeCandidate } from '../contracts.ts'
-import type { SkillCard } from '../screening.ts'
+import type { SkillCard } from '../skill-card.ts'
 
 export type EngineScreenResult =
   | { readonly ok: true; readonly report: Record<string, unknown> }

@@ -8,7 +8,7 @@
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeCandidate, MergeDecision, MergeRow } from './contracts.ts'
 import { pairKey } from './contracts.ts'
-import type { SkillCard } from './screening.ts'
+import type { SkillCard } from './skill-card.ts'
 import { runRound1OverChannel, type ChannelRound1Result, type ConversationChannelLike } from './channel-port.ts'
 import type { CommitPort } from './commit-execute.ts'
 import type { StageToolContext } from './stage-tool.ts'

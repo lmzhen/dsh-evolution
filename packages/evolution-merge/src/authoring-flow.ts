@@ -9,7 +9,7 @@ import { readStagedTree } from './staged-tree.ts'
 import { validateStagedTree, hasBlockingFinding, type RuleFinding } from './rules.ts'
 import { commitStagedRun, type CommitPort, type CommitStagedResult } from './commit-execute.ts'
 import type { StagedTree } from './rules.ts'
-import type { SkillCard } from './screening.ts'
+import type { SkillCard } from './skill-card.ts'
 
 export interface RunAuthoringOptions {
   readonly io: EvolutionIoLike

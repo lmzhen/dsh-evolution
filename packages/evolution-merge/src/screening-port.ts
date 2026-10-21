@@ -3,7 +3,7 @@
  * Each stage is independently testable; this file only composes their frozen contracts.
  */
 import { pairKey, type MergeCandidate } from './contracts.ts'
-import { lexicalCandidates, type SkillCard, type ScreeningOptions } from './screening.ts'
+import { lexicalCandidates, type SkillCard, type ScreeningOptions } from './skill-card.ts'
 import { proposePairs, type ModelPort } from './propose.ts'
 import { filterCandidates } from './gate-filter.ts'
 import type { GateCache, GateFacts, GateModelPort } from './ladder.ts'

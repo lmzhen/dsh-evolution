@@ -3,7 +3,7 @@
  * Round 1 may only decide; round 2 may only write the staged tree through merge_stage.
  */
 import type { MergeDecision, MergeRow } from './contracts.ts'
-import type { SkillCard } from './screening.ts'
+import type { SkillCard } from './skill-card.ts'
 
 export const MERGE_PROMPT_VERSION = 'merge-pair/v1'
 

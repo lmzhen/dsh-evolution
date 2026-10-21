@@ -7,7 +7,7 @@ import { probeText, type EvolutionIoLike, type RunRegistry, type SkillLibrary } 
 import { pairKey, type MergeCandidate } from './contracts.ts'
 import { skippedPairKeys } from './skipped.ts'
 import type { MergeParams } from './params.ts'
-import type { SkillCard } from './screening.ts'
+import type { SkillCard } from './skill-card.ts'
 import type { MergeRegistryPort } from './run-shell.ts'
 import type { MergeCommandContext, MergeCommandService } from './merge-command.ts'
 import { createReadOnlyMergeService } from './merge-command.ts'
@@ -46,8 +46,9 @@ export interface MergeRuntimeDeps {
   readonly cwd?: string
   readonly timeoutMinutes: number
   readonly cards: (signal: AbortSignal) => Promise<readonly SkillCard[]>
-  readonly screening: (cards: readonly SkillCard[], signal: AbortSignal) => Promise<readonly MergeCandidate[]>
-  /** Run-scoped screening (lexical/C3/gate with a runId-seeded audit); preferred when present. */
+  /** Test-only/legacy fallback; production index always supplies screeningForRun. */
+  readonly screening?: (cards: readonly SkillCard[], signal: AbortSignal) => Promise<readonly MergeCandidate[]>
+  /** Run-scoped engine screening. */
   readonly screeningForRun?: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
   readonly stage?: MergeStageBindingPort
 }
@@ -102,9 +103,11 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
             screening: async (turnSignal) => {
-              const raw = deps.screeningForRun === undefined
-                ? await deps.screening(cards, turnSignal)
-                : await deps.screeningForRun(cards, runId, turnSignal)
+              const raw = deps.screeningForRun !== undefined
+                ? await deps.screeningForRun(cards, runId, turnSignal)
+                : deps.screening === undefined
+                  ? (() => { throw new Error('engine screening is required') })()
+                  : await deps.screening(cards, turnSignal)
               return raw.filter(candidate => {
                 const key = pairKey(candidate.a, candidate.b)
                 return !skipped.has(key) && !held.has(key)

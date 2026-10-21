@@ -11,7 +11,6 @@ import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
 import { createMergeCommand } from './merge-command.ts'
 import { createMergeRuntime } from './runtime.ts'
 import { resolveMergeParams } from './params.ts'
-import { lexicalCandidates } from './screening.ts'
 import { subagentChannelAdapter } from './adapters/channel.ts'
 import { StageToolRegistry } from './stage-tool-registry.ts'
 import type { StageToolContext } from './stage-tool.ts'
@@ -87,14 +86,15 @@ export * from './round2-outcome.ts'
 export * from './approve-command.ts'
 export * from './pair-command.ts'
 export * from './resume-command.ts'
+export * from './decision.ts'
+export * from './prompts.ts'
 export * from './screening.ts'
 export * from './propose.ts'
 export * from './ladder.ts'
 export * from './gate-cache.ts'
 export * from './gate-filter.ts'
 export * from './screening-port.ts'
-export * from './decision.ts'
-export * from './prompts.ts'
+export * from './adapters/model.ts'
 export * from './channel-port.ts'
 export * from './authoring-flow.ts'
 export * from './merge-tool.ts'
@@ -171,7 +171,6 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         if (signal.aborted) return []
         return listed.map(item => ({ name: item.name, description: item.description, body: item.content ?? '' }))
       },
-      screening(cards) { return Promise.resolve(lexicalCandidates(cards).candidates) },
       screeningForRun: engineScreening,
       stage: {
         bind: (context: StageToolContext) => { stage.bind(context.childId, context) },

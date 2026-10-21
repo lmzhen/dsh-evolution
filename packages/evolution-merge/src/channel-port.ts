@@ -4,7 +4,7 @@
  * outside this adapter: the caller owns staging -> commitStagedRun.
  */
 import type { MergeDecision, MergeRow } from './contracts.ts'
-import type { SkillCard } from './screening.ts'
+import type { SkillCard } from './skill-card.ts'
 import { parseDecision } from './decision.ts'
 import { buildRound1Prompt, buildRound2Prompt } from './prompts.ts'
 import type { ScanRound1Outcome } from './scan-run.ts'

@@ -4,7 +4,7 @@
  */
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeDecision, MergeRow } from './contracts.ts'
-import type { SkillCard } from './screening.ts'
+import type { SkillCard } from './skill-card.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
 import { buildRound2Prompt } from './prompts.ts'
 import { createStaging } from './staging.ts'
