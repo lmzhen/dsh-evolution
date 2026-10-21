@@ -41,7 +41,9 @@ export function toRowView(row: MergeRow): MergeRowView {
     createdAt: row.createdAt,
     ...(row.decision?.target === undefined ? {} : { target: row.decision.target }),
     ...(row.decision?.confidence === undefined ? {} : { confidence: row.decision.confidence }),
-    ...(row.failure === undefined ? {} : { failure: { stage: row.failure.stage, code: row.failure.code, message: row.failure.message, retryable: row.failure.retryable } }),
+    ...(row.failure === undefined ? {} : {
+      failure: { stage: row.failure.stage, code: row.failure.code, message: row.failure.message, retryable: row.failure.retryable },
+    }),
     ...(row.attempts === undefined ? {} : { attempts: row.attempts }),
     ...(row.origin === undefined ? {} : { origin: row.origin }),
     ...(row.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: row.stagingExpiresAt }),
@@ -62,7 +64,12 @@ export interface MergeView {
   readonly approval?: boolean
 }
 
-export function buildMergeView(rows: readonly MergeRow[], commands: readonly string[], latestRun?: MergeRunFact, approval?: boolean): MergeView {
+export function buildMergeView(
+  rows: readonly MergeRow[],
+  commands: readonly string[],
+  latestRun?: MergeRunFact,
+  approval?: boolean,
+): MergeView {
   const counts = countRows(rows)
   return {
     schemaVersion: 1,

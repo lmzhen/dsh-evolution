@@ -46,7 +46,12 @@ export async function assembleStagedCommit(
     target = requested
     for (let suffix = 2; suffix <= 99; suffix += 1) {
       const candidate = requested + '-v' + String(suffix)
-      if (await port.readSkill(candidate) === null && await port.isArchived?.(candidate) !== true) { target = candidate; targetCurrent = null; break }
+      if (await port.readSkill(candidate) === null
+        && await port.isArchived?.(candidate) !== true) {
+        target = candidate
+        targetCurrent = null
+        break
+      }
     }
     if (target === requested) return { ok: false, message: 'no free umbrella target for ' + requested }
   }

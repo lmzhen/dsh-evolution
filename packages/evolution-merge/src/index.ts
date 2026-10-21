@@ -147,21 +147,29 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const engineConfig = engineConfigFromEnv(params.mergeModelsRoot)
     const llm = (ctx as unknown as { get(name: string): unknown }).get('llm') as LlmServiceLike | undefined
     const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
-    const runner = llm === undefined || defaultModel === undefined ? undefined : createEngineRunner(llm, () => defaultModel.currentSelection())
+    const runner = llm === undefined || defaultModel === undefined
+      ? undefined
+      : createEngineRunner(llm, () => defaultModel.currentSelection())
     const engineScreening = createEngineScreening({
-        io, home, engine: { screen: engineScreen as unknown as EngineScreenPort['screen'] }, select: selectCandidates as unknown as (report: Record<string, unknown>) => CandidateSelection,
-        ...(engineConfig === undefined ? {} : { cfg: engineConfig }),
-        ...(runner === undefined ? {} : { runner }),
-        async onSelection(selection) {
-          const loaded = await loadMergeState(io, home)
-          const at = new Date().toISOString()
-          for (const skipped of selection.skipped) {
-            if (loaded.state.rows.some(row => row.pairKey === skipped.pairKey)) continue
-            const next = transition(undefined, { type: 'gate-keep', a: skipped.a, b: skipped.b, ...(skipped.reason === undefined ? {} : { reason: skipped.reason }), at })
-            if (next.ok && next.row !== null) await upsertRow(io, home, () => Date.now(), next.row)
-          }
-        },
-      })
+      io,
+      home,
+      engine: { screen: engineScreen as unknown as EngineScreenPort['screen'] },
+      select: selectCandidates as unknown as (report: Record<string, unknown>) => CandidateSelection,
+      ...(engineConfig === undefined ? {} : { cfg: engineConfig }),
+      ...(runner === undefined ? {} : { runner }),
+      async onSelection(selection) {
+        const loaded = await loadMergeState(io, home)
+        const at = new Date().toISOString()
+        for (const skipped of selection.skipped) {
+          if (loaded.state.rows.some(row => row.pairKey === skipped.pairKey)) continue
+          const next = transition(undefined, {
+            type: 'gate-keep', a: skipped.a, b: skipped.b,
+            ...(skipped.reason === undefined ? {} : { reason: skipped.reason }), at,
+          })
+          if (next.ok && next.row !== null) await upsertRow(io, home, () => Date.now(), next.row)
+        }
+      },
+    })
     source = {
       rows() { return loadMergeState(io, home).then(loaded => loaded.state.rows) },
       run(id: string): Promise<RunRecord | undefined> { return Promise.resolve(runs.runs().find(record => record.id === id)) },
@@ -179,7 +187,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       async cards(signal) {
         const listed = await skills.list({ withContent: true })
         if (signal.aborted) return []
-        return Promise.all(listed.map(async item => {
+        return Promise.all(listed.map(async (item) => {
           const probe = await skills.listSupportFiles(item.name)
           const paths = probe.kind === 'present' ? probe.value : []
           const files = await Promise.all(paths.map(async path => ({ path, content: await skills.readSupportFile(item.name, path) ?? '' })))
