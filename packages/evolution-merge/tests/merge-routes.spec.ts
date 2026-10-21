@@ -9,10 +9,11 @@ const row = (a: string, b: string, state: MergeRow['state']): MergeRow => ({
   queue: state === 'pending' ? 'pending' : state === 'skipped' ? 'skipped' : 'retry', createdAt: 'x', updatedAt: 'x',
 })
 const run: RunRecord = { id: 'r1', kind: 'merge', state: 'running', startedAt: 1, command: 'scan' }
+const other: RunRecord = { id: 'r0', kind: 'maintenance', state: 'succeeded', startedAt: 0 }
 const source: MergeRouteSource = {
   async rows() { return [row('a', 'b', 'pending'), row('c', 'd', 'fuse')] },
   async run(id) { return id === 'r1' ? run : undefined },
-  async runs() { return [run] },
+  async runs() { return [other, run] },
   commands() { return ['merge scan'] },
   approval() { return true },
 }

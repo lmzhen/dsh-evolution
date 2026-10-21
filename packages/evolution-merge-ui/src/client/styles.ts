@@ -1,7 +1,10 @@
+import { TOKEN_CSS } from './tokens.ts'
+
 export const CSS_TAG_ID = 'evolution-merge-panel'
 
 export const CSS = [
-  '.' + CSS_TAG_ID + ' { display:flex; flex-direction:column; gap:var(--evo-space-12); padding:var(--evo-space-16); }',
+  ':where(.' + CSS_TAG_ID + ') { ' + TOKEN_CSS + ' }',
+  '.' + CSS_TAG_ID + ' { display:flex; flex-direction:column; gap:var(--evo-space-12); padding:var(--evo-space-16); color:var(--dsw-alias-label-primary); font-size:var(--evo-type-sm); line-height:var(--evo-leading-base); }',
   '.' + CSS_TAG_ID + ' [data-role="hint"] { margin:0; color:var(--dsw-alias-label-tertiary); font-size:var(--evo-type-xs); }',
   '.' + CSS_TAG_ID + ' [data-role="stats"] { display:flex; gap:var(--evo-space-8); flex-wrap:wrap; }',
   '.' + CSS_TAG_ID + ' [data-role="stat"] { border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); padding:var(--evo-space-6) var(--evo-space-10); min-width:calc(var(--evo-space-16) * 4); }',
