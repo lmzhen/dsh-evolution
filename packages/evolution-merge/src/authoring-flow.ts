@@ -38,7 +38,7 @@ export async function runAuthoring(options: RunAuthoringOptions): Promise<Author
       runId: stageKey,
       target: options.target,
       sources: options.cards.map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
-      promptVersion: 'merge-pair/v1',
+      promptVersion: 'merge-b/v1',
       ttlDays: 7,
       now: options.now,
     })

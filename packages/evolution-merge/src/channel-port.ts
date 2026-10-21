@@ -6,7 +6,7 @@
 import type { MergeDecision, MergeRow } from './contracts.ts'
 import type { SkillCard } from './skill-card.ts'
 import { parseDecision } from './decision.ts'
-import { buildRound1Prompt, buildRound2Prompt } from './prompts.ts'
+import { buildRound1Prompt, buildRound2Prompt, STANDBY_PROMPT } from './prompts.ts'
 import type { ScanRound1Outcome } from './scan-run.ts'
 
 export interface ChannelTurnLike {
@@ -45,6 +45,7 @@ export interface ChannelRound1Options {
   readonly allow: readonly string[]
   readonly cwd?: string
   readonly timeoutMs: number
+  readonly onChildOpened?: (childId: string) => void
 }
 
 export interface ChannelRound1Result {
@@ -71,7 +72,7 @@ export async function runRound1OverChannel(
   const opened = await options.channel.open({
     parent: options.parent,
     label: 'merge-round1',
-    promptText: buildRound1Prompt(candidate, options.cards),
+    promptText: STANDBY_PROMPT,
     kind: 'reviewer',
     allow: options.allow,
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
@@ -83,9 +84,19 @@ export async function runRound1OverChannel(
   childId = opened.childId
   if (opened.turn.stopReason !== 'completed') {
     await dispose()
-    return { outcome: { kind: 'failed', failure: { stage: 'decide', code: opened.turn.stopReason, message: 'round1 did not complete', retryable: true, retryFrom: 'agent1' } }, dispose }
+    return { outcome: { kind: 'failed', failure: { stage: 'decide', code: opened.turn.stopReason, message: 'standby did not complete', retryable: true, retryFrom: 'agent1' } }, dispose }
   }
-  const parsed = parseDecision(opened.turn.text, candidate)
+  try { options.onChildOpened?.(opened.childId) } catch (error) { await dispose(); return { outcome: { kind: 'failed', failure: { stage: 'decide', code: 'child-bind', message: String(error), retryable: true, retryFrom: 'agent1' } }, dispose } }
+  const round1 = await options.channel.continueTurn(opened.childId, buildRound1Prompt(candidate, options.cards), { timeoutMs: options.timeoutMs, signal })
+  if (round1.kind !== 'ok') {
+    await dispose()
+    return { outcome: { kind: 'failed', failure: { stage: 'decide', code: round1.kind, message: round1.kind === 'unavailable' ? round1.reason : 'round1 aborted', retryable: round1.kind !== 'aborted', retryFrom: round1.kind === 'aborted' ? 'none' : 'agent1' } }, dispose }
+  }
+  if (round1.turn.stopReason !== 'completed') {
+    await dispose()
+    return { outcome: { kind: 'failed', failure: { stage: 'decide', code: round1.turn.stopReason, message: 'round1 did not complete', retryable: true, retryFrom: 'agent1' } }, dispose }
+  }
+  const parsed = parseDecision(round1.turn.text, candidate)
   if (!parsed.ok) {
     await dispose()
     return { outcome: { kind: 'failed', failure: { stage: 'decide', code: parsed.code, message: parsed.message, retryable: true, retryFrom: 'agent1' } }, dispose }

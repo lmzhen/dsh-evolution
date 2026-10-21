@@ -6,7 +6,7 @@ import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeDecision, MergeRow } from './contracts.ts'
 import type { SkillCard } from './skill-card.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
-import { buildRound2Prompt } from './prompts.ts'
+import { buildRound2Prompt, STANDBY_PROMPT } from './prompts.ts'
 import { createStaging, readStaging, setStagingTarget, stageKeyOf, stagingRoot } from './staging.ts'
 import { pairKey } from './contracts.ts'
 import { readStagedTree } from './staged-tree.ts'
@@ -46,7 +46,7 @@ export async function runNewChildAuthoring(
       runId: stageKey,
       target: decision.target,
       sources: options.cards.filter(card => card.name === row.a || card.name === row.b).map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
-      promptVersion: 'merge-pair/v1',
+      promptVersion: 'merge-b/v1',
       ttlDays: 7,
       now: options.now,
     })
@@ -55,7 +55,7 @@ export async function runNewChildAuthoring(
   const opened = await options.channel.open({
     parent: options.parent,
     label: 'merge-round2',
-    promptText: buildRound2Prompt(row, decision),
+    promptText: STANDBY_PROMPT,
     kind: 'maintainer',
     allow: options.allow,
     cwd: stagingRoot(options.home, stageKey),
@@ -65,10 +65,15 @@ export async function runNewChildAuthoring(
   if (opened.kind !== 'ok') {
     return { kind: 'failed', failure: { stage: 'author', code: opened.kind, message: opened.kind === 'unavailable' ? opened.reason : 'round2 aborted', retryable: opened.kind !== 'aborted', retryFrom: opened.kind === 'aborted' ? 'none' : 'agent2' } }
   }
-  options.onChild?.({ runId: options.runId, childId: opened.childId, expectedChildId: opened.childId, phase: 'author' })
+  options.onChild?.({ runId: stageKey, childId: opened.childId, expectedChildId: opened.childId, phase: 'author' })
   try {
     if (opened.turn.stopReason !== 'completed') {
-      return { kind: 'failed', failure: { stage: 'author', code: opened.turn.stopReason, message: 'round2 did not complete', retryable: true, retryFrom: 'agent2' } }
+      return { kind: 'failed', failure: { stage: 'author', code: opened.turn.stopReason, message: 'standby did not complete', retryable: true, retryFrom: 'agent2' } }
+    }
+    const turn = await options.channel.continueTurn(opened.childId, buildRound2Prompt(row, decision, 'fresh'), { timeoutMs: options.timeoutMs, signal })
+    if (turn.kind !== 'ok') return { kind: 'failed', failure: { stage: 'author', code: turn.kind, message: turn.kind === 'unavailable' ? turn.reason : 'round2 aborted', retryable: turn.kind !== 'aborted', retryFrom: turn.kind === 'aborted' ? 'none' : 'agent2' } }
+    if (turn.turn.stopReason !== 'completed') {
+      return { kind: 'failed', failure: { stage: 'author', code: turn.turn.stopReason, message: 'round2 did not complete', retryable: true, retryFrom: 'agent2' } }
     }
     const tree = await readStagedTree(options.io, options.home, stageKey)
     if (tree.kind !== 'present') return { kind: 'failed', failure: { stage: 'author', code: 'staging-missing', message: tree.kind === 'unknown' ? tree.reason : 'staged tree absent', retryable: true, retryFrom: 'agent2' } }
