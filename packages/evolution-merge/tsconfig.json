@@ -1,6 +1,11 @@
 {
-  "extends": "../tsconfig.pkg.json",
-  "references": [
-    { "path": "../evolution-core" }
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
   ]
 }

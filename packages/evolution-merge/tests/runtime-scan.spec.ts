@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { createMergeRuntime, writeStagedFile, type MergeRuntimeDeps, type SkillCard } from '../src/index.ts'
+import { createMergeRuntime, pairKey, stageKeyOf, writeStagedFile, type MergeRuntimeDeps, type SkillCard } from '../src/index.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill') }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill') }]
@@ -22,9 +22,15 @@ it('runs a scan through the runtime registry/channel/commit path', async () => {
     async read(name: string) { return cards.find(card => card.name === name)?.body ?? null },
     async commitMerge(plan: { sources: string[] }) { return { ok: true, message: 'merged', unitId: 'u-1', archived: plan.sources, mutations: 3 } },
   } as unknown as SkillLibrary
+  const stageKey = stageKeyOf('run-1', pairKey('alpha-skill', 'beta-skill'))
+  let first = true
   const channel = {
-    async open() { return { kind: 'ok' as const, childId: 'child-1', turn: { text: JSON.stringify(decision), stopReason: 'completed' } } },
-    async continueTurn() { await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella')); return { kind: 'ok' as const, childId: 'child-1', turn: { text: 'written', stopReason: 'completed' } } },
+    async open() { return { kind: 'ok' as const, childId: 'child-1', turn: { text: 'standby', stopReason: 'completed' } } },
+    async continueTurn() {
+      if (first) { first = false; return { kind: 'ok' as const, childId: 'child-1', turn: { text: JSON.stringify(decision), stopReason: 'completed' } } }
+      await writeStagedFile(io, home, stageKey, 'SKILL.md', BODY('umbrella'))
+      return { kind: 'ok' as const, childId: 'child-1', turn: { text: 'written', stopReason: 'completed' } }
+    },
     async dispose() {},
   }
   const deps: MergeRuntimeDeps = {

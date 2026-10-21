@@ -2,7 +2,7 @@
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { createChannelScanPorts, runScan, writeStagedFile, type CommitPort, type ConversationChannelLike, type SkillCard } from '../src/index.ts'
+import { createChannelScanPorts, pairKey, runScan, stageKeyOf, writeStagedFile, type CommitPort, type ConversationChannelLike, type SkillCard } from '../src/index.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill') }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill') }]
@@ -18,11 +18,17 @@ function commitPort(): CommitPort {
 it('runs scan through channel authoring and commit', async () => {
   const home = await tempRoot('dsh-merge-scan-ports-')
   const io = nodeEvolutionIo()
+  const stageKey = stageKeyOf('run-1', pairKey('alpha-skill', 'beta-skill'))
   let disposed = 0
+  let first = true
   const channel: ConversationChannelLike = {
-    async open() { return { kind: 'ok', childId: 'child-1', turn: { text: JSON.stringify(decision), stopReason: 'completed' } } },
+    async open() { return { kind: 'ok', childId: 'child-1', turn: { text: 'standby', stopReason: 'completed' } } },
     async continueTurn() {
-      expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
+      if (first) {
+        first = false
+        return { kind: 'ok', childId: 'child-1', turn: { text: JSON.stringify(decision), stopReason: 'completed' } }
+      }
+      expect((await writeStagedFile(io, home, stageKey, 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
       return { kind: 'ok', childId: 'child-1', turn: { text: 'written', stopReason: 'completed' } }
     },
     async dispose() { disposed += 1 },

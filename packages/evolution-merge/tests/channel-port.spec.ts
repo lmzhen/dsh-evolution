@@ -12,24 +12,31 @@ const signal = new AbortController().signal
 const mergeText = JSON.stringify({ should_merge: true, mode: 'merge-into-existing', target: 'alpha-skill', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' })
 
 function channel(text: string): ConversationChannelLike & { disposed: number; continued: number } {
-  const state = { disposed: 0, continued: 0 }
+  const state = { disposed: 0, continued: 0, first: true }
   return {
     ...state,
-    async open() { return { kind: 'ok' as const, childId: 'child-1', turn: { text, stopReason: 'completed' } } },
-    async continueTurn() { this.continued += 1; return { kind: 'ok' as const, childId: 'child-1', turn: { text: 'written', stopReason: 'completed' } } },
+    async open() { return { kind: 'ok' as const, childId: 'child-1', turn: { text: 'standby', stopReason: 'completed' } } },
+    async continueTurn() {
+      this.continued += 1
+      const reply = this.first ? text : 'written'
+      this.first = false
+      return { kind: 'ok' as const, childId: 'child-1', turn: { text: reply, stopReason: 'completed' } }
+    },
     async dispose() { this.disposed += 1 },
   }
 }
 
-it('opens, parses merge and exposes same-child author', async () => {
+it('opens standby, binds, sends round1 and exposes same-child author', async () => {
   const fake = channel(mergeText)
-  const result = await runRound1OverChannel({ channel: fake, parent: {}, cards, allow: [], timeoutMs: 1000 }, candidate, signal)
+  let bound = 0
+  const result = await runRound1OverChannel({ channel: fake, parent: {}, cards, allow: [], timeoutMs: 1000, onChildOpened: () => { bound += 1 } }, candidate, signal)
   expect(result.outcome).toMatchObject({ kind: 'merge', decision: { shouldMerge: true } })
   expect(result.childId).toBe('child-1')
+  expect(bound).toBe(1)
   expect(await result.author?.(row, { shouldMerge: true, mode: 'merge-into-existing', target: 'alpha-skill', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }, signal)).toBe('written')
   await result.dispose()
   await result.dispose()
-  expect(fake.continued).toBe(1)
+  expect(fake.continued).toBe(2)
   expect(fake.disposed).toBe(1)
 })
 

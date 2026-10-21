@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, upsertRow, writeStagedFile, type MergeRuntimeDeps, type MergeRow, type SkillCard } from '../src/index.ts'
+import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, stageKeyOf, upsertRow, writeStagedFile, type MergeRuntimeDeps, type MergeRow, type SkillCard } from '../src/index.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill') }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill') }]
@@ -25,9 +25,10 @@ it('approves a pending row through a new child and drops it after commit', async
     async read(name: string) { return cards.find(card => card.name === name)?.body ?? null },
     async commitMerge(plan: { sources: string[] }) { return { ok: true, message: 'merged', unitId: 'u-1', archived: plan.sources, mutations: 3 } },
   } as unknown as SkillLibrary
+  const stageKey = stageKeyOf('run-1', key)
   const channel = {
-    async open() { await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella')); return { kind: 'ok' as const, childId: 'child-2', turn: { text: 'written', stopReason: 'completed' } } },
-    async continueTurn() { throw new Error('not used') },
+    async open() { return { kind: 'ok' as const, childId: 'child-2', turn: { text: 'standby', stopReason: 'completed' } } },
+    async continueTurn() { await writeStagedFile(io, home, stageKey, 'SKILL.md', BODY('umbrella')); return { kind: 'ok' as const, childId: 'child-2', turn: { text: 'written', stopReason: 'completed' } } },
     async dispose() {},
   }
   const deps: MergeRuntimeDeps = {
