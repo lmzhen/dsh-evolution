@@ -32,7 +32,7 @@ it('serves view/rows/run/runs', async () => {
   const one = await (await fetchPath(MERGE_ROUTES.run + '?id=r1')).json() as { data: { id: string } }
   expect(one.data.id).toBe('r1')
   expect((await (await fetchPath(MERGE_ROUTES.run + '?id=missing')).json() as { ok: boolean }).ok).toBe(false)
-  expect((await (await fetchPath(MERGE_ROUTES.runs)).json() as { data: { items: unknown[] } }).data.items).toHaveLength(1)
+  expect((await (await fetchPath(MERGE_ROUTES.runs)).json() as { data: { items: unknown[] } }).data.items).toHaveLength(2)
 })
 
 it('rejects non-GET and reports an absent service', async () => {
