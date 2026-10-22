@@ -43,8 +43,7 @@ it('trusts a commit receipt over a stale journal', async () => {
 })
 
 it('removes an empty target directory when rolling back a create', async () => {
-  const home = await tempRoot('dsh-merge-recovery-empty-'
-  )
+  const home = await tempRoot('dsh-merge-recovery-empty-')
   const io = nodeEvolutionIo()
   const runId = 'run-1'
   const root = join(home, 'skills')
