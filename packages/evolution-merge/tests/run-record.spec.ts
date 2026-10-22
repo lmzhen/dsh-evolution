@@ -1,6 +1,6 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { it } from 'vitest'
 import { allCommittedUndone, deriveMergeStatus, type RunRecordV2 } from '../src/domain/run-record.ts'
 
 const base: RunRecordV2 = {
@@ -8,22 +8,22 @@ const base: RunRecordV2 = {
   startedAt: 1, updatedAt: 1, pairs: [],
 }
 
-test('running without pending stays running', () => {
+it('running without pending stays running', () => {
   assert.equal(deriveMergeStatus(base), 'running')
 })
 
-test('approval on with pending becomes awaiting-approval', () => {
+it('approval on with pending becomes awaiting-approval', () => {
   const record: RunRecordV2 = { ...base, approval: 'on', pairs: [{ pairKey: 'a', a: 'a', b: 'b', result: 'pending' }] }
   assert.equal(deriveMergeStatus(record), 'awaiting-approval')
 })
 
-test('all committed pairs undone becomes undone', () => {
+it('all committed pairs undone becomes undone', () => {
   const record: RunRecordV2 = { ...base, status: 'succeeded', pairs: [{ pairKey: 'a', a: 'a', b: 'b', result: 'undone', committed: true }] }
   assert.equal(deriveMergeStatus(record), 'undone')
   assert.equal(allCommittedUndone(record), true)
 })
 
-test('partial undone remains succeeded', () => {
+it('partial undone remains succeeded', () => {
   const record: RunRecordV2 = { ...base, status: 'succeeded', pairs: [
     { pairKey: 'a', a: 'a', b: 'b', result: 'undone', committed: true },
     { pairKey: 'c', a: 'c', b: 'd', result: 'merged', committed: true },
@@ -32,13 +32,13 @@ test('partial undone remains succeeded', () => {
   assert.equal(allCommittedUndone(record), false)
 })
 
-test('terminal statuses project directly', () => {
+it('terminal statuses project directly', () => {
   assert.equal(deriveMergeStatus({ ...base, status: 'failed' }), 'failed')
   assert.equal(deriveMergeStatus({ ...base, status: 'cancelled' }), 'cancelled')
   assert.equal(deriveMergeStatus({ ...base, status: 'interrupted' }), 'interrupted')
   assert.equal(deriveMergeStatus({ ...base, status: 'orphan' }), 'orphan')
 })
 
-test('superseded wins over success', () => {
+it('superseded wins over success', () => {
   assert.equal(deriveMergeStatus({ ...base, status: 'succeeded', supersededAt: 2 }), 'superseded')
 })

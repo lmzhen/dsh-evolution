@@ -1,9 +1,9 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { it } from 'vitest'
 import { routeFailure } from '../src/domain/failure-route.ts'
 
-test('routes parameter errors and report-only failures', () => {
+it('routes parameter errors and report-only failures', () => {
   assert.deepEqual(routeFailure('bad-pair'), { kind: 'parameter', reportOnly: false })
   assert.deepEqual(routeFailure('source-gone'), { kind: 'source-gone', reportOnly: true })
   assert.deepEqual(routeFailure('target-taken'), { kind: 'target-taken', reportOnly: true })

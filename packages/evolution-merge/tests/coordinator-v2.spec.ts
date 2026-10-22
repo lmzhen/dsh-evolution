@@ -1,6 +1,6 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { it } from 'vitest'
 import { transition } from '../src/coordinator.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
@@ -18,12 +18,12 @@ function apply(rowValue: ReturnType<typeof row>, event: Parameters<typeof transi
   return result.row
 }
 
-test('candidate uses new verify queue', () => {
+it('candidate uses new verify queue', () => {
   assert.equal(row().state, 'verify')
   assert.equal(row().queue, 'verify')
 })
 
-test('approval off enters approved; approve enters approved', () => {
+it('approval off enters approved; approve enters approved', () => {
   const off = apply(row(), { type: 'round1-merge', approval: 'off', at: AT })
   assert.equal(off.state, 'approved')
   assert.equal(off.queue, 'fuse')
@@ -31,7 +31,7 @@ test('approval off enters approved; approve enters approved', () => {
   assert.equal(apply(pending, { type: 'approve', at: AT }).state, 'approved')
 })
 
-test('round2 fail returns approved and success drops', () => {
+it('round2 fail returns approved and success drops', () => {
   const approved = apply(row(), { type: 'round1-merge', approval: 'off', at: AT })
   const failed = apply(approved, { type: 'round2-fail', failure, at: AT })
   assert.equal(failed.state, 'approved')
@@ -39,7 +39,7 @@ test('round2 fail returns approved and success drops', () => {
   assert.equal(apply(failed, { type: 'round2-success', at: AT }), null)
 })
 
-test('restore skipped row to verify', () => {
+it('restore skipped row to verify', () => {
   const skipped = apply(row(), { type: 'round1-keep', at: AT })
   assert.equal(apply(skipped, { type: 'restore', at: AT }).state, 'verify')
 })

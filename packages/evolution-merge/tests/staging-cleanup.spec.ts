@@ -1,6 +1,6 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { it } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,7 +9,7 @@ import { cleanupExpiredStaging, createStaging, readStaging } from '../src/stagin
 
 const input = (runId: string, ttlDays: number) => ({ runId, target: 't', sources: [{ name: 's', body: '# s', files: [] }], promptVersion: 'p', ttlDays, now: () => 1000 })
 
-test('staging cleanup removes expired runs, respects keep and half-created', async () => {
+it('staging cleanup removes expired runs, respects keep and half-created', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dsh-staging-cleanup-'))
   const io = nodeEvolutionIo()
   try {

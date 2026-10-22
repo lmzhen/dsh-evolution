@@ -1,9 +1,9 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { it } from 'vitest'
 import { findPairRun } from '../src/domain/resolve-pair.ts'
 
-test('finds a committed pair by pairKey or pairs[]', () => {
+it('finds a committed pair by pairKey or pairs[]', () => {
   const runs = [
     { id: 'r1', pairKey: 'a', pairs: [], resultRef: 'report' },
     { id: 'r2', pairs: [{ pairKey: 'b', a: 'b', b: 'c', result: 'merged' as const, target: { requested: 't', actual: 'u' }, committed: true }] },

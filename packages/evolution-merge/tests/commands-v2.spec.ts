@@ -1,6 +1,6 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { it } from 'vitest'
 import { parseMergeCommand } from '../src/commands.ts'
 
 function command(argv: string[]) {
@@ -10,7 +10,7 @@ function command(argv: string[]) {
   return parsed.command
 }
 
-test('parses the 19 command forms', () => {
+it('parses the 19 command forms', () => {
   const forms = [
     ['scan'], ['pair', 'a', 'b'], ['pair', '--force', 'a', 'b'], ['status'], ['status', 'id'],
     ['report'], ['cancel'], ['runs'], ['doctor'], ['pending'], ['pending', '--expired'],
@@ -21,7 +21,7 @@ test('parses the 19 command forms', () => {
   for (const argv of forms) assert.equal(parseMergeCommand(argv).ok, true, argv.join(' '))
 })
 
-test('force/expired/retry switches keep positional args', () => {
+it('force/expired/retry switches keep positional args', () => {
   assert.deepEqual(command(['pair', '--force', 'a', 'b']), { verb: 'pair', a: 'a', b: 'b', force: true })
   assert.deepEqual(command(['pending', '--expired']), { verb: 'pending', expired: true })
   assert.deepEqual(command(['candidates', '--retry']), { verb: 'candidates', retry: true })
@@ -29,7 +29,7 @@ test('force/expired/retry switches keep positional args', () => {
   assert.deepEqual(command(['discard', 'id']), { verb: 'discard', id: 'id' })
 })
 
-test('rejects unknown flags and missing args', () => {
+it('rejects unknown flags and missing args', () => {
   assert.equal(parseMergeCommand(['discard']).ok, false)
   assert.equal(parseMergeCommand(['resume', '--nope']).ok, false)
 })
