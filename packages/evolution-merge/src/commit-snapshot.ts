@@ -16,7 +16,13 @@ export function snapshotPath(home: string, runId: string): string {
   return join(home, 'merge', 'snapshots', runId.replace(/[^A-Za-z0-9_-]+/g, '_') + '.json')
 }
 
-export async function writeCommitSnapshot(io: EvolutionIoLike, home: string, runId: string, plan: CommitMergePlan, now: number): Promise<CommitSnapshot> {
+export async function writeCommitSnapshot(
+  io: EvolutionIoLike,
+  home: string,
+  runId: string,
+  plan: CommitMergePlan,
+  now: number,
+): Promise<CommitSnapshot> {
   const snapshot: CommitSnapshot = {
     runId, target: plan.target, create: !plan.targetExists, sources: plan.sources,
     targetBody: plan.expectedTargetBody,

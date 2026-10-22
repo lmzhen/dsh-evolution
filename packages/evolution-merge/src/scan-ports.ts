@@ -75,9 +75,9 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
       const sourceRevision = result.outcome.kind === 'merge' ? sourceRevisionOf(options.cards, candidate.a, candidate.b) : undefined
       return result.outcome.kind === 'merge'
         ? {
-            ...result.outcome, stagingRef: stageKey, stagingExpiresAt: options.now() + 7 * 86_400_000,
-            ...(sourceRevision === undefined ? {} : { sourceRevision }),
-          }
+          ...result.outcome, stagingRef: stageKey, stagingExpiresAt: options.now() + 7 * 86_400_000,
+          ...(sourceRevision === undefined ? {} : { sourceRevision }),
+        }
         : result.outcome
     },
     async round2(row: MergeRow, decision: MergeDecision, signal: AbortSignal): Promise<ScanRound2Outcome> {
