@@ -26,6 +26,8 @@ export type MergeEvent =
   | { readonly type: 'round2-success'; readonly unitId?: string; readonly at: string }
   | { readonly type: 'restore'; readonly at: string }
   | { readonly type: 'source-gone'; readonly at: string }
+  | { readonly type: 'target-taken'; readonly at: string }
+  | { readonly type: 'source-changed'; readonly at: string }
   | { readonly type: 'gate-keep'; readonly a: string; readonly b: string; readonly reason?: string; readonly at: string }
 
 export type TransitionResult =
@@ -145,6 +147,11 @@ export function transition(current: MergeRow | undefined, event: MergeEvent): Tr
     case 'round2-success':
       return current.state === 'fuse' || current.state === 'approved'
         ? { ok: true, row: null }
+        : invalid(event, current.state)
+    case 'target-taken':
+    case 'source-changed':
+      return current.state === 'pending' || current.state === 'approved' || current.state === 'fuse'
+        ? next(current, event.at, current.state, { expired: event.type })
         : invalid(event, current.state)
     case 'restore':
       return current.state === 'skipped'

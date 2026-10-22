@@ -4,7 +4,7 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import { probeText, type EvolutionIoLike, type RunRegistry, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
-import { canRetry, pairKey, type MergeCandidate, type MergeDecision, type MergeRow } from './contracts.ts'
+import { canRetry, pairKey, type MergeCandidate, type MergeDecision } from './contracts.ts'
 import { skippedPairKeys } from './skipped.ts'
 import type { MergeParams } from './params.ts'
 import type { SkillCard } from './skill-card.ts'
