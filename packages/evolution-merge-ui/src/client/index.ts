@@ -58,7 +58,7 @@ export function apply(ctx: ClientContext): void {
       PanelIcon,
     )
     yield seam.slots.register(
-      { name: 'main', key: PANEL_ID, inject: (): MergeFace => ({ view: seedView(), rows: [], loadView: api.view, loadRows: api.rows, t }) },
+      { name: 'main', key: PANEL_ID, inject: (): MergeFace => ({ view: seedView(), rows: [], loadView: api.view, loadRows: api.rows, loadBody: api.body, loadHistory: api.history, t }) },
       MergePanel,
     )
   })

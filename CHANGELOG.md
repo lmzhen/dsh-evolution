@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.1 (patch) — merge 面板补 body/history 入口
+
+> **范围**：`@lmzhen/dsh-evolution-merge-ui` 的 main inject 补 `loadBody`/`loadHistory`，恢复行内 A/B 与历史只读 overlay。
+> **验证**：official overlay 重建 client bundle；临时 DSH_HOME 3082 + capture-client-console 的 merge action：hasBodyA/B/History=true，consoleErrors=0；截图 `design/assets/merge-panel-0.30.1-body.png`。
+
 ## 0.30.0 (minor) — 技能自动合并 G0–G8 收口：两轮状态机、target-first commit、四队列 UI、发布构建线
 
 > **范围**：merge 内核按契约冻结收口（5 状态/4 队列/19 命令/4 只读 GET/schema 2）；commit 改 target-first + journal + undo pairIndex；run 壳支持 detached/interrupted/orphan；UI 四 tab、body/history 只读 overlay、expired/reason/summary；engine 包补类型导出与模型根；family 构建线补 lib/index.js 与 client bundle；许可裁定 MIT（代码）+ model-derived asset NOTICE。

@@ -6,7 +6,7 @@
  */
 
 /** The family version this surface belongs to. */
-export const FAMILY_VERSION = '0.30.0'
+export const FAMILY_VERSION = '0.30.1'
 
 /** What this surface is for, in one line. */
 export const PACKAGE_PURPOSE = 'Web settings cards for the evolution family\'s parameter namespaces'
