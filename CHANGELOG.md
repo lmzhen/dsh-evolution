@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.2 (patch) — G8 P1 根治：范围门、pair --force、consolidate 退役、冲突判定、approve 时效、8k 预算、commit 恢复
+
+> **范围**：D19–D25。SkillCard.managed 范围门；pair --force 生成 forced decision；consolidate 退出用户面；pending/fuse 冲突拒绝；approve 前 sourceRevision/source-gone/target-taken/source-changed；report/status 8k 预算；commit 前 snapshot + journal 写前声明 + 启动自动恢复。
+> **验证**：merge 69 files/159 tests、commands 62/62；0.30.2 发布后补矩阵、API web 真机、独立复核。
+
 ## 0.30.1 (patch) — merge 面板补 body/history 入口
 
 > **范围**：`@lmzhen/dsh-evolution-merge-ui` 的 main inject 补 `loadBody`/`loadHistory`，恢复行内 A/B 与历史只读 overlay。
