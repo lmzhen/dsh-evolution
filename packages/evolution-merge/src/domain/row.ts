@@ -87,16 +87,16 @@ export function transitionRow(current: MergeRowV2 | undefined, event: MergeRowEv
     return { ok: true, row: { id: rowIdOf(key), pairKey: key, a: event.a, b: event.b, state: 'verify', queue: 'verify', createdAt: event.at, updatedAt: event.at } }
   }
   if (event.type === 'source-gone') return { ok: true, row: null }
+  if (event.type === 'gate-keep') {
+    if (current !== undefined) return { ok: true, row: current }
+    const key = pairKey(event.a, event.b)
+    return { ok: true, row: { id: rowIdOf(key), pairKey: key, a: event.a, b: event.b, state: 'skipped', queue: 'skipped', origin: 'agent', createdAt: event.at, updatedAt: event.at } }
+  }
   if (current === undefined) return invalid(event, undefined)
   if (event.type === 'discard') {
     return current.state === 'pending' || current.state === 'approved' || current.state === 'fuse'
       ? { ok: true, row: null }
       : invalid(event, current.state)
-  }
-  if (event.type === 'gate-keep') {
-    return { ok: true, row: current }
-    const key = pairKey(event.a, event.b)
-    return { ok: true, row: { id: rowIdOf(key), pairKey: key, a: event.a, b: event.b, state: 'skipped', queue: 'skipped', origin: 'agent', createdAt: event.at, updatedAt: event.at } }
   }
   if (event.type === 'restore') {
     return current.state === 'skipped' ? next(current, event.at, 'verify') : invalid(event, current.state)
