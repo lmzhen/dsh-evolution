@@ -88,7 +88,8 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (cardA === undefined || cardB === undefined || cardA.managed !== true || cardB.managed !== true) {
           return { ok: false, text: 'merge pair 仅支持 family-managed 技能: ' + command.a + ' / ' + command.b }
         }
-        if (cardA.protectedBy != null || cardB.protectedBy != null || cardA.protectionUnknown === true || cardB.protectionUnknown === true) {
+        if (cardA.protectedBy != null || cardB.protectedBy != null
+          || cardA.protectionUnknown === true || cardB.protectionUnknown === true) {
           return { ok: false, text: 'merge pair 不接受受保护/保护状态未知技能: ' + command.a + ' / ' + command.b }
         }
         const pair = [{ a: command.a, b: command.b }]
@@ -290,7 +291,8 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             return { ok: false, text: 'source-changed：源技能内容在决策后变化，拒绝照跑；出口：重新 merge pair，或 merge skipped --discard' }
           }
           const currentTargetRevision = targetRevisionOf(cards, candidate.decision.target)
-          if (candidate.targetRevision !== undefined && currentTargetRevision !== undefined && currentTargetRevision !== candidate.targetRevision) {
+          if (candidate.targetRevision !== undefined && currentTargetRevision !== undefined
+            && currentTargetRevision !== candidate.targetRevision) {
             const taken = transition(candidate, { type: 'target-taken', at: new Date().toISOString() })
             if (taken.ok && taken.row !== null) await upsertRow(deps.io, deps.home, deps.now, taken.row)
             return { ok: false, text: 'target-taken：目标 ' + candidate.decision.target + ' 在决策后变化，拒绝照跑；可重新 merge pair 或 discard' }
