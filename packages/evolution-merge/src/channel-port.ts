@@ -12,6 +12,7 @@ import type { ScanRound1Outcome } from './scan-run.ts'
 export interface ChannelTurnLike {
   readonly text: string
   readonly stopReason: string
+  readonly cacheRead?: number
 }
 
 export type ChannelTurnOutcome =
@@ -105,13 +106,14 @@ export async function runRound1OverChannel(
     await dispose()
     return { outcome: { kind: 'failed', failure: { stage: 'decide', code: parsed.code, message: parsed.message, retryable: true, retryFrom: 'agent1' } }, dispose }
   }
-  if (!parsed.decision.shouldMerge || parsed.decision.mode === 'keep') {
+  const decision = round1.turn.cacheRead === undefined ? parsed.decision : { ...parsed.decision, cacheRead: round1.turn.cacheRead }
+  if (!decision.shouldMerge || decision.mode === 'keep') {
     await dispose()
-    return { outcome: { kind: 'keep', decision: parsed.decision }, dispose }
+    return { outcome: { kind: 'keep', decision }, dispose }
   }
   const child = opened.childId
   return {
-    outcome: { kind: 'merge', decision: parsed.decision },
+    outcome: { kind: 'merge', decision },
     childId: child,
     dispose,
     async author(row, decision, turnSignal) {

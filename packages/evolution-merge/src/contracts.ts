@@ -86,6 +86,7 @@ export interface MergeDecision {
   readonly confidence?: number
   readonly aSummary?: string
   readonly bSummary?: string
+  readonly cacheRead?: number
 }
 
 export interface MergeUsage {

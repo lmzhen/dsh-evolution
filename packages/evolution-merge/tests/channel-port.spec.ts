@@ -11,7 +11,7 @@ const row: MergeRow = { id: '', pairKey: 'a\u0000b', a: 'alpha-skill', b: 'beta-
 const signal = new AbortController().signal
 const mergeText = JSON.stringify({ should_merge: true, mode: 'merge-into-existing', target: 'alpha-skill', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' })
 
-function channel(text: string): ConversationChannelLike & { disposed: number; continued: number } {
+function channel(text: string, cacheRead?: number): ConversationChannelLike & { disposed: number; continued: number } {
   const state = { disposed: 0, continued: 0, first: true }
   return {
     ...state,
@@ -19,8 +19,9 @@ function channel(text: string): ConversationChannelLike & { disposed: number; co
     async continueTurn() {
       this.continued += 1
       const reply = this.first ? text : 'written'
+      const turn = { text: reply, stopReason: 'completed', ...(this.first && cacheRead !== undefined ? { cacheRead } : {}) }
       this.first = false
-      return { kind: 'ok' as const, childId: 'child-1', turn: { text: reply, stopReason: 'completed' } }
+      return { kind: 'ok' as const, childId: 'child-1', turn }
     },
     async dispose() { this.disposed += 1 },
   }
@@ -42,6 +43,13 @@ it('opens standby, binds, sends round1 and exposes same-child author', async () 
   await result.dispose()
   expect(fake.continued).toBe(2)
   expect(fake.disposed).toBe(1)
+})
+
+it('carries cacheRead into the decision observation', async () => {
+  const fake = channel(mergeText, 1234)
+  const result = await runRound1OverChannel({ channel: fake, parent: {}, cards, allow: [], timeoutMs: 1000 }, candidate, signal)
+  expect(result.outcome).toMatchObject({ kind: 'merge', decision: { cacheRead: 1234 } })
+  await result.dispose()
 })
 
 it('disposes immediately for keep and invalid decisions', async () => {
