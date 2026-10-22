@@ -117,7 +117,15 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       if (!created.ok || created.row === null) throw new Error(created.ok ? 'candidate row missing' : created.message)
       row = created.row
       const placed = await upsertRow(options.io, options.home, options.now, row, 'verify')
-      if (!placed.ok) throw new Error('pair already in ' + placed.current.state)
+      if (!placed.ok && placed.current.state === 'skipped') {
+        const restored = transition(placed.current, { type: 'restore', at: at(options.now) })
+        if (!restored.ok || restored.row === null) throw new Error('cannot restore skipped pair')
+        row = restored.row
+        const retried = await upsertRow(options.io, options.home, options.now, row, 'verify')
+        if (!retried.ok) throw new Error('pair already in ' + retried.current.state)
+      } else if (!placed.ok) {
+        throw new Error('pair already in ' + placed.current.state)
+      }
     } catch (error) {
       totals.failed += 1
       pairs.push({
