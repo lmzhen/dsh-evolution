@@ -18,6 +18,12 @@ it('maps keep and rejects invalid decisions', () => {
   expect(parseDecision('not json', pair)).toMatchObject({ ok: false })
 })
 
+it('fails closed when maxTokens truncates the decision JSON', () => {
+  const truncated = JSON.stringify(valid).slice(0, -10)
+  expect(parseDecision(truncated, pair)).toMatchObject({ ok: false })
+  expect(parseDecision('{"should_merge":true,"aSummary":"' + 'x'.repeat(1_000_000), pair)).toMatchObject({ ok: false })
+})
+
 it('keeps the two skill summaries for the pending row', () => {
   const withSummaries = { ...valid, aSummary: 'alpha does A', bSummary: 'beta does B' }
   expect(parseDecision(JSON.stringify(withSummaries), pair)).toMatchObject({ ok: true, decision: { aSummary: 'alpha does A', bSummary: 'beta does B' } })

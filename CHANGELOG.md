@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.8 (patch) — merge 长跑登记、maxTokens 容错测试、诊断脱敏
+
+> **范围**：LONG_RUNS 增 /evolution merge（plugin 生命周期、report home）；decision 截断/1MB 输入 fail closed；运行错误 stage/run id + sk/Bearer/api_key 脱敏。
+> **验证**：core long-runs 3 tests、merge 70 files/165 tests；0.30.8 发布后补矩阵。
+
 ## 0.30.7 (patch) — 设置卡文案、create 回滚空目录
 
 > **范围**：写入审批/技能自动合并卡内写明“写入审批=使用中生成/修改；合并审批=两轮工作流”；create 回滚删除空目录。

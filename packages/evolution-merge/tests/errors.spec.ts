@@ -10,11 +10,13 @@ it('parameter errors are two lines max', () => {
 })
 
 it('runtime errors carry stage and run id without raw body', () => {
-  const text = formatMergeError({ kind: 'target', code: 'target-taken', message: 'target changed', stage: 'commit', runId: 'run-1' })
+  const text = formatMergeError({ kind: 'target', code: 'target-taken', message: 'target changed sk-abcdefghijklmnop', stage: 'commit', runId: 'run-1' })
   assert.equal(text.split('\n').length, 3)
   assert.match(text, /stage=commit/)
   assert.match(text, /run=run-1/)
   assert.doesNotMatch(text, /SKILL\.md/)
+  assert.doesNotMatch(text, /sk-abcdefghijklmnop/)
+  assert.match(text, /\[redacted\]/)
 })
 
 it('runtime errors have detail and next line', () => {

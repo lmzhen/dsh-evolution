@@ -406,6 +406,7 @@ why their cost cannot reach a client wall. The table is rendered from
 | entry | kind | owner | lifetime | measured | result home |
 |---|---|---|---|---|---|
 | `/evolution maintain` | command | evolution-commands | plugin | the same scan measured 949.7 s end to end on the web plane (no Electron); the desktop shell ends the REQUEST at ~305 s (four runs: 305.6/307.0/306.0/305.7 s) | <evolutionHome>/reports/maintain-<runId>.{json,md}, indexed in <evolutionHome>/runs.json |
+| `/evolution merge` | command | evolution-merge | plugin | not measured end to end; each pair runs two agent turns whose wall is bounded by mergePairTimeoutMinutes, not by the request | <evolutionHome>/reports/merge-<runId>.json, indexed by merge status/report |
 | `maintenance_probe` | tool | evolution-maintenance | request | 188/220/225 ms on the deployed library (28 skills / 418 KB); ~5.5 ms per skill and linear (100 skills 0.4-0.6 s, 400 skills 1.9-2.5 s) | the tool result (JSON detail), answered in-turn |
 | `skill_manage` | tool | tool-skill-manage | request | not measured as a duration: single-file IO plus a library listing the cross-source gate already reads; the only unbounded wait is a HUMAN answer | the tool result, plus the mutation audit records |
 | `memory` | tool | tool-memory | request | single-file IO on the memory store | the tool result |

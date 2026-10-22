@@ -60,6 +60,16 @@ export const LONG_RUNS: readonly LongRunEntry[] = [
     note: 'The ~305 s wall is a CLIENT lifetime, not a budget: the run keeps working and the result is read back with maintain status/report. Its cancellation is the run registry handle (maintain cancel <id>) or plugin dispose.',
   },
   {
+    id: '/evolution merge',
+    kind: 'command',
+    owner: 'evolution-merge',
+    lifetime: 'plugin',
+    measured: 'not measured end to end; each pair runs two agent turns whose wall is bounded by mergePairTimeoutMinutes, not by the request',
+    budget: 'mergeRunTimeoutMinutes (row config, 0 = no limit) for the run; mergePairTimeoutMinutes for one pair',
+    resultHome: '<evolutionHome>/reports/merge-<runId>.json, indexed by merge status/report',
+    note: 'The command returns a run id or the report; a client disconnect does not cancel the run registry handle. Cancellation is merge cancel <id> or plugin dispose.',
+  },
+  {
     id: 'maintenance_probe',
     kind: 'tool',
     owner: 'evolution-maintenance',
