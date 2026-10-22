@@ -15,8 +15,8 @@ export interface CommitRecoveryReport {
 
 export async function recoverCommitJournals(io: EvolutionIoLike, home: string, now: number): Promise<readonly CommitRecoveryReport[]> {
   const dir = join(home, 'merge', 'journals')
-  let files: string[] = []
-  try { files = (await io.list(dir)).filter(name => name.endsWith('.json')) } catch { return [] }
+  if (!(await io.exists(dir))) return []
+  const files = (await io.list(dir)).filter(name => name.endsWith('.json'))
   const reports: CommitRecoveryReport[] = []
   for (const file of files) {
     let journal: CommitJournal
