@@ -12,6 +12,7 @@ export async function handleReadOnlyMergeCommand(
   command: MergeCliCommand,
   io: EvolutionIoLike,
   home: string,
+  cards?: readonly { readonly name: string }[],
 ): Promise<string | null> {
   const withNote = (text: string, note: string | undefined): string => note === undefined ? text : 'note: ' + note + '\n' + text
   if (command.verb === 'status') {
@@ -25,7 +26,8 @@ export async function handleReadOnlyMergeCommand(
   if (command.verb === 'pending') {
     const loaded = await loadMergeState(io, home)
     const rows = command.expired === true ? loaded.state.rows.filter(row => row.expired !== undefined) : loaded.state.rows
-    return withNote(command.expired === true ? formatStatus(rows) : formatQueue(rows, 'pending'), loaded.note)
+    const live = cards === undefined ? rows : rows.filter(row => cards.some(card => card.name === row.a) && cards.some(card => card.name === row.b))
+    return withNote(command.expired === true ? formatStatus(live) : formatQueue(live, 'pending'), loaded.note)
   }
   if (command.verb === 'candidates') {
     const loaded = await loadMergeState(io, home)

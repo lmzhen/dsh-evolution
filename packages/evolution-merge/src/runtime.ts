@@ -320,7 +320,8 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (!('report' in result)) return { ok: false, text: 'merge approve started without a report' }
         return { ok: true, text: 'merge approve 完成：merged ' + String(result.report.totals.merged) }
       }
-      const text = await handleReadOnlyMergeCommand(command, deps.io, deps.home)
+      const cards = command.verb === 'pending' ? await deps.cards(new AbortController().signal) : undefined
+      const text = await handleReadOnlyMergeCommand(command, deps.io, deps.home, cards)
       if (text !== null) return { ok: true, text }
       return readOnly.execute(command)
     },
