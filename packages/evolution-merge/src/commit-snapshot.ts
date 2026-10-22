@@ -19,7 +19,8 @@ export function snapshotPath(home: string, runId: string): string {
 export async function writeCommitSnapshot(io: EvolutionIoLike, home: string, runId: string, plan: CommitMergePlan, now: number): Promise<CommitSnapshot> {
   const snapshot: CommitSnapshot = {
     runId, target: plan.target, create: !plan.targetExists, sources: plan.sources,
-    targetBody: plan.expectedTargetBody, sourceBodies: plan.expectedSourceBodies.map(item => ({ name: item.name, body: item.body })),
+    targetBody: plan.expectedTargetBody,
+    sourceBodies: plan.expectedSourceBodies.map(item => ({ name: item.name, body: item.body })),
     at: new Date(now).toISOString(),
   }
   await io.writeText(snapshotPath(home, runId), JSON.stringify(snapshot, null, 2))
