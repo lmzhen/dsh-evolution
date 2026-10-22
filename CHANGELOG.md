@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.15 (patch) — resume fuse/approved owner 守卫
+
+> **范围**：resume 的 fuse/approved 分支拒绝活 owner；无 id 自动选行跳过活 owner；verify resume 透传 isOwnerActive。
+> **验证**：merge 71 files/168 tests；0.30.15 发布后最终复核。
+
 ## 0.30.14 (patch) — scan owner 闭环
 
 > **范围**：runScan 在接管 verify 前查 owner run 是否仍 running；活跃 owner 跳过该 pair；resume verify 分支拒绝仍在跑的 owner。

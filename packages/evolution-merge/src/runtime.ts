@@ -249,9 +249,15 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           return { ok: true, text: '已清除合并行：' + cleared.id }
         }
         const loaded = await loadMergeState(deps.io, deps.home)
-        const row = command.id === undefined
-          ? loaded.state.rows.find(item => item.state === 'fuse' || item.state === 'verify' || (command.retry === true && item.state === 'approved'))
-          : loaded.state.rows.find(item => item.id === command.id)
+        let row = command.id === undefined ? undefined : loaded.state.rows.find(item => item.id === command.id)
+        if (command.id === undefined) {
+          for (const item of loaded.state.rows) {
+            if (item.state !== 'fuse' && item.state !== 'verify' && !(command.retry === true && item.state === 'approved')) continue
+            if (item.runId !== undefined && (await deps.isOwnerActive?.(item.runId)) === true) continue
+            row = item
+            break
+          }
+        }
         if (row === undefined) return { ok: false, text: 'merge row not found: ' + (command.id ?? '(auto)') }
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)

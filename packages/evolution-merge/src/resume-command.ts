@@ -47,9 +47,13 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
           },
         }),
       ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
+      ...(options.isOwnerActive === undefined ? {} : { isOwnerActive: options.isOwnerActive }),
     })
   }
   if (row.state !== 'fuse' && row.state !== 'approved') return { ok: false, message: 'row is not resumable from state ' + row.state }
+  if (row.runId !== undefined && (await options.isOwnerActive?.(row.runId)) === true) {
+    return { ok: false, message: 'merge run still owns this fuse row: ' + row.runId }
+  }
   const decision = row.decision
   if (decision === undefined) return { ok: false, message: 'fuse row has no decision' }
   return await withMergeRun({
