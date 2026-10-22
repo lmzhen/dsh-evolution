@@ -1,5 +1,5 @@
 /** Pure failure routing for merge errors. */
-export type MergeFailureRoute = 
+export type MergeFailureRoute =
   | { readonly kind: 'parameter'; readonly reportOnly: false }
   | { readonly kind: 'source-gone'; readonly reportOnly: true }
   | { readonly kind: 'target-taken'; readonly reportOnly: true }

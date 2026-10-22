@@ -16,7 +16,7 @@ export function parsePairIndex(raw: string | null): Map<string, PairIndexEntryV2
   for (const value of body.entries) {
     const entry = value as Partial<PairIndexEntryV2>
     if (typeof entry.pairKey !== 'string' || typeof entry.runId !== 'string' || typeof entry.result !== 'string') continue
-    if (entry.result !== 'merged' && entry.result !== 'kept' && entry.result !== 'failed' && entry.result !== 'cancelled' && entry.result !== 'undone') continue
+    if (!['merged', 'kept', 'failed', 'cancelled', 'undone'].includes(entry.result)) continue
     index.set(entry.pairKey, entry as PairIndexEntryV2)
   }
   return index

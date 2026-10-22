@@ -4,7 +4,8 @@ import { it } from 'vitest'
 import { selectCandidates } from '@deepseek-ai/dsh-evolution-merge-engine'
 
 const row = (overrides: Record<string, unknown>) => ({ a: 'a', b: 'b', level: 'L2', verdict_id: -1, reason: 'x', ...overrides })
-const select = (report: Record<string, unknown>) => selectCandidates(report) as { candidates: unknown[]; skipped: unknown[]; reportOnly: unknown[] }
+type Selection = { candidates: unknown[]; skipped: unknown[]; reportOnly: unknown[] }
+const select = (report: Record<string, unknown>) => selectCandidates(report) as Selection
 
 it('L2 KEEP becomes skipped; L0/L1 stay reportOnly', () => {
   const selection = select({ pairs_final: [

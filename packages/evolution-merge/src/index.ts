@@ -133,7 +133,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     if (registry === undefined) return
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
-    void loadMergeState(io, home).then(loaded => cleanupExpiredStaging(io, home, Date.now(), new Set(loaded.state.rows.map(row => row.runId).filter((id): id is string => id !== undefined)))).catch((error) => { ctx.logger.warn('merge staging cleanup failed: ' + (error instanceof Error ? error.message : String(error))) })
+    void loadMergeState(io, home).then(loaded => cleanupExpiredStaging(io, home, Date.now(), new Set(loaded.state.rows.map(row => row.runId).filter((id): id is string => id !== undefined)))).catch((error: unknown) => { ctx.logger.warn('merge staging cleanup failed: ' + (error instanceof Error ? error.message : String(error))) })
     const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) } })
     void runs.load()
     ctx.effect(() => {

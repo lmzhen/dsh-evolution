@@ -17,6 +17,8 @@ import { recordPair } from './domain/pair-index-store.ts'
 import type { EvolutionIoLike, RunStage } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeRunReportDraft } from './run-shell.ts'
 
+const isAborted = (signal: AbortSignal): boolean => signal.aborted
+
 export interface ScanRound1Outcome {
   readonly kind: 'keep' | 'merge' | 'failed'
   readonly decision?: MergeDecision
@@ -96,7 +98,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
   let stopReason: MergeRunReportDraft['stopReason'] = 'completed'
 
   for (let index = 0; index < candidates.length; index += 1) {
-    if (options.signal.aborted) {
+    if (isAborted(options.signal)) {
       stopReason = 'cancelled'
       remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'verify' as const })))
       break
@@ -129,7 +131,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     } catch (error) {
       round1 = { kind: 'failed', failure: failureOf('decide', error) }
     }
-    if (options.signal.aborted) {
+    if (isAborted(options.signal)) {
       stopReason = 'cancelled'
       remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'verify' as const })))
       break
@@ -173,7 +175,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     }
     row = fuse.row
     await upsertRow(options.io, options.home, options.now, row)
-    if (options.signal.aborted) {
+    if (isAborted(options.signal)) {
       const cancelled = transition(row, { type: 'round2-cancel', at: at(options.now) })
       if (cancelled.ok && cancelled.row !== null) { row = cancelled.row; await upsertRow(options.io, options.home, options.now, row) }
       stopReason = 'cancelled'

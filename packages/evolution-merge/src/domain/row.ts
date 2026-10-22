@@ -94,7 +94,7 @@ export function transitionRow(current: MergeRowV2 | undefined, event: MergeRowEv
       : invalid(event, current.state)
   }
   if (event.type === 'gate-keep') {
-    if (current !== undefined) return { ok: true, row: current }
+    return { ok: true, row: current }
     const key = pairKey(event.a, event.b)
     return { ok: true, row: { id: rowIdOf(key), pairKey: key, a: event.a, b: event.b, state: 'skipped', queue: 'skipped', origin: 'agent', createdAt: event.at, updatedAt: event.at } }
   }
@@ -131,9 +131,7 @@ export function transitionRow(current: MergeRowV2 | undefined, event: MergeRowEv
                 ? { type: 'round1-fail' as const }
                 : event.type === 'approve'
                   ? { type: 'approve' as const }
-                  : event.type === 'reject'
-                    ? { type: 'reject' as const }
-                    : undefined
+                  : { type: 'reject' as const }
   if (mapped === undefined) return invalid(event, current.state)
   const moved = stateTransition(current.state, mapped)
   if (!moved.ok) return invalid(event, current.state)

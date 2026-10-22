@@ -99,7 +99,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
               commitPort: skillLibraryPort(deps.skills), now: deps.now,
               ...stageHooks,
             })
-            return forced === undefined ? ports : { ...ports, round1: async () => ({ kind: 'merge' as const, decision: forced.decision as MergeDecision }) }
+            return forced === undefined ? ports : { ...ports, round1: () => Promise.resolve({ kind: 'merge' as const, decision: forced.decision as MergeDecision }) }
           },
         })
         if (!result.ok) return { ok: false, text: result.message }
