@@ -438,6 +438,7 @@
         "evolution-merge::tests/read-commands.spec.ts",
         "evolution-merge::tests/report.spec.ts",
         "evolution-merge::tests/resolve-pair.spec.ts",
+        "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/routes-summary.spec.ts",
         "evolution-merge::tests/routes.spec.ts",
         "evolution-merge::tests/row-v2.spec.ts",
@@ -926,6 +927,7 @@
         "evolution-merge::tests/read-commands.spec.ts",
         "evolution-merge::tests/report.spec.ts",
         "evolution-merge::tests/resolve-pair.spec.ts",
+        "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/routes-summary.spec.ts",
         "evolution-merge::tests/routes.spec.ts",
         "evolution-merge::tests/row-v2.spec.ts",
@@ -1366,6 +1368,7 @@
         "evolution-merge::tests/read-commands.spec.ts",
         "evolution-merge::tests/report.spec.ts",
         "evolution-merge::tests/resolve-pair.spec.ts",
+        "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/routes-summary.spec.ts",
         "evolution-merge::tests/routes.spec.ts",
         "evolution-merge::tests/row-v2.spec.ts",
@@ -1563,7 +1566,7 @@
     },
     "pre-tag": {
       "gates": 56,
-      "specs": 283
+      "specs": 284
     },
     "ci-only": {
       "gates": 10,
@@ -1571,16 +1574,16 @@
     },
     "full(ci=off)": {
       "gates": 56,
-      "specs": 283
+      "specs": 284
     },
     "full(ci=on)": {
       "gates": 66,
-      "specs": 344
+      "specs": 345
     }
   },
   "specs": {
-    "total": 344,
-    "marked": 344,
+    "total": 345,
+    "marked": 345,
     "unmarked": 0
   }
 }
