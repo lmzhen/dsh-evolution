@@ -126,7 +126,7 @@ export function MergePanel(face: MergeFace): ReactNode {
       return createElement('div', { key: row.id, 'data-role': 'row' },
         createElement('div', null,
           createElement('div', { 'data-role': 'row-label' }, row.label),
-          createElement('div', { 'data-role': 'row-meta' }, t('state.' + row.state) + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage))),
+          createElement('div', { 'data-role': 'row-meta' }, t('state.' + row.state) + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage)) + ' · ' + row.id),
           facts === '' ? null : createElement('div', { 'data-role': 'row-facts' }, facts),
         ),
         createElement('div', null,

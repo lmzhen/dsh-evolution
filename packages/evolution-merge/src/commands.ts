@@ -23,7 +23,7 @@ export type ParseMergeCommandResult =
   | { readonly ok: true; readonly command: MergeCliCommand; readonly help?: boolean }
   | { readonly ok: false; readonly code: 'usage'; readonly message: string }
 
-const USAGE = 'usage: /evolution merge scan | pair [--force] <a> <b> | status [id] | report [id] | cancel [id] | runs | doctor | pending [--expired] | candidates [--retry] | approve <id> | reject <id> | resume [id] [--retry] [--clear <id>] | skipped [--restore <id>] | discard <id> | undo <target> --run <id>'
+const USAGE = 'usage: /evolution merge scan | pair [--force] <a> <b> | status [id] | report [id] | cancel [id] | runs | doctor | pending [--expired] | candidates [--retry] | approve <id> | reject <id> | resume [id] [--retry] [--clear <id>] | skipped [--restore <id>] | discard <id> | undo <target> --run <id>\ndefaults: mergeApproval=false, mergeSkippedTtlDays=0, mergeRunTimeoutMinutes=0, mergePairTimeoutMinutes=15, mergeModelsRoot=""'
 
 function flags(args: readonly string[], allowed: readonly string[]): { values: Map<string, string>; error?: string } {
   const values = new Map<string, string>()
