@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.10 (patch) — pending 读时收敛、snapshot 清理
+
+> **范围**：pending 按当前 cards 过滤 source-gone；commit receipt 成功后删除 run snapshot（journal/receipt 保留）。
+> **验证**：merge 70 files/166 tests；0.30.10 发布后补矩阵。
+
 ## 0.30.9 (patch) — cacheRead 观测字段
 
 > **范围**：ChannelTurnLike 读 cacheRead，写入 MergeDecision.cacheRead；channel-port 用例断言透传；不改第二轮上下文复用。
