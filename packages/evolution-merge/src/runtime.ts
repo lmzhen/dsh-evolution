@@ -57,6 +57,8 @@ export interface MergeRuntimeDeps {
   /** Start scan/pair in the background and return the run id immediately. */
   readonly detached?: boolean
   readonly cards: (signal: AbortSignal) => Promise<readonly SkillCard[]>
+  /** Curator gate set: excluded/referenced/suppressed/protected builtins. */
+  readonly isBlocked?: (name: string) => boolean
   /** Run-scoped engine screening. */
   readonly screeningForRun: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
   readonly stage?: MergeStageBindingPort
@@ -91,6 +93,9 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (cardA.protectedBy != null || cardB.protectedBy != null
           || cardA.protectionUnknown === true || cardB.protectionUnknown === true) {
           return { ok: false, text: 'merge pair 不接受受保护/保护状态未知技能: ' + command.a + ' / ' + command.b }
+        }
+        if (deps.isBlocked?.(command.a) === true || deps.isBlocked?.(command.b) === true) {
+          return { ok: false, text: 'merge pair 不接受被范围门拦下的技能: ' + command.a + ' / ' + command.b }
         }
         const pair = [{ a: command.a, b: command.b }]
         const existing = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === pairKey(command.a, command.b))
@@ -131,7 +136,9 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'scan') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
-        const managed = new Set(cards.filter(card => card.managed === true && card.protectedBy == null).map(card => card.name))
+        const managed = new Set(cards
+          .filter(card => card.managed === true && card.protectedBy == null && deps.isBlocked?.(card.name) !== true)
+          .map(card => card.name))
         const loadedState = await loadMergeState(deps.io, deps.home)
         const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
         const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse' || (row.queue === 'verify' && !canRetry(row))).map(row => row.pairKey))

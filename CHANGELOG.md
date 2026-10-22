@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.11 (patch) — 范围门、target claim、恢复逐文件容错
+
+> **范围**：pair/scan 接 curator gates（excluded/referenced/suppressed/protected builtin）；approve 前按 target 持久 claim，第二 approve 拒绝；recovery snapshot 读取失败不再中断整轮。
+> **验证**：merge 70 files/167 tests；0.30.11 发布后最终复核。
+
 ## 0.30.10 (patch) — pending 读时收敛、snapshot 清理
 
 > **范围**：pending 按当前 cards 过滤 source-gone；commit receipt 成功后删除 run snapshot（journal/receipt 保留）。

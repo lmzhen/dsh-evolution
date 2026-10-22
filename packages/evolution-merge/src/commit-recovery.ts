@@ -51,7 +51,13 @@ export async function recoverCommitJournals(
       reports.push({ runId: journal.runId, phase: journal.phase, action: 'receipt-committed', ok: true })
       continue
     }
-    const snapshot = await readCommitSnapshot(io, home, journal.runId)
+    let snapshot: Awaited<ReturnType<typeof readCommitSnapshot>>
+    try {
+      snapshot = await readCommitSnapshot(io, home, journal.runId)
+    } catch (error) {
+      reports.push({ runId: journal.runId, phase: journal.phase, action: 'snapshot-read-failed: ' + (error instanceof Error ? error.message : String(error)), ok: false })
+      continue
+    }
     let action = 'report-only'
     let ok = true
     if (recovery === 'retry-commit') {
