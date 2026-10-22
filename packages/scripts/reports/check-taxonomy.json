@@ -408,6 +408,7 @@
         "evolution-merge::tests/commit-journal.spec.ts",
         "evolution-merge::tests/commit-plan.spec.ts",
         "evolution-merge::tests/commit-receipts.spec.ts",
+        "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
         "evolution-merge::tests/coordinator-v2.spec.ts",
         "evolution-merge::tests/coordinator.spec.ts",
@@ -432,6 +433,7 @@
         "evolution-merge::tests/params.spec.ts",
         "evolution-merge::tests/pending-actions.spec.ts",
         "evolution-merge::tests/plugin.spec.ts",
+        "evolution-merge::tests/presentation-budget.spec.ts",
         "evolution-merge::tests/prompts.spec.ts",
         "evolution-merge::tests/read-commands.spec.ts",
         "evolution-merge::tests/report.spec.ts",
@@ -894,6 +896,7 @@
         "evolution-merge::tests/commit-journal.spec.ts",
         "evolution-merge::tests/commit-plan.spec.ts",
         "evolution-merge::tests/commit-receipts.spec.ts",
+        "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
         "evolution-merge::tests/coordinator-v2.spec.ts",
         "evolution-merge::tests/coordinator.spec.ts",
@@ -918,6 +921,7 @@
         "evolution-merge::tests/params.spec.ts",
         "evolution-merge::tests/pending-actions.spec.ts",
         "evolution-merge::tests/plugin.spec.ts",
+        "evolution-merge::tests/presentation-budget.spec.ts",
         "evolution-merge::tests/prompts.spec.ts",
         "evolution-merge::tests/read-commands.spec.ts",
         "evolution-merge::tests/report.spec.ts",
@@ -1332,6 +1336,7 @@
         "evolution-merge::tests/commit-journal.spec.ts",
         "evolution-merge::tests/commit-plan.spec.ts",
         "evolution-merge::tests/commit-receipts.spec.ts",
+        "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
         "evolution-merge::tests/coordinator-v2.spec.ts",
         "evolution-merge::tests/coordinator.spec.ts",
@@ -1356,6 +1361,7 @@
         "evolution-merge::tests/params.spec.ts",
         "evolution-merge::tests/pending-actions.spec.ts",
         "evolution-merge::tests/plugin.spec.ts",
+        "evolution-merge::tests/presentation-budget.spec.ts",
         "evolution-merge::tests/prompts.spec.ts",
         "evolution-merge::tests/read-commands.spec.ts",
         "evolution-merge::tests/report.spec.ts",
@@ -1557,7 +1563,7 @@
     },
     "pre-tag": {
       "gates": 56,
-      "specs": 281
+      "specs": 283
     },
     "ci-only": {
       "gates": 10,
@@ -1565,16 +1571,16 @@
     },
     "full(ci=off)": {
       "gates": 56,
-      "specs": 281
+      "specs": 283
     },
     "full(ci=on)": {
       "gates": 66,
-      "specs": 342
+      "specs": 344
     }
   },
   "specs": {
-    "total": 342,
-    "marked": 342,
+    "total": 344,
+    "marked": 344,
     "unmarked": 0
   }
 }
