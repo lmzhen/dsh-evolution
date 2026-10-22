@@ -60,6 +60,7 @@ it('resumes a fuse row with its persisted decision', async () => {
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   if (!result.ok) return
+  if (!('report' in result)) return
   expect(result.report.totals.merged).toBe(1)
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })

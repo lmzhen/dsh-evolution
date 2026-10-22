@@ -33,5 +33,16 @@ export declare function probe(cfg?: EngineCfg): {
 }
 export declare function ensureModels(cfg?: EngineCfg): Promise<{ ok: true; models: 'ok'; dirs: Record<string, string> }>
 export declare function pairKeyOf(a: string, b: string): string
-export declare function toEngineCandidate(p: Record<string, unknown>, fallback?: string): { readonly a: string; readonly b: string; readonly score?: number; readonly arms: readonly unknown[]; readonly reason?: string; readonly source: string; readonly gate?: unknown }
+export declare function toEngineCandidate(
+  p: Record<string, unknown>,
+  fallback?: string,
+): {
+  readonly a: string
+  readonly b: string
+  readonly score?: number
+  readonly arms: readonly unknown[]
+  readonly reason?: string
+  readonly source: string
+  readonly gate?: unknown
+}
 export declare function selectCandidates(report: Record<string, unknown>): unknown

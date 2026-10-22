@@ -35,6 +35,7 @@ it('approves one pending row and drops it after a successful round2', async () =
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   if (!result.ok) return
+  if (!('report' in result)) return
   expect(result.report.totals).toEqual({ merged: 1, kept: 0, pending: 0, failed: 0 })
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })

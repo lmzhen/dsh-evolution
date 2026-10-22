@@ -135,11 +135,11 @@ export function MergePanel(face: MergeFace): ReactNode {
             face.loadBody === undefined ? null : createElement('button', { type: 'button', 'data-role': 'body-a', onClick: () => { openBody(row.id, 'a') } }, 'A'),
             face.loadBody === undefined ? null : createElement('button', { type: 'button', 'data-role': 'body-b', onClick: () => { openBody(row.id, 'b') } }, 'B'),
             (row.actions ?? []).filter(action => view.approval !== false || !action.includes('/evolution merge approve')).map(action =>
-            createElement('button', {
-              key: action, type: 'button', 'data-role': 'row-action', title: action,
-              onClick: () => { void navigator.clipboard.writeText(action) },
-            }, t('row.copy')),
-          )),
+              createElement('button', {
+                key: action, type: 'button', 'data-role': 'row-action', title: action,
+                onClick: () => { void navigator.clipboard.writeText(action) },
+              }, t('row.copy')),
+            )),
         ),
       )
     }))

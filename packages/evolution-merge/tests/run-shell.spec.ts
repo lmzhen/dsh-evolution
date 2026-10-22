@@ -59,7 +59,7 @@ it('detached returns a run id before the body settles', async () => {
   expect(reg.calls).not.toContain('settle:succeeded')
   release()
   for (let i = 0; i < 100 && !reg.calls.includes('settle:succeeded'); i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 5))
+    await new Promise(resolve => setTimeout(resolve, 5))
   }
   expect(reg.calls).toContain('settle:succeeded')
 })

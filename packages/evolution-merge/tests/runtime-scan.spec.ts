@@ -51,7 +51,8 @@ it('returns an accepted run id when detached is enabled', async () => {
   const deps: MergeRuntimeDeps = {
     io, home, now: () => 1,
     registry: { async begin() { return { id: 'run-det', signal: new AbortController().signal, startedAt: 1 } }, async stage() {}, async settle() {} },
-    skills: {} as SkillLibrary, params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    skills: {} as SkillLibrary,
+    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, parent: {}, allow: [], timeoutMinutes: 0, detached: true,
     channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
     cards: async () => [], screeningForRun: async () => [],

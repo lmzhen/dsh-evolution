@@ -73,44 +73,44 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
   const stage = (name: RunStage, progress?: { done: number; total: number }) => options.registry.stage(handle.id, name, progress)
   await stage('screening', options.total === undefined ? undefined : { done: 0, total: options.total })
   const finish = async (): Promise<WithMergeRunResult> => {
-  let draft: MergeRunReportDraft
-  try {
-    draft = await options.body({ runId: handle.id, startedAt, signal: handle.signal, stage })
-  } catch (error) {
-    draft = emptyDraft('run body failed: ' + (error instanceof Error ? error.message : String(error)))
-  }
-  const report: MergeReport = {
-    schemaVersion: 2,
-    runId: handle.id,
-    kind: 'merge',
-    command: options.command,
-    startedAt,
-    endedAt: options.now(),
-    stopReason: draft.stopReason,
-    approval: options.approval,
-    scope: draft.scope,
-    pairs: draft.pairs,
-    totals: draft.totals,
-    notes: draft.notes,
-    ...(draft.remaining === undefined ? {} : { remaining: draft.remaining }),
-  }
-  let reportPath: string
-  try {
-    reportPath = await writeMergeReport(options.io, options.home, report)
-  } catch (error) {
-    await options.registry.settle(handle.id, { state: 'failed', failure: 'report write failed: ' + (error instanceof Error ? error.message : String(error)) })
-    return { ok: false, runId: handle.id, message: 'report write failed' }
-  }
-  const runState = report.stopReason === 'completed'
-    ? 'succeeded'
-    : report.stopReason === 'cancelled'
-      ? 'cancelled'
-      : 'failed'
-  const awaiting = report.pairs.some(pair => pair.outcome === 'pending')
-  const mergeStatus = awaiting ? 'awaiting-approval' as const : runState
-  await options.registry.settle(handle.id, { state: runState, resultRef: reportPath, mergeStatus, ...(runState === 'failed' ? { failure: 'merge ' + report.stopReason } : {}) })
-  if (report.stopReason === 'completed') return { ok: true, runId: handle.id, reportPath, report }
-  return { ok: false, runId: handle.id, message: 'merge ' + report.stopReason, reportPath }
+    let draft: MergeRunReportDraft
+    try {
+      draft = await options.body({ runId: handle.id, startedAt, signal: handle.signal, stage })
+    } catch (error) {
+      draft = emptyDraft('run body failed: ' + (error instanceof Error ? error.message : String(error)))
+    }
+    const report: MergeReport = {
+      schemaVersion: 2,
+      runId: handle.id,
+      kind: 'merge',
+      command: options.command,
+      startedAt,
+      endedAt: options.now(),
+      stopReason: draft.stopReason,
+      approval: options.approval,
+      scope: draft.scope,
+      pairs: draft.pairs,
+      totals: draft.totals,
+      notes: draft.notes,
+      ...(draft.remaining === undefined ? {} : { remaining: draft.remaining }),
+    }
+    let reportPath: string
+    try {
+      reportPath = await writeMergeReport(options.io, options.home, report)
+    } catch (error) {
+      await options.registry.settle(handle.id, { state: 'failed', failure: 'report write failed: ' + (error instanceof Error ? error.message : String(error)) })
+      return { ok: false, runId: handle.id, message: 'report write failed' }
+    }
+    const runState = report.stopReason === 'completed'
+      ? 'succeeded'
+      : report.stopReason === 'cancelled'
+        ? 'cancelled'
+        : 'failed'
+    const awaiting = report.pairs.some(pair => pair.outcome === 'pending')
+    const mergeStatus = awaiting ? 'awaiting-approval' as const : runState
+    await options.registry.settle(handle.id, { state: runState, resultRef: reportPath, mergeStatus, ...(runState === 'failed' ? { failure: 'merge ' + report.stopReason } : {}) })
+    if (report.stopReason === 'completed') return { ok: true, runId: handle.id, reportPath, report }
+    return { ok: false, runId: handle.id, message: 'merge ' + report.stopReason, reportPath }
   }
   if (options.detached === true) {
     void finish().catch(() => {})

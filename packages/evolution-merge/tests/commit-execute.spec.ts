@@ -39,15 +39,13 @@ it('commit survives a failing journal write', async () => {
   const io = nodeEvolutionIo()
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
-  const flaky = new Proxy(io, {
-    get(target, prop) {
-      if (prop === 'writeText') return async (path: string, content: string) => {
-        if (path.includes('journals')) throw new Error('journal disk full')
-        return target.writeText(path, content)
-      }
-      return Reflect.get(target, prop, target)
+  const flaky = {
+    ...io,
+    async writeText(path: string, content: string) {
+      if (path.includes('journals')) throw new Error('journal disk full')
+      await io.writeText(path, content)
     },
-  })
+  }
   const result = await commitStagedRun(flaky, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { return { ok: true, message: 'merged', unitId: 'u-1', archived: ['a', 'b'], mutations: 3 } },

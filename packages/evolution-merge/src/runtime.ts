@@ -88,7 +88,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           ...common,
           approval,
           ...(detached ? { detached: true } : {}),
-          makePorts: runId => {
+          makePorts: (runId) => {
             const ports = createChannelScanPorts({
               io: deps.io, home: deps.home, runId, cards,
               screening: () => Promise.resolve(pair),
