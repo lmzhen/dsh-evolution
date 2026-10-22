@@ -19,6 +19,7 @@ export interface RunScanCommandOptions {
   readonly now: () => number
   readonly detached?: boolean
   readonly notes?: readonly string[]
+  readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
 }
 
 export async function runScanCommand(options: RunScanCommandOptions): Promise<WithMergeRunResult> {
@@ -45,6 +46,7 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
         runId: ctx.runId,
         ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
         ...(options.notes === undefined ? {} : { notes: options.notes }),
+        ...(options.isOwnerActive === undefined ? {} : { isOwnerActive: options.isOwnerActive }),
       })
     },
   })

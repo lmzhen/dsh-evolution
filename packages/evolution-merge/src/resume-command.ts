@@ -23,6 +23,7 @@ export interface RunResumeCommandOptions {
   readonly platformWrite: boolean
   readonly timeoutMinutes?: number
   readonly now: () => number
+  readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
 }
 
 export async function runResumeCommand(options: RunResumeCommandOptions): Promise<WithMergeRunResult> {
@@ -30,6 +31,9 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
   const row = loaded.state.rows.find(item => item.id === options.rowId)
   if (row === undefined) return { ok: false, message: 'merge row not found: ' + options.rowId }
   if (row.state === 'verify') {
+    if (row.runId !== undefined && (await options.isOwnerActive?.(row.runId)) === true) {
+      return { ok: false, message: 'merge run still owns this verify row: ' + row.runId }
+    }
     return await runScanCommand({
       io: options.io, home: options.home, registry: options.registry,
       approval: true, platformWrite: options.platformWrite, now: options.now,

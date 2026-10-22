@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.14 (patch) — scan owner 闭环
+
+> **范围**：runScan 在接管 verify 前查 owner run 是否仍 running；活跃 owner 跳过该 pair；resume verify 分支拒绝仍在跑的 owner。
+> **验证**：merge 71 files/168 tests；0.30.14 发布后最终复核。
+
 ## 0.30.13 (patch) — 复核 P1：真 gate 接线、原子 claim、30min lease、scan owner
 
 > **范围**：curator 暴露 isBlocked(name)；merge 异步调用；target-claim 用 io.transact 原子 RMW、lease 30min；scan 行写 owner runId，held 排除新鲜 owner verify。

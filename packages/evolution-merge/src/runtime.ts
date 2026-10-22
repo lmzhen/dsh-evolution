@@ -59,6 +59,7 @@ export interface MergeRuntimeDeps {
   readonly cards: (signal: AbortSignal) => Promise<readonly SkillCard[]>
   /** Curator gate set: excluded/referenced/suppressed/protected builtins. */
   readonly isBlocked?: (name: string) => boolean | Promise<boolean>
+  readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
   /** Run-scoped engine screening. */
   readonly screeningForRun: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
   readonly stage?: MergeStageBindingPort
@@ -70,6 +71,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
   const common = {
     io: deps.io, home: deps.home, registry: deps.registry,
     platformWrite: deps.platformWrite, now: deps.now,
+    ...(deps.isOwnerActive === undefined ? {} : { isOwnerActive: deps.isOwnerActive }),
     ...(timeout === undefined ? {} : { timeoutMinutes: timeout }),
   }
   const stage = deps.stage
@@ -265,6 +267,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         }
         const result = await runResumeCommand({
           ...common, rowId: row.id, ports: basePorts,
+          ...(deps.isOwnerActive === undefined ? {} : { isOwnerActive: deps.isOwnerActive }),
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards, screening: pair,
             channel: deps.channel, parent, allow: deps.allow,

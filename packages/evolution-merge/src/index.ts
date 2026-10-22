@@ -226,6 +226,10 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         const curator = (ctx as unknown as { get(key: string): unknown }).get('evolutionCurator') as { isBlocked?: (name: string) => Promise<boolean> } | undefined
         return (await curator?.isBlocked?.(name)) === true
       },
+      isOwnerActive: (runId) => {
+        const run = runs.find(runId)
+        return run !== undefined && run.state === 'running'
+      },
       async cards(signal) {
         const listed = await skills.list({ withContent: true })
         if (signal.aborted) return []

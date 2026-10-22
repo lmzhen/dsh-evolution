@@ -55,6 +55,7 @@ export interface RunScanOptions {
   readonly stage?: (stage: RunStage, progress?: { done: number; total: number }) => Promise<void>
   readonly notes?: readonly string[]
   readonly runId?: string
+  readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
 }
 
 function at(now: () => number): string {
@@ -118,6 +119,10 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       if (!created.ok || created.row === null) throw new Error(created.ok ? 'candidate row missing' : created.message)
       row = options.runId === undefined ? created.row : { ...created.row, runId: options.runId }
       const before = (await loadMergeState(options.io, options.home)).state.rows.find(item => item.pairKey === row.pairKey)
+      if (before?.state === 'verify' && before.runId !== undefined && before.runId !== options.runId
+        && (await options.isOwnerActive?.(before.runId)) === true) {
+        continue
+      }
       const placed = await upsertRow(options.io, options.home, options.now, row, 'verify', before?.updatedAt ?? null)
       if (!placed.ok && before?.state === 'skipped') {
         const restored = transition(before, { type: 'restore', at: at(options.now) })
