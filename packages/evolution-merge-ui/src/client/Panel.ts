@@ -4,7 +4,7 @@
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
-import type { MergeOutcome, MergeQueue, MergeRowView, MergeViewPayload, QueuePage } from './api.ts'
+import type { MergeBody, MergeHistoryItem, MergeOutcome, MergeQueue, MergeRowView, MergeViewPayload, QueuePage } from './api.ts'
 import type { RouteFailure } from './route-client.generated.ts'
 import { FailureBlock } from './states.generated.ts'
 import { FALLBACKS } from './fallbacks.generated.ts'
@@ -14,10 +14,12 @@ export interface MergeFace {
   rows: MergeRowView[]
   loadView?: () => Promise<MergeOutcome<MergeViewPayload>>
   loadRows?: (queue: MergeQueue, cursor?: number) => Promise<MergeOutcome<QueuePage>>
+  loadBody?: (id: string, side: 'a' | 'b') => Promise<MergeOutcome<MergeBody>>
+  loadHistory?: () => Promise<MergeOutcome<{ items: MergeHistoryItem[] }>>
   t: (key: string) => string
 }
 
-const QUEUES: MergeQueue[] = ['pending', 'retry', 'skipped']
+const QUEUES: MergeQueue[] = ['verify', 'pending', 'fuse', 'skipped']
 
 function failure(t: (key: string) => string, failure: RouteFailure): ReactNode {
   return FailureBlock({ failure, t, fallback: FALLBACKS['merge'] })
@@ -31,6 +33,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const [loading, setLoading] = useState<boolean>(face.loadRows !== undefined || face.loadView !== undefined)
   const [failed, setFailed] = useState<RouteFailure | undefined>(undefined)
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
+  const [overlay, setOverlay] = useState<{ kind: 'body'; html: string; label: string } | { kind: 'history'; items: MergeHistoryItem[] } | undefined>(undefined)
   const request = useRef(0)
 
   const loadRows = (queue: MergeQueue, cursor = 0): void => {
@@ -58,10 +61,28 @@ export function MergePanel(face: MergeFace): ReactNode {
     if (load === undefined) return
     load().then((outcome) => {
       if (!outcome.ok) { setFailed(outcome.failure); return }
-      if (outcome.payload.schemaVersion !== undefined && outcome.payload.schemaVersion !== 1) {
+      if (outcome.payload.schemaVersion !== undefined && outcome.payload.schemaVersion !== 2) {
         setFailed({ kind: 'server', status: 0 }); return
       }
       setView(outcome.payload)
+    }).catch(() => { setFailed({ kind: 'server', status: 0 }) })
+  }
+
+  const openBody = (id: string, side: 'a' | 'b'): void => {
+    const load = face.loadBody
+    if (load === undefined) return
+    load(id, side).then((outcome) => {
+      if (outcome.ok) setOverlay({ kind: 'body', html: outcome.payload.html, label: id + ':' + side })
+      else setFailed(outcome.failure)
+    }).catch(() => { setFailed({ kind: 'server', status: 0 }) })
+  }
+
+  const openHistory = (): void => {
+    const load = face.loadHistory
+    if (load === undefined) return
+    load().then((outcome) => {
+      if (outcome.ok) setOverlay({ kind: 'history', items: outcome.payload.items })
+      else setFailed(outcome.failure)
     }).catch(() => { setFailed({ kind: 'server', status: 0 }) })
   }
 
@@ -97,6 +118,9 @@ export function MergePanel(face: MergeFace): ReactNode {
         row.attempts === undefined ? undefined : t('row.attempts') + ' ' + String(row.attempts),
         row.origin === undefined ? undefined : t('row.origin') + ' ' + t('origin.' + row.origin),
         row.stagingExpiresAt === undefined ? undefined : t('row.expires') + ' ' + new Date(row.stagingExpiresAt).toLocaleString(),
+        row.expired === undefined ? undefined : t('row.expired') + ' ' + row.expired,
+        row.reason === undefined ? undefined : t('row.reason') + ' ' + row.reason,
+        row.summary === undefined ? undefined : row.summary.filter(Boolean).join(' · '),
         row.failure === undefined ? undefined : t('row.failure') + ' ' + row.failure.message + (row.failure.retryable ? '' : ' · ' + t('row.noRetry')),
       ].filter((value): value is string => value !== undefined).join(' · ')
       return createElement('div', { key: row.id, 'data-role': 'row' },
@@ -107,7 +131,10 @@ export function MergePanel(face: MergeFace): ReactNode {
         ),
         createElement('div', null,
           createElement('div', { 'data-role': 'row-meta' }, row.updatedAt),
-          createElement('div', { 'data-role': 'row-actions' }, (row.actions ?? []).filter(action => view.approval !== false || !action.includes('/evolution merge approve')).map(action =>
+          createElement('div', { 'data-role': 'row-actions' },
+            face.loadBody === undefined ? null : createElement('button', { type: 'button', 'data-role': 'body-a', onClick: () => { openBody(row.id, 'a') } }, 'A'),
+            face.loadBody === undefined ? null : createElement('button', { type: 'button', 'data-role': 'body-b', onClick: () => { openBody(row.id, 'b') } }, 'B'),
+            (row.actions ?? []).filter(action => view.approval !== false || !action.includes('/evolution merge approve')).map(action =>
             createElement('button', {
               key: action, type: 'button', 'data-role': 'row-action', title: action,
               onClick: () => { void navigator.clipboard.writeText(action) },
@@ -127,6 +154,13 @@ export function MergePanel(face: MergeFace): ReactNode {
     failed === undefined ? null : createElement('div', { 'data-role': 'note' }, failure(t, failed)),
     list,
     nextCursor === undefined ? null : createElement('button', { type: 'button', 'data-role': 'load-more', onClick: () => { loadRows(tab, Number(nextCursor)) } }, t('loadMore')),
+    face.loadHistory === undefined ? null : createElement('button', { type: 'button', 'data-role': 'history', onClick: openHistory }, t('history')),
+    overlay === undefined ? null : createElement('section', { 'data-role': 'overlay' },
+      createElement('button', { type: 'button', 'data-role': 'overlay-close', onClick: () => { setOverlay(undefined) } }, t('close')),
+      overlay.kind === 'body'
+        ? createElement('div', { 'data-role': 'body', 'data-label': overlay.label, dangerouslySetInnerHTML: { __html: overlay.html } })
+        : createElement('ul', { 'data-role': 'history-list' }, overlay.items.map(item => createElement('li', { key: item.name }, item.name + ' · ' + item.kind + ' · ' + item.reason + ' · v' + String(item.lastVersion)))),
+    ),
     createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { loadView(); loadRows(tab, 0) } }, t('refresh')),
   )
 }

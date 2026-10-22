@@ -6,7 +6,7 @@ import { MERGE_ROUTES, makeMergeRoutes, type MergeRow, type MergeRouteSource } f
 const audit = { channel: 'connection.fetch' as const, principal: 'owner' as const, deploymentAllowsRemote: true }
 const row = (a: string, b: string, state: MergeRow['state']): MergeRow => ({
   id: 'mr_' + a, pairKey: a + '\u0000' + b, a, b, state,
-  queue: state === 'pending' ? 'pending' : state === 'skipped' ? 'skipped' : 'retry', createdAt: 'x', updatedAt: 'x',
+  queue: state === 'pending' ? 'pending' : state === 'skipped' ? 'skipped' : state === 'fuse' || state === 'approved' ? 'fuse' : 'verify', createdAt: 'x', updatedAt: 'x',
 })
 const run: RunRecord = { id: 'r1', kind: 'merge', state: 'running', startedAt: 1, command: 'scan' }
 const other: RunRecord = { id: 'r0', kind: 'maintenance', state: 'succeeded', startedAt: 0 }
@@ -14,6 +14,8 @@ const source: MergeRouteSource = {
   async rows() { return [row('a', 'b', 'pending'), row('c', 'd', 'fuse')] },
   async run(id) { return id === 'r1' ? run : undefined },
   async runs() { return [other, run] },
+  async body(id, side) { const found = id === 'mr_a' ? row('a', 'b', 'pending') : undefined; return found === undefined ? null : side === 'a' ? '# alpha' : '# beta' },
+  async history() { return [] },
   commands() { return ['merge scan'] },
   approval() { return true },
 }
@@ -31,14 +33,15 @@ it('serves view/rows/run/runs', async () => {
   }
   expect(view).toMatchObject({
     ok: true,
-    data: { counts: { pending: 1, retry: 1, skipped: 0 }, latestRun: { id: 'r1' }, approval: true },
+    data: { counts: { verify: 0, pending: 1, fuse: 1, skipped: 0 }, latestRun: { id: 'r1' }, approval: true },
   })
   const rows = await (await fetchPath(MERGE_ROUTES.rows + '?queue=pending')).json() as { data: { items: unknown[] } }
   expect(rows.data.items).toHaveLength(1)
-  const one = await (await fetchPath(MERGE_ROUTES.run + '?id=r1')).json() as { data: { id: string } }
-  expect(one.data.id).toBe('r1')
-  expect((await (await fetchPath(MERGE_ROUTES.run + '?id=missing')).json() as { ok: boolean }).ok).toBe(false)
-  expect((await (await fetchPath(MERGE_ROUTES.runs)).json() as { data: { items: unknown[] } }).data.items).toHaveLength(2)
+  const body = await (await fetchPath(MERGE_ROUTES.body + '?id=mr_a&side=a')).json() as { data: { content: string; markdown: boolean; html: string } }
+  expect(body.data).toMatchObject({ content: '# alpha', markdown: true })
+  expect(body.data.html).toContain('<h1>alpha</h1>')
+  expect((await (await fetchPath(MERGE_ROUTES.body + '?id=missing&side=a')).json() as { ok: boolean }).ok).toBe(false)
+  expect((await (await fetchPath(MERGE_ROUTES.history)).json() as { data: { items: unknown[] } }).data.items).toHaveLength(0)
 })
 
 it('rejects non-GET and reports an absent service', async () => {

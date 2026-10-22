@@ -50,7 +50,7 @@ it('resumes a fuse row with its persisted decision', async () => {
   const io = nodeEvolutionIo()
   const key = pairKey('a', 'b')
   const row: MergeRow = {
-    id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'fuse', queue: 'retry',
+    id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'fuse', queue: 'fuse',
     decision: DECISION, createdAt: AT, updatedAt: AT,
   }
   await upsertRow(io, home, () => Date.parse(AT), row)

@@ -15,7 +15,7 @@ const AT = 1761000000000
 
 function fixture(runId: string): MergeReport {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId,
     kind: 'merge',
     command: 'scan',
@@ -23,13 +23,13 @@ function fixture(runId: string): MergeReport {
     endedAt: AT + 1000,
     stopReason: 'completed',
     approval: { platformWrite: true, mergeApproval: false },
-    scope: { candidatePairs: 2, queueBefore: { pending: 0, retry: 2, skipped: 0 } },
+    scope: { candidatePairs: 2, queueBefore: { verify: 0, pending: 0, fuse: 2, skipped: 0 } },
     pairs: [
       {
-        id: 'mr_a', pairKey: 'a\u0000b', a: 'a', b: 'b', queue: 'retry', outcome: 'merged',
+        id: 'mr_a', pairKey: 'a\u0000b', a: 'a', b: 'b', queue: 'fuse', outcome: 'merged',
         archived: ['b'], unitId: 'u-1', target: { requested: 'a', actual: 'a', created: false },
       },
-      { id: 'mr_c', pairKey: 'c\u0000d', a: 'c', b: 'd', queue: 'retry', outcome: 'failed', archived: [] },
+      { id: 'mr_c', pairKey: 'c\u0000d', a: 'c', b: 'd', queue: 'verify', outcome: 'failed', archived: [] },
     ],
     totals: { merged: 1, kept: 0, pending: 0, failed: 1 },
     notes: ['one note'],

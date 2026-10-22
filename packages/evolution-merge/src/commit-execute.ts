@@ -6,6 +6,8 @@
 import type { CommitMergePlan, CommitMergeResult, EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { assembleStagedCommit, type CommitAssemblyPort } from './commit-assembly.ts'
 import { writeCommitReceipt, type CommitReceipt } from './commit-receipt.ts'
+import { pairKey } from './contracts.ts'
+import { writeJournal } from './domain/commit-journal-store.ts'
 
 export interface CommitPort extends CommitAssemblyPort {
   commitMerge(plan: CommitMergePlan): Promise<CommitMergeResult>
@@ -36,8 +38,13 @@ export async function commitStagedRun(
 ): Promise<CommitStagedResult> {
   const assembled = await assembleStagedCommit(io, home, runId, port, { origin: options.origin, summary: options.summary })
   if (!assembled.ok) return { ok: false, message: assembled.message }
+  const journal = { runId, target: assembled.plan.target, create: !assembled.plan.targetExists, sources: assembled.plan.sources, phase: 'prepared' as const, updatedAt: new Date(options.now()).toISOString() }
+  try { await writeJournal(io, home, journal) } catch { /* journal is best-effort; receipt remains the commit record */ }
   const result = await port.commitMerge(assembled.plan)
-  if (!result.ok) return { ok: false, message: result.message, plan: assembled.plan }
+  if (!result.ok) {
+    try { await writeJournal(io, home, { ...journal, phase: 'failed', updatedAt: new Date(options.now()).toISOString() }) } catch {}
+    return { ok: false, message: result.message, plan: assembled.plan }
+  }
   if (result.unitId === undefined) return { ok: true, plan: assembled.plan, result, warning: 'commit landed without a unitId; receipt not written' }
   const receipt: CommitReceipt = {
     runId,
@@ -46,11 +53,13 @@ export async function commitStagedRun(
     target: assembled.plan.target,
     create: !assembled.plan.targetExists,
     sources: assembled.plan.sources,
+    ...(assembled.plan.sources[0] === undefined ? {} : { pairKey: pairKey(assembled.plan.target, assembled.plan.sources[0]) }),
     archived: result.archived ?? [],
     at: options.now(),
   }
   try {
     await writeCommitReceipt(io, home, receipt)
+    try { await writeJournal(io, home, { ...journal, unitId: result.unitId, phase: 'committed', updatedAt: new Date(options.now()).toISOString() }) } catch {}
     return { ok: true, plan: assembled.plan, result, receipt }
   } catch (error) {
     return {

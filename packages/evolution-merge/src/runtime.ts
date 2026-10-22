@@ -4,7 +4,7 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import { probeText, type EvolutionIoLike, type RunRegistry, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
-import { canRetry, pairKey, type MergeCandidate } from './contracts.ts'
+import { canRetry, pairKey, type MergeCandidate, type MergeDecision, type MergeRow } from './contracts.ts'
 import { skippedPairKeys } from './skipped.ts'
 import type { MergeParams } from './params.ts'
 import type { SkillCard } from './skill-card.ts'
@@ -19,6 +19,7 @@ import { dropRow, loadMergeState, upsertRow } from './state.ts'
 import { transition } from './coordinator.ts'
 import { readCommitReceipt } from './commit-receipt.ts'
 import { undoMergeReceipt } from './undo-merge.ts'
+import { recordPair } from './domain/pair-index-store.ts'
 import { skillLibraryUndoPort } from './adapters/undo.ts'
 import { mergeDoctor } from './doctor.ts'
 import type { StageToolContext } from './stage-tool.ts'
@@ -45,6 +46,8 @@ export interface MergeRuntimeDeps {
   readonly allow: readonly string[]
   readonly cwd?: string
   readonly timeoutMinutes: number
+  /** Start scan/pair in the background and return the run id immediately. */
+  readonly detached?: boolean
   readonly cards: (signal: AbortSignal) => Promise<readonly SkillCard[]>
   /** Run-scoped engine screening. */
   readonly screeningForRun: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
@@ -67,27 +70,42 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
   return {
     async execute(command, context?: MergeCommandContext) {
       const parent = context?.parent ?? deps.parent
+      const detached = deps.detached !== false
       if (command.verb === 'pair') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
         const pair = [{ a: command.a, b: command.b }]
+        let forced: MergeRow | undefined
+        if (command.force === true) {
+          const key = pairKey(command.a, command.b)
+          forced = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === key)
+          if (forced === undefined || forced.decision === undefined) {
+            return { ok: false, text: 'pair --force 需要已有决策，找不到该 pair 的 decision: ' + key }
+          }
+        }
+        const approval = command.force === true ? false : deps.params.mergeApproval
         const result = await runScanCommand({
           ...common,
-          approval: deps.params.mergeApproval,
-          makePorts: runId => createChannelScanPorts({
-            io: deps.io, home: deps.home, runId, cards,
-            screening: () => Promise.resolve(pair),
-            channel: deps.channel, parent, allow: deps.allow,
-            ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
-            timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
-            approval: deps.params.mergeApproval,
-            commitPort: skillLibraryPort(deps.skills), now: deps.now,
-            ...stageHooks,
-          }),
+          approval,
+          ...(detached ? { detached: true } : {}),
+          makePorts: runId => {
+            const ports = createChannelScanPorts({
+              io: deps.io, home: deps.home, runId, cards,
+              screening: () => Promise.resolve(pair),
+              channel: deps.channel, parent, allow: deps.allow,
+              ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
+              timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
+              approval,
+              commitPort: skillLibraryPort(deps.skills), now: deps.now,
+              ...stageHooks,
+            })
+            return forced === undefined ? ports : { ...ports, round1: async () => ({ kind: 'merge' as const, decision: forced.decision as MergeDecision }) }
+          },
         })
-        return result.ok
-          ? { ok: true, text: 'merge pair 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
-          : { ok: false, text: result.message }
+        if (!result.ok) return { ok: false, text: result.message }
+        if ('accepted' in result) return { ok: true, text: 'merge pair 已启动：' + result.runId }
+        if (!('report' in result)) return { ok: false, text: 'merge pair started without a report' }
+        return { ok: true, text: 'merge pair 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
       }
       if (command.verb === 'scan') {
         const signal = new AbortController().signal
@@ -98,6 +116,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const result = await runScanCommand({
           ...common,
           approval: deps.params.mergeApproval,
+          ...(detached ? { detached: true } : {}),
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
             screening: async (turnSignal) => {
@@ -117,9 +136,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             ...stageHooks,
           }),
         })
-        return result.ok
-          ? { ok: true, text: 'merge scan 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
-          : { ok: false, text: result.message }
+        if (!result.ok) return { ok: false, text: result.message }
+        if ('accepted' in result) return { ok: true, text: 'merge scan 已启动：' + result.runId }
+        if (!('report' in result)) return { ok: false, text: 'merge scan started without a report' }
+        return { ok: true, text: 'merge scan 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
       }
       if (command.verb === 'reject') {
         const loaded = await loadMergeState(deps.io, deps.home)
@@ -157,11 +177,22 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           ? { ok: false, text: 'report is missing: ' + run.resultRef }
           : { ok: true, text: report.value.slice(0, 12000) }
       }
+      if (command.verb === 'discard') {
+        const loaded = await loadMergeState(deps.io, deps.home)
+        const row = loaded.state.rows.find(item => item.id === command.id)
+        if (row === undefined) return { ok: false, text: 'merge row not found: ' + command.id }
+        if (row.state !== 'pending' && row.state !== 'approved' && row.state !== 'fuse') return { ok: false, text: 'merge row is not discardable: ' + command.id }
+        await dropRow(deps.io, deps.home, deps.now, row.id)
+        return { ok: true, text: '已丢弃合并行：' + command.id }
+      }
       if (command.verb === 'undo') {
         const receipt = await readCommitReceipt(deps.io, deps.home, command.run, command.target)
         if (receipt === null) return { ok: false, text: 'merge run has no commit receipt: ' + command.run }
         if (receipt.target !== command.target) return { ok: false, text: 'receipt target is ' + receipt.target + ', not ' + command.target }
         const result = await undoMergeReceipt(receipt, skillLibraryUndoPort(deps.skills))
+        if (result.ok && receipt.pairKey !== undefined) {
+          await recordPair(deps.io, deps.home, { pairKey: receipt.pairKey, runId: receipt.parentRunId ?? receipt.runId, result: 'undone', target: receipt.target })
+        }
         return { ok: result.ok, text: result.message }
       }
       if (command.verb === 'skipped' && command.restore !== undefined) {
@@ -180,7 +211,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         }
         const loaded = await loadMergeState(deps.io, deps.home)
         const row = command.id === undefined
-          ? loaded.state.rows.find(item => item.state === 'fuse' || item.state === 'verify')
+          ? loaded.state.rows.find(item => item.state === 'fuse' || item.state === 'verify' || (command.retry === true && item.state === 'approved'))
           : loaded.state.rows.find(item => item.id === command.id)
         if (row === undefined) return { ok: false, text: 'merge row not found: ' + (command.id ?? '(auto)') }
         const signal = new AbortController().signal
@@ -212,9 +243,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             ...stageHooks,
           }),
         })
-        return result.ok
-          ? { ok: true, text: 'merge resume 完成：merged ' + String(result.report.totals.merged) }
-          : { ok: false, text: result.message }
+        if (!result.ok) return { ok: false, text: result.message }
+        if ('accepted' in result) return { ok: true, text: 'merge resume 已启动：' + result.runId }
+        if (!('report' in result)) return { ok: false, text: 'merge resume started without a report' }
+        return { ok: true, text: 'merge resume 完成：merged ' + String(result.report.totals.merged) }
       }
       if (command.verb === 'approve') {
         const signal = new AbortController().signal
@@ -231,9 +263,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             }),
           },
         })
-        return result.ok
-          ? { ok: true, text: 'merge approve 完成：merged ' + String(result.report.totals.merged) }
-          : { ok: false, text: result.message }
+        if (!result.ok) return { ok: false, text: result.message }
+        if ('accepted' in result) return { ok: true, text: 'merge approve 已启动：' + result.runId }
+        if (!('report' in result)) return { ok: false, text: 'merge approve started without a report' }
+        return { ok: true, text: 'merge approve 完成：merged ' + String(result.report.totals.merged) }
       }
       const text = await handleReadOnlyMergeCommand(command, deps.io, deps.home)
       if (text !== null) return { ok: true, text }

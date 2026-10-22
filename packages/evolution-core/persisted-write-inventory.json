@@ -207,6 +207,15 @@
       "marker": "transactIo(options.io, path",
       "state": [],
       "note": "The release half of the same lock: delete only when the recorded token still matches."
+    },
+    {
+      "id": "merge-pair-index",
+      "path": "<evolutionHome>/merge/pair-index.json",
+      "writer": "evolution-merge/src/domain/pair-index-store.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, pairIndexPath(home)",
+      "state": [],
+      "note": "pairKey → result/runId/target index; RMW under the same IO lock so two merge runs cannot lose each other's entries."
     }
   ]
 }

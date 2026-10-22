@@ -26,7 +26,7 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
     key: 'state',
     label: '合并状态',
     status: loaded.note === undefined ? 'ok' : 'warn',
-    detail: loaded.note ?? 'pairs ' + String(loaded.state.rows.length) + '；pending ' + String(counts.pending) + ' / retry ' + String(counts.retry) + ' / skipped ' + String(counts.skipped),
+    detail: loaded.note ?? 'pairs ' + String(loaded.state.rows.length) + '；verify ' + String(counts.verify) + ' / pending ' + String(counts.pending) + ' / fuse ' + String(counts.fuse) + ' / skipped ' + String(counts.skipped),
   })
   const modelRoot = configuredRoot !== undefined && configuredRoot !== '' ? configuredRoot : process.env.SKILL_MERGE_MODELS_ROOT
   if (modelRoot === undefined || modelRoot === '') {

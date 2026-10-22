@@ -18,9 +18,9 @@ it('approves one pending row and rejects a second action', async () => {
   const io = nodeEvolutionIo()
   const row = await pending(home)
   const approved = await approvePending(io, home, () => Date.parse(AT), row.id)
-  expect(approved).toMatchObject({ ok: true, row: { state: 'fuse', queue: 'retry' } })
+  expect(approved).toMatchObject({ ok: true, row: { state: 'approved', queue: 'fuse' } })
   expect(await approvePending(io, home, () => Date.parse(AT), row.id)).toMatchObject({ ok: false, reason: 'not-pending' })
-  expect((await loadMergeState(io, home)).state.rows[0]?.state).toBe('fuse')
+  expect((await loadMergeState(io, home)).state.rows[0]?.state).toBe('approved')
 })
 
 it('rejects pending to skipped and reports unknown ids', async () => {

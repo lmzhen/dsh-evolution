@@ -17,6 +17,7 @@ export interface RunScanCommandOptions {
   readonly platformWrite: boolean
   readonly timeoutMinutes?: number
   readonly now: () => number
+  readonly detached?: boolean
 }
 
 export async function runScanCommand(options: RunScanCommandOptions): Promise<WithMergeRunResult> {
@@ -27,6 +28,7 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
     command: 'scan',
     approval: { platformWrite: options.platformWrite, mergeApproval: options.approval },
     now: options.now,
+    ...(options.detached === undefined ? {} : { detached: options.detached }),
     async body(ctx) {
       const ports = options.makePorts === undefined ? options.ports : options.makePorts(ctx.runId)
       if (ports === undefined) throw new Error('scan requires ports or makePorts')

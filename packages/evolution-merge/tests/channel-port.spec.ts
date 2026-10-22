@@ -7,7 +7,7 @@ const cards: SkillCard[] = [
   { name: 'beta-skill', description: 'b', body: 'b' },
 ]
 const candidate = { a: 'alpha-skill', b: 'beta-skill' }
-const row: MergeRow = { id: '', pairKey: 'a\u0000b', a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'retry', createdAt: '', updatedAt: '' }
+const row: MergeRow = { id: '', pairKey: 'a\u0000b', a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'fuse', createdAt: '', updatedAt: '' }
 const signal = new AbortController().signal
 const mergeText = JSON.stringify({ should_merge: true, mode: 'merge-into-existing', target: 'alpha-skill', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' })
 

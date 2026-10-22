@@ -151,3 +151,31 @@ export async function dropStaging(io: EvolutionIoLike, home: string, stageKey: s
   await io.remove(stagingRoot(home, stageKey))
 }
 
+export interface StagingCleanupResult {
+  readonly removed: readonly string[]
+  readonly kept: readonly string[]
+  readonly unknown: readonly string[]
+}
+
+/** Remove expired run-level staging trees; `keep` names runs a live row still points at. */
+export async function cleanupExpiredStaging(
+  io: EvolutionIoLike,
+  home: string,
+  now: number,
+  keep: ReadonlySet<string> = new Set<string>(),
+): Promise<StagingCleanupResult> {
+  let runs: string[]
+  try { runs = await io.list(join(home, 'merge', 'runs')) } catch { return { removed: [], kept: [], unknown: [] } }
+  const removed: string[] = []
+  const kept: string[] = []
+  const unknown: string[] = []
+  for (const runId of runs.sort()) {
+    if (keep.has(runId)) { kept.push(runId); continue }
+    const view = await readStaging(io, home, runId)
+    if (view.kind === 'unknown') { unknown.push(runId); continue }
+    if (view.kind !== 'present' || view.value.manifest.expiresAt > now) { kept.push(runId); continue }
+    try { await io.remove(stagingRoot(home, runId)); removed.push(runId) } catch { unknown.push(runId) }
+  }
+  return { removed, kept, unknown }
+}
+

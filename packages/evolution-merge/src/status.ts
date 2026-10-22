@@ -6,13 +6,14 @@ import type { MergeQueue, MergeRow } from './contracts.ts'
 import { queueOf, stageOf } from './contracts.ts'
 
 export interface MergeCounts {
+  readonly verify: number
   readonly pending: number
-  readonly retry: number
+  readonly fuse: number
   readonly skipped: number
 }
 
 export function countRows(rows: readonly MergeRow[]): MergeCounts {
-  const counts = { pending: 0, retry: 0, skipped: 0 }
+  const counts = { verify: 0, pending: 0, fuse: 0, skipped: 0 }
   for (const row of rows) counts[queueOf(row.state)] += 1
   return counts
 }
@@ -26,7 +27,7 @@ function describe(row: MergeRow): string {
 export function formatStatus(rows: readonly MergeRow[]): string {
   const counts = countRows(rows)
   const lines = [
-    'merge: pending ' + String(counts.pending) + ', retry ' + String(counts.retry) + ', skipped ' + String(counts.skipped),
+    'merge: verify ' + String(counts.verify) + ', pending ' + String(counts.pending) + ', fuse ' + String(counts.fuse) + ', skipped ' + String(counts.skipped),
   ]
   for (const row of rows) lines.push('- ' + describe(row))
   return lines.join('\n')

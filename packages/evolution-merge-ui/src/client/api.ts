@@ -7,11 +7,12 @@ import { requestJson, type RouteFailure } from './route-client.generated.ts'
 
 export const HOST_ROUTES = ROUTES.merge
 
-export type MergeQueue = 'pending' | 'retry' | 'skipped'
+export type MergeQueue = 'verify' | 'pending' | 'fuse' | 'skipped'
 
 export interface MergeCounts {
+  verify: number
   pending: number
-  retry: number
+  fuse: number
   skipped: number
 }
 
@@ -50,6 +51,9 @@ export interface MergeRowView {
   attempts?: number
   origin?: 'agent' | 'human'
   stagingExpiresAt?: number
+  expired?: 'target-taken' | 'source-changed'
+  reason?: string
+  summary?: string[]
   actions?: string[]
 }
 
@@ -57,6 +61,21 @@ export interface QueuePage {
   queue: MergeQueue
   items: MergeRowView[]
   nextCursor?: string
+}
+
+export interface MergeBody {
+  content: string
+  markdown: boolean
+  html: string
+}
+
+export interface MergeHistoryItem {
+  name: string
+  kind: 'merged' | 'deleted' | 'split' | 'other'
+  reason: string
+  lastVersion: number
+  archivedAt: string
+  sourceRunId?: string
 }
 
 export type MergeOutcome<T> = { ok: true; payload: T } | { ok: false; failure: RouteFailure }
@@ -69,5 +88,16 @@ export async function view(): Promise<MergeOutcome<MergeViewPayload>> {
 export async function rows(queue: MergeQueue, cursor = 0): Promise<MergeOutcome<QueuePage>> {
   const url = HOST_ROUTES.rows + '?queue=' + encodeURIComponent(queue) + '&cursor=' + String(cursor)
   const answer = await requestJson<QueuePage>(fetch, url, { headers: { accept: 'application/json' } })
+  return answer.ok ? { ok: true, payload: answer.data } : { ok: false, failure: answer.failure }
+}
+
+export async function body(id: string, side: 'a' | 'b'): Promise<MergeOutcome<MergeBody>> {
+  const url = HOST_ROUTES.body + '?id=' + encodeURIComponent(id) + '&side=' + side
+  const answer = await requestJson<MergeBody>(fetch, url, { headers: { accept: 'application/json' } })
+  return answer.ok ? { ok: true, payload: answer.data } : { ok: false, failure: answer.failure }
+}
+
+export async function history(): Promise<MergeOutcome<{ items: MergeHistoryItem[] }>> {
+  const answer = await requestJson<{ items: MergeHistoryItem[] }>(fetch, HOST_ROUTES.history, { headers: { accept: 'application/json' } })
   return answer.ok ? { ok: true, payload: answer.data } : { ok: false, failure: answer.failure }
 }

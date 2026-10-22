@@ -23,7 +23,13 @@ export async function handleReadOnlyMergeCommand(
   }
   if (command.verb === 'pending') {
     const loaded = await loadMergeState(io, home)
-    return formatQueue(loaded.state.rows, 'pending')
+    const rows = command.expired === true ? loaded.state.rows.filter(row => row.expired !== undefined) : loaded.state.rows
+    return command.expired === true ? formatStatus(rows) : formatQueue(rows, 'pending')
+  }
+  if (command.verb === 'candidates') {
+    const loaded = await loadMergeState(io, home)
+    const rows = command.retry === true ? loaded.state.rows.filter(row => row.state === 'approved') : loaded.state.rows
+    return formatQueue(rows, command.retry === true ? 'fuse' : 'verify')
   }
   if (command.verb === 'skipped') {
     const loaded = await loadMergeState(io, home)

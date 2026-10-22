@@ -29,7 +29,7 @@ export interface EngineScreenPort {
 export interface CandidateSelection {
   readonly candidates: readonly MergeCandidate[]
   readonly skipped: readonly { readonly pairKey: string; readonly a: string; readonly b: string; readonly reason?: string }[]
-  readonly reportOnly: number
+  readonly reportOnly: readonly unknown[]
   readonly candidatePairs?: number
 }
 

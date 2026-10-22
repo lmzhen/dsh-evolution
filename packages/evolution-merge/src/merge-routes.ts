@@ -6,13 +6,32 @@ import type { RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { HOST_ROUTES, json, methodNotAllowed, type ConnectionFetchRouteLike, type DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { MergeRow } from './contracts.ts'
 import { buildMergeView, pageQueue, toRunFact } from './routes.ts'
+import { renderMarkdown } from './domain/markdown.ts'
 
-export const MERGE_ROUTES = HOST_ROUTES.merge
+const MERGE_PATHS = HOST_ROUTES.merge as { view: string; rows: string; body?: string; history?: string }
+const MERGE_BASE = MERGE_PATHS.view.slice(0, -'view'.length)
+export const MERGE_ROUTES: { view: `/api/dsh-evolution/${string}`; rows: `/api/dsh-evolution/${string}`; body: `/api/dsh-evolution/${string}`; history: `/api/dsh-evolution/${string}` } = {
+  view: MERGE_PATHS.view as `/api/dsh-evolution/${string}`,
+  rows: MERGE_PATHS.rows as `/api/dsh-evolution/${string}`,
+  body: (MERGE_PATHS.body ?? MERGE_BASE + 'body') as `/api/dsh-evolution/${string}`,
+  history: (MERGE_PATHS.history ?? MERGE_BASE + 'history') as `/api/dsh-evolution/${string}`,
+}
+
+export interface MergeHistoryItem {
+  readonly name: string
+  readonly kind: 'merged' | 'deleted' | 'split' | 'other'
+  readonly reason: string
+  readonly lastVersion: number
+  readonly archivedAt: string
+  readonly sourceRunId?: string
+}
 
 export interface MergeRouteSource {
   rows(): Promise<readonly MergeRow[]>
   run(id: string): Promise<RunRecord | undefined>
   runs(cursor?: string, limit?: number): Promise<readonly RunRecord[]>
+  body(id: string, side: 'a' | 'b'): Promise<string | null>
+  history(): Promise<readonly MergeHistoryItem[]>
   commands(): readonly string[]
   approval?(): boolean
 }
@@ -57,9 +76,9 @@ export function makeMergeRoutes(
         const source = deps.getSource()
         if (source === undefined) return absent()
         const query = url(request).searchParams
-        const queue = query.get('queue') ?? 'retry'
-        if (queue !== 'pending' && queue !== 'retry' && queue !== 'skipped') {
-          return json(400, { ok: false, error: { code: 'bad-queue', message: 'queue must be pending/retry/skipped' } })
+        const queue = query.get('queue') ?? 'verify'
+        if (queue !== 'verify' && queue !== 'pending' && queue !== 'fuse' && queue !== 'skipped') {
+          return json(400, { ok: false, error: { code: 'bad-queue', message: 'queue must be verify/pending/fuse/skipped' } })
         }
         const cursor = Number.parseInt(query.get('cursor') ?? '0', 10)
         const limit = Number.parseInt(query.get('limit') ?? '50', 10)
@@ -70,24 +89,7 @@ export function makeMergeRoutes(
       },
     },
     {
-      path: MERGE_ROUTES.run,
-      methods: ['GET'],
-      requestBody: 'buffered',
-      fetch: async (request) => {
-        const denied = get(request)
-        if (denied !== null) return denied
-        const source = deps.getSource()
-        if (source === undefined) return absent()
-        const id = url(request).searchParams.get('id')
-        if (id === null || id === '') return json(400, { ok: false, error: { code: 'missing-id', message: 'id is required' } })
-        const run = await source.run(id)
-        return run === undefined
-          ? json(404, { ok: false, error: { code: 'run-not-found', message: 'merge run not found: ' + id } })
-          : json(200, { ok: true, data: toRunFact(run) })
-      },
-    },
-    {
-      path: MERGE_ROUTES.runs,
+      path: MERGE_ROUTES.body,
       methods: ['GET'],
       requestBody: 'buffered',
       fetch: async (request) => {
@@ -96,9 +98,27 @@ export function makeMergeRoutes(
         const source = deps.getSource()
         if (source === undefined) return absent()
         const query = url(request).searchParams
-        const limit = Number.parseInt(query.get('limit') ?? '20', 10)
-        const runs = await source.runs(query.get('cursor') ?? undefined, Number.isFinite(limit) ? limit : 20)
-        return json(200, { ok: true, data: { items: runs.map(toRunFact) } })
+        const id = query.get('id')
+        const side = query.get('side')
+        if (id === null || id === '' || (side !== 'a' && side !== 'b')) {
+          return json(400, { ok: false, error: { code: 'bad-body-query', message: 'id and side=a|b are required' } })
+        }
+        const content = await source.body(id, side)
+        return content === null
+          ? json(404, { ok: false, error: { code: 'body-not-found', message: 'merge body not found: ' + id } })
+          : json(200, { ok: true, data: { content, markdown: true, html: renderMarkdown(content) } })
+      },
+    },
+    {
+      path: MERGE_ROUTES.history,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        const denied = get(request)
+        if (denied !== null) return denied
+        const source = deps.getSource()
+        if (source === undefined) return absent()
+        return json(200, { ok: true, data: { items: await source.history() } })
       },
     },
   ]

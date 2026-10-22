@@ -7,7 +7,7 @@ const cards: SkillCard[] = [
   { name: 'beta-skill', description: 'b', body: 'beta body' },
 ]
 const decision: MergeDecision = { shouldMerge: true, mode: 'merge-into-existing', target: 'alpha-skill', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }
-const row: MergeRow = { id: 'mr_a', pairKey: 'a\u0000b', a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'retry', createdAt: 'x', updatedAt: 'x' }
+const row: MergeRow = { id: 'mr_a', pairKey: 'a\u0000b', a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'fuse', createdAt: 'x', updatedAt: 'x' }
 
 it('round1 is the B decision prompt with merge_stage reads', () => {
   const prompt = buildRound1Prompt({ a: 'alpha-skill', b: 'beta-skill' }, cards)

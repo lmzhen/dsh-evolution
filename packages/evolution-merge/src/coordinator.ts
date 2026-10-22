@@ -22,6 +22,7 @@ export type MergeEvent =
   | { readonly type: 'approve'; readonly runId?: string; readonly at: string }
   | { readonly type: 'reject'; readonly at: string }
   | { readonly type: 'round2-fail'; readonly failure: MergeFailure; readonly at: string }
+  | { readonly type: 'round2-cancel'; readonly at: string }
   | { readonly type: 'round2-success'; readonly unitId?: string; readonly at: string }
   | { readonly type: 'restore'; readonly at: string }
   | { readonly type: 'source-gone'; readonly at: string }
@@ -54,9 +55,14 @@ function base(row: MergeRow, at: string): Omit<MergeRow, 'failure'> {
     ...(row.unitId === undefined ? {} : { unitId: row.unitId }),
     ...(row.origin === undefined ? {} : { origin: row.origin }),
     ...(row.decision === undefined ? {} : { decision: row.decision }),
+    ...(row.sourceRevision === undefined ? {} : { sourceRevision: row.sourceRevision }),
+    ...(row.targetRevision === undefined ? {} : { targetRevision: row.targetRevision }),
     ...(row.attempts === undefined ? {} : { attempts: row.attempts }),
     ...(row.stagingRef === undefined ? {} : { stagingRef: row.stagingRef }),
     ...(row.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: row.stagingExpiresAt }),
+    ...(row.expired === undefined ? {} : { expired: row.expired }),
+    ...(row.reason === undefined ? {} : { reason: row.reason }),
+    ...(row.target === undefined ? {} : { target: row.target }),
   }
 }
 
@@ -84,7 +90,7 @@ export function transition(current: MergeRow | undefined, event: MergeEvent): Tr
         a: event.a,
         b: event.b,
         state: 'verify',
-        queue: 'retry',
+        queue: 'verify',
         createdAt: event.at,
         updatedAt: event.at,
       },
@@ -117,23 +123,27 @@ export function transition(current: MergeRow | undefined, event: MergeEvent): Tr
       if (current.state !== 'verify') return invalid(event, current.state)
       return event.approval === 'on'
         ? next(current, event.at, 'pending', { ...(event.decision === undefined ? {} : { decision: event.decision }), ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }) })
-        : next(current, event.at, 'fuse', { ...(event.decision === undefined ? {} : { decision: event.decision }), ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }) })
+        : next(current, event.at, 'approved', { ...(event.decision === undefined ? {} : { decision: event.decision }), ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }) })
     case 'round1-fail':
       return current.state === 'verify'
         ? next(current, event.at, 'verify', { failure: event.failure, attempts: (current.attempts ?? 0) + 1 })
         : invalid(event, current.state)
     case 'approve':
       return current.state === 'pending'
-        ? next(current, event.at, 'fuse', { ...(event.runId === undefined ? {} : { runId: event.runId }) })
+        ? next(current, event.at, 'approved', { ...(event.runId === undefined ? {} : { runId: event.runId }) })
         : invalid(event, current.state)
     case 'reject':
       return current.state === 'pending' ? next(current, event.at, 'skipped', { origin: 'human' }) : invalid(event, current.state)
+    case 'round2-cancel':
+      return current.state === 'fuse' || current.state === 'approved'
+        ? next(current, event.at, 'approved')
+        : invalid(event, current.state)
     case 'round2-fail':
-      return current.state === 'fuse'
-        ? next(current, event.at, 'fuse', { failure: event.failure, attempts: (current.attempts ?? 0) + 1 })
+      return current.state === 'fuse' || current.state === 'approved'
+        ? next(current, event.at, 'approved', { failure: event.failure, attempts: (current.attempts ?? 0) + 1 })
         : invalid(event, current.state)
     case 'round2-success':
-      return current.state === 'fuse'
+      return current.state === 'fuse' || current.state === 'approved'
         ? { ok: true, row: null }
         : invalid(event, current.state)
     case 'restore':

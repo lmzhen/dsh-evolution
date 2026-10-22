@@ -13,6 +13,7 @@ import {
 } from './contracts.ts'
 import { transition } from './coordinator.ts'
 import { dropRow, loadMergeState, upsertRow } from './state.ts'
+import { recordPair } from './domain/pair-index-store.ts'
 import type { EvolutionIoLike, RunStage } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeRunReportDraft } from './run-shell.ts'
 
@@ -22,6 +23,8 @@ export interface ScanRound1Outcome {
   readonly failure?: MergeFailure
   readonly stagingRef?: string
   readonly stagingExpiresAt?: number
+  readonly sourceRevision?: string
+  readonly targetRevision?: string
 }
 
 export interface ScanRound2Outcome {
@@ -83,7 +86,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
   const stage = options.stage ?? (async () => {})
   const candidates = await options.ports.screening(options.signal)
   const before = await loadMergeState(options.io, options.home)
-  const queueBefore = { pending: 0, retry: 0, skipped: 0 }
+  const queueBefore = { verify: 0, pending: 0, fuse: 0, skipped: 0 }
   for (const row of before.state.rows) queueBefore[row.queue] += 1
   const startedAt = options.startedAt ?? options.now()
   const timeoutMs = (options.timeoutMinutes ?? 0) > 0 ? (options.timeoutMinutes as number) * 60_000 : 0
@@ -95,12 +98,12 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
   for (let index = 0; index < candidates.length; index += 1) {
     if (options.signal.aborted) {
       stopReason = 'cancelled'
-      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'retry' as const })))
+      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'verify' as const })))
       break
     }
     if (timeoutMs > 0 && options.now() - startedAt >= timeoutMs) {
       stopReason = 'timeout'
-      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'retry' as const })))
+      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'verify' as const })))
       break
     }
     const candidate = candidates[index] as MergeCandidate
@@ -114,7 +117,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     } catch (error) {
       totals.failed += 1
       pairs.push({
-        id: '', pairKey: pairKey(candidate.a, candidate.b), a: candidate.a, b: candidate.b, queue: 'retry',
+        id: '', pairKey: pairKey(candidate.a, candidate.b), a: candidate.a, b: candidate.b, queue: 'verify',
         candidate, outcome: 'failed', archived: [], failure: failureOf('screening', error),
       })
       continue
@@ -126,6 +129,11 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     } catch (error) {
       round1 = { kind: 'failed', failure: failureOf('decide', error) }
     }
+    if (options.signal.aborted) {
+      stopReason = 'cancelled'
+      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'verify' as const })))
+      break
+    }
     if (round1.kind === 'failed') {
       const next = transition(row, { type: 'round1-fail', failure: round1.failure ?? failureOf('decide', 'round1 failed'), at: at(options.now) })
       if (next.ok && next.row !== null) { row = next.row; await upsertRow(options.io, options.home, options.now, row) }
@@ -135,7 +143,11 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     }
     if (round1.kind === 'keep') {
       const next = transition(row, { type: 'round1-keep', at: at(options.now) })
-      if (next.ok && next.row !== null) { row = next.row; await upsertRow(options.io, options.home, options.now, row) }
+      if (next.ok && next.row !== null) {
+        row = next.row
+        await upsertRow(options.io, options.home, options.now, row)
+        await recordPair(options.io, options.home, { pairKey: row.pairKey, runId: row.runId ?? 'merge', result: 'kept' })
+      }
       pairs.push(pairOf(row, candidate, 'kept', round1.decision === undefined ? {} : { decision: round1.decision }))
       totals.kept += 1
       continue
@@ -146,7 +158,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       continue
     }
     if (options.approval) {
-      const next = transition(row, { type: 'round1-merge', approval: 'on', decision: round1.decision, ...(round1.stagingRef === undefined ? {} : { stagingRef: round1.stagingRef }), ...(round1.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: round1.stagingExpiresAt }), at: at(options.now) })
+      const next = transition(row, { type: 'round1-merge', approval: 'on', decision: round1.decision, ...(round1.sourceRevision === undefined ? {} : { sourceRevision: round1.sourceRevision }), ...(round1.targetRevision === undefined ? {} : { targetRevision: round1.targetRevision }), at: at(options.now) })
       if (next.ok && next.row !== null) { row = next.row; await upsertRow(options.io, options.home, options.now, row) }
       pairs.push(pairOf(row, candidate, 'pending', { decision: round1.decision }))
       totals.pending += 1
@@ -161,6 +173,13 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     }
     row = fuse.row
     await upsertRow(options.io, options.home, options.now, row)
+    if (options.signal.aborted) {
+      const cancelled = transition(row, { type: 'round2-cancel', at: at(options.now) })
+      if (cancelled.ok && cancelled.row !== null) { row = cancelled.row; await upsertRow(options.io, options.home, options.now, row) }
+      stopReason = 'cancelled'
+      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'fuse' as const })))
+      break
+    }
     await stage('author', { done: index, total: candidates.length })
     let round2: ScanRound2Outcome
     try {

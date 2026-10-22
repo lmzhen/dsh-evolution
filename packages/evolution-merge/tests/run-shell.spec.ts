@@ -26,7 +26,7 @@ it('writes the report before settling a successful run', async () => {
     async body(ctx) {
       expect(ctx.runId).toBe('run-1')
       return {
-        stopReason: 'completed', scope: { candidatePairs: 2, queueBefore: { pending: 0, retry: 2, skipped: 0 } },
+        stopReason: 'completed', scope: { candidatePairs: 2, queueBefore: { verify: 0, pending: 0, fuse: 2, skipped: 0 } },
         pairs: [], totals: { merged: 0, kept: 0, pending: 0, failed: 0 }, notes: [],
       }
     },
@@ -34,7 +34,34 @@ it('writes the report before settling a successful run', async () => {
   expect(result.ok).toBe(true)
   expect(reg.calls).toEqual(['begin:scan', 'stage:screening', 'settle:succeeded'])
   expect((await readMergeReport(io, home, 'run-1')).kind).toBe('present')
-  expect((reg as unknown as { settled: { resultRef?: string } }).settled.resultRef).toContain('merge-run-1.json')
+  expect((reg as unknown as { settled: { resultRef?: string; mergeStatus?: string } }).settled.resultRef).toContain('merge-run-1.json')
+  expect((reg as unknown as { settled: { mergeStatus?: string } }).settled.mergeStatus).toBe('succeeded')
+})
+
+it('detached returns a run id before the body settles', async () => {
+  const home = await tempRoot('dsh-merge-run-shell-detached-')
+  const io = nodeEvolutionIo()
+  const reg = registry()
+  let release = (): void => {}
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const result = await withMergeRun({
+    io, home, registry: reg, command: 'scan', approval: { platformWrite: true, mergeApproval: false },
+    now: () => 200, detached: true,
+    async body() {
+      await gate
+      return {
+        stopReason: 'completed', scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 1, skipped: 0 } },
+        pairs: [], totals: { merged: 0, kept: 0, pending: 0, failed: 0 }, notes: [],
+      }
+    },
+  })
+  expect(result).toMatchObject({ ok: true, accepted: true, runId: 'run-1' })
+  expect(reg.calls).not.toContain('settle:succeeded')
+  release()
+  for (let i = 0; i < 100 && !reg.calls.includes('settle:succeeded'); i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  expect(reg.calls).toContain('settle:succeeded')
 })
 
 it('still writes a failed report when the body throws', async () => {
@@ -50,4 +77,5 @@ it('still writes a failed report when the body throws', async () => {
   expect(reg.calls).toContain('settle:failed')
   const report = await readMergeReport(io, home, 'run-1')
   expect(report).toMatchObject({ kind: 'present', value: { stopReason: 'failed', notes: ['run body failed: round boom'] } })
+  expect((reg as unknown as { settled: { mergeStatus?: string } }).settled.mergeStatus).toBe('failed')
 })

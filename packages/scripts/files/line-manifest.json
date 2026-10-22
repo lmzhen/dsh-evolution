@@ -1,5 +1,5 @@
 {
-  "pin": "499af95d",
+  "pin": "2c8f66e0",
   "bed": {
     "mono": "overlay"
   },
@@ -68,6 +68,21 @@
       "id": "@deepseek-ai/dsh-evolution-maintenance",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-maintenance"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-merge",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-merge"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-merge-engine",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-merge-engine"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-merge-ui",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-merge-ui"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-plan-validator",

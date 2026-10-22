@@ -46,7 +46,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
       } catch (error) {
         outcome = { kind: 'failed', failure: { stage: 'author', code: 'merge-failed', message: error instanceof Error ? error.message : String(error), retryable: true, retryFrom: 'agent2' } }
       }
-      const base = { scope: { candidatePairs: 1, queueBefore: { pending: 0, retry: 1, skipped: 0 } }, notes: [] as string[] }
+      const base = { scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 1, skipped: 0 } }, notes: [] as string[] }
       const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome)
       return {
         ...base,

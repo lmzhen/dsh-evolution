@@ -24,7 +24,7 @@ function row(a: string, b: string): MergeRow {
     a,
     b,
     state: 'verify',
-    queue: 'retry',
+    queue: 'verify',
     createdAt: AT,
     updatedAt: AT,
   }
@@ -44,7 +44,7 @@ it('upserts, moves and drops a row through one ledger', async () => {
   let loaded = await loadMergeState(io, home)
   expect(loaded.ok).toBe(true)
   expect(loaded.state.rows).toHaveLength(1)
-  expect(loaded.state.rows[0]).toMatchObject({ id: first.id, pairKey: first.pairKey, state: 'verify', queue: 'retry' })
+  expect(loaded.state.rows[0]).toMatchObject({ id: first.id, pairKey: first.pairKey, state: 'verify', queue: 'verify' })
 
   const moved = await moveRow(io, home, now, first.id, { queue: 'pending', state: 'pending' })
   expect(moved).toMatchObject({ state: 'pending', queue: 'pending' })

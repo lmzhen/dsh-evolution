@@ -41,6 +41,30 @@ it('stops with remaining when the time budget is already exhausted', async () =>
   expect(draft.totals).toEqual({ merged: 0, kept: 0, pending: 0, failed: 0 })
 })
 
+it('cancelled before start leaves every candidate in remaining', async () => {
+  const home = await tempRoot('dsh-merge-scan-cancelled-')
+  const io = nodeEvolutionIo()
+  const controller = new AbortController()
+  controller.abort()
+  const draft = await runScan({ io, home, now: () => 1000, signal: controller.signal, approval: false, ports: ports() })
+  expect(draft.stopReason).toBe('cancelled')
+  expect(draft.remaining).toHaveLength(2)
+})
+
+it('cancels after round1 and leaves the current candidate in remaining', async () => {
+  const home = await tempRoot('dsh-merge-scan-cancel-round1-')
+  const io = nodeEvolutionIo()
+  const controller = new AbortController()
+  const draft = await runScan({
+    io, home, now: () => 1000, signal: controller.signal, approval: false,
+    ports: ports({
+      async round1(candidate) { controller.abort(); return candidate.a === 'a' ? { kind: 'merge', decision: DECISION } : { kind: 'keep' } },
+    }),
+  })
+  expect(draft.stopReason).toBe('cancelled')
+  expect(draft.remaining).toHaveLength(2)
+})
+
 it('approval on stops at pending without calling round2', async () => {
   const home = await tempRoot('dsh-merge-scan-approval-')
   const io = nodeEvolutionIo()
@@ -54,4 +78,5 @@ it('approval on stops at pending without calling round2', async () => {
   const rows = (await loadMergeState(io, home)).state.rows
   const pending = rows.find(row => row.state === 'pending')
   expect(pending?.decision).toEqual(DECISION)
+  expect(pending?.stagingRef).toBeUndefined()
 })

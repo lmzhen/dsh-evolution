@@ -5,6 +5,7 @@
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { parseMergeCommand, mergeUsage, type MergeCliCommand } from './commands.ts'
 import { handleReadOnlyMergeCommand } from './read-commands.ts'
+import { formatMergeError } from './domain/errors.ts'
 
 export interface MergeCommandResult {
   readonly ok: boolean
@@ -62,7 +63,7 @@ export async function runMergeCommand(
   try {
     return await service.execute(parsed.command, invocation?.agent === undefined ? {} : { parent: invocation.agent })
   } catch (error) {
-    return { ok: false, text: 'merge 命令失败：' + (error instanceof Error ? error.message : String(error)) + '\n运行 /evolution merge status 查看状态。' }
+    return { ok: false, text: formatMergeError({ kind: 'runtime', code: 'merge-command-failed', message: error instanceof Error ? error.message : String(error) }) }
   }
 }
 

@@ -11,13 +11,13 @@ import { transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
   MERGE_STATE_VERSION,
-  MERGE_PAIR_STATES,
   queueOf,
   type MergePairState,
   type MergeQueue,
   type MergeRow,
   type MergeState,
 } from './contracts.ts'
+import { parseLedger } from './domain/ledger.ts'
 
 export function mergeStatePath(home: string): string {
   return join(home, 'merge', 'merge-state.json')
@@ -29,57 +29,14 @@ interface ParsedState {
   readonly note?: string
 }
 
-function isState(value: unknown): value is MergePairState {
-  return typeof value === 'string' && (MERGE_PAIR_STATES as readonly string[]).includes(value)
-}
-
 function parseState(raw: string | null): ParsedState {
-  if (raw === null) return { ok: true, rows: [] }
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return { ok: false, rows: [] }
+  const parsed = parseLedger(raw)
+  if (!parsed.ok) return { ok: false, rows: [] }
+  return {
+    ok: true,
+    rows: parsed.ledger.rows as MergeRow[],
+    ...(parsed.note === undefined ? {} : { note: parsed.note }),
   }
-  const body = parsed as { schemaVersion?: unknown; rows?: unknown }
-  if (!Array.isArray(body.rows)) return { ok: false, rows: [] }
-  const rows: MergeRow[] = []
-  let skipped = 0
-  for (const value of body.rows) {
-    const row = value as Partial<MergeRow>
-    if (typeof row.id !== 'string' || typeof row.pairKey !== 'string' || typeof row.a !== 'string' || typeof row.b !== 'string') {
-      skipped += 1
-      continue
-    }
-    if (!isState(row.state) || typeof row.createdAt !== 'string' || typeof row.updatedAt !== 'string') {
-      skipped += 1
-      continue
-    }
-    const normalized: MergeRow = {
-      id: row.id,
-      pairKey: row.pairKey,
-      a: row.a,
-      b: row.b,
-      state: row.state,
-      queue: queueOf(row.state),
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      ...(row.failure === undefined ? {} : { failure: row.failure }),
-      ...(row.decision === undefined ? {} : { decision: row.decision }),
-      ...(typeof row.runId === 'string' ? { runId: row.runId } : {}),
-      ...(typeof row.unitId === 'string' ? { unitId: row.unitId } : {}),
-      ...(row.origin === 'agent' || row.origin === 'human' ? { origin: row.origin } : {}),
-      ...(typeof row.attempts === 'number' ? { attempts: row.attempts } : {}),
-    }
-    rows.push(normalized)
-  }
-  const versionNote = typeof body.schemaVersion === 'number' && body.schemaVersion !== MERGE_STATE_VERSION
-    ? 'the index declares schemaVersion ' + String(body.schemaVersion) + ' while this build writes ' + String(MERGE_STATE_VERSION)
-    : undefined
-  const note = versionNote === undefined
-    ? (skipped === 0 ? undefined : String(skipped) + ' invalid row(s) skipped')
-    : (skipped === 0 ? versionNote : versionNote + '; ' + String(skipped) + ' invalid row(s) skipped')
-  return { ok: true, rows, ...(note === undefined ? {} : { note }) }
 }
 
 export interface LoadMergeStateResult {

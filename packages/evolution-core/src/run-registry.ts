@@ -86,6 +86,11 @@ export interface RunRecord {
   supersededAt?: number | undefined
   /** The run this run was spawned from (approve/resume after an earlier command). */
   parentRunId?: string | undefined
+  /** Merge-side projection; core lifecycle stays four-state. */
+  mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan' | undefined
+  stagingRef?: string | undefined
+  pairKey?: string | undefined
+  pairs?: readonly unknown[] | undefined
 }
 
 /** What a started run gets: its id and the signal its work must honour. */
@@ -97,6 +102,11 @@ export interface RunHandle {
   readonly startedAt: number
   readonly command?: RunCommand | undefined
   readonly parentRunId?: string | undefined
+  /** Merge-side projection; core lifecycle stays four-state. */
+  readonly mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan' | undefined
+  readonly stagingRef?: string | undefined
+  readonly pairKey?: string | undefined
+  readonly pairs?: readonly unknown[] | undefined
 }
 
 /** How a run ended, as reported by its owner. */
@@ -104,6 +114,7 @@ export interface RunOutcome {
   state: 'succeeded' | 'failed' | 'cancelled'
   resultRef?: string | undefined
   failure?: string | undefined
+  mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan' | undefined
 }
 
 /** The registry surface the commands row drives. */
@@ -121,7 +132,7 @@ export interface RunRegistry {
    * lifetime starts when the caller answers "started", so a plane that reads that answer
    * must find the run. The cost is one local index write on the ack path (milliseconds).
    */
-  begin(kind: RunKind, seed?: { command?: RunCommand; total?: number; parentRunId?: string }): Promise<RunHandle>
+  begin(kind: RunKind, seed?: { command?: RunCommand; total?: number; parentRunId?: string; mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan'; stagingRef?: string; pairKey?: string; pairs?: readonly unknown[] }): Promise<RunHandle>
   /** Record a run's terminal state (first writer wins). */
   settle(id: string, outcome: RunOutcome): Promise<void>
   /** Record the current stage/progress of a running run. */
@@ -221,6 +232,10 @@ function parseIndex(raw: string | null): { ok: boolean; records: RunRecord[]; fo
       ...(typeof record.failure === 'string' ? { failure: record.failure } : {}),
       ...(typeof record.supersededAt === 'number' ? { supersededAt: record.supersededAt } : {}),
       ...(typeof record.parentRunId === 'string' ? { parentRunId: record.parentRunId } : {}),
+      ...(record.mergeStatus === 'running' || record.mergeStatus === 'succeeded' || record.mergeStatus === 'failed' || record.mergeStatus === 'cancelled' || record.mergeStatus === 'awaiting-approval' || record.mergeStatus === 'undone' || record.mergeStatus === 'superseded' || record.mergeStatus === 'interrupted' || record.mergeStatus === 'orphan' ? { mergeStatus: record.mergeStatus } : {}),
+      ...(typeof record.stagingRef === 'string' ? { stagingRef: record.stagingRef } : {}),
+      ...(typeof record.pairKey === 'string' ? { pairKey: record.pairKey } : {}),
+      ...(Array.isArray(record.pairs) ? { pairs: record.pairs } : {}),
     })
   }
   return { ok: true, records, foreign, ...(notes.length > 0 ? { note: notes.join('; ') } : {}) }
@@ -249,7 +264,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
   /** A row whose owner cannot be reached: `pid` absent (an older build) or not alive. */
   const ownerIsGone = (row: RunRecord): boolean => row.pid === undefined || !isProcessAlive(row.pid)
   /** The verdict is materialized ONCE, so its `endedAt` (and the duration a reader sees) is stable. */
-  const orphanOf = (row: RunRecord): RunRecord => ({ ...row, state: 'failed', endedAt: now(), failure: ORPHAN_FAILURE })
+  const orphanOf = (row: RunRecord): RunRecord => ({ ...row, state: 'failed', mergeStatus: 'orphan', endedAt: now(), failure: ORPHAN_FAILURE })
 
   /** Every row this process knows, newest first. ALL reads go through here. */
   const view = (): RunRecord[] => [...owned.values(), ...foreign.values()].sort((a, b) => b.startedAt - a.startedAt)
@@ -407,6 +422,10 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         pid: process.pid,
         ...(seed?.command !== undefined ? { command: seed.command } : {}),
         ...(seed?.parentRunId !== undefined ? { parentRunId: seed.parentRunId } : {}),
+        ...(seed?.mergeStatus !== undefined ? { mergeStatus: seed.mergeStatus } : {}),
+        ...(seed?.stagingRef !== undefined ? { stagingRef: seed.stagingRef } : {}),
+        ...(seed?.pairKey !== undefined ? { pairKey: seed.pairKey } : {}),
+        ...(seed?.pairs !== undefined ? { pairs: seed.pairs } : {}),
         ...(seed?.total !== undefined ? { progress: { done: 0, total: seed.total } } : {}),
       })
       // Write-through (0.19.1, review P2): answering "started" promises a run another
@@ -437,6 +456,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         const row = owned.get(id)
         if (row === undefined || row.supersededAt !== undefined) continue
         row.supersededAt = now()
+        if (row.kind === 'merge') row.mergeStatus = 'superseded'
         changed = true
       }
       if (changed) await persist()
@@ -452,6 +472,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         for (const row of merged.values()) {
           if (row.kind !== kind || row.supersededAt !== undefined) continue
           row.supersededAt = now()
+          if (row.kind === 'merge') row.mergeStatus = 'superseded'
           marked += 1
         }
         const kept = capped([...merged.values()])
@@ -471,6 +492,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       row.endedAt = now()
       if (outcome.resultRef !== undefined) row.resultRef = outcome.resultRef
       if (outcome.failure !== undefined) row.failure = outcome.failure
+      if (outcome.mergeStatus !== undefined) row.mergeStatus = outcome.mergeStatus
       controllers.delete(id)
       await persist()
     },

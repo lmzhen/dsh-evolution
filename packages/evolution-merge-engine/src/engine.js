@@ -9,6 +9,7 @@ import { runPipeline } from '../vendor/skill-merge-pipeline/src/pipeline/index.j
 import { defineStage } from '../vendor/skill-merge-pipeline/src/pipeline/stage.js'
 import { resolveJudge, judgeCascade } from '../vendor/skill-merge-pipeline/src/judge.js'
 import { ensureDir } from '../vendor/skill-merge-pipeline/src/io/bytes.js'
+import { resolveModels } from '../vendor/skill-merge-pipeline/src/models/firstrun.js'
 import * as corpus from '../vendor/skill-merge-pipeline/src/corpus.js'
 import * as ledger from '../vendor/skill-merge-pipeline/src/ledger.js'
 import * as report from '../vendor/skill-merge-pipeline/src/report.js'
@@ -97,6 +98,8 @@ export function probe(cfgInput) {
   return { models, judge: cfg.judge === 'deepseek' ? 'platform' : 'stub', ranker: cfg.rank_mode === 'vec' ? 'vec' : 'auto', onnx: false }
 }
 
-export async function ensureModels() {
-  throw new Error('ensureModels is implemented in G3')
+export async function ensureModels(cfgInput) {
+  const cfg = makeConfig(cfgInput ?? {})
+  const resolved = await resolveModels({ cfg, rootDir: cfg.models_dir || undefined })
+  return { ok: true, models: 'ok', dirs: resolved.dirs }
 }

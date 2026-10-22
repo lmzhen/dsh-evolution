@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.0 (minor) — 技能自动合并 G0–G8 收口：两轮状态机、target-first commit、四队列 UI、发布构建线
+
+> **范围**：merge 内核按契约冻结收口（5 状态/4 队列/19 命令/4 只读 GET/schema 2）；commit 改 target-first + journal + undo pairIndex；run 壳支持 detached/interrupted/orphan；UI 四 tab、body/history 只读 overlay、expired/reason/summary；engine 包补类型导出与模型根；family 构建线补 lib/index.js 与 client bundle；许可裁定 MIT（代码）+ model-derived asset NOTICE。
+> **验证**：宿主 46 files/99 tests、domain 55/55、UI 5/5+2/2、runtime 5/5、merge tsc 0 错；RC 3 包 + 35 family tarball，离线解压/npm install 两种形态导入通过；API web 真机、截图、故障注入、回滚在 0.30.0 发布后验收。
+
 ## 0.29.0 (minor) — 整模块重接收口：本地源码 Web 验收、面板样式与 run strip 修复、命令面测试
 
 > **范围**：merge 整模块重接到 `@deepseek-ai/dsh-evolution-merge` host；panel 补 family client token，修复统计卡/间距/边框；run strip 只显示 merge run，跳过 maintenance；`merge-command` 只读分派测试覆盖 help/scan/status；本地源码 web（3081）完成 host 路由 200 与隔离 CUA 面板验收。

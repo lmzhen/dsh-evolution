@@ -6,6 +6,7 @@ import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { transition } from './coordinator.ts'
 import type { MergeFailure, MergeReportPair, MergeRow } from './contracts.ts'
 import { dropRow, upsertRow } from './state.ts'
+import { recordPair } from './domain/pair-index-store.ts'
 import type { ScanRound2Outcome } from './scan-run.ts'
 
 export interface Round2Record {
@@ -23,7 +24,17 @@ export async function recordRound2Outcome(
   const at = new Date(now()).toISOString()
   if (outcome.kind === 'merged') {
     const success = transition(row, { type: 'round2-success', at })
-    if (success.ok) await dropRow(io, home, now, row.id)
+    if (success.ok) {
+      await dropRow(io, home, now, row.id)
+      const target = outcome.target?.actual ?? outcome.target?.requested ?? row.decision?.target
+      await recordPair(io, home, {
+        pairKey: row.pairKey,
+        runId: row.runId ?? 'merge',
+        result: 'merged',
+        ...(target === undefined ? {} : { target }),
+        ...(outcome.unitId === undefined ? {} : { reportRef: outcome.unitId }),
+      })
+    }
     return {
       merged: true,
       pair: {
@@ -37,7 +48,15 @@ export async function recordRound2Outcome(
   }
   const failure: MergeFailure = outcome.failure ?? { stage: 'author', code: 'merge-failed', message: 'round2 failed', retryable: true, retryFrom: 'agent2' }
   const next = transition(row, { type: 'round2-fail', failure, at })
-  if (next.ok && next.row !== null) await upsertRow(io, home, now, next.row)
+  if (next.ok && next.row !== null) {
+    await upsertRow(io, home, now, next.row)
+    await recordPair(io, home, {
+      pairKey: row.pairKey,
+      runId: row.runId ?? 'merge',
+      result: 'failed',
+      ...(row.decision?.target === undefined ? {} : { target: row.decision.target }),
+    })
+  }
   return {
     merged: false,
     pair: {

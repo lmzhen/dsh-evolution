@@ -45,7 +45,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
     })
   }
-  if (row.state !== 'fuse') return { ok: false, message: 'row is not resumable from state ' + row.state }
+  if (row.state !== 'fuse' && row.state !== 'approved') return { ok: false, message: 'row is not resumable from state ' + row.state }
   const decision = row.decision
   if (decision === undefined) return { ok: false, message: 'fuse row has no decision' }
   return await withMergeRun({
@@ -64,7 +64,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome)
       return {
         stopReason: record.merged ? 'completed' as const : 'failed' as const,
-        scope: { candidatePairs: 1, queueBefore: { pending: 0, retry: 1, skipped: 0 } },
+        scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 1, skipped: 0 } },
         pairs: [record.pair],
         totals: record.merged ? { merged: 1, kept: 0, pending: 0, failed: 0 } : { merged: 0, kept: 0, pending: 0, failed: 1 },
         notes: [],

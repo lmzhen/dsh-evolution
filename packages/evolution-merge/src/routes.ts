@@ -22,8 +22,11 @@ export interface MergeRowView {
   readonly confidence?: number
   readonly failure?: { readonly stage: string; readonly code: string; readonly message: string; readonly retryable: boolean }
   readonly attempts?: number
-  readonly origin?: 'agent' | 'human'
+  readonly origin?: 'agent' | 'human' | 'system'
   readonly stagingExpiresAt?: number
+  readonly expired?: 'target-taken' | 'source-changed'
+  readonly reason?: string
+  readonly summary?: readonly string[]
   readonly actions: readonly string[]
 }
 
@@ -47,6 +50,13 @@ export function toRowView(row: MergeRow): MergeRowView {
     ...(row.attempts === undefined ? {} : { attempts: row.attempts }),
     ...(row.origin === undefined ? {} : { origin: row.origin }),
     ...(row.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: row.stagingExpiresAt }),
+    ...(row.expired === undefined ? {} : { expired: row.expired }),
+    ...(row.reason === undefined ? {} : { reason: row.reason }),
+    summary: [
+      row.a + ' + ' + row.b,
+      row.decision?.rationale ?? row.reason ?? '',
+      row.failure?.message ?? '',
+    ],
     actions: row.state === 'pending'
       ? ['/evolution merge approve ' + row.id, '/evolution merge reject ' + row.id]
       : row.state === 'skipped'
@@ -56,7 +66,7 @@ export function toRowView(row: MergeRow): MergeRowView {
 }
 
 export interface MergeView {
-  readonly schemaVersion: 1
+  readonly schemaVersion: 2
   readonly counts: MergeCounts
   readonly tabs: readonly { readonly queue: MergeQueue; readonly count: number }[]
   readonly commands: readonly string[]
@@ -72,11 +82,12 @@ export function buildMergeView(
 ): MergeView {
   const counts = countRows(rows)
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     counts,
     tabs: [
+      { queue: 'verify', count: counts.verify },
       { queue: 'pending', count: counts.pending },
-      { queue: 'retry', count: counts.retry },
+      { queue: 'fuse', count: counts.fuse },
       { queue: 'skipped', count: counts.skipped },
     ],
     commands,

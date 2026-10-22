@@ -6,8 +6,8 @@ import { MergePanel, type MergeFace } from '../src/client/Panel.ts'
 
 const face: MergeFace = {
   view: {
-    counts: { pending: 2, retry: 1, skipped: 3 },
-    tabs: [{ queue: 'pending', count: 2 }, { queue: 'retry', count: 1 }, { queue: 'skipped', count: 3 }],
+    counts: { verify: 0, pending: 2, fuse: 1, skipped: 3 },
+    tabs: [{ queue: 'verify', count: 0 }, { queue: 'pending', count: 2 }, { queue: 'fuse', count: 1 }, { queue: 'skipped', count: 3 }],
     commands: [],
     approval: true,
     latestRun: { id: 'run-1', state: 'running', stage: 'author', startedAt: 1 },

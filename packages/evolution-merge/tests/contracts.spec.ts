@@ -11,9 +11,9 @@ import {
 } from '../src/index.ts'
 
 describe('merge contracts', () => {
-  it('maps four states to three queues', () => {
-    expect(MERGE_PAIR_STATES.map(queueOf)).toEqual(['retry', 'pending', 'retry', 'skipped'])
-    expect(MERGE_PAIR_STATES.map(stageOf)).toEqual(['verify', 'decide', 'author', null])
+  it('maps five states to four queues', () => {
+    expect(MERGE_PAIR_STATES.map(queueOf)).toEqual(['verify', 'pending', 'fuse', 'fuse', 'skipped'])
+    expect(MERGE_PAIR_STATES.map(stageOf)).toEqual(['verify', 'decide', 'author', 'author', null])
   })
 
   it('builds symmetric pair keys', () => {
@@ -22,11 +22,11 @@ describe('merge contracts', () => {
   })
 
   it('starts empty with the current schema', () => {
-    expect(emptyMergeState()).toEqual({ schemaVersion: 1, rows: [] })
+    expect(emptyMergeState()).toEqual({ schemaVersion: 2, rows: [] })
   })
 
   it('allows retry only when the failure is retryable and names a stage', () => {
-    const base: MergeRow = { id: 'mr_a', pairKey: 'a|b', a: 'a', b: 'b', state: 'fuse', queue: 'retry', createdAt: '2026-10-20T00:00:00.000Z', updatedAt: '2026-10-20T00:00:00.000Z' }
+    const base: MergeRow = { id: 'mr_a', pairKey: 'a|b', a: 'a', b: 'b', state: 'fuse', queue: 'fuse', createdAt: '2026-10-20T00:00:00.000Z', updatedAt: '2026-10-20T00:00:00.000Z' }
     expect(canRetry(base)).toBe(true)
     expect(canRetry({ ...base, state: 'pending' })).toBe(false)
     expect(canRetry({ ...base, state: 'skipped' })).toBe(false)

@@ -5,21 +5,22 @@
  * queue and keeps the stage as a chip. The API queue must never expose the raw state.
  */
 
-export const MERGE_STATE_VERSION = 1
+export const MERGE_STATE_VERSION = 2
 
-export type MergePairState = 'verify' | 'pending' | 'fuse' | 'skipped'
-export type MergeQueue = 'pending' | 'retry' | 'skipped'
+export type MergePairState = 'verify' | 'pending' | 'approved' | 'fuse' | 'skipped'
+export type MergeQueue = 'verify' | 'pending' | 'fuse' | 'skipped'
 export type MergeStage = 'verify' | 'decide' | 'author' | 'commit'
 export type MergeCommand = 'scan' | 'pair' | 'approve' | 'resume'
 
-export const MERGE_PAIR_STATES: readonly MergePairState[] = ['verify', 'pending', 'fuse', 'skipped']
-export const MERGE_QUEUES: readonly MergeQueue[] = ['pending', 'retry', 'skipped']
+export const MERGE_PAIR_STATES: readonly MergePairState[] = ['verify', 'pending', 'approved', 'fuse', 'skipped']
+export const MERGE_QUEUES: readonly MergeQueue[] = ['verify', 'pending', 'fuse', 'skipped']
 
 /** User-facing queue of one data state. verify/fuse share retry, not two tabs. */
 export function queueOf(state: MergePairState): MergeQueue {
   switch (state) {
+    case 'verify': return 'verify'
     case 'pending': return 'pending'
-    case 'verify': case 'fuse': return 'retry'
+    case 'approved': case 'fuse': return 'fuse'
     case 'skipped': return 'skipped'
   }
 }
@@ -29,7 +30,7 @@ export function stageOf(state: MergePairState): MergeStage | null {
   switch (state) {
     case 'verify': return 'verify'
     case 'pending': return 'decide'
-    case 'fuse': return 'author'
+    case 'approved': case 'fuse': return 'author'
     case 'skipped': return null
   }
 }
@@ -122,7 +123,7 @@ export interface MergeReportPair {
 }
 
 export interface MergeReport {
-  readonly schemaVersion: 1
+  readonly schemaVersion: 2
   readonly runId: string
   readonly kind: 'merge'
   readonly command: MergeRunCommand
@@ -144,12 +145,17 @@ export interface MergeRow {
   readonly b: string
   readonly state: MergePairState
   readonly queue: MergeQueue
+  readonly expired?: 'target-taken' | 'source-changed'
+  readonly reason?: string
+  readonly target?: { readonly requested: string; readonly actual?: string; readonly created?: boolean }
   readonly failure?: MergeFailure
   /** Round-1 decision, persisted for the later approve round. */
   readonly decision?: MergeDecision
+  readonly sourceRevision?: string
+  readonly targetRevision?: string
   readonly runId?: string
   readonly unitId?: string
-  readonly origin?: 'agent' | 'human'
+  readonly origin?: 'agent' | 'human' | 'system'
   readonly attempts?: number
   readonly stagingRef?: string
   readonly stagingExpiresAt?: number

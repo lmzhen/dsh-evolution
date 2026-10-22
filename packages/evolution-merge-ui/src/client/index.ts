@@ -22,8 +22,8 @@ function PanelIcon(props: { size?: number; active?: boolean } = {}): ReactElemen
 
 function seedView(): api.MergeViewPayload {
   return {
-    counts: { pending: 0, retry: 0, skipped: 0 },
-    tabs: [{ queue: 'pending', count: 0 }, { queue: 'retry', count: 0 }, { queue: 'skipped', count: 0 }],
+    counts: { verify: 0, pending: 0, fuse: 0, skipped: 0 },
+    tabs: [{ queue: 'verify', count: 0 }, { queue: 'pending', count: 0 }, { queue: 'fuse', count: 0 }, { queue: 'skipped', count: 0 }],
     commands: [],
   }
 }

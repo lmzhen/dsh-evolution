@@ -15,6 +15,7 @@ export interface CommitReceipt {
   readonly target: string
   readonly create: boolean
   readonly sources: readonly string[]
+  readonly pairKey?: string
   readonly archived: readonly string[]
   readonly at: number
 }
@@ -50,6 +51,24 @@ export async function writeCommitReceipt(io: EvolutionIoLike, home: string, rece
   const parent = receipt.parentRunId ?? receipt.runId.split('/pairs/')[0] ?? receipt.runId
   await io.writeText(durableReceiptPath(home, parent, receipt.runId), JSON.stringify({ ...receipt, parentRunId: parent }, null, 2) + '\n')
   return path
+}
+
+export async function readCommitReceipts(io: EvolutionIoLike, home: string): Promise<readonly CommitReceipt[]> {
+  const root = join(home, 'merge', 'receipts')
+  const out: CommitReceipt[] = []
+  let runs: string[]
+  try { runs = await io.list(root) } catch { return out }
+  for (const run of runs.sort()) {
+    const dir = join(root, run)
+    let files: string[]
+    try { files = await io.list(dir) } catch { continue }
+    for (const file of files.sort()) {
+      if (!file.endsWith('.json')) continue
+      const receipt = parseReceipt(await io.readText(join(dir, file)))
+      if (receipt !== null) out.push(receipt)
+    }
+  }
+  return out
 }
 
 export async function readCommitReceipt(io: EvolutionIoLike, home: string, runId: string, target?: string): Promise<CommitReceipt | null> {

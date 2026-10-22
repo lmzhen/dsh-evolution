@@ -26,7 +26,7 @@ export function mergeReportDigestPath(home: string, runId: string): string {
 function isReport(value: unknown): value is MergeReport {
   if (typeof value !== 'object' || value === null) return false
   const report = value as Partial<MergeReport>
-  return report.schemaVersion === 1
+  return report.schemaVersion === 2
     && report.kind === 'merge'
     && typeof report.runId === 'string'
     && typeof report.command === 'string'

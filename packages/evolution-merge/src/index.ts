@@ -1,12 +1,15 @@
 import { join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
-import { screen as engineScreen, selectCandidates } from '@deepseek-ai/dsh-evolution-merge-engine'
-import { createEngineScreening, type CandidateSelection, type EngineScreenPort } from './adapters/engine-screen.ts'
+import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
+import { selectWithErrors } from './adapters/select.ts'
+import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type LlmServiceLike } from './adapters/model-runner.ts'
 import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState, upsertRow } from './state.ts'
+import { cleanupExpiredStaging } from './staging.ts'
+import { readCommitReceipts } from './commit-receipt.ts'
 import { transition } from './coordinator.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
 import { createMergeCommand, runMergeCommand, type MergeCommandResult } from './merge-command.ts'
@@ -130,6 +133,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     if (registry === undefined) return
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
+    void loadMergeState(io, home).then(loaded => cleanupExpiredStaging(io, home, Date.now(), new Set(loaded.state.rows.map(row => row.runId).filter((id): id is string => id !== undefined)))).catch((error) => { ctx.logger.warn('merge staging cleanup failed: ' + (error instanceof Error ? error.message : String(error))) })
     const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) } })
     void runs.load()
     ctx.effect(() => {
@@ -156,8 +160,8 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       io,
       home,
       engine: { screen: engineScreen as unknown as EngineScreenPort['screen'] },
-      select: selectCandidates as unknown as (report: Record<string, unknown>) => CandidateSelection,
-      ...(engineConfig === undefined ? {} : { cfg: engineConfig }),
+      select: selectWithErrors,
+      cfg: { ...(engineConfig ?? {}), judge: 'deepseek' },
       ...(runner === undefined ? {} : { runner }),
       async onSelection(selection) {
         const loaded = await loadMergeState(io, home)
@@ -176,6 +180,29 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       rows() { return loadMergeState(io, home).then(loaded => loaded.state.rows) },
       run(id: string): Promise<RunRecord | undefined> { return Promise.resolve(runs.runs().find(record => record.id === id)) },
       runs() { return Promise.resolve(runs.runs()) },
+      async body(id: string, side: 'a' | 'b'): Promise<string | null> {
+        const row = (await loadMergeState(io, home)).state.rows.find(item => item.id === id)
+        if (row === undefined) return null
+        return await skills.read(side === 'a' ? row.a : row.b)
+      },
+      async history() {
+        const receipts = await readCommitReceipts(io, home)
+        const items = new Map<string, { name: string; kind: 'merged' | 'other'; reason: string; lastVersion: number; archivedAt: string; sourceRunId?: string }>()
+        for (const receipt of receipts) {
+          for (const source of receipt.sources) {
+            const key = source + ':' + receipt.runId
+            if (items.has(key)) continue
+            items.set(key, { name: source, kind: 'merged', reason: 'Merged into ' + receipt.target, lastVersion: 1, archivedAt: new Date(receipt.at).toISOString(), sourceRunId: receipt.runId })
+          }
+        }
+        const archived = await (skills as unknown as { archivedNames?: () => Promise<string[] | null> }).archivedNames?.() ?? []
+        const seen = new Set([...items.values()].map(item => item.name))
+        for (const name of archived) {
+          if (seen.has(name)) continue
+          items.set('archived:' + name, { name, kind: 'other', reason: 'archived', lastVersion: 1, archivedAt: new Date(Date.now()).toISOString() })
+        }
+        return [...items.values()]
+      },
       approval() { return params.mergeApproval },
       commands() {
         return ['merge scan', 'merge doctor', 'merge status', 'merge pending', 'merge skipped', 'merge report', 'merge runs', 'merge cancel']

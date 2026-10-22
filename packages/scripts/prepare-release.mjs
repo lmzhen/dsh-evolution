@@ -489,7 +489,7 @@ for (const item of tarballs) {
     // bundler style changes, extend this pattern or the guard silently turns
     // vacuum-pass.
     for (const match of text.matchAll(/from\s+"(\.\/[^"]+\.js)"/g)) {
-      const local = join(libRoot, match[1].slice(2))
+      const local = join(libRoot, dirname(rel), match[1].slice(2))
       if (!inShipped(relative(staged, local).replace(/\\/g, '/'))) {
         failures.push(`${item.name}: lib/${rel} imports ${match[1]} which is missing from the tarball`)
       }

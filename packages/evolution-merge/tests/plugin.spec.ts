@@ -51,7 +51,7 @@ it('mounts routes, command and merge_stage with a minimal host context', async (
   try {
     apply(ctx as never, {})
     expect(routes.map(route => route.path).sort()).toEqual([
-      '/api/dsh-evolution/merge/rows', '/api/dsh-evolution/merge/run', '/api/dsh-evolution/merge/runs', '/api/dsh-evolution/merge/view',
+      '/api/dsh-evolution/merge/body', '/api/dsh-evolution/merge/history', '/api/dsh-evolution/merge/rows', '/api/dsh-evolution/merge/view',
     ])
     expect(commands).toHaveLength(1)
     expect(commands[0]).toMatchObject({ name: 'merge' })

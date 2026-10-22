@@ -7,7 +7,7 @@ import { mergeDoctor, pairKey, rowIdOf, upsertRow, type MergeRow } from '../src/
 const AT = '2026-10-20T00:00:00.000Z'
 const row = (a: string, b: string, state: MergeRow['state']): MergeRow => {
   const key = pairKey(a, b)
-  return { id: rowIdOf(key), pairKey: key, a, b, state, queue: state === 'pending' ? 'pending' : state === 'skipped' ? 'skipped' : 'retry', createdAt: AT, updatedAt: AT }
+  return { id: rowIdOf(key), pairKey: key, a, b, state, queue: state === 'pending' ? 'pending' : state === 'skipped' ? 'skipped' : state === 'fuse' || state === 'approved' ? 'fuse' : 'verify', createdAt: AT, updatedAt: AT }
 }
 
 it('reports empty, populated and unreadable state without writing', async () => {

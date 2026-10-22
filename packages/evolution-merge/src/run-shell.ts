@@ -15,9 +15,9 @@ import type { MergeReport, MergeReportPair, MergeRunCommand } from './contracts.
 import { writeMergeReport } from './report.ts'
 
 export interface MergeRegistryPort {
-  begin(kind: RunKind, seed?: { command?: MergeRunCommand; total?: number; parentRunId?: string }): Promise<Pick<RunHandle, 'id' | 'signal' | 'startedAt'>>
+  begin(kind: RunKind, seed?: { command?: MergeRunCommand; total?: number; parentRunId?: string; mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan' }): Promise<Pick<RunHandle, 'id' | 'signal' | 'startedAt'>>
   stage(id: string, stage: RunStage, progress?: { done: number; total: number }): Promise<void>
-  settle(id: string, outcome: { state: 'succeeded' | 'failed' | 'cancelled'; resultRef?: string; failure?: string }): Promise<void>
+  settle(id: string, outcome: { state: 'succeeded' | 'failed' | 'cancelled'; resultRef?: string; failure?: string; mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan' }): Promise<void>
 }
 
 export interface MergeRunBodyContext {
@@ -44,17 +44,19 @@ export interface WithMergeRunOptions {
   readonly approval: MergeReport['approval']
   readonly now: () => number
   readonly total?: number
+  readonly detached?: boolean
   readonly body: (ctx: MergeRunBodyContext) => Promise<MergeRunReportDraft>
 }
 
 export type WithMergeRunResult =
   | { readonly ok: true; readonly runId: string; readonly reportPath: string; readonly report: MergeReport }
+  | { readonly ok: true; readonly accepted: true; readonly runId: string }
   | { readonly ok: false; readonly runId?: string; readonly message: string; readonly reportPath?: string }
 
 function emptyDraft(reason: string): MergeRunReportDraft {
   return {
     stopReason: 'failed',
-    scope: { candidatePairs: 0, queueBefore: { pending: 0, retry: 0, skipped: 0 } },
+    scope: { candidatePairs: 0, queueBefore: { verify: 0, pending: 0, fuse: 0, skipped: 0 } },
     pairs: [],
     totals: { merged: 0, kept: 0, pending: 0, failed: 0 },
     notes: [reason],
@@ -64,11 +66,13 @@ function emptyDraft(reason: string): MergeRunReportDraft {
 export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMergeRunResult> {
   const handle = await options.registry.begin('merge', {
     command: options.command,
+    mergeStatus: 'running',
     ...(options.total === undefined ? {} : { total: options.total }),
   })
   const startedAt = handle.startedAt
   const stage = (name: RunStage, progress?: { done: number; total: number }) => options.registry.stage(handle.id, name, progress)
   await stage('screening', options.total === undefined ? undefined : { done: 0, total: options.total })
+  const finish = async (): Promise<WithMergeRunResult> => {
   let draft: MergeRunReportDraft
   try {
     draft = await options.body({ runId: handle.id, startedAt, signal: handle.signal, stage })
@@ -76,7 +80,7 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     draft = emptyDraft('run body failed: ' + (error instanceof Error ? error.message : String(error)))
   }
   const report: MergeReport = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: handle.id,
     kind: 'merge',
     command: options.command,
@@ -102,7 +106,15 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     : report.stopReason === 'cancelled'
       ? 'cancelled'
       : 'failed'
-  await options.registry.settle(handle.id, { state: runState, resultRef: reportPath, ...(runState === 'failed' ? { failure: 'merge ' + report.stopReason } : {}) })
+  const awaiting = report.pairs.some(pair => pair.outcome === 'pending')
+  const mergeStatus = awaiting ? 'awaiting-approval' as const : runState
+  await options.registry.settle(handle.id, { state: runState, resultRef: reportPath, mergeStatus, ...(runState === 'failed' ? { failure: 'merge ' + report.stopReason } : {}) })
   if (report.stopReason === 'completed') return { ok: true, runId: handle.id, reportPath, report }
   return { ok: false, runId: handle.id, message: 'merge ' + report.stopReason, reportPath }
+  }
+  if (options.detached === true) {
+    void finish().catch(() => {})
+    return { ok: true, accepted: true, runId: handle.id }
+  }
+  return await finish()
 }

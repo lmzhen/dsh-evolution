@@ -2269,24 +2269,40 @@ export class SkillLibrary {
           : `合并失败（${reason}）；已回滚，但以下未回滚：${stuck.join(', ')}：它们仍在 .archive 里，请用 /evolution skill restore 恢复。`,
       })
 
+      const rollbackTarget = async (): Promise<string[]> => {
+        const stuck: string[] = []
+        const support = plan.supportFiles.map(file => ({
+          target: join(dir, ...file.path.replace(/\\/g, '/').split('/').filter(Boolean)),
+          content: supportPrevious.get(file.path) ?? null,
+          previous: file.content,
+        }))
+        const writes: TreeChangeWrite[] = [
+          { target: targetPath, content: plan.expectedTargetBody ?? '', expected: plan.body.trimEnd() + '\n' },
+          ...support.map(file => ({ target: file.target, content: file.content ?? '', expected: file.previous })),
+        ]
+        try {
+          const restored = await this.applyTreeChange({
+            name: target,
+            origin: plan.origin,
+            protection: 'write',
+            writes,
+            auditAction: 'merge-rollback',
+            auditSummary: 'merge rollback: restore target snapshot',
+            eventAction: 'merge-rollback',
+            unitId,
+            unitHead,
+          })
+          if (!restored.ok) stuck.push(target)
+        } catch {
+          stuck.push(target)
+        }
+        return stuck
+      }
+
       if (plan.targetExists) {
         for (const source of sources) {
           const fresh = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
-          if (fresh !== sourceBodies.get(source)) {
-            const stuck = await rollbackSources()
-            return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
-          }
-          const result = await this.archive(source, {
-            absorbedInto: target,
-            unitId,
-            unitHead: { skill: target },
-            reason: `Merged into ${target}`,
-          }, plan.origin)
-          if (!result.ok) {
-            const stuck = await rollbackSources()
-            return rollbackMessage(result.message, stuck)
-          }
-          archived.push(source)
+          if (fresh !== sourceBodies.get(source)) return rollbackMessage(`来源技能「${source}」在归档前被改过`, [])
         }
         const writes: TreeChangeWrite[] = [
           { target: targetPath, content: plan.body.trimEnd() + '\n', expected: plan.expectedTargetBody },
@@ -2307,9 +2323,26 @@ export class SkillLibrary {
           unitId,
           unitHead,
         })
-        if (!result.ok) {
-          const stuck = await rollbackSources()
-          return rollbackMessage(result.message, stuck)
+        if (!result.ok) return rollbackMessage(result.message, [])
+        for (const source of sources) {
+          const fresh = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
+          if (fresh !== sourceBodies.get(source)) {
+            const stuck = await rollbackSources()
+            stuck.push(...await rollbackTarget())
+            return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
+          }
+          const archivedResult = await this.archive(source, {
+            absorbedInto: target,
+            unitId,
+            unitHead: { skill: target },
+            reason: `Merged into ${target}`,
+          }, plan.origin)
+          if (!archivedResult.ok) {
+            const stuck = await rollbackSources()
+            stuck.push(...await rollbackTarget())
+            return rollbackMessage(archivedResult.message, stuck)
+          }
+          archived.push(source)
         }
         return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
       }

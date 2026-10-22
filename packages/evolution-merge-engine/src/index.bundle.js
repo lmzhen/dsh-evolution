@@ -1888,7 +1888,7 @@ function validateRegistry(reg) {
   return reg;
 }
 function defaultRegistryPath() {
-  return path6.join(__dirname, "..", "..", "models", "registry.json");
+  return path6.join(__dirname, "vendor", "skill-merge-pipeline", "models", "registry.json");
 }
 function loadRegistry(file) {
   const f = file || defaultRegistryPath();
@@ -5701,8 +5701,10 @@ function probe(cfgInput) {
   const models = int8 && pca && existsSync(int8) && existsSync(pca) ? "ok" : "missing";
   return { models, judge: cfg.judge === "deepseek" ? "platform" : "stub", ranker: cfg.rank_mode === "vec" ? "vec" : "auto", onnx: false };
 }
-async function ensureModels2() {
-  throw new Error("ensureModels is implemented in G3");
+async function ensureModels2(cfgInput) {
+  const cfg = makeConfig(cfgInput ?? {});
+  const resolved = await resolveModels({ cfg, rootDir: cfg.models_dir || void 0 });
+  return { ok: true, models: "ok", dirs: resolved.dirs };
 }
 
 // dsh-evolution-mirror/packages/evolution-merge-engine/src/report-map.js
