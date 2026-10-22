@@ -116,13 +116,14 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       const created = transition(undefined, { type: 'candidate', a: candidate.a, b: candidate.b, at: at(options.now) })
       if (!created.ok || created.row === null) throw new Error(created.ok ? 'candidate row missing' : created.message)
       row = created.row
-      const placed = await upsertRow(options.io, options.home, options.now, row, 'verify')
-      if (!placed.ok && placed.current.state === 'skipped') {
-        const restored = transition(placed.current, { type: 'restore', at: at(options.now) })
+      const before = (await loadMergeState(options.io, options.home)).state.rows.find(item => item.pairKey === row.pairKey)
+      const placed = await upsertRow(options.io, options.home, options.now, row, 'verify', before?.updatedAt ?? null)
+      if (!placed.ok && before?.state === 'skipped') {
+        const restored = transition(before, { type: 'restore', at: at(options.now) })
         if (!restored.ok || restored.row === null) throw new Error('cannot restore skipped pair')
+        const persisted = await upsertRow(options.io, options.home, options.now, restored.row, 'any', before.updatedAt)
+        if (!persisted.ok) throw new Error('pair changed while restoring skipped row')
         row = restored.row
-        const retried = await upsertRow(options.io, options.home, options.now, row, 'verify')
-        if (!retried.ok) throw new Error('pair already in ' + retried.current.state)
       } else if (!placed.ok) {
         throw new Error('pair already in ' + placed.current.state)
       }

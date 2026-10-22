@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.12 (patch) — 并发 CAS
+
+> **范围**：upsertRow 增 `cas`（updatedAt 或 null）；scan 落 verify 行前带当前快照，两个并发 scan 单赢家；skipped restore 也走 CAS。
+> **验证**：merge 71 files/168 tests；0.30.12 发布后最终独立复核。
+
 ## 0.30.11 (patch) — 范围门、target claim、恢复逐文件容错
 
 > **范围**：pair/scan 接 curator gates（excluded/referenced/suppressed/protected builtin）；approve 前按 target 持久 claim，第二 approve 拒绝；recovery snapshot 读取失败不再中断整轮。

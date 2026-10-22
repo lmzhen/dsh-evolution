@@ -96,10 +96,20 @@ export interface MoveRowPatch {
 export type UpsertExpect = 'any' | 'absent' | 'verify' | 'pending' | 'fuse' | 'skipped'
 export type UpsertResult = { readonly ok: true } | { readonly ok: false; readonly current: MergeRow }
 
-export async function upsertRow(io: EvolutionIoLike, home: string, now: () => number, row: MergeRow, expect: UpsertExpect = 'any'): Promise<UpsertResult> {
+export async function upsertRow(
+  io: EvolutionIoLike,
+  home: string,
+  now: () => number,
+  row: MergeRow,
+  expect: UpsertExpect = 'any',
+  cas?: string | null,
+): Promise<UpsertResult> {
   return await mutateMergeState(io, home, now, (rows): { rows: readonly MergeRow[]; result: UpsertResult } => {
     const index = rows.findIndex(item => item.pairKey === row.pairKey)
     const current = index < 0 ? undefined : rows[index]
+    if (cas !== undefined && ((cas === null && current !== undefined) || (cas !== null && current?.updatedAt !== cas))) {
+      return { rows, result: { ok: false, current: current ?? row } }
+    }
     if (current !== undefined && expect !== 'any' && (expect === 'absent' || queueOf(current.state) !== expect)) {
       return { rows, result: { ok: false, current } }
     }

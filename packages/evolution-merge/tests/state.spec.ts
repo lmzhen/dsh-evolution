@@ -91,3 +91,12 @@ it('reads without writing and normalizes a queue from state', async () => {
   expect(loaded.note).toContain('invalid row')
   expect(typeof base.readText).toBe('function')
 })
+
+it('compare-and-set refuses a second writer on a stale snapshot', async () => {
+  const home = await tempRoot('dsh-merge-cas-')
+  const io = nodeEvolutionIo()
+  const first = { ...row('a', 'b'), state: 'verify' as const, queue: 'verify' as const }
+  expect((await upsertRow(io, home, () => 1, first, 'verify', null)).ok).toBe(true)
+  expect((await upsertRow(io, home, () => 2, first, 'verify', null)).ok).toBe(false)
+  expect((await upsertRow(io, home, () => 3, first, 'verify', first.updatedAt)).ok).toBe(true)
+})
