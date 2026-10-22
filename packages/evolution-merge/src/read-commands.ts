@@ -13,27 +13,28 @@ export async function handleReadOnlyMergeCommand(
   io: EvolutionIoLike,
   home: string,
 ): Promise<string | null> {
+  const withNote = (text: string, note: string | undefined): string => note === undefined ? text : 'note: ' + note + '\n' + text
   if (command.verb === 'status') {
     const loaded = await loadMergeState(io, home)
     if (command.id !== undefined) {
       const row = loaded.state.rows.find(item => item.id === command.id)
-      return row === undefined ? 'merge row not found: ' + command.id : formatStatus([row])
+      return withNote(row === undefined ? 'merge row not found: ' + command.id : formatStatus([row]), loaded.note)
     }
-    return formatStatus(loaded.state.rows)
+    return withNote(formatStatus(loaded.state.rows), loaded.note)
   }
   if (command.verb === 'pending') {
     const loaded = await loadMergeState(io, home)
     const rows = command.expired === true ? loaded.state.rows.filter(row => row.expired !== undefined) : loaded.state.rows
-    return command.expired === true ? formatStatus(rows) : formatQueue(rows, 'pending')
+    return withNote(command.expired === true ? formatStatus(rows) : formatQueue(rows, 'pending'), loaded.note)
   }
   if (command.verb === 'candidates') {
     const loaded = await loadMergeState(io, home)
     const rows = command.retry === true ? loaded.state.rows.filter(row => row.state === 'approved') : loaded.state.rows
-    return formatQueue(rows, command.retry === true ? 'fuse' : 'verify')
+    return withNote(formatQueue(rows, command.retry === true ? 'fuse' : 'verify'), loaded.note)
   }
   if (command.verb === 'skipped') {
     const loaded = await loadMergeState(io, home)
-    return formatQueue(loaded.state.rows, 'skipped')
+    return withNote(formatQueue(loaded.state.rows, 'skipped'), loaded.note)
   }
   return null
 }

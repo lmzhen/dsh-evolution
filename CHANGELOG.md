@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.6 (patch) — skipped 过期重扫、损坏 note 可见、错误 stage/run id
+
+> **范围**：scan held 排除 skipped，过期 skipped 先 restore 再落 verify；pair 先清 skipped；status/pending/candidates/skipped 显示 state note；runtime/target 错误第二行支持 stage/run id 且不回正文。
+> **验证**：merge 70 files/163 tests、tsc 0；0.30.6 发布后补矩阵。
+
 ## 0.30.5 (patch) — 剩余证据批：源保护/同名源、help 默认值、pending id、targetRevision、revision 含 support
 
 > **范围**：pair 拒同名/受保护/未知保护源；scan managed 排除 protected；merge help 增 defaults；待批准行显示 id；sourceRevision 哈希含 support 文件，新增 targetRevision，approve 比对目标变化；恢复路径专项测试。

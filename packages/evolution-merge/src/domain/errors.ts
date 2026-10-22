@@ -6,10 +6,14 @@ export interface MergeError {
   readonly code: string
   readonly message: string
   readonly detail?: string
+  readonly stage?: string
+  readonly runId?: string
 }
 
 export function formatMergeError(error: MergeError): string {
   if (error.kind === 'parameter') return 'merge: ' + error.message + ' (' + error.code + ')'
-  const detail = '\n' + (error.detail ?? 'no additional detail')
-  return 'merge failed: ' + error.message + ' (' + error.code + ')' + detail + '\nnext: fix the target or rerun after the cause is gone'
+  const where = error.stage === undefined && error.runId === undefined
+    ? (error.detail ?? 'no additional detail')
+    : [error.stage === undefined ? undefined : 'stage=' + error.stage, error.runId === undefined ? undefined : 'run=' + error.runId].filter(Boolean).join(' ')
+  return 'merge failed: ' + error.message + ' (' + error.code + ')\n' + where + '\nnext: fix the target or rerun after the cause is gone'
 }
