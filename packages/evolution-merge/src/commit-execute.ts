@@ -8,6 +8,7 @@ import { assembleStagedCommit, type CommitAssemblyPort } from './commit-assembly
 import { writeCommitReceipt, type CommitReceipt } from './commit-receipt.ts'
 import { pairKey } from './contracts.ts'
 import { writeJournal } from './domain/commit-journal-store.ts'
+import { writeCommitSnapshot } from './commit-snapshot.ts'
 
 export interface CommitPort extends CommitAssemblyPort {
   commitMerge(plan: CommitMergePlan): Promise<CommitMergeResult>
@@ -38,11 +39,16 @@ export async function commitStagedRun(
 ): Promise<CommitStagedResult> {
   const assembled = await assembleStagedCommit(io, home, runId, port, { origin: options.origin, summary: options.summary })
   if (!assembled.ok) return { ok: false, message: assembled.message }
-  const journal = { runId, target: assembled.plan.target, create: !assembled.plan.targetExists, sources: assembled.plan.sources, phase: 'prepared' as const, updatedAt: new Date(options.now()).toISOString() }
+  try {
+    await writeCommitSnapshot(io, home, runId, assembled.plan, options.now())
+  } catch (error) {
+    return { ok: false, message: 'commit snapshot failed; refusing to write: ' + (error instanceof Error ? error.message : String(error)), plan: assembled.plan }
+  }
+  const journal = { runId, target: assembled.plan.target, create: !assembled.plan.targetExists, sources: assembled.plan.sources, phase: 'sources-archived' as const, updatedAt: new Date(options.now()).toISOString() }
   try { await writeJournal(io, home, journal) } catch { /* journal is best-effort; receipt remains the commit record */ }
   const result = await port.commitMerge(assembled.plan)
   if (!result.ok) {
-    try { await writeJournal(io, home, { ...journal, phase: 'failed', updatedAt: new Date(options.now()).toISOString() }) } catch {}
+    try { await writeJournal(io, home, { ...journal, updatedAt: new Date(options.now()).toISOString() }) } catch {}
     return { ok: false, message: result.message, plan: assembled.plan }
   }
   if (result.unitId === undefined) return { ok: true, plan: assembled.plan, result, warning: 'commit landed without a unitId; receipt not written' }

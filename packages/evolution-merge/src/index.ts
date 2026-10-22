@@ -9,6 +9,7 @@ import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHo
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState, upsertRow } from './state.ts'
 import { cleanupExpiredStaging } from './staging.ts'
+import { recoverCommitJournals } from './commit-recovery.ts'
 import { readCommitReceipts } from './commit-receipt.ts'
 import { transition } from './coordinator.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
@@ -134,6 +135,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
     void loadMergeState(io, home).then(loaded => cleanupExpiredStaging(io, home, Date.now(), new Set(loaded.state.rows.map(row => row.runId).filter((id): id is string => id !== undefined)))).catch((error: unknown) => { ctx.logger.warn('merge staging cleanup failed: ' + (error instanceof Error ? error.message : String(error))) })
+    void recoverCommitJournals(io, home, Date.now()).then(reports => { if (reports.length > 0) ctx.logger.info('merge commit recovery: ' + reports.map(report => report.runId + '=' + report.action).join(', ')) }).catch((error: unknown) => { ctx.logger.warn('merge commit recovery failed: ' + (error instanceof Error ? error.message : String(error))) })
     const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) } })
     void runs.load()
     ctx.effect(() => {
