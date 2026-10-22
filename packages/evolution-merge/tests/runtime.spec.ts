@@ -40,7 +40,10 @@ it('serves report/runs/cancel from the run registry', async () => {
     parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
   }
   const runtime = createMergeRuntime(deps)
-  expect(await runtime.execute({ verb: 'report', id: 'r1' })).toEqual({ ok: true, text: '{"ok":true}' })
+  const reportAnswer = await runtime.execute({ verb: 'report', id: 'r1' })
+  expect(reportAnswer.ok).toBe(true)
+  expect(reportAnswer.text).toContain('{"ok":true}')
+  expect(reportAnswer.text).toContain('report: ' + report)
   expect(await runtime.execute({ verb: 'runs' })).toMatchObject({ ok: true })
   expect(await runtime.execute({ verb: 'cancel', id: 'r1' })).toMatchObject({ ok: true })
 })

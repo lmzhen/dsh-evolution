@@ -53,6 +53,7 @@ export interface RunScanOptions {
   readonly startedAt?: number
   readonly ports: ScanPorts
   readonly stage?: (stage: RunStage, progress?: { done: number; total: number }) => Promise<void>
+  readonly notes?: readonly string[]
 }
 
 function at(now: () => number): string {
@@ -216,7 +217,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     },
     pairs,
     totals,
-    notes: [],
+    notes: [ ...(options.notes ?? []) ],
     ...(remaining.length === 0 ? {} : { remaining }),
   }
 }

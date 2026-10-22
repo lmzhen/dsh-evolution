@@ -62,7 +62,6 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { readonly: false, usage: 'curator run|pause|resume|status|report|scope', summary: '立即运行一次自动整理，或暂停／恢复／查看状态' },
   { readonly: true, usage: 'mutations', summary: '列出技能改动记录' },
   { readonly: false, usage: 'restore', summary: '从最近的快照恢复技能' },
-  { readonly: false, usage: 'consolidate <target> <sources...> [--plan <runId>]', summary: '把若干技能合并进一个总括技能' },
   { readonly: false, usage: 'skill restore <name>', summary: '按名字恢复一个已归档的技能' },
   { readonly: true, usage: 'skill history <name>', summary: '列出某个技能的内容版本（含时间、动作、字符数、哈希前缀）' },
   { readonly: false, usage: 'skill undo <name> [--to v<N>]', summary: '把某个技能的内容回退到某一版（默认上一版；只动内容，撤销本身也记为一版）' },

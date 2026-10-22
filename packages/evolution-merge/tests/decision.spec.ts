@@ -17,3 +17,9 @@ it('maps keep and rejects invalid decisions', () => {
   expect(parseDecision(JSON.stringify({ ...valid, sources: ['alpha-skill'] }), pair)).toMatchObject({ ok: false })
   expect(parseDecision('not json', pair)).toMatchObject({ ok: false })
 })
+
+it('keeps the two skill summaries for the pending row', () => {
+  const withSummaries = { ...valid, aSummary: 'alpha does A', bSummary: 'beta does B' }
+  expect(parseDecision(JSON.stringify(withSummaries), pair)).toMatchObject({ ok: true, decision: { aSummary: 'alpha does A', bSummary: 'beta does B' } })
+  expect(parseDecision(JSON.stringify({ ...withSummaries, a_summary: 'snake A', b_summary: 'snake B', aSummary: undefined, bSummary: undefined }), pair)).toMatchObject({ ok: true, decision: { aSummary: 'snake A', bSummary: 'snake B' } })
+})

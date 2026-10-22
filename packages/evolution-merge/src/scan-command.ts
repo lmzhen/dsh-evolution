@@ -18,6 +18,7 @@ export interface RunScanCommandOptions {
   readonly timeoutMinutes?: number
   readonly now: () => number
   readonly detached?: boolean
+  readonly notes?: readonly string[]
 }
 
 export async function runScanCommand(options: RunScanCommandOptions): Promise<WithMergeRunResult> {
@@ -42,6 +43,7 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
         stage: ctx.stage,
         startedAt: ctx.startedAt,
         ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
+        ...(options.notes === undefined ? {} : { notes: options.notes }),
       })
     },
   })

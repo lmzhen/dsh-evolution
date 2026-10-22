@@ -108,11 +108,13 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands)
     expect(captured).toBeDefined()
     const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'consolidate target-a source-b source-c' })
-    expect(result.text).toContain('Consolidated source-b, source-c into "target-a".')
-    expect(calls).toEqual(['consolidate:target-a:source-b,source-c'])
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('已退出用户面')
+    expect(result.text).toContain('merge pair')
+    expect(calls).toEqual([])
     const restoreResult = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill restore source-b' })
     expect(restoreResult.text).toContain('restored from .archive.')
-    expect(calls).toEqual(['consolidate:target-a:source-b,source-c', 'restore:source-b'])
+    expect(calls).toEqual(['restore:source-b'])
     // skill history renders the recorded versions (one line each, oldest first).
     const historyResult = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill history source-b' })
     expect(historyResult.kind).toBe('success')
@@ -127,7 +129,7 @@ describe('evolution-commands', () => {
     expect(undoPrev.kind).toBe('success')
     expect(calls.slice(-3)).toEqual(['history:source-b', 'undo:source-b:1', 'undo:source-b:prev'])
     // Commands runtime contract: handlers must return a CommandResult with kind.
-    expect(result.kind).toBe('success')
+    expect(result.kind).toBe('error')
     expect(restoreResult.kind).toBe('success')
     const missing = await captured!.handler({ agent: { ctx } as never, rawInput: 'approve some-id' })
     expect(missing.kind).toBe('error')
@@ -1507,7 +1509,6 @@ describe('evolution-commands', () => {
 
   it('v43 (P1-2): a staging deployment is refused for the destructive writes the skill runner cannot replay', async () => {
     const cases = [
-      { input: 'consolidate target src', what: 'consolidate' },
       { input: 'restore', what: 'restore' },
       { input: 'skill restore demo', what: 'skill restore' },
       { input: 'skill undo demo', what: 'skill undo' },
@@ -1534,8 +1535,8 @@ describe('evolution-commands', () => {
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionApproval', { isEnabled: true, stageForeground: false, list: async () => [] })
     await ctx.plugin(Commands)
-    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'consolidate target src' })
-    // No curator is mounted here, so the command must reach its own E-302
+    const result = await captured!.handler({ agent: { ctx } as never, rawInput: 'restore' })
+    // No curator is mounted here, so `restore` must reach its own E-302
     // service check — proof the refusal is policy-scoped, not a blanket ban.
     expect(result.kind).toBe('error')
     expect(result.text).toContain('E-302')

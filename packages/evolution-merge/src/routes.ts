@@ -20,6 +20,9 @@ export interface MergeRowView {
   readonly createdAt: string
   readonly target?: string
   readonly confidence?: number
+  readonly aSummary?: string
+  readonly bSummary?: string
+  readonly rationale?: string
   readonly failure?: { readonly stage: string; readonly code: string; readonly message: string; readonly retryable: boolean }
   readonly attempts?: number
   readonly origin?: 'agent' | 'human' | 'system'
@@ -44,6 +47,9 @@ export function toRowView(row: MergeRow): MergeRowView {
     createdAt: row.createdAt,
     ...(row.decision?.target === undefined ? {} : { target: row.decision.target }),
     ...(row.decision?.confidence === undefined ? {} : { confidence: row.decision.confidence }),
+    ...(row.decision?.aSummary === undefined ? {} : { aSummary: row.decision.aSummary }),
+    ...(row.decision?.bSummary === undefined ? {} : { bSummary: row.decision.bSummary }),
+    ...(row.decision?.rationale === undefined ? {} : { rationale: row.decision.rationale }),
     ...(row.failure === undefined ? {} : {
       failure: { stage: row.failure.stage, code: row.failure.code, message: row.failure.message, retryable: row.failure.retryable },
     }),
@@ -53,9 +59,9 @@ export function toRowView(row: MergeRow): MergeRowView {
     ...(row.expired === undefined ? {} : { expired: row.expired }),
     ...(row.reason === undefined ? {} : { reason: row.reason }),
     summary: [
-      row.a + ' + ' + row.b,
-      row.decision?.rationale ?? row.reason ?? '',
-      row.failure?.message ?? '',
+      row.decision?.aSummary ?? '未提供技能1摘要',
+      row.decision?.bSummary ?? '未提供技能2摘要',
+      row.decision?.rationale ?? row.reason ?? '未提供融合原因',
     ],
     actions: row.state === 'pending'
       ? ['/evolution merge approve ' + row.id, '/evolution merge reject ' + row.id]

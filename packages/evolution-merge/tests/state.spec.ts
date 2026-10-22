@@ -56,6 +56,17 @@ it('upserts, moves and drops a row through one ledger', async () => {
   expect(await dropRow(io, home, now, first.id)).toBe(false)
 })
 
+it('refuses an upsert that would overwrite a different queue', async () => {
+  const home = await tempRoot('dsh-merge-state-conflict-')
+  const io = nodeEvolutionIo()
+  const first = row('a', 'b')
+  await upsertRow(io, home, now, first)
+  await moveRow(io, home, now, first.id, { queue: 'pending', state: 'pending' })
+  const conflict = await upsertRow(io, home, now, { ...first, state: 'verify', queue: 'verify' }, 'verify')
+  expect(conflict.ok).toBe(false)
+  expect((await loadMergeState(io, home)).state.rows[0]).toMatchObject({ state: 'pending' })
+})
+
 it('reads without writing and normalizes a queue from state', async () => {
   const home = await tempRoot('dsh-merge-state-read-')
   const base = nodeEvolutionIo()

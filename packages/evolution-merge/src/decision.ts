@@ -39,8 +39,11 @@ export function parseDecision(text: string | undefined, pair: { readonly a: stri
   const target = typeof record.target === 'string' ? record.target.trim() : ''
   const sources = Array.isArray(record.sources) ? record.sources.filter((item): item is string => typeof item === 'string').map(item => item.trim()).filter(Boolean) : []
   const rationale = typeof record.rationale === 'string' ? record.rationale.trim() : ''
+  const aSummary = typeof record.aSummary === 'string' ? record.aSummary.trim() : typeof record.a_summary === 'string' ? record.a_summary.trim() : ''
+  const bSummary = typeof record.bSummary === 'string' ? record.bSummary.trim() : typeof record.b_summary === 'string' ? record.b_summary.trim() : ''
+  const summaries = { ...(aSummary === '' ? {} : { aSummary }), ...(bSummary === '' ? {} : { bSummary }) }
   if (!shouldMerge || mode === 'keep') {
-    return { ok: true, decision: { shouldMerge: false, mode: 'keep', target, sources, rationale } }
+    return { ok: true, decision: { shouldMerge: false, mode: 'keep', target, sources, rationale, ...summaries } }
   }
   if (target === '') return { ok: false, code: 'decision-invalid', message: 'merge decision needs target' }
   if (sources.length === 0) return { ok: false, code: 'decision-invalid', message: 'merge decision needs sources' }
@@ -53,6 +56,7 @@ export function parseDecision(text: string | undefined, pair: { readonly a: stri
       target,
       sources,
       rationale,
+      ...summaries,
       ...(typeof record.confidence === 'number' ? { confidence: record.confidence } : {}),
     },
   }

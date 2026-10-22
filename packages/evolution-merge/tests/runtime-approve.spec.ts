@@ -6,7 +6,7 @@ import { tempRoot } from '../../test-support/temp-home.ts'
 import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, stageKeyOf, upsertRow, writeStagedFile, type MergeRuntimeDeps, type MergeRow, type SkillCard } from '../src/index.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
-const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill') }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill') }]
+const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill'), managed: true }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill'), managed: true }, { name: 'umbrella', description: 'u', body: BODY('umbrella'), managed: true }]
 const decision = { shouldMerge: true, mode: 'merge-into-existing' as const, target: 'umbrella', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }
 
 it('approves a pending row through a new child and drops it after commit', async () => {

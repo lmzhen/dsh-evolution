@@ -220,7 +220,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
           const probe = await skills.listSupportFiles(item.name)
           const paths = probe.kind === 'present' ? probe.value : []
           const files = await Promise.all(paths.map(async path => ({ path, content: await skills.readSupportFile(item.name, path) ?? '' })))
-          return { name: item.name, description: item.description, body: item.content ?? '', files, protectedBy: item.protectedBy, protectionUnknown: item.protectionUnknown }
+          return { name: item.name, description: item.description, body: item.content ?? '', files, protectedBy: item.protectedBy, protectionUnknown: item.protectionUnknown, managed: item.managed }
         }))
       },
       screeningForRun: engineScreening,

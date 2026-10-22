@@ -27,6 +27,14 @@ import { createChannelScanPorts } from './scan-ports.ts'
 import { createNewChildRound2 } from './new-child-authoring.ts'
 import { skillLibraryPort } from './adapters/library.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
+import { fitToolText } from './presentation-budget.ts'
+import { sourceRevisionOf } from './revision.ts'
+
+function forcedDecisionFor(a: string, b: string): MergeDecision {
+  const sorted = [a, b].sort()
+  const target = ('merge-' + sorted.join('-')).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64)
+  return { shouldMerge: true, mode: 'create-umbrella', target, sources: [a, b], rationale: 'forced pair merge of ' + sorted.join(' and ') }
+}
 
 export interface MergeStageBindingPort {
   bind(context: StageToolContext): void
@@ -74,16 +82,21 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'pair') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
-        const pair = [{ a: command.a, b: command.b }]
-        let forced: MergeRow | undefined
-        if (command.force === true) {
-          const key = pairKey(command.a, command.b)
-          forced = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === key)
-          if (forced === undefined || forced.decision === undefined) {
-            return { ok: false, text: 'pair --force 需要已有决策，找不到该 pair 的 decision: ' + key }
-          }
+        const cardA = cards.find(card => card.name === command.a)
+        const cardB = cards.find(card => card.name === command.b)
+        if (cardA === undefined || cardB === undefined || cardA.managed !== true || cardB.managed !== true) {
+          return { ok: false, text: 'merge pair 仅支持 family-managed 技能: ' + command.a + ' / ' + command.b }
         }
-        const approval = command.force === true ? false : deps.params.mergeApproval
+        const pair = [{ a: command.a, b: command.b }]
+        const existing = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === pairKey(command.a, command.b))
+        if (existing?.state === 'pending') {
+          return { ok: false, text: '该 pair 已在待批准队列，先 approve/reject/discard: ' + existing.id }
+        }
+        if (existing?.state === 'approved' || existing?.state === 'fuse') {
+          return { ok: false, text: '该 pair 已在待合并队列，用 merge resume --retry 复用: ' + (existing.runId ?? existing.id) }
+        }
+        const forced = command.force === true ? forcedDecisionFor(command.a, command.b) : undefined
+        const approval = deps.params.mergeApproval
         const result = await runScanCommand({
           ...common,
           approval,
@@ -99,7 +112,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
               commitPort: skillLibraryPort(deps.skills), now: deps.now,
               ...stageHooks,
             })
-            return forced === undefined ? ports : { ...ports, round1: () => Promise.resolve({ kind: 'merge' as const, decision: forced.decision as MergeDecision }) }
+            return forced === undefined ? ports : { ...ports, round1: () => Promise.resolve({ kind: 'merge' as const, decision: forced }) }
           },
         })
         if (!result.ok) return { ok: false, text: result.message }
@@ -110,12 +123,17 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'scan') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
+        const managed = new Set(cards.filter(card => card.managed === true).map(card => card.name))
         const loadedState = await loadMergeState(deps.io, deps.home)
         const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
         const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || !canRetry(row)).map(row => row.pairKey))
+        const conflictNotes = loadedState.state.rows
+          .filter(row => row.state === 'pending' || row.state === 'approved' || row.state === 'fuse' || row.state === 'skipped')
+          .map(row => 'conflict:' + row.state + ':' + row.pairKey + ':' + row.id)
         const result = await runScanCommand({
           ...common,
           approval: deps.params.mergeApproval,
+          notes: conflictNotes,
           ...(detached ? { detached: true } : {}),
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards,
@@ -123,7 +141,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
               const raw = await deps.screeningForRun(cards, runId, turnSignal)
               const filtered = raw.filter((candidate) => {
                 const key = pairKey(candidate.a, candidate.b)
-                return !skipped.has(key) && !held.has(key)
+                return managed.has(candidate.a) && managed.has(candidate.b) && !skipped.has(key) && !held.has(key)
               })
               const candidatePairs = (raw as readonly MergeCandidate[] & { readonly candidatePairs?: number }).candidatePairs
               return candidatePairs === undefined ? filtered : Object.assign(filtered, { candidatePairs })
@@ -175,7 +193,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (report.kind === 'unknown') return { ok: false, text: 'report is unreadable: ' + run.resultRef + '：' + report.reason }
         return report.kind === 'absent'
           ? { ok: false, text: 'report is missing: ' + run.resultRef }
-          : { ok: true, text: report.value.slice(0, 12000) }
+          : { ok: true, text: 'report: ' + run.resultRef + '\n' + fitToolText(report.value, 7600) }
       }
       if (command.verb === 'discard') {
         const loaded = await loadMergeState(deps.io, deps.home)
@@ -251,6 +269,25 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'approve') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
+        const candidate = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.id === command.id)
+        if (candidate !== undefined && candidate.state === 'pending' && candidate.decision !== undefined) {
+          const missingSource = [candidate.a, candidate.b].find(name => !cards.some(card => card.name === name && card.managed === true))
+          if (missingSource !== undefined) {
+            await dropRow(deps.io, deps.home, deps.now, candidate.id)
+            return { ok: false, text: 'source-gone：' + missingSource + ' 已不在 family-managed 技能库，已从 active 队列清除；可 merge skipped --discard 清理' }
+          }
+          const currentRevision = sourceRevisionOf(cards, candidate.a, candidate.b)
+          if (candidate.sourceRevision !== undefined && currentRevision !== undefined && currentRevision !== candidate.sourceRevision) {
+            const changed = transition(candidate, { type: 'source-changed', at: new Date().toISOString() })
+            if (changed.ok && changed.row !== null) await upsertRow(deps.io, deps.home, deps.now, changed.row)
+            return { ok: false, text: 'source-changed：源技能内容在决策后变化，拒绝照跑；出口：重新 merge pair，或 merge skipped --discard' }
+          }
+          if (candidate.decision.mode === 'merge-into-existing' && !cards.some(card => card.name === candidate.decision?.target)) {
+            const expired = transition(candidate, { type: 'target-taken', at: new Date().toISOString() })
+            if (expired.ok && expired.row !== null) await upsertRow(deps.io, deps.home, deps.now, expired.row)
+            return { ok: false, text: 'target-taken：目标 ' + candidate.decision.target + ' 已不存在，行保留 pending --expired；出口：重新 merge pair，或 merge skipped --discard' }
+          }
+        }
         const result = await runApproveCommand({
           ...common,
           rowId: command.id,

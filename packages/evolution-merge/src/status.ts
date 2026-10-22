@@ -4,6 +4,7 @@
  */
 import type { MergeQueue, MergeRow } from './contracts.ts'
 import { queueOf, stageOf } from './contracts.ts'
+import { fitToolText } from './presentation-budget.ts'
 
 export interface MergeCounts {
   readonly verify: number
@@ -30,11 +31,11 @@ export function formatStatus(rows: readonly MergeRow[]): string {
     'merge: verify ' + String(counts.verify) + ', pending ' + String(counts.pending) + ', fuse ' + String(counts.fuse) + ', skipped ' + String(counts.skipped),
   ]
   for (const row of rows) lines.push('- ' + describe(row))
-  return lines.join('\n')
+  return fitToolText(lines.join('\n'))
 }
 
 export function formatQueue(rows: readonly MergeRow[], queue: MergeQueue): string {
   const selected = rows.filter(row => queueOf(row.state) === queue)
   if (selected.length === 0) return 'merge ' + queue + ': empty'
-  return ['merge ' + queue + ': ' + String(selected.length)].concat(selected.map(row => '- ' + describe(row))).join('\n')
+  return fitToolText(['merge ' + queue + ': ' + String(selected.length)].concat(selected.map(row => '- ' + describe(row))).join('\n'))
 }

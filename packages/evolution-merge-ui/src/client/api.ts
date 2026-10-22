@@ -47,6 +47,9 @@ export interface MergeRowView {
   createdAt?: string
   target?: string
   confidence?: number
+  aSummary?: string
+  bSummary?: string
+  rationale?: string
   failure?: { stage: string; code: string; message: string; retryable: boolean }
   attempts?: number
   origin?: 'agent' | 'human'

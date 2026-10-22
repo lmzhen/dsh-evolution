@@ -655,19 +655,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const result = curator ? await curator.restoreSnapshot() : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
-        if (input.startsWith('consolidate ')) {
-          const consolidateRefusal = unreplayableWriteRefusal('consolidate')
-          if (consolidateRefusal) return consolidateRefusal
-          const planTail = /\s--plan\s+(\S+)\s*$/.exec(input) ?? null
-          const planRunId = planTail?.[1] ?? undefined
-          const rest = planTail ? input.slice(0, planTail.index) : input
-          const names = rest.slice(12).trim().split(/\s+/).filter(Boolean)
-          const [target, ...sources] = names
-          if (!target || sources.length === 0) return err('用法：/evolution consolidate <target> <source...>')
-          const curator = ctx.get('evolutionCurator') as { consolidate(target: string, sources: string[]): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.consolidate(target, sources) : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
-          if (!result.ok) return err(result.message)
-          return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
+        if (input === 'consolidate' || input.startsWith('consolidate ')) {
+          const plan = /--plan\s+(\S+)/.exec(input)?.[1]
+          return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
         }
         if (input.startsWith('skill restore ')) {
           const name = input.slice(14).trim()

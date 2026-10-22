@@ -93,14 +93,24 @@ export interface MoveRowPatch {
   readonly attempts?: number
 }
 
-export async function upsertRow(io: EvolutionIoLike, home: string, now: () => number, row: MergeRow): Promise<void> {
-  await mutateMergeState(io, home, now, (rows) => {
+export type UpsertExpect = 'any' | 'absent' | 'verify' | 'pending' | 'fuse' | 'skipped'
+export type UpsertResult = { readonly ok: true } | { readonly ok: false; readonly current: MergeRow }
+
+export async function upsertRow(io: EvolutionIoLike, home: string, now: () => number, row: MergeRow, expect: UpsertExpect = 'any'): Promise<UpsertResult> {
+  return await mutateMergeState(io, home, now, (rows): { rows: readonly MergeRow[]; result: UpsertResult } => {
     const index = rows.findIndex(item => item.pairKey === row.pairKey)
+    const current = index < 0 ? undefined : rows[index]
+    if (current !== undefined && expect !== 'any' && (expect === 'absent' || queueOf(current.state) !== expect)) {
+      return { rows, result: { ok: false, current } }
+    }
+    if (current === undefined && expect !== 'any' && expect !== 'absent') {
+      return { rows, result: { ok: false, current: row } }
+    }
     const normalized: MergeRow = { ...row, queue: queueOf(row.state) }
     const next = [...rows]
-    if (index < 0) next.push(normalized)
-    else next[index] = { ...normalized, createdAt: rows[index]?.createdAt ?? normalized.createdAt }
-    return { rows: next, result: undefined }
+    if (current === undefined) next.push(normalized)
+    else next[index] = { ...normalized, createdAt: current.createdAt }
+    return { rows: next, result: { ok: true } }
   })
 }
 

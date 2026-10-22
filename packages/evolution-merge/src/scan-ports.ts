@@ -15,6 +15,7 @@ import type { StageToolContext } from './stage-tool.ts'
 import { runAuthoring } from './authoring-flow.ts'
 import { dropStaging, ensureStaging, stageKeyOf, stagingRoot } from './staging.ts'
 import type { ScanPorts, ScanRound2Outcome } from './scan-run.ts'
+import { sourceRevisionOf } from './revision.ts'
 
 export interface CreateScanPortsOptions {
   readonly io: EvolutionIoLike
@@ -71,8 +72,9 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           }
         }
       }
+      const sourceRevision = result.outcome.kind === 'merge' ? sourceRevisionOf(options.cards, candidate.a, candidate.b) : undefined
       return result.outcome.kind === 'merge'
-        ? { ...result.outcome, stagingRef: stageKey, stagingExpiresAt: options.now() + 7 * 86_400_000 }
+        ? { ...result.outcome, stagingRef: stageKey, stagingExpiresAt: options.now() + 7 * 86_400_000, ...(sourceRevision === undefined ? {} : { sourceRevision }) }
         : result.outcome
     },
     async round2(row: MergeRow, decision: MergeDecision, signal: AbortSignal): Promise<ScanRound2Outcome> {
