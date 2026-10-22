@@ -15,7 +15,7 @@ import type { StageToolContext } from './stage-tool.ts'
 import { runAuthoring } from './authoring-flow.ts'
 import { dropStaging, ensureStaging, stageKeyOf, stagingRoot } from './staging.ts'
 import type { ScanPorts, ScanRound2Outcome } from './scan-run.ts'
-import { sourceRevisionOf } from './revision.ts'
+import { sourceRevisionOf, targetRevisionOf } from './revision.ts'
 
 export interface CreateScanPortsOptions {
   readonly io: EvolutionIoLike
@@ -73,10 +73,13 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
         }
       }
       const sourceRevision = result.outcome.kind === 'merge' ? sourceRevisionOf(options.cards, candidate.a, candidate.b) : undefined
+      const target = result.outcome.kind === 'merge' ? result.outcome.decision?.target : undefined
+      const targetRevision = target === undefined ? undefined : targetRevisionOf(options.cards, target)
       return result.outcome.kind === 'merge'
         ? {
           ...result.outcome, stagingRef: stageKey, stagingExpiresAt: options.now() + 7 * 86_400_000,
           ...(sourceRevision === undefined ? {} : { sourceRevision }),
+          ...(targetRevision === undefined ? {} : { targetRevision }),
         }
         : result.outcome
     },

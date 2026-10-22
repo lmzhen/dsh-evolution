@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.5 (patch) — 剩余证据批：源保护/同名源、help 默认值、pending id、targetRevision、revision 含 support
+
+> **范围**：pair 拒同名/受保护/未知保护源；scan managed 排除 protected；merge help 增 defaults；待批准行显示 id；sourceRevision 哈希含 support 文件，新增 targetRevision，approve 比对目标变化；恢复路径专项测试。
+> **验证**：merge 70 files/162 tests、tsc 0；0.30.5 发布后补矩阵/真机。
+
 ## 0.30.4 (patch) — 第二轮复核 P1 修复：skipped pair、可重试回滚、receipt 权威、活跃 run 跳过、support fail-closed
 
 > **范围**：显式 pair 遇 skipped 先清行；回滚失败保留原 journal phase 以便重试；恢复先读 commit receipt，存在则直接 committed；活跃 run 跳过恢复；support snapshot 读取 unknown/消失 fail closed；路径 `..` 按段判定；未知 journal phase 拒绝。

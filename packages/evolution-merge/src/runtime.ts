@@ -28,7 +28,7 @@ import { createNewChildRound2 } from './new-child-authoring.ts'
 import { skillLibraryPort } from './adapters/library.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
 import { fitToolText } from './presentation-budget.ts'
-import { sourceRevisionOf } from './revision.ts'
+import { sourceRevisionOf, targetRevisionOf } from './revision.ts'
 
 function forcedDecisionFor(a: string, b: string): MergeDecision {
   const sorted = [a, b].sort()
@@ -288,6 +288,12 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             const changed = transition(candidate, { type: 'source-changed', at: new Date().toISOString() })
             if (changed.ok && changed.row !== null) await upsertRow(deps.io, deps.home, deps.now, changed.row)
             return { ok: false, text: 'source-changed：源技能内容在决策后变化，拒绝照跑；出口：重新 merge pair，或 merge skipped --discard' }
+          }
+          const currentTargetRevision = targetRevisionOf(cards, candidate.decision.target)
+          if (candidate.targetRevision !== undefined && currentTargetRevision !== undefined && currentTargetRevision !== candidate.targetRevision) {
+            const taken = transition(candidate, { type: 'target-taken', at: new Date().toISOString() })
+            if (taken.ok && taken.row !== null) await upsertRow(deps.io, deps.home, deps.now, taken.row)
+            return { ok: false, text: 'target-taken：目标 ' + candidate.decision.target + ' 在决策后变化，拒绝照跑；可重新 merge pair 或 discard' }
           }
           if (candidate.decision.mode === 'merge-into-existing' && !cards.some(card => card.name === candidate.decision?.target)) {
             const expired = transition(candidate, { type: 'target-taken', at: new Date().toISOString() })
