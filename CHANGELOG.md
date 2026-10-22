@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.4 (patch) — 第二轮复核 P1 修复：skipped pair、可重试回滚、receipt 权威、活跃 run 跳过、support fail-closed
+
+> **范围**：显式 pair 遇 skipped 先清行；回滚失败保留原 journal phase 以便重试；恢复先读 commit receipt，存在则直接 committed；活跃 run 跳过恢复；support snapshot 读取 unknown/消失 fail closed；路径 `..` 按段判定；未知 journal phase 拒绝。
+> **验证**：merge 69 files/159 tests、tsc 0、oxlint 0；0.30.4 发布后补真机。
+
 ## 0.30.3 (patch) — 独立复核 P0/P1 修复：恢复根、journal 终态、sourceRevision 落行、scan 冲突、路径校验
 
 > **范围**：崩溃恢复改用 skillsRoot（不再写 evolution/skills 幻影树）；commit 失败写 failed、成功后先 committed 再写 receipt；sourceRevision/targetRevision 真正落 pending；scan held 扩到 approved/fuse，候选 upsert 用 expect=verify；恢复器校验技能名/路径，source 恢复走 restoreFromArchive；snapshot 增记 target/source support。

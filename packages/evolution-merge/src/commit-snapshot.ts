@@ -64,7 +64,7 @@ export function isSafeSkillName(name: string): boolean {
 }
 
 export function skillFilePath(root: string, name: string, path: string): string {
-  if (!isSafeSkillName(name) || path.startsWith('/') || path.includes('..')) throw new Error('unsafe skill file: ' + name + '/' + path)
+  if (!isSafeSkillName(name) || path.startsWith('/') || path.split('/').includes('..')) throw new Error('unsafe skill file: ' + name + '/' + path)
   const base = resolve(root, name)
   const file = resolve(base, path)
   if (!file.startsWith(base + sep)) throw new Error('skill file escapes skill: ' + name + '/' + path)

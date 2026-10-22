@@ -149,9 +149,13 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       io, ctx, authority: authorityFrom({ origin: 'subagent' }),
       limits: { ...DEFAULT_SKILL_LIMITS, ...policyStageLimits(policySnapshot?.get?.()) },
     })
-    void recoverCommitJournals(io, home, Date.now(), skillsRoot(), async (name) => {
+    const mergeSkillsRoot = (skills as unknown as { root?: string }).root ?? skillsRoot()
+    void recoverCommitJournals(io, home, Date.now(), mergeSkillsRoot, async (name) => {
       const result = await skills.restoreFromArchive(name)
       return result.ok
+    }, (runId) => {
+      const run = runs.find(runId)
+      return run !== undefined && run.state === 'running'
     }).then((reports) => { if (reports.length > 0) ctx.logger.info('merge commit recovery: ' + reports.map(report => report.runId + '=' + report.action).join(', ')) }).catch((error: unknown) => { ctx.logger.warn('merge commit recovery failed: ' + (error instanceof Error ? error.message : String(error))) })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()

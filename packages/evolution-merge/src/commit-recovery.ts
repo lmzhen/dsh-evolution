@@ -5,6 +5,7 @@ import type { CommitJournal } from './domain/commit-journal.ts'
 import { recoveryFor } from './domain/commit-journal.ts'
 import { writeJournal } from './domain/commit-journal-store.ts'
 import { readCommitSnapshot, skillBodyPath, skillFilePath } from './commit-snapshot.ts'
+import { readCommitReceipt } from './commit-receipt.ts'
 
 export interface CommitRecoveryReport {
   readonly runId: string
@@ -19,6 +20,7 @@ export async function recoverCommitJournals(
   now: number,
   skillRoot: string,
   restoreSource?: (name: string) => Promise<boolean>,
+  isActive?: (runId: string) => boolean,
 ): Promise<readonly CommitRecoveryReport[]> {
   const dir = join(home, 'merge', 'journals')
   if (!(await io.exists(dir))) return []
@@ -27,8 +29,28 @@ export async function recoverCommitJournals(
   for (const file of files) {
     let journal: CommitJournal
     try { journal = JSON.parse(await io.readText(join(dir, file)) ?? '') as CommitJournal } catch { continue }
+    if (isActive?.(journal.runId) === true) {
+      reports.push({ runId: journal.runId, phase: journal.phase, action: 'skipped-active-run', ok: true })
+      continue
+    }
     const recovery = recoveryFor(journal)
     if (recovery === 'none') continue
+    if (recovery === 'refuse') {
+      reports.push({ runId: journal.runId, phase: journal.phase, action: 'unknown-phase-refused', ok: false })
+      continue
+    }
+    let receipt = null
+    try {
+      receipt = await readCommitReceipt(io, home, journal.runId, journal.target)
+    } catch {
+      reports.push({ runId: journal.runId, phase: journal.phase, action: 'receipt-read-failed', ok: false })
+      continue
+    }
+    if (receipt !== null) {
+      await writeJournal(io, home, { ...journal, phase: 'committed', unitId: receipt.unitId, updatedAt: new Date(now).toISOString() })
+      reports.push({ runId: journal.runId, phase: journal.phase, action: 'receipt-committed', ok: true })
+      continue
+    }
     const snapshot = await readCommitSnapshot(io, home, journal.runId)
     let action = 'report-only'
     let ok = true
@@ -71,7 +93,7 @@ export async function recoverCommitJournals(
         ok = false
       }
     }
-    await writeJournal(io, home, { ...journal, phase: ok ? 'rolled-back' : 'failed', updatedAt: new Date(now).toISOString() })
+    if (ok) await writeJournal(io, home, { ...journal, phase: 'rolled-back', updatedAt: new Date(now).toISOString() })
     reports.push({ runId: journal.runId, phase: journal.phase, action, ok })
   }
   await io.writeText(join(home, 'merge', 'recovery.json'), JSON.stringify(reports, null, 2))

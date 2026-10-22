@@ -89,6 +89,9 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         }
         const pair = [{ a: command.a, b: command.b }]
         const existing = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === pairKey(command.a, command.b))
+        if (existing?.state === 'skipped') {
+          await dropRow(deps.io, deps.home, deps.now, existing.id)
+        }
         if (existing?.state === 'pending') {
           return { ok: false, text: '该 pair 已在待批准队列，先 approve/reject/discard: ' + existing.id }
         }

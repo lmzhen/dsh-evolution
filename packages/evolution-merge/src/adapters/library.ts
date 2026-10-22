@@ -18,8 +18,13 @@ export function skillLibraryPort(skills: SkillLibrary): CommitPort {
     async readSupportFiles(name) {
       if (typeof skills.listSupportFiles !== 'function') return []
       const probe = await skills.listSupportFiles(name)
-      if (probe.kind !== 'present') return []
-      return await Promise.all(probe.value.map(async path => ({ path, content: await skills.readSupportFile(name, path) ?? '' })))
+      if (probe.kind === 'unknown') throw new Error('support file list unknown: ' + name)
+      if (probe.kind === 'absent') return []
+      return await Promise.all(probe.value.map(async (path) => {
+        const content = await skills.readSupportFile(name, path)
+        if (content === null) throw new Error('support file disappeared: ' + name + '/' + path)
+        return { path, content }
+      }))
     },
   }
 }

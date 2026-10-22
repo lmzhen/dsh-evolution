@@ -25,7 +25,7 @@ export function advanceJournal(journal: CommitJournal, phase: JournalPhase, at: 
   return { ...journal, phase, updatedAt: at }
 }
 
-export type JournalRecovery = 'none' | 'retry-commit' | 'rollback-target' | 'rollback-sources'
+export type JournalRecovery = 'none' | 'retry-commit' | 'rollback-target' | 'rollback-sources' | 'refuse'
 
 /** What a restart may do with the last durable phase. */
 export function recoveryFor(journal: CommitJournal): JournalRecovery {
@@ -36,5 +36,6 @@ export function recoveryFor(journal: CommitJournal): JournalRecovery {
     case 'committed':
     case 'rolled-back':
     case 'failed': return 'none'
+    default: return 'refuse'
   }
 }
