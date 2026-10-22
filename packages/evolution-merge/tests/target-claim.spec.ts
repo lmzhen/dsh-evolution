@@ -8,10 +8,11 @@ import { acquireTargetClaim } from '../src/target-claim.ts'
 it('one approve writer per target at a time', async () => {
   const home = await tempRoot('dsh-merge-target-claim-')
   const io = nodeEvolutionIo()
-  const first = await acquireTargetClaim(io, home, 'alpha', 1)
-  assert.notEqual(first, null)
+  const [first, second] = await Promise.all([acquireTargetClaim(io, home, 'alpha', 1), acquireTargetClaim(io, home, 'alpha', 1)])
+  assert.equal([first, second].filter(Boolean).length, 1)
+  const holder = first ?? second
   assert.equal(await acquireTargetClaim(io, home, 'alpha', 1), null)
-  await first?.release()
+  await holder?.release()
   const again = await acquireTargetClaim(io, home, 'alpha', 2)
   assert.notEqual(again, null)
   await again?.release()

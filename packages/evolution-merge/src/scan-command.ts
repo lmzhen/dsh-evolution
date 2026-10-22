@@ -42,6 +42,7 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
         ports,
         stage: ctx.stage,
         startedAt: ctx.startedAt,
+        runId: ctx.runId,
         ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
         ...(options.notes === undefined ? {} : { notes: options.notes }),
       })

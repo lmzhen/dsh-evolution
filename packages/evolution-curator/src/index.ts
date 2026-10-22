@@ -296,6 +296,11 @@ export class EvolutionCurator extends Service {
   })
 
   readonly skills: SkillLibrary
+  /** Read-only scope gate for sibling plugins (merge): name blocked by curator sets. */
+  async isBlocked(name: string): Promise<boolean> {
+    if (this.excludeSkillNames.has(name) || this.referencedSkillNames.has(name)) return true
+    return (await loadSuppressedNames(this.skills.root, this.io)).has(name)
+  }
   private readonly io: EvolutionIoLike
   private readonly enabled: boolean
   /** This row's live config (G1 §8.3): its volatile fields are resolved at USE time. */

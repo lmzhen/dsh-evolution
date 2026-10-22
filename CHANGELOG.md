@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.13 (patch) — 复核 P1：真 gate 接线、原子 claim、30min lease、scan owner
+
+> **范围**：curator 暴露 isBlocked(name)；merge 异步调用；target-claim 用 io.transact 原子 RMW、lease 30min；scan 行写 owner runId，held 排除新鲜 owner verify。
+> **验证**：merge 71 files/168 tests；0.30.13 发布后最终复核。
+
 ## 0.30.12 (patch) — 并发 CAS
 
 > **范围**：upsertRow 增 `cas`（updatedAt 或 null）；scan 落 verify 行前带当前快照，两个并发 scan 单赢家；skipped restore 也走 CAS。

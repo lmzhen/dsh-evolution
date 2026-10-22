@@ -4,20 +4,31 @@ import { join } from 'node:path'
 import { contentHash, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { acquireClaim, releaseClaim, type Claim } from './domain/claim.ts'
 
-const LEASE_MS = 5 * 60_000
+const LEASE_MS = 30 * 60_000
 
 function claimPath(home: string, target: string): string {
   return join(home, 'merge', 'claims', contentHash(target) + '.json')
 }
 
-async function readClaim(io: EvolutionIoLike, home: string, target: string): Promise<Claim | undefined> {
-  const path = claimPath(home, target)
-  if (!(await io.exists(path))) return undefined
-  const raw = await io.readText(path)
+function parseClaim(raw: string | null): Claim | undefined {
   if (raw === null) return undefined
   const parsed = JSON.parse(raw) as Partial<Claim>
-  if (typeof parsed.token !== 'string' || typeof parsed.expiresAt !== 'number') throw new Error('corrupt target claim: ' + target)
+  if (typeof parsed.token !== 'string' || typeof parsed.expiresAt !== 'number') throw new Error('corrupt target claim')
   return { id: 'claim', token: parsed.token, expiresAt: parsed.expiresAt }
+}
+
+async function compareAndSwap(io: EvolutionIoLike, path: string, task: (current: string | null) => string | null): Promise<void> {
+  if (io.transact !== undefined) {
+    await io.transact(path, current => task(current))
+    return
+  }
+  const current = (await io.exists(path)) ? await io.readText(path) : null
+  const next = task(current)
+  if (next === null) {
+    if (current !== null) try { await io.remove(path) } catch { /* already gone */ }
+  } else if (next !== current) {
+    await io.writeText(path, next)
+  }
 }
 
 export interface TargetClaim {
@@ -26,21 +37,23 @@ export interface TargetClaim {
 }
 
 export async function acquireTargetClaim(io: EvolutionIoLike, home: string, target: string, now: number): Promise<TargetClaim | null> {
-  const current = await readClaim(io, home, target)
+  const path = claimPath(home, target)
   const token = randomUUID()
-  const claim = acquireClaim(current, now, LEASE_MS, token)
-  if (claim === undefined) return null
-  await io.writeText(claimPath(home, target), JSON.stringify(claim) + '\n')
+  let granted: Claim | undefined
+  await compareAndSwap(io, path, (raw) => {
+    const claim = acquireClaim(parseClaim(raw), now, LEASE_MS, token)
+    if (claim === undefined) return raw
+    granted = claim
+    return JSON.stringify(claim) + '\n'
+  })
+  if (granted === undefined) return null
   return {
     token,
     async release() {
-      const latest = await readClaim(io, home, target)
-      const next = releaseClaim(latest, token)
-      if (next === undefined) {
-        try { await io.remove(claimPath(home, target)) } catch { /* already gone */ }
-      } else {
-        await io.writeText(claimPath(home, target), JSON.stringify(next) + '\n')
-      }
+      await compareAndSwap(io, path, (raw) => {
+        const next = releaseClaim(parseClaim(raw), token)
+        return next === undefined ? null : JSON.stringify(next) + '\n'
+      })
     },
   }
 }

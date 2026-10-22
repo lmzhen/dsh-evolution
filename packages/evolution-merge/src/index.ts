@@ -222,9 +222,9 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const runtime = createMergeRuntime({
       io, home, registry: runs, skills, now: () => Date.now(), params, platformWrite: true,
       channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: params.mergeRunTimeoutMinutes,
-      isBlocked: (name) => {
-        const curator = (ctx as unknown as { get(key: string): unknown }).get('evolutionCurator') as { gates?: { isBlocked?: (name: string) => boolean } } | undefined
-        return curator?.gates?.isBlocked?.(name) === true
+      isBlocked: async (name) => {
+        const curator = (ctx as unknown as { get(key: string): unknown }).get('evolutionCurator') as { isBlocked?: (name: string) => Promise<boolean> } | undefined
+        return (await curator?.isBlocked?.(name)) === true
       },
       async cards(signal) {
         const listed = await skills.list({ withContent: true })

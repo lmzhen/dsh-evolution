@@ -58,7 +58,7 @@ export interface MergeRuntimeDeps {
   readonly detached?: boolean
   readonly cards: (signal: AbortSignal) => Promise<readonly SkillCard[]>
   /** Curator gate set: excluded/referenced/suppressed/protected builtins. */
-  readonly isBlocked?: (name: string) => boolean
+  readonly isBlocked?: (name: string) => boolean | Promise<boolean>
   /** Run-scoped engine screening. */
   readonly screeningForRun: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
   readonly stage?: MergeStageBindingPort
@@ -94,7 +94,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           || cardA.protectionUnknown === true || cardB.protectionUnknown === true) {
           return { ok: false, text: 'merge pair 不接受受保护/保护状态未知技能: ' + command.a + ' / ' + command.b }
         }
-        if (deps.isBlocked?.(command.a) === true || deps.isBlocked?.(command.b) === true) {
+        if ((await deps.isBlocked?.(command.a)) === true || (await deps.isBlocked?.(command.b)) === true) {
           return { ok: false, text: 'merge pair 不接受被范围门拦下的技能: ' + command.a + ' / ' + command.b }
         }
         const pair = [{ a: command.a, b: command.b }]
@@ -136,12 +136,16 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'scan') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
+        const blocked = new Set<string>()
+        for (const card of cards) if ((await deps.isBlocked?.(card.name)) === true) blocked.add(card.name)
         const managed = new Set(cards
-          .filter(card => card.managed === true && card.protectedBy == null && deps.isBlocked?.(card.name) !== true)
+          .filter(card => card.managed === true && card.protectedBy == null && !blocked.has(card.name))
           .map(card => card.name))
         const loadedState = await loadMergeState(deps.io, deps.home)
         const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
-        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse' || (row.queue === 'verify' && !canRetry(row))).map(row => row.pairKey))
+        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse'
+          || (row.queue === 'verify' && (row.runId !== undefined && deps.now() - Date.parse(row.updatedAt) < 10 * 60_000 || !canRetry(row))))
+          .map(row => row.pairKey))
         const conflictNotes = loadedState.state.rows
           .filter(row => row.state === 'pending' || row.state === 'approved' || row.state === 'fuse' || row.state === 'skipped')
           .map(row => 'conflict:' + row.state + ':' + row.pairKey + ':' + row.id)
