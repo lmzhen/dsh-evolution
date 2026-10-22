@@ -132,7 +132,6 @@ export function transitionRow(current: MergeRowV2 | undefined, event: MergeRowEv
                 : event.type === 'approve'
                   ? { type: 'approve' as const }
                   : { type: 'reject' as const }
-  if (mapped === undefined) return invalid(event, current.state)
   const moved = stateTransition(current.state, mapped)
   if (!moved.ok) return invalid(event, current.state)
   if (moved.state === null) return { ok: true, row: null }
