@@ -26,7 +26,8 @@ export async function handleReadOnlyMergeCommand(
   if (command.verb === 'pending') {
     const loaded = await loadMergeState(io, home)
     const rows = command.expired === true ? loaded.state.rows.filter(row => row.expired !== undefined) : loaded.state.rows
-    const live = cards === undefined ? rows : rows.filter(row => cards.some(card => card.name === row.a) && cards.some(card => card.name === row.b))
+    const live = cards === undefined ? rows : rows.filter(row =>
+      cards.some(card => card.name === row.a) && cards.some(card => card.name === row.b))
     return withNote(command.expired === true ? formatStatus(live) : formatQueue(live, 'pending'), loaded.note)
   }
   if (command.verb === 'candidates') {
