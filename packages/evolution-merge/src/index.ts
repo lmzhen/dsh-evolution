@@ -5,7 +5,7 @@ import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type LlmServiceLike } from './adapters/model-runner.ts'
-import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, skillsRoot, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState, upsertRow } from './state.ts'
 import { cleanupExpiredStaging } from './staging.ts'
@@ -135,7 +135,6 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
     void loadMergeState(io, home).then(loaded => cleanupExpiredStaging(io, home, Date.now(), new Set(loaded.state.rows.map(row => row.runId).filter((id): id is string => id !== undefined)))).catch((error: unknown) => { ctx.logger.warn('merge staging cleanup failed: ' + (error instanceof Error ? error.message : String(error))) })
-    void recoverCommitJournals(io, home, Date.now()).then((reports) => { if (reports.length > 0) ctx.logger.info('merge commit recovery: ' + reports.map(report => report.runId + '=' + report.action).join(', ')) }).catch((error: unknown) => { ctx.logger.warn('merge commit recovery failed: ' + (error instanceof Error ? error.message : String(error))) })
     const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) } })
     void runs.load()
     ctx.effect(() => {
@@ -150,6 +149,10 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       io, ctx, authority: authorityFrom({ origin: 'subagent' }),
       limits: { ...DEFAULT_SKILL_LIMITS, ...policyStageLimits(policySnapshot?.get?.()) },
     })
+    void recoverCommitJournals(io, home, Date.now(), skillsRoot(), async (name) => {
+      const result = await skills.restoreFromArchive(name)
+      return result.ok
+    }).then((reports) => { if (reports.length > 0) ctx.logger.info('merge commit recovery: ' + reports.map(report => report.runId + '=' + report.action).join(', ')) }).catch((error: unknown) => { ctx.logger.warn('merge commit recovery failed: ' + (error instanceof Error ? error.message : String(error))) })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()
     const engineConfig = engineConfigFromEnv(params.mergeModelsRoot)

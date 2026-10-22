@@ -15,5 +15,11 @@ export function skillLibraryPort(skills: SkillLibrary): CommitPort {
       return names === null ? true : names.includes(name)
     },
     commitMerge: plan => skills.commitMerge(plan),
+    async readSupportFiles(name) {
+      if (typeof skills.listSupportFiles !== 'function') return []
+      const probe = await skills.listSupportFiles(name)
+      if (probe.kind !== 'present') return []
+      return await Promise.all(probe.value.map(async path => ({ path, content: await skills.readSupportFile(name, path) ?? '' })))
+    },
   }
 }

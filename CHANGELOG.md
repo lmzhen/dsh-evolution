@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.3 (patch) — 独立复核 P0/P1 修复：恢复根、journal 终态、sourceRevision 落行、scan 冲突、路径校验
+
+> **范围**：崩溃恢复改用 skillsRoot（不再写 evolution/skills 幻影树）；commit 失败写 failed、成功后先 committed 再写 receipt；sourceRevision/targetRevision 真正落 pending；scan held 扩到 approved/fuse，候选 upsert 用 expect=verify；恢复器校验技能名/路径，source 恢复走 restoreFromArchive；snapshot 增记 target/source support。
+> **验证**：merge 69 files/159 tests、tsc 0 错；0.30.3 发布后补真机与矩阵。
+
 ## 0.30.2 (patch) — G8 P1 根治：范围门、pair --force、consolidate 退役、冲突判定、approve 时效、8k 预算、commit 恢复
 
 > **范围**：D19–D25。SkillCard.managed 范围门；pair --force 生成 forced decision；consolidate 退出用户面；pending/fuse 冲突拒绝；approve 前 sourceRevision/source-gone/target-taken/source-changed；report/status 8k 预算；commit 前 snapshot + journal 写前声明 + 启动自动恢复。

@@ -12,6 +12,7 @@ import { writeCommitSnapshot } from './commit-snapshot.ts'
 
 export interface CommitPort extends CommitAssemblyPort {
   commitMerge(plan: CommitMergePlan): Promise<CommitMergeResult>
+  readSupportFiles?(name: string): Promise<readonly { readonly path: string; readonly content: string }[]>
 }
 
 export interface CommitStagedOptions {
@@ -40,7 +41,7 @@ export async function commitStagedRun(
   const assembled = await assembleStagedCommit(io, home, runId, port, { origin: options.origin, summary: options.summary })
   if (!assembled.ok) return { ok: false, message: assembled.message }
   try {
-    await writeCommitSnapshot(io, home, runId, assembled.plan, options.now())
+    await writeCommitSnapshot(io, home, runId, assembled.plan, options.now(), port)
   } catch (error) {
     return { ok: false, message: 'commit snapshot failed; refusing to write: ' + (error instanceof Error ? error.message : String(error)), plan: assembled.plan }
   }
@@ -48,9 +49,11 @@ export async function commitStagedRun(
   try { await writeJournal(io, home, journal) } catch { /* journal is best-effort; receipt remains the commit record */ }
   const result = await port.commitMerge(assembled.plan)
   if (!result.ok) {
-    try { await writeJournal(io, home, { ...journal, updatedAt: new Date(options.now()).toISOString() }) } catch {}
+    try { await writeJournal(io, home, { ...journal, phase: 'failed', updatedAt: new Date(options.now()).toISOString() }) } catch {}
     return { ok: false, message: result.message, plan: assembled.plan }
   }
+  const committed = { ...journal, phase: 'committed' as const, updatedAt: new Date(options.now()).toISOString() }
+  try { await writeJournal(io, home, committed) } catch {}
   if (result.unitId === undefined) return { ok: true, plan: assembled.plan, result, warning: 'commit landed without a unitId; receipt not written' }
   const receipt: CommitReceipt = {
     runId,
@@ -65,7 +68,6 @@ export async function commitStagedRun(
   }
   try {
     await writeCommitReceipt(io, home, receipt)
-    try { await writeJournal(io, home, { ...journal, unitId: result.unitId, phase: 'committed', updatedAt: new Date(options.now()).toISOString() }) } catch {}
     return { ok: true, plan: assembled.plan, result, receipt }
   } catch (error) {
     return {

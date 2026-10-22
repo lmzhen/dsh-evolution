@@ -17,7 +17,7 @@ import {
 export type MergeEvent =
   | { readonly type: 'candidate'; readonly a: string; readonly b: string; readonly at: string }
   | { readonly type: 'round1-keep'; readonly at: string }
-  | { readonly type: 'round1-merge'; readonly approval: 'on' | 'off'; readonly decision?: MergeDecision; readonly stagingRef?: string; readonly stagingExpiresAt?: number; readonly at: string }
+  | { readonly type: 'round1-merge'; readonly approval: 'on' | 'off'; readonly decision?: MergeDecision; readonly stagingRef?: string; readonly stagingExpiresAt?: number; readonly sourceRevision?: string; readonly targetRevision?: string; readonly at: string }
   | { readonly type: 'round1-fail'; readonly failure: MergeFailure; readonly at: string }
   | { readonly type: 'approve'; readonly runId?: string; readonly at: string }
   | { readonly type: 'reject'; readonly at: string }
@@ -124,8 +124,8 @@ export function transition(current: MergeRow | undefined, event: MergeEvent): Tr
     case 'round1-merge':
       if (current.state !== 'verify') return invalid(event, current.state)
       return event.approval === 'on'
-        ? next(current, event.at, 'pending', { ...(event.decision === undefined ? {} : { decision: event.decision }), ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }) })
-        : next(current, event.at, 'approved', { ...(event.decision === undefined ? {} : { decision: event.decision }), ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }) })
+        ? next(current, event.at, 'pending', { ...(event.decision === undefined ? {} : { decision: event.decision }), ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }), ...(event.sourceRevision === undefined ? {} : { sourceRevision: event.sourceRevision }), ...(event.targetRevision === undefined ? {} : { targetRevision: event.targetRevision }) })
+        : next(current, event.at, 'approved', { ...(event.decision === undefined ? {} : { decision: event.decision }), ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }), ...(event.sourceRevision === undefined ? {} : { sourceRevision: event.sourceRevision }), ...(event.targetRevision === undefined ? {} : { targetRevision: event.targetRevision }) })
     case 'round1-fail':
       return current.state === 'verify'
         ? next(current, event.at, 'verify', { failure: event.failure, attempts: (current.attempts ?? 0) + 1 })

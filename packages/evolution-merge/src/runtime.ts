@@ -126,7 +126,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const managed = new Set(cards.filter(card => card.managed === true).map(card => card.name))
         const loadedState = await loadMergeState(deps.io, deps.home)
         const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
-        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || !canRetry(row)).map(row => row.pairKey))
+        const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse' || !canRetry(row)).map(row => row.pairKey))
         const conflictNotes = loadedState.state.rows
           .filter(row => row.state === 'pending' || row.state === 'approved' || row.state === 'fuse' || row.state === 'skipped')
           .map(row => 'conflict:' + row.state + ':' + row.pairKey + ':' + row.id)

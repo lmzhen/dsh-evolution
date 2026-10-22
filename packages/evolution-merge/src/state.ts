@@ -103,7 +103,7 @@ export async function upsertRow(io: EvolutionIoLike, home: string, now: () => nu
     if (current !== undefined && expect !== 'any' && (expect === 'absent' || queueOf(current.state) !== expect)) {
       return { rows, result: { ok: false, current } }
     }
-    if (current === undefined && expect !== 'any' && expect !== 'absent') {
+    if (current === undefined && expect !== 'any' && expect !== 'absent' && expect !== 'verify') {
       return { rows, result: { ok: false, current: row } }
     }
     const normalized: MergeRow = { ...row, queue: queueOf(row.state) }

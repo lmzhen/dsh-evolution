@@ -116,7 +116,8 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       const created = transition(undefined, { type: 'candidate', a: candidate.a, b: candidate.b, at: at(options.now) })
       if (!created.ok || created.row === null) throw new Error(created.ok ? 'candidate row missing' : created.message)
       row = created.row
-      await upsertRow(options.io, options.home, options.now, row)
+      const placed = await upsertRow(options.io, options.home, options.now, row, 'verify')
+      if (!placed.ok) throw new Error('pair already in ' + placed.current.state)
     } catch (error) {
       totals.failed += 1
       pairs.push({
