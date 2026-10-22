@@ -337,6 +337,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const locked = disabled || busy || clearing !== null
   const titleKey = NAMESPACE_TITLES[namespace] as MessageKey | undefined
   const title = titleKey === undefined ? namespace : t(titleKey)
+  const hintKey: MessageKey | undefined = namespace === 'evolution-merge' ? 'mergeCardHint' : namespace === 'evolution-approval' ? 'approvalCardHint' : undefined
   const keyOf = (field: ClientParamField): string => fieldKeyOf(namespace, field)
   const changed = fields.filter(field => Object.hasOwn(user, keyOf(field))).length
   const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[keyOf(field)])
@@ -406,6 +407,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     ),
     open
       ? createElement('div', { className: 'evolution-param-body' },
+        hintKey === undefined ? null : createElement('p', { className: 'evolution-param-note' }, t(hintKey)),
         disabled ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('readonly')) : null,
         fields.length === 0
           ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('empty'))

@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.7 (patch) — 设置卡文案、create 回滚空目录
+
+> **范围**：写入审批/技能自动合并卡内写明“写入审批=使用中生成/修改；合并审批=两轮工作流”；create 回滚删除空目录。
+> **验证**：merge 70 files/164 tests、settings build；0.30.7 发布后补矩阵/真机。
+
 ## 0.30.6 (patch) — skipped 过期重扫、损坏 note 可见、错误 stage/run id
 
 > **范围**：scan held 排除 skipped，过期 skipped 先 restore 再落 verify；pair 先清 skipped；status/pending/candidates/skipped 显示 state note；runtime/target 错误第二行支持 stage/run id 且不回正文。

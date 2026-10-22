@@ -74,6 +74,10 @@ export async function recoverCommitJournals(
         }
         if (snapshot.create && snapshot.targetBody === null) {
           try { await io.remove(skillBodyPath(skillRoot, snapshot.target)) } catch { /* already gone */ }
+          try {
+            const dir = join(skillRoot, snapshot.target)
+            if ((await io.list(dir)).length === 0) await io.remove(dir)
+          } catch { /* absent or non-empty */ }
         } else if (snapshot.targetBody !== null) {
           await io.writeText(skillBodyPath(skillRoot, snapshot.target), snapshot.targetBody)
         }

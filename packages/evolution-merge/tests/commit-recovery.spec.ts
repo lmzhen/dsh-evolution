@@ -42,6 +42,22 @@ it('trusts a commit receipt over a stale journal', async () => {
   assert.equal(journal.phase, 'committed')
 })
 
+it('removes an empty target directory when rolling back a create', async () => {
+  const home = await tempRoot('dsh-merge-recovery-empty-'
+  )
+  const io = nodeEvolutionIo()
+  const runId = 'run-1'
+  const root = join(home, 'skills')
+  const snapshot = { runId, target: 'ghost', create: true, sources: ['a'], targetBody: null, sourceBodies: [{ name: 'a', body: 'a' }], at: 'x' }
+  await io.writeText(snapshotPath(home, runId), JSON.stringify(snapshot))
+  const dir = join(root, 'ghost')
+  await io.writeText(join(dir, 'notes.txt'), 'leftover')
+  await io.remove(join(dir, 'notes.txt'))
+  await io.writeText(join(home, 'merge', 'journals', runId + '.json'), JSON.stringify({ runId, target: 'ghost', create: true, sources: ['a'], phase: 'target-written', updatedAt: 'x' }))
+  await recoverCommitJournals(io, home, 1, root)
+  assert.equal(await io.exists(dir), false)
+})
+
 it('skips a journal whose run is still active', async () => {
   const home = await tempRoot('dsh-merge-recovery-active-')
   const io = nodeEvolutionIo()
