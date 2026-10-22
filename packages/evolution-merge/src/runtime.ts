@@ -81,11 +81,15 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       const detached = deps.detached !== false
       if (command.verb === 'pair') {
         const signal = new AbortController().signal
+        if (command.a === command.b) return { ok: false, text: 'merge pair 需要两个不同技能源: ' + command.a }
         const cards = await deps.cards(signal)
         const cardA = cards.find(card => card.name === command.a)
         const cardB = cards.find(card => card.name === command.b)
         if (cardA === undefined || cardB === undefined || cardA.managed !== true || cardB.managed !== true) {
           return { ok: false, text: 'merge pair 仅支持 family-managed 技能: ' + command.a + ' / ' + command.b }
+        }
+        if (cardA.protectedBy != null || cardB.protectedBy != null || cardA.protectionUnknown === true || cardB.protectionUnknown === true) {
+          return { ok: false, text: 'merge pair 不接受受保护/保护状态未知技能: ' + command.a + ' / ' + command.b }
         }
         const pair = [{ a: command.a, b: command.b }]
         const existing = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === pairKey(command.a, command.b))
@@ -126,7 +130,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'scan') {
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
-        const managed = new Set(cards.filter(card => card.managed === true).map(card => card.name))
+        const managed = new Set(cards.filter(card => card.managed === true && card.protectedBy == null).map(card => card.name))
         const loadedState = await loadMergeState(deps.io, deps.home)
         const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
         const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse' || !canRetry(row)).map(row => row.pairKey))
