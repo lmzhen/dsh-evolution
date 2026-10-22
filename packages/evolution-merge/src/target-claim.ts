@@ -11,15 +11,13 @@ function claimPath(home: string, target: string): string {
 }
 
 async function readClaim(io: EvolutionIoLike, home: string, target: string): Promise<Claim | undefined> {
-  try {
-    const raw = await io.readText(claimPath(home, target))
-    if (raw === null) return undefined
-    const parsed = JSON.parse(raw) as Partial<Claim>
-    if (typeof parsed.token !== 'string' || typeof parsed.expiresAt !== 'number') return undefined
-    return { id: 'claim', token: parsed.token, expiresAt: parsed.expiresAt }
-  } catch {
-    return undefined
-  }
+  const path = claimPath(home, target)
+  if (!(await io.exists(path))) return undefined
+  const raw = await io.readText(path)
+  if (raw === null) return undefined
+  const parsed = JSON.parse(raw) as Partial<Claim>
+  if (typeof parsed.token !== 'string' || typeof parsed.expiresAt !== 'number') throw new Error('corrupt target claim: ' + target)
+  return { id: 'claim', token: parsed.token, expiresAt: parsed.expiresAt }
 }
 
 export interface TargetClaim {
