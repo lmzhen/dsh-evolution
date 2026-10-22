@@ -8,7 +8,7 @@ import { assembleStagedCommit, type CommitAssemblyPort } from './commit-assembly
 import { writeCommitReceipt, type CommitReceipt } from './commit-receipt.ts'
 import { pairKey } from './contracts.ts'
 import { writeJournal } from './domain/commit-journal-store.ts'
-import { writeCommitSnapshot } from './commit-snapshot.ts'
+import { snapshotPath, writeCommitSnapshot } from './commit-snapshot.ts'
 
 export interface CommitPort extends CommitAssemblyPort {
   commitMerge(plan: CommitMergePlan): Promise<CommitMergeResult>
@@ -68,6 +68,7 @@ export async function commitStagedRun(
   }
   try {
     await writeCommitReceipt(io, home, receipt)
+    try { await io.remove(snapshotPath(home, runId)) } catch { /* committed journal is the record */ }
     return { ok: true, plan: assembled.plan, result, receipt }
   } catch (error) {
     return {
