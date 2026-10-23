@@ -25,6 +25,9 @@ export function parseLedger(raw: string | null): LedgerParseResult {
   let parsed: unknown
   try { parsed = JSON.parse(raw) } catch { return { ok: false, ledger: { schemaVersion: 2, rows: [] }, note: 'invalid json' } }
   const body = parsed as { schemaVersion?: unknown; rows?: unknown }
+  if (typeof body.schemaVersion === 'number' && body.schemaVersion > 2) {
+    return { ok: false, ledger: { schemaVersion: 2, rows: [] }, note: 'merge-state-forward-only' }
+  }
   if (!Array.isArray(body.rows)) return { ok: false, ledger: { schemaVersion: 2, rows: [] }, note: 'rows missing' }
   const rows: MergeRowV2[] = []
   let skipped = 0

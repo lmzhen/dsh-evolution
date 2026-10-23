@@ -31,7 +31,7 @@ interface ParsedState {
 
 function parseState(raw: string | null): ParsedState {
   const parsed = parseLedger(raw)
-  if (!parsed.ok) return { ok: false, rows: [] }
+  if (!parsed.ok) return { ok: false, rows: [], ...(parsed.note === undefined ? {} : { note: parsed.note }) }
   return {
     ok: true,
     rows: parsed.ledger.rows as MergeRow[],

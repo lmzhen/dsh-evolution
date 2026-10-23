@@ -15,8 +15,13 @@ export async function handleReadOnlyMergeCommand(
   cards?: readonly { readonly name: string }[],
 ): Promise<string | null> {
   const withNote = (text: string, note: string | undefined): string => note === undefined ? text : 'note: ' + note + '\n' + text
+  const load = async () => {
+    const result = await loadMergeState(io, home)
+    if (result.note === 'merge-state-forward-only') throw new Error('merge-state-forward-only')
+    return result
+  }
   if (command.verb === 'status') {
-    const loaded = await loadMergeState(io, home)
+    const loaded = await load()
     if (command.id !== undefined) {
       const row = loaded.state.rows.find(item => item.id === command.id)
       return withNote(row === undefined ? 'merge row not found: ' + command.id : formatStatus([row]), loaded.note)
@@ -24,19 +29,19 @@ export async function handleReadOnlyMergeCommand(
     return withNote(formatStatus(loaded.state.rows), loaded.note)
   }
   if (command.verb === 'pending') {
-    const loaded = await loadMergeState(io, home)
+    const loaded = await load()
     const rows = command.expired === true ? loaded.state.rows.filter(row => row.expired !== undefined) : loaded.state.rows
     const live = cards === undefined ? rows : rows.filter(row =>
       cards.some(card => card.name === row.a) && cards.some(card => card.name === row.b))
     return withNote(command.expired === true ? formatStatus(live) : formatQueue(live, 'pending'), loaded.note)
   }
   if (command.verb === 'candidates') {
-    const loaded = await loadMergeState(io, home)
+    const loaded = await load()
     const rows = command.retry === true ? loaded.state.rows.filter(row => row.state === 'approved') : loaded.state.rows
     return withNote(formatQueue(rows, command.retry === true ? 'fuse' : 'verify'), loaded.note)
   }
   if (command.verb === 'skipped') {
-    const loaded = await loadMergeState(io, home)
+    const loaded = await load()
     return withNote(formatQueue(loaded.state.rows, 'skipped'), loaded.note)
   }
   return null
