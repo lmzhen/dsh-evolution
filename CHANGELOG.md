@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.17 (patch) — forward-only write guard
+
+> **范围**：v3 state 上写路径也 fail-closed：mutateMergeState 拒绝 forward-only/corrupt；scan 读到 !ok 即失败；不改 v3/功能。
+> **验证**：写 sentinel + 0.30.17 安装包 upsert 尝试拒绝、hash 不变。
+
 ## 0.30.16 (patch) — forward-only merge-state guard
 
 > **范围**：仅修旧构建读到未来 schema 的 fail-closed：`schemaVersion > 2` 不解析 rows，读命令返回错误；不改 v3、不改功能。

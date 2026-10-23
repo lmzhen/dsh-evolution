@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-activity",
   "description": "Durable activity store for self-evolution plan outcomes",
-  "version": "0.30.16",
+  "version": "0.30.17",
   "publishConfig": {
     "access": "public"
   },

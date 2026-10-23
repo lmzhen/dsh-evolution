@@ -73,6 +73,7 @@ export async function mutateMergeState<T>(
   await transactIo(io, mergeStatePath(home), (current) => {
     ran = true
     const parsed = parseState(current)
+    if (!parsed.ok || parsed.note === 'merge-state-forward-only') throw new Error(parsed.note ?? 'merge-state-invalid')
     const out = fn(parsed.rows)
     result = out.result
     return JSON.stringify({ schemaVersion: MERGE_STATE_VERSION, rows: out.rows }, null, 2)

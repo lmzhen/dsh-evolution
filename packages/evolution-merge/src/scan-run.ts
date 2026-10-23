@@ -91,6 +91,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
   const stage = options.stage ?? (async () => {})
   const candidates = await options.ports.screening(options.signal)
   const before = await loadMergeState(options.io, options.home)
+  if (!before.ok) throw new Error(before.note ?? 'merge-state-invalid')
   const queueBefore = { verify: 0, pending: 0, fuse: 0, skipped: 0 }
   for (const row of before.state.rows) queueBefore[row.queue] += 1
   const startedAt = options.startedAt ?? options.now()
