@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.16 (patch) — forward-only merge-state guard
+
+> **范围**：仅修旧构建读到未来 schema 的 fail-closed：`schemaVersion > 2` 不解析 rows，读命令返回错误；不改 v3、不改功能。
+> **验证**：merge guard tests；0.30.16 发布后真实安装包 sentinel。
+
 ## 0.30.15 (patch) — resume fuse/approved owner 守卫
 
 > **范围**：resume 的 fuse/approved 分支拒绝活 owner；无 id 自动选行跳过活 owner；verify resume 透传 isOwnerActive。
