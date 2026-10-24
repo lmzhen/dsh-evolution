@@ -18,15 +18,18 @@ import type { EvolutionIoLike } from './io.ts'
 
 export interface TreeLockRecord {
   readonly token: string
+  readonly epoch: number
   readonly pid: number
   readonly startedAt: number
 }
 
 export interface TreeLock {
   readonly token: string
+  readonly epoch: number
   readonly path: string
   readonly acquiredAt: number
   release(): Promise<void>
+  assertHeld(): Promise<boolean>
 }
 
 export type TreeLockAcquireResult =
@@ -55,7 +58,7 @@ function parseLock(raw: string | null): TreeLockRecord | undefined {
   try {
     const value = JSON.parse(raw) as Partial<TreeLockRecord>
     if (typeof value.token !== 'string' || typeof value.pid !== 'number' || typeof value.startedAt !== 'number') return undefined
-    return { token: value.token, pid: value.pid, startedAt: value.startedAt }
+    return { token: value.token, epoch: typeof value.epoch === 'number' ? value.epoch : 0, pid: value.pid, startedAt: value.startedAt }
   } catch {
     return undefined
   }
@@ -69,9 +72,10 @@ export async function readTreeLock(io: EvolutionIoLike, home: string): Promise<T
 }
 
 /** Try once. A stale record (dead pid or unparsable) is replaced. */
-async function tryAcquire(io: EvolutionIoLike, home: string, now: () => number): Promise<{ token?: string; holder?: TreeLockRecord }> {
+async function tryAcquire(io: EvolutionIoLike, home: string, now: () => number): Promise<{ token?: string; epoch?: number; holder?: TreeLockRecord }> {
   const path = treeLockFile(home)
   let token: string | undefined
+  let epoch: number | undefined
   let holder: TreeLockRecord | undefined
   await transactIo(io, path, (current) => {
     const existing = parseLock(current)
@@ -79,11 +83,12 @@ async function tryAcquire(io: EvolutionIoLike, home: string, now: () => number):
       holder = existing
       return current
     }
-    // Absent, corrupt, our own stale row, or a dead owner: take it.
+    // Absent, corrupt, our own stale row, or a dead owner: take it and bump the epoch.
     token = randomUUID()
-    return JSON.stringify({ token, pid: process.pid, startedAt: now() })
+    epoch = (existing?.epoch ?? 0) + 1
+    return JSON.stringify({ token, epoch, pid: process.pid, startedAt: now() })
   })
-  return token === undefined ? (holder === undefined ? {} : { holder }) : { token }
+  return token === undefined ? (holder === undefined ? {} : { holder }) : { token, epoch: epoch ?? 0 }
 }
 
 /**
@@ -104,18 +109,24 @@ export async function acquireTreeWriteLock(options: TreeLockOptions): Promise<Tr
       const attempt = await tryAcquire(options.io, options.home, now)
       if (attempt.token !== undefined) {
         const token = attempt.token
+        const epoch = attempt.epoch ?? 0
         const path = treeLockFile(options.home)
         let released = false
         const lock: TreeLock = {
           token,
+          epoch,
           path,
           acquiredAt: now(),
+          async assertHeld() {
+            const current = parseLock(await options.io.readText(path))
+            return current?.token === token && current.epoch === epoch
+          },
           async release() {
             if (released) return
             released = true
             await transactIo(options.io, path, (current) => {
               const existing = parseLock(current)
-              return existing?.token === token ? null : current
+              return existing?.token === token && existing.epoch === epoch ? null : current
             })
           },
         }

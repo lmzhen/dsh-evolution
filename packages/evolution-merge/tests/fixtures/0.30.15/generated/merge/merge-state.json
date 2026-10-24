@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 2,
+  "rows": [
+    {
+      "id": "mr_0z2h4bn",
+      "pairKey": "alpha-skill\u0000beta-skill",
+      "a": "alpha-skill",
+      "b": "beta-skill",
+      "state": "verify",
+      "queue": "verify",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z"
+    },
+    {
+      "id": "mr_1nd1j6k",
+      "pairKey": "delta-skill\u0000gamma-skill",
+      "a": "gamma-skill",
+      "b": "delta-skill",
+      "state": "pending",
+      "queue": "pending",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "gamma-skill",
+        "sources": [
+          "gamma-skill",
+          "delta-skill"
+        ],
+        "rationale": "same"
+      }
+    },
+    {
+      "id": "mr_1jvzv8l",
+      "pairKey": "epsilon-skill\u0000zeta-skill",
+      "a": "epsilon-skill",
+      "b": "zeta-skill",
+      "state": "approved",
+      "queue": "fuse",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "gamma-skill",
+        "sources": [
+          "gamma-skill",
+          "delta-skill"
+        ],
+        "rationale": "same"
+      }
+    },
+    {
+      "id": "mr_0zlm877",
+      "pairKey": "eta-skill\u0000theta-skill",
+      "a": "eta-skill",
+      "b": "theta-skill",
+      "state": "fuse",
+      "queue": "fuse",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "gamma-skill",
+        "sources": [
+          "gamma-skill",
+          "delta-skill"
+        ],
+        "rationale": "same"
+      },
+      "stagingRef": "run-1/pairs/abc"
+    },
+    {
+      "id": "mr_03nbzct",
+      "pairKey": "iota-skill\u0000kappa-skill",
+      "a": "iota-skill",
+      "b": "kappa-skill",
+      "state": "skipped",
+      "queue": "skipped",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "reason": "agent keep",
+      "origin": "agent"
+    }
+  ]
+}

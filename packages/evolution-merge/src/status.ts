@@ -3,6 +3,7 @@
  * writes, no report reads. The UI and command parser share this vocabulary.
  */
 import type { MergeQueue, MergeRow } from './contracts.ts'
+import type { Facts, RunsView } from './wire.ts'
 import { queueOf, stageOf } from './contracts.ts'
 import { fitToolText } from './presentation-budget.ts'
 
@@ -32,6 +33,21 @@ export function formatStatus(rows: readonly MergeRow[]): string {
   ]
   for (const row of rows) lines.push('- ' + describe(row))
   return fitToolText(lines.join('\n'))
+}
+
+export function formatFacts(facts: Facts): string {
+  const lines = [
+    'merge: verify ' + String(facts.counts.active.verify) + ', pending ' + String(facts.counts.active.pending) + ', fuse ' + String(facts.counts.active.fuse) + ', skipped ' + String(facts.counts.active.skipped) + ', expired ' + String(facts.counts.expired),
+  ]
+  if (facts.active !== null) lines.push('active: ' + facts.active.id + ' [' + facts.active.state + ']')
+  if (facts.last !== null) lines.push('last: ' + facts.last.id + ' [' + facts.last.state + ']')
+  if (facts.degraded) lines.push('degraded: ' + facts.notes.join(','))
+  return fitToolText(lines.join('\n'))
+}
+
+export function formatRunsView(view: RunsView): string {
+  if (view.runs.length === 0) return 'merge runs: empty'
+  return fitToolText(['merge runs: ' + String(view.runs.length)].concat(view.runs.map(run => '- ' + run.id + ' [' + run.state + ']' + (run.endedAt === undefined ? '' : ' ' + new Date(run.endedAt).toISOString()))).join('\n'))
 }
 
 export function formatQueue(rows: readonly MergeRow[], queue: MergeQueue): string {

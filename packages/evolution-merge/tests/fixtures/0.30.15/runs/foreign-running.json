@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "runs": [
+    {
+      "id": "run-foreign",
+      "kind": "merge",
+      "command": "scan",
+      "state": "running",
+      "pid": 999999,
+      "startedAt": 1760000000000
+    }
+  ]
+}

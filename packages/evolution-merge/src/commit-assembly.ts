@@ -16,6 +16,8 @@ export interface CommitAssemblyPort {
   readSkill(name: string): Promise<string | null>
   /** Whether the name is already occupied by an archived (tombstoned) skill. */
   isArchived?(name: string): Promise<boolean>
+  /** Whether a directory exists for the name (including a SKILL.md-less ghost). */
+  isNameOccupied?(name: string): Promise<boolean>
 }
 
 export interface CommitAssemblyOptions {
@@ -41,13 +43,18 @@ export async function assembleStagedCommit(
   const requested = staging.value.manifest.target
   let target = requested
   let targetCurrent = await port.readSkill(requested)
+  if (staging.value.manifest.mode !== 'create-umbrella' && targetCurrent === null) {
+    return { ok: false, message: 'target is gone; refusing to re-create it: ' + requested }
+  }
   const requestedArchived = targetCurrent === null && await port.isArchived?.(requested) === true
-  if (staging.value.manifest.mode === 'create-umbrella' && (targetCurrent !== null || requestedArchived)) {
+  const requestedOccupied = targetCurrent === null && await port.isNameOccupied?.(requested) === true
+  if (staging.value.manifest.mode === 'create-umbrella' && (targetCurrent !== null || requestedArchived || requestedOccupied)) {
     target = requested
     for (let suffix = 2; suffix <= 99; suffix += 1) {
       const candidate = requested + '-v' + String(suffix)
       if (await port.readSkill(candidate) === null
-        && await port.isArchived?.(candidate) !== true) {
+        && await port.isArchived?.(candidate) !== true
+        && await port.isNameOccupied?.(candidate) !== true) {
         target = candidate
         targetCurrent = null
         break

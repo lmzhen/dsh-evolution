@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 0,
+  "runs": [
+    {
+      "id": "run-old",
+      "kind": "merge",
+      "state": "succeeded"
+    }
+  ]
+}

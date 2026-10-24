@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "runId": "run-legacy",
+  "target": "legacy",
+  "mode": "create-umbrella",
+  "sources": [
+    "a",
+    "b"
+  ],
+  "promptVersion": "1",
+  "createdAt": 1760000000000,
+  "expiresAt": 1760604800000
+}

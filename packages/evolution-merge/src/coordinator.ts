@@ -2,7 +2,7 @@
  * Pure merge transition table. No io, no run shell, no subagents.
  *
  * Every transition returns the whole next row (or a drop), so the caller can persist it
- * through mutateMergeState in one transaction. Invalid transitions are refused by name;
+ * through one state transaction. Invalid transitions are refused by name;
  * a caller never "repairs" a row by guessing which state the operator meant.
  */
 import {
@@ -80,7 +80,8 @@ function next(row: MergeRow, at: string, state: MergeRow['state'], patch: Partia
   }
 }
 
-export function transition(current: MergeRow | undefined, event: MergeEvent): TransitionResult {
+/** Legacy v2 projection only; runtime writes must use transitionV3/RowTx. */
+export function transitionLegacyForProjection(current: MergeRow | undefined, event: MergeEvent): TransitionResult {
   if (event.type === 'candidate') {
     if (current !== undefined) return { ok: true, row: current }
     const key = pairKey(event.a, event.b)

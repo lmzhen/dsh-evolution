@@ -10,7 +10,7 @@ it('serves read-only verbs through the runtime', async () => {
   const home = await tempRoot('dsh-merge-runtime-')
   const io = nodeEvolutionIo()
   const deps: MergeRuntimeDeps = {
-    io, home, registry: { begin: async () => { throw new Error('not used') } } as unknown as MergeRuntimeDeps['registry'],
+    io, home, registry: { begin: async () => { throw new Error('not used') }, runs: () => [], find: () => undefined, cancel: () => false, cancelAll: () => 0 } as unknown as MergeRuntimeDeps['registry'],
     skills: {} as SkillLibrary, now: () => 1,
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },

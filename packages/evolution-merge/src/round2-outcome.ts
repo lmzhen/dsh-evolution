@@ -3,9 +3,9 @@
  * row is dropped (commit landed) or kept in fuse with a failure. No report/registry logic.
  */
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { transition } from './coordinator.ts'
+import { v3ToLegacy } from './domain/row-v3-bridge.ts'
 import type { MergeFailure, MergeReportPair, MergeRow } from './contracts.ts'
-import { dropRow, upsertRow } from './state.ts'
+import { dropRowV3, transactRows } from './state.ts'
 import { recordPair } from './domain/pair-index-store.ts'
 import type { ScanRound2Outcome } from './scan-run.ts'
 
@@ -21,11 +21,11 @@ export async function recordRound2Outcome(
   row: MergeRow,
   outcome: ScanRound2Outcome,
 ): Promise<Round2Record> {
-  const at = new Date(now()).toISOString()
+  void now
   if (outcome.kind === 'merged') {
-    const success = transition(row, { type: 'round2-success', at })
-    if (success.ok) {
-      await dropRow(io, home, now, row.id)
+    {
+      const dropped = await dropRowV3(io, home, row.id, 'committed', outcome.unitId ?? 'unknown')
+      if (!dropped) return { merged: false, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, outcome: 'failed', archived: [], failure: { stage: 'commit', code: 'row-changed', message: 'row changed before commit record', retryable: true, retryFrom: 'agent2' } } }
       const target = outcome.target?.actual ?? outcome.target?.requested ?? row.decision?.target
       await recordPair(io, home, {
         pairKey: row.pairKey,
@@ -47,9 +47,14 @@ export async function recordRound2Outcome(
     }
   }
   const failure: MergeFailure = outcome.failure ?? { stage: 'author', code: 'merge-failed', message: 'round2 failed', retryable: true, retryFrom: 'agent2' }
-  const next = transition(row, { type: 'round2-fail', failure, at })
-  if (next.ok && next.row !== null) {
-    await upsertRow(io, home, now, next.row)
+  const projected = await transactRows(io, home, tx => {
+    const current = tx.rows().find(item => item.id === row.id)
+    if (current === undefined) return null
+    const moved = tx.transition(row.id, { type: 'failed', failure }, current.version)
+    return moved.ok && moved.row !== null ? v3ToLegacy(moved.row) : null
+  })
+  if (projected === null) return { merged: false, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, outcome: 'failed', archived: [], failure: { ...failure, code: 'row-changed', message: 'row changed before failure record' } } }
+  {
     await recordPair(io, home, {
       pairKey: row.pairKey,
       runId: row.runId ?? 'merge',

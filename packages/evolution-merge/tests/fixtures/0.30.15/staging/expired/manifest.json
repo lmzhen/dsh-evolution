@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "runId": "run-expired",
+  "target": "expired",
+  "mode": "merge-into-existing",
+  "sources": [
+    "a"
+  ],
+  "promptVersion": "1",
+  "createdAt": 1,
+  "expiresAt": 2
+}

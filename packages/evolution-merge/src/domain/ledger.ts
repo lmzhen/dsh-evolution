@@ -1,6 +1,8 @@
 /** Pure v2 ledger normalization/projection. No IO. */
 import { migrateV1Row, type LegacyMergeRow } from './migrate-v1.ts'
 import type { MergeRowV2 } from './row.ts'
+import { isV3Row } from './row-v3.ts'
+import { v3ToLegacy } from './row-v3-bridge.ts'
 import { queueOf, type MergeQueue } from './state.ts'
 
 export interface LedgerV2 {
@@ -25,7 +27,17 @@ export function parseLedger(raw: string | null): LedgerParseResult {
   let parsed: unknown
   try { parsed = JSON.parse(raw) } catch { return { ok: false, ledger: { schemaVersion: 2, rows: [] }, note: 'invalid json' } }
   const body = parsed as { schemaVersion?: unknown; rows?: unknown }
+  if (typeof body.schemaVersion === 'number' && body.schemaVersion > 3) {
+    return { ok: false, ledger: { schemaVersion: 2, rows: [] }, note: 'merge-state-forward-only' }
+  }
   if (!Array.isArray(body.rows)) return { ok: false, ledger: { schemaVersion: 2, rows: [] }, note: 'rows missing' }
+  if (body.schemaVersion === 3) {
+    if (!body.rows.every(isV3Row)) {
+      const v3Like = body.rows.some(row => row !== null && typeof row === 'object' && 'pairKey' in row && 'version' in row)
+      return { ok: false, ledger: { schemaVersion: 2, rows: [] }, note: v3Like ? 'merge-state-needs-repair' : 'merge-state-forward-only' }
+    }
+    return { ok: true, ledger: { schemaVersion: 2, rows: body.rows.map(v3ToLegacy) } }
+  }
   const rows: MergeRowV2[] = []
   let skipped = 0
   for (const value of body.rows) {

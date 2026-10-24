@@ -19,9 +19,10 @@ unit undo.
 ## Models
 
 The engine needs local `potion-multilingual-128M-int8` and
-`potion-multilingual-128M-pca64-int8` directories under `mergeModelsRoot`
-(falling back to `SKILL_MERGE_MODELS_ROOT`). No auto provisioning; missing
-models fail loud and `/evolution doctor` warns.
+`potion-multilingual-128M-pca64-int8` directories under `mergeModelsRoot`.
+No auto provisioning; missing models fail loud and `/evolution doctor` warns.
+`SKILL_MERGE_MODELS_ROOT` is an engine-internal test/CLI knob, not a host
+configuration surface.
 
 ## Read-only panel
 

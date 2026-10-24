@@ -35,6 +35,11 @@
 export * from './citations.ts'
 // G1/1.1: the ONE authority behind a write (its type and the authorityFrom builder).
 export * from './tree-write.ts'
+export * from './unit-storage.ts'
+export * from './unit-journal.ts'
+export * from './unit-transaction.ts'
+export * from './unit-backend.ts'
+export * from './unit-recovery.ts'
 export * from './package-identity.ts'
 export * from './write-authority.ts'
 export * from './write-gates.ts'

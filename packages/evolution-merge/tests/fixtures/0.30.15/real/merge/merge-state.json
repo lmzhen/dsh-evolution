@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 2,
+  "rows": [
+    {
+      "id": "mr_18yav5v",
+      "pairKey": "alpha\u0000beta",
+      "a": "alpha",
+      "b": "beta",
+      "state": "verify",
+      "queue": "verify",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z"
+    },
+    {
+      "id": "mr_14u2j2w",
+      "pairKey": "delta\u0000gamma",
+      "a": "gamma",
+      "b": "delta",
+      "state": "pending",
+      "queue": "pending",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "gamma",
+        "sources": [
+          "gamma",
+          "delta"
+        ],
+        "rationale": "same"
+      }
+    },
+    {
+      "id": "mr_0i63cut",
+      "pairKey": "epsilon\u0000zeta",
+      "a": "epsilon",
+      "b": "zeta",
+      "state": "approved",
+      "queue": "fuse",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "epsilon",
+        "sources": [
+          "epsilon",
+          "zeta"
+        ],
+        "rationale": "same"
+      }
+    },
+    {
+      "id": "mr_0rv0yij",
+      "pairKey": "eta\u0000theta",
+      "a": "eta",
+      "b": "theta",
+      "state": "fuse",
+      "queue": "fuse",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "eta",
+        "sources": [
+          "eta",
+          "theta"
+        ],
+        "rationale": "same"
+      },
+      "stagingRef": "run-1/pairs/abc"
+    },
+    {
+      "id": "mr_0r8rdld",
+      "pairKey": "iota\u0000kappa",
+      "a": "iota",
+      "b": "kappa",
+      "state": "skipped",
+      "queue": "skipped",
+      "createdAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "reason": "agent keep",
+      "origin": "agent"
+    }
+  ]
+}

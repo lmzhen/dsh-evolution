@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "rows": [
+    {
+      "id": "mr_fail",
+      "pairKey": "a\u0000b",
+      "a": "a",
+      "b": "b",
+      "state": "approved",
+      "queue": "fuse",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "a",
+        "sources": [
+          "a",
+          "b"
+        ],
+        "rationale": "same"
+      },
+      "failure": {
+        "stage": "commit",
+        "code": "commit-failed",
+        "message": "round2 failed",
+        "retryable": true
+      },
+      "createdAt": "2026-10-20T00:00:00.000Z",
+      "updatedAt": "2026-10-20T00:00:00.000Z"
+    }
+  ]
+}

@@ -18,6 +18,7 @@ export interface MergeRowV2 {
   readonly unitId?: string
   readonly origin?: 'agent' | 'human' | 'system'
   readonly attempts?: number
+  readonly version?: number
   readonly stagingRef?: string
   readonly stagingExpiresAt?: number
   readonly target?: { readonly requested: string; readonly actual?: string; readonly created?: boolean }

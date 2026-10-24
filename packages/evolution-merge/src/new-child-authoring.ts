@@ -2,7 +2,7 @@
  * Round2 with a NEW child (approval after the pending window). The child gets the round2
  * prompt and writes the staging tree; the plugin then runs the same gate/commit path.
  */
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike, UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeDecision, MergeRow } from './contracts.ts'
 import type { SkillCard } from './skill-card.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
@@ -27,8 +27,10 @@ export interface NewChildAuthoringOptions {
   readonly timeoutMs: number
   readonly commitPort: CommitPort
   readonly now: () => number
+  readonly isBlocked?: (name: string) => boolean | Promise<boolean>
   readonly onChild?: (context: StageToolContext) => void
   readonly onChildClosed?: (childId: string) => void
+  readonly unit?: UnitTransaction | undefined
 }
 
 export async function runNewChildAuthoring(
@@ -38,7 +40,12 @@ export async function runNewChildAuthoring(
   signal: AbortSignal,
 ): Promise<ScanRound2Outcome> {
   const targetCard = options.cards.find(card => card.name === decision.target)
-  if (targetCard?.protectionUnknown === true || targetCard?.protectedBy === 'pinned') return { kind: 'failed', failure: { stage: 'author', code: 'target-pinned', message: 'target is pinned: ' + decision.target, retryable: false, retryFrom: 'none' } }
+  const createMode = decision.mode === 'create-umbrella'
+  if (!createMode && targetCard !== undefined) {
+    if (targetCard.managed !== true) return { kind: 'failed', failure: { stage: 'author', code: 'target-not-managed', message: 'target is not family-managed: ' + decision.target, retryable: false, retryFrom: 'none' } }
+    if (targetCard.protectionUnknown === true || targetCard.protectedBy != null) return { kind: 'failed', failure: { stage: 'author', code: 'target-protected', message: 'target is protected: ' + decision.target, retryable: false, retryFrom: 'none' } }
+  }
+  if (!createMode && await options.isBlocked?.(decision.target) === true) return { kind: 'failed', failure: { stage: 'author', code: 'target-blocked', message: 'target is blocked by curator: ' + decision.target, retryable: false, retryFrom: 'none' } }
   const stageKey = row.stagingRef ?? stageKeyOf(options.runId, pairKey(row.a, row.b))
   const existing = await readStaging(options.io, options.home, stageKey)
   if (existing.kind === 'present') {
@@ -84,7 +91,11 @@ export async function runNewChildAuthoring(
     if (tree.kind !== 'present') return { kind: 'failed', failure: { stage: 'author', code: 'staging-missing', message: tree.kind === 'unknown' ? tree.reason : 'staged tree absent', retryable: true, retryFrom: 'agent2' } }
     const findings = validateStagedTree(tree.value)
     if (hasBlockingFinding(findings)) return { kind: 'failed', failure: { stage: 'validate', code: 'rule-gate', message: 'staged tree failed the rule gate', retryable: true, retryFrom: 'agent2' } }
-    const commit = await commitStagedRun(options.io, options.home, stageKey, options.commitPort, { origin: 'subagent', summary: 'merge ' + row.a + ' + ' + row.b, now: options.now })
+    const commit = await commitStagedRun(options.io, options.home, stageKey, options.commitPort, {
+      origin: 'foreground', summary: 'merge ' + row.a + ' + ' + row.b, now: options.now,
+      ...(options.isBlocked === undefined ? {} : { isBlocked: options.isBlocked }),
+      ...(options.unit === undefined ? {} : { unit: options.unit }),
+    })
     if (!commit.ok) return { kind: 'failed', failure: { stage: 'commit', code: 'commit-failed', message: commit.message, retryable: true, retryFrom: 'agent2' } }
     const receipt = commit.receipt
     return {

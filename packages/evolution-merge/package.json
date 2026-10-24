@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-merge",
   "description": "Skill auto-merge domain: screening, two-round authoring, queues and commit orchestration",
-  "version": "0.30.15",
+  "version": "0.30.18",
   "publishConfig": {
     "access": "public"
   },
@@ -22,15 +22,19 @@
   },
   "files": [
     "lib/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "data/**/*"
   ],
   "license": "MIT",
+  "scripts": {
+    "verify:publish-manifest": "node scripts/verify-publish-manifest.mjs"
+  },
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-core": "0.30.18",
     "@deepseek-ai/dsh-evolution-merge-engine": "workspace:^",
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "^4.0.5"
   }
 }

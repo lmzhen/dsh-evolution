@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.18 (patch) — RG8 release: v3 origin + test parity
+
+> **范围**：runtime reject 保留 origin=human；12 个旧 characterization 测试移植到 v2 模块；engine 精确依赖 0.30.18；全量 merge suite 133/328。
+> **验证**：RG0–RG7 pass；RG8 tech-accept；candidate 0.30.18。
+
 ## 0.30.15 (patch) — resume fuse/approved owner 守卫
 
 > **范围**：resume 的 fuse/approved 分支拒绝活 owner；无 id 自动选行跳过活 owner；verify resume 透传 isOwnerActive。

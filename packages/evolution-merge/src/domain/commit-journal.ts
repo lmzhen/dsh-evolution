@@ -12,7 +12,7 @@ export interface CommitJournal {
 }
 
 const NEXT: Record<JournalPhase, readonly JournalPhase[]> = {
-  prepared: ['target-written', 'failed'],
+  prepared: ['committed', 'target-written', 'failed'],
   'target-written': ['sources-archived', 'rolled-back', 'failed'],
   'sources-archived': ['committed', 'rolled-back', 'failed'],
   committed: [],

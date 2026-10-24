@@ -21,6 +21,8 @@ export interface RunResumeCommandOptions {
   readonly round2WithRun?: (row: MergeRow, decision: MergeDecision, signal: AbortSignal, runId: string) => Promise<ScanRound2Outcome>
   readonly rowId: string
   readonly platformWrite: boolean
+  readonly detached?: boolean
+  readonly pairTimeoutMinutes?: number
   readonly timeoutMinutes?: number
   readonly now: () => number
   readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
@@ -37,6 +39,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
     return await runScanCommand({
       io: options.io, home: options.home, registry: options.registry,
       approval: true, platformWrite: options.platformWrite, now: options.now,
+      ...(options.detached === true ? { detached: true } : {}),
       ...(options.makePorts === undefined
         ? { ports: { ...options.ports, screening: () => Promise.resolve([{ a: row.a, b: row.b }]) } }
         : {
@@ -56,9 +59,10 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
   }
   const decision = row.decision
   if (decision === undefined) return { ok: false, message: 'fuse row has no decision' }
-  return await withMergeRun({
+  const result = await withMergeRun({
     io: options.io, home: options.home, registry: options.registry,
     command: 'resume', approval: { platformWrite: options.platformWrite, mergeApproval: true }, now: options.now,
+    ...(options.detached === true ? { detached: true } : {}),
     async body(ctx) {
       await ctx.stage('author', { done: 0, total: 1 })
       let outcome
@@ -79,4 +83,5 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       }
     },
   })
+  return result
 }

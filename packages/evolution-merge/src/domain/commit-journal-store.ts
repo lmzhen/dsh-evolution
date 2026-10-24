@@ -9,7 +9,9 @@ export function journalPath(home: string, runId: string): string {
 
 export async function writeJournal(io: EvolutionIoLike, home: string, journal: CommitJournal): Promise<string> {
   const path = journalPath(home, journal.runId)
-  await io.writeText(path, JSON.stringify(journal, null, 2))
+  const content = JSON.stringify(journal, null, 2)
+  if (io.transact !== undefined) await io.transact(path, () => content)
+  else await io.writeText(path, content)
   return path
 }
 

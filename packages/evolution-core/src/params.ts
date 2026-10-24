@@ -300,7 +300,7 @@ export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
   { id: 'mergeSkippedTtlDays', group: 'merge', tier: 'E3', authority: 'cordis', owner: 'evolution-merge', applies: 'live', docAnchor: 'PARAMETERS.md#merge', summary: 'Days a skipped pair stays out of screening; 0 means it never expires.', label: '无需合并保留天数', hint: '判定无需合并的对，多少天内不再参与筛选；0 表示一直保留。', control: 'number', unit: '天', values: '', card: 'evolution-merge' },
   { id: 'mergeRunTimeoutMinutes', group: 'merge', tier: 'E3', authority: 'cordis', owner: 'evolution-merge', applies: 'live', docAnchor: 'PARAMETERS.md#merge', summary: 'Wall-clock budget of one merge run; 0 means no limit.', label: '单次运行上限', hint: '一次合并运行最多持续多少分钟；0 表示不设上限。', control: 'number', unit: '分钟', values: '', card: 'evolution-merge' },
   { id: 'mergePairTimeoutMinutes', group: 'merge', tier: 'E2', authority: 'cordis', owner: 'evolution-merge', applies: 'none', docAnchor: 'PARAMETERS.md#merge', summary: 'Wall-clock budget of one pair round (a stuck child guard).', why: 'internal' },
-  { id: 'mergeModelsRoot', group: 'merge', tier: 'E2', authority: 'cordis', owner: 'evolution-merge', applies: 'none', docAnchor: 'PARAMETERS.md#merge', summary: 'Local model root containing the int8 and pca64 model directories; empty falls back to SKILL_MERGE_MODELS_ROOT. No auto provisioning.', why: 'path' },
+  { id: 'mergeModelsRoot', group: 'merge', tier: 'E2', authority: 'cordis', owner: 'evolution-merge', applies: 'none', docAnchor: 'PARAMETERS.md#merge', summary: 'Local model root containing the int8 and pca64 model directories; no env fallback. No auto provisioning.', why: 'path' },
 ])
 
 /** The settings namespace each OWNER PACKAGE registers (design §7.2).

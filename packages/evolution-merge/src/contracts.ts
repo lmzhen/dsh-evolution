@@ -5,7 +5,7 @@
  * queue and keeps the stage as a chip. The API queue must never expose the raw state.
  */
 
-export const MERGE_STATE_VERSION = 2
+export const MERGE_STATE_VERSION = 3
 
 export type MergePairState = 'verify' | 'pending' | 'approved' | 'fuse' | 'skipped'
 export type MergeQueue = 'verify' | 'pending' | 'fuse' | 'skipped'

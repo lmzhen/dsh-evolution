@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "rows": [
+    {
+      "id": "mr_fuse_no_staging",
+      "pairKey": "a\u0000b",
+      "a": "a",
+      "b": "b",
+      "state": "fuse",
+      "queue": "fuse",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "a",
+        "sources": [
+          "a",
+          "b"
+        ],
+        "rationale": "same"
+      },
+      "createdAt": "2026-10-20T00:00:00.000Z",
+      "updatedAt": "2026-10-20T00:00:01.000Z"
+    }
+  ]
+}

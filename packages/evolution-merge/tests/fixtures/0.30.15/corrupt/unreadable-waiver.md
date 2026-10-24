@@ -1,0 +1,1 @@
+unreadable fixture requires OS-level permissions; waiver recorded for RG1a

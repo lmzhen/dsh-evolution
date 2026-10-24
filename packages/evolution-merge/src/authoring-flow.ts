@@ -3,7 +3,7 @@
  * rule gate, then commit through the injected CommitPort. The channel adapter and the
  * author tool live outside; this is the seam they share.
  */
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike, UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
 import { createStaging, setStagingTarget } from './staging.ts'
 import { readStagedTree } from './staged-tree.ts'
 import { validateStagedTree, hasBlockingFinding, type RuleFinding } from './rules.ts'
@@ -24,6 +24,8 @@ export interface RunAuthoringOptions {
   readonly commitPort: CommitPort
   readonly now: () => number
   readonly summary: string
+  readonly isBlocked?: (name: string) => boolean | Promise<boolean>
+  readonly unit?: UnitTransaction | undefined
 }
 
 export type AuthoringResult =
@@ -32,15 +34,21 @@ export type AuthoringResult =
 
 export async function runAuthoring(options: RunAuthoringOptions): Promise<AuthoringResult> {
   const targetCard = options.cards.find(card => card.name === options.target)
-  if (targetCard?.protectionUnknown === true || targetCard?.protectedBy === 'pinned') return { ok: false, message: 'target is pinned: ' + options.target }
+  const mode = options.mode ?? (targetCard === undefined ? 'create-umbrella' : 'merge-into-existing')
+  const createMode = mode === 'create-umbrella'
+  if (!createMode && targetCard !== undefined) {
+    if (targetCard.managed !== true) return { ok: false, message: 'target is not family-managed: ' + options.target }
+    if (targetCard.protectionUnknown === true || targetCard.protectedBy != null) return { ok: false, message: 'target is protected (' + (targetCard.protectedBy ?? 'unknown') + '): ' + options.target }
+  }
+  if (!createMode && await options.isBlocked?.(options.target) === true) return { ok: false, message: 'target is blocked by curator: ' + options.target }
   const stageKey = options.stageKey ?? options.runId
   if (options.reuseStaging === true) {
-    if (!await setStagingTarget(options.io, options.home, stageKey, options.target, options.mode)) return { ok: false, message: 'staging missing or unreadable: ' + stageKey }
+    if (!await setStagingTarget(options.io, options.home, stageKey, options.target, mode)) return { ok: false, message: 'staging missing or unreadable: ' + stageKey }
   } else {
     const created = await createStaging(options.io, options.home, {
       runId: stageKey,
       target: options.target,
-      ...(options.mode === undefined ? {} : { mode: options.mode }),
+      mode,
       sources: options.cards.map(card => ({ name: card.name, body: card.body, files: card.files ?? [] })),
       promptVersion: 'merge-b/v1',
       ttlDays: 7,
@@ -58,9 +66,11 @@ export async function runAuthoring(options: RunAuthoringOptions): Promise<Author
   const findings = validateStagedTree(tree.value)
   if (hasBlockingFinding(findings)) return { ok: false, message: 'staged tree failed the rule gate', findings }
   const commit = await commitStagedRun(options.io, options.home, stageKey, options.commitPort, {
-    origin: 'subagent',
+    origin: 'foreground',
     summary: options.summary,
     now: options.now,
+    ...(options.isBlocked === undefined ? {} : { isBlocked: options.isBlocked }),
+    ...(options.unit === undefined ? {} : { unit: options.unit }),
   })
   if (!commit.ok) return { ok: false, message: commit.message }
   return { ok: true, tree: tree.value, commit }

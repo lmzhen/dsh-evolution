@@ -1,0 +1,1 @@
+staging directory without manifest (fixture)

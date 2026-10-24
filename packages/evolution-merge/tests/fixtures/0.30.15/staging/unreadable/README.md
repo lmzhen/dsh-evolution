@@ -1,0 +1,1 @@
+unreadable staging is represented as a corrupt manifest in this fixture

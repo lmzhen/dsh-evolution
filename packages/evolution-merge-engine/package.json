@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-merge-engine",
   "description": "Vendored skill-merge Node pipeline engine (byte-identical upstream) for DSH evolution-merge",
-  "version": "0.30.15",
+  "version": "0.30.18",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -15,6 +15,8 @@
   "files": [
     "lib/",
     "data/",
+    "vendor/skill-merge-pipeline/models/registry.json",
+    "vendor/skill-merge-pipeline/models/pca64/",
     "LICENSE",
     "NOTICE",
     "UPSTREAM.json"
@@ -22,7 +24,9 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test \"vendor/skill-merge-pipeline/test/*.test.js\"",
-    "verify:upstream": "node verify-upstream.mjs"
+    "verify:upstream": "node verify-upstream.mjs",
+    "verify:package": "node scripts/verify-package.mjs",
+    "verify:tarball": "node scripts/verify-tarball.mjs"
   },
   "license": "MIT"
 }

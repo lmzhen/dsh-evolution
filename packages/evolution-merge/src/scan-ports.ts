@@ -5,7 +5,7 @@
  * Approval on: round1 disposes the child immediately; the row waits in pending and the later
  * approve run must open a new child (not handled by this factory).
  */
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike, UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeCandidate, MergeDecision, MergeRow } from './contracts.ts'
 import { pairKey } from './contracts.ts'
 import type { SkillCard } from './skill-card.ts'
@@ -30,7 +30,9 @@ export interface CreateScanPortsOptions {
   readonly timeoutMs: number
   readonly approval: boolean
   readonly commitPort: CommitPort
+  readonly unit?: UnitTransaction | undefined
   readonly now: () => number
+  readonly isBlocked?: (name: string) => boolean | Promise<boolean>
   readonly onChild?: (context: StageToolContext) => void
   readonly onChildClosed?: (childId: string) => void
 }
@@ -101,7 +103,9 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           mode: decision.mode,
           cards: options.cards,
           commitPort: options.commitPort,
+          ...(options.unit === undefined ? {} : { unit: options.unit }),
           now: options.now,
+          ...(options.isBlocked === undefined ? {} : { isBlocked: options.isBlocked }),
           summary: 'merge ' + row.a + ' + ' + row.b,
           author: async () => {
             await entry.result.author?.(row, decision, signal)

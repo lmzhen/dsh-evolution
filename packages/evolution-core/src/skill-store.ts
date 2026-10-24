@@ -53,7 +53,7 @@ import { contentHash, loadMutations, recordMutation, type MutationRecord } from 
 import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
-import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
+import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
 /**
  * The CLASS boundary default authority (G1/1.1, Stage 2).
@@ -359,6 +359,12 @@ export interface CommitMergePlan {
   readonly expectedSourceBodies: readonly { readonly name: string; readonly body: string }[]
   readonly origin: WriteOrigin
   readonly summary: string
+  /** Real write-phase callback used by UnitTransaction; not persisted. */
+  readonly onPhase?: (phase: 'target-pending' | 'target-applied' | 'target-written' | 'source-archiving' | 'sources-archived' | 'support-pending' | 'unit-written', detail?: { source?: string }) => void | Promise<void>
+  /** Phase-boundary cancellation; checked before target/source writes. */
+  readonly signal?: AbortSignal
+  /** Tree-fence guard; checked before every tree/source write. */
+  readonly assertFence?: () => Promise<boolean>
 }
 
 export interface CommitMergeResult {
@@ -1218,6 +1224,13 @@ export class SkillLibrary {
     return null
   }
 
+  /** Whether the target directory exists at all (a SKILL.md-less ghost still occupies the name). */
+  async skillDirExists(rawName: string): Promise<boolean> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return false
+    return await this.io.exists(this.dirOf(name))
+  }
+
   async isManaged(rawName: string): Promise<boolean> {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
@@ -1622,7 +1635,7 @@ export class SkillLibrary {
     normalized: string,
     content: string,
     origin: WriteOrigin,
-    options: { unitId?: string; unitHead?: UnitHead } = {},
+    options: { unitId?: string; unitHead?: UnitHead; managed?: boolean } = {},
   ): Promise<SkillActionResult> {
     // C-12 (v10 audit): the inline badName() copy is gone (see setPinned).
     const bad = this.badName(normalized)
@@ -1735,7 +1748,7 @@ export class SkillLibrary {
     // marker never landed" inside the fsync/durability wrapper, producing a
     // self-contradicting operator-facing message.
     let markerWarning = ''
-    if (origin !== 'foreground') {
+    if (origin !== 'foreground' || options.managed === true) {
       // v29 SK-05: the marker write gets the same committed-only tolerance as
       // every other write in this file (A1-15) — a post-rename dir-fsync
       // failure means the MARKER landed; rejecting the create as a plain
@@ -2188,15 +2201,27 @@ export class SkillLibrary {
       const bad = this.badName(name)
       if (bad) return { ok: false, message: bad }
     }
+    if (PROTECTED_BUILTIN_SKILLS.has(target)) return { ok: false, message: `目标技能「${target}」是受保护的内置技能。` }
+    const protectedSource = sources.find(name => PROTECTED_BUILTIN_SKILLS.has(name))
+    if (protectedSource !== undefined) return { ok: false, message: `来源技能「${protectedSource}」是受保护的内置技能。` }
     return await this.serial(async (): Promise<CommitMergeResult> => {
       const dir = this.dirOf(target)
       const targetPath = join(dir, 'SKILL.md')
+      if (!plan.targetExists && await this.io.exists(dir)) {
+        return { ok: false, message: `目标目录「${target}」已存在但不是技能；拒绝把 SKILL.md 写进同名目录。` }
+      }
       const currentTarget = await this.io.readText(targetPath)
       if (plan.targetExists !== (currentTarget !== null)) {
         return { ok: false, message: plan.targetExists ? `目标技能「${target}」不存在。` : `目标技能「${target}」已存在。` }
       }
       if (currentTarget !== plan.expectedTargetBody) {
         return { ok: false, message: `目标技能「${target}」在计划之后被改过；拒绝提交（未写入任何内容）。` }
+      }
+      if (plan.targetExists && !(await this.isManaged(target))) {
+        return { ok: false, message: `目标技能「${target}」不是 family-managed；拒绝提交。` }
+      }
+      if (await this.io.exists(markerPath(dir, 'pinned'))) {
+        return { ok: false, message: `目标技能「${target}」已被固定；拒绝提交。` }
       }
       const targetProtection = await this.writeProtection(target, plan.origin)
       if (targetProtection) return { ok: false, message: `技能「${target}」受保护（${targetProtection}）。` }
@@ -2312,6 +2337,8 @@ export class SkillLibrary {
             expected: supportPrevious.get(file.path) ?? null,
           })),
         ]
+        await plan.onPhase?.('target-pending')
+        if (plan.assertFence !== undefined && !(await plan.assertFence())) return { ok: false, message: 'tree fence lost before target write' }
         const result = await this.applyTreeChange({
           name: target,
           origin: plan.origin,
@@ -2324,13 +2351,28 @@ export class SkillLibrary {
           unitHead,
         })
         if (!result.ok) return rollbackMessage(result.message, [])
+        await plan.onPhase?.('target-applied')
+        await plan.onPhase?.('target-written')
+        if (plan.signal?.aborted) {
+          const stuck = await rollbackTarget()
+          return rollbackMessage('cancelled before sources archived', stuck)
+        }
         for (const source of sources) {
+          if (plan.signal?.aborted) {
+            const stuck = await rollbackSources()
+            stuck.push(...await rollbackTarget())
+            return rollbackMessage('cancelled before next source archive', stuck)
+          }
           const fresh = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
           if (fresh !== sourceBodies.get(source)) {
             const stuck = await rollbackSources()
             stuck.push(...await rollbackTarget())
             return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
           }
+          if (plan.assertFence !== undefined && !(await plan.assertFence())) {
+            return { ok: false, message: 'tree fence lost before source archive; recovery required' }
+          }
+          await plan.onPhase?.('source-archiving', { source })
           const archivedResult = await this.archive(source, {
             absorbedInto: target,
             unitId,
@@ -2344,12 +2386,28 @@ export class SkillLibrary {
           }
           archived.push(source)
         }
+        await plan.onPhase?.('sources-archived')
+        await plan.onPhase?.('unit-written')
         return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
       }
 
-      const created = await this.createCore(target, plan.body, plan.origin, { unitId, unitHead })
+      await plan.onPhase?.('target-pending')
+      if (plan.assertFence !== undefined && !(await plan.assertFence())) return { ok: false, message: 'tree fence lost before target write' }
+      const created = await this.createCore(target, plan.body, plan.origin, { unitId, unitHead, managed: true })
       if (!created.ok) return { ok: false, message: created.message }
+      await plan.onPhase?.('target-applied')
+      await plan.onPhase?.('target-written')
+      if (plan.signal?.aborted) {
+        const targetRollback = await this.archive(target, { reason: 'merge cancelled' }, plan.origin)
+        return rollbackMessage('cancelled before sources archived', targetRollback.ok ? [] : [target])
+      }
       for (const source of sources) {
+        if (plan.signal?.aborted) {
+          const stuck = await rollbackSources()
+          const targetRollback = await this.archive(target, { reason: 'merge cancelled' }, plan.origin)
+          if (!targetRollback.ok) stuck.push(target)
+          return rollbackMessage('cancelled before next source archive', stuck)
+        }
         const fresh = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
         if (fresh !== sourceBodies.get(source)) {
           const stuck = await rollbackSources()
@@ -2357,6 +2415,10 @@ export class SkillLibrary {
           if (!targetRollback.ok) stuck.push(target)
           return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
         }
+        if (plan.assertFence !== undefined && !(await plan.assertFence())) {
+          return { ok: false, message: 'tree fence lost before source archive; recovery required' }
+        }
+        await plan.onPhase?.('source-archiving', { source })
         const result = await this.archive(source, {
           absorbedInto: target,
           unitId,
@@ -2372,6 +2434,10 @@ export class SkillLibrary {
         archived.push(source)
       }
       if (plan.supportFiles.length > 0) {
+        await plan.onPhase?.('support-pending')
+        if (plan.assertFence !== undefined && !(await plan.assertFence())) {
+          return { ok: false, message: 'tree fence lost before support write; recovery required' }
+        }
         const writes: TreeChangeWrite[] = plan.supportFiles.map(file => ({
           target: join(dir, ...file.path.replace(/\\/g, '/').split('/').filter(Boolean)),
           content: file.content,
@@ -2395,6 +2461,8 @@ export class SkillLibrary {
           return rollbackMessage(result.message, stuck)
         }
       }
+      await plan.onPhase?.('sources-archived')
+      await plan.onPhase?.('unit-written')
       return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
     })
   }

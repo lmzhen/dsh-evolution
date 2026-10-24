@@ -23,8 +23,12 @@ function PanelIcon(props: { size?: number; active?: boolean } = {}): ReactElemen
 function seedView(): api.MergeViewPayload {
   return {
     counts: { verify: 0, pending: 0, fuse: 0, skipped: 0 },
+    expired: 0,
     tabs: [{ queue: 'verify', count: 0 }, { queue: 'pending', count: 0 }, { queue: 'fuse', count: 0 }, { queue: 'skipped', count: 0 }],
-    commands: [],
+    commands: ['/evolution merge scan','/evolution merge pair <a> <b>','/evolution merge candidates','/evolution merge pending','/evolution merge resume','/evolution merge skipped','/evolution merge status','/evolution merge report','/evolution merge doctor'],
+    startCommands: { scan: '/evolution merge scan', pair: '/evolution merge pair <a> <b>' },
+    notes: [],
+    degraded: false,
   }
 }
 

@@ -13,7 +13,7 @@ export interface MergeFace {
   view: MergeViewPayload
   rows: MergeRowView[]
   loadView?: () => Promise<MergeOutcome<MergeViewPayload>>
-  loadRows?: (queue: MergeQueue, cursor?: number) => Promise<MergeOutcome<QueuePage>>
+  loadRows?: (queue: MergeQueue, cursor?: string, expiredOnly?: boolean) => Promise<MergeOutcome<QueuePage>>
   loadBody?: (id: string, side: 'a' | 'b') => Promise<MergeOutcome<MergeBody>>
   loadHistory?: () => Promise<MergeOutcome<{ items: MergeHistoryItem[] }>>
   t: (key: string) => string
@@ -22,6 +22,7 @@ export interface MergeFace {
 const QUEUES: MergeQueue[] = ['verify', 'pending', 'fuse', 'skipped']
 
 function failure(t: (key: string) => string, failure: RouteFailure): ReactNode {
+  if (failure.kind === 'refused' && failure.code === 'merge-body-missing') return FailureBlock({ failure: { ...failure, message: t('body.missing') }, t, fallback: FALLBACKS['merge'] })
   return FailureBlock({ failure, t, fallback: FALLBACKS['merge'] })
 }
 
@@ -29,24 +30,27 @@ export function MergePanel(face: MergeFace): ReactNode {
   const t = face.t
   const [view, setView] = useState<MergeViewPayload>(face.view)
   const [tab, setTab] = useState<MergeQueue>('pending')
+  const [expiredOnly, setExpiredOnly] = useState<boolean>(false)
   const [rows, setRows] = useState<MergeRowView[]>(face.rows)
   const [loading, setLoading] = useState<boolean>(face.loadRows !== undefined || face.loadView !== undefined)
   const [failed, setFailed] = useState<RouteFailure | undefined>(undefined)
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
+  const [copied, setCopied] = useState<string | undefined>(undefined)
   const [overlay, setOverlay] = useState<{ kind: 'body'; html: string; label: string } | { kind: 'history'; items: MergeHistoryItem[] } | undefined>(undefined)
   const request = useRef(0)
+  const copyCommand = (command: string): void => { void navigator.clipboard.writeText(command); setCopied(command) }
 
-  const loadRows = (queue: MergeQueue, cursor = 0): void => {
+  const loadRows = (queue: MergeQueue, cursor?: string, expired = false): void => {
     const load = face.loadRows
     if (load === undefined) return
     const token = request.current + 1
     request.current = token
     setLoading(true)
-    load(queue, cursor).then((outcome) => {
+    load(queue, cursor, queue === 'pending' && expired).then((outcome) => {
       if (token !== request.current) return
       if (outcome.ok) {
         setRows(current => [
-          ...(cursor === 0 ? [] : current),
+          ...(cursor === undefined ? [] : current),
           ...outcome.payload.items,
         ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
         setNextCursor(outcome.payload.nextCursor)
@@ -61,9 +65,6 @@ export function MergePanel(face: MergeFace): ReactNode {
     if (load === undefined) return
     load().then((outcome) => {
       if (!outcome.ok) { setFailed(outcome.failure); return }
-      if (outcome.payload.schemaVersion !== undefined && outcome.payload.schemaVersion !== 2) {
-        setFailed({ kind: 'server', status: 0 }); return
-      }
       setView(outcome.payload)
     }).catch(() => { setFailed({ kind: 'server', status: 0 }) })
   }
@@ -72,7 +73,7 @@ export function MergePanel(face: MergeFace): ReactNode {
     const load = face.loadBody
     if (load === undefined) return
     load(id, side).then((outcome) => {
-      if (outcome.ok) setOverlay({ kind: 'body', html: outcome.payload.html, label: id + ':' + side })
+      if (outcome.ok) { setFailed(undefined); setOverlay({ kind: 'body', html: outcome.payload.html, label: id + ':' + side }) }
       else setFailed(outcome.failure)
     }).catch(() => { setFailed({ kind: 'server', status: 0 }) })
   }
@@ -81,21 +82,15 @@ export function MergePanel(face: MergeFace): ReactNode {
     const load = face.loadHistory
     if (load === undefined) return
     load().then((outcome) => {
-      if (outcome.ok) setOverlay({ kind: 'history', items: outcome.payload.items })
+      if (outcome.ok) { setFailed(undefined); setOverlay({ kind: 'history', items: outcome.payload.items }) }
       else setFailed(outcome.failure)
     }).catch(() => { setFailed({ kind: 'server', status: 0 }) })
   }
 
   useEffect(() => { loadView(); loadRows('pending') }, [face])
-  useEffect(() => { setNextCursor(undefined); loadRows(tab, 0) }, [tab])
+  useEffect(() => { if (tab !== 'pending' && expiredOnly) setExpiredOnly(false); setNextCursor(undefined); loadRows(tab, undefined, tab === 'pending' && expiredOnly) }, [tab, expiredOnly])
 
   const counts = view.counts
-  const stats = createElement('div', { 'data-role': 'stats' }, QUEUES.map(queue =>
-    createElement('div', { key: queue, 'data-role': 'stat', 'data-queue': queue },
-      createElement('div', { 'data-role': 'stat-value' }, String(counts[queue])),
-      createElement('div', { 'data-role': 'stat-label' }, t('tab.' + queue)),
-    ),
-  ))
   const latest = view.latestRun
   const runStrip = latest === undefined ? null : createElement('div', { 'data-role': 'run-strip' },
     createElement('span', { 'data-role': 'run-id' }, latest.id),
@@ -109,58 +104,87 @@ export function MergePanel(face: MergeFace): ReactNode {
       onClick: () => { setTab(queue) },
     }, t('tab.' + queue) + ' ' + String(counts[queue])),
   ))
+  const expiredToggle = tab === 'pending' ? createElement('button', {
+    type: 'button', role: 'switch', 'aria-checked': expiredOnly ? 'true' : 'false', 'data-role': 'expired-toggle', 'data-active': expiredOnly ? 'true' : 'false',
+    onClick: () => { setExpiredOnly(value => !value) },
+  }, t('tab.expired') + ' ' + String(view.expired)) : null
   const list = rows.length === 0
     ? createElement('p', { 'data-role': 'note' }, t('empty.' + tab))
     : createElement('div', { 'data-role': 'rows' }, rows.map((row) => {
       const facts = [
-        row.target === undefined ? undefined : t('row.target') + ' ' + row.target,
+        row.target === undefined ? undefined : t('row.target') + ' ' + row.target + (row.targetActual === undefined ? '' : ' → ' + row.targetActual) + (row.targetCreated === true ? ' (' + t('row.targetCreated') + ')' : ''),
+        row.verifySubState === undefined ? undefined : t('row.verify') + ' ' + t('verify.' + row.verifySubState),
+        row.stagingState === undefined || row.stagingState === 'none' ? undefined : t('row.staging') + ' ' + t('staging.' + row.stagingState),
+        row.skipKind === undefined ? undefined : t('row.skipKind') + ' ' + t('skipKind.' + row.skipKind),
+        row.bodies === undefined ? undefined : t('row.bodies') + ' ' + row.bodies.map(body => body.name + '(' + body.side + ')').join(', '),
         row.confidence === undefined ? undefined : t('row.confidence') + ' ' + row.confidence.toFixed(2),
         row.attempts === undefined ? undefined : t('row.attempts') + ' ' + String(row.attempts),
         row.origin === undefined ? undefined : t('row.origin') + ' ' + t('origin.' + row.origin),
         row.stagingExpiresAt === undefined ? undefined : t('row.expires') + ' ' + new Date(row.stagingExpiresAt).toLocaleString(),
-        row.expired === undefined ? undefined : t('row.expired') + ' ' + row.expired,
+        row.expired === undefined ? undefined : t('row.expired') + ' ' + t('expired.' + row.expired),
         row.reason === undefined ? undefined : t('row.reason') + ' ' + row.reason,
-        row.summary === undefined ? undefined : row.summary.filter(Boolean).join(' · '),
+        row.summary === undefined ? undefined : (row.summary.filter(Boolean).join(' · ') || t('row.noSummary')),
         row.failure === undefined ? undefined : t('row.failure') + ' ' + row.failure.message + (row.failure.retryable ? '' : ' · ' + t('row.noRetry')),
       ].filter((value): value is string => value !== undefined).join(' · ')
       return createElement('div', { key: row.id, 'data-role': 'row' },
         createElement('div', null,
           createElement('div', { 'data-role': 'row-label' }, row.label),
-          createElement('div', { 'data-role': 'row-meta' }, t('state.' + row.state) + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage)) + ' · ' + row.id),
+          createElement('div', { 'data-role': 'row-meta' }, t('state.' + row.state) + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage))),
           facts === '' ? null : createElement('div', { 'data-role': 'row-facts' }, facts),
         ),
         createElement('div', null,
-          createElement('div', { 'data-role': 'row-meta' }, row.updatedAt),
+          createElement('div', { 'data-role': 'row-meta' }, new Date(row.updatedAt).toLocaleString()),
           createElement('div', { 'data-role': 'row-actions' },
-            face.loadBody === undefined ? null : createElement('button', { type: 'button', 'data-role': 'body-a', onClick: () => { openBody(row.id, 'a') } }, 'A'),
-            face.loadBody === undefined ? null : createElement('button', { type: 'button', 'data-role': 'body-b', onClick: () => { openBody(row.id, 'b') } }, 'B'),
-            (row.actions ?? []).filter(action => view.approval !== false || !action.includes('/evolution merge approve')).map(action =>
+            face.loadBody === undefined || row.bodies === undefined ? null : createElement('button', { type: 'button', 'data-role': 'body-a', onClick: () => { openBody(row.id, 'a') } }, 'A'),
+            face.loadBody === undefined || row.bodies === undefined ? null : createElement('button', { type: 'button', 'data-role': 'body-b', onClick: () => { openBody(row.id, 'b') } }, 'B'),
+            (row.actions ?? []).map(action =>
               createElement('button', {
-                key: action, type: 'button', 'data-role': 'row-action', title: action,
-                onClick: () => { void navigator.clipboard.writeText(action) },
-              }, t('row.copy')),
+                key: action.id, type: 'button', 'data-role': 'row-action', 'data-action': action.id,
+                title: action.disabledReason === undefined ? action.command : t('disabled.' + action.disabledReason),
+                disabled: !action.enabled,
+                onClick: () => {
+                  if (!action.enabled) return
+                  if (action.confirm && globalThis.confirm !== undefined && !globalThis.confirm(t('action.confirm') + ' ' + t('action.' + action.id))) return
+                  copyCommand(action.command)
+                },
+              }, t('action.' + action.id)),
             )),
         ),
       )
     }))
   const uiState = loading ? 'loading' : failed !== undefined ? 'failed' : rows.length === 0 ? 'empty' : 'ready'
   return createElement('section', { className: CSS_TAG_ID, 'data-state': uiState },
+    createElement('h2', { 'data-role': 'title' }, t('title')),
     createElement('p', { 'data-role': 'hint' }, t('hint')),
+    createElement('div', { 'data-role': 'start' },
+      createElement('button', { type: 'button', 'data-role': 'start-scan', onClick: () => { copyCommand(view.startCommands.scan) } }, t('start.scan')),
+      createElement('button', { type: 'button', 'data-role': 'start-pair', onClick: () => { copyCommand(view.startCommands.pair) } }, t('start.pair')),
+    ),
+    view.degraded ? createElement('p', { 'data-role': 'degraded' }, t('degraded') + ' ' + view.notes.join(',')) : null,
     view.approval === undefined ? null : createElement('p', { 'data-role': 'approval' }, t(view.approval ? 'approval.on' : 'approval.off')),
     runStrip,
-    stats,
     tabs,
+    expiredToggle,
     loading ? createElement('p', { 'data-role': 'note' }, t('loading')) : null,
-    failed === undefined ? null : createElement('div', { 'data-role': 'note' }, failure(t, failed)),
+    failed === undefined ? null : createElement('div', { 'data-role': 'failure' },
+      failure(t, failed),
+      createElement('div', { 'data-role': 'fallback' }, view.commands.map(command =>
+        createElement('button', { key: command, type: 'button', 'data-role': 'fallback-command', onClick: () => { copyCommand(command) } }, command),
+      )),
+    ),
+    copied === undefined ? null : createElement('p', { 'data-role': 'copied', role: 'status' }, t('copied') + ' ' + copied),
     list,
-    nextCursor === undefined ? null : createElement('button', { type: 'button', 'data-role': 'load-more', onClick: () => { loadRows(tab, Number(nextCursor)) } }, t('loadMore')),
+    nextCursor === undefined ? null : createElement('button', { type: 'button', 'data-role': 'load-more', onClick: () => { loadRows(tab, nextCursor, expiredOnly) } }, t('loadMore')),
     face.loadHistory === undefined ? null : createElement('button', { type: 'button', 'data-role': 'history', onClick: openHistory }, t('history')),
-    overlay === undefined ? null : createElement('section', { 'data-role': 'overlay' },
+    overlay === undefined ? null : createElement('section', { 'data-role': 'overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': overlay.kind === 'body' ? t('overlay.body') : t('history') },
+      createElement('h3', { 'data-role': 'overlay-title' }, overlay.kind === 'body' ? t('overlay.body') : t('history')),
       createElement('button', { type: 'button', 'data-role': 'overlay-close', onClick: () => { setOverlay(undefined) } }, t('close')),
       overlay.kind === 'body'
         ? createElement('div', { 'data-role': 'body', 'data-label': overlay.label, dangerouslySetInnerHTML: { __html: overlay.html } })
-        : createElement('ul', { 'data-role': 'history-list' }, overlay.items.map(item => createElement('li', { key: item.name }, item.name + ' · ' + item.kind + ' · ' + item.reason + ' · v' + String(item.lastVersion)))),
+        : overlay.items.length === 0
+          ? createElement('p', { 'data-role': 'history-empty' }, t('history.empty'))
+          : createElement('ul', { 'data-role': 'history-list' }, overlay.items.map(item => createElement('li', { key: item.name }, item.name + ' · ' + t('history.kind.' + item.kind) + ' · ' + item.reason + ' · v' + String(item.lastVersion)))),
     ),
-    createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { loadView(); loadRows(tab, 0) } }, t('refresh')),
+    createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { loadView(); loadRows(tab, undefined, tab === 'pending' && expiredOnly) } }, t('refresh')),
   )
 }

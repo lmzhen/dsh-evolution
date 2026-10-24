@@ -1,0 +1,8 @@
+{
+  "sourceHost": "npm @lmzhen/dsh-evolution-merge@0.30.15",
+  "packageVersion": "0.30.15",
+  "method": "published upsertRow writer",
+  "capturedAt": "2026-10-23T08:13:31.137Z",
+  "file": "real/merge/merge-state.json",
+  "sha256": "674aa014421e8b6f1a148635a9bc6e2166187286dc144335db9dc9c7f0c4a299"
+}

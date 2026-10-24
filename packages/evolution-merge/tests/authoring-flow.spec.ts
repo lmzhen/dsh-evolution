@@ -5,7 +5,7 @@ import { tempRoot } from '../../test-support/temp-home.ts'
 import { readCommitReceipt, runAuthoring, writeStagedFile, type CommitPort, type SkillCard } from '../src/index.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
-const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill') }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill') }]
+const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill'), managed: true }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill'), managed: true }]
 
 function port(): CommitPort {
   return {
@@ -68,4 +68,32 @@ it('archives only the non-target source when merging into an existing target', a
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   if (result.ok) expect(result.commit.ok && result.commit.result.archived).toEqual(['beta-skill'])
+})
+
+it('refuses a non-managed or curator-blocked target before authoring', async () => {
+  const home = await tempRoot('dsh-merge-authoring-target-guard-')
+  const io = nodeEvolutionIo()
+  const unmanaged: SkillCard[] = [{ ...cards[0]!, managed: false }]
+  const first = await runAuthoring({ io, home, runId: 'run-1', target: 'alpha-skill', cards: unmanaged, commitPort: port(), now: () => 200, summary: 'merge', async author() { throw new Error('must not author') } })
+  expect(first.ok).toBe(false)
+  if (!first.ok) expect(first.message).toContain('family-managed')
+  const second = await runAuthoring({ io, home, runId: 'run-2', target: 'alpha-skill', cards, isBlocked: name => name === 'alpha-skill', commitPort: port(), now: () => 200, summary: 'merge', async author() { throw new Error('must not author') } })
+  expect(second.ok).toBe(false)
+  if (!second.ok) expect(second.message).toContain('blocked')
+})
+
+it('refuses when curator blocks the target during authoring', async () => {
+  const home = await tempRoot('dsh-merge-authoring-blocked-during-')
+  const io = nodeEvolutionIo()
+  let blocked = false
+  let commits = 0
+  const guarded: CommitPort = { ...port(), async commitMerge(plan) { commits += 1; return await port().commitMerge(plan) } }
+  const result = await runAuthoring({
+    io, home, runId: 'run-1', target: 'umbrella', cards, commitPort: guarded, now: () => 200, summary: 'merge',
+    isBlocked: () => blocked,
+    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')); blocked = true },
+  })
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.message).toContain('blocked')
+  expect(commits).toBe(0)
 })

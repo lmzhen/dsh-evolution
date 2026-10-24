@@ -21,7 +21,7 @@ const input = (runId: string) => ({
 it('assembles a create plan from staged bytes and live source bodies', async () => {
   const home = await tempRoot('dsh-merge-commit-assembly-')
   const io = nodeEvolutionIo()
-  expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
+  expect((await createStaging(io, home, { ...input('run-1'), mode: 'create-umbrella' })).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('old-name'))).ok).toBe(true)
   const result = await assembleStagedCommit(io, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
@@ -36,7 +36,7 @@ it('assembles a create plan from staged bytes and live source bodies', async () 
 it('refuses when a source is no longer live', async () => {
   const home = await tempRoot('dsh-merge-commit-assembly-missing-')
   const io = nodeEvolutionIo()
-  expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
+  expect((await createStaging(io, home, { ...input('run-1'), mode: 'create-umbrella' })).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
   const result = await assembleStagedCommit(io, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : null },
@@ -56,4 +56,16 @@ it('skips an archived target name for create-umbrella', async () => {
   }, { origin: 'foreground', summary: 'merge' })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   if (result.ok) expect(result.plan.target).toBe('umbrella-v2')
+})
+
+it('refuses to re-create a merge-into-existing target that disappeared during authoring', async () => {
+  const home = await tempRoot('dsh-merge-commit-assembly-target-gone-')
+  const io = nodeEvolutionIo()
+  expect((await createStaging(io, home, { ...input('run-1'), mode: 'merge-into-existing' })).ok).toBe(true)
+  expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
+  const result = await assembleStagedCommit(io, home, 'run-1', {
+    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+  }, { origin: 'foreground', summary: 'merge' })
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.message).toContain('target is gone')
 })

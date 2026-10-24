@@ -214,6 +214,10 @@ function rewritePackage(pkg, ourNames, sourceDir) {
     delete pkg.exports?.['./src/*']
     if (typeof pkg.description === 'string') pkg.description = `${pkg.description} (community build)`
   }
+  if (pkg.name.endsWith('/dsh-evolution-merge')) {
+    const engine = `${scope ?? '@deepseek-ai'}/dsh-evolution-merge-engine`
+    if (pkg.dependencies?.[engine] !== undefined) pkg.dependencies[engine] = releaseVersion
+  }
   return pkg
 }
 

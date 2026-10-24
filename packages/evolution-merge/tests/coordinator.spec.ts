@@ -1,18 +1,20 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { canRetry, transition, type MergeEvent, type MergeRow, type MergeFailure } from '../src/index.ts'
+import { canRetry } from '../src/contracts.ts'
+import { transitionLegacyForProjection, type MergeEvent } from '../src/coordinator.ts'
+import type { MergeRow, MergeFailure } from '../src/contracts.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const failure: MergeFailure = { stage: 'author', code: 'E', message: 'boom', retryable: true, retryFrom: 'agent2' }
 
 function candidate(): MergeRow {
-  const result = transition(undefined, { type: 'candidate', a: 'b-skill', b: 'a-skill', at: AT })
+  const result = transitionLegacyForProjection(undefined, { type: 'candidate', a: 'b-skill', b: 'a-skill', at: AT })
   if (!result.ok || result.row === null) throw new Error('candidate failed')
   return result.row
 }
 
 function apply(row: MergeRow, event: MergeEvent): MergeRow | null {
-  const result = transition(row, event)
+  const result = transitionLegacyForProjection(row, event)
   if (!result.ok) throw new Error(result.message)
   return result.row
 }
@@ -47,13 +49,13 @@ it('approves, rejects, fails round2 and drops a committed row', () => {
 it('restores a skipped row and refuses an invalid transition', () => {
   const skipped = apply(candidate(), { type: 'round1-keep', at: AT })
   expect(apply(skipped, { type: 'restore', at: AT })).toMatchObject({ state: 'verify', queue: 'verify' })
-  const refused = transition(skipped, { type: 'approve', at: AT })
+  const refused = transitionLegacyForProjection(skipped, { type: 'approve', at: AT })
   expect(refused).toMatchObject({ ok: false, code: 'invalid-transition' })
-  expect(transition(undefined, { type: 'approve', at: AT })).toMatchObject({ ok: false, code: 'invalid-transition' })
+  expect(transitionLegacyForProjection(undefined, { type: 'approve', at: AT })).toMatchObject({ ok: false, code: 'invalid-transition' })
 })
 it('stops retrying after the attempt cap', () => {
   const row: MergeRow = { id: 'mr_x', pairKey: 'a\u0000b', a: 'a', b: 'b', state: 'verify', queue: 'verify', attempts: 2, createdAt: 'x', updatedAt: 'x' }
-  const result = transition(row, { type: 'round1-fail', failure: { stage: 'decide', code: 'invalid', message: 'bad', retryable: true, retryFrom: 'agent1' }, at: 'y' })
+  const result = transitionLegacyForProjection(row, { type: 'round1-fail', failure: { stage: 'decide', code: 'invalid', message: 'bad', retryable: true, retryFrom: 'agent1' }, at: 'y' })
   expect(result.ok).toBe(true)
   if (result.ok && result.row) expect(canRetry(result.row)).toBe(false)
 })

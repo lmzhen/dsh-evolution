@@ -1,0 +1,11 @@
+{
+  "runId": "run-rb",
+  "target": "a",
+  "create": false,
+  "sources": [
+    "a",
+    "b"
+  ],
+  "phase": "rolled-back",
+  "updatedAt": "2026-10-20T00:00:00.000Z"
+}

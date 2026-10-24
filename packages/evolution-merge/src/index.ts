@@ -5,13 +5,13 @@ import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type LlmServiceLike } from './adapters/model-runner.ts'
-import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, skillsRoot, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, DEFAULT_SKILL_LIMITS, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, policyStageLimits, type EvolutionIoLike, type PolicyStageFields, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
-import { loadMergeState, upsertRow } from './state.ts'
+import { loadMergeState, transactRows } from './state.ts'
 import { cleanupExpiredStaging } from './staging.ts'
 import { recoverCommitJournals } from './commit-recovery.ts'
 import { readCommitReceipts } from './commit-receipt.ts'
-import { transition } from './coordinator.ts'
+import { pairKey, rowIdOf } from './contracts.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
 import { createMergeCommand, runMergeCommand, type MergeCommandResult } from './merge-command.ts'
 import { createMergeRuntime } from './runtime.ts'
@@ -36,14 +36,15 @@ export interface MergePresentationScope {
   settings?: { configure?: (presentation: { auto?: boolean }, owner?: unknown) => unknown }
 }
 
-export function engineConfigFromEnv(configuredRoot?: string): Record<string, unknown> | undefined {
-  const root = configuredRoot !== undefined && configuredRoot !== '' ? configuredRoot : process.env.SKILL_MERGE_MODELS_ROOT
-  if (root === undefined || root === '') return undefined
+export interface EngineModelConfig {
+  readonly embedder_model: string
+  readonly embedder_model_last: string
+}
+
+export function engineConfigFromRoot(configuredRoot?: string): EngineModelConfig | undefined {
+  const root = configuredRoot?.trim() ?? ''
+  if (root === '') return undefined
   return {
-    models_dir: '',
-    offline: true,
-    auto_provision: false,
-    embed_backend: 'local',
     embedder_model: join(root, 'potion-multilingual-128M-int8'),
     embedder_model_last: join(root, 'potion-multilingual-128M-pca64-int8'),
   }
@@ -104,7 +105,6 @@ export * from './new-child-authoring.ts'
 export * from './status.ts'
 export * from './skipped.ts'
 export * from './read-commands.ts'
-export * from './routes.ts'
 export * from './merge-routes.ts'
 export * from './merge-command.ts'
 export * from './params.ts'
@@ -136,7 +136,6 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const home = evolutionHome()
     void loadMergeState(io, home).then(loaded => cleanupExpiredStaging(io, home, Date.now(), new Set(loaded.state.rows.map(row => row.runId).filter((id): id is string => id !== undefined)))).catch((error: unknown) => { ctx.logger.warn('merge staging cleanup failed: ' + (error instanceof Error ? error.message : String(error))) })
     const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) } })
-    void runs.load()
     ctx.effect(() => {
       const host = ctx as unknown as { on(name: string, listener: (event: { action?: string }) => void): () => void }
       if (typeof host.on !== 'function') return () => {}
@@ -149,17 +148,13 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       io, ctx, authority: authorityFrom({ origin: 'subagent' }),
       limits: { ...DEFAULT_SKILL_LIMITS, ...policyStageLimits(policySnapshot?.get?.()) },
     })
-    const mergeSkillsRoot = (skills as unknown as { root?: string }).root ?? skillsRoot()
-    void recoverCommitJournals(io, home, Date.now(), mergeSkillsRoot, async (name) => {
-      const result = await skills.restoreFromArchive(name)
-      return result.ok
-    }, (runId) => {
+    void runs.load().then(() => recoverCommitJournals(io, home, Date.now(), (runId) => {
       const run = runs.find(runId)
       return run !== undefined && run.state === 'running'
-    }).then((reports) => { if (reports.length > 0) ctx.logger.info('merge commit recovery: ' + reports.map(report => report.runId + '=' + report.action).join(', ')) }).catch((error: unknown) => { ctx.logger.warn('merge commit recovery failed: ' + (error instanceof Error ? error.message : String(error))) })
+    })).then((reports) => { if (reports.length > 0) ctx.logger.info('merge commit recovery: ' + reports.map(report => report.runId + '=' + report.action).join(', ')) }).catch((error: unknown) => { ctx.logger.warn('merge commit recovery failed: ' + (error instanceof Error ? error.message : String(error))) })
     const channel = subagentChannelAdapter(createSubagentChannel(ctx))
     const stage = new StageToolRegistry()
-    const engineConfig = engineConfigFromEnv(params.mergeModelsRoot)
+    const engineConfig = engineConfigFromRoot(params.mergeModelsRoot)
     const llm = (ctx as unknown as { get(name: string): unknown }).get('llm') as LlmServiceLike | undefined
     const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
     const runner = llm === undefined || defaultModel === undefined
@@ -177,11 +172,12 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         const at = new Date().toISOString()
         for (const skipped of selection.skipped) {
           if (loaded.state.rows.some(row => row.pairKey === skipped.pairKey)) continue
-          const next = transition(undefined, {
-            type: 'gate-keep', a: skipped.a, b: skipped.b,
-            ...(skipped.reason === undefined ? {} : { reason: skipped.reason }), at,
-          })
-          if (next.ok && next.row !== null) await upsertRow(io, home, () => Date.now(), next.row)
+          const key = pairKey(skipped.a, skipped.b)
+          await transactRows(io, home, tx => tx.createSkipped({
+            id: rowIdOf(key), pairKey: key, a: skipped.a, b: skipped.b, version: 0,
+            createdAt: at, updatedAt: at, origin: 'agent',
+            state: 'skipped', reason: skipped.reason ?? 'gate-keep', attempts: 0,
+          }).ok)
         }
       },
     })

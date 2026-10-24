@@ -14,7 +14,10 @@ export function skillLibraryPort(skills: SkillLibrary): CommitPort {
       const names = await archivedNames.call(skills)
       return names === null ? true : names.includes(name)
     },
-    commitMerge: plan => skills.commitMerge(plan),
+    isNameOccupied: async (name) => {
+      const probe = (skills as unknown as { skillDirExists?: (name: string) => Promise<boolean> }).skillDirExists
+      return typeof probe === 'function' ? await probe.call(skills, name) : false
+    },
     async readSupportFiles(name) {
       if (typeof skills.listSupportFiles !== 'function') return []
       const probe = await skills.listSupportFiles(name)

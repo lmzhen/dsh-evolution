@@ -125,6 +125,10 @@ export interface RunRegistry {
    * re-read here instead of being frozen at whatever this process first saw.
    */
   load(): Promise<{ ok: boolean; note?: string }>
+  /** Load and throw on unreadable/invalid index. */
+  ensureLoaded(): Promise<void>
+  /** The active run after ensureLoaded; explicit read entry. */
+  findActive(kind?: RunKind): Promise<RunRecord | undefined>
   /**
    * Register a new run, arm its cancellation, and return its handle.
    *
@@ -406,6 +410,16 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         regressed > 0 ? `${regressed} settled run(s) stayed settled although the index claimed they were running` : undefined,
       ].filter((note): note is string => note !== undefined)
       return { ok: true, ...(notes.length > 0 ? { note: notes.join('; ') } : {}) }
+    },
+
+    async ensureLoaded() {
+      const loaded = await this.load()
+      if (!loaded.ok) throw new Error(loaded.note ?? 'runs-unreadable')
+    },
+
+    async findActive(kind) {
+      await this.ensureLoaded()
+      return this.inFlight(kind)
     },
 
     async begin(kind, seed) {

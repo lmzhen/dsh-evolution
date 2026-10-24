@@ -1,30 +1,29 @@
 /**
- * Pending approval actions. The row lookup and the transition happen in one
- * mutateMergeState transaction, so two clients approving the same row cannot both win.
+ * Pending approval actions. The row lookup and transition happen in one v3
+ * transactRows transaction, so two clients approving the same row cannot both win.
  */
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { transition } from './coordinator.ts'
 import type { MergeRow } from './contracts.ts'
-import { mutateMergeState } from './state.ts'
+import { v3ToLegacy } from './domain/row-v3-bridge.ts'
+import { transactRows } from './state.ts'
 
 export type PendingActionResult =
   | { readonly ok: true; readonly row: MergeRow }
   | { readonly ok: false; readonly reason: 'not-found' | 'not-pending' | 'invalid'; readonly message: string }
 
 async function act(io: EvolutionIoLike, home: string, now: () => number, id: string, type: 'approve' | 'reject'): Promise<PendingActionResult> {
-  return await mutateMergeState<PendingActionResult>(io, home, now, (rows) => {
-    const index = rows.findIndex(row => row.id === id)
-    if (index < 0) return { rows, result: { ok: false as const, reason: 'not-found' as const, message: 'pending row not found: ' + id } }
-    const current = rows[index] as MergeRow
-    if (current.state !== 'pending') return { rows, result: { ok: false as const, reason: 'not-pending' as const, message: 'row is not pending: ' + current.state } }
+  void now
+  return await transactRows<PendingActionResult>(io, home, tx => {
+    const row = tx.rows().find(item => item.id === id)
+    if (row === undefined) return { ok: false as const, reason: 'not-found' as const, message: 'pending row not found: ' + id }
+    if (row.state !== 'pending') return { ok: false as const, reason: 'not-pending' as const, message: 'row is not pending: ' + row.state }
     const event = type === 'approve'
-      ? { type: 'approve' as const, at: new Date(now()).toISOString() }
-      : { type: 'reject' as const, at: new Date(now()).toISOString() }
-    const next = transition(current, event)
-    if (!next.ok || next.row === null) return { rows, result: { ok: false as const, reason: 'invalid' as const, message: next.ok ? 'transition produced no row' : next.message } }
-    const copy = [...rows]
-    copy[index] = next.row
-    return { rows: copy, result: { ok: true as const, row: next.row } }
+      ? { type: 'approved' as const, runId: row.runId ?? 'approve:' + id }
+      : { type: 'skipped' as const, reason: 'rejected', origin: 'human' as const }
+    const moved = tx.transition(id, event, row.version)
+    if (!moved.ok) return { ok: false as const, reason: 'invalid' as const, message: moved.message }
+    if (moved.row === null) return { ok: false as const, reason: 'invalid' as const, message: 'transition produced no row' }
+    return { ok: true as const, row: v3ToLegacy(moved.row) }
   })
 }
 

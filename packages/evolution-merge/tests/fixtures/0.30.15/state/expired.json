@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "rows": [
+    {
+      "id": "mr_expired",
+      "pairKey": "a\u0000b",
+      "a": "a",
+      "b": "b",
+      "state": "pending",
+      "queue": "pending",
+      "decision": {
+        "shouldMerge": true,
+        "mode": "merge-into-existing",
+        "target": "a",
+        "sources": [
+          "a",
+          "b"
+        ],
+        "rationale": "same"
+      },
+      "expired": "target-taken",
+      "createdAt": "2026-10-20T00:00:00.000Z",
+      "updatedAt": "2026-10-20T00:00:00.000Z"
+    }
+  ]
+}

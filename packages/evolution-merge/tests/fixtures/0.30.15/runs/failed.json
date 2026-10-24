@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "runs": [
+    {
+      "id": "run-failed",
+      "kind": "merge",
+      "command": "pair",
+      "state": "failed",
+      "startedAt": 1760000000000,
+      "endedAt": 1760000001000,
+      "failure": "merge failed"
+    }
+  ]
+}
