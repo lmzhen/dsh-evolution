@@ -1,5 +1,5 @@
 // @tier pre-tag
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
@@ -18,7 +18,7 @@ ${extra}`
 it('commitMerge archives sources and writes the target with one unit', async () => {
   const root = await tempRoot('dsh-commit-merge-')
   const lib = new SkillLibrary(root)
-  await lib.create('target-skill', BODY('target-skill'), 'foreground')
+  await lib.create('target-skill', BODY('target-skill'), 'subagent')
   await lib.create('src-a', BODY('src-a'), 'foreground')
   await lib.create('src-b', BODY('src-b'), 'foreground')
   const targetBody = (await lib.read('target-skill')) ?? ''
@@ -70,6 +70,7 @@ it('commitMerge creates the umbrella target first, then archives sources', async
   })
   expect(result).toMatchObject({ ok: true, mutations: 3, archived: ['src-a', 'src-b'] })
   expect(await lib.read('umbrella')).toContain('## Merged')
+  expect(await lib.isManaged('umbrella')).toBe(true)
   expect(await lib.read('src-a')).toBeNull()
   expect(await readFile(join(root, 'umbrella', 'references', 'merged.md'), 'utf8')).toBe('# merged\n')
 })
@@ -106,7 +107,7 @@ it('commitMerge rolls a created target back when a source archive fails', async 
 it('commitMerge refuses target protection and stale source bytes without side effects', async () => {
   const root = await tempRoot('dsh-commit-merge-guard-')
   const lib = new SkillLibrary(root)
-  await lib.create('target-skill', BODY('target-skill'), 'foreground')
+  await lib.create('target-skill', BODY('target-skill'), 'subagent')
   await lib.create('src-a', BODY('src-a'), 'foreground')
   await lib.setPinned('src-a', true, 'foreground')
   const targetBody = (await lib.read('target-skill')) ?? ''
@@ -130,4 +131,44 @@ it('commitMerge refuses target protection and stale source bytes without side ef
   expect((await lib.commitMerge(planned)).ok).toBe(false)
   expect(await lib.read('src-a')).toBe(sourceBody)
   expect(await lib.read('target-skill')).toBe(targetBody)
+})
+
+it('commitMerge refuses a target that is not family-managed', async () => {
+  const root = await tempRoot('dsh-commit-merge-unmanaged-')
+  const lib = new SkillLibrary(root)
+  await lib.create('target-skill', BODY('target-skill'), 'foreground')
+  await lib.create('src-a', BODY('src-a'), 'foreground')
+  const targetBody = (await lib.read('target-skill')) ?? ''
+  const sourceBody = (await lib.read('src-a')) ?? ''
+  const result = await lib.commitMerge({ target: 'target-skill', targetExists: true, sources: ['src-a'], body: BODY('target-skill', '## Merged\n'), supportFiles: [], expectedTargetBody: targetBody, expectedSourceBodies: [{ name: 'src-a', body: sourceBody }], origin: 'foreground', summary: 'guard' })
+  expect(result.ok).toBe(false)
+  expect(result.ok ? '' : result.message).toContain('family-managed')
+  expect(await lib.read('target-skill')).toBe(targetBody)
+  expect(await lib.read('src-a')).toBe(sourceBody)
+})
+
+it('commitMerge refuses a pinned target even for a foreground origin', async () => {
+  const root = await tempRoot('dsh-commit-merge-pinned-target-')
+  const lib = new SkillLibrary(root)
+  await lib.create('target-skill', BODY('target-skill'), 'subagent')
+  await lib.create('src-a', BODY('src-a'), 'foreground')
+  await lib.setPinned('target-skill', true, 'foreground')
+  const targetBody = (await lib.read('target-skill')) ?? ''
+  const sourceBody = (await lib.read('src-a')) ?? ''
+  const result = await lib.commitMerge({ target: 'target-skill', targetExists: true, sources: ['src-a'], body: BODY('target-skill', '## Merged\n'), supportFiles: [], expectedTargetBody: targetBody, expectedSourceBodies: [{ name: 'src-a', body: sourceBody }], origin: 'foreground', summary: 'guard' })
+  expect(result.ok).toBe(false)
+  expect(result.ok ? '' : result.message).toContain('固定')
+  expect(await lib.read('target-skill')).toBe(targetBody)
+})
+
+it('commitMerge refuses protected builtin and ghost target directory', async () => {
+  const root = await tempRoot('dsh-commit-merge-plan-ghost-')
+  const lib = new SkillLibrary(root)
+  await lib.create('src-a', BODY('src-a'), 'foreground')
+  const sourceBody = (await lib.read('src-a')) ?? ''
+  const plan = { target: 'plan', targetExists: false, sources: ['src-a'], body: BODY('plan'), supportFiles: [], expectedTargetBody: null, expectedSourceBodies: [{ name: 'src-a', body: sourceBody }], origin: 'foreground' as const, summary: 'guard' }
+  expect((await lib.commitMerge(plan)).ok).toBe(false)
+  await mkdir(join(root, 'ghost'))
+  expect((await lib.commitMerge({ ...plan, target: 'ghost' })).ok).toBe(false)
+  expect(await lib.read('ghost')).toBeNull()
 })
