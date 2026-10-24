@@ -1,5 +1,5 @@
 /** G2 adapter: core UnitBackend over the existing SkillLibrary. */
-import type { SkillLibrary, WriteOrigin } from './skill-store.ts'
+import type { SkillLibrary } from './skill-store.ts'
 import type { UnitBackend, UnitCommitResult, UnitPlan } from './unit-transaction.ts'
 
 export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
