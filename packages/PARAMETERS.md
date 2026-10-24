@@ -168,4 +168,3 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `mergeSkippedTtlDays` | E3 | live | cordis | evolution-merge | — | 卡：evolution-merge | Days a skipped pair stays out of screening; 0 means it never expires. |
 | `mergeRunTimeoutMinutes` | E3 | live | cordis | evolution-merge | — | 卡：evolution-merge | Wall-clock budget of one merge run; 0 means no limit. |
 | `mergePairTimeoutMinutes` | E2 | none | cordis | evolution-merge | — | 无（internal） | Wall-clock budget of one pair round (a stuck child guard). |
-| `mergeModelsRoot` | E2 | none | cordis | evolution-merge | — | 无（path） | Local model root containing the int8 and pca64 model directories; no env fallback. No auto provisioning. |
