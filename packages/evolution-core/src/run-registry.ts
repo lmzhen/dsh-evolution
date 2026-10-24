@@ -129,6 +129,8 @@ export interface RunRegistry {
   ensureLoaded(): Promise<void>
   /** The active run after ensureLoaded; explicit read entry. */
   findActive(kind?: RunKind): Promise<RunRecord | undefined>
+  /** Whether this run id is currently owned by a live running process (RG0b). */
+  hasOwner(id: string): Promise<boolean>
   /**
    * Register a new run, arm its cancellation, and return its handle.
    *
@@ -153,6 +155,8 @@ export interface RunRegistry {
   runs(kind?: RunKind): readonly RunRecord[]
   /** One run by id, converged view included. */
   find(id: string): RunRecord | undefined
+  /** Settle a running run whose owner is gone as failed(orphan). @returns whether a run was running. */
+  settleOrphan(id: string): Promise<boolean>
   /** Ask a running run to stop; it settles as `cancelled`. @returns whether it was running. */
   cancel(id: string): boolean
   /** Ask every running run to stop (fiber dispose). @returns how many were running. */
@@ -420,6 +424,18 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
     async findActive(kind) {
       await this.ensureLoaded()
       return this.inFlight(kind)
+    },
+
+    async hasOwner(id) {
+      await this.ensureLoaded()
+      return this.find(id)?.state === 'running'
+    },
+
+    async settleOrphan(id) {
+      const run = this.find(id)
+      if (run?.state !== 'running') return false
+      await this.settle(id, { state: 'failed', failure: 'orphan', mergeStatus: 'orphan' })
+      return true
     },
 
     async begin(kind, seed) {

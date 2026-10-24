@@ -83,8 +83,8 @@ export const HOST_ROUTES = {
   merge: {
     view: '/api/dsh-evolution/merge/view',
     rows: '/api/dsh-evolution/merge/rows',
-    body: '/api/dsh-evolution/merge/body',
-    history: '/api/dsh-evolution/merge/history',
+    run: '/api/dsh-evolution/merge/run',
+    runs: '/api/dsh-evolution/merge/runs',
   },
   diagnostics: {
     view: '/api/dsh-evolution/diagnostics',
