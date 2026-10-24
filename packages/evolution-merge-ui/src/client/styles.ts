@@ -22,7 +22,7 @@ export const CSS = [
   '.' + CSS_TAG_ID + ' [data-role="failure"] [data-tone="fail"] { color:var(--dsw-alias-state-error-primary); }',
   '.' + CSS_TAG_ID + ' [data-role="fallback"] { display:flex; gap:var(--evo-space-6); flex-wrap:wrap; }',
   '.' + CSS_TAG_ID + ' [data-role="overlay"] { position:relative; display:flex; flex-direction:column; gap:var(--evo-space-8); padding:var(--evo-space-12); border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); background:var(--dsw-alias-bg-layer-1); }',
-  '.' + CSS_TAG_ID + ' [data-role="overlay-title"] { margin:0; font-size:var(--evo-type-base); }',
+  '.' + CSS_TAG_ID + ' [data-role="overlay-title"] { margin:0; font-size:var(--evo-type-lg); }',
   '.' + CSS_TAG_ID + ' [data-role="rows"] { display:flex; flex-direction:column; gap:var(--evo-space-6); }',
   '.' + CSS_TAG_ID + ' [data-role="row"] { display:grid; grid-template-columns:1fr auto; gap:var(--evo-space-8); padding:var(--evo-space-8); border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); }',
   '.' + CSS_TAG_ID + ' [data-role="row-label"] { font-weight:600; }',
