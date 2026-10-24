@@ -31,7 +31,7 @@ describe('G0 frozen contracts', () => {
     const surfaces = Object.values(HOST_ROUTES)
     expect(surfaces).toHaveLength(5)
     const paths = surfaces.flatMap(surface => Object.values(surface))
-    expect(paths).toHaveLength(16)
+    expect(paths).toHaveLength(18)
     for (const path of paths) expect(path.startsWith('/api/dsh-evolution/')).toBe(true)
     expect(MAX_REQUEST_BODY_BYTES).toBe(64 * 1024)
   })
