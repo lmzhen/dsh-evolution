@@ -113,8 +113,9 @@ for (const tarball of tarballs) {
         if (name.startsWith('@deepseek-ai/dsh-') && expectedPlatformRange !== undefined && range !== expectedPlatformRange) {
           problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ' + expectedPlatformRange + ')')
         }
-        if (name.startsWith('@lmzhen/') && expectedVersion !== undefined && range !== '^' + expectedVersion) {
-          problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ^' + expectedVersion + ')')
+        const exactEnginePin = name.endsWith('/dsh-evolution-merge-engine') && range === expectedVersion
+        if (name.startsWith('@lmzhen/') && expectedVersion !== undefined && range !== '^' + expectedVersion && !exactEnginePin) {
+          problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ^' + expectedVersion + ' or exact engine pin)')
         }
       }
     }
