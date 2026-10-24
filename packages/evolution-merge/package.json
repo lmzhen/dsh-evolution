@@ -30,7 +30,7 @@
     "verify:publish-manifest": "node scripts/verify-publish-manifest.mjs"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-core": "0.30.18",
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-merge-engine": "workspace:^",
     "@deepseek-ai/schemastery": "3.18.5"
   },
