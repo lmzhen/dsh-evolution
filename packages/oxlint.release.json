@@ -1,0 +1,19 @@
+{
+  "overrides": [
+    {
+      "files": [
+        "**/evolution-merge/src/**",
+        "**/evolution-core/src/**",
+        "**/evolution-merge-ui/src/**"
+      ],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
+        "typescript/restrict-plus-operands": "off",
+        "typescript/no-base-to-string": "off",
+        "no-extra-semi": "off",
+        "max-len": "off"
+      }
+    }
+  ]
+}
