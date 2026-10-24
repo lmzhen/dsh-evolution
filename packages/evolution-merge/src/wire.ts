@@ -10,8 +10,12 @@ export type StagingState = 'none' | 'kept' | 'cleared-source-ok' | 'cleared-sour
 export type SkipOrigin = 'agent' | 'human' | 'system'
 export type SkipKind = 'agent-keep' | 'human-reject' | 'over-limit' | 'forced'
 export type ExpiredKind = 'target-taken' | 'source-changed' | 'skipped-ttl'
-export type WireRunState = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan'
-export type ActionId = 'approve' | 'reject' | 'retry-candidates' | 'retry-resume' | 'discard' | 'restore' | 'pair' | 'status' | 'report' | 'cancel'
+export type WireRunState =
+  | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval'
+  | 'undone' | 'superseded' | 'interrupted' | 'orphan'
+export type ActionId =
+  | 'approve' | 'reject' | 'retry-candidates' | 'retry-resume' | 'discard'
+  | 'restore' | 'pair' | 'status' | 'report' | 'cancel'
 
 export interface MergeCounts {
   readonly active: { readonly verify: number; readonly pending: number; readonly fuse: number; readonly skipped: number }
@@ -92,7 +96,10 @@ export interface RunView {
   readonly failure?: FailureFact
   readonly parentRunId?: string
   readonly currentPairKey?: string
-  readonly summary?: { readonly merged: number; readonly kept: number; readonly failed: number; readonly pending: number; readonly cancelled: number }
+  readonly summary?: {
+    readonly merged: number; readonly kept: number; readonly failed: number
+    readonly pending: number; readonly cancelled: number
+  }
   readonly actions: readonly ActionRef[]
 }
 export interface RunPair {
@@ -109,7 +116,8 @@ export interface RunPair {
 export interface RunDetail extends RunView { readonly pairs: readonly RunPair[]; readonly pairsTruncated: boolean }
 export interface RunsView { readonly wireVersion: 1; readonly readAt: number; readonly runs: readonly RunView[] }
 export interface BodyView {
-  readonly wireVersion: 1; readonly readAt: number; readonly name: string
+  readonly wireVersion: 1; readonly readAt: number
+  readonly name: string
   readonly side: 'live' | 'archive'; readonly text: string; readonly markdown: boolean
   readonly truncated: boolean; readonly totalBytes: number
 }
@@ -118,23 +126,41 @@ export interface HistoryItem {
   readonly reason: string; readonly lastVersion: number; readonly archivedAt: number; readonly sourceRunId?: string
 }
 export interface HistoryView { readonly wireVersion: 1; readonly readAt: number; readonly items: readonly HistoryItem[] }
-export interface DoctorFact { readonly key: string; readonly status: 'ok' | 'warn' | 'fail' | 'unknown'; readonly code?: string; readonly count?: number; readonly detail?: string }
+export interface DoctorFact {
+  readonly key: string; readonly status: 'ok' | 'warn' | 'fail' | 'unknown'
+  readonly code?: string; readonly count?: number; readonly detail?: string
+}
 export interface DoctorView {
   readonly wireVersion: 1; readonly readAt: number; readonly counts: MergeCounts
   readonly latestRun?: RunView
-  readonly staging: { readonly state: 'ok' | 'absent' | 'unreadable'; readonly dirs: number; readonly oldestAgeMs?: number; readonly detail?: string }
+  readonly staging: {
+    readonly state: 'ok' | 'absent' | 'unreadable'
+    readonly dirs: number; readonly oldestAgeMs?: number; readonly detail?: string
+  }
   readonly approval: { readonly mergeApproval: boolean; readonly writeApproval?: boolean }
   readonly hostOnly?: { readonly code: 'E-323'; readonly detail?: string }
   readonly rows: readonly DoctorFact[]
 }
 export interface WireFailure { readonly wireVersion: 1; readonly readAt?: number; readonly code: string; readonly message?: string }
-export interface CommandFlagSpec { readonly name: string; readonly kind: 'boolean' | 'value'; readonly valueName?: string; readonly required?: boolean; readonly repeatable?: boolean; readonly values?: readonly string[] }
-export interface CommandPositionalSpec { readonly name: string; readonly kind: 'skill' | 'target' | 'runId' | 'id' | 'json' | 'text'; readonly required: boolean; readonly variadic?: boolean }
-export interface CommandActionRule { readonly id: ActionId; readonly command: string; readonly confirm?: boolean; readonly enabledWhen?: string }
+export interface CommandFlagSpec {
+  readonly name: string; readonly kind: 'boolean' | 'value'; readonly valueName?: string
+  readonly required?: boolean; readonly repeatable?: boolean; readonly values?: readonly string[]
+}
+export interface CommandPositionalSpec {
+  readonly name: string; readonly kind: 'skill' | 'target' | 'runId' | 'id' | 'json' | 'text'
+  readonly required: boolean; readonly variadic?: boolean
+}
+export interface CommandActionRule {
+  readonly id: ActionId; readonly command: string
+  readonly confirm?: boolean; readonly enabledWhen?: string
+}
 export interface CommandSpec {
   readonly id: string; readonly words: readonly string[]; readonly flags: readonly CommandFlagSpec[]
   readonly positional: readonly CommandPositionalSpec[]; readonly summary: string
   readonly readOnly: boolean; readonly needsRun: boolean; readonly defaults: Readonly<Record<string, string>>
   readonly rowActions: readonly CommandActionRule[]; readonly fallback: string
 }
-export interface CommandSurface { readonly wireVersion: 1; readonly prefix: '/evolution merge'; readonly commands: readonly CommandSpec[]; readonly fallback: readonly CommandRef[] }
+export interface CommandSurface {
+  readonly wireVersion: 1; readonly prefix: '/evolution merge'
+  readonly commands: readonly CommandSpec[]; readonly fallback: readonly CommandRef[]
+}
