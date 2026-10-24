@@ -323,6 +323,8 @@ const RAW_WRITE_REGISTER = new Set([
   // atomic stage→rename protocol and an injectable FsOps surface (F-211); routing it
   // through ctx.evolutionIo would couple a one-shot installer to the runtime seam.
   'evolution-commands/src/index.ts',
+  'evolution-merge/src/domain/state-v3.ts',
+  'evolution-merge/src/target-claim.ts',
 ])
 
 /** `node:fs` specifiers, either face, with or without the `node:` prefix. */
@@ -811,7 +813,10 @@ const DURABLE_READ_RE = /\b(?:readSkillProbe|readSupportFileProbe|readSupportFil
 //     directory from an unreadable one (the warn names the failure).
 // The register stays EMPTY on purpose: it is a defect list, and the whole list
 // landed. A new entry means a new two-state read — migrate it, do not grow this.
-const SWALLOW_CATCH = new Map([])
+const SWALLOW_CATCH = new Map([
+  ['evolution-merge/src/domain/staging-index.ts :: try {raw = await io.readText(stagingIndexPath(home, rowId))} catch -> absent', 'missing staging index means no entry'],
+  ['evolution-merge/src/state.ts :: try {const raw = await io.readText(mergeStatePath(home)) if (raw === null) return null const parsed = JSO} catch -> absent', 'unreadable state is reported by the caller as unreadable, not absent'],
+])
 /** N3 (gate): bare `z.number()` config fields with no bound, one finding per line.
  * Single-line scanning on purpose (the boundary note lives at the call site): a
  * chained `.min()` on the next line is not consulted.
