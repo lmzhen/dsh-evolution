@@ -34,7 +34,8 @@ const p = await tx.prepare({ runId: 'run-1', pairKey: 'alpha', target: 'alpha', 
 if (!p.ok) process.exit(2)
 await tx.commit(p.prepared)
 `)
-  const child = spawn(join(process.cwd(), 'node_modules', '.bin', 'tsx.cmd'), [scriptPath], { shell: true, stdio: 'ignore' })
+  const tsx = process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
+  const child = spawn(join(process.cwd(), 'node_modules', '.bin', tsx), [scriptPath], { shell: true, stdio: 'ignore' })
   const pid = Number(await waitFor(pidPath, 20_000))
   const killed = spawnSync('taskkill', ['/F', '/PID', String(pid)], { encoding: 'utf8' })
   expect(killed.status, killed.stderr).toBe(0)
