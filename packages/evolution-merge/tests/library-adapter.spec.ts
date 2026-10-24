@@ -1,6 +1,8 @@
 // @tier pre-tag
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, SkillLibrary, skillLibraryUnitBackend, UnitTransactions } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { commitStagedRun, createStaging, readCommitReceipt, skillLibraryPort, writeStagedFile } from '../src/index.ts'
 
@@ -11,6 +13,7 @@ it('commits through SkillLibrary and archives the source', async () => {
   const io = nodeEvolutionIo()
   const lib = new SkillLibrary(home)
   await lib.create('target', BODY('target'), 'foreground')
+  await writeFile(join(home, 'target', '.hermes-managed'), '')
   await lib.create('src', BODY('src'), 'foreground')
   const sourceBody = (await lib.read('src')) ?? ''
   expect((await createStaging(io, home, {
@@ -22,10 +25,12 @@ it('commits through SkillLibrary and archives the source', async () => {
     now: () => 1000,
   })).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('target'))).ok).toBe(true)
+  const unit = new UnitTransactions({ io, home, backend: skillLibraryUnitBackend(lib), claim: { async acquire() { return { async release() {} } } } })
   const result = await commitStagedRun(io, home, 'run-1', skillLibraryPort(lib), {
     origin: 'foreground',
     summary: 'adapter merge',
     now: () => 2000,
+    unit,
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   if (!result.ok) return
