@@ -122,7 +122,7 @@ export class UnitTransactions implements UnitTransaction {
     const journalBase = { schemaVersion: 1 as const, unitId: prepared.unitId, runId: stored.plan.runId, planDigest: stored.digest, target: stored.plan.target, sources: stored.plan.sources, storageKey: unitStorageKey(prepared.unitId), snapshotSha256: stored.snapshotSha256, updatedAt: this.now() }
     let lock: TreeLock | undefined
     let claim: UnitClaim | undefined
-    let checkpoints: UnitJournalCheckpoint[] = []
+    const checkpoints: UnitJournalCheckpoint[] = []
     const writePhase = async (phase: UnitJournalPhase, checkpointsNext?: UnitJournal['checkpoints']) => {
       if (lock !== undefined && !(await lock.assertHeld())) throw new Error('unit-fence-lost')
       await writeUnitJournal(this.options.io, this.options.home, { ...journalBase, phase, ...(checkpointsNext === undefined ? {} : { checkpoints: checkpointsNext }) })
@@ -168,7 +168,8 @@ export class UnitTransactions implements UnitTransaction {
     if ('unitId' in ref) return await readUnitEvidence(this.options.io, this.options.home, ref.unitId)
     const all = await Promise.all([...this.prepared.keys()].map(async id => readUnitEvidence(this.options.io, this.options.home, id)))
     const found = all.filter((item): item is UnitEvidenceRecord => item !== null && item.runId === ref.runId)
-    return found.length === 0 ? null : found.length === 1 ? found[0]! : found
+    const only = found[0]
+    return found.length === 0 ? null : found.length === 1 ? only ?? null : found
   }
 
   async finalize(unitId: string) {
