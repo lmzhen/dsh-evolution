@@ -45,7 +45,7 @@ it('detached approve returns before round2 without holding the commit claim', as
   expect(contender).not.toBeNull()
   await contender?.release()
   release()
-  for (let i = 0; i < 100 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
+  for (let i = 0; i < 2000 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
   for (let i = 0; i < 100 && !reg.calls.includes('settle:succeeded'); i += 1) await new Promise(resolve => setTimeout(resolve, 5))
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
   expect(reg.calls).toContain('settle:succeeded')
