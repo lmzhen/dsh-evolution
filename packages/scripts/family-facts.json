@@ -1110,14 +1110,16 @@
             "rows": 7,
             "reason": "seven check rows still lack a drillCmd/noDrillReason on the 0.30.18 line; each is scheduled for the next gate-table pass",
             "expiry": "0.31.0",
-            "owner": "scripts"
+            "owner": "scripts",
+            "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           },
           {
             "axis": "mutation-coverage",
             "rows": 1,
             "reason": "decl-contracts-surface probe signature is stale after the contracts surface moved; ledger refresh scheduled",
             "expiry": "0.31.0",
-            "owner": "scripts"
+            "owner": "scripts",
+            "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           }
         ],
         "checkMutations": {
