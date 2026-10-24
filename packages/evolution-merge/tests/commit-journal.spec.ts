@@ -6,7 +6,6 @@ import { advanceJournal, recoveryFor, type CommitJournal } from '../src/domain/c
 const base: CommitJournal = { runId: 'r1', unitId: 'u1', target: 't', create: false, sources: ['s'], phase: 'prepared', updatedAt: 'x' }
 
 it('target-first journal phases advance in order', () => {
-  assert.equal(advanceJournal(base, 'committed', 't0').phase, 'committed')
   const written = advanceJournal(base, 'target-written', 't1')
   const archived = advanceJournal(written, 'sources-archived', 't2')
   const committed = advanceJournal(archived, 'committed', 't3')

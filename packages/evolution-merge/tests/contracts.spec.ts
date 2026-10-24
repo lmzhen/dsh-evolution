@@ -22,7 +22,7 @@ describe('merge contracts', () => {
   })
 
   it('starts empty with the current schema', () => {
-    expect(emptyMergeState()).toEqual({ schemaVersion: 3, rows: [] })
+    expect(emptyMergeState()).toEqual({ schemaVersion: 2, rows: [] })
   })
 
   it('allows retry only when the failure is retryable and names a stage', () => {

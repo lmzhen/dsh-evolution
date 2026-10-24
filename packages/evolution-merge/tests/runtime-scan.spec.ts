@@ -6,7 +6,7 @@ import { tempRoot } from '../../test-support/temp-home.ts'
 import { createMergeRuntime, pairKey, stageKeyOf, writeStagedFile, type MergeRuntimeDeps, type SkillCard } from '../src/index.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
-const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill'), managed: true }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill'), managed: true }, { name: 'umbrella', description: 'u', body: BODY('umbrella'), managed: true }]
+const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill'), managed: true }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill'), managed: true }]
 const decision = { should_merge: true, mode: 'merge-into-existing', target: 'umbrella', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }
 
 it('runs a scan through the runtime registry/channel/commit path', async () => {
@@ -37,13 +37,6 @@ it('runs a scan through the runtime registry/channel/commit path', async () => {
     io, home, registry, skills, now: () => 200,
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: [], timeoutMinutes: 0, detached: false,
-    unit: {
-      async prepare() { return { ok: true as const, prepared: { unitId: 'u-runtime', planDigest: 'd' } } },
-      async commit() { return { ok: true as const, evidence: { unitId: 'u-runtime', runId: 'run-1', planDigest: 'd', state: 'complete' as const, target: { before: null, after: BODY('umbrella'), supportDigest: '', created: true }, sources: [{ name: 'alpha-skill', before: BODY('alpha-skill'), after: null, archived: true, absorbedInto: 'umbrella' }, { name: 'beta-skill', before: BODY('beta-skill'), after: null, archived: true, absorbedInto: 'umbrella' }], mutations: 2, at: 1 } } },
-      async verify() { return null },
-      async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
-      async cancel() { return { ok: false, phase: 'none' as const } },
-    } as never,
     cards: async () => cards,
     screeningForRun: async () => [{ a: 'alpha-skill', b: 'beta-skill' }],
   }

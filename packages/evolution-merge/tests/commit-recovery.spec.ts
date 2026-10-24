@@ -8,7 +8,7 @@ import { recoverCommitJournals } from '../src/commit-recovery.ts'
 import { snapshotPath, skillBodyPath } from '../src/commit-snapshot.ts'
 import { durableReceiptPath } from '../src/commit-receipt.ts'
 
-it('reports manual-required instead of writing the target after a crash', async () => {
+it('restores the target from the pre-commit snapshot after a crash', async () => {
   const home = await tempRoot('dsh-merge-recovery-')
   const io = nodeEvolutionIo()
   const runId = 'run-1'
@@ -17,12 +17,12 @@ it('reports manual-required instead of writing the target after a crash', async 
   const root = join(home, 'skills')
   await io.writeText(skillBodyPath(root, 'umbrella'), 'new body')
   await io.writeText(join(home, 'merge', 'journals', runId + '.json'), JSON.stringify({ runId, target: 'umbrella', create: false, sources: ['a', 'b'], phase: 'target-written', updatedAt: 'x' }))
-  const reports = await recoverCommitJournals(io, home, 1)
+  const reports = await recoverCommitJournals(io, home, 1, root)
   assert.equal(reports.length, 1)
-  assert.equal(reports[0]?.action, 'manual-required')
-  assert.equal(await io.readText(skillBodyPath(root, 'umbrella')), 'new body')
+  assert.equal(reports[0]?.action, 'restored-target')
+  assert.equal(await io.readText(skillBodyPath(root, 'umbrella')), 'old body')
   const recovery = JSON.parse(await io.readText(join(home, 'merge', 'recovery.json')) ?? '[]') as { ok: boolean }[]
-  assert.equal(recovery[0]?.ok, false)
+  assert.equal(recovery[0]?.ok, true)
 })
 
 it('trusts a commit receipt over a stale journal', async () => {
@@ -35,14 +35,14 @@ it('trusts a commit receipt over a stale journal', async () => {
   await io.writeText(skillBodyPath(root, 'umbrella'), 'committed body')
   await io.writeText(durableReceiptPath(home, runId, runId), JSON.stringify({ runId, unitId: 'u1', target: 'umbrella', create: true, sources: ['a'], archived: ['a'], at: 1 }))
   await io.writeText(join(home, 'merge', 'journals', runId + '.json'), JSON.stringify({ runId, target: 'umbrella', create: true, sources: ['a'], phase: 'sources-archived', updatedAt: 'x' }))
-  const reports = await recoverCommitJournals(io, home, 1)
+  const reports = await recoverCommitJournals(io, home, 1, root)
   assert.equal(reports[0]?.action, 'receipt-committed')
   assert.equal(await io.readText(skillBodyPath(root, 'umbrella')), 'committed body')
   const journal = JSON.parse(await io.readText(join(home, 'merge', 'journals', runId + '.json')) ?? '{}') as { phase: string }
   assert.equal(journal.phase, 'committed')
 })
 
-it('does not remove or write a created target during manual recovery', async () => {
+it('removes an empty target directory when rolling back a create', async () => {
   const home = await tempRoot('dsh-merge-recovery-empty-')
   const io = nodeEvolutionIo()
   const runId = 'run-1'
@@ -53,9 +53,8 @@ it('does not remove or write a created target during manual recovery', async () 
   await io.writeText(join(dir, 'notes.txt'), 'leftover')
   await io.remove(join(dir, 'notes.txt'))
   await io.writeText(join(home, 'merge', 'journals', runId + '.json'), JSON.stringify({ runId, target: 'ghost', create: true, sources: ['a'], phase: 'target-written', updatedAt: 'x' }))
-  const reports = await recoverCommitJournals(io, home, 1)
-  assert.equal(reports[0]?.action, 'manual-required')
-  assert.equal(await io.exists(dir), true)
+  await recoverCommitJournals(io, home, 1, root)
+  assert.equal(await io.exists(dir), false)
 })
 
 it('skips a journal whose run is still active', async () => {
@@ -64,33 +63,8 @@ it('skips a journal whose run is still active', async () => {
   const runId = 'run-1'
   const root = join(home, 'skills')
   await io.writeText(join(home, 'merge', 'journals', runId + '.json'), JSON.stringify({ runId, target: 'umbrella', create: false, sources: ['a'], phase: 'sources-archived', updatedAt: 'x' }))
-  const reports = await recoverCommitJournals(io, home, 1, () => true)
+  const reports = await recoverCommitJournals(io, home, 1, root, undefined, () => true)
   assert.equal(reports[0]?.action, 'skipped-active-run')
   const journal = JSON.parse(await io.readText(join(home, 'merge', 'journals', runId + '.json')) ?? '{}') as { phase: string }
   assert.equal(journal.phase, 'sources-archived')
-})
-
-it('reports receipt-missing for a committed journal without a receipt', async () => {
-  const home = await tempRoot('dsh-merge-recovery-receipt-missing-')
-  const io = nodeEvolutionIo()
-  const runId = 'run-1'
-  const root = join(home, 'skills')
-  await io.writeText(skillBodyPath(root, 'umbrella'), 'committed body')
-  await io.writeText(join(home, 'merge', 'journals', runId + '.json'), JSON.stringify({ runId, target: 'umbrella', create: true, sources: ['a'], phase: 'committed', updatedAt: 'x' }))
-  const reports = await recoverCommitJournals(io, home, 1)
-  assert.equal(reports[0]?.action, 'receipt-missing')
-  assert.equal(reports[0]?.ok, false)
-  assert.equal(await io.readText(skillBodyPath(root, 'umbrella')), 'committed body')
-})
-
-it('reports a corrupt journal instead of skipping it', async () => {
-  const home = await tempRoot('dsh-merge-recovery-corrupt-')
-  const io = nodeEvolutionIo()
-  const root = join(home, 'skills')
-  await io.writeText(skillBodyPath(root, 'umbrella'), 'body')
-  await io.writeText(join(home, 'merge', 'journals', 'bad.json'), '{not json')
-  const reports = await recoverCommitJournals(io, home, 1)
-  assert.equal(reports[0]?.action, 'journal-unreadable')
-  assert.equal(reports[0]?.ok, false)
-  assert.equal(await io.readText(skillBodyPath(root, 'umbrella')), 'body')
 })

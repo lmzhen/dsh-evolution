@@ -7,7 +7,7 @@ import { pairKey, runNewChildAuthoring, stageKeyOf, writeStagedFile, type Commit
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill') }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill') }]
 const row: MergeRow = { id: 'mr_a', pairKey: pairKey('alpha-skill', 'beta-skill'), a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'fuse', createdAt: 'x', updatedAt: 'x' }
-const decision: MergeDecision = { shouldMerge: true, mode: 'create-umbrella', target: 'umbrella', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }
+const decision: MergeDecision = { shouldMerge: true, mode: 'merge-into-existing', target: 'umbrella', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }
 
 function commitPort(): CommitPort {
   return {

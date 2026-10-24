@@ -1,19 +1,19 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { transitionLegacyForProjection } from '../src/coordinator.ts'
+import { transition } from '../src/coordinator.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const failure = { stage: 'author' as const, code: 'E', message: 'boom', retryable: true, retryFrom: 'agent2' as const }
 
 function row() {
-  const result = transitionLegacyForProjection(undefined, { type: 'candidate', a: 'a', b: 'b', at: AT })
+  const result = transition(undefined, { type: 'candidate', a: 'a', b: 'b', at: AT })
   if (!result.ok || result.row === null) throw new Error('candidate failed')
   return result.row
 }
 
 function apply(rowValue: ReturnType<typeof row>, event: Parameters<typeof transition>[1]) {
-  const result = transitionLegacyForProjection(rowValue, event)
+  const result = transition(rowValue, event)
   if (!result.ok) throw new Error(result.message)
   return result.row
 }

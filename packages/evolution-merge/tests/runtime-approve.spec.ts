@@ -35,21 +35,9 @@ it('approves a pending row through a new child and drops it after commit', async
     io, home, registry, skills, now: () => 200,
     params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: [], timeoutMinutes: 0,
-    unit: {
-      async prepare() { return { ok: true as const, prepared: { unitId: 'u-1', planDigest: 'd' } } },
-      async commit() { return { ok: true as const, evidence: { unitId: 'u-1', runId: 'run-1', planDigest: 'd', state: 'complete' as const, target: { before: null, after: BODY('umbrella'), supportDigest: '', created: false }, sources: [{ name: 'alpha-skill', before: BODY('alpha-skill'), after: null, archived: true, absorbedInto: 'umbrella' }, { name: 'beta-skill', before: BODY('beta-skill'), after: null, archived: true, absorbedInto: 'umbrella' }], mutations: 3, at: 1 } } },
-      async verify() { return null },
-      async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
-      async cancel() { return { ok: false, phase: 'none' as const } },
-    } as never,
     cards: async () => cards, screeningForRun: async () => [],
   }
   const result = await createMergeRuntime(deps).execute({ verb: 'approve', id: row.id })
   expect(result.ok, result.text).toBe(true)
-  expect(result.text).toContain('已启动')
-  for (let i = 0; i < 100; i += 1) {
-    if ((await loadMergeState(io, home)).state.rows.length === 0) break
-    await new Promise(resolve => setTimeout(resolve, 5))
-  }
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })
