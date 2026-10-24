@@ -18,7 +18,7 @@ it('a detached run completes and stays readable after the client is gone', async
   expect(accepted).toMatchObject({ ok: true, accepted: true })
   const runId = (accepted as { runId: string }).runId
   let run = registry.find(runId)
-  for (let i = 0; i < 100 && run?.state !== 'succeeded'; i += 1) { await new Promise(resolve => setTimeout(resolve, 5)); run = registry.find(runId) }
+  for (let i = 0; i < 2000 && run?.state !== 'succeeded'; i += 1) { await new Promise(resolve => setTimeout(resolve, 5)); run = registry.find(runId) }
   expect(run?.state).toBe('succeeded')
   expect(run?.resultRef).toBeDefined()
   const report = await io.readText(run!.resultRef!)

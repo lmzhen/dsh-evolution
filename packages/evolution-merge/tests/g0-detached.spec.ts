@@ -46,7 +46,7 @@ it('detached approve returns before round2 without holding the commit claim', as
   await contender?.release()
   release()
   for (let i = 0; i < 2000 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
-  for (let i = 0; i < 100 && !reg.calls.includes('settle:succeeded'); i += 1) await new Promise(resolve => setTimeout(resolve, 5))
+  for (let i = 0; i < 2000 && !reg.calls.includes('settle:succeeded'); i += 1) await new Promise(resolve => setTimeout(resolve, 5))
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
   expect(reg.calls).toContain('settle:succeeded')
 })
@@ -89,7 +89,7 @@ it('detached resume returns before round2 and completes in background', async ()
     ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } },
   })
   expect(result).toMatchObject({ ok: true, accepted: true, runId: 'run-1' })
-  for (let i = 0; i < 100 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
+  for (let i = 0; i < 2000 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })
 

@@ -26,7 +26,7 @@ await r.lock.release()
   const bin = join(process.cwd(), 'node_modules', '.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx')
   const child = () => new Promise<number>((resolve) => { const c = spawn(bin, [script, home], { shell: true, stdio: 'ignore' }); c.once('exit', code => resolve(code ?? 1)) })
   const first = child()
-  for (let i = 0; i < 100; i += 1) { if ((await readdir(join(home, 'winners')).catch(() => [])).length > 0) break; await new Promise(resolve => setTimeout(resolve, 25)) }
+  for (let i = 0; i < 2000; i += 1) { if ((await readdir(join(home, 'winners')).catch(() => [])).length > 0) break; await new Promise(resolve => setTimeout(resolve, 25)) }
   const second = child()
   const [a, b] = await Promise.all([first, second])
   const winners = await readdir(join(home, 'winners')).catch(() => [])

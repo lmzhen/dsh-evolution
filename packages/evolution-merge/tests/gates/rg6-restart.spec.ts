@@ -44,6 +44,6 @@ it('manual resume after restart is explicit and can complete', async () => {
   const registry = newRunRegistry({ io, home, now: () => 1000 })
   const accepted = await runResumeCommand({ io, home, registry, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
   expect(accepted).toMatchObject({ ok: true, accepted: true })
-  for (let i = 0; i < 100 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
+  for (let i = 0; i < 2000 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })

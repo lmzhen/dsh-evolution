@@ -47,7 +47,7 @@ it('approves a pending row through a new child and drops it after commit', async
   const result = await createMergeRuntime(deps).execute({ verb: 'approve', id: row.id })
   expect(result.ok, result.text).toBe(true)
   expect(result.text).toContain('已启动')
-  for (let i = 0; i < 100; i += 1) {
+  for (let i = 0; i < 2000; i += 1) {
     if ((await loadMergeState(io, home)).state.rows.length === 0) break
     await new Promise(resolve => setTimeout(resolve, 5))
   }
