@@ -72,6 +72,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `reviewEnabled` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Master switch for the review plugin. |
 | `reviewMode` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Run the review in the parent session (inject) or on a subagent. |
 | `reviewWakeInject` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Deliver the deferred review as a waking follow-up message. |
+| `reviewSilent` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Deliver nothing into the parent conversation (background-only review). |
 | `reviewProvider` | E2 | none | cordis | evolution-review | — | 无（identity） | LLM provider for review subagents (deployment identity). |
 | `reviewTimeoutMs` | E2 | none | cordis | evolution-review | — | 无（internal） | Bound on one review subagent run and its write leg. |
 | `reviewContextMessages` | E2 | none | cordis | evolution-review | — | 无（internal） | Messages of context handed to a review subagent. |

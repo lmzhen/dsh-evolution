@@ -99,6 +99,14 @@ export interface Config {
    * POLICY row (`evolution-policy`): the mounted policy snapshot shadows this
    * row's value, which the plugin reports once at load (v37 P2-24). */
   reviewMode?: Volatile<'subagent' | 'inject'>
+  /** Deliver nothing into the parent conversation (opt-in, default false).
+   *
+   * Two kinds of noise motivate this: a failed subagent leg falls back to the
+   * inject path and pastes the whole review prompt into the chat, and a
+   * successful one posts a result notice that wakes a turn just to report a
+   * count. Deployments that review in the background enable this and read
+   * `reviews/` (or the evolution ledger) instead. */
+  reviewSilent?: Volatile<boolean>
   /** Review cadence in TOOL CALLS — the CANONICAL registry id (G1, signals.ts:
    * a turn advances by its tool-call count, minimum 1, or by 1 when the turn
    * itself carried the memory signal). Shadowed by the policy snapshot in every
@@ -174,6 +182,11 @@ export const Config = z.object({
   // first-class opt-in for deployments that want the parent context kept clean
   // or a dedicated review model.
   reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject').volatile(),
+  // Silent mode: deliver nothing into the parent conversation. Any failure of the
+  // subagent leg falls back to the inject path, which pastes the whole review prompt
+  // into the chat; on success the result notice wakes a turn just to report a count.
+  // Deployments that review in the background set this true and read `reviews/` instead.
+  reviewSilent: z.boolean().default(false).volatile(),
   // G1: the canonical registry ids, merged into the row Config. No .default(): a
   // schema default would fill the canonical key and make the deprecated alias
   // below unreachable through the alias fallback (resolveReviewRowSettings resolves
@@ -356,6 +369,8 @@ export interface ReviewSettings {
   reviewMode: 'subagent' | 'inject'
   /** Deliver the deferred review as a waking follow-up message. */
   reviewWakeInject: boolean
+  /** Deliver nothing into the parent conversation (see the Config JSDoc). */
+  reviewSilent: boolean
 }
 
 /**
@@ -378,6 +393,7 @@ export function resolveReviewRowSettings(rawConfig: Config, warn: (message: stri
     reviewEnabled: liveBool(rawConfig.reviewEnabled, true),
     reviewMode: unwrapLive(rawConfig.reviewMode) ?? 'inject',
     reviewWakeInject: liveBool(rawConfig.reviewWakeInject, true),
+    reviewSilent: liveBool(rawConfig.reviewSilent, false),
   }
 }
 
@@ -510,6 +526,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       reviewEnabled: row.reviewEnabled,
       reviewMode: mode(),
       reviewWakeInject: row.reviewWakeInject,
+      reviewSilent: row.reviewSilent,
     }
   }
 
@@ -1065,6 +1082,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const deliverMessage = (agent: import('@deepseek-ai/dsh-agent').Agent, text: string, summary: string, reviewPrompt = false): boolean => {
     const wake = agent as { followup?: (message: unknown) => void }
     const inbox = (agent as { inbox?: InboxLike }).inbox
+    // SILENT (opt-in, default off): deliver nothing into the parent conversation.
+    //
+    // The default deployment is noisy in a way that is easy to miss: any failure of
+    // the subagent leg (an unresolvable model id, no structured output, a timeout)
+    // falls back to the inject path, which pastes the whole review prompt into the
+    // chat — and on success the result notice wakes a fresh turn just to say "0 ops
+    // landed". Deployments that want the review to run unseen set `reviewSilent: true`
+    // and read the audit trail in `reviews/` instead.
+    //
+    // Returning true keeps every caller's bookkeeping satisfied (no retry latch, no
+    // pending set); `noticeIsOutstanding` never blocks the next cadence firing.
+    if (params().reviewSilent) {
+      ctx.logger.info(`dsh-evolution-review: suppressed a parent-conversation notice (${summary}) — reviewSilent is on`)
+      return true
+    }
     // C 组（未结窗口）+ D 组（兜底）：本会话已经有一条未结的复查通知——队列里还排着它（`turn === null`），
     // 或者取走它的那个回合还没结束——就不再投第二条。旧实现靠「同 kind 就就地替换」收敛重复，代价是
     // 被换掉的那条还要补一个唤醒桩；现在直接不投：那条还没跑完，接着再投只会让模型连着做两次复查。
@@ -1569,6 +1601,53 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
   }
 
+  /**
+   * Repair a skill body that arrived without YAML frontmatter instead of losing
+   * the whole create op.
+   *
+   * The skill writer hard-rejects any SKILL.md whose first line is not `---`, so a
+   * reviewer that emits a perfectly good body starting with `# Title` gets the op
+   * thrown away — a real, repeated failure mode in production. Prompt guidance
+   * alone cannot guarantee it (models forget under load), so synthesise the
+   * missing header from the op's own `name` and a derived description.
+   *
+   * Deliberately conservative: fires only when the body does NOT already start
+   * with `---`, and passes any existing header through byte-identical.
+   *
+   * @param content - the op's raw `content` string.
+   * @param name - the skill name from the op (used for `name:` and validation).
+   * @param description - optional description from the op; otherwise derived from
+   *   the body's first heading (or first prose line), clipped to the length cap.
+   * @returns the repaired content (or the original when no repair is needed).
+   */
+  function ensureFrontmatter(content: unknown, name: string, description?: unknown): string {    const body = typeof content === 'string' ? content : ''
+    // Already has a header — leave it exactly as the reviewer wrote it.
+    if (/^---\r?\n/.test(body)) return body
+    const heading = body.match(/^#{1,6}\s+(.+?)\s*$/m)
+    const firstLine = body.split(/\r?\n/).map(line => line.trim()).find(line => line !== '' && !line.startsWith('#')) ?? ''
+    const summary = (() => {
+      const given = typeof description === 'string' ? description.trim() : ''
+      if (given !== '') return given
+      const source = (heading?.[1] ?? firstLine ?? name).replace(/\s+/g, ' ').trim()
+      const clipped = source.length > 58 ? `${source.slice(0, 57)}…` : source
+      // Already ends a sentence (Latin or CJK full stop) — don't double it.
+      return /[.。！？!?]$/.test(clipped) ? clipped : `${clipped}.`
+    })()
+    const header = [
+      '---',
+      `name: ${name}`,
+      `description: ${summary}`,
+      'version: 0.1.0',
+      'author: Hermes',
+      '---',
+      '',
+    ].join('\n')
+    // Drop a leading BOM / blank lines so the file starts on the fence, and keep
+    // exactly one blank line between the closing `---` and the body.
+    const cleaned = body.replace(/^\uFEFF/, '').replace(/^\s*\r?\n/, '')
+    return `${header}\n${cleaned}`
+  }
+
   async function executePlan(
     plan: EvolutionPlan,
     session?: Session,
@@ -1898,7 +1977,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // The direct path (approval-disabled deployments) must keep the same
         // lifecycle entry as the runner: an agent-created record so the
         // curator actually manages the skill.
-        const created = await library.create(name, op.content ?? '', origin)
+        const created = await library.create(name, ensureFrontmatter(op.content, name), origin)
         if (created.ok) {
           const usageRegistry = ctx.get('skillUsage') as { markAgentCreated?(name: string): Promise<void> } | undefined
           await usageRegistry?.markAgentCreated?.(name)
@@ -1912,7 +1991,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // silently lost with BOTH writers reporting success. The anchor now rides
         // the library call and is verified against the bytes read under the
         // write's own lock.
-        const updated = await library.update(name, op.content ?? '', origin, anchorOf(op))
+        const updated = await library.update(name, ensureFrontmatter(op.content, name), origin, anchorOf(op))
         if (updated.stale === true) return staleRefusal(updated, name, op.file_path)
         // v30 TSM-04: keep the mutation-maturity accounting aligned with the
         // runner path, which bumps patch_count for every content write.
@@ -2076,6 +2155,15 @@ const DISPATCH_DIGEST_FRAMES = 128
 /** One dispatch frame the review digest can render (a native call/result or a PTC sub-dispatch). */
 interface ReviewDispatchFrame {
   readonly type: string
+  /**
+   * The frame's own session seq, kept so a plan can cite real evidence.
+   *
+   * The plan validator requires every op's `evidence` to name an integer seq within
+   * [0, sessionSeq], but the digest dropped the seq entirely — the rendered request
+   * carried no seq at all, so a reviewer could only guess, and every op was rejected
+   * with "evidence is required and must reference a valid session seq".
+   */
+  readonly seq?: number
   readonly data?: unknown
 }
 
@@ -2092,11 +2180,15 @@ interface ReviewDispatchFrame {
 function appendDispatchFrame(
   digest: Map<SessionId, ReviewDispatchFrame[]>,
   id: SessionId,
-  event: { type: string; data?: unknown },
+  event: { type: string; seq?: number; data?: unknown },
 ): void {
   if (readDispatchSignal(event) === null && resultCallIdOf(event) === null) return
   const frames = digest.get(id) ?? []
-  frames.push({ type: event.type, ...event.data === undefined ? {} : { data: event.data } })
+  frames.push({
+    type: event.type,
+    ...event.seq === undefined ? {} : { seq: event.seq },
+    ...event.data === undefined ? {} : { data: event.data },
+  })
   if (frames.length > DISPATCH_DIGEST_FRAMES) frames.splice(0, frames.length - DISPATCH_DIGEST_FRAMES)
   digest.set(id, frames)
 }
@@ -2187,7 +2279,7 @@ function resultCallIdOf(event: { type?: string; data?: unknown } | undefined): s
  * keeps the call identity its `[call]` line would have had. Budget: 500 chars
  * per line (the 12-line cap lives in buildReviewRequest and is unchanged).
  */
-export function renderToolResultLine(data: unknown, identity?: { name: string; argsRaw: string }): string {
+export function renderToolResultLine(data: unknown, identity?: { name: string; argsRaw: string }, seq?: number): string {
   const shape = data as (ToolResultEventDataLike & {
     subCallId?: unknown
     isError?: unknown
@@ -2220,7 +2312,9 @@ export function renderToolResultLine(data: unknown, identity?: { name: string; a
     ? ''
     : `${foldUntrustedLines(identity.name, 0)} ${foldUntrustedLines(identity.argsRaw, 200)} → `
   const failure = failed ? ' [ERROR]' : ''
-  return `[result]${failure} ${head}${foldUntrustedLines(output, 500)}`
+  // The frame's own seq rides the line so a plan can cite it as evidence verbatim.
+  const seqTag = seq === undefined ? '' : `seq=${seq} `
+  return `${seqTag}[result]${failure} ${head}${foldUntrustedLines(output, 500)}`
 }
 
 /** Text of a PTC settle `content` payload (the logged ContentBlock list):
@@ -2312,7 +2406,7 @@ export function buildReviewRequest(
   }
   const openedCallIds = new Set<string>()
   for (let index = events.length - 1; index >= 0 && toolLines.length < 12; index -= 1) {
-    const event = events[index] as { type?: string; data?: unknown } | undefined
+    const event = events[index] as { type?: string; seq?: number; data?: unknown } | undefined
     const answeredCallId = resultCallIdOf(event)
     if (answeredCallId !== null) {
       if (openedCallIds.has(answeredCallId)) continue
@@ -2331,7 +2425,7 @@ export function buildReviewRequest(
           argsRaw: typeof settleData.arguments === 'string' ? settleData.arguments : JSON.stringify(settleData.arguments ?? {}),
         }
         : callIdentity.get(answeredCallId)
-      toolLines.push(renderToolResultLine(event?.data, identity))
+      toolLines.push(renderToolResultLine(event?.data, identity, event?.seq))
       continue
     }
     // `readDispatchSignal` is the pure half of the fold: it names the call one
@@ -2343,7 +2437,9 @@ export function buildReviewRequest(
     const argsRaw = typeof opened.arguments === 'string' ? opened.arguments : JSON.stringify(opened.arguments ?? {})
     // T3-03/A31: same fold as the [result] line — the name and the raw
     // arguments are model-authored data, not this digest's structure.
-    toolLines.push(`[call] ${foldUntrustedLines(opened.name, 0)} ${foldUntrustedLines(argsRaw, 500)}`)
+    // The frame's own seq leads the line so the plan can cite it verbatim.
+    const seqTag = event?.seq === undefined ? '' : `seq=${event.seq} `
+    toolLines.push(`${seqTag}[call] ${foldUntrustedLines(opened.name, 0)} ${foldUntrustedLines(argsRaw, 500)}`)
   }
   toolLines.reverse()
   return [
@@ -2351,7 +2447,16 @@ export function buildReviewRequest(
     `Signals: ${signal.toolCalls} tool calls, ${signal.userChars} user chars, ${signal.assistantChars} assistant chars.`,
     `Recent tool activity (${toolLines.length}):`,
     ...toolLines,
-    'Return ONLY the structured JSON plan. Evidence is mandatory for every op.',
+    'Return ONLY the structured JSON plan: {"summary": "<one line>", "memoryOps": [...], "skillOps": [...]}.',
+    '',
+    'OP CONTRACT (a deterministic validator checks every field name; a wrong name REJECTS the op, it is not repaired):',
+    'MEMORY op fields — action: "add" | "replace" | "remove"; target: "memory" | "user" (these exact two words, NOT scope/profile/machine/user-profile); content: the text (facts also accepted); old_text: REQUIRED when action is replace/remove; evidence: [{seq: <int>}].',
+    'SKILL op fields — action: "create" | "patch" | "write_file" | "delete" | "remove_file" | "restructure" | "pin" | "unpin"; name: the skill name (REQUIRED for every skill action, NOT skill/skill_name); then per action: create|edit|update → content (REQUIRED, NOT body/markdown); patch → old_string + new_string (both REQUIRED); write_file → file_path (e.g. "references/x.md") + file_content (both REQUIRED, NOT path/content); remove_file → file_path; delete → absorbed_into; evidence: [{seq: <int>}].',
+    'NEVER use these near-miss names: scope, op, path, body, skill, text, target_scope. A memory op with "scope" instead of "target" fails with \'target must be memory or user\'; a skill op without "name" fails with \'name is required\'.',
+    'SKILL create/update CONTENT REQUIREMENT (hard — the skill writer validates this and rejects the whole op): the `content` string MUST begin with a YAML frontmatter block: the first line is exactly `---`, then `name:` and `description:` lines, then another line that is exactly `---`, then a blank line, then the markdown body. Content that starts with `# Title` or plain prose is REJECTED with \'SKILL.md 必须以 `---` 行开头\' and the create is lost entirely.',
+    'CORRECT content value (one JSON string, newlines escaped): "---\\nname: my-skill-name\\ndescription: One sentence, 60 chars max, ends with a period.\\nversion: 0.1.0\\nauthor: Hermes\\n---\\n\\n# Title\\n\\n## When to Use\\n..." — the frontmatter `name:` MUST equal the op\'s `name` field exactly (lowercase letters, digits, hyphens only), and neither fences nor a leading blank line may be added around the whole string.',
+    'EVIDENCE — every op needs "evidence": [{"seq": <n>}] where n is an integer copied verbatim from a `seq=<n>` tag printed on the activity lines above. A bare string, a prose quote, or an invented number fails with \'evidence is required and must reference a valid session seq\'.',
+    'VALIDITY IS PER-OP: one rejected op does NOT void the plan — the valid ones still apply. So emit each op independently and completely; never drop an op only because a neighbour might be wrong.',
     '',
     ...messages,
   ].join('\n')
