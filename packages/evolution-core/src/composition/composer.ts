@@ -423,7 +423,7 @@ export function presetRowBlock(patchText: string, rowId: string): string | null 
   const lines = patchText.split('\n')
   const span = rowBlockSpan(lines, rowId)
   if (span === null) return null
-  const block = [...lines.slice(span.start, span.end)]
+  const block = lines.slice(span.start, span.end)
   while (block.length > 0 && (block[block.length - 1] ?? '').trim() === '') block.pop()
   return block.join('\n') + '\n'
 }

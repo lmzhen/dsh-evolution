@@ -105,7 +105,7 @@ function payloadFor(level: GateLevel, candidate: GateCandidate, facts: Map<strin
 const SYSTEM = 'Judge whether two skill documents describe the same reusable capability. Shared vocabulary or a shared preamble is not duplication. Return only strict JSON: {"verdict":1|0|-1,"reason":"..."}'
 
 function extractJson(text: string): unknown {
-  const fenced = /\`\`\`(?:json)?\s*([\s\S]*?)\`\`\`/i.exec(text)
+  const fenced = /`\``(?:json)?\s*([\s\S]*?)`\``/i.exec(text)
   const body = fenced?.[1] ?? text
   const start = body.indexOf('{')
   if (start < 0) return undefined

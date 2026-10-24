@@ -424,7 +424,7 @@ export function yamlPlainScalarNeedsQuotes(value: string): boolean {
   if (/^0x[0-9a-f]+$/i.test(value)) return true
   if (/^0o[0-7]+$/.test(value)) return true
   if (/^(?:[-+]?\.inf|\.nan)$/i.test(value)) return true
-  if (/^[-?:,[\]{}#&*!|>'\"%@`\s]/.test(value)) return true
+  if (/^[-?:,[\]{}#&*!|>'"%@`\s]/.test(value)) return true
   return false
 }
 

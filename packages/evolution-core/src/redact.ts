@@ -31,7 +31,7 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
   ['google api key', /AIza[0-9A-Za-z_-]{30,}/g],
   // F-335 (0.3.23): case-insensitive (`bearer`), and `\s+` so a tab or run of
   // spaces between `Bearer` and the token is still masked (`Bearer\t...`).
-  ['bearer credential', /Bearer[\s]+[a-z0-9._~+/=\-]{16,}/gi],
+  ['bearer credential', /Bearer[\s]+[a-z0-9._~+/=-]{16,}/gi],
   // R3 (round-2 audit): HTTP Basic — `Authorization: Basic <base64>` crossed
   // every model boundary: `Basic` was in no value-shape row and
   // `authorization` in no keyword set, so the base64 user:password blob
@@ -125,7 +125,7 @@ const PEM_PRIVATE_KEY_PATTERN = new RegExp(`${PEM_HEAD}[\\s\\S]*?${PEM_TAIL}`, '
 // secret crossed verbatim. Both anchors now tolerate an optional `\r` so the
 // line-paired pass behaves identically on LF and CRLF input (Windows-authored
 // .env / compose / kubectl YAML is the realistic carrier).
-const BLOCK_KEY_ONLY_LINE = /(?:^|\s)([\w-]*[_\-])?((?:token|api[_-]?key|secret|password|passwd)(?:[_\-][\w-]*)?)\s*:(?:\r)?$/i
+const BLOCK_KEY_ONLY_LINE = /(?:^|\s)([\w-]*[_-])?((?:token|api[_-]?key|secret|password|passwd)(?:[_-][\w-]*)?)\s*:(?:\r)?$/i
 
 // S0.3 (v37 P0-2): the two patterns above cannot express a camelCase hump —
 // they are case-INSENSITIVE, so [A-Z] would match lowercase too. This pair

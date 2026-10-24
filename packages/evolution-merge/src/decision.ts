@@ -9,7 +9,7 @@ export type DecisionParse =
   | { readonly ok: false; readonly code: 'decision-invalid'; readonly message: string }
 
 function extractJson(text: string): unknown {
-  const fenced = /\`\`\`(?:json)?\s*([\s\S]*?)\`\`\`/i.exec(text)
+  const fenced = /`\``(?:json)?\s*([\s\S]*?)`\``/i.exec(text)
   const body = fenced?.[1] ?? text
   const start = body.indexOf('{')
   if (start < 0) return undefined

@@ -165,7 +165,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       home,
       engine: { screen: engineScreen as unknown as EngineScreenPort['screen'] },
       select: selectWithErrors,
-      cfg: { ...(engineConfig ?? {}), judge: 'deepseek' },
+      cfg: { ...engineConfig, judge: 'deepseek' },
       ...(runner === undefined ? {} : { runner }),
       async onSelection(selection) {
         const loaded = await loadMergeState(io, home)

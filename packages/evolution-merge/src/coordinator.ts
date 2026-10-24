@@ -133,7 +133,7 @@ export function transitionLegacyForProjection(current: MergeRow | undefined, eve
         : invalid(event, current.state)
     case 'approve':
       return current.state === 'pending'
-        ? next(current, event.at, 'approved', { ...(event.runId === undefined ? {} : { runId: event.runId }) })
+        ? next(current, event.at, 'approved', (event.runId === undefined ? {} : { runId: event.runId }))
         : invalid(event, current.state)
     case 'reject':
       return current.state === 'pending' ? next(current, event.at, 'skipped', { origin: 'human' }) : invalid(event, current.state)
