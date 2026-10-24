@@ -65,6 +65,8 @@ it('R-G3a-5：merge 已有目标的 unit 整体撤销，源从归档恢复', asy
   try {
     await lib.create('target-skill', USABLE('target-skill'), 'foreground')
     await lib.create('src-a', USABLE('src-a'), 'foreground')
+    writeFileSync(join(home, 'skills', 'target-skill', '.hermes-managed'), '')
+    writeFileSync(join(home, 'skills', 'src-a', '.hermes-managed'), '')
     const targetBody = (await lib.read('target-skill')) ?? ''
     const sourceBody = (await lib.read('src-a')) ?? ''
     const commit = await lib.commitMerge({

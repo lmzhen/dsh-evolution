@@ -136,6 +136,7 @@ export class UnitTransactions implements UnitTransaction {
       this.options.onLock?.('tree')
       claim = await this.options.claim.acquire(stored.plan.target, stored.plan.runId)
       this.options.onLock?.('claim')
+      await writePhase('target-pending')
       const result = await this.options.backend.commit(stored.plan, async (phase, detail) => {
         if (phase === 'support-pending') { await writePhase('support-pending'); await this.options.onPhase?.('support-pending' as never); return }
         if (phase === 'target-applied') { await this.options.onPhase?.('target-applied' as never); return }
