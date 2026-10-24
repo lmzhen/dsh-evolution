@@ -1,5 +1,5 @@
 // @tier pre-tag
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
@@ -37,8 +37,7 @@ await tx.commit(p.prepared)
   const tsx = process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
   const child = spawn(join(process.cwd(), 'node_modules', '.bin', tsx), [scriptPath], { shell: true, stdio: 'ignore' })
   const pid = Number(await waitFor(pidPath, 20_000))
-  const killed = spawnSync('taskkill', ['/F', '/PID', String(pid)], { encoding: 'utf8' })
-  expect(killed.status === 0 || killed.signal !== null, killed.stderr).toBe(true)
+  process.kill(pid, 'SIGKILL')
   await new Promise<void>(resolve => child.once('exit', () => { resolve() }))
   const dir = join(home, 'merge', 'unit-journals')
   const files = await readdir(dir)
