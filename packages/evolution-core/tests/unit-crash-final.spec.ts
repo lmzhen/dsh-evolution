@@ -39,7 +39,7 @@ await tx.commit(p.prepared)
   const pid = Number(await waitFor(pidPath, 20_000))
   const killed = spawnSync('taskkill', ['/F', '/PID', String(pid)], { encoding: 'utf8' })
   expect(killed.status === 0 || killed.signal !== null, killed.stderr).toBe(true)
-  await new Promise<void>(resolve => child.once('exit', () => resolve()))
+  await new Promise<void>(resolve => child.once('exit', () => { resolve() }))
   const dir = join(home, 'merge', 'unit-journals')
   const files = await readdir(dir)
   const journal = JSON.parse(await readFile(join(dir, files[0]!), 'utf8')) as { unitId: string; phase: string }

@@ -18,7 +18,7 @@ export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
         supportFiles: plan.supportFiles,
         expectedTargetBody: plan.expectedTargetBody,
         expectedSourceBodies: plan.expectedSourceBodies,
-        origin: plan.origin as WriteOrigin,
+        origin: plan.origin,
         summary: plan.summary,
         ...(onPhase === undefined ? {} : { onPhase }),
         ...(signal === undefined ? {} : { signal }),

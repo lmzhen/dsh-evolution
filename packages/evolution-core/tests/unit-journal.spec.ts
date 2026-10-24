@@ -5,10 +5,10 @@ import { tempRoot } from '../../test-support/temp-home.ts'
 import { assertUnitJournalTransition, readUnitJournal, unitJournalPath, writeUnitJournal, type UnitJournal } from '../src/unit-journal.ts'
 
 it('journals monotonic phases and rejects terminal/backwards transitions', () => {
-  expect(() => assertUnitJournalTransition('prepared', 'target-pending')).not.toThrow()
-  expect(() => assertUnitJournalTransition('target-pending', 'target-written')).not.toThrow()
-  expect(() => assertUnitJournalTransition('target-written', 'source-archiving')).not.toThrow()
-  expect(() => assertUnitJournalTransition('source-archiving', 'sources-archived')).not.toThrow()
+  expect(() => { assertUnitJournalTransition('prepared', 'target-pending') }).not.toThrow()
+  expect(() => { assertUnitJournalTransition('target-pending', 'target-written') }).not.toThrow()
+  expect(() => { assertUnitJournalTransition('target-written', 'source-archiving') }).not.toThrow()
+  expect(() => { assertUnitJournalTransition('source-archiving', 'sources-archived') }).not.toThrow()
   expect(() => assertUnitJournalTransition('sources-archived', 'committed')).not.toThrow()
   expect(() => assertUnitJournalTransition('committed', 'prepared')).toThrow()
   expect(() => assertUnitJournalTransition('target-written', 'prepared')).toThrow()

@@ -150,7 +150,7 @@ export class UnitTransactions implements UnitTransaction {
       if (!result.ok) { await writePhase('failed'); return { ok: false as const, code: 'unit-commit-failed' as const, message: result.message } }
       const targetAfter = await this.options.backend.readSkill(stored.plan.target) ?? ''
       const evidence: UnitEvidenceRecord = { schemaVersion: 1, unitId: prepared.unitId, runId: stored.plan.runId, planDigest: stored.digest, state: 'complete', target: { before: stored.plan.expectedTargetBody, after: targetAfter, supportDigest: createHash('sha256').update(JSON.stringify(stored.plan.supportFiles)).digest('hex'), created: !stored.plan.targetExists }, sources: stored.plan.sources.filter(source => source !== stored.plan.target).map(name => ({ name, before: stored.plan.expectedSourceBodies.find(item => item.name === name)?.body ?? '', after: null, archived: (result.archived ?? []).includes(name), absorbedInto: stored.plan.target })), mutations: result.mutations ?? 0, at: this.now() }
-      if (lock !== undefined && !(await lock.assertHeld())) throw new Error('unit-fence-lost')
+      if (!(await lock.assertHeld())) throw new Error('unit-fence-lost')
       await writeUnitEvidence(this.options.io, this.options.home, evidence)
       await writePhase('committed', checkpoints)
       this.prepared.delete(prepared.unitId)
