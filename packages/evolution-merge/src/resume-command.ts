@@ -2,7 +2,7 @@
  * resume command: verify rows re-enter round1; fuse rows re-enter round2 with the persisted
  * decision. pending/skipped rows are not resumable.
  */
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { errorText, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { loadMergeState } from './state.ts'
 import { runScanCommand } from './scan-command.ts'
 import { withMergeRun, type MergeRegistryPort, type WithMergeRunResult } from './run-shell.ts'
@@ -66,7 +66,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
   if (row.runId !== undefined && (await options.isOwnerActive?.(row.runId)) === true) {
     return failure('resume', 'run-owns-row', '该 fuse 行仍由运行中的 run 持有：' + row.runId, '等待该 run 结束，或运行 /evolution merge cancel ' + row.runId, row.runId)
   }
-  if (options.agentless === true) return failure('resume', 'e-305', 'E-305: 本次调用没有携带 agent；resume 需要会话支撑的调用', '在 GUI 或 CLI 的会话里运行 /evolution merge resume --retry ' + row.id)
+  if (options.agentless === true) return failure('resume', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'resume' }), '在 GUI 或 CLI 的会话里运行 /evolution merge resume --retry ' + row.id)
   const parentRunId = options.parentRunId ?? row.runId
   if (parentRunId === undefined) return failure('resume', 'merge-parent-required', '缺 parent run id（E-305 提示：该行可能由无会话调用创建，或父 run 已丢失）', '在 agent 会话中执行 /evolution merge resume --retry ' + row.id, row.runId)
   const decision = selected.decision

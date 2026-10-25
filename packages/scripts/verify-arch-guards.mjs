@@ -325,6 +325,9 @@ const RAW_WRITE_REGISTER = new Set([
   'evolution-commands/src/index.ts',
   'evolution-merge/src/domain/state-v3.ts',
   'evolution-merge/src/target-claim.ts',
+  // chmod only flips the read-only bit on the v2 backup; the bytes went through the IO seam.
+  'evolution-merge/src/domain/pre-1b-backup.ts',
+  'evolution-merge/src/domain/state-bootstrap.ts',
 ])
 
 /** `node:fs` specifiers, either face, with or without the `node:` prefix. */

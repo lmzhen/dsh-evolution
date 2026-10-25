@@ -4,7 +4,7 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import { createHash } from 'node:crypto'
-import { probeText, SkillLibrary, UnitTransactions, skillLibraryUnitBackend, type EvolutionIoLike, type RunRegistry, type UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
+import { errorText, probeText, SkillLibrary, UnitTransactions, skillLibraryUnitBackend, type EvolutionIoLike, type RunRegistry, type UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
 import { targetClaimUnitPort } from './unit-claim.ts'
 import { canRetry, pairKey, type MergeCandidate, type MergeDecision, type MergeRow } from './contracts.ts'
 import { skippedPairKeys } from './skipped.ts'
@@ -133,7 +133,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if ([command.a, command.b].some(name => name.includes('/') || name.includes(':'))) return fail('pair', 'target-invalid', '技能名不能包含 provider/name 或 provider:name 语法：' + command.a + ' / ' + command.b, '使用裸技能名重新 pair')
         // FR-RUN-03: a session-less invocation cannot host a merge child. Answer E-305 in
         // the three-line shape instead of opening a run that is guaranteed to fail.
-        if (agentless) return fail('pair', 'e-305', 'E-305: 本次调用没有携带 agent；pair 需要会话支撑的调用', '在 GUI 或 CLI 的会话里运行 /evolution merge pair ' + command.a + ' ' + command.b)
+        if (agentless) return fail('pair', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'pair' }), '在 GUI 或 CLI 的会话里运行 /evolution merge pair ' + command.a + ' ' + command.b)
         // FR-EXEC-17/NFR-04: two pair runs for one pair must not race for the same row.
         const pairKeyValue = pairKey(command.a, command.b)
         const inFlight = inFlightPairRun(await readRunMetas(deps.io, deps.home), pairKeyValue)
@@ -197,7 +197,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         return { ok: true, text: 'merge pair 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
       }
       if (command.verb === 'scan') {
-        if (agentless) return fail('scan', 'e-305', 'E-305: 本次调用没有携带 agent；scan 需要会话支撑的调用', '在 GUI 或 CLI 的会话里运行 /evolution merge scan')
+        if (agentless) return fail('scan', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'scan' }), '在 GUI 或 CLI 的会话里运行 /evolution merge scan')
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
         const blocked = new Set<string>()

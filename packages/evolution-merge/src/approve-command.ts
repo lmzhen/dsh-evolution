@@ -2,7 +2,7 @@
  * approve command: one pending row is atomically taken to fuse, then a new run executes
  * round2 with the persisted decision. A second approve loses at approvePending (not-pending).
  */
-import type { EvolutionIoLike, RunStage } from '@deepseek-ai/dsh-evolution-core'
+import { errorText, type EvolutionIoLike, type RunStage } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeDecision, MergeRow } from './contracts.ts'
 import { approvePending } from './pending-actions.ts'
 import { pairLedger } from './domain/pair-ledger.ts'
@@ -40,7 +40,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
   const before = loaded.state.rows.find(item => item.id === options.rowId)
   if (before === undefined) return failure('approve', 'row-not-found', '找不到待批准行 ' + options.rowId, '运行 /evolution merge pending 查看当前待批准行')
   if (before.state !== 'pending') return failure('approve', 'row-not-pending', '该行当前状态是 ' + before.state + '，不能批准', '运行 /evolution merge status ' + before.id + ' 查看行状态', before.runId)
-  if (options.agentless === true) return failure('approve', 'e-305', 'E-305: 本次调用没有携带 agent；approve 需要会话支撑的调用', '在 GUI 或 CLI 的会话里运行 /evolution merge approve ' + before.id)
+  if (options.agentless === true) return failure('approve', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'approve' }), '在 GUI 或 CLI 的会话里运行 /evolution merge approve ' + before.id)
   const parentRunId = options.parentRunId ?? before.runId
   if (parentRunId === undefined) return failure('approve', 'merge-parent-required', '缺 parent run id（E-305 提示：该行可能由无会话调用创建，或父 run 已丢失）', '在 agent 会话中执行 /evolution merge approve ' + before.id, before.runId)
   const taken = await approvePending(options.io, options.home, options.now, options.rowId)
