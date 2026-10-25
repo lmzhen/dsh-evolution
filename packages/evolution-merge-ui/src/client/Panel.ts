@@ -263,7 +263,7 @@ function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Tra
 
 export function MergePanel(face: MergeFace): ReactNode {
   const { store, t } = face
-  const snapshot: StoreSnapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const snapshot: StoreSnapshot = useSyncExternalStore(store.subscribe, store.read, store.read)
   const [copied, setCopied] = useState<string | undefined>(undefined)
   const [orders, setOrders] = useState<Record<string, readonly string[]>>({})
   const [dragId, setDragId] = useState<string | undefined>(undefined)

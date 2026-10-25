@@ -191,6 +191,15 @@
       "note": "The L0-L2 gate cache. A cache is still a durable write and goes through the same transaction seam."
     },
     {
+      "id": "reports-retention-lock",
+      "path": "<evolutionHome>/reports/.retention",
+      "writer": "evolution-merge/src/index.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, reportsSweepLockTarget()",
+      "state": [],
+      "note": "The report sweep retention lock; startup sweeps merge-* reports under this one transaction."
+    },
+    {
       "id": "merge-tree-lock-acquire",
       "path": "<evolutionHome>/merge/.tree-lock",
       "writer": "evolution-core/src/tree-lock.ts",

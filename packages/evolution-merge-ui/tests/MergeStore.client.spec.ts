@@ -34,26 +34,26 @@ describe('MergeStore', () => {
     store.select('fuse')
     resolvePending?.({ ok: true, payload: { queue: 'pending', expiredOnly: false, items: [row('old')], counts: view().counts } })
     await pending
-    expect(store.getSnapshot().current.status).toBe('loading')
+    expect(store.read().current.status).toBe('loading')
     resolveFuse?.({ ok: true, payload: { queue: 'fuse', expiredOnly: false, items: [row('new')], counts: view().counts } })
     await Promise.resolve()
-    expect(store.getSnapshot().current.rows.map(item => item.id)).toEqual(['new'])
-    expect(store.getSnapshot().queue).toBe('fuse')
+    expect(store.read().current.rows.map(item => item.id)).toEqual(['new'])
+    expect(store.read().queue).toBe('fuse')
   })
 
   it('keeps body/history errors local to the overlay', async () => {
     const store = new MergeStore(source({ body: vi.fn(async () => ({ ok: false, failure: problem('body-missing') } as MergeOutcome<MergeBody>)) }), { view: view(), rows: [row('r1')] })
     await store.openBody('a', 'live')
-    expect(store.getSnapshot().overlay).toMatchObject({ kind: 'body', status: 'error' })
-    expect(store.getSnapshot().viewState).toBe('ready')
-    expect(store.getSnapshot().current.rows).toHaveLength(1)
+    expect(store.read().overlay).toMatchObject({ kind: 'body', status: 'error' })
+    expect(store.read().viewState).toBe('ready')
+    expect(store.read().current.rows).toHaveLength(1)
   })
 
   it('moves the whole panel to blocked and clears rows', async () => {
     const store = new MergeStore(source({ view: vi.fn(async () => ({ ok: false, failure: { kind: 'blocked', code: 'merge-state-blocked', readiness: { code: 'merge-state-migration-blocked', message: 'raw' } } } as MergeOutcome<MergeViewPayload>)) }), { view: view(), rows: [row('r1')] })
     await store.loadView()
-    expect(store.getSnapshot().viewState).toBe('blocked')
-    expect(store.getSnapshot().current.rows).toEqual([])
+    expect(store.read().viewState).toBe('blocked')
+    expect(store.read().current.rows).toEqual([])
   })
 
   it('appends pages with an opaque cursor', async () => {
@@ -66,13 +66,13 @@ describe('MergeStore', () => {
     await store.loadQueue('pending', false)
     store.loadMore()
     await Promise.resolve()
-    expect(store.getSnapshot().current.rows.map(item => item.id)).toEqual(['p1', 'p2'])
+    expect(store.read().current.rows.map(item => item.id)).toEqual(['p1', 'p2'])
     expect(rows).toHaveBeenCalledWith('pending', 'cursor-2', false)
   })
 
   it('switches to empty and ready without overlap', async () => {
     const store = new MergeStore(source({ rows: vi.fn(async () => ({ ok: true, payload: { queue: 'pending', expiredOnly: false, items: [], counts: view().counts } } as MergeOutcome<QueuePage>)) }))
     await store.loadQueue('pending', false)
-    expect(store.getSnapshot().current.status).toBe('empty')
+    expect(store.read().current.status).toBe('empty')
   })
 })

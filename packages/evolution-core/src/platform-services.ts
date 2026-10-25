@@ -22,7 +22,7 @@ export interface PlatformServiceProbe {
   readonly side: 'host' | 'client'
 }
 
-/** The 25 probes, in service-name order (the guard checks this list against the tree). */
+/** The 26 probes, in service-name order (the guard checks this list against the tree). */
 export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.freeze([
   { service: 'agents', feature: 'review and curator subagent wake-ups', side: 'host' },
   { service: 'approval', feature: 'the platform approval policy the approval row shadows', side: 'host' },
@@ -31,6 +31,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'evolutionApproval', feature: 'pending writes: list, approve and reject from the command surface', side: 'host' },
   { service: 'evolutionCurator', feature: '/evolution curator subcommands, skill undo and history', side: 'host' },
   { service: 'evolutionIo', feature: 'every durable read and write (the IO seam)', side: 'host' },
+  { service: 'evolutionMerge', feature: 'merge command delegation and the merge doctor fact', side: 'host' },
   { service: 'hmr', feature: 'the preset install read-merge-write commit (the platform HMR lock serializes it)', side: 'host' },
   { service: 'evolutionMemoryBudget', feature: 'the memory-budget divergence section of this report', side: 'host' },
   { service: 'evolutionPolicy', feature: 'the policy snapshot that shadows row knobs', side: 'host' },
