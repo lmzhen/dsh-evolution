@@ -44,6 +44,9 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
     namespace: 'evolution-approval',
     seatKey: 'evolution-approval',
     fields: [
+      { id: 'enabled', group: 'write-caps', doc: 'Master approval switch: run the approval pipeline for foreground writes.', label: '启用批准流水线', hint: '关闭后前台写入不再经批准。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
+      { id: 'pendingTtlMs', group: 'write-caps', doc: 'How long a pending approval stays alive before it expires.', label: '批准等待时长', hint: '待批准项最多保留多久。', control: 'number', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },
+      { id: 'approvalConfirm', group: 'write-caps', doc: 'Approval confirmation mode: auto, ask, or timeout.', label: '批准确认方式', hint: '自动批准／每次询问／超时取消。', control: 'select', unit: '', values: ['auto', 'ask', 'timeout'], valueLabels: ['自动', '询问', '超时取消'], atLeast: '' },
       { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'number', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },
       { id: 'approvalConfirm', group: 'write-caps', doc: 'What the confirmation before an APPROVE does: write straight through, ask first, or treat an unanswered prompt as a cancel. The same three words skillWriteConfirm uses for a skill write.', label: '批准前先确认', hint: '点「批准」时要不要再确认一次：直接执行 / 先确认 / 等待超时即取消。默认直接执行（不打断批量批准）。', control: 'select', unit: '', values: ['auto', 'ask', 'timeout'], valueLabels: ['直接执行', '先确认', '等待超时即取消'], atLeast: '' },
     ],

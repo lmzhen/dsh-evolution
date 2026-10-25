@@ -48,6 +48,9 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 |---|---|---|---|---|---|---|---|
 | `skillContentChars` | E3 | live | cordis | tool-skill-manage | maxSkillContentChars | 卡：tool-skill-manage | Character cap on a SKILL.md body (tighten-only). |
 | `maxSkillFileBytes` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Byte cap on one support file (tighten-only). |
+| `enabled` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | Master approval switch: run the approval pipeline for foreground writes. |
+| `pendingTtlMs` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | How long a pending approval stays alive before it expires. |
+| `approvalConfirm` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | Approval confirmation mode: auto, ask, or timeout. |
 | `maxSkillNameLength` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Character cap on a skill name (tighten-only). |
 | `maxDescriptionLength` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Character cap on a skill description (tighten-only). |
 | `descriptionStrict` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Refuse a description over the authoring bar instead of advising. |
