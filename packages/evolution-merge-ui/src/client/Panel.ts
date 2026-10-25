@@ -115,8 +115,8 @@ function ReadOnlySetting({ section, label, value, disabled, missing, note, link,
 }
 function EditableSetting({ form, field, label, fallback, capability, t }: { form: ConfigFormLike; field: string; label: string; fallback: boolean; capability: boolean; t: Translate }): ReactNode {
   const subscribe = useCallback((listener: () => void) => form.subscribe(listener), [form])
-  const getSnapshot = useCallback(() => form.getSnapshot(), [form])
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const readSnapshot = useCallback(() => form['getSnapshot'](), [form])
+  const snapshot = useSyncExternalStore(subscribe, readSnapshot, readSnapshot)
   const fieldPresent = snapshot.status !== 'ready' || snapshot.value === undefined || Object.prototype.hasOwnProperty.call(snapshot.value, field)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState<'saved' | 'failed' | undefined>(undefined)
