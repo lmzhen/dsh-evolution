@@ -175,7 +175,7 @@
     {
       "id": "merge-state",
       "path": "<evolutionHome>/merge/merge-state.json",
-      "writer": "evolution-merge/src/state.ts",
+      "writer": "evolution-merge/src/domain/pair-ledger.ts",
       "serializedBy": "transact",
       "marker": "transactIo(io, mergeStatePath(home)",
       "state": [],
