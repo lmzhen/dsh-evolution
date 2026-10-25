@@ -1,7 +1,7 @@
 /** Batch 2c unit-journal recovery coordinator. UnitTransaction remains the only skill writer. */
 import { join } from 'node:path'
 import type { EvolutionIoLike, UnitJournal, UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
-import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
+import { probeList, readUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
 import { evidenceSha256 } from './domain/evidence-hash.ts'
 import { projectRecoveredUnit } from './recovery-projection.ts'
 
@@ -37,9 +37,9 @@ export async function recoverCommitUnits(options: {
   readonly onProjectionPhase?: (phase: string) => void | Promise<void>
 }): Promise<readonly RecoveryReport[]> {
   const dir = join(options.home, 'merge', 'unit-journals')
-  if (!(await options.io.exists(dir))) return []
-  let files: string[] = []
-  try { files = (await options.io.list(dir)).filter(name => name.endsWith('.json')) } catch { return [] }
+  const listed = await probeList(options.io, dir)
+  if (listed.kind !== 'present') return []
+  const files: string[] = listed.value.filter(name => name.endsWith('.json'))
   const reports: RecoveryReport[] = []
   for (const file of files.sort()) {
     let journal: UnitJournal | null = null
