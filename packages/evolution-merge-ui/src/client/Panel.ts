@@ -154,13 +154,11 @@ function SettingsCard({ view, settings, t }: { view: MergeViewPayload; settings?
     settings?.merge === undefined
       ? createElement(ReadOnlySetting, { section: 'merge-approval', label: t('settings.mergeApproval'), value: mergeFallback, disabled: false, missing: false, t })
       : createElement(EditableSetting, { form: settings.merge, field: 'mergeApproval', label: t('settings.mergeApproval'), fallback: mergeFallback, capability: mergeCapability, t }),
-    settings?.platform === undefined
-      ? createElement(ReadOnlySetting, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, note: t('settings.platformWriteLinkHint'), link: true, t })
-      : createElement(EditableSetting, { form: settings.platform, field: 'enabled', label: t('settings.platformWrite'), fallback: platformFallback, capability: platformCapability, t }),
-    settings?.merge === undefined || settings?.platform === undefined
+    createElement(ReadOnlySetting, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, note: t('settings.platformWriteLinkHint'), link: true, t }),
+    settings?.merge === undefined
       ? createElement('a', { 'data-role': 'settings-link', href: '#/settings' }, t('settings.openPlatform'))
       : null,
-    createElement('p', { 'data-role': 'settings-readonly' }, settings?.merge === undefined || settings?.platform === undefined ? t('settings.readonly') : t('settings.live')),
+    createElement('p', { 'data-role': 'settings-readonly' }, settings?.merge === undefined ? t('settings.readonly') : t('settings.live')),
   )
 }
 interface RowSortHandlers {

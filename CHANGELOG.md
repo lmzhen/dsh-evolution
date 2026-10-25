@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.22 (patch) — host-owned platform write
+
+> **范围**：merge 面板的「平台写入审批」改为只读能力行，不再向 `evolution-approval.enabled` 写开关值；该能力由宿主提供，避免保存时 E-310（字段非 volatile）。合并审批仍可编辑。
+> **验证**：UI 34 tests passed；平台行无 enabled 输入，section 保留 capability/on/off 显示。
+
 ## 0.30.21 (patch) — body row identity
 
 > **范围**：merge UI 的 A/B 正文请求改带 `id=<rowId>`，不再只按技能名读取；修复同名技能时 `body-ambiguous`（“同名技能匹配到多行”）。`MergeRowView.bodies` 保留 `rowId`，无 rowId 的旧调用仍走 `name=`。

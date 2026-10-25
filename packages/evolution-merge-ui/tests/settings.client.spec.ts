@@ -60,11 +60,8 @@ it('saves mergeApproval through the platform settings form', async () => {
   expect(merge.calls).toEqual([['mergeApproval', true]])
   expect(el.querySelector('[data-role="settings-save-state"]')?.textContent).toContain('settings.saved')
   expect(el.querySelector('input[data-field="mergeApproval"]')?.getAttribute('data-value')).toBe('on')
-  const platformInput = el.querySelector('input[data-field="enabled"]') as HTMLInputElement
-  expect(platformInput).toBeTruthy()
-  expect(platformInput.disabled).toBe(false)
-  await act(async () => { platformInput.click() })
-  expect(platform.calls).toEqual([['enabled', true]])
+  expect(el.querySelector('input[data-field="enabled"]')).toBeNull()
+  expect(platform.calls).toEqual([])
 })
 
 it('renders mergeApproval and platformWrite as two independent owner rows', async () => {
@@ -81,9 +78,9 @@ it('disables platformWrite when capability is false and never derives it from me
   const merge = new FakeForm({ mergeApproval: true })
   const platform = new FakeForm({ enabled: true })
   const el = await mount({ merge, platform }, false)
-  const input = el.querySelector('input[data-field="enabled"]') as HTMLInputElement
-  expect(input).toBeTruthy()
-  expect(input.disabled).toBe(true)
+  const section = el.querySelector('[data-section="platform-write"]')
+  expect(section?.getAttribute('data-disabled')).toBe('true')
+  expect(el.querySelector('input[data-field="enabled"]')).toBeNull()
   expect(merge.calls).toEqual([])
 })
 
