@@ -42,6 +42,9 @@ describe('merge-ui client api', () => {
     expect(fetchMock.mock.calls[1]?.[0]).toContain('name=alpha')
     await body('beta', 'archive')
     expect(fetchMock.mock.calls[2]?.[0]).toContain('side=archive')
+    await body('alpha', 'live', 'mr_a')
+    expect(fetchMock.mock.calls[3]?.[0]).toContain('id=mr_a')
+    expect(fetchMock.mock.calls[3]?.[0]).not.toContain('name=alpha')
   })
 
   it('maps the duplicate-name 400 to a body-ambiguous failure', async () => {

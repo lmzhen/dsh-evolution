@@ -31,7 +31,7 @@ export interface MergeRowView {
   failure?: { stage: string; code: string; message: string; retryable: boolean }
   verifySubState?: 'queued' | 'running' | 'failed' | 'cancelled'
   skipKind?: 'agent-keep' | 'human-reject' | 'over-limit' | 'forced'
-  bodies?: { name: string; side: 'live' | 'archive' }[]; actions: RowActionView[]
+  bodies?: { rowId?: string; name: string; side: 'live' | 'archive' }[]; actions: RowActionView[]
 }
 export interface QueuePage { queue: MergeQueue; items: MergeRowView[]; nextCursor?: string; counts: MergeCounts; expiredOnly: boolean }
 export interface MergeBody { name: string; side: 'live' | 'archive'; text: string; markdown: boolean; truncated: boolean; totalBytes: number }
@@ -80,7 +80,7 @@ interface WireRow {
   readonly confidence?: number; readonly expiresAt?: number
   readonly verifySubState?: 'queued' | 'running' | 'failed' | 'cancelled'
   readonly skipKind?: 'agent-keep' | 'human-reject' | 'over-limit' | 'forced'
-  readonly bodies?: readonly { readonly name: string; readonly side: 'live' | 'archive' }[]
+  readonly bodies?: readonly { readonly rowId?: string; readonly name: string; readonly side: 'live' | 'archive' }[]
   readonly attempts?: number; readonly createdAt: number; readonly updatedAt: number; readonly actions: readonly WireAction[]
 }
 interface WirePage { readonly wireVersion: 1; readonly queue: MergeQueue; readonly expiredOnly: boolean; readonly counts: unknown; readonly rows: readonly WireRow[]; readonly nextCursor?: string }
@@ -179,7 +179,7 @@ const toRow = (row: WireRow): MergeRowView => ({
   ...(row.failure === undefined ? {} : { failure: { stage: row.failure.stage, code: row.failure.code, message: row.failure.detail ?? row.failure.code, retryable: row.failure.retryable } }),
   ...(row.verifySubState === undefined ? {} : { verifySubState: row.verifySubState }),
   ...(row.skipKind === undefined ? {} : { skipKind: row.skipKind }),
-  ...(row.bodies === undefined ? {} : { bodies: row.bodies.map(body => ({ name: body.name, side: body.side })) }),
+  ...(row.bodies === undefined ? {} : { bodies: row.bodies.map(body => ({ ...(body.rowId === undefined ? {} : { rowId: body.rowId }), name: body.name, side: body.side })) }),
   actions: row.actions.map(action => ({ id: action.id, command: action.command, confirm: action.confirm, enabled: action.enabled, ...(action.disabledReason === undefined ? {} : { disabledReason: action.disabledReason }) })),
 })
 
@@ -209,8 +209,8 @@ export async function rows(queue: MergeQueue, cursor?: string, expiredOnly = fal
   return { ok: true, payload: { queue: answer.payload.queue, expiredOnly: answer.payload.expiredOnly, items: answer.payload.rows.map(toRow), counts: answer.payload.counts as MergeCounts, ...(answer.payload.nextCursor === undefined ? {} : { nextCursor: answer.payload.nextCursor }) } }
 }
 
-export async function body(name: string, side: 'live' | 'archive'): Promise<MergeOutcome<MergeBody>> {
-  const url = HOST_ROUTES.body + '?name=' + encodeURIComponent(name) + '&side=' + side
+export async function body(name: string, side: 'live' | 'archive', rowId?: string): Promise<MergeOutcome<MergeBody>> {
+  const url = HOST_ROUTES.body + (rowId === undefined ? '?name=' + encodeURIComponent(name) : '?id=' + encodeURIComponent(rowId)) + '&side=' + side
   const answer = await requestWire<WireBody>(url)
   if (!answer.ok) {
     if (answer.failure.kind === 'problem' && answer.failure.code === 'bad-query' && (answer.failure.message ?? '').includes('multiple merge rows')) {

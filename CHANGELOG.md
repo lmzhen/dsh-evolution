@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.21 (patch) — body row identity
+
+> **范围**：merge UI 的 A/B 正文请求改带 `id=<rowId>`，不再只按技能名读取；修复同名技能时 `body-ambiguous`（“同名技能匹配到多行”）。`MergeRowView.bodies` 保留 `rowId`，无 rowId 的旧调用仍走 `name=`。
+> **验证**：0.30.20 真机同名行复现 body 歧义；新增 api client 断言 id 请求不含 name。
+
 ## 0.30.20 (patch) — storage peer seam
 
 > **范围**：`evolution-preset` 不再把 `@deepseek-ai/dsh-storage*` 当作普通依赖安装；三者改为宿主提供的 peer（`^0.2.1-rc.1`，profile 已 `autoInstallPeers: false`），避免在 DSH 0.2.1-rc.2 宿主上解析到 rc.3 并停用 `storage-domain`。

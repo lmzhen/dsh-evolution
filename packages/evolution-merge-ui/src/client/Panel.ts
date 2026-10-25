@@ -217,8 +217,8 @@ function rowNode(row: MergeRowView, store: MergeStore, t: Translate, copy: (comm
           const bodyA = row.bodies?.find(body => body.name === row.a)
           const bodyB = row.bodies?.find(body => body.name === row.b)
           return [
-            bodyA === undefined ? null : createElement('button', { key: 'a', type: 'button', 'data-role': 'body-a', onClick: () => { void store.openBody(bodyA.name, bodyA.side) } }, 'A'),
-            bodyB === undefined ? null : createElement('button', { key: 'b', type: 'button', 'data-role': 'body-b', onClick: () => { void store.openBody(bodyB.name, bodyB.side) } }, 'B'),
+            bodyA === undefined ? null : createElement('button', { key: 'a', type: 'button', 'data-role': 'body-a', onClick: () => { void store.openBody(bodyA.name, bodyA.side, bodyA.rowId) } }, 'A'),
+            bodyB === undefined ? null : createElement('button', { key: 'b', type: 'button', 'data-role': 'body-b', onClick: () => { void store.openBody(bodyB.name, bodyB.side, bodyB.rowId) } }, 'B'),
           ]
         })(),
         actions,

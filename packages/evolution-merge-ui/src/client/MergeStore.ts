@@ -4,7 +4,7 @@ import type { MergeBody, MergeFailure, MergeHistoryItem, MergeOutcome, MergeQueu
 export interface MergeSource {
   view(): Promise<MergeOutcome<MergeViewPayload>>
   rows(queue: MergeQueue, cursor?: string, expiredOnly?: boolean): Promise<MergeOutcome<QueuePage>>
-  body(name: string, side: 'live' | 'archive'): Promise<MergeOutcome<MergeBody>>
+  body(name: string, side: 'live' | 'archive', rowId?: string): Promise<MergeOutcome<MergeBody>>
   history(): Promise<MergeOutcome<{ items: MergeHistoryItem[] }>>
 }
 export type QueueStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
@@ -172,10 +172,10 @@ export class MergeStore {
     void this.loadQueue(this.snapshot.queue, this.snapshot.expiredOnly, current.nextCursor)
   }
 
-  async openBody(name: string, side: 'live' | 'archive'): Promise<void> {
+  async openBody(name: string, side: 'live' | 'archive', rowId?: string): Promise<void> {
     const token = ++this.overlayToken
     this.set({ ...this.snapshot, overlay: { kind: 'body', name, side, status: 'loading' } })
-    const outcome = await this.source.body(name, side)
+    const outcome = await this.source.body(name, side, rowId)
     if (this.disposed || token !== this.overlayToken) return
     if (!outcome.ok) {
       if (outcome.failure.kind === 'blocked') {
