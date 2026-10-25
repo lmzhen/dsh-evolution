@@ -48,9 +48,6 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 |---|---|---|---|---|---|---|---|
 | `skillContentChars` | E3 | live | cordis | tool-skill-manage | maxSkillContentChars | 卡：tool-skill-manage | Character cap on a SKILL.md body (tighten-only). |
 | `maxSkillFileBytes` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Byte cap on one support file (tighten-only). |
-| `enabled` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | Master approval switch: run the approval pipeline for foreground writes. |
-| `pendingTtlMs` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | How long a pending approval stays alive before it expires. |
-| `approvalConfirm` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | Approval confirmation mode: auto, ask, or timeout. |
 | `maxSkillNameLength` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Character cap on a skill name (tighten-only). |
 | `maxDescriptionLength` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Character cap on a skill description (tighten-only). |
 | `descriptionStrict` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Refuse a description over the authoring bar instead of advising. |
@@ -145,7 +142,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `threatExemptLabels` | E1 | none | cordis | evolution-threat | — | 无（security） | Threat labels the deployment declares benign (safety surface, never user-writable). |
 | `evolution-threat.enabled` | E2 | none | cordis | evolution-threat | — | 无（security） | Mount the write-time threat guard at all. |
 | `evolution-threat.maxScanChars` | E2 | none | cordis | evolution-threat | — | 无（security） | Scan window size of the threat guard. |
-| `evolution-approval.enabled` | E2 | none | cordis | evolution-approval | — | 无（security） | Require approval before a staged write executes. |
+| `evolution-approval.enabled` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | Master approval switch: run the approval pipeline for foreground writes. |
 | `evolution-approval.stageForeground` | E2 | none | cordis | evolution-approval | — | 无（security） | Stage foreground agent writes for approval too. |
 | `evolution-approval.pendingTtlMs` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires. |
 | `qualityWarnThreshold` | E2 | none | cordis | evolution-feedback | — | 无（internal） | Feedback score below which a skill carries a warning. |
