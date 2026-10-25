@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.20 (patch) — storage peer seam
+
+> **范围**：`evolution-preset` 不再把 `@deepseek-ai/dsh-storage*` 当作普通依赖安装；三者改为宿主提供的 peer（`^0.2.1-rc.1`，profile 已 `autoInstallPeers: false`），避免在 DSH 0.2.1-rc.2 宿主上解析到 rc.3 并停用 `storage-domain`。
+> **验证**：0.30.19 真机复现 rc.3 不兼容→storage-domain 停→workspace/agent 不可用；手工钉 rc.2 后 workspace 列表恢复。
+
 ## 0.30.19 (patch) — Batch5 merge remediation complete
 
 > **范围**：190-ID 审计全绿（P0 78/78、P1 100/100、P2 5/5）；CAND L1 MERGE selector 修复；commit unitId 贯通；approve stageHooks；target-protected 前置；CAS 终态可见；resume approval 透传；MergeReportPair.lengths。

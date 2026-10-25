@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-preset",
   "description": "Compatibility one-click bundle (legacy; new installs should use evolution-all)",
-  "version": "0.30.19",
+  "version": "0.30.20",
   "publishConfig": {
     "access": "public"
   },
@@ -32,9 +32,6 @@
   "dependencies": {
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
-    "@deepseek-ai/dsh-storage": "workspace:^",
-    "@deepseek-ai/dsh-storage-json": "workspace:^",
-    "@deepseek-ai/dsh-storage-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-domain": "workspace:^",
@@ -59,6 +56,11 @@
     "@deepseek-ai/dsh-evolution-replay": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-storage": "^0.2.1-rc.1",
+    "@deepseek-ai/dsh-storage-json": "^0.2.1-rc.1",
+    "@deepseek-ai/dsh-storage-domain": "^0.2.1-rc.1"
   },
   "exports": {
     ".": {
