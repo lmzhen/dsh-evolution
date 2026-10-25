@@ -1,5 +1,5 @@
 // Test-only v4 row seeder: tests no longer write through the legacy v3 writer.
-import { transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { probeText, transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeRow } from '../../src/contracts.ts'
 import { legacyToV3 } from '../../src/domain/row-v3-bridge.ts'
 import { v3ToV4 } from '../../src/domain/row-v4.ts'
@@ -11,12 +11,13 @@ import { ensureMergeStateReady, mergeStatePath } from '../../src/domain/state-bo
 export async function seedRow(io: EvolutionIoLike, home: string, row: MergeRow): Promise<void> {
   const target = legacyToV3(row)
   if (target === null) throw new Error('invalid fixture row')
-  let raw = await io.readText(mergeStatePath(home)).catch(() => null)
+  const initial = await probeText(io, mergeStatePath(home))
+  let raw = initial.kind === 'present' ? initial.value : null
   let existing = raw === null ? null : parseV4State(raw)
   if (existing === null) {
     const ready = await ensureMergeStateReady(io, home)
     if (!ready.ok) throw new Error(ready.code + ': ' + ready.message)
-    if (await io.readText(mergeStatePath(home)).catch(() => null) === null) await io.writeText(mergeStatePath(home), JSON.stringify({ schemaVersion: 3, rows: [] }))
+    if ((await probeText(io, mergeStatePath(home))).kind === 'absent') await io.writeText(mergeStatePath(home), JSON.stringify({ schemaVersion: 3, rows: [] }))
     const backup = await createPre1bBackup(io, home)
     if (!backup.ok) throw new Error(backup.message)
     existing = normalizeV3State({ schemaVersion: 3, rows: ready.state.rows }, { backupRef: backup.id, at: 'seed' })
