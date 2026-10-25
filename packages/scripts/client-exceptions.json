@@ -7,6 +7,11 @@
       "owner": "G5"
     },
     {
+      "fieldId": "evolution-approval.enabled",
+      "reason": "switch — the platform field spec offers number/text only; the approval master switch is a family control (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
       "fieldId": "mergeApproval",
       "reason": "switch — the platform field spec offers number/text only; the merge approval gate is a family switch (31 号 P-1)",
       "owner": "G5"
