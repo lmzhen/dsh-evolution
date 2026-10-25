@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.19 (patch) — Batch5 merge remediation complete
+
+> **范围**：190-ID 审计全绿（P0 78/78、P1 100/100、P2 5/5）；CAND L1 MERGE selector 修复；commit unitId 贯通；approve stageHooks；target-protected 前置；CAS 终态可见；resume approval 透传；MergeReportPair.lengths。
+> **验证**：merge+UI 512 passed / 1 skipped；真实 host approve→commit→report→undo 与 CAND scan→pending→approve→commit→undo 全链。
+
 ## 0.30.18 (patch) — RG8 release: v3 origin + test parity
 
 > **范围**：runtime reject 保留 origin=human；12 个旧 characterization 测试移植到 v2 模块；engine 精确依赖 0.30.18；全量 merge suite 133/328。
