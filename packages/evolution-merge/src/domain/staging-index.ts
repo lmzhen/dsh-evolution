@@ -9,6 +9,7 @@ export interface StagingEntry {
   readonly expiresAt: number
   readonly runId?: string
   readonly createdAt: number
+  readonly state?: 'reserved' | 'present' | 'expired' | 'lost'
 }
 
 export function stagingIndexPath(home: string, rowId: string): string {

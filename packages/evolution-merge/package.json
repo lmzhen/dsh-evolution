@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-merge",
   "description": "Skill auto-merge domain: screening, two-round authoring, queues and commit orchestration",
-  "version": "0.30.18",
+  "version": "0.30.19",
   "publishConfig": {
     "access": "public"
   },
@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-commands": "workspace:^",
     "@deepseek-ai/dsh-evolution-merge-engine": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"
   },

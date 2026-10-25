@@ -12,6 +12,7 @@ it('mounts routes, command and merge_stage with a minimal host context', async (
   const routes: Array<{ path: string; fetch: (request: Request) => Promise<Response> }> = []
   const commands: unknown[] = []
   const tools: unknown[] = []
+  const provided = new Map<string, unknown>()
   const scope = {
     get(name: string) {
       if (name === 'evolutionIo') return { provider: () => io }
@@ -47,6 +48,7 @@ it('mounts routes, command and merge_stage with a minimal host context', async (
     on: () => () => {},
     fiber: {},
     get: (name: string) => scope.get(name),
+    provide: (name: string, value: unknown) => { provided.set(name, value) },
   }
   try {
     apply(ctx as never, {})
@@ -57,6 +59,10 @@ it('mounts routes, command and merge_stage with a minimal host context', async (
     expect(commands[0]).toMatchObject({ name: 'merge' })
     expect(tools).toHaveLength(1)
     expect(tools[0]).toMatchObject({ name: 'merge_stage' })
+    const service = provided.get('evolutionMerge') as { run?: unknown; doctorFact?: unknown } | undefined
+    expect(typeof service?.run).toBe('function')
+    expect(typeof service?.doctorFact).toBe('function')
+    expect(await service?.doctorFact?.()).toMatchObject({ status: expect.stringMatching(/^(ok|warn|fail|unknown)$/), detail: expect.any(String) })
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous

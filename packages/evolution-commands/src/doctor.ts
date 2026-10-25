@@ -229,6 +229,13 @@ export interface LegacyMigrationRow {
   readonly pending: readonly string[]
 }
 
+/** The merge plugin's one-line contribution to the global doctor (cross-plugin read). */
+export interface MergeDoctorLine {
+  readonly status: 'ok' | 'warn' | 'fail' | 'unknown'
+  readonly detail: string
+  readonly remedy?: string
+}
+
 export interface DoctorReport {
   /** OPT-23 (2026-09): `preset-only` — the delivered Evolution preset
    * artifact exists but NO profile carries an evolution bundle (e.g. the
@@ -307,6 +314,8 @@ export interface DoctorReport {
   /** G6/W8 tail: the frozen DiagnosticsView (7 facts + 8 runtime rows) — the SAME object the
    * diagnostics route and the client card render; `--json` emits it and the text renderer prints it. */
   readonly view: DiagnosticsView
+  /** The merge row: produced by the merge plugin's buildDoctorView consumer; absent service = unknown. */
+  readonly merge: MergeDoctorLine
 }
 
 /** Profile bundle rows for evolution-family packages across all profiles.
@@ -854,6 +863,10 @@ export async function diagnose(
   // exists in preset-source.ts — doctor must not add a second).
   // G6/W8 tail: one view for every doctor face (text / --json / diagnostics route / client card).
   const view = buildDoctorView(await assembleDoctorInputs(ctx as unknown as Parameters<typeof assembleDoctorInputs>[0]))
+  // Plan §2.3: evolution-commands owns the global doctor; the merge plugin contributes one line
+  // built from ITS DoctorView envelope. A missing merge row is an honest unknown, not silence.
+  const merge = await mergeDoctorLine(ctx)
+  if (merge.status !== 'ok' && merge.remedy !== undefined) actions.push('合并行：' + merge.remedy)
   const foreignProfiles = homeProfiles(home)
     .filter(({ profile, dir }) => mounted === undefined || (profile !== mounted.profile && dir !== mounted.dir))
     .map(({ profile }) => profile)
@@ -868,7 +881,28 @@ export async function diagnose(
     serviceSource: reviewRow === undefined ? 'bundles' : 'platform',
     actions,
     view,
+    merge,
   }
+}
+
+/**
+ * Probe the merge plugin's global-doctor line. The plugin exposes `doctorFact()` (which composes
+ * its wire DoctorView); this module never reads merge files itself, so core stays free of merge
+ * rows and the two producers cannot drift.
+ * @param ctx - the host service view.
+ * @returns the one-line merge fact; unknown on absence or failure (doctor must answer).
+ */
+async function mergeDoctorLine(ctx: { get(name: string): unknown }): Promise<MergeDoctorLine> {
+  const service = ctx.get('evolutionMerge') as { doctorFact?: () => Promise<unknown> } | undefined
+  if (service?.doctorFact === undefined) {
+    return { status: 'unknown', detail: 'evolutionMerge 服务未挂载：本安装形态没有合并行', remedy: '安装含 evolution-merge 的 bundle 后重新运行 /evolution doctor' }
+  }
+  const probed = await probeBounded(() => service.doctorFact!(), 'merge doctor')
+  if (!probed.ok) return { status: 'unknown', detail: '合并状态探测失败：' + probed.message, remedy: '运行 /evolution merge doctor 查看详情' }
+  const value = probed.value as { status?: unknown; detail?: unknown; remedy?: unknown }
+  const status = value.status === 'ok' || value.status === 'warn' || value.status === 'fail' || value.status === 'unknown' ? value.status : 'unknown'
+  const detail = typeof value.detail === 'string' && value.detail !== '' ? value.detail : '合并状态探测没有返回 detail'
+  return { status, detail, ...(typeof value.remedy === 'string' && value.remedy !== '' ? { remedy: value.remedy } : {}) }
 }
 
 /**
@@ -1044,6 +1078,9 @@ export function renderDoctorText(report: DoctorReport): string {
   // mounted service. The view's platform-services row only names MISSING probed services, not this
   // family-specific inference, so the line stays here.
   extras.push(`services: review=${report.services.review} (${report.serviceSource === 'platform' ? 'the live row, this runtime' : 'inferred from bundles, all profiles'}) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`)
+  const mergeStatus = report.merge.status === 'ok' ? '正常' : report.merge.status === 'warn' ? '注意' : report.merge.status === 'fail' ? '异常' : '未知'
+  extras.push('merge: [' + mergeStatus + '] ' + report.merge.detail + (report.merge.remedy === undefined ? '' : '；下一步：' + report.merge.remedy))
+  if (report.merge.status !== 'ok' && report.merge.remedy !== undefined) extras.push('  → ' + report.merge.remedy)
   // O-2 (S3.4/A99): one line, only when a capability the family uses is missing. Each entry names
   // the feature that goes quiet, because "service X is absent" alone does not tell a reader what
   // they are losing.

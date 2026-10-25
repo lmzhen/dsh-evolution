@@ -5,7 +5,8 @@
  * This module only turns those bytes into a CommitMergePlan; it never reads the live tree and
  * never decides whether a merge is allowed (validateStagedTree does that).
  */
-import type { CommitMergePlan, WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import type { CommitMergePlan, WriteOrigin, SkillLimits } from '@deepseek-ai/dsh-evolution-core'
+import type { RevisionRef } from './contracts.ts'
 
 const MAX_SKILL_NAME_LENGTH = 64
 
@@ -51,6 +52,11 @@ export interface BuildCommitPlanInput {
   readonly sourceBodies: readonly { readonly name: string; readonly body: string }[]
   readonly origin: WriteOrigin
   readonly summary: string
+  readonly limits?: SkillLimits
+  /** Round-1 anchors; carried on the plan so every committer (unit or legacy port) re-checks them. */
+  readonly targetRevision?: RevisionRef
+  readonly sourceRevisions?: Readonly<Record<string, RevisionRef>>
+  readonly supportDigest?: string
 }
 
 export type BuildCommitPlanResult =
@@ -72,8 +78,12 @@ export function buildCommitPlan(input: BuildCommitPlanInput): BuildCommitPlanRes
       supportFiles: input.mergedFiles,
       expectedTargetBody: input.targetCurrent,
       expectedSourceBodies: sources,
+      ...(input.targetRevision === undefined ? {} : { targetRevision: input.targetRevision }),
+      ...(input.sourceRevisions === undefined ? {} : { sourceRevisions: input.sourceRevisions }),
+      ...(input.supportDigest === undefined ? {} : { supportDigest: input.supportDigest }),
       origin: input.origin,
       summary: input.summary,
+      ...(input.limits === undefined ? {} : { limits: input.limits }),
     },
   }
 }

@@ -20,6 +20,7 @@ export interface RunScanCommandOptions {
   readonly detached?: boolean
   readonly notes?: readonly string[]
   readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
+  readonly cards?: readonly import('./skill-card.ts').SkillCard[]
 }
 
 export async function runScanCommand(options: RunScanCommandOptions): Promise<WithMergeRunResult> {
@@ -31,6 +32,7 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
     approval: { platformWrite: options.platformWrite, mergeApproval: options.approval },
     now: options.now,
     ...(options.detached === undefined ? {} : { detached: options.detached }),
+    ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
     async body(ctx) {
       const ports = options.makePorts === undefined ? options.ports : options.makePorts(ctx.runId)
       if (ports === undefined) throw new Error('scan requires ports or makePorts')
@@ -47,6 +49,7 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
         ...(options.timeoutMinutes === undefined ? {} : { timeoutMinutes: options.timeoutMinutes }),
         ...(options.notes === undefined ? {} : { notes: options.notes }),
         ...(options.isOwnerActive === undefined ? {} : { isOwnerActive: options.isOwnerActive }),
+        ...(options.cards === undefined ? {} : { cards: options.cards }),
       })
     },
   })

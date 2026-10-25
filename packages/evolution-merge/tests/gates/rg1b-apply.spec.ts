@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
-import { loadOrMigrateStateV3, v2BackupPath } from '../../src/domain/state-v3.ts'
+import { ensureMergeStateReady, v2BackupPath } from '../../src/domain/state-bootstrap.ts'
 import { loadMergeState, mergeStatePath } from '../../src/state.ts'
 
 const fixture = fileURLToPath(new URL('../fixtures/0.30.15/generated/merge/merge-state.json', import.meta.url))
@@ -19,7 +19,7 @@ it('applies the real 0.30.15 fixture once and verifies identity', async () => {
   const v2 = await readFile(fixture, 'utf8')
   await writeFile(mergeStatePath(home), v2)
   const before = JSON.parse(v2) as { rows: { id: string; state: string }[] }
-  const first = await loadOrMigrateStateV3(io, home)
+  const first = await ensureMergeStateReady(io, home)
   expect(first).toMatchObject({ ok: true, migrated: true })
   if (!first.ok) return
   expect(first.state.rows.map(row => [row.id, row.state])).toEqual(before.rows.map(row => [row.id, row.state]))
@@ -27,7 +27,7 @@ it('applies the real 0.30.15 fixture once and verifies identity', async () => {
   expect((await stat(v2BackupPath(home))).mode & 0o200).toBe(0)
   const v3 = await readFile(mergeStatePath(home), 'utf8')
   expect(JSON.parse(v3).schemaVersion).toBe(3)
-  const second = await loadOrMigrateStateV3(io, home)
+  const second = await ensureMergeStateReady(io, home)
   expect(second).toMatchObject({ ok: true, migrated: false })
   expect(hash(await readFile(mergeStatePath(home), 'utf8'))).toBe(hash(v3))
   const loaded = await loadMergeState(io, home)
@@ -42,9 +42,9 @@ it('refuses corrupt v2 and a future v4 state', async () => {
   const corrupt = fileURLToPath(new URL('../fixtures/0.30.15/corrupt/truncated-state.json', import.meta.url))
   const bytes = await readFile(corrupt, 'utf8')
   await writeFile(mergeStatePath(home), bytes)
-  expect(await loadOrMigrateStateV3(io, home)).toMatchObject({ ok: false, code: 'state-migration-blocked' })
+  expect(await ensureMergeStateReady(io, home)).toMatchObject({ ok: false, code: 'merge-state-needs-repair' })
   expect(await readFile(mergeStatePath(home), 'utf8')).toBe(bytes)
-  await writeFile(mergeStatePath(home), JSON.stringify({ schemaVersion: 4, rows: [] }))
+  await writeFile(mergeStatePath(home), JSON.stringify({ schemaVersion: 5, rows: [] }))
   const future = await loadMergeState(io, home)
   expect(future.ok).toBe(false)
   expect(future.note).toBe('merge-state-forward-only')

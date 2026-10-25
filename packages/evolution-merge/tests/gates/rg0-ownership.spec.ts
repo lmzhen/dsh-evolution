@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const owners: [string, string][] = [
-  ['merge-state', 'src/state.ts'],
+  ['merge-state', 'src/domain/pair-ledger.ts'],
   ['runs', '../evolution-core/src/run-registry.ts'],
   ['journal', 'src/domain/commit-journal-store.ts'],
   ['receipt/unit', '../evolution-core/src/skill-store.ts'],
@@ -22,7 +22,8 @@ const owners: [string, string][] = [
 it('RG0 only state.ts may write merge-state directly', () => {
   const files = readdirSync(root + '/src', { recursive: true }).map(String).filter(name => name.endsWith('.ts'))
   for (const file of files) {
-    if (file === 'state.ts') continue
+    const normalized = file.replace(/\\/g, '/')
+    if (normalized === 'state.ts' || normalized === 'domain/state-bootstrap.ts' || normalized === 'domain/pair-ledger.ts') continue
     const source = readFileSync(root + '/src/' + file, 'utf8')
     expect(source, file).not.toContain('mergeStatePath')
   }
@@ -31,7 +32,7 @@ it('RG0 only state.ts may write merge-state directly', () => {
 it('RG0 writer map allows only the declared row/commit writers', () => {
   const files = readdirSync(root + '/src', { recursive: true }).map(String).filter(name => name.endsWith('.ts'))
   const rowWriters = files.filter(file => /import .*\b(transactRows|dropRowV3)\b/.test(readFileSync(root + '/src/' + file, 'utf8')))
-  expect(rowWriters.sort()).toEqual(['index.ts', 'pending-actions.ts', 'round2-outcome.ts', 'runtime.ts', 'scan-run.ts'])
+  expect(rowWriters).toEqual([])
   const legacyWriters = files.filter(file => /\b(upsertRow|dropRow|moveRow|mutateMergeState)\b/.test(readFileSync(root + '/src/' + file, 'utf8')))
   expect(legacyWriters).toEqual(['state.ts'])
   const commitWriters = files.filter(file => readFileSync(root + '/src/' + file, 'utf8').includes('port.commitMerge'))

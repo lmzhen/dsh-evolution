@@ -42,6 +42,13 @@ it('V1: the default policy reports expired archives and deletes nothing', async 
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('readArchived returns the archived body by original name', async () => {
+  const { root, lib } = await seed()
+  expect(await lib.readArchived('old-skill')).toContain('Body of old-skill.')
+  expect(await lib.readArchiveReason('old-skill')).toContain('Consolidated into umbrella')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 it('V1: an explicit prune policy still deletes past the window', async () => {
   const { root } = await seed()
   const pruning = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, archiveRetention: 'prune' })

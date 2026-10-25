@@ -3,7 +3,7 @@
  * writes, no report reads. The UI and command parser share this vocabulary.
  */
 import type { MergeQueue, MergeRow } from './contracts.ts'
-import type { Facts, RunsView } from './wire.ts'
+import type { Facts, RunDetail, RunsView } from './wire.ts'
 import { queueOf, stageOf } from './contracts.ts'
 import { fitToolText } from './presentation-budget.ts'
 
@@ -50,8 +50,55 @@ export function formatRunsView(view: RunsView): string {
   return fitToolText(['merge runs: ' + String(view.runs.length)].concat(view.runs.map(run => '- ' + run.id + ' [' + run.state + ']' + (run.endedAt === undefined ? '' : ' ' + new Date(run.endedAt).toISOString()))).join('\n'))
 }
 
+/** CLI face of the RunDetail wire projection: one run, its current pair and every pair outcome. */
+export function formatRunDetail(detail: RunDetail): string {
+  const lines = ['merge run ' + detail.id + ' [' + detail.state + '] command=' + detail.command
+    + (detail.stage === undefined ? '' : ' stage=' + detail.stage)
+    + (detail.progress === null || detail.progress === undefined ? '' : ' progress=' + String(detail.progress.done) + '/' + String(detail.progress.total))
+    + (detail.currentPairKey === undefined ? '' : ' currentPair=' + detail.currentPairKey.replace('\u0000', ' + '))]
+  lines.push('started=' + new Date(detail.startedAt).toISOString()
+    + (detail.endedAt === undefined ? '' : ' ended=' + new Date(detail.endedAt).toISOString())
+    + (detail.parentRunId === undefined ? '' : ' parent=' + detail.parentRunId)
+    + (detail.resultRef === undefined ? '' : ' resultRef=' + detail.resultRef)
+    + (detail.reportRef === undefined ? '' : ' report=' + detail.reportRef)
+    + (detail.meta?.phase === undefined ? '' : ' phase=' + detail.meta.phase)
+    + (detail.meta?.approval === undefined ? '' : ' approval=' + detail.meta.approval)
+    + (detail.stopReason === undefined ? '' : ' stopReason=' + detail.stopReason)
+    + (detail.failure === undefined ? '' : ' failure=' + detail.failure.code))
+  for (const pair of detail.pairs) {
+    lines.push('- ' + pair.a + ' + ' + pair.b + ': ' + pair.outcome
+      + (pair.stage === undefined ? '' : ' stage=' + pair.stage)
+      + (pair.code === undefined ? '' : ' code=' + pair.code)
+      + (pair.target === undefined ? '' : ' target=' + pair.target.requested))
+  }
+  if (detail.pairsTruncated) lines.push('(pairs truncated)')
+  return fitToolText(lines.join('\n'))
+}
+
 export function formatQueue(rows: readonly MergeRow[], queue: MergeQueue): string {
   const selected = rows.filter(row => queueOf(row.state) === queue)
   if (selected.length === 0) return 'merge ' + queue + ': empty'
   return fitToolText(['merge ' + queue + ': ' + String(selected.length)].concat(selected.map(row => '- ' + describe(row))).join('\n'))
+}
+
+const REASON_TEXT: Readonly<Record<string, string>> = {
+  kept: '门禁判定保留，不合并。',
+  'gate-keep': '门禁判定保留，不合并。',
+  rejected: '人工拒绝合并。',
+  'merge-over-limit': '超出合并限制，未合并。',
+  'validation-failed': '合并校验未通过，未合并。',
+}
+function humanReason(reason: string): string { return REASON_TEXT[reason] ?? reason }
+
+/** Snapshot-compatible formatting, no legacy MergeRow. */
+export function formatSnapshotStatus(rows: readonly import('./wire.ts').RowFact[]): string {
+  const counts = { verify: 0, pending: 0, fuse: 0, skipped: 0 }
+  for (const row of rows) counts[row.queue] += 1
+  const lines = ['merge: verify ' + String(counts.verify) + ', pending ' + String(counts.pending) + ', fuse ' + String(counts.fuse) + ', skipped ' + String(counts.skipped)]
+  for (const row of rows) lines.push('- ' + row.a + ' + ' + row.b + ' [' + row.state + ']' + (row.reason === undefined ? '' : ' — ' + humanReason(row.reason)))
+  return fitToolText(lines.join('\n'))
+}
+export function formatSnapshotQueue(rows: readonly import('./wire.ts').RowFact[], queue: import('./wire.ts').QueueId): string {
+  const selected = rows.filter(row => row.queue === queue)
+  return selected.length === 0 ? 'merge ' + queue + ': empty' : fitToolText(['merge ' + queue + ': ' + String(selected.length)].concat(selected.map(row => '- ' + row.a + ' + ' + row.b + ' [' + row.state + ']' + (row.reason === undefined ? '' : ' — ' + humanReason(row.reason)))).join('\n'))
 }

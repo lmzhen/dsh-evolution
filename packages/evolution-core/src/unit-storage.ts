@@ -19,6 +19,7 @@ export interface UnitSnapshot {
   readonly sourceBefore: readonly { name: string; body: string }[]
   readonly origin: string
   readonly summary: string
+  readonly validationPlan?: { readonly planVersion: 1; readonly stageDigest: string; readonly revision: string }
   readonly createdAt: number
 }
 
@@ -31,6 +32,7 @@ export interface UnitEvidenceRecord {
   readonly target: { before: string | null; after: string; supportDigest: string; created: boolean }
   readonly sources: readonly { name: string; before: string; after: string | null; archived: boolean; absorbedInto: string }[]
   readonly mutations: number
+  readonly validationPlan?: { readonly planVersion: 1; readonly stageDigest: string; readonly revision: string }
   readonly at: number
 }
 
@@ -127,6 +129,8 @@ export interface UnitReceiptRecord {
   readonly target: string
   readonly archived: readonly string[]
   readonly at: number
+  /** Hash of the evidence written after this receipt; set on the final receipt. */
+  readonly evidenceSha256?: string
 }
 
 export function unitReceiptPath(home: string, unitId: string): string {

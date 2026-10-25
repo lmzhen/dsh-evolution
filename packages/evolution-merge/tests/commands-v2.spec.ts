@@ -1,7 +1,7 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
-import { it } from 'vitest'
-import { parseMergeCommand } from '../src/commands.ts'
+import { expect, it } from 'vitest'
+import { mergeUsage, parseMergeCommand } from '../src/commands.ts'
 
 function command(argv: string[]) {
   const parsed = parseMergeCommand(argv)
@@ -10,15 +10,25 @@ function command(argv: string[]) {
   return parsed.command
 }
 
-it('parses the 19 command forms', () => {
+it('parses the 20 command forms', () => {
   const forms = [
     ['scan'], ['pair', 'a', 'b'], ['pair', '--force', 'a', 'b'], ['status'], ['status', 'id'],
     ['report'], ['cancel'], ['runs'], ['doctor'], ['pending'], ['pending', '--expired'],
     ['candidates', '--retry'], ['approve', 'id'], ['reject', 'id'], ['resume'], ['resume', '--retry'],
     ['skipped', '--restore', 'id'], ['discard', 'id'], ['undo', 'target', '--run', 'r1'],
+    ['reconcile'],
   ]
-  assert.equal(forms.length, 19)
+  assert.equal(forms.length, 20)
   for (const argv of forms) assert.equal(parseMergeCommand(argv).ok, true, argv.join(' '))
+})
+
+it('help lists every parser form, the reconcile consumer and the defaults line', () => {
+  const usage = mergeUsage()
+  const [forms, defaults] = usage.split('\n')
+  expect(forms?.split(' | ')).toHaveLength(20)
+  expect(defaults).toContain('defaults:')
+  expect(defaults).toContain('mergeApproval=false')
+  expect(forms).toContain('/evolution merge reconcile')
 })
 
 it('force/expired/retry switches keep positional args', () => {

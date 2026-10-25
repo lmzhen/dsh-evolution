@@ -25,6 +25,7 @@ it('runs merge then keep, dropping the committed row and keeping the skipped row
   expect(draft.stopReason).toBe('completed')
   expect(draft.totals).toEqual({ merged: 1, kept: 1, pending: 0, failed: 0 })
   expect(draft.pairs.map(pair => pair.outcome)).toEqual(['merged', 'kept'])
+  await draft.finalize?.()
   const rows = (await loadMergeState(io, home)).state.rows
   expect(rows.map(row => row.state)).toEqual(['skipped'])
 })

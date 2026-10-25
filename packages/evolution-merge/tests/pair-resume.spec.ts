@@ -1,3 +1,4 @@
+import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
@@ -8,7 +9,6 @@ import {
   rowIdOf,
   runPairCommand,
   runResumeCommand,
-  upsertRow,
   type MergeDecision,
   type MergeRegistryPort,
   type MergeRow,
@@ -51,9 +51,9 @@ it('resumes a fuse row with its persisted decision', async () => {
   const key = pairKey('a', 'b')
   const row: MergeRow = {
     id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'fuse', queue: 'fuse',
-    decision: DECISION, createdAt: AT, updatedAt: AT,
+    decision: DECISION, runId: 'parent-run', createdAt: AT, updatedAt: AT,
   }
-  await upsertRow(io, home, () => Date.parse(AT), row)
+  await seedRow(io, home, row)
   const result = await runResumeCommand({
     io, home, registry: registry(), ports: ports(), rowId: row.id,
     platformWrite: true, now: () => 200,

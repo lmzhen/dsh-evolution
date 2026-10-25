@@ -7,11 +7,14 @@
 import { join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { stagingRoot } from './staging.ts'
+import type { MergeValidationPlanRef } from './contracts.ts'
 
 export interface CommitReceipt {
   readonly runId: string
   readonly parentRunId?: string
   readonly unitId: string
+  readonly evidenceSha256?: string
+  readonly validationPlan?: MergeValidationPlanRef
   readonly target: string
   readonly create: boolean
   readonly sources: readonly string[]

@@ -44,6 +44,10 @@ export const BASELINE_ACTION = 'baseline'
 
 /** G3b: one unit's head. Exactly one of the two forms is present (they never coexist). */
 export interface UnitHead {
+  /** The merge run this unit belongs to, when the writer recorded one. */
+  runId?: string
+  /** This unit starts a fresh target baseline; older versions remain listable but outside it. */
+  baseline?: true
   /** Representative shard: the unit's WHOLE manifest of moves (one entry per written path). */
   moves?: readonly Readonly<Record<string, unknown>>[]
   /** Representative shard: the skills this unit wrote, so members resolve without a directory scan. */

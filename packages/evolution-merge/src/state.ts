@@ -7,7 +7,6 @@
  * mismatch is repaired by the next write, never by a GET.
  */
 import { join } from 'node:path'
-import { transactIo } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
   MERGE_STATE_VERSION,
@@ -18,10 +17,10 @@ import {
   type MergeState,
 } from './contracts.ts'
 import { parseLedger } from './domain/ledger.ts'
-import { legacyToV3 } from './domain/row-v3-bridge.ts'
-import { applyRowWrite, type RowWrite, type RowWriteResult } from './domain/row-tx.ts'
-import { isV3Row, type SkippedRowV3, type V3Event, type V3Row, type VerifyRowV3 } from './domain/row-v3.ts'
-import { deleteStagingIndex } from './domain/staging-index.ts'
+import type { RowWriteResult } from './domain/row-tx.ts'
+import { parseV4State } from './domain/schema4.ts'
+import { v4ToLegacy } from './domain/row-v4.ts'
+import type { SkippedRowV3, V3Event, V3Row, VerifyRowV3 } from './domain/row-v3.ts'
 
 export function mergeStatePath(home: string): string {
   return join(home, 'merge', 'merge-state.json')
@@ -57,6 +56,17 @@ export async function loadMergeState(io: EvolutionIoLike, home: string): Promise
   } catch {
     return { ok: false, state: { schemaVersion: MERGE_STATE_VERSION, rows: [] } }
   }
+  if (raw !== null) {
+    try {
+      const header = JSON.parse(raw) as { schemaVersion?: unknown }
+      if (header.schemaVersion === 4) {
+        const v4 = parseV4State(raw)
+        if (v4 === null) return { ok: false, state: { schemaVersion: MERGE_STATE_VERSION, rows: [] }, note: 'merge-state-needs-repair' }
+        return { ok: true, state: { schemaVersion: MERGE_STATE_VERSION, rows: v4.rows.map(v4ToLegacy) } }
+      }
+      if (typeof header.schemaVersion === 'number' && header.schemaVersion > 4) return { ok: false, state: { schemaVersion: MERGE_STATE_VERSION, rows: [] }, note: 'merge-state-forward-only' }
+    } catch { /* parseState below reports the detailed note */ }
+  }
   const parsed = parseState(raw)
   return {
     ok: parsed.ok,
@@ -83,59 +93,18 @@ export interface RowTx {
 }
 
 /** G3-5 runtime write API: only createVerify/createSkipped/transition. v2 writes are rejected. */
-export async function transactRows<T>(io: EvolutionIoLike, home: string, fn: (tx: RowTx) => T): Promise<T> {
-  let result: T | undefined
-  await transactIo(io, mergeStatePath(home), (current) => {
-    let rows: readonly V3Row[] = []
-    if (current !== null) {
-      let parsed: unknown
-      try { parsed = JSON.parse(current) } catch { throw new Error('merge-state-needs-repair') }
-      const body = parsed as { schemaVersion?: unknown; rows?: unknown }
-      if (body.schemaVersion !== 3 || !Array.isArray(body.rows) || !body.rows.every(isV3Row)) {
-        throw new Error(body.schemaVersion === 2 ? 'merge-state-migration-required' : 'merge-state-needs-repair')
-      }
-      rows = body.rows
-    }
-    const apply = (write: RowWrite): RowWriteResult => {
-      const next = applyRowWrite(rows, write, new Date().toISOString())
-      if (next.ok) rows = next.rows
-      return next
-    }
-    const tx: RowTx = {
-      rows: () => rows,
-      createVerify: row => apply({ kind: 'createVerify', row }),
-      createSkipped: row => apply({ kind: 'createSkipped', row }),
-      transition: (id, event, expectedVersion) => apply({ kind: 'transition', id, event, expectedVersion }),
-    }
-    result = fn(tx)
-    return JSON.stringify({ schemaVersion: 3, rows }, null, 2)
-  })
-  return result as T
+export async function transactRows<T>(_io: EvolutionIoLike, _home: string, _fn: (tx: RowTx) => T): Promise<T> {
+  throw new Error('legacy-writer-removed')
 }
 
 /** The ONE write point. The callback returns the whole row set, not a delta. */
 export async function mutateMergeState<T>(
-  io: EvolutionIoLike,
-  home: string,
-  now: () => number,
-  fn: (rows: readonly MergeRow[]) => { rows: readonly MergeRow[]; result: T },
+  _io: EvolutionIoLike,
+  _home: string,
+  _now: () => number,
+  _fn: (rows: readonly MergeRow[]) => { rows: readonly MergeRow[]; result: T },
 ): Promise<T> {
-  let result: T | undefined
-  let ran = false
-  await transactIo(io, mergeStatePath(home), (current) => {
-    ran = true
-    const parsed = parseState(current)
-    if (!parsed.ok || parsed.note === 'merge-state-forward-only') throw new Error(parsed.note ?? 'merge-state-invalid')
-    const out = fn(parsed.rows)
-    result = out.result
-    const rows = out.rows.map(row => legacyToV3(row))
-    if (rows.some(row => row === null)) throw new Error('merge-state-v3-row-invalid')
-    return JSON.stringify({ schemaVersion: 3, rows }, null, 2)
-  })
-  // transactIo only returns after fn ran; a skipped write is not a state outcome.
-  void ran
-  void now
-  return result as T
+  throw new Error('legacy-writer-removed')
 }
 
 export interface MoveRowPatch {
@@ -209,15 +178,8 @@ export async function moveRow(
 }
 
 /** G3-5 v3-aware drop: only terminal events. */
-export async function dropRowV3(io: EvolutionIoLike, home: string, id: string, event: 'committed' | 'superseded' | 'restored', unitId = 'unknown'): Promise<boolean> {
-  const dropped = await transactRows(io, home, tx => {
-    const row = tx.rows().find(item => item.id === id)
-    if (row === undefined) return false
-    const moved = tx.transition(id, event === 'committed' ? { type: 'committed', unitId } : { type: event }, row.version)
-    return moved.ok
-  })
-  if (dropped) await deleteStagingIndex(io, home, id)
-  return dropped
+export async function dropRowV3(_io: EvolutionIoLike, _home: string, _id: string, _event: 'committed' | 'superseded' | 'restored', _unitId = 'unknown'): Promise<boolean> {
+  throw new Error('legacy-writer-removed')
 }
 
 export async function dropRow(io: EvolutionIoLike, home: string, now: () => number, id: string): Promise<boolean> {

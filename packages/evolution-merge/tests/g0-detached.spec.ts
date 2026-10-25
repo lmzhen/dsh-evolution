@@ -1,3 +1,4 @@
+import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { contentHash, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
@@ -5,7 +6,7 @@ import { join } from 'node:path'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import {
   loadMergeState, pairKey, rowIdOf, runApproveCommand, runResumeCommand,
-  upsertRow, type MergeDecision, type MergeRegistryPort, type MergeRow, type ScanPorts,
+  type MergeDecision, type MergeRegistryPort, type MergeRow, type ScanPorts,
 } from '../src/index.ts'
 import { acquireTargetClaim } from '../src/target-claim.ts'
 
@@ -14,7 +15,7 @@ const DECISION: MergeDecision = { shouldMerge: true, mode: 'merge-into-existing'
 
 function row(state: 'pending' | 'fuse'): MergeRow {
   const key = pairKey('a', 'b')
-  return { id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state, queue: state === 'pending' ? 'pending' : 'fuse', decision: DECISION, createdAt: AT, updatedAt: AT }
+  return { id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state, queue: state === 'pending' ? 'pending' : 'fuse', decision: DECISION, runId: 'parent-run', createdAt: AT, updatedAt: AT }
 }
 
 function registry() {
@@ -31,7 +32,7 @@ it('detached approve returns before round2 without holding the commit claim', as
   const home = await tempRoot('dsh-merge-detached-approve-')
   const io = nodeEvolutionIo()
   const row0 = row('pending')
-  await upsertRow(io, home, () => 1000, row0)
+  await seedRow(io, home, row0)
   let release = (): void => {}
   const gate = new Promise<void>(resolve => { release = resolve })
   const reg = registry()
@@ -55,7 +56,7 @@ it('approve does not take the commit claim before commit', async () => {
   const home = await tempRoot('dsh-merge-detached-claim-')
   const io = nodeEvolutionIo()
   const row0 = row('pending')
-  await upsertRow(io, home, () => 1000, row0)
+  await seedRow(io, home, row0)
   const held = await acquireTargetClaim(io, home, 'a', 1000)
   const reg = registry()
   const result = await runApproveCommand({ io, home, registry: reg.port, rowId: row0.id, platformWrite: true, now: () => 1000, ports: { async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
@@ -68,7 +69,7 @@ it('resume fuse does not take the commit claim', async () => {
   const home = await tempRoot('dsh-merge-detached-resume-claim-')
   const io = nodeEvolutionIo()
   const row0 = row('fuse')
-  await upsertRow(io, home, () => 1000, row0)
+  await seedRow(io, home, row0)
   const held = await acquireTargetClaim(io, home, 'a', 1000)
   const reg = registry()
   const ports: ScanPorts = { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } }
@@ -82,7 +83,7 @@ it('detached resume returns before round2 and completes in background', async ()
   const home = await tempRoot('dsh-merge-detached-resume-')
   const io = nodeEvolutionIo()
   const row0 = row('fuse')
-  await upsertRow(io, home, () => 1000, row0)
+  await seedRow(io, home, row0)
   const reg = registry()
   const result = await runResumeCommand({
     io, home, registry: reg.port, rowId: row0.id, platformWrite: true, detached: true, now: () => 1000,
@@ -97,7 +98,7 @@ it('releases the claim when registry begin throws', async () => {
   const home = await tempRoot('dsh-merge-detached-begin-fail-')
   const io = nodeEvolutionIo()
   const row0 = row('pending')
-  await upsertRow(io, home, () => 1000, row0)
+  await seedRow(io, home, row0)
   const bad: MergeRegistryPort = {
     async begin() { throw new Error('begin boom') },
     async stage() {},

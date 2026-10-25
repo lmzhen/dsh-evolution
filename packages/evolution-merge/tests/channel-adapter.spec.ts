@@ -18,6 +18,11 @@ it('maps child ids and turns; missing optional methods degrade', async () => {
   await adapted.dispose('42')
   expect(disposed).toBe('42')
 
+  const withUsage = subagentChannelAdapter({
+    async open() { return { kind: 'ok', childId: 7, turn: { childId: 7, stopReason: 'completed', text: 'x', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } } } },
+  })
+  expect(await withUsage.open({ parent: {}, label: 'x', promptText: 'p', kind: 'reviewer', allow: [], timeoutMs: 1, signal })).toMatchObject({ turn: { usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } } })
+
   const weak = subagentChannelAdapter({})
   expect(await weak.open({ parent: {}, label: 'x', promptText: 'p', kind: 'reviewer', allow: [], timeoutMs: 1, signal })).toMatchObject({ kind: 'unavailable', code: 'E-323' })
 })

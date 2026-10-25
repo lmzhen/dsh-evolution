@@ -1,9 +1,10 @@
+import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, stageKeyOf, upsertRow, writeStagedFile, type MergeRuntimeDeps, type MergeRow, type SkillCard } from '../src/index.ts'
+import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, stageKeyOf, writeStagedFile, type MergeRuntimeDeps, type MergeRow, type SkillCard } from '../src/index.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill'), managed: true }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill'), managed: true }, { name: 'umbrella', description: 'u', body: BODY('umbrella'), managed: true }]
@@ -13,8 +14,8 @@ it('approves a pending row through a new child and drops it after commit', async
   const home = await tempRoot('dsh-merge-runtime-approve-')
   const io = nodeEvolutionIo()
   const key = pairKey('alpha-skill', 'beta-skill')
-  const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'alpha-skill', b: 'beta-skill', state: 'pending', queue: 'pending', decision, createdAt: 'x', updatedAt: 'x' }
-  await upsertRow(io, home, () => 1, row)
+  const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'alpha-skill', b: 'beta-skill', state: 'pending', queue: 'pending', decision, runId: 'parent-run', createdAt: 'x', updatedAt: 'x' }
+  await seedRow(io, home, row)
   const registry: MergeRuntimeDeps['registry'] = {
     async begin() { return { id: 'run-1', signal: new AbortController().signal, startedAt: 1 } },
     async stage() {},

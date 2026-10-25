@@ -5,6 +5,8 @@ import { expect, it } from 'vitest'
 import { DEFAULT_SKILL_LIMITS, SkillLibrary, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { createMergeRuntime, pairKey, stageKeyOf, writeStagedFile, type MergeRuntimeDeps, type SkillCard } from '../src/index.ts'
+import { readMergeSnapshot } from '../src/domain/merge-snapshot.ts'
+import { buildFacts } from '../src/surface/merge-view.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 const decision = { should_merge: true, mode: 'create-umbrella', target: 'umbrella', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }
@@ -44,5 +46,12 @@ it('runs a real scan through UnitTransactions and SkillLibrary', async () => {
   expect(result.ok, result.text).toBe(true)
   expect(await skills.read('umbrella')).toContain('# umbrella')
   const stateBytes = await readFile(join(home, 'merge', 'merge-state.json'), 'utf8')
-  expect(JSON.parse(stateBytes).schemaVersion).toBe(3)
+  expect(JSON.parse(stateBytes).schemaVersion).toBe(4)
+  const report = JSON.parse(await readFile(join(home, 'reports', 'merge-run-1.json'), 'utf8')) as { reportOnly?: unknown[]; validationFailures?: unknown[]; archived?: string[]; criteria?: unknown[]; usage?: unknown; timing?: unknown; commit?: unknown }
+  expect(report.reportOnly).toEqual([])
+  expect(report.validationFailures).toEqual([])
+  expect(report.archived).toEqual(['alpha-skill', 'beta-skill'])
+  expect(report.criteria).toHaveLength(1)
+  const snapshot = await readMergeSnapshot({ io, home, runs: [], approval: false })
+  expect(buildFacts(snapshot).counts.expired).toBe(0)
 })

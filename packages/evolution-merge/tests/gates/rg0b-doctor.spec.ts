@@ -40,12 +40,12 @@ it('reads every journal phase and a receipt from disk', async () => {
   for (const phase of ['prepared', 'target-written', 'sources-archived', 'committed', 'rolled-back', 'failed']) {
     await writeFile(journalPath(home, 'run-1'), JSON.stringify({ runId: 'run-1', phase, target: 'a', sources: ['b'], updatedAt: '2026-10-23T00:00:00.000Z' }))
     const row = (await mergeDoctor(io, home)).find(item => item.key === 'consistency')
-    expect(row?.status, phase).toBe(phase === 'target-written' || phase === 'sources-archived' ? 'ok' : 'warn')
+    expect(row?.status, phase).toBe('blocked')
   }
   await mkdir(join(home, 'merge', 'receipts'), { recursive: true })
   await writeFile(journalPath(home, 'run-1'), JSON.stringify({ runId: 'run-1', phase: 'committed', target: 'a', sources: ['b'], updatedAt: '2026-10-23T00:00:00.000Z' }))
   await writeFile(join(home, 'merge', 'receipts', 'run-1.json'), JSON.stringify({ runId: 'run-1', unitId: 'u-1', target: 'a', sources: ['b'] }))
-  expect((await mergeDoctor(io, home)).find(item => item.key === 'consistency')).toMatchObject({ status: 'warn' })
+  expect((await mergeDoctor(io, home)).find(item => item.key === 'consistency')).toMatchObject({ status: 'blocked' })
 })
 
 it('rejects cancelled and unknown run phases for active rows', () => {

@@ -1,14 +1,15 @@
+import { seedRow } from '../support/seed-row.ts'
 // @tier pre-tag
 import { createHash } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
-import { loadMergeState, pairKey, rowIdOf, runApproveCommand, runResumeCommand, upsertRow, type MergeDecision, type MergeRegistryPort, type MergeRow } from '../../src/index.ts'
+import { loadMergeState, pairKey, rowIdOf, runApproveCommand, runResumeCommand, type MergeDecision, type MergeRegistryPort, type MergeRow } from '../../src/index.ts'
 import { mergeStatePath } from '../../src/state.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const DECISION: MergeDecision = { shouldMerge: true, mode: 'merge-into-existing', target: 'a', sources: ['a', 'b'], rationale: 'same' }
-const row = (): MergeRow => { const key = pairKey('a', 'b'); return { id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'pending', queue: 'pending', decision: DECISION, createdAt: AT, updatedAt: AT } }
+const row = (): MergeRow => { const key = pairKey('a', 'b'); return { id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'pending', queue: 'pending', decision: DECISION, runId: 'parent-run', createdAt: AT, updatedAt: AT } }
 function registry() {
   const calls: string[] = []
   const port: MergeRegistryPort = {
@@ -23,7 +24,7 @@ it('detached approve accepts under 1s and completes without a client', async () 
   const home = await tempRoot('dsh-rg6-detached-')
   const io = nodeEvolutionIo()
   const planned = row()
-  await upsertRow(io, home, () => 1000, planned)
+  await seedRow(io, home, planned)
   let release = (): void => {}
   const gate = new Promise<void>(resolve => { release = resolve })
   const reg = registry()
@@ -41,7 +42,7 @@ it('detached resume accepts under 1s and completes in background', async () => {
   const home = await tempRoot('dsh-rg6-detached-resume-')
   const io = nodeEvolutionIo()
   const planned = { ...row(), state: 'fuse' as const, queue: 'fuse' as const }
-  await upsertRow(io, home, () => 1000, planned)
+  await seedRow(io, home, planned)
   const reg = registry()
   const started = Date.now()
   const result = await runResumeCommand({ io, home, registry: reg.port, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
@@ -55,7 +56,7 @@ it('client disconnect does not abort a detached run', async () => {
   const home = await tempRoot('dsh-rg6-kill-client-')
   const io = nodeEvolutionIo()
   const planned = row()
-  await upsertRow(io, home, () => 1000, planned)
+  await seedRow(io, home, planned)
   const reg = registry()
   const result = await runApproveCommand({ io, home, registry: reg.port, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, ports: { async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
   expect(result).toMatchObject({ ok: true, accepted: true })

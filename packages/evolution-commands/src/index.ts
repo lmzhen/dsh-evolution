@@ -1913,3 +1913,5 @@ function safeStagedArgs(args: unknown): string {
     return '(unserializable)'
   }
 }
+
+export * from './command-catalog.ts'

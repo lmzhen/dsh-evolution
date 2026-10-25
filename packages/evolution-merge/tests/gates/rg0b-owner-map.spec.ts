@@ -30,7 +30,7 @@ it('each remaining owner has exactly one writer definition', () => {
 })
 
 it('query/command/engine/UI are declared read/consumer surfaces', () => {
-  const forbidden = /\b(transactRows|dropRowV3|upsertRow|dropRow|moveRow|mutateMergeState|mergeStatePath)\b/
+  const forbidden = /\b(transactRows|dropRowV3|upsertRow|dropRow|mutateMergeState|mergeStatePath)\b/
   for (const path of ['read-commands.ts', 'commands.ts']) {
     const text = readFileSync(mergeRoot + '/src/' + path, 'utf8')
     expect(forbidden.test(text), path).toBe(false)

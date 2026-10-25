@@ -6,7 +6,7 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { isV3Row } from '../../src/domain/row-v3.ts'
-import { loadMergeState, mergeStatePath, upsertRow } from '../../src/state.ts'
+import { loadMergeState, mergeStatePath, transactRows } from '../../src/state.ts'
 
 const base = { id: 'r', pairKey: 'a|b', a: 'a', b: 'b', version: 0, createdAt: 'c', updatedAt: 'u', origin: 'agent', attempts: 0 }
 
@@ -32,7 +32,7 @@ it('runtime load turns an invalid v3 row into needs-repair and refuses writes', 
   const loaded = await loadMergeState(io, home)
   expect(loaded.ok).toBe(false)
   expect(loaded.note).toBe('merge-state-needs-repair')
-  await expect(upsertRow(io, home, () => 1, { ...base, state: 'verify', verifySubState: 'candidate', attempts: 0 })).rejects.toThrow('merge-state-needs-repair')
+  await expect(transactRows(io, home, () => 1)).rejects.toThrow('legacy-writer-removed')
   expect(createHash('sha256').update(await readFile(mergeStatePath(home))).digest('hex')).toBe(createHash('sha256').update(bytes).digest('hex'))
 })
 

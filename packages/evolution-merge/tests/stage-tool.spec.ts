@@ -3,6 +3,7 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { applyStageTool, createStaging, type StageToolContext } from '../src/index.ts'
+import { StageToolRegistry } from '../src/stage-tool-registry.ts'
 
 const input = (runId: string) => ({
   runId,
@@ -27,6 +28,15 @@ it('binds the child and phase, then reads/writes/copies the staged tree', async 
   expect(await applyStageTool(io, home, author(), { op: 'list', area: 'sources', source: 'a', path: 'references' })).toMatchObject({ ok: true, value: ['x.md'] })
   expect(await applyStageTool(io, home, author(), { op: 'copy', source: 'a', from: 'references/x.md', to: 'references/x.md' })).toMatchObject({ ok: true })
   expect(await applyStageTool(io, home, author(), { op: 'read', area: 'merged', path: 'references/x.md' })).toMatchObject({ ok: true, value: 'x' })
+})
+
+it('resolves a unique author binding when the session id differs from the channel child id', () => {
+  const registry = new StageToolRegistry()
+  registry.bind('channel-child', author())
+  const exec = { agent: { session: { id: 'session-child' } } }
+  expect(registry.resolve(exec)?.runId).toBe('run-1')
+  registry.bind('second-child', author('second-child'))
+  expect(registry.resolve(exec)).toBeUndefined()
 })
 
 it('reports not-found for a missing staged file', async () => {

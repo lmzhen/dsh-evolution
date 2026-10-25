@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
-import { loadOrMigrateStateV3 } from '../../src/domain/state-v3.ts'
+import { ensureMergeStateReady } from '../../src/domain/state-bootstrap.ts'
 import { mergeStatePath } from '../../src/state.ts'
 
 const fixture = fileURLToPath(new URL('../fixtures/0.30.15/generated/merge/merge-state.json', import.meta.url))
@@ -18,7 +18,7 @@ it('reconciles v2 identity fields against the v3 result', async () => {
   const raw = await readFile(fixture, 'utf8')
   await writeFile(mergeStatePath(home), raw)
   const v2 = JSON.parse(raw) as { rows: Array<Record<string, unknown>> }
-  const result = await loadOrMigrateStateV3(io, home)
+  const result = await ensureMergeStateReady(io, home)
   expect(result.ok).toBe(true)
   if (!result.ok) return
   const v3 = result.state.rows

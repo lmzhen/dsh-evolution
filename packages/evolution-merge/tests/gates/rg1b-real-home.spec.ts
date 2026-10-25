@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
-import { loadOrMigrateStateV3, v2BackupPath } from '../../src/domain/state-v3.ts'
+import { ensureMergeStateReady, v2BackupPath } from '../../src/domain/state-bootstrap.ts'
 import { mergeStatePath } from '../../src/state.ts'
 
 const sample = fileURLToPath(new URL('../fixtures/0.30.15/real/merge/merge-state.json', import.meta.url))
@@ -16,7 +16,7 @@ it('applies the B1 0.30.15 published-writer sample with zero quarantine', async 
   await mkdir(join(home, 'merge'), { recursive: true })
   const raw = await readFile(sample, 'utf8')
   await writeFile(mergeStatePath(home), raw)
-  const result = await loadOrMigrateStateV3(io, home)
+  const result = await ensureMergeStateReady(io, home)
   expect(result.ok).toBe(true)
   if (!result.ok) return
   const parsed = JSON.parse(raw) as { rows: Array<{ id: string; state: string; pairKey: string; a: string; b: string }> }

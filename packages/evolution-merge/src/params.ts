@@ -2,12 +2,16 @@
  * Merge parameter resolution. E2/E3 values arrive as one JSON object; this is the only
  * validator. Invalid values throw loudly (no silent clamp), matching the screening contract.
  */
+import { resolveLimitsSnapshot } from './domain/merge-limits.ts'
+
 export interface MergeParams {
   readonly mergeApproval: boolean
   readonly mergeSkippedTtlDays: number
   readonly mergeRunTimeoutMinutes: number
   readonly mergePairTimeoutMinutes: number
   readonly mergeModelsRoot: string
+  readonly platformWrite?: boolean
+  readonly limitsSnapshot?: import('./domain/merge-limits.ts').MergeLimitsSnapshot
 }
 
 export const MERGE_PARAM_DEFAULTS: MergeParams = {
@@ -16,6 +20,7 @@ export const MERGE_PARAM_DEFAULTS: MergeParams = {
   mergeRunTimeoutMinutes: 0,
   mergePairTimeoutMinutes: 15,
   mergeModelsRoot: '',
+  platformWrite: false,
 }
 
 const KEYS = new Set(Object.keys(MERGE_PARAM_DEFAULTS))
@@ -43,6 +48,12 @@ export function resolveMergeParams(input: unknown = {}): MergeParams {
     mergeApproval: approval,
     mergeSkippedTtlDays: record.mergeSkippedTtlDays === undefined ? MERGE_PARAM_DEFAULTS.mergeSkippedTtlDays : nonNegative('mergeSkippedTtlDays', record.mergeSkippedTtlDays),
     mergeRunTimeoutMinutes: record.mergeRunTimeoutMinutes === undefined ? MERGE_PARAM_DEFAULTS.mergeRunTimeoutMinutes : nonNegative('mergeRunTimeoutMinutes', record.mergeRunTimeoutMinutes),
+    platformWrite: record.platformWrite === undefined ? (MERGE_PARAM_DEFAULTS.platformWrite ?? false) : (() => {
+      const value = materialize(record.platformWrite)
+      if (typeof value !== 'boolean') throw new Error('platformWrite must be a boolean')
+      return value
+    })(),
+    limitsSnapshot: resolveLimitsSnapshot(),
     mergeModelsRoot: record.mergeModelsRoot === undefined ? MERGE_PARAM_DEFAULTS.mergeModelsRoot : (() => {
       const value = materialize(record.mergeModelsRoot)
       if (typeof value !== 'string') throw new Error('mergeModelsRoot must be a string')

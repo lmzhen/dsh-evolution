@@ -21,6 +21,8 @@ export interface UnitSupportFile {
 }
 export interface UnitPlan {
   readonly runId: string;
+  /** Filled by the transaction before the backend write; history records it. */
+  readonly unitId?: string;
   readonly pairKey: string;
   readonly target: string;
   readonly targetExists: boolean;
@@ -31,10 +33,18 @@ export interface UnitPlan {
   readonly expectedSourceBodies: readonly { name: string; body: string }[];
   readonly origin: "foreground" | "subagent" | "background_review";
   readonly summary: string;
+  readonly skillLimits?: import("./limits.ts").SkillLimits;
+  readonly limitsDigest?: string;
+  readonly validationPlan?: { readonly planVersion: 1; readonly stageDigest: string; readonly revision: string };
+  readonly targetRevision?: { readonly kind: 'absent' } | { readonly kind: 'present'; readonly sha256: string };
+  readonly sourceRevisions?: Readonly<Record<string, { readonly kind: 'absent' } | { readonly kind: 'present'; readonly sha256: string }>>;
+  readonly supportDigest?: string;
 }
 export interface UnitCommitResult {
   readonly ok: boolean;
   readonly message: string;
+  /** Typed backend refusal (revision CAS); absent means a generic commit failure. */
+  readonly code?: UnitErrorCode;
   readonly archived?: readonly string[];
   readonly mutations?: number;
 }
@@ -87,7 +97,10 @@ export type UnitErrorCode =
   | "unit-commit-failed"
   | "unit-claim-failed"
   | "unit-fence-failed"
-  | "unit-rollback-blocked";
+  | "unit-rollback-blocked"
+  | "target-changed"
+  | "source-changed"
+  | "support-changed";
 export interface UnitFailure {
   readonly ok: false;
   readonly code: UnitErrorCode;
@@ -122,6 +135,18 @@ function canonical(value: unknown): string {
 }
 function digest(plan: UnitPlan): string {
   return createHash("sha256").update(canonical(plan)).digest("hex");
+}
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']'
+  const object = value as Record<string, unknown>
+  return '{' + Object.keys(object).sort().map(key => JSON.stringify(key) + ':' + canonicalJson(object[key])).join(',') + '}'
+}
+export function unitEvidenceDigest(evidence: UnitEvidenceRecord): string {
+  return createHash("sha256").update(canonicalJson({ ...evidence, at: 0, mutations: 0 })).digest("hex")
+}
+function evidenceDigest(evidence: UnitEvidenceRecord): string {
+  return createHash("sha256").update(JSON.stringify({ ...evidence, at: 0, mutations: 0 }, null, 2) + "\n").digest("hex");
 }
 
 export class UnitTransactions implements UnitTransaction {
@@ -163,6 +188,7 @@ export class UnitTransactions implements UnitTransaction {
       sourceBefore,
       origin: plan.origin,
       summary: plan.summary,
+      ...(plan.validationPlan === undefined ? {} : { validationPlan: plan.validationPlan }),
       createdAt: this.now(),
     };
   }
@@ -252,12 +278,12 @@ export class UnitTransactions implements UnitTransaction {
     let lock: TreeLock | undefined;
     let claim: UnitClaim | undefined;
     const checkpoints: UnitJournalCheckpoint[] = [];
-    const writePhase = async (phase: UnitJournalPhase, checkpointsNext?: UnitJournal["checkpoints"]) => {
+    const writePhase = async (phase: UnitJournalPhase, checkpointsNext: UnitJournal["checkpoints"] = checkpoints) => {
       if (lock !== undefined && !(await lock.assertHeld())) throw new Error("unit-fence-lost");
       await writeUnitJournal(this.options.io, this.options.home, {
         ...journalBase,
         phase,
-        ...(checkpointsNext === undefined ? {} : { checkpoints: checkpointsNext }),
+        checkpoints: checkpointsNext,
       });
       await this.options.onPhase?.(phase);
     };
@@ -271,7 +297,7 @@ export class UnitTransactions implements UnitTransaction {
       this.options.onLock?.("claim");
       await writeUnitJournal(this.options.io, this.options.home, { ...journalBase, phase: "target-pending" });
       const result = await this.options.backend.commit(
-        stored.plan,
+        { ...stored.plan, unitId: prepared.unitId },
         async (phase, detail) => {
           if (phase === "support-pending") {
             await writePhase("support-pending");
@@ -293,7 +319,7 @@ export class UnitTransactions implements UnitTransaction {
               archived: stored.plan.sources.filter((source) => source !== stored.plan.target),
               at: this.now(),
             });
-            await this.options.onPhase?.("unit-written" as never);
+            await writePhase("unit-written");
             return;
           }
           if (phase === "source-archiving" && detail?.source !== undefined) {
@@ -313,7 +339,7 @@ export class UnitTransactions implements UnitTransaction {
       );
       if (!result.ok) {
         await writePhase("failed");
-        return { ok: false as const, code: "unit-commit-failed" as const, message: result.message };
+        return { ok: false as const, code: result.code ?? "unit-commit-failed", message: result.message };
       }
       const targetAfter = (await this.options.backend.readSkill(stored.plan.target)) ?? "";
       const evidence: UnitEvidenceRecord = {
@@ -338,10 +364,16 @@ export class UnitTransactions implements UnitTransaction {
             absorbedInto: stored.plan.target,
           })),
         mutations: result.mutations ?? 0,
+        ...(stored.plan.validationPlan === undefined ? {} : { validationPlan: stored.plan.validationPlan }),
         at: this.now(),
       };
       if (!(await lock.assertHeld())) throw new Error("unit-fence-lost");
+      const evidenceSha256 = evidenceDigest(evidence);
       await writeUnitEvidence(this.options.io, this.options.home, evidence);
+      await writeUnitReceipt(this.options.io, this.options.home, {
+        schemaVersion: 1, unitId: prepared.unitId, runId: stored.plan.runId, planDigest: stored.digest,
+        target: stored.plan.target, archived: stored.plan.sources.filter((source) => source !== stored.plan.target), at: this.now(), evidenceSha256,
+      });
       await writePhase("committed", checkpoints);
       this.prepared.delete(prepared.unitId);
       return { ok: true as const, evidence };
@@ -394,6 +426,16 @@ export class UnitTransactions implements UnitTransaction {
         code: "unit-rollback-blocked" as const,
         message: "source checkpoint missing: " + missing.map((item) => item.name).join(","),
       };
+    const liveTarget = await this.options.backend.readSkill(snapshot.target);
+    if (liveTarget === null || liveTarget !== (snapshot.targetAfter ?? null))
+      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "target live hash does not match the prepared target; manual recovery required" };
+    const liveSources = await Promise.all(snapshot.sourceBefore.map(async source => ({ name: source.name, body: await this.options.backend.readSkill(source.name) })));
+    const liveSource = liveSources.find(source => source.body !== null);
+    if (liveSource !== undefined)
+      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source is still live: " + liveSource.name };
+    const liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
+    if (liveSupport.some(file => file.content !== (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null)))
+      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file live hash does not match the prepared support; manual recovery required" };
     const evidence: UnitEvidenceRecord = {
       schemaVersion: 1,
       unitId,
@@ -414,8 +456,11 @@ export class UnitTransactions implements UnitTransaction {
         absorbedInto: snapshot.target,
       })),
       mutations: 0,
+      ...(snapshot.validationPlan === undefined ? {} : { validationPlan: snapshot.validationPlan }),
       at: this.now(),
     };
+    if (receipt?.evidenceSha256 !== undefined && evidenceDigest(evidence) !== receipt.evidenceSha256)
+      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "receipt evidence hash does not match rebuilt evidence" };
     await writeUnitEvidence(this.options.io, this.options.home, evidence);
     if (journal.phase !== "committed")
       await writeUnitJournal(this.options.io, this.options.home, { ...journal, phase: "committed", checkpoints, updatedAt: this.now() });
@@ -427,7 +472,7 @@ export class UnitTransactions implements UnitTransaction {
     if (existing !== null) return { ok: true as const, evidence: existing };
     const snapshot = await readUnitSnapshot(this.options.io, this.options.home, unitId);
     const journal = await readUnitJournal(this.options.io, this.options.home, unitId);
-    if (snapshot === null || journal === null || (journal.phase !== "target-written" && journal.phase !== "sources-archived"))
+    if (snapshot === null || journal === null || !["target-written", "support-pending", "source-archiving", "sources-archived", "unit-written"].includes(journal.phase))
       return {
         ok: false as const,
         code: "unit-rollback-blocked" as const,
@@ -442,8 +487,15 @@ export class UnitTransactions implements UnitTransaction {
         message: "source checkpoint missing: " + missing.map((item) => item.name).join(","),
       };
     const targetAfter = await this.options.backend.readSkill(snapshot.target);
-    if (targetAfter === null)
-      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "target missing; manual recovery required" };
+    if (targetAfter === null || targetAfter !== (snapshot.targetAfter ?? null))
+      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "target missing or drifted; manual recovery required" };
+    const liveSources = await Promise.all(snapshot.sourceBefore.map(async source => ({ name: source.name, body: await this.options.backend.readSkill(source.name) })));
+    const liveSource = liveSources.find(source => source.body !== null);
+    if (liveSource !== undefined)
+      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source is still live: " + liveSource.name };
+    const liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
+    if (liveSupport.some(file => file.content !== (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null)))
+      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file live hash does not match the prepared support; manual recovery required" };
     const evidence: UnitEvidenceRecord = {
       schemaVersion: 1,
       unitId,
@@ -464,6 +516,7 @@ export class UnitTransactions implements UnitTransaction {
         absorbedInto: snapshot.target,
       })),
       mutations: 0,
+      ...(snapshot.validationPlan === undefined ? {} : { validationPlan: snapshot.validationPlan }),
       at: this.now(),
     };
     await writeUnitEvidence(this.options.io, this.options.home, evidence);

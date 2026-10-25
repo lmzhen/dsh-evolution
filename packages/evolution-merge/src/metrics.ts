@@ -30,7 +30,7 @@ export function buildMergeMetrics(rows: readonly MergeRow[], runs: readonly RunR
   for (const queue of ['verify', 'pending', 'fuse', 'skipped'] as const) samples.push({ name: 'merge_queue_depth', labels: { queue, kind: 'active' }, value: counts.active[queue] })
   samples.push({ name: 'merge_queue_depth', labels: { queue: 'pending', kind: 'expired' }, value: counts.expired })
   for (const run of runs) {
-    const state = run.mergeStatus ?? run.state
+    const state = run.state
     samples.push({ name: 'merge_run_total', labels: { state }, value: 1 })
     if (run.endedAt !== undefined) samples.push({ name: 'merge_run_duration_ms', labels: { state }, value: Math.max(0, run.endedAt - run.startedAt) })
   }

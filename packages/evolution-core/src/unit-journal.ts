@@ -12,6 +12,7 @@ export const UNIT_JOURNAL_PHASES = [
   'source-archiving',
   'sources-archived',
   'support-pending',
+  'unit-written',
   'committed',
   'failed',
   'rolled-back',

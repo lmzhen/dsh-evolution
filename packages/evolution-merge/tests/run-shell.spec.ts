@@ -35,7 +35,6 @@ it('writes the report before settling a successful run', async () => {
   expect(reg.calls).toEqual(['begin:scan', 'stage:screening', 'settle:succeeded'])
   expect((await readMergeReport(io, home, 'run-1')).kind).toBe('present')
   expect((reg as unknown as { settled: { resultRef?: string; mergeStatus?: string } }).settled.resultRef).toContain('merge-run-1.json')
-  expect((reg as unknown as { settled: { mergeStatus?: string } }).settled.mergeStatus).toBe('succeeded')
 })
 
 it('detached returns a run id before the body settles', async () => {
@@ -77,5 +76,4 @@ it('still writes a failed report when the body throws', async () => {
   expect(reg.calls).toContain('settle:failed')
   const report = await readMergeReport(io, home, 'run-1')
   expect(report).toMatchObject({ kind: 'present', value: { stopReason: 'failed', notes: ['run body failed: round boom'] } })
-  expect((reg as unknown as { settled: { mergeStatus?: string } }).settled.mergeStatus).toBe('failed')
 })

@@ -9,12 +9,12 @@ export type VerifySubState = 'queued' | 'running' | 'failed' | 'cancelled'
 export type StagingState = 'none' | 'kept' | 'cleared-source-ok' | 'cleared-source-gone'
 export type SkipOrigin = 'agent' | 'human' | 'system'
 export type SkipKind = 'agent-keep' | 'human-reject' | 'over-limit' | 'forced'
-export type ExpiredKind = 'target-taken' | 'source-changed' | 'skipped-ttl'
+export type ExpiredKind = 'target-taken' | 'source-changed' | 'source-gone' | 'skipped-ttl'
 export type WireRunState =
   | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval'
   | 'undone' | 'superseded' | 'interrupted' | 'orphan'
 export type ActionId =
-  | 'approve' | 'reject' | 'retry-candidates' | 'retry-resume' | 'discard'
+  | 'approve' | 'reject' | 'retry-candidates' | 'retry-resume' | 'resume' | 'discard'
   | 'restore' | 'pair' | 'status' | 'report' | 'cancel'
 
 export interface MergeCounts {
@@ -42,6 +42,8 @@ export interface RowFact {
   readonly state: WireRowState
   readonly queue: QueueId
   readonly verifySubState?: VerifySubState
+  /** Optional Batch4 projection; old staging remains compatibility. */
+  readonly stage?: 'present' | 'lost' | 'expired'
   readonly a: string
   readonly b: string
   readonly target?: { readonly requested: string; readonly actual?: string; readonly created?: boolean }
@@ -63,7 +65,7 @@ export interface RowFact {
 export interface Facts {
   readonly wireVersion: 1
   readonly readAt: number
-  readonly approval: { readonly mergeApproval: boolean }
+  readonly approval: { readonly mergeApproval: boolean; readonly platformWrite?: boolean }
   readonly counts: MergeCounts
   readonly active: RunView | null
   readonly last: RunView | null
@@ -92,10 +94,11 @@ export interface RunView {
   readonly progress?: { readonly done: number; readonly total: number } | null
   readonly startedAt: number
   readonly endedAt?: number
-  readonly stopReason?: 'timeout' | 'cancelled' | 'error' | 'orphan'
+  readonly stopReason?: string
   readonly failure?: FailureFact
   readonly parentRunId?: string
   readonly currentPairKey?: string
+  readonly resultRef?: string
   readonly summary?: {
     readonly merged: number; readonly kept: number; readonly failed: number
     readonly pending: number; readonly cancelled: number
@@ -113,7 +116,7 @@ export interface RunPair {
   readonly target?: { readonly requested: string; readonly actual?: string; readonly created?: boolean }
   readonly actions?: readonly ActionRef[]
 }
-export interface RunDetail extends RunView { readonly pairs: readonly RunPair[]; readonly pairsTruncated: boolean }
+export interface RunDetail extends RunView { readonly pairs: readonly RunPair[]; readonly pairsTruncated: boolean; readonly meta?: { readonly pairKey?: string; readonly phase?: string; readonly approval?: string }; readonly reportRef?: string }
 export interface RunsView { readonly wireVersion: 1; readonly readAt: number; readonly runs: readonly RunView[] }
 export interface BodyView {
   readonly wireVersion: 1; readonly readAt: number
@@ -123,7 +126,7 @@ export interface BodyView {
 }
 export interface HistoryItem {
   readonly name: string; readonly kind: 'merged' | 'deleted' | 'split' | 'other'
-  readonly reason: string; readonly lastVersion: number; readonly archivedAt: number; readonly sourceRunId?: string
+  readonly reason: string; readonly reasonCode?: string; readonly generation?: number; readonly lastVersion: number; readonly archivedAt: number; readonly sourceRunId?: string; readonly runId?: string; readonly absorbedInto?: string
 }
 export interface HistoryView { readonly wireVersion: 1; readonly readAt: number; readonly items: readonly HistoryItem[] }
 export interface DoctorFact {
@@ -139,6 +142,8 @@ export interface DoctorView {
   }
   readonly approval: { readonly mergeApproval: boolean; readonly writeApproval?: boolean }
   readonly hostOnly?: { readonly code: 'E-323'; readonly detail?: string }
+  /** Set when the read model cannot read the merge state; the rows are empty placeholders. */
+  readonly blocked?: { readonly code: string; readonly message: string }
   readonly rows: readonly DoctorFact[]
 }
 export interface WireFailure { readonly wireVersion: 1; readonly readAt?: number; readonly code: string; readonly message?: string }

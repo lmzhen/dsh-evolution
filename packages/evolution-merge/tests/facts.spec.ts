@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nodeEvolutionIo, type EvolutionIoLike, type RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { makeV4Home } from './support/schema4-home.ts'
 import type { MergeRow } from '../src/contracts.ts'
 import { buildFacts, countsOf, readFacts } from '../src/facts.ts'
 import { mergeStatePath } from '../src/state.ts'
@@ -21,10 +22,8 @@ it('counts active/expired separately and never writes', () => {
 })
 
 it('readFacts is GET-zero-write', async () => {
-  const home = await tempRoot('dsh-facts-read-')
-  await mkdir(join(home, 'merge'), { recursive: true })
-  await writeFile(mergeStatePath(home), JSON.stringify({ schemaVersion: 3, rows: [] }))
-  const io = nodeEvolutionIo()
+  const { home, io: baseIo } = await makeV4Home([])
+  const io = baseIo
   let writes = 0
   const guarded: EvolutionIoLike = { ...io, writeText: async (path, content) => { writes += 1; await io.writeText(path, content) }, remove: async path => { writes += 1; await io.remove(path) }, rename: async (from, to) => { writes += 1; await io.rename(from, to) } }
   const facts = await readFacts({ io: guarded, home, runs: [], approval: false, readAt: 1 })
@@ -43,4 +42,12 @@ it('projects active/last RunView from the run snapshot', () => {
   expect(facts.last).toMatchObject({ id: 'old', state: 'succeeded' })
   expect(facts.degraded).toBe(true)
   expect(JSON.parse(JSON.stringify(facts))).toEqual(facts)
+})
+
+it('refuses to project v2 rows when state is not ready', async () => {
+  const home = await tempRoot('dsh-facts-blocked-')
+  await mkdir(join(home, 'merge'), { recursive: true })
+  await writeFile(mergeStatePath(home), JSON.stringify({ schemaVersion: 2, rows: [] }))
+  const io = nodeEvolutionIo()
+  await expect(readFacts({ io, home, runs: [], approval: false, readAt: 1 })).rejects.toThrow('merge-state-migration-required')
 })

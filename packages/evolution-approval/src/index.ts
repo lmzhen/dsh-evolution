@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto'
 // v43 FLOW2-1: the orphan criterion needs ONE liveness rule. G2 S4 retired the io write-lock
 // protocol this grammar was borrowed from, so the claim-id grammar and its pid probe live HERE —
 // the only remaining user — instead of keeping a lock parser alive in core for a non-lock caller.
-import { clampOnce, type WriteConfirmMode } from '@deepseek-ai/dsh-evolution-core'
+import { clampOnce, unwrapLive, type WriteConfirmMode } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
@@ -199,7 +199,7 @@ declare module '@deepseek-ai/cordis' {
 
 export interface Config {
   /** Master switch. Default false matches Hermes write_approval default. */
-  enabled?: boolean
+  enabled?: Volatile<boolean>
   /** Require approval for foreground writes as well. */
   stageForeground?: boolean
   /**
@@ -227,7 +227,7 @@ export class EvolutionApproval extends Service {
   // exactOptionalPropertyTypes (the schema's output type is required and the interface's property is
   // optional) — every other volatile-bearing row in the family declares the schema unannotated.
   static Config = z.object({
-    enabled: z.boolean().default(false),
+    enabled: z.boolean().default(false).volatile(),
     stageForeground: z.boolean().default(true),
     // 0 = never expire (the shipped default: the window is unbounded until the operator decides).
     // The schema floor keeps a negative TTL from meaning "everything is instantly stale".
@@ -241,7 +241,7 @@ export class EvolutionApproval extends Service {
     approvalConfirm: z.union([z.const('auto'), z.const('ask'), z.const('timeout')]).default('auto').volatile(),
   })
 
-  private readonly enabled: boolean
+  private readonly enabledConfig?: Volatile<boolean> | undefined
   private readonly stageForegroundConfig: boolean
   /** The TTL carrier as configured: a plain number, or the live reference `.volatile()` hands a
    * user-layer field. Read through {@link ttl} at every use, never cached (registry row: live). */
@@ -260,7 +260,7 @@ export class EvolutionApproval extends Service {
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionApproval')
-    this.enabled = config.enabled ?? false
+    this.enabledConfig = config.enabled
     this.stageForegroundConfig = config.stageForeground ?? true
     this.pendingTtlMsConfig = config.pendingTtlMs
     // The reading face for the pending window (the settings panel's card). `ctx.inject` and not
@@ -290,8 +290,13 @@ export class EvolutionApproval extends Service {
   }
 
   /** Fail-closed capability adapters need to distinguish "allowed" from "enabled". */
+  /** Host write capability exposed to settings/Facts; mirrors the live enabled switch. */
+  get platformWrite(): boolean {
+    return this.isEnabled
+  }
+
   get isEnabled(): boolean {
-    return this.enabled
+    return unwrapLive(this.enabledConfig) ?? false
   }
 
   registerRunner(kind: PendingKind, runner: WriteRunner, preview?: WritePreview): () => void {
@@ -341,7 +346,7 @@ export class EvolutionApproval extends Service {
   /** Evaluate one mutation. Returns allow, or stores the write and returns staged. */
   async request(input: ApprovalRequest): Promise<ApprovalDecision> {
     const summary = normalizeSummary(input)
-    if (!this.enabled) return { action: 'allow', message: '批准已禁用。' }
+    if (!this.isEnabled) return { action: 'allow', message: '批准已禁用。' }
     // 0.3.17 (S3.1, E-22): the session policy is DERIVED server-side from the
     // platform approval service when it is mounted (overrideOf is the platform
     // authority). The caller's self-reported sessionPolicy is honored ONLY in

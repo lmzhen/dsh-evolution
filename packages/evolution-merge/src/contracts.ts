@@ -56,6 +56,7 @@ export interface MergeFailure {
   readonly message: string
   readonly retryable: boolean
   readonly retryFrom: 'agent1' | 'agent2' | 'none'
+  readonly lengths?: Readonly<Record<string, number>>
 }
 
 /** One persisted pair. The id is stable for the UI; the pairKey is the natural key. */
@@ -77,6 +78,8 @@ export interface MergeCandidate {
   readonly source?: 'lexical' | 'proposed' | 'engine'
 }
 
+export type RevisionRef = { readonly kind: 'absent' } | { readonly kind: 'present'; readonly sha256: string }
+
 export interface MergeDecision {
   readonly shouldMerge: boolean
   readonly mode: 'merge-into-existing' | 'create-umbrella' | 'keep'
@@ -84,10 +87,19 @@ export interface MergeDecision {
   readonly sources: readonly string[]
   readonly rationale: string
   readonly confidence?: number
+  readonly promptVersion?: string
+  readonly promptHash?: string
   readonly aSummary?: string
   readonly bSummary?: string
   readonly cacheRead?: number
+  readonly targetRevisionRef?: RevisionRef
+  readonly sourceRevisionRef?: RevisionRef
+  /** Per-source anchors recorded with the decision; a commit re-checks each one. */
+  readonly sourceRevisions?: Readonly<Record<string, RevisionRef>>
+  readonly supportDigest?: string
 }
+
+export interface MergeValidationPlanRef { readonly planVersion: 1; readonly stageDigest: string; readonly revision: string }
 
 export interface MergeUsage {
   readonly inputTokens?: number
@@ -120,8 +132,13 @@ export interface MergeReportPair {
   readonly unitId?: string
   readonly failure?: MergeFailure
   readonly usage?: MergeUsage
+  readonly lengths?: Readonly<Record<string, number>>
   readonly timing?: MergeTiming
+  readonly validationPlan?: MergeValidationPlanRef
+  readonly criteria?: MergeCriteria
+  readonly reportOnly?: boolean
 }
+export interface MergeCriteria { readonly decision: 'keep' | 'merge' | 'candidate'; readonly validation: 'not-run' | 'report-only' | 'required'; readonly commit: 'never' | 'if-approved' | 'required'; readonly archive: 'none' | 'sources'; readonly evidence: 'none' | 'receipt' }
 
 export interface MergeReport {
   readonly schemaVersion: 2
@@ -137,6 +154,13 @@ export interface MergeReport {
   readonly totals: Record<'merged' | 'kept' | 'pending' | 'failed', number>
   readonly notes: readonly string[]
   readonly remaining?: readonly { readonly pairKey: string; readonly queue: MergeQueue }[]
+  readonly reportOnly?: readonly MergeReportPair[]
+  readonly validationFailures?: readonly MergeReportPair[]
+  readonly archived?: readonly string[]
+  readonly commit?: { readonly unitId?: string; readonly target?: string; readonly created?: boolean }
+  readonly usage?: MergeUsage
+  readonly timing?: MergeTiming
+  readonly criteria?: readonly MergeCriteria[]
 }
 
 export interface MergeRow {
@@ -154,6 +178,8 @@ export interface MergeRow {
   readonly decision?: MergeDecision
   readonly sourceRevision?: string
   readonly targetRevision?: string
+  readonly sourceRevisionRef?: RevisionRef
+  readonly targetRevisionRef?: RevisionRef
   readonly runId?: string
   readonly unitId?: string
   readonly origin?: 'agent' | 'human' | 'system'

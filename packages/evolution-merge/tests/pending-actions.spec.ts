@@ -1,15 +1,16 @@
+import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { approvePending, loadMergeState, pairKey, rejectPending, rowIdOf, upsertRow, type MergeRow } from '../src/index.ts'
+import { approvePending, loadMergeState, pairKey, rejectPending, rowIdOf, type MergeRow } from '../src/index.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 
 async function pending(home: string): Promise<MergeRow> {
   const key = pairKey('a', 'b')
   const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'pending', queue: 'pending', createdAt: AT, updatedAt: AT }
-  await upsertRow(nodeEvolutionIo(), home, () => Date.parse(AT), row)
+  await seedRow(nodeEvolutionIo(), home, row)
   return row
 }
 

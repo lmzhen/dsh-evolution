@@ -37,5 +37,5 @@ it('remaining owner writer scan has no legacy row writer', () => {
   const legacy = files.filter(file => file !== 'state.ts' && /\b(upsertRow|dropRow|moveRow|mutateMergeState)\b/.test(readFileSync(root + '/src/' + file, 'utf8')))
   expect(legacy).toEqual([])
   const rowTx = files.filter(file => /\b(transactRows|dropRowV3)\b/.test(readFileSync(root + '/src/' + file, 'utf8')))
-  expect(rowTx.sort()).toEqual(['index.ts', 'pending-actions.ts', 'round2-outcome.ts', 'runtime.ts', 'scan-run.ts', 'state.ts'])
+  expect(rowTx.map(file => file.replaceAll('\\', '/')).sort()).toEqual(['state.ts'])
 })

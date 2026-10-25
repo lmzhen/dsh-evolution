@@ -1,6 +1,7 @@
 {
   "extends": "../tsconfig.pkg.json",
   "references": [
-    { "path": "../evolution-core" }
+    { "path": "../evolution-core" },
+    { "path": "../evolution-commands" }
   ]
 }

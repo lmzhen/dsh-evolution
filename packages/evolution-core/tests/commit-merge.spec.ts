@@ -2,7 +2,7 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { loadUsage, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const BODY = (name: string, extra = '') => `---
@@ -37,15 +37,29 @@ it('commitMerge archives sources and writes the target with one unit', async () 
     expectedSourceBodies: sourceBodies,
     origin: 'foreground',
     summary: 'merge two sources',
+    unitId: 'u-test-merge',
   })
   expect(result).toMatchObject({ ok: true, mutations: 3, archived: ['src-a', 'src-b'] })
   expect(await lib.read('target-skill')).toContain('## Merged')
   expect(await lib.read('src-a')).toBeNull()
   expect(await lib.read('src-b')).toBeNull()
+  const usage = await loadUsage(root)
+  expect(usage.get('src-a')?.state).toBe('archived')
+  expect(usage.get('src-b')?.state).toBe('archived')
   expect(await readFile(join(root, 'target-skill', 'references', 'merged.md'), 'utf8')).toBe('# merged\n')
+  const targetSummary = (await lib.list()).find(item => item.name === 'target-skill')
+  expect(targetSummary?.managed).toBe(true)
+  expect(targetSummary?.protectedBy).toBeNull()
+  expect(targetSummary?.protectionUnknown).toBe(false)
   const targetVersions = await lib.listVersions('target-skill')
   expect(targetVersions.some(v => v.unitId === result.unitId)).toBe(true)
+  expect(targetVersions.at(-1)?.action).toBe('merge')
   expect((await lib.listVersions('src-a')).some(v => v.unitId === result.unitId)).toBe(true)
+  expect((await lib.listVersions('target-skill')).some(v => v.unitId === 'u-test-merge')).toBe(true)
+  const baseline = await lib.listBaselineVersions('target-skill')
+  expect(baseline.length).toBeGreaterThan(0)
+  expect(baseline[0]?.unitHead?.baseline).toBe(true)
+  expect((await lib.listVersions('target-skill')).length).toBeGreaterThan(baseline.length)
 })
 
 it('commitMerge creates the umbrella target first, then archives sources', async () => {

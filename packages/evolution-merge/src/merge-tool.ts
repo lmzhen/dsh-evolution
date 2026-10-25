@@ -51,6 +51,7 @@ export function createMergeStageTool(
   io: EvolutionIoLike,
   home: string,
   context: (exec: unknown) => StageToolContext | undefined,
+  diagnose?: (exec: unknown) => unknown,
 ): ToolDefinitionLike {
   return {
     name: MERGE_STAGE_TOOL_NAME,
@@ -77,7 +78,7 @@ export function createMergeStageTool(
       const op = operation(args)
       if ('ok' in op) return JSON.stringify(op)
       const ctx = context(exec)
-      if (ctx === undefined) return JSON.stringify({ ok: false, code: 'not-merge-child', message: 'merge_stage is only available to an active merge child' })
+      if (ctx === undefined) return JSON.stringify({ ok: false, code: 'not-merge-child', message: 'merge_stage is only available to an active merge child', ...(diagnose === undefined ? {} : { diagnostic: diagnose(exec) }) })
       return JSON.stringify(await applyStageTool(io, home, ctx, op))
     },
   }

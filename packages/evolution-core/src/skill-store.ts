@@ -50,8 +50,9 @@ import { makeSerialQueue } from './serial.ts'
 import { h2Sections } from './document-body.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
+import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
 import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
-import { suppressedFile, usageFile } from './usage.ts'
+import { getRecord, mutateUsage, suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
@@ -348,6 +349,9 @@ export interface ArchiveOptions {
 
 /** One multi-skill merge commit: target body + support files, with the source names it absorbs. */
 export interface CommitMergePlan {
+  readonly runId?: string
+  /** The unit transaction id; history must record this exact id for undo. */
+  readonly unitId?: string
   readonly target: string
   /** Whether the target already exists. The caller planned this; commit re-checks it. */
   readonly targetExists: boolean
@@ -357,6 +361,11 @@ export interface CommitMergePlan {
   /** Plan-time target body; null for a create. */
   readonly expectedTargetBody: string | null
   readonly expectedSourceBodies: readonly { readonly name: string; readonly body: string }[]
+  /** Stage limits snapshot; absent uses the deployed store limits. */
+  readonly limits?: import('./limits.ts').SkillLimits
+  readonly targetRevision?: RevisionAnchor
+  readonly sourceRevisions?: Readonly<Record<string, RevisionAnchor>>
+  readonly supportDigest?: string
   readonly origin: WriteOrigin
   readonly summary: string
   /** Real write-phase callback used by UnitTransaction; not persisted. */
@@ -370,6 +379,8 @@ export interface CommitMergePlan {
 export interface CommitMergeResult {
   readonly ok: boolean
   readonly message: string
+  /** Typed refusal kind for the revision CAS (target/source/support changed after the plan). */
+  readonly code?: 'target-changed' | 'source-changed' | 'support-changed'
   readonly unitId?: string
   readonly targetPath?: string
   readonly archived?: readonly string[]
@@ -739,6 +750,12 @@ function serialForRoot(root: string): ReturnType<typeof makeSerialQueue> {
   ROOT_SERIAL.set(key, created)
   return created
 }
+/** Same-content test for two revision anchors (absent only equals absent). */
+function sameRevisionAnchor(expected: RevisionAnchor, live: RevisionAnchor): boolean {
+  if (expected.kind !== live.kind) return false
+  return expected.kind === 'absent' || expected.sha256 === (live as { readonly sha256: string }).sha256
+}
+
 export class SkillLibrary {
   readonly root: string
   readonly limits: SkillLimits
@@ -1128,7 +1145,50 @@ export class SkillLibrary {
   }
 
   /**
+   * Content anchor of one live skill: name + body + every support file under SUPPORT_DIRS.
+   *
+   * This is the commit-side counterpart of the decision-time anchor recorded by the merge
+   * domain (see skill-revision.ts): both sides call the same fingerprint, so a changed
+   * source, target or support file cannot slip past the commit CAS.
+   * @param rawName - caller-supplied skill name (trimmed here).
+   * @returns present anchor, or absent when the skill has no SKILL.md.
+   */
+  async revisionFingerprint(rawName: string): Promise<string | null> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return null
+    let body: string | null
+    try {
+      body = await this.io.readText(join(this.dirOf(name), 'SKILL.md'))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException | undefined)?.code === 'EISDIR') return null
+      throw error
+    }
+    if (body === null) return null
+    return revisionFingerprint(name, body, await this.liveSupportFiles(name))
+  }
 
+  /** Content anchor of one live skill; the hash a decision records and a commit re-checks. */
+  async revisionAnchor(rawName: string): Promise<RevisionAnchor> {
+    const fingerprint = await this.revisionFingerprint(rawName)
+    return fingerprint === null ? { kind: 'absent' } : { kind: 'present', sha256: contentHash(fingerprint) }
+  }
+
+  /** Every support file of one live skill, in listing order; unreadable/missing files fail loud. */
+  async liveSupportFiles(rawName: string): Promise<readonly RevisionFile[]> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return []
+    const listed = await this.listSupportFiles(name)
+    if (isUnknown(listed)) throw new Error('support file list is unknown: ' + name)
+    if (!isPresent(listed)) return []
+    const dir = this.dirOf(name)
+    return await Promise.all(listed.value.map(async path => {
+      const content = await this.io.readText(join(dir, ...path.replace(/\\/g, '/').split('/').filter(Boolean)))
+      if (content === null) throw new Error('support file disappeared: ' + name + '/' + path)
+      return { path, content }
+    }))
+  }
+
+  /**
    * Single path-building choke point (rc.42 audit P2-5): every directory path
 
    * is built from the TRIMMED name, so a name that passes `badName` (which
@@ -1530,6 +1590,16 @@ export class SkillLibrary {
     return await loadVersions(this.root, this.io, name)
   }
 
+  /** Versions from the latest merge baseline onward; old versions stay listable via listVersions. */
+  async listBaselineVersions(rawName: string): Promise<SkillVersion[]> {
+    const versions = await this.listVersions(rawName)
+    let start = -1
+    for (let index = versions.length - 1; index >= 0; index -= 1) {
+      if (versions[index]?.unitHead?.baseline === true) { start = index; break }
+    }
+    return start < 0 ? versions : versions.slice(start)
+  }
+
   /**
    * One version's content, read back from the content-addressed blob store.
    * @param rawName - the skill's name.
@@ -1541,6 +1611,42 @@ export class SkillLibrary {
     const name = rawName.trim()
     if (this.badName(name) !== null) return null
     return await loadVersionContent(this.root, this.io, name, v)
+  }
+
+  /** Read an archived skill's human-readable reason, exact or stamped. */
+  async readArchiveReason(rawName: string): Promise<string | null> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return null
+    const archiveRoot = join(this.root, '.archive')
+    const exact = await this.io.readText(join(archiveRoot, name, '.archive-reason'))
+    if (exact !== null) return exact.trim()
+    const entries = await this.io.list(archiveRoot).catch(() => [] as string[])
+    for (const entry of [...entries].reverse()) {
+      if (entry !== name && !entry.startsWith(name + '-')) continue
+      const marker = await this.io.readText(join(archiveRoot, entry, '.archive-name'))
+      if (marker !== null && marker.trim() !== name) continue
+      const reason = await this.io.readText(join(archiveRoot, entry, '.archive-reason'))
+      if (reason !== null) return reason.trim()
+    }
+    return null
+  }
+
+  /** Read an archived skill body (SKILL.md) by its original name, exact or stamped. */
+  async readArchived(rawName: string): Promise<string | null> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return null
+    const archiveRoot = join(this.root, '.archive')
+    const exact = await this.io.readText(join(archiveRoot, name, 'SKILL.md'))
+    if (exact !== null) return exact
+    const entries = await this.io.list(archiveRoot).catch(() => [] as string[])
+    for (const entry of [...entries].reverse()) {
+      if (entry !== name && !entry.startsWith(name + '-')) continue
+      const marker = await this.io.readText(join(archiveRoot, entry, '.archive-name'))
+      if (marker !== null && marker.trim() !== name) continue
+      const text = await this.io.readText(join(archiveRoot, entry, 'SKILL.md'))
+      if (text !== null) return text
+    }
+    return null
   }
 
   /**
@@ -2071,6 +2177,19 @@ export class SkillLibrary {
       && basename(name) === name
   }
 
+  /** Mark merge-absorbed sources archived in the usage sidecar (FR-DATA-07). */
+  private async foldArchivedUsage(sources: readonly string[], at: string): Promise<void> {
+    try {
+      await mutateUsage(this.root, this.io, map => {
+        for (const name of sources) {
+          const record = getRecord(map, name)
+          record.state = 'archived'
+          record.archived_at = at
+        }
+      })
+    } catch { /* lifecycle telemetry is best-effort; the archive already landed */ }
+  }
+
   async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
 
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
@@ -2204,6 +2323,7 @@ export class SkillLibrary {
     if (PROTECTED_BUILTIN_SKILLS.has(target)) return { ok: false, message: `目标技能「${target}」是受保护的内置技能。` }
     const protectedSource = sources.find(name => PROTECTED_BUILTIN_SKILLS.has(name))
     if (protectedSource !== undefined) return { ok: false, message: `来源技能「${protectedSource}」是受保护的内置技能。` }
+    const limits = plan.limits ?? this.limits
     return await this.serial(async (): Promise<CommitMergeResult> => {
       const dir = this.dirOf(target)
       const targetPath = join(dir, 'SKILL.md')
@@ -2237,7 +2357,36 @@ export class SkillLibrary {
         if (body !== expected) return { ok: false, message: `来源技能「${source}」在计划之后被改过；拒绝提交（未写入任何内容）。` }
         sourceBodies.set(source, body)
       }
-      const validation = validateFrontmatter(plan.body, target, this.limits)
+      // Decision-time CAS (FR-EXEC-12/GAP-CAND-02): the body compare above only covers
+      // SKILL.md; a changed support file (or a changed target body recorded with different
+      // formatting) would still slip through. Re-hash the LIVE tree with the same canonical
+      // fingerprint the decision recorded and refuse before the first write.
+      if (plan.targetRevision !== undefined) {
+        const liveTargetRevision = await this.revisionAnchor(target)
+        if (!sameRevisionAnchor(plan.targetRevision, liveTargetRevision)) {
+          return { ok: false, code: 'target-changed', message: `目标技能「${target}」的内容在决策之后被改过；拒绝提交（未写入任何内容）。` }
+        }
+      }
+      if (plan.sourceRevisions !== undefined) {
+        for (const [name, expected] of Object.entries(plan.sourceRevisions)) {
+          if (!sources.includes(name)) continue
+          const live = await this.revisionAnchor(name)
+          if (!sameRevisionAnchor(expected, live)) {
+            return { ok: false, code: 'source-changed', message: `来源技能「${name}」的内容在决策之后被改过；拒绝提交（未写入任何内容）。` }
+          }
+        }
+      }
+      if (plan.supportDigest !== undefined) {
+        const fingerprints: string[] = []
+        for (const name of [target, ...sources]) {
+          const fingerprint = await this.revisionFingerprint(name)
+          if (fingerprint !== null) fingerprints.push(fingerprint)
+        }
+        if (revisionSupportDigest(fingerprints) !== plan.supportDigest) {
+          return { ok: false, code: 'support-changed', message: '参与合并的技能支撑文件在决策之后被改过；拒绝提交（未写入任何内容）。' }
+        }
+      }
+      const validation = validateFrontmatter(plan.body, target, limits)
       if (validation) return { ok: false, message: validation }
       const supportPaths = new Set<string>()
       const supportPrevious = new Map<string, string | null>()
@@ -2246,7 +2395,7 @@ export class SkillLibrary {
         if (badPath) return { ok: false, message: badPath }
         if (supportPaths.has(file.path)) return { ok: false, message: `支撑文件重复：${file.path}` }
         supportPaths.add(file.path)
-        if (Buffer.byteLength(file.content, 'utf8') > this.limits.maxSkillFileBytes) return { ok: false, message: `支撑文件超过 ${this.limits.maxSkillFileBytes} 字节：${file.path}` }
+        if (Buffer.byteLength(file.content, 'utf8') > limits.maxSkillFileBytes) return { ok: false, message: `支撑文件超过 ${limits.maxSkillFileBytes} 字节：${file.path}` }
         const threat = this.contentThreatBlock(file.content)
         if (threat) return { ok: false, message: threat }
         const previous = await this.io.readText(join(dir, ...file.path.replace(/\\/g, '/').split('/').filter(Boolean)))
@@ -2259,7 +2408,7 @@ export class SkillLibrary {
           : false
         if (!existing) return { ok: false, message: `正文引用了未提供的支撑文件「${ref}」；拒绝提交。` }
       }
-      const unitId = 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
+      const unitId = plan.unitId ?? ('u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36))
       const supportMoves = plan.supportFiles.map((file) => {
         const previous = supportPrevious.get(file.path) ?? null
         return {
@@ -2271,6 +2420,8 @@ export class SkillLibrary {
         }
       })
       const unitHead: UnitHead = {
+        ...(plan.runId === undefined ? {} : { runId: plan.runId }),
+        baseline: true,
         moves: supportMoves,
         sources: [{ skill: target }, ...sources.map(source => ({ skill: source }))],
       }
@@ -2387,6 +2538,7 @@ export class SkillLibrary {
           archived.push(source)
         }
         await plan.onPhase?.('sources-archived')
+        await this.foldArchivedUsage(sources, new Date().toISOString())
         await plan.onPhase?.('unit-written')
         return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
       }

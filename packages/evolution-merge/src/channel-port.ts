@@ -3,16 +3,17 @@
  * an author callback for round 2 when the same child continues. Commit is deliberately
  * outside this adapter: the caller owns staging -> commitStagedRun.
  */
-import type { MergeDecision, MergeRow } from './contracts.ts'
+import type { MergeDecision, MergeRow, MergeUsage } from './contracts.ts'
 import type { SkillCard } from './skill-card.ts'
 import { parseDecision } from './decision.ts'
-import { buildRound1Prompt, buildRound2Prompt, STANDBY_PROMPT } from './prompts.ts'
+import { buildRound1Prompt, buildRound2Prompt, MERGE_PROMPT_VERSION, promptHashOf, STANDBY_PROMPT } from './prompts.ts'
 import type { ScanRound1Outcome } from './scan-run.ts'
 
 export interface ChannelTurnLike {
   readonly text: string
   readonly stopReason: string
   readonly cacheRead?: number
+  readonly usage?: MergeUsage
 }
 
 export type ChannelTurnOutcome =
@@ -52,6 +53,7 @@ export interface ChannelRound1Options {
 export interface ChannelRound1Result {
   readonly outcome: ScanRound1Outcome
   readonly childId?: string
+  readonly usage?: () => MergeUsage | undefined
   /** Same-child round 2; absent for keep/fail/unavailable. */
   readonly author?: (row: MergeRow, decision: MergeDecision, signal: AbortSignal) => Promise<string>
   readonly dispose: () => Promise<void>
@@ -63,6 +65,7 @@ export async function runRound1OverChannel(
   signal: AbortSignal,
 ): Promise<ChannelRound1Result> {
   let childId: string | undefined
+  let lastUsage: MergeUsage | undefined
   const dispose = async (): Promise<void> => {
     if (childId !== undefined) {
       const id = childId
@@ -88,9 +91,10 @@ export async function runRound1OverChannel(
     return { outcome: { kind: 'failed', failure: { stage: 'decide', code: opened.turn.stopReason, message: 'standby did not complete', retryable: true, retryFrom: 'agent1' } }, dispose }
   }
   try { options.onChildOpened?.(opened.childId) } catch (error) { await dispose(); return { outcome: { kind: 'failed', failure: { stage: 'decide', code: 'child-bind', message: String(error), retryable: true, retryFrom: 'agent1' } }, dispose } }
+  const prompt = buildRound1Prompt(candidate, options.cards)
   const round1 = await options.channel.continueTurn(
     opened.childId,
-    buildRound1Prompt(candidate, options.cards),
+    prompt,
     { timeoutMs: options.timeoutMs, signal },
   )
   if (round1.kind !== 'ok') {
@@ -106,7 +110,8 @@ export async function runRound1OverChannel(
     await dispose()
     return { outcome: { kind: 'failed', failure: { stage: 'decide', code: parsed.code, message: parsed.message, retryable: true, retryFrom: 'agent1' } }, dispose }
   }
-  const decision = round1.turn.cacheRead === undefined ? parsed.decision : { ...parsed.decision, cacheRead: round1.turn.cacheRead }
+  lastUsage = round1.turn.usage
+  const decision = { ...parsed.decision, promptVersion: MERGE_PROMPT_VERSION, promptHash: promptHashOf(prompt), ...(round1.turn.cacheRead === undefined ? {} : { cacheRead: round1.turn.cacheRead }) }
   if (!decision.shouldMerge || decision.mode === 'keep') {
     await dispose()
     return { outcome: { kind: 'keep', decision }, dispose }
@@ -116,6 +121,7 @@ export async function runRound1OverChannel(
     outcome: { kind: 'merge', decision },
     childId: child,
     dispose,
+    usage: () => lastUsage,
     async author(row, decision, turnSignal) {
       const turn = await options.channel.continueTurn(
         child,
@@ -124,6 +130,7 @@ export async function runRound1OverChannel(
       )
       if (turn.kind !== 'ok') throw new Error(turn.kind === 'unavailable' ? turn.reason : 'round2 aborted')
       if (turn.turn.stopReason !== 'completed') throw new Error('round2 did not complete: ' + turn.turn.stopReason)
+      lastUsage = turn.turn.usage
       return turn.turn.text
     },
   }

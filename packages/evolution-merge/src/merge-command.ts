@@ -4,8 +4,10 @@
  */
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { parseMergeCommand, mergeUsage, type MergeCliCommand } from './commands.ts'
+import { aliasRegistration } from '@deepseek-ai/dsh-evolution-commands'
+import { MERGE_ALIAS_DEF, MERGE_PACKAGE_VERSION } from './command-defs.ts'
 import { handleReadOnlyMergeCommand } from './read-commands.ts'
-import { formatMergeError } from './domain/errors.ts'
+import { commandError, formatMergeError } from './domain/errors.ts'
 
 export interface MergeCommandResult {
   readonly ok: boolean
@@ -15,6 +17,8 @@ export interface MergeCommandResult {
 export interface MergeCommandContext {
   /** The invoking agent, when a command (not a route) initiated the run. */
   readonly parent?: unknown
+  /** True when the invocation carried no agent at all (the E-305 shape). */
+  readonly agentless?: boolean
 }
 
 export interface MergeCommandService {
@@ -43,7 +47,7 @@ export function createReadOnlyMergeService(io: EvolutionIoLike, home: string): M
     async execute(command) {
       const text = await handleReadOnlyMergeCommand(command, io, home)
       return text === null
-        ? { ok: false, text: 'merge ' + command.verb + ' 需要运行引擎（当前只挂载了只读命令）' }
+        ? { ok: false, text: formatMergeError(commandError(command.verb, 'merge-engine-required', '该命令需要合并运行时（当前只挂载了只读命令）', '安装 evolution-merge 完整行后重试；只读队列见 /evolution merge status')) }
         : { ok: true, text }
     },
   }
@@ -61,16 +65,17 @@ export async function runMergeCommand(
   if (!parsed.ok) return { ok: false, text: parsed.message }
   if (parsed.help === true) return { ok: true, text: mergeUsage() }
   try {
-    return await service.execute(parsed.command, invocation?.agent === undefined ? {} : { parent: invocation.agent })
+    return await service.execute(parsed.command, invocation?.agent === undefined ? { agentless: true } : { parent: invocation.agent })
   } catch (error) {
-    return { ok: false, text: formatMergeError({ kind: 'runtime', code: 'merge-command-failed', message: error instanceof Error ? error.message : String(error) }) }
+    return { ok: false, text: formatMergeError(commandError('command', 'merge-command-failed', error instanceof Error ? error.message : String(error), '重试；若持续失败，运行 /evolution merge doctor 查看状态')) }
   }
 }
 
-export function createMergeCommand(service: MergeCommandService): MergeCommandDefinitionLike {
+export function createMergeCommand(service: MergeCommandService, version: string = MERGE_PACKAGE_VERSION): MergeCommandDefinitionLike | null {
+  if (aliasRegistration(version, MERGE_ALIAS_DEF) === 'removed') return null
   return {
     name: 'merge',
-    description: '技能自动合并：扫描、待批准、重跑、报告与 undo（兼容别名；请用 /evolution merge）',
+    description: (aliasRegistration(version, MERGE_ALIAS_DEF) === 'deprecated' ? '已弃用，请用 /evolution merge。' : '') + '技能自动合并：扫描、待批准、重跑、报告与 undo（兼容别名；请用 /evolution merge）',
     input: { hint: mergeUsage() },
     async handler(invocation) {
       const result = await runMergeCommand(service, invocation.rawInput, invocation)

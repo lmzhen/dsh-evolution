@@ -31,7 +31,6 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'evolutionApproval', feature: 'pending writes: list, approve and reject from the command surface', side: 'host' },
   { service: 'evolutionCurator', feature: '/evolution curator subcommands, skill undo and history', side: 'host' },
   { service: 'evolutionIo', feature: 'every durable read and write (the IO seam)', side: 'host' },
-  { service: 'evolutionMerge', feature: 'merge rows and run state', side: 'host' },
   { service: 'hmr', feature: 'the preset install read-merge-write commit (the platform HMR lock serializes it)', side: 'host' },
   { service: 'evolutionMemoryBudget', feature: 'the memory-budget divergence section of this report', side: 'host' },
   { service: 'evolutionPolicy', feature: 'the policy snapshot that shadows row knobs', side: 'host' },

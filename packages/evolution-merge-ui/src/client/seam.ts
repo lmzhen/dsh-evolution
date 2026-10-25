@@ -34,3 +34,22 @@ export interface ClientSeam {
   slots: SlotsSeat
   locale: LocaleSeat
 }
+
+/** One client settings row's readable/writable face (platform configForms). */
+export interface ConfigFormSnapshotLike {
+  status: 'loading' | 'ready' | 'unavailable'
+  value: Record<string, unknown> | undefined
+  writable: boolean
+  revision?: number
+}
+export interface ConfigFormLike {
+  getSnapshot(): ConfigFormSnapshotLike
+  subscribe(listener: () => void): () => void
+  set(field: string, value: unknown): Promise<boolean>
+  unset(field: string): Promise<boolean>
+}
+export interface ConfigFormsSeat { get(entryId: string): ConfigFormLike }
+export interface SettingsFace {
+  merge?: ConfigFormLike
+  platform?: ConfigFormLike
+}

@@ -1,8 +1,9 @@
+import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { loadMergeState, pairKey, rowIdOf, runApproveCommand, upsertRow, type MergeDecision, type MergeRegistryPort, type MergeRow } from '../src/index.ts'
+import { loadMergeState, pairKey, rowIdOf, runApproveCommand, type MergeDecision, type MergeRegistryPort, type MergeRow } from '../src/index.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const DECISION: MergeDecision = { shouldMerge: true, mode: 'merge-into-existing', target: 'a', sources: ['a', 'b'], rationale: 'same' }
@@ -11,9 +12,9 @@ async function pending(home: string) {
   const key = pairKey('a', 'b')
   const row: MergeRow = {
     id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'pending', queue: 'pending',
-    decision: DECISION, createdAt: AT, updatedAt: AT,
+    decision: DECISION, runId: 'parent-run', createdAt: AT, updatedAt: AT,
   }
-  await upsertRow(nodeEvolutionIo(), home, () => Date.parse(AT), row)
+  await seedRow(nodeEvolutionIo(), home, row)
   return row
 }
 

@@ -11,6 +11,8 @@ export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
     },
     async commit(plan: UnitPlan, onPhase, signal, assertFence): Promise<UnitCommitResult> {
       const result = await skills.commitMerge({
+        ...(plan.runId === undefined ? {} : { runId: plan.runId }),
+        ...(plan.unitId === undefined ? {} : { unitId: plan.unitId }),
         target: plan.target,
         targetExists: plan.targetExists,
         sources: plan.sources,
@@ -20,11 +22,15 @@ export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
         expectedSourceBodies: plan.expectedSourceBodies,
         origin: plan.origin,
         summary: plan.summary,
+        ...(plan.skillLimits === undefined ? {} : { limits: plan.skillLimits }),
+        ...(plan.targetRevision === undefined ? {} : { targetRevision: plan.targetRevision }),
+        ...(plan.sourceRevisions === undefined ? {} : { sourceRevisions: plan.sourceRevisions }),
+        ...(plan.supportDigest === undefined ? {} : { supportDigest: plan.supportDigest }),
         ...(onPhase === undefined ? {} : { onPhase }),
         ...(signal === undefined ? {} : { signal }),
         ...(assertFence === undefined ? {} : { assertFence }),
       })
-      return { ok: result.ok, message: result.message, ...(result.archived === undefined ? {} : { archived: result.archived }), ...(result.mutations === undefined ? {} : { mutations: result.mutations }) }
+      return { ok: result.ok, message: result.message, ...(result.code === undefined ? {} : { code: result.code }), ...(result.archived === undefined ? {} : { archived: result.archived }), ...(result.mutations === undefined ? {} : { mutations: result.mutations }) }
     },
     async restoreTarget(name, body) {
       if (body === null) { await skills.archive(name, { reason: 'unit-rollback' }); return }

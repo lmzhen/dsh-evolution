@@ -2,11 +2,11 @@
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { makeV4Home } from './support/schema4-home.ts'
 import { createMergeCommand, createReadOnlyMergeService, runMergeCommand } from '../src/index.ts'
 
 it('dispatches read-only verbs and rejects missing ones', async () => {
-  const home = await tempRoot('dsh-merge-command-')
-  const io = nodeEvolutionIo()
+  const { home, io } = await makeV4Home([])
   const command = createMergeCommand(createReadOnlyMergeService(io, home))
   expect(command.name).toBe('merge')
   const status = await command.handler({ rawInput: '/merge status' })
@@ -19,8 +19,7 @@ it('dispatches read-only verbs and rejects missing ones', async () => {
 })
 
 it('accepts the /evolution merge prefix through the shared runner', async () => {
-  const home = await tempRoot('dsh-merge-command-prefix-')
-  const io = nodeEvolutionIo()
+  const { home, io } = await makeV4Home([])
   const result = await runMergeCommand(createReadOnlyMergeService(io, home), '/evolution merge status')
   expect(result.ok).toBe(true)
   expect(result.text).toContain('merge: verify 0, pending 0')

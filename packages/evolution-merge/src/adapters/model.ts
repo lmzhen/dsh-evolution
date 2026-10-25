@@ -4,6 +4,7 @@
  * because the gate and proposer own JSON extraction.
  */
 import type { ModelPort } from '../propose.ts'
+import { normalizeProviderKey } from '../domain/provider-key.ts'
 
 export interface ModelRoute {
   readonly provider: string
@@ -42,7 +43,7 @@ export function createModelPort(llm: LlmServiceLike, route: () => ModelRoute): M
       let text = ''
       if (llm.stream !== undefined) {
         for await (const chunk of llm.stream({
-          provider: selection.provider,
+          provider: normalizeProviderKey(selection.provider),
           model: selection.model,
           system: request.system,
           messages: [{ role: 'user', content: [{ type: 'text', text: request.user }] }],

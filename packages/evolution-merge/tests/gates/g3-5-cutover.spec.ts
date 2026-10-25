@@ -36,7 +36,6 @@ it('has no legacy production writer and only the read-only v2 projection', async
 it('all production state writes go through RowTx or terminal drop', async () => {
   const all = await files(src)
   const text = (await Promise.all(all.map(path => readFile(path, 'utf8')))).join('\n')
-  expect(text).toContain('transactRows(')
-  expect(text).toContain('dropRowV3(')
-  expect(text).toContain('transitionV3(')
+  expect(text).toContain('transactMergeState(')
+  expect(text).toContain('transitionV4(')
 })

@@ -42,7 +42,7 @@ export interface EngineScreeningDeps {
   readonly select: (report: Record<string, unknown>) => CandidateSelection
   readonly cfg?: Record<string, unknown>
   readonly runner?: (prompt: string, cfg?: Record<string, unknown>) => Promise<string>
-  readonly onSelection?: (selection: CandidateSelection, runId: string) => Promise<void>
+  readonly onSelection?: (selection: CandidateSelection, runId: string, cards: readonly SkillCard[]) => Promise<void>
 }
 
 function safeName(name: string, index: number): string {
@@ -76,10 +76,15 @@ export function createEngineScreening(deps: EngineScreeningDeps) {
       throw new Error('engine screen failed: ' + result.error.code + (result.error.stage === undefined ? '' : ' @' + result.error.stage) + (result.error.detail === undefined ? '' : ': ' + result.error.detail))
     }
     const selection = deps.select(result.report)
-    if (deps.onSelection !== undefined) await deps.onSelection(selection, runId)
+    if (deps.onSelection !== undefined) await deps.onSelection(selection, runId, cards)
+    const degraded = selection.reportOnly
+      .filter(row => (row as { error?: unknown }).error === true)
+      .map(row => { const value = row as { a?: unknown; b?: unknown }; return 'gate error: ' + String(value.a ?? '?') + ' + ' + String(value.b ?? '?') })
     return Object.assign(
       selection.candidates.slice(),
       selection.candidatePairs === undefined ? {} : { candidatePairs: selection.candidatePairs },
+      degraded.length === 0 ? {} : { degraded },
+      selection.reportOnly.length === 0 ? {} : { reportOnly: selection.reportOnly },
     )
   }
 }

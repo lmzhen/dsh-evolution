@@ -3,6 +3,8 @@
  * runner(prompt, cfg) and expects raw model text; the platform owns provider
  * selection, usage accounting and transport.
  */
+import { normalizeProviderKey } from '../domain/provider-key.ts'
+
 export interface ModelRoute {
   readonly provider: string
   readonly model: string
@@ -39,7 +41,7 @@ export function createEngineRunner(llm: LlmServiceLike, route: () => ModelRoute)
     let text = ''
     if (llm.stream !== undefined) {
       for await (const chunk of llm.stream({
-        provider: selection.provider,
+        provider: normalizeProviderKey(selection.provider),
         model: selection.model,
         messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
         temperature: 0,
@@ -47,7 +49,7 @@ export function createEngineRunner(llm: LlmServiceLike, route: () => ModelRoute)
       return text
     }
     if (llm.prepareCall === undefined) throw new Error('llm service has neither stream nor prepareCall')
-    const call = await llm.prepareCall({ provider: selection.provider, model: selection.model, temperature: 0 })
+    const call = await llm.prepareCall({ provider: normalizeProviderKey(selection.provider), model: selection.model, temperature: 0 })
     for await (const chunk of call.stream({
       ...call.config,
       messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],

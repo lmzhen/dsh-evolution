@@ -1,13 +1,11 @@
-/**
- * Browser half: one sidebar row ("技能合并") and the read-only main body it opens.
- * All facts arrive through the generated routes; the bundle holds no service and writes nothing.
- */
+/** Browser half: one sidebar row and the read-only Batch 4 panel. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactElement } from 'react'
 import * as api from './api.ts'
-import { PANEL_ID, PANEL_ORDER, type ClientSeam } from './seam.ts'
+import { PANEL_ID, PANEL_ORDER, type ClientSeam, type ConfigFormsSeat } from './seam.ts'
 import { NS, en, zh } from './messages.ts'
-import { MergePanel, type MergeFace } from './Panel.ts'
+import { MergePanel, type MergeFace, type Translate } from './Panel.ts'
+import { MergeStore, type MergeSource } from './MergeStore.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 
 export const inject = ['slots', 'locale']
@@ -20,16 +18,23 @@ function PanelIcon(props: { size?: number; active?: boolean } = {}): ReactElemen
   }, createElement('path', { d: 'M3 4h10M3 8h6M3 12h8' }))
 }
 
-function seedView(): api.MergeViewPayload {
-  return {
-    counts: { verify: 0, pending: 0, fuse: 0, skipped: 0 },
-    expired: 0,
-    tabs: [{ queue: 'verify', count: 0 }, { queue: 'pending', count: 0 }, { queue: 'fuse', count: 0 }, { queue: 'skipped', count: 0 }],
-    commands: ['/evolution merge scan','/evolution merge pair <a> <b>','/evolution merge candidates','/evolution merge pending','/evolution merge resume','/evolution merge skipped','/evolution merge status','/evolution merge report','/evolution merge doctor'],
-    startCommands: { scan: '/evolution merge scan', pair: '/evolution merge pair <a> <b>' },
-    notes: [],
-    degraded: false,
+function interpolate(text: string, values?: Readonly<Record<string, string | number>>): string {
+  if (values === undefined) return text
+  return text.replace(/\{(\w+)\}/g, (_match, key: string) => String(values[key] ?? ''))
+}
+
+/** Best-effort panel workspace; the merge panel itself is not workspace-keyed. */
+function panelWorkspaceId(ctx: ClientContext): string | undefined {
+  const get = (ctx as unknown as { get?: (name: string) => unknown }).get
+  if (typeof get !== 'function') return undefined
+  for (const name of ['workspace', 'uiWorkspace']) {
+    try {
+      const seat = get.call(ctx, name) as { readonly workspaceId?: unknown; readonly currentWorkspaceId?: unknown } | undefined
+      const id = seat?.workspaceId ?? seat?.currentWorkspaceId
+      if (typeof id === 'string' && id.trim() !== '') return id
+    } catch { /* optional service: absence is the local scope */ }
   }
+  return undefined
 }
 
 export function apply(ctx: ClientContext): void {
@@ -50,10 +55,13 @@ export function apply(ctx: ClientContext): void {
     document.head.append(tag)
     return () => { tag.remove() }
   }, 'evolution-merge-ui: styles')
-  const t = (key: string): string => {
+  const t: Translate = (key, values) => {
     const fallback = zh[key] ?? key
-    if (!registered) return fallback
-    try { return seam.locale.bind(NS)(key) } catch { return fallback }
+    let text = fallback
+    if (registered) {
+      try { text = seam.locale.bind(NS)(key) } catch { text = fallback }
+    }
+    return interpolate(text, values)
   }
   const label = (): string => t('entry.label')
   seam.slots.inject('sidebar.panellist', function* () {
@@ -62,7 +70,19 @@ export function apply(ctx: ClientContext): void {
       PanelIcon,
     )
     yield seam.slots.register(
-      { name: 'main', key: PANEL_ID, inject: (): MergeFace => ({ view: seedView(), rows: [], loadView: api.view, loadRows: api.rows, loadBody: api.body, loadHistory: api.history, t }) },
+      { name: 'main', key: PANEL_ID, inject: (): MergeFace => {
+        const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
+        let seat: ConfigFormsSeat | undefined
+        try { seat = (ctx as unknown as { get?: (name: string) => unknown }).get?.('configForms') as ConfigFormsSeat | undefined } catch { seat = undefined }
+        const workspaceId = panelWorkspaceId(ctx)
+        return {
+          store: new MergeStore(source),
+          t,
+          doctorCommand: '/evolution doctor',
+          settings: { ...(seat === undefined ? {} : { merge: seat.get('evolution-merge'), platform: seat.get('evolution-approval') }) },
+          ...(workspaceId === undefined ? {} : { workspaceId }),
+        }
+      } },
       MergePanel,
     )
   })

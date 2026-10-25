@@ -51,7 +51,7 @@ await tx.commit(p.prepared)
     const dir = join(home, 'merge', 'unit-journals')
     const files = await readdir(dir)
     const journal = JSON.parse(await readFile(join(dir, files[0]!), 'utf8')) as { phase: string; unitId: string }
-    expect(journal.phase).toBe(point === 'unit-written' ? 'sources-archived' : point === 'target-applied' ? 'target-pending' : point)
+    expect(journal.phase).toBe(point === 'target-applied' ? 'target-pending' : point)
     const alpha = await readFile(join(home, 'tree', 'alpha'), 'utf8').catch(() => null)
     const beta = await readFile(join(home, 'tree', 'beta'), 'utf8').catch(() => null)
     if (point === 'prepared' || point === 'target-pending') {
@@ -82,7 +82,7 @@ await tx.commit(p.prepared)
       : point === 'sources-archived'
         ? await tx.rollForward(journal.unitId)
         : await tx.rollback({ unitId: journal.unitId, reason: 'crash' })
-    expect(recovered.ok).toBe(true)
+    expect(recovered.ok, recovered.ok ? '' : recovered.message).toBe(true)
     expect(await readFile(join(home, 'tree', 'alpha'), 'utf8').catch(() => null)).toBe(point === 'committed' || point === 'unit-written' || point === 'sources-archived' ? 'new' : 'old')
     expect(await readFile(join(home, 'tree', 'beta'), 'utf8').catch(() => null)).toBe(point === 'committed' || point === 'unit-written' || point === 'sources-archived' ? null : 'beta')
   }, 60_000)

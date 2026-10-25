@@ -1,8 +1,9 @@
+import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { handleReadOnlyMergeCommand, pairKey, rowIdOf, upsertRow, type MergeRow } from '../src/index.ts'
+import { handleReadOnlyMergeCommand, pairKey, rowIdOf, type MergeRow } from '../src/index.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const row = (a: string, b: string, state: MergeRow['state']): MergeRow => {
@@ -14,9 +15,9 @@ it('serves status/pending/skipped from the ledger', async () => {
   const home = await tempRoot('dsh-merge-read-commands-')
   const io = nodeEvolutionIo()
   const pending = row('alpha-skill', 'beta-skill', 'pending')
-  await upsertRow(io, home, () => Date.parse(AT), pending)
-  await upsertRow(io, home, () => Date.parse(AT), row('gamma-skill', 'delta-skill', 'pending'))
-  await upsertRow(io, home, () => Date.parse(AT), row('epsilon-skill', 'zeta-skill', 'skipped'))
+  await seedRow(io, home, pending)
+  await seedRow(io, home, row('gamma-skill', 'delta-skill', 'pending'))
+  await seedRow(io, home, row('epsilon-skill', 'zeta-skill', 'skipped'))
   expect(await handleReadOnlyMergeCommand({ verb: 'status' }, io, home)).toContain('verify 0, pending 2, fuse 0, skipped 1')
   expect(await handleReadOnlyMergeCommand({ verb: 'pending' }, io, home)).toContain('alpha-skill + beta-skill')
   const filtered = await handleReadOnlyMergeCommand({ verb: 'pending' }, io, home, [{ name: 'alpha-skill' }, { name: 'beta-skill' }])

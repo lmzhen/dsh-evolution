@@ -12,11 +12,15 @@ import {
   type MergeReportPair,
   type MergeRow,
 } from './contracts.ts'
-import { dropRowV3, loadMergeState, transactRows } from './state.ts'
-import { recordPair } from './domain/pair-index-store.ts'
-import { writeStagingIndex } from './domain/staging-index.ts'
-import { v3ToLegacy } from './domain/row-v3-bridge.ts'
+import { loadMergeState } from './state.ts'
+import { pairLedger } from './domain/pair-ledger.ts'
+import { presentStage, dropStage, type StageEntry } from './domain/stage-aggregate.ts'
+import { recordPair } from './domain/run-coordinator.ts'
+import { v4ToLegacy } from './domain/row-v4.ts'
 import type { EvolutionIoLike, RunStage } from '@deepseek-ai/dsh-evolution-core'
+import { criteriaFrom } from './domain/engine-criteria.ts'
+import type { SkillCard } from './skill-card.ts'
+import { withDecisionRevisions } from './revision.ts'
 import type { MergeRunReportDraft } from './run-shell.ts'
 
 const isAborted = (signal: AbortSignal): boolean => signal.aborted
@@ -29,19 +33,27 @@ export interface ScanRound1Outcome {
   readonly stagingExpiresAt?: number
   readonly sourceRevision?: string
   readonly targetRevision?: string
+  readonly degraded?: readonly string[]
+  readonly usage?: import('./contracts.ts').MergeUsage
 }
 
 export interface ScanRound2Outcome {
   readonly kind: 'merged' | 'failed'
   readonly unitId?: string
+  readonly evidenceSha256?: string
+  readonly validationPlan?: import('./contracts.ts').MergeValidationPlanRef
   readonly archived?: readonly string[]
   readonly target?: { readonly requested: string; readonly actual: string; readonly created: boolean }
   readonly failure?: MergeFailure
+  readonly usage?: import('./contracts.ts').MergeUsage
+  readonly lengths?: Readonly<Record<string, number>>
 }
 
 export interface ScanPorts {
   screening(signal: AbortSignal): Promise<readonly MergeCandidate[]>
+  resolve?(candidate: MergeCandidate): Promise<boolean>
   round1(candidate: MergeCandidate, signal: AbortSignal): Promise<ScanRound1Outcome>
+  stage?(row: MergeRow, decision: MergeDecision): Promise<{ readonly ok: true; readonly entry: StageEntry } | { readonly ok: false; readonly message: string }>
   round2(row: MergeRow, decision: MergeDecision, signal: AbortSignal): Promise<ScanRound2Outcome>
 }
 
@@ -58,6 +70,7 @@ export interface RunScanOptions {
   readonly notes?: readonly string[]
   readonly runId?: string
   readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
+  readonly cards?: readonly SkillCard[]
 }
 
 function at(now: () => number): string {
@@ -99,8 +112,10 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
   const startedAt = options.startedAt ?? options.now()
   const timeoutMs = (options.timeoutMinutes ?? 0) > 0 ? (options.timeoutMinutes as number) * 60_000 : 0
   const pairs: MergeReportPair[] = []
+  const degradedNotes: string[] = []
   const totals = { merged: 0, kept: 0, pending: 0, failed: 0 }
   const remaining: { pairKey: string; queue: ReturnType<typeof queueOf> }[] = []
+const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = []
   let stopReason: MergeRunReportDraft['stopReason'] = 'completed'
 
   for (let index = 0; index < candidates.length; index += 1) {
@@ -126,7 +141,7 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
         && (await options.isOwnerActive?.(before.runId)) === true) {
         continue
       }
-      const status = await transactRows(options.io, options.home, tx => {
+      const status = await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.pairKey === row.pairKey)
         if (current !== undefined && current.state !== 'verify' && current.state !== 'skipped') return 'conflict:' + current.state
         if (current?.state === 'skipped') {
@@ -153,6 +168,15 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       continue
     }
 
+    if (options.ports.resolve !== undefined && !(await options.ports.resolve(candidate))) {
+      await pairLedger(options.io, options.home).transact(tx => {
+        const current = tx.rows().find(item => item.id === row.id)
+        return current === undefined ? false : tx.remove(row.id, 'superseded', undefined, current.version).ok
+      })
+      pairs.push(pairOf(row, candidate, 'failed', { failure: { stage: 'decide', code: 'source-gone', message: 'source skill disappeared before round1', retryable: false, retryFrom: 'none' } }))
+      totals.failed += 1
+      continue
+    }
     let round1: ScanRound1Outcome
     try {
       round1 = await options.ports.round1(candidate, options.signal)
@@ -165,12 +189,13 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       break
     }
     if (round1.kind === 'failed') {
+      if (round1.degraded !== undefined) degradedNotes.push(...round1.degraded)
       const failure = round1.failure ?? failureOf('decide', 'round1 failed')
-      const projected = await transactRows(options.io, options.home, tx => {
+      const projected = await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
         if (current === undefined) return null
         const moved = tx.transition(row.id, { type: 'failed', failure }, current.version)
-        return moved.ok && moved.row !== null ? v3ToLegacy(moved.row) : null
+        return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
       })
       if (projected === null) { pairs.push(pairOf(row, candidate, 'failed', { failure: failureOf('decide', 'row changed before failure record') })); totals.failed += 1; continue }
       row = projected
@@ -179,16 +204,17 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       continue
     }
     if (round1.kind === 'keep') {
-      const projected = await transactRows(options.io, options.home, tx => {
+      const projected = await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
         if (current === undefined) return null
-        const moved = tx.transition(row.id, { type: 'skipped', reason: 'kept' }, current.version)
-        return moved.ok && moved.row !== null ? v3ToLegacy(moved.row) : null
+        const keepReason = round1.decision?.rationale?.trim()
+        const moved = tx.transition(row.id, { type: 'skipped', ...(keepReason === undefined || keepReason === '' ? { reason: 'kept' } : { reason: keepReason }), origin: 'agent' }, current.version)
+        return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
       })
       if (projected === null) { pairs.push(pairOf(row, candidate, 'failed', { failure: failureOf('decide', 'row changed before keep record') })); totals.failed += 1; continue }
       row = projected
       await recordPair(options.io, options.home, { pairKey: row.pairKey, runId: row.runId ?? 'merge', result: 'kept' })
-      pairs.push(pairOf(row, candidate, 'kept', round1.decision === undefined ? {} : { decision: round1.decision }))
+      pairs.push(pairOf(row, candidate, 'kept', { ...(round1.decision === undefined ? {} : { decision: round1.decision }), ...(round1.usage === undefined ? {} : { usage: round1.usage }) }))
       totals.kept += 1
       continue
     }
@@ -197,45 +223,63 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
       totals.failed += 1
       continue
     }
+    const mergeDecision = options.cards !== undefined ? withDecisionRevisions(round1.decision!, options.cards, row.a, row.b) : round1.decision!
     if (options.approval) {
-      const event = { type: 'verify-passed' as const, decision: round1.decision, target: round1.decision.target, ...(round1.sourceRevision === undefined ? {} : { sourceRevision: round1.sourceRevision }) }
-      const projected = await transactRows(options.io, options.home, tx => {
+      const event = { type: 'verify-passed' as const, decision: mergeDecision, target: mergeDecision.target, ...(round1.sourceRevision === undefined ? {} : { sourceRevision: round1.sourceRevision }), ...(mergeDecision.promptVersion === undefined ? {} : { promptVersion: mergeDecision.promptVersion }), ...(mergeDecision.promptHash === undefined ? {} : { promptHash: mergeDecision.promptHash }) }
+      const projected = await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
         if (current === undefined) return null
         const moved = tx.transition(row.id, event, current.version)
-        return moved.ok && moved.row !== null ? v3ToLegacy(moved.row) : null
+        return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
       })
-      if (projected === null) { pairs.push(pairOf(row, candidate, 'failed', { decision: round1.decision, failure: failureOf('decide', 'row changed before pending record') })); totals.failed += 1; continue }
+      if (projected === null) { pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failureOf('decide', 'row changed before pending record') })); totals.failed += 1; continue }
       row = projected
-      pairs.push(pairOf(row, candidate, 'pending', { decision: round1.decision }))
+      pairs.push(pairOf(row, candidate, 'pending', { decision: mergeDecision }))
       totals.pending += 1
       continue
     }
 
-    const staged = await transactRows(options.io, options.home, tx => {
+    const approved = await pairLedger(options.io, options.home).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       if (current === undefined) return null
-      const approved = tx.transition(row.id, { type: 'auto-approved', decision: round1.decision!, target: round1.decision!.target, ...(row.runId === undefined ? {} : { runId: row.runId }) }, current.version)
-      if (!approved.ok || approved.row === null) return null
-      const moved = tx.transition(row.id, { type: 'staged', ...(round1.stagingRef === undefined ? {} : { ref: round1.stagingRef }), ...(round1.stagingExpiresAt === undefined ? {} : { expiresAt: round1.stagingExpiresAt }) }, approved.row.version)
-      return moved.ok && moved.row !== null ? v3ToLegacy(moved.row) : null
+      const moved = tx.transition(row.id, { type: 'auto-approved', decision: mergeDecision!, target: mergeDecision!.target, ...(row.runId === undefined ? {} : { runId: row.runId }) }, current.version)
+      return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
     })
-    if (staged === null) {
-      pairs.push(pairOf(row, candidate, 'failed', { decision: round1.decision, failure: failureOf('author', 'row changed before staging record') }))
+    if (approved === null) {
+      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failureOf('author', 'row changed before approve record') }))
       totals.failed += 1
       continue
     }
-    row = staged
-    if (round1.stagingRef !== undefined) {
-      const expiresAt = round1.stagingExpiresAt ?? options.now() + 7 * 86_400_000
-      await writeStagingIndex(options.io, options.home, { rowId: row.id, pairKey: row.pairKey, ref: round1.stagingRef, expiresAt, ...(row.runId === undefined ? {} : { runId: row.runId }), createdAt: options.now() })
+    row = approved
+    let stageEntry: StageEntry | undefined
+    if (options.ports.stage !== undefined) {
+      const staged = await options.ports.stage(row, mergeDecision)
+      if (!staged.ok) {
+        pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failureOf('author', staged.message) }))
+        totals.failed += 1
+        continue
+      }
+      stageEntry = staged.entry
     }
+    const fused = await pairLedger(options.io, options.home).transact(tx => {
+      const current = tx.rows().find(item => item.id === row.id)
+      if (current === undefined) return null
+      const moved = tx.transition(row.id, { type: 'staged' }, current.version)
+      return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
+    })
+    if (fused === null) {
+      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failureOf('author', 'row changed before staging record') }))
+      totals.failed += 1
+      continue
+    }
+    row = fused
+    if (stageEntry !== undefined) await presentStage(options.io, options.home, stageEntry)
     if (isAborted(options.signal)) {
-      const projected = await transactRows(options.io, options.home, tx => {
+      const projected = await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
         if (current === undefined) return null
         const moved = tx.transition(row.id, { type: 'skipped', reason: 'cancelled' }, current.version)
-        return moved.ok && moved.row !== null ? v3ToLegacy(moved.row) : null
+        return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
       })
       if (projected !== null) row = projected
       stopReason = 'cancelled'
@@ -245,39 +289,76 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     await stage('author', { done: index, total: candidates.length })
     let round2: ScanRound2Outcome
     try {
-      round2 = await options.ports.round2(row, round1.decision, options.signal)
+      round2 = await options.ports.round2(row, mergeDecision, options.signal)
     } catch (error) {
       round2 = { kind: 'failed', failure: failureOf('author', error) }
     }
     if (round2.kind === 'merged') {
-      const dropped = await dropRowV3(options.io, options.home, row.id, 'committed', round2.unitId ?? 'unknown')
-      if (!dropped) {
-        pairs.push(pairOf(row, candidate, 'failed', { decision: round1.decision, failure: failureOf('commit', 'row changed before commit record') }))
-        totals.failed += 1
-        continue
-      }
-      pairs.push(pairOf(row, candidate, 'merged', {
-        decision: round1.decision,
+      finalizeRows.push({ id: row.id, unitId: round2.unitId ?? 'unknown', evidenceSha256: round2.evidenceSha256 ?? 'unknown' })
+      pairs.push({ ...pairOf(row, candidate, 'merged', {
+        decision: mergeDecision,
         ...(round2.unitId === undefined ? {} : { unitId: round2.unitId }),
         ...(round2.target === undefined ? {} : { target: round2.target }),
+        ...(round2.usage === undefined ? {} : { usage: round2.usage }),
+        ...(round2.lengths === undefined ? {} : { lengths: round2.lengths }),
         archived: round2.archived ?? [],
-      }))
+      }), ...(round2.validationPlan === undefined ? {} : { validationPlan: round2.validationPlan }) })
       totals.merged += 1
       continue
     }
     const failed = round2.failure ?? failureOf('author', 'round2 failed')
-    const projected = await transactRows(options.io, options.home, tx => {
+    if (failed.code === 'merge-over-limit' || failed.code === 'limit' || failed.code === 'merge-validation') {
+      const reason = failed.code === 'merge-validation' ? 'validation-failed' : 'merge-over-limit'
+      const skipped = await pairLedger(options.io, options.home).transact(tx => {
+        const current = tx.rows().find(item => item.id === row.id)
+        return current === undefined ? false : tx.transition(row.id, { type: 'skipped', reason, origin: 'system', skipSource: 'system' }, current.version).ok
+      })
+      if (skipped) await dropStage(options.io, options.home, row.id)
+      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed }))
+      totals.failed += 1
+      continue
+    }
+    if (failed.code === 'target-changed' || failed.code === 'target-taken' || failed.code === 'source-changed' || failed.code === 'support-changed' || failed.code === 'source-gone') {
+      const code = failed.code === 'target-changed' ? 'target-taken' : failed.code === 'support-changed' ? 'source-changed' : failed.code
+      await pairLedger(options.io, options.home).transact(tx => {
+        const current = tx.rows().find(item => item.id === row.id)
+        if (current === undefined) return false
+        if (code === 'source-gone') return tx.remove(row.id, 'superseded', undefined, current.version).ok
+        return tx.transition(row.id, { type: 'skipped', reason: code, origin: 'system', skipSource: 'system' }, current.version).ok
+      })
+      await dropStage(options.io, options.home, row.id)
+      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: { ...failed, code, retryable: false, retryFrom: 'none' } }))
+      totals.failed += 1
+      continue
+    }
+    const terminal = failed.code === 'commit-failed' || failed.code === 'validation-failed' || failed.code === 'merge-validation'
+    const projected = terminal ? null : await pairLedger(options.io, options.home).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       if (current === undefined) return null
       const moved = tx.transition(row.id, { type: 'failed', failure: failed }, current.version)
-      return moved.ok && moved.row !== null ? v3ToLegacy(moved.row) : null
+      return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
     })
-    if (projected === null) { pairs.push(pairOf(row, candidate, 'failed', { decision: round1.decision, failure: failureOf('author', 'row changed before failure record') })); totals.failed += 1; continue }
+    if (projected === null && terminal) {
+      await pairLedger(options.io, options.home).transact(tx => {
+        const current = tx.rows().find(item => item.id === row.id)
+        return current === undefined ? false : tx.remove(row.id, 'superseded', undefined, current.version).ok
+      })
+      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed }))
+      totals.failed += 1
+      continue
+    }
+    if (projected === null) { pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failureOf('author', 'row changed before failure record') })); totals.failed += 1; continue }
     row = projected
-    pairs.push(pairOf(row, candidate, 'failed', { decision: round1.decision, failure: failed }))
+    pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed }))
     totals.failed += 1
   }
 
+  const selectionReportOnly = (candidates as readonly MergeCandidate[] & { readonly reportOnly?: readonly unknown[] }).reportOnly ?? []
+  const selectionReportOnlyPairs: MergeReportPair[] = selectionReportOnly.flatMap(raw => {
+    const value = raw as { readonly a?: unknown; readonly b?: unknown; readonly pairKey?: unknown; readonly gate?: MergeReportPair['gate'] }
+    if (typeof value.a !== 'string' || typeof value.b !== 'string') return []
+    return [{ id: '', pairKey: typeof value.pairKey === 'string' ? value.pairKey : pairKey(value.a, value.b), a: value.a, b: value.b, queue: 'verify' as const, candidate: { a: value.a, b: value.b }, outcome: 'kept' as const, archived: [], ...(value.gate === undefined ? {} : { gate: value.gate }) }]
+  })
   return {
     stopReason,
     scope: {
@@ -286,7 +367,24 @@ export async function runScan(options: RunScanOptions): Promise<MergeRunReportDr
     },
     pairs,
     totals,
-    notes: [ ...(options.notes ?? []) ],
+    notes: [ ...(options.notes ?? []), ...degradedNotes ],
+    reportOnly: [...pairs.filter(pair => pair.outcome === 'kept' || pair.gate?.level === 'L0' || pair.gate?.level === 'L1'), ...selectionReportOnlyPairs],
+    validationFailures: pairs.filter(pair => pair.failure !== undefined && (pair.failure.stage === 'validate' || pair.failure.code === 'merge-validation' || pair.failure.code === 'merge-over-limit')),
+    archived: [...new Set(pairs.flatMap(pair => pair.archived))],
+    ...(pairs.find(pair => pair.outcome === 'merged' && pair.unitId !== undefined) === undefined ? {} : { commit: (() => { const pair = pairs.find(item => item.outcome === 'merged' && item.unitId !== undefined)!; return { ...(pair.unitId === undefined ? {} : { unitId: pair.unitId }), ...(pair.target === undefined ? {} : { target: pair.target.actual ?? pair.target.requested }), ...(pair.target === undefined ? {} : { created: pair.target.created }) } })() }),
+    ...(pairs.every(pair => pair.usage === undefined) ? {} : { usage: { inputTokens: pairs.reduce((sum, pair) => sum + (pair.usage?.inputTokens ?? 0), 0), outputTokens: pairs.reduce((sum, pair) => sum + (pair.usage?.outputTokens ?? 0), 0), totalTokens: pairs.reduce((sum, pair) => sum + (pair.usage?.totalTokens ?? 0), 0), costCny: pairs.reduce((sum, pair) => sum + (pair.usage?.costCny ?? 0), 0) } }),
+    timing: { screeningMs: 0, gateMs: 0, agentMs: Math.max(0, options.now() - startedAt), commitMs: 0 },
+    criteria: pairs.map(pair => pair.criteria ?? criteriaFrom(pair.gate?.level ?? 'L2', pair.gate?.verdict ?? 0, pair.decision?.shouldMerge === true ? 'merge' : 'keep')),
     ...(remaining.length === 0 ? {} : { remaining }),
+    ...(finalizeRows.length === 0 ? {} : { finalize: async () => {
+      for (const item of finalizeRows) {
+        const removed = await pairLedger(options.io, options.home).transact(tx => {
+          const current = tx.rows().find(entry => entry.id === item.id);
+          return current === undefined ? true : tx.remove(item.id, 'committed', { unitId: item.unitId, evidenceSha256: item.evidenceSha256 }, current.version).ok;
+        });
+        if (!removed) throw new Error('row changed before commit record: ' + item.id);
+        await dropStage(options.io, options.home, item.id);
+      }
+    } })
   }
 }

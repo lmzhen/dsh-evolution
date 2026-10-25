@@ -2,6 +2,7 @@
 import { expect, it } from 'vitest'
 import type { RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import { MERGE_ROUTES, makeMergeRoutes, type MergeRow, type MergeRouteSource } from '../src/index.ts'
+import type { StateReadiness } from '../src/domain/state-bootstrap.ts'
 
 const audit = { channel: 'connection.fetch' as const, principal: 'owner' as const, deploymentAllowsRemote: true }
 const row = (a: string, b: string, state: MergeRow['state']): MergeRow => ({
@@ -47,4 +48,22 @@ it('rejects bad queries and reports E-325 for an absent service', async () => {
   const response = await (absent.find(item => item.path === MERGE_ROUTES.view) as { fetch: (request: Request) => Promise<Response> }).fetch(new Request('http://local' + MERGE_ROUTES.view))
   expect(response.status).toBe(404)
   expect((await response.json() as { code: string }).code).toBe('E-325')
+})
+
+it('returns a typed 503 on all four panel GETs when state is not ready', async () => {
+  const notReady: MergeRouteSource = {
+    ...source,
+    async readiness(): Promise<StateReadiness> { return { ok: false, code: 'merge-state-migration-required', message: 'v2 requires migration' } },
+  }
+  const blocked = makeMergeRoutes({ getSource: () => notReady }, audit)
+  const get = async (path: string) => {
+    const route = blocked.find(item => item.path === path.split('?')[0])
+    if (route === undefined) throw new Error('missing route')
+    return await route.fetch(new Request('http://local' + path))
+  }
+  for (const path of [MERGE_ROUTES.view, MERGE_ROUTES.rows + '?queue=pending', MERGE_ROUTES.body + '?id=mr_a&side=a', MERGE_ROUTES.history]) {
+    const response = await get(path)
+    expect(response.status, path).toBe(503)
+    expect(await response.json(), path).toMatchObject({ wireVersion: 1, code: 'merge-state-blocked', readiness: { code: 'merge-state-migration-required' } })
+  }
 })

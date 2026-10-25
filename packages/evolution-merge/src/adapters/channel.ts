@@ -4,11 +4,25 @@
  * of throwing a TypeError.
  */
 import type { ConversationChannelLike, ChannelTurnOutcome } from '../channel-port.ts'
+import type { MergeUsage } from '../contracts.ts'
 
 interface PlatformTurn {
   readonly childId: unknown
   readonly stopReason: string
   readonly text: string
+  readonly usage?: unknown
+}
+
+function usageOf(value: unknown): MergeUsage | undefined {
+  if (value === null || typeof value !== 'object') return undefined
+  const raw = value as { inputTokens?: unknown; outputTokens?: unknown; totalTokens?: unknown; costCny?: unknown }
+  const num = (input: unknown): number | undefined => typeof input === 'number' && Number.isFinite(input) ? input : undefined
+  const inputTokens = num(raw.inputTokens)
+  const outputTokens = num(raw.outputTokens)
+  const totalTokens = num(raw.totalTokens)
+  const costCny = num(raw.costCny)
+  if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined && costCny === undefined) return undefined
+  return { ...(inputTokens === undefined ? {} : { inputTokens }), ...(outputTokens === undefined ? {} : { outputTokens }), ...(totalTokens === undefined ? {} : { totalTokens }), ...(costCny === undefined ? {} : { costCny }) }
 }
 
 type PlatformOutcome =
@@ -33,10 +47,11 @@ export interface SubagentChannelLike {
 
 function convert(outcome: PlatformOutcome): ChannelTurnOutcome {
   if (outcome.kind !== 'ok') return outcome
+  const usage = usageOf(outcome.turn.usage)
   return {
     kind: 'ok',
     childId: String(outcome.childId),
-    turn: { text: outcome.turn.text, stopReason: outcome.turn.stopReason },
+    turn: { text: outcome.turn.text, stopReason: outcome.turn.stopReason, ...(usage === undefined ? {} : { usage }) },
   }
 }
 

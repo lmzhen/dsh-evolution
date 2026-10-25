@@ -3,22 +3,59 @@
  * A missing file is an empty feature, not a failure; an unreadable file is a warning the
  * operator can act on. This module never repairs or writes.
  */
+import { createHash } from 'node:crypto'
+import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { probeList, readTreeLock, runsFile, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { v2BackupPath } from './domain/state-v3.ts'
-import { loadMergeState } from './state.ts'
-import { countRows } from './status.ts'
-import { stagingRoot } from './staging.ts'
-import { validateArtifacts } from './domain/consistency.ts'
+import { migrationJournalPath, migrationReportPath, v2BackupPath } from './domain/state-bootstrap.ts'
+import { readMergeSnapshot } from './domain/merge-snapshot.ts'
+import { validateArtifacts, type RowState, type RunState, type JournalState, type EvidenceState, type StagingState } from './domain/consistency.ts'
 import { readJournal } from './domain/commit-journal-store.ts'
-import { loadStateSchema } from './state.ts'
+import { stagingRoot } from './staging.ts'
+import { readReconcileReport, type ReconcileReport } from './domain/reconcile.ts'
+import type { DoctorView } from './wire.ts'
 
 export const MERGE_DOCTOR_SCHEMA_VERSION = 3
+
+/** The global doctor's merge line; built from the DoctorView envelope, never from raw files. */
+export interface MergeDoctorFact {
+  readonly status: 'ok' | 'warn' | 'fail' | 'unknown'
+  readonly detail: string
+  readonly remedy?: string
+}
+
+/** Compose the one-line global-doctor fact from buildDoctorView + the last reconcile report. */
+export function mergeDoctorFact(view: DoctorView, report: ReconcileReport | null): MergeDoctorFact {
+  const counts = view.counts
+  const reconcileText = report === null
+    ? 'reconcile 尚未运行'
+    : report.state === 'blocked'
+      ? 'reconcile blocked ' + (report.code ?? 'merge-state-blocked')
+      : 'reconcile ' + String(report.actions.length) + ' 项动作'
+  const problems: string[] = []
+  if (view.blocked !== undefined) problems.push('state blocked ' + view.blocked.code)
+  if (view.hostOnly !== undefined) problems.push('宿主数据面不可用 ' + view.hostOnly.code)
+  if (view.staging.state === 'unreadable') problems.push('staging 索引不可读' + (view.staging.detail === undefined ? '' : '：' + view.staging.detail))
+  if (counts.expired > 0) problems.push('expired ' + String(counts.expired))
+  const unstable = view.rows.filter(row => row.status === 'warn' || row.status === 'fail')
+  if (unstable.length > 0) problems.push(unstable.map(row => row.key + '=' + row.status).join(','))
+  if (report?.state === 'blocked') problems.push('reconcile blocked')
+  const latest = view.latestRun
+  const latestText = latest === undefined ? '' : '；最近 run ' + latest.id + ' [' + latest.state + ']'
+  const detail = 'verify ' + String(counts.active.verify) + ' / pending ' + String(counts.active.pending) + ' / fuse ' + String(counts.active.fuse) + ' / skipped ' + String(counts.active.skipped) + ' / expired ' + String(counts.expired)
+    + '；staging ' + view.staging.state + ' dirs=' + String(view.staging.dirs)
+    + '；审批 ' + (view.approval.mergeApproval ? '开' : '关') + '；' + reconcileText + latestText
+    + (problems.length === 0 ? '' : '；问题：' + problems.join('；'))
+  const status: MergeDoctorFact['status'] = problems.length === 0
+    ? 'ok'
+    : view.blocked !== undefined || view.hostOnly !== undefined || report?.state === 'blocked' ? 'fail' : 'warn'
+  return problems.length === 0 ? { status, detail } : { status, detail, remedy: '运行 /evolution merge doctor 查看逐项；必要时 /evolution merge reconcile 收敛' }
+}
 
 export interface MergeDoctorRow {
   readonly key: string
   readonly label: string
-  readonly status: 'ok' | 'warn' | 'unknown'
+  readonly status: 'ok' | 'warn' | 'blocked' | 'unknown'
   readonly detail: string
 }
 
@@ -29,13 +66,14 @@ export function mergeDoctorAvailability(mounted: boolean): { readonly ok: true }
 
 export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredRoot?: string): Promise<readonly MergeDoctorRow[]> {
   const rows: MergeDoctorRow[] = []
-  const loaded = await loadMergeState(io, home)
-  const counts = countRows(loaded.state.rows)
+  const snapshot = await readMergeSnapshot({ io, home, runs: [], approval: false })
+  const hasState = await io.exists(join(home, 'merge', 'merge-state.json'))
+  const counts = snapshot.doctor.counts.active
   rows.push({
     key: 'state',
     label: '合并状态',
-    status: loaded.note === undefined ? 'ok' : 'warn',
-    detail: loaded.note ?? 'pairs ' + String(loaded.state.rows.length) + '；verify ' + String(counts.verify) + ' / pending ' + String(counts.pending) + ' / fuse ' + String(counts.fuse) + ' / skipped ' + String(counts.skipped),
+    status: snapshot.blocked === undefined || !hasState ? 'ok' : 'warn',
+    detail: snapshot.blocked === undefined ? 'pairs ' + String(snapshot.rows.length) + '；verify ' + String(counts.verify) + ' / pending ' + String(counts.pending) + ' / fuse ' + String(counts.fuse) + ' / skipped ' + String(counts.skipped) : snapshot.blocked.code + ': ' + snapshot.blocked.message,
   })
   const recoveryRuns = new Set<string>()
   try {
@@ -45,29 +83,35 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
   const receiptRuns = new Set<string>()
   const receiptDir = await probeList(io, join(home, 'merge', 'receipts'))
   if (receiptDir.kind === 'present') for (const name of receiptDir.value) receiptRuns.add(name)
-  const invalid = [] as typeof loaded.state.rows[number][]
-  for (const row of loaded.state.rows) {
-    const run = row.state === 'pending' && row.runId !== undefined ? 'awaiting-approval' as const : row.runId === undefined ? 'none' as const : 'running' as const
-    const staging = row.stagingRef !== undefined ? 'kept' as const : row.state === 'fuse' ? 'missing' as const : 'none' as const
-    const phase = row.runId === undefined ? undefined : (await readJournal(io, home, row.runId))?.phase
-    const journal = phase === undefined || phase === null ? 'none' as const
-      : phase === 'committed' ? 'committed' as const
-      : phase === 'prepared' ? 'prepared' as const
-      : phase === 'rolled-back' ? 'rolled-back' as const
-      : phase === 'failed' ? 'failed' as const
-      : 'committing' as const
-    const evidence = row.runId !== undefined && receiptRuns.has(row.runId) ? 'receipt' as const : 'none' as const
-    const recovery = row.runId !== undefined && recoveryRuns.has(row.runId)
-    if (!validateArtifacts({ row: row.state, run, staging, journal, evidence, activeRuns: run === 'running' || run === 'awaiting-approval' ? 1 : 0, recovery }).ok) invalid.push(row)
+  const invalid: { id: string; reason: string }[] = []
+  if (snapshot.blocked !== undefined) invalid.push({ id: 'state', reason: snapshot.blocked.code })
+  for (const item of snapshot.rows) {
+    const row = item.row
+    const runId = row.runId ?? (item.stage?.ref.split('/')[0])
+    const artifactRow: RowState = row.state === 'approved' ? 'approved' : row.state === 'fuse' ? 'fuse' : row.state
+    const run: RunState = runId === undefined ? 'none' : row.state === 'pending' ? 'awaiting-approval' : 'running'
+    const staging: StagingState = item.stage === null ? (row.state === 'fuse' ? 'missing' : 'none') : item.stage.state === 'present' || item.stage.state === 'reserved' ? 'kept' : row.state === 'fuse' ? 'missing' : 'none'
+    const phase = runId === undefined ? null : await readJournal(io, home, runId)
+    const journal: JournalState = phase === null ? 'none' : phase.phase === 'prepared' ? 'prepared' : phase.phase === 'target-written' || phase.phase === 'sources-archived' ? 'committing' : phase.phase === 'committed' ? 'committed' : phase.phase === 'rolled-back' ? 'rolled-back' : 'failed'
+    const evidence: EvidenceState = runId !== undefined && await io.readText(join(home, 'merge', 'receipts', runId + '.json')).catch(() => null) !== null ? 'receipt' : 'none'
+    const result = validateArtifacts({ row: artifactRow, run, staging, journal, evidence, activeRuns: run === 'running' || run === 'awaiting-approval' ? 1 : 0, ...(runId !== undefined && recoveryRuns.has(runId) ? { recovery: true } : {}) })
+    if (!result.ok) invalid.push({ id: row.id, reason: result.reason ?? 'not-allowed' })
   }
-  const schema = await loadStateSchema(io, home)
-  rows.push({ key: 'merge-state-v3', label: 'state schema', status: schema === 3 ? 'ok' : schema === 2 ? 'warn' : 'unknown', detail: schema === 3 ? 'schemaVersion 3' : schema === 2 ? 'schemaVersion 2；等待 v3 迁移' : 'schemaVersion 未知/不可读' })
+  rows.push({ key: 'merge-state-v3', label: 'state schema', status: snapshot.blocked === undefined ? 'ok' : 'warn', detail: snapshot.blocked === undefined ? 'schemaVersion 4' : snapshot.blocked.code })
   let quarantineCount = 0
   try { const qraw = await io.readText(join(home, 'merge', 'merge-state.quarantine.json')); if (qraw !== null) { const parsed = JSON.parse(qraw) as unknown; quarantineCount = Array.isArray(parsed) ? parsed.length : 0 } } catch { quarantineCount = -1 }
   rows.push({ key: 'quarantine', label: 'quarantine', status: quarantineCount < 0 ? 'unknown' : quarantineCount === 0 ? 'ok' : 'warn', detail: quarantineCount < 0 ? 'quarantine 不可读' : quarantineCount + ' 行待人工检查' })
   const holder = await readTreeLock(io, home).catch(() => null)
   rows.push({ key: 'tree-lock', label: 'tree lock', status: holder == null ? 'ok' : 'warn', detail: holder == null ? 'free' : 'holder pid=' + String(holder.pid) + ' epoch=' + String(holder.epoch) + ' token=' + holder.token.slice(0, 8) })
-  rows.push({ key: 'backup', label: 'v2 backup', status: await io.exists(v2BackupPath(home)) ? 'ok' : 'unknown', detail: await io.exists(v2BackupPath(home)) ? 'merge-state.v2.bak.json' : 'no v2 backup (not migrated or already cleaned)' })
+  const backupPath = v2BackupPath(home)
+  const backupRaw = await io.readText(backupPath).catch(() => null)
+  const backupMode = await stat(backupPath).then(value => value.mode).catch(() => null)
+  const backupReadOnly = backupMode === null ? null : (backupMode & 0o200) === 0
+  rows.push({ key: 'backup', label: 'v2 backup', status: backupRaw === null ? 'unknown' : backupReadOnly === false ? 'warn' : 'ok', detail: backupRaw === null ? 'no v2 backup (not migrated or already cleaned)' : 'merge-state.v2.bak.json sha256=' + createHash('sha256').update(backupRaw).digest('hex').slice(0, 16) + ' readonly=' + String(backupReadOnly) })
+  const journal = await io.readText(migrationJournalPath(home)).catch(() => null)
+  const report = await io.readText(migrationReportPath(home)).catch(() => null)
+  rows.push({ key: 'migration', label: 'state migration', status: snapshot.blocked === undefined ? (journal === null ? 'ok' : 'warn') : 'warn', detail: snapshot.blocked === undefined ? (journal === null ? (report === null ? 'ready (no migration report)' : 'ready; report present') : 'ready; migration journal pending') : snapshot.blocked.code + ': ' + snapshot.blocked.message })
+  rows.push({ key: 'staging-index', label: 'staging index', status: 'ok', detail: String(snapshot.stages.length) + ' index entries' })
   const claims = await probeList(io, join(home, 'merge', 'claims'))
   rows.push({ key: 'target-claim', label: 'target claim', status: claims.kind === 'unknown' ? 'unknown' : 'ok', detail: claims.kind === 'unknown' ? 'claims unreadable' : claims.kind === 'absent' ? 'no claims' : String(claims.value.length) + ' claim files' })
   let orphanRuns = 0
@@ -85,7 +129,18 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
   } catch { orphanRuns = -1 }
   rows.push({ key: 'runs', label: 'run owner', status: orphanRuns < 0 ? 'unknown' : orphanRuns === 0 ? 'ok' : 'warn', detail: orphanRuns < 0 ? 'runs.json unreadable' : String(runCount) + ' runs; ' + String(orphanRuns) + ' dead-owner running' })
   rows.push({ key: 'install', label: 'install form', status: io.exists === undefined ? 'unknown' : 'ok', detail: 'merge plugin loaded' })
-  rows.push({ key: 'consistency', label: '一致性', status: invalid.length === 0 ? 'ok' : 'warn', detail: invalid.length === 0 ? '无非法组合' : String(invalid.length) + ' 行需人工检查: ' + invalid.map(row => row.id).join(', ') })
+  const reconcile = await readReconcileReport(io, home)
+  rows.push({
+    key: 'reconcile',
+    label: '状态收敛',
+    status: reconcile === null ? 'unknown' : reconcile.state === 'blocked' ? 'warn' : reconcile.actions.length > 0 ? 'warn' : 'ok',
+    detail: reconcile === null
+      ? '尚无 reconcile 报告（启动或 /evolution merge reconcile 会生成）'
+      : reconcile.state === 'blocked'
+        ? 'blocked：' + (reconcile.code ?? 'merge-state-blocked') + (reconcile.message === undefined ? '' : ' — ' + reconcile.message)
+        : String(reconcile.actions.length) + ' 项动作（' + new Date(reconcile.at).toISOString() + '）' + (reconcile.actions.length === 0 ? '' : '：' + reconcile.actions.map(action => action.rowId + '=' + action.code).join(', ')),
+  })
+  rows.push({ key: 'consistency', label: '一致性', status: snapshot.blocked !== undefined ? 'blocked' : invalid.length === 0 ? 'ok' : 'warn', detail: snapshot.blocked !== undefined ? 'blocked: ' + snapshot.blocked.code : invalid.length === 0 ? '无非法组合' : String(invalid.length) + ' 行需人工检查: ' + invalid.map(row => row.id + '=' + row.reason).join(', ') })
   const modelRoot = configuredRoot?.trim() ?? ''
   if (modelRoot === '') {
     rows.push({ key: 'models', label: '合并模型', status: 'warn', detail: '未配置 mergeModelsRoot；合并扫描会 fail loud' })

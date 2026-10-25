@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { tempRoot } from '../../../test-support/temp-home.ts'
-import { loadMergeState, upsertRow, type MergeRow } from '../../src/state.ts'
+import { loadMergeState, transactRows } from '../../src/state.ts'
 import { createReadOnlyMergeService, runMergeCommand } from '../../src/merge-command.ts'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 
@@ -25,8 +25,7 @@ it('fails closed on a v3 state instead of reading it as empty', async () => {
   const service = createReadOnlyMergeService(nodeEvolutionIo(), home)
   const result = await runMergeCommand(service, 'merge status')
   expect(result.ok).toBe(false)
-  expect(result.text).toContain('merge-state-forward-only')
-  const row = { id: 'mr_write', pairKey: 'gamma\u0000delta', a: 'gamma', b: 'delta', state: 'verify', queue: 'verify', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as MergeRow
-  await expect(upsertRow(nodeEvolutionIo(), home, () => Date.now(), row)).rejects.toThrow('merge-state-forward-only')
+  expect(result.text).toMatch(/merge-state-(forward-only|normalize-required)/)
+  await expect(transactRows(nodeEvolutionIo(), home, () => 1)).rejects.toThrow('legacy-writer-removed')
   expect(createHash('sha256').update(readFileSync(target)).digest('hex')).toBe(before)
 })

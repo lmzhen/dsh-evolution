@@ -1,14 +1,15 @@
+import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, upsertRow, type MergeRow, type MergeRuntimeDeps } from '../src/index.ts'
+import { makeV4Home } from './support/schema4-home.ts'
+import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, type MergeRow, type MergeRuntimeDeps } from '../src/index.ts'
 
 it('serves read-only verbs through the runtime', async () => {
-  const home = await tempRoot('dsh-merge-runtime-')
-  const io = nodeEvolutionIo()
+  const { home, io } = await makeV4Home([])
   const deps: MergeRuntimeDeps = {
     io, home, registry: { begin: async () => { throw new Error('not used') }, runs: () => [], find: () => undefined, cancel: () => false, cancelAll: () => 0 } as unknown as MergeRuntimeDeps['registry'],
     skills: {} as SkillLibrary, now: () => 1,
@@ -53,7 +54,7 @@ it('rejects a pending row into the skipped queue', async () => {
   const io = nodeEvolutionIo()
   const key = pairKey('alpha-skill', 'beta-skill')
   const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'alpha-skill', b: 'beta-skill', state: 'pending', queue: 'pending', createdAt: 'x', updatedAt: 'x' }
-  await upsertRow(io, home, () => 1, row)
+  await seedRow(io, home, row)
   const deps: MergeRuntimeDeps = {
     io, home, registry: {} as MergeRuntimeDeps['registry'], skills: {} as SkillLibrary, now: () => 1,
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
@@ -70,7 +71,7 @@ it('restores a skipped row and clears a resume row', async () => {
   const io = nodeEvolutionIo()
   const key = pairKey('alpha-skill', 'beta-skill')
   const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'alpha-skill', b: 'beta-skill', state: 'skipped', queue: 'skipped', createdAt: 'x', updatedAt: 'x' }
-  await upsertRow(io, home, () => 1, row)
+  await seedRow(io, home, row)
   const deps: MergeRuntimeDeps = {
     io, home, registry: {} as MergeRuntimeDeps['registry'], skills: {} as SkillLibrary, now: () => 1,
     params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
