@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.23 (patch) — expose platform-write capability
+
+> **范围**：merge snapshot 现在把计算出的 `platformWrite` 传给 `readMergeSnapshot`；view/UI 能读到宿主能力，平台写入行不再显示“宿主未提供该能力”。
+> **验证**：merge suite 479 passed / 1 skipped；真机 0.30.22 复现 view 缺 platformWrite。
+
 ## 0.30.22 (patch) — host-owned platform write
 
 > **范围**：merge 面板的「平台写入审批」改为只读能力行，不再向 `evolution-approval.enabled` 写开关值；该能力由宿主提供，避免保存时 E-310（字段非 volatile）。合并审批仍可编辑。

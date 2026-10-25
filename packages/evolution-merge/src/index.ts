@@ -282,7 +282,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     })
     source = {
       async snapshot() {
-        return await readMergeSnapshot({ io, home, runs: runs.runs('merge'), approval: params.mergeApproval, live: async () => liveRowFactsOf(await readSkillCards(skills)), history: async (): Promise<readonly HistoryItem[]> => {
+        return await readMergeSnapshot({ io, home, runs: runs.runs('merge'), approval: params.mergeApproval, platformWrite, live: async () => liveRowFactsOf(await readSkillCards(skills)), history: async (): Promise<readonly HistoryItem[]> => {
           const items = new Map<string, HistoryItem>()
           const receipts = [...await readCommitReceipts(io, home)].sort((a, b) => a.at - b.at)
           const generationOf = new Map(receipts.map((receipt, index) => [receipt.runId, index + 1]))
