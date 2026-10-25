@@ -1,3 +1,4 @@
+import { readTextOrNull } from './read-probe.ts'
 /** Undo receipt: immutable per-pair settlement, separate from the commit receipt. */
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
@@ -19,7 +20,7 @@ export function undoReceiptPath(home: string, runId: string, pairKey: string): s
   return join(home, 'merge', 'undo-receipts', encodeURIComponent(runId), createHash('sha256').update(pairKey).digest('hex') + '.json')
 }
 export async function readUndoReceipt(io: EvolutionIoLike, home: string, runId: string, pairKey: string): Promise<UndoReceipt | null> {
-  const raw = await io.readText(undoReceiptPath(home, runId, pairKey)).catch(() => null)
+  const raw = await readTextOrNull(io, undoReceiptPath(home, runId, pairKey))
   if (raw === null) return null
   try { return JSON.parse(raw) as UndoReceipt } catch { return null }
 }

@@ -1,3 +1,4 @@
+import { readTextOrNull } from './domain/read-probe.ts'
 /**
  * Merge doctor rows: state, pending, gate cache and staging are each probed read-only.
  * A missing file is an empty feature, not a failure; an unreadable file is a warning the
@@ -93,7 +94,7 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
     const staging: StagingState = item.stage === null ? (row.state === 'fuse' ? 'missing' : 'none') : item.stage.state === 'present' || item.stage.state === 'reserved' ? 'kept' : row.state === 'fuse' ? 'missing' : 'none'
     const phase = runId === undefined ? null : await readJournal(io, home, runId)
     const journal: JournalState = phase === null ? 'none' : phase.phase === 'prepared' ? 'prepared' : phase.phase === 'target-written' || phase.phase === 'sources-archived' ? 'committing' : phase.phase === 'committed' ? 'committed' : phase.phase === 'rolled-back' ? 'rolled-back' : 'failed'
-    const evidence: EvidenceState = runId !== undefined && await io.readText(join(home, 'merge', 'receipts', runId + '.json')).catch(() => null) !== null ? 'receipt' : 'none'
+    const evidence: EvidenceState = runId !== undefined && await readTextOrNull(io, join(home, 'merge', 'receipts', runId + '.json')) !== null ? 'receipt' : 'none'
     const result = validateArtifacts({ row: artifactRow, run, staging, journal, evidence, activeRuns: run === 'running' || run === 'awaiting-approval' ? 1 : 0, ...(runId !== undefined && recoveryRuns.has(runId) ? { recovery: true } : {}) })
     if (!result.ok) invalid.push({ id: row.id, reason: result.reason ?? 'not-allowed' })
   }
@@ -104,12 +105,12 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
   const holder = await readTreeLock(io, home).catch(() => null)
   rows.push({ key: 'tree-lock', label: 'tree lock', status: holder == null ? 'ok' : 'warn', detail: holder == null ? 'free' : 'holder pid=' + String(holder.pid) + ' epoch=' + String(holder.epoch) + ' token=' + holder.token.slice(0, 8) })
   const backupPath = v2BackupPath(home)
-  const backupRaw = await io.readText(backupPath).catch(() => null)
+  const backupRaw = await readTextOrNull(io, backupPath)
   const backupMode = await stat(backupPath).then(value => value.mode).catch(() => null)
   const backupReadOnly = backupMode === null ? null : (backupMode & 0o200) === 0
   rows.push({ key: 'backup', label: 'v2 backup', status: backupRaw === null ? 'unknown' : backupReadOnly === false ? 'warn' : 'ok', detail: backupRaw === null ? 'no v2 backup (not migrated or already cleaned)' : 'merge-state.v2.bak.json sha256=' + createHash('sha256').update(backupRaw).digest('hex').slice(0, 16) + ' readonly=' + String(backupReadOnly) })
-  const journal = await io.readText(migrationJournalPath(home)).catch(() => null)
-  const report = await io.readText(migrationReportPath(home)).catch(() => null)
+  const journal = await readTextOrNull(io, migrationJournalPath(home))
+  const report = await readTextOrNull(io, migrationReportPath(home))
   rows.push({ key: 'migration', label: 'state migration', status: snapshot.blocked === undefined ? (journal === null ? 'ok' : 'warn') : 'warn', detail: snapshot.blocked === undefined ? (journal === null ? (report === null ? 'ready (no migration report)' : 'ready; report present') : 'ready; migration journal pending') : snapshot.blocked.code + ': ' + snapshot.blocked.message })
   rows.push({ key: 'staging-index', label: 'staging index', status: 'ok', detail: String(snapshot.stages.length) + ' index entries' })
   const claims = await probeList(io, join(home, 'merge', 'claims'))

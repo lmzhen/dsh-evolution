@@ -1,3 +1,4 @@
+import { readTextOrNull } from './read-probe.ts'
 /** Batch 1b-2a pre-1b backup manifest. Read-only, idempotent, no production normalize. */
 import { createHash } from 'node:crypto'
 import { chmod, stat } from 'node:fs/promises'
@@ -64,7 +65,7 @@ async function chmodReadOnly(path: string): Promise<string> {
 }
 
 export async function readPre1bManifest(io: EvolutionIoLike, home: string, id: string): Promise<Pre1bBackupManifest | null> {
-  const raw = await io.readText(pre1bManifestPath(home, id)).catch(() => null)
+  const raw = await readTextOrNull(io, pre1bManifestPath(home, id))
   if (raw === null) return null
   try {
     const value = JSON.parse(raw) as Partial<Pre1bBackupManifest>
@@ -75,7 +76,7 @@ export async function readPre1bManifest(io: EvolutionIoLike, home: string, id: s
 
 /** Create or reuse the single pre-1b backup. Never writes merge-state. */
 export async function createPre1bBackup(io: EvolutionIoLike, home: string, at = new Date().toISOString()): Promise<Pre1bBackupResult> {
-  const raw = await io.readText(statePath(home)).catch(() => null)
+  const raw = await readTextOrNull(io, statePath(home))
   if (raw === null) return { ok: false, code: 'pre-1b-backup-invalid', message: 'merge state is missing' }
   let state: { schemaVersion?: unknown }
   try { state = JSON.parse(raw) as { schemaVersion?: unknown } } catch { return { ok: false, code: 'pre-1b-backup-invalid', message: 'merge state is not JSON' } }
@@ -109,7 +110,7 @@ export async function createPre1bBackup(io: EvolutionIoLike, home: string, at = 
     ]
     for (const item of sources) {
       if (item.kind === 'file') {
-        const text = await io.readText(item.source).catch(() => null)
+        const text = await readTextOrNull(io, item.source)
         if (text === null) continue
         const rel = item.source.slice(home.length + 1)
         const copy = join(target, 'snapshot', rel)

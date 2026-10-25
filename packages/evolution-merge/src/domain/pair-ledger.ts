@@ -1,3 +1,4 @@
+import { readTextOrNull } from './read-probe.ts'
 /** 1b-1 additive read view; the production row writer stays in state.ts until 1b-2. */
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
@@ -96,7 +97,7 @@ export async function normalizePairLedger(io: EvolutionIoLike, home: string): Pr
 
 /** Read schema4 rows only; no legacy projection. */
 export async function readPairLedgerV4(io: EvolutionIoLike, home: string): Promise<{ readonly rows: readonly V4Row[]; readonly revision: string } | null> {
-  const raw = await io.readText(mergeStatePath(home)).catch(() => null)
+  const raw = await readTextOrNull(io, mergeStatePath(home))
   if (raw === null) return null
   const state = parseV4State(raw)
   if (state === null) return null

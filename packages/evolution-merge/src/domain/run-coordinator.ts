@@ -1,3 +1,4 @@
+import { readTextOrNull, listOrEmpty } from './read-probe.ts'
 /** 1b-1 additive types for the merge run lifecycle; no writer is active in this phase. */
 import { join } from 'node:path'
 import { transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -49,7 +50,7 @@ export async function writeRunMeta(io: EvolutionIoLike, home: string, meta: Merg
   await transactIo(io, runMetaPath(home, meta.runId), () => JSON.stringify(meta, null, 2) + '\n')
 }
 export async function readRunMeta(io: EvolutionIoLike, home: string, runId: string): Promise<MergeRunMeta | null> {
-  const raw = await io.readText(runMetaPath(home, runId)).catch(() => null)
+  const raw = await readTextOrNull(io, runMetaPath(home, runId))
   if (raw === null) return null
   try { return JSON.parse(raw) as MergeRunMeta } catch { return null }
 }
@@ -57,11 +58,11 @@ export async function readRunMeta(io: EvolutionIoLike, home: string, runId: stri
 /** Every run-meta record on disk (the in-flight index for pair/target serialisation). */
 export async function readRunMetas(io: EvolutionIoLike, home: string): Promise<readonly MergeRunMeta[]> {
   const root = join(home, 'merge', 'run-meta')
-  const names = await io.exists(root) ? await io.list(root).catch(() => []) : []
+  const names = await io.exists(root) ? await listOrEmpty(io, root) : []
   const metas: MergeRunMeta[] = []
   for (const name of names) {
     if (!name.endsWith('.json')) continue
-    const raw = await io.readText(join(root, name)).catch(() => null)
+    const raw = await readTextOrNull(io, join(root, name))
     if (raw === null) continue
     try {
       const meta = JSON.parse(raw) as MergeRunMeta

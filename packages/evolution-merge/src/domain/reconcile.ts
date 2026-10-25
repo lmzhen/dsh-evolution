@@ -1,3 +1,4 @@
+import { readTextOrNull } from './read-probe.ts'
 /**
  * Explicit merge reconciliation: the ONE writer of row-state convergence.
  *
@@ -60,7 +61,7 @@ export function reconcileReportPath(home: string): string {
 
 /** Read the last reconcile report; a malformed report is absent, never a throw. */
 export async function readReconcileReport(io: EvolutionIoLike, home: string): Promise<ReconcileReport | null> {
-  const raw = await io.readText(reconcileReportPath(home)).catch(() => null)
+  const raw = await readTextOrNull(io, reconcileReportPath(home))
   if (raw === null) return null
   try {
     const parsed = JSON.parse(raw) as Partial<ReconcileReport>

@@ -1,3 +1,4 @@
+import { readTextOrNull, listOrEmpty } from './read-probe.ts'
 /** 1b-1 shadow staging adoption. Production staging is still owned by the old staged writers. */
 import { join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -113,7 +114,7 @@ export async function adoptLegacy(io: EvolutionIoLike, home: string): Promise<Sh
   for (const entry of adopted) {
     const path = shadowStagingIndexPath(home, entry.rowId)
     const text = JSON.stringify(entry, null, 2) + '\n'
-    const current = await io.readText(path).catch(() => null)
+    const current = await readTextOrNull(io, path)
     if (current !== null) {
       try {
         const previous = JSON.parse(current) as Partial<StageEntry>
@@ -129,14 +130,14 @@ export async function adoptLegacy(io: EvolutionIoLike, home: string): Promise<Sh
 
 export async function readShadowStageAggregate(io: EvolutionIoLike, home: string, rowId?: string): Promise<StageAggregateRead> {
   if (rowId !== undefined) {
-    const raw = await io.readText(shadowStagingIndexPath(home, rowId)).catch(() => null)
+    const raw = await readTextOrNull(io, shadowStagingIndexPath(home, rowId))
     if (raw === null) return { entries: [], shadowPath: shadowStagingRoot(home) }
     try { return { entries: [JSON.parse(raw) as StageEntry], shadowPath: shadowStagingRoot(home) } } catch { return { entries: [], shadowPath: shadowStagingRoot(home) } }
   }
   const listed = await io.exists(shadowStagingRoot(home)) ? await io.list(shadowStagingRoot(home)) : []
   const entries: StageEntry[] = []
   for (const name of listed) {
-    const raw = await io.readText(join(shadowStagingRoot(home), name)).catch(() => null)
+    const raw = await readTextOrNull(io, join(shadowStagingRoot(home), name))
     if (raw === null) continue
     try { entries.push(JSON.parse(raw) as StageEntry) } catch { /* ignore malformed shadow */ }
   }
@@ -206,7 +207,7 @@ export async function writeStageIndex(io: EvolutionIoLike, home: string, entry: 
 export async function readStageIndex(io: EvolutionIoLike, home: string, rowId: string, now = Date.now()): Promise<StagingEntry | null> { return await readStagingIndex(io, home, rowId, now) }
 
 export async function readStageEntry(io: EvolutionIoLike, home: string, rowId: string): Promise<StageEntry | null> {
-  const raw = await io.readText(join(home, 'merge', 'staging-index', encodeURIComponent(rowId) + '.json')).catch(() => null)
+  const raw = await readTextOrNull(io, join(home, 'merge', 'staging-index', encodeURIComponent(rowId) + '.json'))
   if (raw === null) return null
   try {
     const entry = JSON.parse(raw) as Partial<StageEntry>
@@ -233,10 +234,10 @@ export async function cleanupStage(io: EvolutionIoLike, home: string, now: numbe
   const orphans: string[] = []
   const refs = new Set<string>()
   const indexRoot = join(home, 'merge', 'staging-index')
-  const names = await io.exists(indexRoot) ? await io.list(indexRoot).catch(() => []) : []
+  const names = await io.exists(indexRoot) ? await listOrEmpty(io, indexRoot) : []
   for (const name of names.slice(0, limit)) {
     if (!name.endsWith('.json')) continue
-    const raw = await io.readText(join(indexRoot, name)).catch(() => null)
+    const raw = await readTextOrNull(io, join(indexRoot, name))
     if (raw === null) continue
     let entry: Partial<StageEntry>
     try { entry = JSON.parse(raw) as Partial<StageEntry> } catch { continue }
@@ -260,7 +261,7 @@ export async function cleanupStage(io: EvolutionIoLike, home: string, now: numbe
     kept.push(entry.rowId)
   }
   const runRoot = join(home, 'merge', 'runs')
-  const runNames = await io.exists(runRoot) ? await io.list(runRoot).catch(() => []) : []
+  const runNames = await io.exists(runRoot) ? await listOrEmpty(io, runRoot) : []
   for (const run of runNames.slice(0, limit)) {
     const prefix = run + '/'
     if ([...refs].some(ref => ref === run || ref.startsWith(prefix))) continue
@@ -273,10 +274,10 @@ export async function cleanupStage(io: EvolutionIoLike, home: string, now: numbe
 /** Read all production v2 stage entries. */
 export async function readAllStages(io: EvolutionIoLike, home: string): Promise<readonly StageEntry[]> {
   const root = join(home, 'merge', 'staging-index')
-  const names = await io.exists(root) ? await io.list(root).catch(() => []) : []
+  const names = await io.exists(root) ? await listOrEmpty(io, root) : []
   const entries: StageEntry[] = []
   for (const name of names) {
-    const raw = await io.readText(join(root, name)).catch(() => null)
+    const raw = await readTextOrNull(io, join(root, name))
     if (raw === null) continue
     try {
       const entry = JSON.parse(raw) as Partial<StageEntry>

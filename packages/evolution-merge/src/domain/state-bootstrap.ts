@@ -1,3 +1,4 @@
+import { readTextOrNull } from './read-probe.ts'
 /** G3 Batch -1 state bootstrap: one readiness gate, backup/journal migration. */
 import { createHash } from 'node:crypto'
 import { chmod } from 'node:fs/promises'
@@ -99,7 +100,7 @@ function v3State(body: Record<string, unknown>): V3State | null {
 }
 
 async function readJournal(io: EvolutionIoLike, home: string): Promise<MigrationJournal | null> {
-  const raw = await io.readText(migrationJournalPath(home)).catch(() => null)
+  const raw = await readTextOrNull(io, migrationJournalPath(home))
   if (raw === null) return null
   try {
     const value = JSON.parse(raw) as Partial<MigrationJournal>
@@ -109,7 +110,7 @@ async function readJournal(io: EvolutionIoLike, home: string): Promise<Migration
 }
 
 async function readReport(io: EvolutionIoLike, home: string): Promise<MigrationReport | null> {
-  const raw = await io.readText(migrationReportPath(home)).catch(() => null)
+  const raw = await readTextOrNull(io, migrationReportPath(home))
   if (raw === null) return null
   try {
     const value = JSON.parse(raw) as MigrationReport
@@ -197,7 +198,7 @@ export async function ensureMergeStateReady(io: EvolutionIoLike, home: string): 
       if (!mapped.ok) { outcome = blocked('merge-state-migration-blocked', mapped.message); return current }
       const sourceSha256 = hash(current)
       const backup = v2BackupPath(home)
-      const existingBackup = await io.readText(backup).catch(() => null)
+      const existingBackup = await readTextOrNull(io, backup)
       if (existingBackup !== null && existingBackup !== current) { outcome = blocked('merge-state-migration-blocked', 'v2 backup exists with different bytes'); return current }
       if (existingBackup === null) await transactIo(io, backup, () => current)
       try { await chmod(backup, 0o444) } catch { outcome = blocked('merge-state-migration-blocked', 'v2 backup is not read-only'); return current }
