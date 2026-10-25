@@ -200,6 +200,87 @@
       "note": "The report sweep retention lock; startup sweeps merge-* reports under this one transaction."
     },
     {
+      "id": "merge-reconcile-report",
+      "path": "<evolutionHome>/merge/reconcile.json",
+      "writer": "evolution-merge/src/domain/reconcile.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(options.io, reconcileReportPath(options.home)",
+      "state": [],
+      "note": "The reconcile report snapshot, written once per reconcile action set."
+    },
+    {
+      "id": "merge-run-meta",
+      "path": "<evolutionHome>/merge/run-meta/<runId>.json",
+      "writer": "evolution-merge/src/domain/run-coordinator.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, runMetaPath(home, meta.runId)",
+      "state": [],
+      "note": "One merge run metadata record; phase and approval transitions go through the same transaction."
+    },
+    {
+      "id": "merge-state-schema4",
+      "path": "<evolutionHome>/merge/merge-state.json",
+      "writer": "evolution-merge/src/domain/schema4.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, schema4StatePath(home)",
+      "state": [],
+      "note": "The schema4 state writer; the same file as merge-state, guarded by the readiness gate."
+    },
+    {
+      "id": "merge-migration-report",
+      "path": "<evolutionHome>/merge/merge-state.migration.report.json",
+      "writer": "evolution-merge/src/domain/state-bootstrap.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, migrationReportPath(home)",
+      "state": [],
+      "note": "Migration report for the v3 to v4 bootstrap."
+    },
+    {
+      "id": "merge-state-bootstrap",
+      "path": "<evolutionHome>/merge/merge-state.json",
+      "writer": "evolution-merge/src/domain/state-bootstrap.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, mergeStatePath(home), async (current)",
+      "state": [],
+      "note": "The bootstrap migration write of the state file."
+    },
+    {
+      "id": "merge-v2-backup",
+      "path": "<evolutionHome>/merge/merge-state.v2.bak.json",
+      "writer": "evolution-merge/src/domain/state-bootstrap.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, backup,",
+      "state": [],
+      "note": "The v2 backup is written through the transaction once before migration."
+    },
+    {
+      "id": "merge-migration-journal",
+      "path": "<evolutionHome>/merge/merge-state.migration.json",
+      "writer": "evolution-merge/src/domain/state-bootstrap.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, migrationJournalPath(home)",
+      "state": [],
+      "note": "The migration journal; a resumable record of the v3 to v4 move."
+    },
+    {
+      "id": "merge-quarantine",
+      "path": "<evolutionHome>/merge/merge-state.quarantine.json",
+      "writer": "evolution-merge/src/domain/state-bootstrap.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, quarantinePath(home)",
+      "state": [],
+      "note": "Rows the migration could not map, preserved for manual repair."
+    },
+    {
+      "id": "merge-undo-journal",
+      "path": "<evolutionHome>/merge/undo-journal/<runId>.json",
+      "writer": "evolution-merge/src/domain/undo-journal.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, undoJournalPath(home, journal.runId)",
+      "state": [],
+      "note": "Per-run undo progress; recovery reads it to finish a partial undo."
+    },
+    {
       "id": "merge-tree-lock-acquire",
       "path": "<evolutionHome>/merge/.tree-lock",
       "writer": "evolution-core/src/tree-lock.ts",
