@@ -333,6 +333,14 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       io, home, registry: runs, skills, now: () => Date.now(), params, platformWrite,
       ...(defaultModel === undefined ? {} : { model: defaultModel.currentSelection().model }),
       channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: params.mergeRunTimeoutMinutes,
+      hostOnly: async () => {
+        try {
+          const state = await platformChannel.prepare({ kind: 'reviewer', allow: ['skill'] })
+          return state.kind === 'unavailable' ? { code: 'E-323' as const, detail: state.reason } : undefined
+        } catch (error) {
+          return { code: 'E-323' as const, detail: error instanceof Error ? error.message : String(error) }
+        }
+      },
       isBlocked: async (name) => {
         const curator = (ctx as unknown as { get(key: string): unknown }).get('evolutionCurator') as { isBlocked?: (name: string) => Promise<boolean> } | undefined
         return (await curator?.isBlocked?.(name)) === true

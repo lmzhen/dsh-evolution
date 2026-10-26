@@ -2574,6 +2574,60 @@
       "grade": "A",
       "ref": "evolution-merge/tests/run-shell.spec.ts#preserves pair natural lengths in the report",
       "note": "real merged bytes + report carries"
+    },
+    {
+      "id": "FR-SEC-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#fails scan and pair at run level when the host data plane is unavailable",
+      "note": "post-audit fix"
+    },
+    {
+      "id": "FR-UI-13",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#fails scan and pair at run level when the host data plane is unavailable",
+      "note": "post-audit fix"
+    },
+    {
+      "id": "GAP-UI-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#fails scan and pair at run level when the host data plane is unavailable",
+      "note": "post-audit fix"
+    },
+    {
+      "id": "FR-UI-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders rejected and kept reasons as localized copy, never raw codes",
+      "note": "post-audit fix"
+    },
+    {
+      "id": "FR-VAL-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders rejected and kept reasons as localized copy, never raw codes",
+      "note": "post-audit fix"
+    },
+    {
+      "id": "GAP-LIFE-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders rejected and kept reasons as localized copy, never raw codes",
+      "note": "post-audit fix"
     }
   ]
 }

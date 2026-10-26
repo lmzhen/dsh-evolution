@@ -41,6 +41,28 @@ function runtime(home: string, io: Awaited<ReturnType<typeof makeV4Home>>['io'],
   return createMergeRuntime(deps)
 }
 
+it('fails scan and pair at run level when the host data plane is unavailable', async () => {
+  const v4 = await makeV4Home([])
+  const reg = registry()
+  const deps = {
+    io: v4.io, home: v4.home, registry: reg, skills: {} as SkillLibrary, now: () => 1,
+    params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    platformWrite: false,
+    channel: { open: async () => ({ kind: 'unavailable' as const, code: 'E-323', reason: 'no channel' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'E-323', reason: 'no channel' }), dispose: async () => {} },
+    hostOnly: async () => ({ code: 'E-323' as const, detail: 'agentPresets not mounted' }),
+    parent: {}, allow: ['merge_stage'], timeoutMinutes: 0,
+    cards: async () => cards, screeningForRun: async () => [],
+  } satisfies MergeRuntimeDeps
+  const service = createMergeRuntime(deps)
+  for (const command of [{ verb: 'scan' }, { verb: 'pair', a: 'a', b: 'b' }] as const) {
+    const result = await service.execute(command as never)
+    expect(result.ok).toBe(false)
+    expect(result.text).toContain('code: e-323')
+  }
+  expect(reg.began).toEqual([])
+  expect((await loadMergeState(v4.io, v4.home)).state.rows).toEqual([])
+})
+
 it('pair refuses the same source twice before opening a run', async () => {
   const v4 = await makeV4Home([])
   const reg = registry()

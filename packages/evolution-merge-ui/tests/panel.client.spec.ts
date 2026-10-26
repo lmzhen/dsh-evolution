@@ -82,6 +82,15 @@ it('renders verify rows with verify facts and no pending summary', () => {
   expect(html).not.toContain('data-role="pending-summary"')
 })
 
+it('renders rejected and kept reasons as localized copy, never raw codes', () => {
+  for (const [reason, text] of [['rejected', '人工拒绝合并'], ['kept', '无需合并']] as const) {
+    const skipped = { ...row(), id: 'mr_' + reason, state: 'skipped' as const, queue: 'skipped' as const, reason, reasonCode: reason }
+    const html = renderToStaticMarkup(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows: [skipped], queue: 'skipped' }), t: key => zh[key] ?? key }))
+    expect(html).toContain(text)
+    expect(html).not.toContain('>' + reason + '<')
+  }
+})
+
 it('renders English labels without raw locale keys', () => {
   const html = renderToStaticMarkup(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows: [row()] }), t: key => en[key] ?? key }))
   expect(html).toContain(en['title']!)
