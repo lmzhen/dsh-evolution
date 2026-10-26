@@ -98,13 +98,27 @@ for (const pkg of packages) {
     notes.push(pkg.dir + ': inject is empty (no client service required)')
     continue
   }
-  const source = readdirSync(join(root, pkg.dir, 'src'), { recursive: true })
+  let source = readdirSync(join(root, pkg.dir, 'src'), { recursive: true })
     .map(rel => String(rel))
     .filter(rel => rel.endsWith('.ts') || rel.endsWith('.tsx'))
     .map(rel => join(root, pkg.dir, 'src', rel))
     .filter(path => path !== entry)
     .map(path => readFileSync(path, 'utf8'))
     .join('\n')
+  // The shared client kit is the reader of the two sidebar seats. A package that delegates its
+  // registration to the kit has no local `ctx.locale`/`ctx.slots` token, but the seat IS read;
+  // follow the import instead of demanding a duplicate local read.
+  if (source.includes('dsh-evolution-client-kit')) {
+    const kitSrc = join(root, 'evolution-client-kit', 'src')
+    if (existsSync(kitSrc)) {
+      source += '\n' + readdirSync(kitSrc, { recursive: true })
+        .map(rel => String(rel))
+        .filter(rel => rel.endsWith('.ts') || rel.endsWith('.tsx'))
+        .map(rel => join(kitSrc, rel))
+        .map(path => readFileSync(path, 'utf8'))
+        .join('\n')
+    }
+  }
   for (const name of names) {
     if (provided !== undefined && !provided.has(name)) {
       problems.push(pkg.dir + ': inject requires "' + name + '", which no client service of the platform line provides — the row stays PENDING forever and its whole browser half never mounts')
