@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Check the family's client scale: the source is well formed, and both copies match it (G2).
+ * Check the family's client scale: the source is well formed, and the client kit copy matches it (G2/G1).
  *
  * A generated file that nobody compares is a copy, not a source. This is the gate step that makes
  * `client-tokens.json` the one home of the scale: it re-renders the module and compares bytes with the
@@ -96,23 +96,14 @@ for (const [name, value] of flat) {
 }
 
 const wanted = renderModule()
-const copies = []
+const tokenFile = join(root, 'evolution-client-kit', 'src', 'tokens.ts')
+let tokenCopy = null
+try { tokenCopy = readFileSync(tokenFile, 'utf8') } catch { tokenCopy = null }
+if (tokenCopy === null) problems.push(tokenFile + ' is missing - run node packages/scripts/gen-client-tokens.mjs ' + (rootArg ?? 'packages'))
+else if (tokenCopy !== wanted) problems.push(tokenFile + ' does not match client-tokens.json - regenerate with node packages/scripts/gen-client-tokens.mjs ' + (rootArg ?? 'packages'))
 for (const pkg of targets) {
-  const file = join(root, pkg, 'src/client/tokens.ts')
-  let current = null
-  try {
-    current = readFileSync(file, 'utf8')
-  } catch {
-    problems.push(file + ' is missing - run node packages/scripts/gen-client-tokens.mjs ' + (rootArg ?? 'packages'))
-    continue
-  }
-  copies.push([file, current])
-  if (current !== wanted) {
-    problems.push(file + ' does not match client-tokens.json - regenerate with node packages/scripts/gen-client-tokens.mjs ' + (rootArg ?? 'packages'))
-  }
-}
-if (copies.length === targets.length && copies[0][1] !== copies[1][1]) {
-  problems.push('the two copies differ from each other: ' + copies.map(pair => pair[0]).join(' vs '))
+  const stale = join(root, pkg, 'src', 'client', 'tokens.ts')
+  if (existsSync(stale)) problems.push(stale + ' is a second copy; the client kit owns the scale')
 }
 
 // A reference that the scale does not declare is a silent bug: the browser drops the declaration and
@@ -135,7 +126,7 @@ if (problems.length > 0) {
   process.exit(1)
 }
 console.log('verify-client-tokens: ok (' + GROUPS.length + ' groups, ' + flat.length + ' properties, '
-  + referenced.size + ' referenced, ' + copies.length + ' identical copies)')
+  + referenced.size + ' referenced, kit copy present)')
 if (strict) {
   const unused = [...declaredNames].filter(name => !referenced.has(name))
   // The scale is a contract, not a wish list: a declared token nobody reads is either a

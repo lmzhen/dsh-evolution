@@ -11,11 +11,11 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/DiagnosticsCard
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
-import type { DiagnosticRow, DiagnosticsView } from './contracts.generated.ts'
+import type { DiagnosticRow, DiagnosticsView } from '@deepseek-ai/dsh-evolution-client-kit/generated/contracts'
 import type { DiagnosticsApi, DiagnosticsState } from './diagnostics-state.ts'
-import type { FallbackHint } from './contracts.generated.ts'
+import type { FallbackHint } from '@deepseek-ai/dsh-evolution-client-kit/generated/contracts'
 import type { MessageKey } from './messages.ts'
-import { FailureBlock } from './states.generated.ts'
+import { FailureBlock } from '@deepseek-ai/dsh-evolution-client-kit/generated/states'
 
 /** Injected face: the copy seat, the one host call, and this surface's command fallback. */
 export interface DiagnosticsCardFace {

@@ -42,5 +42,8 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "react": "^18.2.0"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-evolution-client-kit": "workspace:^"
   }
 }

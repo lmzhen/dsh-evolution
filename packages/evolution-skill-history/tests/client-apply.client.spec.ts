@@ -11,7 +11,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { apply, PANEL_ORDER } from '../src/client/index.ts'
 import { NS, en, zh } from '../src/client/messages.ts'
-import { PANEL_ID, type PanelBodyOptions, type PanelRowOptions } from '../src/client/seam.ts'
+import type { PanelBodyOptions, PanelRowOptions } from '@deepseek-ai/dsh-evolution-client-kit'
+import { PANEL_ID } from '../src/client/ids.ts'
 
 /** A slots registry and locale seat that record contributions and hand back real disposers. */
 function fakeSeams(options: { refuseLocale?: boolean } = {}): {

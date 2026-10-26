@@ -3,11 +3,12 @@
 技能健康面板：把体检引擎（`evolution-core` 的 skill-lint／skill-health）的结论**按规则聚合**呈现，
 让"哪条规则在哪些技能上出现、本次改动新引入了什么"一眼可见。**只读**：不写任何技能、不改任何配置。
 
-## 座位与注册（照 `evolution-skill-history` 的成例）
+## 座位与注册
 
-- 侧栏行：`ctx.slots.inject('sidebar.panellist', …)` ＋ `slots.register({ name: 'sidebar.panellist', id, order, label: () => … })`；
-  `label` 必须是 **thunk**（跟语言切换走 ✓），`order` 取 40 一带（与技能历史相邻 ✓）；`sidebar.panellist` 是**列表座位** ⇒ 多个面板可并存 ✓。
-- 主区：`slots.register({ name: 'main', key: <同一个 id>, inject })` —— **同一个 id 注册两次**，这是本家族面板的既定契约 ✓。
+- 侧栏行和主区由 `@deepseek-ai/dsh-evolution-client-kit` 的 `registerSidebarPanel` 一次注册：
+  同一个 id 既是 `sidebar.panellist` 的行，也是 keyed `main` 的 key（家族面板契约）；
+  `label` 由 Kit 以 thunk 提供，跟随语言切换；`order` 取 40 一带（与技能历史相邻）。
+- 三个侧栏面板共用同一份客户端缝和生命周期；业务只提供 Panel/Store/api 和图标。
 
 ## 数据来源与边界
 
@@ -15,7 +16,7 @@
 - **呈现**：总览四态（ok／warn／error／不可读）＋ **按规则聚合**的清单 ＋ 与技能历史／技能目录的交叉跳转；
   `line: …`／`line: UNKNOWN` 两态要写清（未知就是未知 ✓）。
 - **不上屏**：**未标定**的阈值（如 `SUPPORT_SPRAWL_FILES`）**只报规则名、不报数字** ✓ —— 口径冻结之前不许把数字给读者 ✓。
-- 客户端半**不得** import 其它插件的值/类型 ⇒ 只声明自己消费的座位形状（见 `evolution-settings-ui/src/client/seam.ts` 的头注释 ✓）。
+- 客户端半不直接 import 其它插件的值/类型；座位形状由 `client-kit` 的 seam 唯一定义 ✓。
 
 ## 当前状态
 

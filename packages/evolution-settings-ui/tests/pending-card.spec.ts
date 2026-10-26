@@ -9,7 +9,7 @@ import { createApprovalApi, type PendingRow } from '../src/client/api.ts'
 import {
   beginAction, collapsed, endAction, expanded, failed, INITIAL_PENDING_STATE, loaded, loading, noticed, previewArrived,
 } from '../src/client/pending-state.ts'
-import { ROUTES } from '../src/client/routes.generated.ts'
+import { ROUTES } from '@deepseek-ai/dsh-evolution-client-kit/generated/routes'
 
 const row = (over: Partial<PendingRow> = {}): PendingRow => ({
   id: 'p-1',

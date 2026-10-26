@@ -5,9 +5,9 @@
  * verbatim, and a failed-state block announces itself (role=alert) with the surface's fallback hint.
  */
 import { describe, expect, it } from 'vitest'
-import { Block, FailureBlock, failureText, loadStateOf } from '../src/client/states.generated.ts'
-import type { RouteAnswer, RouteFailure } from '../src/client/route-client.generated.ts'
-import { FALLBACKS } from '../src/client/fallbacks.generated.ts'
+import { Block, FailureBlock, failureText, loadStateOf } from '@deepseek-ai/dsh-evolution-client-kit/generated/states'
+import type { RouteAnswer, RouteFailure } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
+import { FALLBACKS } from '@deepseek-ai/dsh-evolution-client-kit/generated/fallbacks'
 
 const t = (key: string, values?: Readonly<Record<string, string | number>>): string =>
   values === undefined ? key : key + ':' + String(values['command'] ?? '')

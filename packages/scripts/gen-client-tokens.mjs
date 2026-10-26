@@ -1,20 +1,15 @@
 #!/usr/bin/env node
 /**
- * Generate the family's client scale into both browser halves (G2).
+ * Generate the family's client scale into the client kit (G2/G1).
  *
  * `client-tokens.json` is the one source for every size, radius, hairline, measure, tone and cap the
- * two client packages draw. A browser half CANNOT import evolution-core: `build-client.mjs` keeps every
- * `@deepseek-ai/*` specifier external, so an import would become a runtime bare require with no row in
- * the platform's module table. The scale is therefore GENERATED into each package, and
- * `verify-client-tokens.mjs` fails the gate when a copy drifts from the source.
- *
- * The generated file is byte-identical in every package: it may not name its own package, and the
- * package's stylesheet decides which element the custom properties are declared on (`tokenVars`).
+ * client packages draw. The scale is GENERATED once into the client kit, and every browser half
+ * imports it; a half must not carry its own copy. `verify-client-tokens.mjs` fails the gate when the
+ * kit copy drifts from the source.
  *
  * Usage: node gen-client-tokens.mjs <evolution-root> [--check]
  */
-import { readFileSync, writeFileSync } from 'node:fs'
-import { clientHalfDirs } from './lib-family-packages.mjs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,7 +20,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
  * new browser half. */
 
 /** Where the generated copy lives inside one package. */
-const RELATIVE = 'src/client/tokens.ts'
+const TARGET = 'evolution-client-kit'
+const RELATIVE = 'src/tokens.ts'
 
 /**
  * One single-quoted TypeScript string literal. Token values carry no quote, semicolon or brace —
@@ -53,7 +49,7 @@ export function readTokens() {
 }
 
 /**
- * Render the generated module both packages carry.
+ * Render the generated module the client kit carries.
  * @returns the whole file text, ending in one newline.
  */
 export function renderModule() {
@@ -110,14 +106,9 @@ function main(args) {
     console.error('gen-client-tokens: unknown flag ' + unknown.join(', ') + ' - usage: node gen-client-tokens.mjs <evolution-root> [--check]')
     return 2
   }
-  const discovered = clientHalfDirs(root)
-  if (discovered.unreadable.length > 0) {
-    console.error('gen-client-tokens: unreadable manifest(s) under ' + root + ' — a browser half may be hidden: ' + discovered.unreadable.join('; '))
-    return 1
-  }
-  const targets = discovered.dirs
-  if (targets.length === 0) {
-    console.error('gen-client-tokens: no package under ' + root + ' declares dsh.client — the browser halves cannot be discovered (an empty target list would write nothing and report success)')
+  const targets = [TARGET]
+  if (!existsSync(join(root, TARGET, 'package.json'))) {
+    console.error('gen-client-tokens: missing client kit at ' + join(root, TARGET) + ' — there is no target for the generated scale')
     return 1
   }
   const wanted = renderModule()

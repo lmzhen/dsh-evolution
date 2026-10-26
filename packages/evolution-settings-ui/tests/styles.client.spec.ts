@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { CSS } from '../src/client/styles.ts'
-import { TOKEN_CSS } from '../src/client/tokens.ts'
+import { TOKEN_CSS } from '@deepseek-ai/dsh-evolution-client-kit/tokens'
 
 describe('the settings stylesheet', () => {
   it('T5-02/A57: every selector appears ONCE — one class never carries two rules', () => {

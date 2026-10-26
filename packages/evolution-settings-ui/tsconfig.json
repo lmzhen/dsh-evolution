@@ -5,6 +5,7 @@
   // no platform client sources into this project — a separate client leaf would
   // only hide the browser half from the family typecheck.
   "references": [
+    { "path": "../evolution-client-kit" },
     { "path": "../../../vendor/cordis" }
   ]
 }

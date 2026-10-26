@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
  * G5/W6-W7 client seam generator: renders the client route table and the shared route client into
- * the client kit (and settings-ui, which keeps its own settings surface), from the ONE host
- * declaration (evolution-core HOST_ROUTES).
+ * the client kit, from the ONE host declaration (evolution-core HOST_ROUTES).
  *
  * R13 (W6): the publish pipeline builds first, so the generator prefers the BUILT core lib. A mirror
  * checkout has no lib; there it falls back to a constrained static read of src/http-routes.ts (the
@@ -29,11 +28,9 @@ import { tsLiteral } from './lib-ts-literal.mjs'
 const HERE = resolve(new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const scriptsDir = existsSync(join(root, 'scripts')) ? join(root, 'scripts') : HERE
 const templates = join(scriptsDir, 'templates', 'client')
-// The shared generated contract lives in the client kit; settings-ui keeps its own
-// copies because its settings seat is a different surface (and has no kit lifecycle yet).
+// One generated contract lives in the client kit; every client half imports it.
 const OUTPUT_DIRS = [
   ['evolution-client-kit', join(root, 'evolution-client-kit', 'src', 'generated')],
-  ['evolution-settings-ui', join(root, 'evolution-settings-ui', 'src', 'client')],
 ]
 
 const SURFACE_IDS = {

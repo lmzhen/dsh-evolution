@@ -3,7 +3,7 @@ import { createElement, useCallback, useEffect, useMemo, useState, useSyncExtern
 import { CSS_TAG_ID } from './styles.ts'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
-import type { ConfigFormLike, SettingsFace } from './seam.ts'
+import type { ConfigFormLike, SettingsFace } from '@deepseek-ai/dsh-evolution-client-kit'
 import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, rowOrderKey, type RowOrderEdge } from './sorting.ts'
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 

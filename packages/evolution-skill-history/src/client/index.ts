@@ -9,7 +9,7 @@ import { createSkillHistoryApi } from './api.ts'
 import { en, fill, NS, zh } from './messages.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 import { SkillHistoryPanel } from './Panel.ts'
-import { PANEL_ID } from './seam.ts'
+import { PANEL_ID } from './ids.ts'
 
 /** Required client services: the slot registry and the locale seat. */
 export const inject = ['slots', 'locale']
