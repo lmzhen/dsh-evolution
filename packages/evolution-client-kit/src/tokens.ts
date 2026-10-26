@@ -1,16 +1,14 @@
 /**
  * The family client scale - GENERATED from packages/scripts/client-tokens.json. Do not edit.
  *
- * Both browser halves of the family carry this file with identical bytes, because the scale is one
- * fact: `verify-client-tokens.mjs` (a gate step) fails when either copy drifts from the source. The
- * scale cannot be shared at runtime - a browser half may not import evolution-core, since every
- * `@deepseek-ai/*` specifier stays external in the client build and the platform module table has no
- * row for it - so the values are generated into each package instead.
+ * The shared client kit carries this file, because the scale is one fact: `verify-client-tokens.mjs`
+ * (a gate step) fails when the kit copy drifts from the source. The kit bundles into each browser
+ * half at build time, so no runtime module-table row is needed.
  *
  * Usage: put `tokenVars(...)` for your root class in the package stylesheet, then read
  * `var(--evo-group-name)` in its rules.
  * Regenerate with: node packages/scripts/gen-client-tokens.mjs packages
- * @module @deepseek-ai/dsh-evolution-client-scale
+ * @module dsh-evolution-client-scale
  */
 
 /** Every custom property of the scale, in the source order. */
