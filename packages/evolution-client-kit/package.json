@@ -1,0 +1,63 @@
+{
+  "name": "@lmzhen/dsh-evolution-client-kit",
+  "description": "Shared browser seams and lifecycle for the evolution family sidebar panels",
+  "version": "0.30.25",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lmzhen/dsh-evolution.git",
+    "directory": "packages/evolution-client-kit"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./generated/contracts": {
+      "types": "./lib/types/generated/contracts.generated.d.ts",
+      "default": "./lib/generated/contracts.generated.js"
+    },
+    "./generated/fallbacks": {
+      "types": "./lib/types/generated/fallbacks.generated.d.ts",
+      "default": "./lib/generated/fallbacks.generated.js"
+    },
+    "./generated/route-client": {
+      "types": "./lib/types/generated/route-client.generated.d.ts",
+      "default": "./lib/generated/route-client.generated.js"
+    },
+    "./generated/routes": {
+      "types": "./lib/types/generated/routes.generated.d.ts",
+      "default": "./lib/generated/routes.generated.js"
+    },
+    "./generated/states": {
+      "types": "./lib/types/generated/states.generated.d.ts",
+      "default": "./lib/generated/states.generated.js"
+    },
+    "./tokens": {
+      "types": "./lib/types/tokens.d.ts",
+      "default": "./lib/tokens.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/types/**/*.d.ts",
+    "package.json"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
+    "@types/react": "~18.3.1",
+    "react": "^18.2.0"
+  }
+}
