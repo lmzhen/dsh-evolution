@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.25 (patch) — merge reliability and evidence hardening
+
+> **范围**：recovery 按父 run 识别 undo、多 target undo、scan 终态清理、authoring limits 与 commit 同快照、merged pair 自然长度进入报告；A18 错误行数分层、A19 去除不可观察门禁。
+> **验证**：verify-requirements --strict PASS（scored 222/222）；merge+UI 586 passed；真机 scan→approve→commit→undo/restart。
+
 ## 0.30.24 (patch) — review evidence and delivery contract
 
 > **范围**：review digest 把事件 seq 带到 `[call]`/`[result]` 并输出 `seq=<n>`；新增由 validator 常量生成的 `planContractPrompt()`；core 新增 `ensureSkillFrontmatter()`，只在 review 执行边界修复完全缺失的 frontmatter 并留 host warn；新增 `reviewNotice`（默认 true）只抑制结果通知，review prompt 永不抑制。
