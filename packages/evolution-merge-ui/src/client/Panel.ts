@@ -1,6 +1,7 @@
 /** Batch 4 merge panel: keyed read store, four tabs, local overlays, localized errors. */
 import { createElement, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
+import { PLATFORM_MENU } from './platform-menu.ts'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
 import type { ConfigFormLike, SettingsFace } from '@deepseek-ai/dsh-evolution-client-kit'
@@ -321,14 +322,22 @@ export function MergePanel(face: MergeFace): ReactNode {
   const empty = uiState === 'empty' ? createElement('div', null, createElement('p', { 'data-role': 'note' }, t('empty.' + snapshot.queue)), createElement('p', { 'data-role': 'empty-scope' }, t('empty.scope'))) : null
   const activeFailure = viewFailure !== undefined ? viewFailure : queue.status === 'error' ? queue.failure : undefined
   const overlay = snapshot.overlay
-  const menuNode = menu === undefined ? null : createElement('div', {
-    'data-role': 'sort-menu', role: 'menu', 'aria-label': t('sort.menu'),
-    style: { left: String(Math.min(menu.x, Math.max(0, (globalThis.innerWidth || 1440) - 180))) + 'px', top: String(Math.min(menu.y, Math.max(0, (globalThis.innerHeight || 800) - 110))) + 'px' },
-  },
-    createElement('button', { type: 'button', role: 'menuitem', 'data-role': 'sort-pin-top', onClick: () => { pinMenu('top') } }, t('sort.pinTop')),
-    createElement('button', { type: 'button', role: 'menuitem', 'data-role': 'sort-pin-bottom', onClick: () => { pinMenu('bottom') } }, t('sort.pinBottom')),
-    createElement('button', { type: 'button', role: 'menuitem', 'data-role': 'sort-cancel', onClick: () => { setMenu(undefined) } }, t('sort.cancel')),
-  )
+  const menuStyle = menu === undefined ? undefined : {
+    position: 'fixed', zIndex: 70, minWidth: 'var(--evo-measure-read)',
+    left: String(Math.min(menu.x, Math.max(0, (globalThis.innerWidth || 1440) - 180))) + 'px',
+    top: String(Math.min(menu.y, Math.max(0, (globalThis.innerHeight || 800) - 110))) + 'px',
+  }
+  const menuNode = menu === undefined ? null : PLATFORM_MENU === undefined
+    ? createElement('div', { 'data-role': 'sort-menu', role: 'menu', 'aria-label': t('sort.menu'), style: menuStyle },
+        createElement('button', { type: 'button', role: 'menuitem', 'data-role': 'sort-pin-top', onClick: () => { pinMenu('top') } }, t('sort.pinTop')),
+        createElement('button', { type: 'button', role: 'menuitem', 'data-role': 'sort-pin-bottom', onClick: () => { pinMenu('bottom') } }, t('sort.pinBottom')),
+        createElement('button', { type: 'button', role: 'menuitem', 'data-role': 'sort-cancel', onClick: () => { setMenu(undefined) } }, t('sort.cancel')),
+      )
+    : createElement(PLATFORM_MENU.MenuSurface, { 'data-role': 'sort-menu', 'data-platform': 'true', role: 'menu', 'aria-label': t('sort.menu'), style: menuStyle },
+        createElement(PLATFORM_MENU.MenuItemButton, { children: t('sort.pinTop'), onSelect: () => { pinMenu('top') } }),
+        createElement(PLATFORM_MENU.MenuItemButton, { children: t('sort.pinBottom'), onSelect: () => { pinMenu('bottom') } }),
+        createElement(PLATFORM_MENU.MenuItemButton, { children: t('sort.cancel'), separatorBefore: true, onSelect: () => { setMenu(undefined) } }),
+      )
   return createElement('section', { className: CSS_TAG_ID, 'data-state': uiState },
     createElement('h2', { 'data-role': 'title' }, t('title')),
     createElement('p', { 'data-role': 'hint' }, t('hint')),

@@ -57,7 +57,7 @@ export const CSS = [
   '.' + CSS_TAG_ID + ' [data-role="body-text"] { white-space:pre-wrap; overflow-wrap:anywhere; max-height:50vh; overflow:auto; }',
   '.' + CSS_TAG_ID + ' [data-role="overlay"] { display:flex; flex-direction:column; gap:var(--evo-space-6); padding:var(--evo-space-10); border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); }',
   '.' + CSS_TAG_ID + ' button:focus-visible, ' + '.' + CSS_TAG_ID + ' a:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }',
-  '.' + CSS_TAG_ID + ' [data-role="sort-menu"] { position:fixed; z-index:70; display:flex; flex-direction:column; min-width:var(--evo-measure-read); padding:var(--evo-space-4); border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); background:var(--dsw-alias-bg-layer-1); box-shadow:0 0 var(--evo-space-6) var(--dsw-alias-border-l2); }',
-  '.' + CSS_TAG_ID + ' [data-role="sort-menu"] button { text-align:left; }',
+  '.' + CSS_TAG_ID + ' [data-role="sort-menu"]:not([data-platform]) { position:fixed; z-index:70; display:flex; flex-direction:column; min-width:var(--evo-measure-read); padding:var(--evo-space-4); border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); background:var(--dsw-alias-bg-layer-1); box-shadow:0 0 var(--evo-space-6) var(--dsw-alias-border-l2); }',
+  '.' + CSS_TAG_ID + ' [data-role="sort-menu"]:not([data-platform]) button { text-align:left; }',
   '.' + CSS_TAG_ID + ' [data-role="refresh"] { align-self:flex-start; }',
 ].join('\n')
