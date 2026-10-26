@@ -111,6 +111,15 @@ function viewIntegrity(name, version) {
   }
 }
 
+function packageExists(name) {
+  try {
+    npm(['view', name, 'version', '--json'], { stdio: ['ignore', 'pipe', 'ignore'] })
+    return true
+  } catch {
+    return false
+  }
+}
+
 function publish(tarball) {
   const args = ['publish', tarball, '--access', 'public', '--tag', tag]
   if (otp) args.push('--otp', otp)
@@ -170,6 +179,25 @@ if (onlyNames.length > 0) {
     }
   }
 }
+// Fail before the first PUT when a tarball names a package the registry has never seen. npm's
+// trusted-publisher path cannot create a new package (it returns E404), and discovering that
+// mid-run leaves a partial release on the registry. The operator must publish the new package
+// once (or create it) and configure its trusted publisher, then re-run this script.
+const missingPackages = []
+for (const group of publishOrder) {
+  for (const name of group) {
+    if (onlyNames.length > 0 && !onlyNames.includes(name)) continue
+    if (!packageExists(name)) missingPackages.push(name)
+  }
+}
+if (missingPackages.length > 0) {
+  throw new Error(
+    'publish-scoped: refusing to start — package(s) not on the registry: ' + missingPackages.join(', ')
+    + '. npm Trusted Publishing cannot create a new package; publish the tarball once manually,'
+    + ' configure its trusted publisher, then re-run. No package was uploaded by this run.',
+  )
+}
+
 for (const group of publishOrder) {
   for (const name of group) {
     if (onlyNames.length > 0 && !onlyNames.includes(name)) continue
