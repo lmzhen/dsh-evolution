@@ -106,6 +106,7 @@
         "evolution-merge-ui::tests/focus.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
+        "evolution-merge-ui::tests/platform-menu.client.spec.ts",
         "evolution-merge-ui::tests/previous-ui.client.spec.ts",
         "evolution-merge-ui::tests/settings.client.spec.ts",
         "evolution-merge-ui::tests/sorting-panel.client.spec.ts",
@@ -418,6 +419,7 @@
         "evolution-merge-ui::tests/focus.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
+        "evolution-merge-ui::tests/platform-menu.client.spec.ts",
         "evolution-merge-ui::tests/previous-ui.client.spec.ts",
         "evolution-merge-ui::tests/settings.client.spec.ts",
         "evolution-merge-ui::tests/sorting-panel.client.spec.ts",
@@ -454,6 +456,7 @@
         "evolution-merge::tests/foreign-run.spec.ts",
         "evolution-merge::tests/g0-detached.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
+        "evolution-merge::tests/host-capabilities.spec.ts",
         "evolution-merge::tests/indexes.spec.ts",
         "evolution-merge::tests/kernel-adapter.spec.ts",
         "evolution-merge::tests/kernel-ledger.spec.ts",
@@ -967,6 +970,7 @@
         "evolution-merge-ui::tests/focus.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
+        "evolution-merge-ui::tests/platform-menu.client.spec.ts",
         "evolution-merge-ui::tests/previous-ui.client.spec.ts",
         "evolution-merge-ui::tests/settings.client.spec.ts",
         "evolution-merge-ui::tests/sorting-panel.client.spec.ts",
@@ -1003,6 +1007,7 @@
         "evolution-merge::tests/foreign-run.spec.ts",
         "evolution-merge::tests/g0-detached.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
+        "evolution-merge::tests/host-capabilities.spec.ts",
         "evolution-merge::tests/indexes.spec.ts",
         "evolution-merge::tests/kernel-adapter.spec.ts",
         "evolution-merge::tests/kernel-ledger.spec.ts",
@@ -1467,6 +1472,7 @@
         "evolution-merge-ui::tests/focus.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
+        "evolution-merge-ui::tests/platform-menu.client.spec.ts",
         "evolution-merge-ui::tests/previous-ui.client.spec.ts",
         "evolution-merge-ui::tests/settings.client.spec.ts",
         "evolution-merge-ui::tests/sorting-panel.client.spec.ts",
@@ -1503,6 +1509,7 @@
         "evolution-merge::tests/foreign-run.spec.ts",
         "evolution-merge::tests/g0-detached.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
+        "evolution-merge::tests/host-capabilities.spec.ts",
         "evolution-merge::tests/indexes.spec.ts",
         "evolution-merge::tests/kernel-adapter.spec.ts",
         "evolution-merge::tests/kernel-ledger.spec.ts",
@@ -1746,11 +1753,11 @@
   "counts": {
     "fast": {
       "gates": 57,
-      "specs": 58
+      "specs": 59
     },
     "pre-tag": {
       "gates": 57,
-      "specs": 337
+      "specs": 339
     },
     "ci-only": {
       "gates": 12,
@@ -1758,16 +1765,16 @@
     },
     "full(ci=off)": {
       "gates": 57,
-      "specs": 337
+      "specs": 339
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 401
+      "specs": 403
     }
   },
   "specs": {
-    "total": 401,
-    "marked": 401,
+    "total": 403,
+    "marked": 403,
     "unmarked": 0
   }
 }
