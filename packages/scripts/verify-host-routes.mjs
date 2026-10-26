@@ -61,7 +61,7 @@ function walk(dir, rel) {
     if (relToRoot === 'evolution-core/src/platform-services.ts') continue
     scanned += 1
     const isCoreTable = relToRoot === 'evolution-core/src/http-routes.ts'
-    const isGenerated = /\/client\/[^/]*\.generated\.ts$/.test(relToRoot)
+    const isGenerated = /\/client\/[^/]*\.generated\.ts$/.test(relToRoot) || /\/generated\/[^/]*\.generated\.ts$/.test(relToRoot)
     const lines = readFileSync(full, 'utf8').split(/\r?\n/)
     lines.forEach((line, index) => {
       const trimmed = line.trim()
