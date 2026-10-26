@@ -216,7 +216,7 @@ describe('approval routes: the browser half mirrors the host table', () => {
   it('declares the same four literals under the same keys', async () => {
     // Read as SOURCE on purpose: the browser half cannot import this package at runtime, so the
     // generated client table (G5) is the shipping mirror; this spec pins it to the host table.
-    const source = readFileSync(new URL('../../evolution-settings-ui/src/client/routes.generated.ts', import.meta.url), 'utf8')
+    const source = readFileSync(new URL('../../evolution-client-kit/src/generated/routes.generated.ts', import.meta.url), 'utf8')
     // The generated table is JSON-shaped (double-quoted), so compare the PATHS, not one quote style.
     for (const [key, path] of Object.entries(APPROVAL_ROUTES)) {
       expect(source, 'the generated client table has no "' + key + '" path').toContain(path)

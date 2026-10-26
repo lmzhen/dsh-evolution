@@ -1,7 +1,7 @@
 /** Batch 4 merge panel: keyed read store, four tabs, local overlays, localized errors. */
 import { createElement, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
-import { PLATFORM_MENU } from './platform-menu.ts'
+import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
 import type { ConfigFormLike, SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
@@ -333,11 +333,11 @@ export function MergePanel(face: MergeFace): ReactNode {
         createElement('button', { type: 'button', role: 'menuitem', 'data-role': 'sort-pin-bottom', onClick: () => { pinMenu('bottom') } }, t('sort.pinBottom')),
         createElement('button', { type: 'button', role: 'menuitem', 'data-role': 'sort-cancel', onClick: () => { setMenu(undefined) } }, t('sort.cancel')),
       )
-    : createElement(PLATFORM_MENU.MenuSurface, { 'data-role': 'sort-menu', 'data-platform': 'true', role: 'menu', 'aria-label': t('sort.menu'), style: menuStyle },
-        createElement(PLATFORM_MENU.MenuItemButton, { children: t('sort.pinTop'), onSelect: () => { pinMenu('top') } }),
-        createElement(PLATFORM_MENU.MenuItemButton, { children: t('sort.pinBottom'), onSelect: () => { pinMenu('bottom') } }),
-        createElement(PLATFORM_MENU.MenuItemButton, { children: t('sort.cancel'), separatorBefore: true, onSelect: () => { setMenu(undefined) } }),
-      )
+    : renderPlatformMenu(PLATFORM_MENU, [
+        { id: 'sort-pin-top', label: t('sort.pinTop'), onSelect: () => { pinMenu('top') } },
+        { id: 'sort-pin-bottom', label: t('sort.pinBottom'), onSelect: () => { pinMenu('bottom') } },
+        { id: 'sort-cancel', label: t('sort.cancel'), separatorBefore: true, onSelect: () => { setMenu(undefined) } },
+      ], t('sort.menu'), menuStyle as Record<string, string | number>)
   return createElement('section', { className: CSS_TAG_ID, 'data-state': uiState },
     createElement('h2', { 'data-role': 'title' }, t('title')),
     createElement('p', { 'data-role': 'hint' }, t('hint')),

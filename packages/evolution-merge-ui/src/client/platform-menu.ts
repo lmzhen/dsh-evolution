@@ -6,7 +6,7 @@
  * row gets the panel's own menu fallback; the platform path is not a hard dependency.
  * @module dsh-evolution-merge-ui/client
  */
-import type { ReactNode } from 'react'
+import { createElement, type ReactNode } from 'react'
 
 /** The platform's menu surface: a styled container that accepts div props. */
 export type MenuSurfaceComponent = (props: Record<string, unknown> & { children?: ReactNode }) => ReactNode
@@ -27,6 +27,33 @@ export interface MenuPrimitives {
 }
 
 const PLATFORM_UI_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
+
+/** One row of the coordinate menu, independent of the renderer. */
+export interface RowMenuAction {
+  readonly id: string
+  readonly label: string
+  readonly onSelect: () => void
+  readonly separatorBefore?: boolean
+}
+
+/**
+ * Render the coordinate menu through the platform primitives.
+ * @param primitives - the platform MenuSurface/MenuItemButton pair.
+ * @param actions - rows in display order.
+ * @param label - accessible menu name.
+ * @param style - fixed position computed from the pointer.
+ * @returns the menu element.
+ */
+export function renderPlatformMenu(primitives: MenuPrimitives, actions: readonly RowMenuAction[], label: string, style: Record<string, string | number>): ReactNode {
+  return createElement(primitives.MenuSurface, {
+    'data-role': 'sort-menu', 'data-platform': 'true', role: 'menu', 'aria-label': label, style,
+  }, actions.map(action => createElement(primitives.MenuItemButton, {
+    key: action.id,
+    children: action.label,
+    ...(action.separatorBefore === true ? { separatorBefore: true } : {}),
+    onSelect: action.onSelect,
+  })))
+}
 
 /**
  * Accept only the two component functions; a namespace row without them is not a menu.
