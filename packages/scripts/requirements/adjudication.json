@@ -1,0 +1,378 @@
+{
+  "items": [
+    {
+      "id": "A1",
+      "kind": "ADJUDICATION",
+      "title": "undo 的 --run 必填，省略不猜最新；v1 的可选文本作废",
+      "statement": "undo 的 --run 必填，省略不猜最新；v1 的可选文本作废",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "undo 的 --run 必填，省略不猜最新；v1 的可选文本作废"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 8
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A2",
+      "kind": "ADJUDICATION",
+      "title": "skipped 到期标 expired、不删、不自动复活；计入 counts.expired",
+      "statement": "skipped 到期标 expired、不删、不自动复活；计入 counts.expired",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "skipped 到期标 expired、不删、不自动复活；计入 counts.expired"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 9
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "A3",
+      "kind": "ADJUDICATION",
+      "title": "cancel 无 id 只停 merge run（全部），不误伤其它 kind",
+      "statement": "cancel 无 id 只停 merge run（全部），不误伤其它 kind",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "cancel 无 id 只停 merge run（全部），不误伤其它 kind"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 10
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A4",
+      "kind": "ADJUDICATION",
+      "title": "disabledReason 闭集：expired/invalid/not-retryable/source-gone/owned/unava...",
+      "statement": "disabledReason 闭集：expired/invalid/not-retryable/source-gone/owned/unavailable",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "disabledReason 闭集：expired/invalid/not-retryable/source-gone/owned/unavailable"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 11
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A5",
+      "kind": "ADJUDICATION",
+      "title": "confirm：reject/discard/restore/pair=true；approve/retry=false；status/rep...",
+      "statement": "confirm：reject/discard/restore/pair=true；approve/retry=false；status/report/cancel=false",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "confirm：reject/discard/restore/pair=true；approve/retry=false；status/report/cancel=false"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 12
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A6",
+      "kind": "ADJUDICATION",
+      "title": "CommandSurface 以 wire §10 为准：wireVersion/prefix/commands/fallback；Comma...",
+      "statement": "CommandSurface 以 wire §10 为准：wireVersion/prefix/commands/fallback；CommandSpec 含 rowActions/defaults，无 actions/inputSchema",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "CommandSurface 以 wire §10 为准：wireVersion/prefix/commands/fallback；CommandSpec 含 rowActions/defaults，无 actions/inputSchema"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 13
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A7",
+      "kind": "ADJUDICATION",
+      "title": "7 个只读信封是投影；panel 只 4 条 GET（view/rows/body/history）；RunView/RunDetail/Ru...",
+      "statement": "7 个只读信封是投影；panel 只 4 条 GET（view/rows/body/history）；RunView/RunDetail/RunsView 不要求 HTTP；DoctorView 走全局 doctor",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "7 个只读信封是投影；panel 只 4 条 GET（view/rows/body/history）；RunView/RunDetail/RunsView 不要求 HTTP；DoctorView 走全局 doctor"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 14
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A8",
+      "kind": "ADJUDICATION",
+      "title": "NFR-09/10 优先级定为 P1",
+      "statement": "NFR-09/10 优先级定为 P1",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "NFR-09/10 优先级定为 P1"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 15
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A9",
+      "kind": "ADJUDICATION",
+      "title": "V2- 是变更记录，GAP- 是验收权威；同主题只按 GAP 计分，不重复",
+      "statement": "V2-* 是变更记录，GAP-* 是验收权威；同主题只按 GAP 计分，不重复",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "V2-* 是变更记录，GAP-* 是验收权威；同主题只按 GAP 计分，不重复"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 16
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A10",
+      "kind": "ADJUDICATION",
+      "title": "“覆盖”分真改写/仅适用；真改写按 v2，适用/细化按 v1+补充判据",
+      "statement": "“覆盖”分真改写/仅适用；真改写按 v2，适用/细化按 v1+补充判据",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "“覆盖”分真改写/仅适用；真改写按 v2，适用/细化按 v1+补充判据"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 17
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A11",
+      "kind": "ADJUDICATION",
+      "title": "v1 §2.13 的“唯一裁决面”降为“未被 D/v2 改写时有效”",
+      "statement": "v1 §2.13 的“唯一裁决面”降为“未被 D/v2 改写时有效”",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "v1 §2.13 的“唯一裁决面”降为“未被 D/v2 改写时有效”"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 18
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A12",
+      "kind": "ADJUDICATION",
+      "title": "0.30.18 是实际交付基线，已含 wire v1/v3/UI 与 /merge；0.31/0.32 仅为历史计划标签",
+      "statement": "0.30.18 是实际交付基线，已含 wire v1/v3/UI 与 /merge；0.31/0.32 仅为历史计划标签",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "0.30.18 是实际交付基线，已含 wire v1/v3/UI 与 /merge；0.31/0.32 仅为历史计划标签"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 19
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A13",
+      "kind": "ADJUDICATION",
+      "title": "v2 P1 组接受 gate 覆盖 + 已知 P2；按 gates §0 补正式 waiver：fallback/risk/re-gate 见...",
+      "statement": "v2 P1 组接受 gate 覆盖 + 已知 P2；按 gates §0 补正式 waiver：fallback/risk/re-gate 见 gates §13.1",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "v2 P1 组接受 gate 覆盖 + 已知 P2；按 gates §0 补正式 waiver：fallback/risk/re-gate 见 gates §13.1"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 20
+      },
+      "baselineStatus": "unverified"
+    },
+    {
+      "id": "A14",
+      "kind": "ADJUDICATION",
+      "title": "approved 归 fuse 队列，active.fuse 含 approved；queue=fuse 同时返回 approved+fuse",
+      "statement": "approved 归 fuse 队列，active.fuse 含 approved；queue=fuse 同时返回 approved+fuse",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "approved 归 fuse 队列，active.fuse 含 approved；queue=fuse 同时返回 approved+fuse"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 21
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A15",
+      "kind": "ADJUDICATION",
+      "title": "skipped-ttl expired 计入 counts.expired；queue=skipped 普通页也返回它们；expiredOnl...",
+      "statement": "skipped-ttl expired 计入 counts.expired；queue=skipped 普通页也返回它们；expiredOnly 仍只对 pending",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "skipped-ttl expired 计入 counts.expired；queue=skipped 普通页也返回它们；expiredOnly 仍只对 pending"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 22
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "A16",
+      "kind": "ADJUDICATION",
+      "title": "D2 的 parser/help 归属改为 ADR-3（v2 §10.1/wire §10），不是 D9",
+      "statement": "D2 的 parser/help 归属改为 ADR-3（v2 §10.1/wire §10），不是 D9",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "D2 的 parser/help 归属改为 ADR-3（v2 §10.1/wire §10），不是 D9"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 23
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "A17",
+      "kind": "ADJUDICATION",
+      "title": "/merge 在 0.30.18 保留，0.31 弃用提示，0.32 删除；GAP-WIRE-03 的“无 /merge”只适用于 0.32",
+      "statement": "/merge 在 0.30.18 保留，0.31 弃用提示，0.32 删除；GAP-WIRE-03 的“无 /merge”只适用于 0.32",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "/merge 在 0.30.18 保留，0.31 弃用提示，0.32 删除；GAP-WIRE-03 的“无 /merge”只适用于 0.32"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "requirements-adjudication-2026-10-25.md",
+        "line": 24
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

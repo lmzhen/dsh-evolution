@@ -1,0 +1,2579 @@
+{
+  "records": [
+    {
+      "id": "FR-APP-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/locale.client.spec.ts#zh and en have the same complete key set",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-SEC-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#rejects provider/name and provider:name skill syntax before opening a run",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "NFR-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#a pair already in flight is refused with the owning run id",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "NFR-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/errors-redaction.spec.ts#redacts common credential shapes from the three-line diagnostic",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "DEC-D5",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/unit-transaction.spec.ts#accepts a caller-provided unitId and keeps it through commit",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "DEC-D11",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/undo-evidence.spec.ts#fails closed with undo-evidence-expired when the unit evidence aged out",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "Q15",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/foreign-run.spec.ts#a run started by another plane is visible in the merge run view",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "GAP-SEC-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#a stale run-meta whose owner is dead does not block a new pair",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "GAP-SEC-01b",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-curator/tests/curator.spec.ts#control-plane consolidate enforces the full gate set",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-LIFE-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/new-child-authoring.spec.ts#still rejects two source skills contributing different bytes at one support path",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "Q08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/new-child-authoring.spec.ts#still rejects two source skills contributing different bytes at one support path",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "GAP-VAL-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/new-child-authoring.spec.ts#still rejects two source skills contributing different bytes at one support path",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-RUN-06",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "note": "real-host report readback",
+      "runId": "36e8b7d6-e13c-4177-a825-894d9ece84e6",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-36e8b7d6-e13c-4177-a825-894d9ece84e6.json"
+    },
+    {
+      "id": "Q16",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/new-child-authoring.spec.ts#opens a new child, authors staging and commits",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-VAL-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg3a-limits.spec.ts#flags support conflicts, threats and limits",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-VAL-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg3a-limits.spec.ts#flags support conflicts, threats and limits",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-CMD-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/wire-projection.spec.ts#host generates copy-only ActionRefs and keeps 2000 rows stable",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-UI-13",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/merge-routes.spec.ts#returns E-323 on view/rows but keeps read-only body/history available when the host data plane is unavailable",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-PLUG-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/merge-routes.spec.ts#returns E-323 on view/rows but keeps read-only body/history available when the host data plane is unavailable",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-SEC-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/merge-routes.spec.ts#returns E-323 on view/rows but keeps read-only body/history available when the host data plane is unavailable",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "GAP-UI-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/merge-routes.spec.ts#returns E-323 on view/rows but keeps read-only body/history available when the host data plane is unavailable",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-EXEC-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/row-fact-reason.spec.ts#gives a non-retryable stale fuse row pair/discard",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-LIFE-11",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commands-v2.spec.ts#help lists every parser form, the reconcile consumer and the defaults line",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "V2-DATA-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-shell.spec.ts#records stagingRef and the claimed pair in run-meta",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "V2-TXN-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/recovery-settle.spec.ts#load() materializes the orphan verdict, then recovery upgrades it to succeeded",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-DATA-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#records the model identity on a pending decision",
+      "note": "P1 targeted regression evidence"
+    },
+    {
+      "id": "FR-LIFE-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/unit-head.spec.ts#G3b：代表片必须带 unitHead.moves",
+      "note": "targeted closure evidence"
+    },
+    {
+      "id": "NFR-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/decision.spec.ts#fails closed when maxTokens truncates the decision JSON",
+      "note": "targeted closure evidence"
+    },
+    {
+      "id": "FR-SEC-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#rejects provider/name and provider:name skill syntax before opening a run",
+      "note": "targeted closure evidence"
+    },
+    {
+      "id": "GAP-P0-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg6-detached.spec.ts#detached approve accepts under 1s and completes without a client",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "GAP-P0-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/authoring-flow.spec.ts#refuses a non-managed or curator-blocked target before authoring",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-P0-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/engine-config.spec.ts#enforces the OI-11 engine input allowlist",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-LIFE-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/history-port.spec.ts#projects deleted/split archive history through the snapshot history port",
+      "note": "history deleted/split plumbing"
+    },
+    {
+      "id": "FR-DATA-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge creates the umbrella target first, then archives sources",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-SEC-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge creates the umbrella target first, then archives sources",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-EXEC-11",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commit-revision-cas.spec.ts#removes a report-only commit-failed row without writing skipped",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-EXEC-14",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commit-revision-cas.spec.ts#removes a report-only commit-failed row without writing skipped",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-RUN-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-shell.spec.ts#waits for an aborted body before settling the timeout",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-LIFE-15",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/doctor.spec.ts#counts a skipped-ttl expired row in the doctor state line",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-LIFE-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/doctor.spec.ts#counts a skipped-ttl expired row in the doctor state line",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-UI-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/doctor.spec.ts#counts a skipped-ttl expired row in the doctor state line",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "A2",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/doctor.spec.ts#counts a skipped-ttl expired row in the doctor state line",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "A15",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/doctor.spec.ts#counts a skipped-ttl expired row in the doctor state line",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-LIFE-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge rolls a created target back when a source archive fails",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-LIFE-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/unit-transaction.spec.ts#rolls back an uncommitted target from the snapshot",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-LIFE-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "note": "review-recommended exact anchor",
+      "ref": "evolution-merge/tests/undo-merge.spec.ts#undoes a merge receipt by restoring the source and target body"
+    },
+    {
+      "id": "FR-LIFE-14",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commit-revision-cas.spec.ts#assembly refuses a target whose support files changed with a typed cause",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "DEC-D3",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/unit-transaction.spec.ts#prepares, commits and returns stored evidence",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "DEC-D4",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/state-v3.spec.ts#backs up v2 and writes schema 3 once",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "DEC-D8",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/recovery-settle.spec.ts#load() materializes the orphan verdict",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-PLUG-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/foreign-run.spec.ts#a run started by another plane is visible in the merge run view",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-SCHED-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/params.spec.ts#defaults the five merge knobs",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-UI-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-UI-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-UI-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#shows loading before a view exists, and empty only after a ready empty page",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-UI-12",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-UI-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#keeps body and history errors inside the overlay",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-UI-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-UI-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#keeps body and history errors inside the overlay",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-APP-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#does not derive platformWrite from mergeApproval",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-APP-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-DATA-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/row-fact-reason.spec.ts#carries the skipped reason code to the wire row",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "GAP-LIFE-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/row-fact-reason.spec.ts#carries the skipped reason code to the wire row",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-UI-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/locale.client.spec.ts#zh and en have the same complete key set",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D1",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/row-v4-failure.spec.ts#keeps a non-retryable failure in fuse instead of writing skipped",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D2",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge creates the umbrella target first, then archives sources",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D3",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/unit-transaction.spec.ts#prepares, commits and returns stored evidence",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D4",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/state-v3.spec.ts#backs up v2 and writes schema 3 once",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D5",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-shell.spec.ts#records stagingRef and the claimed pair in run-meta",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D6",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/doctor.spec.ts#exposes host-only E-323 to the doctor view and fact",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D7",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/row-fact-reason.spec.ts#carries the skipped reason code to the wire row",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D8",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/new-child-authoring.spec.ts#still rejects two source skills contributing different bytes at one support path",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D9",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/wire-projection.spec.ts#host generates copy-only ActionRefs and keeps 2000 rows stable",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "D10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-curator/tests/curator.spec.ts#control-plane consolidate enforces the full gate set (P1-8)",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-DEF-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/params.spec.ts#defaults the five merge knobs",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-DEF-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/rules.spec.ts#warns for placeholders and long descriptions without blocking",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "NFR-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-shell.spec.ts#detached returns a run id before the body settles",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "NFR-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/recovery-settle.spec.ts#load() materializes the orphan verdict",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "NFR-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/state-v3.spec.ts#refuses corrupt v2 and differing backup without touching v2",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-VAL-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/rules.spec.ts#blocks bad frontmatter, unsafe paths and missing references",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-APP-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#approval on stops at pending without calling round2",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "FR-APP-07",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "runId": "735c83ae-f8c1-4cf0-b958-afe8fc4cfcc8",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-735c83ae-f8c1-4cf0-b958-afe8fc4cfcc8.json",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "FR-DEF-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/params.spec.ts#defaults the five merge knobs",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "FR-EXEC-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg0-consistency.spec.ts#RG0 commit goes through the CommitPort only",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-EXEC-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#approval on stops at pending without calling round2",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "FR-EXEC-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/surface-v2.spec.ts#counts four queues",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-LIFE-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge creates the umbrella target first, then archives sources",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "FR-RUN-01",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "runId": "36e8b7d6-e13c-4177-a825-894d9ece84e6",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-36e8b7d6-e13c-4177-a825-894d9ece84e6.json",
+      "note": "scan/pair/commit run created and settled under one run id"
+    },
+    {
+      "id": "FR-RUN-02",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "runId": "36e8b7d6-e13c-4177-a825-894d9ece84e6",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-36e8b7d6-e13c-4177-a825-894d9ece84e6.json",
+      "note": "detached scan returned a run id before settle"
+    },
+    {
+      "id": "FR-RUN-05",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "runId": "36e8b7d6-e13c-4177-a825-894d9ece84e6",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-36e8b7d6-e13c-4177-a825-894d9ece84e6.json",
+      "note": "status reported current stage/progress/stopReason"
+    },
+    {
+      "id": "FR-RUN-11",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "runId": "36e8b7d6-e13c-4177-a825-894d9ece84e6",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-36e8b7d6-e13c-4177-a825-894d9ece84e6.json",
+      "note": "report carries decision/validation/commit/archive/evidence criteria"
+    },
+    {
+      "id": "FR-SCOPE-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/authoring-flow.spec.ts#refuses a non-managed or curator-blocked target before authoring",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-SCOPE-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#pair refuses the same source twice before opening a run",
+      "note": "same-source runtime"
+    },
+    {
+      "id": "FR-SCOPE-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commands-v2.spec.ts#help lists every parser form, the reconcile consumer and the defaults line",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "FR-SEC-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge refuses protected builtin and ghost target directory",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-SEC-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge refuses a pinned target even for a foreground origin",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-VAL-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commit-revision-cas.spec.ts#the scan authoring path checks the child manifest files[]",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-APP-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/pending-actions.spec.ts#rejects pending to skipped and reports unknown ids",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-APP-06",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "runId": "735c83ae-f8c1-4cf0-b958-afe8fc4cfcc8",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-735c83ae-f8c1-4cf0-b958-afe8fc4cfcc8.json",
+      "note": "real-host pending→approve→commit"
+    },
+    {
+      "id": "FR-APP-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#approve serialises on a target held by another run and names that run",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-DATA-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-shell.spec.ts#writes the report before settling a successful run",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-DATA-06",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "runId": "36e8b7d6-e13c-4177-a825-894d9ece84e6",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-36e8b7d6-e13c-4177-a825-894d9ece84e6.json",
+      "note": "report carries target/source archive audit"
+    },
+    {
+      "id": "FR-DATA-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/state-v3.spec.ts#refuses corrupt v2 and differing backup without touching v2",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-DATA-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/foreign-run.spec.ts#a run started by another plane is visible in the merge run view",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-LIFE-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/new-child-authoring.spec.ts#resolves a free actual target for create-umbrella",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-LIFE-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/undo-merge.spec.ts#undoes a merge receipt by restoring the source and target body",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-RUN-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-scan.spec.ts#runs a scan through the runtime registry/channel/commit path",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "FR-SEC-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/errors-redaction.spec.ts#redacts common credential shapes from the three-line diagnostic",
+      "note": "exact test anchor"
+    },
+    {
+      "id": "GAP-SEC-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg4-curator.spec.ts#a real curator lock wrapper waits for the merge fence",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "GAP-SEC-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/target-claim.spec.ts#one approve writer per target at a time",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "GAP-LIFE-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg1b2b-stage-lifecycle.spec.ts#marks present, expires TTL, drops terminal indices, and sweeps trees without index",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "GAP-WIRE-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg5-wire.spec.ts#all seven wire envelopes carry wireVersion=1",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-EXEC-12",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commit-revision-cas.spec.ts#assembly refuses a source whose support files changed with a typed cause",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "A1",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A3",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A4",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A5",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A6",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A7",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A8",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A9",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A10",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A11",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A12",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A13",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A14",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A16",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "A17",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/requirements-adjudication-2026-10-25.md",
+      "note": "adjudication record is the decision artifact"
+    },
+    {
+      "id": "Q01",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q02",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q03",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q04",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q05",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q06",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q07",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q09",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q10",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q11",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q12",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q13",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q14",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q17",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q18",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "Q19",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "integration discussion is the decision artifact"
+    },
+    {
+      "id": "D11",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/merge-design-decisions.md",
+      "note": "design decision record"
+    },
+    {
+      "id": "D12",
+      "criterion": "AC-1",
+      "kind": "doc",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/docs/merge/merge-design-decisions.md",
+      "note": "design decision record"
+    },
+    {
+      "id": "DEC-D1",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/row-v4-failure.spec.ts#keeps a non-retryable failure in fuse instead of writing skipped",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "DEC-D2",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge creates the umbrella target first, then archives sources",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "DEC-D6",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/doctor.spec.ts#exposes host-only E-323 to the doctor view and fact",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "DEC-D7",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/row-fact-reason.spec.ts#carries the skipped reason code to the wire row",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "DEC-D9",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/wire-projection.spec.ts#host generates copy-only ActionRefs and keeps 2000 rows stable",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "DEC-D10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-curator/tests/curator.spec.ts#control-plane consolidate enforces the full gate set (P1-8)",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-VAL-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/rules.spec.ts#warns for placeholders and long descriptions without blocking",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "FR-DATA-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/state-v3.spec.ts#maps the five-state v2 fixture to v3 with zero identity diff",
+      "note": "audit re-anchor (54d4bcbe)"
+    },
+    {
+      "id": "FR-RUN-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-detail.spec.ts#CLI status consumes buildRunDetail with the current pair and per-pair outcomes",
+      "note": "audit PASS (54d4bcbe)"
+    },
+    {
+      "id": "FR-SCOPE-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#pair refuses a protected source before opening a run",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-PLUG-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes, command and merge_stage with a minimal host context",
+      "note": "plugin mount"
+    },
+    {
+      "id": "FR-PLUG-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes, command and merge_stage with a minimal host context",
+      "note": "single command registration"
+    },
+    {
+      "id": "FR-PLUG-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "settings owner row"
+    },
+    {
+      "id": "FR-PLUG-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes, command and merge_stage with a minimal host context",
+      "note": "read-only routes"
+    },
+    {
+      "id": "FR-PLUG-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-shell.spec.ts#writes the report before settling a successful run",
+      "note": "long-run report"
+    },
+    {
+      "id": "GAP-LIFE-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-shell.spec.ts#records stagingRef and the claimed pair in run-meta",
+      "note": "stagingRef/pairs"
+    },
+    {
+      "id": "GAP-LIFE-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/undo-merge.spec.ts#undoes a merge receipt by restoring the source and target body",
+      "note": "multi undo"
+    },
+    {
+      "id": "GAP-WIRE-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commands-v2.spec.ts#help lists every parser form, the reconcile consumer and the defaults line",
+      "note": "versioned command surface"
+    },
+    {
+      "id": "FR-DATA-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/contracts.spec.ts#builds symmetric pair keys",
+      "note": "pair key symmetry"
+    },
+    {
+      "id": "FR-CAND-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#a pair already in flight is refused with the owning run id, and no run opens",
+      "note": "same pair in-flight"
+    },
+    {
+      "id": "FR-CAND-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/reconcile.spec.ts#reconcile clears active rows whose sources are gone only when the live library is supplied",
+      "note": "source gone re-resolution"
+    },
+    {
+      "id": "GAP-CAND-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/reconcile.spec.ts#reconcile clears active rows whose sources are gone only when the live library is supplied",
+      "note": "staging/live source consistency"
+    },
+    {
+      "id": "GAP-CAND-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#pair refuses a protected source before opening a run",
+      "note": "protected pair KEEP not skipped"
+    },
+    {
+      "id": "FR-CAND-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#puts L0/L1 report-only rows into the report without executing them",
+      "note": "report-only counts/details"
+    },
+    {
+      "id": "FR-CAND-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/select-policy.spec.ts#L2 KEEP becomes skipped; L0/L1 stay reportOnly",
+      "note": "independent-review recommended exact anchor"
+    },
+    {
+      "id": "FR-CAND-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/select-policy.spec.ts#L2 MERGE/UNDECIDED are candidates and fallback bypasses level",
+      "note": "independent-review recommended exact anchor"
+    },
+    {
+      "id": "FR-EXEC-02",
+      "criterion": "AC-1",
+      "kind": "real-host",
+      "verdict": "pass",
+      "grade": "A",
+      "runId": "36e8b7d6-e13c-4177-a825-894d9ece84e6",
+      "artifact": "D:/dsh-lab-e4-merge70/evolution/reports/merge-36e8b7d6-e13c-4177-a825-894d9ece84e6.json",
+      "note": "report pins promptVersion merge-b/v1 and promptHash"
+    },
+    {
+      "id": "FR-DEF-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-unit-scan.spec.ts#runs a real scan through UnitTransactions and SkillLibrary",
+      "note": "independent-review recommended exact anchor"
+    },
+    {
+      "id": "NFR-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/presentation-budget.spec.ts#keeps small text untouched and caps large text at 8000",
+      "note": "independent-review recommended exact anchor"
+    },
+    {
+      "id": "NFR-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/channel-port.spec.ts#carries cacheRead into the decision observation",
+      "note": "independent-review recommended exact anchor"
+    },
+    {
+      "id": "FR-SCOPE-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-curator/tests/curator.spec.ts#runs the full LLM-提名→门→吸收→归档→报告 merge chain (P1b)",
+      "note": "independent-review exact anchor"
+    },
+    {
+      "id": "FR-LIFE-13",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/staging-cleanup.spec.ts#staging cleanup removes expired runs, respects keep and half-created",
+      "note": "independent-review exact anchor"
+    },
+    {
+      "id": "FR-PLUG-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-all/tests/all.spec.ts#evolution-all aggregates the host entry, the four model-tool entries, the preset container and the settings UI (0.3.54)",
+      "note": "independent-review exact anchor"
+    },
+    {
+      "id": "DEC-D12",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/migrate-v3.spec.ts#maps all five v2 states and preserves identity",
+      "note": "independent-review exact anchor"
+    },
+    {
+      "id": "FR-RUN-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/long-runs.spec.ts#registers the merge run with its owner and result home",
+      "note": "long-run inventory pin"
+    },
+    {
+      "id": "FR-EXEC-16",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/prompts.spec.ts#round2 carries quality/structure/safety guidance and no body compression instruction",
+      "note": "prompt constraints"
+    },
+    {
+      "id": "FR-SCOPE-08",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "FR-CAND-01",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "FR-CAND-05",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "FR-SCHED-01",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "FR-SCHED-02",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "GAP-P0-05",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "GAP-CMD-04",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "GAP-CMD-05",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "GAP-CAND-01",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "GAP-CAND-03",
+      "criterion": "AC-1",
+      "kind": "review",
+      "verdict": "pass",
+      "grade": "A",
+      "reviewer": "b73e032c-evidence-review",
+      "checkedAt": "2026-10-26",
+      "note": "independent review: PASS_REVIEW / design decision retained; see review artifact"
+    },
+    {
+      "id": "FR-LIFE-12",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "note": "review-recommended exact anchor",
+      "ref": "evolution-merge/tests/gates/rg2b-undo.spec.ts#undoes all pairs of one run and target in reverse order"
+    },
+    {
+      "id": "FR-SCOPE-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-commands/tests/commands.spec.ts#README marks the retired mechanical-append command and does not sell it as live",
+      "note": "README consistency"
+    },
+    {
+      "id": "FR-PLUG-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/settings.client.spec.ts#INSTALL states the three product axes and does not collapse them into one switch",
+      "note": "three-axis wording"
+    },
+    {
+      "id": "FR-CAND-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/engine-probe.spec.ts#engine probe exposes the judge gate and a ranker alongside screening",
+      "note": "judge gate retained; real-provider path still host-verified"
+    },
+    {
+      "id": "FR-EXEC-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#reports every pair and emits no plan/dry-run artifact",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "NFR-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/merge-routes.spec.ts#GET routes do not mutate the snapshot object",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "NFR-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/merge-routes.spec.ts#serves wire envelopes for view/rows/body/history",
+      "note": "review-recommended exact anchor"
+    },
+    {
+      "id": "FR-APP-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/pending-actions.spec.ts#rejects pending to skipped and reports unknown ids",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-APP-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime.spec.ts#rejects a pending row into the skipped queue",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-APP-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg3b-runtime-target.spec.ts#target absent while expected present is target-taken and zero writes",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-APP-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg3b-runtime-target.spec.ts#approve after support change is source-changed and zero writes",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-17",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#a pair already in flight is refused with the owning run id, and no run opens",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-17",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#approve serialises on a target held by another run and names that run",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-RUN-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg6-kill-client.spec.ts#a detached run completes and stays readable after the client is gone",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-RUN-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#pair and scan answer E-305 in three lines and start no run",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-RUN-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-record.spec.ts#all committed pairs undone becomes undone",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-RUN-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-record.spec.ts#partial undone remains succeeded",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-SCOPE-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#pair refuses a protected source before opening a run",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-SCOPE-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge refuses target protection and stale source bytes without side effects",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-SEC-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#pair refuses a protected source before opening a run",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-SEC-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge refuses target protection and stale source bytes without side effects",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-SEC-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge rolls a created target back when a source archive fails",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-SEC-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/unit-transaction.spec.ts#rolls back an uncommitted target from the snapshot",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-VAL-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge rolls a created target back when a source archive fails",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-VAL-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/unit-transaction.spec.ts#rolls back an uncommitted target from the snapshot",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-DEF-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#reports every pair and emits no plan/dry-run artifact",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-DEF-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg6-restart.spec.ts#restart marks a dead-owner running run as orphan and never auto-resumes",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-UI-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#shows loading before a view exists, and empty only after a ready empty page",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-UI-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#keeps generic errors localized and raw host text in details/title",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-UI-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, the expired toggle, and pending summary only on pending rows",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-UI-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders verify rows with verify facts and no pending summary",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-UI-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, the expired toggle, and pending summary only on pending rows",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-UI-09",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-WIRE-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg5-wire.spec.ts#all seven wire envelopes carry wireVersion=1",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-WIRE-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-detail.spec.ts#CLI status consumes buildRunDetail with the current pair and per-pair outcomes",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-CMD-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-detail.spec.ts#CLI status consumes buildRunDetail with the current pair and per-pair outcomes",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-CMD-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-detail.spec.ts#status with an unknown id answers the three-line row-not-found error",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-QUERY-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg5-get-zero-write.spec.ts#four panel routes only call read methods on the source",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-QUERY-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/facts.spec.ts#readFacts is GET-zero-write",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, the expired toggle, and pending summary only on pending rows",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders verify rows with verify facts and no pending summary",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#puts L0/L1 report-only rows into the report without executing them",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/wire-projection.spec.ts#host generates copy-only ActionRefs and keeps 2000 rows stable",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/gates/rg7-ui-contract.spec.ts#RG7 UI consumes wireVersion, ActionRef, and imports no write model",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-08",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/settings.client.spec.ts#copies row actions and honors the confirm gate on the production panel",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-11",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/focus.client.spec.ts#refreshes facts and the current tab on focus and visibilitychange",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-11",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, the expired toggle, and pending summary only on pending rows",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-scan.spec.ts#runs a scan through the runtime registry/channel/commit path",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#approval on stops at pending without calling round2",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/stage-tool.spec.ts#binds the child and phase, then reads/writes/copies the staged tree",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/authoring-flow.spec.ts#authors a staged tree, passes the gate and commits",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/channel-port.spec.ts#opens standby, binds, sends round1 and exposes same-child author",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/approve-command.spec.ts#approves one pending row and drops it after a successful round2",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-EXEC-15",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-run.spec.ts#approval on stops at pending without calling round2",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-SEC-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/commit-merge.spec.ts#commitMerge creates the umbrella target first, then archives sources",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-SEC-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-core/tests/mutation-origin.spec.ts#store 级：写入面经 plan.origin 落进账本（foreground / background 可区分）",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-WIRE-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg5-wire.spec.ts#ActionRef and CommandSurface are JSON-safe and copy-complete",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-WIRE-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders four tabs, settings, run strip, pending id/three sentences and stage lost",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-VAL-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg3a-limits.spec.ts#classifies Q09 forward/reverse/orphan mutually",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "GAP-VAL-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg3a-limits.spec.ts#classifies Q09 forward/reverse/orphan mutually",
+      "note": "combined anchor set (audit re-check)"
+    },
+    {
+      "id": "FR-UI-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/sorting-panel.client.spec.ts#persists row order across a remount",
+      "note": "third-audit complement"
+    },
+    {
+      "id": "FR-UI-06",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/sorting-panel.client.spec.ts#right-click pins a row to top and persists by workspace+queue",
+      "note": "third-audit complement"
+    },
+    {
+      "id": "FR-LIFE-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/decision.spec.ts#parses create-umbrella and forced decisions with pending summaries",
+      "note": "third-audit complement"
+    },
+    {
+      "id": "FR-LIFE-05",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/decision.spec.ts#maps keep and rejects invalid decisions",
+      "note": "third-audit complement"
+    },
+    {
+      "id": "FR-VAL-01",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/rules.spec.ts#blocks bad frontmatter, unsafe paths and missing references",
+      "note": "third-audit complement"
+    },
+    {
+      "id": "GAP-P0-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg3-crash.spec.ts#force-kills at unit-written (literal)",
+      "note": "third-audit complement"
+    },
+    {
+      "id": "GAP-P0-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commit-recovery.spec.ts#trusts a commit receipt over a stale journal",
+      "note": "third-audit complement"
+    },
+    {
+      "id": "GAP-P0-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/recovery-settle.spec.ts#load() materializes the orphan verdict, then recovery upgrades it to succeeded",
+      "note": "third-audit complement"
+    },
+    {
+      "id": "FR-SCOPE-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/locale.client.spec.ts#maps the command surfaces to the three queue labels",
+      "note": "forms + mapping"
+    },
+    {
+      "id": "FR-SCOPE-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commands-v2.spec.ts#parses the command forms",
+      "note": "forms + mapping"
+    },
+    {
+      "id": "FR-SCOPE-10",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commands.spec.ts#maps candidates/pending/resume and forced pair commands",
+      "note": "forms + mapping"
+    },
+    {
+      "id": "GAP-UI-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/panel.client.spec.ts#renders English labels without raw locale keys",
+      "note": "final-audit decisive"
+    },
+    {
+      "id": "GAP-UI-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/locale.client.spec.ts#zh and en have the same complete key set",
+      "note": "final-audit decisive"
+    },
+    {
+      "id": "GAP-UI-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/locale.client.spec.ts#maps the command surfaces to the three queue labels",
+      "note": "final-audit decisive"
+    },
+    {
+      "id": "FR-UI-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/settings.client.spec.ts#asks for confirmation before copying a confirm action",
+      "note": "final-audit decisive"
+    },
+    {
+      "id": "FR-UI-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/settings.client.spec.ts#copies row actions and honors the confirm gate on the production panel",
+      "note": "final-audit decisive"
+    },
+    {
+      "id": "FR-UI-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge-ui/tests/gates/rg7-ui-contract.spec.ts#RG7 UI consumes wireVersion, ActionRef, and imports no write model",
+      "note": "final-audit decisive"
+    },
+    {
+      "id": "GAP-VAL-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/authoring-flow.spec.ts#allows the exact limit and rejects one byte over at both gate and commit",
+      "note": "final-audit decisive"
+    },
+    {
+      "id": "GAP-VAL-03",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/gates/rg3a-limits.spec.ts#flags support conflicts, threats and limits",
+      "note": "final-audit decisive"
+    },
+    {
+      "id": "FR-SCOPE-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#pair --force writes the forced decision without round 1",
+      "note": "post-A19 decisive"
+    },
+    {
+      "id": "FR-SCOPE-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/authoring-flow.spec.ts#fails closed on a target with a separator before authoring",
+      "note": "post-A19 decisive"
+    },
+    {
+      "id": "FR-SCOPE-04",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commands.spec.ts#maps candidates/pending/resume and forced pair commands",
+      "note": "post-A19 decisive"
+    },
+    {
+      "id": "FR-EXEC-13",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-ports.spec.ts#runs scan through channel authoring and commit",
+      "note": "post-A19 decisive"
+    },
+    {
+      "id": "FR-EXEC-13",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/merge-tool.spec.ts#limits the child to merge_stage and refuses writes in the decide phase",
+      "note": "post-A19 decisive"
+    },
+    {
+      "id": "FR-EXEC-13",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/plugin.spec.ts#passes the production merge_stage allow-list to the runtime",
+      "note": "post-A19 decisive"
+    },
+    {
+      "id": "GAP-CMD-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#resume --retry enters the approved-row authoring path without a new approval",
+      "note": "post-A19 decisive"
+    },
+    {
+      "id": "GAP-CMD-02",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/runtime-guards.spec.ts#candidates --retry reruns round 1 for a verify row",
+      "note": "post-A19 decisive"
+    },
+    {
+      "id": "FR-VAL-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/scan-ports.spec.ts#runs scan through channel authoring and commit",
+      "note": "real merged bytes + report carries"
+    },
+    {
+      "id": "FR-VAL-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/commit-revision-cas.spec.ts#a merged new-child outcome carries natural lengths",
+      "note": "real merged bytes + report carries"
+    },
+    {
+      "id": "FR-VAL-07",
+      "criterion": "AC-1",
+      "kind": "test",
+      "verdict": "pass",
+      "grade": "A",
+      "ref": "evolution-merge/tests/run-shell.spec.ts#preserves pair natural lengths in the report",
+      "note": "real merged bytes + report carries"
+    }
+  ]
+}

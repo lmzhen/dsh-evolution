@@ -1318,6 +1318,13 @@ Body of ${name}.
 
     expect(builtinSource.ok).toBe(false)
 
+    // The sibling isBlocked gate must agree with consolidate, including protected builtins.
+    expect(await ctx.evolutionCurator.isBlocked('plan')).toBe(true)
+    expect(await ctx.evolutionCurator.isBlocked('excluded-source')).toBe(true)
+    expect(await ctx.evolutionCurator.isBlocked('referenced-source')).toBe(true)
+    expect(await ctx.evolutionCurator.isBlocked('suppressed-source')).toBe(true)
+    expect(await ctx.evolutionCurator.isBlocked('target-skill')).toBe(false)
+
     // Nothing was consumed: the whole tree is intact.
 
     expect((await skills.list()).map(s => s.name).sort()).toEqual([

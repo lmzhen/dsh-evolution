@@ -1,0 +1,334 @@
+{
+  "items": [
+    {
+      "id": "FR-LIFE-01",
+      "kind": "FR",
+      "title": "先建/更新目标，成功后再归档源",
+      "statement": "先建/更新目标，成功后再归档源",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "目标失败时源不在 archive"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 172
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-02",
+      "kind": "FR",
+      "title": "失败回滚目标与已归档源到提交前；新建目标失败删除新目标/恢复快照；已有目标失败恢复快照；无 partial success",
+      "statement": "失败回滚目标与已归档源到提交前；新建目标失败删除新目标/恢复快照；已有目标失败恢复快照；无 partial success",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "故障注入后树/归档回到提交前；新建目标不残留；无 partial"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 173
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-03",
+      "kind": "FR",
+      "title": "create-umbrella 冲突自动 -v2/-v3；旧 target 不动；actualTarget 超过 64 字符或后缀 `-v2....",
+      "statement": "create-umbrella 冲突自动 -v2/-v3；旧 target 不动；actualTarget 超过 64 字符或后缀 `-v2..-v99` 耗尽则整对失败；报告写 requestedTarget→actualTarget；archive/absorbedInto/undo/历史/报告用 actualTarget；UI 在 actualTarget 产生后显示（pending 阶段显示 requestedTarget）。优先级：create-umbrella 的 target 等于源名先走后缀；merge-into-existing 的 target 等于源名直接拒绝；pair 位置参数不传 target。",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "64 边界、后缀耗尽、actualTarget 在报告/归档/undo/历史/UI 各一条"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 174
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-04",
+      "kind": "FR",
+      "title": "create-umbrella 新建目标必须进入 family-managed 范围（显式写 managed 标记）",
+      "statement": "create-umbrella 新建目标必须进入 family-managed 范围（显式写 managed 标记）",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "后续 scan/curator 能列出该目标；显式 pair 可对它执行"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 175
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-05",
+      "kind": "FR",
+      "title": "decision schema：shouldMerge/mode/target/sources/confidence/rationale/aS...",
+      "statement": "decision schema：shouldMerge/mode/target/sources/confidence/rationale/aSummary/bSummary；mode ∈ {keep, create-umbrella, merge-into-existing}；shouldMerge=false 时 mode=keep、target/sources 可空；`pair --force` 的强制 decision 固定 mode=create-umbrella、target=`merge-<a>-<b>`、sources=两源、rationale=用户强制跳过第1轮，三句用固定模板；create/merge 规则不变；两源同名拒绝；非法 target/name failed(target-invalid)、只报告",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "一般 decision 与 create-umbrella 分支可用；forced decision 的 target/摘要非空；--force pending 三句话可读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 176
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-06",
+      "kind": "FR",
+      "title": "undo 的 --run 必填，省略不猜最新，直接参数错；--run 必须属于该 target；源已删/改名/再次归档/源名被占用则整次拒绝并...",
+      "statement": "undo 的 --run 必填，省略不猜最新，直接参数错；--run 必须属于该 target；源已删/改名/再次归档/源名被占用则整次拒绝并列出未恢复项；撤销粒度按 D2 与 D11",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "省略 --run 参数错；错误 run/target 组合参数错；源异常整次拒绝并列出未恢复项"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 177
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-07",
+      "kind": "FR",
+      "title": "merge-into-existing 正文整体覆盖；同名支撑文件不同内容拒绝；目标原有未列文件保留",
+      "statement": "merge-into-existing 正文整体覆盖；同名支撑文件不同内容拒绝；目标原有未列文件保留",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "三个写入用例"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 178
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-LIFE-08",
+      "kind": "FR",
+      "title": "归档带 reason/absorbedInto；源历史保留最后一版 + 原因；“历史技能”独立视图覆盖 merged/deleted/spli...",
+      "statement": "归档带 reason/absorbedInto；源历史保留最后一版 + 原因；“历史技能”独立视图覆盖 merged/deleted/split/other，只展示最后一版、不展示改动链",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "归档源可查原因；四类原因可读；历史技能可读且无改动链"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 179
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-09",
+      "kind": "FR",
+      "title": "合并后目标历史清零为新基线 v1，不删旧数据；首条记录标 action=merge、sources[]、runId；旧记录在独立视图/标记中可...",
+      "statement": "合并后目标历史清零为新基线 v1，不删旧数据；首条记录标 action=merge、sources[]、runId；旧记录在独立视图/标记中可追溯",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "新目标显示合并来源与源列表；旧记录仍可追溯且不混入新基线"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 180
+      },
+      "baselineStatus": "unverified"
+    },
+    {
+      "id": "FR-LIFE-10",
+      "kind": "FR",
+      "title": "undo 是一次多技能事务：target + sources + runId；委托 unit undo；成功后 pairs[].result=...",
+      "statement": "undo 是一次多技能事务：target + sources + runId；委托 unit undo；成功后 pairs[].result=undone；若该 run 全部已提交 pair undone 才 run.status=undone；失败不部分恢复；部分撤销时 run 状态保持 succeeded/cancelled 不变",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "部分撤销 run 仍 succeeded/cancelled；全部已提交 pair 撤销 run undone；失败不变"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 181
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-11",
+      "kind": "FR",
+      "title": "新建目标撤销归档不硬删；整树 restore 后旧 run superseded 且 UI 标失效；merge undo/skill undo...",
+      "statement": "新建目标撤销归档不硬删；整树 restore 后旧 run superseded 且 UI 标失效；merge undo/skill undo/restore 三动词适用/互斥可查；skill restore/skill history 保留，不在用户面移除",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两场景验证；三动词分工表/帮助可见；skill restore/history 仍可用"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 182
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-LIFE-12",
+      "kind": "FR",
+      "title": "多代合并按 run 反序；每个已提交 pair 存 before/after hash；同 run 同 target 多 pair 按 pai...",
+      "statement": "多代合并按 run 反序；每个已提交 pair 存 before/after hash；同 run 同 target 多 pair 按 pair 反序逐个撤销，--run 撤销该 run 全部已提交 pair",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "多代撤销顺序正确；同 target 多 pair 反序"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 183
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-13",
+      "kind": "FR",
+      "title": "staging 保留 7 天；不自动续跑。待批准行正常无 staging（agent2 未开始），显示“无现场”；异常/旧记录若已有 stag...",
+      "statement": "staging 保留 7 天；不自动续跑。待批准行正常无 staging（agent2 未开始），显示“无现场”；异常/旧记录若已有 staging，按待合并的 staging 在/已清处理（不再新增待批准 staging）。待合并行：staging 在显示“现场保留到 X”；已清但源还在→重建；源已变/没了→拒绝并给两出口。approve 成功后行转 approved/移出待批准；成功提交后清理 staging",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "待批准无现场；待合并三态正确；已清源在两分支；approve 后行状态正确；成功提交无残留"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 184
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-14",
+      "kind": "FR",
+      "title": "pending 无 TTL；读时收敛 source-gone（从 active 队列清除，报告审计）/target-taken（仅 merge...",
+      "statement": "pending 无 TTL；读时收敛 source-gone（从 active 队列清除，报告审计）/target-taken（仅 merge-into-existing 目标被改动/占用，标 expired）/source-changed（决策后源 sourceRevision 变化，标 expired 并拒绝）；expired 通过 pending --expired / 面板“已过期”筛选只读可见，不参与 active 计数；approve 前重校验，给“重新 merge pair/丢弃”两个出口",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "source-gone 不显示；target-taken/source-changed 只读可见不计数；create-umbrella 冲突不被误判 target-taken；两出口可用"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 185
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-LIFE-15",
+      "kind": "FR",
+      "title": "skipped TTL 默认 0=不过期；>0 到期后标 expired、不删、不再自动参与下一轮；expired 只读可见，计入 count...",
+      "statement": "skipped TTL 默认 0=不过期；>0 到期后标 expired、不删、不再自动参与下一轮；expired 只读可见，计入 counts.expired；restore 仍可手动恢复；记录不硬删、审计保留",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "到期后可见 expired；不自动参与下一轮；restore 恢复；记录不硬删"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 186
+      },
+      "baselineStatus": "partial"
+    }
+  ]
+}

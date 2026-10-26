@@ -24,6 +24,16 @@ it('approves one pending row and rejects a second action', async () => {
   expect((await loadMergeState(io, home)).state.rows[0]?.state).toBe('approved')
 })
 
+it('refuses approve/reject on an expired pending row', async () => {
+  const home = await tempRoot('dsh-merge-pending-expired-')
+  const io = nodeEvolutionIo()
+  const key = pairKey('a', 'b')
+  const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'pending', queue: 'pending', decision: { shouldMerge: true, mode: 'merge-into-existing', target: 'a', sources: ['a', 'b'], rationale: 'r' }, expired: 'target-taken', createdAt: AT, updatedAt: AT }
+  await seedRow(io, home, row)
+  expect(await approvePending(io, home, () => Date.parse(AT), row.id)).toMatchObject({ ok: false, reason: 'expired' })
+  expect(await rejectPending(io, home, () => Date.parse(AT), row.id)).toMatchObject({ ok: false, reason: 'expired' })
+})
+
 it('rejects pending to skipped and reports unknown ids', async () => {
   const home = await tempRoot('dsh-merge-pending-reject-')
   const io = nodeEvolutionIo()

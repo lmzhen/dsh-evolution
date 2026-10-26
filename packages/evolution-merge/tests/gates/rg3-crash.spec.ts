@@ -16,8 +16,7 @@ async function waitFor(path: string, timeoutMs: number): Promise<string> {
   throw new Error('timeout waiting for ' + path)
 }
 
-for (const point of POINTS) {
-  it('force-kills at ' + point, async () => {
+async function crashAt(point: (typeof POINTS)[number]): Promise<void> {
     const home = await tempRoot('dsh-rg3-crash-')
     const core = new URL('../../../evolution-core/src/unit-transaction.ts', import.meta.url).href
     const ioUrl = new URL('../../../evolution-core/src/io.ts', import.meta.url).href
@@ -85,5 +84,6 @@ await tx.commit(p.prepared)
     expect(recovered.ok, recovered.ok ? '' : recovered.message).toBe(true)
     expect(await readFile(join(home, 'tree', 'alpha'), 'utf8').catch(() => null)).toBe(point === 'committed' || point === 'unit-written' || point === 'sources-archived' ? 'new' : 'old')
     expect(await readFile(join(home, 'tree', 'beta'), 'utf8').catch(() => null)).toBe(point === 'committed' || point === 'unit-written' || point === 'sources-archived' ? null : 'beta')
-  }, 60_000)
 }
+for (const point of POINTS) it('force-kills at ' + point, () => crashAt(point), 60_000)
+it('force-kills at unit-written (literal)', () => crashAt('unit-written'), 60_000)

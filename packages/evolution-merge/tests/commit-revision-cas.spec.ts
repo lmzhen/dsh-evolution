@@ -156,10 +156,12 @@ it('a merged new-child outcome carries natural lengths', async () => {
     }, parent: {}, allow: [], timeoutMs: 1000, commitPort: livePort(), now: () => 1,
   }, { id: 'flen', pairKey: pairKey('alpha-skill', 'beta-skill'), a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'fuse', decision, createdAt: 'x', updatedAt: 'x' }, decision, new AbortController().signal)
   expect(result.kind).toBe('merged')
-  expect(result.kind === 'merged' ? result.lengths : undefined).toMatchObject({ bodyBytes: expect.any(Number), fileBytes: 0, totalBytes: expect.any(Number) })
+  const body = BODY('umbrella')
+  const bytes = Buffer.byteLength(body, 'utf8')
+  expect(result.kind === 'merged' ? result.lengths : undefined).toEqual({ bodyBytes: bytes, fileBytes: 0, totalBytes: bytes })
 })
 
-it('a non-limit blocking finding maps to merge-validation and lands in skipped', async () => {
+it('a non-limit blocking finding maps to merge-validation and stays a failed row, not skipped', async () => {
   const home = await tempRoot('dsh-validation-')
   const io = nodeEvolutionIo()
   const noFrontmatter = '# umbrella\n\nno frontmatter here\n'
@@ -180,8 +182,16 @@ it('a non-limit blocking finding maps to merge-validation and lands in skipped',
   const row: MergeRow = { id: 'f1', pairKey: pairKey('alpha-skill', 'beta-skill'), a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'fuse', decision, createdAt: 'x', updatedAt: 'x' }
   await recordRound2Outcome(v4.io, v4.home, () => 2, row, authoring)
   const persisted = (await readPairLedgerV4(v4.io, v4.home))?.rows[0]
-  expect(persisted?.state).toBe('skipped')
-  expect(persisted !== undefined && persisted.state === 'skipped' ? persisted.reason : undefined).toBe('validation-failed')
+  expect(persisted?.state).toBe('fuse')
+  expect(persisted?.state === 'fuse' ? persisted.failure?.code : undefined).toBe('merge-validation')
+})
+
+it('removes a report-only commit-failed row without writing skipped', async () => {
+  const v4 = await makeV4Home([v3Row({ id: 'f3', state: 'fuse', target: 'umbrella', decision } as never)])
+  const row: MergeRow = { id: 'f3', pairKey: pairKey('alpha-skill', 'beta-skill'), a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'fuse', decision, createdAt: 'x', updatedAt: 'x' }
+  const record = await recordRound2Outcome(v4.io, v4.home, () => 2, row, { kind: 'failed', failure: { stage: 'commit', code: 'commit-failed', message: 'boom', retryable: true, retryFrom: 'agent2' } })
+  expect(record.pair.outcome).toBe('failed')
+  expect((await readPairLedgerV4(v4.io, v4.home))?.rows).toEqual([])
 })
 
 it('the new-child commit failure is typed from the decision anchors', async () => {

@@ -50,6 +50,45 @@ it('rejects bad queries and reports E-325 for an absent service', async () => {
   expect((await response.json() as { code: string }).code).toBe('E-325')
 })
 
+it('GET routes do not mutate the snapshot object', async () => {
+  const snapshot = Object.freeze({
+    wireVersion: 1, schemaVersion: 4, readAt: 0, queueRevision: 'x', consistency: 'eventual',
+    rows: [], stages: [], runs: [], reports: [], report: null, history: [], bodyRefs: [],
+    doctor: { counts: { active: { verify: 0, pending: 0, fuse: 0, skipped: 0 }, expired: 0 }, staging: { state: 'absent', dirs: 0 }, rows: [] },
+    approval: { mergeApproval: false }, notes: [], degraded: false,
+  } as never)
+  const frozenRoutes = makeMergeRoutes({ getSource: () => ({ snapshot: async () => snapshot }) }, audit)
+  for (const path of [MERGE_ROUTES.view, MERGE_ROUTES.rows + '?queue=pending', MERGE_ROUTES.body + '?id=x&side=a', MERGE_ROUTES.history]) {
+    const route = frozenRoutes.find(item => item.path === path.split('?')[0])
+    if (route === undefined) throw new Error('missing route')
+    const response = await route.fetch(new Request('http://local' + path))
+    expect(response.status, path).not.toBe(500)
+  }
+})
+
+it('returns E-323 on view/rows but keeps read-only body/history available when the host data plane is unavailable', async () => {
+  const snapshot = {
+    wireVersion: 1, schemaVersion: 4, readAt: 0, queueRevision: 'x', consistency: 'eventual',
+    hostOnly: { code: 'E-323', detail: 'agentPresets not mounted' },
+    rows: [], stages: [], runs: [], reports: [], report: null, history: [], bodyRefs: [],
+    doctor: { counts: { active: { verify: 0, pending: 0, fuse: 0, skipped: 0 }, expired: 0 }, staging: { state: 'absent', dirs: 0 }, rows: [] },
+    approval: { mergeApproval: false }, notes: [], degraded: false,
+  } as never
+  const capRoutes = makeMergeRoutes({ getSource: () => ({ snapshot: async () => snapshot }) }, audit)
+  for (const path of [MERGE_ROUTES.view, MERGE_ROUTES.rows + '?queue=pending']) {
+    const route = capRoutes.find(item => item.path === path.split('?')[0])
+    if (route === undefined) throw new Error('missing route')
+    const response = await route.fetch(new Request('http://local' + path))
+    expect(response.status, path).toBe(503)
+    expect(await response.json(), path).toMatchObject({ wireVersion: 1, code: 'E-323' })
+  }
+  const bodyRoute = capRoutes.find(item => item.path === MERGE_ROUTES.body)
+  const historyRoute = capRoutes.find(item => item.path === MERGE_ROUTES.history)
+  if (bodyRoute === undefined || historyRoute === undefined) throw new Error('missing route')
+  expect((await bodyRoute.fetch(new Request('http://local' + MERGE_ROUTES.body + '?id=mr_a&side=a'))).status).toBe(404)
+  expect((await historyRoute.fetch(new Request('http://local' + MERGE_ROUTES.history))).status).toBe(200)
+})
+
 it('returns a typed 503 on all four panel GETs when state is not ready', async () => {
   const notReady: MergeRouteSource = {
     ...source,

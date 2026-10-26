@@ -32,6 +32,12 @@ describe('long-run inventory (S4)', () => {
     }
   })
 
+  it('registers the merge run with its owner and result home', () => {
+    const merge = LONG_RUNS.find(entry => entry.id === '/evolution merge')
+    expect(merge).toMatchObject({ owner: 'evolution-merge', lifetime: 'plugin' })
+    expect(merge?.resultHome).toContain('merge-<runId>.json')
+  })
+
   // G5 step 5 (audit F1/F2): the README-vs-renderer pin was retired with the renderer's last
   // consumer - `renderLongRunTable` has no caller (the README is generated on the producing side),
   // so both sides of that assertion sat off the production path.

@@ -23,6 +23,16 @@ it('defines merge_stage and routes writes through applyStageTool', async () => {
   expect(read).toMatchObject({ ok: true, value: 'target' })
 })
 
+it('limits the child to merge_stage and refuses writes in the decide phase', async () => {
+  const home = await tempRoot('dsh-merge-tool-phase-')
+  const io = nodeEvolutionIo()
+  expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
+  const decide: StageToolContext = { runId: 'run-1', childId: 'child-1', expectedChildId: 'child-1', phase: 'decide' }
+  const tool = createMergeStageTool(io, home, () => decide)
+  expect(tool.name).toBe('merge_stage')
+  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'x' }, {}))).toMatchObject({ ok: false, code: 'phase' })
+})
+
 it('rejects bad shapes and wrong child without writing', async () => {
   const home = await tempRoot('dsh-merge-tool-guard-')
   const io = nodeEvolutionIo()

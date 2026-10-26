@@ -1,0 +1,180 @@
+{
+  "items": [
+    {
+      "id": "FR-VAL-01",
+      "kind": "FR",
+      "title": "规则门只复用 SkillLibrary 写入校验 + merge 自有规则；不做 LLM 内容 judge",
+      "statement": "规则门只复用 SkillLibrary 写入校验 + merge 自有规则；不做 LLM 内容 judge",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "规则门只产出封闭 rule 集，不含 judge/second-admission 规则；校验失败带 rule/path/message"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 159
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-VAL-02",
+      "kind": "FR",
+      "title": "manifest 路径白名单：references/templates/scripts/assets 下相对路径",
+      "statement": "manifest 路径白名单：references/templates/scripts/assets 下相对路径",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "越权/绝对路径拒绝"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 160
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-VAL-03",
+      "kind": "FR",
+      "title": "manifest 每个文件必须存在",
+      "statement": "manifest 每个文件必须存在",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "缺文件整对失败"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 161
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-VAL-04",
+      "kind": "FR",
+      "title": "manifest 每个文件必须被正文/支撑文件引用；正文每条引用必须有文件",
+      "statement": "manifest 每个文件必须被正文/支撑文件引用；正文每条引用必须有文件",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "双向引用缺一即失败"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 162
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-VAL-05",
+      "kind": "FR",
+      "title": "合成后、提交前按平台单文件大小上限判定：判定对象=合并后的 SKILL.md 文件字节数；支撑文件各自按平台单文件上限；任一超限即整对 ski...",
+      "statement": "合成后、提交前按平台单文件大小上限判定：判定对象=合并后的 SKILL.md 文件字节数；支撑文件各自按平台单文件上限；任一超限即整对 skipped。固定 reason 保留用户文案“融合后超出字数上限”（文案不改，底层按字节判定）。先于通用 limits；不提交、源不归档、活树不变；报告同时记录。U1 #5 优先于 Q13 普通执行失败口径",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "刚超 1 字节的 pair 进 skipped 且 reason 正确、可 restore；通用 limits 不先短路；源未归档；提示词无字数指令"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 163
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-VAL-06",
+      "kind": "FR",
+      "title": "60 字描述仅建议；TODO 不作硬门（含正文 task TODO）；模板占位符是否硬门沿用 SkillLibrary 既有校验，merge ...",
+      "statement": "60 字描述仅建议；TODO 不作硬门（含正文 task TODO）；模板占位符是否硬门沿用 SkillLibrary 既有校验，merge 不另加规则",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "TODO 不阻断；60 字不强制；不新增 merge 专属占位符门"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 164
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-VAL-07",
+      "kind": "FR",
+      "title": "记录合成自然长度，供回退率分析",
+      "statement": "记录合成自然长度，供回退率分析",
+      "priority": "P2",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "报告/日志含 merged pair 的自然长度；长度由真实 merged outcome 计算"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 165
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-VAL-08",
+      "kind": "FR",
+      "title": "失败整对不提交；正常路径不把活树当草稿；失败按 FR-LIFE-02 回滚目标/源到提交前，禁止 partial",
+      "statement": "失败整对不提交；正常路径不把活树当草稿；失败按 FR-LIFE-02 回滚目标/源到提交前，禁止 partial",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "失败后目标/源回到提交前；无 partial；不是“先归档源再写目标”"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 166
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

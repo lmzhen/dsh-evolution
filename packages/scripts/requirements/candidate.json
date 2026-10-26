@@ -1,0 +1,180 @@
+{
+  "items": [
+    {
+      "id": "FR-CAND-01",
+      "kind": "FR",
+      "title": "严格复用原筛选 pipeline ①–⑤，不另写一套",
+      "statement": "严格复用原筛选 pipeline ①–⑤，不另写一套",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "stage 顺序与原 pipeline 一致；输入输出可对照"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 124
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-CAND-02",
+      "kind": "FR",
+      "title": "⑤ judge 保留为候选闸门",
+      "statement": "⑤ judge 保留为候选闸门",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "judge 可运行；不是仅 stub 冒充"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 125
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-CAND-03",
+      "kind": "FR",
+      "title": "L0/L1 KEEP 只进报告，不进第 1 轮",
+      "statement": "L0/L1 KEEP 只进报告，不进第 1 轮",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "构造 L0/L1 用例不产生 agent1"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 126
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-CAND-04",
+      "kind": "FR",
+      "title": "L2 MERGE/UNDECIDED 进第 1 轮",
+      "statement": "L2 MERGE/UNDECIDED 进第 1 轮",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "构造 L2 用例产生 agent1"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 127
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-CAND-05",
+      "kind": "FR",
+      "title": "judge fallback 分支也按 level 过滤",
+      "statement": "judge fallback 分支也按 level 过滤",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "fallback 时 L0/L1 不进 round1；加回归测试"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 128
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-CAND-06",
+      "kind": "FR",
+      "title": "scan 内部默认串行；不做 abc 聚类；显式 pair 可另起 run，但同 target 串行、同 pair 在飞返回同一 run",
+      "statement": "scan 内部默认串行；不做 abc 聚类；显式 pair 可另起 run，但同 target 串行、同 pair 在飞返回同一 run",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "scan 内无并发；显式 pair 并发受 target/claim 约束；无 abc"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 129
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-CAND-07",
+      "kind": "FR",
+      "title": "每对执行前重新 resolve；源消失记 source-gone 并继续",
+      "statement": "每对执行前重新 resolve；源消失记 source-gone 并继续",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "构造源删除用例，run 继续且报告记录"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 130
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-CAND-08",
+      "kind": "FR",
+      "title": "报告包含 L0/L1 KEEP 的计数与明细",
+      "statement": "报告包含 L0/L1 KEEP 的计数与明细",
+      "priority": "P2",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "报告可查 KEEP 列表，不只引擎原始文件"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 131
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

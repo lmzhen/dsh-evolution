@@ -67,4 +67,6 @@ it('returns an accepted run id when detached is enabled', async () => {
   const result = await createMergeRuntime(deps).execute({ verb: 'scan' })
   expect(result.ok).toBe(true)
   expect(result.text).toContain('已启动：run-det')
+  expect(result.text).toContain('作用域：family-managed')
+  expect(result.text).toContain('无 per-run 上限')
 })

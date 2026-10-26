@@ -87,6 +87,9 @@ it('commitMerge creates the umbrella target first, then archives sources', async
   expect(await lib.isManaged('umbrella')).toBe(true)
   expect(await lib.read('src-a')).toBeNull()
   expect(await readFile(join(root, 'umbrella', 'references', 'merged.md'), 'utf8')).toBe('# merged\n')
+  const usage = await loadUsage(root)
+  expect(usage.get('src-a')?.state).toBe('archived')
+  expect(usage.get('src-b')?.state).toBe('archived')
 })
 
 

@@ -11,7 +11,7 @@ import { readRunMeta, writeRunMeta } from './domain/run-coordinator.ts'
 import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
 import { evidenceSha256 as unitEvidenceDigest } from './domain/evidence-hash.ts'
 
-export type UndoErrorCode = 'undo-unavailable-legacy-receipt' | 'undo-evidence-hash-mismatch' | 'undo-target-drift' | 'undo-source-drift' | 'undo-partial-state' | 'undo-unit-not-committed'
+export type UndoErrorCode = 'undo-unavailable-legacy-receipt' | 'undo-evidence-expired' | 'undo-evidence-hash-mismatch' | 'undo-target-drift' | 'undo-source-drift' | 'undo-partial-state' | 'undo-unit-not-committed'
 export interface UndoResult { readonly ok: boolean; readonly code?: UndoErrorCode; readonly message: string; readonly undone: readonly string[] }
 interface PlanPair { readonly receipt: CommitReceipt; readonly evidence: UnitEvidenceRecord; readonly targetNow: string | null; readonly sourcesNow: Readonly<Record<string, string | null>>; readonly done: boolean; readonly targetDone: boolean; readonly sourcesDone: boolean }
 
@@ -33,7 +33,13 @@ function sortReceipts(receipts: readonly CommitReceipt[]): readonly CommitReceip
 }
 async function preflight(io: EvolutionIoLike, home: string, port: MergeUndoPort, receipt: CommitReceipt): Promise<PlanPair | UndoResult> {
   const evidence = await readUnitEvidence(io, home, receipt.unitId)
-  if (evidence === null) return { ok: false, code: 'undo-unavailable-legacy-receipt', message: 'commit evidence is missing; undo unavailable for legacy receipt', undone: [] }
+  if (evidence === null) {
+    // A legacy receipt never had evidence to hash. A receipt WITH evidenceSha256 whose unit is
+    // gone aged out of the retention window; undo must refuse, never guess (DEC-D11).
+    return receipt.evidenceSha256 === undefined
+      ? { ok: false, code: 'undo-unavailable-legacy-receipt', message: 'commit evidence is missing; undo unavailable for legacy receipt', undone: [] }
+      : { ok: false, code: 'undo-evidence-expired', message: 'commit evidence aged out of the retention window; undo unavailable (fail-closed)', undone: [] }
+  }
   const expectedSha = receipt.evidenceSha256 ?? unitEvidenceDigest(evidence)
   if (unitEvidenceDigest(evidence) !== expectedSha) return { ok: false, code: 'undo-evidence-hash-mismatch', message: 'commit receipt evidence hash does not match evidence', undone: [] }
   const targetNow = await port.readSkill(receipt.target)
@@ -67,9 +73,10 @@ async function settleRun(io: EvolutionIoLike, home: string, runId: string, pairK
     createdAt: current?.createdAt ?? new Date(at).toISOString(), updatedAt: new Date(at).toISOString(),
   })
 }
-export async function runUndoOperation(options: { readonly io: EvolutionIoLike; readonly home: string; readonly runId: string; readonly port: MergeUndoPort; readonly now: () => number; readonly pairKey?: string; readonly finalizeUnit?: (unitId: string) => Promise<{ readonly ok: boolean; readonly message?: string }>; readonly onPhase?: (phase: string, pairKey: string) => void | Promise<void> }): Promise<UndoResult> {
-  const allReceipts = (await readCommitReceipts(options.io, options.home)).filter(receipt => (receipt.parentRunId ?? receipt.runId) === options.runId)
-  const allPairKeys = allReceipts.map(receipt => receipt.pairKey ?? receipt.unitId)
+export async function runUndoOperation(options: { readonly io: EvolutionIoLike; readonly home: string; readonly runId: string; readonly port: MergeUndoPort; readonly now: () => number; readonly pairKey?: string; readonly target?: string; readonly finalizeUnit?: (unitId: string) => Promise<{ readonly ok: boolean; readonly message?: string }>; readonly onPhase?: (phase: string, pairKey: string) => void | Promise<void> }): Promise<UndoResult> {
+  const runReceipts = (await readCommitReceipts(options.io, options.home)).filter(receipt => (receipt.parentRunId ?? receipt.runId) === options.runId)
+  const allPairKeys = runReceipts.map(receipt => receipt.pairKey ?? receipt.unitId)
+  const allReceipts = runReceipts.filter(receipt => options.target === undefined || receipt.target === options.target)
   const receipts = options.pairKey === undefined ? allReceipts : allReceipts.filter(receipt => receipt.pairKey === options.pairKey)
   if (receipts.length === 0) return { ok: false, message: 'merge run has no commit receipt: ' + options.runId, undone: [] }
   const pairs: UndoPairState[] = receipts.map(receipt => ({ pairKey: receipt.pairKey ?? receipt.unitId, unitId: receipt.unitId, phase: 'pending' as const }))

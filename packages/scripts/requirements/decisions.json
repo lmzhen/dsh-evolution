@@ -1,0 +1,291 @@
+{
+  "items": [
+    {
+      "id": "DEC-D1",
+      "kind": "DECISION",
+      "title": "staging 时序：decide 之后: 裁决：采用口径 B。resolve 后先 decide，child 只读源，不建 staging；...",
+      "statement": "staging 时序：decide 之后: 裁决：采用口径 B。resolve 后先 decide，child 只读源，不建 staging；approve 之后才 stage，从当时活树复制两源；pending 不产生 staging。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：采用口径 B。resolve 后先 decide，child 只读源，不建 staging；approve 之后才 stage，从当时活树复制两源；pending 不产生 staging。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 8
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "DEC-D2",
+      "kind": "DECISION",
+      "title": "undo 的 --run 与 --retry: 裁决：undo 的 --run 必填，省略不猜最新；--retry 是布尔开关，不是取值参数。",
+      "statement": "undo 的 --run 与 --retry: 裁决：undo 的 --run 必填，省略不猜最新；--retry 是布尔开关，不是取值参数。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：undo 的 --run 必填，省略不猜最新；--retry 是布尔开关，不是取值参数。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 30
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "DEC-D3",
+      "kind": "DECISION",
+      "title": "审计粒度：一个 merge unit + N 条 per-skill mutations: 裁决：v1 采用 1+N。一个 merge 写一个...",
+      "statement": "审计粒度：一个 merge unit + N 条 per-skill mutations: 裁决：v1 采用 1+N。一个 merge 写一个 merge unit（target + sources[] + runId）；底层复用 SkillLibrary 既有 per-skill mutations，不新增 merge 级事件流。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：v1 采用 1+N。一个 merge 写一个 merge unit（target + sources[] + runId）；底层复用 SkillLibrary 既有 per-skill mutations，不新增 merge 级事件流。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 51
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "DEC-D4",
+      "kind": "DECISION",
+      "title": "数据布局：单 merge-state.json（显式例外）: 裁决：v1 保留单 evolution/merge-state.json 存 p...",
+      "statement": "数据布局：单 merge-state.json（显式例外）: 裁决：v1 保留单 evolution/merge-state.json 存 pending/skipped 行；不拆 merge-pending.json / merge-skipped.json。runs 仍走 run registry。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：v1 保留单 evolution/merge-state.json 存 pending/skipped 行；不拆 merge-pending.json / merge-skipped.json。runs 仍走 run registry。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 72
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "DEC-D5",
+      "kind": "DECISION",
+      "title": "UnitTransaction：core 唯一事务所有者（ADR-1）: 裁决：SkillLibrary 持一个不透明 UnitTransac...",
+      "statement": "UnitTransaction：core 唯一事务所有者（ADR-1）: 裁决：SkillLibrary 持一个不透明 UnitTransaction；merge/host 只提交 plan + 提供 journal hooks，绝不写活树。事务有四个方法：prepare / commit / verify / rollback；unitId 由调用方提供且幂等；evidence 由 core 持久；rollback 只能被 evidence 授权。拆分 core 内核成公开多阶段、或 host 自己补偿回滚，均 reject。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：SkillLibrary 持一个不透明 UnitTransaction；merge/host 只提交 plan + 提供 journal hooks，绝不写活树。事务有四个方法：prepare / commit / verify / rollback；unitId 由调用方提供且幂等；evidence 由 core 持久；rollback 只能被 evidence 授权。拆分 core 内核成公开多阶段、或 host 自己补偿回滚，均 reject。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 128
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "DEC-D6",
+      "kind": "DECISION",
+      "title": "一个 commit fence + commit 期 target claim: 裁决：正确性只由一个 commit fence 保证：tre...",
+      "statement": "一个 commit fence + commit 期 target claim: 裁决：正确性只由一个 commit fence 保证：tree lock 的 `token` 即 epoch；只有提交段持锁；target claim 只在 commit 阶段取；不做 tree/target/run 三套 TTL。run 没有独立 lease（所有权在 run registry 行，见 D7）。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：正确性只由一个 commit fence 保证：tree lock 的 `token` 即 epoch；只有提交段持锁；target claim 只在 commit 阶段取；不做 tree/target/run 三套 TTL。run 没有独立 lease（所有权在 run registry 行，见 D7）。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 174
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "DEC-D7",
+      "kind": "DECISION",
+      "title": "run registry：唯一持久/所有权源，只记账: 裁决：run registry 是 run 的唯一持久与所有权源（begin/stag...",
+      "statement": "run registry：唯一持久/所有权源，只记账: 裁决：run registry 是 run 的唯一持久与所有权源（begin/stage/settle/pid/plane），但不做执行、调度、重试、恢复；执行/恢复属于 host 用例层。display 层不得自行推断终态或合成状态。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：run registry 是 run 的唯一持久与所有权源（begin/stage/settle/pid/plane），但不做执行、调度、重试、恢复；执行/恢复属于 host 用例层。display 层不得自行推断终态或合成状态。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 193
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "DEC-D8",
+      "kind": "DECISION",
+      "title": "恢复四分支（journal 只存 intent，evidence/receipt 权威）: 裁决：恢复按 evidence 定相，分四支：fi...",
+      "statement": "恢复四分支（journal 只存 intent，evidence/receipt 权威）: 裁决：恢复按 evidence 定相，分四支：finalize / roll-forward / rollback / refuse-manual。已提交（unit complete 且全部源已归档）绝不回滚；journal 只存 intent，不存\"完成事实\"。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：恢复按 evidence 定相，分四支：finalize / roll-forward / rollback / refuse-manual。已提交（unit complete 且全部源已归档）绝不回滚；journal 只存 intent，不存\"完成事实\"。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 215
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "DEC-D9",
+      "kind": "DECISION",
+      "title": "包拓扑与发布矩阵（ADR-2）: 拓扑裁决",
+      "statement": "包拓扑与发布矩阵（ADR-2）: 拓扑裁决",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "拓扑裁决"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 238
+      },
+      "baselineStatus": "drift"
+    },
+    {
+      "id": "DEC-D10",
+      "kind": "DECISION",
+      "title": "兼容窗口: 裁决",
+      "statement": "兼容窗口: 裁决",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 260
+      },
+      "baselineStatus": "drift"
+    },
+    {
+      "id": "DEC-D11",
+      "kind": "DECISION",
+      "title": "evidence/units/receipts 保留：90 天且 1000 次 merge: 裁决：`units/<unitId>.json`...",
+      "statement": "evidence/units/receipts 保留：90 天且 1000 次 merge: 裁决：`units/<unitId>.json` 与 receipt 至少满足两个下限中的更强者：保留最近 90 天 且保留最近 1000 次 merge（即保留窗口 = max(90 天, 最近 1000 次)）。超出窗口后：",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：`units/<unitId>.json` 与 receipt 至少满足两个下限中的更强者：保留最近 90 天 且保留最近 1000 次 merge（即保留窗口 = max(90 天, 最近 1000 次)）。超出窗口后："
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 274
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "DEC-D12",
+      "kind": "DECISION",
+      "title": "迁移范围（ADR-4）: 裁决：v3 迁移覆盖 state / runs / receipts / journals / staging / ...",
+      "statement": "迁移范围（ADR-4）: 裁决：v3 迁移覆盖 state / runs / receipts / journals / staging / unit-history 六类；旧文件只读备份；不做双写；失败按 K10 拒绝（不产生半迁移状态）。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "裁决：v3 迁移覆盖 state / runs / receipts / journals / staging / unit-history 六类；旧文件只读备份；不做双写；失败按 K10 拒绝（不产生半迁移状态）。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 286
+      },
+      "baselineStatus": "unverified"
+    },
+    {
+      "id": "DEC-D13",
+      "kind": "DECISION",
+      "title": "执行顺序（覆盖本文旧\"后续实现顺序\"）: 1. 文档冻结 + RG0 ownership matrix。",
+      "statement": "执行顺序（覆盖本文旧\"后续实现顺序\"）: 1. 文档冻结 + RG0 ownership matrix。",
+      "priority": "P1",
+      "authority": "DEC",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "1. 文档冻结 + RG0 ownership matrix。"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-design-decisions.md",
+        "line": 299
+      },
+      "baselineStatus": "n/a",
+      "disposition": "n/a"
+    }
+  ]
+}

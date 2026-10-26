@@ -26,7 +26,7 @@ it('approves a pending row through a new child and drops it after commit', async
     async read(name: string) { return cards.find(card => card.name === name)?.body ?? null },
     async commitMerge(plan: { sources: string[] }) { return { ok: true, message: 'merged', unitId: 'u-1', archived: plan.sources, mutations: 3 } },
   } as unknown as SkillLibrary
-  const stageKey = stageKeyOf('run-1', key)
+  const stageKey = stageKeyOf(row.id, key)
   const channel = {
     async open() { return { kind: 'ok' as const, childId: 'child-2', turn: { text: 'standby', stopReason: 'completed' } } },
     async continueTurn() { await writeStagedFile(io, home, stageKey, 'SKILL.md', BODY('umbrella')); return { kind: 'ok' as const, childId: 'child-2', turn: { text: 'written', stopReason: 'completed' } } },
@@ -48,6 +48,7 @@ it('approves a pending row through a new child and drops it after commit', async
   const result = await createMergeRuntime(deps).execute({ verb: 'approve', id: row.id })
   expect(result.ok, result.text).toBe(true)
   expect(result.text).toContain('已启动')
+  expect(result.text).toContain('作用域：单条 pending 行')
   for (let i = 0; i < 2000; i += 1) {
     if ((await loadMergeState(io, home)).state.rows.length === 0) break
     await new Promise(resolve => setTimeout(resolve, 5))

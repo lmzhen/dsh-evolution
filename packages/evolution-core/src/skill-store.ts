@@ -2613,6 +2613,7 @@ export class SkillLibrary {
           return rollbackMessage(result.message, stuck)
         }
       }
+      await this.foldArchivedUsage(sources, new Date().toISOString())
       await plan.onPhase?.('sources-archived')
       await plan.onPhase?.('unit-written')
       return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }

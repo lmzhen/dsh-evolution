@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 import type { MergeBody, MergeHistoryItem, MergeOutcome, MergeRowView, MergeViewPayload, QueuePage } from '../src/client/api.ts'
 import { MergePanel } from '../src/client/Panel.ts'
 import { MergeStore, type MergeSource } from '../src/client/MergeStore.ts'
-import { zh } from '../src/client/messages.ts'
+import { en, zh } from '../src/client/messages.ts'
 
 const t = (key: string): string => key
 const view = (): MergeViewPayload => ({
@@ -64,6 +64,31 @@ it('renders four tabs, settings, run strip, pending id/three sentences and stage
   expect(html).toContain('data-role="body-b"')
   expect(html).toContain('data-disabled-reason="unavailable"')
   expect(html).toContain('data-role="tab"')
+})
+
+it('renders four tabs, the expired toggle, and pending summary only on pending rows', () => {
+  const fuse = { ...row(), id: 'mr_fuse', state: 'fuse' as const, queue: 'fuse' as const, summary: undefined, stageView: undefined }
+  const html = render(new MergeStore(source(), { view: view(), rows: [row(), fuse] }))
+  expect((html.match(/data-role="tab"/g) ?? []).length).toBe(4)
+  expect(html).toContain('data-role="expired-toggle"')
+  expect((html.match(/data-role="pending-summary"/g) ?? []).length).toBe(1)
+})
+
+it('renders verify rows with verify facts and no pending summary', () => {
+  const verify = { ...row(), id: 'mr_verify', state: 'verify' as const, queue: 'verify' as const, verifySubState: 'candidates' as const, summary: undefined, stageView: undefined }
+  const html = render(new MergeStore(source(), { view: view(), rows: [verify], queue: 'verify' }))
+  expect(html).toContain('data-row-state="verify"')
+  expect(html).toContain('verify.candidates')
+  expect(html).not.toContain('data-role="pending-summary"')
+})
+
+it('renders English labels without raw locale keys', () => {
+  const html = renderToStaticMarkup(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows: [row()] }), t: key => en[key] ?? key }))
+  expect(html).toContain(en['title']!)
+  expect(html).toContain(en['tab.pending']! + ' 2')
+  expect(html).not.toContain('settings.title')
+  expect(html).not.toMatch(/[\u4e00-\u9fff]/)
+  for (const key of Object.keys(en).filter(item => item.includes('.'))) expect(html, key).not.toContain(key)
 })
 
 it('does not derive platformWrite from mergeApproval', () => {

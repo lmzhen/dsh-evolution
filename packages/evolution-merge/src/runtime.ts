@@ -4,7 +4,7 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import { createHash } from 'node:crypto'
-import { errorText, probeText, SkillLibrary, UnitTransactions, skillLibraryUnitBackend, type EvolutionIoLike, type RunRegistry, type UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
+import { errorText, isProcessAlive, probeText, SkillLibrary, UnitTransactions, skillLibraryUnitBackend, type EvolutionIoLike, type RunRegistry, type UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
 import { targetClaimUnitPort } from './unit-claim.ts'
 import { canRetry, pairKey, type MergeCandidate, type MergeDecision, type MergeRow } from './contracts.ts'
 import { skippedPairKeys } from './skipped.ts'
@@ -22,7 +22,7 @@ import { runApproveCommand } from './approve-command.ts'
 import { runResumeCommand } from './resume-command.ts'
 import { loadMergeState } from './state.ts'
 import { pairLedger } from './domain/pair-ledger.ts'
-import { readCommitReceipt } from './commit-receipt.ts'
+import { readCommitReceipts } from './commit-receipt.ts'
 import { runUndoOperation } from './undo-operation.ts'
 import { readStageIndex } from './domain/stage-aggregate.ts'
 import { skillLibraryUndoPort } from './adapters/undo.ts'
@@ -55,7 +55,7 @@ function busyTarget(rows: readonly MergeRow[], target: string, excludeRowId: str
   const row = rows.find(item => item.id !== excludeRowId && (item.state === 'approved' || item.state === 'fuse') && item.decision?.target === target)
   return row === undefined ? undefined : { id: row.id, ...(row.runId === undefined ? {} : { runId: row.runId }) }
 }
-function forcedDecisionFor(a: string, b: string): MergeDecision {
+export function forcedDecisionFor(a: string, b: string): MergeDecision {
   const sorted = [a, b].sort()
   const raw = ('merge-' + sorted.join('-')).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
   const target = raw.length <= 64 ? raw : raw.slice(0, 55) + '-' + createHash('sha256').update(raw).digest('hex').slice(0, 8)
@@ -86,6 +86,8 @@ export interface MergeRuntimeDeps {
   /** Curator gate set: excluded/referenced/suppressed/protected builtins. */
   readonly isBlocked?: (name: string) => boolean | Promise<boolean>
   readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
+  /** The host's current model identity, recorded on pending decisions. */
+  readonly model?: string
   /** Run-scoped engine screening. */
   readonly screeningForRun: (cards: readonly SkillCard[], runId: string, signal: AbortSignal) => Promise<readonly MergeCandidate[]>
   readonly stage?: MergeStageBindingPort
@@ -114,6 +116,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
   const common = {
     io: deps.io, home: deps.home, registry: deps.registry,
     platformWrite: deps.platformWrite, now: deps.now,
+    ...(deps.model === undefined ? {} : { model: deps.model }),
     ...(deps.isOwnerActive === undefined ? {} : { isOwnerActive: deps.isOwnerActive }),
     ...(timeout === undefined ? {} : { timeoutMinutes: timeout }),
   }
@@ -130,15 +133,23 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       if (command.verb === 'pair') {
         const signal = new AbortController().signal
         if (command.a === command.b) return fail('pair', 'pair-same-source', 'merge pair 需要两个不同技能源：' + command.a, '重新指定两个不同的 family-managed 技能')
-        if ([command.a, command.b].some(name => name.includes('/') || name.includes(':'))) return fail('pair', 'target-invalid', '技能名不能包含 provider/name 或 provider:name 语法：' + command.a + ' / ' + command.b, '使用裸技能名重新 pair')
+        if ([command.a, command.b].some(name => name.includes('/') || name.includes(':'))) {
+          return { ok: false, text: 'merge: 技能名不能包含 provider/name 或 provider:name 语法：' + command.a + ' / ' + command.b + ' (provider-conflict)\nusage: /evolution merge pair <a> <b>' }
+        }
         // FR-RUN-03: a session-less invocation cannot host a merge child. Answer E-305 in
         // the three-line shape instead of opening a run that is guaranteed to fail.
         if (agentless) return fail('pair', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'pair' }), '在 GUI 或 CLI 的会话里运行 /evolution merge pair ' + command.a + ' ' + command.b)
         // FR-EXEC-17/NFR-04: two pair runs for one pair must not race for the same row.
         const pairKeyValue = pairKey(command.a, command.b)
         const inFlight = inFlightPairRun(await readRunMetas(deps.io, deps.home), pairKeyValue)
-        if (inFlight !== undefined && (deps.isOwnerActive === undefined || (await deps.isOwnerActive(inFlight.runId)) === true)) {
-          return fail('pair', 'merge-pair-in-flight', '同一 pair 已在运行 ' + inFlight.runId, '等待该 run 结束，或运行 /evolution merge status ' + inFlight.runId, inFlight.runId)
+        let ownerActive = false
+        if (inFlight !== undefined) {
+          if (deps.isOwnerActive !== undefined) ownerActive = await deps.isOwnerActive(inFlight.runId)
+          else ownerActive = inFlight.pid === undefined ? true : isProcessAlive(inFlight.pid)
+        }
+        if (inFlight !== undefined && ownerActive) {
+          // NFR-04: the same pair is idempotent, not an error — answer the run that already owns it.
+          return { ok: true, text: 'merge pair 已在运行：' + inFlight.runId + '；作用域：family-managed 技能对，1 对，无 per-run 上限' }
         }
         const cards = await deps.cards(signal)
         const cardA = cards.find(card => card.name === command.a)
@@ -155,9 +166,11 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         }
         const pair = [{ a: command.a, b: command.b }]
         const existing = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === pairKey(command.a, command.b))
-        if (existing?.state === 'skipped') {
+        let cleared = false
+        if (existing?.state === 'skipped' || (existing?.state === 'fuse' && existing.failure?.retryable === false)) {
           const dropped = await removeRuntimeRow(deps.io, deps.home, existing.id, 'superseded')
-          if (!dropped) return fail('pair', 'row-changed', '清理 skipped 行时发现并发修改：' + existing.id, '运行 /evolution merge status 后重试')
+          if (!dropped) return fail('pair', 'row-changed', '清理可替换行时发现并发修改：' + existing.id, '运行 /evolution merge status 后重试')
+          cleared = true
         }
         if (existing?.state === 'verify' && existing.runId !== undefined && (await deps.isOwnerActive?.(existing.runId)) === true) {
           return fail('pair', 'merge-pair-in-flight', '同一 pair 已在运行 ' + existing.runId, '等待该 run 结束，或运行 /evolution merge status ' + existing.runId, existing.runId)
@@ -165,7 +178,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (existing?.state === 'pending') {
           return fail('pair', 'pair-pending', '该 pair 已在待批准队列：' + existing.id, '先运行 /evolution merge approve/reject/discard ' + existing.id, existing.runId)
         }
-        if (existing?.state === 'approved' || existing?.state === 'fuse') {
+        if (!cleared && (existing?.state === 'approved' || existing?.state === 'fuse')) {
           return fail('pair', 'pair-fuse', '该 pair 已在待合并队列，可复用决策重跑', '运行 /evolution merge resume --retry ' + (existing.runId ?? existing.id), existing.runId)
         }
         const forced = command.force === true ? forcedDecisionFor(command.a, command.b) : undefined
@@ -192,7 +205,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           },
         })
         if (!result.ok) return failRun('pair', result.message, '修复后重新发起 pair；run 报告见 /evolution merge report', result)
-        if ('accepted' in result) return { ok: true, text: 'merge pair 已启动：' + result.runId }
+        if ('accepted' in result) return { ok: true, text: 'merge pair 已启动：' + result.runId + '；作用域：family-managed 技能对，1 对，无 per-run 上限' }
         if (!('report' in result)) return fail('pair', 'report-missing', 'merge pair 已结束但没有写报告', '重新运行 pair，或运行 /evolution merge runs 查看运行')
         return { ok: true, text: 'merge pair 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
       }
@@ -251,7 +264,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           }),
         })
         if (!result.ok) return failRun('scan', result.message, '修复后重新 scan；run 报告见 /evolution merge report', result)
-        if ('accepted' in result) return { ok: true, text: 'merge scan 已启动：' + result.runId }
+        if ('accepted' in result) return { ok: true, text: 'merge scan 已启动：' + result.runId + '；作用域：family-managed 技能库，候选来源 engine screening，无 per-run 上限' }
         if (!('report' in result)) return fail('scan', 'report-missing', 'merge scan 已结束但没有写报告', '重新运行 scan，或运行 /evolution merge runs 查看运行')
         return { ok: true, text: 'merge scan 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
       }
@@ -287,7 +300,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           }),
         })
         if (!result.ok) return failRun('candidates', result.message, '修复后重试 candidates --retry', result)
-        if ('accepted' in result) return { ok: true, text: 'candidates --retry 已启动：' + result.runId }
+        if ('accepted' in result) return { ok: true, text: 'candidates --retry 已启动：' + result.runId + '；作用域：单条 verify 行重跑，无 per-run 上限' }
         if (!('report' in result)) return fail('candidates', 'report-missing', 'candidates --retry 已结束但没有写报告', '运行 /evolution merge runs 查看运行')
         return { ok: true, text: 'candidates --retry 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
       }
@@ -357,14 +370,13 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         return { ok: true, text: '已丢弃合并行：' + command.id }
       }
       if (command.verb === 'undo') {
-        const receipt = await readCommitReceipt(deps.io, deps.home, command.run, command.target)
-        if (receipt === null) return fail('undo', 'receipt-not-found', '该 run 没有提交回执：' + command.run, '只有已提交的 run 可 undo；运行 /evolution merge runs 查看')
-        if (receipt.target !== command.target) return fail('undo', 'receipt-target-mismatch', '回执目标是 ' + receipt.target + '，不是 ' + command.target, '按回执目标重新运行 undo')
-        const undoRunId = receipt.parentRunId ?? receipt.runId
+        const receipts = (await readCommitReceipts(deps.io, deps.home)).filter(receipt => (receipt.parentRunId ?? receipt.runId) === command.run && receipt.target === command.target)
+        if (receipts.length === 0) return fail('undo', 'receipt-not-found', '该 run 没有目标回执：' + command.run + ' / ' + command.target, '只有已提交的 run 可 undo；运行 /evolution merge runs 查看')
+        const undoRunId = receipts[0]!.parentRunId ?? receipts[0]!.runId
         const undoRegistry = deps.registry as unknown as RunRegistry
         if (undoRegistry.runs('merge').some(run => run.id === undoRunId && run.supersededAt !== undefined)) return fail('undo', 'run-superseded', '该 run 已因技能树 restore 失效，不能再 undo：' + undoRunId, '运行 /evolution merge runs 查看失效标记')
         const unit = unitFor(deps)
-        const result = await runUndoOperation({ io: deps.io, home: deps.home, runId: undoRunId, port: skillLibraryUndoPort(deps.skills), now: deps.now, ...(receipt.pairKey === undefined ? {} : { pairKey: receipt.pairKey }), ...(unit === undefined ? {} : { finalizeUnit: id => unit.finalize.call(unit, id) }) })
+        const result = await runUndoOperation({ io: deps.io, home: deps.home, runId: undoRunId, port: skillLibraryUndoPort(deps.skills), now: deps.now, target: command.target, ...(unit === undefined ? {} : { finalizeUnit: id => unit.finalize.call(unit, id) }) })
         return result.ok ? { ok: true, text: result.message } : fail('undo', 'undo-failed', result.message, '检查回执与暂存后重试')
       }
       if (command.verb === 'skipped' && command.restore !== undefined) {
@@ -431,6 +443,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           }),
           round2WithRun: createNewChildRound2({
             io: deps.io, home: deps.home, cards, channel: deps.channel, parent,
+            parentRunId: (runId: string) => runId,
             allow: deps.allow, ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
             timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
             commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
@@ -440,7 +453,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           }),
         })
         if (!result.ok) return failRun('resume', result.message, '修复后重新 resume；run 报告见 /evolution merge report', result)
-        if ('accepted' in result) return { ok: true, text: 'merge resume 已启动：' + result.runId }
+        if ('accepted' in result) return { ok: true, text: 'merge resume 已启动：' + result.runId + '；作用域：单条待合并行重跑 agent2，无 per-run 上限' }
         if (!('report' in result)) return fail('resume', 'report-missing', 'merge resume 已结束但没有写报告', '重新运行 resume，或运行 /evolution merge runs 查看运行')
         return { ok: true, text: 'merge resume 完成：merged ' + String(result.report.totals.merged) }
       }
@@ -535,6 +548,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             stage: createStageForCards({ io: deps.io, home: deps.home, runId: command.id, cards, now: deps.now }),
             round2: createNewChildRound2({
               io: deps.io, home: deps.home, cards, channel: deps.channel, parent,
+              parentRunId: (runId: string) => runId,
               allow: deps.allow, ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
               timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
               commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
@@ -545,7 +559,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           },
         })
         if (!result.ok) return failRun('approve', result.message, '修复后重新 approve；run 报告见 /evolution merge report', result)
-        if ('accepted' in result) return { ok: true, text: 'merge approve 已启动：' + result.runId }
+        if ('accepted' in result) return { ok: true, text: 'merge approve 已启动：' + result.runId + '；作用域：单条 pending 行批准后重跑 agent2，无 per-run 上限' }
         if (!('report' in result)) return fail('approve', 'report-missing', 'merge approve 已结束但没有写报告', '重新运行 approve，或运行 /evolution merge runs 查看运行')
         return { ok: true, text: 'merge approve 完成：merged ' + String(result.report.totals.merged) }
       }

@@ -6,7 +6,9 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { makeV4Home, v3Row } from './support/schema4-home.ts'
 import { journalPath } from '../src/domain/commit-journal-store.ts'
-import { mergeDoctor, pairKey, rowIdOf } from '../src/index.ts'
+import { mergeDoctor, mergeDoctorFact, pairKey, rowIdOf } from '../src/index.ts'
+import { readMergeSnapshot } from '../src/domain/merge-snapshot.ts'
+import { buildDoctorView } from '../src/surface/merge-view.ts'
 import { mergeStatePath } from '../src/state.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
@@ -24,6 +26,24 @@ it('reports empty, populated and unreadable state without writing', async () => 
   const v4 = await makeV4Home([pendingRow('alpha-skill', 'beta-skill')])
   const rows = await mergeDoctor(v4.io, v4.home)
   expect(rows[0]?.detail).toContain('pending 1')
+})
+
+it('counts a skipped-ttl expired row in the doctor state line', async () => {
+  const v4 = await makeV4Home([v3Row({ id: 's1', state: 'skipped', reason: 'agent keep', expiredAt: Date.parse(AT) } as never)])
+  const rows = await mergeDoctor(v4.io, v4.home)
+  const state = rows.find(item => item.key === 'state')
+  expect(state?.detail).toContain('expired 1')
+  expect(state?.detail).toContain('skipped 0')
+})
+
+it('exposes host-only E-323 to the doctor view and fact', async () => {
+  const v4 = await makeV4Home([])
+  const snapshot = await readMergeSnapshot({ io: v4.io, home: v4.home, runs: [], approval: false, hostOnly: async () => ({ code: 'E-323', detail: 'agentPresets not mounted' }) })
+  const view = buildDoctorView(snapshot)
+  expect(view.hostOnly).toEqual({ code: 'E-323', detail: 'agentPresets not mounted' })
+  const fact = mergeDoctorFact(view, null)
+  expect(fact.status).toBe('fail')
+  expect(fact.detail).toContain('E-323')
 })
 
 it('does not warn a pending row with an awaiting-approval run', async () => {

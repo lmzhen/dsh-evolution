@@ -18,10 +18,12 @@ export async function projectRecoveredUnit(options: {
   readonly unitId: string
   readonly evidence: UnitEvidenceRecord
   readonly now: () => number
+  /** Branch D: the unit committed, but the run was interrupted by process death. */
+  readonly interrupted?: boolean
   readonly runs?: {
-    settle(id: string, outcome: { state: 'succeeded' | 'failed' | 'cancelled'; resultRef?: string; failure?: string }): Promise<void>
+    settle(id: string, outcome: { state: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'; resultRef?: string; failure?: string }): Promise<void>
     /** Controlled orphan upgrade: lets a committed unit turn failed(orphan) back into succeeded. */
-    settleRecovered?(id: string, outcome: { state: 'succeeded' | 'failed' | 'cancelled'; resultRef?: string; failure?: string }): Promise<boolean>
+    settleRecovered?(id: string, outcome: { state: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'; resultRef?: string; failure?: string }): Promise<boolean>
   }
   readonly onPhase?: (phase: string) => void | Promise<void>
 }): Promise<ProjectionResult> {
@@ -69,7 +71,7 @@ export async function projectRecoveredUnit(options: {
   else {
     const report: MergeReport = {
       schemaVersion: 2, runId: options.runId, kind: 'merge', command: 'approve', startedAt: at, endedAt: at,
-      stopReason: 'completed', approval: { platformWrite: false, mergeApproval: true },
+      stopReason: options.interrupted === true ? 'interrupted' : 'completed', approval: { platformWrite: false, mergeApproval: true },
       scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 0, skipped: 0 } },
       pairs: [{ id: row?.id ?? options.unitId, pairKey, a: row?.a ?? target, b: row?.b ?? options.evidence.sources[0]?.name ?? '', queue: 'fuse', outcome: 'merged', archived: options.evidence.sources.filter(source => source.archived).map(source => source.name), unitId: options.unitId, ...(validationPlan === undefined ? {} : { validationPlan }) }],
       totals: { merged: 1, kept: 0, pending: 0, failed: 0 }, notes: ['recovered from unit journal'],
@@ -94,10 +96,10 @@ export async function projectRecoveredUnit(options: {
   await recordPair(options.io, options.home, { pairKey, runId: options.runId, result: 'merged', target })
   await options.onPhase?.('run-meta')
   const meta = await readRunMeta(options.io, options.home, options.runId)
-  await writeRunMeta(options.io, options.home, { version: 1, runId: options.runId, phase: 'settled', reportRef: reportPath, pairCount: 1, ...(meta?.parentRunId === undefined ? {} : { parentRunId: meta.parentRunId }), createdAt: meta?.createdAt ?? new Date(at).toISOString(), updatedAt: new Date(at).toISOString() })
+  await writeRunMeta(options.io, options.home, { version: 1, runId: options.runId, ...(meta?.pid === undefined ? {} : { pid: meta.pid }), phase: 'settled', ...(options.interrupted === true ? { stopReason: 'interrupted' } : {}), reportRef: reportPath, pairCount: 1, ...(meta?.parentRunId === undefined ? {} : { parentRunId: meta.parentRunId }), ...(meta?.stagingRef === undefined ? {} : { stagingRef: meta.stagingRef }), ...(meta?.pairs === undefined ? {} : { pairs: meta.pairs }), createdAt: meta?.createdAt ?? new Date(at).toISOString(), updatedAt: new Date(at).toISOString() })
   await options.onPhase?.('settle')
   if (options.runs !== undefined) {
-    const outcome = { state: 'succeeded' as const, resultRef: reportPath }
+    const outcome = { state: options.interrupted === true ? 'interrupted' as const : 'succeeded' as const, resultRef: reportPath }
     const upgraded = options.runs.settleRecovered === undefined ? false : await options.runs.settleRecovered(options.runId, outcome)
     if (!upgraded) await options.runs.settle(options.runId, outcome)
   }

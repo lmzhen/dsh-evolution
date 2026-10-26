@@ -74,7 +74,7 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
     key: 'state',
     label: '合并状态',
     status: snapshot.blocked === undefined || !hasState ? 'ok' : 'warn',
-    detail: snapshot.blocked === undefined ? 'pairs ' + String(snapshot.rows.length) + '；verify ' + String(counts.verify) + ' / pending ' + String(counts.pending) + ' / fuse ' + String(counts.fuse) + ' / skipped ' + String(counts.skipped) : snapshot.blocked.code + ': ' + snapshot.blocked.message,
+    detail: snapshot.blocked === undefined ? 'pairs ' + String(snapshot.rows.length) + '；verify ' + String(counts.verify) + ' / pending ' + String(counts.pending) + ' / fuse ' + String(counts.fuse) + ' / skipped ' + String(counts.skipped) + ' / expired ' + String(snapshot.doctor.counts.expired) : snapshot.blocked.code + ': ' + snapshot.blocked.message,
   })
   const recoveryRuns = new Set<string>()
   try {

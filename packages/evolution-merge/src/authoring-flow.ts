@@ -30,6 +30,8 @@ export interface RunAuthoringOptions {
   readonly stageKey?: string
   readonly reuseStaging?: boolean
   readonly target: string
+  /** The two participating source skills; conflict detection is limited to these. */
+  readonly sources?: readonly string[]
   readonly mode?: 'merge-into-existing' | 'create-umbrella' | 'keep'
   readonly cards: readonly SkillCard[]
   readonly author: (staging: { readonly home: string; readonly runId: string }) => Promise<string>
@@ -41,12 +43,14 @@ export interface RunAuthoringOptions {
   readonly limits?: SkillLimits
   readonly promptVersion?: string
   readonly promptHash?: string
+  /** Propagated to the commit; aborting before the durable point prevents a orphaned commit. */
+  readonly signal?: AbortSignal
   /** Round-1 decision anchors; when absent the commit keeps the legacy body-only CAS. */
   readonly revisions?: CommitRevisionRefs
 }
 
 export type AuthoringResult =
-  | { readonly ok: true; readonly tree: StagedTree; readonly validationPlan: import('./domain/validation-plan.ts').ValidationPlan; readonly commit: Extract<CommitStagedResult, { readonly ok: true }> }
+  | { readonly ok: true; readonly tree: StagedTree; readonly validationPlan: import('./domain/validation-plan.ts').ValidationPlan; readonly commit: Extract<CommitStagedResult, { readonly ok: true }>; readonly lengths: Readonly<Record<string, number>> }
   | { readonly ok: false; readonly code?: string; readonly message: string; readonly findings?: readonly RuleFinding[]; readonly lengths?: Readonly<Record<string, number>> }
 
 export async function runAuthoring(options: RunAuthoringOptions): Promise<AuthoringResult> {
@@ -91,22 +95,25 @@ export async function runAuthoring(options: RunAuthoringOptions): Promise<Author
   const missing = missingManifestFile(manifestFiles, stagedPaths)
   if (missing !== null) return { ok: false, code: 'merge-manifest-missing', message: 'manifest file missing from staged tree: ' + missing }
   const limitsSnapshot = limitsSnapshotOf(options.limits ?? DEFAULT_SKILL_LIMITS)
-  const supportSources = options.cards.flatMap(card => (card.files ?? []).map(file => ({ path: file.path, content: file.content, source: card.name })))
+  const participants = new Set(options.sources ?? [])
+  const supportSources = options.cards.filter(card => participants.has(card.name)).flatMap(card => (card.files ?? []).map(file => ({ path: file.path, content: file.content, source: card.name })))
   const validationPlan = buildValidationPlan({ tree: tree.value, target: options.target, limits: limitsSnapshot, cards: options.cards, supportSources, ...(options.promptVersion === undefined ? {} : { promptVersion: options.promptVersion }), ...(options.promptHash === undefined ? {} : { promptHash: options.promptHash }), supportFiles: tree.value.files.map(file => ({ path: file.path, content: file.content, source: 'staged' })), manifestFiles, existingSupport: (options.cards.find(card => card.name === options.target)?.files ?? []).map(file => file.path) })
   const findings = [...validateStagedTree(tree.value, limitsSnapshot.skillLimits), ...validationPlan.findings]
-  if (hasBlockingFinding(findings)) return { ok: false, code: findings.some(finding => finding.rule === 'limit') ? 'merge-over-limit' : 'merge-validation', message: 'staged tree failed the rule gate', findings, lengths: { bodyBytes: Buffer.byteLength(tree.value.body, 'utf8'), fileBytes: tree.value.files.reduce((sum, file) => sum + Buffer.byteLength(file.content, 'utf8'), 0), totalBytes: Buffer.byteLength(tree.value.body, 'utf8') + tree.value.files.reduce((sum, file) => sum + Buffer.byteLength(file.content, 'utf8'), 0) } }
+  const lengths = { bodyBytes: Buffer.byteLength(tree.value.body, 'utf8'), fileBytes: tree.value.files.reduce((sum, file) => sum + Buffer.byteLength(file.content, 'utf8'), 0), totalBytes: Buffer.byteLength(tree.value.body, 'utf8') + tree.value.files.reduce((sum, file) => sum + Buffer.byteLength(file.content, 'utf8'), 0) }
+  if (hasBlockingFinding(findings)) return { ok: false, code: findings.some(finding => finding.rule === 'limit') ? 'merge-over-limit' : 'merge-validation', message: 'staged tree failed the rule gate', findings, lengths }
   const commit = await commitStagedRun(options.io, options.home, stageKey, options.commitPort, {
     origin: 'foreground',
     summary: options.summary,
     now: options.now,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.isBlocked === undefined ? {} : { isBlocked: options.isBlocked }),
     ...(options.unit === undefined ? {} : { unit: options.unit }),
-    ...(options.limits === undefined ? {} : { limits: options.limits }),
-    validationPlan: { planVersion: validationPlan.planVersion, stageDigest: validationPlan.stageDigest, revision: validationPlan.revision },
+    limits: limitsSnapshot.skillLimits,
+    validationPlan: { planVersion: validationPlan.planVersion, stageDigest: validationPlan.stageDigest, revision: validationPlan.revision, manifestFiles: validationPlan.manifestFiles },
     ...(options.revisions?.targetRevision === undefined ? {} : { targetRevision: options.revisions.targetRevision }),
     ...(options.revisions?.sourceRevisions === undefined ? {} : { sourceRevisions: options.revisions.sourceRevisions }),
     ...(options.revisions?.supportDigest === undefined ? {} : { supportDigest: options.revisions.supportDigest }),
   })
-  if (commit.ok) return { ok: true, tree: tree.value, validationPlan, commit }
+  if (commit.ok) return { ok: true, tree: tree.value, validationPlan, commit, lengths }
   return { ok: false, code: commit.code ?? 'commit-failed', message: commit.message }
 }

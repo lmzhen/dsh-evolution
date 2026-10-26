@@ -52,7 +52,9 @@ export async function writeCommitReceipt(io: EvolutionIoLike, home: string, rece
   const path = commitReceiptPath(home, receipt.runId)
   await io.writeText(path, JSON.stringify(receipt, null, 2) + '\n')
   const parent = receipt.parentRunId ?? receipt.runId.split('/pairs/')[0] ?? receipt.runId
-  await io.writeText(durableReceiptPath(home, parent, receipt.runId), JSON.stringify({ ...receipt, parentRunId: parent }, null, 2) + '\n')
+  // One durable file per unit: two pairs of the same run/target must not overwrite each other.
+  const leaf = (receipt.runId + '-' + receipt.unitId).replace(/[^A-Za-z0-9._-]+/g, '-')
+  await io.writeText(durableReceiptPath(home, parent, leaf), JSON.stringify({ ...receipt, parentRunId: parent }, null, 2) + '\n')
   return path
 }
 

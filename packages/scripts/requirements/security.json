@@ -1,0 +1,337 @@
+{
+  "items": [
+    {
+      "id": "FR-SEC-01",
+      "kind": "FR",
+      "title": "target 由控制面校验，不接受模型自由控制",
+      "statement": "target 由控制面校验，不接受模型自由控制",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "非法 target 被拒；模型不能绕过"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 256
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SEC-02",
+      "kind": "FR",
+      "title": "保护尺：pinned/bundled/hub/protected built-in + referenced/excluded/suppres...",
+      "statement": "保护尺：pinned/bundled/hub/protected built-in + referenced/excluded/suppressed",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "每类用例"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 257
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SEC-03",
+      "kind": "FR",
+      "title": "禁 FORBIDDENCONTROLKEYS；源正文按不可信输入做 threat scan；merge 不新增凭据/HTTP，模型调用走平台路由",
+      "statement": "禁 FORBIDDEN_CONTROL_KEYS；源正文按不可信输入做 threat scan；merge 不新增凭据/HTTP，模型调用走平台路由",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "控制键/注入用例；无新凭据/HTTP"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 258
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SEC-04",
+      "kind": "FR",
+      "title": "快照 + 原子换入；一次 merge 一条事务/unit",
+      "statement": "快照 + 原子换入；一次 merge 一条事务/unit",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "失败无半写；快照可回滚"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 259
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SEC-05",
+      "kind": "FR",
+      "title": "显式 pair 遵守范围/保护；无手动绕过开关",
+      "statement": "显式 pair 遵守范围/保护；无手动绕过开关",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "显式 pinned pair 被拒"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 260
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SEC-06",
+      "kind": "FR",
+      "title": "不静默降级；E-323=host-only/无 subagent 能力，E-324=受限 preset 建不起，E-305=无 live pa...",
+      "statement": "不静默降级；E-323=host-only/无 subagent 能力，E-324=受限 preset 建不起，E-305=无 live parent；E-306 不用于 merge（平台写入审批不拦 commitMerge）；深度用尽映射 E-323；环境级不可用=run 级失败、不写队列",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "三码各一条；merge 不产生 E-306；环境失败不产生待判断"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 261
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-SEC-07",
+      "kind": "FR",
+      "title": "新错误场景用场景 key，不新造数字码范围",
+      "statement": "新错误场景用场景 key，不新造数字码范围",
+      "priority": "P2",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "errors.ts 有 key；码表一致"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 262
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-SEC-08",
+      "kind": "FR",
+      "title": "v1 单 provider，不提供 provider 语法；输入含 `provider/name`、`provider:name` 或显式 p...",
+      "statement": "v1 单 provider，不提供 provider 语法；输入含 `provider/name`、`provider:name` 或显式 provider 字段均先于 SCOPE-01/02/03 拒绝，错误用 provider-conflict 场景 key、两行错；显式 pair 同样拒绝",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两种 provider 词法被拒；错误先于范围检查；显式 pair 拒绝"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 263
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "V2-TXN-01",
+      "kind": "CHANGE",
+      "title": "core 持唯一不透明 UnitTransaction；unitId 调用方提供；evidence 持久；rollback 由 evidenc...",
+      "statement": "core 持唯一不透明 UnitTransaction；unitId 调用方提供；evidence 持久；rollback 由 evidence 授权；恢复四分支；已提交绝不回滚；run registry 只记账",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "core 持唯一不透明 UnitTransaction；unitId 调用方提供；evidence 持久；rollback 由 evidence 授权；恢复四分支；已提交绝不回滚；run registry 只记账"
+        }
+      ],
+      "supersedes": [
+        "FR-LIFE-01",
+        "FR-SEC-04"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 68
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "GAP-SEC-01",
+      "kind": "GAP",
+      "title": "写库 origin=foreground；create 显式 .hermes-managed（FR-SCOPE-01/FR-LIFE-04）",
+      "statement": "写库 origin=foreground；create 显式 .hermes-managed（FR-SCOPE-01/FR-LIFE-04）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "audit origin 正确；新目标可被 family 列出"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 135
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-SEC-01b",
+      "kind": "GAP",
+      "title": "protected builtin 进入 curator.isBlocked（FR-SCOPE-02）",
+      "statement": "protected builtin 进入 curator.isBlocked（FR-SCOPE-02）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "plan 无 marker 时 scan/pair/commit 均拒"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 136
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "GAP-SEC-02",
+      "kind": "GAP",
+      "title": "merge 与 curator 共用 tree-lock/instance claim（FR-PLUG-03）",
+      "statement": "merge 与 curator 共用 tree-lock/instance claim（FR-PLUG-03）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "同 home 并发 merge/curator 串行"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 137
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-SEC-03",
+      "kind": "GAP",
+      "title": "target 级串行覆盖 scan/pair/approve（FR-EXEC-17）",
+      "statement": "target 级串行覆盖 scan/pair/approve（FR-EXEC-17）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "同 target 两 scan/pair 单赢家"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 138
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-SEC-04",
+      "kind": "GAP",
+      "title": "Q15 跨平面 foreign；Q16 三行错误+run id；Q17 E-code（NFR-04/07）",
+      "statement": "Q15 跨平面 foreign；Q16 三行错误+run id；Q17 E-code（NFR-04/07）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "跨平面拒绝；错误三行含 stage/run id；场景 key 可读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 139
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "GAP-SEC-05",
+      "kind": "GAP",
+      "title": "usage 折叠复用 curator 口径（FR-DATA-07）",
+      "statement": "usage 折叠复用 curator 口径（FR-DATA-07）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "合并后源 usage 显示 archived"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 140
+      },
+      "baselineStatus": "gap"
+    }
+  ]
+}

@@ -10,10 +10,10 @@ import { mergeReportPath, readMergeReport } from '../report.ts'
 import { readCommitReceipts } from '../commit-receipt.ts'
 import type { MergeReport } from '../contracts.ts'
 import type { V4Row } from './row-v4.ts'
-import { pendingExpiry, persistedExpiry, type LiveRowFacts, type PendingExpiryKind } from './live-facts.ts'
-import type { QueueId, MergeCounts, DoctorFact } from '../wire.ts'
+import { pendingExpiry, persistedExpiry, type LiveRowFacts } from './live-facts.ts'
+import type { QueueId, MergeCounts, DoctorFact, ExpiredKind } from '../wire.ts'
 
-export interface SnapshotRow { readonly row: V4Row; readonly stage: StageEntry | null; readonly bodies: readonly BodyRef[]; readonly queue: QueueId; readonly expired: boolean; readonly expiredKind?: PendingExpiryKind }
+export interface SnapshotRow { readonly row: V4Row; readonly stage: StageEntry | null; readonly bodies: readonly BodyRef[]; readonly queue: QueueId; readonly expired: boolean; readonly expiredKind?: ExpiredKind }
 export interface BodyRef { readonly rowId: string; readonly name: string; readonly side: 'live' | 'archive' }
 export interface SnapshotRun { readonly record: RunRecord; readonly meta: MergeRunMeta | null; readonly pairs: readonly { readonly pairKey: string; readonly runId: string; readonly result: string; readonly target?: string }[]; readonly report: MergeReport | null; readonly reportRef: string | null }
 export interface SnapshotDoctor { readonly counts: MergeCounts; readonly staging: { readonly state: 'ok' | 'absent' | 'unreadable'; readonly dirs: number; readonly oldestAgeMs?: number; readonly detail?: string }; readonly rows: readonly DoctorFact[] }
@@ -34,6 +34,7 @@ export interface MergeSnapshot {
   readonly history: readonly HistoryItem[]
   readonly bodyRefs: readonly BodyRef[]
   readonly doctor: SnapshotDoctor
+  readonly hostOnly?: { readonly code: 'E-323'; readonly detail?: string }
   readonly approval: { readonly mergeApproval: boolean; readonly platformWrite?: boolean }
   readonly notes: readonly string[]
   readonly degraded: boolean
@@ -44,6 +45,8 @@ export interface ReadSnapshotOptions {
   readonly runs: readonly RunRecord[]
   readonly approval: boolean
   readonly platformWrite?: boolean
+  /** Host data-plane capability probe; absent means available/unknown. */
+  readonly hostOnly?: () => Promise<{ readonly code: 'E-323'; readonly detail?: string } | undefined>
   readonly now?: () => number
   readonly history?: () => Promise<readonly HistoryItem[]>
   readonly notes?: readonly string[]
@@ -56,9 +59,10 @@ const queueOf = (state: V4Row['state']): QueueId => state === 'approved' || stat
 export async function readMergeSnapshot(options: ReadSnapshotOptions): Promise<MergeSnapshot> {
   const now = options.now ?? (() => Date.now())
   const readAt = now()
+  const hostOnly = options.hostOnly === undefined ? undefined : await options.hostOnly().catch((error) => ({ code: 'E-323' as const, detail: error instanceof Error ? error.message : String(error) }))
   const readiness = await readV4Readiness(options.io, options.home)
   if (!readiness.ok) {
-    return { wireVersion: 1, schemaVersion: 4, readAt, queueRevision: 'blocked', consistency: 'eventual', blocked: { code: readiness.code, message: readiness.message, readiness }, rows: [], stages: [], runs: [], reports: [], report: null, history: [], bodyRefs: [], doctor: { counts: emptyCounts, staging: { state: 'absent', dirs: 0 }, rows: [] }, approval: { mergeApproval: options.approval, ...(options.platformWrite === undefined ? {} : { platformWrite: options.platformWrite }) }, notes: options.notes ?? [], degraded: true }
+    return { wireVersion: 1, schemaVersion: 4, readAt, queueRevision: 'blocked', consistency: 'eventual', ...(hostOnly === undefined ? {} : { hostOnly }), blocked: { code: readiness.code, message: readiness.message, readiness }, rows: [], stages: [], runs: [], reports: [], report: null, history: [], bodyRefs: [], doctor: { counts: emptyCounts, staging: { state: 'absent', dirs: 0 }, rows: [] }, approval: { mergeApproval: options.approval, ...(options.platformWrite === undefined ? {} : { platformWrite: options.platformWrite }) }, notes: options.notes ?? [], degraded: true }
   }
   const ledger = await readPairLedgerV4(options.io, options.home)
   // Read-time derivation only: a stage past its TTL reads as expired even when the
@@ -75,8 +79,12 @@ export async function readMergeSnapshot(options: ReadSnapshotOptions): Promise<M
   for (const row of ledger?.rows ?? []) {
     const stage = stages.find(item => item.rowId === row.id) ?? null
     const queue = queueOf(row.state)
-    const bodies: BodyRef[] = [{ rowId: row.id, name: row.a, side: 'live' }, { rowId: row.id, name: row.b, side: 'archive' }]
-    const expiredKind = persistedExpiry(row) ?? pendingExpiry(row, live)
+    // A row's b is a live source until it is actually archived; only then is the archive
+    // body the addressable one. Pending/fuse/verify rows therefore expose two live bodies.
+    const bSide: BodyRef['side'] = live !== undefined && live.managed(row.b) ? 'live' : 'archive'
+    const bodies: BodyRef[] = [{ rowId: row.id, name: row.a, side: 'live' }, { rowId: row.id, name: row.b, side: bSide }]
+    const skippedExpired = row.state === 'skipped' && row.expiredAt !== undefined
+    const expiredKind = skippedExpired ? 'skipped-ttl' as const : persistedExpiry(row) ?? pendingExpiry(row, live)
     rows.push({ row, stage, bodies, queue, expired: expiredKind !== null, ...(expiredKind === null ? {} : { expiredKind }) })
     bodyRefs.push(...bodies)
   }
@@ -107,7 +115,7 @@ export async function readMergeSnapshot(options: ReadSnapshotOptions): Promise<M
   const ledgerConflicts = [...pairIndex.values()].filter(entry => (entry.result === 'merged' || entry.result === 'undone')
     && rows.some(item => item.row.pairKey === entry.pairKey && (item.row.state === 'verify' || item.row.state === 'pending' || item.row.state === 'approved' || item.row.state === 'fuse')))
   if (ledgerConflicts.length > 0) notes.push('ledger-conflict: pair-index says completed but the ledger still has it active (' + String(ledgerConflicts.length) + ')')
-  return { wireVersion: 1, schemaVersion: 4, readAt, queueRevision, consistency: 'eventual', rows, stages, runs, reports, report: reports.at(-1)?.report ?? null, history, bodyRefs, doctor, approval: { mergeApproval: options.approval, ...(options.platformWrite === undefined ? {} : { platformWrite: options.platformWrite }) }, notes, degraded: notes.length > 0 }
+  return { wireVersion: 1, schemaVersion: 4, readAt, queueRevision, consistency: 'eventual', ...(hostOnly === undefined ? {} : { hostOnly }), rows, stages, runs, reports, report: reports.at(-1)?.report ?? null, history, bodyRefs, doctor, approval: { mergeApproval: options.approval, ...(options.platformWrite === undefined ? {} : { platformWrite: options.platformWrite }) }, notes, degraded: notes.length > 0 }
 }
 async function readHistory(io: EvolutionIoLike, home: string): Promise<readonly HistoryItem[]> {
   const receipts = await readCommitReceipts(io, home)

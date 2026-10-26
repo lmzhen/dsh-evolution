@@ -1,8 +1,14 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { apply } from '../src/index.ts'
+
+it('passes the production merge_stage allow-list to the runtime', () => {
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  expect(source).toContain("allow: ['merge_stage']")
+})
 
 it('mounts routes, command and merge_stage with a minimal host context', async () => {
   const home = await tempRoot('dsh-merge-plugin-')

@@ -1,0 +1,180 @@
+{
+  "schema": 1,
+  "baseline": "0.30.24",
+  "authority": [
+    {
+      "id": "DEC",
+      "rank": 6
+    },
+    {
+      "id": "v2",
+      "rank": 5
+    },
+    {
+      "id": "v1",
+      "rank": 4
+    },
+    {
+      "id": "wire",
+      "rank": 3
+    },
+    {
+      "id": "gates",
+      "rank": 2
+    },
+    {
+      "id": "integration",
+      "rank": 1
+    }
+  ],
+  "groups": [
+    {
+      "id": "scope",
+      "file": "scope.json",
+      "title": "Scope"
+    },
+    {
+      "id": "run",
+      "file": "run.json",
+      "title": "Run"
+    },
+    {
+      "id": "candidate",
+      "file": "candidate.json",
+      "title": "Candidate"
+    },
+    {
+      "id": "execution",
+      "file": "execution.json",
+      "title": "Execution"
+    },
+    {
+      "id": "validation",
+      "file": "validation.json",
+      "title": "Validation"
+    },
+    {
+      "id": "lifecycle",
+      "file": "lifecycle.json",
+      "title": "Lifecycle"
+    },
+    {
+      "id": "data",
+      "file": "data.json",
+      "title": "Data"
+    },
+    {
+      "id": "approval",
+      "file": "approval.json",
+      "title": "Approval"
+    },
+    {
+      "id": "ui",
+      "file": "ui.json",
+      "title": "UI"
+    },
+    {
+      "id": "scheduling",
+      "file": "scheduling.json",
+      "title": "Scheduling"
+    },
+    {
+      "id": "security",
+      "file": "security.json",
+      "title": "Security"
+    },
+    {
+      "id": "defaults",
+      "file": "defaults.json",
+      "title": "Defaults"
+    },
+    {
+      "id": "v2",
+      "file": "v2.json",
+      "title": "v2 changes"
+    },
+    {
+      "id": "gaps",
+      "file": "gaps.json",
+      "title": "P1 gaps"
+    },
+    {
+      "id": "design",
+      "file": "design.json",
+      "title": "Design"
+    },
+    {
+      "id": "questions",
+      "file": "questions.json",
+      "title": "Questions"
+    },
+    {
+      "id": "adjudication",
+      "file": "adjudication.json",
+      "title": "Adjudication"
+    },
+    {
+      "id": "decisions",
+      "file": "decisions.json",
+      "title": "Decisions"
+    }
+  ],
+  "aliases": {
+    "V2-EXEC-01": {
+      "canonical": "FR-EXEC-06",
+      "kind": "change-record"
+    },
+    "V2-LIFE-01": {
+      "canonical": "FR-LIFE-06",
+      "kind": "change-record"
+    },
+    "V2-DATA-01": {
+      "canonical": "FR-DATA-06",
+      "kind": "change-record"
+    },
+    "V2-DATA-02": {
+      "canonical": "FR-DATA-02",
+      "kind": "change-record"
+    },
+    "V2-WIRE-01": {
+      "canonical": "FR-UI-01",
+      "kind": "change-record"
+    },
+    "V2-WIRE-02": {
+      "canonical": "FR-SCOPE-05",
+      "kind": "change-record"
+    },
+    "V2-UI-01": {
+      "canonical": "FR-UI-01",
+      "kind": "change-record"
+    },
+    "V2-UI-02": {
+      "canonical": "FR-APP-03",
+      "kind": "change-record"
+    },
+    "V2-QUERY-01": {
+      "canonical": "FR-UI-03",
+      "kind": "change-record"
+    },
+    "V2-UI-03": {
+      "canonical": "FR-UI-06",
+      "kind": "change-record"
+    },
+    "V2-TXN-01": {
+      "canonical": "FR-LIFE-01",
+      "kind": "change-record"
+    }
+  },
+  "universe": {
+    "total": 251,
+    "sourceCounts": {
+      "v1FR": 126,
+      "v1NFR": 8,
+      "v2": 56,
+      "D": 12,
+      "Q": 19,
+      "A": 17,
+      "DEC": 13
+    }
+  }
+}

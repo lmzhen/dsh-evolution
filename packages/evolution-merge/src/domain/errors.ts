@@ -17,8 +17,12 @@ export interface MergeError {
 function redact(text: string): string {
   return text
     .replace(/sk-[A-Za-z0-9_-]{16,}/g, '[redacted]')
+    .replace(/ghp_[A-Za-z0-9]{20,}/g, '[redacted]')
+    .replace(/github_pat_[A-Za-z0-9_]{20,}/g, '[redacted]')
+    .replace(/xox[baprs]-[A-Za-z0-9-]{10,}/g, '[redacted]')
+    .replace(/AKIA[0-9A-Z]{16}/g, '[redacted]')
     .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
-    .replace(/(api[_-]?key\s*[:=]\s*)\S+/gi, '$1[redacted]')
+    .replace(/((?:api[_-]?key|token|password|secret)\s*[:=]\s*)\S+/gi, '$1[redacted]')
 }
 
 /** Build the typed failure every command/CLI/runtime branch returns. */

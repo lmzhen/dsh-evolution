@@ -10,6 +10,8 @@ control-plane invariants. For the project overview, the install matrix and the F
 start at the [root README](../README.md); the install-FORM semantics and the
 per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) is the generated 251-ID baseline; its definitions and evidence live under [`scripts/requirements/`](scripts/requirements/README.md).
+
 **Contents:** [Package map](#package-map) · [Installation](#installation) ·
 [Command reference](#command-reference) · [Composition details](#composition-details) ·
 [Composition](#composition) · [Control-plane invariants](#control-plane-invariants) ·
@@ -129,10 +131,10 @@ what makes a hand-edited patch fail the gate; the three-way byte comparison in
 cross-check of the emitted files.
 ## Command reference
 
-The `/evolution` surface below is generated from the subcommand registry
+The `/evolution` surface below is kept in sync with the subcommand registry
 (`evolution-commands/src/registry.ts` — single source shared with the
-input-declaration hint and the emitted help/README text; `registry.spec.ts`
-pins the equality).
+input-declaration hint and the emitted help text; `registry.spec.ts` covers the
+registry, and this README is reviewed alongside it).
 
 | Command | Purpose |
 |---|---|
@@ -145,7 +147,7 @@ pins the equality).
 | `/evolution curator run\|pause\|resume\|status\|report\|scope` | 立即运行一次自动整理，或暂停／恢复／查看状态 |
 | `/evolution mutations` | 列出技能改动记录 |
 | `/evolution restore` | 从最近的快照恢复技能 |
-| `/evolution consolidate <target> <sources...> [--plan <runId>]` | 把若干技能合并进一个总括技能 |
+| `/evolution consolidate <target> <sources...> [--plan <runId>]` | 已从用户面退役：机械追加入口关闭，脚本调用给迁移提示；旧 `--plan` 审计只读保留。人类合成请用 `/evolution merge`（两轮合成） |
 | `/evolution skill restore <name>` | 按名字恢复一个已归档的技能 |
 | `/evolution skill history <name>` | 列出某个技能的内容版本（含时间、动作、字符数、哈希前缀） |
 | `/evolution skill undo <name> [--to v<N>]` | 把某个技能的内容回退到某一版（默认上一版；只动内容，撤销本身也记为一版） |

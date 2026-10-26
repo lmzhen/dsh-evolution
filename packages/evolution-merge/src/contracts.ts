@@ -87,6 +87,7 @@ export interface MergeDecision {
   readonly sources: readonly string[]
   readonly rationale: string
   readonly confidence?: number
+  readonly model?: string
   readonly promptVersion?: string
   readonly promptHash?: string
   readonly aSummary?: string
@@ -99,7 +100,7 @@ export interface MergeDecision {
   readonly supportDigest?: string
 }
 
-export interface MergeValidationPlanRef { readonly planVersion: 1; readonly stageDigest: string; readonly revision: string }
+export interface MergeValidationPlanRef { readonly planVersion: 1; readonly stageDigest: string; readonly revision: string; readonly manifestFiles?: readonly string[] }
 
 export interface MergeUsage {
   readonly inputTokens?: number
@@ -135,10 +136,13 @@ export interface MergeReportPair {
   readonly lengths?: Readonly<Record<string, number>>
   readonly timing?: MergeTiming
   readonly validationPlan?: MergeValidationPlanRef
+  readonly manifestFiles?: readonly string[]
   readonly criteria?: MergeCriteria
+  readonly validation?: { readonly issues: readonly MergeValidationIssue[] }
   readonly reportOnly?: boolean
 }
 export interface MergeCriteria { readonly decision: 'keep' | 'merge' | 'candidate'; readonly validation: 'not-run' | 'report-only' | 'required'; readonly commit: 'never' | 'if-approved' | 'required'; readonly archive: 'none' | 'sources'; readonly evidence: 'none' | 'receipt' }
+export interface MergeValidationIssue { readonly rule: string; readonly path: string; readonly severity: 'block' | 'warn'; readonly message: string }
 
 export interface MergeReport {
   readonly schemaVersion: 2
@@ -147,13 +151,17 @@ export interface MergeReport {
   readonly command: MergeRunCommand
   readonly startedAt: number
   readonly endedAt: number
-  readonly stopReason: 'completed' | 'failed' | 'cancelled' | 'timeout'
+  readonly stopReason: 'completed' | 'failed' | 'cancelled' | 'timeout' | 'interrupted'
   readonly approval: { readonly platformWrite: boolean; readonly mergeApproval: boolean }
   readonly scope: { readonly candidatePairs: number; readonly queueBefore: Record<MergeQueue, number> }
   readonly pairs: readonly MergeReportPair[]
+  /** Backward-compatible alias; same objects as pairs[]. */
+  readonly processedPairs?: readonly MergeReportPair[]
   readonly totals: Record<'merged' | 'kept' | 'pending' | 'failed', number>
   readonly notes: readonly string[]
   readonly remaining?: readonly { readonly pairKey: string; readonly queue: MergeQueue }[]
+  /** Backward-compatible alias; same objects as remaining[]. */
+  readonly remainingPairs?: readonly { readonly pairKey: string; readonly queue: MergeQueue }[]
   readonly reportOnly?: readonly MergeReportPair[]
   readonly validationFailures?: readonly MergeReportPair[]
   readonly archived?: readonly string[]

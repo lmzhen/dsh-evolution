@@ -130,7 +130,7 @@ export async function reconcileMergeState(options: ReconcileOptions): Promise<Re
       if (current === undefined || current.state !== 'approved') continue
       const entry = byRow.get(row.id)
       if (usable.get(row.id) === true) {
-        const moved = tx.transition(row.id, { type: 'staged' }, current.version)
+        const moved = tx.transition(row.id, { type: 'staged', ...(entry === undefined ? {} : { stagingRef: entry.ref, stagingExpiresAt: entry.expiresAt }) }, current.version)
         if (moved.ok) {
           actions.push({ kind: 'approved-fused', rowId: row.id, from: 'approved', to: 'fuse', code: 'stage-present' })
           if (entry !== undefined && entry.state === 'reserved') promote.push(entry)

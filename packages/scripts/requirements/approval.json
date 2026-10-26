@@ -1,0 +1,224 @@
+{
+  "items": [
+    {
+      "id": "FR-APP-01",
+      "kind": "FR",
+      "title": "mergeApproval 默认关；独立于平台写入审批",
+      "statement": "mergeApproval 默认关；独立于平台写入审批",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两开关互不影响"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 206
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-APP-02",
+      "kind": "FR",
+      "title": "审批只在两轮之间；第 2 轮不再人工审批",
+      "statement": "审批只在两轮之间；第 2 轮不再人工审批",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "approval 开也只停一次"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 207
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-APP-03",
+      "kind": "FR",
+      "title": "pending 显示三句话：skill1 摘要/skill2 摘要/融合原因",
+      "statement": "pending 显示三句话：skill1 摘要/skill2 摘要/融合原因",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "行上三句可见"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 208
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-APP-04",
+      "kind": "FR",
+      "title": "待批准行显示 pending id；批准/拒绝都复制对应命令到剪贴板（approve/reject），不在 UI 直接执行",
+      "statement": "待批准行显示 pending id；批准/拒绝都复制对应命令到剪贴板（approve/reject），不在 UI 直接执行",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "id 可见；approve/reject 复制文本正确；无写按钮"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 209
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-APP-05",
+      "kind": "FR",
+      "title": "reject 进无需合并（origin:human）；不跑第 2 轮",
+      "statement": "reject 进无需合并（origin:human）；不跑第 2 轮",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "拒绝后无 agent2"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 210
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-APP-06",
+      "kind": "FR",
+      "title": "四队列在册对在下一轮 scan 前过滤（不删除记录）；显式 pair 仅跳过 skipped 过滤。命中 pending → 返回冲突，要求 ...",
+      "statement": "四队列在册对在下一轮 scan 前过滤（不删除记录）；显式 pair 仅跳过 skipped 过滤。命中 pending → 返回冲突，要求 approve/reject/discard，不自动起 agent2；命中待合并 → 返回既有 fuse run id，要求 resume --retry，不重复写 pending；源被合并/删除/改名时 active 清除、报告审计、无墓碑",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "skipped pair 可用；pending 冲突不绕过审批；fuse 复用不重复；改名新键"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 211
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-APP-07",
+      "kind": "FR",
+      "title": "所有 merge 后台，不弹窗；不因等待人工卡住请求",
+      "statement": "所有 merge 后台，不弹窗；不因等待人工卡住请求",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "无弹窗；命令已返回"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 212
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-APP-08",
+      "kind": "FR",
+      "title": "approve 前重新 resolve/校验；source-gone 从 active 队列清除；target-taken 仅指 merge-...",
+      "statement": "approve 前重新 resolve/校验；source-gone 从 active 队列清除；target-taken 仅指 merge-into-existing 目标在决策后被他人改动/占用（create-umbrella 冲突走后缀，不算 target-taken）；决策后源内容变化（sourceRevision 与 decision 时不一致）标 source-changed、拒绝不照跑；expired/source-changed 通过 pending --expired 只读可见、不计数；给“重新 merge pair / 丢弃”两个出口",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "source-gone 不显示；merge-into-existing 目标被改动→target-taken；create 冲突仍走 -v2/-v3；source-changed 拒绝；两出口可用"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 213
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-APP-09",
+      "kind": "FR",
+      "title": "设置卡“技能自动合并”与“写入审批”分栏；卡内文案写明“写入审批=使用中生成/修改；合并审批=两轮工作流”",
+      "statement": "设置卡“技能自动合并”与“写入审批”分栏；卡内文案写明“写入审批=使用中生成/修改；合并审批=两轮工作流”",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两处开关独立；文案可读且不混淆"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 214
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-APP-10",
+      "kind": "FR",
+      "title": "不保留 mergeApprovalTimeoutSeconds；pending 无 TTL",
+      "statement": "不保留 mergeApprovalTimeoutSeconds；pending 无 TTL",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "参数不存在；pending 不过期"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 215
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

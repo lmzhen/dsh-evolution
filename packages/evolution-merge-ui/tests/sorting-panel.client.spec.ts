@@ -40,6 +40,18 @@ it('right-click pins a row to top and persists by workspace+queue', async () => 
   expect(JSON.parse(localStorage.getItem(rowOrderKey('ws-A', 'pending'))!)).toEqual(['r3', 'r1', 'r2'])
 })
 
+it('persists row order across a remount', async () => {
+  await mount()
+  await act(async () => { host.querySelectorAll('[data-role="row"]')[2]?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 20, clientY: 20 })) })
+  await act(async () => { (host.querySelector('[data-role="sort-pin-top"]') as HTMLButtonElement).click() })
+  expect(order()).toEqual(['r3', 'r1', 'r2'])
+  root.unmount(); host.remove()
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host)
+  await mount()
+  expect(order()).toEqual(['r3', 'r1', 'r2'])
+  expect(JSON.parse(localStorage.getItem(rowOrderKey('ws-A', 'pending'))!)).toEqual(['r3', 'r1', 'r2'])
+})
+
 it('drops a row before its target and survives a tab switch', async () => {
   await mount()
   const before = host.querySelectorAll('[data-role="row"]')[0] as HTMLElement

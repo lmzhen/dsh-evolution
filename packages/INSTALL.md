@@ -226,6 +226,17 @@ The engine needs local `potion-multilingual-128M-int8` and `potion-multilingual-
 directories under `mergeModelsRoot`; `/evolution doctor`
 warns when they are missing. There is no auto provisioning.
 
+| Install form | Merge command | Browser panel | Host-only E-323 |
+| --- | --- | --- | --- |
+| `all` | mounted | mounted (`evolution-merge-ui`) | shown only when the host data plane is unavailable |
+| `host` | mounted | **not mounted** | shown when the host data plane is unavailable |
+| `preset` / `attach` | per the bundle that supplies the merge row | per that bundle | same rule |
+
+The product plane has **three axes**, not one: capability availability (host data plane /
+subagent / model), entry visibility (command vs panel), and configuration value
+(`mergeApproval`, `platformWrite`). Install form affects the first two; settings or
+deployment input affect the third. Do not describe one axis as another.
+
 ## 3. Agent-only install
 
 ```bash

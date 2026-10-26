@@ -34,7 +34,17 @@ if (existsSync(journalDir)) for (const name of readdirSync(journalDir)) { const 
 const staging = []
 const stagingRoot = join(home, 'merge', 'runs')
 if (existsSync(stagingRoot)) for (const name of readdirSync(stagingRoot)) staging.push(name)
-const report = { schemaVersion: 1, applied: false, generatedAt: new Date().toISOString(), source: { state: statePath, runs: runsPath, receipts, journals, staging }, counts, pairs, blockers, quarantine, wouldMigrate: Object.values(counts).reduce((a, b) => a + b, 0) }
+// DEC-D12 class 6: unit-history. The sixth migration input is the evidence tree under
+// merge/units/<key>/evidence.json; a dry run that skips it cannot claim six-class coverage.
+const units = []
+const unitRoot = join(home, 'merge', 'units')
+if (existsSync(unitRoot)) for (const name of readdirSync(unitRoot)) {
+  const evidence = join(unitRoot, name, 'evidence.json')
+  const value = existsSync(evidence) ? readJson(evidence) : null
+  if (value === null) quarantine.push({ path: 'merge/units/' + name + '/evidence.json', reason: 'unreadable-json' })
+  else units.push({ key: name, unitId: value.unitId ?? null, runId: value.runId ?? null })
+}
+const report = { schemaVersion: 1, applied: false, generatedAt: new Date().toISOString(), source: { state: statePath, runs: runsPath, receipts, journals, staging, units }, counts, pairs, blockers, quarantine, wouldMigrate: Object.values(counts).reduce((a, b) => a + b, 0) }
 mkdirSync(dirname(out), { recursive: true })
 writeFileSync(out, JSON.stringify(report, null, 2) + '\n')
 console.log('DRY RUN OK rows=' + report.wouldMigrate + ' blockers=' + blockers.length + ' quarantine=' + quarantine.length + ' (blockers are reported, not applied)')

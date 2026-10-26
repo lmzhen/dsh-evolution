@@ -4,6 +4,8 @@ import type { EvolutionIoLike, UnitJournal, UnitTransaction } from '@deepseek-ai
 import { probeList, readUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
 import { evidenceSha256 } from './domain/evidence-hash.ts'
 import { projectRecoveredUnit } from './recovery-projection.ts'
+import { readCommitReceipts } from './commit-receipt.ts'
+import { readUndoReceipt } from './domain/undo-receipt.ts'
 
 export type RecoveryBranch = 'A' | 'B' | 'C' | 'D'
 export interface RecoveryReport {
@@ -12,6 +14,8 @@ export interface RecoveryReport {
   readonly phase: string
   readonly branch: RecoveryBranch
   readonly action: 'rollback' | 'rollForward' | 'finalize' | 'blocked' | 'none'
+  /** Branch D proves the unit committed after the process died; the run was interrupted, not cleanly completed. */
+  readonly state?: 'interrupted'
   readonly ok: boolean
   readonly code?: string | undefined
   readonly message?: string | undefined
@@ -47,17 +51,25 @@ export async function recoverCommitUnits(options: {
     if (journal === null || typeof journal.unitId !== 'string') continue
     if (options.isActive?.(journal.runId) === true) { reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch: branchOf(journal.phase as string), action: 'none', ok: true, code: 'skipped-active-run' }); continue }
     const evidence = await readUnitEvidence(options.io, options.home, journal.unitId)
+    // An undo is the newest durable fact. Recovery must not re-project a committed unit
+    // over an undo receipt (that would re-archive the source and reset pair-index to merged).
+    const receipt = (await readCommitReceipts(options.io, options.home)).find(item => item.unitId === journal.unitId)
+    const undoRunId = receipt?.parentRunId ?? journal.runId
+    if (receipt?.pairKey !== undefined && await readUndoReceipt(options.io, options.home, undoRunId, receipt.pairKey) !== null) {
+      reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch: branchOf(journal.phase), action: 'none', ok: true, code: 'undo-recorded' })
+      continue
+    }
     const branch = branchOf(journal.phase)
     if (journal.phase as string === 'committed' || evidence !== null || journal.phase as string === 'unit-written' || journal.phase as string === 'sources-archived') {
       const result = await options.unit.finalize(journal.unitId)
       if (result.ok) {
         let projection: Awaited<ReturnType<typeof projectRecoveredUnit>>
-        try { projection = await projectRecoveredUnit({ io: options.io, home: options.home, runId: journal.runId, unitId: journal.unitId, evidence: result.evidence, now: options.now, ...(options.runs === undefined ? {} : { runs: options.runs }), ...(options.onProjectionPhase === undefined ? {} : { onPhase: options.onProjectionPhase }) }) } catch (error) { projection = { ok: false, action: 'projection-threw', message: error instanceof Error ? error.message : String(error) } }
-        if (!projection.ok) reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'blocked', ok: false, code: 'projection-failed', message: projection.message })
-        else reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'finalize', ok: true, evidenceSha256: evidenceSha256(result.evidence) })
+        try { projection = await projectRecoveredUnit({ io: options.io, home: options.home, runId: journal.runId, unitId: journal.unitId, evidence: result.evidence, now: options.now, ...(branch === 'D' ? { interrupted: true } : {}), ...(options.runs === undefined ? {} : { runs: options.runs }), ...(options.onProjectionPhase === undefined ? {} : { onPhase: options.onProjectionPhase }) }) } catch (error) { projection = { ok: false, action: 'projection-threw', message: error instanceof Error ? error.message : String(error) } }
+        if (!projection.ok) reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'blocked', ok: false, code: 'projection-failed', message: projection.message, ...(branch === 'D' ? { state: 'interrupted' as const } : {}) })
+        else reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'finalize', ok: true, evidenceSha256: evidenceSha256(result.evidence), ...(branch === 'D' ? { state: 'interrupted' as const } : {}) })
         continue
       }
-      reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'finalize', ok: false, code: result.code, message: result.message })
+      reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'finalize', ok: false, code: result.code, message: result.message, ...(branch === 'D' ? { state: 'interrupted' as const } : {}) })
       continue
     }
     if (branch === 'A') {

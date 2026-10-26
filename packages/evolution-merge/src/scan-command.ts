@@ -21,6 +21,7 @@ export interface RunScanCommandOptions {
   readonly notes?: readonly string[]
   readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
   readonly cards?: readonly import('./skill-card.ts').SkillCard[]
+  readonly model?: string
 }
 
 export async function runScanCommand(options: RunScanCommandOptions): Promise<WithMergeRunResult> {
@@ -50,6 +51,7 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
         ...(options.notes === undefined ? {} : { notes: options.notes }),
         ...(options.isOwnerActive === undefined ? {} : { isOwnerActive: options.isOwnerActive }),
         ...(options.cards === undefined ? {} : { cards: options.cards }),
+        ...(options.model === undefined ? {} : { model: options.model }),
       })
     },
   })

@@ -1,0 +1,268 @@
+{
+  "items": [
+    {
+      "id": "D1",
+      "kind": "DESIGN",
+      "title": "手动/自动/事件；全量 vs 指定对: 手动 `merge scan` 与 `merge pair <a> <b>`；自动运行设计保留、v1 ...",
+      "statement": "手动/自动/事件；全量 vs 指定对: 手动 `merge scan` 与 `merge pair <a> <b>`；自动运行设计保留、v1 不实现",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "手动 `merge scan` 与 `merge pair <a> <b>`；自动运行设计保留、v1 不实现"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 47
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D2",
+      "kind": "DESIGN",
+      "title": "哪些对进入/退出；在哪个环节判定: 原 pipeline ①–⑤；L2 MERGE/UNDECIDED 进第 1 轮，L0/L1 KEEP 只...",
+      "statement": "哪些对进入/退出；在哪个环节判定: 原 pipeline ①–⑤；L2 MERGE/UNDECIDED 进第 1 轮，L0/L1 KEEP 只进报告；agent KEEP 进无需合并",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "原 pipeline ①–⑤；L2 MERGE/UNDECIDED 进第 1 轮，L0/L1 KEEP 只进报告；agent KEEP 进无需合并"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 48
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D3",
+      "kind": "DESIGN",
+      "title": "谁批准、批准什么、默认开还是关: `mergeApproval` 默认关，独立于平台写入审批；审批只卡两轮之间；所有运行后台、不弹窗",
+      "statement": "谁批准、批准什么、默认开还是关: `mergeApproval` 默认关，独立于平台写入审批；审批只卡两轮之间；所有运行后台、不弹窗",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "`mergeApproval` 默认关，独立于平台写入审批；审批只卡两轮之间；所有运行后台、不弹窗"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 49
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D4",
+      "kind": "DESIGN",
+      "title": "目标命名、mode、支撑文件、原子性、并发: B staging；插件唯一 `commitMerge`；默认串行；逐对重新 resolve；提...",
+      "statement": "目标命名、mode、支撑文件、原子性、并发: B staging；插件唯一 `commitMerge`；默认串行；逐对重新 resolve；提交前校验；原子换入后归档",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "B staging；插件唯一 `commitMerge`；默认串行；逐对重新 resolve；提交前校验；原子换入后归档"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 50
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D5",
+      "kind": "DESIGN",
+      "title": "平台限制集合与处置: 规则门复用 SkillLibrary 写入校验 + merge 的 manifest/路径/引用成对；不做 LLM ju...",
+      "statement": "平台限制集合与处置: 规则门复用 SkillLibrary 写入校验 + merge 的 manifest/路径/引用成对；不做 LLM judge；字数后审",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "规则门复用 SkillLibrary 写入校验 + merge 的 manifest/路径/引用成对；不做 LLM judge；字数后审"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 51
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D6",
+      "kind": "DESIGN",
+      "title": "归档、历史、恢复、撤销、多代合并: 归档/恢复/历史复用既有能力；undo 委托 merge unit/receipt；多代按 run 反序",
+      "statement": "归档、历史、恢复、撤销、多代合并: 归档/恢复/历史复用既有能力；undo 委托 merge unit/receipt；多代按 run 反序",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "归档/恢复/历史复用既有能力；undo 委托 merge unit/receipt；多代按 run 反序"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 52
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "D7",
+      "kind": "DESIGN",
+      "title": "清单/历史的键、存储、失效与重审: 对级键=两源名排序拼接，不做内容 hash；run 内 undo 才存 hash；删除/改名清记录",
+      "statement": "清单/历史的键、存储、失效与重审: 对级键=两源名排序拼接，不做内容 hash；run 内 undo 才存 hash；删除/改名清记录",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "对级键=两源名排序拼接，不做内容 hash；run 内 undo 才存 hash；删除/改名清记录"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 53
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D8",
+      "kind": "DESIGN",
+      "title": "运行状态、进度、通知、清单 UI: 侧栏面板四个 tab（待判断 / 待批准 / 待合并 / 无需合并）+ 本次运行区；读 run regis...",
+      "statement": "运行状态、进度、通知、清单 UI: 侧栏面板四个 tab（待判断 / 待批准 / 待合并 / 无需合并）+ 本次运行区；读 run registry；focus 刷新；只存展示排序",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "侧栏面板四个 tab（待判断 / 待批准 / 待合并 / 无需合并）+ 本次运行区；读 run registry；focus 刷新；只存展示排序"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 54
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D9",
+      "kind": "DESIGN",
+      "title": "执行宿主、错过补偿、并发、暂停: v1 只手动/后台；持久 lastRunAt、启动补偿、SchedulerPort 仅保留设计",
+      "statement": "执行宿主、错过补偿、并发、暂停: v1 只手动/后台；持久 lastRunAt、启动补偿、SchedulerPort 仅保留设计",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "v1 只手动/后台；持久 lastRunAt、启动补偿、SchedulerPort 仅保留设计"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 55
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D10",
+      "kind": "DESIGN",
+      "title": "curator/技能健康/设置卡/包归属: 模块进插件目录；curator 自动 consolidate 保留但 merge 是唯一人类合成入...",
+      "statement": "curator/技能健康/设置卡/包归属: 模块进插件目录；curator 自动 consolidate 保留但 merge 是唯一人类合成入口；命令归 `/evolution`",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "模块进插件目录；curator 自动 consolidate 保留但 merge 是唯一人类合成入口；命令归 `/evolution`"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 56
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "D11",
+      "kind": "DESIGN",
+      "title": "pin/bundled/hub、跨 provider、注入: 提交前 writeProtection；target 控制面校验；禁控制键；快照...",
+      "statement": "pin/bundled/hub、跨 provider、注入: 提交前 writeProtection；target 控制面校验；禁控制键；快照/原子/威胁扫描",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "提交前 writeProtection；target 控制面校验；禁控制键；快照/原子/威胁扫描"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 57
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "D12",
+      "kind": "DESIGN",
+      "title": "默认值、scope、自动合并还是只产 plan: B 默认、审批关、无自动、无步骤 plan、默认串行、scope 只 family-mana...",
+      "statement": "默认值、scope、自动合并还是只产 plan: B 默认、审批关、无自动、无步骤 plan、默认串行、scope 只 family-managed",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "B 默认、审批关、无自动、无步骤 plan、默认串行、scope 只 family-managed"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 58
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

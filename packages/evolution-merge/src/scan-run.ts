@@ -8,7 +8,9 @@ import {
   queueOf,
   type MergeCandidate,
   type MergeDecision,
+  type MergeCriteria,
   type MergeFailure,
+  type MergeValidationIssue,
   type MergeReportPair,
   type MergeRow,
 } from './contracts.ts'
@@ -42,6 +44,9 @@ export interface ScanRound2Outcome {
   readonly unitId?: string
   readonly evidenceSha256?: string
   readonly validationPlan?: import('./contracts.ts').MergeValidationPlanRef
+  readonly manifestFiles?: readonly string[]
+  readonly criteria?: import('./contracts.ts').MergeCriteria
+  readonly validationIssues?: readonly MergeValidationIssue[]
   readonly archived?: readonly string[]
   readonly target?: { readonly requested: string; readonly actual: string; readonly created: boolean }
   readonly failure?: MergeFailure
@@ -71,6 +76,8 @@ export interface RunScanOptions {
   readonly runId?: string
   readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
   readonly cards?: readonly SkillCard[]
+  /** The model identity recorded on pending decisions/summary; absent when the host has none. */
+  readonly model?: string
 }
 
 function at(now: () => number): string {
@@ -87,6 +94,12 @@ function failureOf(stage: MergeFailure['stage'], error: unknown): MergeFailure {
   }
 }
 
+function pairCriteria(outcome: MergeReportPair['outcome']): MergeCriteria {
+  if (outcome === 'merged') return { decision: 'merge', validation: 'required', commit: 'required', archive: 'sources', evidence: 'receipt' }
+  if (outcome === 'kept') return { decision: 'keep', validation: 'report-only', commit: 'never', archive: 'none', evidence: 'none' }
+  if (outcome === 'pending') return { decision: 'merge', validation: 'required', commit: 'if-approved', archive: 'none', evidence: 'none' }
+  return { decision: 'merge', validation: 'required', commit: 'never', archive: 'none', evidence: 'none' }
+}
 function pairOf(row: MergeRow, candidate: MergeCandidate, outcome: MergeReportPair['outcome'], extra: Partial<MergeReportPair> = {}): MergeReportPair {
   return {
     id: row.id,
@@ -98,6 +111,7 @@ function pairOf(row: MergeRow, candidate: MergeCandidate, outcome: MergeReportPa
     ...(candidate.gate === undefined ? {} : { gate: candidate.gate }),
     outcome,
     archived: [],
+    criteria: pairCriteria(outcome),
     ...extra,
   }
 }
@@ -223,7 +237,8 @@ const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = [
       totals.failed += 1
       continue
     }
-    const mergeDecision = options.cards !== undefined ? withDecisionRevisions(round1.decision!, options.cards, row.a, row.b) : round1.decision!
+    const decided = options.model === undefined || round1.decision!.model !== undefined ? round1.decision! : { ...round1.decision!, model: options.model }
+    const mergeDecision = options.cards !== undefined ? withDecisionRevisions(decided, options.cards, row.a, row.b) : decided
     if (options.approval) {
       const event = { type: 'verify-passed' as const, decision: mergeDecision, target: mergeDecision.target, ...(round1.sourceRevision === undefined ? {} : { sourceRevision: round1.sourceRevision }), ...(mergeDecision.promptVersion === undefined ? {} : { promptVersion: mergeDecision.promptVersion }), ...(mergeDecision.promptHash === undefined ? {} : { promptHash: mergeDecision.promptHash }) }
       const projected = await pairLedger(options.io, options.home).transact(tx => {
@@ -264,7 +279,7 @@ const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = [
     const fused = await pairLedger(options.io, options.home).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       if (current === undefined) return null
-      const moved = tx.transition(row.id, { type: 'staged' }, current.version)
+      const moved = tx.transition(row.id, { type: 'staged', ...(stageEntry === undefined ? {} : { stagingRef: stageEntry.ref, stagingExpiresAt: stageEntry.expiresAt }) }, current.version)
       return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
     })
     if (fused === null) {
@@ -275,15 +290,15 @@ const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = [
     row = fused
     if (stageEntry !== undefined) await presentStage(options.io, options.home, stageEntry)
     if (isAborted(options.signal)) {
-      const projected = await pairLedger(options.io, options.home).transact(tx => {
+      // Cancel/timeout after staging is not a policy close: remove the in-flight row (so the
+      // next scan can re-evaluate it) and drop its stage tree. Never write skipped here.
+      await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
-        if (current === undefined) return null
-        const moved = tx.transition(row.id, { type: 'skipped', reason: 'cancelled' }, current.version)
-        return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
+        return current === undefined ? false : tx.remove(row.id, 'superseded', undefined, current.version).ok
       })
-      if (projected !== null) row = projected
+      await dropStage(options.io, options.home, row.id, row.stagingRef)
       stopReason = 'cancelled'
-      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'fuse' as const })))
+      remaining.push(...candidates.slice(index).map(candidate => ({ pairKey: pairKey(candidate.a, candidate.b), queue: 'verify' as const })))
       break
     }
     await stage('author', { done: index, total: candidates.length })
@@ -297,6 +312,8 @@ const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = [
       finalizeRows.push({ id: row.id, unitId: round2.unitId ?? 'unknown', evidenceSha256: round2.evidenceSha256 ?? 'unknown' })
       pairs.push({ ...pairOf(row, candidate, 'merged', {
         decision: mergeDecision,
+        ...(round2.manifestFiles === undefined ? {} : { manifestFiles: round2.manifestFiles }),
+        ...(round2.validationIssues === undefined ? {} : { validation: { issues: round2.validationIssues } }),
         ...(round2.unitId === undefined ? {} : { unitId: round2.unitId }),
         ...(round2.target === undefined ? {} : { target: round2.target }),
         ...(round2.usage === undefined ? {} : { usage: round2.usage }),
@@ -307,27 +324,28 @@ const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = [
       continue
     }
     const failed = round2.failure ?? failureOf('author', 'round2 failed')
-    if (failed.code === 'merge-over-limit' || failed.code === 'limit' || failed.code === 'merge-validation') {
-      const reason = failed.code === 'merge-validation' ? 'validation-failed' : 'merge-over-limit'
+    if (failed.code === 'merge-over-limit' || failed.code === 'limit') {
+      const reason = 'merge-over-limit'
       const skipped = await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
         return current === undefined ? false : tx.transition(row.id, { type: 'skipped', reason, origin: 'system', skipSource: 'system' }, current.version).ok
       })
       if (skipped) await dropStage(options.io, options.home, row.id)
-      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed }))
+      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed, ...(round2.manifestFiles === undefined ? {} : { manifestFiles: round2.manifestFiles }), ...(round2.criteria === undefined ? {} : { criteria: round2.criteria }), ...(round2.validationIssues === undefined ? {} : { validation: { issues: round2.validationIssues } }) }))
       totals.failed += 1
       continue
     }
     if (failed.code === 'target-changed' || failed.code === 'target-taken' || failed.code === 'source-changed' || failed.code === 'support-changed' || failed.code === 'source-gone') {
       const code = failed.code === 'target-changed' ? 'target-taken' : failed.code === 'support-changed' ? 'source-changed' : failed.code
+      const terminalFailure = { ...failed, code, retryable: false, retryFrom: 'none' as const }
       await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
         if (current === undefined) return false
         if (code === 'source-gone') return tx.remove(row.id, 'superseded', undefined, current.version).ok
-        return tx.transition(row.id, { type: 'skipped', reason: code, origin: 'system', skipSource: 'system' }, current.version).ok
+        return tx.transition(row.id, { type: 'failed', failure: terminalFailure }, current.version).ok
       })
       await dropStage(options.io, options.home, row.id)
-      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: { ...failed, code, retryable: false, retryFrom: 'none' } }))
+      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: terminalFailure }))
       totals.failed += 1
       continue
     }
@@ -339,17 +357,21 @@ const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = [
       return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
     })
     if (projected === null && terminal) {
-      await pairLedger(options.io, options.home).transact(tx => {
+      const dropped = await pairLedger(options.io, options.home).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
         return current === undefined ? false : tx.remove(row.id, 'superseded', undefined, current.version).ok
       })
-      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed }))
+      if (dropped) {
+        await dropStage(options.io, options.home, row.id, row.stagingRef)
+        await recordPair(options.io, options.home, { pairKey: row.pairKey, runId: row.runId ?? 'merge', result: 'failed', ...(row.decision?.target === undefined ? {} : { target: row.decision.target }) })
+      }
+      pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed, ...(round2.manifestFiles === undefined ? {} : { manifestFiles: round2.manifestFiles }), ...(round2.criteria === undefined ? {} : { criteria: round2.criteria }), ...(round2.validationIssues === undefined ? {} : { validation: { issues: round2.validationIssues } }) }))
       totals.failed += 1
       continue
     }
     if (projected === null) { pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failureOf('author', 'row changed before failure record') })); totals.failed += 1; continue }
     row = projected
-    pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed }))
+    pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed, ...(round2.manifestFiles === undefined ? {} : { manifestFiles: round2.manifestFiles }), ...(round2.criteria === undefined ? {} : { criteria: round2.criteria }), ...(round2.validationIssues === undefined ? {} : { validation: { issues: round2.validationIssues } }) }))
     totals.failed += 1
   }
 

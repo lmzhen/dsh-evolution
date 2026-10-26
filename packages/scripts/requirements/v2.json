@@ -1,0 +1,289 @@
+{
+  "items": [
+    {
+      "id": "V2-EXEC-01",
+      "kind": "CHANGE",
+      "title": "staging 在 decide 之后：agent1 只读源，不建 staging；pending 不产生 staging；approve 后...",
+      "statement": "staging 在 decide 之后：agent1 只读源，不建 staging；pending 不产生 staging；approve 后重新 resolve 活树，再复制两源到 staging",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "staging 在 decide 之后：agent1 只读源，不建 staging；pending 不产生 staging；approve 后重新 resolve 活树，再复制两源到 staging"
+        }
+      ],
+      "supersedes": [
+        "FR-EXEC-06",
+        "FR-LIFE-13"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 58
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "V2-LIFE-01",
+      "kind": "CHANGE",
+      "title": "undo 的 --run 必填，省略不猜最新；--retry 是布尔 flag，不进取值参数表",
+      "statement": "undo 的 --run 必填，省略不猜最新；--retry 是布尔 flag，不进取值参数表",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "undo 的 --run 必填，省略不猜最新；--retry 是布尔 flag，不进取值参数表"
+        }
+      ],
+      "supersedes": [
+        "FR-LIFE-06",
+        "FR-SCOPE-10"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 59
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "V2-DATA-01",
+      "kind": "CHANGE",
+      "title": "一个 merge unit + 底层 per-skill mutations（1+N）；merge unit 记 target+sources...",
+      "statement": "一个 merge unit + 底层 per-skill mutations（1+N）；merge unit 记 target+sources+runId；不新增 merge 级事件流",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "一个 merge unit + 底层 per-skill mutations（1+N）；merge unit 记 target+sources+runId；不新增 merge 级事件流"
+        }
+      ],
+      "supersedes": [
+        "FR-DATA-06"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 60
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "V2-DATA-02",
+      "kind": "CHANGE",
+      "title": "pending/skipped 用单 evolution/merge-state.json，作为三文件设计的显式例外；runs 仍走 run ...",
+      "statement": "pending/skipped 用单 evolution/merge-state.json，作为三文件设计的显式例外；runs 仍走 run registry；必须配损坏/备份/迁移保障",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "pending/skipped 用单 evolution/merge-state.json，作为三文件设计的显式例外；runs 仍走 run registry；必须配损坏/备份/迁移保障"
+        }
+      ],
+      "supersedes": [
+        "FR-DATA-02"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 61
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "V2-WIRE-01",
+      "kind": "CHANGE",
+      "title": "查询面拆 7 个版本化信封：Facts、QueuePage、RunView+RunDetail、RunsView、BodyView、Histo...",
+      "statement": "查询面拆 7 个版本化信封：Facts、QueuePage、RunView+RunDetail、RunsView、BodyView、HistoryView、DoctorView；wireVersion=1，全部携带；status/runs 用 RunView，doctor 独立、面板不请求",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "查询面拆 7 个版本化信封：Facts、QueuePage、RunView+RunDetail、RunsView、BodyView、HistoryView、DoctorView；wireVersion=1，全部携带；status/runs 用 RunView，doctor 独立、面板不请求"
+        }
+      ],
+      "supersedes": [
+        "FR-UI-01",
+        "FR-RUN-05",
+        "FR-APP-04"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 62
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "V2-WIRE-02",
+      "kind": "CHANGE",
+      "title": "ActionRef[]{id,command,confirm,enabled,disabledReason}；CommandSpec 只放 J...",
+      "statement": "ActionRef[]{id,command,confirm,enabled,disabledReason}；CommandSpec 只放 JSON-safe schema/actions/fallback，handler map 另层，CommandSurface 版本化；/merge 别名 0.31 弃用提示、0.32 删除",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "ActionRef[]{id,command,confirm,enabled,disabledReason}；CommandSpec 只放 JSON-safe schema/actions/fallback，handler map 另层，CommandSurface 版本化；/merge 别名 0.31 弃用提示、0.32 删除"
+        }
+      ],
+      "supersedes": [
+        "FR-SCOPE-05",
+        "FR-APP-04",
+        "FR-UI-07"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 63
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "V2-QUERY-01",
+      "kind": "CHANGE",
+      "title": "MergeFacts 纯读、Reconcile 唯一写、共用同一派生；GET 零写；读时收敛只派生不落盘",
+      "statement": "MergeFacts 纯读、Reconcile 唯一写、共用同一派生；GET 零写；读时收敛只派生不落盘",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "MergeFacts 纯读、Reconcile 唯一写、共用同一派生；GET 零写；读时收敛只派生不落盘"
+        }
+      ],
+      "supersedes": [
+        "FR-UI-03",
+        "FR-PLUG-05"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 66
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-P0-01",
+      "kind": "GAP",
+      "title": "approve/resume 必须后台，命令立即返回 run id（FR-RUN-02/FR-APP-07）",
+      "statement": "approve/resume 必须后台，命令立即返回 run id（FR-RUN-02/FR-APP-07）",
+      "priority": "P0",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "approve/resume 1 秒内返回 accepted/runId；断客户端后 run 仍完成；status/report 可查"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 93
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-P0-02",
+      "kind": "GAP",
+      "title": "提交期保护/范围链：target 必须 family-managed；pinned 在 marker-after-snapshot 后仍拒（F...",
+      "statement": "提交期保护/范围链：target 必须 family-managed；pinned 在 marker-after-snapshot 后仍拒（FR-SCOPE-01/02、FR-LIFE-04）",
+      "priority": "P0",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "构造 target 非 managed、决策后 pin 两类；approve 后整对 failed、零写入、源不归档"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 94
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-P0-03",
+      "kind": "GAP",
+      "title": "崩溃恢复不得回滚已提交 merge；journal 记录真实分段；恢复先读 receipt/unit（FR-LIFE-02、FR-VAL-08）",
+      "statement": "崩溃恢复不得回滚已提交 merge；journal 记录真实分段；恢复先读 receipt/unit（FR-LIFE-02、FR-VAL-08）",
+      "priority": "P0",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "unit-written 崩溃不回滚已提交 merge；重启后树保持已提交、finalize 成功；receipt/journal 恢复路径由 commit-recovery/recovery-settle 覆盖"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 95
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-P0-04",
+      "kind": "GAP",
+      "title": "engine 部署输入 allowlist：宿主不得写 offline/autoprovision/embedbackend/rankmode...",
+      "statement": "engine 部署输入 allowlist：宿主不得写 offline/auto_provision/embed_backend/rank_mode 等非白名单 cfg（Lead §10.2）",
+      "priority": "P0",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "非法 cfg 拒绝；白名单外字段不可达；engine 默认 report 不变"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 96
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-P0-05",
+      "kind": "GAP",
+      "title": "engine 发布 parity：字节 parity/UPSTREAM/许可/精确版本；merge manifest 不留 workspace...",
+      "statement": "engine 发布 parity：字节 parity/UPSTREAM/许可/精确版本；merge manifest 不留 workspace:^（Lead §10.2/ADR-2）",
+      "priority": "P0",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "npm pack 冒烟 + parity 校验；锁步版本"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 97
+      },
+      "baselineStatus": "partial"
+    }
+  ]
+}

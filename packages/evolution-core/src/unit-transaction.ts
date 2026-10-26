@@ -158,7 +158,9 @@ export class UnitTransactions implements UnitTransaction {
   }
 
   private unitId(plan: UnitPlan): string {
-    return plan.runId + ":" + createHash("sha256").update(plan.pairKey).digest("hex").slice(0, 16);
+    // DEC-D5: the caller may provide the unitId and still get idempotent prepare/commit.
+    // Deriving one remains the fallback for callers that do not.
+    return plan.unitId ?? plan.runId + ":" + createHash("sha256").update(plan.pairKey).digest("hex").slice(0, 16);
   }
 
   private async snapshot(plan: UnitPlan, unitId: string, planDigest: string): Promise<UnitSnapshot> {

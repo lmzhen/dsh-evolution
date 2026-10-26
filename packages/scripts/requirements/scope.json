@@ -1,0 +1,224 @@
+{
+  "items": [
+    {
+      "id": "FR-SCOPE-01",
+      "kind": "FR",
+      "title": "只处理 family-managed 技能；显式 pair 也遵守",
+      "statement": "只处理 family-managed 技能；显式 pair 也遵守",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "非 managed 的技能/对被拒绝，报明确原因"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 93
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-02",
+      "kind": "FR",
+      "title": "bundled/hub/pinned/protected built-in 不参与；referenced/excluded/suppresse...",
+      "statement": "bundled/hub/pinned/protected built-in 不参与；referenced/excluded/suppressed 遵守 curator 保护尺",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "每类构造用例被拒；显式 pair 不可绕过"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 94
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-03",
+      "kind": "FR",
+      "title": "提供 merge scan 与 merge pair 两个入口；两源必须不同；pair 的位置参数不接收 target",
+      "statement": "提供 merge scan 与 merge pair 两个入口；两源必须不同；pair 的位置参数不接收 target",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两命令可发现、可执行；两源同名运行期错误三行（NFR-07）；语法/形状错误两行；pair 位置参数不接受 target"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 95
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-04",
+      "kind": "FR",
+      "title": "pair 位置参数不接收 target；只有两种 pair 形式：`pair <a> <b>` 走两阶段 agent；`pair --forc...",
+      "statement": "pair 位置参数不接收 target；只有两种 pair 形式：`pair <a> <b>` 走两阶段 agent；`pair --force <a> <b>` 跳过第 1 轮、直接第 2 阶段。--force 生成强制 decision：mode=create-umbrella，target=`merge-<a>-<b>`（排序后的源名，清理非法字符；超 64/冲突走后缀），sources=两源；不跑 agent1。审批开写 pending，三句用固定模板；审批关直接 agent2。语法/参数错（缺参、两源同名、非法源名）两行错、不入队；运行期 target-invalid/分支失败三行 failed、只报告、不进 skipped",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两种形式可用；--force 产生 forced decision 且不进入 round 1 决策；语法/形状错误两行、运行期错误三行（NFR-07）；target-invalid fail-closed 并报告"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 96
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-05",
+      "kind": "FR",
+      "title": "所有 merge 命令挂在 /evolution 下；两段命令 + flags；help 每条带默认值，裸 merge 给一族帮助",
+      "statement": "所有 merge 命令挂在 /evolution 下；两段命令 + flags；help 每条带默认值，裸 merge 给一族帮助",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "help 列出且含默认值；无三段 blocked 命令"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 97
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-06",
+      "kind": "FR",
+      "title": "merge 是唯一人类合成入口；/evolution consolidate 退出用户面；脚本调用给迁移提示，旧 --plan 审计只读保留；...",
+      "statement": "merge 是唯一人类合成入口；/evolution consolidate 退出用户面；脚本调用给迁移提示，旧 --plan 审计只读保留；面板空态写清“机械追加 vs 两轮合成”",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "help/README/doctor/空态一致；旧审计不被删"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 98
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-07",
+      "kind": "FR",
+      "title": "curator 自动 consolidate 保留为归档收尾；任何后台/curator 不得自动调用 merge",
+      "statement": "curator 自动 consolidate 保留为归档收尾；任何后台/curator 不得自动调用 merge",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "自动流程仍可运行；merge 只由用户命令/批准后的 agent2 启动"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 99
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-08",
+      "kind": "FR",
+      "title": "v1 不实现自动运行，只保留 SchedulerPort/lastRunAt 设计",
+      "statement": "v1 不实现自动运行，只保留 SchedulerPort/lastRunAt 设计",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "无默认定时任务；参数/代码不启动自动 run"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 100
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-09",
+      "kind": "FR",
+      "title": "显式 pair 不受 skipped 拦截；仍过范围/保护/校验",
+      "statement": "显式 pair 不受 skipped 拦截；仍过范围/保护/校验",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "skipped 内的对可被 pair 强制重跑；不自动跳过保护"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 101
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCOPE-10",
+      "kind": "FR",
+      "title": "命令面清单：scan/pair/pair --force <a> <b>/status/report/cancel/runs/pending/...",
+      "statement": "命令面清单：scan/pair/pair --force <a> <b>/status/report/cancel/runs/pending/pending --expired/approve/reject/skipped/skipped --restore/candidates/candidates --retry/resume/resume --retry/discard/undo --run；映射 candidates=待判断、resume=待合并、pending=待批准；status/report 省略 id 时取最近 run；cancel 无 id 只停 merge run（全部，不误伤其它 kind）；undo 为 undo <target> --run <id>（--run 必填，省略不猜最新）；help 写明 pair 两形式",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "命令面覆盖实际 parser 形式（不锁定固定数量）；pair/--force 可读；空态/失败态/未知 id/非法参数可读；candidates/resume/pending 三队列映射与 UI 标签一致"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 102
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

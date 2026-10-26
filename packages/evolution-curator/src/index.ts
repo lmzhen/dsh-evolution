@@ -298,8 +298,15 @@ export class EvolutionCurator extends Service {
   readonly skills: SkillLibrary
   /** Read-only scope gate for sibling plugins (merge): name blocked by curator sets. */
   async isBlocked(name: string): Promise<boolean> {
-    if (this.excludeSkillNames.has(name) || this.referencedSkillNames.has(name)) return true
-    return (await loadSuppressedNames(this.skills.root, this.io)).has(name)
+    // ONE gate set for siblings too: exclude/referenced/suppressed AND protected builtins.
+    // The pre-fix check omitted PROTECTED_BUILTIN_SKILLS, so merge could admit `plan` and only
+    // fail at commit (GAP-SEC-01b / P2-7).
+    const gates = new EvolutionGateSet({
+      exclude: this.excludeSkillNames,
+      referenced: this.referencedSkillNames,
+      suppressed: await loadSuppressedNames(this.skills.root, this.io),
+    })
+    return gates.isBlocked(name)
   }
   private readonly io: EvolutionIoLike
   private readonly enabled: boolean

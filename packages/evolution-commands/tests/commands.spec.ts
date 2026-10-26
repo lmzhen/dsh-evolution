@@ -22,6 +22,12 @@ interface FamilyBase {
 
 const FAMILY_BASES = (JSON.parse(readFileSync(new URL('../../evolution-agent/bases.json', import.meta.url), 'utf8')) as { bases: FamilyBase[] }).bases
 
+it('README marks the retired mechanical-append command and does not sell it as live', () => {
+  const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8')
+  expect(readme).toContain('已从用户面退役')
+  expect(readme).not.toContain('把若干技能合并进一个总括技能')
+})
+
 /** One base-table row by base NAME, or a loud fixture error. */
 function familyBase(name: string): FamilyBase {
   const row = FAMILY_BASES.find(candidate => candidate.name === name)

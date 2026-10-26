@@ -25,8 +25,12 @@ function actions(row: SnapshotRow): readonly ActionRef[] {
   const context = { id: row.row.id, a: row.row.a, b: row.row.b, ...(row.row.runId === undefined ? {} : { runId: row.row.runId }) }
   if (row.row.state === 'pending' && row.row.expired !== undefined) return [renderAction('discard', context, true, true), renderAction('pair', context, true, true)]
   if (row.row.state === 'pending') return [renderAction('approve', context), renderAction('reject', context, true, true), renderAction('discard', context, true, true)]
-  if (row.row.state === 'approved' || row.row.state === 'fuse') return [renderAction('retry-resume', context, true, true), renderAction('discard', context, true, true), renderAction('status', context)]
+  if (row.row.state === 'approved' || row.row.state === 'fuse') {
+    if (row.row.failure !== undefined && row.row.failure.retryable === false) return [renderAction('pair', context, true, true), renderAction('discard', context, true, true)]
+    return [renderAction('retry-resume', context, true, true), renderAction('discard', context, true, true), renderAction('status', context)]
+  }
   if (row.row.state === 'skipped') return [renderAction('restore', context, true, true)]
+  if (row.row.state === 'verify') return [renderAction('retry-candidates', context)]
   return [renderAction('pair', context)]
 }
 function verifyState(row: SnapshotRow): VerifySubState | undefined {
@@ -52,7 +56,7 @@ export function toRowFact(row: SnapshotRow): RowFact {
     a: state.a, b: state.b,
     ...(target === undefined ? {} : { target }),
     ...(summary === undefined ? {} : { summary }),
-    ...(state.state === 'skipped' ? { reason: state.reason } : {}),
+    ...(state.state === 'skipped' ? { reason: state.reason, reasonCode: state.reason } : {}),
     ...(state.origin === undefined ? {} : { origin: state.origin }),
     ...(state.failure === undefined ? {} : { failure: { stage: state.failure.stage, code: state.failure.code, retryable: state.failure.retryable, retryFrom: state.failure.retryFrom, detail: state.failure.message } }),
     ...(staging === undefined ? {} : { staging }),
@@ -69,7 +73,10 @@ function runView(run: SnapshotRun, readAt: number, includeResultRef = false): Ru
   void includeResultRef
   const record = run.record
   const metaPhase = run.meta?.phase
-  const state = metaPhase === 'undone' ? 'undone' as const : run.meta?.approval === 'pending' ? 'awaiting-approval' as const : record.state
+  const state = metaPhase === 'undone' ? 'undone' as const
+    : run.meta?.stopReason === 'interrupted' ? 'interrupted' as const
+      : run.meta?.approval === 'pending' ? 'awaiting-approval' as const
+        : record.state
   const stopReason = run.meta?.stopReason ?? (record.state === 'cancelled' ? 'cancelled' : record.state === 'failed' ? 'failed' : record.state === 'succeeded' ? 'completed' : undefined)
   return { wireVersion: 1, readAt, id: record.id, state, command: record.command ?? 'scan', ...(record.stage === undefined ? {} : { stage: record.stage }), progress: record.progress === undefined ? null : { done: record.progress.done, total: record.progress.total }, startedAt: record.startedAt, ...(record.endedAt === undefined ? {} : { endedAt: record.endedAt }), ...(stopReason === undefined ? {} : { stopReason }), ...(record.failure === undefined ? {} : { failure: { stage: 'settle', code: 'run-failed', retryable: false, retryFrom: 'none', detail: record.failure } }), ...(record.parentRunId === undefined ? {} : { parentRunId: record.parentRunId }), ...(run.pairs[0]?.pairKey === undefined ? {} : { currentPairKey: run.pairs[0].pairKey }), ...(record.resultRef === undefined ? {} : { resultRef: record.resultRef }), actions: [{ id: 'status', command: base + 'status ' + record.id, confirm: false, enabled: true }, { id: 'report', command: base + 'report ' + record.id, confirm: false, enabled: record.resultRef !== undefined }, { id: 'cancel', command: base + 'cancel ' + record.id, confirm: false, enabled: record.state === 'running' }] }
 }
@@ -104,5 +111,5 @@ export function buildRunDetail(snapshot: MergeSnapshot, runId: string): RunDetai
 }
 export function buildRunsView(snapshot: MergeSnapshot): RunsView { return { wireVersion: 1, readAt: snapshot.readAt, runs: [...snapshot.runs].sort((a, b) => b.record.startedAt - a.record.startedAt).map(run => runView(run, snapshot.readAt, true)) } }
 export function buildDoctorView(snapshot: MergeSnapshot): DoctorView {
-  return { wireVersion: 1, readAt: snapshot.readAt, counts: snapshot.doctor.counts, ...(snapshot.runs[0] === undefined ? {} : { latestRun: runView(snapshot.runs[0], snapshot.readAt) }), staging: snapshot.doctor.staging, approval: snapshot.approval, ...(snapshot.blocked === undefined ? {} : { blocked: { code: snapshot.blocked.code, message: snapshot.blocked.message } }), rows: snapshot.doctor.rows }
+  return { wireVersion: 1, readAt: snapshot.readAt, counts: snapshot.doctor.counts, ...(snapshot.runs[0] === undefined ? {} : { latestRun: runView(snapshot.runs[0], snapshot.readAt) }), staging: snapshot.doctor.staging, approval: snapshot.approval, ...(snapshot.hostOnly === undefined ? {} : { hostOnly: snapshot.hostOnly }), ...(snapshot.blocked === undefined ? {} : { blocked: { code: snapshot.blocked.code, message: snapshot.blocked.message } }), rows: snapshot.doctor.rows }
 }

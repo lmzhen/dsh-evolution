@@ -1,0 +1,246 @@
+{
+  "items": [
+    {
+      "id": "FR-RUN-01",
+      "kind": "FR",
+      "title": "run = 一次命令；scan/pair/approve 后的 agent2 各自是一个 run",
+      "statement": "run = 一次命令；scan/pair/approve 后的 agent2 各自是一个 run",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "run 记录与命令一一对应；一对失败不是新 run"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 108
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-RUN-02",
+      "kind": "FR",
+      "title": "所有 merge 后台执行；命令立即返回 run id + 作用域（family-managed/候选来源/无 per-run 上限）；sta...",
+      "statement": "所有 merge 后台执行；命令立即返回 run id + 作用域（family-managed/候选来源/无 per-run 上限）；status/report 可在 screening 后展示候选对数（若适用），pair run 无候选对数；target 在 decision 后出现",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "命令 1 秒内返回；作用域可读；不承诺返回候选对数/target"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 109
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-RUN-03",
+      "kind": "FR",
+      "title": "命令不依赖客户端请求；后台 run 启动仍需 exact live parent，缺失给 E-305；已启动 run 不随客户端断开而中断",
+      "statement": "命令不依赖客户端请求；后台 run 启动仍需 exact live parent，缺失给 E-305；已启动 run 不随客户端断开而中断",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "kill 客户端后 run 仍完成/可取消；无 live parent 时有 E-305 与下一步"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 110
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-RUN-04",
+      "kind": "FR",
+      "title": "run 记录含 id/状态枚举（running/succeeded/failed/cancelled/awaiting-approval/un...",
+      "statement": "run 记录含 id/状态枚举（running/succeeded/failed/cancelled/awaiting-approval/undone/superseded/interrupted/orphan）/stage/进度/时间/resultRef/failure/stagingRef/pairs[]；多对撤销在 pairs[].result=undone，“全部已提交 pair”撤销才 run.status=undone；KEEP/失败/未提交 pair 不计入分母",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "仅 1 个 KEEP + 1 个 merge：撤销 merge 后 run undone；未提交 pair 不阻塞"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 111
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-RUN-05",
+      "kind": "FR",
+      "title": "提供 status/report/cancel/runs 四命令；status 作用于 run，输出当前 pair/逐对进度/stopReas...",
+      "statement": "提供 status/report/cancel/runs 四命令；status 作用于 run，输出当前 pair/逐对进度/stopReason；runs 只列 merge kind；awaiting-approval 已 settle，cancel 不适用于它；cancel 保留 staging 现场",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "四命令可用；status 有 stopReason；runs 不混 maintain；settle 后 cancel 有明确拒绝；cancel 后现场可读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 112
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-RUN-06",
+      "kind": "FR",
+      "title": "report 写 reports/merge-<runId>.json/.md，并进 sweepReports；顶层含 runId/stopR...",
+      "statement": "report 写 reports/merge-<runId>.json/.md，并进 sweepReports；顶层含 runId/stopReason/processedPairs/remainingPairs/reportOnly[]（L0/L1 KEEP 计数+明细）/validationFailures[]/archived[]（本次归档源）/commit.created/updated/archived（计数）/耗时/token；pairs[] 含所有已处理 pair（含 KEEP/失败/source-gone），字段 pair/target={requested,actual,created}/sources/decision/result/stage/code/validation.issues/absorbedInto/manifestFiles[]/criteria{decision,validation,commit,archive,evidence}",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "pairs 成员/已提交子集可辨；target 三字段；stopReason/耗时/token/commit 三分计数/archived 可回读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 113
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-RUN-07",
+      "kind": "FR",
+      "title": "跑完不主动推送，用户查询 status/report",
+      "statement": "跑完不主动推送，用户查询 status/report",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "无通知依赖；查询可得到结果"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 114
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-RUN-08",
+      "kind": "FR",
+      "title": "mergeRunTimeoutMinutes 默认 0=无上限；到时停：agent1/agent2 在飞按阶段失败入队（agent1→待判断，...",
+      "statement": "mergeRunTimeoutMinutes 默认 0=无上限；到时停：agent1/agent2 在飞按阶段失败入队（agent1→待判断，agent2→待合并）；在 validate/commit 阶段则终态报告、不入队；未开始项留在待判断并在 remainingPairs 列子集",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "设为 1 时到点停止；四类时点去向唯一；未开始项仍可 candidates --retry"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 115
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-RUN-09",
+      "kind": "FR",
+      "title": "scan 处理候选集全部对，无 per-run 对数上限；按候选分数降序；单对硬失败记录后继续，除非达时间预算/取消",
+      "statement": "scan 处理候选集全部对，无 per-run 对数上限；按候选分数降序；单对硬失败记录后继续，除非达时间预算/取消",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "候选 N 对全部进入处理/记录；无 3 对截断；单对失败不中止其余对"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 116
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-RUN-10",
+      "kind": "FR",
+      "title": "长跑表登记 merge owner/result home",
+      "statement": "长跑表登记 merge owner/result home",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "长跑表有 merge 行；可指向报告"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 117
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-RUN-11",
+      "kind": "FR",
+      "title": "成功四判据：decision shouldMerge 且 mode≠keep；staging 校验无 issue；commit created...",
+      "statement": "成功四判据：decision shouldMerge 且 mode≠keep；staging 校验无 issue；commit created/updated/archived 与 manifest/源列表一致；目标可列且源归档带 absorbed_into",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "报告 criteria/证据可逐项回读；一条真实 pair + 一条故障注入"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 118
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

@@ -38,6 +38,7 @@ export interface NewChildAuthoringOptions {
   readonly onChildClosed?: (childId: string) => void
   readonly unit?: UnitTransaction | undefined
   readonly limits?: import('@deepseek-ai/dsh-evolution-core').SkillLimits
+  readonly parentRunId?: string | ((runId: string) => string | undefined)
 }
 
 /** Commit-side causes that mean "the world moved"; they must not be retried blindly. */
@@ -116,23 +117,26 @@ export async function runNewChildAuthoring(
     const missing = missingManifestFile(manifestFiles, stagedPaths)
     if (missing !== null) return { kind: 'failed', failure: { stage: 'author', code: 'merge-manifest-missing', message: 'manifest file missing from staged tree: ' + missing, retryable: true, retryFrom: 'agent2' } }
     const limitsSnapshot = limitsSnapshotOf(options.limits ?? DEFAULT_SKILL_LIMITS)
-    const validationPlan = buildValidationPlan({ tree: tree.value, target: decision.target, limits: limitsSnapshot, cards: options.cards, promptVersion: MERGE_PROMPT_VERSION, promptHash: promptHashOf(buildRound2Prompt(row, decision)), supportFiles: tree.value.files.map(file => ({ path: file.path, content: file.content, source: 'staged' })), manifestFiles, existingSupport: (options.cards.find(card => card.name === decision.target)?.files ?? []).map(file => file.path), supportSources: options.cards.flatMap(card => (card.files ?? []).map(file => ({ path: file.path, content: file.content, source: card.name }))) })
+    const validationPlan = buildValidationPlan({ tree: tree.value, target: decision.target, limits: limitsSnapshot, cards: options.cards, promptVersion: MERGE_PROMPT_VERSION, promptHash: promptHashOf(buildRound2Prompt(row, decision)), supportFiles: tree.value.files.map(file => ({ path: file.path, content: file.content, source: 'staged' })), manifestFiles, existingSupport: (options.cards.find(card => card.name === decision.target)?.files ?? []).map(file => file.path), supportSources: options.cards.filter(card => card.name === row.a || card.name === row.b).flatMap(card => (card.files ?? []).map(file => ({ path: file.path, content: file.content, source: card.name }))) })
     const findings = [...validateStagedTree(tree.value, limitsSnapshot.skillLimits), ...validationPlan.findings]
     if (hasBlockingFinding(findings)) {
       const lengths = { bodyBytes: Buffer.byteLength(tree.value.body, 'utf8'), fileBytes: tree.value.files.reduce((sum, file) => sum + Buffer.byteLength(file.content, 'utf8'), 0), totalBytes: Buffer.byteLength(tree.value.body, 'utf8') + tree.value.files.reduce((sum, file) => sum + Buffer.byteLength(file.content, 'utf8'), 0) }
-      // FR-EXEC-11/14: only a LIMIT finding is over-limit; every other blocking rule
-      // (manifest mismatch, support conflict, validation plan) is a validation block and
-      // must land in skipped, not bounce back to fuse as a retryable generic failure.
+      // FR-EXEC-11/14: only a LIMIT finding is over-limit (a policy close); every other
+      // blocking rule (manifest mismatch, support conflict, validation plan) is a
+      // validation failure that goes to the report as failed, never to skipped.
       const limit = findings.find(finding => finding.rule === 'limit')
+      const plan = { planVersion: validationPlan.planVersion, stageDigest: validationPlan.stageDigest, revision: validationPlan.revision, manifestFiles: validationPlan.manifestFiles } as const
       return limit === undefined
-        ? { kind: 'failed', failure: { stage: 'validate', code: 'merge-validation', message: 'staged tree failed the rule gate', retryable: false, retryFrom: 'none' } }
-        : { kind: 'failed', failure: { stage: 'validate', code: 'merge-over-limit', message: limit.message, retryable: false, retryFrom: 'none', lengths } }
+        ? { kind: 'failed', failure: { stage: 'validate', code: 'merge-validation', message: 'staged tree failed the rule gate', retryable: false, retryFrom: 'none' }, validationPlan: plan, manifestFiles: validationPlan.manifestFiles, validationIssues: findings, criteria: { decision: 'merge', validation: 'required', commit: 'never', archive: 'none', evidence: 'none' } }
+        : { kind: 'failed', failure: { stage: 'validate', code: 'merge-over-limit', message: limit.message, retryable: false, retryFrom: 'none', lengths }, validationPlan: plan, manifestFiles: validationPlan.manifestFiles, validationIssues: findings, criteria: { decision: 'merge', validation: 'required', commit: 'never', archive: 'none', evidence: 'none' } }
     }
+    const parentRunId = typeof options.parentRunId === 'function' ? options.parentRunId(options.runId) : options.parentRunId
     const commit = await commitStagedRun(options.io, options.home, stageKey, options.commitPort, {
-      origin: 'foreground', summary: 'merge ' + row.a + ' + ' + row.b, now: options.now,
+      origin: 'foreground', summary: 'merge ' + row.a + ' + ' + row.b, now: options.now, signal,
       ...(options.isBlocked === undefined ? {} : { isBlocked: options.isBlocked }),
       ...(options.unit === undefined ? {} : { unit: options.unit }),
       ...(options.limits === undefined ? {} : { limits: options.limits }),
+      ...(parentRunId === undefined ? {} : { parentRunId }),
       validationPlan: { planVersion: validationPlan.planVersion, stageDigest: validationPlan.stageDigest, revision: validationPlan.revision },
       ...(decision.targetRevisionRef === undefined ? {} : { targetRevision: decision.targetRevisionRef }),
       ...(decision.sourceRevisions === undefined ? {} : { sourceRevisions: decision.sourceRevisions }),
@@ -149,6 +153,11 @@ export async function runNewChildAuthoring(
       ...(receipt?.unitId === undefined ? {} : { unitId: receipt.unitId }),
       archived: receipt?.archived ?? [],
       lengths,
+      validationPlan: { planVersion: validationPlan.planVersion, stageDigest: validationPlan.stageDigest, revision: validationPlan.revision, manifestFiles: validationPlan.manifestFiles },
+      ...(parentRunId === undefined ? {} : { parentRunId }),
+      manifestFiles: validationPlan.manifestFiles,
+      validationIssues: findings,
+      criteria: { decision: 'merge', validation: 'required', commit: 'required', archive: 'sources', evidence: 'receipt' },
       target: { requested: decision.target, actual: commit.plan.target, created: receipt?.create ?? false },
     }
   } finally {

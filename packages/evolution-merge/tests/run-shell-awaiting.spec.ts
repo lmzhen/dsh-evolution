@@ -50,7 +50,7 @@ it('times out an in-flight run and settles it as failed', async () => {
   })
   expect(result.ok).toBe(false)
   expect(aborted).toBe(true)
-  expect(await readRunMeta(io, home, 'run-1')).toMatchObject({ phase: 'settled', stopReason: 'failed' })
+  expect(await readRunMeta(io, home, 'run-1')).toMatchObject({ phase: 'settled', stopReason: 'timeout' })
 })
 
 it('a completed approval-on scan with pending rows is awaiting approval', async () => {

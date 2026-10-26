@@ -1,0 +1,12 @@
+{
+  "source": "gap-report.md (0.30.24)",
+  "counts": {
+    "total": 251,
+    "satisfied": 186,
+    "partial": 50,
+    "gap": 4,
+    "drift": 3,
+    "n/a": 1,
+    "unverified": 7
+  }
+}

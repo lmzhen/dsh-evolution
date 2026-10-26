@@ -12,6 +12,18 @@
       "patchedSha256": "0b2f5b4b0a5bfc770ef710a2fb7f5c5cae97062f6a249aac685862ca2ff5093d",
       "patchedBytes": 1410,
       "reason": "canonicalize corpus paths to <skill>/SKILL.md; fail loudly on ref mismatch. Test-only; source tree hash unchanged."
+    },
+    {
+      "path": "node/parity/cases/stage4.js",
+      "patchedSha256": "6c1823c234015203f3a6b96a785a3298485a1b55aea876061f726d60fc7fc855",
+      "patchedBytes": 2478,
+      "reason": "normalize candidate paths to <skill>/SKILL.md so parity is independent of the corpus absolute prefix; test-only."
+    },
+    {
+      "path": "node/parity/cases/stages123.js",
+      "patchedSha256": "885ad65a600da93f2bf1c7571e7a93bcc080694ae3f7ba02f0e70b74665d531f",
+      "patchedBytes": 2761,
+      "reason": "normalize candidate paths to <skill>/SKILL.md so parity is independent of the corpus absolute prefix; test-only."
     }
   ],
   "versionVector": {

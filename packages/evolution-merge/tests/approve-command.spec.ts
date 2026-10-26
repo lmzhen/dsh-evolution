@@ -41,6 +41,21 @@ it('approves one pending row and drops it after a successful round2', async () =
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })
 
+it('carries the reserved staging ref into round2 instead of inventing a second key', async () => {
+  const home = await tempRoot('dsh-merge-approve-staging-ref-')
+  const io = nodeEvolutionIo()
+  const row = await pending(home)
+  let seen: string | undefined
+  await runApproveCommand({
+    io, home, registry: registry(), rowId: row.id, platformWrite: true, now: () => 200,
+    ports: {
+      async stage() { return { ok: true as const, entry: { version: 1 as const, rowId: row.id, pairKey: row.pairKey, ref: 'stage-A', state: 'present' as const, createdAt: 1, expiresAt: 999999999999, updatedAt: 1 } } },
+      async round2(next) { seen = next.stagingRef; return { kind: 'failed', failure: { stage: 'author', code: 'merge-failed', message: 'fixture', retryable: true, retryFrom: 'agent2' } } },
+    },
+  })
+  expect(seen).toBe('stage-A')
+})
+
 it('refuses a second approve and leaves no pending row', async () => {
   const home = await tempRoot('dsh-merge-approve-command-second-')
   const io = nodeEvolutionIo()

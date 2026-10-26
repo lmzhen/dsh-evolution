@@ -27,6 +27,9 @@ it('classifies Q09 forward/reverse/orphan mutually', () => {
   expect(reverse.q09.forwardRefs).toEqual([])
   const orphan = buildValidationPlan({ tree: tree('no refs'), target: 't', limits, existingSupport: ['references/x.md'] })
   expect(orphan.q09.orphanFiles).toEqual(['references/x.md'])
+  expect(forward.findings).toContainEqual(expect.objectContaining({ rule: 'q09-forward', severity: 'block' }))
+  expect(reverse.findings).toContainEqual(expect.objectContaining({ rule: 'q09-reverse', severity: 'block' }))
+  expect(orphan.findings).toContainEqual(expect.objectContaining({ rule: 'q09-orphan', severity: 'block' }))
 })
 
 it('flags support conflicts, threats and limits', () => {

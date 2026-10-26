@@ -10,6 +10,8 @@ import { tempRoot } from '../../test-support/temp-home.ts'
 import { recoverCommitUnits } from '../src/recovery-coordinator.ts'
 import { projectRecoveredUnit } from '../src/recovery-projection.ts'
 import { readRunMeta } from '../src/domain/run-coordinator.ts'
+import { writeCommitReceipt } from '../src/commit-receipt.ts'
+import { writeUndoReceipt } from '../src/domain/undo-receipt.ts'
 
 const evidence: UnitEvidenceRecord = { schemaVersion: 1, unitId: 'u-1', runId: 'run-1', planDigest: 'd', state: 'complete', target: { before: 'old', after: 'new', supportDigest: '', created: false }, sources: [{ name: 'b', before: 'b', after: null, archived: true, absorbedInto: 'new' }], mutations: 1, at: 1 }
 const journal: UnitJournal = { schemaVersion: 1, unitId: 'u-1', runId: 'run-1', planDigest: 'd', target: 'new', sources: ['b'], phase: 'committed', storageKey: 'k', snapshotSha256: 's', updatedAt: 1 }
@@ -40,11 +42,31 @@ it('load() materializes the orphan verdict, then recovery upgrades it to succeed
   expect(registry.find('run-1')?.state).toBe('failed')
 
   const reports = await recoverCommitUnits({ io, home, unit: fakeUnit(), now: () => 6, runs: registry })
-  expect(reports[0]).toMatchObject({ action: 'finalize', ok: true })
-  expect(registry.find('run-1')).toMatchObject({ state: 'succeeded' })
+  expect(reports[0]).toMatchObject({ action: 'finalize', ok: true, state: 'interrupted' })
+  expect(registry.find('run-1')).toMatchObject({ state: 'interrupted' })
   const disk = JSON.parse(await readFile(join(home, 'runs.json'), 'utf8')) as { runs: { id: string; state: string }[] }
-  expect(disk.runs.find(row => row.id === 'run-1')?.state).toBe('succeeded')
-  expect((await readRunMeta(io, home, 'run-1'))?.phase).toBe('settled')
+  expect(disk.runs.find(row => row.id === 'run-1')?.state).toBe('interrupted')
+  expect(await readRunMeta(io, home, 'run-1')).toMatchObject({ phase: 'settled', stopReason: 'interrupted' })
+})
+
+it('does not re-project a committed unit that already has an undo receipt', async () => {
+  const home = await homeWithRun({ id: 'run-1', kind: 'merge', state: 'running', startedAt: 1, pid: 999_999 })
+  const io = nodeEvolutionIo()
+  await writeCommitReceipt(io, home, { runId: 'run-1', unitId: 'u-1', target: 'new', create: false, sources: ['b'], archived: ['b'], at: 1, pairKey: 'p1' })
+  await writeUndoReceipt(io, home, { version: 1, runId: 'run-1', pairKey: 'p1', unitId: 'u-1', evidenceSha256: 'e', target: 'new', sources: ['b'], restoredTargetHash: 'h', restoredSourceHashes: { b: 'h' }, at: 2 })
+  const reports = await recoverCommitUnits({ io, home, unit: fakeUnit(), now: () => 6 })
+  expect(reports[0]).toMatchObject({ action: 'none', ok: true, code: 'undo-recorded' })
+})
+
+it('finds an undo receipt keyed by the parent run when the journal uses a stage run id', async () => {
+  const home = await tempRoot('dsh-recovery-stage-undo-')
+  const io = nodeEvolutionIo()
+  await mkdir(join(home, 'merge', 'unit-journals'), { recursive: true })
+  await writeFile(join(home, 'merge', 'unit-journals', 'u.json'), JSON.stringify({ ...journal, runId: 'run-1/pairs/abc' }))
+  await writeCommitReceipt(io, home, { runId: 'run-1/pairs/abc', parentRunId: 'run-1', unitId: 'u-1', target: 'new', create: false, sources: ['b'], archived: ['b'], at: 1, pairKey: 'p1' })
+  await writeUndoReceipt(io, home, { version: 1, runId: 'run-1', pairKey: 'p1', unitId: 'u-1', evidenceSha256: 'e', target: 'new', sources: ['b'], restoredTargetHash: 'h', restoredSourceHashes: { b: 'h' }, at: 2 })
+  const reports = await recoverCommitUnits({ io, home, unit: fakeUnit(), now: () => 6 })
+  expect(reports[0]).toMatchObject({ action: 'none', ok: true, code: 'undo-recorded' })
 })
 
 it('a run owned by a live process is never upgraded', async () => {

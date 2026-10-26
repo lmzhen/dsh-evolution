@@ -29,6 +29,10 @@ export interface CommitStagedOptions {
   readonly targetRevision?: import('./contracts.ts').RevisionRef
   readonly sourceRevisions?: Readonly<Record<string, import('./contracts.ts').RevisionRef>>
   readonly supportDigest?: string
+  /** The run that started this child; absent means the receipt itself is the root run. */
+  readonly parentRunId?: string
+  /** Aborts a commit before its durable point; a landed commit still gets a receipt. */
+  readonly signal?: AbortSignal
   /** G2 transitional: when present, commit through core UnitTransaction. */
   readonly unit?: UnitTransaction
 }
@@ -65,6 +69,7 @@ export async function commitStagedRun(
   const journal = { runId, target: assembled.plan.target, create: !assembled.plan.targetExists, sources: assembled.plan.sources, phase: 'prepared' as const, updatedAt: new Date(options.now()).toISOString() }
   let result: CommitMergeResult
   let evidenceSha256: string | undefined
+  let warning: string | undefined
   const transaction = options.unit ?? port.unit ?? legacyUnitAdapter(port, assembled.plan, options, runId)
   if (transaction === undefined) return { ok: false, message: 'commit port missing: UnitTransaction or commitMerge required', plan: assembled.plan }
   {
@@ -73,14 +78,16 @@ export async function commitStagedRun(
     try { await writeJournal(io, home, journal) } catch { /* compat mirror; unit journal is authority */ }
     const prepared = await transaction.prepare(unitPlan)
     if (!prepared.ok) return { ok: false, message: prepared.message, plan: assembled.plan }
-    const committed = await transaction.commit(prepared.prepared)
+    const committed = await transaction.commit(prepared.prepared, options.signal === undefined ? undefined : { signal: options.signal })
     if (!committed.ok) { try { await writeJournal(io, home, { ...journal, phase: 'failed', updatedAt: new Date(options.now()).toISOString() }) } catch {} ; return { ok: false, message: committed.message, plan: assembled.plan, ...(committed.code === 'target-changed' || committed.code === 'source-changed' || committed.code === 'support-changed' ? { code: committed.code } : {}) } }
     const unitId = committed.evidence.unitId
     if (committed.evidence.unitId !== prepared.prepared.unitId && !prepared.prepared.unitId.startsWith('legacy:')) return { ok: false, message: 'unit evidence does not match prepared unitId', plan: assembled.plan }
     const finalize = (transaction as { finalize?: (unitId: string) => Promise<{ ok: true; evidence: import('@deepseek-ai/dsh-evolution-core').UnitEvidenceRecord } | { ok: false; message: string }> }).finalize
     if (finalize !== undefined) {
       const finalized = await finalize.call(transaction, unitId)
-      if (!finalized.ok) return { ok: false, message: 'unit committed but finalize failed: ' + finalized.message, plan: assembled.plan }
+      // The tree is already committed. Finalize is post-commit bookkeeping; failing it must
+      // not turn a landed merge into a failed run. Keep the receipt path alive and warn.
+      if (!finalized.ok) warning = 'commit landed but finalize failed: ' + finalized.message
     }
     evidenceSha256 = digestEvidence(committed.evidence)
     result = { ok: true, message: 'merged', unitId, archived: committed.evidence.sources.filter(source => source.archived).map(source => source.name), mutations: committed.evidence.mutations }
@@ -96,7 +103,7 @@ export async function commitStagedRun(
     runId,
     ...(evidenceSha256 === undefined ? {} : { evidenceSha256 }),
     ...(options.validationPlan === undefined ? {} : { validationPlan: options.validationPlan }),
-    parentRunId: runId.split('/pairs/')[0] ?? runId,
+    ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }),
     unitId: result.unitId,
     target: assembled.plan.target,
     create: !assembled.plan.targetExists,
@@ -108,13 +115,13 @@ export async function commitStagedRun(
   try {
     await writeCommitReceipt(io, home, receipt)
     try { await io.remove(snapshotPath(home, runId)) } catch { /* committed journal is the record */ }
-    return { ok: true, plan: assembled.plan, result, receipt }
+    return { ok: true, plan: assembled.plan, result, receipt, ...(warning === undefined ? {} : { warning }) }
   } catch (error) {
     return {
       ok: true,
       plan: assembled.plan,
       result,
-      warning: 'commit landed but receipt write failed: ' + (error instanceof Error ? error.message : String(error)),
+      warning: (warning === undefined ? '' : warning + '; ') + 'commit landed but receipt write failed: ' + (error instanceof Error ? error.message : String(error)),
     }
   }
 }

@@ -1,0 +1,378 @@
+{
+  "items": [
+    {
+      "id": "FR-EXEC-01",
+      "kind": "FR",
+      "title": "固定两阶段：第 1 轮决策（只输出 KEEP/MERGE）、第 2 轮合成；第 2 轮不得改判 merge，改判即 failed、保留原 de...",
+      "statement": "固定两阶段：第 1 轮决策（只输出 KEEP/MERGE）、第 2 轮合成；第 2 轮不得改判 merge，改判即 failed、保留原 decision；schema 失败直接 failed，不启动第 3 个 LLM 修复轮",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两个阶段可观测；第 1 轮无 UNDECIDED 输出；第 2 轮改判有固定失败；无第三轮"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 137
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-02",
+      "kind": "FR",
+      "title": "流程/上下文/提示词固定，不存在自由对话式合并",
+      "statement": "流程/上下文/提示词固定，不存在自由对话式合并",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "提示词版本固定；无开放式对话入口"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 138
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-03",
+      "kind": "FR",
+      "title": "合成形态 B：child 在 staging 多步写/改",
+      "statement": "合成形态 B：child 在 staging 多步写/改",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "child 只用 staging 写工具；源不被修改"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 139
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-04",
+      "kind": "FR",
+      "title": "插件是唯一提交者；child 不能写活树",
+      "statement": "插件是唯一提交者；child 不能写活树",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "活树只在 commit 时变；child 无通用写工具"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 140
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-05",
+      "kind": "FR",
+      "title": "审批关时同 child 尽量跑两轮；结束/失败即释放 child",
+      "statement": "审批关时同 child 尽量跑两轮；结束/失败即释放 child",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "同 child continue；失败的降级路径也保留 decision；无泄漏 child"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 141
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-06",
+      "kind": "FR",
+      "title": "审批开时 agent1 完成写 pending，不产生 staging",
+      "statement": "审批开时 agent1 完成写 pending，不产生 staging",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "approval 开启时 agent1 后无 staging"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 142
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-07",
+      "kind": "FR",
+      "title": "approve 后另起 agent2 run；失败进待合并",
+      "statement": "approve 后另起 agent2 run；失败进待合并",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "approve 后 run 记录 link 原 run；失败保留 decision"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 143
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-08",
+      "kind": "FR",
+      "title": "不生成带操作步骤的 plan；执行前不逐对列预执行清单/dry-run，只回作用域；screening 后 status 可给候选对数（sca...",
+      "statement": "不生成带操作步骤的 plan；执行前不逐对列预执行清单/dry-run，只回作用域；screening 后 status 可给候选对数（scan 适用）；执行后 report 给逐对结果；pair run 无候选对数",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "scan 返回无 pair 列表/无数对；执行后 report 有逐对结果；无 dry-run"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 144
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-09",
+      "kind": "FR",
+      "title": "失败分类：待判断/待批准/待合并/无需合并；无 blocked",
+      "statement": "失败分类：待判断/待批准/待合并/无需合并；无 blocked",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "四队列可区分；无 blocked 队列"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 145
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-10",
+      "kind": "FR",
+      "title": "重试语义：candidates --retry 只重跑该条待判断行；resume --retry 只重跑该条待合并行 agent2；stagi...",
+      "statement": "重试语义：candidates --retry 只重跑该条待判断行；resume --retry 只重跑该条待合并行 agent2；staging 已清时，源仍在/未变则重建，源已变/没了则拒绝并给 pair/丢弃两出口；discard <id> 删除 pending/待合并记录；pair 可强制整对",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "三种重试不重新审批；discard 可删记录；staging 过期两种源状态各有唯一结果"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 146
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-EXEC-11",
+      "kind": "FR",
+      "title": "skipped 收录：L2 KEEP + agent1 KEEP + 人工拒绝（origin:human）+ 超限失败（system，固定 r...",
+      "statement": "skipped 收录：L2 KEEP + agent1 KEEP + 人工拒绝（origin:human）+ 超限失败（system，固定 reason）；L0/L1 KEEP、source-gone、校验/提交失败只进报告；L2 UNDECIDED 进第 1 轮；pair 无视 skipped",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "四类各一条；其它失败不产生 skipped"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 147
+      },
+      "baselineStatus": "gap"
+    },
+    {
+      "id": "FR-EXEC-12",
+      "kind": "FR",
+      "title": "提交前重读源；sourceRevision 变化则 failed(source-changed)、不写库（复用平台内容版本；不要求 sha25...",
+      "statement": "提交前重读源；sourceRevision 变化则 failed(source-changed)、不写库（复用平台内容版本；不要求 sha256/固定摘要；不作 pair 键）",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "运行中改源用例失败且无写库"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 148
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-13",
+      "kind": "FR",
+      "title": "child 最小权限：第 1 轮 mergestage 只开 list/read（write/copy 拒绝）；第 2 轮开 write/co...",
+      "statement": "child 最小权限：第 1 轮 merge_stage 只开 list/read（write/copy 拒绝）；第 2 轮开 write/copy；无 shell/网络/skill_manage/通用 FS 写",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "child 只挂载 merge_stage；第 1 轮不能写 staging；author 阶段可写/复制；源不被 round-1 写路径修改"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 149
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-14",
+      "kind": "FR",
+      "title": "事件→队列/报告转移按 §2.13 表：阶段失败回上一阶段队列；终态失败只报告；超限为 skipped 特例",
+      "statement": "事件→队列/报告转移按 §2.13 表：阶段失败回上一阶段队列；终态失败只报告；超限为 skipped 特例",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "每个事件各一条构造用例；四 tab 计数正确"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 150
+      },
+      "baselineStatus": "gap"
+    },
+    {
+      "id": "FR-EXEC-15",
+      "kind": "FR",
+      "title": "审批开时 scan：逐对跑第 1 轮，每 MERGE 写 pending，不产生 staging/不启动 agent2；approve 后 a...",
+      "statement": "审批开时 scan：逐对跑第 1 轮，每 MERGE 写 pending，不产生 staging/不启动 agent2；approve 后 agent2 串行",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "3 对 MERGE + approval 开 = 3 pending、0 staging、0 agent2；逐条 approve 后串行且 link 原 run"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 151
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-16",
+      "kind": "FR",
+      "title": "固定提示词必须包含质量/结构/安全约束引导；不包含字数上限/压缩指令",
+      "statement": "固定提示词必须包含质量/结构/安全约束引导；不包含字数上限/压缩指令",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "提示词快照/版本包含三类引导；字数/压缩指令不在其中"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 152
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-EXEC-17",
+      "kind": "FR",
+      "title": "并发/幂等：同 pair 在飞=已有 running run 且 pair 已开始，返回同一 run；待判断未开始不算在飞，pair 可启动新...",
+      "statement": "并发/幂等：同 pair 在飞=已有 running run 且 pair 已开始，返回同一 run；待判断未开始不算在飞，pair 可启动新 run 但须重 resolve/claim target；同 target 串行 + 提交 CAS，冲突整对 failed；重复 approve 用 claim（lease+release，崩溃可回收）只起一个 agent2，claim 后行转 approved/移出待批准；跨平面 foreign 行拒绝并返回 foreign run id",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "五场景各一条；claim lease 过期可回收；跨平面不双跑"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 153
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

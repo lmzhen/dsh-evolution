@@ -31,3 +31,11 @@ it('round2 is the B author prompt, fresh adds only the bridge sentence', () => {
   expect(buildRound2Prompt(row, decision, 'fresh')).toContain('基于已持久化的 decision。')
   expect(STANDBY_PROMPT.length).toBeGreaterThan(0)
 })
+
+it('round2 carries quality/structure/safety guidance and no body compression instruction', () => {
+  const prompt = buildRound2Prompt(row, decision)
+  expect(prompt).toContain('质量')
+  expect(prompt).toContain('结构')
+  expect(prompt).toContain('安全')
+  expect(prompt).not.toContain('压缩')
+})

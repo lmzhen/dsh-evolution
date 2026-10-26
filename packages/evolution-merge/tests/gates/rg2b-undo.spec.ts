@@ -53,6 +53,38 @@ it('undoes a committed pair, writes undo receipt and marks the run undone', asyn
   expect((await loadPairIndex(io, home)).get('a\u0000b')?.result).toBe('undone')
 })
 
+it('undoes all pairs of one run and target in reverse order', async () => {
+  const home = await tempRoot('dsh-rg2b-undo-multi-')
+  const io = nodeEvolutionIo()
+  const ev1: UnitEvidenceRecord = { ...evidence, unitId: 'u-1', runId: 'run-1', target: { before: 'body-0', after: 'body-1', supportDigest: '', created: false }, sources: [{ name: 'source-1', before: 'src-1', after: null, archived: true, absorbedInto: 'target' }] }
+  const ev2: UnitEvidenceRecord = { ...evidence, unitId: 'u-2', runId: 'run-1', target: { before: 'body-1', after: 'body-2', supportDigest: '', created: false }, sources: [{ name: 'source-2', before: 'src-2', after: null, archived: true, absorbedInto: 'target' }] }
+  await writeUnitEvidence(io, home, ev1)
+  await writeUnitEvidence(io, home, ev2)
+  await writeCommitReceipt(io, home, { runId: 'run-1', unitId: 'u-1', evidenceSha256: evidenceSha256(ev1), target: 'target', create: false, sources: ['source-1'], archived: ['source-1'], at: 1, pairKey: 'p1' })
+  await writeCommitReceipt(io, home, { runId: 'run-1', unitId: 'u-2', evidenceSha256: evidenceSha256(ev2), target: 'target', create: false, sources: ['source-2'], archived: ['source-2'], at: 2, pairKey: 'p2' })
+  await writeRunMeta(io, home, { version: 1, runId: 'run-1', phase: 'settled', pairCount: 2, createdAt: AT, updatedAt: AT })
+  const live = new Map<string, string | null>([['target', 'body-2'], ['source-1', null], ['source-2', null]])
+  const versions = [version(1, 'baseline', contentHash('body-0')), version(2, 'merge', contentHash('body-1'), contentHash('body-0')), { ...version(3, 'merge', contentHash('body-2'), contentHash('body-1')), unitId: 'u-2' }]
+  const multiPort: MergeUndoPort = {
+    async listVersions(skill) { return skill === 'target' ? versions : [] },
+    async readSkill(skill) { return live.get(skill) ?? null },
+    async readSupport() { return null },
+    async readBlob(hash) { return hash === contentHash('body-0') ? 'body-0' : hash === contentHash('body-1') ? 'body-1' : null },
+    async hasArchived() { return true },
+    async restoreFromArchive(skill) { live.set(skill, skill === 'source-1' ? 'src-1' : 'src-2'); return { ok: true, message: 'restored' } },
+    async archive(skill) { live.set(skill, null); return { ok: true, message: 'archived' } },
+    async updateSkill(_skill, body) { live.set('target', body); return { ok: true, message: 'updated' } },
+    async writeSupportFile() { return { ok: true, message: 'written' } },
+    async removeSupportFile() { return { ok: true, message: 'removed' } },
+  }
+  const result = await runUndoOperation({ io, home, runId: 'run-1', target: 'target', port: multiPort, now: () => 3 })
+  expect(result.ok, result.ok ? '' : result.message).toBe(true)
+  expect(live.get('target')).toBe('body-0')
+  expect(live.get('source-1')).toBe('src-1')
+  expect(live.get('source-2')).toBe('src-2')
+  expect(result.undone.sort()).toEqual(['p1', 'p2'])
+})
+
 it('target create undo archives the target and records null restored hash', async () => {
   const { home, io, state } = await setup(true)
   const result = await runUndoOperation({ io, home, runId: 'run-1', port: port(state), now: () => 2 })

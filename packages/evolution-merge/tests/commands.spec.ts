@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { mergeUsage, parseMergeCommand } from '../src/index.ts'
+import { forcedDecisionFor } from '../src/runtime.ts'
 
 it('parses the command surface', () => {
   expect(parseMergeCommand([])).toMatchObject({ ok: true, help: true })
@@ -10,6 +11,14 @@ it('parses the command surface', () => {
   expect(parseMergeCommand(['resume', 'mr_1', '--clear', 'mr_2'])).toEqual({ ok: true, command: { verb: 'resume', id: 'mr_1', clear: 'mr_2' } })
   expect(parseMergeCommand(['skipped', '--restore', 'mr_1'])).toEqual({ ok: true, command: { verb: 'skipped', restore: 'mr_1' } })
   expect(parseMergeCommand(['undo', 'umbrella', '--run', 'run-1'])).toEqual({ ok: true, command: { verb: 'undo', target: 'umbrella', run: 'run-1' } })
+})
+
+it('maps candidates/pending/resume and forced pair commands', () => {
+  expect(parseMergeCommand(['candidates'])).toMatchObject({ ok: true, command: { verb: 'candidates' } })
+  expect(parseMergeCommand(['candidates', '--retry', 'mr_1'])).toMatchObject({ ok: true, command: { verb: 'candidates', retry: true, id: 'mr_1' } })
+  expect(parseMergeCommand(['pending', '--expired'])).toMatchObject({ ok: true, command: { verb: 'pending', expired: true } })
+  expect(parseMergeCommand(['resume', '--retry', 'mr_1'])).toMatchObject({ ok: true, command: { verb: 'resume', retry: true, id: 'mr_1' } })
+  expect(forcedDecisionFor('b', 'a')).toMatchObject({ shouldMerge: true, mode: 'create-umbrella', target: 'merge-a-b', sources: ['b', 'a'] })
 })
 
 it('rejects missing/unknown shapes with usage', () => {

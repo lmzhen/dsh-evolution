@@ -59,6 +59,32 @@ it('commits through the UnitTransaction branch without calling commitMerge', asy
   expect(result.receipt).toMatchObject({ unitId: 'u-unit', archived: ['a', 'b'] })
 })
 
+it('passes the abort signal to the unit and keeps a landed commit when finalize fails', async () => {
+  const home = await tempRoot('dsh-merge-commit-unit-signal-')
+  const io = nodeEvolutionIo()
+  expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
+  expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
+  const controller = new AbortController()
+  let seen: AbortSignal | undefined
+  const unit = {
+    async prepare() { return { ok: true as const, prepared: { unitId: 'u-signal', planDigest: 'd1' } } },
+    async commit(_prepared: unknown, options?: { signal?: AbortSignal }) { seen = options?.signal; return { ok: true as const, evidence: { unitId: 'u-signal', runId: 'run-1', planDigest: 'd1', state: 'complete' as const, target: { before: null, after: BODY('umbrella'), supportDigest: '', created: true }, sources: [{ name: 'a', before: BODY('a'), after: null, archived: true, absorbedInto: 'umbrella' }, { name: 'b', before: BODY('b'), after: null, archived: true, absorbedInto: 'umbrella' }], mutations: 3, at: 1 } } },
+    async verify() { return null },
+    async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
+    async cancel() { return { ok: false, phase: 'none' as const } },
+    async finalize() { return { ok: false as const, code: 'unit-plan-missing' as const, message: 'finalize unavailable' } },
+  }
+  const result = await commitStagedRun(io, home, 'run-1', {
+    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async commitMerge() { throw new Error('old path must not run') },
+  }, { origin: 'foreground', summary: 'merge', now: () => 2000, unit: unit as never, signal: controller.signal })
+  expect(seen).toBe(controller.signal)
+  expect(result.ok, result.ok ? '' : result.message).toBe(true)
+  if (!result.ok) return
+  expect(result.warning).toContain('finalize failed')
+  expect(await readCommitReceipt(io, home, 'run-1')).toMatchObject({ unitId: 'u-signal' })
+})
+
 it('commit survives a failing journal write', async () => {
   const home = await tempRoot('dsh-merge-commit-journal-fail-')
   const io = nodeEvolutionIo()

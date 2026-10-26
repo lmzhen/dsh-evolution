@@ -51,7 +51,11 @@ export function buildValidationPlan(input: {
   const existing = new Set(input.existingSupport ?? [])
   const orphanFiles = [...existing].filter(path => !staged.has(path)).sort()
   const byPath = new Map<string, { contents: Set<string>; sources: string[] }>()
-  for (const file of input.supportSources ?? []) {
+  // Conflict means TWO SKILLS contributing different bytes at one path. Staged edits and
+  // the target's previous file are not conflicts: the target file is a CAS baseline that
+  // round 2 is expected to update, so including either here would block every support edit.
+  const supportSources = input.supportSources ?? []
+  for (const file of supportSources) {
     const entry = byPath.get(file.path) ?? { contents: new Set<string>(), sources: [] }
     entry.contents.add(file.content)
     entry.sources.push(file.source)

@@ -6,10 +6,68 @@ import { act } from 'react-dom/test-utils'
 import { createRoot, type Root } from 'react-dom/client'
 import { createElement } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { MergeBody, MergeHistoryItem, MergeOutcome, MergeRowView, MergeViewPayload, QueuePage } from '../src/client/api.ts'
 import { MergePanel, saveSetting } from '../src/client/Panel.ts'
 import { MergeStore, type MergeSource } from '../src/client/MergeStore.ts'
 import type { ConfigFormLike } from '../src/client/seam.ts'
+
+it('copies row actions and honors the confirm gate on the production panel', async () => {
+  const command = '/evolution merge approve mr_copy'
+  const row: MergeRowView = {
+    id: 'mr_copy', pairKey: 'mr_copy', a: 'alpha', b: 'beta', state: 'pending', queue: 'pending', stage: null, label: 'alpha + beta',
+    updatedAt: '2026-01-01T00:00:00.000Z', bodies: [],
+    actions: [{ id: 'approve', command, confirm: false, enabled: true }], createdAt: 1,
+  }
+  const copySource: MergeSource = { ...source(), rows: async (queue): Promise<MergeOutcome<QueuePage>> => ({ ok: true, payload: { queue, expiredOnly: false, items: [row], counts: view().counts } }) }
+  const store = new MergeStore(copySource, { view: view(), rows: [row] })
+  const writeText = vi.fn(async () => {})
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  await act(async () => { root.render(createElement(MergePanel, { store, t: key => key })) })
+  const button = host.querySelector('[data-role="row-action"]') as HTMLButtonElement
+  await act(async () => { button.click() })
+  expect(writeText).toHaveBeenCalledWith(command)
+  root.unmount(); host.remove()
+})
+
+it('asks for confirmation before copying a confirm action', async () => {
+  const command = '/evolution merge skipped --restore mr_confirm'
+  const row: MergeRowView = {
+    id: 'mr_confirm', pairKey: 'mr_confirm', a: 'alpha', b: 'beta', state: 'pending', queue: 'pending', stage: null, label: 'alpha + beta',
+    updatedAt: '2026-01-01T00:00:00.000Z', bodies: [],
+    actions: [{ id: 'restore', command, confirm: true, enabled: true }], createdAt: 1,
+  }
+  const confirmSource: MergeSource = { ...source(), rows: async (queue): Promise<MergeOutcome<QueuePage>> => ({ ok: true, payload: { queue, expiredOnly: false, items: [row], counts: view().counts } }) }
+  const store = new MergeStore(confirmSource, { view: view(), rows: [row] })
+  const writeText = vi.fn(async () => {})
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  const confirm = vi.fn(() => false)
+  Object.defineProperty(globalThis, 'confirm', { configurable: true, value: confirm })
+  const host = document.createElement('div'); document.body.append(host)
+  const root = createRoot(host)
+  await act(async () => { root.render(createElement(MergePanel, { store, t: key => key })) })
+  const button = host.querySelector('[data-role="row-action"]') as HTMLButtonElement
+  await act(async () => { button.click() })
+  expect(confirm).toHaveBeenCalled()
+  expect(writeText).not.toHaveBeenCalled()
+  confirm.mockReturnValue(true)
+  await act(async () => { button.click() })
+  expect(writeText).toHaveBeenCalledWith(command)
+  root.unmount(); host.remove()
+})
+
+it('INSTALL states the three product axes and does not collapse them into one switch', () => {
+  const candidates = [join(process.cwd(), 'packages/evolution/INSTALL.md'), join(process.cwd(), 'packages/INSTALL.md')]
+  const file = candidates.find(path => existsSync(path))
+  if (file === undefined) throw new Error('INSTALL.md not found in ' + candidates.join(' / '))
+  const install = readFileSync(file, 'utf8')
+  expect(install).toContain('three axes')
+  expect(install).toContain('`mergeApproval`, `platformWrite`')
+})
 
 class FakeForm implements ConfigFormLike {
   value: Record<string, unknown>

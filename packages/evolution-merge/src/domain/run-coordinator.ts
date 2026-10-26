@@ -10,7 +10,13 @@ export interface MergeRunMeta {
   readonly pairCount?: number
   /** The pair a single-pair command (pair/approve/resume) is working on; absent for scan. */
   readonly pairKey?: string
+  /** Staging tree this run authors/commits; absent for scan before staging. */
+  readonly stagingRef?: string
+  /** Pair rows this run claims, when it is a single-pair command. */
+  readonly pairs?: readonly { readonly pairKey: string; readonly state: 'pending' | 'approved' | 'fused' | 'skipped' }[]
   readonly parentRunId?: string
+  /** Owner process; lets a shared run-meta distinguish a live foreign plane from a dead writer. */
+  readonly pid?: number
   readonly phase: MergeRunPhase
   readonly stopReason?: string
   readonly approval?: 'pending' | 'approved' | 'rejected'

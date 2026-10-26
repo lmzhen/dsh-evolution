@@ -49,6 +49,7 @@ export interface RowFact {
   readonly target?: { readonly requested: string; readonly actual?: string; readonly created?: boolean }
   readonly summary?: SummarySlots
   readonly reason?: string
+  readonly reasonCode?: string
   readonly origin?: SkipOrigin
   readonly skipKind?: SkipKind
   readonly confidence?: number

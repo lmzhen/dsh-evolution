@@ -25,7 +25,8 @@ export default {
     ctx.assert(stats.selected === pyt.selected, "④ selected 不一致: " + stats.selected + " vs " + pyt.selected);
     ctx.assert(JSON.stringify(stats.floors_used) === JSON.stringify(pyt.floors_used), "④ floors 不一致");
     ctx.assert(JSON.stringify(stats.per_projection) === JSON.stringify(pyt.per_projection), "④ per_projection 不一致");
-    const key = r => [r.a_path, r.b_path].sort().join("|");
+    const rel = p => p.replace(/^.*[\\/]fixtures[\\/]corpus[\\/]/, "");
+    const key = r => [rel(r.a_path), rel(r.b_path)].sort().join("|");
     const nodeSet = new Set(hit.map(key));
     const pySet = new Set(ref4.stage4_rows.map(key));
     ctx.assert(nodeSet.size === pySet.size && [...pySet].every(k => nodeSet.has(k)), "④ 名单不一致");

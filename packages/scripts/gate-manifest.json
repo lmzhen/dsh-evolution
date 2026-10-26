@@ -892,6 +892,19 @@
       ]
     },
     {
+      "id": "gate-58",
+      "kind": "script",
+      "human": "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 发布 parity：UPSTREAM.json 的逐文件 bytes/sha256 与 testPatchSet 的 patchedBytes/patchedSha256 必须全等；缺文件/不匹配→exit 1。GAP-P0-05 的发布门禁）",
+      "argv": [
+        "node",
+        "packages/evolution-merge-engine/verify-upstream.mjs"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
@@ -1015,6 +1028,23 @@
     },
     {
       "id": "ci-only-08",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/gen-requirements.mjs",
+        "packages/evolution",
+        "--check"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-09",
       "kind": "step",
       "human": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
       "argv": [
@@ -1029,7 +1059,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-09",
+      "id": "ci-only-10",
       "kind": "step",
       "human": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
       "argv": [
@@ -1048,7 +1078,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-10",
+      "id": "ci-only-11",
       "kind": "step",
       "human": "node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json",
       "argv": [
@@ -1064,7 +1094,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-11",
+      "id": "ci-only-12",
       "kind": "step",
       "human": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
       "argv": [
@@ -1078,7 +1108,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-12",
+      "id": "ci-only-13",
       "kind": "step",
       "human": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
       "argv": [
@@ -1093,7 +1123,20 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-13",
+      "id": "ci-only-14",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/requirements.selftest.mjs",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/requirements.selftest.mjs"
+      ],
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-15",
       "kind": "step",
       "human": "node packages/evolution/scripts/run-load-sensitive.mjs .",
       "argv": [
@@ -1107,7 +1150,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-14",
+      "id": "ci-only-16",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
       "argv": [
@@ -1126,7 +1169,7 @@
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
     {
-      "id": "ci-only-15",
+      "id": "ci-only-17",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
       "argv": [
@@ -1140,6 +1183,22 @@
       ],
       "reason": "probe registry schema lint; the CI job executes it, the mirror local lane has no platform overlay",
       "owner": "ci"
+    },
+    {
+      "id": "ci-only-18",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-requirements.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
     },
     {
       "id": "line-identity-ci",

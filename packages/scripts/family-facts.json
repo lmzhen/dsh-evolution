@@ -287,7 +287,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 57 steps",
+          "text": "all 58 steps",
           "unique": true
         }
       ],
@@ -675,7 +675,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "78fddbd585f1e0afd442441e9b3332c077bc24ea56bf778ecdbe627b8c2f629f",
+        "sha256": "6ef515aff8d061665a4c968b2ac37d01de38ece9279220188857cbe155bd61e5",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -973,6 +973,11 @@
             "criterion": "assemble-release-evidence"
           },
           {
+            "id": "gate-58",
+            "tier": "fast",
+            "criterion": "verify-upstream"
+          },
+          {
             "id": "ci-only-01",
             "tier": "ci-only",
             "criterion": "audit-release-tarballs",
@@ -1018,43 +1023,58 @@
           },
           {
             "id": "ci-only-08",
-            "tier": "unmapped",
-            "criterion": "inject-evolution-paths"
+            "tier": "ci-only",
+            "criterion": "gen-requirements"
           },
           {
             "id": "ci-only-09",
             "tier": "unmapped",
-            "criterion": "install-layered"
+            "criterion": "inject-evolution-paths"
           },
           {
             "id": "ci-only-10",
             "tier": "unmapped",
-            "criterion": "lib-line-header"
+            "criterion": "install-layered"
           },
           {
             "id": "ci-only-11",
             "tier": "unmapped",
-            "criterion": "prepare-release"
+            "criterion": "lib-line-header"
           },
           {
             "id": "ci-only-12",
             "tier": "unmapped",
-            "criterion": "publish-scoped"
+            "criterion": "prepare-release"
           },
           {
             "id": "ci-only-13",
             "tier": "unmapped",
-            "criterion": "run-load-sensitive"
+            "criterion": "publish-scoped"
           },
           {
             "id": "ci-only-14",
+            "tier": "unmapped",
+            "criterion": "requirements.selftest"
+          },
+          {
+            "id": "ci-only-15",
+            "tier": "unmapped",
+            "criterion": "run-load-sensitive"
+          },
+          {
+            "id": "ci-only-16",
             "tier": "ci-only",
             "criterion": "verify-layout-sync"
           },
           {
-            "id": "ci-only-15",
+            "id": "ci-only-17",
             "tier": "ci-only",
             "criterion": "verify-probes"
+          },
+          {
+            "id": "ci-only-18",
+            "tier": "ci-only",
+            "criterion": "verify-requirements"
           },
           {
             "id": "line-identity-ci",
@@ -1098,7 +1118,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 76,
+            "rowsWithoutIt": 80,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -1770,12 +1790,6 @@
             "owner": "scripts"
           },
           {
-            "id": "ci-only-08",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-08",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
             "id": "ci-only-09",
             "reasonRef": "scripts/gate-manifest.json#ci-only-09",
             "expiry": "0.26.0",
@@ -1802,6 +1816,18 @@
           {
             "id": "ci-only-13",
             "reasonRef": "scripts/gate-manifest.json#ci-only-13",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-14",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-14",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-15",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-15",
             "expiry": "0.26.0",
             "owner": "scripts"
           }

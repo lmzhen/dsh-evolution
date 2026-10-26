@@ -1,0 +1,334 @@
+{
+  "items": [
+    {
+      "id": "FR-DEF-01",
+      "kind": "FR",
+      "title": "mergeApproval 默认 false；mergeSkippedTtlDays 默认 0；mergeRunTimeoutMinutes ...",
+      "statement": "mergeApproval 默认 false；mergeSkippedTtlDays 默认 0；mergeRunTimeoutMinutes 默认 0",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "默认值可读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 269
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-DEF-02",
+      "kind": "FR",
+      "title": "默认串行；无自动运行；无步骤 plan；scope 只 family-managed",
+      "statement": "默认串行；无自动运行；无步骤 plan；scope 只 family-managed",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "行为符合"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 270
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-DEF-03",
+      "kind": "FR",
+      "title": "用户旋钮 E3：mergeApproval/mergeSkippedTtlDays/mergeRunTimeoutMinutes；部署输入 E...",
+      "statement": "用户旋钮 E3：mergeApproval/mergeSkippedTtlDays/mergeRunTimeoutMinutes；部署输入 E2/internal：模型预算、候选阈值、referencedSkillNames；mergeRunTimeoutMinutes 只在 E3",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "设置卡/params/doctor 档位一致"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 271
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-DEF-04",
+      "kind": "FR",
+      "title": "不把 plan 当成提交前必需物；候选清单/摘要/报告允许",
+      "statement": "不把 plan 当成提交前必需物；候选清单/摘要/报告允许",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "无 plan 也能 run"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 272
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-DEF-05",
+      "kind": "FR",
+      "title": "60 字描述仅建议；不因此拒绝",
+      "statement": "60 字描述仅建议；不因此拒绝",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "描述超 60 仍可通过校验"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 273
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "NFR-01",
+      "kind": "NFR",
+      "title": "长跑不绑定请求/客户端；305 s 内不中断",
+      "statement": "长跑不绑定请求/客户端；305 s 内不中断",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "kill 客户端后 run 仍可完成"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 317
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "NFR-02",
+      "kind": "NFR",
+      "title": "工具结果 8k 上限；命令输出只回摘要/路径/short hash；报告文件可存逐对明细，但不整篇回模型",
+      "statement": "工具结果 8k 上限；命令输出只回摘要/路径/short hash；报告文件可存逐对明细，但不整篇回模型",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "不把整篇正文回给模型；报告文件可审计"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 318
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "NFR-03",
+      "kind": "NFR",
+      "title": "子智能体输出受模型 maxTokens 影响；插件必须校验/容错",
+      "statement": "子智能体输出受模型 maxTokens 影响；插件必须校验/容错",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "大输出不越界；失败可恢复"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 319
+      },
+      "baselineStatus": "unverified"
+    },
+    {
+      "id": "NFR-04",
+      "kind": "NFR",
+      "title": "同 pair 在飞返回同一 run；同 target 串行；重复 approve 用 claim 只起一个 agent2；跨平面读 forei...",
+      "statement": "同 pair 在飞返回同一 run；同 target 串行；重复 approve 用 claim 只起一个 agent2；跨平面读 foreign 行",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "重跑不重复计费/不双写；冲突有明确结果"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 320
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "NFR-05",
+      "kind": "NFR",
+      "title": "崩溃/重启后 run/staging/pending 可收敛",
+      "statement": "崩溃/重启后 run/staging/pending 可收敛",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "读时收敛；无孤儿不可见"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 321
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "NFR-06",
+      "kind": "NFR",
+      "title": "数据损坏不静默丢；保留现场/版本",
+      "statement": "数据损坏不静默丢；保留现场/版本",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "损坏有提示/迁移"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 322
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "NFR-07",
+      "kind": "NFR",
+      "title": "语法错两行、运行失败三行（stage/code/next + run id）；诊断不含技能正文/凭据",
+      "statement": "语法错两行、运行失败三行（stage/code/next + run id）；诊断不含技能正文/凭据",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "报告/命令可读；脱敏检查通过"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 323
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "NFR-08",
+      "kind": "NFR",
+      "title": "审批关/同 run 路径下，同 child 第 2 轮复用第 1 轮上下文、不重发整篇源文；审批开另起 agent2 run 时允许 cach...",
+      "statement": "审批关/同 run 路径下，同 child 第 2 轮复用第 1 轮上下文、不重发整篇源文；审批开另起 agent2 run 时允许 cache 损失，不要求复用",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "审批关路径 cacheRead/上下文复用可查；审批开路径不误判"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 324
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "NFR-09",
+      "kind": "NFR",
+      "title": "GET 零写 / Facts 纯读 / Reconcile 显式写（v2.1）",
+      "statement": "GET 零写 / Facts 纯读 / Reconcile 显式写（v2.1）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "write-spy io × 4 panel GET × 状态注入零写；ReconcileReport 可查"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 180
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "NFR-10",
+      "kind": "NFR",
+      "title": "wire/命令面版本化（v2.1）",
+      "statement": "wire/命令面版本化（v2.1）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "wireVersion=1 全信封；CommandSurface 版本；版本不符可读失败"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 181
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

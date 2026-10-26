@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { parseDecision } from '../src/index.ts'
+import { forcedDecisionFor } from '../src/runtime.ts'
 
 const pair = { a: 'alpha-skill', b: 'beta-skill' }
 const valid = { should_merge: true, mode: 'merge-into-existing', target: 'alpha-skill', sources: ['alpha-skill', 'beta-skill'], rationale: 'same', confidence: 0.9 }
@@ -16,6 +17,16 @@ it('maps keep and rejects invalid decisions', () => {
   expect(parseDecision(JSON.stringify({ ...valid, target: '' }), pair)).toMatchObject({ ok: false })
   expect(parseDecision(JSON.stringify({ ...valid, sources: ['alpha-skill'] }), pair)).toMatchObject({ ok: false })
   expect(parseDecision('not json', pair)).toMatchObject({ ok: false })
+})
+
+it('parses create-umbrella and forced decisions with pending summaries', () => {
+  expect(parseDecision(JSON.stringify({ ...valid, mode: 'create-umbrella', target: 'merge-a-b' }), pair)).toMatchObject({ ok: true, decision: { mode: 'create-umbrella', target: 'merge-a-b' } })
+  const forced = forcedDecisionFor('a'.repeat(40), 'b'.repeat(40))
+  expect(forced.target.length).toBeLessThanOrEqual(64)
+  expect(forced).toMatchObject({ mode: 'create-umbrella', shouldMerge: true })
+  expect(forced.aSummary.length).toBeGreaterThan(0)
+  expect(forced.bSummary.length).toBeGreaterThan(0)
+  expect(forced.rationale.length).toBeGreaterThan(0)
 })
 
 it('fails closed when maxTokens truncates the decision JSON', () => {

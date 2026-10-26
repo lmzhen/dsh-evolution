@@ -221,17 +221,24 @@ export async function reserveStage(io: EvolutionIoLike, home: string, entry: Sta
 export async function presentStage(io: EvolutionIoLike, home: string, entry: StageEntry): Promise<void> {
   await writeStageIndex(io, home, { rowId: entry.rowId, pairKey: entry.pairKey, ref: entry.ref, expiresAt: entry.expiresAt, ...(entry.runId === undefined ? {} : { runId: entry.runId }), createdAt: entry.createdAt, state: 'present' })
 }
-export async function dropStage(io: EvolutionIoLike, home: string, rowId: string, ref?: string): Promise<void> {
-  await io.remove(join(home, 'merge', 'staging-index', encodeURIComponent(rowId) + '.json')).catch(() => {})
-  if (ref !== undefined && ref !== '') await io.remove(join(home, 'merge', 'runs', ref)).catch(() => {})
+export async function dropStage(io: EvolutionIoLike, home: string, rowId: string, ref?: string, onError?: (path: string, error: unknown) => void): Promise<void> {
+  const index = join(home, 'merge', 'staging-index', encodeURIComponent(rowId) + '.json')
+  await io.remove(index).catch(error => onError?.(index, error))
+  if (ref !== undefined && ref !== '') {
+    const tree = join(home, 'merge', 'runs', ref)
+    await io.remove(tree).catch(error => onError?.(tree, error))
+  }
 }
-export interface StageCleanupResult { readonly removed: readonly string[]; readonly expired: readonly string[]; readonly kept: readonly string[]; readonly orphans: readonly string[] }
+export interface StageCleanupFailure { readonly path: string; readonly message: string }
+export interface StageCleanupResult { readonly removed: readonly string[]; readonly expired: readonly string[]; readonly kept: readonly string[]; readonly orphans: readonly string[]; readonly failures: readonly StageCleanupFailure[] }
 /** Bounded cleanup: reserved/present TTL, pending/verify stale index removal, terminal/absent rows, orphan trees. */
 export async function cleanupStage(io: EvolutionIoLike, home: string, now: number, rows: ReadonlyMap<string, { readonly state: string }>, limit = 100): Promise<StageCleanupResult> {
   const removed: string[] = []
   const expired: string[] = []
   const kept: string[] = []
   const orphans: string[] = []
+  const failures: StageCleanupFailure[] = []
+  const fail = (path: string, error: unknown): void => { failures.push({ path, message: error instanceof Error ? error.message : String(error) }) }
   const refs = new Set<string>()
   const indexRoot = join(home, 'merge', 'staging-index')
   const names = await io.exists(indexRoot) ? await listOrEmpty(io, indexRoot) : []
@@ -245,18 +252,18 @@ export async function cleanupStage(io: EvolutionIoLike, home: string, now: numbe
     if (entry.ref !== '') refs.add(entry.ref)
     const row = rows.get(entry.rowId)
     const terminal = row === undefined || row.state === 'skipped'
-    if (terminal || row?.state === 'pending' || row?.state === 'verify') { await dropStage(io, home, entry.rowId, entry.ref); removed.push(entry.rowId); continue }
+    if (terminal || row?.state === 'pending' || row?.state === 'verify') { await dropStage(io, home, entry.rowId, entry.ref, fail); removed.push(entry.rowId); continue }
     if (entry.expiresAt <= now) {
       if (entry.state === 'present') {
         // The index is the durable record both the read face and the resume path consult:
         // stamp it expired instead of leaving a present entry that reads as live elsewhere.
         try {
           await writeStagingIndex(io, home, { rowId: entry.rowId, pairKey: typeof entry.pairKey === 'string' ? entry.pairKey : '', ref: entry.ref, expiresAt: entry.expiresAt, createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : now, state: 'expired' })
-        } catch { /* the read face still derives expired */ }
+        } catch (error) { /* the read face still derives expired; visibility is still required */ fail(join(indexRoot, name), error) }
         expired.push(entry.rowId)
         continue
       }
-      await dropStage(io, home, entry.rowId, entry.ref); removed.push(entry.rowId); continue
+      await dropStage(io, home, entry.rowId, entry.ref, fail); removed.push(entry.rowId); continue
     }
     kept.push(entry.rowId)
   }
@@ -265,10 +272,10 @@ export async function cleanupStage(io: EvolutionIoLike, home: string, now: numbe
   for (const run of runNames.slice(0, limit)) {
     const prefix = run + '/'
     if ([...refs].some(ref => ref === run || ref.startsWith(prefix))) continue
-    await io.remove(join(runRoot, run)).catch(() => {})
+    await io.remove(join(runRoot, run)).catch(error => fail(join(runRoot, run), error))
     orphans.push(run)
   }
-  return { removed, expired, kept, orphans }
+  return { removed, expired, kept, orphans, failures }
 }
 
 /** Read all production v2 stage entries. */

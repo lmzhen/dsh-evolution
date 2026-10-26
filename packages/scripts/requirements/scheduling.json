@@ -1,0 +1,268 @@
+{
+  "items": [
+    {
+      "id": "FR-SCHED-01",
+      "kind": "FR",
+      "title": "v1 不自动运行；保留 lastRunAt/启动补偿/SchedulerPort、失败清理/并发/暂停/重试设计",
+      "statement": "v1 不自动运行；保留 lastRunAt/启动补偿/SchedulerPort、失败清理/并发/暂停/重试设计",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "无默认定时；设计文档保留全部项"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 239
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCHED-02",
+      "kind": "FR",
+      "title": "未来自动运行：agent1 停 pending，批准后 agent2；默认间隔 7 天（设计保留）",
+      "statement": "未来自动运行：agent1 停 pending，批准后 agent2；默认间隔 7 天（设计保留）",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "设计保留；不实现；默认值有记录"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 240
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-SCHED-03",
+      "kind": "FR",
+      "title": "curator 168 h 定时整理不与 mergeSkippedTtlDays 共用参数",
+      "statement": "curator 168 h 定时整理不与 mergeSkippedTtlDays 共用参数",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两参数独立"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 241
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-PLUG-01",
+      "kind": "FR",
+      "title": "功能模块放进插件目录（JS）；TS 草稿只参考",
+      "statement": "功能模块放进插件目录（JS）；TS 草稿只参考",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "生产入口不依赖外部 node 包"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 242
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-PLUG-02",
+      "kind": "FR",
+      "title": "/evolution 只保留一个命令注册者；merge 子命令由 merge handler 分派",
+      "statement": "/evolution 只保留一个命令注册者；merge 子命令由 merge handler 分派",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "无重复注册；help 正确"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 243
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-PLUG-03",
+      "kind": "FR",
+      "title": "与 curator 同一把锁/instance claim 串行",
+      "statement": "与 curator 同一把锁/instance claim 串行",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "同 home 不双写"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 244
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-PLUG-04",
+      "kind": "FR",
+      "title": "命令进 all/preset；面板只 all；host-only E-323；INSTALL 形态表写明面板可见性",
+      "statement": "命令进 all/preset；面板只 all；host-only E-323；INSTALL 形态表写明面板可见性",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "三形态安装矩阵与文档一致"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 245
+      },
+      "baselineStatus": "unverified"
+    },
+    {
+      "id": "FR-PLUG-05",
+      "kind": "FR",
+      "title": "doctor 增加 merge 段：四队列计数、最近 run、staging、审批形态、host-only 故障；修正不存在的 /evolut...",
+      "statement": "doctor 增加 merge 段：四队列计数、最近 run、staging、审批形态、host-only 故障；修正不存在的 /evolution runs 补救命令",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "doctor 可见且命令正确；能回答 host-only/审批/staging 不可读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 246
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-PLUG-06",
+      "kind": "FR",
+      "title": "设置卡独立 owner 行，不挂“维护扫描”",
+      "statement": "设置卡独立 owner 行，不挂“维护扫描”",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "卡名/字段正确"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 247
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-PLUG-07",
+      "kind": "FR",
+      "title": "管理面只读路由 + 生成式路由表；不自建 family fence",
+      "statement": "管理面只读路由 + 生成式路由表；不自建 family fence",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "路由一致；鉴权走平台"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 248
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-PLUG-08",
+      "kind": "FR",
+      "title": "报告/长跑表/清理与 maintain 先例一致",
+      "statement": "报告/长跑表/清理与 maintain 先例一致",
+      "priority": "P2",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "报告可回读、可清理"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 249
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-PLUG-09",
+      "kind": "FR",
+      "title": "产品面三轴：能力可用性/入口可见性/配置值；安装形态影响前两者，设置/部署输入影响第三者，不得混说",
+      "statement": "产品面三轴：能力可用性/入口可见性/配置值；安装形态影响前两者，设置/部署输入影响第三者，不得混说",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "帮助/INSTALL/设置卡三处措辞一致"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 250
+      },
+      "baselineStatus": "unverified"
+    }
+  ]
+}

@@ -49,6 +49,7 @@ export function makeMergeRoutes(
 ): ConnectionFetchRouteLike[] {
   const absent = () => json(404, { wireVersion: 1, code: 'E-325', message: 'merge service is not mounted' })
   const blocked = (readiness: StateReadiness) => json(503, { wireVersion: 1, code: 'merge-state-blocked', readiness })
+  const hostOnly = (snapshot: MergeSnapshot): Response | null => snapshot.hostOnly === undefined ? null : json(503, { wireVersion: 1, code: 'E-323', message: snapshot.hostOnly.detail ?? 'host data plane unavailable' })
   const notReady = async (source: MergeRouteSource): Promise<Response | null> => {
     if (source.readiness === undefined) return null
     const readiness = await source.readiness()
@@ -70,6 +71,8 @@ export function makeMergeRoutes(
         if (source.snapshot !== undefined) {
           const snapshot = await source.snapshot()
           if (snapshot.blocked !== undefined) return json(503, { wireVersion: 1, code: 'merge-state-blocked', readiness: snapshot.blocked.readiness })
+          const capability = hostOnly(snapshot)
+          if (capability !== null) return capability
           return json(200, buildSnapshotFacts(snapshot))
         }
         const readiness = await notReady(source)
@@ -98,6 +101,8 @@ export function makeMergeRoutes(
         if (source.snapshot !== undefined) {
           const snapshot = await source.snapshot()
           if (snapshot.blocked !== undefined) return json(503, { wireVersion: 1, code: 'merge-state-blocked', readiness: snapshot.blocked.readiness })
+          const capability = hostOnly(snapshot)
+          if (capability !== null) return capability
           try { return json(200, buildQueuePage(snapshot, queue as QueueId, expiredOnly, query.get('cursor') ?? undefined, Number.isFinite(limit) ? limit : 50)) } catch (error) { return bad(error instanceof Error ? error.message : 'queue cursor is stale') }
         }
         const readiness = await notReady(source)
@@ -126,6 +131,8 @@ export function makeMergeRoutes(
         if (source.snapshot !== undefined) {
           const snapshot = await source.snapshot()
           if (snapshot.blocked !== undefined) return json(503, { wireVersion: 1, code: 'merge-state-blocked', readiness: snapshot.blocked.readiness })
+          // Body/history are read-only projections of already-written files; a host without
+          // the live agent data plane can still read past reports and archived bodies.
           const refs = id !== null && id !== '' ? snapshot.bodyRefs.filter(ref => ref.rowId === id) : snapshot.bodyRefs.filter(ref => ref.name === name)
           if (refs.length === 0) return json(404, { wireVersion: 1, code: 'merge-body-not-found', message: 'merge body not found' })
           if (name !== null && refs.length > 1) return bad('name matches multiple merge rows')

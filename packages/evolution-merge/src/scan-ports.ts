@@ -125,6 +125,7 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           reuseStaging: true,
           target: decision.target,
           mode: decision.mode,
+          sources: [row.a, row.b],
           cards: options.cards,
           commitPort: options.commitPort,
           ...(options.unit === undefined ? {} : { unit: options.unit }),
@@ -134,6 +135,7 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           ...(options.limits === undefined ? {} : { limits: options.limits }),
           promptVersion: MERGE_PROMPT_VERSION,
           promptHash: promptHashOf(buildRound2Prompt(row, decision)),
+          signal,
           revisions: {
             ...(decision.targetRevisionRef === undefined ? {} : { targetRevision: decision.targetRevisionRef }),
             ...(decision.sourceRevisions === undefined ? {} : { sourceRevisions: decision.sourceRevisions }),
@@ -153,6 +155,7 @@ export function createChannelScanPorts(options: CreateScanPortsOptions): ScanPor
           ...(receipt?.unitId === undefined ? {} : { unitId: receipt.unitId }),
           ...(receipt?.evidenceSha256 === undefined ? {} : { evidenceSha256: receipt.evidenceSha256 }),
           ...(receipt?.validationPlan === undefined ? {} : { validationPlan: receipt.validationPlan }),
+          ...(authored.lengths === undefined ? {} : { lengths: authored.lengths }),
           ...(usage === undefined ? {} : { usage }),
           archived: receipt?.archived ?? [],
           target: { requested: decision.target, actual: authored.commit.plan.target, created: receipt?.create ?? false },

@@ -21,6 +21,7 @@ it('runs scan through channel authoring and commit', async () => {
   const stageKey = stageKeyOf('run-1', pairKey('alpha-skill', 'beta-skill'))
   let disposed = 0
   let first = true
+  const phases: string[] = []
   const channel: ConversationChannelLike = {
     async open() { return { kind: 'ok', childId: 'child-1', turn: { text: 'standby', stopReason: 'completed' } } },
     async continueTurn() {
@@ -37,8 +38,12 @@ it('runs scan through channel authoring and commit', async () => {
     io, home, runId: 'run-1', cards,
     screening: async () => [{ a: 'alpha-skill', b: 'beta-skill' }],
     channel, parent: {}, allow: [], timeoutMs: 1000, approval: false, commitPort: commitPort(), now: () => 200,
+    onChild: context => { phases.push(context.phase) },
   })
   const draft = await runScan({ io, home, now: () => 200, signal: new AbortController().signal, approval: false, ports })
   expect(draft.totals).toEqual({ merged: 1, kept: 0, pending: 0, failed: 0 })
+  const bodyBytes = Buffer.byteLength(BODY('umbrella'), 'utf8')
+  expect(draft.pairs[0]?.lengths).toEqual({ bodyBytes, fileBytes: 0, totalBytes: bodyBytes })
   expect(disposed).toBe(1)
+  expect(phases).toEqual(['decide', 'author'])
 })

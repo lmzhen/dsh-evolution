@@ -1,0 +1,202 @@
+{
+  "items": [
+    {
+      "id": "FR-DATA-01",
+      "kind": "FR",
+      "title": "pair 键=两源名排序拼接；不做内容 hash（源 sourceRevision 只作失效锚）；改名/删除=从 active 队列清除，ru...",
+      "statement": "pair 键=两源名排序拼接；不做内容 hash（源 sourceRevision 只作失效锚）；改名/删除=从 active 队列清除，run/report 保留审计，不设队列墓碑",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "改名/删除后旧队列不再显示；报告仍可查；新键重评"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 192
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-DATA-02",
+      "kind": "FR",
+      "title": "pending/skipped 状态用 evolutionIo JSON，不扩 state-storage 三表",
+      "statement": "pending/skipped 状态用 evolutionIo JSON，不扩 state-storage 三表",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "文件可读；无新表"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 193
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-DATA-03",
+      "kind": "FR",
+      "title": "pending 记录含技能名、三句话摘要、decision、target/sources、targetRevision/sourceRevis...",
+      "statement": "pending 记录含技能名、三句话摘要、decision、target/sources、targetRevision/sourceRevision（不透明锚，来自平台版本或内容摘要；只作失效判定，不作 pair 键）、状态、来源、originRunId、时间、模型/prompt 版本；不存正文",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "sourceRevision 必存且 opaque；不要求 sha256；无正文落盘"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 194
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-DATA-04",
+      "kind": "FR",
+      "title": "skipped 记录含一句话原因（agent KEEP 由模型总结；人工/超限固定）、来源（agent/human/system）、状态（ac...",
+      "statement": "skipped 记录含一句话原因（agent KEEP 由模型总结；人工/超限固定）、来源（agent/human/system）、状态（active/历史审计）",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "原因可读；三类来源可区分"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 195
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-DATA-05",
+      "kind": "FR",
+      "title": "run 记录与报告分离：机器状态 vs 人读结果",
+      "statement": "run 记录与报告分离：机器状态 vs 人读结果",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "run 可查状态；报告可读 per-pair"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 196
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-DATA-06",
+      "kind": "FR",
+      "title": "审计只写 run + report + per-skill mutations；目标 1 条、每个源 1 条，origin=foregroun...",
+      "statement": "审计只写 run + report + per-skill mutations；目标 1 条、每个源 1 条，origin=foreground；runId 可出现在 run/report/历史首条记录，不新增 mutation 字段；不新增 events/activity",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "mutation 条数/来源可查；历史首条 runId 可读；无新事件流"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 197
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-DATA-07",
+      "kind": "FR",
+      "title": "源 usage 折叠复用 curator 口径；不折叠会让归档源仍显活跃",
+      "statement": "源 usage 折叠复用 curator 口径；不折叠会让归档源仍显活跃",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "合并后源显示 archived；未折叠有验收失败"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 198
+      },
+      "baselineStatus": "gap"
+    },
+    {
+      "id": "FR-DATA-08",
+      "kind": "FR",
+      "title": "状态文件损坏/版本/清理规则：损坏保留原文件并报错，不静默重置；版本不符迁移或拒绝；staging 7 天自动清、报告按 sweepRepor...",
+      "statement": "状态文件损坏/版本/清理规则：损坏保留原文件并报错，不静默重置；版本不符迁移或拒绝；staging 7 天自动清、报告按 sweepReports；pending expired 只读保留到报告保留期后清理；skipped 到期标 expired、不删、可 restore，计入 counts.expired；清理失败可见",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "损坏不静默丢；版本迁移/拒绝；staging/报告/pending 清理各有验收；skipped expired 可见"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 199
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-DATA-09",
+      "kind": "FR",
+      "title": "跨平面共享 home 的 run/pending 可收敛；merge 清单是决策事实源，筛选 ledger 只是候选缓存，冲突以清单为准",
+      "statement": "跨平面共享 home 的 run/pending 可收敛；merge 清单是决策事实源，筛选 ledger 只是候选缓存，冲突以清单为准",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两平面看到一致状态；ledger 不覆盖 skipped/pending"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 200
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

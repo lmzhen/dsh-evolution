@@ -60,7 +60,7 @@ export interface RunProgress {
 }
 
 /** The four terminal-or-live states of a run. */
-export type RunState = 'running' | 'succeeded' | 'failed' | 'cancelled'
+export type RunState = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
 
 /** One tracked run. `resultRef` is a path to the run's report, never its content. */
 export interface RunRecord {
@@ -117,7 +117,7 @@ export interface RunHandle {
 
 /** How a run ended, as reported by its owner. */
 export interface RunOutcome {
-  state: 'succeeded' | 'failed' | 'cancelled'
+  state: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
   resultRef?: string | undefined
   failure?: string | undefined
   /** @deprecated Legacy merge projection; read-only compatibility, never written. */
@@ -204,7 +204,7 @@ export function runsFile(home: string): string {
   return join(home, 'runs.json')
 }
 
-const TERMINAL: ReadonlySet<RunState> = new Set<RunState>(['succeeded', 'failed', 'cancelled'])
+const TERMINAL: ReadonlySet<RunState> = new Set<RunState>(['succeeded', 'failed', 'cancelled', 'interrupted'])
 
 /**
  * Parse an index body into records.

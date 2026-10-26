@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { readCommitReceipt, runAuthoring, writeStagedFile, type CommitPort, type SkillCard } from '../src/index.ts'
 
@@ -31,6 +31,14 @@ it('authors a staged tree, passes the gate and commits', async () => {
   expect(await readCommitReceipt(io, home, 'run-1')).toMatchObject({ unitId: 'u-1', target: 'umbrella' })
 })
 
+it('fails closed on a target with a separator before authoring', async () => {
+  const home = await tempRoot('dsh-merge-authoring-target-')
+  const io = nodeEvolutionIo()
+  const result = await runAuthoring({ io, home, runId: 'run-target', target: 'bad/target', cards, commitPort: port(), now: () => 200, summary: 'merge', async author() { throw new Error('must not author') } })
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.code).toBe('target-invalid')
+})
+
 it('refuses when the author fails or leaves a blocking tree', async () => {
   const home = await tempRoot('dsh-merge-authoring-fail-')
   const io = nodeEvolutionIo()
@@ -48,6 +56,36 @@ it('refuses when the author fails or leaves a blocking tree', async () => {
   if (blocking.ok) return
   expect(blocking.findings?.some(finding => finding.rule === 'frontmatter')).toBe(true)
 })
+it('uses one limits snapshot at the gate and never commits an over-limit tree', async () => {
+  const home = await tempRoot('dsh-merge-authoring-limits-')
+  const io = nodeEvolutionIo()
+  let commits = 0
+  const commitPort: CommitPort = { readSkill: port().readSkill, async commitMerge(plan) { commits += 1; return { ok: true, message: 'merged', unitId: 'u-limit', archived: plan.sources, mutations: 1 } } }
+  const result = await runAuthoring({
+    io, home, runId: 'run-limit', target: 'umbrella', cards, commitPort, now: () => 200, summary: 'merge',
+    limits: { ...DEFAULT_SKILL_LIMITS, maxSkillFileBytes: 8 },
+    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) },
+  })
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.findings?.some(finding => finding.rule === 'limit' && finding.severity === 'block')).toBe(true)
+  expect(commits).toBe(0)
+  expect(await readCommitReceipt(io, home, 'run-limit')).toBeNull()
+})
+
+it('allows the exact limit and rejects one byte over at both gate and commit', async () => {
+  const body = BODY('umbrella')
+  const exact = Buffer.byteLength(body, 'utf8')
+  for (const [runId, limit, ok] of [['run-exact', exact, true], ['run-over', exact - 1, false]] as const) {
+    const home = await tempRoot('dsh-merge-authoring-boundary-')
+    const io = nodeEvolutionIo()
+    let commits = 0
+    const commitPort: CommitPort = { readSkill: port().readSkill, async commitMerge(plan) { commits += 1; return { ok: true, message: 'merged', unitId: 'u-' + runId, archived: plan.sources, mutations: 1 } } }
+    const result = await runAuthoring({ io, home, runId, target: 'umbrella', cards, commitPort, now: () => 200, summary: 'merge', limits: { ...DEFAULT_SKILL_LIMITS, maxSkillFileBytes: limit }, async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', body) } })
+    expect(result.ok, runId).toBe(ok)
+    expect(commits).toBe(ok ? 1 : 0)
+  }
+})
+
 it('refuses a pinned target before authoring', async () => {
   const home = await tempRoot('dsh-merge-authoring-pinned-')
   const io = nodeEvolutionIo()

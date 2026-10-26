@@ -30,6 +30,36 @@ it('runs merge then keep, dropping the committed row and keeping the skipped row
   expect(rows.map(row => row.state)).toEqual(['skipped'])
 })
 
+it('records the model identity on a pending decision', async () => { const home = await tempRoot('dsh-merge-scan-model-'); const io = nodeEvolutionIo(); await runScan({ io, home, now: () => 1000, signal: new AbortController().signal, approval: true, model: 'deepseek-flash', ports: ports() }); const rows = (await loadMergeState(io, home)).state.rows; expect(rows).toHaveLength(2); expect(rows[0]?.decision?.model).toBe('deepseek-flash') })
+
+it('records a validation failure as failed, not skipped', async () => { const home = await tempRoot('dsh-merge-scan-validation-'); const io = nodeEvolutionIo(); const draft = await runScan({ io, home, now: () => 1000, signal: new AbortController().signal, approval: false, ports: ports({ async round2() { return { kind: 'failed', failure: { stage: 'validate', code: 'merge-validation', message: 'bad tree', retryable: false, retryFrom: 'none' } } } }) }); expect(draft.totals.failed).toBe(1); expect(draft.pairs[0]?.outcome).toBe('failed'); const rows = (await loadMergeState(io, home)).state.rows; expect(rows.some(row => row.a === 'a' && row.b === 'b' && row.state === 'skipped')).toBe(false) });
+
+it('puts L0/L1 report-only rows into the report without executing them', async () => {
+  const home = await tempRoot('dsh-merge-scan-report-only-')
+  const io = nodeEvolutionIo()
+  const draft = await runScan({
+    io, home, now: () => 1000, signal: new AbortController().signal, approval: false,
+    ports: ports({ async screening() { return Object.assign([...candidates], { candidatePairs: 2, reportOnly: [{ a: 'x', b: 'y', gate: { level: 'L0' as const } }] }) } }),
+  })
+  expect(draft.reportOnly?.map(pair => pair.pairKey)).toContain('x\u0000y')
+  expect(draft.pairs.map(pair => pair.outcome)).toEqual(['merged', 'kept'])
+})
+
+it('records natural lengths from a merged pair', async () => {
+  const home = await tempRoot('dsh-merge-scan-lengths-')
+  const io = nodeEvolutionIo()
+  const draft = await runScan({ io, home, now: () => 1000, signal: new AbortController().signal, approval: false, ports: ports({ async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'], lengths: { bodyBytes: 10, fileBytes: 0, totalBytes: 10 } } } }) })
+  expect(draft.pairs.find(pair => pair.outcome === 'merged')?.lengths).toEqual({ bodyBytes: 10, fileBytes: 0, totalBytes: 10 })
+})
+
+it('reports every pair and emits no plan/dry-run artifact', async () => {
+  const home = await tempRoot('dsh-merge-scan-no-plan-')
+  const io = nodeEvolutionIo()
+  const draft = await runScan({ io, home, now: () => 1000, signal: new AbortController().signal, approval: false, ports: ports() })
+  expect(draft.pairs.map(pair => pair.pairKey)).toHaveLength(2)
+  expect('plan' in draft).toBe(false)
+})
+
 it('stops with remaining when the time budget is already exhausted', async () => {
   const home = await tempRoot('dsh-merge-scan-timeout-')
   const io = nodeEvolutionIo()

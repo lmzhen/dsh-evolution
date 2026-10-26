@@ -54,7 +54,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
     const fused = await pairLedger(options.io, options.home).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       if (current === undefined) return null
-      const moved = tx.transition(row.id, { type: 'staged' }, current.version)
+      const moved = tx.transition(row.id, { type: 'staged', stagingRef: staged.entry.ref, stagingExpiresAt: staged.entry.expiresAt }, current.version)
       return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
     })
     if (fused === null) return failure('approve', 'row-changed', '行在暂存完成前被并发修改：' + row.id, '运行 /evolution merge status ' + row.id + ' 后重试', row.runId)
@@ -68,6 +68,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
     command: 'approve',
     approval: { platformWrite: options.platformWrite, mergeApproval: true },
     pairKey: row.pairKey,
+    ...(row.stagingRef === undefined ? {} : { stagingRef: row.stagingRef }),
     parentRunId,
     now: options.now,
     ...(options.detached === true ? { detached: true } : {}),

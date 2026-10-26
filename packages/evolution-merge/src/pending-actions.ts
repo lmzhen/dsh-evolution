@@ -9,7 +9,7 @@ import { pairLedger } from './domain/pair-ledger.ts'
 
 export type PendingActionResult =
   | { readonly ok: true; readonly row: MergeRow }
-  | { readonly ok: false; readonly reason: 'not-found' | 'not-pending' | 'invalid'; readonly message: string }
+  | { readonly ok: false; readonly reason: 'not-found' | 'not-pending' | 'invalid' | 'expired'; readonly message: string }
 
 async function act(io: EvolutionIoLike, home: string, now: () => number, id: string, type: 'approve' | 'reject'): Promise<PendingActionResult> {
   void now
@@ -17,6 +17,9 @@ async function act(io: EvolutionIoLike, home: string, now: () => number, id: str
     const row = tx.rows().find(item => item.id === id)
     if (row === undefined) return { ok: false, reason: 'not-found', message: 'pending row not found: ' + id }
     if (row.state !== 'pending') return { ok: false, reason: 'not-pending', message: 'row is not pending: ' + row.state }
+    // Expired pending rows are read-only until discarded or re-paired; approve/reject would
+    // resurrect a target/source decision that reconcile already invalidated.
+    if (row.expired !== undefined) return { ok: false, reason: 'expired', message: 'pending row expired (' + row.expired + '): only discard or re-pair' }
     const event = type === 'approve'
       ? { type: 'approved' as const, runId: row.runId ?? 'approve:' + id }
       : { type: 'skipped' as const, reason: 'rejected', origin: 'human' as const }

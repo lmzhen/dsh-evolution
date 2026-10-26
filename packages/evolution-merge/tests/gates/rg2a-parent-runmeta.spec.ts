@@ -35,11 +35,11 @@ it('run-meta writes only pairCount/reportRef and ignores legacy pairKeys on read
   expect(raw).not.toContain('"pairKey"')
 })
 
-it('CAS hook is typed expired and recordRound2Outcome keeps the row visible as skipped', async () => {
+it('CAS hook is typed expired and recordRound2Outcome keeps the row as failed, not skipped', async () => {
   expect(casExpiredHook('target-changed')).toEqual({ kind: 'expired', reason: 'target-taken', write: false })
   const v4 = await makeV4Home([v3Row({ id: 'f1', state: 'fuse', target: 'a', decision, runId: 'run-1' })])
   const record = await recordRound2Outcome(v4.io, v4.home, () => 1, (await loadMergeState(v4.io, v4.home)).state.rows[0]!, { kind: 'failed', failure: { stage: 'commit', code: 'target-changed', message: 'target changed', retryable: true, retryFrom: 'agent2' } })
   expect(record.merged).toBe(false)
   expect(record.pair.failure?.code).toBe('target-taken')
-  expect((await loadMergeState(v4.io, v4.home)).state.rows[0]).toMatchObject({ state: 'skipped', reason: 'target-taken' })
+  expect((await loadMergeState(v4.io, v4.home)).state.rows[0]).toMatchObject({ state: 'fuse', failure: { code: 'target-taken' } })
 })

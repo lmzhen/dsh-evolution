@@ -14,8 +14,12 @@ export function actionRefs(row: MergeRow): RowFact['actions'] {
   const action = (id: RowFact['actions'][number]['id'], confirm = false, enabled = true): RowFact['actions'][number] => ({ id, command: base + id + ' ' + row.id, confirm, enabled, ...(enabled ? {} : { disabledReason: disabled ?? 'invalid' }) })
   if (row.state === 'pending' && row.expired !== undefined) return [{ id: 'discard', command: base + 'discard ' + row.id, confirm: true, enabled: true }, { id: 'pair', command: base + 'pair ' + row.a + ' ' + row.b, confirm: true, enabled: true }]
   if (row.state === 'pending') return [action('approve'), action('reject', true), action('discard', true)]
-  if (row.state === 'approved' || row.state === 'fuse') return [action('discard', true), action('status')]
+  if (row.state === 'approved' || row.state === 'fuse') {
+    if (row.failure !== undefined && row.failure.retryable === false) return [{ id: 'pair', command: base + 'pair ' + row.a + ' ' + row.b, confirm: true, enabled: true }, action('discard', true)]
+    return [{ id: 'retry-resume', command: base + 'resume --retry ' + row.id, confirm: true, enabled: true }, action('discard', true), action('status')]
+  }
   if (row.state === 'skipped') return [action('restore', true)]
+  if (row.state === 'verify') return [{ id: 'retry-candidates', command: base + 'candidates --retry ' + row.id, confirm: false, enabled: true }]
   return [action('pair')]
 }
 

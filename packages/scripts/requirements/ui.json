@@ -1,0 +1,563 @@
+{
+  "items": [
+    {
+      "id": "FR-UI-01",
+      "kind": "FR",
+      "title": "四个 tab：待判断/待批准/待合并/无需合并；待批准 tab 提供“已过期”只读筛选；不复用 disabled 的技能健康面板，新面板 v1...",
+      "statement": "四个 tab：待判断/待批准/待合并/无需合并；待批准 tab 提供“已过期”只读筛选；不复用 disabled 的技能健康面板，新面板 v1 只 all",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "四 tab 均可见、计数正确；expired 只读筛选可见；新面板 id 与 all-only 在 INSTALL 表可见"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 221
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-02",
+      "kind": "FR",
+      "title": "待判断 tab 显示上游候选/第 1 轮未完成（未开始、进行中、失败、取消）；计数含未开始/进行中/失败，L0/L1 KEEP 不计入；不是执...",
+      "statement": "待判断 tab 显示上游候选/第 1 轮未完成（未开始、进行中、失败、取消）；计数含未开始/进行中/失败，L0/L1 KEEP 不计入；不是执行前预览",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "未完成行/计数可读；L0/L1 不计数；scan 命令不预列 pair"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 222
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-03",
+      "kind": "FR",
+      "title": "待合并 tab 显示已批准、agent2 未成功/待重试，并显示 staging 现场（保留到 X/已清理）与 actualTarget（已产...",
+      "statement": "待合并 tab 显示已批准、agent2 未成功/待重试，并显示 staging 现场（保留到 X/已清理）与 actualTarget（已产生时）",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "失败行可见、可重试；现场/target 可读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 223
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-04",
+      "kind": "FR",
+      "title": "无需合并 tab 显示原因（一句话）和 skill1/skill2 两个正文只读入口；归档源从归档读取；空态文案写清“机械追加 vs 两轮合成”",
+      "statement": "无需合并 tab 显示原因（一句话）和 skill1/skill2 两个正文只读入口；归档源从归档读取；空态文案写清“机械追加 vs 两轮合成”",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "两源正文都能打开；原因/空态可读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 224
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-UI-05",
+      "kind": "FR",
+      "title": "待批准 tab 显示 pending id + 三句话摘要 + requestedTarget + 复制 approve/reject + “...",
+      "statement": "待批准 tab 显示 pending id + 三句话摘要 + requestedTarget + 复制 approve/reject + “无现场/已过期”筛选",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "id/三句/requestedTarget/两个复制动作可见；expired 只读可见"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 225
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-06",
+      "kind": "FR",
+      "title": "无需合并支持拖动/右键置顶/置底；排序只影响展示并可持久化",
+      "statement": "无需合并支持拖动/右键置顶/置底；排序只影响展示并可持久化",
+      "priority": "P2",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "刷新/重开仍保留顺序"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 226
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-07",
+      "kind": "FR",
+      "title": "移出无需合并是复制 restore 命令到剪贴板（不直接写库）；复制 merge 命令同理；需确认；该交互是对 U1 #3“移出按钮”的只读面...",
+      "statement": "移出无需合并是复制 restore 命令到剪贴板（不直接写库）；复制 merge 命令同理；需确认；该交互是对 U1 #3“移出按钮”的只读面板替代，已在 §8 记录",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "无写按钮；确认框；复制正确；文档 §8 已记录只读偏离（文档项不单独计分）"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 227
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-08",
+      "kind": "FR",
+      "title": "面板只读：无写按钮、无直接执行、无自建写路由",
+      "statement": "面板只读：无写按钮、无直接执行、无自建写路由",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "代码无写请求；所有动作复制命令"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 228
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-09",
+      "kind": "FR",
+      "title": "UI 三态互斥：读取中/空/失败",
+      "statement": "UI 三态互斥：读取中/空/失败",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "首帧不显示空态；失败不画空列表"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 229
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-10",
+      "kind": "FR",
+      "title": "失败态/E-325 有可读文案；不渲染裸 locale key；服务缺失给命令 fallback + doctor 指引",
+      "statement": "失败态/E-325 有可读文案；不渲染裸 locale key；服务缺失给命令 fallback + doctor 指引",
+      "priority": "P0",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "preset/host-only 兜底可读；不画空列表"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 230
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "FR-UI-11",
+      "kind": "FR",
+      "title": "面板获得焦点时刷新；不要求轮询",
+      "statement": "面板获得焦点时刷新；不要求轮询",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "focus 后计数/运行态更新"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 231
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-12",
+      "kind": "FR",
+      "title": "本次运行区显示 stage/进度/失败/结束时间；待合并行的 staging 现场在行上显示",
+      "statement": "本次运行区显示 stage/进度/失败/结束时间；待合并行的 staging 现场在行上显示",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "运行中/失败可读；staging 现场可读"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 232
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "FR-UI-13",
+      "kind": "FR",
+      "title": "面板 v1 只 all；preset 命令 fallback；host-only 明确 E-323",
+      "statement": "面板 v1 只 all；preset 命令 fallback；host-only 明确 E-323",
+      "priority": "P1",
+      "authority": "v1",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "三形态行为符合"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec.md",
+        "line": 233
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "V2-UI-01",
+      "kind": "CHANGE",
+      "title": "四队列 + counts.active/expired 分离；expired 只读可见、不计数；pending-expired 有 pair/...",
+      "statement": "四队列 + counts.active/expired 分离；expired 只读可见、不计数；pending-expired 有 pair/discard 出口；skipped-ttl 标 expired 不删",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "四队列 + counts.active/expired 分离；expired 只读可见、不计数；pending-expired 有 pair/discard 出口；skipped-ttl 标 expired 不删"
+        }
+      ],
+      "supersedes": [
+        "FR-UI-01",
+        "FR-LIFE-14"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 64
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "V2-UI-02",
+      "kind": "CHANGE",
+      "title": "summary 仅在 pending，三槽 a/b/rationale 可空；host 不出中文占位；缺失由 client locale 显示...",
+      "statement": "summary 仅在 pending，三槽 a/b/rationale 可空；host 不出中文占位；缺失由 client locale 显示“无摘要”",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "summary 仅在 pending，三槽 a/b/rationale 可空；host 不出中文占位；缺失由 client locale 显示“无摘要”"
+        }
+      ],
+      "supersedes": [
+        "FR-APP-03",
+        "FR-UI-04"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 65
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "V2-UI-03",
+      "kind": "CHANGE",
+      "title": "host 只给事实/code，client 管 locale/三态/actions；doctor/body/history 独立；body/h...",
+      "statement": "host 只给事实/code，client 管 locale/三态/actions；doctor/body/history 独立；body/history 读面保留",
+      "priority": "P2",
+      "authority": "v2",
+      "scoring": false,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "host 只给事实/code，client 管 locale/三态/actions；doctor/body/history 独立；body/history 读面保留"
+        }
+      ],
+      "supersedes": [
+        "FR-UI-06",
+        "FR-PLUG-05"
+      ],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 67
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-UI-01",
+      "kind": "GAP",
+      "title": "loading/空/失败三态互斥（FR-UI-02/03）",
+      "statement": "loading/空/失败三态互斥（FR-UI-02/03）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "三态各截图；失败不显示空态"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 146
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-UI-02",
+      "kind": "GAP",
+      "title": "locale 完整：failure、stage.verify/screening/settle、origin.system；t 支持插值（FR...",
+      "statement": "locale 完整：failure*、stage.verify/screening/settle、origin.system；t 支持插值（FR-UI-04）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "英文界面无裸 dotted key；无中文占位混入"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 147
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-UI-03",
+      "kind": "GAP",
+      "title": "focus/visibilitychange 刷新（FR-UI-05）",
+      "statement": "focus/visibilitychange 刷新（FR-UI-05）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "切回窗口刷新；无轮询"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 148
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-UI-04",
+      "kind": "GAP",
+      "title": "三句摘要只在 pending 行；非 pending 不显示中文占位（FR-APP-03）",
+      "statement": "三句摘要只在 pending 行；非 pending 不显示中文占位（FR-APP-03）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "verify/fuse/skipped 无三句占位"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 149
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-UI-05",
+      "kind": "GAP",
+      "title": "E-325/404 分类可达；fallback 命令完整（FR-UI-06）",
+      "statement": "E-325/404 分类可达；fallback 命令完整（FR-UI-06）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "服务缺席显示 E-325；兜底命令可整段复制"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 150
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "GAP-UI-06",
+      "kind": "GAP",
+      "title": "切 tab 清旧 rows；正文失败不拖垮整面板（FR-UI-03/05）",
+      "statement": "切 tab 清旧 rows；正文失败不拖垮整面板（FR-UI-03/05）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "新 tab 不显示旧数据；局部错误局部提示"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 151
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-UI-07",
+      "kind": "GAP",
+      "title": "运行区显示 endedAt/failure/resultRef；展示排序；doctor 段（FR-UI-07/08）",
+      "statement": "运行区显示 endedAt/failure/resultRef；展示排序；doctor 段（FR-UI-07/08）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "运行区字段/词表完整；排序持久；doctor 有 merge 行"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 152
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "GAP-UI-08",
+      "kind": "GAP",
+      "title": "四队列 counts.active/expired 分离；expired 只读不计数；pending-expired 只给 pair/disc...",
+      "statement": "四队列 counts.active/expired 分离；expired 只读不计数；pending-expired 只给 pair/discard；skipped-ttl 标 expired（ADR-3）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "计数分离；expired 筛选只读；出口正确"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 163
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "GAP-UI-09",
+      "kind": "GAP",
+      "title": "三句 summary 仅 pending、三槽可空；host 无中文占位（ADR-3）",
+      "statement": "三句 summary 仅 pending、三槽可空；host 无中文占位（ADR-3）",
+      "priority": "P1",
+      "authority": "v2",
+      "scoring": true,
+      "owner": "evolution-merge-ui",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "非 pending 无占位；三槽缺失时 client 显示“无摘要”"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "merge-functional-spec-v2.md",
+        "line": 164
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

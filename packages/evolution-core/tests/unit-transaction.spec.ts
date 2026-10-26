@@ -20,6 +20,18 @@ function plan(body = 'new'): UnitPlan {
   return { runId: 'run-1', pairKey: 'alpha|beta', target: 'alpha', targetExists: true, sources: ['beta'], body, supportFiles: [], expectedTargetBody: 'old', expectedSourceBodies: [{ name: 'beta', body: 'beta' }], origin: 'foreground', summary: 's' }
 }
 
+it('accepts a caller-provided unitId and keeps it through commit', async () => {
+  const home = await tempRoot('dsh-unit-tx-caller-id-')
+  const io = nodeEvolutionIo()
+  const tree = new Map<string, string>([['alpha', 'old'], ['beta', 'beta']])
+  const tx = new UnitTransactions({ io, home, backend: backend(tree), claim: { async acquire() { return { async release() {} } } }, now: () => 1 })
+  const prepared = await tx.prepare({ ...plan(), unitId: 'caller-unit' })
+  expect(prepared).toMatchObject({ ok: true, prepared: { unitId: 'caller-unit' } })
+  if (!prepared.ok) return
+  const committed = await tx.commit(prepared.prepared)
+  expect(committed).toMatchObject({ ok: true, evidence: { unitId: 'caller-unit' } })
+})
+
 it('prepares, commits and returns stored evidence', async () => {
   const home = await tempRoot('dsh-unit-tx-')
   const io = nodeEvolutionIo()

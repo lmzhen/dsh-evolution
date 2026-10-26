@@ -1,0 +1,422 @@
+{
+  "items": [
+    {
+      "id": "Q01",
+      "kind": "QUESTION",
+      "title": "scan 对数/顺序/停止: 处理固定候选集全部对，无 per-run 对数上限；默认串行、按候选分数降序；时间预算可选；hard failu...",
+      "statement": "scan 对数/顺序/停止: 处理固定候选集全部对，无 per-run 对数上限；默认串行、按候选分数降序；时间预算可选；hard failure 记录并继续/按预算停，不静默丢",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "处理固定候选集全部对，无 per-run 对数上限；默认串行、按候选分数降序；时间预算可选；hard failure 记录并继续/按预算停，不静默丢"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 277
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q02",
+      "kind": "QUESTION",
+      "title": "⑤ judge 是否作闸门: 保留；L0/L1 KEEP 只进报告，L2 MERGE/UNDECIDED 进第 1 轮；“不做 LLM jud...",
+      "statement": "⑤ judge 是否作闸门: 保留；L0/L1 KEEP 只进报告，L2 MERGE/UNDECIDED 进第 1 轮；“不做 LLM judge”只指合成后内容质量门",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "保留；L0/L1 KEEP 只进报告，L2 MERGE/UNDECIDED 进第 1 轮；“不做 LLM judge”只指合成后内容质量门"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 278
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q03",
+      "kind": "QUESTION",
+      "title": "扫描中源被归档/usage: 每对执行前重新 resolve；源消失记 source-gone 并继续；usage 折叠复用 curator ...",
+      "statement": "扫描中源被归档/usage: 每对执行前重新 resolve；源消失记 source-gone 并继续；usage 折叠复用 curator 口径",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "每对执行前重新 resolve；源消失记 source-gone 并继续；usage 折叠复用 curator 口径"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 279
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q04",
+      "kind": "QUESTION",
+      "title": "前后台/结果落点: 后台 Job + run id；报告 `reports/merge-<runId>.{json,md}`；长跑表补 mer...",
+      "statement": "前后台/结果落点: 后台 Job + run id；报告 `reports/merge-<runId>.{json,md}`；长跑表补 merge 行",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "后台 Job + run id；报告 `reports/merge-<runId>.{json,md}`；长跑表补 merge 行"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 280
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q05",
+      "kind": "QUESTION",
+      "title": "取消/断线/重启/staging: staging 放 `merge/runs/<runId>/`；7 天保留；run 读时收敛；不自动续跑",
+      "statement": "取消/断线/重启/staging: staging 放 `merge/runs/<runId>/`；7 天保留；run 读时收敛；不自动续跑",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "staging 放 `merge/runs/<runId>/`；7 天保留；run 读时收敛；不自动续跑"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 281
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q06",
+      "kind": "QUESTION",
+      "title": "审批等待/超时/写 pending: 最新口径：scan 与 pair 都后台，agent1 完成直接写 pending，不弹窗；旧“pair...",
+      "statement": "审批等待/超时/写 pending: 最新口径：scan 与 pair 都后台，agent1 完成直接写 pending，不弹窗；旧“pair 前台即时问 120s”被覆盖，仅保留兼容参数",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "最新口径：scan 与 pair 都后台，agent1 完成直接写 pending，不弹窗；旧“pair 前台即时问 120s”被覆盖，仅保留兼容参数"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 282
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q07",
+      "kind": "QUESTION",
+      "title": "target 命名冲突: 最新口径：target 已存在→`<target>-v2`，再冲突 `-v3` 递增；旧 target 不动；超 6...",
+      "statement": "target 命名冲突: 最新口径：target 已存在→`<target>-v2`，再冲突 `-v3` 递增；旧 target 不动；超 64 字符/后缀耗尽整对失败",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "最新口径：target 已存在→`<target>-v2`，再冲突 `-v3` 递增；旧 target 不动；超 64 字符/后缀耗尽整对失败"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 283
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q08",
+      "kind": "QUESTION",
+      "title": "目标已存在写入语义: 正文整体覆盖；支撑文件按路径写；同名不同内容拒绝并列名；目标原有未列入 manifest 的文件保留",
+      "statement": "目标已存在写入语义: 正文整体覆盖；支撑文件按路径写；同名不同内容拒绝并列名；目标原有未列入 manifest 的文件保留",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "正文整体覆盖；支撑文件按路径写；同名不同内容拒绝并列名；目标原有未列入 manifest 的文件保留"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 284
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "Q09",
+      "kind": "QUESTION",
+      "title": "manifest/路径/引用校验: 四条硬规则：白名单相对路径、文件存在、每个文件被引用、每条正文引用有目标；任一失败整对失败",
+      "statement": "manifest/路径/引用校验: 四条硬规则：白名单相对路径、文件存在、每个文件被引用、每条正文引用有目标；任一失败整对失败",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "四条硬规则：白名单相对路径、文件存在、每个文件被引用、每条正文引用有目标；任一失败整对失败"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 285
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q10",
+      "kind": "QUESTION",
+      "title": "提交顺序/部分失败: 先建/更新目标，再归档源；失败回滚目标与已归档源；不留 partial success",
+      "statement": "提交顺序/部分失败: 先建/更新目标，再归档源；失败回滚目标与已归档源；不留 partial success",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "先建/更新目标，再归档源；失败回滚目标与已归档源；不留 partial success"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 286
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q11",
+      "kind": "QUESTION",
+      "title": "写库身份/保护: 审计 origin=foreground；commitMerge 显式写 `.hermes-managed`、显式拒 pin...",
+      "statement": "写库身份/保护: 审计 origin=foreground；commitMerge 显式写 `.hermes-managed`、显式拒 pinned/bundled/hub，不靠 origin 推断",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "审计 origin=foreground；commitMerge 显式写 `.hermes-managed`、显式拒 pinned/bundled/hub，不靠 origin 推断"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 287
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q12",
+      "kind": "QUESTION",
+      "title": "undo 判定/粒度/多代: run 存目标 before/after hash + 源列表 + 快照；live hash==after 才 ...",
+      "statement": "undo 判定/粒度/多代: run 存目标 before/after hash + 源列表 + 快照；live hash==after 才 undo；多代按 run 反序；新目标撤销归档不硬删",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "run 存目标 before/after hash + 源列表 + 快照；live hash==after 才 undo；多代按 run 反序；新目标撤销归档不硬删"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 288
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q13",
+      "kind": "QUESTION",
+      "title": "skipped 收录/TTL: 收 agent KEEP（含 L2 KEEP）+ 人工拒绝（origin:human）；执行失败只进报告；pa...",
+      "statement": "skipped 收录/TTL: 收 agent KEEP（含 L2 KEEP）+ 人工拒绝（origin:human）；执行失败只进报告；pair 无视清单；TTL 到期标 expired 不删",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "收 agent KEEP（含 L2 KEEP）+ 人工拒绝（origin:human）；执行失败只进报告；pair 无视清单；TTL 到期标 expired 不删"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 289
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "Q14",
+      "kind": "QUESTION",
+      "title": "pending 失效/批准重校验: pending 无 TTL；读时收敛 source-gone/target-taken；approve 前...",
+      "statement": "pending 失效/批准重校验: pending 无 TTL；读时收敛 source-gone/target-taken；approve 前重新 resolve + 重新校验目标",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "pending 无 TTL；读时收敛 source-gone/target-taken；approve 前重新 resolve + 重新校验目标"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 290
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q15",
+      "kind": "QUESTION",
+      "title": "并发/幂等: pair 键=两源名排序拼接；target 级串行 + 提交 CAS；跨平面用 run-registry foreign 行",
+      "statement": "并发/幂等: pair 键=两源名排序拼接；target 级串行 + 提交 CAS；跨平面用 run-registry foreign 行",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "pair 键=两源名排序拼接；target 级串行 + 提交 CAS；跨平面用 run-registry foreign 行"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 291
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "Q16",
+      "kind": "QUESTION",
+      "title": "成功验收/失败呈现: 四判据：decision shouldMerge 且 mode≠keep、staging 校验无 issue、commi...",
+      "statement": "成功验收/失败呈现: 四判据：decision shouldMerge 且 mode≠keep、staging 校验无 issue、commit 与 manifest/源列表一致、目标可列且源归档带 absorbed_into；失败三行 stage/code/next + run id；无 partial success",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "四判据：decision shouldMerge 且 mode≠keep、staging 校验无 issue、commit 与 manifest/源列表一致、目标可列且源归档带 absorbed_into；失败三行 stage/code/next + run id；无 partial success"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 292
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "Q17",
+      "kind": "QUESTION",
+      "title": "范围/保护/E-code: 复用 E-323/E-324/E-305/E-306；errors.ts 增加 target-out-of-sco...",
+      "statement": "范围/保护/E-code: 复用 E-323/E-324/E-305/E-306；errors.ts 增加 target-out-of-scope/protected/invalid 场景 key，不新造数字码",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "复用 E-323/E-324/E-305/E-306；errors.ts 增加 target-out-of-scope/protected/invalid 场景 key，不新造数字码"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 293
+      },
+      "baselineStatus": "partial"
+    },
+    {
+      "id": "Q18",
+      "kind": "QUESTION",
+      "title": "面板/运行可见性: 新面板 id，四 tab（待判断/待批准/待合并/无需合并）+ 本次运行区；读 run registry；focus 刷新...",
+      "statement": "面板/运行可见性: 新面板 id，四 tab（待判断/待批准/待合并/无需合并）+ 本次运行区；读 run registry；focus 刷新；平台 connection carrier 鉴权，不自建 fence",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "新面板 id，四 tab（待判断/待批准/待合并/无需合并）+ 本次运行区；读 run registry；focus 刷新；平台 connection carrier 鉴权，不自建 fence"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 294
+      },
+      "baselineStatus": "satisfied"
+    },
+    {
+      "id": "Q19",
+      "kind": "QUESTION",
+      "title": "blocked 队列: 已取消；四队列取代；下轮筛选过滤待验证/待融合/待批准/无需合并",
+      "statement": "blocked 队列: 已取消；四队列取代；下轮筛选过滤待验证/待融合/待批准/无需合并",
+      "priority": "P2",
+      "authority": "integration",
+      "scoring": true,
+      "owner": "evolution-merge",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "text": "已取消；四队列取代；下轮筛选过滤待验证/待融合/待批准/无需合并"
+        }
+      ],
+      "supersedes": [],
+      "source": {
+        "doc": "integration-discussion.md",
+        "line": 295
+      },
+      "baselineStatus": "satisfied"
+    }
+  ]
+}

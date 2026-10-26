@@ -19,7 +19,7 @@ export interface RowBaseV4 {
 export interface VerifyRowV4 extends RowBaseV4 { readonly state: 'verify'; readonly verifySubState: VerifySubStateV4; readonly sourceRevision?: string; readonly attempts: number }
 export interface PendingRowV4 extends RowBaseV4 { readonly state: 'pending'; readonly target: string; readonly decision: MergeDecision; readonly targetRevision?: string; readonly sourceRevision?: string; readonly promptVersion?: string; readonly promptHash?: string; readonly expired?: 'target-taken' | 'source-changed'; readonly expiredAt?: number; readonly attempts: number }
 export interface ApprovedRowV4 extends RowBaseV4 { readonly state: 'approved'; readonly target: string; readonly decision: MergeDecision; readonly sourceRevision?: string; readonly targetRevision?: string; readonly runId?: string; readonly attempts: number }
-export interface FuseRowV4 extends RowBaseV4 { readonly state: 'fuse'; readonly target: string; readonly decision: MergeDecision; readonly sourceRevision?: string; readonly targetRevision?: string; readonly runId?: string; readonly attempts: number }
+export interface FuseRowV4 extends RowBaseV4 { readonly state: 'fuse'; readonly target: string; readonly decision: MergeDecision; readonly sourceRevision?: string; readonly targetRevision?: string; readonly runId?: string; readonly stagingRef?: string; readonly stagingExpiresAt?: number; readonly attempts: number }
 export interface SkippedRowV4 extends RowBaseV4 { readonly state: 'skipped'; readonly reason: string; readonly skipSource?: string; readonly expiredAt?: number; readonly attempts: number }
 export type V4Row = VerifyRowV4 | PendingRowV4 | ApprovedRowV4 | FuseRowV4 | SkippedRowV4
 
@@ -27,7 +27,7 @@ export type V4Event =
   | { readonly type: 'verify-passed'; readonly decision: MergeDecision; readonly target: string; readonly sourceRevision?: string; readonly promptVersion?: string; readonly promptHash?: string }
   | { readonly type: 'approved'; readonly runId: string }
   | { readonly type: 'auto-approved'; readonly decision: MergeDecision; readonly target: string; readonly runId?: string }
-  | { readonly type: 'staged' }
+  | { readonly type: 'staged'; readonly stagingRef?: string; readonly stagingExpiresAt?: number }
   | { readonly type: 'committed'; readonly unitId: CommitUnitRef }
   | { readonly type: 'skipped'; readonly reason: string; readonly origin?: RowOriginV4; readonly skipSource?: string }
   | { readonly type: 'mark-skipped-expired'; readonly at: number }
@@ -73,27 +73,25 @@ export function transitionV4(row: V4Row, event: V4Event, expectedVersion: number
     case 'pending':
       if (event.type === 'approved') return { ok: true, row: advance(row, at, { state: 'approved', runId: event.runId }), version: expectedVersion + 1 }
       if (event.type === 'auto-approved') return { ok: true, row: advance(row, at, { state: 'approved', ...(event.runId === undefined ? {} : { runId: event.runId }) }), version: expectedVersion + 1 }
-      if (event.type === 'staged') return { ok: true, row: advance(row, at, { state: 'fuse' }), version: expectedVersion + 1 }
+      if (event.type === 'staged') return { ok: true, row: advance(row, at, { state: 'fuse', ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }) }), version: expectedVersion + 1 }
       if (event.type === 'skipped') return { ok: true, row: advance(row, at, { state: 'skipped', reason: event.reason, ...(event.origin === undefined ? {} : { origin: event.origin }), ...(event.skipSource === undefined ? {} : { skipSource: event.skipSource }) }), version: expectedVersion + 1 }
       if (event.type === 'expired') return { ok: true, row: advance(row, at, { expired: event.kind }), version: expectedVersion + 1 }
       if (event.type === 'failed') return { ok: true, row: advance(row, at, { failure: event.failure, attempts: row.attempts + 1 }), version: expectedVersion + 1 }
       if (event.type === 'superseded') return { ok: true, row: null, version: expectedVersion + 1 }
       return illegal('pending/' + event.type)
     case 'approved':
-      if (event.type === 'staged') return { ok: true, row: advance(row, at, { state: 'fuse' }), version: expectedVersion + 1 }
+      if (event.type === 'staged') return { ok: true, row: advance(row, at, { state: 'fuse', ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }) }), version: expectedVersion + 1 }
       if (event.type === 'committed') return { ok: true, row: null, version: expectedVersion + 1 }
       if (event.type === 'skipped') return { ok: true, row: advance(row, at, { state: 'skipped', reason: event.reason, ...(event.skipSource === undefined ? {} : { skipSource: event.skipSource }) }), version: expectedVersion + 1 }
-      if (event.type === 'failed') return event.failure.retryable
-        ? { ok: true, row: advance(row, at, { state: 'fuse', failure: event.failure, attempts: row.attempts + 1 }), version: expectedVersion + 1 }
-        : { ok: true, row: advance(row, at, { state: 'skipped', reason: event.failure.code, failure: event.failure, attempts: row.attempts + 1 }), version: expectedVersion + 1 }
+      // A failure is never a "no merge" decision. Keep the row in fuse with the failure
+      // recorded; retryable is a property of the failure, not a different queue.
+      if (event.type === 'failed') return { ok: true, row: advance(row, at, { state: 'fuse', failure: event.failure, attempts: row.attempts + 1 }), version: expectedVersion + 1 }
       if (event.type === 'superseded') return { ok: true, row: null, version: expectedVersion + 1 }
       return illegal('approved/' + event.type)
     case 'fuse':
       if (event.type === 'committed') return { ok: true, row: null, version: expectedVersion + 1 }
       if (event.type === 'skipped') return { ok: true, row: advance(row, at, { state: 'skipped', reason: event.reason, ...(event.skipSource === undefined ? {} : { skipSource: event.skipSource }) }), version: expectedVersion + 1 }
-      if (event.type === 'failed') return event.failure.retryable
-        ? { ok: true, row: advance(row, at, { state: 'fuse', failure: event.failure, attempts: row.attempts + 1 }), version: expectedVersion + 1 }
-        : { ok: true, row: advance(row, at, { state: 'skipped', reason: event.failure.code, failure: event.failure, attempts: row.attempts + 1 }), version: expectedVersion + 1 }
+      if (event.type === 'failed') return { ok: true, row: advance(row, at, { state: 'fuse', failure: event.failure, attempts: row.attempts + 1 }), version: expectedVersion + 1 }
       if (event.type === 'superseded') return { ok: true, row: null, version: expectedVersion + 1 }
       return illegal('fuse/' + event.type)
     case 'skipped':
@@ -122,7 +120,7 @@ export function v3ToV4(row: V3Row): V4Row {
   if (row.state === 'verify') return { ...base, state: 'verify', verifySubState: row.verifySubState, ...(row.sourceRevision === undefined ? {} : { sourceRevision: row.sourceRevision }) }
   if (row.state === 'pending') return { ...base, state: 'pending', target: row.target, decision: row.decision, ...(row.targetRevision === undefined ? {} : { targetRevision: row.targetRevision }), ...(row.sourceRevision === undefined ? {} : { sourceRevision: row.sourceRevision }), ...(row.expired === undefined ? {} : { expired: row.expired }) }
   if (row.state === 'approved') return { ...base, state: 'approved', target: row.target, decision: row.decision, ...(row.sourceRevision === undefined ? {} : { sourceRevision: row.sourceRevision }), ...(row.runId === undefined ? {} : { runId: row.runId }) }
-  if (row.state === 'fuse') return { ...base, state: 'fuse', target: row.target, decision: row.decision, ...(row.sourceRevision === undefined ? {} : { sourceRevision: row.sourceRevision }), ...(row.runId === undefined ? {} : { runId: row.runId }) }
+  if (row.state === 'fuse') return { ...base, state: 'fuse', target: row.target, decision: row.decision, ...(row.sourceRevision === undefined ? {} : { sourceRevision: row.sourceRevision }), ...(row.runId === undefined ? {} : { runId: row.runId }), ...(row.staging?.kind === 'present' ? { stagingRef: row.staging.ref, stagingExpiresAt: row.staging.expiresAt } : row.staging?.kind === 'expired' && row.staging.ref !== undefined ? { stagingRef: row.staging.ref, stagingExpiresAt: row.staging.expiresAt } : {}) }
   return { ...base, state: 'skipped', reason: row.reason, ...(row.expiredAt === undefined ? {} : { expiredAt: row.expiredAt }) }
 }
 
@@ -166,6 +164,8 @@ export function v4ToLegacy(row: V4Row): MergeRow {
     ...((row.state === 'pending' || row.state === 'approved' || row.state === 'fuse') && row.sourceRevision !== undefined ? { sourceRevision: row.sourceRevision } : {}),
     ...((row.state === 'pending' || row.state === 'approved' || row.state === 'fuse') && row.targetRevision !== undefined ? { targetRevision: row.targetRevision } : {}),
     ...(row.runId === undefined ? {} : { runId: row.runId }),
+    ...(row.state === 'fuse' && row.stagingRef !== undefined ? { stagingRef: row.stagingRef } : {}),
+    ...(row.state === 'fuse' && row.stagingExpiresAt !== undefined ? { stagingExpiresAt: row.stagingExpiresAt } : {}),
     ...(row.origin === undefined ? {} : { origin: row.origin }),
     ...(row.attempts === undefined ? {} : { attempts: row.attempts }),
     createdAt: row.createdAt, updatedAt: row.updatedAt,

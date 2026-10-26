@@ -34,8 +34,10 @@ export default {
     const [passed, , lexStats] = lexical.lexicalGate(r.kept, aligned, r.cfg);
     ctx.assert(passed.length === ref.passed.length, "③ 通过数不一致: " + passed.length + " vs " + ref.passed.length);
     ctx.assert(JSON.stringify(lexStats) === JSON.stringify(ref.lexical_stats), "③ stats 不一致");
-    const nodeSet = new Set(passed.map(x => [x.a_path, x.b_path].sort().join("|")));
-    const pySet = new Set(ref.passed.map(x => [x.a_path, x.b_path].sort().join("|")));
+    const rel = p => p.replace(/^.*[\\/]fixtures[\\/]corpus[\\/]/, "");
+    const keyOf = x => [rel(x.a_path), rel(x.b_path)].sort().join("|");
+    const nodeSet = new Set(passed.map(keyOf));
+    const pySet = new Set(ref.passed.map(keyOf));
     ctx.assert(nodeSet.size === pySet.size && [...pySet].every(k => nodeSet.has(k)), "③ 通过集不一致");
     return { candidates: r.pairs.size, passed: passed.length };
   }
