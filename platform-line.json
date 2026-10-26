@@ -1,5 +1,5 @@
 {
   "$comment": "ONE home of the platform line: version = the platform release this family line targets; floor = the oldest platform release it admits. peers=^floor; engines=>=floor <nextPatch(floor)-0; previousAnchor is derived (patch-1 prerelease of the same tuple).",
-  "version": "0.2.1-rc.2",
-  "floor": "0.2.1-rc.1"
+  "version": "0.2.1-rc.3",
+  "floor": "0.2.1-rc.2"
 }

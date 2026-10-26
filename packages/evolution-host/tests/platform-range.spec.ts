@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url'
 
 const run = promisify(execFile)
 const guard = fileURLToPath(new URL('../../scripts/verify-platform-ranges.mjs', import.meta.url))
-const PEERS = '^0.2.1-rc.1'
-const ENGINES = '>=0.2.1-rc.1 <0.2.2-0'
+const PEERS = '^0.2.1-rc.2'
+const ENGINES = '>=0.2.1-rc.2 <0.2.2-0'
 
 async function stagedDir(packages: Array<Record<string, unknown>>) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-platform-range-'))
@@ -74,7 +74,7 @@ describe('verify-platform-ranges (G1-S6 range guard)', () => {
     expect(missingResult.code).toBe(1)
     expect(missingResult.stderr).toContain('engines.dsh')
     await cleanup(missing)
-    const drifted = await stagedDir([manifest({ engines: { dsh: '>=0.2.1-rc.1 <0.2.3-0' } })])
+    const drifted = await stagedDir([manifest({ engines: { dsh: '>=0.2.1-rc.2 <0.2.3-0' } })])
     const driftedResult = await runGuard(['--manifest-dir', drifted])
     expect(driftedResult.code).toBe(1)
     expect(driftedResult.stderr).toContain(ENGINES)

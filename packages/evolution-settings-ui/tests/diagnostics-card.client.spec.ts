@@ -24,7 +24,7 @@ const view: DiagnosticsView = {
   schemaVersion: 2,
   generatedAt: '2026-10-19T00:00:00.000Z',
   facts: [
-    { key: 'platform-line', label: '平台兼容线', value: '0.2.1-rc.2（floor 0.2.1-rc.1）', home: 'README.md（兼容线声明）' },
+    { key: 'platform-line', label: '平台兼容线', value: '0.2.1-rc.3（floor 0.2.1-rc.2）', home: 'README.md（兼容线声明）' },
   ],
   runtime: [
     { key: 'host-surface', label: 'Host 数据面', status: 'ok', detail: '已挂载 12/12；仅本机权限' },
@@ -56,7 +56,7 @@ describe('diagnostics card', () => {
     // The documentation facts (labels, values, homes) stay off the settings face.
     expect(screen.queryByText('Environment')).toBeNull()
     expect(screen.queryByText('平台兼容线')).toBeNull()
-    expect(screen.queryByText('0.2.1-rc.2（floor 0.2.1-rc.1）')).toBeNull()
+    expect(screen.queryByText('0.2.1-rc.3（floor 0.2.1-rc.2）')).toBeNull()
     expect(screen.queryByText('README.md（兼容线声明）')).toBeNull()
     expect(screen.queryByText('Technical details')).toBeNull()
   })

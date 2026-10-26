@@ -33,10 +33,10 @@ const validateSpikeEvidence = validateSpikeEvidenceRaw as (spike: unknown, where
 const run = promisify(execFile)
 const script = fileURLToPath(new URL('../../scripts/verify-release-evidence.mjs', import.meta.url))
 const assembleScript = fileURLToPath(new URL('../../scripts/assemble-release-evidence.mjs', import.meta.url))
-const PLATFORM_LINE = { version: '0.2.1-rc.2', floor: '0.2.1-rc.1', peersRange: '^0.2.1-rc.1', enginesRange: '>=0.2.1-rc.1 <0.2.2-0', upstreamRef: 'dsh-v0.2.1-rc.2' }
+const PLATFORM_LINE = { version: '0.2.1-rc.3', floor: '0.2.1-rc.2', peersRange: '^0.2.1-rc.2', enginesRange: '>=0.2.1-rc.2 <0.2.2-0', upstreamRef: 'dsh-v0.2.1-rc.3' }
 
 function spike(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.1-rc.2', familyVersion: '0.27.0', startedAt: '2026-10-19T00:00:00.000Z', readings: { route: 200 }, ...overrides }
+  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.1-rc.3', familyVersion: '0.27.0', startedAt: '2026-10-19T00:00:00.000Z', readings: { route: 200 }, ...overrides }
 }
 
 function staging(): Record<string, unknown> {
