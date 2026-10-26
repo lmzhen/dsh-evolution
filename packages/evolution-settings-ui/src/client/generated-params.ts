@@ -93,6 +93,7 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
       { id: 'reviewEnabled', group: 'review', doc: 'Master switch for the review plugin.', label: '启用自动检查', hint: '关闭后不再自动回顾会话。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
       { id: 'reviewMode', group: 'review', doc: 'Run the review in the parent session (inject) or on a subagent.', label: '运行位置', hint: '在哪里运行检查：在当前会话里／交给子代理。', control: 'select', unit: '', values: ['subagent', 'inject'], valueLabels: ['交给子代理', '在当前会话里'], atLeast: '' },
       { id: 'reviewWakeInject', group: 'review', doc: 'Deliver the deferred review as a waking follow-up message.', label: '延后结果发提醒', hint: '会话空闲时，把延后的检查结果作为一条提醒发给你。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
+      { id: 'reviewNotice', group: 'review', doc: 'Deliver result notices into the parent conversation.', label: '结果通知', hint: '关闭后检查结果不再写进对话；检查本身照常运行，结果留在审计记录里。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
     ],
   },
   {

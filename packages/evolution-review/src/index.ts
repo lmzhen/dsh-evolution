@@ -31,9 +31,9 @@ import type { LiveValue, SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
 import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, sessionEvidenceIndex, sessionReadNames, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
-import { validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
+import { planContractPrompt, validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
 import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
-import { filterUnreadSkillOps, foldUntrustedLines, payloadText } from '@deepseek-ai/dsh-evolution-core'
+import { ensureSkillFrontmatter, filterUnreadSkillOps, foldUntrustedLines, payloadText } from '@deepseek-ai/dsh-evolution-core'
 import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
 // The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
@@ -74,6 +74,11 @@ function emitReviewScheduled(ctx: Context, event: EvolutionReviewScheduledEvent)
 
 export const name = 'evolution-review'
 export const inject = ['agents']
+
+/** Result notices are optional; a review PROMPT is the review itself in inject mode. */
+export function noticeAllowed(reviewPrompt: boolean, notice: boolean): boolean {
+  return reviewPrompt || notice
+}
 
 // V27 G2.4: `MAX_TIMER_DELAY_MS` comes from evolution-core/constants.ts — the
 // ONE definition (this file used to carry a second copy of the literal). Node's
@@ -144,6 +149,10 @@ export interface Config {
    * differs). Default true; false degrades to the non-waking inject (the
    * summary then waits for the next driver wake). */
   reviewWakeInject?: Volatile<boolean>
+  /** Deliver result notices into the parent conversation. Default true. A review PROMPT is the
+   * review itself in inject mode, so this never suppresses prompt delivery — only the result
+   * notice (and late/zero-landing notices) that wakes a turn just to report a count. */
+  reviewNotice?: Volatile<boolean>
   /** V10-11 (P2-7): skill tree root for the review's direct skill writes.
    * Empty (the default) resolves through `resolveSkillsRoot` to the shared
    * default root — the historical behavior. A custom root keeps review-created
@@ -206,6 +215,7 @@ export const Config = z.object({
   // for config authors.
   skillReviewTrigger: z.union([z.const('cadence'), z.const('completion'), z.const('both')]).default(DEFAULT_SKILL_REVIEW_TRIGGER).volatile(),
   reviewWakeInject: z.boolean().default(true).volatile(),
+  reviewNotice: z.boolean().default(true).volatile(),
   sessionScoped: z.boolean().default(false),
   skillReviewCompletionMinToolCalls: z.number().min(1).default(DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS).volatile(),
   // V10-11 (P2-7): empty string keeps the default root (resolveSkillsRoot
@@ -356,6 +366,8 @@ export interface ReviewSettings {
   reviewMode: 'subagent' | 'inject'
   /** Deliver the deferred review as a waking follow-up message. */
   reviewWakeInject: boolean
+  /** Deliver result notices (not review prompts). */
+  reviewNotice: boolean
 }
 
 /**
@@ -378,6 +390,7 @@ export function resolveReviewRowSettings(rawConfig: Config, warn: (message: stri
     reviewEnabled: liveBool(rawConfig.reviewEnabled, true),
     reviewMode: unwrapLive(rawConfig.reviewMode) ?? 'inject',
     reviewWakeInject: liveBool(rawConfig.reviewWakeInject, true),
+    reviewNotice: liveBool(rawConfig.reviewNotice, true),
   }
 }
 
@@ -510,6 +523,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       reviewEnabled: row.reviewEnabled,
       reviewMode: mode(),
       reviewWakeInject: row.reviewWakeInject,
+      reviewNotice: row.reviewNotice,
     }
   }
 
@@ -1065,6 +1079,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const deliverMessage = (agent: import('@deepseek-ai/dsh-agent').Agent, text: string, summary: string, reviewPrompt = false): boolean => {
     const wake = agent as { followup?: (message: unknown) => void }
     const inbox = (agent as { inbox?: InboxLike }).inbox
+    // Result notices only. A review PROMPT is the review itself in inject mode; suppressing it
+    // would silently cancel the work, so `reviewNotice` never touches `reviewPrompt === true`.
+    // Returning true means the notice was deliberately handled (no queue, no retry latch).
+    if (!noticeAllowed(reviewPrompt, params().reviewNotice)) {
+      ctx.logger.info(`dsh-evolution-review: suppressed a result notice (${summary}) — reviewNotice is off`)
+      return true
+    }
     // C 组（未结窗口）+ D 组（兜底）：本会话已经有一条未结的复查通知——队列里还排着它（`turn === null`），
     // 或者取走它的那个回合还没结束——就不再投第二条。旧实现靠「同 kind 就就地替换」收敛重复，代价是
     // 被换掉的那条还要补一个唤醒桩；现在直接不投：那条还没跑完，接着再投只会让模型连着做两次复查。
@@ -1661,6 +1682,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           continue
         }
         const args = { ...op, evidence: op.evidence }
+        // The skill writer rejects a body whose first line is not `---`; a model-authored
+        // create/update can be otherwise perfect. Repair at this execution boundary (both
+        // the direct and approved paths use `args`), leave an existing header byte-identical,
+        // and make the repair observable in the host log.
+        if ((args.action === 'create' || args.action === 'edit' || args.action === 'update') && typeof args.content === 'string' && typeof args.name === 'string') {
+          const repaired = ensureSkillFrontmatter(args.content, args.name, (args as { description?: string }).description)
+          if (repaired.repaired) {
+            args.content = repaired.content
+            ctx.logger.warn(`dsh-evolution-review: synthesized missing SKILL.md frontmatter for ${args.name}`)
+          }
+        }
         // v23 (AP-3): stage-time staleness hash for full-content updates —
         // same contract as the tool's staging (the runner refuses a replay
         // whose live content no longer matches). Review ops re-read through a
@@ -2076,6 +2108,8 @@ const DISPATCH_DIGEST_FRAMES = 128
 /** One dispatch frame the review digest can render (a native call/result or a PTC sub-dispatch). */
 interface ReviewDispatchFrame {
   readonly type: string
+  /** Session seq of the frame, so a plan can cite a real `event_seq`. */
+  readonly seq?: number
   readonly data?: unknown
 }
 
@@ -2092,11 +2126,11 @@ interface ReviewDispatchFrame {
 function appendDispatchFrame(
   digest: Map<SessionId, ReviewDispatchFrame[]>,
   id: SessionId,
-  event: { type: string; data?: unknown },
+  event: { type: string; seq?: number; data?: unknown },
 ): void {
   if (readDispatchSignal(event) === null && resultCallIdOf(event) === null) return
   const frames = digest.get(id) ?? []
-  frames.push({ type: event.type, ...event.data === undefined ? {} : { data: event.data } })
+  frames.push({ type: event.type, ...event.seq === undefined ? {} : { seq: event.seq }, ...event.data === undefined ? {} : { data: event.data } })
   if (frames.length > DISPATCH_DIGEST_FRAMES) frames.splice(0, frames.length - DISPATCH_DIGEST_FRAMES)
   digest.set(id, frames)
 }
@@ -2187,7 +2221,7 @@ function resultCallIdOf(event: { type?: string; data?: unknown } | undefined): s
  * keeps the call identity its `[call]` line would have had. Budget: 500 chars
  * per line (the 12-line cap lives in buildReviewRequest and is unchanged).
  */
-export function renderToolResultLine(data: unknown, identity?: { name: string; argsRaw: string }): string {
+export function renderToolResultLine(data: unknown, identity?: { name: string; argsRaw: string }, seq?: number): string {
   const shape = data as (ToolResultEventDataLike & {
     subCallId?: unknown
     isError?: unknown
@@ -2220,7 +2254,8 @@ export function renderToolResultLine(data: unknown, identity?: { name: string; a
     ? ''
     : `${foldUntrustedLines(identity.name, 0)} ${foldUntrustedLines(identity.argsRaw, 200)} → `
   const failure = failed ? ' [ERROR]' : ''
-  return `[result]${failure} ${head}${foldUntrustedLines(output, 500)}`
+  const tag = seq === undefined ? '' : 'seq=' + String(seq) + ' '
+  return tag + '[result]' + failure + ' ' + head + foldUntrustedLines(output, 500)
 }
 
 /** Text of a PTC settle `content` payload (the logged ContentBlock list):
@@ -2302,7 +2337,7 @@ export function buildReviewRequest(
   const events = dispatchTail
   const callIdentity = new Map<string, { name: string; argsRaw: string }>()
   for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index] as { type?: string; data?: unknown } | undefined
+    const event = events[index] as { type?: string; seq?: number; data?: unknown } | undefined
     const opened = readDispatchSignal(event)
     if (opened === null || callIdentity.has(opened.callId)) continue
     callIdentity.set(opened.callId, {
@@ -2312,7 +2347,7 @@ export function buildReviewRequest(
   }
   const openedCallIds = new Set<string>()
   for (let index = events.length - 1; index >= 0 && toolLines.length < 12; index -= 1) {
-    const event = events[index] as { type?: string; data?: unknown } | undefined
+    const event = events[index] as { type?: string; seq?: number; data?: unknown } | undefined
     const answeredCallId = resultCallIdOf(event)
     if (answeredCallId !== null) {
       if (openedCallIds.has(answeredCallId)) continue
@@ -2331,7 +2366,7 @@ export function buildReviewRequest(
           argsRaw: typeof settleData.arguments === 'string' ? settleData.arguments : JSON.stringify(settleData.arguments ?? {}),
         }
         : callIdentity.get(answeredCallId)
-      toolLines.push(renderToolResultLine(event?.data, identity))
+      toolLines.push(renderToolResultLine(event?.data, identity, event?.seq))
       continue
     }
     // `readDispatchSignal` is the pure half of the fold: it names the call one
@@ -2343,7 +2378,8 @@ export function buildReviewRequest(
     const argsRaw = typeof opened.arguments === 'string' ? opened.arguments : JSON.stringify(opened.arguments ?? {})
     // T3-03/A31: same fold as the [result] line — the name and the raw
     // arguments are model-authored data, not this digest's structure.
-    toolLines.push(`[call] ${foldUntrustedLines(opened.name, 0)} ${foldUntrustedLines(argsRaw, 500)}`)
+    const seq = typeof event?.seq === 'number' ? 'seq=' + String(event.seq) + ' ' : ''
+    toolLines.push(seq + '[call] ' + foldUntrustedLines(opened.name, 0) + ' ' + foldUntrustedLines(argsRaw, 500))
   }
   toolLines.reverse()
   return [
@@ -2352,6 +2388,7 @@ export function buildReviewRequest(
     `Recent tool activity (${toolLines.length}):`,
     ...toolLines,
     'Return ONLY the structured JSON plan. Evidence is mandatory for every op.',
+    planContractPrompt(),
     '',
     ...messages,
   ].join('\n')

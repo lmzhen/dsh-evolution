@@ -438,6 +438,8 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     name: string,
     homePrefix: string,
     betweenOps: ((library: SkillLibrary) => Promise<void>) | undefined,
+    /** The body this plan must settle on; `undefined` keeps the legacy loose poll. */
+    expected?: string,
   ): Promise<{ first: string; second: string; landed: string | null; library: SkillLibrary }> => {
     const root = await mkdtemp(join(tmpdir(), homePrefix))
     const previous = process.env.DSH_HOME
@@ -523,7 +525,9 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
         async () => {
           const currentProbe = await library.readSkillProbe(name)
           const current = isPresent(currentProbe) ? currentProbe.value : null
-          const settled = current !== null && current !== first && current === previousBytes
+          const settled = expected === undefined
+            ? current !== null && current !== first && current === previousBytes
+            : current === expected && current === previousBytes
           previousBytes = current
           return settled
         },
@@ -560,7 +564,8 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
 
   it('TEST-06 (REV-06b): the second of two updates on ONE skill lands (no false stale refusal)', { timeout: 30_000 }, async () => {
     const name = 'twice-skill'
-    const { second, landed } = await runTwoOpPlan(name, 'dsh-review-rev06b-ok-', undefined)
+    const expectedSecond = SKILL(name).replace('Body of', 'Second body of')
+    const { second, landed } = await runTwoOpPlan(name, 'dsh-review-rev06b-ok-', undefined, expectedSecond)
     // Op 1 rebased the baseline onto its own bytes; op 2 is then compared
     // against that LANDED baseline, so it must NOT be refused as stale.
     // Windows writes text through the platform default (CRLF), so the bytes read back differ from
@@ -575,7 +580,7 @@ describe('v32 TEST-01/05: direct-path staleness and protected gates', () => {
     const writerBytes = SKILL(name).replace('Body of', 'Concurrent writer body of')
     const { landed } = await runTwoOpPlan(name, 'dsh-review-rev06b-race-', async (library) => {
       await library.update(name, writerBytes, 'foreground')
-    })
+    }, writerBytes)
     // The writer's bytes must survive: the refresh only happens after a write
     // THIS plan landed, and op 1 is refused as stale against the concurrent
     // write, so nothing re-bases op 2 onto the writer's content.

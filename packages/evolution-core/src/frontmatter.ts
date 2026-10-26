@@ -599,6 +599,40 @@ export function shrinksOverLimit(next: string, current: string | null | undefine
   return skillMdOnDisk(next).length < skillMdOnDisk(current).length
 }
 
+export interface FrontmatterRepair {
+  /** The text to write: unchanged when a header was already present. */
+  readonly content: string
+  /** True only when this call synthesized the missing header. */
+  readonly repaired: boolean
+}
+
+/**
+ * Synthesize a missing SKILL.md header at the write boundary.
+ *
+ * A model-authored create/update whose body starts with `# Title` is valid Markdown but the
+ * skill writer rejects it before any content check. Repair only the truly headerless shape: an
+ * existing fence is passed through byte-identical, even when it is malformed, so this helper
+ * cannot mask a header error that the validator should report. The caller owns the audit notice.
+ * @param content - the model-authored SKILL.md text.
+ * @param name - the validated skill name used for the `name:` field.
+ * @param description - optional description; otherwise derived from the first heading/prose.
+ * @returns the write text and whether a header was synthesized.
+ */
+export function ensureSkillFrontmatter(content: string, name: string, description?: string): FrontmatterRepair {
+  // A valid header is byte-identical; a malformed fence is left for the validator to name,
+  // never silently replaced (that would hide the error and could duplicate the fence).
+  if (frontmatterBlock(content) !== null || content.trimStart().startsWith('---')) return { content, repaired: false }
+  const body = content.replace(/^\uFEFF/, '').replace(/^(?:[ \t]*\r?\n)+/, '')
+  const heading = /^#{1,6}\s+(.+?)\s*$/m.exec(body)?.[1]
+  const firstLine = body.split(/\r?\n/).map(line => line.trim()).find(line => line !== '' && !line.startsWith('#')) ?? ''
+  const source = (description?.trim() || heading || firstLine || name).replace(/\s+/g, ' ').trim()
+  const clipped = source.length > AUTHORING_DESCRIPTION_BAR - 2 ? source.slice(0, AUTHORING_DESCRIPTION_BAR - 3) + '…' : source
+  const summary = /[.。！？!?]$/.test(clipped) ? clipped : clipped + '.'
+  const encoded = yamlPlainScalarNeedsQuotes(summary) ? JSON.stringify(summary) : summary
+  const header = ['---', `name: ${name}`, `description: ${encoded}`, 'version: 0.1.0', 'author: Hermes', '---', ''].join('\n')
+  return { content: header + '\n' + body, repaired: true }
+}
+
 export function validateFrontmatter(
   content: string,
   expectedName?: string,

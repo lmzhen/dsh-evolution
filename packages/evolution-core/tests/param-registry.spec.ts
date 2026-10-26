@@ -22,7 +22,7 @@ const WHY = ['deployment', 'security', 'identity', 'path', 'install', 'internal'
 /** The review group's seed set (design §7.2 G-C, tier split recorded in S1.1). */
 const REVIEW_E3 = [
   'reviewSkillInterval', 'reviewMemoryInterval', 'skillReviewTrigger',
-  'skillReviewCompletionMinToolCalls', 'reviewEnabled', 'reviewMode', 'reviewWakeInject',
+  'skillReviewCompletionMinToolCalls', 'reviewEnabled', 'reviewMode', 'reviewWakeInject', 'reviewNotice',
 ]
 const REVIEW_E2 = [
   'reviewProvider', 'reviewTimeoutMs', 'reviewContextMessages', 'reviewMessageChars',

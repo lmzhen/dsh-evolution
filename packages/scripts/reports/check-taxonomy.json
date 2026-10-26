@@ -667,6 +667,7 @@
         "evolution-commands::tests/doctor-merge.spec.ts",
         "evolution-commands::tests/doctor.spec.ts",
         "evolution-commands::tests/platform-view.spec.ts",
+        "evolution-core::tests/frontmatter-repair.spec.ts",
         "evolution-core::tests/opt-in.spec.ts",
         "evolution-core::tests/preset-composition.spec.ts",
         "evolution-core::tests/session-projection.spec.ts",
@@ -689,6 +690,7 @@
         "evolution-review::tests/delivery-settle.spec.ts",
         "evolution-review::tests/digest-budget.spec.ts",
         "evolution-review::tests/evidence-mutex.spec.ts",
+        "evolution-review::tests/evidence-seq.spec.ts",
         "evolution-review::tests/lifecycle.spec.ts",
         "evolution-review::tests/noop-usage-guard.spec.ts",
         "evolution-review::tests/outstanding-window.spec.ts",
@@ -1297,6 +1299,7 @@
         "evolution-core::tests/frontmatter-mixed-endings.spec.ts",
         "evolution-core::tests/frontmatter-normalize.spec.ts",
         "evolution-core::tests/frontmatter-platform-string-fields.spec.ts",
+        "evolution-core::tests/frontmatter-repair.spec.ts",
         "evolution-core::tests/frontmatter-yaml-1-2-core.spec.ts",
         "evolution-core::tests/fuzzy-patch.spec.ts",
         "evolution-core::tests/gates.spec.ts",
@@ -1556,6 +1559,7 @@
         "evolution-review::tests/delivery-settle.spec.ts",
         "evolution-review::tests/digest-budget.spec.ts",
         "evolution-review::tests/evidence-mutex.spec.ts",
+        "evolution-review::tests/evidence-seq.spec.ts",
         "evolution-review::tests/lifecycle.spec.ts",
         "evolution-review::tests/noop-usage-guard.spec.ts",
         "evolution-review::tests/outstanding-window.spec.ts",
@@ -1720,7 +1724,7 @@
     },
     "ci-only": {
       "gates": 10,
-      "specs": 62
+      "specs": 64
     },
     "full(ci=off)": {
       "gates": 56,
@@ -1728,12 +1732,12 @@
     },
     "full(ci=on)": {
       "gates": 66,
-      "specs": 393
+      "specs": 395
     }
   },
   "specs": {
-    "total": 393,
-    "marked": 393,
+    "total": 395,
+    "marked": 395,
     "unmarked": 0
   }
 }

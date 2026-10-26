@@ -124,8 +124,38 @@ export interface PlanRule<Op> {
 
 const MEMORY_ACTIONS = new Set(['add', 'replace', 'remove'])
 const SKILL_ACTIONS = new Set(['create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure'])
+const MEMORY_TARGETS = ['memory', 'user'] as const
+const MEMORY_STRING_FIELDS = ['facts', 'content', 'old_text', 'target'] as const
+const SKILL_STRING_FIELDS = ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'] as const
+const EVIDENCE_FIELD = 'event_seq'
+const EVIDENCE_ALIAS = 'seq'
 // 0.3.17 (S3.10, T-1): single source lives in core constants.
 const FORBIDDEN_KEYS: readonly string[] = FORBIDDEN_CONTROL_KEYS
+
+/**
+ * The model-facing plan contract, generated from the same constants the validator reads.
+ *
+ * The prompt used to state only "evidence is mandatory" while the validator rejected exact
+ * field-name mismatches, so a model could produce a valid plan that always failed. This text
+ * and the rules below share MEMORY_ACTIONS / SKILL_ACTIONS / MEMORY_TARGETS /
+ * SKILL_ACTION_REQUIRED_FIELDS; a new required field changes one table, not two prose copies.
+ * @returns a compact exact-name contract for the review request.
+ */
+export function planContractPrompt(): string {
+  const skillLines = [...SKILL_ACTIONS].map((action) => {
+    const required = SKILL_ACTION_REQUIRED_FIELDS[action] ?? []
+    return `  - ${action}: ${required.join(', ')}`
+  })
+  return [
+    'Plan contract (exact JSON field names):',
+    `- Every op needs evidence: [{"${EVIDENCE_FIELD}": <integer>}] copied from a seq=<n> tag; ${EVIDENCE_ALIAS} is accepted as an alias.`,
+    `- memoryOps[]: target must be one of ${MEMORY_TARGETS.join('|')}; action one of ${[...MEMORY_ACTIONS].join('|')}; `
+    + 'add needs facts or content, replace/remove need old_text.',
+    `- skillOps[]: action one of ${[...SKILL_ACTIONS].join('|')}; name is always required; required fields per action:`,
+    ...skillLines,
+    '- One rejected op does not void the plan; omit an op you cannot cite rather than guessing.',
+  ].join('\n')
+}
 
 /** The seq ONE evidence item cites, or -1 when it cites none.
  *
@@ -134,11 +164,11 @@ const FORBIDDEN_KEYS: readonly string[] = FORBIDDEN_CONTROL_KEYS
 function citedEvidenceSeq(item: unknown): number {
   if (!item || typeof item !== 'object') return -1
   const record = item as Record<string, unknown>
-  return typeof record.event_seq === 'number'
-    ? record.event_seq
-    : typeof record.seq === 'number' ? record.seq
-      : typeof record.event_seq === 'string' && /^[0-9]+$/.test(record.event_seq)
-        ? Number(record.event_seq)
+  return typeof record[EVIDENCE_FIELD] === 'number'
+    ? record[EVIDENCE_FIELD]
+    : typeof record[EVIDENCE_ALIAS] === 'number' ? record[EVIDENCE_ALIAS]
+      : typeof record[EVIDENCE_FIELD] === 'string' && /^[0-9]+$/.test(record[EVIDENCE_FIELD])
+        ? Number(record[EVIDENCE_FIELD])
         : -1
 }
 
@@ -191,7 +221,7 @@ const MEMORY_PLAN_RULES: readonly PlanRule<MemoryOp>[] = [
     // at the op level). Reject per-op instead.
     id: 'FIELD_TYPE',
     run: ({ op, index }) => {
-      const badField = malformedStringField(op, ['facts', 'content', 'old_text', 'target'])
+      const badField = malformedStringField(op, [...MEMORY_STRING_FIELDS])
       return badField === null ? null : `memory op ${index}: field ${badField} must be a string`
     },
   },
@@ -210,9 +240,9 @@ const MEMORY_PLAN_RULES: readonly PlanRule<MemoryOp>[] = [
   },
   {
     id: 'TARGET',
-    run: ({ op, index }) => (op.target === 'memory' || op.target === 'user'
+    run: ({ op, index }) => (MEMORY_TARGETS.includes(op.target as typeof MEMORY_TARGETS[number])
       ? null
-      : `memory op ${index}: target must be memory or user`),
+      : `memory op ${index}: target must be ${MEMORY_TARGETS.join(' or ')}`),
   },
   {
     id: 'ACTION',
@@ -260,7 +290,7 @@ const SKILL_PLAN_RULES: readonly PlanRule<SkillOp>[] = [
     // used to escape the validator and TypeError mid-plan.
     id: 'FIELD_TYPE',
     run: ({ op, index }) => {
-      const badField = malformedStringField(op, ['name', 'content', 'old_string', 'new_string', 'file_path', 'file_content', 'absorbed_into'])
+      const badField = malformedStringField(op, [...SKILL_STRING_FIELDS])
       return badField === null ? null : `skill op ${index}: field ${badField} must be a string`
     },
   },

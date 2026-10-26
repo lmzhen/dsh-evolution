@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.24 (patch) — review evidence and delivery contract
+
+> **范围**：review digest 把事件 seq 带到 `[call]`/`[result]` 并输出 `seq=<n>`；新增由 validator 常量生成的 `planContractPrompt()`；core 新增 `ensureSkillFrontmatter()`，只在 review 执行边界修复完全缺失的 frontmatter 并留 host warn；新增 `reviewNotice`（默认 true）只抑制结果通知，review prompt 永不抑制。
+> **验证**：review 126 tests / core frontmatter repair passed；构建通过；PR #1 的 4 类问题均有对应测试。
+
 ## 0.30.23 (patch) — expose platform-write capability
 
 > **范围**：merge snapshot 现在把计算出的 `platformWrite` 传给 `readMergeSnapshot`；view/UI 能读到宿主能力，平台写入行不再显示“宿主未提供该能力”。

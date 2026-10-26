@@ -4209,5 +4209,6 @@ export type {
   SupportFileCharPolicy,
   PolicyStageFields,
 } from './limits.ts'
-export { authoringFeedback, frontmatterBlock, frontmatterCatalogInvalid, normalizeFrontmatter, parseFrontmatter, relatedSkillNames, validateFrontmatter, yamlPlainScalarNeedsQuotes } from './frontmatter.ts'
+export { authoringFeedback, ensureSkillFrontmatter, frontmatterBlock, frontmatterCatalogInvalid, normalizeFrontmatter, parseFrontmatter, relatedSkillNames, validateFrontmatter, yamlPlainScalarNeedsQuotes } from './frontmatter.ts'
+export type { FrontmatterRepair } from './frontmatter.ts'
 export type { AuthoringFeedback, Frontmatter, FrontmatterNormalizeResult, FrontmatterRead, PlatformStringSplit } from './frontmatter.ts'

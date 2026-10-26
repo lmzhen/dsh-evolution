@@ -47,6 +47,11 @@
       "owner": "G5"
     },
     {
+      "fieldId": "reviewNotice",
+      "reason": "switch — the platform field spec offers number/text only; the result-notice switch is a family control (31 号 P-1)",
+      "owner": "G5"
+    },
+    {
       "fieldId": "addDatePrefix",
       "reason": "switch — the platform field spec offers number/text only; a switch/select field has no platform piece to switch to (31 号 P-1)",
       "owner": "G5"
