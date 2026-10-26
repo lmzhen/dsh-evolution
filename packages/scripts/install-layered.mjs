@@ -528,7 +528,8 @@ async function copyAllEvolutionPackages(profileDir, dryRun) {
     // to copy any directory carrying a package.json. (Compare the scope-less
     // name: source manifests are `@deepseek-ai/dsh-evolution-*`, destination
     // directories are `dsh-evolution-*`.)
-    if (!EVOLUTION_PREFIXES.some(prefix => scopedName(packageName).startsWith(prefix))) continue
+    const bareName = packageName.startsWith('@') ? (packageName.split('/')[1] ?? '') : packageName
+    if (!EVOLUTION_PREFIXES.some(prefix => bareName.startsWith(prefix))) continue
     // The shared client kit is a community-scope library even in a @deepseek-ai tree; keep its
     // declared scope so the browser bundle's import resolves to the copy this installer writes.
     const destinationScope = packageName.startsWith('@lmzhen/') ? '@lmzhen' : EVOLUTION_SCOPE
@@ -597,6 +598,12 @@ async function removeCopiedEvolutionPackages(profileDir, dryRun = false) {
     if (!entry.isDirectory()) continue
     if (!EVOLUTION_PREFIXES.some(prefix => entry.name.startsWith(prefix))) continue
     if (!dryRun) await rm(join(scopeDir, entry.name), { recursive: true, force: true })
+    removed += 1
+  }
+  // The shared client kit is community-scoped even in a @deepseek-ai install.
+  const communityKit = join(profileDir, 'node_modules', '@lmzhen', 'dsh-evolution-client-kit')
+  if (existsSync(communityKit)) {
+    if (!dryRun) await rm(communityKit, { recursive: true, force: true })
     removed += 1
   }
   return removed

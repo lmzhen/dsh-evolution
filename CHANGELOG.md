@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.26 (patch) — rc.3 platform line and shared client kit
+
+> **范围**：平台线抬到 0.2.1-rc.3（floor rc.2）；新增 `@lmzhen/dsh-evolution-client-kit`，四个 Web 面板共用 seam/生成契约/tokens；合并行菜单改用 rc.3 MenuSurface/MenuItemButton；host capability 单探针；target 不存在时 authoring 归一为 create-umbrella；安装器保留 community Kit scope。
+> **验证**：merge 547 / UI+kit 188 / tsc / 36 包打包与 tarball 审计；rc.3 真机 pair→fuse→commit→undo。
+
 ## 0.30.25 (patch) — merge reliability and evidence hardening
 
 > **范围**：recovery 按父 run 识别 undo、多 target undo、scan 终态清理、authoring limits 与 commit 同快照、merged pair 自然长度进入报告；A18 错误行数分层、A19 去除不可观察门禁。

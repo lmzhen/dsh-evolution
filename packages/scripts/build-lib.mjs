@@ -44,14 +44,17 @@ function run(command, args, cwd) {
 // start from the same clean state or local and CI artifacts diverge.
 for (const name of packages) rmSync(join(evolutionRoot, name, 'lib'), { recursive: true, force: true })
 
+// The engine's hand-maintained lib/index.d.ts is an INPUT to evolution-merge's typecheck. Build it
+// before tsc; the old order deleted it, ran tsc (TS2307), and only then recreated it.
+if (packages.includes('evolution-merge-engine')) {
+  run(join(evolutionRoot, 'evolution-merge-engine', 'scripts', 'build.mjs'), [], join(evolutionRoot, 'evolution-merge-engine'))
+}
+
 const projects = packages.map(name => join(evolutionRoot, name, 'tsconfig.json'))
 run(tsc, ['-b', ...projects, '--force'], repoRoot)
 for (const name of packages) {
   console.log(`build: ${name}`)
-  if (name === 'evolution-merge-engine') {
-    run(join(evolutionRoot, name, 'scripts', 'build.mjs'), [], join(evolutionRoot, name))
-    continue
-  }
+  if (name === 'evolution-merge-engine') continue
   run(tsdown, ['--config', config], join(evolutionRoot, name))
 }
 // G4/S4.4: the BROWSER halves. A package declaring `dsh.client` ships a loader

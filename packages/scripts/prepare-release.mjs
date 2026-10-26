@@ -153,7 +153,9 @@ function currentGitSha() {
 }
 
 function scopedPackageName(name) {
-  return scope ? `${scope}/${name.slice('@deepseek-ai/'.length)}` : name
+  if (!scope) return name
+  const slash = name.indexOf('/')
+  return `${scope}/${slash >= 0 ? name.slice(slash + 1) : name}`
 }
 
 function releaseSpec(name, ourNames, protocol = '^') {
@@ -201,7 +203,7 @@ function rewritePackage(pkg, ourNames, sourceDir) {
     }
   }
   if (scope) {
-    pkg.name = `${scope}/${pkg.name.slice('@deepseek-ai/'.length)}`
+    pkg.name = scopedPackageName(pkg.name)
     pkg.repository = {
       type: 'git',
       url: 'git+https://github.com/lmzhen/dsh-evolution.git',
@@ -483,7 +485,10 @@ for (const item of tarballs) {
   for (const rel of libBundles(libRoot)) {
     const text = readFileSync(join(libRoot, rel), 'utf8')
     for (const originalName of names.keys()) {
-      if (text.includes(originalName)) {
+      const releasedName = scopedPackageName(originalName)
+      // The community client kit is already published under @lmzhen; its source name and
+      // release name are identical, so "still contains the original" is not a drift here.
+      if (releasedName !== originalName && text.includes(originalName)) {
         failures.push(`${item.name}: lib/${rel} still imports ${originalName} (unrewritten scope)`)
       }
     }
