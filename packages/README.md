@@ -53,6 +53,7 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `evolution-feedback` | Durable feedback store; exposes `evolutionFeedback.record()` for hosts/custom commands — the family ships NO producer (the upstream `/feedback` event is free text), so `feedback_score`/`feedback_warn` fire only when a deployment wires one (union-read with `quality_warn` in the curator) |
 | `evolution-learning-graph` | Graph command over skills + memory |
 | `evolution-replay` | A/B replay scoring + session-event driver |
+| `evolution-client-kit` | Shared browser client kit for the four sidebar panels: generated contracts/routes/tokens, one `registerSidebarPanel` lifecycle, workspace id; published as the community package `@lmzhen/dsh-evolution-client-kit` |
 | `evolution-commands` | `/evolution` command surface (see the command table below — rendered from the registry single source) |
 | `evolution-maintenance` | Deterministic maintenance-scan surface (snapshot / drift signals / facts) |
 | `evolution-host` | Host-plane infrastructure bundle (no memory/skill model tools; ships the read-only `maintenance_probe` diagnostic) |
