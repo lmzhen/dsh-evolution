@@ -562,7 +562,8 @@ for (const item of tarballs) {
     if (rel.replace(/^\.\//, '') !== 'README.md') continue
     const text = readFileSync(join(staged, ...rel.split('/')), 'utf8')
     for (const originalName of names.keys()) {
-      if (text.includes(originalName)) {
+      const releasedName = scopedPackageName(originalName)
+      if (releasedName !== originalName && text.includes(originalName)) {
         failures.push(`${item.name}: ${rel} still references ${originalName} (unrewritten scope in the shipped README)`)
       }
     }
