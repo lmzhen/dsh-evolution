@@ -1,13 +1,21 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const args = new Map()
 for (let i = 2; i < process.argv.length; i += 2) args.set(process.argv[i], process.argv[i + 1])
 const repo = args.get('--repo') ?? process.cwd()
 const artifact = args.get('--artifact') ?? join(process.cwd(), 'artifacts', 'gates', 'RG0')
-const src = join(repo, 'packages', 'evolution-merge', 'src')
+// Work from the package's own location so the same gate runs in the mirror
+// (packages/evolution-merge) and the overlay (packages/evolution/evolution-merge).
+const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
+const pkgDir = name => {
+  const direct = join(repo, 'packages', name)
+  return existsSync(direct) ? direct : join(repo, 'packages', 'evolution', name)
+}
+const src = join(packageRoot, 'src')
 const checks = []
 const add = (name, ok, detail) => checks.push({ name, ok, detail })
 
@@ -33,9 +41,15 @@ if (commitSha === 'unknown') try { commitSha = execFileSync('git', ['-C', repo, 
 const digestEntries = []
 const addDigest = (label, path) => { if (existsSync(path)) digestEntries.push(label + ':' + readFileSync(path, 'utf8')) }
 if (existsSync(src)) for (const name of readdirSync(src, { recursive: true }).map(String).filter(name => name.endsWith('.ts'))) addDigest('src/' + name, join(src, name))
-for (const rel of ['tests/gates/rg0-ownership.spec.ts', 'tests/gates/rg0-consistency.spec.ts', 'tests/gates/rg0-port-boundary.spec.ts']) addDigest(rel, join(repo, 'packages/evolution-merge', rel))
-addDigest('scripts/gates/rg0-check.mjs', join(repo, 'packages/evolution-merge/scripts/gates/rg0-check.mjs'))
-for (const rel of ['packages/evolution-core/src/run-registry.ts', 'packages/evolution-core/src/tree-lock.ts', 'packages/evolution-core/src/skill-store.ts', 'packages/evolution-merge-engine/package.json', 'packages/evolution-merge-ui/src/client/Panel.ts']) addDigest(rel, join(repo, rel))
+for (const rel of ['tests/gates/rg0-ownership.spec.ts', 'tests/gates/rg0-consistency.spec.ts', 'tests/gates/rg0-port-boundary.spec.ts']) addDigest(rel, join(packageRoot, rel))
+addDigest('scripts/gates/rg0-check.mjs', fileURLToPath(import.meta.url))
+for (const [label, path] of [
+  ['evolution-core/src/run-registry.ts', join(pkgDir('evolution-core'), 'src', 'run-registry.ts')],
+  ['evolution-core/src/tree-lock.ts', join(pkgDir('evolution-core'), 'src', 'tree-lock.ts')],
+  ['evolution-core/src/skill-store.ts', join(pkgDir('evolution-core'), 'src', 'skill-store.ts')],
+  ['evolution-merge-engine/package.json', join(pkgDir('evolution-merge-engine'), 'package.json')],
+  ['evolution-merge-ui/src/client/Panel.ts', join(pkgDir('evolution-merge-ui'), 'src', 'client', 'Panel.ts')],
+]) addDigest(label, path)
 addDigest('ownership-matrix.md', matrix)
 const treeDigest = createHash('sha256').update(digestEntries.sort().join('\n')).digest('hex')
 const ok = checks.every(check => check.ok)

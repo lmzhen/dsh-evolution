@@ -543,13 +543,14 @@ const CITATION_SKIP_DIRS = new Set(['node_modules', '.git', 'lib', 'dist', '.nex
 /**
  * Generated ledgers that are NOT a citation surface. family-test-lines.json is a ledger
  * gen-test-lines.mjs writes and can replay; the paths inside it are bookkeeping for the
- * line-identity checks, not prose citing platform APIs. Walking it made three mirror-layout
- * family test paths (evolution-agent / evolution-host / evolution-preset) look like platform
- * citations, and they reported missing wherever the checked-out tree carries no tests/ - the
- * released-upstream job went red on them. The list is explicit on purpose: an exclusion is a
- * judgement about the scan surface, so it names the files rather than widening a wildcard.
+ * line-identity checks, not prose citing platform APIs. gate-manifest.json is the generated
+ * gate ledger: its argv strings are validated in the tree that runs them (mirror vs overlay),
+ * and its mirror-layout package paths are not platform anchors. Walking either made real
+ * family paths look like broken platform citations. The list is explicit on purpose: an
+ * exclusion is a judgement about the scan surface, so it names the files rather than widening
+ * a wildcard.
  */
-const CITATION_SKIP_FILES = new Set(['family-test-lines.json'])
+const CITATION_SKIP_FILES = new Set(['family-test-lines.json', 'gate-manifest.json'])
 
 /**
  * Walk the family tree and hand every non-excluded, non-binary file to `visit`;
