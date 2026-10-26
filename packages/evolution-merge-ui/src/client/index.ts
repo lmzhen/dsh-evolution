@@ -1,9 +1,9 @@
 /** Browser half: one sidebar row and the read-only Batch 4 panel. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactElement } from 'react'
-import { panelWorkspaceId, registerSidebarPanel } from '@deepseek-ai/dsh-evolution-client-kit'
+import { panelWorkspaceId, registerSidebarPanel } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
-import type { ConfigFormsSeat } from '@deepseek-ai/dsh-evolution-client-kit'
+import type { ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, en, zh } from './messages.ts'
 import { MergePanel, type MergeFace } from './Panel.ts'

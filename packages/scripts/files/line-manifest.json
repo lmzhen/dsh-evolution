@@ -1,5 +1,5 @@
 {
-  "pin": "879bec58",
+  "pin": "f50efa47",
   "bed": {
     "mono": "overlay"
   },
@@ -23,11 +23,6 @@
       "id": "@deepseek-ai/dsh-evolution-approval",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-approval"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-client-kit",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-client-kit"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-commands",
@@ -158,6 +153,11 @@
       "id": "@deepseek-ai/dsh-evolution-threat",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-threat"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-client-kit"
     },
     {
       "id": "@deepseek-ai/dsh-tool-session-query",

@@ -25,7 +25,7 @@
  *   `dsh-evolution-maintenance` truncates in 264px.
  * @module @deepseek-ai/dsh-evolution-skill-history/client
  */
-import { tokenVars } from '@deepseek-ai/dsh-evolution-client-kit/tokens'
+import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 
 /** Tag id that makes the injection idempotent. */
 export const CSS_TAG_ID = '@deepseek-ai/dsh-evolution-skill-history/panel.css'

@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-evolution-client-kit
+# @lmzhen/dsh-evolution-client-kit
 
 Browser-side seams and lifecycle shared by the evolution family's sidebar panels.
 It owns the client contract types, generated route/state/contract tables, design tokens, and

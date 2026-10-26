@@ -1,4 +1,4 @@
-import { TOKEN_CSS } from '@deepseek-ai/dsh-evolution-client-kit/tokens'
+import { TOKEN_CSS } from '@lmzhen/dsh-evolution-client-kit/tokens'
 
 export const CSS_TAG_ID = 'evolution-merge-panel'
 

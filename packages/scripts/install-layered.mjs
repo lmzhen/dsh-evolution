@@ -529,7 +529,10 @@ async function copyAllEvolutionPackages(profileDir, dryRun) {
     // name: source manifests are `@deepseek-ai/dsh-evolution-*`, destination
     // directories are `dsh-evolution-*`.)
     if (!EVOLUTION_PREFIXES.some(prefix => scopedName(packageName).startsWith(prefix))) continue
-    const destination = join(profileDir, 'node_modules', EVOLUTION_SCOPE, scopedName(packageName))
+    // The shared client kit is a community-scope library even in a @deepseek-ai tree; keep its
+    // declared scope so the browser bundle's import resolves to the copy this installer writes.
+    const destinationScope = packageName.startsWith('@lmzhen/') ? '@lmzhen' : EVOLUTION_SCOPE
+    const destination = join(profileDir, 'node_modules', destinationScope, scopedName(packageName))
     copies.push({ packageName, source, destination })
     if (!dryRun) await copyPackage(source, destination)
   }

@@ -13,9 +13,9 @@ import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } f
 import { emptyState, groupHeading, notice, panelHead, searchField, skillLine, versionRow, type Copy, type OpenKind } from './chrome.ts'
 import { DiffBody, PreviewBody, type BodyState, type DiffState } from './document.ts'
 import { SkillHistoryRefusal, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
-import type { RouteFailure } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
-import { FailureBlock } from '@deepseek-ai/dsh-evolution-client-kit/generated/states'
-import { FALLBACKS } from '@deepseek-ai/dsh-evolution-client-kit/generated/fallbacks'
+import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
+import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
+import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import type { MarkdownWords } from './markdown.ts'
 
 /** What the panel is handed: the dictionary seat, the renderer's words, and the host's callbacks. */

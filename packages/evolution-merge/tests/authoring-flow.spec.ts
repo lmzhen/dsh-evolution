@@ -31,6 +31,17 @@ it('authors a staged tree, passes the gate and commits', async () => {
   expect(await readCommitReceipt(io, home, 'run-1')).toMatchObject({ unitId: 'u-1', target: 'umbrella' })
 })
 
+it('normalizes merge-into-existing to create-umbrella when the target card is absent', async () => {
+  const home = await tempRoot('dsh-merge-authoring-fresh-')
+  const io = nodeEvolutionIo()
+  const result = await runAuthoring({
+    io, home, runId: 'run-fresh', target: 'umbrella', mode: 'merge-into-existing', cards, commitPort: port(), now: () => 200, summary: 'merge',
+    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) },
+  })
+  expect(result.ok, result.ok ? '' : result.message).toBe(true)
+  expect(await readCommitReceipt(io, home, 'run-fresh')).toMatchObject({ target: 'umbrella' })
+})
+
 it('fails closed on a target with a separator before authoring', async () => {
   const home = await tempRoot('dsh-merge-authoring-target-')
   const io = nodeEvolutionIo()

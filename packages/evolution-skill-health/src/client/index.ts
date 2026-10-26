@@ -4,7 +4,7 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactElement } from 'react'
-import { registerSidebarPanel } from '@deepseek-ai/dsh-evolution-client-kit'
+import { registerSidebarPanel } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, en, zh } from './messages.ts'

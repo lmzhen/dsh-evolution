@@ -5,7 +5,7 @@
 
 ## 座位与注册
 
-- 侧栏行和主区由 `@deepseek-ai/dsh-evolution-client-kit` 的 `registerSidebarPanel` 一次注册：
+- 侧栏行和主区由 `@lmzhen/dsh-evolution-client-kit` 的 `registerSidebarPanel` 一次注册：
   同一个 id 既是 `sidebar.panellist` 的行，也是 keyed `main` 的 key（家族面板契约）；
   `label` 由 Kit 以 thunk 提供，跟随语言切换；`order` 取 40 一带（与技能历史相邻）。
 - 三个侧栏面板共用同一份客户端缝和生命周期；业务只提供 Panel/Store/api 和图标。

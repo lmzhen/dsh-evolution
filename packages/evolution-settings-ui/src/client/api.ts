@@ -6,8 +6,8 @@
  * same way, because a refusal is a business answer the card shows as a sentence, not a transport error.
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/api
  */
-import { ROUTES } from '@deepseek-ai/dsh-evolution-client-kit/generated/routes'
-import { requestJson, type RouteAnswer } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
+import { ROUTES } from '@lmzhen/dsh-evolution-client-kit/generated/routes'
+import { requestJson, type RouteAnswer } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 
 /** One staged write, as the pending route hands it over (never the staged args). */
 export interface PendingRow {

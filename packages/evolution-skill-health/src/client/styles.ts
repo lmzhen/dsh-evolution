@@ -25,7 +25,7 @@
  * @module @deepseek-ai/dsh-evolution-skill-health/client
  */
 
-import { TOKEN_CSS } from '@deepseek-ai/dsh-evolution-client-kit/tokens'
+import { TOKEN_CSS } from '@lmzhen/dsh-evolution-client-kit/tokens'
 
 /** Tag id for the injected <style>, so a hot reload replaces rather than stacks it. */
 export const CSS_TAG_ID = 'dsh-evolution-skill-health'

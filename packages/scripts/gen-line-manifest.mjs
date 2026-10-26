@@ -35,7 +35,7 @@ const familyPairs = readdirSync(join(ROOT, 'packages'))
   .map((n) => ({ dir: n, pkg: join(ROOT, 'packages', n, 'package.json') }))
   .filter((p) => existsSync(p.pkg))
   .map((p) => ({ dir: p.dir, id: JSON.parse(readFileSync(p.pkg, 'utf8')).name }))
-  .filter((p) => typeof p.id === 'string' && p.id.startsWith('@deepseek-ai/dsh-evolution-'))
+  .filter((p) => typeof p.id === 'string' && (p.id.startsWith('@deepseek-ai/dsh-evolution-') || p.id === '@lmzhen/dsh-evolution-client-kit'))
   .sort((a, b) => (a.id < b.id ? -1 : 1))
 // F1 (release review 2026-10-15): the artifact must be MACHINE-INDEPENDENT. It used to record the
 // resolved ABSOLUTE path and an `unresolved` kind decided by existsSync, so the committed manifest

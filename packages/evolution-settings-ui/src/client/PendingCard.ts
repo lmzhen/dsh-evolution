@@ -13,8 +13,8 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/PendingCard
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
-import type { FallbackHint } from '@deepseek-ai/dsh-evolution-client-kit/generated/contracts'
-import { FailureBlock, failureText } from '@deepseek-ai/dsh-evolution-client-kit/generated/states'
+import type { FallbackHint } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
+import { FailureBlock, failureText } from '@lmzhen/dsh-evolution-client-kit/generated/states'
 import type { ApprovalApi, PendingRow } from './api.ts'
 import type { MessageKey } from './messages.ts'
 import {

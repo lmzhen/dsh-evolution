@@ -6,15 +6,15 @@
  * and no computation — it only renders.
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/diagnostics-state
  */
-import { ROUTES } from '@deepseek-ai/dsh-evolution-client-kit/generated/routes'
-import { requestJson, type RouteAnswer } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
-import type { DiagnosticsView } from '@deepseek-ai/dsh-evolution-client-kit/generated/contracts'
+import { ROUTES } from '@lmzhen/dsh-evolution-client-kit/generated/routes'
+import { requestJson, type RouteAnswer } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
+import type { DiagnosticsView } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
 
 /** What the card renders: the view, or the classified failure that kept it from arriving. */
 export type DiagnosticsState =
   | { readonly phase: 'loading' }
   | { readonly phase: 'ready'; readonly view: DiagnosticsView }
-  | { readonly phase: 'failed'; readonly failure: import('@deepseek-ai/dsh-evolution-client-kit/generated/route-client').RouteFailure }
+  | { readonly phase: 'failed'; readonly failure: import('@lmzhen/dsh-evolution-client-kit/generated/route-client').RouteFailure }
 
 /** The one call the card makes. */
 export interface DiagnosticsApi {

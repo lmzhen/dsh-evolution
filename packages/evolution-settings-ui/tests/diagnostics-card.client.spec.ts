@@ -12,10 +12,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import type { DiagnosticsView } from '@deepseek-ai/dsh-evolution-client-kit/generated/contracts'
-import type { RouteAnswer } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
+import type { DiagnosticsView } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
+import type { RouteAnswer } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { DiagnosticsCard } from '../src/client/DiagnosticsCard.ts'
-import { FALLBACKS } from '@deepseek-ai/dsh-evolution-client-kit/generated/fallbacks'
+import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { formatText } from '../src/client/messages.ts'
 
 const t = (key: string, values?: Readonly<Record<string, string | number>>): string => formatText(key as never, values)

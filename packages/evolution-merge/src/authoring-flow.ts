@@ -56,7 +56,12 @@ export type AuthoringResult =
 export async function runAuthoring(options: RunAuthoringOptions): Promise<AuthoringResult> {
   if (options.target.includes('/') || options.target.includes(':')) return { ok: false, code: 'target-invalid', message: 'target must be a bare skill name: ' + options.target }
   const targetCard = options.cards.find(card => card.name === options.target)
-  const mode = options.mode ?? (targetCard === undefined ? 'create-umbrella' : 'merge-into-existing')
+  // A decision can name a fresh target yet say merge-into-existing (the model's vocabulary is
+  // about intent, not existence). The target card is the authoritative existence fact: when it is
+  // absent, the only safe mode is create-umbrella; otherwise commit-assembly correctly refuses to
+  // re-create a target that disappeared later.
+  const requestedMode = options.mode ?? (targetCard === undefined ? 'create-umbrella' : 'merge-into-existing')
+  const mode = requestedMode === 'merge-into-existing' && targetCard === undefined ? 'create-umbrella' : requestedMode
   const createMode = mode === 'create-umbrella'
   if (!createMode && targetCard !== undefined) {
     if (targetCard.managed !== true) return { ok: false, code: 'target-not-managed', message: 'target is not family-managed: ' + options.target }

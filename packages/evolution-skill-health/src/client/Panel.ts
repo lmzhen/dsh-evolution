@@ -12,9 +12,9 @@ import { createElement, useEffect, useState, type ReactNode } from 'react'
 // The stylesheet is scoped to this class; without it on the root element the panel renders unstyled.
 import { CSS_TAG_ID } from './styles.ts'
 import type { HealthOutcome } from './api.ts'
-import type { RouteFailure } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
-import { FailureBlock } from '@deepseek-ai/dsh-evolution-client-kit/generated/states'
-import { FALLBACKS } from '@deepseek-ai/dsh-evolution-client-kit/generated/fallbacks'
+import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
+import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
+import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 
 /** One finding, as the host reports it: `line` is null when the position cannot be named. */
 export interface HealthFinding {

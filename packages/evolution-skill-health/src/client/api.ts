@@ -6,9 +6,9 @@
  * with the host's own sentence, so the panel shows what the route actually said.
  * @module @deepseek-ai/dsh-evolution-skill-health/client
  */
-import { ROUTES } from '@deepseek-ai/dsh-evolution-client-kit/generated/routes'
-import { requestJson } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
-import type { RouteFailure } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
+import { ROUTES } from '@lmzhen/dsh-evolution-client-kit/generated/routes'
+import { requestJson } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
+import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import type { HealthRow } from './Panel.ts'
 
 /** Route paths: the generated mirror of the host's HOST_ROUTES (one declaration in core). */

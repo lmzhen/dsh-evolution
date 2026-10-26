@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import type { MergeBody, MergeHistoryItem, MergeOutcome, MergeRowView, MergeViewPayload, QueuePage } from '../src/client/api.ts'
 import { MergePanel, saveSetting } from '../src/client/Panel.ts'
 import { MergeStore, type MergeSource } from '../src/client/MergeStore.ts'
-import type { ConfigFormLike } from '@deepseek-ai/dsh-evolution-client-kit'
+import type { ConfigFormLike } from '@lmzhen/dsh-evolution-client-kit'
 
 it('copies row actions and honors the confirm gate on the production panel', async () => {
   const command = '/evolution merge approve mr_copy'

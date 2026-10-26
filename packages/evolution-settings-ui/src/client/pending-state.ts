@@ -8,7 +8,7 @@
  * @module @deepseek-ai/dsh-evolution-settings-ui/client/pending-state
  */
 import type { PendingRow, PreviewAnswer } from './api.ts'
-import type { RouteFailure } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
+import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 
 /** What one row's preview is showing while it is open. */
 export type PreviewView =

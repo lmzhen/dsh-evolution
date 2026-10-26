@@ -1,5 +1,5 @@
 {
-  "name": "@deepseek-ai/dsh-evolution-client-kit",
+  "name": "@lmzhen/dsh-evolution-client-kit",
   "description": "Shared browser seams and lifecycle for the evolution family sidebar panels",
   "version": "0.30.25",
   "private": false,
