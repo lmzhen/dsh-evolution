@@ -1,5 +1,5 @@
 /** Read-only merge wire client. Classifies every failure and never writes. */
-import { ROUTES } from './routes.generated.ts'
+import { ROUTES } from '@deepseek-ai/dsh-evolution-client-kit/generated/routes'
 
 export const HOST_ROUTES = ROUTES.merge
 export type MergeQueue = 'verify' | 'pending' | 'fuse' | 'skipped'

@@ -601,6 +601,9 @@ const publishGroups = [
   ['tool-memory', 'tool-skill-manage'],
   ['evolution-review', 'evolution-curator', 'evolution-commands'],
   ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog'],
+  // G1: the shared browser kit. Client-only and dependency-free in the family;
+  // every sidebar panel depends on it, so it publishes before them.
+  ['evolution-client-kit'],
   // G4/S4.4: the settings cards. A client-only package (its Host half registers
   // nothing), so it has no family dependency to order after — but the bundle in
   // the next group depends on it, and the table must cover every staged tarball.

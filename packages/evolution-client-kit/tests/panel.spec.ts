@@ -1,3 +1,4 @@
+// @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { registerSidebarPanel, type ClientSeam, type SidebarPanelSpec } from '../src/index.ts'
 import { panelWorkspaceId } from '../src/workspace.ts'

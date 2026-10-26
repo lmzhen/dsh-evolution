@@ -6,9 +6,9 @@
  * can no longer drift from the host table or grow a second HTTP vocabulary.
  * @module @deepseek-ai/dsh-evolution-skill-history/client
  */
-import { ROUTES } from './routes.generated.ts'
-import { failureMessage, requestJson } from './route-client.generated.ts'
-import type { RouteFailure } from './route-client.generated.ts'
+import { ROUTES } from '@deepseek-ai/dsh-evolution-client-kit/generated/routes'
+import { failureMessage, requestJson } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
+import type { RouteFailure } from '@deepseek-ai/dsh-evolution-client-kit/generated/route-client'
 
 /** Route paths: the generated mirror of the host's HOST_ROUTES (one declaration in core). */
 export const HOST_ROUTES = ROUTES['skill-history']

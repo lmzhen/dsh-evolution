@@ -74,7 +74,7 @@ for (const name of packages) {
     "  target: 'es2022',",
     '  dts: false,',
     '  clean: true,',
-    "  external: [/^react($|\\/)/, /^@deepseek-ai\\//],",
+    "  external: id => /^react($|\\/)/.test(id) || (/^@deepseek-ai\\//.test(id) && id !== '@deepseek-ai/dsh-evolution-client-kit' && !id.startsWith('@deepseek-ai/dsh-evolution-client-kit/')),",
     "  outputOptions: { entryFileNames: 'client.body.js' },",
     '}',
     '',

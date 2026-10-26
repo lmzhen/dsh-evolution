@@ -59,7 +59,7 @@ export function registerSidebarPanel<Face>(ctx: ClientContext, spec: SidebarPane
       registered = true
       return dispose
     } catch (error) {
-      ctx.logger.warn(spec.namespace + ': the locale seat refused the dictionary (' + String(error) + '); the panel falls back to its bundle copy')
+      ctx.logger.warn(spec.namespace + ': the locale seat refused the dictionary (' + String(error) + '); the panel falls back to the bundle copy')
       return () => {}
     }
   }, spec.namespace + ': locale')

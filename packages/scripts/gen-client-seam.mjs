@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * G5/W6-W7 client seam generator: renders the client route table and the shared route client into the
- * three UI packages, from the ONE host declaration (evolution-core HOST_ROUTES).
+ * G5/W6-W7 client seam generator: renders the client route table and the shared route client into
+ * the client kit (and settings-ui, which keeps its own settings surface), from the ONE host
+ * declaration (evolution-core HOST_ROUTES).
  *
  * R13 (W6): the publish pipeline builds first, so the generator prefers the BUILT core lib. A mirror
  * checkout has no lib; there it falls back to a constrained static read of src/http-routes.ts (the
@@ -28,7 +29,12 @@ import { tsLiteral } from './lib-ts-literal.mjs'
 const HERE = resolve(new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
 const scriptsDir = existsSync(join(root, 'scripts')) ? join(root, 'scripts') : HERE
 const templates = join(scriptsDir, 'templates', 'client')
-const PACKAGES = ['evolution-settings-ui', 'evolution-skill-history', 'evolution-skill-health', 'evolution-merge-ui']
+// The shared generated contract lives in the client kit; settings-ui keeps its own
+// copies because its settings seat is a different surface (and has no kit lifecycle yet).
+const OUTPUT_DIRS = [
+  ['evolution-client-kit', join(root, 'evolution-client-kit', 'src', 'generated')],
+  ['evolution-settings-ui', join(root, 'evolution-settings-ui', 'src', 'client')],
+]
 
 const SURFACE_IDS = {
   approval: 'approval',
@@ -201,10 +207,9 @@ for (const surface of surfaces) {
   fallbacks[id] = entry
 }
 const fallbacksText = renderFallbacks(surfaceUnion, fallbacks)
-for (const pkg of PACKAGES) {
-  const dir = join(root, pkg, 'src', 'client')
+for (const [label, dir] of OUTPUT_DIRS) {
   if (!existsSync(dir)) {
-    console.error('gen-client-seam: client directory is missing: ' + dir)
+    console.error('gen-client-seam: output directory is missing: ' + label + ' (' + dir + ')')
     process.exit(2)
   }
   outputs.push({ path: join(dir, 'routes.generated.ts'), content: routesText })

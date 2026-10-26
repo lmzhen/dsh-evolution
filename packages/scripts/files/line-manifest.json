@@ -1,5 +1,5 @@
 {
-  "pin": "2c8f66e0",
+  "pin": "dc494b93",
   "bed": {
     "mono": "overlay"
   },
@@ -23,6 +23,11 @@
       "id": "@deepseek-ai/dsh-evolution-approval",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-approval"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-client-kit",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-client-kit"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-commands",

@@ -260,6 +260,7 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
+        "evolution-client-kit::tests/panel.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
@@ -808,6 +809,7 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
+        "evolution-client-kit::tests/panel.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
@@ -1286,6 +1288,7 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
+        "evolution-client-kit::tests/panel.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/commands.spec.ts",
@@ -1747,7 +1750,7 @@
     },
     "pre-tag": {
       "gates": 57,
-      "specs": 336
+      "specs": 337
     },
     "ci-only": {
       "gates": 12,
@@ -1755,16 +1758,16 @@
     },
     "full(ci=off)": {
       "gates": 57,
-      "specs": 336
+      "specs": 337
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 400
+      "specs": 401
     }
   },
   "specs": {
-    "total": 400,
-    "marked": 400,
+    "total": 401,
+    "marked": 401,
     "unmarked": 0
   }
 }

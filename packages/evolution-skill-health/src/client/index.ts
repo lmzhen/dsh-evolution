@@ -1,16 +1,12 @@
 /**
- * Browser half: one left-sidebar row (`技能健康`) and the main-column body it opens.
- *
- * Two places, one id: `sidebar.panellist` owns the row and the layout's keyed `main` slot owns the
- * body, dispatched by that same id. Facts arrive through a loader the HOST half supplies, so this
- * bundle keeps no state of its own and touches no service.
+ * Browser half: one left-sidebar row (技能健康) and the main-column body it opens.
  * @module @deepseek-ai/dsh-evolution-skill-health/client
  */
-
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactElement } from 'react'
+import { registerSidebarPanel } from '@deepseek-ai/dsh-evolution-client-kit'
 import * as api from './api.ts'
-import { PANEL_ID, PANEL_ORDER, type ClientSeam } from './seam.ts'
+import { PANEL_ID, PANEL_ORDER } from './seam.ts'
 import { NS, en, zh } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
@@ -21,88 +17,36 @@ export const inject = ['slots', 'locale']
 /** The host half hands the panel a way to read its rows (a read-only route on the host side). */
 export type HealthFaceLoader = () => Promise<HealthFace>
 
-/**
- * Register the row and the body.
- * @param ctx - the client context; it must carry the two seats above.
- */
-/**
- * The row glyph. The sidebar hands every `sidebar.panellist` occupant `{ size, active }` and owns the
- * slot around it, so this is a plain line glyph drawn in `currentColor`.
- * @param props - the seat-provided size and active flag.
- * @returns the glyph element.
- */
+export { PANEL_ID, PANEL_ORDER }
+
 function PanelIcon(props: { size?: number; active?: boolean } = {}): ReactElement {
   const size = typeof props.size === 'number' && props.size > 0 ? props.size : 16
-  return createElement(
-    'svg',
-    {
-      'aria-hidden': 'true',
-      width: String(size),
-      height: String(size),
-      viewBox: '0 0 16 16',
-      fill: 'none',
-      stroke: 'currentColor',
-      strokeWidth: '1.5',
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-    },
-    createElement('path', { d: 'M2 8h3l1.5-3.5L9 11.5 10.5 8H14' }),
-  )
+  return createElement('svg', {
+    'aria-hidden': 'true',
+    width: String(size),
+    height: String(size),
+    viewBox: '0 0 16 16',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: '1.5',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  }, createElement('path', { d: 'M2 8h3l1.5-3.5L9 11.5 10.5 8H14' }))
 }
+
+/**
+ * Register the row and the body through the shared panel lifecycle.
+ * @param ctx - the client context; it must carry the two seats above.
+ */
 export function apply(ctx: ClientContext): void {
-  const seam = ctx as unknown as ClientSeam
-  // The dictionary registration is an effect AND is guarded: the seat throws when this namespace is
-  // already registered (a second bundle, or a hot reload whose dispose has not run yet), and an
-  // uncaught throw here aborts apply(), so the row and body registrations below never run and the
-  // panel disappears without a message. The sibling half carries the same guard for the same reason.
-  let registered: boolean = false
-  ctx.effect(() => {
-    try {
-      const dispose = seam.locale.register(NS, { zh, en })
-      registered = true
-      return dispose
-    } catch (error) {
-      ctx.logger.warn(
-        `evolution-skill-health: the locale seat refused the "${NS}" dictionary (${String(error)});`
-          + ' the row falls back to the bundle copy.',
-      )
-      return () => {}
-    }
-  }, 'evolution-skill-health: locale')
-  // The panel stylesheet, injected once behind its tag id (see styles.ts).
-  ctx.effect(() => {
-    if (document.querySelector('style[data-plugin-css="' + CSS_TAG_ID + '"]') === null) {
-      const tag = document.createElement('style')
-      tag.setAttribute('data-plugin-css', CSS_TAG_ID)
-      tag.textContent = CSS
-      document.head.append(tag)
-      return () => { tag.remove() }
-    }
-    return () => {}
-  }, 'evolution-skill-health: styles')
-  const label = (): string => {
-    const fallback = zh['entry.label'] ?? '技能健康'
-    if (!registered) return fallback
-    try { return seam.locale.bind(NS)('entry.label') } catch { return fallback }
-  }
-  // The panel's translator: the seat's dictionary binding, with the bundle's own copy as the fallback
-  // (a locale service that is absent or refuses must not turn the panel into a blank area).
-  const t = (key: string): string => {
-    const fallback = zh[key] ?? key
-    if (!registered) return fallback
-    try { return seam.locale.bind(NS)(key) } catch { return fallback }
-  }
-  seam.slots.inject('sidebar.panellist', function* () {
-    yield seam.slots.register(
-      { name: 'sidebar.panellist', id: PANEL_ID, order: PANEL_ORDER, label },
-      PanelIcon,
-    )
-    yield seam.slots.register(
-      // Seeded empty for the first paint; `loadRows` is what makes the panel show real data (api.ts is
-      // the only place a request is made; the host route is its mirror of ROUTES.rows). The seat spreads
-      // this face AS the component's props, so the component takes the face itself — the sibling's shape.
-      { name: 'main', key: PANEL_ID, inject: (): HealthFace => ({ rows: [], truncated: false, loadRows: api.rows, t }) },
-      SkillHealthPanel,
-    )
+  registerSidebarPanel<HealthFace>(ctx, {
+    id: PANEL_ID,
+    order: PANEL_ORDER,
+    namespace: NS,
+    dictionaries: { zh, en },
+    styles: { css: CSS, tagId: CSS_TAG_ID },
+    icon: PanelIcon,
+    component: SkillHealthPanel as unknown as (props: never) => ReactElement,
+    body: t => ({ rows: [], truncated: false, loadRows: api.rows, t }),
   })
 }
