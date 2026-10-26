@@ -41,7 +41,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all   # 默认全量包
 /evolution doctor
 ```
 
-你会看到装上了 29 个包（发布面 30 个；`@lmzhen/dsh-evolution-preset` 是 agent 预设形态，不进 `node_modules`）；重启之后，doctor 报告会说明它识别到的安装形态和找到的行。不用问模型就能验证：
+你会看到装上了 35 个包（发布面 36 个；`@lmzhen/dsh-evolution-preset` 是 agent 预设形态，不进 `node_modules`）；重启之后，doctor 报告会说明它识别到的安装形态和找到的行。不用问模型就能验证：
 
 ```bash
 dsh --profile web --dump-config | grep -c 'id: evolution-'   # 19 行
@@ -102,6 +102,8 @@ $DSH_HOME/memories/                  MEMORY.md + USER.md
 - `/evolution pending` + `approve` / `reject`：分阶段写入（M2）。
 - `/evolution curator status`：上次运行与下次到期（curator 每小时 tick；默认每 168 h 到期一次，所以安静几周是正常的）。
 - `/evolution preset install [--base <name>[,<name>...]]`：生成家族 agent 预设（M4）。
+  DSH 0.2.1-rc.3+ 的新会话可能复用工作区里已有的空白会话，并沿用该会话创建时的预设装配；
+  改完预设定义后先重启 Host，再开下一个会话。
 - `/evolution skill history <name>` 列出某个技能的内容版本；`/evolution skill undo <name> [--to v<N>]` 把该技能退回某一版（只动内容——冻结标记、用量计数与整理状态保持不变，撤销本身也记为新的一版）。左栏那一行 **技能历史**（在平台自带面板行旁边）是同一件事的图形面：列出**有版本记录**的技能，把**正文版本**与**文件版本**分开显示，确认后回退某一版——调用的仍是同一条 `curator.undo`。
 - `/evolution mutations` 是写入日志；`/graph` 把技能与记忆画成图谱。
 

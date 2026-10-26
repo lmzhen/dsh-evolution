@@ -51,7 +51,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all   # the DEFAULT full bund
 /evolution doctor
 ```
 
-You should see<!-- gen:install-counts --> 34 packages installed (the published list is 35; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the
+You should see<!-- gen:install-counts --> 35 packages installed (the published list is 36; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the
 rows it found. Verify without asking the model anything:
 
 ```bash
@@ -125,6 +125,8 @@ under M1, never true for a host-only install (M3), which the plugin reports once
 - `/evolution curator status` shows the last run and the next due time (the curator ticks hourly; a run is due every 168 h by
   default, so quiet weeks are normal).
 - `/evolution preset install [--base <name>[,<name>...]]` generates the family agent preset (M4).
+  On DSH 0.2.1-rc.3+, a new session may reuse an existing blank session and keep the preset it was
+  assembled with; after changing a preset, restart the Host before opening the next session.
 - `/evolution skill history <name>` lists one skill's content versions; `/evolution skill undo <name>
   [--to v<N>]` rolls that skill back (content only — the pin marker, usage counters and curation state stay
   as they are, and the rollback is itself recorded as a new version). The sidebar row **Skill history**
