@@ -16,6 +16,9 @@ import { writeMergeReport } from './report.ts'
 import type { MergeError } from './domain/errors.ts'
 import { writeRunMeta } from './domain/run-coordinator.ts'
 
+/** Bounded wait for a detached body before the run is reported as timed out. */
+const DETACHED_DRAIN_MS = 30_000
+
 export interface MergeRegistryPort {
   begin(kind: RunKind, seed?: { command?: MergeRunCommand; total?: number; parentRunId?: string }): Promise<Pick<RunHandle, 'id' | 'signal' | 'startedAt'>>
   stage(id: string, stage: RunStage, progress?: { done: number; total: number }): Promise<void>
@@ -133,7 +136,7 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
           let drainTimer: ReturnType<typeof setTimeout> | undefined
           const drained = await Promise.race([
             bodyOutcome,
-            new Promise<{ kind: 'drain-timeout' }>(resolve => { drainTimer = setTimeout(() => resolve({ kind: 'drain-timeout' }), 30_000) }),
+            new Promise<{ kind: 'drain-timeout' }>(resolve => { drainTimer = setTimeout(() => resolve({ kind: 'drain-timeout' }), DETACHED_DRAIN_MS) }),
           ])
           if (drainTimer !== undefined) clearTimeout(drainTimer)
           outcome = drained.kind === 'drain-timeout'
