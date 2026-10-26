@@ -34,6 +34,7 @@ import { createChannelScanPorts, createStageForCards } from './scan-ports.ts'
 import { createNewChildRound2 } from './new-child-authoring.ts'
 import { skillLibraryPort } from './adapters/library.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
+import type { HostCapabilities } from './host-capabilities.ts'
 import { fitToolText } from './presentation-budget.ts'
 import { sourceRevisionOf, targetRevisionOf, sourceRevisionRefOf, targetRevisionRefOf, supportDigestOf, revisionMismatch } from './revision.ts'
 import { inFlightPairRun, readRunMetas } from './domain/run-coordinator.ts'
@@ -46,9 +47,9 @@ function failRun(stage: string, hint: string, next: string, result: { readonly m
   return result.error === undefined ? fail(stage, 'run-failed', hint, next, result.runId) : { ok: false, text: formatMergeError(result.error) }
 }
 
-async function hostOnlyFailure(verb: 'scan' | 'pair', probe: (() => Promise<{ readonly code: 'E-323'; readonly detail?: string } | undefined>) | undefined): Promise<MergeCommandResult | undefined> {
-  if (probe === undefined) return undefined
-  const state = await probe().catch(() => ({ code: 'E-323' as const, detail: 'host probe failed' }))
+async function hostOnlyFailure(verb: 'scan' | 'pair', capabilities: HostCapabilities | undefined): Promise<MergeCommandResult | undefined> {
+  if (capabilities === undefined) return undefined
+  const state = await capabilities.hostOnly()
   return state === undefined ? undefined : fail(verb, 'e-323', 'host data plane unavailable: ' + state.code + (state.detail === undefined ? '' : ' (' + state.detail + ')'), 'run /evolution merge doctor')
 }
 interface BusyTarget { readonly id: string; readonly runId?: string }
@@ -82,7 +83,7 @@ export interface MergeRuntimeDeps {
   readonly params: MergeParams
   readonly platformWrite: boolean
   readonly channel: ConversationChannelLike
-  readonly hostOnly?: () => Promise<{ readonly code: 'E-323'; readonly detail?: string } | undefined>
+  readonly hostCapabilities?: HostCapabilities
   readonly parent: unknown
   readonly allow: readonly string[]
   readonly cwd?: string
@@ -146,7 +147,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         // FR-RUN-03: a session-less invocation cannot host a merge child. Answer E-305 in
         // the three-line shape instead of opening a run that is guaranteed to fail.
         if (agentless) return fail('pair', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'pair' }), '在 GUI 或 CLI 的会话里运行 /evolution merge pair ' + command.a + ' ' + command.b)
-        const pairHost = await hostOnlyFailure('pair', deps.hostOnly)
+        const pairHost = await hostOnlyFailure('pair', deps.hostCapabilities)
         if (pairHost !== undefined) return pairHost
         // FR-EXEC-17/NFR-04: two pair runs for one pair must not race for the same row.
         const pairKeyValue = pairKey(command.a, command.b)
@@ -220,7 +221,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       }
       if (command.verb === 'scan') {
         if (agentless) return fail('scan', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'scan' }), '在 GUI 或 CLI 的会话里运行 /evolution merge scan')
-        const scanHost = await hostOnlyFailure('scan', deps.hostOnly)
+        const scanHost = await hostOnlyFailure('scan', deps.hostCapabilities)
         if (scanHost !== undefined) return scanHost
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)

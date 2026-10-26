@@ -34,6 +34,7 @@ import { pairKey, rowIdOf } from './contracts.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
 import { createMergeCommand, runMergeCommand, type MergeCommandResult } from './merge-command.ts'
 import { createMergeRuntime } from './runtime.ts'
+import { createHostCapabilities } from './host-capabilities.ts'
 import { resolveMergeParams } from './params.ts'
 import { subagentChannelAdapter } from './adapters/channel.ts'
 import { StageToolRegistry } from './stage-tool-registry.ts'
@@ -245,6 +246,10 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     }).catch((error: unknown) => { ctx.logger.warn('merge state readiness failed: ' + (error instanceof Error ? error.message : String(error))) })
     const platformChannel = createSubagentChannel(ctx)
     const channel = subagentChannelAdapter(platformChannel)
+    const hostCapabilities = createHostCapabilities(async () => {
+      const state = await platformChannel.prepare({ kind: 'reviewer', allow: ['skill'] })
+      return state.kind === 'unavailable' ? { code: 'E-323' as const, detail: state.reason } : undefined
+    })
     const stage = new StageToolRegistry()
     const engineInput = resolveEngineInput({ modelsRoot: params.mergeModelsRoot })
     const engineConfig = engineConfigFromRoot(engineInput.modelsRoot)
@@ -284,14 +289,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     })
     source = {
       async snapshot() {
-        return await readMergeSnapshot({ io, home, runs: runs.runs('merge'), approval: params.mergeApproval, platformWrite, hostOnly: async () => {
-          try {
-            const state = await platformChannel.prepare({ kind: 'reviewer', allow: ['skill'] })
-            return state.kind === 'unavailable' ? { code: 'E-323' as const, detail: state.reason } : undefined
-          } catch (error) {
-            return { code: 'E-323' as const, detail: error instanceof Error ? error.message : String(error) }
-          }
-        }, live: async () => liveRowFactsOf(await readSkillCards(skills)), history: async (): Promise<readonly HistoryItem[]> => {
+        return await readMergeSnapshot({ io, home, runs: runs.runs('merge'), approval: params.mergeApproval, platformWrite, hostOnly: hostCapabilities.hostOnly, live: async () => liveRowFactsOf(await readSkillCards(skills)), history: async (): Promise<readonly HistoryItem[]> => {
           const items = new Map<string, HistoryItem>()
           const receipts = [...await readCommitReceipts(io, home)].sort((a, b) => a.at - b.at)
           const generationOf = new Map(receipts.map((receipt, index) => [receipt.runId, index + 1]))
@@ -333,14 +331,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       io, home, registry: runs, skills, now: () => Date.now(), params, platformWrite,
       ...(defaultModel === undefined ? {} : { model: defaultModel.currentSelection().model }),
       channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: params.mergeRunTimeoutMinutes,
-      hostOnly: async () => {
-        try {
-          const state = await platformChannel.prepare({ kind: 'reviewer', allow: ['skill'] })
-          return state.kind === 'unavailable' ? { code: 'E-323' as const, detail: state.reason } : undefined
-        } catch (error) {
-          return { code: 'E-323' as const, detail: error instanceof Error ? error.message : String(error) }
-        }
-      },
+      hostCapabilities,
       isBlocked: async (name) => {
         const curator = (ctx as unknown as { get(key: string): unknown }).get('evolutionCurator') as { isBlocked?: (name: string) => Promise<boolean> } | undefined
         return (await curator?.isBlocked?.(name)) === true

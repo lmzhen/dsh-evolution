@@ -49,7 +49,7 @@ it('fails scan and pair at run level when the host data plane is unavailable', a
     params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'E-323', reason: 'no channel' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'E-323', reason: 'no channel' }), dispose: async () => {} },
-    hostOnly: async () => ({ code: 'E-323' as const, detail: 'agentPresets not mounted' }),
+    hostCapabilities: { hostOnly: async () => ({ code: 'E-323' as const, detail: 'agentPresets not mounted' }) },
     parent: {}, allow: ['merge_stage'], timeoutMinutes: 0,
     cards: async () => cards, screeningForRun: async () => [],
   } satisfies MergeRuntimeDeps
