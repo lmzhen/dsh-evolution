@@ -70,7 +70,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `skillReviewTrigger` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Which channel may inject a skill review (cadence, completion, both). |
 | `skillReviewCompletionMinToolCalls` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Tool calls a task needs before the completion channel injects. |
 | `reviewEnabled` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Master switch for the review plugin. |
-| `reviewMode` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Run the review in the parent session (inject) or on a subagent. |
+| `reviewMode` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Run the review in the parent session (inject), on a subagent, or in a background branch. |
 | `reviewWakeInject` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Deliver the deferred review as a waking follow-up message. |
 | `reviewNotice` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Deliver result notices into the parent conversation. |
 | `reviewProvider` | E2 | none | cordis | evolution-review | — | 无（identity） | LLM provider for review subagents (deployment identity). |
