@@ -700,23 +700,7 @@
         "evolution-learning-graph::tests/graph.spec.ts",
         "evolution-maintenance::tests/orchestrate.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
-        "evolution-review::tests/anchored-smoke.spec.ts",
-        "evolution-review::tests/approval-precheck.spec.ts",
-        "evolution-review::tests/delivery-settle.spec.ts",
-        "evolution-review::tests/digest-budget.spec.ts",
-        "evolution-review::tests/evidence-mutex.spec.ts",
-        "evolution-review::tests/evidence-seq.spec.ts",
-        "evolution-review::tests/lifecycle.spec.ts",
-        "evolution-review::tests/noop-usage-guard.spec.ts",
-        "evolution-review::tests/outstanding-window.spec.ts",
-        "evolution-review::tests/persistence-resume.spec.ts",
-        "evolution-review::tests/review-channel-mark.spec.ts",
-        "evolution-review::tests/review-channel-warnings.spec.ts",
-        "evolution-review::tests/review-clamp.spec.ts",
         "evolution-review::tests/review.spec.ts",
-        "evolution-review::tests/session-accessor-real-session.spec.ts",
-        "evolution-review::tests/untrusted-digest.spec.ts",
-        "evolution-review::tests/write-leg-timeout.spec.ts",
         "evolution-skill-catalog::tests/catalog-path-consistency.spec.ts",
         "evolution-skill-catalog::tests/catalog.spec.ts",
         "evolution-skill-catalog::tests/io-preference.spec.ts",
@@ -1590,26 +1574,10 @@
         "evolution-preset::tests/environment-fallbacks.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
-        "evolution-review::tests/anchored-smoke.spec.ts",
-        "evolution-review::tests/approval-precheck.spec.ts",
-        "evolution-review::tests/delivery-settle.spec.ts",
-        "evolution-review::tests/digest-budget.spec.ts",
-        "evolution-review::tests/evidence-mutex.spec.ts",
-        "evolution-review::tests/evidence-seq.spec.ts",
-        "evolution-review::tests/lifecycle.spec.ts",
-        "evolution-review::tests/noop-usage-guard.spec.ts",
-        "evolution-review::tests/outstanding-window.spec.ts",
-        "evolution-review::tests/persistence-resume.spec.ts",
         "evolution-review::tests/redact.spec.ts",
-        "evolution-review::tests/review-channel-mark.spec.ts",
-        "evolution-review::tests/review-channel-warnings.spec.ts",
-        "evolution-review::tests/review-clamp.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
         "evolution-review::tests/review.spec.ts",
-        "evolution-review::tests/session-accessor-real-session.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
-        "evolution-review::tests/untrusted-digest.spec.ts",
-        "evolution-review::tests/write-leg-timeout.spec.ts",
         "evolution-settings-ui::tests/PendingCard.client.spec.ts",
         "evolution-settings-ui::tests/diagnostics-card.client.spec.ts",
         "evolution-settings-ui::tests/locale-fallback.client.spec.ts",
@@ -1761,7 +1729,7 @@
     },
     "ci-only": {
       "gates": 12,
-      "specs": 64
+      "specs": 48
     },
     "full(ci=off)": {
       "gates": 57,
@@ -1769,12 +1737,12 @@
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 403
+      "specs": 387
     }
   },
   "specs": {
-    "total": 403,
-    "marked": 403,
-    "unmarked": 0
+    "total": 388,
+    "marked": 387,
+    "unmarked": 1
   }
 }
