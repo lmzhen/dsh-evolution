@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.29 (patch) — plugin-side review branch
+
+> **范围**：review branch 改为插件侧 `ctx.agents.create`：不设 cwd/workspace，运行后 dispose；普通 list/search/workspace/归档模式不可见；接受 durable log 残留。保留 inject 默认、ReviewRecord；删除 review 的 subagent/plan/queue 旧路径。
+> **验证**：review 37/37；相关测试 240/240；插件侧 branch 集成测试（no-cwd + dispose）。
+
 ## 0.30.28 (patch) — merge validation ignores unrelated skills
 
 > **范围**：修复真实技能库中其他技能的威胁扫描结果阻断当前 m1/m2 合并（validation plan 只看参与者）；0.30.27 的 rc.3/client-kit 内容不变。
