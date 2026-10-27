@@ -28,6 +28,7 @@ export function manifestFilesOf(manifest: AuthoringManifest | null, stagedPaths:
   return ['SKILL.md', ...stagedPaths]
 }
 
+
 /**
  * The first file the manifest promises but the staged tree does not contain.
  * SKILL.md itself is always required, whether or not the manifest lists it.

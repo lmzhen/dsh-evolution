@@ -1,4 +1,8 @@
 # Changelog
+## 0.30.28 (patch) — merge validation ignores unrelated skills
+
+> **范围**：修复真实技能库中其他技能的威胁扫描结果阻断当前 m1/m2 合并（validation plan 只看参与者）；0.30.27 的 rc.3/client-kit 内容不变。
+
 ## 0.30.27 (patch) — rc.3 platform line and shared client kit
 
 > **说明**：0.30.26 的部分包已发布，但客户端 Kit 的手工占位发布占用了该版本号；npm 不允许重发已撤销的版本。此版本是同一批内容的完整发布。

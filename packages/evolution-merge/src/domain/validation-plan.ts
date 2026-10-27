@@ -39,6 +39,8 @@ export function buildValidationPlan(input: {
   readonly supportSources?: readonly { readonly path: string; readonly content: string; readonly source: string }[]
   readonly promptVersion?: string
   readonly promptHash?: string
+  /** Skills that participate in this merge (pair sources and target); omit for legacy all-card behavior. */
+  readonly participants?: readonly string[]
 }): ValidationPlan {
   const files = input.tree.files.map(file => ({ path: file.path, content: file.content, digest: digest(file.content), bytes: Buffer.byteLength(file.content, 'utf8') }))
   const manifestFiles = [...new Set(input.manifestFiles ?? files.map(file => file.path))].sort()
@@ -47,7 +49,9 @@ export function buildValidationPlan(input: {
   const staged = new Set(files.map(file => file.path))
   const manifest = new Set(manifestFiles)
   const forwardRefs = [...refs].filter(ref => !staged.has(ref)).sort()
-  const reverseRefs = files.map(file => file.path).filter(path => !refs.has(path) && manifest.has(path)).sort()
+  // SKILL.md is the body itself, never a support reference; a child may list it in the
+  // authoring manifest, but it must not require the body to reference itself.
+  const reverseRefs = files.map(file => file.path).filter(path => path !== 'SKILL.md' && !refs.has(path) && manifest.has(path)).sort()
   const existing = new Set(input.existingSupport ?? [])
   const orphanFiles = [...existing].filter(path => !staged.has(path)).sort()
   const byPath = new Map<string, { contents: Set<string>; sources: string[] }>()
@@ -62,9 +66,11 @@ export function buildValidationPlan(input: {
     byPath.set(file.path, entry)
   }
   const supportConflicts = [...byPath.entries()].filter(([, value]) => value.contents.size > 1).map(([path, value]) => ({ path, sources: value.sources }))
-  const sourceThreatFiles = (input.cards ?? []).flatMap(card => (card.files ?? []).filter(file => scanContentThreats(file.content) !== null).map(file => card.name + '/' + file.path))
-  const threat = { body: scanContentThreats(input.tree.body) !== null || (input.cards ?? []).some(card => scanContentThreats(card.body) !== null), files: [...files.filter(file => scanContentThreats(file.content) !== null).map(file => file.path), ...sourceThreatFiles] }
-  const sourceRevisions = input.sourceRevisions ?? Object.fromEntries((input.cards ?? []).map(card => [card.name, digest(card.body)]))
+  const participants = input.participants === undefined ? undefined : new Set(input.participants)
+  const participantCards = participants === undefined ? (input.cards ?? []) : (input.cards ?? []).filter(card => participants.has(card.name))
+  const sourceThreatFiles = participantCards.flatMap(card => (card.files ?? []).filter(file => scanContentThreats(file.content) !== null).map(file => card.name + '/' + file.path))
+  const threat = { body: scanContentThreats(input.tree.body) !== null || participantCards.some(card => scanContentThreats(card.body) !== null), files: [...files.filter(file => scanContentThreats(file.content) !== null).map(file => file.path), ...sourceThreatFiles] }
+  const sourceRevisions = input.sourceRevisions ?? Object.fromEntries(participantCards.map(card => [card.name, digest(card.body)]))
   const revision = digest(JSON.stringify({ target: input.target, body: digest(input.tree.body), files: files.map(file => [file.path, file.digest]), q09: { forwardRefs, reverseRefs, orphanFiles }, supportConflicts, threat, sourceRevisions, targetRevision: input.targetRevision ?? null }))
   const findings: RuleFinding[] = []
   const stageDigest = digest(JSON.stringify(files.map(file => [file.path, file.digest])))
