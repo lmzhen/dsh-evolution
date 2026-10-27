@@ -52,6 +52,9 @@ const SKIP = new Set(['node_modules', 'lib', 'dist', 'dist.next', 'dist.previous
 // Externally owned (README): emitted for platform/user wiring, no in-repo
 // production consumer — expected orphans.
 const EXEMPT_ORPHANS = new Set(['evolution/review-scheduled', 'evolution/review-error'])
+// Legacy reader retained only to keep old activity.json ledgers readable; the
+// review subagent/plan path that emitted this event was removed in 0.30.29.
+const EXEMPT_DANGLING = new Map([['evolution/plan-applied', 'legacy activity ledger reader; no current producer']])
 const EMIT_RE = /\w*[Cc]tx\.emit\(\s*['"](evolution\/[A-Za-z0-9/-]+)['"]/g
 // P3 (v15) known boundary: these regexes match LITERAL single/double-quoted
 // event names only. `ctx.emit('evolution/' + variable)` and template-literal
@@ -145,12 +148,16 @@ if (emitted.size === 0 && listened.size === 0) {
 
 const orphans = [...emitted.keys()].filter(name => !listened.has(name) && !EXEMPT_ORPHANS.has(name))
 const exemptOrphans = [...emitted.keys()].filter(name => !listened.has(name) && EXEMPT_ORPHANS.has(name))
-const dangling = [...listened.keys()].filter(name => !emitted.has(name))
+const dangling = [...listened.keys()].filter(name => !emitted.has(name) && !EXEMPT_DANGLING.has(name))
+const exemptDangling = [...listened.keys()].filter(name => !emitted.has(name) && EXEMPT_DANGLING.has(name))
 
 console.log(`verify-event-pairing: ${emitted.size} evolution event(s) emitted, ${listened.size} listened (production src/)`)
 if (orphans.length > 0) {
   console.warn(`verify-event-pairing: orphan emitter(s) with no in-repo listener:`)
   for (const name of orphans.sort()) console.warn(`  - ${name}  (${(emitted.get(name) ?? []).join(', ')})`)
+}
+if (exemptDangling.length > 0) {
+  console.log(`verify-event-pairing: exempt legacy listener(s): ${exemptDangling.sort().join(', ')}`)
 }
 if (dangling.length > 0) {
   console.warn(`verify-event-pairing: listener(s) with no producer:`)
@@ -232,7 +239,7 @@ for (const violation of persistedViolations) {
   console.warn(`verify-event-pairing: ${strict ? 'FAIL' : 'WARN'} — ${violation}`)
 }
 
-console.log(`verify-event-pairing: summary — ${orphans.length} orphan(s), ${dangling.length} dangling listener(s), ${exemptOrphans.length} declared exempt, ${persistedViolations.length} persisted-type violation(s)`)
+console.log(`verify-event-pairing: summary — ${orphans.length} orphan(s), ${dangling.length} dangling listener(s), ${exemptDangling.length} legacy listener(s) exempt, ${exemptOrphans.length} declared exempt, ${persistedViolations.length} persisted-type violation(s)`)
 // V5-15 (0.3.30): strict = the arch-guards posture — any orphan or dangling
 // listener is a broken wiring contract the review would otherwise miss.
 const failures = orphans.length + dangling.length + persistedViolations.length
