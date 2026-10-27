@@ -63,6 +63,8 @@ session log made the session unresumable (A-line P0-1), which is why the payload
 | `evolution/review-completed` | emit (notification) | `evolution-review` after a plugin branch settles |
 | `evolution/memory-applied` | emit (notification) | `memory` after a memory write |
 
+Legacy `evolution/plan-applied` remains declared so old activity ledgers stay readable, but the current production tree has no plan emitter after the review subagent/plan path was removed.
+
 The mode column is what the code does today: every one of them is an announcement, and each
 declaration carries it as a `@mode` tag (finding O-1, landed) — `verify-arch-guards`' rule **N33** checks that
 tag against THIS table and against the dispatch site (`ctx.emit('…'`), so a declaration that drifts from
