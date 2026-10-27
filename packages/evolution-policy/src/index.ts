@@ -53,7 +53,7 @@ export interface PolicySnapshot {
   substantiveMinToolCalls: number
   substantiveMinUserChars: number
   substantiveMinAgentChars: number
-  reviewMode: 'subagent' | 'inject'
+  reviewMode: 'inject' | 'branch'
   memoryReviewModel: string
   skillReviewModel: string
   curatorModel: string
@@ -78,7 +78,7 @@ export interface Config {
   substantiveMinToolCalls?: number
   substantiveMinUserChars?: number
   substantiveMinAgentChars?: number
-  reviewMode?: 'subagent' | 'inject'
+  reviewMode?: 'inject' | 'branch'
   memoryReviewModel?: string
   skillReviewModel?: string
   curatorModel?: string
@@ -111,7 +111,7 @@ export const Config: Schema<Config> = z.object({
   // inside the clamp.
   // 0.3.74: mirrors the review plugin's default (inject) — the policy snapshot
   // overrides the plugin config, so the two defaults must not diverge.
-  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject'),
+  reviewMode: z.union([z.const('inject'), z.const('branch')]).default('inject'),
   memoryReviewModel: z.string().default(DEFAULT_MEMORY_REVIEW_MODEL),
   skillReviewModel: z.string().default(DEFAULT_SKILL_REVIEW_MODEL),
   curatorModel: z.string().default(DEFAULT_CURATOR_MODEL),
@@ -177,7 +177,7 @@ export class EvolutionPolicy extends Service {
         // serves direct construction / legacy reads. 0.3.74: the fallback is
         // 'inject', matching the schema default (only an explicit 'subagent'
         // selects the child-session split).
-        return config.reviewMode === 'subagent' ? 'subagent' : 'inject'
+        return config.reviewMode === 'branch' ? 'branch' : 'inject'
       })(),
       memoryReviewModel: config.memoryReviewModel ?? DEFAULT_MEMORY_REVIEW_MODEL,
       skillReviewModel: config.skillReviewModel ?? DEFAULT_SKILL_REVIEW_MODEL,

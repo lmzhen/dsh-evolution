@@ -15,10 +15,6 @@ import type {} from '@deepseek-ai/dsh-evolution-core'
 import { provideChannel } from './support/channel-fixture.ts'
 
 describe('evolution-review', () => {
-  it('defaults review subagent tools to the plain skill tool only (E-59e: no discovery pair on this platform)', () => {
-    const value = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: { reviewToolAllow: string[] } } } })['~standard'].validate({}).value
-    expect(value.reviewToolAllow).toEqual(['skill'])
-  })
 
   it('loads with review disabled', async () => {
     const ctx = new Context()
@@ -71,53 +67,6 @@ describe('evolution-review', () => {
     expect(ops.map(op => op.name).filter(Boolean)).toEqual(['read-skill', 'brand-new-skill'])
   })
 
-  it('E-19: a deferred review spawns once per completed boundary and never concurrently (0.3.18 + 0.3.39)', async () => {
-    const { ctx, emitEnd, releaseStart } = await mountReviewFixture()
-    let starts = 0
-    provideChannel(ctx, {
-      start: async () => {
-        starts += 1
-        await new Promise<void>((resolve) => { releaseStart.current = resolve })
-        return { result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'no-op' } }), dispose: async () => {} }
-      },
-    })
-    // substantive thresholds live on the policy service, not the plugin Config.
-    ctx.provide('evolutionPolicy', {
-      get: () => ({
-        reviewMode: 'subagent',
-        substantiveMinToolCalls: 1,
-        substantiveMinUserChars: 0,
-        substantiveMinAgentChars: 0,
-        reviewMemoryInterval: 1,
-        reviewSkillInterval: 1,
-        maxOpsPerPlan: 5,
-        protectedSkillNames: [],
-        memoryChars: 10_000,
-        userChars: 10_000,
-        skillContentChars: 10_000,
-        memoryReviewModel: 'model-x',
-        skillReviewModel: 'model-x',
-      }),
-    })
-    await ctx.plugin(Review, {
-      reviewEnabled: true,
-      memoryInterval: 1,
-      skillInterval: 1,
-      reviewMode: 'subagent',
-    })
-    emitEnd(1, 'blocked')
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(starts).toBe(0) // threshold reached but DEFERRED — no mid-task spawn
-    emitEnd(2)
-    await vi.waitFor(() => { expect(starts).toBe(1) }) // flush spawn (held)
-    emitEnd(3)
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(starts).toBe(1) // pending consumed; the next stash waits for its own flush
-    emitEnd(4)
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(starts).toBe(1) // single-flight: the held review blocks the next flush (fallback inject at end)
-    releaseStart.current?.()
-  })
 
   it('E-6: a throwing review state service surfaces as review-error, never bubbles (0.3.18)', async () => {
     const { ctx, session, emitEnd } = await mountReviewFixture({ failState: true })
@@ -134,56 +83,7 @@ describe('evolution-review', () => {
     await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
   })
 
-  it('E-59c: a subagent with no structured plan emits review-error at the END-flush, never mid-task (0.3.19 + 0.3.39)', async () => {
-    const injected: unknown[] = []
-    const { ctx, session, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
-    const errors: string[] = []
-    const scheduled: string[] = []
-    ctx.on('evolution/review-error', event => errors.push(event.sessionId))
-    ctx.on('evolution/review-scheduled', event => scheduled.push(event.sessionId))
-    provideChannel(ctx, {
-      start: async () => ({
-        result: Promise.resolve({ structured: null }),
-        dispose: async () => {},
-      }),
-    })
-    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1, 'blocked')
-    await new Promise(resolve => setTimeout(resolve, 50))
-    // Threshold reached but DEFERRED: no review ran, no error, no inject yet.
-    expect(errors).toEqual([])
-    expect(injected).toHaveLength(0)
-    emitEnd(2)
-    // At the completed flush the subagent runs and fails to produce a plan —
-    // review-error surfaces AND the fallback injects (at the end).
-    // V24-15 (v24): the fallback inject now also emits `review-scheduled`
-    // (channel 'inject') — the old contract left the fallback delivery
-    // invisible to the event bus, so a consumer on the subagent-mode
-    // deployment would have missed every fallback review.
-    await vi.waitFor(() => { expect(errors).toEqual([session.id]) })
-    expect(injected).toHaveLength(1)
-    expect(scheduled).toEqual([session.id])
-  })
 
-  it('F-203: a skill tool/call with JSON-null arguments does not crash read-name collection', async () => {
-    const { ctx, emitEnd } = await mountReviewFixture({ skillArguments: 'null' })
-    const applied: string[] = []
-    ctx.on('evolution/plan-applied', event => applied.push(event.sessionId))
-    provideChannel(ctx, {
-      start: async () => ({
-        result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'no-op' } }),
-        dispose: async () => {},
-      }),
-    })
-    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1, 'blocked')
-    emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
-    // The review reaches read-name collection and completes, proving
-    // `arguments: 'null'` no longer throws inside collectReadSkillNames.
-    await vi.waitFor(() => { expect(applied).toHaveLength(1) })
-  })
 
   it('E-41: the review is deferred when the subagent cannot start; the eventual fallback inject emits review-scheduled (0.3.19 + 0.3.39 + V24-15)', async () => {
     const injected: unknown[] = []
@@ -211,107 +111,8 @@ describe('evolution-review', () => {
     expect(scheduled[0]).toMatchObject({ sessionId: session.id, channel: 'inject' })
   })
 
-  it('V6-53: a deferred cadence review executes at conversation END — neither inject nor subagent runs mid-task (0.3.39)', async () => {
-    const injected: string[] = []
-    let starts = 0
-    const { ctx, emitEnd } = await mountReviewFixture({
-      onInject: (message) => {
-        const box = message as { content?: Array<{ type: string; text: string }> } | null
-        const text = typeof message === 'object' && box?.content?.[0] ? box.content[0].text : ''
-        injected.push(text)
-      },
-    })
-    provideChannel(ctx, {
-      start: async () => {
-        starts += 1
-        throw new Error('subagent spawn failed')
-      },
-    })
-    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1, 'blocked')
-    await new Promise(resolve => setTimeout(resolve, 50))
-    // Threshold reached but fully DEFERRED: no inject AND no subagent spawn.
-    expect(injected).toHaveLength(0)
-    expect(starts).toBe(0)
-    emitEnd(2)
-    await vi.waitFor(() => {
-      expect(injected.some(text => text.includes('Auto-review'))).toBe(true)
-    })
-    expect(starts).toBe(1) // the subagent ran at the flush (and fell back to inject)
-    expect(injected).toHaveLength(1)
-  })
 
-  it('T3-09/A37: the review subagent runs under the fiber abort channel — unloading aborts it', async () => {
-    const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
-    let captured: AbortSignal | undefined
-    provideChannel(ctx, {
-      start: async (_kind: string, options: { signal?: AbortSignal }) => {
-        captured = options.signal
-        // Never resolves: the leg stays in flight so the abort can be observed on it.
-        return { result: new Promise(() => {}), dispose: async () => {} }
-      },
-    })
-    ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1, 'blocked')
-    emitEnd(2)
-    await vi.waitFor(() => { expect(captured).toBeDefined() })
-    // The leg deadline is its own; the fiber lifetime is the other half of the channel.
-    expect(captured?.aborted).toBe(false)
-    await ctx.fiber.dispose()
-    // Before T3-09 this signal did not exist (only AbortSignal.timeout), so an unloaded fiber kept
-    // its subagent running against a session nobody owned any more.
-    expect(captured?.aborted).toBe(true)
-  })
 
-  it('T3-09/A37: a plan whose fiber goes away MID-PLAN stops at the next op boundary', async () => {
-    // Two ops, so the difference is visible: the control lands both, the interrupted run lands only
-    // the op that was already in flight when the fiber went away.
-    const ops = [
-      { target: 'memory', action: 'add', facts: 'first-op', evidence: [{ event_seq: 0 }] },
-      { target: 'memory', action: 'add', facts: 'second-op', evidence: [{ event_seq: 0 }] },
-    ]
-    const unload: { current: (() => Promise<void>) | undefined } = { current: undefined }
-    /** One run; `during` fires inside the first op write, exactly as an unload would. */
-    const run = async (during: (() => void) | null): Promise<{ writes: string[]; logs: string[] }> => {
-      const fixture = await mountReviewFixture({ onInject: () => {} })
-      const writes: string[] = []
-      const logs: string[] = []
-      vi.spyOn(fixture.ctx.logger, 'warn').mockImplementation((...args: unknown[]) => { logs.push(args.map(value => String(value)).join(' ')) })
-      let release: (value: unknown) => void = () => {}
-      const held = new Promise((resolve) => { release = resolve })
-      provideChannel(fixture.ctx, { start: async () => ({ result: held, dispose: async () => {} }) })
-      fixture.ctx.provide('memory', {
-        applyBatch: async () => {
-          writes.push('memory')
-          if (writes.length === 1 && during !== null) during()
-          return { ok: true, message: 'ok' }
-        },
-      })
-      fixture.ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-      await fixture.ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-      unload.current = async () => { await fixture.ctx.fiber.dispose() }
-      fixture.emitEnd(1, 'blocked')
-      fixture.emitEnd(2)
-      // The plan arrives while the fiber is still alive; the WRITE LEG is what the unload
-      // interrupts — the window the audit names (an HMR reload left the running plan writing while
-      // the replacement instance knew nothing about it).
-      release({ structured: { memoryOps: ops, skillOps: [], summary: 'two ops' } })
-      await vi.waitFor(() => { expect(writes.length).toBeGreaterThan(0) })
-      await new Promise(resolve => setTimeout(resolve, 150))
-      if (during === null) await fixture.ctx.fiber.dispose()
-      return { writes, logs }
-    }
-    const control = await run(null)
-    expect(control.writes).toEqual(['memory', 'memory'])
-    const interrupted = await run(() => { void unload.current?.() })
-    // The op boundary is the only judging point: the durable write that already happened stays
-    // recorded (late landings are reported, never erased) and the remaining ops never run.
-    expect(interrupted.writes).toEqual(['memory'])
-    expect(interrupted.logs.some(line => line.includes('stopped at an op boundary'))).toBe(true)
-  })
 
   it('G4.5: warns once when the evolution-state service is absent (stateless cadence)', async () => {
     const { ctx, emitEnd } = await mountReviewFixture({ noState: true })
@@ -324,41 +125,6 @@ describe('evolution-review', () => {
     warnSpy.mockRestore()
   })
 
-  it('G4.4: a result-notice inject failure does not re-trigger a review (double-review)', async () => {
-    const onInjectCalls: string[] = []
-    const { ctx, emitEnd } = await mountReviewFixture({
-      onInject: () => { onInjectCalls.push('inject'); throw new Error('inject boom') },
-    })
-    const applied: string[] = []
-    const errors: string[] = []
-    ctx.on('evolution/plan-applied', event => applied.push(event.sessionId))
-    ctx.on('evolution/review-error', event => errors.push(event.sessionId))
-    provideChannel(ctx, {
-      start: async () => ({
-        result: Promise.resolve({
-          structured: {
-            memoryOps: [{ target: 'memory', action: 'add', facts: 'G4.4-fact', evidence: [{ event_seq: 0 }] }],
-            skillOps: [],
-            summary: 'apply a memory op',
-          },
-        }),
-        dispose: async () => {},
-      }),
-    })
-    ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1, 'blocked')
-    emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
-    // The plan applied (executePlan landed the memory op), so plan-applied is
-    // recorded even though the result-notice inject threw.
-    await vi.waitFor(() => { expect(applied).toHaveLength(1) })
-    // The inject failure is NOT a review failure: no fallback review prompt was
-    // injected (single inject call = the result-notice attempt) and no
-    // review-error surfaced — the double-review window is closed.
-    expect(onInjectCalls).toHaveLength(1)
-    expect(errors).toEqual([])
-  })
 
   /**
    * T3-06/A34: drive ONE plan op through the review's write leg and return whatever the
@@ -398,212 +164,12 @@ describe('evolution-review', () => {
     return applied
   }
 
-  it('T3-06/A34: the plan path lands the content body of an op whose facts is blank', async () => {
-    // Before A34 the validator refused this op as empty AND the write leg wrote '' —
-    // the two halves are pinned by the payload the store finally receives.
-    const applied = await landOnePlanOp(null)
-    expect(applied[0]).toEqual({ target: 'memory', action: 'add', facts: '正文', old_text: undefined })
-  })
 
-  it('T3-06/A34: the approval-disabled replay branch normalizes the same payload', async () => {
-    const applied = await landOnePlanOp({ request: async () => ({ action: 'execute', message: 'ok' }), isEnabled: false })
-    expect(applied[0]).toEqual({ action: 'add', facts: '正文', old_text: undefined })
-  })
 
-  it('V27 G4.3: a write leg that TIMES OUT still records the ops that landed', async () => {
-    const applied: Array<{ memoryApplied: number; skillApplied: number; executionError?: string; executionFailures?: number }> = []
-    const { ctx, emitEnd } = await mountReviewFixture({ onInject: () => {} })
-    ctx.on('evolution/plan-applied', event => applied.push(event as never))
-    provideChannel(ctx, {
-      start: async () => ({
-        result: Promise.resolve({
-          structured: {
-            // TWO ops: the first lands, the second never returns — the deadline
-            // hits mid-write.
-            memoryOps: [
-              { target: 'memory', action: 'add', facts: 'landed-fact', evidence: [{ event_seq: 0 }] },
-              { target: 'memory', action: 'add', facts: 'never-lands', evidence: [{ event_seq: 0 }] },
-            ],
-            skillOps: [],
-            summary: 'one lands, one hangs',
-          },
-        }),
-        dispose: async () => {},
-      }),
-    })
-    let calls = 0
-    ctx.provide('memory', {
-      applyBatch: async () => {
-        calls += 1
-        if (calls === 1) return { ok: true, message: 'ok' }
-        return await new Promise<never>(() => {}) // hangs → the write leg times out
-      },
-    })
-    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1, reviewTimeoutMs: 30 })
-    emitEnd(1, 'blocked')
-    emitEnd(2)
-    // The payload must arrive even though the execution promise never settled:
-    // before this fix the timeout skipped the emit entirely, so replay/activity
-    // saw a review that changed nothing while memory had already been written.
-    await vi.waitFor(() => { expect(applied).toHaveLength(1) }, { timeout: 3000 })
-    expect(applied[0]?.memoryApplied).toBe(1)
-    expect(applied[0]?.skillApplied).toBe(0)
-    expect(applied[0]?.executionError ?? '').toContain('timed out')
-  }, 15_000)
 
-  it('F-363: the completion channel fires through runOnTurnEnd on a proven-long session', async () => {
-    const toolCalls = Array.from({ length: 25 }, (_, i) => ({
-      type: 'tool/call' as const,
-      data: { turn: 1, step: i + 2, callId: `c${i}`, name: 'skill', arguments: '{}' },
-    }))
-    const injected: unknown[] = []
-    const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message), events: toolCalls })
-    let scheduled = false
-    ctx.on('evolution/review-scheduled', () => { scheduled = true })
-    ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMemoryInterval: 1_000_000, reviewSkillInterval: 1_000_000 }) })
-    await ctx.plugin(Review, {
-      reviewEnabled: true,
-      reviewMode: 'subagent',
-      memoryInterval: 1_000_000,
-      skillInterval: 1_000_000,
-      skillReviewTrigger: 'completion',
-      skillReviewCompletionMinToolCalls: 20,
-    })
-    // A proven-long session: ≥20 tool/call events on this turn (the cadence
-    // counters are starved by the huge intervals, so ONLY the completion gate
-    // can fire). The completion channel is an INJECT channel — the prompt is
-    // sent to the parent session, not a subagent spawn.
-    emitEnd(1)
-    await vi.waitFor(() => {
-      const texts = injected.map((message) => {
-        const box = message as { content?: Array<{ type: string; text: string }> } | null
-        return typeof message === 'object' && box?.content?.[0] ? box.content[0].text : ''
-      })
-      expect(texts.some(text => text.includes('Auto-review'))).toBe(true)
-    })
-    expect(scheduled).toBe(true)
-  })
 
-  it('V4-21: a mid-plan execute throw is a partial application, never a re-inject (F-334)', async () => {
-    const injected: unknown[] = []
-    const applied: string[] = []
-    const appliedEvents: Array<{ executionFailures?: number; executionError?: string }> = []
-    const { ctx, emitEnd } = await mountReviewFixture({ onInject: message => injected.push(message) })
-    ctx.on('evolution/plan-applied', (event) => {
-      applied.push(event.sessionId)
-      // V5-19: the event carries the execution-failure dimension (abort reason).
-      appliedEvents.push(event as unknown as { executionFailures?: number; executionError?: string })
-    })
-    provideChannel(ctx, {
-      start: async () => ({
-        result: Promise.resolve({
-          structured: {
-            memoryOps: [
-              { target: 'memory', action: 'add', facts: 'f1', evidence: [{ event_seq: 0 }] },
-              { target: 'memory', action: 'add', facts: 'f2', evidence: [{ event_seq: 0 }] },
-            ],
-            skillOps: [],
-            summary: 'two memory ops',
-          },
-        }),
-        dispose: async () => {},
-      }),
-    })
-    // The first op lands, the second throws an IO exception (not ok:false).
-    let calls = 0
-    ctx.provide('memory', {
-      applyBatch: async () => {
-        calls += 1
-        if (calls === 2) throw new Error('io boom')
-        return { ok: true, message: 'ok' }
-      },
-    })
-    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1, 'blocked')
-    emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
-    // The plan DID run (partially), so plan-applied fires once.
-    await vi.waitFor(() => { expect(applied).toHaveLength(1) })
-    const texts = injected.map((message) => {
-      const box = message as { content?: Array<{ type: string; text: string }> } | null
-      return typeof message === 'object' && box?.content?.[0] ? box.content[0].text : ''
-    })
-    // started=true (the review happened), so the SAME kind is NOT re-injected.
-    expect(texts.some(text => text.includes('Review kind:'))).toBe(false)
-    // The partial failure is surfaced — the model is told what landed.
-    expect(texts.some(text => text.includes('部分操作失败'))).toBe(true)
-    // V5-19: the durable event names the abort so observability can tell an
-    // execution failure from a validation rejection.
-    expect(appliedEvents[0]?.executionError).toContain('io boom')
-  })
 
-  it('V4-21: a failing completion inject rolls the flag back so the next completion re-triggers (F-334)', async () => {
-    const toolCalls = Array.from({ length: 25 }, (_, i) => ({
-      type: 'tool/call' as const,
-      data: { turn: 1, step: i + 2, callId: `c${i}`, name: 'skill', arguments: '{}' },
-    }))
-    let injectCalls = 0
-    const injected: unknown[] = []
-    const { ctx, emitEnd } = await mountReviewFixture({
-      onInject: (message) => {
-        injectCalls += 1
-        if (injectCalls === 1) throw new Error('inject boom')
-        injected.push(message)
-      },
-      events: toolCalls,
-    })
-    const scheduled: string[] = []
-    ctx.on('evolution/review-scheduled', event => scheduled.push(event.sessionId))
-    ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMemoryInterval: 1_000_000, reviewSkillInterval: 1_000_000 }) })
-    await ctx.plugin(Review, {
-      reviewEnabled: true,
-      reviewMode: 'subagent',
-      memoryInterval: 1_000_000,
-      skillInterval: 1_000_000,
-      skillReviewTrigger: 'completion',
-      skillReviewCompletionMinToolCalls: 20,
-    })
-    emitEnd(1)
-    // First completion: the inject throws → the flag is rolled back, and no
-    // schedule signal is emitted (the review was never dispatched).
-    await vi.waitFor(() => { expect(injectCalls).toBe(1) })
-    expect(scheduled).toEqual([])
-    emitEnd(2)
-    // The flag was rolled back, so the next completion re-triggers and succeeds.
-    await vi.waitFor(() => { expect(injectCalls).toBe(2) })
-    expect(scheduled).toHaveLength(1)
-  })
 
-  it('F-102 (V4-27): an aborted run is disposed and the single-flight guard resets for the next turn', async () => {
-    const { ctx, emitEnd } = await mountReviewFixture()
-    let disposed = 0
-    let starts = 0
-    provideChannel(ctx, {
-      start: async () => {
-        starts += 1
-        // Turn 1 aborts; turn 2 succeeds — a stale in-flight guard would block
-        // the second spawn (retry stacking / leak).
-        if (starts === 1) return { result: Promise.reject(new Error('abort')), dispose: async () => { disposed += 1 } }
-        return { result: Promise.resolve({ structured: { memoryOps: [], skillOps: [], summary: 'ok' } }), dispose: async () => { disposed += 1 } }
-      },
-    })
-    ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-    await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-    emitEnd(1, 'blocked')
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(starts).toBe(0) // deferred — no mid-task spawn
-    emitEnd(2)
-    await vi.waitFor(() => { expect(starts).toBe(1) }) // flush: first run aborts
-    await vi.waitFor(() => { expect(disposed).toBe(1) })
-    // The single-flight guard HAS reset. This fixture's agent has no `inbox`
-    // (no queue event can arrive), so the fallback prompt settled its window at
-    // delivery and the next boundary is a fresh one — it spawns again, which is
-    // exactly the flag this case is about.
-    emitEnd(3)
-    await vi.waitFor(() => { expect(starts).toBe(2) }) // next flush: second run succeeds
-    expect(disposed).toBe(2)
-  })
 })
 
 /** Shared mounting: one fake session/agent registered, one turn/end emitter. */
@@ -728,7 +294,7 @@ async function mountReviewFixture(options: {
 /** A policy fake whose low thresholds make the single skill tool/call substantive. */
 function reviewPolicy() {
   return {
-    reviewMode: 'subagent' as const,
+    reviewMode: 'inject' as const,
     substantiveMinToolCalls: 1,
     substantiveMinUserChars: 0,
     substantiveMinAgentChars: 0,
@@ -809,38 +375,6 @@ it('V6-23: a throwing review-error listener does not replace the turn-end failur
   expect(errors).toEqual([session.id])
 })
 
-it('V6-24: a zero-landing plan still notifies the model with the reasons (0.3.36)', async () => {
-  const injected: string[] = []
-  const { ctx, emitEnd } = await mountReviewFixture({
-    onInject: (message) => {
-      const box = message as { content?: Array<{ type: string; text: string }> } | null
-      const text = typeof message === 'object' && box?.content?.[0] ? box.content[0].text : ''
-      injected.push(text)
-    },
-  })
-  provideChannel(ctx, {
-    start: async () => ({
-      result: Promise.resolve({
-        structured: {
-          memoryOps: [],
-          skillOps: [{ action: 'patch', name: 'unread-skill', old_string: 'a', new_string: 'b', evidence: [{ event_seq: 0 }] }],
-          summary: 'patch an unread skill',
-        },
-      }),
-      dispose: async () => {},
-    }),
-  })
-  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-  emitEnd(1)
-  emitEnd(2) // 0.3.39: the review executes at the SECOND (flush) boundary
-  // The plan lands ZERO ops (the only skill op is not read this session) but
-  // the model must still hear that nothing happened and why.
-  await vi.waitFor(() => {
-    expect(injected.some(text => text.includes('0 ops landed') && text.includes('1 op(s) skipped'))).toBe(true)
-  })
-})
 
 it('0.3.40: cadence counters zero at the INJECTION and repeated threshold fires inject once per segment', async () => {
   const injected: string[] = []
@@ -1033,25 +567,6 @@ it('B: a notice the queue drops settles immediately, without waiting for a turn'
   })
 })
 
-it('0.3.45: the review output schema stays inside the raw JSON-Schema type whitelist (V8-01)', () => {
-  // Upstream facts (dsh-tools json-schema.ts:87 SCHEMA_TYPES + the
-  // assertObjectJsonSchema injection at subagent src:434): a defineTool DSL
-  // value like 'json' violates the raw-schema subset and rejects EVERY spawn,
-  // silently degrading the default subagent review to the inject fallback —
-  // the historical P1 that mock-based tests could never see. The review
-  // array nodes deliberately omit `items` (absent accepts any JSON item).
-  const SCHEMA_TYPES = new Set(['object', 'array', 'string', 'number', 'integer', 'boolean', 'null'])
-  expect(SCHEMA_TYPES.has('json')).toBe(false) // the DSL value that caused the P1 is NOT legal here
-  const visit = (node: unknown): void => {
-    if (typeof node !== 'object' || node === null) return
-    const type = (node as { type?: unknown }).type
-    if (type !== undefined) expect(SCHEMA_TYPES.has(type as string)).toBe(true)
-    for (const value of Object.values(node as Record<string, unknown>)) {
-      if (typeof value === 'object' && value !== null) visit(value)
-    }
-  }
-  visit(REVIEW_OUTPUT_SCHEMA)
-})
 
 it('0.3.48: a completing-turn cross of the second threshold delivers the combined review, not the stale latch (V8-04)', async () => {
   const delivered: string[] = []
@@ -1119,29 +634,6 @@ it('0.3.48: a throwing review-scheduled listener cannot skip the counter reset (
   expect(warnSpy.mock.calls.some(([message]) => String(message).includes('review-scheduled emit failed'))).toBe(true)
 })
 
-it('0.3.42: subagent-success result notice wakes via followup, not inject (V7-03)', async () => {
-  const followups: unknown[] = []
-  const injects: unknown[] = []
-  const { ctx, emitEnd } = await mountReviewFixture({
-    onFollowup: (message) => { followups.push(message) },
-    onInject: (message) => { injects.push(message) },
-  })
-  provideChannel(ctx, {
-    start: async () => ({
-      result: Promise.resolve({
-        structured: { memoryOps: [{ target: 'memory', action: 'add', facts: 'f1', evidence: [{ event_seq: 0 }] }], skillOps: [], summary: 'ok' },
-      }),
-      dispose: async () => {},
-    }),
-  })
-  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-  emitEnd(1, 'blocked') // latch mid-task
-  emitEnd(2) // flush: subagent succeeds → the result notice must WALK the parent
-  await vi.waitFor(() => { expect(followups).toHaveLength(1) })
-  expect(injects).toHaveLength(0)
-})
 
 it('0.3.42: a failed counter-reset persist warns once instead of repeating silently (V7-04)', async () => {
   const delivered: unknown[] = []
@@ -1198,33 +690,6 @@ it('0.3.40: the default delivery wakes via agent.followup, not inject', async ()
   expect(injects).toHaveLength(0)
 })
 
-it('P2-12 (v12): the completion channel delivers through the waking followup channel (reviewWakeInject)', async () => {
-  const toolCalls = Array.from({ length: 25 }, (_, i) => ({
-    type: 'tool/call' as const,
-    data: { turn: 1, step: i + 2, callId: `c${i}`, name: 'skill', arguments: '{}' },
-  }))
-  const followups: unknown[] = []
-  const injects: unknown[] = []
-  const { ctx, emitEnd } = await mountReviewFixture({
-    onFollowup: (message) => { followups.push(message) },
-    onInject: (message) => { injects.push(message) },
-    events: toolCalls,
-  })
-  ctx.provide('evolutionPolicy', { get: () => ({ ...reviewPolicy(), reviewMemoryInterval: 1_000_000, reviewSkillInterval: 1_000_000 }) })
-  await ctx.plugin(Review, {
-    reviewEnabled: true,
-    reviewMode: 'subagent',
-    memoryInterval: 1_000_000,
-    skillInterval: 1_000_000,
-    skillReviewTrigger: 'completion',
-    skillReviewCompletionMinToolCalls: 20,
-  })
-  // The completion channel used to inject directly (never waking, reviewWakeInject
-  // ignored, no woken-turn cadence suppression); it must share deliverMessage.
-  emitEnd(1)
-  await vi.waitFor(() => { expect(followups).toHaveLength(1) })
-  expect(injects).toHaveLength(0)
-})
 
 // V26-07 (v25): two-session mounting for the deferred-completion queue — the
 // in-flight review (Y) and the deferred completion (X) must be DIFFERENT
@@ -1347,100 +812,5 @@ it('V25-03: a FAILED deferred completion delivery rolls completionInjected back 
   expect(x.injected).toContain('x-completion')
 })
 
-it('PLAN S4.1 (2026-09-16, P2-12): a persisted content block of null skips instead of breaking buildReviewRequest', () => {
-  // A2-7 style: content crosses the durable session-log boundary, so the
-  // runtime shape is `unknown` even where the static type promises
-  // `{ type, text }`. The unguarded `.map(block => block.type ...)` threw a
-  // TypeError on `content: [null]` and the caller's catch dropped the whole
-  // subagent review leg; the guarded render skips the block and keeps the
-  // rest of the digest usable.
-  const session = {
-    deriveMessages: (): Array<{ role: string; content: unknown[] }> => [
-      { role: 'user', content: [null] },
-      { role: 'assistant', content: [null, { type: 'text', text: 'patched the memory skill' }] },
-      { role: 'user', content: [{ type: 'text', text: 'please remember the preference' }] },
-    ],
-    snapshotEvents: (): unknown[] => [],
-  } as unknown as Session
-  const request = Review.buildReviewRequest(
-    session,
-    'memory',
-    { toolCalls: 1, userChars: 30, assistantChars: 24 },
-    20,
-    4000,
-  )
-  expect(request).toContain('Review kind: memory')
-  expect(request).toContain('ASSISTANT: patched the memory skill')
-  expect(request).toContain('USER: please remember the preference')
-  // The null block contributed no text and no separator noise.
-  expect(request).not.toContain('null')
-})
 
-it('D (phase 1): evidence citing only a bookkeeping frame is REPORTED — the plan still executes', async () => {
-  // A real session log WITH seqs: frame 1 is the turn boundary, frame 2 is the user's own
-  // message. Only frame 2 can back a claim.
-  const events = [
-    { type: 'turn/start', seq: 1, data: { turn: 1 } },
-    { type: 'user/message', seq: 2, data: { content: [{ type: 'text', text: 'the release notes live in CHANGELOG.md' }] } },
-  ]
-  const { ctx, emitEnd } = await mountReviewFixture({ seq: 3, events })
-  const applied: Array<{ evidenceClassReports?: number | undefined; memoryApplied: number }> = []
-  ctx.on('evolution/plan-applied', event => applied.push(event))
-  provideChannel(ctx, {
-    start: async () => ({
-      result: Promise.resolve({
-        structured: {
-          memoryOps: [
-            // Cites the turn boundary: in range, but no content frame behind it.
-            { action: 'add', target: 'memory', facts: 'user prefers tea', evidence: [{ event_seq: 1 }] },
-            // Cites the user's message: nothing to report.
-            { action: 'add', target: 'memory', facts: 'release notes live in CHANGELOG.md', evidence: [{ event_seq: 2 }] },
-          ],
-          skillOps: [],
-          summary: 'two memory ops',
-        },
-      }),
-      dispose: async () => {},
-    }),
-  })
-  // The memory write leg needs its service: without it the ops are "applied 0" and the report
-  // count would be indistinguishable from a plan that never ran.
-  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-  emitEnd(1, 'blocked')
-  emitEnd(2) // the review executes at the flush boundary
-  await vi.waitFor(() => { expect(applied).toHaveLength(1) })
-  // REPORTED, not refused: both ops landed and the report counts exactly the one op.
-  expect(applied[0]?.memoryApplied).toBe(2)
-  expect(applied[0]?.evidenceClassReports).toBe(1)
-})
 
-it('D: a log whose frames carry no seq leaves the class rule silent (cannot classify)', async () => {
-  // The frames here carry no seq at all — the stub shape. The op cites seq 0, which the range
-  // rule accepts (the plan-time seq is 0) and the class rule must NOT report: an
-  // unclassifiable log is not an all-bookkeeping log.
-  const { ctx, emitEnd } = await mountReviewFixture({ events: [{ type: 'turn/start', data: { turn: 1 } }] })
-  const applied: Array<{ evidenceClassReports?: number | undefined; memoryApplied: number }> = []
-  ctx.on('evolution/plan-applied', event => applied.push(event))
-  provideChannel(ctx, {
-    start: async () => ({
-      result: Promise.resolve({
-        structured: {
-          memoryOps: [{ action: 'add', target: 'memory', facts: 'x', evidence: [{ event_seq: 0 }] }],
-          skillOps: [],
-          summary: 'one memory op',
-        },
-      }),
-      dispose: async () => {},
-    }),
-  })
-  ctx.provide('memory', { applyBatch: async () => ({ ok: true, message: 'ok' }) })
-  ctx.provide('evolutionPolicy', { get: () => reviewPolicy() })
-  await ctx.plugin(Review, { reviewEnabled: true, memoryInterval: 1, skillInterval: 1 })
-  emitEnd(1, 'blocked')
-  emitEnd(2)
-  await vi.waitFor(() => { expect(applied).toHaveLength(1) })
-  expect(applied[0]?.memoryApplied).toBe(1)
-  expect(applied[0]?.evidenceClassReports).toBeUndefined()
-})

@@ -32,7 +32,36 @@ export interface EvolutionReviewScheduledEvent {
    * `'subagent'` (spawned review run), `'inject'` (prompt injected into the
    * parent — direct, fallback, or deferred-drain), `'completion'`
    * (completion-trigger prompt, direct or deferred-drain). */
-  channel?: 'subagent' | 'inject' | 'completion' | undefined
+  channel?: 'subagent' | 'inject' | 'completion' | 'branch' | undefined
+}
+
+/** One normalized skill/memory action performed by a review branch. */
+export interface EvolutionReviewAction {
+  readonly type: 'skill' | 'memory' | 'tool'
+  readonly action: string
+  readonly target: string
+  readonly status: 'ok' | 'error'
+  readonly revision?: string | undefined
+  readonly summary?: string | undefined
+}
+
+/** One durable review outcome emitted after a branch settles. */
+export interface EvolutionReviewCompletedEvent {
+  readonly version: 1
+  readonly reviewId: string
+  readonly sessionId: string
+  readonly branchSessionId?: string | undefined
+  readonly kind: ReviewKind
+  readonly status: 'completed' | 'failed' | 'timeout' | 'aborted'
+  readonly trigger: { readonly reason: string; readonly toolCalls: number; readonly userChars: number; readonly assistantChars: number }
+  readonly finalText: string
+  readonly actions: readonly EvolutionReviewAction[]
+  readonly usage?: { readonly inputTokens: number; readonly outputTokens: number; readonly cacheReadTokens: number; readonly cacheWriteTokens: number } | undefined
+  readonly startedAt: number
+  readonly finishedAt: number
+  readonly model?: { readonly provider: string; readonly model: string } | undefined
+  readonly promptVersion?: string | undefined
+  readonly error?: string | undefined
 }
 
 export interface EvolutionPlanAppliedEvent {
@@ -99,6 +128,13 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'evolution/review-scheduled'(event: EvolutionReviewScheduledEvent): void
+    /**
+     * One review branch settled with its durable result. An ANNOUNCEMENT: the
+     * activity ledger folds it into review history; it decides nothing.
+     * @param event - the review identity, status, summary, actions, and usage.
+     * @mode emit
+     */
+    'evolution/review-completed'(event: EvolutionReviewCompletedEvent): void
     /**
      * A reviewed plan finished its write leg, with the counts that describe what landed. An
      * ANNOUNCEMENT: the family's own ledger of plan outcomes (A98 / O-1).

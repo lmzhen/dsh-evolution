@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-memory",
   "description": "Model-facing memory tool and prompt context",
-  "version": "0.30.28",
+  "version": "0.30.29",
   "publishConfig": {
     "access": "public"
   },

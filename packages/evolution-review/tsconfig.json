@@ -1,7 +1,6 @@
 {
   "extends": "../tsconfig.pkg.json",
   "references": [
-    { "path": "../evolution-approval" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
     { "path": "../../core/tools" },
@@ -10,7 +9,6 @@
     { "path": "../../core/session" },
     { "path": "../evolution-core" },
     { "path": "../../test-support/agent-loop-testkit" },
-    { "path": "../evolution-plan-validator" },
     { "path": "../evolution-state" },
     { "path": "../evolution-policy" },
     { "path": "../evolution-curator" }

@@ -18,7 +18,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { EvolutionIoLike, EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike, EvolutionPlanAppliedEvent, EvolutionReviewCompletedEvent } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionHome, evolutionIoAdapter, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
@@ -44,6 +44,25 @@ export interface EvolutionActivityRecord {
    * (the plan path's report-only phase-1 dimension). NOT a "work not done" cause —
    * those ops executed. Optional so sidecars written before the dimension parse. */
   evidenceClassReports?: number | undefined
+  at: number
+}
+
+/** One durable review outcome folded into the activity sidecar. */
+export interface EvolutionReviewActivityRecord {
+  reviewId: string
+  sessionId: string
+  branchSessionId?: string | undefined
+  kind: EvolutionReviewCompletedEvent['kind']
+  status: EvolutionReviewCompletedEvent['status']
+  trigger: EvolutionReviewCompletedEvent['trigger']
+  finalText: string
+  actions: EvolutionReviewCompletedEvent['actions']
+  usage?: EvolutionReviewCompletedEvent['usage']
+  startedAt: number
+  finishedAt: number
+  model?: EvolutionReviewCompletedEvent['model']
+  promptVersion?: string | undefined
+  error?: string | undefined
   at: number
 }
 
@@ -100,12 +119,40 @@ export function applyActivityEvent(
   return [...items, record].slice(-cap)
 }
 
+/** Fold one review-completed payload into a bounded review list (pure). */
+export function applyReviewActivityEvent(
+  reviews: EvolutionReviewActivityRecord[],
+  event: EvolutionReviewCompletedEvent,
+  maxItems: number,
+  at = Date.now(),
+): EvolutionReviewActivityRecord[] {
+  const record: EvolutionReviewActivityRecord = {
+    reviewId: event.reviewId,
+    sessionId: event.sessionId,
+    ...event.branchSessionId === undefined ? {} : { branchSessionId: event.branchSessionId },
+    kind: event.kind,
+    status: event.status,
+    trigger: event.trigger,
+    finalText: event.finalText,
+    actions: event.actions,
+    ...event.usage === undefined ? {} : { usage: event.usage },
+    startedAt: event.startedAt,
+    finishedAt: event.finishedAt,
+    ...event.model === undefined ? {} : { model: event.model },
+    ...event.promptVersion === undefined ? {} : { promptVersion: event.promptVersion },
+    ...event.error === undefined ? {} : { error: event.error },
+    at,
+  }
+  const cap = Number.isFinite(maxItems) ? Math.max(1, maxItems) : DEFAULT_MAX_ITEMS
+  return [...reviews, record].slice(-cap)
+}
+
 /** Single-source activity sidecar serialization (F-304): the `apply()`
  * listener emits the versioned envelope through this one function, so a
  * format change cannot drift across hand-written writers.
  * `parseActivityContent` is the matching single reader. */
-export function serializeActivity(items: EvolutionActivityRecord[]): string {
-  return JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2)
+export function serializeActivity(items: EvolutionActivityRecord[], reviews: EvolutionReviewActivityRecord[] = []): string {
+  return JSON.stringify({ version: ACTIVITY_FILE_VERSION, items, ...reviews.length === 0 ? {} : { reviews } }, null, 2)
 }
 
 export function parseActivityContent(raw: string | null): EvolutionActivityRecord[] {
@@ -146,6 +193,26 @@ export function parseActivityContent(raw: string | null): EvolutionActivityRecor
     // Unparsable bytes fold to empty so every READER stays total; the single
     // WRITE path (see apply) quarantines those bytes before it can overwrite
     // them, which is where the loss would actually happen.
+    return []
+  }
+}
+
+/** Parse the review history sidecar array; malformed entries are dropped. */
+export function parseActivityReviews(raw: string | null): EvolutionReviewActivityRecord[] {
+  if (raw === null) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    const reviews = typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { reviews?: unknown }).reviews)
+      ? (parsed as { reviews: unknown[] }).reviews
+      : []
+    return reviews.filter((item): item is EvolutionReviewActivityRecord =>
+      typeof item === 'object' && item !== null
+      && typeof (item as EvolutionReviewActivityRecord).reviewId === 'string'
+      && typeof (item as EvolutionReviewActivityRecord).sessionId === 'string'
+      && typeof (item as EvolutionReviewActivityRecord).finalText === 'string'
+      && typeof (item as EvolutionReviewActivityRecord).at === 'number'
+      && Number.isFinite((item as EvolutionReviewActivityRecord).at))
+  } catch {
     return []
   }
 }
@@ -243,6 +310,11 @@ export async function loadActivity(root: string, io: EvolutionIoLike): Promise<E
   return (await loadActivityState(root, io)).records
 }
 
+/** Read durable review history without a plan-record read. */
+export async function loadReviewActivity(root: string, io: EvolutionIoLike): Promise<EvolutionReviewActivityRecord[]> {
+  return parseActivityReviews(await io.readText(activityFile(root)))
+}
+
 /**
  * The WRITE side's quarantine predicate: should these bytes be preserved under `.corrupt` before a
  * current-version file replaces them?
@@ -326,12 +398,38 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ioCtx.logger.warn(`evolution-activity: ${file} is unreadable (unparsable JSON or wrong top-level shape); the original bytes were copied to ${file}.corrupt and the store restarts from the readable entries`)
           }
           const items = applyActivityEvent(parseActivityContent(current), event, maxItems)
-          return serializeActivity(items)
+          return serializeActivity(items, parseActivityReviews(current))
         }),
       )
       chain = run.then(() => undefined, () => undefined)
       run.catch((error: unknown) => {
         // Persistence is best-effort: the outcome was already applied upstream.
+        ioCtx.logger.warn(error instanceof Error ? error : String(error))
+      })
+    })
+    // Round 28: a headless host may dispose immediately after the review
+    // summary; await the in-process write chain so the review record is not
+    // lost between event emission and host teardown.
+    ioCtx.effect(() => () => chain, 'evolution-activity.flush')
+
+    ioCtx.on('evolution/review-completed', (event) => {
+      const run = chain.then(() =>
+        transactIo(io, activityFile(root), async (current) => {
+          const file = activityFile(root)
+          if (isCorruptActivity(current)) {
+            const rescued = await io.writeText(`${file}.corrupt`, current as string).then(() => true, () => false)
+            if (!rescued) {
+              ioCtx.logger.warn(`evolution-activity: ${file} is unreadable; the .corrupt copy could not be written — refusing this write so the original bytes stay recoverable`)
+              return current
+            }
+            ioCtx.logger.warn(`evolution-activity: ${file} is unreadable; the original bytes were copied to ${file}.corrupt and the store restarts from the readable entries`)
+          }
+          const reviews = applyReviewActivityEvent(parseActivityReviews(current), event, maxItems)
+          return serializeActivity(parseActivityContent(current), reviews)
+        }),
+      )
+      chain = run.then(() => undefined, () => undefined)
+      run.catch((error: unknown) => {
         ioCtx.logger.warn(error instanceof Error ? error : String(error))
       })
     })

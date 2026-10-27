@@ -4,10 +4,8 @@
  */
 
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
-import { isPresent, isUnknown, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
-import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
-import { createHash, randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
+import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
@@ -18,22 +16,19 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-review': { kind: 'evolution-review' } & ContextFormed
   }
 }
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
-import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, contentHash, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, evolutionIoAdapter, markReviewChannel, resolveOrigins, resolveRootConfig, newSkillLibrary, sweepReviewChannelSessions, type EvolutionIoLike, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_REVIEW_CONTEXT_MESSAGES, DEFAULT_REVIEW_MESSAGE_CHARS, DEFAULT_SKILL_CONTENT_CHARS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_REVIEW_MODEL, DEFAULT_SKILL_REVIEW_MODEL, clampOnce, pickWithPolicy, userSetKeys, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
-import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
-import type { LiveValue, SkillActionResult, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
+import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
+import type { LiveValue } from '@deepseek-ai/dsh-evolution-core'
 // v37 P7a: the platform dispatch vocabulary is read in ONE place —
 // evolution-core's tool-dispatch module, which owns the event types, the
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
-import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, sessionEvidenceIndex, sessionReadNames, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
-import { planContractPrompt, validateEvolutionPlan, type EvolutionPlan, type SkillOp } from '@deepseek-ai/dsh-evolution-plan-validator'
-import { redactSecrets as redactReviewSecrets } from '@deepseek-ai/dsh-evolution-core'
-import { ensureSkillFrontmatter, filterUnreadSkillOps, foldUntrustedLines, payloadText } from '@deepseek-ai/dsh-evolution-core'
+import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
+
 import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
 // The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
@@ -103,7 +98,7 @@ export interface Config {
    * at full price. Deployments that prefer the clean-context split switch the
    * POLICY row (`evolution-policy`): the mounted policy snapshot shadows this
    * row's value, which the plugin reports once at load (v37 P2-24). */
-  reviewMode?: Volatile<'subagent' | 'inject'>
+  reviewMode?: Volatile<'inject' | 'branch'>
   /** Review cadence in TOOL CALLS — the CANONICAL registry id (G1, signals.ts:
    * a turn advances by its tool-call count, minimum 1, or by 1 when the turn
    * itself carried the memory signal). Shadowed by the policy snapshot in every
@@ -119,22 +114,7 @@ export interface Config {
   /** Deprecated alias of `reviewSkillInterval` (G0/S0.3): still readable,
    * refused by writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
   skillInterval?: number
-  /**
-   * Tools the one-shot review subagent may use. Only actually-existing tools
-   * may be listed (the DSH tool catalog has `skill`; the `skill_search` /
-   * `skill_load` discovery pair does not exist on this platform).
-   */
-  reviewToolAllow?: string[]
   reviewTimeoutMs?: number
-  reviewContextMessages?: number
-  reviewMessageChars?: number
-  /** ABSOLUTE cap of the review subagent's own delegation depth (platform
-   * resolveChildDepth: childDepth = parentDepth+1 must be <= maxDepth).
-   * 1 permits the subagent itself and denies nesting (2 > 1); 0 rejects the
-   * spawn outright (SubagentDepthError on any real run — the 0.3.1 defect). */
-  reviewMaxDepth?: number
-  /** LLM provider for review subagents. Omit to inherit the deployment default route. */
-  reviewProvider?: string
   /** E3/P1-8 (v11) — TRUE semantics: this flag gates ONLY the completion
    * channel. The cadence latch stays active regardless of the value (a
    * completion-gated deployment still fires at the policy cadence), so
@@ -182,7 +162,7 @@ export const Config = z.object({
   // 0.3.74: default is 'inject' — see the Config JSDoc. 'subagent' stays a
   // first-class opt-in for deployments that want the parent context kept clean
   // or a dedicated review model.
-  reviewMode: z.union([z.const('subagent'), z.const('inject')]).default('inject').volatile(),
+  reviewMode: z.union([z.const('inject'), z.const('branch')]).default('inject').volatile(),
   // G1: the canonical registry ids, merged into the row Config. No .default(): a
   // schema default would fill the canonical key and make the deprecated alias
   // below unreachable through the alias fallback (resolveReviewRowSettings resolves
@@ -193,21 +173,7 @@ export const Config = z.object({
   // refused by writes; removal was planned for 0.7.0 and is deferred (the alias still ships). Deployment-only (no `.volatile()`).
   memoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
   skillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
-  reviewToolAllow: z.array(z.string()).default(['skill']),
   reviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_REVIEW_TIMEOUT_MS),
-  // P3-4 (v14): the former `executionTimeoutMs` declaration was deleted — no
-  // code path ever read it, and keeping a configurable-looking dead field in
-  // the schema invited deployments to set something with no effect.
-  reviewContextMessages: z.number().min(1).default(DEFAULT_REVIEW_CONTEXT_MESSAGES),
-  reviewMessageChars: z.number().min(1).default(DEFAULT_REVIEW_MESSAGE_CHARS),
-  // reviewMaxDepth 0 is the historical 0.3.1 maximum-depth defect (a 0 rejects
-  // the spawn outright), so its min is 1. `reviewTimeoutMs` 0 is not a "no
-  // timeout" meaning — AbortSignal.timeout(0) aborts immediately (and there is
-  // no disable-timeout branch), so it clamps to at least 1.
-  reviewMaxDepth: z.number().min(1).default(1),
-  // (rc.66 note) schemastery fields are optional by default — the interface
-  // `reviewProvider?` and this schema agree; "Omit to inherit" holds.
-  reviewProvider: z.string(),
   // V7-15 (0.3.44): the trigger is closed to the three known values — a typo
   // cannot silently select a fourth behavior. Note: schemastery is tolerant
   // (it STRIPS an unmatching value and keeps the default), so the runtime
@@ -227,33 +193,13 @@ export const Config = z.object({
   skillsRoot: z.string().default(''),
 })
 
-/** V8-01 (0.3.45): the review subagent's structured-output contract. The
- * `subagents.start` outputSchema is RAW JSON Schema validated by
- * assertObjectJsonSchema (upstream dsh-tools json-schema.ts — SCHEMA_TYPES
- * has no 'json'; 'json' is a defineTool-author DSL-only value). The arrays
- * deliberately use `{ type: 'array' }` with NO items node — absent items
- * accepts any JSON item (upstream semantics, json-schema.ts "Item schema
- * (type: 'array' only); absent accepts any JSON item"), and plan-validator
- * owns the per-op structure proof. The whitelist contract test (review.spec
- * V8-01) forbids a DSL value slipping back in. */
-export const REVIEW_OUTPUT_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    memoryOps: { type: 'array' },
-    skillOps: { type: 'array' },
-    summary: { type: 'string' },
-  },
-} as const
+
 
 /** V8-01 (0.3.45): the minimal start() request shape the review passes — the
  * OUTPUT SCHEMA part is typed against the raw JSON-Schema subset vocabulary,
  * so a defineTool DSL value like `'json'` fails at the type surface instead
  * of silently rejecting every spawn at runtime (the historical defect the
  * mock-based tests and the previous `unknown` request type could not see). */
-interface MemoryLike {
-  applyBatch(target: 'memory' | 'user', operations: unknown[]): Promise<{ ok: boolean; message: string }>
-}
 
 /**
  * S2-8 (FLOW1-3): the platform `Inbox` surface (public `Agent.inbox`,
@@ -307,9 +253,6 @@ const cadenceSummary = (kind: ReviewKind): string => `auto-review:${kind}`
  * {@link resolveReviewRowSettings}, which clamps its own numerics. */
 type ClampedReviewConfig = Config & {
   reviewTimeoutMs: number
-  reviewContextMessages: number
-  reviewMessageChars: number
-  reviewMaxDepth: number
 }
 
 /**
@@ -331,19 +274,7 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
     // (the schema may be bypassed by a programmatic assembly; clampedNumber
     // also catches NaN/±Infinity, which z.number() lets through).
     reviewTimeoutMs: field('reviewTimeoutMs', rawConfig.reviewTimeoutMs, DEFAULT_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS),
-    reviewContextMessages: field('reviewContextMessages', rawConfig.reviewContextMessages, DEFAULT_REVIEW_CONTEXT_MESSAGES, 1),
-    reviewMessageChars: field('reviewMessageChars', rawConfig.reviewMessageChars, DEFAULT_REVIEW_MESSAGE_CHARS, 1),
-    reviewMaxDepth: field('reviewMaxDepth', rawConfig.reviewMaxDepth, 1, 1),
   })
-}
-
-/** v30 REV-04/REV-02: read the policy snapshot off the (optional) policy
- * service through an `unknown` boundary — the Context augmentation types the
- * getter non-optionally, but at runtime the row can be absent. */
-type PolicySnapshotFields = { skillContentChars?: number; protectedSkillNames?: readonly string[] } & PolicyStageFields
-
-function policySnapshotOf(source: unknown): PolicySnapshotFields | undefined {
-  return (source as { get?(): PolicySnapshotFields } | undefined)?.get?.()
 }
 
 /** Review behaviour a user may change (G3/S3.1). Field names are the CANONICAL
@@ -363,7 +294,7 @@ export interface ReviewSettings {
   /** Master switch for the review plugin. */
   reviewEnabled: boolean
   /** Run the review in the parent session (inject) or on a subagent. */
-  reviewMode: 'subagent' | 'inject'
+  reviewMode: 'inject' | 'branch'
   /** Deliver the deferred review as a waking follow-up message. */
   reviewWakeInject: boolean
   /** Deliver result notices (not review prompts). */
@@ -413,11 +344,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   const config = clampReviewConfig(rawConfig, ctx)
   // W5 G3-S3: ONE execution path for both review channels; the channel is fiber-owned (HMR safe).
-  const reviewChannel = createSubagentChannel(ctx)
   // E-7 (v18) → V27 G2.4 (M-08): canonical `root` only; the expired
   // `skillsRoot` alias fails the load instead of being silently ignored.
   assertSkillsRootAliasRetired(rawConfig)
-  const rootConfig = resolveRootConfig(rawConfig)
   // P1-9 (S2-2): every per-session collection below registers at its declaration
   // site; the dispose hook clears what was registered instead of a hand-written
   // list (V7-16 fixed such a list after four additions were missing from it).
@@ -483,9 +412,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // interleave window: the loser records a failed op and the snapshot stays
   // the rollback path. Accepted + documented (plan v20 C-3①); the same
   // statement lives on evolution-curator's acquireMutex.
-  let reviewInFlight = false
-  /** W5 G3-S3: capability-missing is warned once per plugin instance (the error signal is per trigger). */
-  let channelUnavailableWarned = false
+  /** Branch mode runs at most one branch per parent session; a second trigger only sets rerun. */
+  const branchRunning = sessionState.add('branchRunning', new Map<SessionId, { rerun?: ReviewKind }>())
+  /** Child Sessions this plugin owns; their turn/end must not start another review. */
+  const branchSessions = sessionState.add('branchSessions', new Set<SessionId>())
   const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
   /**
@@ -511,7 +441,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // precedence itself is core's `pickWithPolicy` (ONE rule for both readers of the policy row).
     const pick = (key: 'reviewSkillInterval' | 'reviewMemoryInterval'): number =>
       pickWithPolicy(userSet, row, snapshot, key)
-    const mode = (): 'subagent' | 'inject' => {
+    const mode = (): 'inject' | 'branch' => {
       if (userSet.has('reviewMode')) return row.reviewMode
       return snapshot?.reviewMode ?? row.reviewMode
     }
@@ -731,6 +661,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function runOnTurnEnd(session: Session, event: SessionEvent<'turn/end'>): Promise<void> {
     if (!params().reviewEnabled) return
     if (session.header.origin === 'subagent') return
+    if (branchSessions.has(session.id)) return
+    if ((session.header as { visibility?: 'background' }).visibility === 'background') return
     const agent = ctx.agents.get(session.id)
     if (!agent) return
     // 0.2.x: the turn window comes from the family's `evolutionSignals` projection — the same
@@ -830,7 +762,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // Explicit 'inject' deployments also execute at the end (the user
         // decision: BOTH modes complete after the task — the old immediate
         // 'inject' contract is superseded, 0.3.39).
-        if (params().reviewMode === 'inject') {
+        if (params().reviewMode === 'branch' && await tryBranchReview(session, agent, pendingKind, signal as { toolCalls: number; userChars: number; assistantChars: number }, 'cadence')) {
+          return
+        }
+        if (params().reviewMode === 'inject' || params().reviewMode === 'branch') {
           // 0.3.73: a refused delivery restores the latch and returns BEFORE the
           // reset below, so the segment's review retries instead of vanishing.
           if (!deliverMessage(agent, reviewPrompt(pendingKind), cadenceSummary(pendingKind), true)) {
@@ -849,57 +784,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             assistantChars: signal.assistantChars,
             channel: 'inject',
           })
-        } else {
-          const reviewOutcome = await trySubagentReview(session, agent, pendingKind, signal)
-          if (reviewOutcome === true) {
-            // V8-03 (0.3.48): the emit is a protection domain (V5-19③/F-334
-            // discipline) — a throwing listener used to escape the flush,
-            // skip the counter reset below and re-deliver the same kind next
-            // completed turn (the V7-04 double-delivery shape, entered via
-            // the emit instead of the save).
-            emitReviewScheduled(ctx, {
-              sessionId: session.id,
-              kind: pendingKind,
-              toolCalls: signal.toolCalls,
-              userChars: signal.userChars,
-              assistantChars: signal.assistantChars,
-              channel: 'subagent',
-            })
-            // B 组：子代理通道没有「我的队列通知」可等 —— 复查已在子代理里跑完，窗口就在这里重启。
-            // V8-03：这一句在 try/catch 之外，抛错的监听者跳不掉它（该用例钉的正是这一点）。
-            await settleNotice(session.id, 'subagent-flush')
-          } else if (reviewOutcome === 'dropped') {
-            // V27 R-01: nothing was queued and nothing was delivered (the queue
-            // was at cap). Keep the latch — the next completed boundary retries
-            // this segment's review — and skip the counter reset below (zeroing
-            // would declare a segment that never got its review). The cap warn
-            // in trySubagentReview already names the cause.
-            pendingCadenceReviews.set(session.id, pendingKind)
-            return
-          } else if (reviewOutcome !== 'deferred') {
-            // Subagent path failed at the END — fall back to the prompt delivery
-            // (still at completion; there is no later boundary to defer to).
-            // 'deferred' (v20 C-1) is NOT here: trySubagentReview queued the
-            // prompt itself and delivers it when the in-flight window closes —
-            // the old immediate inject let the parent model write while the
-            // subagent could still executePlan, the exact concurrent-writer
-            // window E-19's single-flight exists to prevent.
-            // 0.3.73: same non-consumption contract as the inject-mode branch.
-            if (!deliverMessage(agent, reviewPrompt(pendingKind), cadenceSummary(pendingKind), true)) {
-              pendingCadenceReviews.set(session.id, pendingKind)
-              return
-            }
-            // V24-15 (v24): the fallback inject previously did NOT emit —
-            // unified with every other delivery path.
-            emitReviewScheduled(ctx, {
-              sessionId: session.id,
-              kind: pendingKind,
-              toolCalls: signal.toolCalls,
-              userChars: signal.userChars,
-              assistantChars: signal.assistantChars,
-              channel: 'inject',
-            })
-          }
         }
         // B 组：这里不再清零。计数窗口由「未结通知」的生命周期驱动——被队列丢弃时立刻结清，
         // 或被取走的那个回合结束时结清（`settleNotice`）；投递本身不再是窗口的起点。
@@ -944,34 +828,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (completionInjected.has(session.id)) return
     if (!shouldCompletionReview(event.data.reason, cumulative, params().skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
-    // V24-03 (v24): the completion channel is the one delivery path that
-    // bypassed E-19's single-flight — while a cadence subagent review was in
-    // flight (up to the full review + plan-execution window), a subsequent
-    // completed turn injected the completion review straight into the parent,
-    // and the parent's skill/memory writes could interleave with the in-flight
-    // subagent's executePlan — the exact concurrent-writer window v20 C-1
-    // closed for the cadence fallback. When a review is in flight, the prompt
-    // joins the SAME deferred queue the cadence path uses; the drain delivers
-    // it (and emits `review-scheduled` channel:'completion') right after the
-    // window closes. V26-06 (v25): the completionInjected flag means "queued
-    // or delivered" — a queue-cap DROP must roll it back (same V4-21 parity
-    // as the drain's delivery-failure rollback) or the session's one
-    // completion review is permanently lost in-process.
-    if (reviewInFlight) {
-      if (deferredFallbackReviews.length < DEFERRED_REVIEW_CAP) {
-        deferredFallbackReviews.push({
-          agent,
-          sessionId: session.id,
-          kind: 'skill',
-          prompt: COMPLETION_SKILL_REVIEW_PROMPT,
-          label: 'completion review',
-          channel: 'completion',
-          counts: signal,
-        })
-      } else {
-        completionInjected.delete(session.id)
-        ctx.logger.warn(`dsh-evolution-review: deferred-review queue at cap (${DEFERRED_REVIEW_CAP}) — dropped one deferred completion review prompt; the completion gate re-arms for the next completed turn`)
-      }
+    if (params().reviewMode === 'branch' && await tryBranchReview(session, agent, 'skill', signal as { toolCalls: number; userChars: number; assistantChars: number }, 'completion')) {
       return
     }
     // V4-21 (F-334 residual ②) / 0.3.73: the flag is set BEFORE the delivery, so a
@@ -1128,902 +985,82 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
   }
 
-  // v20 (C-2): the subagent leg is timeout-guarded by its own AbortSignal,
-  // but the write leg (executePlan → memory/approval IO) had NO timeout — a
-  // hung await used to leave `reviewInFlight` set forever and silently
-  // degrade the subagent channel to inject for the whole process lifetime.
-  // Race the wait with a timer: on timeout the rejection falls into the
-  // pipeline catch (returns false → caller falls back to inject) and the
-  // finally above has already reset the single-flight flag and drained the
-  // deferred queue.
-  // v21 (R-1) correction of the v20 wording: the abandoned write leg does NOT
-  // get an audit trail — the result notice and the `evolution/plan-applied`
-  // emit live AFTER the awaited call, so a timeout skips them entirely. The
-  // abandoned op may still land WITHOUT any record, and the fallback inject
-  // re-opens the concurrent-writer window until its IO settles (bounded by
-  // the underlying IO error handling). The catch below warns explicitly.
+  const BRANCH_MEMORY_PROMPT = '[Auto-review — Memory] Review the conversation above and save durable user preferences, corrections, or stable facts with the memory tool when appropriate. Do not create skills here. Return a short summary of what was saved, or say Nothing to save.'
 
-  /**
-   * T3-09/A37: the ONE abort channel for this fiber's long work.
-   *
-   * The review's two legs (the review subagent, and the write leg that executes its plan) were
-   * bounded only by their own timeouts, so an unloaded or HMR-replaced fiber kept running — and the
-   * write leg kept WRITING — while the replacement instance knew nothing about it (its single-flight
-   * flag and min-idle window do not cover a run that no longer belongs to any live fiber). The
-   * disposer below aborts this controller; the subagent leg merges it with its own deadline through
-   * `AbortSignal.any` (the shape evolution-maintenance's scan already uses) and the write leg checks
-   * it at every op boundary — before the first op, so an aborted fiber lands nothing.
-   */
-  const fiberAbort = new AbortController()
-
-  const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
-    new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => { reject(new Error(`dsh-evolution-review: ${label} timed out after ${ms}ms`)) }, ms)
-      promise.then(
-        (value) => { clearTimeout(timer); resolve(value) },
-        (error: unknown) => { clearTimeout(timer); reject(error instanceof Error ? error : new Error(String(error))) },
-      )
-    })
-
-  // v20 (C-1): fallback prompts queued while a review subagent was in flight.
-  // Capped so a pathological pile-up cannot grow unboundedly (the drain point
-  // is the `finally` in trySubagentReview, and C-2 bounds the window itself).
-  // V24-03/V24-15 (v24): the queue entries carry their full delivery spec
-  // (prompt text, source label, emit channel) instead of a bare ReviewKind —
-  // the COMPLETION channel now defers through this same queue when a subagent
-  // review is in flight, and it delivers a different prompt (and must emit a
-  // different channel) than the cadence fallbacks.
-  // V25-02 (v25): entries also carry their OWN sessionId and count window —
-  // the drain runs inside the IN-FLIGHT review's closure, so emitting its
-  // session/counts attributed another session's deferred review to the wrong
-  // session (and used an unrelated count window).
-  const deferredFallbackReviews: Array<{
-    agent: import('@deepseek-ai/dsh-agent').Agent
-    sessionId: SessionId
-    kind: ReviewKind
-    prompt: string
-    label: string
-    channel: 'inject' | 'completion'
-    counts: { toolCalls: number; userChars: number; assistantChars: number }
-  }> = []
-  const DEFERRED_REVIEW_CAP = 16
-  // v21 (L-5): drop queued fallback prompts on dispose — delivering them after
-  // unload would inject through a dead plugin fiber. Scope note: the whole
-  // single-flight mechanism (flag + queue) is PER-MOUNT state; an HMR reload
-  // starts a fresh instance whose flag is false while the old instance's run
-  // may still be in flight. That reload window is covered by the same
-  // per-file locks + marker probe as the curator cross-layer contract (see
-  // the E-19/C-3 comment), not by this flag.
-  ctx.effect(() => () => { deferredFallbackReviews.length = 0 }, 'dsh-evolution-review.deferred-drain')
-
-  /** v32 REV-06(b): content hash of every tree skill at REVIEW SCHEDULE time.
-   * The subagent's read-time hash is not plumbed through the plan, so this
-   * pre-run snapshot is what the execute-time staleness check can honestly
-   * compare against: a skill whose hash changed while the review ran was
-   * touched concurrently, and the plan (authored against the old state) is
-   * refused as stale. */
-  async function treeSkillHashes(): Promise<Map<string, string>> {
-    const hashes = new Map<string, string>()
-    const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-    if (!io) return hashes
-    const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rootConfig, io: evolutionIoAdapter(() => io.provider()) })
-    // v35 C3(a)/C11: the listing already reads every SKILL.md, so ask it for the
-    // bodies instead of re-reading each skill just to hash it (the pre-run
-    // snapshot ran once per review, for both kinds).
-    for (const summary of await library.list({ withContent: true }).catch((error: unknown) => {
-      // v33 R2-3: the fail-open here silently disarms the v32 REV-06(b)
-      // staleness gate for EVERY skill - say so instead of an empty map with
-      // no trace.
-      ctx.logger.warn(`dsh-evolution-review: skill tree scan failed (${error instanceof Error ? error.message : String(error)}) — pre-run staleness hashes are unavailable; full-content updates will not be drift-checked this review`)
-      return []
-    })) {
-      // A skill the listing could not read carries no body: it stays out of the
-      // snapshot exactly as the former per-skill read's null did.
-      if (summary.content !== undefined) hashes.set(summary.name, contentHash(summary.content))
-    }
-    return hashes
-  }
-
-  async function trySubagentReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: unknown): Promise<boolean | 'deferred' | 'dropped'> {
-    if (params().reviewMode === 'inject') return false
-    // W5 G3-S3: explicit capability gate. Unavailable is NOT silently swallowed: the operator
-    // gets one warn per plugin instance plus the durable review-error signal, and the caller
-    // falls back to the synchronous inject path.
-    const channelState = reviewChannel.state
-    if (channelState.kind !== 'available') {
-      if (!channelUnavailableWarned) {
-        channelUnavailableWarned = true
-        ctx.logger.warn('dsh-evolution-review: subagent channel unavailable (' + channelState.code + ': ' + channelState.reason + ') — reviews fall back to the inject path until the capability returns')
+  async function tryBranchReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
+    const state = branchRunning.get(session.id)
+    if (state !== undefined) { state.rerun = kind; return true }
+    const branchState: { rerun?: ReviewKind } = {}
+    branchRunning.set(session.id, branchState)
+    const childId = SessionId('session-' + randomUUID())
+    const startedAt = Date.now()
+    const controller = new AbortController()
+    let timedOut = false
+    const timer = setTimeout(() => { timedOut = true; controller.abort() }, rawConfig.reviewTimeoutMs ?? DEFAULT_REVIEW_TIMEOUT_MS)
+    let handle: Awaited<ReturnType<typeof ctx.agents.create>> | undefined
+    try {
+      const presets = ctx.get('agentPresets') as { resolve(id?: string): Promise<{ id: string }>; mount(target: Context, id?: string): Promise<unknown> } | undefined
+      let agentPreset: string | undefined
+      let setup: ((target: Context, child: import('@deepseek-ai/dsh-agent').Agent) => Promise<void>) | undefined
+      if (presets !== undefined) {
+        const resolved = await presets.resolve(session.header.agentPreset)
+        agentPreset = resolved.id
+        setup = async (target, _child) => { await presets.mount(target, resolved.id) }
       }
-      try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
-        ctx.logger.warn('dsh-evolution-review: review-error emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
-      }
+      const seed = session.snapshotEvents()
+      const current = (ctx.get('agentDefaultModel') as { currentSelection?: () => { provider: string; model: string } } | undefined)?.currentSelection?.()
+      handle = await ctx.agents.create({
+        sessionId: childId,
+        parentAgent: agent,
+        seed,
+        inheritedEventCount: SessionLogOffset(seed.length),
+        meta: { parentSession: session.id, isSeeded: true, ...(agentPreset === undefined ? {} : { agentPreset }) },
+        ...(current === undefined ? {} : { agentOptions: { provider: current.provider, model: current.model } }),
+        ...(setup === undefined ? {} : { setup }),
+      })
+    } catch (error) {
+      clearTimeout(timer)
+      branchRunning.delete(session.id)
+      ctx.logger.warn('dsh-evolution-review: branch Session did not start: ' + (error instanceof Error ? error.message : String(error)))
       return false
     }
-    // 0.3.18 (E-19) single-flight: another review is running (the window can
-    // be 120s). The review still happens on THIS turn, just never concurrently
-    // with a subagent.
-    if (reviewInFlight) {
-      // v20 (C-1 / P1-3): the old path returned false and the caller injected
-      // the review prompt IMMEDIATELY — the parent model started writing via
-      // its tools while the in-flight subagent could still `executePlan`, the
-      // exact concurrent-writer window this single-flight flag exists to
-      // prevent. Queue the prompt; the `finally` below delivers it right after
-      // the window closes (E-19's stated invariant now actually holds).
-      // S2-7 (FLOW1-4): one entry per (session, kind) — last trigger wins, the
-      // same discipline the latch uses. Appending a second entry for the same
-      // window delivered TWO review prompts on drain, and the segment's own
-      // accounting (counters zeroed at the enqueue boundary) already said
-      // "one review for this segment".
-      const existing = deferredFallbackReviews.findIndex(entry => entry.sessionId === session.id && entry.kind === kind)
-      if (existing >= 0 || deferredFallbackReviews.length < DEFERRED_REVIEW_CAP) {
-        const entry = {
-          agent,
-          sessionId: session.id,
-          kind,
-          prompt: reviewPrompt(kind),
-          label: cadenceSummary(kind),
-          channel: 'inject' as const,
-          counts: signal as { toolCalls: number; userChars: number; assistantChars: number },
-        }
-        if (existing >= 0) deferredFallbackReviews[existing] = entry
-        else deferredFallbackReviews.push(entry)
-        return 'deferred'
+    branchSessions.add(childId)
+    const collected = { finalText: '', actions: [] as { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'error' }[], usage: undefined as { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined, error: undefined as string | undefined }
+    const onEvent = (owner: { id: SessionId }, event: SessionEvent): void => {
+      if (owner.id !== childId) return
+      if (event.type === 'tool/call') collected.actions.push({ type: 'tool', action: 'call', target: event.data.name, status: 'ok' })
+      if (event.type === 'assistant/message') {
+        const text = event.data.message.content.filter(block => block.type === 'text').map(block => block.text).join('')
+        if (text !== '') collected.finalText = text
+        if (event.data.usage !== undefined) collected.usage = { inputTokens: event.data.usage.inputTokens ?? 0, outputTokens: event.data.usage.outputTokens ?? 0, cacheReadTokens: event.data.usage.cacheReadTokens ?? 0, cacheWriteTokens: event.data.usage.cacheWriteTokens ?? 0 }
       }
-      // V27 R-01: the queue is at cap, so the prompt was NOT queued. Reporting
-      // 'deferred' here told every caller "already handled": the cadence flush
-      // dropped its latch and zeroed the counters, and this segment's only
-      // review vanished — no prompt, no event, no retry, no count. The
-      // completion channel's cap branch already rolls back; this one reports the
-      // truth so the caller can keep its latch and retry next boundary.
-      ctx.logger.warn(`dsh-evolution-review: deferred-review queue at cap (${DEFERRED_REVIEW_CAP}) — dropping one fallback review prompt`)
-      return 'dropped'
     }
-    reviewInFlight = true
-    try {
-      // One authoritative policy read (E-57): the former PolicyLike view and
-      // the inline memory/skill model table disagreed with each other; both
-      // now come from the single PolicySnapshot type. The policy is immutable
-      // for the life of the process, so a single read is valid after the run.
-      const snapshot = policy()
-      const model = kind === 'memory'
-        // V27 G2.4: same core constants as the policy schema — the review leg
-        // must not fall back to a model the policy would never have chosen.
-        ? snapshot?.memoryReviewModel ?? DEFAULT_MEMORY_REVIEW_MODEL
-        : snapshot?.skillReviewModel ?? DEFAULT_SKILL_REVIEW_MODEL
-      const reviewText = redactReviewSecrets(buildReviewRequest(
-        session,
-        kind,
-        signal as { toolCalls: number; userChars: number; assistantChars: number },
-        config.reviewContextMessages,
-        config.reviewMessageChars,
-        dispatchDigest.get(session.id) ?? [],
-      ))
-      const agentOptions: Record<string, string> = { model }
-      if (config.reviewProvider) agentOptions.provider = config.reviewProvider
-      // I-6 (v37) correction (v39): a scope-less `tools.get(name)` reads the
-      // GLOBAL layer only (core/tools/src/index.ts:1191 — omitted scope = the
-      // global view; the method never reads this.ctx). Model-visible tools are
-      // mounted by the PRESET layer, so a scope-less probe reports a real tool
-      // as missing and the old filter dropped it — the child then started with
-      // an empty allow-list, i.e. a tool-less review (measured: get('skill')
-      // undefined while get('skill', scope) is found). The child scope is the
-      // only place the answer exists, so the list is passed through unchanged;
-      // a name the child cannot restrict is the platform's own rejection and
-      // the caller's existing fallback owns it.
-      // W5 G3-S3: no scope-less tool probing — the CHILD preset owns the visible surface and
-      // the restricted-preset/restrictor path validates the allow set where it is actually applied.
-      const requestedReviewTools = config.reviewToolAllow ?? []
-      // v32 REV-06(b): snapshot the tree hashes BEFORE the subagent runs —
-      // the plan is authored against this state; executePlan refuses a
-      // full-content update whose target drifted while the review ran.
-      const preRunHashes = await treeSkillHashes()
-      // OPT-15 (2026-09): the evidence bound is the seq the plan was authored
-      // against — read it BEFORE the subagent runs, not after `run.result`.
-      // The post-run read let every event appended during the (≤120s) review
-      // window — which the model never saw — widen the accepted evidence
-      // range (the validator accepts any integer in [0, sessionSeq]).
-      const sessionSeqAtPlanTime = session.seq - 1
-      // Batch D (2026-09-27, design §3D): which frames the plan could call EVIDENCE, read at the
-      // SAME instant as the range above and for the same reason — an op must not be able to cite
-      // a frame that did not exist (or was not yet substantive) when the plan was authored.
-      // `undefined` when the log carries no seq at all (a stub session): the class rule then has
-      // nothing to say, which is not the same answer as "every frame is a boundary".
-      // 0.2.x: the boundary complement comes from the family's evolutionEvidence projection
-      // (evidence.ts keeps the pure reader and the one classification table both paths share).
-      const substantiveEvidenceSeqs = sessionEvidenceIndex(ctx, session)
-      // W5 G3-S3: ONE execution path. The channel owns the capability self-check, the restricted
-      // preset ensure/registration, activation, the timeout/abort composition and exactly-one
-      // dispose; this pipeline only maps the OUTCOME (no watchdog, no localAgent probe, no
-      // legacy subagents.start fallback).
-      const outcome = await reviewChannel.run<Set<string>>({
-        parent: agent,
-        label: 'dsh-evolution-review',
-        // C-07: the plan-persona text moves into the task prompt (the 0.2.1 request plane no
-        // longer carries persona; the restricted preset is the tool/authority carrier).
-        promptText: reviewText + '\n\n' + reviewPrompt(kind, 'plan'),
-        kind: 'reviewer',
-        allow: requestedReviewTools,
-        outputSchema: REVIEW_OUTPUT_SCHEMA,
-        maxDepth: config.reviewMaxDepth,
-        agentOptions,
-        timeoutMs: config.reviewTimeoutMs,
-        signal: fiberAbort.signal,
-        // Read-before-write evidence window: the child session is readable after the result
-        // settles and before the channel disposes the activation.
-        afterResult: (child) => {
-          const childSession = (child as { session?: Session }).session
-          return childSession === undefined ? new Set<string>() : new Set<string>(sessionReadNames(ctx, childSession) ?? [])
-        },
-      })
-      if (outcome.kind === 'aborted') {
-        // A timeout/fiber abort loses this turn's review; the caller falls back to inject, so the
-        // observable signal is the same one the removed watchdog used to emit.
-        try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
-          ctx.logger.warn('dsh-evolution-review: review-error emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
-        }
-        return false
-      }
-      if (outcome.kind === 'unavailable') {
-        if (!channelUnavailableWarned) {
-          channelUnavailableWarned = true
-          ctx.logger.warn('dsh-evolution-review: subagent channel unavailable (' + outcome.code + ': ' + outcome.reason + ') — reviews fall back to the inject path until the capability returns')
-        }
-        try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
-          ctx.logger.warn('dsh-evolution-review: review-error emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
-        }
-        return false
-      }
-      if (outcome.kind === 'no-structured') {
-        try { ctx.emit('evolution/review-error', { sessionId: session.id }) } catch (emitError) {
-          ctx.logger.warn('dsh-evolution-review: review-error emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
-        }
-        const stopDetail = typeof outcome.stopReason === 'string' ? outcome.stopReason : undefined
-        const diagDetail = typeof outcome.diagnostic === 'string' ? outcome.diagnostic : undefined
-        ctx.logger.warn('dsh-evolution-review: review subagent returned no structured plan' + (stopDetail !== undefined ? ' (stopReason=' + stopDetail + (diagDetail !== undefined ? '; ' + diagDetail : '') + ')' : ''))
-        return false
-      }
-      // v3-round self-check: the channel captured the child session before disposal (session
-      // events of the child never reach the parent, so this is the only evidence window).
-      const childReads = outcome.evidence ?? new Set<string>()
-      const plan: unknown = outcome.structured
-      const policyFingerprint = fingerprintPolicy(snapshot)
-      const validation = validateEvolutionPlan(plan as EvolutionPlan, {
-        sessionSeq: sessionSeqAtPlanTime,
-        // Batch D phase 1: the report-only dimension. `reports` never enters `ok`, so this
-        // changes no verdict — it makes the observation window readable in the operator log.
-        substantiveEvidenceSeqs,
-        maxOpsPerPlan: snapshot?.maxOpsPerPlan ?? DEFAULT_MAX_OPS_PER_PLAN,
-        protectedSkillNames: new Set(snapshot?.protectedSkillNames ?? []),
-        maxMemoryChars: snapshot?.memoryChars ?? DEFAULT_MEMORY_CHAR_LIMIT,
-        maxUserChars: snapshot?.userChars ?? DEFAULT_USER_CHAR_LIMIT,
-        maxSkillContentChars: snapshot?.skillContentChars ?? DEFAULT_SKILL_CONTENT_CHARS,
-      })
-      // Batch D (phase 1): the EVIDENCE_CLASS findings, said out loud and nowhere else. The
-      // model's notice is deliberately untouched — this dimension is not yet a decision, and a
-      // model-visible line would make it one (design §3D, §5.5).
-      if (validation.reports.length > 0) {
-        ctx.logger.warn(`dsh-evolution-review: ${validation.reports.length} op(s) cite only bookkeeping frames as evidence: ${validation.reports.map(report => report.reason).join('; ')}`)
-      }
-      // F19: the background review may only patch skills it read this session
-      // (read-before-write, matching the original Hermes background guard).
-      // Union of the PARENT session's reads and the review SUBAGENT's own reads.
-      const acceptedSkillOps = validation.accepted.skillOps ?? []
-      // The projection answers the parent's reads; `undefined` (an unfoldable view) falls back to
-      // the child's own reads alone, the same "cannot classify" posture the tool gate documents.
-      const readNames = new Set<string>([...(sessionReadNames(ctx, session) ?? new Set<string>()), ...childReads])
-      const skippedUnread = filterUnreadSkillOps(acceptedSkillOps, readNames)
-      const evidenceQuotes = [...validation.accepted.memoryOps ?? [], ...acceptedSkillOps]
-        .reduce((total, op) => total + (Array.isArray(op.evidence) ? op.evidence.length : 0), 0)
-        // V27 G4.3: ONE exit for the plan-outcome event. The payload used to be
-        // built inline at the very end of the happy path, so a write leg that
-        // TIMED OUT emitted nothing at all: replay and activity saw a review that
-        // did nothing while memory/skill had already been changed — the
-        // false-negative direction of the audit's R-04. `executePlan` reports each
-        // op the moment it lands (`onLanded`), so the timeout path can record the
-        // ops that really landed before the deadline. A synchronous throwing
-        // listener stays contained (V5-19③: it must not flip `started` and
-        // re-trigger the review).
-      type AppliedReport = { actions: readonly string[]; failedOps?: readonly string[]; executionError?: string | undefined }
-      const emitApplied = (report: AppliedReport): void => {
-        try {
-          ctx.emit('evolution/plan-applied', {
-            sessionId: session.id,
-            planId: randomUUID(),
-            policyFingerprint,
-            memoryApplied: report.actions.filter(action => action.startsWith('Memory')).length,
-            skillApplied: report.actions.filter(action => action.startsWith('Skill ')).length,
-            rejectedOps: validation.rejected.length,
-            // V27 R-03: "the plan named a skill this session never read" is its
-            // own dimension. Reporting it inside `rejectedOps` broke that field's
-            // stated contract (validation rejects only) and made the replay
-            // leaderboard penalize one refusal twice (rejectedOps weight AND the
-            // executionFailures dimension).
-            ...skippedUnread > 0 ? { skippedUnread } : {},
-            ...validation.reports.length > 0 ? { evidenceClassReports: validation.reports.length } : {},
-            executionFailures: report.failedOps?.length ?? 0,
-            ...report.executionError !== undefined ? { executionError: report.executionError } : {},
-            evidenceQuotes,
-            estimatedInputChars: reviewText.length,
-          })
-        } catch (emitError) {
-          ctx.logger.warn(`dsh-evolution-review: plan-applied emit failed: ${emitError instanceof Error ? emitError.message : String(emitError)}`)
-        }
-      }
-      // v20 (C-2): the write leg gets the same deadline class as the
-      // subagent leg (config value is schema-clamped ≤ 2^31-1). A timeout
-      // rejects into the pipeline catch below — the single-flight flag is
-      // reset in the finally either way, so the channel recovers instead of
-      // silently degrading to inject for the process lifetime.
-      const landed: string[] = []
-      // S2-10 (FLOW1-6): the deadline does NOT stop the abandoned write leg.
-      // An op can land AFTER the timeout, when the model has already been told
-      // the review failed — "the model thinks nothing landed while it actually
-      // did" is the most misleading outcome for later decisions. Every landing
-      // is recorded (the list is never discarded) and a late one is reported to
-      // the model as it happens; the plan's own op list bounds the notices.
-      let deadlineMissed = false
-      const lateLandings: string[] = []
-      const noteLanded = (action: string): void => {
-        landed.push(action)
-        if (!deadlineMissed) return
-        lateLandings.push(action)
-        const before = landed.length - lateLandings.length
-        const earlier = before > 0 ? ` (${before} other op(s) had landed before the deadline)` : ''
-        const count = lateLandings.length === 1 ? 'landed AFTER the review timed out' : `landed after the timeout (${lateLandings.length} late so far)`
-        deliverMessage(agent, `\u{1F4BE} Self-improvement review: ${action} ${count}${earlier} \u2014 reconcile before re-requesting the same change.`, 'self-improvement review late landing')
-      }
-      let executed: { actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }
+    const offEvent = ctx.on('session/event', onEvent)
+    emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'branch' })
+    void (async () => {
       try {
-        executed = await withTimeout(
-          executePlan(validation.accepted, session, noteLanded, preRunHashes, fiberAbort.signal),
-          config.reviewTimeoutMs,
-          'review plan execution',
-        )
+        const prompt = kind === 'memory' ? BRANCH_MEMORY_PROMPT : COMPLETION_SKILL_REVIEW_PROMPT
+        handle.agent.followup(createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'user' } }))
+        await handle.agent.whenIdle()
+        offEvent()
+        if (collected.finalText.trim() !== '') deliverMessage(agent, collected.finalText, 'branch review result', false)
+        try {
+          ctx.emit('evolution/review-completed', { version: 1, reviewId: childId, sessionId: session.id, branchSessionId: childId, kind, status: collected.error !== undefined ? 'failed' : timedOut ? 'timeout' : controller.signal.aborted ? 'aborted' : 'completed', trigger: { reason, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars }, finalText: collected.finalText, actions: collected.actions, ...(collected.usage === undefined ? {} : { usage: collected.usage }), startedAt, finishedAt: Date.now(), ...(collected.error === undefined ? {} : { error: collected.error }) })
+        } catch (emitError) { ctx.logger.warn('dsh-evolution-review: review-completed emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError))) }
       } catch (error) {
-        // V27 G4.3: the deadline hit mid-write. Everything in `landed` is a
-        // durable write that already happened, so it is recorded before the
-        // failure propagates (the review itself still fails loud).
-        deadlineMissed = true
-        emitApplied({
-          actions: landed,
-          executionError: `execution timed out after ${config.reviewTimeoutMs}ms`,
-        })
-        throw error
+        offEvent()
+        collected.error = error instanceof Error ? error.message : String(error)
+        ctx.logger.warn('dsh-evolution-review: branch review failed: ' + collected.error)
+      } finally {
+        clearTimeout(timer)
+        branchSessions.delete(childId)
+        await handle.dispose().catch(() => {})
+        const rerun = branchState.rerun
+        branchRunning.delete(session.id)
+        if (rerun !== undefined) void tryBranchReview(session, agent, rerun, signal, reason)
       }
-      const actions = executed.actions
-      if (actions.length > 0) {
-        const applied = actions.join(' · ')
-        // E-59d: on partial failure the model must know which ops already
-        // landed so it does not repeat them; the applied list stays explicit.
-        const failedNote = executed.failedOps.length > 0 ? ` 失败 ${executed.failedOps.length} 个：${executed.failedOps.join('；')}。` : ''
-        const note = executed.ok ? '' : `\n部分操作失败。${failedNote}以上操作已应用，请勿重复执行。`
-        // G4.4 (F-334): the result-notice inject is NOT a review-failure — the
-        // plan already landed in memory/skill, so a notification error must not
-        // fall through to the outer "review failed" catch and flip started to
-        // false (which would re-trigger a review inject → double review).
-        // 0.3.73: deliverMessage reports and warns on its own and never throws,
-        // so the separation is structural; the durable plan-applied emit below
-        // still records the execution truth.
-        deliverMessage(agent, `💾 Self-improvement review: ${applied}${note}`, 'self-improvement review')
-      } else {
-        // V6-24 (0.3.36): a zero-landing plan must not be silent — the model
-        // asked for a review and needs to know that nothing landed and WHY
-        // (staged by approval, rejected by validation, skipped as unread, or
-        // failed at execution). Same notification channel and budget as the
-        // applied notice (≤500 chars).
-        // 0.3.73: no try/catch — deliverMessage never throws and warns itself.
-        const reasons: string[] = []
-        if (validation.rejected.length > 0) reasons.push(`${validation.rejected.length} op(s) rejected by validation`)
-        if (skippedUnread > 0) reasons.push(`${skippedUnread} op(s) skipped (skill not read this session)`)
-        if (executed.failedOps.length > 0) reasons.push(`${executed.failedOps.length} op(s) failed at execution: ${executed.failedOps.join('; ')}`)
-        if (executed.aborted !== undefined) reasons.push(`execution aborted: ${executed.aborted}`)
-        if (reasons.length === 0) reasons.push('the review plan contained nothing executable')
-        let text = `💾 Self-improvement review: 0 ops landed. ${reasons.join(' ')}`
-        if (text.length > 500) text = `${text.slice(0, 497)}…`
-        deliverMessage(agent, text, 'self-improvement review')
-      }
-      // Process event, payload v2 (sessionId) — plan-outcome durability is the
-      // evolution-activity store's job; the session log stays native-only.
-      // Emitted AFTER the result-notice inject (E-41 ordering: record the
-      // outcome only once the model was told what landed) through the single
-      // `emitApplied` exit defined above (V27 G4.3).
-      emitApplied({
-        actions,
-        failedOps: executed.failedOps,
-        ...executed.aborted !== undefined
-          ? { executionError: executed.aborted }
-          : executed.failedOps[0] !== undefined ? { executionError: executed.failedOps[0] } : {},
-      })
-      return true
-
-    } catch (error) {
-      // A review pipeline failure must not crash the turn, but it should be
-      // visible. Log the reason so a silent "review never fires" is debuggable,
-      // and fall through to the synchronous inject path (caller returns false).
-      ctx.logger.warn(`dsh-evolution-review: subagent review failed: ${error instanceof Error ? error.message : String(error)}`)
-      // W5 G3-S3: watchdog-specific failure handling is gone — the channel maps timeout/abort
-      // and no-structured before returning; whatever still throws here is a pipeline defect.
-      return false
-    } finally {
-      reviewInFlight = false
-      // v20 (C-1): flush prompts deferred while the window was open — AFTER
-      // the reset, so the parent-model writer never overlaps the subagent
-      // writer. Delivery failures stay warn-only (best-effort, same as the
-      // caller-side fallback). V24-15 (v24): every flushed delivery also
-      // emits `review-scheduled` with its channel — the drain previously
-      // delivered silently, a hole in the emission contract.
-      const deferred = deferredFallbackReviews.splice(0)
-      for (const {
-        agent: waitingAgent, sessionId: entrySession, kind: waitingKind,
-        prompt, label, channel, counts: entryCounts,
-      } of deferred) {
-        // V25-03 (v25): a failed COMPLETION delivery rolls the session's
-        // completionInjected flag back (V4-21 parity with the direct inject
-        // path) — otherwise the flag blocks the only retry and the session's
-        // one completion review is permanently lost in-process.
-        // S2-7 (FLOW1-2): the same for the inject channel. The entry was queued
-        // while a review was in flight, and its own boundary had already
-        // consumed the latch and zeroed the counters — without this rollback a
-        // failed drain delivery was ZERO reviews for that segment, silently.
-        // The latch (not the counters) is the retry vehicle: re-arming it makes
-        // the next completed boundary deliver the stashed kind, while rolling
-        // the counters back would re-fire the interval and double-review.
-        if (!deliverMessage(waitingAgent, prompt, label, true)) {
-          if (channel === 'completion') completionInjected.delete(entrySession)
-          else pendingCadenceReviews.set(entrySession, waitingKind)
-          continue
-        }
-        // V25-02 (v25): attribute the emit to the ENTRY's session and use
-        // the ENTRY's captured count window — this drain runs inside the
-        // in-flight review's closure, whose session/signal belong to a
-        // different review.
-        emitReviewScheduled(ctx, {
-          sessionId: entrySession,
-          kind: waitingKind,
-          toolCalls: entryCounts.toolCalls,
-          userChars: entryCounts.userChars,
-          assistantChars: entryCounts.assistantChars,
-          channel,
-        })
-      }
-    }
-  }
-
-  async function executePlan(
-    plan: EvolutionPlan,
-    session?: Session,
-    /** V27 G4.3: called the moment an op lands, so a caller that abandons this
-     * run (the write leg's timeout) can still record what really happened. */
-    onLanded?: (action: string) => void,
-    /** v32 REV-06(b): content hash of every tree skill at REVIEW START. A
-     * skill whose live hash differs at execute time changed while the review
-     * ran — the plan was authored against the pre-run snapshot, so its
-     * full-content writes are refused as stale (read->execute generation gap:
-     * the subagent's read-time hash is not plumbed through the plan). */
-    preRunHashes?: Map<string, string>,
-    /** T3-09/A37: the owning fiber's lifetime. An aborted signal stops the plan at the next op
-     * boundary — the posture curator's disposed gate takes before its writes. */
-    signal?: AbortSignal,
-  ): Promise<{ actions: string[]; ok: boolean; failedOps: string[]; aborted?: string }> {
-    const sessionId = session?.id
-    const memory = ctx.get('memory') as MemoryLike | undefined
-    const approval = ctx.get('evolutionApproval') as ApprovalLike | undefined
-    // v23 (AP-3): read-only library for the stage-time staleness hash attached
-    // to full-content skill updates (see the ops loop below). Null when the io
-    // registry is absent — the hash is then simply not attached.
-    const hashLibrary = (() => {
-      const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-      if (!io) return null
-      return newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rootConfig, io: evolutionIoAdapter(() => io.provider()) })
     })()
-    // The review pipeline IS the review channel on both surfaces (rc.44 M2-2.3).
-    const origins = resolveOrigins(undefined, true)
-    const actions: string[] = []
-    const failedOps: string[] = []
-    let ok = true
-    // V4-21 (F-334 residual): an op can throw an IO exception (not return
-    // ok:false). Some ops may already have landed before the throw, so the
-    // whole plan is a PARTIAL application — catch and return the accrued
-    // `actions` with ok:false rather than letting the throw escape to the
-    // subagent-review catch (which would report started=false and make the
-    // caller re-inject the same kind, re-requesting an already-landed change).
-    // V5-19 (0.3.31): non-throw op failures are recorded too — a plan where
-    // every op failed silently used to emit nothing but an empty-applied
-    // message; the failure dimension now surfaces on the event AND a warn.
-    try {
-      for (const op of plan.memoryOps ?? []) {
-        // T3-09/A37 (root fix): the owner is checked SYNCHRONOUSLY as well as through the signal.
-        // A disposed fiber reports uid === null (cordis fiber.d.ts: null once disposed), so the
-        // boundary no longer depends on when the abort signal happens to arrive — the race that let
-        // the second op land after an unload is closed. A context without a fiber keeps the old
-        // signal-only behaviour.
-        if (ctx.fiber.uid === null || signal?.aborted === true) {
-          const reason = 'the review was unloaded mid-plan'
-          ctx.logger.warn(`dsh-evolution-review: executePlan stopped at an op boundary after ${actions.length} op(s): ${reason}`)
-          return { actions, ok: false, failedOps, aborted: reason }
-        }
-        // C4 (v15): a validator-bypassed op is RECORDED, not silently dropped —
-        // it lands in failedOps (warn + zero-landing notice) so a loosened
-        // validator contract can never make an op evaporate without a trace.
-        if (!Array.isArray(op.evidence) || op.evidence.length === 0) {
-          ok = false
-          failedOps.push(`memory ${op.action ?? 'add'} ${op.target}: missing evidence (defense-in-depth rejection)`)
-          continue
-        }
-        const target: 'memory' | 'user' = op.target === 'user' ? 'user' : 'memory'
-        const normalized = { target, action: op.action ?? 'add', facts: payloadText(op), old_text: op.old_text }
-        const result = approval
-          ? await runApproved('memory', `memory ${normalized.target} ${normalized.action}`, normalized, normalized, session)
-          : await memory?.applyBatch(normalized.target, [normalized])
-        if (result?.ok) { actions.push('Memory updated'); onLanded?.('Memory updated') }
-        else {
-          ok = false
-          failedOps.push(`memory ${normalized.action} ${normalized.target}: ${result?.message ?? 'service unavailable'}`)
-        }
-      }
-      for (const op of plan.skillOps ?? []) {
-        // T3-09/A37: the same op-boundary stop as the memory loop — one check per op, no partial
-        // plan continuing to write after its owner is gone.
-        // T3-09/A37 (root fix): the owner is checked SYNCHRONOUSLY as well as through the signal.
-        // A disposed fiber reports uid === null (cordis fiber.d.ts: null once disposed), so the
-        // boundary no longer depends on when the abort signal happens to arrive — the race that let
-        // the second op land after an unload is closed. A context without a fiber keeps the old
-        // signal-only behaviour.
-        if (ctx.fiber.uid === null || signal?.aborted === true) {
-          const reason = 'the review was unloaded mid-plan'
-          ctx.logger.warn(`dsh-evolution-review: executePlan stopped at an op boundary after ${actions.length} op(s): ${reason}`)
-          return { actions, ok: false, failedOps, aborted: reason }
-        }
-        // C4 (v15): see the memory loop — recorded, never silently dropped.
-        if (!Array.isArray(op.evidence) || op.evidence.length === 0 || !op.name) {
-          ok = false
-          failedOps.push(`skill ${op.action ?? 'patch'} ${op.name ?? '<unnamed>'}: missing evidence or name (defense-in-depth rejection)`)
-          continue
-        }
-        const args = { ...op, evidence: op.evidence }
-        // The skill writer rejects a body whose first line is not `---`; a model-authored
-        // create/update can be otherwise perfect. Repair at this execution boundary (both
-        // the direct and approved paths use `args`), leave an existing header byte-identical,
-        // and make the repair observable in the host log.
-        if ((args.action === 'create' || args.action === 'edit' || args.action === 'update') && typeof args.content === 'string' && typeof args.name === 'string') {
-          const repaired = ensureSkillFrontmatter(args.content, args.name, (args as { description?: string }).description)
-          if (repaired.repaired) {
-            args.content = repaired.content
-            ctx.logger.warn(`dsh-evolution-review: synthesized missing SKILL.md frontmatter for ${args.name}`)
-          }
-        }
-        // v23 (AP-3): stage-time staleness hash for full-content updates —
-        // same contract as the tool's staging (the runner refuses a replay
-        // whose live content no longer matches). Review ops re-read through a
-        // lightweight read-only library; patch ops carry old_string anchors
-        // and get no stage-time hash — their drift check happens at execute
-        // time against the pre-run snapshot (OPT-16, see the hash gate below).
-        // P1-13 (v37): the read answers `undefined` when the target cannot be read
-        // (no anchor — 'absent' would be a false claim about bytes nobody read) and
-        // `null` when the target does not exist yet, which now anchors as the
-        // 'absent' sentinel exactly like the tool channel (see the attach below).
-        let stagedBytes: string | null | undefined
-        if ((args.action === 'update' || args.action === 'edit') && hashLibrary && typeof args.name === 'string' && args.name !== '') {
-          // S4-01 (G0/0.7): REFUSE, do not silently drop the anchor. Anchoring `absent` would be a false
-          // claim about bytes nobody read - that part of the old rationale stands - but "no anchor at all"
-          // is weaker than refusing: the replay guard then has nothing to compare against, so a plan that
-          // ran while the live content changed can still be replayed. An unreadable target fails this op.
-          const probe = await hashLibrary.readSkillProbe(args.name)
-          if (isUnknown(probe)) {
-            ok = false
-            failedOps.push(`skill ${args.action} ${args.name}: target is unreadable (${probe.reason}); refusing to stage an unverifiable anchor`)
-            continue
-          }
-          stagedBytes = isPresent(probe) ? probe.value : null
-        }
-        // v30 REV-03: support-file ops carry the same anchor — the staged sha
-        // covers the file's current bytes (or the 'absent' sentinel), which
-        // the tool-side replay guard verifies before overwriting.
-        if ((args.action === 'write_file' || args.action === 'remove_file') && hashLibrary && typeof args.name === 'string' && args.name !== '' && typeof args.file_path === 'string' && args.file_path !== '') {
-          // S4-01 (G0/0.7): same posture as the skill read above - an unreadable support file REFUSES the
-          // op; a truly absent one anchors 'absent' (null).
-          const supportProbe = await hashLibrary.readSupportFileProbe(args.name, args.file_path)
-          if (isUnknown(supportProbe)) {
-            ok = false
-            failedOps.push(`file ${args.action} ${args.name}/${args.file_path}: target is unreadable (${supportProbe.reason}); refusing to stage an unverifiable anchor`)
-            continue
-          }
-          const stageFile: string | null = isPresent(supportProbe) ? supportProbe.value : null
-          ;(args as { staged_from_sha256?: string }).staged_from_sha256 = stageFile === null ? 'absent' : contentHash(stageFile)
-        }
-        // v32 REV-06(b): pre-run hash comparison — the plan was authored
-        // against the run-start snapshot; a skill whose live hash differs now
-        // was changed WHILE the review ran (foreground session or another
-        // process). Refuse the full-content write so the concurrent writer's
-        // work is not clobbered (both-writers-success eliminated on this
-        // channel). Runs for BOTH the direct and the staged path.
-        const opName = typeof args.name === 'string' ? args.name : ''
-        // OPT-16 (2026-09): patch ops join the REV-06(b) staleness gate. They
-        // previously skipped it on the theory that old_string anchors carry
-        // their own protection — but a patch applies whenever the anchor
-        // still OCCURS, so a rewritten v2 that retained the anchor sentence
-        // took the patch on top of content the review never saw (the exact
-        // concurrent-writer window this gate exists for). Same refusal
-        // wording and fail-closed reading as update/edit.
-        const hashChecked = (args.action === 'update' || args.action === 'edit' || args.action === 'patch') && opName !== '' && preRunHashes?.has(opName) === true
-        // P1-13 (v37): reuse the staging bytes only when the pre-run gate has
-        // checked them; `stagedBytes === undefined` (unreadable target) is neither
-        // a hash anchor nor the 'absent' sentinel, so it re-reads below as before.
-        const anchored: string | null = hashChecked && typeof stagedBytes === 'string' ? stagedBytes : null
-        // S1-C2: when the staging read FAILED (stagedBytes === undefined) but
-        // the gate's fresh read succeeded and hash-matched, those verified
-        // bytes become the anchor source — previously the attach below saw
-        // `null ?? undefined` and stamped the 'absent' sentinel, so the library
-        // deterministically refused an update it had just verified as current.
-        let gateVerifiedBytes: string | null = null
-        if (hashChecked) {
-          // C10 (v35): the staging read above already holds this skill's bytes —
-          // for update/edit ops nothing awaited in between — so the pre-run
-          // comparison reuses them instead of issuing a second read of the same
-          // file (a null here also covers the no-library case, as before).
-          // OPT-16: patch ops were never stage-read; they read the CURRENT
-          // bytes fresh (a null reads as drift and refuses, fail-closed).
-          const live = anchored !== null
-            ? anchored
-            // G0/0.7 (S4-01 sweep): named three-state read - `unknown` answers null exactly as the swallow did
-          // (both mean "cannot be verified here", and the caller refuses on null), so the behaviour is the same.
-            : await (async () => {
-              if (hashLibrary === null) return null
-              const probed = await hashLibrary.readSkillProbe(opName)
-              return isPresent(probed) ? probed.value : null
-            })()
-          const preRun = preRunHashes.get(opName)
-          if (live === null || (preRun !== undefined && contentHash(live) !== preRun)) {
-            ok = false
-            failedOps.push(`skill ${args.action} ${args.name}: the skill changed while this review ran — ${args.action === 'patch' ? 'patch' : 'update'} refused as stale; produce a fresh plan`)
-            continue
-          }
-          if (anchored === null) gateVerifiedBytes = live
-        }
-        // P1-13 (v37): attach AFTER the staleness gate so a refused op stages
-        // nothing. `anchored` holds the bytes the gate verified; the staging read
-        // stands in when the gate never ran (no pre-run snapshot for this skill),
-        // and S1-C2 adds the gate's own verified re-read when the staging read
-        // failed: an absent target still anchors as 'absent' (null) and a
-        // verified-current target anchors with its real bytes.
-        const anchorBytes = anchored ?? gateVerifiedBytes ?? stagedBytes
-        if ((args.action === 'update' || args.action === 'edit') && anchorBytes !== undefined) {
-          (args as { staged_from_sha256?: string }).staged_from_sha256 = anchorBytes === null ? 'absent' : contentHash(anchorBytes)
-        }
-        // The registered skill runner expects the { operation, origin } wrapper;
-        // passing it on both the pending record and the replay keeps the
-        // background_review origin in the approval-disabled (default) path too.
-        const runnerArgs = { operation: args, origin: origins.library }
-        const result = approval
-          ? await runApproved('skill', `skill ${op.action ?? 'patch'} ${op.name}`, runnerArgs, runnerArgs, session)
-          : await executeSkillDirect(args)
-        if (result?.ok) {
-          actions.push(`Skill ${op.name} ${op.action ?? 'patch'}`)
-          onLanded?.(`Skill ${op.name} ${op.action ?? 'patch'}`)
-          // v33 F-4, corrected: the pre-run baseline is refreshed ONLY here —
-          // after a write THIS PLAN actually landed, from the bytes now on disk.
-          // The first cut refreshed it before the comparison and even when the op
-          // was refused as stale, so a plan with TWO ops on one skill (the very
-          // case this exists for) re-based op 2 onto a concurrent writer's bytes
-          // and let it overwrite them. A concurrent write landing between ops
-          // still mismatches the landed baseline and is refused.
-          if (hashChecked) {
-            // G0/0.7 (S4-01 sweep): explicit three-state read; `unknown` (and a missing library) leaves the
-          // hash unrecorded, which is the behaviour this line already had.
-            const landedProbe = hashLibrary === null ? undefined : await hashLibrary.readSkillProbe(opName)
-            const landed = landedProbe !== undefined && isPresent(landedProbe) ? landedProbe.value : null
-            if (landed !== null) preRunHashes.set(opName, contentHash(landed))
-          }
-        }
-        else {
-          ok = false
-          failedOps.push(`skill ${op.action ?? 'patch'} ${op.name}: ${result?.message ?? 'service unavailable'}`)
-        }
-      }
-      // V5-19: a failed execution is observable on the operator side — every
-      // failure, and loudly so when NOTHING landed (the old code was silent).
-      if (failedOps.length > 0) {
-        ctx.logger.warn(`dsh-evolution-review: executePlan ${actions.length === 0 ? 'no op landed' : `${actions.length} op(s) landed, ${failedOps.length} failed`}: ${failedOps.join('; ')}`)
-      }
-      return { actions, ok, failedOps }
-    } catch (error) {
-      // Partial application: the ops that landed stay in `actions` so the caller
-      // emits them (plan-applied) and tells the model what NOT to repeat.
-      const reason = error instanceof Error ? error.message : String(error)
-      ctx.logger.warn(`dsh-evolution-review: executePlan aborted mid-way after ${actions.length} ops landed: ${reason}`)
-      return { actions, ok: false, failedOps, aborted: reason }
-    }
-
-    async function runApproved(kind: 'memory' | 'skill', summary: string, stored: unknown, runnerArgs: unknown, approvalSession?: Session): Promise<{ ok: boolean; message: string } | undefined> {      if (!approval) return undefined
-      // P1-9 pre-check: with approval ENABLED but no registered runner for
-      // this kind (host-only compositions mount no tool runners), staging
-      // would create a pending record that no approver could ever replay.
-      // Enabled approval is an explicit operator gate on autonomous writes -
-      // with no runner there is no approval path, so the write is REFUSED
-      // (fail closed) rather than staged or silently executed. It becomes
-      // answerable again as soon as a tool that registers the runner mounts.
-      if (approval.isEnabled === true && !approval.hasRunner(kind)) {
-        ctx.logger.warn(`dsh-evolution-review: approval enabled but no replay runner registered for kind "${kind}" - skipping write (${summary})`)
-        return { ok: false, message: `已启用批准，但没有为类型「${kind}」注册回放运行器；已跳过写入（请挂载提供该能力的工具，或禁用批准）。` }
-      }
-      const decision = await approval.request({
-        kind, summary, args: stored, origin: origins.approval,
-        ...sessionId ? { sessionId } : {},
-        ...approvalSession ? { session: approvalSession } : {},
-      })
-      if (decision.action === 'staged') return { ok: false, message: decision.message }
-      // The staged service is mounted but DISABLED (the default deployment),
-      // and host-only compositions mount no tool runners — replaying would
-      // return "No replay runner registered" for every op. Execute directly
-      // with the explicit background_review origin instead.
-      if (approval.isEnabled === false) return await runnerDirect(kind, runnerArgs)
-      // 0.3.17 (S3.2): the replay channel requires the declared background
-      // review intent.
-      return await approval.run(kind, runnerArgs, { interface: 'background_review' })
-    }
-
-    /** Direct execution for the approval-disabled case (parallel to executeSkillDirect). */
-    async function runnerDirect(kind: 'memory' | 'skill', args: unknown): Promise<{ ok: boolean; message: string } | undefined> {
-      if (kind === 'memory') {
-        const memory = ctx.get('memory') as { applyBatch?(target: 'memory' | 'user', ops: unknown[]): Promise<{ ok: boolean; message: string }> } | undefined
-        const op = args as { target?: string; action?: string; facts?: string; content?: string; old_text?: string }
-        if (!memory?.applyBatch) return undefined
-        return await memory.applyBatch(op.target === 'user' ? 'user' : 'memory', [
-          { action: op.action ?? 'add', facts: payloadText(op), old_text: op.old_text },
-        ])
-      }
-      const wrapped = (args ?? {}) as { operation?: SkillOp }
-      if (!wrapped.operation) return undefined
-      return await executeSkillDirect(wrapped.operation)
-    }
-
-    /**
-     * Approval-disabled path: execute the skill op through SkillLibrary with an
-     * EXPLICIT background_review origin. Going through ctx.tools.execute would
-     * make tool-skill-manage infer origin from the parent agent's header
-     * (not 'subagent'), silently escaping the .hermes-managed marker and the
-     * pinned write guard.
-     */
-    async function executeSkillDirect(skillArgs: SkillOp): Promise<{ ok: boolean; message: string }> {
-      const io = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-      if (!io) return { ok: false, message: 'evolution-io 服务未挂载' }
-      // V10-11 (P2-7): the review's background writes previously constructed
-      // the library on the hardcoded default root, so a custom-root deployment
-      // wrote skills into a tree the catalog/tools never read. Route through
-      // the single core resolver (an empty `root` = default root; the retired
-      // `skillsRoot` alias never reaches here — the load refuses it).
-      // v30 REV-04: the library limits come from the policy snapshot's
-      // `skillContentChars` — the v28-era construction passed `undefined` and
-      // ran on DEFAULT_SKILL_LIMITS, so the approval-disabled autonomous
-      // channel wrote up to 10x the configured tool limit.
-      const policySnapshot = policySnapshotOf(ctx.get('evolutionPolicy'))
-      // G1/1.3 (S3-02): this is the review pipeline BACKGROUND WRITE, and it used to declare itself
-      // `foreground` - the one value that switches POLICY_PROTECTION, read-before-write, the .pinned
-      // guard, the authorship mark and staging off. The authority now comes from the SAME resolver the
-      // ops loop above uses (its own comment: "the review pipeline IS the review channel on both
-      // surfaces"), so there is no second answer and no literal to keep in step.
-      const library = newSkillLibrary({ authority: authorityFrom({ origin: resolveOrigins(undefined, true).library }),
-        config: rootConfig,
-        io: evolutionIoAdapter(() => io.provider()),
-        limits: {
-          ...DEFAULT_SKILL_LIMITS,
-          // 0.5.0 (§16.7): stage selectors ride the policy snapshot.
-          ...policyStageLimits(policySnapshot),
-          maxSkillContentChars: policySnapshot?.skillContentChars ?? DEFAULT_SKILL_LIMITS.maxSkillContentChars,
-        },
-        ctx,
-      })
-      const op = skillArgs
-      const name = op.name ?? ''
-      const origin: WriteOrigin = origins.library
-      // v30 REV-02: the immutable policy's protected list is enforced at plan
-      // validation, but the approval replay and this direct path execute
-      // STORED plans — a plan accepted under an older policy must not land on
-      // a skill the CURRENT policy protects. Foreground (operator) writes are
-      // deliberately not gated by this list.
-      const protectedNames = policySnapshot?.protectedSkillNames
-      if (origin !== 'foreground' && protectedNames?.includes(name) && op.action !== 'create') {
-        return { ok: false, message: `技能「${name}」受当前策略保护（protectedSkillNames）：拒绝自主写入。` }
-      }
-      if (op.action === 'create') {
-        // The direct path (approval-disabled deployments) must keep the same
-        // lifecycle entry as the runner: an agent-created record so the
-        // curator actually manages the skill.
-        const created = await library.create(name, op.content ?? '', origin)
-        if (created.ok) {
-          const usageRegistry = ctx.get('skillUsage') as { markAgentCreated?(name: string): Promise<void> } | undefined
-          await usageRegistry?.markAgentCreated?.(name)
-        }
-        return created
-      }
-      if (op.action === 'edit' || op.action === 'update') {
-        // v30 REV-01 → v35 C9: this direct path (approval-disabled DEFAULT) used
-        // to compare the staging anchor against its own lock-free read, then call
-        // the library — a concurrent foreground patch landing in between was
-        // silently lost with BOTH writers reporting success. The anchor now rides
-        // the library call and is verified against the bytes read under the
-        // write's own lock.
-        const updated = await library.update(name, op.content ?? '', origin, anchorOf(op))
-        if (updated.stale === true) return staleRefusal(updated, name, op.file_path)
-        // v30 TSM-04: keep the mutation-maturity accounting aligned with the
-        // runner path, which bumps patch_count for every content write.
-        // v43 audit (FLOW4-2 / D-1): a NO-OP write must not be recorded. The
-        // skill-store result for unchanged content is { ok: true, noop: true,
-        // 'nothing written' }, and recording it bumped patch_count AND refreshed
-        // last_patched_at — the recency factor then read 1 for 30 days and
-        // suppressed the low-quality warn for a skill nobody touched. The tool
-        // channel guards on result.noop !== true; this path must match it.
-        if (updated.ok && updated.noop !== true) {
-          const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
-          await usageRegistry?.record?.(name, 'patch').catch(() => {})
-        }
-        return updated
-      }
-      if (op.action === 'patch') {
-        // S1-C1: the plan's replace_all now flows through (the tool channel
-        // documents this flag to the model; the executor hardcoded
-        // first-occurrence-only, so the plan's intent silently shrank).
-        const patched = await library.patch(name, op.old_string ?? '', op.new_string ?? '', op.file_path ?? '', op.replace_all === true, origin)
-        // v30 TSM-04: same accounting parity as the runner path.
-        // v43 audit (FLOW4-2 / D-1): same no-op guard as the update path — an
-        // unchanged old_string/new_string pair writes nothing and must not read
-        // as activity.
-        if (patched.ok && patched.noop !== true) {
-          const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
-          await usageRegistry?.record?.(name, 'patch').catch(() => {})
-        }
-        return patched
-      }
-      if (op.action === 'delete') {
-        const into = (op.absorbed_into ?? '').trim()
-        if (!into || !(await library.read(into))) {
-          return { ok: false, message: '删除需要一个已存在的 absorbed_into 目标' }
-        }
-        const archived = await library.archive(name, { absorbedInto: into })
-        if (archived.ok) {
-          // The direct path (approval-disabled deployments) must keep the same
-          // lifecycle state as the runner: archiving is a state transition,
-          // and without markArchived the usage record stays active/stale so
-          // every later curator run treats the missing directory as a
-          // candidate and errors forever (rc.39 audit §4-A).
-          const usageRegistry = ctx.get('skillUsage') as { markArchived?(name: string): Promise<void> } | undefined
-          await usageRegistry?.markArchived?.(name)
-        }
-        return archived
-      }
-      // P3 (v16): no `?? op.content` fallback — the validator (plan-validator
-      // write_file gate) and the approval runner (tool-skill-manage) are both
-      // file_content-only; the fallback here was a dead-but-divergent branch.
-      // v31 REV-05 → v35 C9: the support-file anchor rides the library call for
-      // the same reason as the body anchor above; the second lock-free copy of
-      // this check (it used to run twice on this path) is gone with it.
-      if (op.action === 'write_file' || op.action === 'remove_file') {
-        const anchor = anchorOf(op)
-        if (op.action === 'write_file') {
-          const written = await library.writeSupportFile(name, op.file_path ?? '', op.file_content ?? '', origin, anchor)
-          if (written.stale === true) return staleRefusal(written, name, op.file_path)
-          return written
-        }
-        const removedSupport = await library.removeSupportFile(name, op.file_path ?? '', origin, anchor)
-        if (removedSupport.stale === true) return staleRefusal(removedSupport, name, op.file_path)
-        // v30 TSM-04 parity: support-file removals mutate the skill package.
-        // v43 audit (FLOW4-2 / D-1): a support-file removal that changed
-        // nothing (noop) is not a mutation either.
-        if (removedSupport.ok && removedSupport.noop !== true) {
-          const usageRegistry = ctx.get('skillUsage') as { record?(name: string, kind: 'patch'): Promise<void> } | undefined
-          await usageRegistry?.record?.(name, 'patch').catch(() => {})
-        }
-        return removedSupport
-      }
-      if (op.action === 'restructure') {
-        const moves = (op.restructure ?? [])
-          .filter((move): move is { heading?: string; to_file?: string } => move !== null)
-          .map(move => ({ heading: move.heading ?? '', toFile: move.to_file ?? '' }))
-        return await library.restructure(name, moves, origin)
-      }
-      return { ok: false, message: `未知的技能动作「${op.action ?? ''}」` }
-    }
+    return true
   }
 
   ctx.effect(() => () => {
@@ -2031,7 +1068,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // signal, and the write leg stops at its next op boundary instead of landing writes for a
     // plugin instance that no longer exists (the HMR-reload window the author already recorded for
     // the deferred queue, now closed for the run that is actually in flight).
-    fiberAbort.abort()
     // V7-16 (0.3.44) hand-listed these clears because the 0.3.38-0.3.42
     // additions were missing from the list. S2-2 clears what registered at its
     // declaration instead: one collection, one registration, and
@@ -2062,11 +1098,6 @@ export function shouldCompletionReview(reason: { kind?: string } | undefined, se
  * @param op - one accepted plan op.
  * @returns the anchor, or `undefined` when the op carries none.
  */
-function anchorOf(op: unknown): WriteAnchor | undefined {
-  const expected = (op as { staged_from_sha256?: unknown }).staged_from_sha256
-  if (typeof expected !== 'string' || expected === '') return undefined
-  return expected === 'absent' ? { absent: true } : { sha256: expected }
-}
 
 /**
  * Translate the library's anchor refusal into this channel's staging wording.
@@ -2080,17 +1111,6 @@ function anchorOf(op: unknown): WriteAnchor | undefined {
  * @param filePath - the support-file path for file ops; omitted for body ops.
  * @returns the refusal to return from the direct path.
  */
-function staleRefusal(result: SkillActionResult, name: string, filePath?: string): SkillActionResult {
-  if (filePath === undefined && result.anchor === 'missing') {
-    return { ok: false, message: `技能「${name}」不存在。` }
-  }
-  return {
-    ok: false,
-    message: filePath === undefined
-      ? `Skill "${name}" changed since this plan was produced — the full-content update was refused as stale. Re-read the skill and produce a fresh plan.`
-      : `Support file "${filePath}" of "${name}" changed since this plan was produced — the staged file operation was refused as stale. Re-read the skill tree and produce a fresh plan.`,
-  }
-}
 
 
 /** Map/set size that triggers a dead-session counter sweep (bounded, not a hard cap). */
@@ -2154,33 +1174,7 @@ export function sweepDeadSessionEntries<K>(entries: Map<K, unknown> | Set<K>, is
 }
 
 
-function fingerprintPolicy(snapshot: unknown): string | undefined {
-  try {
-    return createHash('sha256').update(JSON.stringify(snapshot)).digest('hex').slice(0, 12)
-  } catch {
-    return undefined
-  }
-}
 
-// V10-10 (P2-11): minimal LOCAL structural types for the upstream rc.2
-// tool-result payload (`SessionEventMap['tool/result']` = `{ turn, step,
-// message: ToolResultMessage, error?, meta? }`) and its `ToolResultBlock`
-// (`{ type: 'tool-result', toolCallId, content: ContentBlock[], isError? }`).
-// Deliberately NOT an upstream type dependency (the mirror tree has no
-// upstream node_modules); only the fields read below are declared.
-interface ToolResultEventDataLike {
-  error?: unknown
-  message?: {
-    content?: Array<{
-      type?: string
-      isError?: boolean
-      /** Tolerated legacy/alternative shape: text directly on the block. */
-      text?: string
-      /** Upstream ToolResultBlock: the payload text lives in inner text blocks. */
-      content?: Array<{ type?: string; text?: string }>
-    }>
-  }
-}
 
 /**
  * The call one log event ANSWERS, in either platform vocabulary.
@@ -2200,196 +1194,4 @@ function resultCallIdOf(event: { type?: string; data?: unknown } | undefined): s
   if (typeof native === 'string') return native
   if (typeof data.subCallId === 'string' && typeof data.isError === 'boolean') return data.subCallId
   return null
-}
-
-/**
- * V10-10 (P2-11) / A1 (audit P1-1): render one `[result]` evidence line from
- * a tool-result event payload. The former read (`data.output`) targeted a
- * field that does not exist on the rc.2 payload; the current contract covers
- * BOTH rc.2 result shapes:
- *   - native `tool/result`: the outcome lives in `message.content`
- *     tool-result blocks (inner text blocks joined); a failure is marked by
- *     the payload-level `error` OR a block-level `isError`;
- *   - PTC `tool/ptc-dispatch` settle: the outcome lives at the TOP level —
- *     `content` is the logged ContentBlock list and `isError` the flag; there
- *     is no `message` wrapper. (Before A1 this shape rendered an empty line,
- *     so every PTC session's evidence block starved while its plan prompt
- *     still demanded evidence.)
- * The legacy pre-rc.2 shape (neither `message` nor a PTC settle marker) is
- * tolerated as an empty payload — it never throws. `identity`, when given, is
- * the dispatched tool's name + raw arguments, prepended so a settled dispatch
- * keeps the call identity its `[call]` line would have had. Budget: 500 chars
- * per line (the 12-line cap lives in buildReviewRequest and is unchanged).
- */
-export function renderToolResultLine(data: unknown, identity?: { name: string; argsRaw: string }, seq?: number): string {
-  const shape = data as (ToolResultEventDataLike & {
-    subCallId?: unknown
-    isError?: unknown
-    content?: unknown
-  }) | undefined
-  const nativeContent = shape?.message?.content
-  const resultBlocks = Array.isArray(nativeContent) ? nativeContent.filter(block => block.type === 'tool-result') : []
-  let output: string
-  let failed: boolean
-  if (shape?.message !== undefined) {
-    output = resultBlocks
-      .map(block => Array.isArray(block.content)
-        ? block.content
-          .map(inner => inner.type === 'text' && typeof inner.text === 'string' ? inner.text : '')
-          .join(' ')
-        : (typeof block.text === 'string' ? block.text : ''))
-      .join(' ')
-      .trim()
-    failed = Boolean(shape.error) || resultBlocks.some(block => block.isError === true)
-  } else if (typeof shape?.subCallId === 'string' && typeof shape.isError === 'boolean') {
-    output = textOfLoggedContent(shape.content)
-    failed = shape.isError
-  } else {
-    output = ''
-    failed = false
-  }
-  // T3-03/A31: the tool NAME, its arguments and its output are all
-  // session-ingested text; only this line's own `[result]` tag is ours.
-  const head = identity === undefined
-    ? ''
-    : `${foldUntrustedLines(identity.name, 0)} ${foldUntrustedLines(identity.argsRaw, 200)} → `
-  const failure = failed ? ' [ERROR]' : ''
-  const tag = seq === undefined ? '' : 'seq=' + String(seq) + ' '
-  return tag + '[result]' + failure + ' ' + head + foldUntrustedLines(output, 500)
-}
-
-/** Text of a PTC settle `content` payload (the logged ContentBlock list):
- * text blocks and plain strings joined, anything else skipped. */
-function textOfLoggedContent(content: unknown): string {
-  if (typeof content === 'string') return content.trim()
-  if (!Array.isArray(content)) return ''
-  return content
-    .map((block) => {
-      if (typeof block === 'string') return block
-      if (block !== null && typeof block === 'object') {
-        const candidate = block as { type?: unknown; text?: unknown }
-        if (candidate.type === 'text' && typeof candidate.text === 'string') return candidate.text
-      }
-      return ''
-    })
-    .join(' ')
-    .trim()
-}
-
-/**
- * PLAN S4.1 (2026-09-16, audit P2-12): text of one persisted content block,
- * or `''` for any other shape. Content blocks cross the durable session-log
- * boundary, so their runtime shape is `unknown` even where the static type
- * promises `{ type, text }` — a persisted `content: [null]` (the A2-7 shape)
- * used to TypeError in buildReviewRequest and the caller's catch dropped the
- * whole subagent review leg. This mirrors evolution-core signals.ts's private
- * `textOfBlock` (same guard, same rationale); it is not imported because core
- * keeps that helper module-private, and this file's other block renderer
- * (renderToolResultLine) guards its own inner-block shapes inline.
- */
-function textOfPersistedBlock(block: unknown): string {
-  if (block === null || typeof block !== 'object') return ''
-  const candidate = block as { type?: unknown; text?: unknown }
-  return candidate.type === 'text' && typeof candidate.text === 'string' ? candidate.text : ''
-}
-
-export function buildReviewRequest(
-  session: Session,
-  kind: ReviewKind,
-  signal: { toolCalls: number; userChars: number; assistantChars: number },
-  maxMessages: number,
-  maxMessageChars: number,
-  dispatchTail: readonly ReviewDispatchFrame[] = [],
-): string {
-  const messages: string[] = []
-  const surface = session.deriveMessages()
-  // T3-08/A36: the window is maxMessages of the data the review MUST see, not maxMessages of the raw
-  // surface. Slicing first and filtering after meant a long tool-heavy stretch filled the whole window
-  // with `tool` entries and the digest carried ZERO user/assistant turns — the review then judged the
-  // session without the conversation that produced it. Filter first, then take the tail (order kept).
-  const eligible = surface.filter(message => message.role === 'user' || message.role === 'assistant').slice(-maxMessages)
-  // `eligible` is already the role filter above, so the loop body needs no second one (v46 lint).
-  for (const message of eligible) {
-    // PLAN S4.1 (2026-09-16, audit P2-12): textOfPersistedBlock — a
-    // persisted `content: [null]` must skip, not break the review leg.
-    const text = message.content.map(textOfPersistedBlock).join(' ').trim()
-    // T3-03/A31: the digest is a plain-text prompt whose PRODUCT is a
-    // write-permission plan, so ingested text must not be able to become
-    // structure — a newline plus `SYSTEM:`/the closing instruction used to
-    // forge a header or a second instruction. Fold (never delete) at ingest.
-    if (text) messages.push(`${message.role.toUpperCase()}: ${foldUntrustedLines(text, maxMessageChars)}`)
-  }
-  // Tool evidence — the review subagent cannot verify a plan against command
-  // output it never saw, so append recent tool calls and results as structured
-  // lines (budgeted: truncated per event, and capped to the last 12 events).
-  //
-  // The call lines come from evolution-core's dispatch vocabulary
-  // (`readDispatchSignal`), not from a `tool/call` match here, so native and
-  // PTC sessions both work. ONE line per dispatch: a settled call renders its
-  // result line with the call's identity (from the forward identity map, or —
-  // for a PTC settle, which carries its own name/arguments — from the payload
-  // itself), and the corresponding call event is skipped.
-  const toolLines: string[] = []
-  // G4: the frames come from the caller's bounded per-session digest (the review's own
-  // `session/event` tail, `appendDispatchFrame`), which is what replaced re-reading the session log
-  // here. The digest IS the window R3 described, so no `length - 2_000` trim is needed, and PTC
-  // sub-dispatches keep their evidence — they never derive a platform message.
-  const events = dispatchTail
-  const callIdentity = new Map<string, { name: string; argsRaw: string }>()
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index] as { type?: string; seq?: number; data?: unknown } | undefined
-    const opened = readDispatchSignal(event)
-    if (opened === null || callIdentity.has(opened.callId)) continue
-    callIdentity.set(opened.callId, {
-      name: opened.name,
-      argsRaw: typeof opened.arguments === 'string' ? opened.arguments : JSON.stringify(opened.arguments ?? {}),
-    })
-  }
-  const openedCallIds = new Set<string>()
-  for (let index = events.length - 1; index >= 0 && toolLines.length < 12; index -= 1) {
-    const event = events[index] as { type?: string; seq?: number; data?: unknown } | undefined
-    const answeredCallId = resultCallIdOf(event)
-    if (answeredCallId !== null) {
-      if (openedCallIds.has(answeredCallId)) continue
-      openedCallIds.add(answeredCallId)
-      // `event.data` crosses the durable session-log boundary, so the shape is
-      // guarded at runtime rather than asserted: anything that is not a plain
-      // object (or an object without a string `name`) falls back to the
-      // identity map, exactly like a native result without its call event.
-      const rawSettle = event?.data
-      const settleData = rawSettle !== null && typeof rawSettle === 'object'
-        ? rawSettle as { name?: unknown; arguments?: unknown }
-        : undefined
-      const identity = settleData !== undefined && typeof settleData.name === 'string' && settleData.name !== ''
-        ? {
-          name: settleData.name,
-          argsRaw: typeof settleData.arguments === 'string' ? settleData.arguments : JSON.stringify(settleData.arguments ?? {}),
-        }
-        : callIdentity.get(answeredCallId)
-      toolLines.push(renderToolResultLine(event?.data, identity, event?.seq))
-      continue
-    }
-    // `readDispatchSignal` is the pure half of the fold: it names the call one
-    // event opens without carrying a ledger, so the "one line per call" rule
-    // stays a property of THIS loop (the budget is per line, not per dispatch).
-    const opened = readDispatchSignal(event)
-    if (opened === null || openedCallIds.has(opened.callId)) continue
-    openedCallIds.add(opened.callId)
-    const argsRaw = typeof opened.arguments === 'string' ? opened.arguments : JSON.stringify(opened.arguments ?? {})
-    // T3-03/A31: same fold as the [result] line — the name and the raw
-    // arguments are model-authored data, not this digest's structure.
-    const seq = typeof event?.seq === 'number' ? 'seq=' + String(event.seq) + ' ' : ''
-    toolLines.push(seq + '[call] ' + foldUntrustedLines(opened.name, 0) + ' ' + foldUntrustedLines(argsRaw, 500))
-  }
-  toolLines.reverse()
-  return [
-    `Review kind: ${kind}`,
-    `Signals: ${signal.toolCalls} tool calls, ${signal.userChars} user chars, ${signal.assistantChars} assistant chars.`,
-    `Recent tool activity (${toolLines.length}):`,
-    ...toolLines,
-    'Return ONLY the structured JSON plan. Evidence is mandatory for every op.',
-    planContractPrompt(),
-    '',
-    ...messages,
-  ].join('\n')
 }
