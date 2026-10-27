@@ -22,8 +22,10 @@ export interface PlatformServiceProbe {
   readonly side: 'host' | 'client'
 }
 
-/** The 26 probes, in service-name order (the guard checks this list against the tree). */
+/** The 28 probes, in service-name order (the guard checks this list against the tree). */
 export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.freeze([
+  { service: 'agentDefaultModel', feature: 'the model route inherited by a plugin review branch', side: 'host' },
+  { service: 'agentPresets', feature: 'the preset mount that gives a plugin review branch its tools/system', side: 'host' },
   { service: 'agents', feature: 'review and curator subagent wake-ups', side: 'host' },
   { service: 'approval', feature: 'the platform approval policy the approval row shadows', side: 'host' },
   { service: 'configEditor', feature: 'the params view inherited-vs-override column', side: 'host' },

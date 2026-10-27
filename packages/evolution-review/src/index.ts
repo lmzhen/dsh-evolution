@@ -1007,7 +1007,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         agentPreset = resolved.id
         setup = async (target, _child) => { await presets.mount(target, resolved.id) }
       }
-      const seed = session.snapshotEvents()
+      const query = ctx.get('sessionQuery') as { readEvents?: (id: SessionId) => Promise<readonly SessionEvent[]> } | undefined
+      const seed = await query?.readEvents?.(session.id)
+      if (seed === undefined) throw new Error('session-query readEvents is unavailable')
       const current = (ctx.get('agentDefaultModel') as { currentSelection?: () => { provider: string; model: string } } | undefined)?.currentSelection?.()
       handle = await ctx.agents.create({
         sessionId: childId,
@@ -1028,7 +1030,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const collected = { finalText: '', actions: [] as { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'error' }[], usage: undefined as { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined, error: undefined as string | undefined }
     const onEvent = (owner: { id: SessionId }, event: SessionEvent): void => {
       if (owner.id !== childId) return
-      if (event.type === 'tool/call') collected.actions.push({ type: 'tool', action: 'call', target: event.data.name, status: 'ok' })
       if (event.type === 'assistant/message') {
         const text = event.data.message.content.filter(block => block.type === 'text').map(block => block.text).join('')
         if (text !== '') collected.finalText = text

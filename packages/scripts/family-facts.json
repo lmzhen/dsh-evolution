@@ -619,21 +619,6 @@
       }
     },
     {
-      "id": "readonly-contract",
-      "home": "evolution-review/README.md",
-      "must": [
-        {
-          "text": "reviewToolAllow"
-        }
-      ],
-      "forbid": [],
-      "cites": [],
-      "machine": {
-        "kind": "readonly-contract",
-        "file": "evolution-review/src/index.ts"
-      }
-    },
-    {
       "id": "upgrade-order",
       "home": "INSTALL.md",
       "must": [

@@ -29,6 +29,8 @@ it('creates a no-cwd plugin branch and disposes it', async () => {
     } as never)
     const created: Array<{ id: SessionId; session: { header: { cwd?: string; parentSession?: SessionId } } }> = []
     ctx.on('agent/created', ({ agent }) => { created.push(agent as never) })
+    let parent: import('@deepseek-ai/dsh-agent').Agent
+    ctx.provide('sessionQuery', { readEvents: async () => parent.session.snapshotEvents() } as never)
     const completed: unknown[] = []
     ctx.on('evolution/review-completed', event => completed.push(event))
     await ctx.plugin(Review, {
@@ -38,7 +40,7 @@ it('creates a no-cwd plugin branch and disposes it', async () => {
       skillReviewTrigger: 'cadence',
       reviewMode: 'branch',
     })
-    const parent = await harness.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    parent = await harness.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
     parent.followup(createUserMessage({ content: [{ type: 'text', text: 'do the task' }], source: { kind: 'user' } }))
     await parent.whenIdle()
     await vi.waitFor(() => { expect(completed).toHaveLength(1) })

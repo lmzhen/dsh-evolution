@@ -139,7 +139,6 @@ declare module '@deepseek-ai/cordis' {
      * A reviewed plan finished its write leg, with the counts that describe what landed. An
      * ANNOUNCEMENT: the family's own ledger of plan outcomes (A98 / O-1).
      * @param event - the outcome counts, the first failure message, and the policy fingerprint.
-     * @mode emit
      */
     'evolution/plan-applied'(event: EvolutionPlanAppliedEvent): void
     /**

@@ -60,7 +60,7 @@ session log made the session unresumable (A-line P0-1), which is why the payload
 | `evolution/skills-refresh` | emit (notification) | `evolution-commands` `/evolution` verbs |
 | `evolution/review-scheduled` | emit (notification) | `evolution-review` cadence paths |
 | `evolution/review-error` | emit (notification) | `evolution-review` failure paths |
-| `evolution/plan-applied` | emit (notification) | `evolution-review` after a plan lands |
+| `evolution/review-completed` | emit (notification) | `evolution-review` after a plugin branch settles |
 | `evolution/memory-applied` | emit (notification) | `memory` after a memory write |
 
 The mode column is what the code does today: every one of them is an announcement, and each
