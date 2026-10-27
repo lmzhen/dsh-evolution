@@ -653,6 +653,9 @@ const DEPRECATED_LOG_ACCESSOR_RE = /\.(snapshotEvents|eventAt|ownEvents)\b/
  * those two lines for the same reason). Grain = one code line. */
 const DEPRECATED_LOG_ACCESSOR_REGISTER = new Map([
   ['evolution-core/src/session-projection.ts', 2],
+  // The live Session is the only complete seed source for a plugin-side review branch;
+  // the query service has no full ordered event reader (0.30.30 acceptance finding).
+  ['evolution-review/src/index.ts', 1],
 ])
 
 const APPROVAL_SRC = 'evolution-approval/src'

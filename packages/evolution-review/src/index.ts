@@ -1007,9 +1007,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         agentPreset = resolved.id
         setup = async (target, _child) => { await presets.mount(target, resolved.id) }
       }
-      const query = ctx.get('sessionQuery') as { readEvents?: (id: SessionId) => Promise<readonly SessionEvent[]> } | undefined
-      const seed = await query?.readEvents?.(session.id)
-      if (seed === undefined) throw new Error('session-query readEvents is unavailable')
+      // The live Session log is the only complete seed source in the current platform;
+      // the query service exposes search/projections, not the full ordered event list.
+      const seed = session.snapshotEvents()
       const current = (ctx.get('agentDefaultModel') as { currentSelection?: () => { provider: string; model: string } } | undefined)?.currentSelection?.()
       handle = await ctx.agents.create({
         sessionId: childId,

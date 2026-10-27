@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.30 (patch) — plugin-side review branch seed fix
+
+> **范围**：插件侧 branch 的 seed 改用当前 live Session 日志；平台 sessionQuery 公开服务没有完整有序事件读取，0.30.29 在真实 host 会回退 inject。保持 inject 默认兼容。
+> **验证**：web 真机 branch 运行，activity ReviewRecord 含 branchSessionId/usage；子会话无 cwd、dispose 后无 session 目录。
+
 ## 0.30.29 (patch) — plugin-side review branch
 
 > **范围**：review branch 改为插件侧 `ctx.agents.create`：不设 cwd/workspace，运行后 dispose；普通 list/search/workspace/归档模式不可见；接受 durable log 残留。保留 inject 默认、ReviewRecord；删除 review 的 subagent/plan/queue 旧路径。
