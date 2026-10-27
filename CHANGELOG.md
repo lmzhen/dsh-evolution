@@ -1,5 +1,8 @@
 # Changelog
-## 0.30.26 (patch) — rc.3 platform line and shared client kit
+## 0.30.27 (patch) — rc.3 platform line and shared client kit
+
+> **说明**：0.30.26 的部分包已发布，但客户端 Kit 的手工占位发布占用了该版本号；npm 不允许重发已撤销的版本。此版本是同一批内容的完整发布。
+
 
 > **范围**：平台线抬到 0.2.1-rc.3（floor rc.2）；新增 `@lmzhen/dsh-evolution-client-kit`，四个 Web 面板共用 seam/生成契约/tokens；合并行菜单改用 rc.3 MenuSurface/MenuItemButton；host capability 单探针；target 不存在时 authoring 归一为 create-umbrella；安装器保留 community Kit scope。
 > **验证**：merge 547 / UI+kit 188 / tsc / 36 包打包与 tarball 审计；rc.3 真机 pair→fuse→commit→undo。
