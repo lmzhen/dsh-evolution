@@ -112,6 +112,7 @@
         "evolution-merge-ui::tests/sorting-panel.client.spec.ts",
         "evolution-merge-ui::tests/sorting.client.spec.ts",
         "evolution-policy::tests/protected-skills.spec.ts",
+        "evolution-review::tests/plugin-branch.integration.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
@@ -536,6 +537,7 @@
         "evolution-policy::tests/protected-skills.spec.ts",
         "evolution-preset::tests/environment-fallbacks.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
+        "evolution-review::tests/plugin-branch.integration.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
@@ -1071,6 +1073,7 @@
         "evolution-policy::tests/protected-skills.spec.ts",
         "evolution-preset::tests/environment-fallbacks.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
+        "evolution-review::tests/plugin-branch.integration.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
@@ -1574,6 +1577,7 @@
         "evolution-preset::tests/environment-fallbacks.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
+        "evolution-review::tests/plugin-branch.integration.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
         "evolution-review::tests/review.spec.ts",
@@ -1721,11 +1725,11 @@
   "counts": {
     "fast": {
       "gates": 57,
-      "specs": 59
+      "specs": 60
     },
     "pre-tag": {
       "gates": 57,
-      "specs": 339
+      "specs": 340
     },
     "ci-only": {
       "gates": 12,
@@ -1733,16 +1737,16 @@
     },
     "full(ci=off)": {
       "gates": 57,
-      "specs": 339
+      "specs": 340
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 387
+      "specs": 388
     }
   },
   "specs": {
     "total": 388,
-    "marked": 387,
-    "unmarked": 1
+    "marked": 388,
+    "unmarked": 0
   }
 }
