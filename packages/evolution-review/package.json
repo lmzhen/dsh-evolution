@@ -42,12 +42,9 @@
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/dsh-evolution-curator": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-session-persistence": "workspace:^",
-    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^"
   }
 }
