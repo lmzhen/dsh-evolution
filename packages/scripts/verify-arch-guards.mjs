@@ -439,6 +439,9 @@ const PLATFORM_CITE_BASELINE = new Map([
   ['evolution-core/src/preset-composition.ts', 1],
   ['evolution-core/src/scope.ts', 2],
   ['evolution-core/src/session-projection.ts', 2],
+  // The live Session is the only complete seed source for a plugin-side review branch;
+  // the query service has no full ordered event reader (0.30.30 acceptance finding).
+  ['evolution-review/src/index.ts', 1],
   ['evolution-core/src/tool-dispatch.ts', 4],
   ['evolution-core/tests/preset-composition.spec.ts', 1],
   ['evolution-core/tests/tool-dispatch.spec.ts', 2],
