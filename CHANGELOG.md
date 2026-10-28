@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.31 (patch) — review prompt calibration and platform marker
+
+> **范围**：skill/combined/completion 三条 review prompt 对齐原版 Hermes 语义并做质量校准：ACTIVE 不再等同产出配额，空结果须说明检查；正文是决策规则，会话细节按需进 references；create 仅在没有 class-level/umbrella 可吸收时；completion prompt 保留 `[Auto-review — Skills · task complete]` 平台标记。
+> **验证**：prompt bundle v22；prompt/review 测试 49/49；completion header 与校准语义人工核对。
+
 ## 0.30.30 (patch) — plugin-side review branch seed fix
 
 > **范围**：插件侧 branch 的 seed 改用当前 live Session 日志；平台 sessionQuery 公开服务没有完整有序事件读取，0.30.29 在真实 host 会回退 inject。保持 inject 默认兼容。

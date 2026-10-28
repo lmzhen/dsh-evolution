@@ -26,7 +26,8 @@ it('verifyPromptBundle rejects tampered prompt content', () => {
 // load-bearing instruction points, not prose. A future simplification that
 // drops any of them fails here first.
 it('skill review prompt keeps the Hermes guiding structure (alignment contract)', () => {
-  expect(SKILL_REVIEW_PROMPT).toContain('A pass that does nothing is a missed learning opportunity')
+  expect(SKILL_REVIEW_PROMPT).toContain('Activity is not a quota');
+  expect(SKILL_REVIEW_PROMPT).toContain('a precise no-op after checking is better than a vague or forced entry')
   expect(SKILL_REVIEW_PROMPT).toContain('FIRST-CLASS skill signals')
   expect(SKILL_REVIEW_PROMPT).toContain('UPDATE A CURRENTLY-LOADED SKILL')
   expect(SKILL_REVIEW_PROMPT).toContain('session artifact')
@@ -62,7 +63,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
   // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
   // bundle identity moves with it (v18 pinned the step-7 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(21)
+  expect(PROMPT_BUNDLE_VERSION).toBe(22)
   // v46 S1.12b (finding T3-07): the dry-run banner is model-visible curator text, so it rides
   // the bundle and the digest covers it.
   expect(PROMPT_BUNDLE.prompts['curatorDryRun']).toBe(CURATOR_DRY_RUN_BANNER)

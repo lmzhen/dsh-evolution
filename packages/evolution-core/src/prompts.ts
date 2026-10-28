@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 21
+export const PROMPT_BUNDLE_VERSION = 22
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -43,9 +43,11 @@ If something stands out, save it using the memory tool.
 If nothing is worth saving, just say "Nothing to save." and stop.`
 
 export const SKILL_REVIEW_PROMPT = `[Auto-review — Skills]
-Review the conversation above and update the skill library. Be ACTIVE — most sessions produce at least one skill update, even if small. A pass that does nothing is a missed learning opportunity, not a neutral outcome.
+Review the conversation above and update the skill library. Be ACTIVE — inspect the session and the existing library thoroughly, and prefer a small, precise update when the session teaches something durable. Activity is not a quota: a precise no-op after checking is better than a vague or forced entry.
 
 Target shape of the library: CLASS-LEVEL skills, each with a rich SKILL.md and a references/ directory for session-specific detail. Not a long flat list of narrow one-session-one-skill entries. This shapes HOW you update, not WHETHER you update.
+
+A skill body is a reusable decision rule (when / do / check); dates, versions, incident narratives, and one-off evidence belong in references when they would otherwise dominate the body.
 
 Signals to look for (any one of these warrants action):
   • User corrected your style, tone, format, legibility, or verbosity. Frustration signals like 'stop doing X', 'this is too verbose', 'don't format like this', 'why are you explaining', 'just give me the answer', 'you always do Y and I hate it', or an explicit 'remember this' are FIRST-CLASS skill signals, not just memory signals. Update the relevant skill(s) to embed the preference so the next session starts already knowing.
@@ -64,7 +66,7 @@ Preference order — prefer the earliest action that fits, but do pick one when 
      • scripts/<name>.<ext> — statically re-runnable actions the skill can invoke directly (verification scripts, fixture generators, deterministic probes, anything the agent should run rather than hand-type each time).
      Add support files via skill_manage action=write_file with file_path starting 'references/', 'templates/', or 'scripts/'. The umbrella's SKILL.md should gain a one-line pointer to any new support file so future agents know it exists.
   4. RESTRUCTURE a loaded skill whose body grew log-like — rc/sha/date-dense sections, session-detail spirals, or a fat body with no support files. Use skill_manage action=restructure with restructure: [{"heading": "<the exact ## heading text>", "to_file": "references/<topic>.md"}] — the ENTIRE ## section (from that heading to the next heading) moves into the support file and its position becomes a pointer line. The skill's name and directory never change. Only propose headings that exist verbatim in the body; never invent one, and never restructure a healthy small skill.
-  5. CREATE A NEW CLASS-LEVEL UMBRELLA SKILL when no existing skill covers the class. The name MUST be at the class level. The name MUST NOT be a specific PR number, error string, feature codename, library-alone name, or 'fix-X / debug-Y / audit-Z-today' session artifact. If the proposed name only makes sense for today's task, it's wrong — fall back to (1), (2), or (3).
+  5. CREATE A NEW CLASS-LEVEL UMBRELLA SKILL only when no existing class-level skill covers the class and no existing umbrella can absorb the learning. The name MUST be at the class level. The name MUST NOT be a specific PR number, error string, feature codename, library-alone name, or 'fix-X / debug-Y / audit-Z-today' session artifact. If the proposed name only makes sense for today's task, it's wrong — fall back to (1), (2), or (3).
 
 User-preference embedding (important): when the user expressed a style/format/workflow preference, the update belongs in the SKILL.md body, not just in memory. Memory captures 'who the user is and what the current situation and state of your operations are'; skills capture 'how to do this class of task for this user'. When they complain about how you handled a task, the skill that governs that task needs to carry the lesson.
 
@@ -88,16 +90,18 @@ Do NOT capture (these become persistent self-imposed constraints that bite you l
 
 If a tool failed because of setup state, capture the FIX (install command, config step, env var to set) under an existing setup or troubleshooting skill — never 'this tool does not work' as a standalone constraint.
 
-'Nothing to save.' is a real option but should NOT be the default. If the session ran smoothly with no corrections and produced no new technique, just say 'Nothing to save.' and stop. Otherwise, act.`
+'Nothing to save.' is a real option but should NOT be the default. If the session ran smoothly with no corrections and produced no new technique, state what you checked and stop. Otherwise, act.`
 
 export const COMBINED_REVIEW_PROMPT = `[Auto-review]
 Review the conversation above and update two things:
 
 **Memory**: who the user is. Did the user reveal persona, desires, preferences, personal details, or expectations about how you should behave? Save facts about the user and durable preferences with the memory tool.
 
-**Skills**: how to do this class of task. Be ACTIVE — most sessions produce at least one skill update. A pass that does nothing is a missed learning opportunity, not a neutral outcome.
+**Skills**: how to do this class of task. Be ACTIVE — inspect the session and the existing library thoroughly, and prefer a small, precise update when the session teaches something durable. Activity is not a quota: a precise no-op after checking is better than a vague or forced entry.
 
 Target shape of the skill library: CLASS-LEVEL skills with a rich SKILL.md and a references/ directory for session-specific detail. Not a long flat list of narrow one-session-one-skill entries.
+
+A skill body is a reusable decision rule (when / do / check); dates, versions, incident narratives, and one-off evidence belong in references when they would otherwise dominate the body.
 
 Signals that warrant a skill update (any one is enough):
   • User corrected your style, tone, format, legibility, verbosity, or approach. Frustration is a FIRST-CLASS skill signal, not just a memory signal. 'stop doing X', 'don't format like this', 'I hate when you Y' — embed the lesson in the skill that governs that task so the next session starts fixed.
@@ -111,7 +115,7 @@ Preference order for skills — pick the earliest that fits:
   2. UPDATE AN EXISTING UMBRELLA. Patch it.
   3. ADD A SUPPORT FILE under an existing umbrella via skill_manage action=write_file. Three kinds: references/<topic>.md for session-specific detail OR condensed knowledge banks (quoted research, API docs excerpts, domain notes) written concise and task-focused; templates/<name>.<ext> for starter files meant to be copied and modified; scripts/<name>.<ext> for statically re-runnable actions (verification, fixture generators, probes). Add a one-line pointer in SKILL.md so future agents find them.
   4. RESTRUCTURE a loaded skill whose body grew log-like (rc/sha/date-dense sections, session-detail spirals, fat body with no support files) via skill_manage action=restructure with restructure: [{"heading": "<the exact ## heading text>", "to_file": "references/<topic>.md"}] — the ENTIRE ## section moves into the support file and its position becomes a pointer line; the skill's name and directory never change. Only propose headings that exist verbatim in the body.
-  5. CREATE A NEW CLASS-LEVEL UMBRELLA when nothing exists. Name at the class level — NOT a PR number, error string, codename, library-alone name, or 'fix-X / debug-Y' session artifact. If the name only fits today's task, fall back to (1), (2), or (3).
+  5. CREATE A NEW CLASS-LEVEL UMBRELLA only when no existing class-level skill covers the class and no existing umbrella can absorb the learning. Name at the class level — NOT a PR number, error string, codename, library-alone name, or 'fix-X / debug-Y' session artifact. If the name only fits today's task, fall back to (1), (2), or (3).
 
 Two-tier deposition discipline (DSH addition): classify before writing — PATTERN (symptom → mechanism → fix → verification) goes in the SKILL.md body; LOG (commit SHAs, npm/profile states, this release's change list, this session's narrative) goes in a references/ file. Body density IS reuse rate; a pattern fits in 2-8 physical lines.
 
@@ -201,11 +205,48 @@ Your output IS the deliverable: produce the exact same human-readable summary an
 If you accidentally take a mutating action, say so explicitly in the summary.`
 
 export const COMPLETION_SKILL_REVIEW_PROMPT = `[Auto-review — Skills · task complete]
-Your current task now appears complete. Before wrapping up, review the approach and update the skill library via skill_manage.
+Review the conversation above and update the skill library. Be ACTIVE — inspect the session and the existing library thoroughly, and prefer a small, precise update when the session teaches something durable. Activity is not a quota: a precise no-op after checking is better than a vague or forced entry.
 
-Follow the skills review policy: be ACTIVE, prefer class-level umbrellas, patch ONLY skills loaded or read this session, and capture non-trivial techniques and user corrections. Do NOT capture environment-dependent failures, negative claims about tools, or one-off task narratives.
+Target shape of the library: CLASS-LEVEL skills, each with a rich SKILL.md and a \`references/\` directory for session-specific detail. Not a long flat list of narrow one-session-one-skill entries. This shapes HOW you update, not WHETHER you update.
 
-Do NOT modify output files or re-run the task. If you are still mid-task, ignore this.`
+A skill body is a reusable decision rule (when / do / check); dates, versions, incident narratives, and one-off evidence belong in references when they would otherwise dominate the body.
+
+Signals to look for (any one of these warrants action):
+  • User corrected your style, tone, format, legibility, or verbosity. Frustration signals like 'stop doing X', 'this is too verbose', 'don't format like this', 'why are you explaining', 'just give me the answer', 'you always do Y and I hate it', or an explicit 'remember this' are FIRST-CLASS skill signals, not just memory signals. Update the relevant skill(s) to embed the preference so the next session starts already knowing.
+  • User corrected your workflow, approach, or sequence of steps. Encode the correction as a pitfall or explicit step in the skill that governs that class of task.
+  • Non-trivial technique, fix, workaround, debugging path, or tool-usage pattern emerged that a future session would benefit from. Capture it.
+  • A skill that got loaded or consulted this session turned out to be wrong, missing a step, or outdated. Patch it NOW.
+
+Preference order — prefer the earliest action that fits, but do pick one when a signal above fired:
+  1. UPDATE A CURRENTLY-LOADED SKILL. Look back through the conversation for skills the user loaded via /skill-name or you read via skill. If any of them covers the territory of the new learning, PATCH that one first. It is the skill that was in play, so it's the right one to extend.
+  2. UPDATE AN EXISTING UMBRELLA (via the skill catalog + skill). If no loaded skill fits but an existing class-level skill does, patch it. Add a subsection, a pitfall, or broaden a trigger.
+  3. ADD A SUPPORT FILE under an existing umbrella. Skills can be packaged with three kinds of support files — use the right directory per kind:
+     • \`references/<topic>.md\` — session-specific detail (error transcripts, reproduction recipes, provider quirks) AND condensed knowledge banks: quoted research, API docs, external authoritative excerpts, or domain notes you found while working on the problem. Write it concise and for the value of the task, not as a full mirror of upstream docs.
+     • \`templates/<name>.<ext>\` — starter files meant to be copied and modified (boilerplate configs, scaffolding, a known-good example the agent can \`reproduce with modifications\`).
+     • \`scripts/<name>.<ext>\` — statically re-runnable actions the skill can invoke directly (verification scripts, fixture generators, deterministic probes, anything the agent should run rather than hand-type each time).
+     Add support files via skill_manage action=write_file with file_path starting 'references/', 'templates/', or 'scripts/'. The umbrella's SKILL.md should gain a one-line pointer to any new support file so future agents know it exists.
+  4. CREATE A NEW CLASS-LEVEL UMBRELLA SKILL only when no existing class-level skill covers the class and no existing umbrella can absorb the learning. The name MUST be at the class level. The name MUST NOT be a specific PR number, error string, feature codename, library-alone name, or 'fix-X / debug-Y / audit-Z-today' session artifact. If the proposed name only makes sense for today's task, it's wrong — fall back to (1), (2), or (3).
+
+User-preference embedding (important): when the user expressed a style/format/workflow preference, the update belongs in the SKILL.md body, not just in memory. Memory captures 'who the user is and what the current situation and state of your operations are'; skills capture 'how to do this class of task for this user'. When they complain about how you handled a task, the skill that governs that task needs to carry the lesson.
+
+If you notice two existing skills that overlap, note it in your reply — the background curator handles consolidation at scale.
+
+Protected skills (DO NOT edit these):
+  • Bundled skills (shipped with the platform).
+  • Hub-installed skills (installed via the platform hub).
+Pinned skills (marked via skill_manage pin) are read-only to THIS background review pass — the pinned write guard refuses background changes, so this pass may not update them. They also cannot be archived by any writer (the foreground included): remove the .pinned marker first. Foreground and delegated-subagent update/patch writes to pinned skills remain allowed.
+If the only skills that need updating are protected, say
+'Nothing to save.' and stop.
+
+Do NOT capture (these become persistent self-imposed constraints that bite you later when the environment changes):
+  • Environment-dependent failures: missing binaries, fresh-install errors, post-migration path mismatches, 'command not found', unconfigured credentials, uninstalled packages. The user can fix these — they are not durable rules.
+  • Negative claims about tools or features ('browser tools do not work', 'X tool is broken', 'cannot use Y from execute_code'). These harden into refusals the agent cites against itself for months after the actual problem was fixed.
+  • Session-specific transient errors that resolved before the conversation ended. If retrying worked, the lesson is the retry pattern, not the original failure.
+  • One-off task narratives. A user asking 'summarize today's market' or 'analyze this PR' is not a class of work that warrants a skill.
+
+If a tool failed because of setup state, capture the FIX (install command, config step, env var to set) under an existing setup or troubleshooting skill — never 'this tool does not work' as a standalone constraint.
+
+'Nothing to save.' is a real option but should NOT be the default. If the session ran smoothly with no corrections and produced no new technique, state what you checked and stop. Otherwise, act.`
 
 /**
  * Maintenance-subagent persona (design 011 §6). Constants pin the persona
@@ -368,7 +409,7 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
   // v46 S1.12b (finding T3-07): the curator's dry-run banner rides the bundle too. It is prepended
   // to the curator prompt at run time and used to live outside the digest, so a drifted banner was
   // model-visible text the integrity check could not see. The bundle digest changes with this entry
-  // (the intended fail-closed signal), and PROMPT_BUNDLE_VERSION moves 20 -> 21 with it.
+  // (the intended fail-closed signal), and PROMPT_BUNDLE_VERSION moves 21 -> 22 with it.
   curatorDryRun: CURATOR_DRY_RUN_BANNER,
   completion: COMPLETION_SKILL_REVIEW_PROMPT,
   maintain: MAINTAIN_PROMPT,
