@@ -80,15 +80,21 @@
         "evolution-core::tests/cost.spec.ts",
         "evolution-core::tests/errors.spec.ts",
         "evolution-core::tests/evidence.spec.ts",
+        "evolution-core::tests/external-support.spec.ts",
+        "evolution-core::tests/extract-plan.spec.ts",
+        "evolution-core::tests/extract-prompt.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
         "evolution-core::tests/learn-prompt.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
         "evolution-core::tests/numeric.spec.ts",
+        "evolution-core::tests/owner-resolver.spec.ts",
         "evolution-core::tests/params.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
+        "evolution-core::tests/proposal-report.spec.ts",
+        "evolution-core::tests/proposal-view.spec.ts",
         "evolution-core::tests/quality-thresholds.spec.ts",
         "evolution-core::tests/reference-rewrite.spec.ts",
         "evolution-core::tests/restricted-preset.spec.ts",
@@ -123,6 +129,7 @@
         "evolution-settings-ui::tests/styles.client.spec.ts",
         "evolution-settings-ui::tests/u8-glossary.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
+        "evolution-skill-health::tests/routes.spec.ts",
         "evolution-skill-history::tests/client-api.spec.ts",
         "evolution-skill-history::tests/markdown.client.spec.ts",
         "evolution-skill-history::tests/route-parity.spec.ts",
@@ -290,6 +297,9 @@
         "evolution-core::tests/event-version.spec.ts",
         "evolution-core::tests/evidence.spec.ts",
         "evolution-core::tests/evolution-events.spec.ts",
+        "evolution-core::tests/external-support.spec.ts",
+        "evolution-core::tests/extract-plan.spec.ts",
+        "evolution-core::tests/extract-prompt.spec.ts",
         "evolution-core::tests/frontmatter-mixed-endings.spec.ts",
         "evolution-core::tests/frontmatter-normalize.spec.ts",
         "evolution-core::tests/frontmatter-platform-string-fields.spec.ts",
@@ -312,6 +322,7 @@
         "evolution-core::tests/mutations.spec.ts",
         "evolution-core::tests/namespace-migration.spec.ts",
         "evolution-core::tests/numeric.spec.ts",
+        "evolution-core::tests/owner-resolver.spec.ts",
         "evolution-core::tests/package-identity.spec.ts",
         "evolution-core::tests/param-registry.spec.ts",
         "evolution-core::tests/params-docs.spec.ts",
@@ -320,6 +331,8 @@
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
+        "evolution-core::tests/proposal-report.spec.ts",
+        "evolution-core::tests/proposal-view.spec.ts",
         "evolution-core::tests/quality-thresholds.spec.ts",
         "evolution-core::tests/quality.spec.ts",
         "evolution-core::tests/reachability.spec.ts",
@@ -339,6 +352,7 @@
         "evolution-core::tests/shared-root-queue.spec.ts",
         "evolution-core::tests/signals.spec.ts",
         "evolution-core::tests/skill-consolidate.spec.ts",
+        "evolution-core::tests/skill-extract-kernel.spec.ts",
         "evolution-core::tests/skill-health.spec.ts",
         "evolution-core::tests/skill-history.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
@@ -563,6 +577,7 @@
         "evolution-settings-ui::tests/u8-glossary.spec.ts",
         "evolution-settings-ui::tests/write-face-verdict.client.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
+        "evolution-skill-health::tests/routes.spec.ts",
         "evolution-skill-history::tests/apply-order.spec.ts",
         "evolution-skill-history::tests/chrome.client.spec.ts",
         "evolution-skill-history::tests/client-api.spec.ts",
@@ -826,6 +841,9 @@
         "evolution-core::tests/event-version.spec.ts",
         "evolution-core::tests/evidence.spec.ts",
         "evolution-core::tests/evolution-events.spec.ts",
+        "evolution-core::tests/external-support.spec.ts",
+        "evolution-core::tests/extract-plan.spec.ts",
+        "evolution-core::tests/extract-prompt.spec.ts",
         "evolution-core::tests/frontmatter-mixed-endings.spec.ts",
         "evolution-core::tests/frontmatter-normalize.spec.ts",
         "evolution-core::tests/frontmatter-platform-string-fields.spec.ts",
@@ -848,6 +866,7 @@
         "evolution-core::tests/mutations.spec.ts",
         "evolution-core::tests/namespace-migration.spec.ts",
         "evolution-core::tests/numeric.spec.ts",
+        "evolution-core::tests/owner-resolver.spec.ts",
         "evolution-core::tests/package-identity.spec.ts",
         "evolution-core::tests/param-registry.spec.ts",
         "evolution-core::tests/params-docs.spec.ts",
@@ -856,6 +875,8 @@
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
+        "evolution-core::tests/proposal-report.spec.ts",
+        "evolution-core::tests/proposal-view.spec.ts",
         "evolution-core::tests/quality-thresholds.spec.ts",
         "evolution-core::tests/quality.spec.ts",
         "evolution-core::tests/reachability.spec.ts",
@@ -875,6 +896,7 @@
         "evolution-core::tests/shared-root-queue.spec.ts",
         "evolution-core::tests/signals.spec.ts",
         "evolution-core::tests/skill-consolidate.spec.ts",
+        "evolution-core::tests/skill-extract-kernel.spec.ts",
         "evolution-core::tests/skill-health.spec.ts",
         "evolution-core::tests/skill-history.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
@@ -1099,6 +1121,7 @@
         "evolution-settings-ui::tests/u8-glossary.spec.ts",
         "evolution-settings-ui::tests/write-face-verdict.client.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
+        "evolution-skill-health::tests/routes.spec.ts",
         "evolution-skill-history::tests/apply-order.spec.ts",
         "evolution-skill-history::tests/chrome.client.spec.ts",
         "evolution-skill-history::tests/client-api.spec.ts",
@@ -1312,6 +1335,9 @@
         "evolution-core::tests/event-version.spec.ts",
         "evolution-core::tests/evidence.spec.ts",
         "evolution-core::tests/evolution-events.spec.ts",
+        "evolution-core::tests/external-support.spec.ts",
+        "evolution-core::tests/extract-plan.spec.ts",
+        "evolution-core::tests/extract-prompt.spec.ts",
         "evolution-core::tests/frontmatter-mixed-endings.spec.ts",
         "evolution-core::tests/frontmatter-normalize.spec.ts",
         "evolution-core::tests/frontmatter-platform-string-fields.spec.ts",
@@ -1336,6 +1362,7 @@
         "evolution-core::tests/namespace-migration.spec.ts",
         "evolution-core::tests/numeric.spec.ts",
         "evolution-core::tests/opt-in.spec.ts",
+        "evolution-core::tests/owner-resolver.spec.ts",
         "evolution-core::tests/package-identity.spec.ts",
         "evolution-core::tests/param-registry.spec.ts",
         "evolution-core::tests/params-docs.spec.ts",
@@ -1345,6 +1372,8 @@
         "evolution-core::tests/preset-composition.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
+        "evolution-core::tests/proposal-report.spec.ts",
+        "evolution-core::tests/proposal-view.spec.ts",
         "evolution-core::tests/quality-thresholds.spec.ts",
         "evolution-core::tests/quality.spec.ts",
         "evolution-core::tests/reachability.spec.ts",
@@ -1365,6 +1394,7 @@
         "evolution-core::tests/shared-root-queue.spec.ts",
         "evolution-core::tests/signals.spec.ts",
         "evolution-core::tests/skill-consolidate.spec.ts",
+        "evolution-core::tests/skill-extract-kernel.spec.ts",
         "evolution-core::tests/skill-health.spec.ts",
         "evolution-core::tests/skill-history.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
@@ -1608,6 +1638,7 @@
         "evolution-skill-catalog::tests/io-preference.spec.ts",
         "evolution-skill-catalog::tests/rank-contract.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
+        "evolution-skill-health::tests/routes.spec.ts",
         "evolution-skill-history::tests/apply-order.spec.ts",
         "evolution-skill-history::tests/chrome.client.spec.ts",
         "evolution-skill-history::tests/client-api.spec.ts",
@@ -1725,11 +1756,11 @@
   "counts": {
     "fast": {
       "gates": 57,
-      "specs": 60
+      "specs": 67
     },
     "pre-tag": {
       "gates": 57,
-      "specs": 340
+      "specs": 348
     },
     "ci-only": {
       "gates": 12,
@@ -1737,16 +1768,16 @@
     },
     "full(ci=off)": {
       "gates": 57,
-      "specs": 340
+      "specs": 348
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 388
+      "specs": 396
     }
   },
   "specs": {
-    "total": 388,
-    "marked": 388,
+    "total": 396,
+    "marked": 396,
     "unmarked": 0
   }
 }
