@@ -504,6 +504,57 @@ describe('evolution-commands', () => {
     expect(support).toContain('old detail')
   })
 
+  it('extract succeeds end-to-end on a temp library', async () => {
+    const dir = await tempRoot('evo-commands-extract-')
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'extract-source'), { recursive: true })
+    await mkdir(join(root, 'extract-target'), { recursive: true })
+    await writeFile(join(root, 'extract-source', 'SKILL.md'), '---\nname: extract-source\ndescription: source.\n---\n\n# Source\n\nIntro.\n\n## Details\n\nreusable detail\n\n## Usage\n\nUse it.\n', 'utf8')
+    await writeFile(join(root, 'extract-target', 'SKILL.md'), '---\nname: extract-target\ndescription: target.\n---\n\n# Target\n\nExisting.\n', 'utf8')
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    await ctx.plugin(Commands, { root })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details"' })
+    expect(result.kind).toBe('success')
+    const source = await io.readText(join(root, 'extract-source', 'SKILL.md'))
+    const target = await io.readText(join(root, 'extract-target', 'SKILL.md'))
+    expect(source).toContain('This capability now lives in extract-target')
+    expect(source).not.toContain('reusable detail')
+    expect(target).toContain('reusable detail')
+  })
+
+  it('extract --plan and start/end sub-block are zero-write then apply', async () => {
+    const dir = await tempRoot('evo-commands-extract-plan-')
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'extract-source'), { recursive: true })
+    await mkdir(join(root, 'extract-target'), { recursive: true })
+    const sourceBody = '---\nname: extract-source\ndescription: source.\n---\n\n# Source\n\n## Details\n\nkeep before\n\nmove start\nmove end\n\nkeep after\n'
+    await writeFile(join(root, 'extract-source', 'SKILL.md'), sourceBody, 'utf8')
+    await writeFile(join(root, 'extract-target', 'SKILL.md'), '---\nname: extract-target\ndescription: target.\n---\n\n# Target\n\nExisting.\n', 'utf8')
+    const ctx = new Context()
+    let captured: Handler | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as Handler }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    await ctx.plugin(Commands, { root })
+    const planned = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end" --plan plan-1' })
+    expect(planned.kind).toBe('success')
+    expect(planned.text).toContain('提取计划')
+    expect(await io.readText(join(root, 'extract-source', 'SKILL.md'))).toBe(sourceBody)
+    const applied = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end"' })
+    expect(applied.kind).toBe('success')
+    const source = await io.readText(join(root, 'extract-source', 'SKILL.md'))
+    const target = await io.readText(join(root, 'extract-target', 'SKILL.md'))
+    expect(source).toContain('keep before')
+    expect(source).toContain('keep after')
+    expect(source).not.toContain('move start')
+    expect(target).toContain('move start')
+    expect(target).toContain('move end')
+  })
+
   // G4 (0.21.0): the /evolution pin face — the user gesture the tool action never had. A REAL library
   // over a temp root, so these cells read the marker on disk and the library's own isPinned() instead
   // of an echoed stub: the round trip (freeze -> release) is the contract, and the marker file is the

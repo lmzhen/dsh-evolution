@@ -117,6 +117,22 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
     }
   })
 
+  it('a review-channel extract is refused before it can touch either root', async () => {
+    const { root, run, messageOf, okOf, cleanup } = await setup()
+    try {
+      await run(PLAIN_SESSION, { action: 'create', name: 'extract-source', content: skill('extract-source', '## Details\n\nreusable detail') })
+      await run(PLAIN_SESSION, { action: 'create', name: 'extract-target', content: skill('extract-target', '# Target\n\nExisting.') })
+      markReviewChannel(MARKED_SESSION)
+      const refused = await run(MARKED_SESSION, { action: 'extract', name: 'extract-source', extract: [{ heading: 'Details', to_skill: 'extract-target' }] })
+      expect(okOf(refused)).toBe(false)
+      expect(messageOf(refused)).toContain('背景审查不能执行 extract')
+      expect(await readFile(join(root, 'skills', 'extract-source', 'SKILL.md'), 'utf8')).toContain('reusable detail')
+      expect(await readFile(join(root, 'skills', 'extract-target', 'SKILL.md'), 'utf8')).not.toContain('reusable detail')
+    } finally {
+      await cleanup()
+    }
+  })
+
   it('a real user message ends the window: the same session writes as foreground again', async () => {
     const { run, messageOf, okOf, cleanup } = await setup()
     try {

@@ -16,7 +16,7 @@ import { en, fill, zh } from '../src/client/messages.ts'
 /** Every action label the library can record, plus one it never wrote (the fail-closed case). */
 const RAW_ACTIONS = [
   'baseline', 'create', 'patch', 'edit', 'update', 'restore', 'delete', 'archive',
-  'consolidate', 'restructure', 'write_file', 'remove_file', 'a-new-write-kind',
+  'consolidate', 'restructure', 'extract', 'write_file', 'remove_file', 'a-new-write-kind',
 ]
 
 /** Every relative-time bucket the host can report. */

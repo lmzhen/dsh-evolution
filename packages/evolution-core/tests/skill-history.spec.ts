@@ -388,7 +388,7 @@ describe('skill-history: the retention line (design §4 item 3)', () => {
 
 describe('skill-history: which artifact a version holds (0.10.1)', () => {
   it('classifies by action, and is fail-closed for an action it does not know', () => {
-    for (const action of ['create', 'update', 'patch', 'consolidate', 'restructure', 'restore']) {
+    for (const action of ['create', 'update', 'patch', 'consolidate', 'restructure', 'extract', 'restore']) {
       expect(versionTarget(action), action).toBe('content')
     }
     for (const action of ['write_file', 'remove_file']) expect(versionTarget(action), action).toBe('support')
@@ -423,7 +423,7 @@ describe('skill-history: which artifact a version holds (0.10.1)', () => {
 
   describe('skill-history: what a person reads about a version (0.13.0)', () => {
     it('classifies every action the library can write, and fails closed on an unknown one', async () => {
-      for (const action of ['create', 'update', 'patch', 'edit', 'restore', 'delete', 'archive', 'consolidate', 'restructure', 'write_file', 'remove_file']) {
+      for (const action of ['create', 'update', 'patch', 'edit', 'restore', 'delete', 'archive', 'consolidate', 'restructure', 'extract', 'write_file', 'remove_file']) {
         expect(versionActionKind(action), action).not.toBe('other')
       }
       expect(versionActionKind(BASELINE_ACTION)).toBe('baseline')

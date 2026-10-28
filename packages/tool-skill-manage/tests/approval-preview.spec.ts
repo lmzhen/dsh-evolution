@@ -15,7 +15,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import { contentHash, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -108,6 +108,24 @@ describe('the staged skill write preview', () => {
     }) as { available: boolean; reason: string }
     expect(missing.available).toBe(false)
     expect(missing.reason).toContain('会被拒绝')
+  })
+
+  it('previews both roots of an extract without writing either', async () => {
+    const { root, preview } = await mount()
+    await mkdir(join(root, 'skills', 'preview-source'), { recursive: true })
+    await mkdir(join(root, 'skills', 'preview-target'), { recursive: true })
+    const source = '---\nname: preview-source\ndescription: source\n---\n\n# Source\n\nIntro.\n\n## Details\n\nreusable detail\n\n## Usage\n\nUse it.\n'
+    const target = '---\nname: preview-target\ndescription: target\n---\n\n# Target\n\nExisting.\n'
+    await writeFile(join(root, 'skills', 'preview-source', 'SKILL.md'), source)
+    await writeFile(join(root, 'skills', 'preview-target', 'SKILL.md'), target)
+    const answer = await preview({
+      operation: { action: 'extract', name: 'preview-source', extract: [{ heading: 'Details', to_skill: 'preview-target' }] },
+    }) as { available: boolean; path: string; before: string; after: string; files?: Array<{ path: string; before: string | null; after: string | null }> }
+    expect(answer.available).toBe(true)
+    expect(answer.path).toBe('preview-source/SKILL.md')
+    expect(answer.after).toContain('This capability now lives in preview-target')
+    expect(answer.files?.some(file => file.path === 'preview-target/SKILL.md' && file.after?.includes('reusable detail'))).toBe(true)
+    expect(await readFile(join(root, 'skills', 'preview-source', 'SKILL.md'), 'utf8')).toBe(source)
   })
 
   it('T2-04/A19: a SUPPORT-file patch is previewed byte-for-byte, with no SKILL.md frontmatter pass', async () => {

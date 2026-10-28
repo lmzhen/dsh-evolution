@@ -166,9 +166,10 @@ describe('tool-skill-manage', () => {
     // by 1151: the expression interpolates more than one constant, which is
     // exactly why this pin has to be runtime-captured.) De-duplication must
     // lower this number and say so; growth must be a deliberate edit here.
-    expect((tool?.description ?? '').length).toBe(4657)
+    expect((tool?.description ?? '').length).toBe(4879)
     expect(tool?.description ?? '').toContain('replace_all')
     expect(tool?.description ?? '').toContain('file_path')
+    expect(tool?.description ?? '').toContain('extract')
     const execute = (args: Record<string, unknown>) => ctx.tools.execute({
       callId: ToolCallId(`g51-${Math.random()}`),
       name: 'skill_manage',
@@ -502,6 +503,66 @@ Use it.
     expect(md).not.toContain('rc.99')
     const sidecar = await ctx.skillUsage.report()
     expect(sidecar.get('fat-body')?.patch_count).toBe(1)
+    await ctx.fiber.dispose()
+  })
+
+  it('action=extract moves a part into an existing owner', async () => {
+    const root = await tempHome('dsh-skill-extract-')
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.plugin(ToolSkillManage)
+    const source = `---
+name: extract-source
+description: extract fixture.
+---
+
+# Source
+
+Intro.
+
+## Details
+
+reusable detail
+
+## Usage
+
+Use it.
+`
+    const target = `---
+name: extract-target
+description: owner fixture.
+---
+
+# Target
+
+Existing.
+`
+    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+      callId: ToolCallId(`extract-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: arguments_,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect((await execute({ action: 'create', name: 'extract-source', content: source })).value?.ok).toBe(true)
+    expect((await execute({ action: 'create', name: 'extract-target', content: target })).value?.ok).toBe(true)
+    const planned = await execute({ action: 'extract', name: 'extract-source', dry_run: true, extract: [{ heading: 'Details', to_skill: 'extract-target' }] })
+    expect(planned.value?.ok).toBe(true)
+    const proposal = JSON.parse((planned.value as { proposal?: string }).proposal ?? '{}') as { outcome?: string; owner?: { mode?: string } }
+    expect(proposal.outcome).toBe('extract')
+    expect(proposal.owner?.mode).toBe('covered')
+    expect(await readFile(join(root, 'skills', 'extract-source', 'SKILL.md'), 'utf8')).toContain('reusable detail')
+    const extracted = await execute({ action: 'extract', name: 'extract-source', extract: [{ heading: 'Details', to_skill: 'extract-target' }] })
+    expect(extracted.value?.ok).toBe(true)
+    const sourceMd = await readFile(join(root, 'skills', 'extract-source', 'SKILL.md'), 'utf8')
+    const targetMd = await readFile(join(root, 'skills', 'extract-target', 'SKILL.md'), 'utf8')
+    expect(sourceMd).toContain('This capability now lives in extract-target')
+    expect(sourceMd).not.toContain('reusable detail')
+    expect(targetMd).toContain('## Details')
+    expect(targetMd).toContain('reusable detail')
     await ctx.fiber.dispose()
   })
 
