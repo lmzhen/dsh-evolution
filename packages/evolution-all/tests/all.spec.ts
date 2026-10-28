@@ -11,6 +11,8 @@ const manifest = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8
   name: string
   dependencies: Record<string, string>
   devDependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>
   dsh?: { bundle?: { patch?: string } }
 }
 
@@ -23,7 +25,6 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     '@deepseek-ai/dsh-evolution-merge-ui',
     '@deepseek-ai/dsh-tool-memory',
     '@deepseek-ai/dsh-tool-skill-manage',
-    '@deepseek-ai/dsh-tool-session-query',
     '@deepseek-ai/dsh-evolution-skill-catalog',
     '@deepseek-ai/dsh-evolution-agent-preset',
     // G4/S4.4: the browser cards. Its Host half registers nothing, so it adds no
@@ -43,6 +44,8 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe('workspace:^')
   }
   expect(Object.keys(manifest.dependencies).sort()).toEqual([...expected].sort())
+  expect(manifest.peerDependencies?.['@deepseek-ai/dsh-tool-session-query']).toBe('^0.2.1-rc.2')
+  expect(manifest.peerDependenciesMeta?.['@deepseek-ai/dsh-tool-session-query']?.optional).toBe(true)
 })
 
 it('G-C: every model row package named by the all.patch resolves in the dependency closure (0.3.54)', () => {
@@ -51,7 +54,7 @@ it('G-C: every model row package named by the all.patch resolves in the dependen
   // The infra rows are evolution-host's own contract (G-A pins the row bodies
   // to host.patch, whose dependency-contract covers them); all's OWN closure
   // must cover the four model rows plus the host package itself.
-  const declared = new Set([...Object.keys(manifest.dependencies), ...Object.keys(manifest.devDependencies ?? {})])
+  const declared = new Set([...Object.keys(manifest.dependencies), ...Object.keys(manifest.devDependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})])
   const modelNames = ['@deepseek-ai/dsh-tool-memory', '@deepseek-ai/dsh-tool-skill-manage', '@deepseek-ai/dsh-tool-session-query', '@deepseek-ai/dsh-evolution-skill-catalog']
   for (const row of rows) {
     const name = rowName(row)
