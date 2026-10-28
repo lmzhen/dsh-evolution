@@ -67,7 +67,7 @@ export function sessionReadSkillNames(ctx: Context, session: EvolutionSessionLog
 
 /** Actions whose target must have been read first (create is authorship, so it is exempt). */
 export const READ_REQUIRED_ACTIONS: readonly string[] = Object.freeze([
-  'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure',
+  'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract',
 ])
 
 /**

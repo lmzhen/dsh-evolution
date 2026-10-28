@@ -28,6 +28,7 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 import {
   errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, findOwnerCandidate, ownerCandidatesFromSummaries, parseFrontmatter, planExtract, proposalFromPlan, readExternalSupport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
@@ -1425,6 +1426,94 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           } catch (error) {
             return err(`预设安装失败：${error instanceof Error ? error.message : String(error)}`)
           }
+        }
+        if (input.startsWith('extract ')) {
+          const extractParsed = parseSubcommand(rawInputTrimmed)
+          if (isParseFailure(extractParsed) || extractParsed.name !== 'extract') {
+            return err('用法：/evolution extract <source> <target> "<## heading>" [--start <line>] [--end <line>]')
+          }
+          const source = extractParsed.positionals[0] ?? ''
+          const target = extractParsed.positionals[1] ?? ''
+          const heading = extractParsed.positionals[2] ?? ''
+          if (source === '' || target === '' || heading === '') {
+            return err('用法：/evolution extract <source> <target> "<## heading>" [--start <line>] [--end <line>]')
+          }
+          const startFlag = extractParsed.flags.get('start')
+          const endFlag = extractParsed.flags.get('end')
+          const start = typeof startFlag === 'string' ? startFlag : undefined
+          const end = typeof endFlag === 'string' ? endFlag : undefined
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
+            config: { root: skillsRootValue },
+            io: ioRegistry.provider(),
+            ctx,
+            threatExemptLabels: config.threatExemptLabels,
+            limits: {
+              ...DEFAULT_SKILL_LIMITS,
+              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+            },
+          })
+          const sourceMd = await library.read(source)
+          const targetMd = await library.read(target)
+          if (sourceMd === null) return err('技能「' + source + '」不存在。')
+          if (targetMd === null) return err('目标技能「' + target + '」不存在；owner-gap 不自动 create。')
+          if (source === target) return err('source 与 target 不能相同。')
+          const summaries = await library.list({ withContent: true, withFrontmatter: true })
+          const candidate = findOwnerCandidate(ownerCandidatesFromSummaries(source, summaries), target)
+          if (candidate === undefined) return err('目标「' + target + '」不是可用的 owner candidate（描述为空或已排除）；owner-gap，不自动 create。')
+          if (candidate.protectionUnknown || candidate.protectedBy !== null) return err('目标「' + target + '」受保护（' + (candidate.protectedBy ?? '未知') + '），拒绝提取。')
+          const sourceParsed = parseFrontmatter(sourceMd)
+          if (sourceParsed === null) return err('技能「' + source + '」没有可读取的正文。')
+          const sourceFiles = await library.listSupportFiles(source)
+          const targetFiles = await library.listSupportFiles(target)
+          if (!isPresent(sourceFiles) || !isPresent(targetFiles)) return err('支撑文件列表不可读；拒绝在不确定的闭包上提取。')
+          const external = await readExternalSupport(sourceParsed.body, join(library.root, source), dirname(library.root), targetFiles.value)
+          if (!external.ok) return err(external.message)
+          const plan = planExtract({
+            body: sourceParsed.body,
+            sourceName: source,
+            targetName: target,
+            targetExists: true,
+            outcome: start !== undefined || end !== undefined ? 'mixed' : 'extract',
+            owner: { mode: 'covered', name: target, triggerCovers: true, outcomeCovers: true, reason: 'explicit target' },
+            requests: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }) }],
+            sourceFiles: sourceFiles.value,
+            targetFiles: targetFiles.value,
+            external: external.files,
+            anchors: { sourceMdSha256: contentHash(sourceMd), targetMdSha256: contentHash(targetMd) },
+          })
+          if (!plan.ok) return err(plan.message)
+          if (extractParsed.flags.has('plan')) {
+            const proposal = proposalFromPlan(plan.plan, { runId: 'cli-' + Date.now().toString(36) })
+            const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+            const io = registry?.provider()
+            if (io !== undefined) await writeProposalReport(io, proposal).catch(() => { /* best-effort proposal report */ })
+            return ok('提取计划（未写入）：' + plan.plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target)
+          }
+          if (approval) {
+            const session = invocationAgent?.session
+            const sessionPolicy = effectiveSessionPolicy(ctx, session)
+            const stagesForeground = approval.isEnabled !== false
+              && sessionPolicy !== 'never'
+              && approval.stageForeground !== false
+            if (stagesForeground && session === undefined) return err(errorText('e-306-this-deployment-stages-foreground-2'))
+            if (stagesForeground && !approval.hasRunner('skill')) {
+              return err('无法暂存提取：没有注册技能回放运行器：请挂载 tool-skill-manage 行，或禁用 evolution-approval。')
+            }
+            const decision = await approval.request({
+              kind: 'skill',
+              summary: '/evolution extract ' + source + ' -> ' + target + ' ' + heading,
+              args: { operation: { action: 'extract', name: source, extract: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }] }, origin: 'foreground', libraryOrigin: 'foreground' },
+              origin: 'foreground',
+              ...session !== undefined ? { sessionId: session.id, session } : {},
+              ...sessionPolicy !== undefined ? { sessionPolicy } : {},
+            })
+            if (decision.action === 'staged') return ok(decision.message)
+          }
+          const result = await library.extract(plan.plan, 'foreground')
+          if (!result.ok) return err(result.message)
+          return ok(result.message)
         }
         if (input.startsWith('restructure ')) {
           // /evolution restructure <name> "<heading>" <to_file> [--plan <runId>]

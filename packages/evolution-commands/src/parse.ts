@@ -23,7 +23,7 @@ export const VALUE_FLAGS: readonly string[] = [
   // No `profile`: the word only appears in the preset row's PROSE, no command declares a value-taking
   // `--profile`, and nothing reads `flags.get('profile')`. Kept honest by the measurement, not by
   // leaving a name standing (independent review P2-4).
-  'group', 'expect', 'base', 'to', 'timeout', 'plan',
+  'group', 'expect', 'base', 'to', 'timeout', 'plan', 'start', 'end',
 ]
 
 /** One parsed command line. */

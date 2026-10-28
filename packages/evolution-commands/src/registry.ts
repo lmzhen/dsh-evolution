@@ -80,6 +80,7 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { readonly: true, usage: 'params [--group <name>] [--json]', summary: '列出全部参数：分组、档位、生效时机、来源与当前值（--json 便于脚本处理）' },
   { readonly: false, usage: 'preset install [--base <name>[,<name>...]]', summary: '把自进化 Agent 预设**行**写进当前 profile 的 patch 层（`profiles/<p>/cordis.patch.yml`；bases 来自 agent 包的 bases.json）' },
   { readonly: false, usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]', summary: '把技能正文的一节移到 references 文件' },
+  { readonly: false, usage: 'extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--plan <runId>]', summary: '把源技能的可复用部分提取到已有类级 owner（多根一次事务）' },
   { readonly: true, usage: 'replay', summary: '比较不同会话与重启之间的计划结果（从活动记录回填）' },
 ]
 

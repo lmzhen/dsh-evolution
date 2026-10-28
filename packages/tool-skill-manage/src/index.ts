@@ -18,6 +18,7 @@
  * @module @deepseek-ai/dsh-tool-skill-manage
  */
 
+import { dirname, join } from 'node:path'
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
@@ -27,6 +28,7 @@ import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
+import { findOwnerCandidate, ownerCandidatesFromSummaries, planExtract, projectExtractBodies, proposalFromPlan, readExternalSupport, type ExtractPlanDraft } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, LiveValue, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -205,7 +207,71 @@ export function validateSkillSettings(
  * The library surface the preview reads. The write path owns the rest (locks, gates, audit), and none
  * of it runs here: a preview reads the CURRENT bytes and computes what the replay would store.
  */
-type PreviewLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'read' | 'readSupportFile' | 'readSkillProbe' | 'readSupportFileProbe'>
+type PreviewLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'root' | 'read' | 'list' | 'readSupportFile' | 'readSkillProbe' | 'readSupportFileProbe' | 'listSupportFiles'>
+
+type ExtractPlanLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'root' | 'read' | 'list' | 'listSupportFiles'>
+
+/** Build the one G1 plan both the execute path and the preview path consume. */
+async function buildExtractPlan(
+  library: ExtractPlanLibrary,
+  operation: SkillWriteArgs,
+): Promise<{ ok: true; plan: ExtractPlanDraft } | { ok: false; message: string }> {
+  const source = typeof operation.name === 'string' ? operation.name.trim() : ''
+  const raw = Array.isArray(operation.extract) ? operation.extract : []
+  if (source === '' || raw.length === 0) return { ok: false, message: 'extract 需要 name 与至少一个 extract 项。' }
+  const requests: Array<{ heading: string; start?: string; end?: string }> = []
+  let target = ''
+  for (const item of raw) {
+    if (item === null || typeof item !== 'object') return { ok: false, message: 'extract 的每一项都必须是对象。' }
+    const heading = typeof item.heading === 'string' ? item.heading.trim() : ''
+    const toSkill = typeof item.to_skill === 'string' ? item.to_skill.trim() : ''
+    if (heading === '' || toSkill === '') return { ok: false, message: 'extract 的每一项都需要 heading 与 to_skill。' }
+    if (target === '') target = toSkill
+    if (target !== toSkill) return { ok: false, message: '一次 extract 只能有一个 to_skill；多目标请分多次调用。' }
+    if (item.to_heading !== undefined && item.to_heading !== heading) {
+      return { ok: false, message: 'to_heading 暂不支持改名；G3 要求 heading 与 to_heading 相同。' }
+    }
+    requests.push({
+      heading,
+      ...(typeof item.start === 'string' ? { start: item.start } : {}),
+      ...(typeof item.end === 'string' ? { end: item.end } : {}),
+    })
+  }
+  const sourceMd = await library.read(source)
+  if (sourceMd === null) return { ok: false, message: '技能「' + source + '」不存在。' }
+  const targetMd = await library.read(target)
+  if (targetMd === null) return { ok: false, message: '目标技能「' + target + '」不存在；owner-gap 不自动 create。' }
+  if (source === target) return { ok: false, message: 'source 与 target 不能相同。' }
+  const summaries = await library.list({ withContent: true, withFrontmatter: true })
+  const candidate = findOwnerCandidate(ownerCandidatesFromSummaries(source, summaries), target)
+  if (candidate === undefined) return { ok: false, message: '目标「' + target + '」不是可用的 owner candidate（描述为空或已排除）；owner-gap，不自动 create。' }
+  if (candidate.protectionUnknown || candidate.protectedBy !== null) {
+    return { ok: false, message: '目标「' + target + '」受保护（' + (candidate.protectedBy ?? '未知') + '），拒绝提取。' }
+  }
+  const parsed = parseFrontmatter(sourceMd)
+  if (parsed === null) return { ok: false, message: '技能「' + source + '」没有可读取的正文。' }
+  const sourceProbe = await library.listSupportFiles(source)
+  const targetProbe = await library.listSupportFiles(target)
+  if (!isPresent(sourceProbe) || !isPresent(targetProbe)) return { ok: false, message: '支撑文件列表不可读；拒绝在不确定的闭包上提取。' }
+  const external = await readExternalSupport(parsed.body, join(library.root, source), dirname(library.root), targetProbe.value)
+  if (!external.ok) return { ok: false, message: external.message }
+  const outcome = requests.some(request => request.start !== undefined || request.end !== undefined) ? 'mixed' : 'extract'
+  const plan = planExtract({
+    body: parsed.body,
+    sourceName: source,
+    targetName: target,
+    targetExists: true,
+    outcome,
+    owner: { mode: 'covered', name: target, triggerCovers: true, outcomeCovers: true, reason: 'explicit target' },
+    requests,
+    sourceFiles: sourceProbe.value,
+    targetFiles: targetProbe.value,
+    external: external.files,
+    anchors: { sourceMdSha256: contentHash(sourceMd), targetMdSha256: contentHash(targetMd) },
+  })
+  if (!plan.ok) return { ok: false, message: plan.message }
+  return { ok: true, plan: plan.plan }
+}
 
 /**
  * What the staged skill write WOULD store, resolved WITHOUT writing.
@@ -283,6 +349,28 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
       ? { available: false, reason: '该支撑文件不存在，无法移除' }
       : { available: true, path, before, after: null }
   }
+  if (action === 'extract') {
+    const built = await buildExtractPlan(library, operation)
+    if (!built.ok) return { available: false, reason: built.message }
+    const source = built.plan.source
+    const target = built.plan.target.name
+    const sourceBefore = await library.read(source)
+    const targetBefore = await library.read(target)
+    if (sourceBefore === null || targetBefore === null) return { available: false, reason: 'source/target 在预览期间不可读。' }
+    const projected = projectExtractBodies(built.plan, sourceBefore, targetBefore)
+    if (!projected.ok) return { available: false, reason: projected.message }
+    const files: Array<{ path: string; before: string | null; after: string | null }> = [
+      { path: source + '/SKILL.md', before: sourceBefore, after: projected.projection.sourceAfter },
+      { path: target + '/SKILL.md', before: targetBefore, after: projected.projection.targetAfter },
+    ]
+    for (const move of [...built.plan.support.shared, ...built.plan.support.exclusive]) {
+      files.push({ path: target + '/' + move.to, before: await library.readSupportFile(target, move.to), after: await library.readSupportFile(source, move.from) })
+    }
+    for (const move of built.plan.support.exclusive) {
+      files.push({ path: source + '/' + move.from, before: await library.readSupportFile(source, move.from), after: null })
+    }
+    return { available: true, path: source + '/SKILL.md', before: sourceBefore, after: projected.projection.sourceAfter, files }
+  }
   return { available: false, reason: '"' + action + '" has no byte-level preview' }
 }
 
@@ -298,6 +386,10 @@ interface SkillWriteArgs {
   absorbed_into?: string
   /** restructure: body sections (by exact `## heading`) moved to references/ (008 batch B). */
   restructure?: Array<{ heading?: string; to_file?: string }>
+  /** extract: parts moved to an existing class-level owner. */
+  extract?: Array<{ heading?: string; start?: string; end?: string; to_skill?: string; to_heading?: string }>
+  /** extract plan only; no write. */
+  dry_run?: boolean
   /** v23 (AP-3): stage-time content hash of the target skill, attached to
    * update/edit stagings so the replay can refuse a stale full-content
    * overwrite (memory carries old_text for the same purpose). Absent on
@@ -738,7 +830,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     /** T2-05/A20: the whole-tree observation the cross-source gate already made for THIS operation
      * (undefined when the gate did not run or its view was empty/unreadable). */
     crossSourceView?: readonly SkillSummary[],
-  ): Promise<{ ok: boolean; message: string; skills: string[] }> {
+  ): Promise<{ ok: boolean; message: string; skills: string[]; proposal?: string }> {
     // T2-09/A24: re-materialize the write caps HERE, not only at the tool entry. The approve path
     // (registerRunner) calls this function directly, so a deployment that TIGHTENED skillContentChars /
     // maxSkillFileBytes while the record sat pending used to replay the write under the old, wider caps —
@@ -749,6 +841,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     applyLimits()
     const action = args.action
     const name = args.name ?? ''
+    if (action === 'extract' && origin === 'background_review') {
+      return { ok: false, message: '背景审查不能执行 extract：review 只提议；提取必须由显式前台工具/命令执行。', skills: [] }
+    }
     if (action === 'review') {
       // v31 TSM-05: the tree scan fails loud on a transient read error
       // (REG-01 posture) — the tool surface owes the model a structured
@@ -810,6 +905,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
     }
     let result
+    let proposal: string | undefined
     if (action === 'create') {
       // Batch C (2026-09-27, design §3C-2): the create-time near-duplicate hint
       // rides the SAME "Authoring check" channel the description bar uses — one
@@ -847,6 +943,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           heading: typeof move.heading === 'string' ? move.heading : '',
           toFile: typeof move.to_file === 'string' ? move.to_file : '',
         })), origin)
+      }
+    }
+    else if (action === 'extract') {
+      const built = await buildExtractPlan(library, args)
+      if (!built.ok) {
+        result = { ok: false, message: built.message }
+      } else {
+        proposal = JSON.stringify(proposalFromPlan(built.plan, { runId: 'tool-' + Date.now().toString(36) }))
+        result = args.dry_run === true
+          ? { ok: true, message: '提取计划（未写入）：' + built.plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + built.plan.target.name }
+          : await library.extract(built.plan, origin)
       }
     }
     else if (action === 'pin') result = await library.setPinned(name, true, origin)
@@ -903,6 +1010,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         ? `${result.message}\n\nAuthoring check:\n${feedbackLines.map(line => `- ${line}`).join('\n')}`
         : result.message,
       skills: [],
+      ...(proposal === undefined ? {} : { proposal }),
     }
   }
 
@@ -1045,10 +1153,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       + 'Per-action arguments: patch needs name + old_string + new_string and patches SKILL.md unless file_path names a support file (e.g. "references/topic.md"); patch replaces the FIRST occurrence only unless replace_all=true, and the result message reports how many anchors the file carried. write_file needs name + file_path + file_content; remove_file needs name + file_path; create/edit/update need name + content; delete needs name. A rejected patch names the reason and the remedy (missing anchor, stale snapshot, frontmatter that cannot be auto-quoted, byte/char limit). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
-      + 'restructure moves entire body sections (by their exact "## heading" line, via restructure: [{heading, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change.'
+      + 'restructure moves entire body sections (by their exact "## heading" line, via restructure: [{heading, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change. '
+      + 'extract moves a reusable part (exact heading, optional start/end sub-block) into an existing class-level owner: extract: [{heading, start?, end?, to_skill}]. One target per call; owner-gap is reported, never auto-created.'
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
-      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'pin', 'unpin'] },
+      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract', 'pin', 'unpin'] },
       name: { type: 'string' },
       content: { type: 'string' },
       old_string: { type: 'string' },
@@ -1058,6 +1167,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       file_content: { type: 'string' },
       absorbed_into: { type: 'string' },
       restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, to_file: { type: 'string' } } } },
+      extract: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_skill: { type: 'string' }, to_heading: { type: 'string' } } } },
+      dry_run: { type: 'boolean' },
     },
     output: {
       schema: {
@@ -1068,6 +1179,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           message: { type: 'string', required: true },
           skills: { type: 'array', required: true, items: { type: 'string' } },
           pending_id: { type: 'string' },
+          proposal: { type: 'string' },
         },
       },
       render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` }],

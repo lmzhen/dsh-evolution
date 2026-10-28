@@ -78,6 +78,8 @@ export type PreviewAnswer =
     readonly before: string | null
     /** The bytes it would write; null when the operation removes the target. */
     readonly after: string | null
+    /** Additional files the operation writes or deletes (multi-root extract). */
+    readonly files?: readonly { readonly path: string; readonly before: string | null; readonly after: string | null }[]
   }
   | { readonly available: false; readonly reason: string }
 

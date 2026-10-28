@@ -47,6 +47,6 @@ export function apply(ctx: ClientContext): void {
     styles: { css: CSS, tagId: CSS_TAG_ID },
     icon: PanelIcon,
     component: SkillHealthPanel as unknown as (props: never) => ReactElement,
-    body: t => ({ rows: [], truncated: false, loadRows: api.rows, t }),
+    body: t => ({ rows: [], proposals: [], truncated: false, loaded: false, proposalStatus: 'unavailable', loadRows: api.rows, t }),
   })
 }

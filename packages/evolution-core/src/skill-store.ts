@@ -33,7 +33,7 @@
  * (OPT-07); the movers' probe→rename window is owned by the io.ts protocol.
  */
 
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { authorityFrom, type WriteAuthority } from './write-authority.ts'
 import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
@@ -47,7 +47,9 @@ import { applyReferenceRewrite, describeReferenceRewrite, planReferenceRewrite, 
 import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFrontmatter, shrinksOverLimit, validateFrontmatter } from './frontmatter.ts'
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
 import { makeSerialQueue } from './serial.ts'
-import { h2Sections } from './document-body.ts'
+import { supportRefs } from './support-refs.ts'
+import { selectSections } from './section-selection.ts'
+import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
@@ -614,26 +616,6 @@ interface PlannedRestructureSection {
 /** Planned section extraction (pure; no IO): new body + extracted section texts. */
 type RestructurePlan = { error: string } | { body: string; sections: PlannedRestructureSection[] }
 
-/**
- * Support-directory references in a markdown body (009 kernel): `references/…`,
- * `templates/…`, `scripts/…`, `assets/…` relative links — any extension and
- * nested paths (v7 audit P3-1: `.md`-only matching missed `scripts/run.sh` and
- * `references/sub/x.md`, both of which dangle just like a `.md` link once the
- * source package is archived). Pure — who checks them and what the verdict is
- * belongs to the caller's context (a moved/appended body whose references
- * travel with an archived source is a dangling link; a restructure pointer is
- * a fresh link to a file written in the same plan). `..` traversal is a
- * different defect class (path validation owns it) and is not a support link.
- */
-export function supportRefs(content: string): string[] {
-  const refs: string[] = []
-  for (const match of content.matchAll(/\b(?:references|templates|scripts|assets)\/[A-Za-z0-9._/-]+/g)) {
-    const ref = match[0]
-    if (ref.includes('..')) continue
-    refs.push(ref)
-  }
-  return refs
-}
 
 /**
  * One content write of a tree-change plan; `target` is an absolute path.
@@ -649,19 +631,47 @@ interface TreeChangeWrite {
   target: string
   content: string
   expected?: string | null
+  /** Skill this path belongs to; omitted on the legacy single-root plan. */
+  skill?: string
+}
+
+/** One deletion in a tree-change plan; expected is the plan-time baseline for CAS. */
+interface TreeChangeDelete {
+  target: string
+  expected?: string | null
+  skill?: string
+}
+
+/** Ordered write/delete operation. ops takes precedence over writes/deletes when present. */
+type TreeChangeOp =
+  | { kind: 'write'; target: string; content: string; expected?: string | null; skill?: string }
+  | { kind: 'delete'; target: string; expected?: string | null; skill?: string }
+
+/** One declared root; names are validated and each root's own protection applies. */
+interface TreeChangeRoot {
+  name: string
+  protection: 'write' | 'delete' | 'none'
 }
 
 /**
- * Deterministic tree-change plan (009 kernel): a batch of content writes with
- * one commit point. The kernel owns validation order, pre-read versions,
- * rollback bytes, audit and the mutation event — mutators compose plans, they
- * never implement two-phase commit themselves.
+ * Deterministic tree-change plan (009 kernel): a batch of content writes (and,
+ * for multi-root extract, deletes) with one commit point. The kernel owns
+ * validation order, pre-read versions, rollback bytes, audit and the mutation
+ * event — mutators compose plans, they never implement two-phase commit
+ * themselves.
  */
 interface TreeChangePlan {
+  /** Primary/legacy skill; also the first root when roots is absent. */
   name: string
   origin: WriteOrigin
+  /** Legacy root protection; ignored when roots is present. */
   protection: 'write' | 'delete' | 'none'
+  /** Explicit roots for a cross-skill unit; first root must include name. */
+  roots?: TreeChangeRoot[]
   writes: TreeChangeWrite[]
+  deletes?: TreeChangeDelete[]
+  /** Ordered operations; when present, writes/deletes are ignored. */
+  ops?: TreeChangeOp[]
   auditAction: string
   auditSummary: string
   eventAction: string
@@ -675,31 +685,22 @@ interface TreeChangePlan {
 }
 
 function planRestructureSections(body: string, moves: SkillRestructureMove[]): RestructurePlan {
-  // G3: the anchor scan has ONE home — document-body's `h2Sections`. A candidate list built from
-  // that function can never name a heading this planner refuses (missing / ambiguous), and the H2
-  // boundary rule (a section spans to the next H2 or EOF) lives there too. The four rejections
-  // below are the store's contract and keep their exact wording.
+  // One scan (h2Sections) and one selection rule; extract reuses the same
+  // selector for start/end sub-blocks, so restructure and extract cannot drift
+  // on heading ambiguity, empty sections or duplicate moves.
+  const selection = selectSections(body, moves.map(move => ({ heading: move.heading })))
+  if (!selection.ok) return { error: selection.message }
   const lines = body.split('\n')
-  const sections = h2Sections(body)
-  const spans: Array<{ start: number; end: number; rel: string; heading: string; text: string }> = []
-  for (const move of moves) {
-    const wanted = move.heading.trim()
-    const matching = sections.filter(section => section.title === wanted)
-    if (matching.length === 0) return { error: `no "## ${wanted}" heading in the body` }
-    if (matching.length > 1) return { error: `heading "## ${wanted}" appears ${matching.length} times (ambiguous anchor)` }
-    const section = matching[0]
-    if (section === undefined) return { error: `no "## ${wanted}" heading in the body` }
-    const { start, end } = section
-    if (end === start + 1) return { error: `heading "## ${wanted}" has an empty section` }
-    if (spans.some(span => start === span.start)) return { error: `heading "## ${wanted}" is moved twice` }
-    spans.push({
-      start,
-      end,
-      rel: move.toFile,
-      heading: wanted,
-      text: lines.slice(start, end).join('\n'),
-    })
-  }
+  const spans = selection.sections.map(section => {
+    const move = moves[section.requestIndex]
+    return {
+      start: section.start,
+      end: section.end,
+      rel: move?.toFile ?? '',
+      heading: section.heading,
+      text: section.text,
+    }
+  })
   // Rebuild the body line-wise: a moved section collapses to its pointer line.
   const byStart = new Map(spans.map(span => [span.start, span]))
   const rebuilt: string[] = []
@@ -3053,40 +3054,140 @@ export class SkillLibrary {
    * restructure (and future reference-mode consolidations) never implement
    * two-phase commit themselves.
    */
+  /**
+   * Apply one G1 ExtractPlan as one cross-skill unit. This is a thin adapter:
+   * selection, residual, pointer and support closure were already decided by
+   * planExtract; this method only projects them into ordered kernel operations.
+   * @param plan - pure plan from extract-plan.ts.
+   * @param origin - write face recorded in the audit ledger.
+   * @returns the kernel result; a refusal writes nothing.
+   */
+  async extract(plan: ExtractPlanDraft, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+    if (plan.outcome === 'owner-gap' || plan.owner.mode !== 'covered') return { ok: false, message: '提取被拒绝：owner-gap 不是写操作。' }
+    if (plan.support.unresolved.length > 0 || plan.support.dangling.length > 0) return { ok: false, message: '提取被拒绝：support closure 存在 unresolved/dangling。' }
+    if (plan.parts.length === 0) return { ok: false, message: '提取被拒绝：没有 part。' }
+    const source = plan.source.trim()
+    const target = plan.target.name.trim()
+    if (source === target) return { ok: false, message: '提取被拒绝：source 与 target 相同。' }
+    if (plan.target.exists !== true) return { ok: false, message: '提取被拒绝：target 不存在；owner-gap 不自动 create。' }
+    const sourceDir = this.dirOf(source)
+    const targetDir = this.dirOf(target)
+    const sourceMd = await this.io.readText(join(sourceDir, 'SKILL.md'))
+    const targetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
+    if (sourceMd === null) return { ok: false, message: '技能「' + source + '」不存在。' }
+    if (targetMd === null) return { ok: false, message: '技能「' + target + '」不存在。' }
+    if (plan.anchors !== undefined) {
+      const sourceHash = contentHash(sourceMd)
+      const targetHash = contentHash(targetMd)
+      if (sourceHash !== plan.anchors.sourceMdSha256 || targetHash !== plan.anchors.targetMdSha256) {
+        return { ok: false, message: '提取被拒绝：source/target 在计划之后发生了变化；请重新计划。' }
+      }
+    }
+    const projected = projectExtractBodies(plan, sourceMd, targetMd)
+    if (!projected.ok) return { ok: false, message: '提取被拒绝：' + projected.message }
+    const sourceNew = projected.projection.sourceAfter
+    const targetNew = projected.projection.targetAfter
+    const ops: TreeChangeOp[] = []
+    for (const move of [...plan.support.shared, ...plan.support.exclusive]) {
+      const fromPath = join(sourceDir, ...move.from.split('/'))
+      const toPath = join(targetDir, ...move.to.split('/'))
+      const content = await this.io.readText(fromPath)
+      if (content === null) return { ok: false, message: '提取被拒绝：support 文件不存在 ' + move.from }
+      const previous = await this.readForCas(toPath)
+      ops.push({ kind: 'write', target: toPath, content, expected: previous, skill: target })
+    }
+    for (const file of plan.support.external) {
+      if (file.content === undefined) return { ok: false, message: '提取被拒绝：external support 缺少已验证的内容 ' + file.from }
+      if (file.to.startsWith('/') || file.to.includes('..') || !/^(?:references|templates|scripts|assets)\//.test(file.to)) {
+        return { ok: false, message: '提取被拒绝：external target 不安全 ' + file.to }
+      }
+      const toPath = join(targetDir, ...file.to.split('/'))
+      const previous = await this.readForCas(toPath)
+      ops.push({ kind: 'write', target: toPath, content: file.content, expected: previous, skill: target })
+    }
+    ops.push({ kind: 'write', target: join(targetDir, 'SKILL.md'), content: targetNew, expected: targetMd, skill: target })
+    for (const move of plan.support.exclusive) {
+      const sourcePath = join(sourceDir, ...move.from.split('/'))
+      const previous = await this.readForCas(sourcePath)
+      if (previous === null) return { ok: false, message: '提取被拒绝：待删除 support 不存在 ' + move.from }
+      ops.push({ kind: 'delete', target: sourcePath, expected: previous, skill: source })
+    }
+    ops.push({ kind: 'write', target: join(sourceDir, 'SKILL.md'), content: sourceNew, expected: sourceMd, skill: source })
+    return this.applyTreeChange({
+      name: source,
+      origin,
+      protection: 'write',
+      roots: [{ name: source, protection: 'write' }, { name: target, protection: 'write' }],
+      writes: [],
+      ops,
+      auditAction: 'extract',
+      auditSummary: 'extract ' + plan.parts.map(part => part.heading).join(', ') + ' from ' + source + ' to ' + target,
+      eventAction: 'extract',
+    })
+  }
+
   private async applyTreeChange(plan: TreeChangePlan): Promise<SkillActionResult> {
-    const name = plan.name.trim()
-    const badName = this.badName(name, { allowReserved: true })
-    if (badName) return { ok: false, message: badName }
-    const dir = this.dirOf(name)
-    const md = await this.io.readText(join(dir, 'SKILL.md'))
-    if (!md) return { ok: false, message: `技能「${name}」不存在。` }
-    const protection = plan.protection === 'write'
-      ? await this.writeProtection(name, plan.origin)
-      : plan.protection === 'delete'
-        ? await this.deleteProtection(name)
-        : null
-    if (protection) return { ok: false, message: `技能「${name}」受保护（${protection}）。` }
-    // Pre-read EVERY write target: the rollback bytes are kernel-owned and the
-    // caller cannot fabricate them. The same read feeds the append semantics of
-    // restructure (the caller re-reads for its own construction — kernel reads
-    // again because the bytes it restores must be the bytes on disk at commit).
-    const landing: Array<{ target: string; content: string; previous: string | null; expected: string | null | undefined }> = []
-    for (const write of plan.writes) {
-      // A1-11 (v18): a read failure (EACCES/EIO) is NOT "missing" —
-      // treating it as null made the rollback delete a file it could not
-      // restore. Refuse the whole plan before any write.
+    const primaryName = plan.name.trim()
+    const declared = plan.roots ?? [{ name: primaryName, protection: plan.protection }]
+    const roots: Array<{ name: string; protection: 'write' | 'delete' | 'none'; dir: string }> = []
+    for (const root of declared) {
+      const name = root.name.trim()
+      if (roots.some(entry => entry.name === name)) return { ok: false, message: '目录树变更声明了重复的根「' + name + '」。' }
+      const badName = this.badName(name, { allowReserved: true })
+      if (badName) return { ok: false, message: badName }
+      const dir = this.dirOf(name)
+      const body = await this.io.readText(join(dir, 'SKILL.md'))
+      if (!body) return { ok: false, message: '技能「' + name + '」不存在。' }
+      const protection = root.protection === 'write'
+        ? await this.writeProtection(name, plan.origin)
+        : root.protection === 'delete'
+          ? await this.deleteProtection(name)
+          : null
+      if (protection) return { ok: false, message: '技能「' + name + '」受保护（' + protection + '）。' }
+      roots.push({ name, protection: root.protection, dir })
+    }
+    if (!roots.some(root => root.name === primaryName)) {
+      return { ok: false, message: '目录树变更的 primary skill「' + primaryName + '」不在 roots 中。' }
+    }
+    const provided: TreeChangeOp[] = plan.ops ?? [
+      ...plan.writes.map(write => ({ kind: 'write' as const, ...write })),
+      ...(plan.deletes ?? []).map(del => ({ kind: 'delete' as const, ...del })),
+    ]
+    if (provided.length === 0) return { ok: false, message: '目录树变更为空。' }
+    const landing: Array<{
+      kind: 'write' | 'delete'
+      target: string
+      content: string | null
+      previous: string | null
+      expected: string | null | undefined
+      skill: string
+      dir: string
+      rel: string
+    }> = []
+    for (const op of provided) {
+      const owner = roots.find(root => {
+        const rel = relative(root.dir, op.target)
+        return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+      })
+      if (owner === undefined) return { ok: false, message: '目标不属于任何声明的技能根：' + op.target }
+      const skill = op.skill ?? owner.name
+      if (!roots.some(root => root.name === skill)) return { ok: false, message: '目标声明的技能「' + skill + '」不在 roots 中：' + op.target }
       let previous: string | null
       try {
-        previous = await this.io.readText(write.target)
+        previous = await this.io.readText(op.target)
       } catch (error) {
-        return { ok: false, message: `拒绝目录树变更：无法安全预读 ${write.target}（${error instanceof Error ? error.message : String(error)}）；未执行任何写入` }
+        return { ok: false, message: '拒绝目录树变更：无法安全预读 ' + op.target + '（' + (error instanceof Error ? error.message : String(error)) + '）；未执行任何写入' }
       }
-      if (Buffer.byteLength(write.content, 'utf8') > this.limits.maxSkillFileBytes) {
-        return { ok: false, message: `写入超过 ${this.limits.maxSkillFileBytes} 字节：${write.target}` }
+      if (op.kind === 'delete' && previous === null) return { ok: false, message: '拒绝目录树变更：删除目标不存在 ' + op.target }
+      if (op.kind === 'write') {
+        if (Buffer.byteLength(op.content, 'utf8') > this.limits.maxSkillFileBytes) {
+          return { ok: false, message: '写入超过 ' + this.limits.maxSkillFileBytes + ' 字节：' + op.target }
+        }
+        const threat = this.contentThreatBlock(op.content)
+        if (threat) return { ok: false, message: threat }
       }
-      const threat = this.contentThreatBlock(write.content)
-      if (threat) return { ok: false, message: threat }
-      landing.push({ target: write.target, content: write.content, previous, expected: write.expected })
+      const rel = relative(owner.dir, op.target).split(String.fromCharCode(92)).join('/')
+      landing.push({ kind: op.kind, target: op.target, content: op.kind === 'write' ? op.content : null, previous, expected: op.expected, skill, dir: owner.dir, rel })
     }
     const written: Array<{ target: string; previous: string | null }> = []
     let durabilityWarning = ''
@@ -3094,70 +3195,32 @@ export class SkillLibrary {
       for (const entry of landing) {
         try {
           if (this.transact) {
-            // v22 (LOCK-1): CAS write — the previous blind writeText committed
-            // plan-time bytes over whatever was on disk, so a concurrent
-            // patch/update (another process, shared DSH_HOME) between the
-            // pre-read above and this write was silently overwritten (lost
-            // update; both writers reported success). The task only commits
-            // when the disk still holds the pre-read baseline; any drift
-            // aborts the plan into the rollback below.
-            // v24 (V24-01): the CAS baseline is the caller's PLAN-TIME bytes
-            // (`expected`) when the write carries them — the pre-read above
-            // only supplies the rollback bytes. Lock-1's own pre-read baseline
-            // still left a window for appends/merges built from an earlier
-            // read: a concurrent write landing between planning and the
-            // pre-read became the CAS baseline, so plan-time content
-            // (composed WITHOUT it) committed cleanly over it — lost update,
-            // both writers successful. Comparing against the plan-time bytes
-            // closes the whole planning→commit span.
-            // P3 (v22; gate fix 0.3.66): the flag lives in a holder so the
-            // control-flow analysis (which cannot see the transact callback's
-            // assignment) does not narrow it to a literal `false`.
             const baseline = entry.expected === undefined ? entry.previous : entry.expected
             const drift = { seen: false }
-            // S1.4 (v37 P2-7): a transact backend that never invokes the task
-            // (the V6-19 contract) would leave BOTH holders at their initial
-            // values and this write would be reported as a success.
             const ran = { done: false }
             await this.transact(this.io, entry.target, (current) => {
-              // v43 audit (FLOW3-1): per-attempt reset. This callback re-runs on a
-              // lock-loss retry, and a stale `drift.seen` from the previous
-              // attempt threw "concurrent modification" even when the retry's own
-              // write had landed — a partial tree change reported as a failure.
               drift.seen = false
               ran.done = true
               if (current !== baseline) {
                 drift.seen = true
                 return current
               }
-              return entry.content
+              return entry.kind === 'delete' ? null : entry.content
             })
-            if (!ran.done) {
-              throw new Error(`internal error: the write transaction for ${entry.target} did not invoke the task; nothing was written`)
-            }
-            if (drift.seen) {
-              throw new Error(`concurrent modification detected: ${entry.target} changed after the plan was computed (a concurrent writer won the race); no further writes were performed`)
-            }
+            if (!ran.done) throw new Error('internal error: the write transaction for ' + entry.target + ' did not invoke the task; nothing was written')
+            if (drift.seen) throw new Error('concurrent modification detected: ' + entry.target + ' changed after the plan was computed (a concurrent writer won the race); no further writes were performed')
+          } else if (entry.kind === 'delete') {
+            await this.io.remove(entry.target)
           } else {
-            // No transact backend: the previous blind write (the class was
-            // constructed without cross-process exclusion anyway).
-            await this.io.writeText(entry.target, entry.content)
+            await this.io.writeText(entry.target, entry.content ?? '')
           }
         } catch (error) {
-          // A1-15 (v18): a post-rename dir-fsync failure means the bytes DID
-          // land — rolling back would delete a visible write, and the audit/
-          // event below must still run. Record it and keep going.
           if (!isCommittedOnly(error)) throw error
           durabilityWarning = error instanceof Error ? error.message : String(error)
         }
         written.push({ target: entry.target, previous: entry.previous })
       }
     } catch (error) {
-      // V27 G8.3: the rollback is best-effort (the .backups snapshot is the
-      // recovery path when the caller took one), so the result must not claim a
-      // rollback that did not happen. Track which targets failed to roll back
-      // and name them; a silent `.catch` made the message a promise the code
-      // never made.
       const stuck: string[] = []
       for (const entry of written.reverse()) {
         try {
@@ -3168,56 +3231,39 @@ export class SkillLibrary {
         }
       }
       const reason = error instanceof Error ? error.message : String(error)
-      if (stuck.length === 0) return { ok: false, message: `目录树变更失败，已回滚：${reason}` }
-      return { ok: false, message: `目录树变更失败：${reason}。回滚无法恢复 ${stuck.join(', ')}：可恢复性由当前快照决定：${await this.snapshotRecoveryAvailability()} —— 若上面不是「最新快照」，请重新应用这次变更。` }
+      if (stuck.length === 0) return { ok: false, message: '目录树变更失败，已回滚：' + reason }
+      return { ok: false, message: '目录树变更失败：' + reason + '。回滚无法恢复 ' + stuck.join(', ') + '：可恢复性由当前快照决定：' + (await this.snapshotRecoveryAvailability()) + ' —— 若上面不是「最新快照」，请重新应用这次变更。' }
     }
-    // A7: both sides come from the KERNEL's own pre-read of the SKILL.md target — the baseline the
-    // CAS write compared against and the bytes the rollback restores — instead of the earlier `md`
-    // read, which names a state the commit did not necessarily replace. (In every current caller the
-    // CAS refuses a drift between the two reads, so this is the same value on every committing run.)
-    // G3a: ONE tree change is ONE unit — every path it wrote is audited under a shared unit id.
-    // The old form picked only the SKILL.md landing, so a support file the same change moved got
-    // no version entry at all and the undo could not restore the file set as a unit.
     const unitId = plan.unitId ?? 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
-    for (const land of landing) {
-      const isBody = land.target.split(/[\\/]/).pop() === 'SKILL.md'
-      const rel = isBody ? undefined : land.target.slice(dir.length + 1).split('\\').join('/')
-      // G3b（A22）：代表片＝第一条 landing；kind 判 null（previous 的取值域只有 string/null）。
-      const unitHead = land === landing[0]
-        ? (plan.unitHead ?? {
-          moves: landing
-            .filter(l => l.target.split(/[\\/]/).pop() !== 'SKILL.md')
-            .map((l) => {
-              const p = l.target.slice(dir.length + 1).split(String.fromCharCode(92)).join(String.fromCharCode(47))
-              return {
-                path: p,
-                kind: l.previous === null ? 'created' : 'moved',
-                to: p,
-                ...l.previous === null ? {} : { beforeRef: contentHash(l.previous) },
-                afterRef: contentHash(l.content),
-              }
-            })
-            // F1 (independent review, 2026-10-14): when one plan writes the SAME path twice, keep the
-            // LAST write -- first-wins left `afterRef` describing the earlier bytes (stale). `beforeRef`
-            // and `kind` are unaffected: both come from the same per-path pre-read.
-            .filter((m, idx, all) => all.map(x => x.path).lastIndexOf(m.path) === idx),
-          sources: [{ skill: name }],
-        })
-        : undefined
-      // A22: previous is string | null (a read failure rejects the whole plan), so the old
-      // `=== undefined ? md : previous` was an unreachable branch -- the type is the truth.
-      const auditedBefore = land.previous
-      const auditedAfter = land.content
-      // G5: the plan already carries the write face (`origin`) — put it in the ledger; G3a adds the unit.
-      await this.audit(name, plan.auditAction, auditedBefore, auditedAfter, plan.auditSummary, rel, unitId, unitHead, plan.origin)
+    const defaultHead: UnitHead = {
+      moves: landing
+        .filter(entry => basename(entry.target) !== 'SKILL.md')
+        .map(entry => ({
+          path: entry.rel,
+          kind: entry.kind === 'delete' ? 'removed' : entry.previous === null ? 'created' : 'moved',
+          ...(entry.previous === null ? {} : { beforeRef: contentHash(entry.previous) }),
+          ...(entry.kind === 'delete' || entry.content === null ? {} : { afterRef: contentHash(entry.content) }),
+        })),
+      sources: roots.map(root => ({ skill: root.name })),
     }
-    this.notifyMutation({ action: plan.eventAction, name, skillDir: dir })
+    const affected = new Set<string>()
+    for (let index = 0; index < landing.length; index += 1) {
+      const entry = landing[index]
+      if (entry === undefined) continue
+      await this.audit(entry.skill, plan.auditAction, entry.previous, entry.kind === 'delete' ? null : entry.content, plan.auditSummary, entry.rel === 'SKILL.md' ? undefined : entry.rel, unitId, index === 0 ? (plan.unitHead ?? defaultHead) : undefined, plan.origin)
+      affected.add(entry.skill)
+    }
+    for (const skill of affected) {
+      const dir = roots.find(root => root.name === skill)?.dir
+      if (dir !== undefined) this.notifyMutation({ action: plan.eventAction, name: skill, skillDir: dir })
+    }
+    const primaryDir = roots.find(root => root.name === primaryName)?.dir ?? roots[0]?.dir ?? ''
     return {
       ok: true,
       message: durabilityWarning === ''
-        ? `${plan.eventAction} "${name}" succeeded.`
-        : `${plan.eventAction} "${name}" succeeded （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${durabilityWarning})`,
-      path: dir,
+        ? plan.eventAction + ' "' + primaryName + '" succeeded.'
+        : plan.eventAction + ' "' + primaryName + '" succeeded （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：' + durabilityWarning + ')',
+      path: primaryDir,
     }
   }
 
