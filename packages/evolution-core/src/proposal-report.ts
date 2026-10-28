@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import type { EvolutionIoLike } from './io.ts'
+import { isPresent, isUnknown, probeList, probeText } from './probe.ts'
 import type { ProposalView } from './proposal-view.ts'
 import { evolutionHome } from './state-store.ts'
 
@@ -41,23 +42,21 @@ function isProposal(value: unknown): value is ProposalView {
  * @returns valid proposals, newest filename first.
  */
 export async function readProposalReports(io: EvolutionIoLike, dir = proposalReportDir(), limit = 10): Promise<ProposalView[]> {
-  let names: string[]
-  try {
-    names = (await io.list(dir)).filter(name => name.startsWith('extract-proposal-') && name.endsWith('.json'))
-  } catch {
-    return []
-  }
+  const listed = await probeList(io, dir)
+  if (isUnknown(listed) || !isPresent(listed)) return []
+  const names = listed.value.filter(name => name.startsWith('extract-proposal-') && name.endsWith('.json'))
   names.sort((a, b) => b.localeCompare(a))
   const proposals: ProposalView[] = []
   for (const name of names.slice(0, limit)) {
+    const raw = await probeText(io, join(dir, name))
+    if (!isPresent(raw)) continue
+    let parsed: unknown
     try {
-      const raw = await io.readText(join(dir, name))
-      if (raw === null) continue
-      const parsed: unknown = JSON.parse(raw)
-      if (isProposal(parsed)) proposals.push(parsed)
+      parsed = JSON.parse(raw.value)
     } catch {
-      // A malformed report is skipped; one bad file must not hide the rest.
+      continue
     }
+    if (isProposal(parsed)) proposals.push(parsed)
   }
   return proposals
 }
