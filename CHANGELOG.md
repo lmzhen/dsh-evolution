@@ -1,5 +1,5 @@
 # Changelog
-## 0.30.32 (patch) — skill extract v3\n\n> **范围**：显式 skill extract v3：纯 ExtractPlan、单一 tree-change kernel、external 有界复制、tool/CLI、owner-gap、proposal/health、history extract 动作、plan-time CAS。\n> **验证**：本地 focused 131 passed；E4 真机 extract/health；CI released-upstream 与 desktop install 绿。\n\n## 0.30.31 (patch) — review prompt calibration and platform marker
+## 0.30.33 (patch) — skill extract v3 release\n\n> **范围**：0.30.32 tag 的 npm transparency-log 冲突后抬版本重发；内容同 0.30.32。\n\n## 0.30.32 (patch) — skill extract v3\n\n> **范围**：显式 skill extract v3：纯 ExtractPlan、单一 tree-change kernel、external 有界复制、tool/CLI、owner-gap、proposal/health、history extract 动作、plan-time CAS。\n> **验证**：本地 focused 131 passed；E4 真机 extract/health；CI released-upstream 与 desktop install 绿。\n\n## 0.30.31 (patch) — review prompt calibration and platform marker
 
 > **范围**：skill/combined/completion 三条 review prompt 对齐原版 Hermes 语义并做质量校准：ACTIVE 不再等同产出配额，空结果须说明检查；正文是决策规则，会话细节按需进 references；create 仅在没有 class-level/umbrella 可吸收时；completion prompt 保留 `[Auto-review — Skills · task complete]` 平台标记。
 > **验证**：prompt bundle v22；prompt/review 测试 49/49；completion header 与校准语义人工核对。
