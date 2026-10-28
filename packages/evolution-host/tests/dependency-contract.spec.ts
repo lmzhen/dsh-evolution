@@ -31,8 +31,8 @@ const HOST_PLANE_NOT_RUNTIME = [HOST_ROW_NAMES.memory, HOST_ROW_NAMES['memory-fi
 describe('dependency contract (one suite, three subjects)', () => {
   for (const subject of SUBJECTS) {
     it(subject.id + ': declares every row package it carries', () => {
-      const manifest = JSON.parse(readFileSync(fileURLToPath(subject.manifestUrl), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
-      const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {})])
+      const manifest = JSON.parse(readFileSync(fileURLToPath(subject.manifestUrl), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; peerDependencies?: Record<string, string> }
+      const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})])
       const patch = loadOverlayPatches('test', fileURLToPath(subject.patchUrl))
       const names = subject.rows === 'inserted' ? insertedRows(patch).map(row => rowName(row)) : cordisRows(patch).map(row => rowName(row))
       for (const name of names) {
