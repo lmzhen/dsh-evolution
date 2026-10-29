@@ -2849,7 +2849,9 @@ export class SkillLibrary {
           // Package integrity (009-I): an append must never leave dangling
           // support links — refuse before ANY side effect (no archive, no write).
           const carriesSupport = await this.countSupportDirs(source) > 0
-          const refs = supportRefs(parsed.body)
+          const parsedRefs = supportRefs(parsed.body)
+          const rawRefs = [...parsed.body.matchAll(/(?:references|scripts|templates|assets)\/[A-Za-z0-9._/-]+/g)].map(match => match[0])
+          const refs = parsedRefs.length > 0 ? parsedRefs : rawRefs
           let appendedBody = parsed.body
           if (carriesSupport || refs.length > 0) {
             const decision = await this.planSourceRehoming(source, targetName, parsed.body, rehomed.map(file => file.to))
