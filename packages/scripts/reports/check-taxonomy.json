@@ -83,10 +83,15 @@
         "evolution-core::tests/external-support.spec.ts",
         "evolution-core::tests/extract-plan.spec.ts",
         "evolution-core::tests/extract-prompt.spec.ts",
+        "evolution-core::tests/hard-cap-event.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
         "evolution-core::tests/learn-prompt.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
+        "evolution-core::tests/mutation-lock.spec.ts",
+        "evolution-core::tests/mutation-storage-adapter.spec.ts",
+        "evolution-core::tests/mutation-unit-preflight.spec.ts",
+        "evolution-core::tests/mutation-unit.spec.ts",
         "evolution-core::tests/numeric.spec.ts",
         "evolution-core::tests/owner-resolver.spec.ts",
         "evolution-core::tests/params.spec.ts",
@@ -103,6 +108,7 @@
         "evolution-core::tests/session-fold.spec.ts",
         "evolution-core::tests/signals.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
+        "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
         "evolution-curator::tests/unit-undo-plan.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
@@ -306,6 +312,7 @@
         "evolution-core::tests/frontmatter-yaml-1-2-core.spec.ts",
         "evolution-core::tests/fuzzy-patch.spec.ts",
         "evolution-core::tests/gates.spec.ts",
+        "evolution-core::tests/hard-cap-event.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
@@ -318,7 +325,12 @@
         "evolution-core::tests/memory-delimiter.spec.ts",
         "evolution-core::tests/memory-store.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
+        "evolution-core::tests/mutation-lock.spec.ts",
         "evolution-core::tests/mutation-origin.spec.ts",
+        "evolution-core::tests/mutation-recovery.spec.ts",
+        "evolution-core::tests/mutation-storage-adapter.spec.ts",
+        "evolution-core::tests/mutation-unit-preflight.spec.ts",
+        "evolution-core::tests/mutation-unit.spec.ts",
         "evolution-core::tests/mutations.spec.ts",
         "evolution-core::tests/namespace-migration.spec.ts",
         "evolution-core::tests/numeric.spec.ts",
@@ -356,6 +368,7 @@
         "evolution-core::tests/skill-health.spec.ts",
         "evolution-core::tests/skill-history.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
+        "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/skill-restructure.spec.ts",
         "evolution-core::tests/skill-row-cells.spec.ts",
         "evolution-core::tests/skill-store-boundary.spec.ts",
@@ -398,6 +411,7 @@
         "evolution-curator::tests/curator.spec.ts",
         "evolution-curator::tests/instance-claim.spec.ts",
         "evolution-curator::tests/io-preference.spec.ts",
+        "evolution-curator::tests/propose-keeps.spec.ts",
         "evolution-curator::tests/referenced-skills.spec.ts",
         "evolution-curator::tests/tree-lock-scope.spec.ts",
         "evolution-curator::tests/unit-undo-e2e.spec.ts",
@@ -736,6 +750,7 @@
         "tool-memory::tests/tool-memory.spec.ts",
         "tool-skill-manage::tests/approval-preview.spec.ts",
         "tool-skill-manage::tests/create-tree-reads.spec.ts",
+        "tool-skill-manage::tests/extract-agent.spec.ts",
         "tool-skill-manage::tests/review-channel-origin.spec.ts",
         "tool-skill-manage::tests/skill-settings.spec.ts",
         "tool-skill-manage::tests/tool-skill-manage.spec.ts",
@@ -850,6 +865,7 @@
         "evolution-core::tests/frontmatter-yaml-1-2-core.spec.ts",
         "evolution-core::tests/fuzzy-patch.spec.ts",
         "evolution-core::tests/gates.spec.ts",
+        "evolution-core::tests/hard-cap-event.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
@@ -862,7 +878,12 @@
         "evolution-core::tests/memory-delimiter.spec.ts",
         "evolution-core::tests/memory-store.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
+        "evolution-core::tests/mutation-lock.spec.ts",
         "evolution-core::tests/mutation-origin.spec.ts",
+        "evolution-core::tests/mutation-recovery.spec.ts",
+        "evolution-core::tests/mutation-storage-adapter.spec.ts",
+        "evolution-core::tests/mutation-unit-preflight.spec.ts",
+        "evolution-core::tests/mutation-unit.spec.ts",
         "evolution-core::tests/mutations.spec.ts",
         "evolution-core::tests/namespace-migration.spec.ts",
         "evolution-core::tests/numeric.spec.ts",
@@ -900,6 +921,7 @@
         "evolution-core::tests/skill-health.spec.ts",
         "evolution-core::tests/skill-history.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
+        "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/skill-restructure.spec.ts",
         "evolution-core::tests/skill-row-cells.spec.ts",
         "evolution-core::tests/skill-store-boundary.spec.ts",
@@ -942,6 +964,7 @@
         "evolution-curator::tests/curator.spec.ts",
         "evolution-curator::tests/instance-claim.spec.ts",
         "evolution-curator::tests/io-preference.spec.ts",
+        "evolution-curator::tests/propose-keeps.spec.ts",
         "evolution-curator::tests/referenced-skills.spec.ts",
         "evolution-curator::tests/tree-lock-scope.spec.ts",
         "evolution-curator::tests/unit-undo-e2e.spec.ts",
@@ -1345,6 +1368,7 @@
         "evolution-core::tests/frontmatter-yaml-1-2-core.spec.ts",
         "evolution-core::tests/fuzzy-patch.spec.ts",
         "evolution-core::tests/gates.spec.ts",
+        "evolution-core::tests/hard-cap-event.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
@@ -1357,7 +1381,12 @@
         "evolution-core::tests/memory-delimiter.spec.ts",
         "evolution-core::tests/memory-store.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
+        "evolution-core::tests/mutation-lock.spec.ts",
         "evolution-core::tests/mutation-origin.spec.ts",
+        "evolution-core::tests/mutation-recovery.spec.ts",
+        "evolution-core::tests/mutation-storage-adapter.spec.ts",
+        "evolution-core::tests/mutation-unit-preflight.spec.ts",
+        "evolution-core::tests/mutation-unit.spec.ts",
         "evolution-core::tests/mutations.spec.ts",
         "evolution-core::tests/namespace-migration.spec.ts",
         "evolution-core::tests/numeric.spec.ts",
@@ -1398,6 +1427,7 @@
         "evolution-core::tests/skill-health.spec.ts",
         "evolution-core::tests/skill-history.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
+        "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/skill-restructure.spec.ts",
         "evolution-core::tests/skill-row-cells.spec.ts",
         "evolution-core::tests/skill-store-boundary.spec.ts",
@@ -1442,6 +1472,7 @@
         "evolution-curator::tests/curator.spec.ts",
         "evolution-curator::tests/instance-claim.spec.ts",
         "evolution-curator::tests/io-preference.spec.ts",
+        "evolution-curator::tests/propose-keeps.spec.ts",
         "evolution-curator::tests/referenced-skills.spec.ts",
         "evolution-curator::tests/tree-lock-scope.spec.ts",
         "evolution-curator::tests/unit-undo-e2e.spec.ts",
@@ -1687,6 +1718,7 @@
         "tool-memory::tests/tool-memory.spec.ts",
         "tool-skill-manage::tests/approval-preview.spec.ts",
         "tool-skill-manage::tests/create-tree-reads.spec.ts",
+        "tool-skill-manage::tests/extract-agent.spec.ts",
         "tool-skill-manage::tests/review-channel-origin.spec.ts",
         "tool-skill-manage::tests/skill-settings.spec.ts",
         "tool-skill-manage::tests/tool-skill-manage.spec.ts",
@@ -1756,28 +1788,28 @@
   "counts": {
     "fast": {
       "gates": 57,
-      "specs": 67
+      "specs": 73
     },
     "pre-tag": {
       "gates": 57,
-      "specs": 348
+      "specs": 356
     },
     "ci-only": {
       "gates": 12,
-      "specs": 48
+      "specs": 49
     },
     "full(ci=off)": {
       "gates": 57,
-      "specs": 348
+      "specs": 356
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 396
+      "specs": 405
     }
   },
   "specs": {
-    "total": 396,
-    "marked": 396,
+    "total": 405,
+    "marked": 405,
     "unmarked": 0
   }
 }
