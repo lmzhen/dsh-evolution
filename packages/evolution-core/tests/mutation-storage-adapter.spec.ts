@@ -1,5 +1,6 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
+import { sep } from 'node:path'
 import { readUnitJournal, unitJournalPort, unitSnapshotPort, type EvolutionIoLike, type MutationJournalRecord, type MutationSnapshot } from '@deepseek-ai/dsh-evolution-core'
 
 class MemoryIo implements EvolutionIoLike {
@@ -8,7 +9,7 @@ class MemoryIo implements EvolutionIoLike {
   async writeText(path: string, content: string): Promise<void> { this.files.set(path, content) }
   async remove(path: string): Promise<void> { this.files.delete(path) }
   async list(path: string): Promise<string[]> {
-    const prefix = path.endsWith('\\') ? path : path + '\\'
+    const prefix = path.endsWith(sep) ? path : path + sep
     return [...this.files.keys()].filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length))
   }
   async exists(path: string): Promise<boolean> { return this.files.has(path) }
