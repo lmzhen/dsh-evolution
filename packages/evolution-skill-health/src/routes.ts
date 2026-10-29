@@ -39,12 +39,16 @@ export interface RouteDims {
   stampDensityPerKb: number | null
 }
 
-/** One row as the client sees it. `readable: false` becomes its own verdict, never `ok`. */
+/** One row as the client sees it. `readable: false` becomes its own verdict, never `healthy`. */
 export interface RouteRow {
   name: string
   verdict: string
   findings: RouteFinding[]
   dims?: RouteDims | null
+  /** Non-null when a protection marker owns the skill; the panel marks the row. */
+  protection?: string | null
+  /** Mechanical hard-cap-hit count; null when the event log was unreadable. */
+  hardCapHits?: number | null
 }
 
 /**
@@ -57,6 +61,8 @@ export function toRouteRows(rows: ReadonlyArray<{
   verdict: string
   findings: ReadonlyArray<{ rule: string; count: number; line?: string | null; severity?: 'warn' | 'error'; message?: string }>
   dims?: (Partial<RouteDims> & { readable?: boolean }) | null
+  protection?: string | null
+  hardCapHits?: number | null
 }>): RouteRow[] {
   return rows.map(row => ({
     name: row.name,
@@ -69,6 +75,8 @@ export function toRouteRows(rows: ReadonlyArray<{
       ...(finding.severity === undefined ? {} : { severity: finding.severity }),
       ...(finding.message === undefined ? {} : { message: finding.message }),
     })),
+    ...(row.protection === undefined || row.protection === null ? {} : { protection: row.protection }),
+    ...(row.hardCapHits === undefined ? {} : { hardCapHits: row.hardCapHits }),
     ...(row.dims === undefined || row.dims === null ? {} : { dims: {
       bodyChars: row.dims.bodyChars ?? null,
       bodyTokens: row.dims.bodyTokens ?? null,

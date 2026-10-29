@@ -13,6 +13,7 @@
  * means the caller writes nothing.
  */
 import { BASELINE_ACTION, entryTarget, type SkillVersion } from './skill-history.ts'
+import { contentHash } from './mutations.ts'
 
 export interface UnitUndoMember {
   readonly skill: string
@@ -110,13 +111,14 @@ export function planUnitUndoAcross(members: readonly UnitUndoMember[]): UnitUndo
     refusals.push(...slotRefusals.map(reason => member.skill + '：' + reason))
     for (const [path, slot] of support) {
       if (slot.newest === undefined) continue
-      const preUnitHash = slot.baseline !== undefined ? slot.baseline.hash : slot.oldest?.beforeHash
+      const removal = slot.oldest?.removed === true
+      const preUnitHash = removal ? slot.oldest?.hash : slot.baseline !== undefined ? slot.baseline.hash : slot.oldest?.beforeHash
       ops.push({
         skill: member.skill,
         path,
-        remove: preUnitHash === undefined,
+        remove: !removal && preUnitHash === undefined,
         ...(preUnitHash === undefined ? {} : { preUnitHash }),
-        expectedHash: slot.newest.hash,
+        expectedHash: removal ? contentHash('') : slot.newest.hash,
       })
     }
     if (body.newest !== undefined) {

@@ -85,6 +85,8 @@ export interface VersionRow {
    * and absent on every support row recorded before the field existed (the bytes carry no name).
    */
   readonly path?: string
+  /** Present when this row belongs to a cross-skill write unit; undo then restores the whole unit. */
+  readonly unitId?: string
 }
 
 /** One skill that has recorded versions, with what the listing already knows about it. */
@@ -130,7 +132,7 @@ export interface VersionsPayload {
 export interface SkillHistoryApi {
   readonly skills: () => Promise<readonly SkillRow[]>
   readonly versions: (name: string) => Promise<VersionsPayload>
-  readonly undo: (name: string, v?: number) => Promise<string>
+  readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
   readonly diff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly body: (name: string, v: number) => Promise<VersionBodyRow>
 }
@@ -165,11 +167,11 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
     versions: async (name: string) => await request(HOST_ROUTES.versions + '?name=' + encodeURIComponent(name)) as VersionsPayload,
     diff: async (name: string, v: number) => await request(HOST_ROUTES.diff + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionDiffRow,
     body: async (name: string, v: number) => await request(HOST_ROUTES.body + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionBodyRow,
-    undo: async (name: string, v?: number) => {
+    undo: async (name: string, v?: number, unitId?: string) => {
       const data = await request(HOST_ROUTES.undo, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(v === undefined ? { name } : { name, v }),
+        body: JSON.stringify(unitId !== undefined && unitId !== '' ? { name, unitId } : v === undefined ? { name } : { name, v }),
       }) as { message: string }
       return data.message
     },

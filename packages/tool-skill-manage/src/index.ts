@@ -18,18 +18,18 @@
  * @module @deepseek-ai/dsh-tool-skill-manage
  */
 
-import { dirname, join } from 'node:path'
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
-import { findOwnerCandidate, ownerCandidatesFromSummaries, planExtract, projectExtractBodies, proposalFromPlan, readExternalSupport, type ExtractPlanDraft } from '@deepseek-ai/dsh-evolution-core'
-import type { CitationPolicy, LiveValue, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, writeProposalReport, type ExtractPlanLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type { CitationPolicy, EvolutionIoLike, LiveValue, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from './write-gates.ts'
@@ -207,70 +207,49 @@ export function validateSkillSettings(
  * The library surface the preview reads. The write path owns the rest (locks, gates, audit), and none
  * of it runs here: a preview reads the CURRENT bytes and computes what the replay would store.
  */
-type PreviewLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'root' | 'read' | 'list' | 'readSupportFile' | 'readSkillProbe' | 'readSupportFileProbe' | 'listSupportFiles'>
+type PreviewLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'root' | 'read' | 'model' | 'readSupportFile' | 'readSkillProbe' | 'readSupportFileProbe' | 'listSupportFiles'>
 
-type ExtractPlanLibrary = Pick<ReturnType<typeof newSkillLibrary>, 'root' | 'read' | 'list' | 'listSupportFiles'>
-
-/** Build the one G1 plan both the execute path and the preview path consume. */
-async function buildExtractPlan(
+async function proposeExtractWithAgent(
+  ctx: Context,
+  parent: Agent | undefined,
   library: ExtractPlanLibrary,
-  operation: SkillWriteArgs,
-): Promise<{ ok: true; plan: ExtractPlanDraft } | { ok: false; message: string }> {
-  const source = typeof operation.name === 'string' ? operation.name.trim() : ''
-  const raw = Array.isArray(operation.extract) ? operation.extract : []
-  if (source === '' || raw.length === 0) return { ok: false, message: 'extract 需要 name 与至少一个 extract 项。' }
-  const requests: Array<{ heading: string; start?: string; end?: string }> = []
-  let target = ''
-  for (const item of raw) {
-    if (item === null || typeof item !== 'object') return { ok: false, message: 'extract 的每一项都必须是对象。' }
-    const heading = typeof item.heading === 'string' ? item.heading.trim() : ''
-    const toSkill = typeof item.to_skill === 'string' ? item.to_skill.trim() : ''
-    if (heading === '' || toSkill === '') return { ok: false, message: 'extract 的每一项都需要 heading 与 to_skill。' }
-    if (target === '') target = toSkill
-    if (target !== toSkill) return { ok: false, message: '一次 extract 只能有一个 to_skill；多目标请分多次调用。' }
-    if (item.to_heading !== undefined && item.to_heading !== heading) {
-      return { ok: false, message: 'to_heading 暂不支持改名；G3 要求 heading 与 to_heading 相同。' }
-    }
-    requests.push({
-      heading,
-      ...(typeof item.start === 'string' ? { start: item.start } : {}),
-      ...(typeof item.end === 'string' ? { end: item.end } : {}),
-    })
-  }
-  const sourceMd = await library.read(source)
-  if (sourceMd === null) return { ok: false, message: '技能「' + source + '」不存在。' }
-  const targetMd = await library.read(target)
-  if (targetMd === null) return { ok: false, message: '目标技能「' + target + '」不存在；owner-gap 不自动 create。' }
-  if (source === target) return { ok: false, message: 'source 与 target 不能相同。' }
-  const summaries = await library.list({ withContent: true, withFrontmatter: true })
-  const candidate = findOwnerCandidate(ownerCandidatesFromSummaries(source, summaries), target)
-  if (candidate === undefined) return { ok: false, message: '目标「' + target + '」不是可用的 owner candidate（描述为空或已排除）；owner-gap，不自动 create。' }
-  if (candidate.protectionUnknown || candidate.protectedBy !== null) {
-    return { ok: false, message: '目标「' + target + '」受保护（' + (candidate.protectedBy ?? '未知') + '），拒绝提取。' }
-  }
-  const parsed = parseFrontmatter(sourceMd)
-  if (parsed === null) return { ok: false, message: '技能「' + source + '」没有可读取的正文。' }
-  const sourceProbe = await library.listSupportFiles(source)
-  const targetProbe = await library.listSupportFiles(target)
-  if (!isPresent(sourceProbe) || !isPresent(targetProbe)) return { ok: false, message: '支撑文件列表不可读；拒绝在不确定的闭包上提取。' }
-  const external = await readExternalSupport(parsed.body, join(library.root, source), dirname(library.root), targetProbe.value)
-  if (!external.ok) return { ok: false, message: external.message }
-  const outcome = requests.some(request => request.start !== undefined || request.end !== undefined) ? 'mixed' : 'extract'
-  const plan = planExtract({
-    body: parsed.body,
-    sourceName: source,
-    targetName: target,
-    targetExists: true,
-    outcome,
-    owner: { mode: 'covered', name: target, triggerCovers: true, outcomeCovers: true, reason: 'explicit target' },
-    requests,
-    sourceFiles: sourceProbe.value,
-    targetFiles: targetProbe.value,
-    external: external.files,
-    anchors: { sourceMdSha256: contentHash(sourceMd), targetMdSha256: contentHash(targetMd) },
+  source: string,
+): Promise<{ ok: true; proposal: string } | { ok: false; message: string }> {
+  if (parent === undefined) return { ok: false, message: 'extract agent 不可用：当前调用没有 agent 上下文。' }
+  const body = await library.read(source)
+  if (body === null) return { ok: false, message: '技能「' + source + '」不存在。' }
+  const summaries = await library.model.list({ withContent: true, withFrontmatter: true })
+  const lookup = ownerCandidatesFromSummaries(source, summaries)
+  const support = await library.listSupportFiles(source)
+  const input = JSON.stringify({
+    source,
+    body,
+    support: isPresent(support) ? support.value : null,
+    candidates: lookup.candidates.map(candidate => ({ name: candidate.name, description: candidate.description, whenToUse: candidate.whenToUse ?? null, headings: candidate.headings })),
+    excluded: lookup.excluded,
   })
-  if (!plan.ok) return { ok: false, message: plan.message }
-  return { ok: true, plan: plan.plan }
+  const outcome = await createSubagentChannel(ctx).run({
+    parent,
+    label: 'dsh-evolution-extract',
+    kind: 'maintainer',
+    allow: ['skill'],
+    promptText: EXTRACT_PROMPT_V1 + '\n\nEXTRACT INPUT\n' + input,
+    timeoutMs: 120_000,
+    outputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['outcome', 'reason'],
+      properties: {
+        outcome: { type: 'string', enum: ['keep', 'extract', 'mixed', 'owner-gap'] },
+        target: { type: 'string' },
+        neededOwner: { type: 'string' },
+        reason: { type: 'string' },
+        parts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['heading'], properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' } } } },
+      },
+    },
+  })
+  if (outcome.kind !== 'ok') return { ok: false, message: 'extract agent 不可用：' + ('reason' in outcome ? outcome.reason : outcome.kind) }
+  return { ok: true, proposal: JSON.stringify(outcome.structured) }
 }
 
 /**
@@ -350,7 +329,12 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
       : { available: true, path, before, after: null }
   }
   if (action === 'extract') {
-    const built = await buildExtractPlan(library, operation)
+    const built = await buildExtractPlanFromLibrary(library, {
+      source: typeof operation.name === 'string' ? operation.name : '',
+      items: Array.isArray(operation.extract) ? operation.extract : [],
+      ...(operation.outcome === undefined ? {} : { outcome: operation.outcome }),
+      ...(operation.owner_covers === undefined ? {} : { ownerCovers: operation.owner_covers }),
+    })
     if (!built.ok) return { available: false, reason: built.message }
     const source = built.plan.source
     const target = built.plan.target.name
@@ -388,6 +372,10 @@ interface SkillWriteArgs {
   restructure?: Array<{ heading?: string; to_file?: string }>
   /** extract: parts moved to an existing class-level owner. */
   extract?: Array<{ heading?: string; start?: string; end?: string; to_skill?: string; to_heading?: string }>
+  /** Semantic outcome supplied by the caller; omitted falls back to explicit-section shape. */
+  outcome?: 'extract' | 'mixed'
+  /** Semantic owner coverage supplied by the caller; false means this target must not be written. */
+  owner_covers?: boolean
   /** extract plan only; no write. */
   dry_run?: boolean
   /** v23 (AP-3): stage-time content hash of the target skill, attached to
@@ -707,6 +695,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     versionKeep: limit('skillVersionKeep', rawConfig.skillVersionKeep, DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
   }
   const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rawConfig, io, limits: libraryLimits, ctx, threatExemptLabels: rawConfig.threatExemptLabels })
+  void library.recoverOnBoot().catch(error => {
+    ctx.logger.warn('skill_manage: boot unit recovery failed: ' + (error instanceof Error ? error.message : String(error)))
+  })
   /** Write the CURRENT resolved settings into the library's live limits object. */
   const applyLimits = (): void => {
     const resolved = settings()
@@ -914,7 +905,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // consumer). Computed BEFORE the create, because afterwards the candidate
       // is in the listing it was compared against.
       feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
-      result = await library.create(name, args.content ?? '', origin)
+      result = await library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
     }
     else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '', origin, stagedAnchor)
     else if (action === 'patch') result = await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
@@ -946,14 +937,35 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
     }
     else if (action === 'extract') {
-      const built = await buildExtractPlan(library, args)
+      const built = await buildExtractPlanFromLibrary(library, {
+        source: typeof args.name === 'string' ? args.name : '',
+        items: Array.isArray(args.extract) ? args.extract : [],
+        ...(args.outcome === undefined ? {} : { outcome: args.outcome }),
+        ...(args.owner_covers === undefined ? {} : { ownerCovers: args.owner_covers }),
+      })
       if (!built.ok) {
         result = { ok: false, message: built.message }
       } else {
         proposal = JSON.stringify(proposalFromPlan(built.plan, { runId: 'tool-' + Date.now().toString(36) }))
+        const ownerText = built.plan.owner.mode === 'covered'
+          ? `covered by ${built.plan.owner.name}`
+          : `owner-gap, neededOwner=${built.plan.owner.neededOwner ?? 'unknown'}`
+        const decisionLine = `提取判定：outcome=${built.plan.outcome}；target=${built.plan.target.name}；owner=${ownerText}`
+        const candidateLines = built.candidates.slice(0, 8).map(candidate => '- ' + candidate.name + '：' + candidate.description + (candidate.whenToUse === undefined ? '' : '；whenToUse: ' + candidate.whenToUse) + (candidate.headings.length === 0 ? '' : '；headings: ' + candidate.headings.join(' / ')))
         result = args.dry_run === true
-          ? { ok: true, message: '提取计划（未写入）：' + built.plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + built.plan.target.name }
+          ? { ok: true, message: '提取计划（未写入）：' + built.plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + built.plan.target.name + '\n' + decisionLine + (candidateLines.length === 0 ? '' : '\n候选 owner：\n' + candidateLines.join('\n')) }
           : await library.extract(built.plan, origin)
+        if (result.ok && built.warnings !== undefined && built.warnings.length > 0) {
+          result = { ...result, message: result.message + '\n' + built.warnings.join('\n') }
+        }
+        if (args.dry_run === true) {
+          try {
+            const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+            const io = registry?.provider()
+            if (io !== undefined) await writeProposalReport(io, proposalFromPlan(built.plan, { runId: 'tool-' + Date.now().toString(36) }))
+          } catch { /* best-effort proposal report */ }
+        }
+        if (result.ok) result = { ...result, message: result.message + '\n' + decisionLine }
       }
     }
     else if (action === 'pin') result = await library.setPinned(name, true, origin)
@@ -974,6 +986,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
     }
     if (result.ok) {
+      if (name !== undefined && name !== '' && (action === 'create' || action === 'update' || action === 'patch')) {
+        const body = action === 'create' ? (args.content ?? null) : await library.read(name)
+        if (body !== null && body.length > DEFAULT_HEALTH_THRESHOLDS.softBodyChars) {
+          feedbackLines.push(`正文 ${body.length} 字符，超过 ${DEFAULT_HEALTH_THRESHOLDS.softBodyChars} 字符软线；保持不改是合法的。`)
+        }
+      }
       // 0.3.11: the write point auto-quoted unquoted YAML-unsafe frontmatter
       // values (catalog-loadability) — surface it so the model can learn.
       if (result.normalizedFrontmatterFields && result.normalizedFrontmatterFields.length > 0) {
@@ -984,7 +1002,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // legacy facade here, or review-created skills silently escape the
       // stale/archive lifecycle. Read-only actions (list/review) must
       // never bump counters or emit mutation events.
-      const mutating = !isReadOnlyAction(action)
+      const mutating = !isReadOnlyAction(action) && !(action === 'extract' && args.dry_run === true)
       // Any non-foreground writer (review channel OR delegated subagent) is an
       // agent-authored skill and must enter the lifecycle as such.
       if (name && action === 'create') {
@@ -1168,6 +1186,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       absorbed_into: { type: 'string' },
       restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, to_file: { type: 'string' } } } },
       extract: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_skill: { type: 'string' }, to_heading: { type: 'string' } } } },
+      outcome: { type: 'string', enum: ['extract', 'mixed'] },
+      owner_covers: { type: 'boolean' },
       dry_run: { type: 'boolean' },
     },
     output: {
@@ -1377,6 +1397,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ...decision.pendingId !== undefined ? { pending_id: decision.pendingId } : {},
           }
         }
+      }
+      if (operation.action === 'extract' && operation.dry_run === true && (operation.extract === undefined || operation.extract.length === 0)) {
+        const source = typeof operation.name === 'string' ? operation.name.trim() : ''
+        if (source === '') return { ok: false, message: 'extract agent 需要 name。', skills: [] }
+        const proposed = await proposeExtractWithAgent(ctx, exec.agent as unknown as Agent | undefined, library, source)
+        return proposed.ok
+          ? { ok: true, message: '提取提议（未写入）。', skills: [], proposal: proposed.proposal }
+          : { ok: false, message: proposed.message, skills: [] }
       }
       return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined)
     },

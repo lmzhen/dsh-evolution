@@ -196,18 +196,23 @@ export function planExtract(input: PlanExtractInput): ExtractPlanResult {
   const selection = selectSections(input.body, input.requests)
   if (!selection.ok) return { ok: false, code: selection.code, message: selection.message }
   if (selection.sections.length === 0) return { ok: false, code: 'part-empty', message: 'at least one part is required' }
-  const parts: ExtractPart[] = selection.sections.map(section => ({
-    heading: section.heading,
-    anchor: {
+  const externalRewrites = new Map((input.external ?? []).map(file => [file.ref, file.targetPath]))
+  const parts: ExtractPart[] = selection.sections.map(section => {
+    let movedText = section.text
+    for (const [from, to] of externalRewrites) movedText = movedText.split(from).join(to)
+    return {
       heading: section.heading,
-      ...(section.anchorStart === undefined ? {} : { start: section.anchorStart }),
-      ...(section.anchorEnd === undefined ? {} : { end: section.anchorEnd }),
-    },
-    sourceText: section.text,
-    movedText: section.text,
-    bytes: Buffer.byteLength(section.text, 'utf8'),
-    sha256: sha256(section.text),
-  }))
+      anchor: {
+        heading: section.heading,
+        ...(section.anchorStart === undefined ? {} : { start: section.anchorStart }),
+        ...(section.anchorEnd === undefined ? {} : { end: section.anchorEnd }),
+      },
+      sourceText: section.text,
+      movedText,
+      bytes: Buffer.byteLength(movedText, 'utf8'),
+      sha256: sha256(movedText),
+    }
+  })
   const ownerName = input.owner.mode === 'covered' ? (input.owner.name ?? input.targetName) : (input.owner.neededOwner ?? input.targetName)
   const pointer = 'This capability now lives in ' + ownerName + '; project-specific facts stay here.'
   const ordered = [...selection.sections].sort((a, b) => a.start - b.start)

@@ -68,7 +68,9 @@ export function resolveUnitMembersFromIndexes(
     const wanted = manifest.map(move => movePath(move)).filter(p => p !== '')
     for (const path of wanted) if (!shardPaths.includes(path)) conflicts.push({ kind: 'missing', path })
     for (const path of shardPaths) if (!wanted.includes(path)) conflicts.push({ kind: 'foreign', path })
-    for (const path of wanted) if (shardPaths.filter(p => p === path).length > 1) conflicts.push({ kind: 'duplicated', path })
+    // No duplicated-path check: the manifest path is skill-relative and carries no skill, so one
+    // path in TWO skills (extract's source support removal + target support write) is the normal
+    // shape. A path-only duplicate refusal made every cross-skill support move un-undoable.
   }
   return { members, missing, conflicts }
 }

@@ -10,9 +10,10 @@ import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, en, zh } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
+import { openSkillHistory, requireHealthSeats } from './seats.ts'
 
 /** Required client services: the slot registry and the locale seat. */
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'layout']
 
 /** The host half hands the panel a way to read its rows (a read-only route on the host side). */
 export type HealthFaceLoader = () => Promise<HealthFace>
@@ -39,6 +40,7 @@ function PanelIcon(props: { size?: number; active?: boolean } = {}): ReactElemen
  * @param ctx - the client context; it must carry the two seats above.
  */
 export function apply(ctx: ClientContext): void {
+  requireHealthSeats(ctx)
   registerSidebarPanel<HealthFace>(ctx, {
     id: PANEL_ID,
     order: PANEL_ORDER,
@@ -47,6 +49,10 @@ export function apply(ctx: ClientContext): void {
     styles: { css: CSS, tagId: CSS_TAG_ID },
     icon: PanelIcon,
     component: SkillHealthPanel as unknown as (props: never) => ReactElement,
-    body: t => ({ rows: [], proposals: [], truncated: false, loaded: false, proposalStatus: 'unavailable', loadRows: api.rows, t }),
+    body: t => ({
+      rows: [], proposals: [], truncated: false, loaded: false, proposalStatus: 'unavailable', loadRows: api.rows,
+      openHistory: () => { openSkillHistory(ctx) },
+      t,
+    }),
   })
 }

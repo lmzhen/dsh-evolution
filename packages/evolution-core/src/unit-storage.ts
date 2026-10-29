@@ -19,6 +19,16 @@ export interface UnitSnapshot {
   readonly sourceBefore: readonly { name: string; body: string }[]
   readonly origin: string
   readonly summary: string
+  /** Tree-change units reuse this store; merge snapshots leave these absent. */
+  readonly kind?: 'merge' | 'tree-change'
+  readonly mutationState?: 'prepared' | 'committed' | 'undone'
+  readonly ops?: readonly {
+    readonly target: string
+    readonly before: string | null
+    readonly after: string | null
+    readonly skill?: string
+  }[]
+  readonly cleanup?: readonly string[]
   readonly validationPlan?: { readonly planVersion: 1; readonly stageDigest: string; readonly revision: string }
   readonly createdAt: number
 }

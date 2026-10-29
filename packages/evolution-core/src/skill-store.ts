@@ -39,6 +39,7 @@ import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
 import { isCommittedWarning, nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { appendEvolutionEvent, eventsFile } from './evolution-events.ts'
 import { isAbsent, isPresent, isUnknown, probeAbsent, probeList, probeMtime, probePresent, probeReason, probeText, probeUnknown, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
 import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY } from './limits.ts'
@@ -49,6 +50,9 @@ import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPa
 import { makeSerialQueue } from './serial.ts'
 import { supportRefs } from './support-refs.ts'
 import { selectSections } from './section-selection.ts'
+import { MutationUnit, fileMutationLock, type MutationResult, type MutationUnitHooks } from './mutation-unit.ts'
+import { SkillModel } from './skill-model.ts'
+import { unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
 import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
@@ -249,6 +253,7 @@ function anchorRefusalFile(name: string, filePath: string, verdict: Exclude<Anch
  */
 function unreadableTarget(label: string, error: unknown): SkillActionResult {
   const code = (error as NodeJS.ErrnoException | undefined)?.code
+    ?? (typeof error === 'string' && error.startsWith('EISDIR') ? 'EISDIR' : undefined)
   const detail = code === 'EISDIR'
     ? 'the path is a DIRECTORY, not a file'
     : error instanceof Error ? error.message : String(error)
@@ -726,6 +731,7 @@ interface SingleWriteOutcome {
   write: string | null
   audit?: { skillName: string; action: string; before: string | null; after: string | null; summary: string; path?: string }
   event?: EvolutionSkillMutatedEvent
+  hardCapHit?: { bodyChars: number; supportFiles: number | null }
 }
 
 /**
@@ -759,6 +765,8 @@ function sameRevisionAnchor(expected: RevisionAnchor, live: RevisionAnchor): boo
 
 export class SkillLibrary {
   readonly root: string
+  /** The ONE read face owner/health/panel consume; a thin adapter, not a store. */
+  readonly model: SkillModel
   readonly limits: SkillLimits
   private readonly io: EvolutionIoLike
   private readonly onMutation: ((event: EvolutionSkillMutatedEvent) => void) | undefined
@@ -812,6 +820,89 @@ export class SkillLibrary {
     // G1/1.4 (S2-02): the queue is per ROOT and shared by every instance (see ROOT_SERIAL above); a
     // per-instance queue ordered nothing across the six services that write this tree.
     this.serial = serialForRoot(this.root)
+    this.model = new SkillModel({
+      list: async query => await this.list(query),
+      read: async name => await this.read(name),
+      listSupportFiles: async name => {
+        const probe = await this.listSupportFiles(name)
+        if (!isPresent(probe)) throw new Error('support listing unreadable for ' + name)
+        return probe.value
+      },
+      readSupportFile: async (name, path) => await this.readSupportFile(name, path),
+    })
+  }
+
+  /**
+   * Transitional root lock for mutators that still own their write path. The
+   * extract/restructure path takes the same lock through MutationUnit, so those
+   * two paths cannot interleave with create/update/patch across processes.
+   */
+  private unitHeadForOps(ops: readonly import('./mutation-unit.ts').MutationSnapshotOp[], roots: readonly string[], provenance: ReadonlyMap<string, string> = new Map()): UnitHead {
+    const moves: Array<Record<string, unknown>> = []
+    for (const op of ops) {
+      if (op.skill === undefined || basename(op.target) === 'SKILL.md') continue
+      const path = relative(this.dirOf(op.skill), op.target).split(String.fromCharCode(92)).join('/')
+      if (path === '' || path.startsWith('..')) continue
+      moves.push({
+        path,
+        kind: op.before === null ? 'created' : op.after === null ? 'removed' : 'moved',
+        ...(op.before === null ? {} : { beforeRef: contentHash(op.before) }),
+        ...(op.after === null ? {} : { afterRef: contentHash(op.after) }),
+        ...(provenance.get(op.target) === undefined ? {} : { provenance: provenance.get(op.target) }),
+      })
+    }
+    return { moves, sources: roots.map(skill => ({ skill })) }
+  }
+
+  private async withMutationLock<T>(task: () => Promise<T>): Promise<T> {
+    let lease: import('./mutation-unit.ts').MutationLockLease | undefined
+    try {
+      lease = await fileMutationLock(this.io, this.root).acquire()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.startsWith('mutation-lock-busy')) throw error
+      // Coordination failure: the per-file transact/serial path remains the
+      // fallback; a lock sidecar must not change the mutation's business result.
+      return await task()
+    }
+    try {
+      return await task()
+    } finally {
+      try {
+        await lease.release()
+      } catch {
+        // A failed lock cleanup is a coordination degradation, not a write failure.
+      }
+    }
+  }
+
+  private recovery: Promise<void> | undefined
+
+  /** Run the boot recovery once per library instance, before the first write. */
+  private async ensureRecovered(): Promise<void> {
+    this.recovery ??= this.recoverPreparedUnits().then(() => undefined).catch(error => {
+      console.warn('skill-store: prepared-unit recovery failed; writes continue: ' + (error instanceof Error ? error.message : String(error)))
+    })
+    await this.recovery
+  }
+
+  /** Public boot hook: idempotent with the first-write recovery. */
+  async recoverOnBoot(): Promise<void> {
+    await this.ensureRecovered()
+  }
+
+  /** Recover every prepared tree-change snapshot in the shared unit store. */
+  async recoverPreparedUnits(): Promise<MutationResult[]> {
+    const home = dirname(this.root)
+    const unit = new MutationUnit({
+      io: this.io,
+      limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
+      serial: this.serial,
+      lock: fileMutationLock(this.io, this.root),
+      journal: unitJournalPort(this.io, home),
+      snapshots: unitSnapshotPort(this.io, home),
+    })
+    return await unit.recoverPrepared()
   }
 
   /**
@@ -823,102 +914,6 @@ export class SkillLibrary {
    * mutation event are issued ONLY when a write actually lands, so a no-op
    * never inflates the mutation-maturity counter.
    */
-  private async runSingleWrite(
-    path: string,
-    task: (current: string | null) => SingleWriteOutcome | Promise<SingleWriteOutcome>,
-    readFailure?: (error: unknown) => SkillActionResult,
-  ): Promise<SkillActionResult> {
-    // v28 G1.1 (EVO-IO-02): `ghostDir` rides the outcome instead of a closure
-    // flag — it is set when the task saw a missing body and chose not to
-    // write, the ghost-directory precondition decided on the clean
-    // `SingleWriteOutcome` type inside `run`.
-    let outcome: (SingleWriteOutcome & { ghostDir?: boolean }) | undefined
-    // v35 C9: a staged write must report an unverifiable target as a refusal, not
-    // as an exception. `progress.entered` distinguishes a failure of the LOCKED
-    // READ (the task never ran, so nothing was verified and nothing was written)
-    // from a failure of the write itself. It is a holder object rather than a
-    // boolean because the assignment happens inside the transact callback.
-    const progress = { entered: false }
-    const run = async (current: string | null) => {
-      progress.entered = true
-      const o = await task(current ?? null)
-      outcome = { ...o, ghostDir: current === null && o.write === null }
-      // write: null = "leave the file untouched" — return the current bytes so
-      // an existing file is preserved and a missing one stays missing (M-4).
-      return o.write ?? (current ?? null)
-    }
-    let durabilityWarning = ''
-    // v28 G2.1 (EVO-IO-05): the module-level `isCommittedOnly` is the single
-    // source of this predicate (V27 G1.3's own consolidation); the local
-    // re-binding here was a fifth copy waiting to drift.
-    const committedOnly = isCommittedOnly
-    if (this.transact) {
-      try {
-        await this.transact(this.io, path, run)
-      } catch (error) {
-        // A1-15 (v18): the rename landed and only the parent-directory fsync
-        // failed. The bytes are visible, so this is NOT a failed write: keep the
-        // audit/event below and report the durability warning instead of
-        // letting a caller roll back (or retry) a write that already happened.
-        if (!progress.entered && readFailure !== undefined) return readFailure(error)
-        if (!committedOnly(error)) throw error
-        durabilityWarning = error instanceof Error ? error.message : String(error)
-      }
-    } else {
-      let current: string | null
-      try {
-        current = await this.io.readText(path)
-      } catch (error) {
-        if (readFailure !== undefined) return readFailure(error)
-        throw error
-      }
-      const next = await run(current)
-      if (next !== null && next !== current) {
-        try {
-          await this.io.writeText(path, next)
-        } catch (error) {
-          if (!committedOnly(error)) throw error
-          durabilityWarning = error instanceof Error ? error.message : String(error)
-        }
-      }
-    }
-    const o = outcome
-    // V6-19 (0.3.37): a transact backend that violates the contract (never
-    // invokes the task — a value-imported transact promised inside guarantees)
-    // leaves `outcome` undefined; a structured error beats the TypeError the
-    // unconditional dereference used to raise.
-    if (o === undefined || typeof o !== 'object' || !Object.prototype.hasOwnProperty.call(o, 'write')) {
-      return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
-    }
-    // v28 G1.1 (EVO-IO-02): nothing was written and the body was missing —
-    // the io seam's mkdir-before-lock may have resurrected the directory a
-    // concurrent archive just moved away (the update/patch shape of the v22
-    // LOCK-4 race; setPinnedCore/createCore carry their own compensating
-    // cleanups). Without this, a SKILL.md-less ghost dir blocks
-    // restoreFromArchive forever ("carries no SKILL.md; remove or repair it").
-    if (o.ghostDir === true) await this.cleanupGhostDir(path)
-    let result = o.result
-    if (o.write !== null && o.audit) {
-      await this.audit(o.audit.skillName, o.audit.action, o.audit.before, o.audit.after, o.audit.summary, o.audit.path)
-      // Design §4 item 3: the retention line, said HERE because this is the only place that still
-      // holds both bodies (the write's own in-lock read) — a caller would have to re-read the file
-      // and race the writers this library serializes. Feedback only: it never changes the ok flag.
-      const retention = contentRetentionFeedback({
-        name: o.audit.skillName,
-        action: o.audit.action,
-        before: o.audit.before,
-        after: o.audit.after,
-      })
-      if (retention !== null && result.ok) result = { ...result, message: `${result.message}\n${retention}` }
-    }
-    if (o.write !== null && o.event) this.notifyMutation(o.event)
-    // A1-15 (v18): audit and the mutation event ran even when only the fsync
-    // failed — say so in the result instead of pretending the write failed.
-    return durabilityWarning === '' || !result.ok
-      ? result
-      : { ...result, message: `${result.message} （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${durabilityWarning})` }
-  }
-
   /**
    * v28 G1.1 (EVO-IO-02): shared compensating cleanup for a locked write that
    * found no SKILL.md — remove the possibly-resurrected directory ONLY when it
@@ -1466,22 +1461,42 @@ export class SkillLibrary {
    */
   async assessHealth(    rawName: string,
     thresholds: SkillHealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
-    counts?: { patchCount?: number; readCount?: number },
+    counts?: { patchCount?: number; readCount?: number; hardCapHits?: number | null },
   ): Promise<SkillHealthAssessment | null> {
     try {
       const name = rawName.trim()
       const content = await this.read(name)
       if (content === null) return null
+      const support = await this.listSupportFiles(name)
+      const supportFiles = isPresent(support) ? support.value.length : undefined
       return assessStructureHealth({
         skillName: name,
         bodyChars: content.length,
         bodyText: content,
         supportGroups: await this.countSupportDirs(name),
+        ...(supportFiles === undefined ? {} : { supportFiles }),
         patchCount: counts?.patchCount,
         readCount: counts?.readCount,
+        ...(counts?.hardCapHits === undefined ? {} : { hardCapHits: counts.hardCapHits }),
       }, thresholds)
     } catch {
       return null
+    }
+  }
+
+  /** S2: mechanical hard-cap event; failure must not change the refusal. */
+  private async recordHardCapHit(name: string, bodyChars: number, source: 'create' | 'update' | 'patch' | 'write_file', supportFiles: number | null = null): Promise<void> {
+    try {
+      await appendEvolutionEvent(this.io, eventsFile(dirname(this.root)), {
+        type: 'hard-cap',
+        target: name,
+        bodyChars,
+        supportFiles,
+        restructureRounds: 0,
+        source,
+      })
+    } catch (error) {
+      console.warn('skill-store: hard-cap event not recorded for "' + name + '": ' + (error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -1728,14 +1743,15 @@ export class SkillLibrary {
     name: string,
     content: string,
     origin: WriteOrigin = this.authority.origin,
-    options: { unitId?: string; unitHead?: UnitHead } = {},
+    options: { unitId?: string; unitHead?: UnitHead; managed?: boolean } = {},
   ): Promise<SkillActionResult> {
+    await this.ensureRecovered()
     const normalized = name.trim()
     // P2-3 (v11): the exists-probe → write window runs under the in-process
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
     // create calls for one name used to both pass exists() and double-write
     // (double audit, double mutation event).
-    return await this.serial(() => this.createCore(normalized, content, origin, options))
+    return await this.serial(() => this.withMutationLock(() => this.createCore(normalized, content, origin, options)))
   }
 
   private async createCore(
@@ -1748,7 +1764,10 @@ export class SkillLibrary {
     const bad = this.badName(normalized)
     if (bad) return { ok: false, message: bad }
     const validation = validateFrontmatter(content, normalized, this.limits)
-    if (validation) return { ok: false, message: validation }
+    if (validation) {
+      if (exceedsContentLimit(content, this.limits.maxSkillContentChars)) await this.recordHardCapHit(normalized, content.length, 'create')
+      return { ok: false, message: validation }
+    }
     // 0.3.11: frontmatter normalization happens at the write point — the
     // platform catalog parses strict YAML, so unquoted plain scalars carrying
     // `: ` (etc.) would silently make the skill invisible to the platform.
@@ -1806,44 +1825,36 @@ export class SkillLibrary {
     // create on another instance/process, and the later write silently
     // overwrote the winner's bytes (double audit, double event). In-lock
     // re-check: current bytes present -> structured refusal, nothing written.
-    let existsAtCommit = false
-    let taskRan = false
-    let createDurabilityWarning = ''
-    if (this.transact) {
-      try {
-        await this.transact(this.io, createPath, (current) => {
-          // v43 audit (FLOW3-1): this callback RE-RUNS when the write lock is
-          // lost before the commit (io redoes the whole RMW), and the flags above
-          // are OR-accumulated across attempts. A stale `existsAtCommit` from the
-          // first attempt made a create whose retry DID write report "already
-          // exists". Reset per attempt so the post-loop decision reads the LAST
-          // attempt's observation only.
-          existsAtCommit = false
-          taskRan = true
-          if (current !== null) { existsAtCommit = true; return current }
-          return onDisk
-        })
-      } catch (error) {
-        // P2-2 (v19): the SKILL.md landed; only the dir fsync failed.
-        if (!isCommittedOnly(error)) throw error
-        createDurabilityWarning = error instanceof Error ? error.message : String(error)
-      }
-    } else if (await this.io.exists(createPath)) {
-      taskRan = true
-      existsAtCommit = true
-    } else {
-      taskRan = true
-      try {
-        await this.io.writeText(createPath, onDisk)
-      } catch (error) {
-        if (!isCommittedOnly(error)) throw error
-        createDurabilityWarning = error instanceof Error ? error.message : String(error)
-      }
+    const unit = new MutationUnit({
+      io: this.io,
+      limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
+      lock: { acquire: async () => ({ release: async () => {} }) },
+      journal: unitJournalPort(this.io, dirname(this.root)),
+      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
+      transactGuard: false,
+      hooks: {
+        undone: async () => {
+          await this.io.remove(markerPath(dir, 'hermes-managed')).catch(() => {})
+        },
+      },
+    })
+    const result = await unit.apply({
+      name: normalized,
+      origin,
+      roots: [{ name: normalized, protection: 'write' }],
+      rootDirs: { [normalized]: dir },
+      ops: [{ kind: 'write', target: createPath, content: onDisk, expected: null, skill: normalized }],
+      auditAction: 'create',
+      auditSummary: 'created',
+      eventAction: 'create',
+      cleanupPaths: [markerPath(dir, 'hermes-managed')],
+      ...(options.unitId === undefined ? {} : { unitId: options.unitId }),
+    })
+    if (!result.ok) {
+      if (result.errors.some(error => error.code === 'cas-drift' || error.message.includes('concurrent modification'))) return { ok: false, message: `技能「${normalized}」已存在。` }
+      return { ok: false, message: result.errors.map(error => error.message).join('；') }
     }
-    // A1-22 (v18): a contract-violating transact that never invokes the
-    // task used to report success with no file. Mirror runSingleWrite.
-    if (!taskRan) return { ok: false, message: '内部错误：创建事务没有调用任务；未写入任何文件' }
-    if (existsAtCommit) return { ok: false, message: `技能「${normalized}」已存在。` }
+    const createDurabilityWarning = result.warnings === undefined ? '' : result.warnings.join('；')
     // Any non-foreground writer (review channel OR delegated subagent) is an
     // agent-authored skill: mark it managed so the lifecycle owns it.
     // v22 (LOCK-4): the marker lands only while the body we just wrote is
@@ -1887,7 +1898,7 @@ export class SkillLibrary {
         return { ok: false, message: `创建过程中技能「${normalized}」被并发归档；残留标记已移除：等搬运完成后重试一次。` }
       }
     }
-    await this.audit(normalized, 'create', null, onDisk, 'created', undefined, options.unitId, options.unitHead)
+    await this.audit(normalized, 'create', null, onDisk, 'created', undefined, result.unitId, options.unitHead)
     this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
     // Both warnings ride the normal success path (audit/event included) — a
     // durability warning must never skip the accounting.
@@ -1911,6 +1922,7 @@ export class SkillLibrary {
   ): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
+    await this.ensureRecovered()
     // F-208: the whole read→validate→write runs under the in-process serialize
     // queue so two concurrent updates on one skill never interleave.
     return await this.serial(() => this.updateCore(name, content, origin, anchor))
@@ -1935,7 +1947,10 @@ export class SkillLibrary {
     if (isUnknown(limitProbe)) console.warn(`skill-store: could not re-read ${path} for the shrink exemption (${limitProbe.reason}); validating without it — an over-limit repair is refused, not accepted`)
     const currentForLimit = isPresent(limitProbe) ? limitProbe.value : null
     const validation = validateFrontmatter(content, name, this.limits, currentForLimit)
-    if (validation) return { ok: false, message: validation }
+    if (validation) {
+      if (exceedsContentLimit(content, this.limits.maxSkillContentChars)) await this.recordHardCapHit(name, content.length, 'update')
+      return { ok: false, message: validation }
+    }
     // 0.3.11: normalize at the write point (see create) — same reasoning.
     const norm = normalizeFrontmatter(content)
     if (norm.issues.length > 0) return { ok: false, message: `技能「${name}」的 frontmatter 无法自动修复：${norm.issues[0]}：请用双引号包住取值后重试。` }
@@ -1946,32 +1961,61 @@ export class SkillLibrary {
     }
     const threat = this.contentThreatBlock(finalContent)
     if (threat) return { ok: false, message: threat }
-    return await this.runSingleWrite(path, (current) => {
-      // v35 C9: the stage-time anchor is checked against THIS locked read, so the
-      // compare and the commit share one lock (the caller's former pre-read left
-      // a window where both writers could report success).
-      const verdict = anchorVerdict(anchor, current)
-      if (verdict !== 'match') return { result: anchorRefusal(name, verdict), write: null }
-      if (current === null) return { result: { ok: false, message: `技能「${name}」不存在。` }, write: null }
-      // F-318 (②): a byte-equivalent rewrite (same content modulo trailing
-      // newlines) is a no-op — no write, no audit, no mutation event, so the
-      // mutation-maturity counter is not inflated by a redundant re-save.
-      if (finalContent.trimEnd() === current.trimEnd()) {
-        return { result: { ok: true, message: `技能「${name}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: dir }, write: null }
-      }
-      // F-337: hash the BYTES that actually land on disk (write uses
-      // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
-      const onDisk = finalContent.trimEnd() + '\n'
-      return {
-        result: { ok: true, message: `技能「${name}」已更新。`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) },
-        write: onDisk,
-        audit: { skillName: name, action: 'update', before: current, after: onDisk, summary: 'updated' },
-        event: { action: 'update', name, skillDir: dir },
-      }
-    }, anchor !== undefined ? () => anchorUnverifiable(name, null) : error => unreadableTarget(name, error))
+    let current: string | null
+    try {
+      current = await this.io.readText(path)
+    } catch (error) {
+      return anchor !== undefined ? anchorUnverifiable(name, null) : unreadableTarget(name, error)
+    }
+    const verdict = anchorVerdict(anchor, current)
+    if (verdict !== 'match') return anchorRefusal(name, verdict)
+    if (current === null) {
+      await this.cleanupGhostDir(path)
+      return { ok: false, message: `技能「${name}」不存在。` }
+    }
+    if (finalContent.trimEnd() === current.trimEnd()) {
+      return { ok: true, message: `技能「${name}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: dir }
+    }
+    const onDisk = finalContent.trimEnd() + '\n'
+    const unit = new MutationUnit({
+      io: this.io,
+      limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
+      lock: fileMutationLock(this.io, this.root),
+      journal: unitJournalPort(this.io, dirname(this.root)),
+      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
+      ...(this.transact === undefined ? {} : { transact: this.transact }),
+      hooks: {
+        committed: async event => {
+          const op = event.ops[0]
+          if (op === undefined) return
+          await this.audit(name, 'update', op.before, op.after, 'updated', undefined, event.unitId, { sources: [{ skill: name }] }, origin)
+          this.notifyMutation({ action: 'update', name, skillDir: dir })
+        },
+      },
+      validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
+    })
+    const result = await unit.apply({
+      name,
+      origin,
+      roots: [{ name, protection: 'write' }],
+      rootDirs: { [name]: dir },
+      ops: [{ kind: 'write', target: path, content: onDisk, expected: current, skill: name }],
+      auditAction: 'update',
+      auditSummary: 'updated',
+      eventAction: 'update',
+    })
+    if (!result.ok) {
+      const messages = result.errors.map(error => error.message)
+      if (messages.some(message => message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
+      return { ok: false, message: messages.join('；') }
+    }
+    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
+    const retention = contentRetentionFeedback({ name, action: 'update', before: current, after: onDisk })
+    return { ok: true, message: `技能「${name}」已更新。${warning}${retention === null ? '' : '\n' + retention}`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+    await this.ensureRecovered()
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→patch→write runs under the in-process serialize
@@ -2008,7 +2052,7 @@ export class SkillLibrary {
       target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
       patchLabel = filePath
     }
-    return await this.runSingleWrite(target, (current) => {
+    const compute = (current: string | null): SingleWriteOutcome => {
       const md = current
       if (md === null) return { result: { ok: false, message: `文件不存在：${patchLabel}` }, write: null }
 
@@ -2058,7 +2102,7 @@ export class SkillLibrary {
       const overLimit = exceedsContentLimit(writeContent, this.limits.maxSkillContentChars)
       const repairing = shrinksOverLimit(writeContent, md, this.limits.maxSkillContentChars)
       if (overLimit && target === skillMd && !repairing) {
-        return { result: { ok: false, message: `修补后的内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }, write: null }
+        return { result: { ok: false, message: `修补后的内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }, write: null, hardCapHit: { bodyChars: writeContent.length, supportFiles: null } }
       }
       // V4: the same cap on a SUPPORT file. Report mode writes with an advisory;
       // enforce refuses unless the patch makes an already-over file smaller.
@@ -2067,7 +2111,7 @@ export class SkillLibrary {
         ? ` Warning: ${writeContent.length} characters is over the ${this.limits.maxSkillContentChars}-character cap upstream applies to every file; plan a split.`
         : ''
       if (supportOverCap && this.supportFileCharPolicy() === 'enforce') {
-        return { result: { ok: false, message: `修补后的文件内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }, write: null }
+        return { result: { ok: false, message: `修补后的文件内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }, write: null, hardCapHit: { bodyChars: writeContent.length, supportFiles: 1 } }
       }
       const threat = this.contentThreatBlock(writeContent)
       if (threat) return { result: { ok: false, message: threat }, write: null }
@@ -2091,7 +2135,56 @@ export class SkillLibrary {
         audit: { skillName: name, action: 'patch', before: md, after: onDisk, summary: `patched ${patchLabel}` },
         event: { action: 'patch', name, skillDir: dir },
       }
-    }, error => unreadableTarget(name + '/' + patchLabel, error))
+    }
+    let current: string | null
+    try {
+      current = await this.io.readText(target)
+    } catch (error) {
+      return unreadableTarget(name + '/' + patchLabel, error)
+    }
+    if (current === null) {
+      await this.cleanupGhostDir(target)
+      return { ok: false, message: `文件不存在：${patchLabel}` }
+    }
+    const outcome = compute(current)
+    if (outcome.write === null) {
+      if (outcome.hardCapHit !== undefined) await this.recordHardCapHit(name, outcome.hardCapHit.bodyChars, 'patch', outcome.hardCapHit.supportFiles)
+      return outcome.result
+    }
+    const onDisk = outcome.write
+    const unit = new MutationUnit({
+      io: this.io,
+      limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
+      lock: fileMutationLock(this.io, this.root),
+      journal: unitJournalPort(this.io, dirname(this.root)),
+      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
+      ...(this.transact === undefined ? {} : { transact: this.transact }),
+      hooks: {
+        committed: async event => {
+          await this.audit(name, 'patch', outcome.audit?.before ?? current, event.ops[0]?.after ?? onDisk, outcome.audit?.summary ?? `patched ${patchLabel}`, filePath === '' ? undefined : filePath, event.unitId, { sources: [{ skill: name }] }, origin)
+          this.notifyMutation({ action: 'patch', name, skillDir: dir })
+        },
+      },
+      validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
+    })
+    const result = await unit.apply({
+      name,
+      origin,
+      roots: [{ name, protection: 'write' }],
+      rootDirs: { [name]: dir },
+      ops: [{ kind: 'write', target, content: onDisk, expected: current, skill: name }],
+      auditAction: 'patch',
+      auditSummary: outcome.audit?.summary ?? `patched ${patchLabel}`,
+      eventAction: 'patch',
+    })
+    if (!result.ok) {
+      const messages = result.errors.map(error => error.message)
+      if (messages.some(message => message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
+      return { ok: false, message: messages.join('；') }
+    }
+    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
+    const retention = contentRetentionFeedback({ name, action: 'patch', before: current, after: onDisk })
+    return { ...outcome.result, message: `${outcome.result.message}${warning}${retention === null ? '' : '\n' + retention}` }
   }
 
   /**
@@ -2935,9 +3028,10 @@ export class SkillLibrary {
     origin: WriteOrigin = this.authority.origin,
   ): Promise<SkillActionResult> {
     const name = rawName.trim()
+    await this.ensureRecovered()
     // F-208: the whole read→plan→write runs under the in-process serialize
     // queue so two concurrent restructures on one skill never interleave.
-    return await this.serial(() => this.restructureCore(name, moves, origin))
+    return await this.restructureCore(name, moves, origin)
   }
 
   private async restructureCore(name: string, moves: SkillRestructureMove[], origin: WriteOrigin): Promise<SkillActionResult> {
@@ -3034,16 +3128,49 @@ export class SkillLibrary {
       })
     }
     writes.push({ target: join(dir, 'SKILL.md'), content: finalMd, expected: md })
-    const result = await this.applyTreeChange({
+    const protection = await this.writeProtection(name, origin)
+    if (protection !== null) return { ok: false, message: `技能「${name}」受保护（${protection}）。` }
+    const summary = `moved ${plan.sections.length} section(s): ${[...byRel.keys()].join(', ')}`
+    const ops: TreeChangeOp[] = writes.map(write => ({
+      kind: 'write' as const,
+      target: write.target,
+      content: write.content,
+      ...(write.expected === undefined ? {} : { expected: write.expected }),
+      skill: name,
+    }))
+    const hooks: MutationUnitHooks = {
+      committed: async event => {
+        let headPlaced = false
+        for (const op of event.ops) {
+          const rel = relative(dir, op.target).split(String.fromCharCode(92)).join('/')
+          await this.audit(name, 'restructure', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : this.unitHeadForOps(event.ops, [name]), origin)
+          headPlaced = true
+        }
+        this.notifyMutation({ action: 'restructure', name, skillDir: dir })
+      },
+    }
+    const home = dirname(this.root)
+    const unit = new MutationUnit({
+      io: this.io,
+      limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
+      serial: this.serial,
+      lock: fileMutationLock(this.io, this.root),
+      journal: unitJournalPort(this.io, home),
+      snapshots: unitSnapshotPort(this.io, home),
+      hooks,
+      validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
+    })
+    const result = await unit.apply({
       name,
       origin,
-      protection: 'write',
-      writes,
+      roots: [{ name, protection: 'write' as const }],
+      rootDirs: { [name]: dir },
+      ops,
       auditAction: 'restructure',
-      auditSummary: `moved ${plan.sections.length} section(s): ${[...byRel.keys()].join(', ')}`,
+      auditSummary: summary,
       eventAction: 'restructure',
     })
-    if (!result.ok) return result
+    if (!result.ok) return { ok: false, message: result.errors.map(error => error.message).join('；') }
     return { ok: true, message: `已重构「${name}」：把 ${plan.sections.length} 个章节搬到 references/。`, path: dir }
   }
 
@@ -3063,6 +3190,7 @@ export class SkillLibrary {
    * @returns the kernel result; a refusal writes nothing.
    */
   async extract(plan: ExtractPlanDraft, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+    await this.ensureRecovered()
     if (plan.outcome === 'owner-gap' || plan.owner.mode !== 'covered') return { ok: false, message: '提取被拒绝：owner-gap 不是写操作。' }
     if (plan.support.unresolved.length > 0 || plan.support.dangling.length > 0) return { ok: false, message: '提取被拒绝：support closure 存在 unresolved/dangling。' }
     if (plan.parts.length === 0) return { ok: false, message: '提取被拒绝：没有 part。' }
@@ -3113,17 +3241,53 @@ export class SkillLibrary {
       ops.push({ kind: 'delete', target: sourcePath, expected: previous, skill: source })
     }
     ops.push({ kind: 'write', target: join(sourceDir, 'SKILL.md'), content: sourceNew, expected: sourceMd, skill: source })
-    return this.applyTreeChange({
+    const targetSummary = (await this.list({ withFrontmatter: true })).find(summary => summary.name === target)
+    if (targetSummary === undefined) return { ok: false, message: '提取被拒绝：target 不在技能库中。' }
+    if (!targetSummary.managed) return { ok: false, message: '提取被拒绝：target 不是家族管理的技能。' }
+    for (const name of [source, target]) {
+      const protection = await this.writeProtection(name, origin)
+      if (protection !== null) return { ok: false, message: '技能「' + name + '」受保护（' + protection + '）。' }
+    }
+    const summary = 'extract ' + plan.parts.map(part => part.heading).join(', ') + ' from ' + source + ' to ' + target
+    const roots = [source, target]
+    const hooks: MutationUnitHooks = {
+      committed: async event => {
+        const provenance = new Map<string, string>()
+        for (const move of [...plan.support.shared, ...plan.support.external]) provenance.set(join(targetDir, ...move.to.split('/')), move.provenance)
+        const head: UnitHead = this.unitHeadForOps(event.ops, roots, provenance)
+        let headPlaced = false
+        for (const op of event.ops) {
+          if (op.skill === undefined) continue
+          const rel = relative(this.dirOf(op.skill), op.target).split(String.fromCharCode(92)).join('/')
+          await this.audit(op.skill, 'extract', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : head, origin)
+          headPlaced = true
+        }
+        for (const name of roots) this.notifyMutation({ action: 'extract', name, skillDir: this.dirOf(name) })
+      },
+    }
+    const home = dirname(this.root)
+    const unit = new MutationUnit({
+      io: this.io,
+      limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
+      serial: this.serial,
+      lock: fileMutationLock(this.io, this.root),
+      journal: unitJournalPort(this.io, home),
+      snapshots: unitSnapshotPort(this.io, home),
+      hooks,
+      validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
+    })
+    const result = await unit.apply({
       name: source,
       origin,
-      protection: 'write',
-      roots: [{ name: source, protection: 'write' }, { name: target, protection: 'write' }],
-      writes: [],
+      roots: roots.map(name => ({ name, protection: 'write' as const })),
+      rootDirs: Object.fromEntries(roots.map(name => [name, this.dirOf(name)])),
       ops,
       auditAction: 'extract',
-      auditSummary: 'extract ' + plan.parts.map(part => part.heading).join(', ') + ' from ' + source + ' to ' + target,
+      auditSummary: summary,
       eventAction: 'extract',
     })
+    if (!result.ok) return { ok: false, message: '提取失败：' + result.errors.map(error => error.message).join('；') }
+    return { ok: true, message: summary + ' succeeded.', path: this.dirOf(source) }
   }
 
   private async applyTreeChange(plan: TreeChangePlan): Promise<SkillActionResult> {
@@ -3411,11 +3575,8 @@ export class SkillLibrary {
     origin: WriteOrigin = this.authority.origin,
     anchor?: WriteAnchor,
   ): Promise<SkillActionResult> {
-    // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
-    // F-208: the whole read→validate→write runs under the in-process serialize
-    // queue so two concurrent writers to one support file never interleave.
-    return await this.serial(() => this.writeSupportFileCore(name, filePath, content, origin, anchor))
+    return await this.writeSupportFileCore(name, filePath, content, origin, anchor)
   }
 
   private async writeSupportFileCore(
@@ -3425,8 +3586,6 @@ export class SkillLibrary {
     origin: WriteOrigin,
     anchor?: WriteAnchor,
   ): Promise<SkillActionResult> {
-    // P3 (v17): guard BEFORE dirOf — the last holdout of the old order
-    // (updateCore/patchCore/removeSupportFileCore all check first).
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
@@ -3439,38 +3598,54 @@ export class SkillLibrary {
     const threat = this.contentThreatBlock(content)
     if (threat) return { ok: false, message: threat }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
-    return await this.runSingleWrite(target, (current) => {
-      // v35 C9: the stage-time anchor is verified against this locked read; a
-      // mismatch refuses before the no-op check (a stale anchor is a refusal even
-      // when the supplied bytes happen to equal the current ones).
-      const verdict = anchorVerdict(anchor, current)
-      if (verdict !== 'match') return { result: anchorRefusalFile(name, filePath, verdict), write: null }
-      // V6-15 (0.3.36): a byte-equivalent (modulo trailing whitespace) rewrite
-      // is a no-op — no write, no audit, no mutation event — so a repeated
-      // write_file cannot inflate the mutation-maturity counter or churn the
-      // catalog (the update/patch/memory-add noop discipline, 0.3.29).
-      // V4 (design §16.6): upstream applies the 100k-character cap to EVERY written
-      // file. Landing it here in report mode first — the write goes through with an
-      // advisory; `enforce` refuses, and a NET SHRINK of an already-over file is the
-      // repair path in both modes (so a legacy 189k file can always be reduced).
-      const overCap = exceedsContentLimit(content, this.limits.maxSkillContentChars)
-      const repairing = shrinksOverLimit(content, current, this.limits.maxSkillContentChars)
-      const capAdvisory = overCap && !repairing
-        ? ` Warning: ${content.length} characters is over the ${this.limits.maxSkillContentChars}-character cap upstream applies to every file; plan a split.`
-        : ''
-      if (overCap && !repairing && this.supportFileCharPolicy() === 'enforce') {
-        return { result: { ok: false, message: `支撑文件「${filePath}」的内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }, write: null }
-      }
-      if (current !== null && content.trimEnd() === current.trimEnd()) {
-        return { result: { ok: true, message: `支撑文件「${filePath}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: target }, write: null }
-      }
-      return {
-        result: { ok: true, message: `支撑文件「${filePath}」已写入「${name}」。${capAdvisory}`, path: target },
-        write: content,
-        audit: { skillName: name, action: 'write_file', before: current, after: content, summary: `wrote ${filePath}`, path: filePath },
-        event: { action: 'write_file', name, skillDir: dir, file: target },
-      }
-    }, anchor !== undefined ? () => anchorUnverifiable(name, filePath) : error => unreadableTarget(name + '/' + filePath, error))
+    const probe = await probeText(this.io, target)
+    if (isUnknown(probe)) return unreadableTarget(name + '/' + filePath, probe.reason)
+    const current = isPresent(probe) ? probe.value : null
+    const verdict = anchorVerdict(anchor, current)
+    if (verdict !== 'match') return anchorRefusalFile(name, filePath, verdict)
+    const overCap = exceedsContentLimit(content, this.limits.maxSkillContentChars)
+    const repairing = shrinksOverLimit(content, current, this.limits.maxSkillContentChars)
+    const capAdvisory = overCap && !repairing
+      ? ` Warning: ${content.length} characters is over the ${this.limits.maxSkillContentChars}-character cap upstream applies to every file; plan a split.`
+      : ''
+    if (overCap && !repairing && this.supportFileCharPolicy() === 'enforce') {
+      await this.recordHardCapHit(name, content.length, 'write_file', 1)
+      return { ok: false, message: `支撑文件「${filePath}」的内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }
+    }
+    if (current !== null && content.trimEnd() === current.trimEnd()) {
+      return { ok: true, message: `支撑文件「${filePath}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: target }
+    }
+    const unit = new MutationUnit({
+      io: this.io,
+      limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
+      serial: this.serial,
+      lock: fileMutationLock(this.io, this.root),
+      journal: unitJournalPort(this.io, dirname(this.root)),
+      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
+      ...(this.transact === undefined ? {} : { transact: this.transact }),
+      hooks: {
+        committed: async event => {
+          const op = event.ops[0]
+          if (op === undefined) return
+          await this.audit(name, 'write_file', op.before, op.after, `wrote ${filePath}`, filePath, event.unitId, undefined, origin)
+          this.notifyMutation({ action: 'write_file', name, skillDir: dir, file: target })
+        },
+      },
+      validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
+    })
+    const result = await unit.apply({
+      name,
+      origin,
+      roots: [{ name, protection: 'write' }],
+      rootDirs: { [name]: dir },
+      ops: [{ kind: 'write', target, content, expected: current, skill: name }],
+      auditAction: 'write_file',
+      auditSummary: `wrote ${filePath}`,
+      eventAction: 'write_file',
+    })
+    if (!result.ok) return { ok: false, message: result.errors.map(error => error.message).join('；') }
+    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
+    return { ok: true, message: `支撑文件「${filePath}」已写入「${name}」。${capAdvisory}${warning}`, path: target }
   }
 
   async removeSupportFile(
@@ -3480,12 +3655,7 @@ export class SkillLibrary {
     anchor?: WriteAnchor,
     unitId?: string,
   ): Promise<SkillActionResult> {
-    // One trim per entry: paths (dirOf), validation and messages all see the same name.
-    const name = rawName.trim()
-    // P2-4 (v11): the exists/read/remove window runs under the serialize queue
-    // — writeSupportFile wraps itself (F-208), so an unwrapped remove could
-    // interleave with a concurrent write and silently drop its write.
-    return await this.serial(() => this.removeSupportFileCore(name, filePath, origin, anchor, unitId))
+    return await this.serial(() => this.removeSupportFileCore(rawName.trim(), filePath, origin, anchor, unitId))
   }
 
   private async removeSupportFileCore(
@@ -3493,8 +3663,6 @@ export class SkillLibrary {
     filePath: string,
     origin: WriteOrigin,
     anchor?: WriteAnchor,
-    // G3a: the unit this removal belongs to (the undo path stamps its own `u-undo-*`), so the
-    // `remove_file` entry it audits lands under the same unit as the rest of that operation.
     unitId?: string,
   ): Promise<SkillActionResult> {
     const badName = this.badName(name)
@@ -3507,50 +3675,22 @@ export class SkillLibrary {
     if (validation) return { ok: false, message: validation }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     if (!await this.io.exists(target)) {
-      // v35 C9: a staged replay reports its own anchor verdict for a vanished
-      // target; the generic not-found report is for unanchored callers.
       if (anchor !== undefined) return anchorRefusalFile(name, filePath, 'missing')
       return { ok: false, message: `文件「${filePath}」不在技能「${name}」里。` }
     }
-    // P2-10 (v15): `io.remove` is a recursive rm, so a DIRECTORY path passed
-    // as file_path (nested support dirs are a feature) would wipe the whole
-    // subtree with only a null audit `before` — bytes gone without a hash.
-    // A regular file always reads as a string here; exists+unreadable means
-    // directory (EISDIR) or an unreadable file — refuse both (fail-closed;
-    // directories must be removed file by file).
-    // N36: three-state. Both non-present answers REFUSE below (the pre-read decides whether the target
-    // is a readable regular file — EISDIR lands here too); the unknown one names its reason.
     const beforeProbe = await probeText(this.io, target)
     if (!isPresent(beforeProbe)) {
       if (isUnknown(beforeProbe)) console.warn(`skill-store: could not read ${target} before removing it (${beforeProbe.reason}); refusing the removal`)
       return { ok: false, message: `"${filePath}" is not a readable regular file — remove the files inside it one by one.` }
     }
     const before = beforeProbe.value
-    // A1-5 (v18): a bare `io.remove` does not participate in the write-lock
-    // protocol, so a cross-instance/process writer could land its rename after
-    // our read and have the bytes deleted while it reports success. Route the
-    // delete through the same per-path transact lock (returning null = remove).
-    // v35 C9: verify the anchor inside the same lock the delete runs under. A
-    // mismatch returns `current` unchanged — "no change" in the transact
-    // contract — so nothing is deleted and nothing is audited.
     let verdict = anchorVerdict(anchor, before)
-    // A7: the audit's `before` is the bytes the LOCKED read saw. The pre-read above
-    // only decides the fast path and supplies a baseline when the target is already
-    // gone at commit time; a concurrent writer between the two reads would otherwise
-    // leave the ledger naming bytes this operation never removed.
     let lockedBefore = before
     if (verdict === 'match' && this.transact) {
-      // S1.4 (v37 P2-7): a violating transact backend would leave `verdict` at
-      // its pre-read value, so the "removed" claim (and the audit record and the
-      // mutation event) would all be false while the file stayed on disk.
-      // Holder (not a `let`): the control-flow analysis cannot see the transact
-      // callback's assignment and would narrow a plain flag to a literal.
       const ran = { done: false }
       await this.transact(this.io, target, (current) => {
         ran.done = true
         verdict = anchorVerdict(anchor, current)
-        // An unanchored caller accepts ANY current, so the locked bytes are the ones the
-        // delete replaces — `null` (the file vanished before the lock) keeps the pre-read.
         if (verdict === 'match' && current !== null) lockedBefore = current
         return verdict === 'match' ? null : current
       })
@@ -3563,7 +3703,6 @@ export class SkillLibrary {
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
     return { ok: true, message: `支撑文件「${filePath}」已从「${name}」移除。`, path: target }
   }
-
 
   /**
    * v23 (ML-1): `.archive` retention. Archived skills are recoverable history,

@@ -26,7 +26,7 @@ export interface PanelFace extends Copy {
   readonly loadVersions: (name: string) => Promise<VersionsPayload>
   readonly loadDiff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly loadBody: (name: string, v: number) => Promise<VersionBodyRow>
-  readonly undo: (name: string, v?: number) => Promise<string>
+  readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
 }
 
 /** The one expanded row. */
@@ -146,7 +146,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     if (selected !== undefined) showVersions(selected)
   }
 
-  const restore = (v: number): void => {
+  const restore = (v: number, unitId?: string): void => {
     if (selected === undefined) return
     if (pending !== v) {
       setPending(v)
@@ -157,7 +157,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     // The result sentence is the curator's — shown verbatim, then the rows are READ AGAIN because the
     // restore itself recorded a new version. A re-read that fails is APPENDED to that sentence: the
     // write already happened, so replacing it with \u201ccould not load\u201d would report the wrong thing.
-    void face.undo(name, v).then((message) => {
+    void face.undo(name, unitId === undefined ? v : undefined, unitId).then((message) => {
       showVersions(name, (error) => {
         setNoteError(true)
         setNoteText(message + '\n' + face.t('error') + ': ' + (error instanceof Error ? error.message : String(error)))
@@ -242,7 +242,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
         confirming: pending === row.v,
         open: expanded !== undefined && expanded.v === row.v ? expanded.kind : undefined,
         expanded: expandedOf(row),
-        onRestore: () => { restore(row.v) },
+        onRestore: () => { restore(row.v, row.unitId) },
         onCancel: cancelRestore,
         onToggle: (kind: OpenKind) => { toggle(row.v, kind) },
       })))

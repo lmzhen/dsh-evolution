@@ -20,7 +20,7 @@ export interface UnitUndoSink {
   restoreFromArchive(skill: string): Promise<SkillActionResult>
   archive(skill: string, reason: string): Promise<SkillActionResult>
   updateSkill(skill: string, body: string, anchor: { sha256: string }): Promise<SkillActionResult>
-  writeSupportFile(skill: string, path: string, content: string, anchor: { sha256: string }): Promise<SkillActionResult>
+  writeSupportFile(skill: string, path: string, content: string, anchor?: { sha256: string }): Promise<SkillActionResult>
   removeSupportFile(skill: string, path: string, anchor: { sha256: string }): Promise<SkillActionResult>
 }
 
@@ -38,6 +38,8 @@ interface PreparedRestore {
 interface PreparedOp extends UnitUndoOp {
   readonly bytes: string
   readonly live: string
+  /** The path was absent at preflight; recreate it without a content anchor. */
+  readonly absent: boolean
 }
 
 export async function executeUnitUndo(plan: UnitUndoPlan, sink: UnitUndoSink): Promise<UnitUndoExecution> {
@@ -56,6 +58,20 @@ export async function executeUnitUndo(plan: UnitUndoPlan, sink: UnitUndoSink): P
   for (const op of plan.ops) {
     const live = op.path === '' ? await sink.readSkill(op.skill) : await sink.readSupport(op.skill, op.path)
     if (live === null) {
+      // The unit may have DELETED this path (extract moving an exclusive support file). Its
+      // after-hash is then the absent-content hash, and undo must recreate it from the pre-unit
+      // blob. A remove op against an already-absent path is a no-op.
+      // A remove op against an already-absent path is a no-op (the unit's deletion landed).
+      if (op.remove) continue
+      if (op.expectedHash === contentHash('')) {
+        const bytes = op.preUnitHash === undefined ? null : await sink.readBlob(op.preUnitHash)
+        if (bytes === null) {
+          refusals.push(`${op.skill}/${op.path === '' ? 'SKILL.md' : op.path}（单元前字节读不到：blob ${op.preUnitHash ?? '(missing)'}）`)
+          continue
+        }
+        prepared.push({ ...op, bytes, live: '', absent: true })
+        continue
+      }
       refusals.push(`${op.skill}/${op.path === '' ? 'SKILL.md' : op.path}（盘上文件不存在）`)
       continue
     }
@@ -64,7 +80,7 @@ export async function executeUnitUndo(plan: UnitUndoPlan, sink: UnitUndoSink): P
       continue
     }
     if (op.remove) {
-      prepared.push({ ...op, bytes: '', live })
+      prepared.push({ ...op, bytes: '', live, absent: false })
       continue
     }
     const bytes = op.preUnitHash === undefined ? null : await sink.readBlob(op.preUnitHash)
@@ -72,7 +88,7 @@ export async function executeUnitUndo(plan: UnitUndoPlan, sink: UnitUndoSink): P
       refusals.push(`${op.skill}/${op.path === '' ? 'SKILL.md' : op.path}（单元前字节读不到：blob ${op.preUnitHash ?? '(missing)'}）`)
       continue
     }
-    prepared.push({ ...op, bytes, live })
+    prepared.push({ ...op, bytes, live, absent: false })
   }
   if (refusals.length > 0) {
     return { ok: false, message: `整单元撤销未开始（零写）—— 预检未通过：${refusals.join('；')}。修好后可重试。`, reverted: [] }
@@ -90,7 +106,7 @@ export async function executeUnitUndo(plan: UnitUndoPlan, sink: UnitUndoSink): P
   for (const op of supportOps) {
     const result = op.remove
       ? await sink.removeSupportFile(op.skill, op.path, { sha256: op.expectedHash })
-      : await sink.writeSupportFile(op.skill, op.path, op.bytes, { sha256: op.expectedHash })
+      : op.absent ? await sink.writeSupportFile(op.skill, op.path, op.bytes) : await sink.writeSupportFile(op.skill, op.path, op.bytes, { sha256: op.expectedHash })
     if (!result.ok) return { ok: false, message: `${op.skill}/${op.path}：${result.message} —— 撤销未完成（已回退：${done()}）。`, reverted }
     reverted.push(op.skill + '/' + op.path)
   }

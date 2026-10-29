@@ -8,7 +8,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import { authorityFrom, withTreeWrite, type SnapshotView } from '@deepseek-ai/dsh-evolution-core'
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
@@ -24,6 +24,7 @@ import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntry
 
 /** Shape of one history index file (only the field this reading needs). */
 type RawIndex = { versions?: unknown[] }
+import { eventsFile, EXTRACT_PROMPT_HASH, readEvolutionEvents, writeProposalReport, type ProposalView } from '@deepseek-ai/dsh-evolution-core'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 // G2.4/C3: the review ceiling has ONE home (core's DEFAULT_REVIEW_TIMEOUT_MS) — this package used to
@@ -2054,14 +2055,24 @@ export class EvolutionCurator extends Service {
       supportFiles: number | null
       churnPatches: number | null
       churnReads: number | null
+      readable?: boolean
     }
     findings: Array<{ severity: 'warn' | 'error'; rule: string; message: string; count: number }>
+    hardCapHits?: number | null
+    protection?: string | null
   }>> {
     const settings = this.settings()
     const thresholds: SkillHealthThresholds = {
       softBodyChars: settings.healthSoftBodyChars,
       stampDensityPerKb: settings.healthStampDensityPerKb,
       churnMinPatches: settings.healthChurnMinPatches,
+      hardCapMinHits: DEFAULT_HEALTH_THRESHOLDS.hardCapMinHits,
+    }
+    const eventLog = await readEvolutionEvents(this.io, eventsFile(dirname(this.skills.root)))
+    const hardCapHits = new Map<string, number>()
+    for (const event of eventLog.events) {
+      if (event.type !== 'hard-cap' || event.target === undefined) continue
+      hardCapHits.set(event.target, (hardCapHits.get(event.target) ?? 0) + 1)
     }
     const usage = await loadUsage(this.skills.root, this.io)
     // C observation window: before ANY observed read exists in the library,
@@ -2072,18 +2083,21 @@ export class EvolutionCurator extends Service {
     // tell 'nothing is wrong' from 'nothing could be read', and the panel has no denominator.
     type HealthRow = Awaited<ReturnType<EvolutionCurator['healthView']>>[number]
     const rows: HealthRow[] = []
-    for (const summary of await this.skills.list()) {
+    for (const summary of await this.skills.model.list()) {
       const record = usage.get(summary.name)
       const assessment = await this.skills.assessHealth(summary.name, thresholds, observed && record ? {
         patchCount: record.patch_count,
         readCount: record.view_count,
-      } : undefined)
+        ...(eventLog.malformed ? { hardCapHits: null } : { hardCapHits: hardCapHits.get(summary.name) ?? 0 }),
+      } : eventLog.malformed ? { hardCapHits: null } : { hardCapHits: hardCapHits.get(summary.name) ?? 0 })
       if (assessment !== null) {
         rows.push({
           name: summary.name,
           verdict: assessment.verdict,
           dims: assessment.dims,
           findings: assessment.findings,
+          hardCapHits: eventLog.malformed ? null : (hardCapHits.get(summary.name) ?? 0),
+          ...(summary.protectedBy === null ? {} : { protection: summary.protectedBy }),
         })
         continue
       }
@@ -2099,12 +2113,14 @@ export class EvolutionCurator extends Service {
           supportFiles: null,
           churnPatches: null,
           churnReads: null,
+          hardCapHits: null,
         },
         softLineChars: thresholds.softBodyChars,
         overSoftLine: false,
         overTwiceSoftLine: false,
         stampLimitPerKb: thresholds.stampDensityPerKb,
         churnMinPatches: thresholds.churnMinPatches,
+        hardCapMinHits: thresholds.hardCapMinHits,
         readable: false,
       })
       rows.push({
@@ -2118,6 +2134,7 @@ export class EvolutionCurator extends Service {
           supportFiles: null,
           churnPatches: null,
           churnReads: null,
+          readable: false,
         },
         findings,
       })
@@ -2363,6 +2380,34 @@ export class EvolutionCurator extends Service {
    * @param unitId - the unit to undo; omitted takes the newest unit the index carries.
    * @returns the outcome; the message names what was reverted, or why nothing was written.
    */
+  /** E12: curator proposer — oversized skills get a keep proposal, never an automatic split. */
+  async proposeKeeps(): Promise<{ ok: true; count: number; message: string }> {
+    const policy = this.ctx.get('evolutionPolicy') as { get?(): { curatorModel: string } | undefined } | undefined
+    const model = policy?.get?.()?.curatorModel ?? DEFAULT_CURATOR_MODEL
+    const rows = await this.healthView()
+    let count = 0
+    const at = Date.now()
+    for (const row of rows) {
+      if (row.protection !== undefined && row.protection !== null) continue
+      if (!row.findings.some(finding => finding.rule === 'body-oversize' || finding.rule === 'body-oversize-2x')) continue
+      const runId = 'curator-keep-' + at.toString(36) + '-' + String(count)
+      const proposal: ProposalView = {
+        version: 1,
+        id: 'extract-' + runId + '-' + row.name,
+        source: row.name,
+        outcome: 'keep',
+        parts: [],
+        owner: { mode: 'covered', name: row.name, triggerCovers: true, outcomeCovers: true, reason: 'keep: the current owner remains' },
+        warnings: ['keep is valid: size alone does not require a split'],
+        provenance: { promptVersion: 'v1', promptHash: EXTRACT_PROMPT_HASH, model, runId, at },
+        status: 'proposed',
+      }
+      await writeProposalReport(this.io, proposal)
+      count += 1
+    }
+    return { ok: true, count, message: count === 0 ? '没有需要 keep 提案的 body-oversize 技能。' : '已写入 ' + String(count) + ' 条 keep 提案。' }
+  }
+
   async undoUnit(name: string, unitId?: string): Promise<SkillActionResult> {
     const versions = await this.skills.listVersions(name)
     if (versions.length === 0) return { ok: false, message: `技能「${name}」还没有记录内容版本 —— 没有可撤销的。` }
@@ -2386,7 +2431,9 @@ export class EvolutionCurator extends Service {
       readonly sources?: readonly { readonly skill: string }[]
       readonly skill?: string
     }
-    const head = members[0] as { unitHead?: UnitHeadLike } | undefined
+    // The unit head is written on the extract/update entry, not on the oldest baseline entry.
+    // Reading only members[0] silently downgraded a cross-skill undo to a single-skill undo.
+    const head = (members.find(entry => (entry as { unitHead?: UnitHeadLike }).unitHead?.sources !== undefined) ?? members[0]) as { unitHead?: UnitHeadLike } | undefined
     const headLike = head !== undefined && head.unitHead !== undefined ? head.unitHead : undefined
     const sources = headLike?.sources
     if (sources !== undefined && sources.length > 0) {

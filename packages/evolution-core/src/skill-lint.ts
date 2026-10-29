@@ -36,6 +36,7 @@ export interface SkillDims {
   stampHits: number | null
   churnPatches: number | null
   churnReads: number | null
+  hardCapHits: number | null
 }
 
 /** The judgement itself, computed by `skill-health.ts` on its own scales; this module never
@@ -49,6 +50,7 @@ export interface LintFacts {
   stampLimitPerKb: number
   /** The engine's own churn threshold — the rule must use the SAME number, not a literal. */
   churnMinPatches: number
+  hardCapMinHits: number
   /** True when the caller could read the body at all. */
   readable: boolean
 }
@@ -77,7 +79,7 @@ export const RULES: readonly LintRule[] = [
     severity: 'error',
     run: facts =>
       facts.overTwiceSoftLine
-        ? { severity: 'error', rule: 'body-oversize-2x', message: msg([facts.skillName, ': body is at or past twice the soft line (', facts.softLineChars, ' chars)']), count: 1 }
+        ? { severity: 'error', rule: 'body-oversize-2x', message: msg([facts.skillName, ': body is at or past twice the soft line (', facts.softLineChars, ' chars); keeping the current skill is valid']), count: 1 }
         : null,
   },
   {
@@ -85,7 +87,7 @@ export const RULES: readonly LintRule[] = [
     severity: 'warn',
     run: facts =>
       !facts.overTwiceSoftLine && facts.overSoftLine
-        ? { severity: 'warn', rule: 'body-oversize', message: msg([facts.skillName, ': body is at or above the soft line (', facts.softLineChars, ' chars)']), count: 1 }
+        ? { severity: 'warn', rule: 'body-oversize', message: msg([facts.skillName, ': body is at or above the soft line (', facts.softLineChars, ' chars); keep is valid — size alone does not require a split']), count: 1 }
         : null,
   },
   {
@@ -113,6 +115,16 @@ export const RULES: readonly LintRule[] = [
       const files = facts.dims.supportFiles
       if (files === null || files < SUPPORT_SPRAWL_FILES) return null
       return { severity: 'warn', rule: 'references-sprawl', message: msg([facts.skillName, ': ', files, ' support files']), count: files }
+    },
+  },
+  {
+    id: 'scope-overloaded',
+    severity: 'warn',
+    run: (facts) => {
+      const hits = facts.dims.hardCapHits
+      const files = facts.dims.supportFiles
+      if (hits === null || files === null || hits < facts.hardCapMinHits || files < 3) return null
+      return { severity: 'warn', rule: 'scope-overloaded', message: msg([facts.skillName, ': ', hits, ' hard-cap hit(s) with ', files, ' support files — remaining growth may be scope']), count: hits }
     },
   },
   {

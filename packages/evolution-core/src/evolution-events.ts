@@ -59,7 +59,7 @@ export interface EvolutionEvent {
    * observation anchors (C semantics: `usage` events carry the library-wide
    * count snapshot at the moment the observation window opened), and
    * maintain scans (011: verdict + recommendation count + runId). */
-  type: 'feedback' | 'learn' | 'usage' | 'maintain'
+  type: 'feedback' | 'learn' | 'usage' | 'maintain' | 'hard-cap'
   /** Fold key for a `feedback` event: required and non-empty there (P2-10),
    * optional on the other tags and on a record this version only reads. */
   target?: string | undefined
@@ -75,6 +75,10 @@ export interface EvolutionEvent {
   counts?: { skills?: number; views?: number; use?: number; patches?: number } | undefined
   /** Anchor fields for one event (usage: the observation window). */
   window?: { opened?: string } | undefined
+  /** hard-cap: the rejected body size and the write source. */
+  bodyChars?: number | undefined
+  supportFiles?: number | null | undefined
+  restructureRounds?: number | undefined
 }
 
 /** The durable-write shape of one event: `feedback` REQUIRES a `target` —
@@ -82,7 +86,7 @@ export interface EvolutionEvent {
  * field optional, exactly as the runtime payload gate treats them. */
 type EvolutionEventInput =
   | (Omit<EvolutionEvent, 'seq' | 'at' | 'target'> & { type: 'feedback'; target: string })
-  | (Omit<EvolutionEvent, 'seq' | 'at'> & { type: 'learn' | 'usage' | 'maintain' })
+  | (Omit<EvolutionEvent, 'seq' | 'at'> & { type: 'learn' | 'usage' | 'maintain' | 'hard-cap' })
 
 export function eventsFile(home: string): string {
   return join(home, 'evolution', 'events.json')
@@ -114,6 +118,10 @@ export function evolutionEventPayloadIssue(event: { type?: unknown } & Partial<E
       return typeof event.runId === 'string' ? null : 'maintain event requires runId'
     case 'learn':
     case 'usage':
+      return null
+    case 'hard-cap':
+      if (typeof event.target !== 'string' || event.target.trim() === '') return 'hard-cap event requires a non-empty target'
+      if (typeof event.bodyChars !== 'number' || !Number.isFinite(event.bodyChars)) return 'hard-cap event requires a finite bodyChars'
       return null
     default:
       // Unreachable for the declared union; reachable when a JS host writes

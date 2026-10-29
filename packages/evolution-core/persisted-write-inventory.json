@@ -122,10 +122,10 @@
       "id": "skill-tree",
       "path": "<skillsRoot>/**",
       "writer": "evolution-core/src/skill-store.ts",
-      "serializedBy": "transact",
-      "marker": "this.transact(this.io, path",
+      "serializedBy": "write-lock",
+      "marker": "fileMutationLock(",
       "state": [],
-      "note": "The skill tree itself. G2 S4: the family write-lock protocol is retired; every byte writer goes through the provider's versioned read-modify-write (`transact`), so this entry is serialized by the same seam as the rest. Destructive movers refuse only when a support directory cannot be listed (fail-closed)."
+      "note": "The skill tree itself. G1: ordinary byte writers take the root mutation lock (fileMutationLock) and still run their per-file read-modify-write through `transact`; the root lock is what keeps extract/restructure/update/patch/create from interleaving. Destructive movers refuse only when a support directory cannot be listed (fail-closed)."
     },
     {
       "id": "activity-log",

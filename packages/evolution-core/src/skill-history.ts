@@ -79,6 +79,8 @@ export interface SkillVersion {
    * can interleave (the index is appended after the content lock is released); this link is computed
    * from the bytes a write lock actually read, so it is the authoritative predecessor. */
   beforeHash?: string
+  /** True on the synthetic entry that records a REMOVAL; its hash is the removed bytes. */
+  removed?: boolean
   /** One line saying what this write changed, when the deployment turned the summarizer on
    * (registry `skillVersionSummary`). Absent is a first-class state: the faces say so instead of
    * inventing a sentence, and a version recorded before the feature existed simply has none. */
@@ -318,6 +320,7 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
   const summary = typeof candidate.summary === 'string' && candidate.summary !== '' ? candidate.summary : undefined
   const path = typeof candidate.path === 'string' && candidate.path !== '' ? candidate.path : undefined
   const unitId = typeof candidate.unitId === 'string' && candidate.unitId !== '' ? candidate.unitId : undefined
+  const removed = candidate.removed === true ? true : undefined
   // The fold must carry unitHead or the next write drops it for good (the G3a lesson).
   const unitHead = candidate.unitHead
   const base: SkillVersion = {
@@ -329,6 +332,7 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
     ...summary === undefined ? {} : { summary },
     ...path === undefined ? {} : { path },
     ...unitId === undefined ? {} : { unitId },
+    ...removed === undefined ? {} : { removed },
     ...unitHead === undefined ? {} : { unitHead },
   }
   return typeof candidate.beforeHash === 'string' && candidate.beforeHash !== ''
@@ -458,6 +462,7 @@ export function nextHistoryIndex(
         action: input.action,
         hash: removalHash,
         chars: input.before?.length ?? 0,
+        removed: true,
         ...pathField,
         ...input.unitId === undefined ? {} : { unitId: input.unitId },
         // F-G3b-1: a removal-only landing IS the last entry of its unit, so it carries the head;

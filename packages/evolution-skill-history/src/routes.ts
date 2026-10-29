@@ -28,7 +28,7 @@ export const SKILL_HISTORY_ROUTES = HOST_ROUTES.skillHistory
 export const MAX_BODY_CHARS = 20_000
 
 /** The curator surface the routes read: history() and the library listing, undo() as the only write. */
-export type CuratorFace = Pick<Context['evolutionCurator'], 'history' | 'undo' | 'skills'>
+export type CuratorFace = Pick<Context['evolutionCurator'], 'history' | 'undo' | 'undoUnit' | 'skills'>
 
 /**
  * What the handlers resolve PER REQUEST.
@@ -246,8 +246,14 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
           if (raw !== undefined && (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1)) {
             return json(400, { ok: false, code: 'bad-request', message: 'v 必须是正整数' })
           }
+          const unitId = typeof payload?.unitId === 'string' ? payload.unitId.trim() : ''
+          if (raw !== undefined && unitId !== '') {
+            return json(400, { ok: false, code: 'bad-request', message: 'v 与 unitId 不能同时使用' })
+          }
           return withCurator(async (curator) => {
-            const result = raw === undefined ? await curator.undo(name) : await curator.undo(name, raw)
+            const result = unitId !== ''
+              ? await curator.undoUnit(name, unitId)
+              : raw === undefined ? await curator.undo(name) : await curator.undo(name, raw)
             // A refusal is a BUSINESS answer, not a transport failure: the body carries the curator's own
             // sentence (the same one the slash command prints), so the two faces cannot drift.
             return json(200, result.ok ? { ok: true, data: result } : { ok: false, code: 'undo-refused', message: result.message })

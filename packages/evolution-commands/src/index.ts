@@ -28,7 +28,7 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 import {
   errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
-import { contentHash, findOwnerCandidate, ownerCandidatesFromSummaries, parseFrontmatter, planExtract, proposalFromPlan, readExternalSupport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, proposalFromPlan, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
@@ -681,7 +681,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // Content order, not append order: two writers of one skill can interleave their index
           // appends, and every entry written from 0.10.0 on links the version it replaced.
           const groups = partitionVersions(versions)
-          const row = (entry: SkillVersion): string => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}`
+          const row = (entry: SkillVersion): string => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}${entry.unitId === undefined ? '' : `\tunit:${entry.unitId}`}`
           const lines = [`技能 "${name}" 的内容版本（由旧到新，${groups.content.length} 条，最多保留这么多）：`, ...groups.content.map(row)]
           // Support files share this index; their bytes are history, but undo restores SKILL.md only,
           // so they are listed apart instead of being passed off as versions of the body.
@@ -692,15 +692,24 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input.startsWith('skill undo ')) {
           const rest = input.slice(11).trim()
-          const toMatch = /--to\s+v?(\d+)\s*$/.exec(rest)
-          const name = (toMatch?.index === undefined ? rest : rest.slice(0, toMatch.index)).trim()
-          if (!name) return err('用法：/evolution skill undo <name> [--to v<N>]')
+          const toMatch = /--to\s+v?(\d+)/.exec(rest)
+          const unitMatch = /--unit\s+(\S+)/.exec(rest)
+          const marker = [toMatch?.index, unitMatch?.index].filter((index): index is number => index !== undefined).sort((a, b) => a - b)[0]
+          const name = (marker === undefined ? rest : rest.slice(0, marker)).trim()
+          if (!name) return err('用法：/evolution skill undo <name> [--to v<N> | --unit <id>]')
+          if (toMatch !== null && unitMatch !== null) return err('--to 与 --unit 不能同时使用')
           const skillUndoRefusal = unreplayableWriteRefusal('skill undo')
           if (skillUndoRefusal) return skillUndoRefusal
-          const curator = ctx.get('evolutionCurator') as { undo(name: string, v?: number): Promise<{ ok: boolean; message: string }> } | undefined
+          const curator = ctx.get('evolutionCurator') as {
+            undo(name: string, v?: number): Promise<{ ok: boolean; message: string }>
+            undoUnit(name: string, unitId?: string): Promise<{ ok: boolean; message: string }>
+          } | undefined
           const target = toMatch?.[1] === undefined ? undefined : Number(toMatch[1])
+          const unitId = unitMatch?.[1]
           const result = curator
-            ? await (target === undefined ? curator.undo(name) : curator.undo(name, target))
+            ? unitId !== undefined
+              ? await curator.undoUnit(name, unitId)
+              : target === undefined ? await curator.undo(name) : await curator.undo(name, target)
             : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
@@ -728,6 +737,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             },
           })
           const result = await library.setPinned(name, pinned)
+          return result.ok ? ok(result.message) : err(result.message)
+        }
+        if (input === 'propose') {
+          const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
+          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          const result = await curator.proposeKeeps()
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'skills health') {
@@ -1430,16 +1445,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input.startsWith('extract ')) {
           const extractParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(extractParsed) || extractParsed.name !== 'extract') {
-            return err('用法：/evolution extract <source> <target> "<## heading>" [--start <line>] [--end <line>]')
+            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
           }
           const source = extractParsed.positionals[0] ?? ''
           const target = extractParsed.positionals[1] ?? ''
           const heading = extractParsed.positionals[2] ?? ''
           if (source === '' || target === '' || heading === '') {
-            return err('用法：/evolution extract <source> <target> "<## heading>" [--start <line>] [--end <line>]')
+            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
           }
           const startFlag = extractParsed.flags.get('start')
           const endFlag = extractParsed.flags.get('end')
+          const outcomeFlag = extractParsed.flags.get('outcome')
+          if (outcomeFlag !== undefined && outcomeFlag !== 'extract' && outcomeFlag !== 'mixed') {
+            return err('--outcome 只能是 extract 或 mixed。')
+          }
           const start = typeof startFlag === 'string' ? startFlag : undefined
           const end = typeof endFlag === 'string' ? endFlag : undefined
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
@@ -1454,42 +1473,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
             },
           })
-          const sourceMd = await library.read(source)
-          const targetMd = await library.read(target)
-          if (sourceMd === null) return err('技能「' + source + '」不存在。')
-          if (targetMd === null) return err('目标技能「' + target + '」不存在；owner-gap 不自动 create。')
-          if (source === target) return err('source 与 target 不能相同。')
-          const summaries = await library.list({ withContent: true, withFrontmatter: true })
-          const candidate = findOwnerCandidate(ownerCandidatesFromSummaries(source, summaries), target)
-          if (candidate === undefined) return err('目标「' + target + '」不是可用的 owner candidate（描述为空或已排除）；owner-gap，不自动 create。')
-          if (candidate.protectionUnknown || candidate.protectedBy !== null) return err('目标「' + target + '」受保护（' + (candidate.protectedBy ?? '未知') + '），拒绝提取。')
-          const sourceParsed = parseFrontmatter(sourceMd)
-          if (sourceParsed === null) return err('技能「' + source + '」没有可读取的正文。')
-          const sourceFiles = await library.listSupportFiles(source)
-          const targetFiles = await library.listSupportFiles(target)
-          if (!isPresent(sourceFiles) || !isPresent(targetFiles)) return err('支撑文件列表不可读；拒绝在不确定的闭包上提取。')
-          const external = await readExternalSupport(sourceParsed.body, join(library.root, source), dirname(library.root), targetFiles.value)
-          if (!external.ok) return err(external.message)
-          const plan = planExtract({
-            body: sourceParsed.body,
-            sourceName: source,
-            targetName: target,
-            targetExists: true,
-            outcome: start !== undefined || end !== undefined ? 'mixed' : 'extract',
-            owner: { mode: 'covered', name: target, triggerCovers: true, outcomeCovers: true, reason: 'explicit target' },
-            requests: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }) }],
-            sourceFiles: sourceFiles.value,
-            targetFiles: targetFiles.value,
-            external: external.files,
-            anchors: { sourceMdSha256: contentHash(sourceMd), targetMdSha256: contentHash(targetMd) },
+          const built = await buildExtractPlanFromLibrary(library, {
+            source,
+            items: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }],
+            ...(outcomeFlag === undefined ? {} : { outcome: outcomeFlag }),
           })
-          if (!plan.ok) return err(plan.message)
-          if (extractParsed.flags.has('plan')) {
-            const proposal = proposalFromPlan(plan.plan, { runId: 'cli-' + Date.now().toString(36) })
+          if (!built.ok) return err(built.message)
+          const plan = built.plan
+          const warnings = built.warnings === undefined || built.warnings.length === 0 ? '' : '\n' + built.warnings.join('\n')
+          if (!extractParsed.flags.has('apply')) {
+            const proposal = proposalFromPlan(plan, { runId: 'cli-' + Date.now().toString(36) })
             const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
             const io = registry?.provider()
             if (io !== undefined) await writeProposalReport(io, proposal).catch(() => { /* best-effort proposal report */ })
-            return ok('提取计划（未写入）：' + plan.plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target)
+            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=covered by ' + target + warnings)
           }
           if (approval) {
             const session = invocationAgent?.session
@@ -1511,9 +1508,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             })
             if (decision.action === 'staged') return ok(decision.message)
           }
-          const result = await library.extract(plan.plan, 'foreground')
+          const result = await library.extract(plan, 'foreground')
           if (!result.ok) return err(result.message)
-          return ok(result.message)
+          return ok(result.message + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + warnings)
         }
         if (input.startsWith('restructure ')) {
           // /evolution restructure <name> "<heading>" <to_file> [--plan <runId>]
@@ -1526,13 +1523,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
           const restParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(restParsed) || restParsed.name !== 'restructure') {
-            return err('用法：/evolution restructure <name> "<## heading>" <to_file>')
+            return err('用法：/evolution restructure <name> "<heading>" <to_file>')
           }
           const name = restParsed.positionals[0] ?? ''
           const heading = restParsed.positionals[1] ?? ''
           const toFile = restParsed.positionals[2] ?? ''
           if (name === '' || heading === '' || toFile === '') {
-            return err('用法：/evolution restructure <name> "<## heading>" <to_file>')
+            return err('用法：/evolution restructure <name> "<heading>" <to_file>')
           }
           const planFlag = restParsed.flags.get('plan')
           const planRunId = typeof planFlag === 'string' ? planFlag : undefined

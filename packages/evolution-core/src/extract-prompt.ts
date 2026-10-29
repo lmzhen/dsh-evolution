@@ -3,6 +3,8 @@
  * explicit extract agents and tests; it is deliberately not part of the review
  * prompt bundle, and no review path injects it.
  */
+import { createHash } from 'node:crypto'
+
 export const EXTRACT_PROMPT_VERSION = 'v1'
 
 export const EXTRACT_PROMPT_V1 = `Inspect the source skill, its linked support files, and the candidate owners
@@ -14,3 +16,5 @@ the owner gap and name the class-level owner that would be needed. If it mixes
 a reusable capability with parent-specific facts, return mixed and name only
 the reusable part. Otherwise keep it. Keep, extract, mixed, and owner-gap are
 all valid outcomes; no split is required.`
+
+export const EXTRACT_PROMPT_HASH = createHash('sha256').update(EXTRACT_PROMPT_V1, 'utf8').digest('hex')

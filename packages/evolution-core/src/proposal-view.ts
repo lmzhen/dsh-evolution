@@ -1,4 +1,5 @@
 import type { ExtractOutcome, ExtractPlanDraft, OwnerDecision, SupportClosure } from './extract-plan.ts'
+import { EXTRACT_PROMPT_HASH, EXTRACT_PROMPT_VERSION } from './extract-prompt.ts'
 
 /** The semantic outcome a proposal may carry; keep is valid even though planExtract only plans a split. */
 export type ProposalOutcome = ExtractOutcome | 'keep'
@@ -12,8 +13,10 @@ export interface ProposalView {
   parts: Array<{ heading: string; anchor: { heading: string; start?: string; end?: string }; reason: string }>
   owner: OwnerDecision
   support?: SupportClosure
+  /** The source body left behind after extraction; the panel can show what is KEPT. */
+  residual?: string
   warnings: string[]
-  provenance: { promptVersion: 'v1'; runId: string; at: number }
+  provenance: { promptVersion: 'v1'; promptHash?: string; model?: string; runId: string; at: number }
   status: 'proposed' | 'previewed' | 'stale' | 'dismissed'
 }
 
@@ -38,8 +41,9 @@ export function proposalFromPlan(
     parts: plan.parts.map(part => ({ heading: part.heading, anchor: part.anchor, reason: part.sourceText.slice(0, 160) })),
     owner: plan.owner,
     support: plan.support,
+    residual: plan.residual,
     warnings: plan.warnings,
-    provenance: { promptVersion: 'v1', runId: provenance.runId, at: provenance.at ?? Date.now() },
+    provenance: { promptVersion: EXTRACT_PROMPT_VERSION, promptHash: EXTRACT_PROMPT_HASH, runId: provenance.runId, at: provenance.at ?? Date.now() },
     status: 'proposed',
   }
 }

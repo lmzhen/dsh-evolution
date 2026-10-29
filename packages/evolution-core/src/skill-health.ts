@@ -27,6 +27,8 @@ export interface SkillHealthThresholds {
   /** Patch count at/above this with zero reads -> 'warn' (write-ghost: the
    * skill is churned but nothing ever loads it). */
   churnMinPatches: number
+  /** Hard-cap hits at/above this with a large support closure -> scope-overloaded advisory. */
+  hardCapMinHits: number
 }
 
 export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
@@ -40,6 +42,7 @@ export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
   softBodyChars: AUTHORING_SPLIT_LINE_CHARS,
   stampDensityPerKb: 2,
   churnMinPatches: 20,
+  hardCapMinHits: 3,
 }
 
 /**
@@ -90,6 +93,8 @@ interface SkillHealthSnapshot {
   patchCount?: number | undefined
   /** Usage-side view count, when the caller has it (A2 churn dimension). */
   readCount?: number | undefined
+  /** Mechanical hard-cap-hit count, when the caller has it; null = unknown. */
+  hardCapHits?: number | null | undefined
 }
 
 interface SkillHealthDim {
@@ -105,6 +110,7 @@ interface SkillHealthDim {
   /** Usage churn facts; null when the caller supplied no counts. */
   churnPatches: number | null
   churnReads: number | null
+  hardCapHits: number | null
 }
 
 export interface SkillHealthAssessment {
@@ -152,6 +158,7 @@ export function assessStructureHealth(
     supportFiles: snapshot.supportFiles ?? null,
     churnPatches: null,
     churnReads: null,
+    hardCapHits: snapshot.hardCapHits ?? null,
   }
   // V6: the JUDGMENT runs on the token scale. The configured number stays the
   // borrowed UPSTREAM character line, converted per body composition, so the
@@ -195,6 +202,7 @@ export function assessStructureHealth(
     overTwiceSoftLine: overTwice,
     stampLimitPerKb: thresholds.stampDensityPerKb,
     churnMinPatches: thresholds.churnMinPatches,
+    hardCapMinHits: thresholds.hardCapMinHits,
     // This engine's snapshot always carries a MEASURED body (its type has no null arm yet); the
     // unreadable case becomes expressible when the caller's type does, and the rule already waits.
     readable: true,

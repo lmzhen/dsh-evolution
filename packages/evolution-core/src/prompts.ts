@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 22
+export const PROMPT_BUNDLE_VERSION = 23
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -437,6 +437,7 @@ export const DSH_AUTHORING_STANDARDS = `Follow the Hermes skill-authoring standa
 Frontmatter:
 - name: lowercase-hyphenated, <=64 chars, no spaces.
 - description: ONE sentence, <=60 characters, ends with a period. State the capability, not the implementation. No marketing words. Do NOT repeat the skill name. Count the characters before saving. If the description contains a colon, wrap the whole value in double quotes.
+- whenToUse: ONE abstract sentence describing the task situation that should trigger this skill. This is the platform's machine-routing field: do not enumerate a scenario list and do not repeat the description. One line only; quote it if it contains a colon.
 - version: 0.1.0
 - author: always the literal value "Hermes". NEVER fill it from the environment, git config, or any identity you can probe — an environment-derived name is a privacy leak the user never opted into (skills get shared and published), and the skill names itself as Hermes.
 - platforms: declare [macos], [linux], and/or [windows] only when the skill is genuinely OS-bound (osascript/apt/systemctl => the matching OS; /proc, signal.SIGKILL => linux; fcntl/termios => POSIX). Prefer fixing it cross-platform first (tempdir, pathlib, pure-Node); omit the field for portable skills.
@@ -445,13 +446,12 @@ Frontmatter:
 
 Body section order (omit only when empty):
 1. "# <Human Title>" then a 2-3 sentence intro: what it does, what it does NOT do, key dependency stance.
-2. "## When to Use" — concrete trigger phrases.
-3. "## Prerequisites" — exact env vars, install steps, credentials.
-4. "## How to Run" — canonical invocation framed through DSH tools.
-5. "## Quick Reference" — flat command/endpoint list.
-6. "## Procedure" — numbered steps with copy-paste-exact commands.
-7. "## Pitfalls" — known limits and rate limits.
-8. "## Verification" — one check proving the skill worked.
+2. "## Prerequisites" — exact env vars, install steps, credentials.
+3. "## How to Run" — canonical invocation framed through DSH tools.
+4. "## Quick Reference" — flat command/endpoint list.
+5. "## Procedure" — numbered steps with copy-paste-exact commands.
+6. "## Pitfalls" — known limits and rate limits.
+7. "## Verification" — one check proving the skill worked.
 
 DSH-tool framing:
 - Reference DSH tools by name in backticks: \`bash\`, \`str_replace_editor\`, \`write\`, \`skill\`, \`skill_manage\`, \`memory\`.
