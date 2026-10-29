@@ -53,12 +53,7 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
       }
     },
     async listPrepared(): Promise<MutationSnapshot[]> {
-      let names: string[]
-      try {
-        names = await io.list(unitSnapshotsDir(home))
-      } catch {
-        return []
-      }
+      const names = await io.list(unitSnapshotsDir(home))
       const out: MutationSnapshot[] = []
       for (const name of names) {
         if (!name.endsWith('.json')) continue
