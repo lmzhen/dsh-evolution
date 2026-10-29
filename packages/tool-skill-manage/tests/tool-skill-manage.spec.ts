@@ -166,7 +166,7 @@ describe('tool-skill-manage', () => {
     // by 1151: the expression interpolates more than one constant, which is
     // exactly why this pin has to be runtime-captured.) De-duplication must
     // lower this number and say so; growth must be a deliberate edit here.
-    expect((tool?.description ?? '').length).toBe(4879)
+    expect((tool?.description ?? '').length).toBe(5090)
     expect(tool?.description ?? '').toContain('replace_all')
     expect(tool?.description ?? '').toContain('file_path')
     expect(tool?.description ?? '').toContain('extract')
@@ -549,8 +549,17 @@ Existing.
     })
     expect((await execute({ action: 'create', name: 'extract-source', content: source })).value?.ok).toBe(true)
     expect((await execute({ action: 'create', name: 'extract-target', content: target })).value?.ok).toBe(true)
+    await writeFile(join(root, 'skills', 'extract-target', '.hermes-managed'), '')
     const planned = await execute({ action: 'extract', name: 'extract-source', dry_run: true, extract: [{ heading: 'Details', to_skill: 'extract-target' }] })
     expect(planned.value?.ok).toBe(true)
+    expect((planned.value as { message?: string }).message ?? '').toContain('outcome=extract')
+    const agentMode = await execute({ action: 'extract', name: 'extract-source', dry_run: true })
+    const gap = await execute({ action: 'extract', name: 'extract-source', dry_run: true, extract: [{ heading: 'Details', to_skill: 'missing-owner' }] })
+    expect(gap.value?.ok).toBe(true)
+    expect(JSON.parse((gap.value as { proposal?: string }).proposal ?? '{}').outcome).toBe('owner-gap')
+    expect((gap.value as { message?: string }).message ?? '').toContain('neededOwner=missing-owner')
+    expect(agentMode.value?.ok).toBe(false)
+    expect((agentMode.value as { message?: string }).message ?? '').toContain('extract agent 不可用')
     const proposal = JSON.parse((planned.value as { proposal?: string }).proposal ?? '{}') as { outcome?: string; owner?: { mode?: string } }
     expect(proposal.outcome).toBe('extract')
     expect(proposal.owner?.mode).toBe('covered')
@@ -565,6 +574,28 @@ Existing.
     expect(targetMd).toContain('reusable detail')
     await ctx.fiber.dispose()
   })
+
+  it('S1: a >20k write gets one neutral size fact, a 19k write does not', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+      callId: ToolCallId('s1-' + Math.random()),
+      name: 'skill_manage',
+      arguments: arguments_,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    const skill = (name: string, chars: number) => '---\nname: ' + name + '\ndescription: size fixture.\n---\n\n' + 'x'.repeat(chars)
+    const big = await execute({ action: 'create', name: 'big-write', content: skill('big-write', 20_500) })
+    expect((big.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    expect((big.value as { message?: string } | undefined)?.message ?? '').toContain('保持不改是合法的')
+    const small = await execute({ action: 'create', name: 'small-write', content: skill('small-write', 18_000) })
+    expect((small.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    expect((small.value as { message?: string } | undefined)?.message ?? '').not.toContain('保持不改是合法的')
+    await ctx.fiber.dispose()
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }, 15_000)
 
   it('T-13: limit schemas reject zero/negative values at configuration time (0.3.18)', () => {
     const validate = (value: unknown): boolean => {

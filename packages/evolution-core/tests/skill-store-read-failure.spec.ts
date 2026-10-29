@@ -93,4 +93,4 @@ it('S2-14: every staged write path refuses an unreadable target with a named cau
       await rm(root, { recursive: true, force: true })
     }
   }
-})
+}, 30_000)

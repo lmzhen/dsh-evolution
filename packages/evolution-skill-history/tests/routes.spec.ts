@@ -30,6 +30,29 @@ describe('skill-history routes: the curator seam', () => {
   })
 })
 
+describe('skill-history routes: unit undo', () => {
+  it('forwards unitId to undoUnit and refuses v+unitId together', async () => {
+    const ctx = new Context()
+    const calls: Array<{ name: string; unitId?: string }> = []
+    const curator = {
+      history: async () => [],
+      undo: async () => ({ ok: true, message: 'version undo' }),
+      undoUnit: async (name: string, unitId?: string) => { calls.push({ name, unitId }); return { ok: true, message: 'unit undo' } },
+      skills: { list: async () => [] },
+    }
+    const host = await mountHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => curator as never }, audit))
+    const ok = await host.json<{ ok: boolean; data: { message: string } }>(SKILL_HISTORY_ROUTES.undo, { method: 'POST', body: { name: 'panel-skill', unitId: 'u-1' } })
+    expect(ok.status).toBe(200)
+    expect(ok.body.ok).toBe(true)
+    expect(ok.body.data.message).toBe('unit undo')
+    expect(calls).toEqual([{ name: 'panel-skill', unitId: 'u-1' }])
+    const both = await host.json<{ ok: boolean; code: string }>(SKILL_HISTORY_ROUTES.undo, { method: 'POST', body: { name: 'panel-skill', v: 1, unitId: 'u-1' } })
+    expect(both.status).toBe(400)
+    expect(both.body.code).toBe('bad-request')
+    expect(calls).toHaveLength(1)
+  })
+})
+
 describe('skill-history routes: the read/write surface', () => {
   it('serves the health probe, the skills with history, the split version lists and one undo', async () => {
     await tempHome('dsh-skill-history-routes-')

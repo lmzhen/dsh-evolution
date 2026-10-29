@@ -16,6 +16,11 @@ it('keeps needs-restructure, severity, message and dims in the route row', () =>
   expect(rows[0]?.dims).toMatchObject({ bodyChars: 41000, supportFiles: 8, churnPatches: 3 })
 })
 
+it('normalizes the host healthy verdict to the panel ok vocabulary', () => {
+  const rows = toRouteRows([{ name: 'fine', verdict: 'healthy', findings: [] }])
+  expect(rows[0]?.verdict).toBe('healthy')
+})
+
 it('keeps an unreadable row unreadable even when the verdict says otherwise', () => {
   const rows = toRouteRows([{ name: 'bad', verdict: 'ok', findings: [], dims: { readable: false } }])
   expect(rows[0]?.verdict).toBe('unreadable')

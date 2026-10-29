@@ -36,7 +36,14 @@ it('skill review prompt keeps the Hermes guiding structure (alignment contract)'
   // the Hermes "pin only blocks the curator" wording.
   expect(SKILL_REVIEW_PROMPT).toContain('read-only to THIS background review pass')
   expect(SKILL_REVIEW_PROMPT).toContain('Two-tier deposition discipline')
+  expect(SKILL_REVIEW_PROMPT).toContain('no existing umbrella can absorb the learning')
+  expect(SKILL_REVIEW_PROMPT).toContain('A skill body is a reusable decision rule')
+  expect(SKILL_REVIEW_PROMPT).toContain('state what you checked and stop')
   expect(MEMORY_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
+})
+
+it('authoring standards put routing metadata in frontmatter', () => {
+  expect(DSH_AUTHORING_STANDARDS).toContain('whenToUse:')
 })
 
 it('combined review prompt mirrors the same guidance and two-tier rule', () => {
@@ -63,7 +70,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
   // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
   // bundle identity moves with it (v18 pinned the step-7 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(22)
+  expect(PROMPT_BUNDLE_VERSION).toBe(23)
   // v46 S1.12b (finding T3-07): the dry-run banner is model-visible curator text, so it rides
   // the bundle and the digest covers it.
   expect(PROMPT_BUNDLE.prompts['curatorDryRun']).toBe(CURATOR_DRY_RUN_BANNER)

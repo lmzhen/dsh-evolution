@@ -41,7 +41,7 @@ it('G1/1.4: the second instance reads what the first wrote (one queue per root)'
     two.update('shared-root', BODY('shared-root', 'v3'), 'foreground'),
   ])
   expect(first).toMatchObject({ ok: true })
-  expect(second).toMatchObject({ ok: true })
+  expect(second.ok, second.message).toBe(true)
   // `update` reads twice (CAS baseline + body), so the FIRST instance contributes two v1 reads and the
   // second contributes two v2 reads. The criterion is about the second instance: the LAST read of the
   // target must be the first instance write - with a per-instance queue it would still be v1.

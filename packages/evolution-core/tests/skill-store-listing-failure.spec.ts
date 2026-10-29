@@ -23,8 +23,9 @@ describe('create refuses when the case-variant probe cannot list (FLOW3-2)', () 
     expect(result.ok).toBe(false)
     expect(result.message).toContain('是否与大小写变体冲突')
     expect(result.message).toContain('EACCES: injected listing failure')
-    // Nothing was written: the refusal happens before any body lands.
-    expect(writes).toEqual([])
+    // No body lands: the refusal happens before any skill write. The root
+    // coordination sidecar is not a skill body and is allowed to land first.
+    expect(writes.filter(path => !path.endsWith('.mutation-lock'))).toEqual([])
   })
 
   it('an empty listing still creates (the control: refusal is about the failure, not about being empty)', async () => {

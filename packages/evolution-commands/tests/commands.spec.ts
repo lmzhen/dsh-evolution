@@ -100,7 +100,7 @@ describe('evolution-commands', () => {
       history: async (name: string) => {
         calls.push(`history:${name}`)
         return [
-          { v: 1, at: '2026-09-27T00:00:00.000Z', action: 'create', hash: 'aaaaaaaaaaaaaaaaaaaa', chars: 42 },
+          { v: 1, at: '2026-09-27T00:00:00.000Z', action: 'create', hash: 'aaaaaaaaaaaaaaaaaaaa', chars: 42, unitId: 'u-create-1' },
           { v: 2, at: '2026-09-27T00:01:00.000Z', action: 'update', hash: 'bbbbbbbbbbbbbbbbbbbb', chars: 43 },
           // A support file shares the index: it must not read as a version of the body (0.10.1).
           { v: 3, at: '2026-09-27T00:02:00.000Z', action: 'write_file', hash: 'cccccccccccccccccccc', chars: 9 },
@@ -109,6 +109,10 @@ describe('evolution-commands', () => {
       undo: async (name: string, v?: number) => {
         calls.push(`undo:${name}:${v === undefined ? 'prev' : v}`)
         return { ok: true, message: `Skill "${name}" updated. (undone to v${v ?? 1} — content only)` }
+      },
+      undoUnit: async (name: string, unitId?: string) => {
+        calls.push(`undoUnit:${name}:${unitId ?? ''}`)
+        return { ok: true, message: `Skill "${name}" unit undone.` }
       },
     })
     await ctx.plugin(Commands)
@@ -133,7 +137,13 @@ describe('evolution-commands', () => {
     expect(undoTo.kind).toBe('success')
     const undoPrev = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill undo source-b' })
     expect(undoPrev.kind).toBe('success')
-    expect(calls.slice(-3)).toEqual(['history:source-b', 'undo:source-b:1', 'undo:source-b:prev'])
+    const undoUnit = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill undo source-b --unit u-1' })
+    expect(undoUnit.kind).toBe('success')
+    expect(undoUnit.text).toContain('unit undone')
+    expect(calls.slice(-4)).toEqual(['history:source-b', 'undo:source-b:1', 'undo:source-b:prev', 'undoUnit:source-b:u-1'])
+    const both = await captured!.handler({ agent: { ctx } as never, rawInput: 'skill undo source-b --to v1 --unit u-1' })
+    expect(both.kind).toBe('error')
+    expect(both.text).toContain('不能同时使用')
     // Commands runtime contract: handlers must return a CommandResult with kind.
     expect(result.kind).toBe('error')
     expect(restoreResult.kind).toBe('success')
@@ -509,6 +519,7 @@ describe('evolution-commands', () => {
     const root = join(dir, 'skills')
     await mkdir(join(root, 'extract-source'), { recursive: true })
     await mkdir(join(root, 'extract-target'), { recursive: true })
+    await writeFile(join(root, 'extract-target', '.hermes-managed'), '')
     await writeFile(join(root, 'extract-source', 'SKILL.md'), '---\nname: extract-source\ndescription: source.\n---\n\n# Source\n\nIntro.\n\n## Details\n\nreusable detail\n\n## Usage\n\nUse it.\n', 'utf8')
     await writeFile(join(root, 'extract-target', 'SKILL.md'), '---\nname: extract-target\ndescription: target.\n---\n\n# Target\n\nExisting.\n', 'utf8')
     const ctx = new Context()
@@ -517,7 +528,7 @@ describe('evolution-commands', () => {
     const io = nodeEvolutionIo()
     ctx.provide('evolutionIo', { provider: () => io })
     await ctx.plugin(Commands, { root })
-    const result = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details"' })
+    const result = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --apply' })
     expect(result.kind).toBe('success')
     const source = await io.readText(join(root, 'extract-source', 'SKILL.md'))
     const target = await io.readText(join(root, 'extract-target', 'SKILL.md'))
@@ -531,6 +542,7 @@ describe('evolution-commands', () => {
     const root = join(dir, 'skills')
     await mkdir(join(root, 'extract-source'), { recursive: true })
     await mkdir(join(root, 'extract-target'), { recursive: true })
+    await writeFile(join(root, 'extract-target', '.hermes-managed'), '')
     const sourceBody = '---\nname: extract-source\ndescription: source.\n---\n\n# Source\n\n## Details\n\nkeep before\n\nmove start\nmove end\n\nkeep after\n'
     await writeFile(join(root, 'extract-source', 'SKILL.md'), sourceBody, 'utf8')
     await writeFile(join(root, 'extract-target', 'SKILL.md'), '---\nname: extract-target\ndescription: target.\n---\n\n# Target\n\nExisting.\n', 'utf8')
@@ -544,7 +556,12 @@ describe('evolution-commands', () => {
     expect(planned.kind).toBe('success')
     expect(planned.text).toContain('提取计划')
     expect(await io.readText(join(root, 'extract-source', 'SKILL.md'))).toBe(sourceBody)
-    const applied = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end"' })
+    const defaultPreview = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end" --outcome extract' })
+    expect(defaultPreview.kind, defaultPreview.text).toBe('success')
+    expect(defaultPreview.text).toContain('默认 plan')
+    expect(defaultPreview.text).toContain('outcome=extract')
+    expect(await io.readText(join(root, 'extract-source', 'SKILL.md'))).toBe(sourceBody)
+    const applied = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end" --apply' })
     expect(applied.kind).toBe('success')
     const source = await io.readText(join(root, 'extract-source', 'SKILL.md'))
     const target = await io.readText(join(root, 'extract-target', 'SKILL.md'))

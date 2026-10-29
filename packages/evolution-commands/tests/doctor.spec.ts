@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { Context } from '@deepseek-ai/cordis'
 import { PLATFORM_SERVICE_PROBES, sessionAudited } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetRowId, removePresetRow } from '@deepseek-ai/dsh-evolution-core/composition'
@@ -38,7 +39,7 @@ function legacyStub(home: string, user: Record<string, unknown>): { get(name: st
 /** G3-② (B2): the delta and the base table doctor compares against, resolved
  * from the installed family package through the same export a user install uses. */
 function familyAsset(asset: string): string {
-  return fileURLToPath(import.meta.resolve(`@deepseek-ai/dsh-evolution-agent-preset/${asset}`))
+  return createRequire(import.meta.url).resolve(`@deepseek-ai/dsh-evolution-agent-preset/${asset}`)
 }
 
 /** G3-② (B2): the platform base preset patch a delivered row composes from — the shape a

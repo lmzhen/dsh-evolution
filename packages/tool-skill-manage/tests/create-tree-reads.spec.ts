@@ -52,7 +52,8 @@ it('T2-05/A20: one create reads each existing SKILL.md once (no second whole-tre
   const execArg = { agent: fakeAgent(undefined) } as unknown as Parameters<typeof tool.execute>[1]
   const created = await tool.execute({ action: 'create', name: 'brand-new-skill', content: body('brand-new-skill') }, execArg) as { ok: boolean; message: string }
   expect(created.ok).toBe(true)
-  // ONE listing for the whole create: the cross-source probe's scan is the only whole-tree pass.
-  expect(skillMdReads).toBe(names.length)
+  // ONE listing for the whole create: the cross-source probe's scan is the only whole-tree pass;
+  // the newly created skill is read once after its write, but no existing skill is read twice.
+  expect(skillMdReads).toBe(names.length + 1)
   await ctx.fiber.dispose()
 })

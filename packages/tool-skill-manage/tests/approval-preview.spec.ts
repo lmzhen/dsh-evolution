@@ -118,6 +118,7 @@ describe('the staged skill write preview', () => {
     const target = '---\nname: preview-target\ndescription: target\n---\n\n# Target\n\nExisting.\n'
     await writeFile(join(root, 'skills', 'preview-source', 'SKILL.md'), source)
     await writeFile(join(root, 'skills', 'preview-target', 'SKILL.md'), target)
+    await writeFile(join(root, 'skills', 'preview-target', '.hermes-managed'), '')
     const answer = await preview({
       operation: { action: 'extract', name: 'preview-source', extract: [{ heading: 'Details', to_skill: 'preview-target' }] },
     }) as { available: boolean; path: string; before: string; after: string; files?: Array<{ path: string; before: string | null; after: string | null }> }

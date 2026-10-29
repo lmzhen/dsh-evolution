@@ -11,7 +11,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { apply, PANEL_ORDER } from '../src/client/index.ts'
 import { NS, en, zh } from '../src/client/messages.ts'
-import type { PanelBodyOptions, PanelRowOptions } from '@lmzhen/dsh-evolution-client-kit'
+import type { PanelBodyOptions, PanelRowOptions } from '@deepseek-ai/dsh-evolution-client-kit'
 import { PANEL_ID } from '../src/client/ids.ts'
 
 /** A slots registry and locale seat that record contributions and hand back real disposers. */

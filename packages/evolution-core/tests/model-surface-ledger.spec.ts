@@ -18,7 +18,7 @@ it('E4：两段家族前缀的双轨摘要逐值冻结（改一个字符必须�
   // 只更新一个＝红（这正是 E4 要防的「前缀悄悄变宽而没人看见」）。
   const frozen = {
     SKILLS_GUIDANCE: { utf16: 407, utf8Bytes: 413, sha256: '6fd62626901053bf84c3a7bf964a400a76d47c01a2471ad734b35a259b439571' },
-    DSH_AUTHORING_STANDARDS: { utf16: 2991, utf8Bytes: 3011, sha256: '8665c0f40df8803e2789fcf99984a0af623310e5d88bb9bc2be161ecc401279d' },
+    DSH_AUTHORING_STANDARDS: { utf16: 3202, utf8Bytes: 3220, sha256: 'c373db031d918b5e7e2d3df6b63a0f5e42733397670138f45e648530eddec507' },
   }
   const ledger = { SKILLS_GUIDANCE: measureSection(SKILLS_GUIDANCE), DSH_AUTHORING_STANDARDS: measureSection(DSH_AUTHORING_STANDARDS) }
   expect(ledger).toEqual(frozen)

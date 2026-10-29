@@ -118,3 +118,13 @@ it('F-320: HEALTH_STAMP_RE counts offset/non-UTC timestamps and hex-with-digits,
   const body = 'commit abc1234 did work; the word defaced and feedback appeared; rc.41 done'
   expect((body.match(HEALTH_STAMP_RE) ?? []).length).toBe(2) // abc1234 + rc.41
 })
+
+it('S3: scope-overloaded needs 3 hard-cap hits and a support closure', () => {
+  const noHistory = assessStructureHealth({ skillName: 's', bodyChars: 5_000, supportGroups: 1, supportFiles: 3 })
+  expect(noHistory.findings.map(f => f.rule)).not.toContain('scope-overloaded')
+  const oneHit = assessStructureHealth({ skillName: 's', bodyChars: 5_000, supportGroups: 1, supportFiles: 3, hardCapHits: 1 })
+  expect(oneHit.findings.map(f => f.rule)).not.toContain('scope-overloaded')
+  const advisory = assessStructureHealth({ skillName: 's', bodyChars: 5_000, supportGroups: 1, supportFiles: 3, hardCapHits: 3 })
+  expect(advisory.findings.map(f => f.rule)).toContain('scope-overloaded')
+  expect(advisory.verdict).toBe('warn')
+})

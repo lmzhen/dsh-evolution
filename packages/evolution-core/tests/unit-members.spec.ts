@@ -57,6 +57,17 @@ describe('resolveUnitMembers', () => {
     expect(unitMembersAreComplete({ members: [], missing: [], conflicts: [] })).toBe(true)
   })
 
+  it('M4b：同一 support path 属于两个技能是正常 extract 形态，不算 duplicated', () => {
+    const manifest = { moves: [{ path: 'references/shared.md' }] }
+    const withManifest = { ...head, unitHead: manifest as never }
+    const members = resolveUnitMembersFromIndexes(withManifest, indexes([
+      ['head-skill', JSON.stringify([entry({ v: 1, unitId: 'u1', unitHead: { moves: [{ path: 'references/shared.md' }] } })])],
+      ['other-skill', JSON.stringify([entry({ v: 2, unitId: 'u1', unitHead: { moves: [{ path: 'references/shared.md' }] } })])],
+    ]), parse)
+    expect(members.conflicts).toEqual([])
+    expect(unitMembersAreComplete(members)).toBe(true)
+  })
+
   it('M5：顺序确定（sources[] 原序），同输入两次结果逐字节相同', () => {
     const input = indexes([
       ['head-skill', JSON.stringify([entry({ v: 1, unitId: 'u1' })])],

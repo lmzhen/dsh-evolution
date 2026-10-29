@@ -38,7 +38,7 @@ async function makeLib(): Promise<{ root: string; lib: SkillLibrary }> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-evo-extract-kernel-'))
   const lib = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
   await lib.create('source', skill('source', sourceBody(false)), 'foreground')
-  await lib.create('target', skill('target', '# Target' + NL + NL + 'Existing.'), 'foreground')
+  await lib.create('target', skill('target', '# Target' + NL + NL + 'Existing.'), 'foreground', { managed: true })
   return { root, lib }
 }
 
@@ -86,6 +86,36 @@ it('writes source residual and target addition in one unit', async () => {
   }
 })
 
+it('refuses an unmanaged target before writing either body', async () => {
+  const { root, lib } = await makeLib()
+  try {
+    await mkdir(join(root, 'unmanaged'), { recursive: true })
+    await writeFile(join(root, 'unmanaged', 'SKILL.md'), skill('unmanaged', '# Unmanaged' + NL + NL + 'Existing.'))
+    const plan = planExtract({
+      body: sourceBody(false),
+      sourceName: 'source',
+      targetName: 'unmanaged',
+      targetExists: true,
+      outcome: 'extract',
+      owner: { ...COVERED, name: 'unmanaged' },
+      requests: [{ heading: 'Details' }],
+      sourceFiles: [],
+      targetFiles: [],
+    })
+    expect(plan.ok).toBe(true)
+    if (!plan.ok) return
+    const sourceBefore = await readFile(join(root, 'source', 'SKILL.md'), 'utf8')
+    const targetBefore = await readFile(join(root, 'unmanaged', 'SKILL.md'), 'utf8')
+    const result = await lib.extract(plan.plan, 'foreground')
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('不是家族管理')
+    expect(await readFile(join(root, 'source', 'SKILL.md'), 'utf8')).toBe(sourceBefore)
+    expect(await readFile(join(root, 'unmanaged', 'SKILL.md'), 'utf8')).toBe(targetBefore)
+  } finally {
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
 it('copies shared support, deletes exclusive support, and keeps the parent reference', async () => {
   const { root, lib } = await makeLib()
   try {
@@ -109,6 +139,10 @@ it('copies shared support, deletes exclusive support, and keeps the parent refer
     expect(await readFile(join(root, 'target', 'references', 'shared.md'), 'utf8')).toBe('# shared')
     expect(await readFile(join(root, 'target', 'references', 'exclusive.md'), 'utf8')).toBe('# exclusive')
     expect(await readFile(join(root, 'source', 'references', 'shared.md'), 'utf8')).toBe('# shared')
+    const versions = await lib.listVersions('target')
+    const head = versions.find(version => (version as { unitHead?: { moves?: unknown[] } }).unitHead?.moves !== undefined) as { unitHead: { moves: Array<{ path: string; provenance?: string }> } }
+    const sharedMove = head.unitHead.moves.find(move => move.path === 'references/shared.md')
+    expect(sharedMove?.provenance).toBe(plan.plan.support.shared[0]?.provenance)
     await expect(readFile(join(root, 'source', 'references', 'exclusive.md'), 'utf8')).rejects.toThrow()
   } finally {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -203,7 +237,7 @@ it('rolls back a copy when the target body write fails', async () => {
   } finally {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
-})
+}, 15_000)
 
 it('refuses when source/target drift after the plan was computed', async () => {
   const { root, lib } = await makeLib()
@@ -262,8 +296,13 @@ it('copies bounded external support to the target without deleting the source', 
     expect(result.ok, result.message).toBe(true)
     const target = await readFile(join(root, 'target', 'SKILL.md'), 'utf8')
     expect(target).toContain('scripts/run.mjs')
+    expect(target).not.toContain('../shared/scripts/run.mjs')
     expect(await readFile(join(root, 'target', 'scripts', 'run.mjs'), 'utf8')).toContain('external source:')
     expect(await readFile(join(root, 'shared', 'scripts', 'run.mjs'), 'utf8')).toBe('console.log(1)' + NL)
+    const versions = await lib.listVersions('target')
+    const head = versions.find(version => (version as { unitHead?: { moves?: unknown[] } }).unitHead?.moves !== undefined) as { unitHead: { moves: Array<{ path: string; provenance?: string }> } }
+    const externalMove = head.unitHead.moves.find(move => move.path === 'scripts/run.mjs')
+    expect(externalMove?.provenance).toBe(plan.plan.support.external[0]?.provenance)
   } finally {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }

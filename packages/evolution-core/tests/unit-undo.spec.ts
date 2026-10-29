@@ -23,7 +23,9 @@ it('R-G3a-1：restructure 写过的每个路径都有版本条目，且共享同
     const versions = await lib.listVersions('r-skill')
     const paths = versions.map(v => (v as { path?: string }).path ?? 'SKILL.md')
     expect(paths).toContain('references/extra.md')
-    const units = new Set(versions.map(v => (v as { unitId?: string }).unitId).filter((u): u is string => typeof u === 'string' && u.length > 0))
+    // create is its own unit now; the restructure entries must share ONE unit.
+    const restructure = versions.filter(v => (v as { action?: string }).action === 'restructure')
+    const units = new Set(restructure.map(v => (v as { unitId?: string }).unitId).filter((u): u is string => typeof u === 'string' && u.length > 0))
     expect(units.size).toBe(1)
   } finally { await rm(root, { recursive: true, force: true }) }
 })

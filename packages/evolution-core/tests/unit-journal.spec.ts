@@ -9,9 +9,9 @@ it('journals monotonic phases and rejects terminal/backwards transitions', () =>
   expect(() => { assertUnitJournalTransition('target-pending', 'target-written') }).not.toThrow()
   expect(() => { assertUnitJournalTransition('target-written', 'source-archiving') }).not.toThrow()
   expect(() => { assertUnitJournalTransition('source-archiving', 'sources-archived') }).not.toThrow()
-  expect(() => assertUnitJournalTransition('sources-archived', 'committed')).not.toThrow()
-  expect(() => assertUnitJournalTransition('committed', 'prepared')).toThrow()
-  expect(() => assertUnitJournalTransition('target-written', 'prepared')).toThrow()
+  expect(() =>{  assertUnitJournalTransition('sources-archived', 'committed'); }).not.toThrow()
+  expect(() =>{  assertUnitJournalTransition('committed', 'prepared'); }).toThrow()
+  expect(() =>{  assertUnitJournalTransition('target-written', 'prepared'); }).toThrow()
 })
 
 it('writes and reads a journal under a safe run path', async () => {

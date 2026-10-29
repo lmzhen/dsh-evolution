@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator from '../src/index.ts'
+import { planExtract } from '@deepseek-ai/dsh-evolution-core'
 import { newestUnitId } from '../src/unit-undo-plan.ts'
 
 const stamp = String.fromCharCode(10)
@@ -129,5 +130,36 @@ it('R-G3a-3：支撑文件被手改过 ⇒ 零写拒绝，文件原样保留', a
     expect(undone.message).toContain('references/extra.md')
     expect(existsSync(target)).toBe(true)
     expect(readFileSync(target, 'utf8')).toBe(handEdited)
+  } finally { await rm(home, { recursive: true, force: true }) }
+})
+
+it('R-G3a-2b：extract 的 source/target/support 由一次 undoUnit 全字节还原', async () => {
+  const { home, curator, lib } = await setup()
+  try {
+    const sourceBody = ['---', 'name: ex-source', 'description: extract source', '---', '', '# Source', '', 'Intro.', '', '## Details', '', 'reusable detail. See references/shared.md for details', '', '## Usage', '', 'Use it.', ''].join(stamp)
+    const targetBody = ['---', 'name: ex-target', 'description: extract target', '---', '', '# Target', '', 'Existing.', ''].join(stamp)
+    await lib.create('ex-source', sourceBody, 'foreground')
+    await lib.create('ex-target', targetBody, 'foreground')
+    writeFileSync(join(home, 'skills', 'ex-target', '.hermes-managed'), '')
+    await lib.writeSupportFile('ex-source', 'references/shared.md', 'shared bytes' + stamp, 'foreground')
+    const plan = planExtract({
+      body: sourceBody.replace(/^---[\s\S]*?---\n\n/, ''),
+      sourceName: 'ex-source', targetName: 'ex-target', targetExists: true, outcome: 'extract',
+      owner: { mode: 'covered', name: 'ex-target', triggerCovers: true, outcomeCovers: true, reason: 'e2e' },
+      requests: [{ heading: 'Details' }], sourceFiles: ['references/shared.md'], targetFiles: [],
+    })
+    expect(plan.ok, plan.ok ? '' : plan.message).toBe(true)
+    if (!plan.ok) return
+    const moved = await lib.extract(plan.plan, 'foreground')
+    expect(moved.ok, moved.message).toBe(true)
+    expect(readFileSync(join(home, 'skills', 'ex-target', 'references', 'shared.md'), 'utf8')).toBe('shared bytes' + stamp)
+    const unit = newestUnitId(await lib.listVersions('ex-target'))
+    expect(unit).toBeDefined()
+    const undone = await curator.undoUnit('ex-target', unit)
+    expect(undone.ok, undone.message).toBe(true)
+    expect(await lib.read('ex-source')).toBe(sourceBody)
+    expect(await lib.read('ex-target')).toBe(targetBody)
+    expect(readFileSync(join(home, 'skills', 'ex-source', 'references', 'shared.md'), 'utf8')).toBe('shared bytes' + stamp)
+    expect(existsSync(join(home, 'skills', 'ex-target', 'references', 'shared.md'))).toBe(false)
   } finally { await rm(home, { recursive: true, force: true }) }
 })

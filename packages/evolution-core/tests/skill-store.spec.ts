@@ -846,7 +846,7 @@ it('v43 (FLOW3-1): a lock-loss retry re-observes the file — the create does no
   }
   const lib = new SkillLibrary(root, io as never)
   const result = await lib.create('retry-skill', SKILL.replace('python-testing', 'retry-skill'), 'foreground')
-  expect(result.ok).toBe(true)
+  expect(result.ok, result.message).toBe(true)
   expect(result.message).not.toContain('已存在')
 })
 
@@ -1018,7 +1018,7 @@ it('A1-15 (v18): a post-commit dir-fsync failure still audits and reports a dura
   }
   const lib = new SkillLibrary(root, io)
   const updated = await lib.update('durable-skill', SKILL.replace('python-testing', 'durable-skill').replace('Run tests with pytest.', 'Updated after the fsync failure.'), 'foreground')
-  expect(updated.ok).toBe(true)
+  expect(updated.ok, updated.message).toBe(true)
   expect(updated.message).toContain('持久性未确认')
   // The bytes ARE on disk and the audit trail recorded the write.
   expect(await lib.read('durable-skill')).toContain('Updated after the fsync failure.')
