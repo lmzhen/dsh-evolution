@@ -2125,7 +2125,7 @@ export class EvolutionCurator extends Service {
       })
       rows.push({
         name: summary.name,
-        verdict: 'warn',
+        verdict: 'unreadable',
         dims: {
           bodyChars: null,
           bodyTokens: null,

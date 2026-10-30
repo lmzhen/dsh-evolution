@@ -28,7 +28,7 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 import {
   errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
-import { buildExtractPlanFromLibrary, proposalFromPlan, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
@@ -1445,7 +1445,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input.startsWith('extract ')) {
           const extractParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(extractParsed) || extractParsed.name !== 'extract') {
-            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
+            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--owner-covers]')
           }
           const source = extractParsed.positionals[0] ?? ''
           const target = extractParsed.positionals[1] ?? ''
@@ -1455,6 +1455,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const startFlag = extractParsed.flags.get('start')
           const endFlag = extractParsed.flags.get('end')
+          const ownerCovers = extractParsed.flags.has('owner-covers')
           const outcomeFlag = extractParsed.flags.get('outcome')
           if (outcomeFlag !== undefined && outcomeFlag !== 'extract' && outcomeFlag !== 'mixed') {
             return err('--outcome 只能是 extract 或 mixed。')
@@ -1477,6 +1478,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             source,
             items: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }],
             ...(outcomeFlag === undefined ? {} : { outcome: outcomeFlag }),
+            ...(ownerCovers ? { ownerCovers: true } : {}),
           })
           if (!built.ok) return err(built.message)
           const plan = built.plan
@@ -1486,7 +1488,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
             const io = registry?.provider()
             if (io !== undefined) await writeProposalReport(io, proposal).catch(() => { /* best-effort proposal report */ })
-            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=covered by ' + target + warnings)
+            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=' + ownerDecisionText(plan.owner) + warnings)
           }
           if (approval) {
             const session = invocationAgent?.session

@@ -15,6 +15,7 @@ function sections(body) {
 function headExtract(skill, maxChars) {
   const mc = maxChars || 2400;
   const parts = [String(skill.description).trim()];
+  if (skill.whenToUse) parts.push(String(skill.whenToUse).trim());
   const secs = sections(skill.body_core || skill.body);
   if (secs.length) parts.push(secs[0][1]);
   const when = secs.filter(([h]) => WHEN_RE.test(h)).map(([, t]) => t);

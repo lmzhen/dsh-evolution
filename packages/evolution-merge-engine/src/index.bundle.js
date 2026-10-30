@@ -2397,12 +2397,13 @@ import path9 from "node:path";
 import crypto2 from "node:crypto";
 var FM_RE = /^---\s*\n([\s\S]*?)\n---\s*\n?/;
 var Skill = class {
-  constructor(p, name, description, body) {
+  constructor(p, name, description, body, whenToUse) {
     this.path = p;
     this.name = name;
     this.description = description;
     this.body = body;
     this.body_core = "";
+    this.whenToUse = typeof whenToUse === "string" ? whenToUse : "";
   }
   get summary() {
     return (this.name + " " + this.description).trim();
@@ -2414,7 +2415,7 @@ function frontmatter(text) {
   const fm = {};
   for (const rawLine of m[1].split(/\r?\n/)) {
     const line = rawLine.trim();
-    const mm = /^(name|description|tags)\s*:\s*(.*)$/.exec(line);
+    const mm = /^(name|description|whenToUse|tags)\s*:\s*(.*)$/.exec(line);
     if (!mm) continue;
     let v = mm[2].trim();
     if (v.length >= 2 && (v[0] === '"' || v[0] === "'") && v[v.length - 1] === v[0]) v = v.slice(1, -1);
@@ -2462,7 +2463,7 @@ function loadCorpus(roots) {
       }
       const [fm, body] = frontmatter(text);
       const name = fm.name || path9.basename(dir);
-      skills.push(new Skill(p, name, fm.description || "", body));
+      skills.push(new Skill(p, name, fm.description || "", body, fm.whenToUse || ""));
       return;
     }
     for (const d of keep) walk(path9.join(dir, d));
@@ -3207,6 +3208,7 @@ function sections(body) {
 function headExtract(skill, maxChars) {
   const mc = maxChars || 2400;
   const parts = [String(skill.description).trim()];
+  if (skill.whenToUse) parts.push(String(skill.whenToUse).trim());
   const secs = sections(skill.body_core || skill.body);
   if (secs.length) parts.push(secs[0][1]);
   const when = secs.filter(([h]) => WHEN_RE.test(h)).map(([, t]) => t);

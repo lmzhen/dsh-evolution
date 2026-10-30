@@ -72,7 +72,7 @@ export const HEALTH_STAMP_RE = new RegExp(
  */
 export const MIN_STAMP_BODY_CHARS = 2_000
 
-export type SkillHealthVerdict = 'healthy' | 'warn' | 'needs-restructure'
+export type SkillHealthVerdict = 'healthy' | 'warn' | 'needs-restructure' | 'unreadable'
 
 /** Facts a caller already has; assessors never do IO.
  *

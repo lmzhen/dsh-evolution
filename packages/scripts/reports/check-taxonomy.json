@@ -325,6 +325,7 @@
         "evolution-core::tests/memory-delimiter.spec.ts",
         "evolution-core::tests/memory-store.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
+        "evolution-core::tests/mutation-crash.spec.ts",
         "evolution-core::tests/mutation-lock.spec.ts",
         "evolution-core::tests/mutation-origin.spec.ts",
         "evolution-core::tests/mutation-recovery.spec.ts",
@@ -878,6 +879,7 @@
         "evolution-core::tests/memory-delimiter.spec.ts",
         "evolution-core::tests/memory-store.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
+        "evolution-core::tests/mutation-crash.spec.ts",
         "evolution-core::tests/mutation-lock.spec.ts",
         "evolution-core::tests/mutation-origin.spec.ts",
         "evolution-core::tests/mutation-recovery.spec.ts",
@@ -1381,6 +1383,7 @@
         "evolution-core::tests/memory-delimiter.spec.ts",
         "evolution-core::tests/memory-store.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
+        "evolution-core::tests/mutation-crash.spec.ts",
         "evolution-core::tests/mutation-lock.spec.ts",
         "evolution-core::tests/mutation-origin.spec.ts",
         "evolution-core::tests/mutation-recovery.spec.ts",
@@ -1792,7 +1795,7 @@
     },
     "pre-tag": {
       "gates": 57,
-      "specs": 356
+      "specs": 357
     },
     "ci-only": {
       "gates": 12,
@@ -1800,16 +1803,16 @@
     },
     "full(ci=off)": {
       "gates": 57,
-      "specs": 356
+      "specs": 357
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 405
+      "specs": 406
     }
   },
   "specs": {
-    "total": 405,
-    "marked": 405,
+    "total": 406,
+    "marked": 406,
     "unmarked": 0
   }
 }

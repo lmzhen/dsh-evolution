@@ -5,7 +5,7 @@ import { parseFrontmatter } from './frontmatter.ts'
 import { isPresent } from './probe.ts'
 import { findOwnerCandidate, ownerCandidatesFromSummaries, type OwnerCandidate } from './owner-resolver.ts'
 import { nearDuplicateSummaries } from './quality.ts'
-import { planExtract, type ExtractPlanDraft } from './extract-plan.ts'
+import { planExtract, type ExtractPlanDraft, type OwnerDecision } from './extract-plan.ts'
 import { readExternalSupport } from './external-support.ts'
 import type { SkillLibrary } from './skill-store.ts'
 import type { SkillModel } from './skill-model.ts'
@@ -32,6 +32,11 @@ export interface ExtractRequestPlan {
   plan: ExtractPlanDraft
   candidates: OwnerCandidate[]
   warnings?: string[]
+}
+
+/** The one human-readable owner decision shared by tool and CLI. */
+export function ownerDecisionText(owner: OwnerDecision): string {
+  return owner.mode === 'covered' ? 'covered by ' + (owner.name ?? 'unknown') : 'owner-gap, neededOwner=' + (owner.neededOwner ?? 'unknown')
 }
 
 /** Build the one extract plan both the tool and CLI consume. */
@@ -97,7 +102,8 @@ export async function buildExtractPlanFromLibrary(
   const candidate = findOwnerCandidate(lookup, target)
   if (candidate === undefined) return { ok: false, message: '目标「' + target + '」不是可用的 owner candidate（描述为空或已排除）；owner-gap，不自动 create。' + candidateHint }
   if (!candidate.managed) return { ok: false, message: '目标「' + target + '」不是家族 managed 技能；拒绝把可复用部分写进不受管目录。' }
-  if (input.ownerCovers === false) {
+  // EXT-002: existence of a target is not evidence of coverage; only an explicit true covers.
+  if (input.ownerCovers !== true) {
     const parsed = parseFrontmatter(sourceMd)
     if (parsed === null) return { ok: false, message: '技能「' + source + '」没有可读取的正文。' }
     const sourceProbe = await library.listSupportFiles(source)
@@ -139,7 +145,8 @@ export async function buildExtractPlanFromLibrary(
   if (input.outcome !== undefined && input.outcome !== 'extract' && input.outcome !== 'mixed') {
     return { ok: false, message: 'outcome 只能是 extract 或 mixed；owner-gap 由缺失 target 的路径自动决定。' }
   }
-  const outcome = input.outcome ?? (requests.some(request => request.start !== undefined || request.end !== undefined) ? 'mixed' : 'extract')
+  // G2.4: outcome is semantic input, never inferred from anchor shape.
+  const outcome = input.outcome ?? 'extract'
   const plan = planExtract({
     body: parsed.body,
     sourceName: source,

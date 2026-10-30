@@ -28,7 +28,7 @@ import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
-import { buildExtractPlanFromLibrary, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, writeProposalReport, type ExtractPlanLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, ownerDecisionText, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, writeProposalReport, type ExtractPlanLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, EvolutionIoLike, LiveValue, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -947,9 +947,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         result = { ok: false, message: built.message }
       } else {
         proposal = JSON.stringify(proposalFromPlan(built.plan, { runId: 'tool-' + Date.now().toString(36) }))
-        const ownerText = built.plan.owner.mode === 'covered'
-          ? `covered by ${built.plan.owner.name}`
-          : `owner-gap, neededOwner=${built.plan.owner.neededOwner ?? 'unknown'}`
+        const ownerText = ownerDecisionText(built.plan.owner)
         const decisionLine = `提取判定：outcome=${built.plan.outcome}；target=${built.plan.target.name}；owner=${ownerText}`
         const candidateLines = built.candidates.slice(0, 8).map(candidate => '- ' + candidate.name + '：' + candidate.description + (candidate.whenToUse === undefined ? '' : '；whenToUse: ' + candidate.whenToUse) + (candidate.headings.length === 0 ? '' : '；headings: ' + candidate.headings.join(' / ')))
         result = args.dry_run === true

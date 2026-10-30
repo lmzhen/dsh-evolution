@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.39 — root-cause release
+
+> **范围**：单一源同步/四层 symbol 审计；merge-engine whenToUse 源修复；ownerCovers 显式、outcome 去推导、unreadable verdict、共享 ownerDecisionText、去 prompt 句子锁、MutationUnit crash test。
+> **验证**：0.30.39 候选四层 audit OK；lab T0-05 owner-gap、mixed PASS；focused commands/tool/core/curator 绿。
+
 ## 0.30.38 (patch) — core extract builder sync
 
 > **范围**：同步 overlay 的单一 core extract builder、owner-gap、health canonical、unit undo、SkillModel/prompt hash。
