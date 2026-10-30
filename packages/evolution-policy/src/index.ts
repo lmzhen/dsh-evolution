@@ -25,8 +25,6 @@ import {
   DEFAULT_MEMORY_CHAR_LIMIT,
   DEFAULT_USER_CHAR_LIMIT,
   DEFAULT_SKILL_CONTENT_CHARS,
-  DEFAULT_MEMORY_REVIEW_MODEL,
-  DEFAULT_SKILL_REVIEW_MODEL,
   DEFAULT_CURATOR_MODEL,
   DEFAULT_CITATION_POLICY,
   DEFAULT_REFERENCE_REWRITE_POLICY,
@@ -54,8 +52,6 @@ export interface PolicySnapshot {
   substantiveMinUserChars: number
   substantiveMinAgentChars: number
   reviewMode: 'inject' | 'branch'
-  memoryReviewModel: string
-  skillReviewModel: string
   curatorModel: string
   memoryChars: number
   userChars: number
@@ -79,8 +75,6 @@ export interface Config {
   substantiveMinUserChars?: number
   substantiveMinAgentChars?: number
   reviewMode?: 'inject' | 'branch'
-  memoryReviewModel?: string
-  skillReviewModel?: string
   curatorModel?: string
   memoryChars?: number
   userChars?: number
@@ -112,8 +106,6 @@ export const Config: Schema<Config> = z.object({
   // 0.3.74: mirrors the review plugin's default (inject) — the policy snapshot
   // overrides the plugin config, so the two defaults must not diverge.
   reviewMode: z.union([z.const('inject'), z.const('branch')]).default('inject'),
-  memoryReviewModel: z.string().default(DEFAULT_MEMORY_REVIEW_MODEL),
-  skillReviewModel: z.string().default(DEFAULT_SKILL_REVIEW_MODEL),
   curatorModel: z.string().default(DEFAULT_CURATOR_MODEL),
   memoryChars: z.number().min(1).default(DEFAULT_MEMORY_CHAR_LIMIT),
   userChars: z.number().min(1).default(DEFAULT_USER_CHAR_LIMIT),
@@ -179,8 +171,6 @@ export class EvolutionPolicy extends Service {
         // selects the child-session split).
         return config.reviewMode === 'branch' ? 'branch' : 'inject'
       })(),
-      memoryReviewModel: config.memoryReviewModel ?? DEFAULT_MEMORY_REVIEW_MODEL,
-      skillReviewModel: config.skillReviewModel ?? DEFAULT_SKILL_REVIEW_MODEL,
       curatorModel: config.curatorModel ?? DEFAULT_CURATOR_MODEL,
       memoryChars: field('memoryChars', config.memoryChars, DEFAULT_MEMORY_CHAR_LIMIT),
       userChars: field('userChars', config.userChars, DEFAULT_USER_CHAR_LIMIT),

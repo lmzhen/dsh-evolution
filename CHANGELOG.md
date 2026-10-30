@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.40 (patch) — review config debt cleanup
+
+> **范围**：删除无消费者的 `memoryReviewModel`/`skillReviewModel`（Config/常量/参数注册/测试/生成文档，109→107）；清理 `reviewMode: subagent` 失效引用；branch review 文档化为平台临时缺口路径（默认仍 inject）。
+> **验证**：param registry/parity/declared-config 全绿；review/policy/params 42/42；全库 review model 引用 0。
+
 ## 0.30.39 — root-cause release
 
 > **范围**：单一源同步/四层 symbol 审计；merge-engine whenToUse 源修复；ownerCovers 显式、outcome 去推导、unreadable verdict、共享 ownerDecisionText、去 prompt 句子锁、MutationUnit crash test。
