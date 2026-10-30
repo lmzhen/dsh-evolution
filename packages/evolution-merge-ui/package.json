@@ -11,7 +11,7 @@
       ]
     }
   },
-  "version": "0.30.38",
+  "version": "0.30.39",
   "publishConfig": {
     "access": "public"
   },
