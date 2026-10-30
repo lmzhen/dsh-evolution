@@ -134,8 +134,6 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `evolution-state.provider` | E2 | none | cordis | evolution-state | — | 无（identity） | Registered state-store provider name. |
 | `memory.provider` | E2 | none | cordis | memory | — | 无（identity） | Registered memory provider name. |
 | `memory-files.providerName` | E2 | none | cordis | memory-files | — | 无（identity） | Name this package registers as the memory provider. |
-| `memoryReviewModel` | E2 | none | cordis | evolution-review | — | 无（identity） | Model for the memory review channel (deployment identity). |
-| `skillReviewModel` | E2 | none | cordis | evolution-review | — | 无（identity） | Model for the skill review channel (deployment identity). |
 | `maxOpsPerPlan` | E2 | none | cordis | evolution-plan-validator | — | 无（internal） | Operation cap one staged plan may carry. |
 | `substantiveMinToolCalls` | E2 | none | cordis | evolution-review | — | 无（internal） | Tool calls that make a turn count as substantive. |
 | `substantiveMinUserChars` | E2 | none | cordis | evolution-review | — | 无（internal） | User characters that make a turn count as substantive. |

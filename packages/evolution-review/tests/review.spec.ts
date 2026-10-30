@@ -305,8 +305,6 @@ function reviewPolicy() {
     memoryChars: 10_000,
     userChars: 10_000,
     skillContentChars: 10_000,
-    memoryReviewModel: 'model-x',
-    skillReviewModel: 'model-x',
   }
 }
 

@@ -21,7 +21,7 @@ import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
+import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, MEMORY_REVIEW_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import type { LiveValue } from '@deepseek-ai/dsh-evolution-core'
 // v37 P7a: the platform dispatch vocabulary is read in ONE place —
 // evolution-core's tool-dispatch module, which owns the event types, the
@@ -86,18 +86,13 @@ export function noticeAllowed(reviewPrompt: boolean, notice: boolean): boolean {
 
 export interface Config {
   reviewEnabled?: Volatile<boolean>
-  /** How the flush delivers the review: `'inject'` (default since 0.3.74) hands
-   * the review prompt to the PARENT agent — waking it through the same
-   * followup-first channel — so the review runs on the parent's model against
-   * the parent's already-cached prefix and no separate prefill is paid.
-   * `'subagent'` spawns a one-shot child instead: the parent context stays clean
-   * and the review can use a dedicated model, but the child re-prefills its own
-   * system prompt plus a re-serialized conversation digest
-   * (`buildReviewRequest`, redacted, header-prepended) on a DIFFERENT model —
-   * so no prefix cache is shared with the parent and the input tokens are paid
-   * at full price. Deployments that prefer the clean-context split switch the
-   * POLICY row (`evolution-policy`): the mounted policy snapshot shadows this
-   * row's value, which the plugin reports once at load (v37 P2-24). */
+  /** How the flush delivers the review. `'inject'` (default) runs it in the
+   * parent agent on the parent's model and cached prefix. `'branch'` is a
+   * TEMPORARY platform-gap path, not a durable product feature: the platform
+   * cannot currently provide a review child that is simultaneously
+   * durable-log-governable, parent-prefix-cache-reusing, and free of workspace
+   * pollution. Choose branch only when that trade-off is acceptable; see the
+   * README "Branch review is a temporary platform-gap path". */
   reviewMode?: Volatile<'inject' | 'branch'>
   /** Review cadence in TOOL CALLS — the CANONICAL registry id (G1, signals.ts:
    * a turn advances by its tool-call count, minimum 1, or by 1 when the turn
@@ -498,7 +493,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // session and emits no `evolution/plan-applied` — an empty ledger is a
   // property of the composition, so it is disclosed once at load, not per review.
   if (params().reviewMode === 'inject') {
-    ctx.logger.warn('dsh-evolution-review: reviewMode "inject" (default) runs the review in the parent session and emits NO evolution/plan-applied ledger entry — evolution-activity and evolution-replay stay empty in this mode (see the evolution-review README, "Known Limitations and Deferred Work"). Set reviewMode: "subagent" on the evolution-policy row to keep the audited plan path.')
+    ctx.logger.warn('dsh-evolution-review: reviewMode "inject" (default) runs the review in the parent session and emits NO evolution/plan-applied ledger entry — evolution-activity and evolution-replay stay empty in this mode (see the evolution-review README, "Known Limitations and Deferred Work"). Set reviewMode: "branch" on the evolution-policy row to keep the audited plan path; branch review is a temporary platform-gap path (see the README known limitations).')
   }
 
   // V24-04 (v24): per-session mutex over the persisted review-state RMW.
@@ -583,7 +578,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   const settleNotice = async (
     sessionId: SessionId,
-    why: 'discarded' | 'turn-end' | 'delivery-no-inbox' | 'subagent-flush' | 'queue-lost',
+    why: 'discarded' | 'turn-end' | 'delivery-no-inbox' | 'queue-lost',
   ): Promise<void> => {
     pendingReviewNotices.delete(sessionId)
     // D 组（可观测）：每一次结清都留下归因——窗口什么时候重开、因为什么，是这条链路最难看出的
@@ -985,7 +980,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
   }
 
-  const BRANCH_MEMORY_PROMPT = '[Auto-review — Memory] Review the conversation above and save durable user preferences, corrections, or stable facts with the memory tool when appropriate. Do not create skills here. Return a short summary of what was saved, or say Nothing to save.'
+  const BRANCH_MEMORY_PROMPT = MEMORY_REVIEW_PROMPT.replace(
+    'If nothing is worth saving, just say "Nothing to save." and stop.',
+    'Do not create skills here; return a short summary of what was saved.\nIf nothing is worth saving, say "Nothing to save." and stop.',
+  )
 
   async function tryBranchReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
     const state = branchRunning.get(session.id)

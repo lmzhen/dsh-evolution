@@ -47,7 +47,7 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `evolution-state-storage` / `evolution-state-domain` / `evolution-state-json` / `evolution-state` | State seam: provider registry, storage-domain KV, JSON fallback, consumer |
 | `evolution-approval` | Hermes-style staged/pending writes over `evolutionState` |
 | `evolution-threat` | `tools.guard` content threat guard |
-| `evolution-review` | Signal gate → end-of-conversation review (`reviewMode: 'inject'` default since 0.3.74; opt-in one-shot subagent) → validated plan execution |
+| `evolution-review` | Signal gate → end-of-conversation review (`reviewMode: 'inject'` default; `branch` is a temporary platform-gap opt-in) → validated plan execution |
 | `evolution-curator` | Deterministic lifecycle + LLM nomination + run reports + min-idle gate |
 | `evolution-activity` | Durable audit store for self-evolution plan outcomes (`evolution/plan-applied`) |
 | `evolution-feedback` | Durable feedback store; exposes `evolutionFeedback.record()` for hosts/custom commands — the family ships NO producer (the upstream `/feedback` event is free text), so `feedback_score`/`feedback_warn` fire only when a deployment wires one (union-read with `quality_warn` in the curator) |

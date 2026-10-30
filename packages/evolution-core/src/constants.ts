@@ -227,8 +227,6 @@ export const DEFAULT_PROBE_TIMEOUT_MS = 120_000
  * the policy resolver and the curator's LLM nomination pass each carried their
  * own copy of these strings — a deployment that changed the policy default used
  * to leave the curator passing a different model than the reviews. */
-export const DEFAULT_MEMORY_REVIEW_MODEL = 'deepseek-v4-flash'
-export const DEFAULT_SKILL_REVIEW_MODEL = 'deepseek-v4-pro'
 export const DEFAULT_CURATOR_MODEL = 'deepseek-v4-pro'
 
 // ── Model-visible prompt-section orders ──────────────────────────────────────
