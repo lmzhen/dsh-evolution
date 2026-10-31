@@ -50,6 +50,7 @@ describe('evolution-agent composition', () => {
       'tool-skill-manage',
       'tool-session-query',
       'evolution-skill-catalog',
+      'evolution-skill-discovery',
     ])
     for (const row of rows) {
       expect(Object.values(AGENT_EVOLUTION_ROW_NAMES)).toContain(rowName(row))

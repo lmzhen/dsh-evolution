@@ -177,7 +177,7 @@ const DELTA_FIXTURE = [
 ].join('\n')
 
 /** The four family delta rows every generated preset must carry. */
-const FAMILY_DELTA_IDS = ['tool-memory', 'tool-skill-manage', 'tool-session-query', 'evolution-skill-catalog']
+const FAMILY_DELTA_IDS = ['tool-memory', 'tool-skill-manage', 'tool-session-query', 'evolution-skill-catalog', 'evolution-skill-discovery']
 
 /** The identity the installer composes for one base, as the row it writes. */
 const IDENTITY = {

@@ -64,6 +64,7 @@ export const AGENT_EVOLUTION_ROW_IDS = [
   'tool-skill-manage',
   'tool-session-query',
   'evolution-skill-catalog',
+  'evolution-skill-discovery',
 ] as const
 
 export const AGENT_EVOLUTION_ROW_NAMES = {
@@ -71,6 +72,7 @@ export const AGENT_EVOLUTION_ROW_NAMES = {
   'tool-skill-manage': scoped('@deepseek-ai/dsh-tool-skill-manage'),
   'tool-session-query': scoped('@deepseek-ai/dsh-tool-session-query'),
   'evolution-skill-catalog': scoped('@deepseek-ai/dsh-evolution-skill-catalog'),
+  'evolution-skill-discovery': scoped('@deepseek-ai/dsh-evolution-skill-discovery'),
 } as const
 
 /** Model-facing tools that the host bundle must never register. */

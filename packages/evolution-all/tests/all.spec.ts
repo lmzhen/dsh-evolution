@@ -26,6 +26,7 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     '@deepseek-ai/dsh-tool-memory',
     '@deepseek-ai/dsh-tool-skill-manage',
     '@deepseek-ai/dsh-evolution-skill-catalog',
+    '@deepseek-ai/dsh-evolution-skill-discovery',
     '@deepseek-ai/dsh-evolution-agent-preset',
     // G4/S4.4: the browser cards. Its Host half registers nothing, so it adds no
     // infra row and nothing model-visible — only the settings tab's card row.
@@ -55,7 +56,7 @@ it('G-C: every model row package named by the all.patch resolves in the dependen
   // to host.patch, whose dependency-contract covers them); all's OWN closure
   // must cover the four model rows plus the host package itself.
   const declared = new Set([...Object.keys(manifest.dependencies), ...Object.keys(manifest.devDependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})])
-  const modelNames = ['@deepseek-ai/dsh-tool-memory', '@deepseek-ai/dsh-tool-skill-manage', '@deepseek-ai/dsh-tool-session-query', '@deepseek-ai/dsh-evolution-skill-catalog']
+  const modelNames = ['@deepseek-ai/dsh-tool-memory', '@deepseek-ai/dsh-tool-skill-manage', '@deepseek-ai/dsh-tool-session-query', '@deepseek-ai/dsh-evolution-skill-catalog', '@deepseek-ai/dsh-evolution-skill-discovery']
   for (const row of rows) {
     const name = rowName(row)
     if (name.startsWith('@deepseek-ai/') && modelNames.includes(name)) {
