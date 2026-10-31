@@ -85,14 +85,13 @@
     # tests/rank-contract.spec.ts pins both halves mechanically.
     - id: evolution-skill-catalog
       name: '@deepseek-ai/dsh-evolution-skill-catalog'
-
-    # ── write admission: staged approval (off by default) + threat guard ────
     - id: evolution-skill-discovery
       name: '@deepseek-ai/dsh-evolution-skill-discovery'
       config:
         mode: off
         featureEpoch: v0
 
+    # ── write admission: staged approval (off by default) + threat guard ────
     - id: evolution-approval
       name: '@deepseek-ai/dsh-evolution-approval'
       config:

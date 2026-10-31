@@ -1345,6 +1345,33 @@
       "leads": {
         "standalone": []
       }
+    },
+    {
+      "id": "evolution-skill-discovery",
+      "group": "skill-usage",
+      "forms": [
+        "all",
+        "preset",
+        "standalone"
+      ],
+      "lead": [],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-skill-discovery'",
+        "      config:",
+        "        mode: off",
+        "        featureEpoch: v0"
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-skill-discovery'",
+          "  config:",
+          "    mode: off",
+          "    featureEpoch: v0"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
     }
   ]
 }
