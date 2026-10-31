@@ -28,6 +28,7 @@ const REGISTERED_DEFAULTS: Record<string, string> = {
   'evolution-commands/src/index.ts :: { authority: authorityFrom({ origin: \'foreground\' }), config: { root: skillsRootValue }, io: ioRegistry.provider() } #2': 'read-only: as above',
   'evolution-learning-graph/src/index.ts :: { authority: authorityFrom({ origin: \'foreground\' }), config: rawConfig, io: evolutionIoAdapter(() => io.provider()), ctx, threatExemptLabels: rawConfig.threatExemptLabels }': 'read-only: withSkills() serves reads and the graph read path',
   'evolution-maintenance/src/tools.ts :: { authority: authorityFrom({ origin: \'foreground\' }), config: rootConfig, io: ioRegistry.provider() }': 'read-only: the maintenance probe walks the tree',
+    'evolution-skill-discovery/src/plugin.ts :: { config: {}, io, ctx, authority: authorityFrom({ origin: \'foreground\' }) }': 'read-only: the discovery index reads skills and the domain map; no skill writes',
   'evolution-skill-catalog/src/index.ts :: { authority: authorityFrom({ origin: \'foreground\' }), config: rawConfig, io }': 'read-only: the catalog walk',
 }
 
