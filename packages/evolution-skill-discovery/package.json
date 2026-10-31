@@ -33,7 +33,8 @@
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^"
+    "@deepseek-ai/dsh-evolution-io": "workspace:^",
+    "@deepseek-ai/dsh-system-prompt": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-skill": "workspace:^",
