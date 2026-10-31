@@ -6,7 +6,10 @@ export const DISCOVERY_AWARENESS = 'When skill coverage for a task is uncertain,
 
 interface PromptRegistry { section(section: PromptSection): () => void }
 
-/** Register the static awareness section; absent systemPrompt is a no-op. */
+/**
+ * Register the static awareness section; absent systemPrompt is a no-op.
+ * platform-declaration anchor: the optional systemPrompt service declared in core PLATFORM_SERVICE_PROBES.
+ */
 export function installDiscoveryAwareness(ctx: Context): () => void {
   const prompt = ctx.get('systemPrompt') as PromptRegistry | undefined
   if (prompt === undefined) return () => {}

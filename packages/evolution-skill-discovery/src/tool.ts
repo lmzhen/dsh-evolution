@@ -36,14 +36,17 @@ function toToolResponse(response: SkillSearchResponse): { results: Array<{ name:
 }
 
 /**
- * Register skill_search on ctx.tools. The description/schema are static; the
+ * Register skill_search on the optional tools service. The description/schema are static; the
  * provider is the only dynamic dependency.
+ * platform-declaration anchor: tools is declared in core PLATFORM_SERVICE_PROBES.
  * @param ctx - plugin context.
  * @param provider - search service or undefined when unavailable.
  * @returns tool disposer.
  */
 export function registerSkillSearchTool(ctx: Context, provider: SkillSearchProvider | undefined): () => void {
-  return ctx.tools.register(defineTool({
+  const tools = ctx.get('tools') as { register: (definition: ReturnType<typeof defineTool>) => () => void } | undefined
+  if (tools === undefined) return () => {}
+  return tools.register(defineTool({
     name: 'skill_search',
     description: SKILL_SEARCH_DESCRIPTION,
     parameters: {

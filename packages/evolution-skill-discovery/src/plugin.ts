@@ -1,7 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { authorityFrom, evolutionIoAdapter, newSkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, evolutionIoAdapter, evolutionRoot, newSkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { installCatalogProjection } from './adapter.ts'
@@ -85,7 +84,7 @@ export function apply(ctx: Context, config: Config): void {
   const io = evolutionIoAdapter(() => evolutionIo.provider())
   const library = newSkillLibrary({ config: {}, io, ctx, authority: authorityFrom({ origin: 'foreground' }) })
   const source = new PlatformSkillIndexSource(ctx, library)
-  const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+  const dshHome = evolutionRoot()
   const map = new DomainMapFileStore(io, config.domainMapPath ?? join(dshHome, 'evolution', 'domain-map.json'))
   if (config.domainGeneration !== undefined && config.domainGenerationSkills !== undefined && config.domainGenerationSkillKeys !== undefined) {
     void initialDomainMap(map, config.domainGeneration, config.domainGenerationSkills, config.domainGenerationSkillKeys, '0', undefined, buildDomainGenerationPrompt({ ...config.domainMinDomains === undefined ? {} : { minDomains: config.domainMinDomains }, ...config.domainMaxDomains === undefined ? {} : { maxDomains: config.domainMaxDomains } })).catch(() => { /* fail open; map may bootstrap later */ })
@@ -146,6 +145,7 @@ export function apply(ctx: Context, config: Config): void {
   const worker = new AssignmentWorker(assignment, queue)
   void queue.load().then(() => worker.drain()).catch(() => { /* queued assignments stay for the next start */ })
   installAssignmentSidecar(ctx, assignment, { onSubmitted: () => { void worker.drain().catch(() => { /* assignment work is best-effort */ }) } })
+  // platform-declaration anchor: commands is optional and declared in core PLATFORM_SERVICE_PROBES.
   const commandRuntime = ctx.get('commands') as { register: (definition: { name: string; description: string; handler: (invocation: { rawInput: string }) => { kind: 'success'; text?: string } | { kind: 'error'; text: string } | Promise<{ kind: 'success'; text?: string } | { kind: 'error'; text: string }> }) => () => void } | undefined
   if (commandRuntime !== undefined) {
     ctx.effect(() => commandRuntime.register({

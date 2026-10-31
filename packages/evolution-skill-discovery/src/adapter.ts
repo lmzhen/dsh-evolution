@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import { SessionSeq, type UserMessage } from '@deepseek-ai/dsh-session'
+import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type { CatalogEntry, ProjectionResult } from './projection.ts'
 import { sanitizeUntrustedText } from './security.ts'
 
@@ -59,12 +59,10 @@ function renderCatalog(entries: readonly CatalogEntry[]): string[] {
 }
 
 /** Build the plugin-owned replacement message from a complete projection. */
-function projectionPresent(agent: { session: { seq: number; surface: { nodes: readonly unknown[] }; eventAt: (seq: never) => { type: string; data?: unknown; seq: unknown } | undefined } }, digest: string): boolean {
+function projectionPresent(agent: { session: { surface: { nodes: readonly unknown[] }; snapshotEvents: () => readonly { type: string; data?: unknown; seq: unknown }[] } }, digest: string): boolean {
   try {
     const visible = new Set(agent.session.surface.nodes)
-    for (let index = agent.session.seq - 1; index >= 0; index -= 1) {
-      const event = agent.session.eventAt(SessionSeq(index) as never)
-      if (event === undefined) return false
+    for (const event of agent.session.snapshotEvents()) {
       if (event.type !== 'user/message') continue
       const data = event.data as { source?: { kind?: string; digest?: string } } | undefined
       if (data?.source?.kind !== 'evolution-skill-projection' || data.source.digest !== digest) continue
