@@ -88,8 +88,12 @@ export function registerSkillSearchTool(ctx: Context, provider: SkillSearchProvi
       }],
     },
     async execute(args, exec) {
-      const allowed = await provider?.allowedSkillKeys?.(exec.agent)
-      return toToolResponse(await searchWithDegraded(provider, { query: args.query, limit: args.limit }, allowed, exec.agent))
+      try {
+        const allowed = await provider?.allowedSkillKeys?.(exec.agent)
+        return toToolResponse(await searchWithDegraded(provider, { query: args.query, limit: args.limit }, allowed, exec.agent))
+      } catch (error) {
+        return { results: [], truncated: false, degraded: true, hint: 'Skill search failed: ' + (error instanceof Error ? error.message : String(error)) }
+      }
     },
   }))
 }

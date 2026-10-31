@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.43 (fix) — skill_search degraded-on-throw
+
+> **范围**：`skill_search` handler 捕获 allowedSkillKeys/search 异常，返回 degraded tool result，避免平台把 handler 异常归为 TOOL_OUTCOME_UNKNOWN。
+> **验证**：web 3080 evolution preset 直调 `skill_search` 返回 tool/result。
+
 ## 0.30.42 (fix) — wire discovery into all + agent preset
 
 > **范围**：`evolution-all` 依赖/bundle row 加入 skill-discovery；`evolution-agent` preset 挂载 discovery，使 `skill_search` 的 schema 与执行器同处 preset scope。
