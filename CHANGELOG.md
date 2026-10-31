@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.42 (fix) — wire discovery into all + agent preset
+
+> **范围**：`evolution-all` 依赖/bundle row 加入 skill-discovery；`evolution-agent` preset 挂载 discovery，使 `skill_search` 的 schema 与执行器同处 preset scope。
+> **验证**：CI validate/desktop；web 3080 真实模型直调 `skill_search` 返回 tool/result。
+
 ## 0.30.41 (feature) — skill discovery / domain map
 
 > **范围**：新增 `@lmzhen/dsh-evolution-skill-discovery`；SkillIndex/域投影/词法检索/域归类/影子证据/`/skill-domain`；默认 mode off，OUT-006 不注册 skill_domains。

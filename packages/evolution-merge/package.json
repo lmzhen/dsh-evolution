@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-merge",
   "description": "Skill auto-merge domain: screening, two-round authoring, queues and commit orchestration",
-  "version": "0.30.41",
+  "version": "0.30.42",
   "publishConfig": {
     "access": "public"
   },
