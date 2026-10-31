@@ -62,6 +62,7 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
 | `evolution-skill-history` | Browser-only sidebar panel (技能历史): the skills that recorded content versions, the body chain and the support-file chain apart, and one restore per body version — its Host half mounts the four loopback routes the panel reads |
 | `evolution-skill-health` | Browser-only sidebar panel (技能健康) — **name claimed, content pending**: what the linter found aggregated by rule, four states (healthy / warn / needs-restructure / **unreadable, never folded into healthy**), and the line it was measured on |
+| `evolution-skill-discovery` | Read-only skill index + domain map: domain cards, lexical `skill_search`, provisional assignment/shadow evidence; `mode: off` by default and no `skill_domains` tool |
 | `evolution-merge` | Skill auto-merge Host/command surface: candidate screening, two-round child authoring, pending approvals, staging/commit receipts and unit undo — mounts `/evolution merge` (and the 0.29 `/merge` alias) plus four read-only routes |
 | `evolution-merge-ui` | Browser-only sidebar panel (技能合并): pending / retry / skipped queues, read-only row projection from the merge routes; commands stay CLI text |
 | `evolution-merge-engine` | Vendored byte-identical skill-merge Node pipeline engine: the original 8-stage scan, two-round prompts, LSH/ranker/judge chain; consumed by the merge Host adapter |
