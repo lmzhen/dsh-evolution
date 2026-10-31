@@ -50,7 +50,7 @@ section, and importing the package root is its only entry.
 
 ## Events (the family's own, process-local)
 
-Six process events ride the cordis bus (`evolution-core/src/events.ts` declares the payloads;
+Seven process events ride the cordis bus (`evolution-core/src/events.ts` declares the payloads;
 producers call `ctx.emit`, consumers `ctx.on`). They are NOT session events — appending one to a
 session log made the session unresumable (A-line P0-1), which is why the payload file says so.
 
@@ -62,6 +62,7 @@ session log made the session unresumable (A-line P0-1), which is why the payload
 | `evolution/review-error` | emit (notification) | `evolution-review` failure paths |
 | `evolution/review-completed` | emit (notification) | `evolution-review` after a plugin branch settles |
 | `evolution/memory-applied` | emit (notification) | `memory` after a memory write |
+| `evolution/approval-decided` | emit (notification) | `evolution-approval` after an approval decision lands |
 
 Legacy `evolution/plan-applied` remains declared so old activity ledgers stay readable, but the current production tree has no plan emitter after the review subagent/plan path was removed.
 
