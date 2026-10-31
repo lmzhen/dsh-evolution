@@ -619,6 +619,7 @@ const publishGroups = [
   ['evolution-skill-history'],
   // 0.25.0: the skill-health surface. Client-only in order too (one read-only route, no infra row).
   ['evolution-skill-health'],
+  ['evolution-skill-discovery'],
   // 0.28.0: the merge host + client surfaces. Both depend only on core/cordis; the bundle below
   // mounts their rows.
   ['evolution-merge-engine', 'evolution-merge', 'evolution-merge-ui'],

@@ -1,4 +1,9 @@
 # Changelog
+## 0.30.41 (feature) — skill discovery / domain map
+
+> **范围**：新增 `@lmzhen/dsh-evolution-skill-discovery`；SkillIndex/域投影/词法检索/域归类/影子证据/`/skill-domain`；默认 mode off，OUT-006 不注册 skill_domains。
+> **验证**：G8b PASS；97/97 discovery tests；真实 Loader/resume/disabled e2e；95/95 REQ、13 OUT、32/32 PLAN 覆盖审计。
+
 ## 0.30.40 (patch) — review config debt cleanup
 
 > **范围**：删除无消费者的 `memoryReviewModel`/`skillReviewModel`（Config/常量/参数注册/测试/生成文档，109→107）；清理 `reviewMode: subagent` 失效引用；branch review 文档化为平台临时缺口路径（默认仍 inject）。

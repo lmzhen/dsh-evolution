@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "querySet": "eval-010",
+  "judgeKind": "model",
+  "judgeId": "subagent-b",
+  "observations": [
+    {
+      "queryId": "q0",
+      "relevant": true,
+      "note": "Top1「mixed-skill-000」描述含查询原文，whenToUse 指向同编号任务 中文任务000"
+    },
+    {
+      "queryId": "q1",
+      "relevant": true,
+      "note": "Top1「mixed-skill-002」描述含查询原文，whenToUse 指向同编号任务 中文任务002"
+    },
+    {
+      "queryId": "q2",
+      "relevant": true,
+      "note": "Top1「mixed-skill-004」描述含查询原文，whenToUse 指向同编号任务 中文任务004"
+    },
+    {
+      "queryId": "q3",
+      "relevant": true,
+      "note": "Top1「mixed-skill-006」描述含查询原文，whenToUse 指向同编号任务 中文任务006"
+    },
+    {
+      "queryId": "q4",
+      "relevant": true,
+      "note": "Top1「mixed-skill-008」描述含查询原文，whenToUse 指向同编号任务 中文任务008"
+    },
+    {
+      "queryId": "q5",
+      "relevant": true,
+      "note": "Top1「mixed-skill-010」描述含查询原文，whenToUse 指向同编号任务 中文任务010"
+    },
+    {
+      "queryId": "q6",
+      "relevant": true,
+      "note": "Top1「mixed-skill-012」描述含查询原文，whenToUse 指向同编号任务 中文任务012"
+    },
+    {
+      "queryId": "q7",
+      "relevant": true,
+      "note": "Top1「mixed-skill-014」描述含查询原文，whenToUse 指向同编号任务 中文任务014"
+    },
+    {
+      "queryId": "q8",
+      "relevant": true,
+      "note": "Top1「mixed-skill-016」描述含查询原文，whenToUse 指向同编号任务 中文任务016"
+    },
+    {
+      "queryId": "q9",
+      "relevant": true,
+      "note": "Top1「mixed-skill-018」描述含查询原文，whenToUse 指向同编号任务 中文任务018"
+    },
+    {
+      "queryId": "q10",
+      "relevant": true,
+      "note": "Top1「mixed-skill-020」描述含查询原文，whenToUse 指向同编号任务 中文任务020"
+    },
+    {
+      "queryId": "q11",
+      "relevant": true,
+      "note": "Top1「mixed-skill-022」描述含查询原文，whenToUse 指向同编号任务 中文任务022"
+    },
+    {
+      "queryId": "q12",
+      "relevant": true,
+      "note": "Top1「mixed-skill-024」描述含查询原文，whenToUse 指向同编号任务 中文任务024"
+    },
+    {
+      "queryId": "q13",
+      "relevant": true,
+      "note": "Top1「mixed-skill-026」描述含查询原文，whenToUse 指向同编号任务 中文任务026"
+    },
+    {
+      "queryId": "q14",
+      "relevant": true,
+      "note": "Top1「mixed-skill-028」描述含查询原文，whenToUse 指向同编号任务 中文任务028"
+    },
+    {
+      "queryId": "q15",
+      "relevant": true,
+      "note": "Top1「mixed-skill-030」描述含查询原文，whenToUse 指向同编号任务 中文任务030"
+    },
+    {
+      "queryId": "q16",
+      "relevant": true,
+      "note": "Top1「mixed-skill-032」描述含查询原文，whenToUse 指向同编号任务 中文任务032"
+    },
+    {
+      "queryId": "q17",
+      "relevant": true,
+      "note": "Top1「mixed-skill-034」描述含查询原文，whenToUse 指向同编号任务 中文任务034"
+    },
+    {
+      "queryId": "q18",
+      "relevant": true,
+      "note": "Top1「mixed-skill-036」描述含查询原文，whenToUse 指向同编号任务 中文任务036"
+    },
+    {
+      "queryId": "q19",
+      "relevant": true,
+      "note": "Top1「mixed-skill-038」描述含查询原文，whenToUse 指向同编号任务 中文任务038"
+    },
+    {
+      "queryId": "q20",
+      "relevant": true,
+      "note": "Top1「mixed-skill-040」描述含查询原文，whenToUse 指向同编号任务 中文任务040"
+    },
+    {
+      "queryId": "q21",
+      "relevant": true,
+      "note": "Top1「mixed-skill-042」描述含查询原文，whenToUse 指向同编号任务 中文任务042"
+    },
+    {
+      "queryId": "q22",
+      "relevant": true,
+      "note": "Top1「mixed-skill-044」描述含查询原文，whenToUse 指向同编号任务 中文任务044"
+    },
+    {
+      "queryId": "q23",
+      "relevant": true,
+      "note": "Top1「mixed-skill-046」描述含查询原文，whenToUse 指向同编号任务 中文任务046"
+    },
+    {
+      "queryId": "q24",
+      "relevant": true,
+      "note": "Top1「mixed-skill-048」描述含查询原文，whenToUse 指向同编号任务 中文任务048"
+    },
+    {
+      "queryId": "q25",
+      "relevant": true,
+      "note": "Top1「mixed-skill-050」描述含查询原文，whenToUse 指向同编号任务 中文任务050"
+    },
+    {
+      "queryId": "q26",
+      "relevant": true,
+      "note": "Top1「mixed-skill-052」描述含查询原文，whenToUse 指向同编号任务 中文任务052"
+    },
+    {
+      "queryId": "q27",
+      "relevant": true,
+      "note": "Top1「mixed-skill-054」描述含查询原文，whenToUse 指向同编号任务 中文任务054"
+    },
+    {
+      "queryId": "q28",
+      "relevant": true,
+      "note": "Top1「mixed-skill-056」描述含查询原文，whenToUse 指向同编号任务 中文任务056"
+    },
+    {
+      "queryId": "q29",
+      "relevant": true,
+      "note": "Top1「mixed-skill-058」描述含查询原文，whenToUse 指向同编号任务 中文任务058"
+    }
+  ]
+}

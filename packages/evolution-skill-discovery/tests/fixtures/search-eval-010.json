@@ -1,0 +1,488 @@
+{
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "name": "mixed-skill-000",
+      "description": "中文描述000 deployment",
+      "whenToUse": "when 中文任务000 is requested"
+    },
+    {
+      "name": "mixed-skill-001",
+      "description": "中文描述001 deployment",
+      "whenToUse": "when 中文任务001 is requested"
+    },
+    {
+      "name": "mixed-skill-002",
+      "description": "中文描述002 deployment",
+      "whenToUse": "when 中文任务002 is requested"
+    },
+    {
+      "name": "mixed-skill-003",
+      "description": "中文描述003 deployment",
+      "whenToUse": "when 中文任务003 is requested"
+    },
+    {
+      "name": "mixed-skill-004",
+      "description": "中文描述004 deployment",
+      "whenToUse": "when 中文任务004 is requested"
+    },
+    {
+      "name": "mixed-skill-005",
+      "description": "中文描述005 deployment",
+      "whenToUse": "when 中文任务005 is requested"
+    },
+    {
+      "name": "mixed-skill-006",
+      "description": "中文描述006 deployment",
+      "whenToUse": "when 中文任务006 is requested"
+    },
+    {
+      "name": "mixed-skill-007",
+      "description": "中文描述007 deployment",
+      "whenToUse": "when 中文任务007 is requested"
+    },
+    {
+      "name": "mixed-skill-008",
+      "description": "中文描述008 deployment",
+      "whenToUse": "when 中文任务008 is requested"
+    },
+    {
+      "name": "mixed-skill-009",
+      "description": "中文描述009 deployment",
+      "whenToUse": "when 中文任务009 is requested"
+    },
+    {
+      "name": "mixed-skill-010",
+      "description": "中文描述010 deployment",
+      "whenToUse": "when 中文任务010 is requested"
+    },
+    {
+      "name": "mixed-skill-011",
+      "description": "中文描述011 deployment",
+      "whenToUse": "when 中文任务011 is requested"
+    },
+    {
+      "name": "mixed-skill-012",
+      "description": "中文描述012 deployment",
+      "whenToUse": "when 中文任务012 is requested"
+    },
+    {
+      "name": "mixed-skill-013",
+      "description": "中文描述013 deployment",
+      "whenToUse": "when 中文任务013 is requested"
+    },
+    {
+      "name": "mixed-skill-014",
+      "description": "中文描述014 deployment",
+      "whenToUse": "when 中文任务014 is requested"
+    },
+    {
+      "name": "mixed-skill-015",
+      "description": "中文描述015 deployment",
+      "whenToUse": "when 中文任务015 is requested"
+    },
+    {
+      "name": "mixed-skill-016",
+      "description": "中文描述016 deployment",
+      "whenToUse": "when 中文任务016 is requested"
+    },
+    {
+      "name": "mixed-skill-017",
+      "description": "中文描述017 deployment",
+      "whenToUse": "when 中文任务017 is requested"
+    },
+    {
+      "name": "mixed-skill-018",
+      "description": "中文描述018 deployment",
+      "whenToUse": "when 中文任务018 is requested"
+    },
+    {
+      "name": "mixed-skill-019",
+      "description": "中文描述019 deployment",
+      "whenToUse": "when 中文任务019 is requested"
+    },
+    {
+      "name": "mixed-skill-020",
+      "description": "中文描述020 deployment",
+      "whenToUse": "when 中文任务020 is requested"
+    },
+    {
+      "name": "mixed-skill-021",
+      "description": "中文描述021 deployment",
+      "whenToUse": "when 中文任务021 is requested"
+    },
+    {
+      "name": "mixed-skill-022",
+      "description": "中文描述022 deployment",
+      "whenToUse": "when 中文任务022 is requested"
+    },
+    {
+      "name": "mixed-skill-023",
+      "description": "中文描述023 deployment",
+      "whenToUse": "when 中文任务023 is requested"
+    },
+    {
+      "name": "mixed-skill-024",
+      "description": "中文描述024 deployment",
+      "whenToUse": "when 中文任务024 is requested"
+    },
+    {
+      "name": "mixed-skill-025",
+      "description": "中文描述025 deployment",
+      "whenToUse": "when 中文任务025 is requested"
+    },
+    {
+      "name": "mixed-skill-026",
+      "description": "中文描述026 deployment",
+      "whenToUse": "when 中文任务026 is requested"
+    },
+    {
+      "name": "mixed-skill-027",
+      "description": "中文描述027 deployment",
+      "whenToUse": "when 中文任务027 is requested"
+    },
+    {
+      "name": "mixed-skill-028",
+      "description": "中文描述028 deployment",
+      "whenToUse": "when 中文任务028 is requested"
+    },
+    {
+      "name": "mixed-skill-029",
+      "description": "中文描述029 deployment",
+      "whenToUse": "when 中文任务029 is requested"
+    },
+    {
+      "name": "mixed-skill-030",
+      "description": "中文描述030 deployment",
+      "whenToUse": "when 中文任务030 is requested"
+    },
+    {
+      "name": "mixed-skill-031",
+      "description": "中文描述031 deployment",
+      "whenToUse": "when 中文任务031 is requested"
+    },
+    {
+      "name": "mixed-skill-032",
+      "description": "中文描述032 deployment",
+      "whenToUse": "when 中文任务032 is requested"
+    },
+    {
+      "name": "mixed-skill-033",
+      "description": "中文描述033 deployment",
+      "whenToUse": "when 中文任务033 is requested"
+    },
+    {
+      "name": "mixed-skill-034",
+      "description": "中文描述034 deployment",
+      "whenToUse": "when 中文任务034 is requested"
+    },
+    {
+      "name": "mixed-skill-035",
+      "description": "中文描述035 deployment",
+      "whenToUse": "when 中文任务035 is requested"
+    },
+    {
+      "name": "mixed-skill-036",
+      "description": "中文描述036 deployment",
+      "whenToUse": "when 中文任务036 is requested"
+    },
+    {
+      "name": "mixed-skill-037",
+      "description": "中文描述037 deployment",
+      "whenToUse": "when 中文任务037 is requested"
+    },
+    {
+      "name": "mixed-skill-038",
+      "description": "中文描述038 deployment",
+      "whenToUse": "when 中文任务038 is requested"
+    },
+    {
+      "name": "mixed-skill-039",
+      "description": "中文描述039 deployment",
+      "whenToUse": "when 中文任务039 is requested"
+    },
+    {
+      "name": "mixed-skill-040",
+      "description": "中文描述040 deployment",
+      "whenToUse": "when 中文任务040 is requested"
+    },
+    {
+      "name": "mixed-skill-041",
+      "description": "中文描述041 deployment",
+      "whenToUse": "when 中文任务041 is requested"
+    },
+    {
+      "name": "mixed-skill-042",
+      "description": "中文描述042 deployment",
+      "whenToUse": "when 中文任务042 is requested"
+    },
+    {
+      "name": "mixed-skill-043",
+      "description": "中文描述043 deployment",
+      "whenToUse": "when 中文任务043 is requested"
+    },
+    {
+      "name": "mixed-skill-044",
+      "description": "中文描述044 deployment",
+      "whenToUse": "when 中文任务044 is requested"
+    },
+    {
+      "name": "mixed-skill-045",
+      "description": "中文描述045 deployment",
+      "whenToUse": "when 中文任务045 is requested"
+    },
+    {
+      "name": "mixed-skill-046",
+      "description": "中文描述046 deployment",
+      "whenToUse": "when 中文任务046 is requested"
+    },
+    {
+      "name": "mixed-skill-047",
+      "description": "中文描述047 deployment",
+      "whenToUse": "when 中文任务047 is requested"
+    },
+    {
+      "name": "mixed-skill-048",
+      "description": "中文描述048 deployment",
+      "whenToUse": "when 中文任务048 is requested"
+    },
+    {
+      "name": "mixed-skill-049",
+      "description": "中文描述049 deployment",
+      "whenToUse": "when 中文任务049 is requested"
+    },
+    {
+      "name": "mixed-skill-050",
+      "description": "中文描述050 deployment",
+      "whenToUse": "when 中文任务050 is requested"
+    },
+    {
+      "name": "mixed-skill-051",
+      "description": "中文描述051 deployment",
+      "whenToUse": "when 中文任务051 is requested"
+    },
+    {
+      "name": "mixed-skill-052",
+      "description": "中文描述052 deployment",
+      "whenToUse": "when 中文任务052 is requested"
+    },
+    {
+      "name": "mixed-skill-053",
+      "description": "中文描述053 deployment",
+      "whenToUse": "when 中文任务053 is requested"
+    },
+    {
+      "name": "mixed-skill-054",
+      "description": "中文描述054 deployment",
+      "whenToUse": "when 中文任务054 is requested"
+    },
+    {
+      "name": "mixed-skill-055",
+      "description": "中文描述055 deployment",
+      "whenToUse": "when 中文任务055 is requested"
+    },
+    {
+      "name": "mixed-skill-056",
+      "description": "中文描述056 deployment",
+      "whenToUse": "when 中文任务056 is requested"
+    },
+    {
+      "name": "mixed-skill-057",
+      "description": "中文描述057 deployment",
+      "whenToUse": "when 中文任务057 is requested"
+    },
+    {
+      "name": "mixed-skill-058",
+      "description": "中文描述058 deployment",
+      "whenToUse": "when 中文任务058 is requested"
+    },
+    {
+      "name": "mixed-skill-059",
+      "description": "中文描述059 deployment",
+      "whenToUse": "when 中文任务059 is requested"
+    }
+  ],
+  "queries": [
+    {
+      "query": "中文描述000",
+      "acceptable": [
+        "mixed-skill-000"
+      ]
+    },
+    {
+      "query": "中文描述002",
+      "acceptable": [
+        "mixed-skill-002"
+      ]
+    },
+    {
+      "query": "中文描述004",
+      "acceptable": [
+        "mixed-skill-004"
+      ]
+    },
+    {
+      "query": "中文描述006",
+      "acceptable": [
+        "mixed-skill-006"
+      ]
+    },
+    {
+      "query": "中文描述008",
+      "acceptable": [
+        "mixed-skill-008"
+      ]
+    },
+    {
+      "query": "中文描述010",
+      "acceptable": [
+        "mixed-skill-010"
+      ]
+    },
+    {
+      "query": "中文描述012",
+      "acceptable": [
+        "mixed-skill-012"
+      ]
+    },
+    {
+      "query": "中文描述014",
+      "acceptable": [
+        "mixed-skill-014"
+      ]
+    },
+    {
+      "query": "中文描述016",
+      "acceptable": [
+        "mixed-skill-016"
+      ]
+    },
+    {
+      "query": "中文描述018",
+      "acceptable": [
+        "mixed-skill-018"
+      ]
+    },
+    {
+      "query": "中文描述020",
+      "acceptable": [
+        "mixed-skill-020"
+      ]
+    },
+    {
+      "query": "中文描述022",
+      "acceptable": [
+        "mixed-skill-022"
+      ]
+    },
+    {
+      "query": "中文描述024",
+      "acceptable": [
+        "mixed-skill-024"
+      ]
+    },
+    {
+      "query": "中文描述026",
+      "acceptable": [
+        "mixed-skill-026"
+      ]
+    },
+    {
+      "query": "中文描述028",
+      "acceptable": [
+        "mixed-skill-028"
+      ]
+    },
+    {
+      "query": "中文描述030",
+      "acceptable": [
+        "mixed-skill-030"
+      ]
+    },
+    {
+      "query": "中文描述032",
+      "acceptable": [
+        "mixed-skill-032"
+      ]
+    },
+    {
+      "query": "中文描述034",
+      "acceptable": [
+        "mixed-skill-034"
+      ]
+    },
+    {
+      "query": "中文描述036",
+      "acceptable": [
+        "mixed-skill-036"
+      ]
+    },
+    {
+      "query": "中文描述038",
+      "acceptable": [
+        "mixed-skill-038"
+      ]
+    },
+    {
+      "query": "中文描述040",
+      "acceptable": [
+        "mixed-skill-040"
+      ]
+    },
+    {
+      "query": "中文描述042",
+      "acceptable": [
+        "mixed-skill-042"
+      ]
+    },
+    {
+      "query": "中文描述044",
+      "acceptable": [
+        "mixed-skill-044"
+      ]
+    },
+    {
+      "query": "中文描述046",
+      "acceptable": [
+        "mixed-skill-046"
+      ]
+    },
+    {
+      "query": "中文描述048",
+      "acceptable": [
+        "mixed-skill-048"
+      ]
+    },
+    {
+      "query": "中文描述050",
+      "acceptable": [
+        "mixed-skill-050"
+      ]
+    },
+    {
+      "query": "中文描述052",
+      "acceptable": [
+        "mixed-skill-052"
+      ]
+    },
+    {
+      "query": "中文描述054",
+      "acceptable": [
+        "mixed-skill-054"
+      ]
+    },
+    {
+      "query": "中文描述056",
+      "acceptable": [
+        "mixed-skill-056"
+      ]
+    },
+    {
+      "query": "中文描述058",
+      "acceptable": [
+        "mixed-skill-058"
+      ]
+    }
+  ],
+  "noResultQuery": "不存在的技能组合"
+}

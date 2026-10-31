@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "querySet": "eval-010",
+  "judgeKind": "model",
+  "judgeId": "subagent-a",
+  "observations": [
+    {
+      "queryId": "q0",
+      "relevant": true,
+      "note": "描述「中文描述000 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q1",
+      "relevant": true,
+      "note": "描述「中文描述002 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q2",
+      "relevant": true,
+      "note": "描述「中文描述004 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q3",
+      "relevant": true,
+      "note": "描述「中文描述006 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q4",
+      "relevant": true,
+      "note": "描述「中文描述008 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q5",
+      "relevant": true,
+      "note": "描述「中文描述010 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q6",
+      "relevant": true,
+      "note": "描述「中文描述012 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q7",
+      "relevant": true,
+      "note": "描述「中文描述014 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q8",
+      "relevant": true,
+      "note": "描述「中文描述016 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q9",
+      "relevant": true,
+      "note": "描述「中文描述018 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q10",
+      "relevant": true,
+      "note": "描述「中文描述020 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q11",
+      "relevant": true,
+      "note": "描述「中文描述022 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q12",
+      "relevant": true,
+      "note": "描述「中文描述024 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q13",
+      "relevant": true,
+      "note": "描述「中文描述026 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q14",
+      "relevant": true,
+      "note": "描述「中文描述028 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q15",
+      "relevant": true,
+      "note": "描述「中文描述030 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q16",
+      "relevant": true,
+      "note": "描述「中文描述032 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q17",
+      "relevant": true,
+      "note": "描述「中文描述034 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q18",
+      "relevant": true,
+      "note": "描述「中文描述036 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q19",
+      "relevant": true,
+      "note": "描述「中文描述038 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q20",
+      "relevant": true,
+      "note": "描述「中文描述040 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q21",
+      "relevant": true,
+      "note": "描述「中文描述042 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q22",
+      "relevant": true,
+      "note": "描述「中文描述044 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q23",
+      "relevant": true,
+      "note": "描述「中文描述046 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q24",
+      "relevant": true,
+      "note": "描述「中文描述048 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q25",
+      "relevant": true,
+      "note": "描述「中文描述050 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q26",
+      "relevant": true,
+      "note": "描述「中文描述052 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q27",
+      "relevant": true,
+      "note": "描述「中文描述054 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q28",
+      "relevant": true,
+      "note": "描述「中文描述056 deployment」直接包含查询词，用途一致"
+    },
+    {
+      "queryId": "q29",
+      "relevant": true,
+      "note": "描述「中文描述058 deployment」直接包含查询词，用途一致"
+    }
+  ]
+}

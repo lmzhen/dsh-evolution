@@ -1,0 +1,9 @@
+- name: '@deepseek-ai/dsh-system-prompt'
+- name: '@deepseek-ai/dsh-tools'
+- name: '@deepseek-ai/dsh-skill'
+- name: '@deepseek-ai/dsh-evolution-io'
+- name: './io-provider.ts'
+- name: '@deepseek-ai/dsh-evolution-skill-discovery'
+  config:
+    mode: off
+    featureEpoch: test

@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 1,
+  "querySet": "eval-010",
+  "blind": true,
+  "queries": [
+    {
+      "queryId": "q0",
+      "query": "中文描述000",
+      "results": [
+        {
+          "name": "mixed-skill-000",
+          "description": "中文描述000 deployment",
+          "whenToUse": "when 中文任务000 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q1",
+      "query": "中文描述002",
+      "results": [
+        {
+          "name": "mixed-skill-002",
+          "description": "中文描述002 deployment",
+          "whenToUse": "when 中文任务002 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q2",
+      "query": "中文描述004",
+      "results": [
+        {
+          "name": "mixed-skill-004",
+          "description": "中文描述004 deployment",
+          "whenToUse": "when 中文任务004 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q3",
+      "query": "中文描述006",
+      "results": [
+        {
+          "name": "mixed-skill-006",
+          "description": "中文描述006 deployment",
+          "whenToUse": "when 中文任务006 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q4",
+      "query": "中文描述008",
+      "results": [
+        {
+          "name": "mixed-skill-008",
+          "description": "中文描述008 deployment",
+          "whenToUse": "when 中文任务008 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q5",
+      "query": "中文描述010",
+      "results": [
+        {
+          "name": "mixed-skill-010",
+          "description": "中文描述010 deployment",
+          "whenToUse": "when 中文任务010 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q6",
+      "query": "中文描述012",
+      "results": [
+        {
+          "name": "mixed-skill-012",
+          "description": "中文描述012 deployment",
+          "whenToUse": "when 中文任务012 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q7",
+      "query": "中文描述014",
+      "results": [
+        {
+          "name": "mixed-skill-014",
+          "description": "中文描述014 deployment",
+          "whenToUse": "when 中文任务014 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q8",
+      "query": "中文描述016",
+      "results": [
+        {
+          "name": "mixed-skill-016",
+          "description": "中文描述016 deployment",
+          "whenToUse": "when 中文任务016 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q9",
+      "query": "中文描述018",
+      "results": [
+        {
+          "name": "mixed-skill-018",
+          "description": "中文描述018 deployment",
+          "whenToUse": "when 中文任务018 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q10",
+      "query": "中文描述020",
+      "results": [
+        {
+          "name": "mixed-skill-020",
+          "description": "中文描述020 deployment",
+          "whenToUse": "when 中文任务020 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q11",
+      "query": "中文描述022",
+      "results": [
+        {
+          "name": "mixed-skill-022",
+          "description": "中文描述022 deployment",
+          "whenToUse": "when 中文任务022 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q12",
+      "query": "中文描述024",
+      "results": [
+        {
+          "name": "mixed-skill-024",
+          "description": "中文描述024 deployment",
+          "whenToUse": "when 中文任务024 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q13",
+      "query": "中文描述026",
+      "results": [
+        {
+          "name": "mixed-skill-026",
+          "description": "中文描述026 deployment",
+          "whenToUse": "when 中文任务026 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q14",
+      "query": "中文描述028",
+      "results": [
+        {
+          "name": "mixed-skill-028",
+          "description": "中文描述028 deployment",
+          "whenToUse": "when 中文任务028 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q15",
+      "query": "中文描述030",
+      "results": [
+        {
+          "name": "mixed-skill-030",
+          "description": "中文描述030 deployment",
+          "whenToUse": "when 中文任务030 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q16",
+      "query": "中文描述032",
+      "results": [
+        {
+          "name": "mixed-skill-032",
+          "description": "中文描述032 deployment",
+          "whenToUse": "when 中文任务032 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q17",
+      "query": "中文描述034",
+      "results": [
+        {
+          "name": "mixed-skill-034",
+          "description": "中文描述034 deployment",
+          "whenToUse": "when 中文任务034 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q18",
+      "query": "中文描述036",
+      "results": [
+        {
+          "name": "mixed-skill-036",
+          "description": "中文描述036 deployment",
+          "whenToUse": "when 中文任务036 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q19",
+      "query": "中文描述038",
+      "results": [
+        {
+          "name": "mixed-skill-038",
+          "description": "中文描述038 deployment",
+          "whenToUse": "when 中文任务038 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q20",
+      "query": "中文描述040",
+      "results": [
+        {
+          "name": "mixed-skill-040",
+          "description": "中文描述040 deployment",
+          "whenToUse": "when 中文任务040 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q21",
+      "query": "中文描述042",
+      "results": [
+        {
+          "name": "mixed-skill-042",
+          "description": "中文描述042 deployment",
+          "whenToUse": "when 中文任务042 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q22",
+      "query": "中文描述044",
+      "results": [
+        {
+          "name": "mixed-skill-044",
+          "description": "中文描述044 deployment",
+          "whenToUse": "when 中文任务044 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q23",
+      "query": "中文描述046",
+      "results": [
+        {
+          "name": "mixed-skill-046",
+          "description": "中文描述046 deployment",
+          "whenToUse": "when 中文任务046 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q24",
+      "query": "中文描述048",
+      "results": [
+        {
+          "name": "mixed-skill-048",
+          "description": "中文描述048 deployment",
+          "whenToUse": "when 中文任务048 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q25",
+      "query": "中文描述050",
+      "results": [
+        {
+          "name": "mixed-skill-050",
+          "description": "中文描述050 deployment",
+          "whenToUse": "when 中文任务050 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q26",
+      "query": "中文描述052",
+      "results": [
+        {
+          "name": "mixed-skill-052",
+          "description": "中文描述052 deployment",
+          "whenToUse": "when 中文任务052 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q27",
+      "query": "中文描述054",
+      "results": [
+        {
+          "name": "mixed-skill-054",
+          "description": "中文描述054 deployment",
+          "whenToUse": "when 中文任务054 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q28",
+      "query": "中文描述056",
+      "results": [
+        {
+          "name": "mixed-skill-056",
+          "description": "中文描述056 deployment",
+          "whenToUse": "when 中文任务056 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    },
+    {
+      "queryId": "q29",
+      "query": "中文描述058",
+      "results": [
+        {
+          "name": "mixed-skill-058",
+          "description": "中文描述058 deployment",
+          "whenToUse": "when 中文任务058 is requested",
+          "matchedBy": "name"
+        }
+      ]
+    }
+  ]
+}

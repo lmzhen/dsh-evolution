@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "observations": [
+    {
+      "awarenessShown": true,
+      "awarenessRecalled": true,
+      "silentMiss": true,
+      "searched": false,
+      "overSearch": true,
+      "underSearch": true,
+      "wrongLoad": false,
+      "taskSuccess": false,
+      "tokens": 10,
+      "fallback": true
+    },
+    {
+      "awarenessShown": false,
+      "awarenessRecalled": false,
+      "silentMiss": false,
+      "searched": true,
+      "overSearch": false,
+      "underSearch": false,
+      "wrongLoad": true,
+      "taskSuccess": true,
+      "tokens": 11,
+      "fallback": false
+    },
+    {
+      "awarenessShown": true,
+      "awarenessRecalled": false,
+      "silentMiss": false,
+      "searched": true,
+      "overSearch": false,
+      "underSearch": false,
+      "wrongLoad": false,
+      "taskSuccess": true,
+      "tokens": 12,
+      "fallback": false
+    },
+    {
+      "awarenessShown": false,
+      "awarenessRecalled": false,
+      "silentMiss": false,
+      "searched": false,
+      "overSearch": false,
+      "underSearch": false,
+      "wrongLoad": false,
+      "taskSuccess": true,
+      "tokens": 13,
+      "fallback": true
+    },
+    {
+      "awarenessShown": true,
+      "awarenessRecalled": true,
+      "silentMiss": false,
+      "searched": true,
+      "overSearch": false,
+      "underSearch": false,
+      "wrongLoad": false,
+      "taskSuccess": false,
+      "tokens": 14,
+      "fallback": false
+    },
+    {
+      "awarenessShown": false,
+      "awarenessRecalled": false,
+      "silentMiss": true,
+      "searched": true,
+      "overSearch": false,
+      "underSearch": false,
+      "wrongLoad": false,
+      "taskSuccess": true,
+      "tokens": 15,
+      "fallback": false
+    },
+    {
+      "awarenessShown": true,
+      "awarenessRecalled": false,
+      "silentMiss": false,
+      "searched": false,
+      "overSearch": false,
+      "underSearch": true,
+      "wrongLoad": true,
+      "taskSuccess": true,
+      "tokens": 16,
+      "fallback": true
+    },
+    {
+      "awarenessShown": false,
+      "awarenessRecalled": false,
+      "silentMiss": false,
+      "searched": true,
+      "overSearch": true,
+      "underSearch": false,
+      "wrongLoad": false,
+      "taskSuccess": true,
+      "tokens": 17,
+      "fallback": false
+    },
+    {
+      "awarenessShown": true,
+      "awarenessRecalled": true,
+      "silentMiss": false,
+      "searched": true,
+      "overSearch": false,
+      "underSearch": false,
+      "wrongLoad": false,
+      "taskSuccess": false,
+      "tokens": 18,
+      "fallback": false
+    },
+    {
+      "awarenessShown": false,
+      "awarenessRecalled": false,
+      "silentMiss": false,
+      "searched": false,
+      "overSearch": false,
+      "underSearch": false,
+      "wrongLoad": false,
+      "taskSuccess": true,
+      "tokens": 19,
+      "fallback": true
+    }
+  ]
+}
