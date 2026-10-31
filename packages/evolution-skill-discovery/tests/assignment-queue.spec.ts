@@ -1,3 +1,4 @@
+// @tier ci-only
 import { expect, it } from 'vitest'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { AssignmentWorker, DomainAssignmentService, DomainMapFileStore, JsonAssignmentQueue, type AssignmentProposal } from '../src/index.ts'

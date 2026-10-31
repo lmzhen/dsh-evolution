@@ -1,3 +1,4 @@
+// @tier ci-only
 import { expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'

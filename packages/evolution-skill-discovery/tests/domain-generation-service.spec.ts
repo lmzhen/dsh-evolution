@@ -1,3 +1,4 @@
+// @tier ci-only
 import { expect, it } from 'vitest'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { DOMAIN_GENERATION_PROMPT, buildDomainGenerationPrompt, DomainMapFileStore, initialDomainMap, type DomainGenerationProposal } from '../src/index.ts'

@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { DomainPolicyValidationError, domainGenerationMode, mergeDomainPolicy, validateDomainGeneration, type GeneratedDomain, type GenerationSkillFact } from '../src/index.ts'
 

@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import {

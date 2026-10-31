@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import { SKILL_SEARCH_TOKENIZER_VERSION, SkillSearchCache, SkillSearchIndex, searchTerms, skillIndexRowOf, skillKeyOf } from '../src/index.ts'

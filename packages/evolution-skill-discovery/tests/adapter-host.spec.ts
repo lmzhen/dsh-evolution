@@ -1,3 +1,4 @@
+// @tier ci-only
 import { afterEach, expect, it } from 'vitest'
 import { provideWorkingDirectoryFixture, unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { mkdir, rm, writeFile } from 'node:fs/promises'

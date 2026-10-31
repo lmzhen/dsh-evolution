@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { computeDomainMetrics, descriptionHashOf, descriptionIsServable, evaluateDomainQuality, renderDomainDescription, shouldRegenerateDescription, type DomainNode, type SkillDomainEdge, type SkillKey } from '../src/index.ts'
 

@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import { aggregateJudge, validateJudgeRecord, type JudgeRecord } from '../src/index.ts'

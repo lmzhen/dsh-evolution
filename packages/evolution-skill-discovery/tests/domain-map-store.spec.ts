@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { DomainMapCorruptError, DomainMapFileStore, DomainMapValidationError, DomainMapVersionConflict, type DomainNode, type SkillDomainEdge } from '../src/index.ts'

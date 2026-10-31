@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { DISCOVERY_STAGES, V0_DISCOVERY_FEATURES, canClassifyAtCreate, mayAdvance, stageIndex } from '../src/index.ts'
 

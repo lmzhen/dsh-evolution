@@ -1,3 +1,4 @@
+// @tier ci-only
 import { expect, it } from 'vitest'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { ShadowEvidenceStore } from '../src/index.ts'

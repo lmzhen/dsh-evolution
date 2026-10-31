@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { SKILL_MANAGE_DESCRIPTION, computeBehaviorMetrics, isDiscoveryUserPolicy } from '../src/index.ts'
 

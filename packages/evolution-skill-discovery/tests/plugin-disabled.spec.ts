@@ -1,3 +1,4 @@
+// @tier ci-only
 import { afterEach, expect, it } from 'vitest'
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'

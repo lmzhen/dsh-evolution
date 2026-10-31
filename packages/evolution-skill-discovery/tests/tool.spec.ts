@@ -1,3 +1,4 @@
+// @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { SKILL_SEARCH_DESCRIPTION, searchWithDegraded } from '../src/index.ts'
 
