@@ -1,8 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import type { UserMessage } from '@deepseek-ai/dsh-session'
+import type { ContextFormed, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { CatalogEntry, ProjectionResult } from './projection.ts'
 import { sanitizeUntrustedText } from './security.ts'
 
