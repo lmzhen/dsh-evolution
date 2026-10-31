@@ -1,4 +1,4 @@
-import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { isRecord, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { DomainMapSnapshot, DomainMapStore, DomainMapWrite, DomainNode, SkillDomainEdge } from './domain-map.ts'
 
 /** File schema version supported by this store. */
@@ -40,10 +40,6 @@ export class DomainMapValidationError extends Error {
 
 function emptySnapshot(): DomainMapSnapshot {
   return { mapVersion: '0', domains: [], edges: [] }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function assertNode(node: unknown): asserts node is DomainNode {
