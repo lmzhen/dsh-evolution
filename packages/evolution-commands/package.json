@@ -29,6 +29,7 @@
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-maintenance": "workspace:^",
+    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "optionalDependencies": {

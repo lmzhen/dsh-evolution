@@ -14,10 +14,10 @@ it('G2b/2b.3: every record type states its medium and scope, with a reason', () 
   }
 })
 
-it('G2b/2b.3: a cross-process claim is refused when the io has no transact lock', () => {
-  expect(processScopeViolations({ transact: async () => null })).toEqual([])
-  const unbacked = processScopeViolations({})
+it('G2b/2b.3: a cross-process claim needs an explicit processScope, not just transact', () => {
+  expect(processScopeViolations({ processScope: 'cross-process' })).toEqual([])
+  const unbacked = processScopeViolations({ transact: async () => null })
   expect(unbacked.length).toBeGreaterThan(0)
-  expect(unbacked[0]).toContain('no transact lock')
+  expect(unbacked[0]).toContain('declares no process scope')
   expect(processScopeViolations(undefined).length).toBe(unbacked.length)
 })

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, presetRowBlock, presetRowBody, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import type { DiagnosticsView } from '@deepseek-ai/dsh-evolution-core'
+import { processScopeViolations } from '@deepseek-ai/dsh-evolution-state-storage'
 import { assembleDoctorInputs, buildDoctorView } from './doctor-view.ts'
 import { readLegacyDocumentState } from './migration.ts'
 import { readPlatformView } from './platform-view.ts'
@@ -661,6 +662,9 @@ export async function diagnose(
   // renders no section at all), and the table lives in evolution-core so the set is declared once
   // and cross-checked by the arch guard.
   const capabilityAbsence = absentHostServices(has)
+  const ioRegistry = ctx.get('evolutionIo') as { provider?: () => { processScope?: 'single-process' | 'cross-process' | undefined } } | undefined
+  let processScopeIssues: readonly string[] = []
+  try { if (ioRegistry?.provider !== undefined) processScopeIssues = processScopeViolations(ioRegistry.provider()) } catch { /* the IO row is absent; capabilityAbsence reports that */ }
   // G3-② (B2): the variant half of the report. Computed before the action
   // ladder so a stale snapshot contributes its own regeneration step. The
   // comparison reads the profile patches and the platform base patches — the
@@ -813,6 +817,9 @@ export async function diagnose(
   // step ship together, like every other row of this report.
   if (capabilityAbsence.length > 0) {
     actions.push(`The family probes ${capabilityAbsence.length} platform capability/ies this deployment does not mount (${capabilityAbsence.map(entry => entry.service).join(', ')}) — mount the rows that carry the ones you need; the features they gate are listed above.`)
+  }
+  if (processScopeIssues.length > 0) {
+    actions.push(`The mounted IO backend does not back every cross-process medium claim: ${processScopeIssues.join('; ')} — mount a provider that declares processScope 'cross-process', or treat this home as single-process (no concurrent writers).`)
   }
   if (services.review && !services.curator) actions.push('Curator service is not mounted — automatic curation is off; verify the host/all bundle row set is complete.')
   if (pendingCount === null && services.approval) actions.push('Approval service is mounted but pending listing failed — check the evolution state service.')

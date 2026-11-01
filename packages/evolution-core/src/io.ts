@@ -15,6 +15,13 @@ import { randomBytes } from 'node:crypto'
 import { isMissingPath } from './probe.ts'
 
 export interface EvolutionIoLike {
+  /**
+   * The process scope this backend actually guarantees. `transact` is NOT proof:
+   * nodeEvolutionIo's transact serializes in-process only (G2 S4). Required for
+   * any backend that claims cross-process; omitted/`single-process` means the
+   * caller must keep its own chain and the family must report the weaker truth.
+   */
+  readonly processScope?: 'single-process' | 'cross-process' | undefined
   readText(path: string): Promise<string | null>
   writeText(path: string, content: string): Promise<void>
   remove(path: string): Promise<void>
@@ -163,6 +170,7 @@ export function transactTaskGuard(what: string): TransactTaskGuard {
 /** Lazy adapter over an IO provider registry, shared by every evolution consumer. */
 export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIoLike {
   return {
+    get processScope() { return provider().processScope },
     readText: path => provider().readText(path),
     writeText: (path, content) => provider().writeText(path, content),
     remove: path => provider().remove(path),
@@ -473,6 +481,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
     }
   }
   return {
+    processScope: 'single-process',
     async readText(path) {
       try { return await readFile(path, 'utf8') } catch (error) {
         // Only "missing" maps to null (the "not there" signal); any other

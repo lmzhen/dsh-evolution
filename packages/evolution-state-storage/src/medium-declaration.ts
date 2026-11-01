@@ -56,8 +56,8 @@ export const MEDIUM_PROCESS_DECLARATION: readonly MediumProcessClaim[] = [
 
 /** The capability the claims are checked against: the io the medium writes through. */
 export interface ProcessScopeProbe {
-  /** The IO backend transact entry point, when it has one. */
-  readonly transact?: unknown
+  /** The scope the backend actually declares; `transact` alone is not proof. */
+  readonly processScope?: 'single-process' | 'cross-process' | undefined
 }
 
 /**
@@ -66,8 +66,8 @@ export interface ProcessScopeProbe {
  * @returns one message per claim the capability cannot back up; empty when every claim holds.
  */
 export function processScopeViolations(io: ProcessScopeProbe | undefined): readonly string[] {
-  const backed = typeof io?.transact === 'function'
+  const backed = io?.processScope === 'cross-process'
   return MEDIUM_PROCESS_DECLARATION
     .filter(claim => claim.scope === 'cross-process' && !backed)
-    .map(claim => claim.record + ' claims cross-process (' + claim.because + ') but the mounted io exposes no transact lock')
+    .map(claim => claim.record + ' claims cross-process (' + claim.because + ') but the mounted io declares ' + (io?.processScope ?? 'no process scope'))
 }

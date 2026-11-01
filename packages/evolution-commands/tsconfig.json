@@ -5,6 +5,7 @@
     { "path": "../../interaction/commands" },
     { "path": "../evolution-approval" },
     { "path": "../evolution-maintenance" },
+    { "path": "../evolution-state-storage" },
     { "path": "../../../vendor/schemastery" }
   ]
 }
