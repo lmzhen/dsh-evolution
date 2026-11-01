@@ -18,20 +18,16 @@ export * from './projection.ts'
 
 export * from './adapter.ts'
 
-export * from './features.ts'
-export * from './stages.ts'
 export * from './search.ts'
 
 export * from './domain-map-store.ts'
 
-export * from './domain-view.ts'
 
 export * from './domain-policy.ts'
 export * from './domain-generation.ts'
 
 export * from './domain-description.ts'
 export * from './domain-quality.ts'
-export * from './domain-metrics.ts'
 
 export * from './domain-projection.ts'
 export * from './session-projection.ts'
@@ -40,9 +36,7 @@ export * from './tool.ts'
 
 export * from './assignment.ts'
 
-export * from './maintenance.ts'
 
-export * from './ui.ts'
 
 export * from './security.ts'
 
@@ -52,7 +46,6 @@ export * from './runtime.ts'
 
 export * from './assignment-sidecar.ts'
 
-export * from './search-judge.ts'
 
 export * from './awareness.ts'
 
