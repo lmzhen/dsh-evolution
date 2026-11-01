@@ -34,6 +34,8 @@ it('creates a no-cwd plugin branch and disposes it', async () => {
     ctx.provide('sessionQuery', { readEvents: async () => parent.session.snapshotEvents() } as never)
     const completed: unknown[] = []
     ctx.on('evolution/review-completed', event => completed.push(event))
+    const applied: unknown[] = []
+    ctx.on('evolution/plan-applied', event => applied.push(event))
     await ctx.plugin(Review, {
       reviewEnabled: true,
       reviewMemoryInterval: 1,
@@ -45,11 +47,13 @@ it('creates a no-cwd plugin branch and disposes it', async () => {
     parent.followup(createUserMessage({ content: [{ type: 'text', text: 'do the task' }], source: { kind: 'user' } }))
     await parent.whenIdle()
     await vi.waitFor(() => { expect(completed).toHaveLength(1) })
+    await vi.waitFor(() => { expect(applied).toHaveLength(1) })
     const child = created.find(agent => agent.id !== parent.id)
     expect(child).toBeDefined()
     expect(child?.session.header.cwd).toBeUndefined()
     expect(child?.session.header.parentSession).toBe(parent.id)
     expect(ctx.agents.get(child!.id)).toBeUndefined()
+    expect(applied[0]).toMatchObject({ sessionId: String(parent.id), planId: String(child!.id), memoryApplied: 0, skillApplied: 0, rejectedOps: 0 })
   } finally {
     await ctx.fiber.dispose()
   }
