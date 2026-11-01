@@ -25,7 +25,7 @@
 | FR-RUN-09 | satisfied | P1 | v1 | evolution-merge | 1 | pass:A |
 | FR-RUN-10 | satisfied | P1 | v1 | evolution-merge | 1 | pass:A |
 | FR-RUN-11 | satisfied | P0 | v1 | evolution-merge | 1 | pass:A |
-| FR-CAND-01 | satisfied | P0 | v1 | evolution-merge | 1 | pass:A |
+| FR-CAND-01 | partial | P0 | v1 | evolution-merge | 2 | pass:A, missing |
 | FR-CAND-02 | satisfied | P0 | v1 | evolution-merge | 1 | pass:A |
 | FR-CAND-03 | satisfied | P0 | v1 | evolution-merge | 1 | pass:A |
 | FR-CAND-04 | satisfied | P0 | v1 | evolution-merge | 1 | pass:A |

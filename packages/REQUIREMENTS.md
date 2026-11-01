@@ -7,10 +7,10 @@
 
 | total | satisfied | partial | gap | n/a | unverified | docDrift | scored |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 251 | 241 | 0 | 0 | 1 | 9 | 0 | 222 |
+| 251 | 240 | 1 | 0 | 1 | 9 | 0 | 222 |
 
 历史审计基线（gap-report.md (0.30.24)）：total 251 / satisfied 186 / partial 50 / gap 4 / drift 3 / n/a 1 / unverified 7。
-当前证据计算：satisfied 241 / partial 0 / gap 0 / drift 0 / n/a 1 / unverified 9。
+当前证据计算：satisfied 240 / partial 1 / gap 0 / drift 0 / n/a 1 / unverified 9。
 
 ## 权威顺序
 
@@ -182,7 +182,7 @@ scan 处理候选集全部对，无 per-run 对数上限；按候选分数降序
 
 | ID | 状态 | 优先级 | 权威 | owner | 需求 |
 | --- | --- | --- | --- | --- | --- |
-| FR-CAND-01 | satisfied | P0 | v1 | evolution-merge | 严格复用原筛选 pipeline ①–⑤，不另写一套 |
+| FR-CAND-01 | partial | P0 | v1 | evolution-merge | 严格复用原筛选 pipeline ①–⑤，不另写一套 |
 | FR-CAND-02 | satisfied | P0 | v1 | evolution-merge | ⑤ judge 保留为候选闸门 |
 | FR-CAND-03 | satisfied | P0 | v1 | evolution-merge | L0/L1 KEEP 只进报告，不进第 1 轮 |
 | FR-CAND-04 | satisfied | P0 | v1 | evolution-merge | L2 MERGE/UNDECIDED 进第 1 轮 |
@@ -196,7 +196,7 @@ scan 处理候选集全部对，无 per-run 对数上限；按候选分数降序
 严格复用原筛选 pipeline ①–⑤，不另写一套
 
 - AC-1 stage 顺序与原 pipeline 一致；输入输出可对照 → pass (A)
-- 冻结（2026-11-01）：筛选 pipeline ①–⑤ 的实质流程（阶段顺序、输入输出、模型/权重/阈值/过滤/评分/判定、影响候选集/排序的选择策略）不得修改；包装/打包/加载/错误边界/诊断/IO/测试可动，但必须有 parity 证明候选集、顺序、分数、判定完全一致。
+- AC-2 筛选 pipeline ①–⑤ 实质流程冻结：阶段顺序、输入输出、模型/权重/阈值/过滤/评分/判定、影响候选集/排序的选择策略不得修改；仅包装/加载/错误边界/诊断/IO/测试/非筛选适配可动，须 parity 证明候选集、顺序、分数、判定完全一致 → missing
 
 ### FR-CAND-02 ⑤ judge 保留为候选闸门
 
