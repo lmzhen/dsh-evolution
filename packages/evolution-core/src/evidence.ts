@@ -1,9 +1,8 @@
 /**
  * Which session frames are EVIDENCE, and which are bookkeeping.
  *
- * A plan op must cite `evidence` seqs, and the validator's range rule
- * (`evolution-plan-validator`, rule `EVIDENCE_RANGE`) answers only "is this an integer inside
- * the window the plan was authored against". A boundary frame satisfies that while carrying
+ * The session's evidence index answers "does this seq carry content"; a bare range check used
+ * to accept any integer inside the authoring window. A boundary frame satisfies that while carrying
  * nothing a claim can rest on: the `turn/start` seq is the frame a claim about that turn was
  * most likely read out of, and citing it is indistinguishable from citing a real exchange. This
  * module owns the ONE classification of a session frame by what it CARRIES, so the plan path can
@@ -45,8 +44,7 @@ export function isBookkeepingFrame(type: string): boolean {
  *
  * Structural on purpose — {@link evidenceKindIndex} materializes the dense set of content seqs,
  * while the projection answers by complement over the sparse boundary seqs
- * (`session-projection.ts`). Both satisfy this interface, and it is all the plan path reads
- * (`evolution-plan-validator/src/index.ts:164`).
+ * (`session-projection.ts`). Both satisfy this interface; `session-projection` is the reader.
  */
 export interface EvidenceIndex {
   /** @param seq - a cited evidence seq. @returns true when that frame carries content. */

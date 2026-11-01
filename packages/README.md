@@ -44,7 +44,6 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `memory` / `memory-files` / `tool-memory` | Memory seam: registry, provider, model tool |
 | `skill-usage` / `tool-skill-manage` / `evolution-skill-catalog` | Usage telemetry + `skill_manage` + native `ctx.skills` provider |
 | `evolution-policy` | Immutable policy snapshot + native `tools.guard` denials |
-| `evolution-plan-validator` | Deterministic validation for model-produced plans |
 | `evolution-state-storage` / `evolution-state-domain` / `evolution-state-json` / `evolution-state` | State seam: provider registry, storage-domain KV, JSON fallback, consumer |
 | `evolution-approval` | Hermes-style staged/pending writes over `evolutionState` |
 | `evolution-threat` | `tools.guard` content threat guard |
@@ -379,7 +378,7 @@ joins only when mounted (D-30):
 
 1. Model writes only `memory` and `skills`; policy/prompts/routing/state are
    never model-writable. `evolution-policy` installs a monotonic
-   `ctx.tools.guard` and `evolution-plan-validator` rejects forbidden fields.
+   `ctx.tools.guard` rejects forbidden fields.
 2. Every mutation is gated by the `tools.guard` threat scan (the pre-execute allow path) and, when
    enabled, the staged approval service. Approved writes replay through the
    exact runner they were registered with.
@@ -471,7 +470,6 @@ being bypassed. (v14 audit §7.)
 | New memory backend | `ctx.memory.registerProvider` | `snapshot()` **and** `renderContext()` must both be single-generation (v14 P2-3) |
 | New threat rule | `evolution-core/threats.ts` `PATTERNS` row + `scope` | one false-positive and one true-positive case; add the label to the exemption surface if it can be benign |
 | New `/evolution` subcommand | `evolution-commands/src/registry.ts` row + handler | the README command table is rendered from this table (T-WD2 pins it) |
-| New plan-path rule | `evolution-plan-validator/src/index.ts` `PLAN_RULES` row (the memory/skill table, in the order the model meets the questions) | one case per table it joins; a report-only row needs its context field and a caller that passes it |
 | New model-facing tool | the tool package + the `evolution-agent` delta row (+ a bundle row only if every session needs it) | tool description must name the real fields/tools; unit test on the tool surface |
 | New agent-preset row | `evolution-agent/agent.cordis.yml` (delta only) | never repeat a host-owned row; `composePresetComposition` / installer byte-parity test |
 | Upstream platform bump | `UPSTREAM_SHA` + `PLATFORM_VERSION` + the name-collision check | CI baseline **and** released-compat chains; re-verify the seams listed in the audit report §3 |
