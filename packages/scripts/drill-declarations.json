@@ -312,6 +312,39 @@
     "gate-51": {
       "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-51",
       "evidence": "the bed manifest is roster-derived: breaking the derived relPath root makes the committed artifact stale and --check must red (the same mutation the checkMutations record pins; --only proves it and stamps provenAt/provenSha)."
+    },
+    "gate-52": {
+      "noDrillReason": "architecture guard: negative source scan; a mutation would need a synthetic tree beyond this gate's own fixtures"
+    },
+    "gate-53": {
+      "noDrillReason": "host-route uniqueness guard: negative source scan; mutation proof is the empty-scan exit 2 path"
+    },
+    "gate-54": {
+      "noDrillReason": "generated client seam check: its --check is already the red path; no separate mutation fixture"
+    },
+    "gate-55": {
+      "noDrillReason": "traceability schema/coverage gate: red via missing row/order, covered by its own fixtures"
+    },
+    "gate-56": {
+      "noDrillReason": "release-evidence schema gate: red via malformed/missing evidence; no additional mutation fixture"
+    },
+    "gate-57": {
+      "noDrillReason": "release-evidence assembly gate: red via missing inputs; covered by its own fixtures"
+    },
+    "gate-58": {
+      "noDrillReason": "engine upstream parity gate: red via byte/sha mismatch; no additional mutation fixture"
+    },
+    "ci-only-16": {
+      "noDrillReason": "layout-sync release gate: red via drift; no mutation fixture"
+    },
+    "ci-only-17": {
+      "noDrillReason": "probe registration release gate: red via unregistered probe; no mutation fixture"
+    },
+    "ci-only-18": {
+      "noDrillReason": "requirements coverage release gate: red via missing requirement; no mutation fixture"
+    },
+    "ci-only-15": {
+      "noDrillReason": "load-sensitive execution gate: the pinned-concurrency run is itself the falsifiable probe; a separate mutation fixture would duplicate it"
     }
   }
 }
