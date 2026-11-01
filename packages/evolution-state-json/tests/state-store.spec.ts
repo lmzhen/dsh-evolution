@@ -1,5 +1,6 @@
 // @tier fast
 import { expect, it } from 'vitest'
+import { join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { EvolutionCollection } from '@deepseek-ai/dsh-evolution-contract'
 import { JsonStateStore } from '../src/index.ts'
@@ -32,4 +33,18 @@ it('serializes concurrent transactions without losing an update', async () => {
     store.transact<{ n: number }>(collection, 'counter', async current => ({ n: (current?.n ?? 0) + 1 })),
   ])
   expect(await store.read(collection, 'counter')).toEqual({ n: 2 })
+})
+
+it('keeps the prior record when a transaction throws', async () => {
+  const store = new JsonStateStore(new Io(), 'root')
+  await store.transact(collection, 'k', async () => ({ n: 1 }))
+  await expect(store.transact(collection, 'k', async () => { throw new Error('boom') })).rejects.toThrow('boom')
+  expect(await store.read(collection, 'k')).toEqual({ n: 1 })
+})
+
+it('rejects a corrupt collection instead of reading it as empty', async () => {
+  const io = new Io()
+  io.files.set(join('root', 'state-store', 'assignment-queue.json'), '{broken')
+  const store = new JsonStateStore(io, 'root')
+  await expect(store.read(collection, 'k')).rejects.toThrow()
 })
