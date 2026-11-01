@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.pkg.json",
+  "compilerOptions": {
+    "rootDir": "${configDir}/src",
+    "outDir": "${configDir}/lib/types"
+  },
+  "include": [
+    "${configDir}/src"
+  ]
+}
