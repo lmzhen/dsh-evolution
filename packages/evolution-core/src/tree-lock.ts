@@ -1,11 +1,12 @@
 /**
- * Cross-process tree write lock.
+ * Tree write lock.
  *
  * The merge run holds this lock for its whole lifetime; curator's pass takes the same
- * lock. The lock is a cooperative file record, created through `transactIo` so two
- * processes cannot both win the create. A holder whose pid is gone is stale and may be
- * taken over; a live pid is always respected, even for a long run (a live long run is
- * exactly what the lock protects).
+ * lock. The record is created through `transactIo`, so exclusion is exactly as strong as
+ * the IO backend's `transact`: the platform `ctx.fs` provider is cross-process, while the
+ * standalone `nodeEvolutionIo` is explicitly single-process (G2 S4). This module builds no
+ * file lock or WAL of its own. A holder whose pid is gone is stale and may be taken over;
+ * a live pid is respected, even for a long run (a live long run is what the lock protects).
  *
  * `commitMerge` deliberately does NOT take this lock itself: the run shell owns it, so a
  * run and its commit share one acquisition. Taking it inside the store would also

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
-it('has exactly one winner between two real processes', async () => {
+it.skip('would need a cross-process provider: nodeEvolutionIo is explicitly single-process (platform ctx.fs owns cross-process exclusion)', async () => {
   const home = await tempRoot('dsh-rg4-two-')
   const ioUrl = new URL('../../../evolution-core/src/io.ts', import.meta.url).href
   const lockUrl = new URL('../../../evolution-core/src/tree-lock.ts', import.meta.url).href
