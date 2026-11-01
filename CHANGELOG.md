@@ -1,4 +1,10 @@
 # Changelog
+## 0.31.1 (fix) — P0 hotfixes: discovery search, assignment queue, merge fail-closed, UI tokens
+
+> **范围**：mode:off 下 skill_search 不再解析未初始化的 policy；assignment queue 改 single-flight load，避免并发丢队；merge library 归档/名字能力缺失改 fail-closed；settings 保存按钮受 blocked 约束；merge/skill-health 死亡 token 更正；core 注释不再宣称 node backend 跨进程锁；merge-engine 筛选 pipeline 冻结文档。
+> **验证**：discovery 3 files/8 tests；tsc discovery/merge/settings；G0 审计基线落盘。
+> **状态**：0.31.1 补丁；架构优化 goal 仍 active，发布不等于完成。
+
 ## 0.31.0 (feature) — skill discovery architecture rework
 
 > **范围**：production root 切到 main-entry（search + domain projection + generation/confirm），search-entry 保留 search-only；shadow 自动晋升删除；catalog codec 保留平台全量 source.entries，projection 按 agent+digest 去重；平台格式/escapeText；assignment confirm、awareness、stale/quality/provenance/edge hash 收口。
