@@ -68,6 +68,18 @@ describe('projectCatalog', () => {
     expect(result.context).not.toContain('<available_skills>')
   })
 
+  it('fails open when a catalog name is ambiguous across providers', () => {
+    const managed = summary('alpha')
+    const external = summary('alpha', 'other')
+    const base = input([{ name: 'alpha', description: 'a' }])
+    const result = projectCatalog({
+      ...base,
+      rows: [...base.rows, skillIndexRowOf(external, false)],
+    })
+    expect(result.hiddenNames).toEqual([])
+    expect(result.catalogEntries.map(entry => entry.name)).toEqual(['alpha'])
+  })
+
   it('fails open on incomplete input', () => {
     const entries = [{ name: 'alpha', description: 'a' }]
     const result = projectCatalog(input(entries, false))

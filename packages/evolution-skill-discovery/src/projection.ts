@@ -127,14 +127,19 @@ export function projectCatalog(input: ProjectionInput): ProjectionResult {
     }
   }
 
-  const activeByName = new Map<string, SkillIndexRow>()
+  const rowsByName = new Map<string, SkillIndexRow[]>()
   for (const row of input.rows) {
-    if (row.managed && row.modelInvocable && !row.protected && input.activeManagedSkillKeys.has(row.skillKey)) {
-      activeByName.set(row.name, row)
-    }
+    const list = rowsByName.get(row.name)
+    if (list === undefined) rowsByName.set(row.name, [row])
+    else list.push(row)
   }
   const hiddenNames = input.entries
-    .filter(entry => activeByName.has(entry.name))
+    .filter(entry => {
+      const candidates = rowsByName.get(entry.name)
+      if (candidates === undefined || candidates.length !== 1) return false
+      const row = candidates[0]!
+      return row.managed && row.modelInvocable && !row.protected && input.activeManagedSkillKeys.has(row.skillKey)
+    })
     .map(entry => entry.name)
     .sort()
   const hidden = new Set(hiddenNames)
