@@ -2,6 +2,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
+
+// platform-declaration anchor: this composition probes skills/workingDirectory/tools/evolutionIo/systemPrompt; all are declared in core PLATFORM_SERVICE_PROBES.
 import { authorityFrom, evolutionIoAdapter, evolutionRoot, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { LlmStreamService } from './domain-generation-llm.ts'

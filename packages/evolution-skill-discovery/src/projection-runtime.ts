@@ -1,5 +1,5 @@
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import { SessionSeq } from '@deepseek-ai/dsh-session'
+import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { DomainMapSnapshot, DomainMapStore } from './domain-map.ts'
 import { buildDomainProjection } from './domain-projection.ts'
 import type { DomainPolicyStore } from './domain-policy-store.ts'
@@ -63,14 +63,17 @@ function fullCatalogText(capture: CatalogCapture): string {
 }
 
 function sessionCatalogCapture(agent: Agent): CatalogCapture | undefined {
+  const readEvents = (agent.session as { readEvents?: () => Iterable<{ type: string; data?: unknown }> }).readEvents
+  if (readEvents === undefined) return undefined
   let projected: CatalogCapture | undefined
-  for (let index = agent.session.seq - 1; index >= 0; index -= 1) {
-    const event = agent.session.eventAt(SessionSeq(index))
-    if (event === undefined || event.type !== 'user/message' || event.data.source.kind !== 'skill-catalog') continue
-    const capture = captureCatalog(event.data)
+  for (const event of readEvents()) {
+    if (event.type !== 'user/message' || typeof event.data !== 'object' || event.data === null) continue
+    const message = event.data as UserMessage
+    if (message.source.kind !== 'skill-catalog') continue
+    const capture = captureCatalog(message)
     if (capture === undefined) continue
-    projected ??= capture
-    if (catalogText(event.data) === fullCatalogText(capture)) return capture
+    projected = capture
+    if (catalogText(message) === fullCatalogText(capture)) return capture
   }
   return projected
 }

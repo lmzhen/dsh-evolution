@@ -56,6 +56,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => registerSkillSearchTool(ctx, {
     async search(query, options, agent, signal) {
       if (agent === undefined) return unavailable()
+      // platform-declaration anchor: workingDirectory is declared in core PLATFORM_SERVICE_PROBES.
       const workingDirectory = ctx.get('workingDirectory') as WorkingDirectoryService | undefined
       if (workingDirectory === undefined) return unavailable()
       const cwd = await workingDirectory.ensure(agent, signal)

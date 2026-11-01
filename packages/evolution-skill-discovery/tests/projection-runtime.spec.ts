@@ -137,7 +137,7 @@ describe('ProjectionRuntime', () => {
   it('restores from session history after a process restart', async () => {
     const base = decision()
     const message = base.kind === 'enter' ? base.messages[0]! : undefined
-    const session = { seq: 1, eventAt: () => message === undefined ? undefined : { type: 'user/message', data: message } }
+    const session = { readEvents: () => message === undefined ? [] : [{ type: 'user/message', data: message }] }
     const first = { id: 'restart', session } as unknown as Agent
     const journal = new ProjectionJournal(memoryIo(), 'journal.json')
     const map = { read: async () => snapshot } as DomainMapStore
@@ -150,7 +150,7 @@ describe('ProjectionRuntime', () => {
   it('recovers the catalog from session history when no current capture or journal exists', async () => {
     const base = decision()
     const message = base.kind === 'enter' ? base.messages[0]! : undefined
-    const cold = { id: 'cold', session: { seq: 1, eventAt: () => message === undefined ? undefined : { type: 'user/message', data: message } } } as unknown as Agent
+    const cold = { id: 'cold', session: { readEvents: () => message === undefined ? [] : [{ type: 'user/message', data: message }] } } as unknown as Agent
     const map = { read: async () => snapshot } as DomainMapStore
     const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
     const projected = await rt.project(cold, { kind: 'enter', messages: [] })

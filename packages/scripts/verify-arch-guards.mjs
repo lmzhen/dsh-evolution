@@ -823,6 +823,7 @@ const DURABLE_READ_RE = /\b(?:readSkillProbe|readSupportFileProbe|readSupportFil
 // The register stays EMPTY on purpose: it is a defect list, and the whole list
 // landed. A new entry means a new two-state read — migrate it, do not grow this.
 const SWALLOW_CATCH = new Map([
+  ['evolution-skill-discovery/src/main-entry.ts :: try {const text = await io.readText(isAbsolute(path) ? path : resolve(cwd, path)) return text === null ? } catch -> absent', 'unreadable policy layer is optional; the warning is emitted and the configured fallback is used'],
   ['evolution-merge/src/domain/staging-index.ts :: try {raw = await io.readText(stagingIndexPath(home, rowId))} catch -> absent', 'missing staging index means no entry'],
   ['evolution-merge/src/state.ts :: try {const raw = await io.readText(mergeStatePath(home)) if (raw === null) return null const parsed = JSO} catch -> absent', 'unreadable state is reported by the caller as unreadable, not absent'],
 ])

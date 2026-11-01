@@ -22,7 +22,7 @@ export interface PlatformServiceProbe {
   readonly side: 'host' | 'client'
 }
 
-/** The 29 probes, in service-name order (the guard checks this list against the tree). */
+/** The 30 probes, in service-name order (the guard checks this list against the tree). */
 export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.freeze([
   { service: 'agentDefaultModel', feature: 'the model route inherited by a plugin review branch', side: 'host' },
   { service: 'agentPresets', feature: 'the preset mount that gives a plugin review branch its tools/system', side: 'host' },
@@ -53,6 +53,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'storageDomain', feature: 'the storage-domain state provider', side: 'host' },
   { service: 'systemPrompt', feature: 'the protected-skills prompt variable', side: 'host' },
   { service: 'tools', feature: 'tool registration and the guard seam', side: 'host' },
+  { service: 'workingDirectory', feature: 'the cwd used for skill snapshots and per-view policy files', side: 'host' },
 ])
 
 /**

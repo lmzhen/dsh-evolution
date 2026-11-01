@@ -185,3 +185,5 @@ it('maps catalog token budgets to off/shadow/on at the boundaries', () => {
   expect(projectionBudgetMode(3000)).toBe('shadow')
   expect(projectionBudgetMode(3000, true)).toBe('on')
 })
+
+
