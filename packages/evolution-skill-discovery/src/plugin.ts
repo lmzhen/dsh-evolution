@@ -111,9 +111,9 @@ export function apply(ctx: Context, config: Config): void {
     mapStale: config.mapStale ?? false,
     searchAvailable: config.searchAvailable ?? true,
   })
+  if (config.mode !== 'off') installDiscoveryAwareness(ctx)
   ctx.on('agent/created', async ({ agent, source }) => {
     try {
-      if (config.mode !== 'off') installDiscoveryAwareness(agent.ctx)
       if (source === 'startup') {
         await sessions.put({ sessionId: String(agent.session.id), discoveryMode: config.mode === 'on' ? 'on' : config.mode === 'shadow' || config.mode === 'auto' ? 'shadow' : 'off', featureEpoch: config.featureEpoch })
       }
