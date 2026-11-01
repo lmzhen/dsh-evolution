@@ -111,3 +111,28 @@ export interface EvolutionStateStorage {
   claimPending(id: string, claimId: string): Promise<PendingRecord | null>
   releasePendingClaim(id: string, claimId: string): Promise<void>
 }
+
+/** Outcome counts of one reviewed plan write leg. */
+export interface EvolutionPlanAppliedEvent {
+  sessionId: string
+  planId: string
+  policyFingerprint?: string | undefined
+  memoryApplied: number
+  skillApplied: number
+  rejectedOps: number
+  executionFailures?: number | undefined
+  skippedUnread?: number | undefined
+  executionError?: string | undefined
+  evidenceClassReports?: number | undefined
+  evidenceQuotes?: number | undefined
+  estimatedInputChars?: number | undefined
+}
+
+/** One skill mutation announcement. */
+export interface EvolutionSkillMutatedEvent {
+  action: string
+  name: string
+  skillDir?: string
+  file?: string
+  archivedPath?: string
+}

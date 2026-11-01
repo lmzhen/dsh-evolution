@@ -14,6 +14,8 @@
  */
 
 import type {} from '@deepseek-ai/cordis'
+import type { EvolutionPlanAppliedEvent, EvolutionSkillMutatedEvent } from '@deepseek-ai/dsh-evolution-contract'
+export type { EvolutionPlanAppliedEvent, EvolutionSkillMutatedEvent } from '@deepseek-ai/dsh-evolution-contract'
 import type { ReviewKind } from './signals.ts'
 
 export interface EvolutionReviewScheduledEvent {
@@ -64,53 +66,6 @@ export interface EvolutionReviewCompletedEvent {
   readonly error?: string | undefined
 }
 
-export interface EvolutionPlanAppliedEvent {
-  /** Owning session (payload v2): process events carry no session envelope. */
-  sessionId: string
-  planId: string
-  /** Stable fingerprint of the policy snapshot that produced this plan. */
-  policyFingerprint?: string | undefined
-  memoryApplied: number
-  skillApplied: number
-  /** Validation rejects ONLY (see the contract note below). V27 R-03: a plan op
-   * that was skipped because the session had not read the skill is NOT a
-   * validation reject and now travels in `skippedUnread`. */
-  rejectedOps: number
-  /** 0.3.31 (V5-19): execution-layer failures — ops that reached execution but
-   * did not land (non-throw `ok:false` results). `rejectedOps` counts only
-   * VALIDATION rejects; a consumer that treats rejectedOps as "work not done"
-   * would otherwise miss a partial application. */
-  executionFailures?: number | undefined
-  /** V27 R-03: "not done" has a third, independent cause — an op naming a skill
-   * this session never read (the review pipeline refuses to touch unread
-   * skills). It is neither a validation reject nor an execution failure, so it
-   * has its own field; folding it into `rejectedOps` broke that field's stated
-   * contract and made the replay leaderboard penalize one refusal twice
-   * (rejectedOps weight AND the executionFailures dimension). */
-  skippedUnread?: number | undefined
-  /** First execution-layer failure message (abort reason or op failure). */
-  executionError?: string | undefined
-  /** Batch D (2026-09-27): ops whose ENTIRE evidence list cites bookkeeping frames
-   * (a turn/step boundary) — the report-only phase of the plan path's
-   * `EVIDENCE_CLASS` rule. Not a refusal and not a "not done" cause: the ops in
-   * this count executed. It rides the same payload as the other dimensions so the
-   * observation window has a durable record; the model's notice says nothing about
-   * it. */
-  evidenceClassReports?: number | undefined
-  evidenceQuotes?: number | undefined
-  estimatedInputChars?: number | undefined
-}
-
-export interface EvolutionSkillMutatedEvent {
-  action: string
-  name: string
-  /** 0.3.16 (E-50): was `filePath` with mixed semantics — skill-directory ops
-   * carried the DIRECTORY while file ops (write_file/remove_file) carried the
-   * FILE path. Split into explicit fields so a subscriber can distinguish. */
-  skillDir?: string
-  file?: string
-  archivedPath?: string
-}
 
 /** 0.3.18 (E-6): a turn-end review pipeline failure was caught (never an
  * unhandled rejection); this event lets operators/observability see it. The
