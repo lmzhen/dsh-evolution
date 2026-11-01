@@ -17,6 +17,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../evolution-contract"
+    },
+    {
       "path": "../evolution-core"
     },
     {

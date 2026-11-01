@@ -172,7 +172,7 @@ export function apply(ctx: Context, config: Config): void {
     ...config.descriptionStaleAfterHours === undefined ? {} : { descriptionStaleAfterHours: config.descriptionStaleAfterHours },
     isFrozen: async agent => snapshots.isFrozen(String(agent.session.id), config.featureEpoch),
   })
-  const queue = new JsonAssignmentQueue(io, config.assignmentQueuePath ?? join(root, 'evolution', 'assignment-queue.json'))
+  const queue = new JsonAssignmentQueue(io, config.assignmentQueuePath ?? join(root, 'evolution', 'assignment-queue.json'), ctx.get('evolutionStateStore'))
   const assignment = new DomainAssignmentService(queue, map, { createClassificationEnabled: config.createClassificationEnabled ?? false, ...config.provisionalThreshold === undefined ? {} : { provisionalThreshold: config.provisionalThreshold }, now: Date.now })
   const worker = new AssignmentWorker(assignment, queue)
   void queue.load().then(() => worker.drain()).catch(() => { ctx.logger.warn('evolution-skill-discovery: assignment queue load failed; queued work stays for the next start') })

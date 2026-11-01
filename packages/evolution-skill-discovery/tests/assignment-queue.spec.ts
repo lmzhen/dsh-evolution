@@ -1,6 +1,7 @@
 // @tier ci-only
 import { expect, it } from 'vitest'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionCollection, EvolutionStateStore } from '@deepseek-ai/dsh-evolution-contract'
 import { AssignmentWorker, DomainAssignmentService, DomainMapFileStore, JsonAssignmentQueue, type AssignmentProposal } from '../src/index.ts'
 
 class Io implements EvolutionIoLike {
@@ -54,4 +55,29 @@ it('retries a queued assignment after a new queue instance loads it', async () =
   const service = new DomainAssignmentService(second, store, { createClassificationEnabled: true, now: () => 1 })
   expect(await new AssignmentWorker(service, second).drain()).toBe(1)
   expect(second.list()[0]?.status).not.toBe('queued')
+})
+
+class MemoryStore implements EvolutionStateStore {
+  values = new Map<string, unknown>()
+  async read<T>(collection: EvolutionCollection, key: string): Promise<T | undefined> { return this.values.get(collection + "/" + key) as T | undefined }
+  async transact<T>(collection: EvolutionCollection, key: string, fn: (current: T | undefined) => Promise<T>): Promise<T> {
+    const next = await fn(this.values.get(collection + "/" + key) as T | undefined)
+    this.values.set(collection + "/" + key, next)
+    return next
+  }
+  async list<T>(collection: EvolutionCollection): Promise<T[]> { return [...this.values.entries()].filter(([key]) => key.startsWith(collection + "/")).map(([, value]) => value as T) }
+}
+
+it("migrates the legacy queue file into the state store once", async () => {
+  const io = new Io()
+  const legacy = new JsonAssignmentQueue(io, "queue.json")
+  await legacy.enqueue({ key: "k", submission: { skillKey: "k", threeFieldHash: "h", modelInvocable: true }, proposalDigest: "p", createdAt: 1 })
+  const store = new MemoryStore()
+  const migrated = new JsonAssignmentQueue(io, "queue.json", store)
+  await migrated.load()
+  expect(migrated.list()).toHaveLength(1)
+  expect(await store.list("assignment-queue" as EvolutionCollection)).toHaveLength(1)
+  const reloaded = new JsonAssignmentQueue(io, "queue.json", store)
+  await reloaded.load()
+  expect(reloaded.list()).toHaveLength(1)
 })

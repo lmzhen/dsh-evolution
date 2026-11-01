@@ -34,6 +34,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'evolutionPolicy', feature: 'the policy snapshot that shadows row knobs', side: 'host' },
   { service: 'evolutionReplay', feature: '/evolution replay', side: 'host' },
   { service: 'evolutionState', feature: 'the state facade behind activity and replay', side: 'host' },
+  { service: 'evolutionStateStore', feature: 'generic durable state store for assignment queue and future collections', side: 'host' },
   { service: 'llm', feature: 'the curator one-shot review model call', side: 'host' },
   { service: 'memory', feature: 'the cross-session memory store (review and learning-graph reads)', side: 'host' },
   { service: 'pluginInventory', feature: 'the plugin inventory view', side: 'host' },
