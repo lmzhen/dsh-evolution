@@ -1,6 +1,7 @@
 {
   "extends": "../tsconfig.pkg.json",
   "references": [
+    { "path": "../evolution-contract" },
     { "path": "../../../vendor/cordis" }
   ]
 }

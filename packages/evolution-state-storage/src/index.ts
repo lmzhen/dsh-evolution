@@ -8,12 +8,11 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { EvolutionStateStorage, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-contract'
+export type { CuratorStateRecord, EvolutionStateStorage, PendingKind, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-contract'
 // S3-2: the two caps live in ./constants.ts (the conformance suite reads them
 // without importing this entry); the local import feeds the pure rules below.
 import { PENDING_RESOLVED_CAP, REVIEW_STATE_SESSION_CAP } from './constants.ts'
-// S2.9/1-10: the pending vocabulary lives in the record contract (ONE source for the types, the
-// write gate and the domain schema); this entry publishes it through the `export *` below.
-import type { PendingKind, PendingStatus } from './record-contract.ts'
 
 // S-06: the state-stack magic strings (singleton key, file names,
 // provider names, table names) are single-sourced here.
@@ -120,83 +119,6 @@ export function selectSessionOverflow<T>(
  * refused) followed by a deliberate re-approve or reject.
  */
 
-export interface ReviewStateRecord {
-  turnsSinceMemory: number
-  turnsSinceSkill: number
-  lastTurn: number
-}
-
-export interface CuratorStateRecord {
-  lastRunAt: number
-  runCount: number
-  lastSummary: string
-  paused: boolean
-}
-
-export interface PendingRecord {
-  id: string
-  kind: PendingKind
-  summary: string
-  args: unknown
-  createdAt: string
-  status: PendingStatus
-  resolvedAt?: string | undefined
-  claimedBy?: string | undefined
-  claimedAt?: string | undefined
-  /** 0.3.17 (E-25): who staged this (foreground vs background review) and
-   * which session — kept so resolved audit history is attributable. */
-  origin?: string | undefined
-  sessionId?: string | undefined
-  /** W6/G4: the platform's admission decision that resolved this record (channel/principal/
-   * deploymentAllowsRemote). Optional and read-tolerant: records resolved before 0.2.1 (or by TTL
-   * expiry, which has no request) carry none — readers must never backfill it. Structural shape
-   * (not an import) keeps the storage domain independent of core's http-routes module. */
-  decidedBy?: { readonly channel: 'connection.fetch' | 'command'; readonly principal: 'owner'; readonly deploymentAllowsRemote: boolean } | undefined
-}
-
-export interface PendingResolution {
-  record: PendingRecord | null
-  applied: boolean
-}
-
-export interface EvolutionStateStorage {
-  readonly name: string
-  loadReviewState(sessionId: string): Promise<ReviewStateRecord | null>
-  saveReviewState(sessionId: string, record: ReviewStateRecord): Promise<void>
-  loadCuratorState(): Promise<CuratorStateRecord | null>
-  saveCuratorState(record: CuratorStateRecord): Promise<void>
-  /**
-   * Atomically read-modify-write the curator-state record (S5.5): `task`
-   * receives the current record (or null when none exists) and returns the
-   * next record; returning null keeps the current record unchanged (the
-   * domain update primitive cannot delete, and json aligns with it). The
-   * whole read → transform → write runs inside one provider transact, so a
-   * setPaused racing the run-core bookkeeping write can never interleave a
-   * stale load with a newer save.
-   *
-   * V27 S4: the record handed to `task` belongs to the task — a provider must
-   * NEVER pass the object it stores (both current providers hand out a copy:
-   * json re-parses its medium, the domain clones its record). Mutating the
-   * argument is not a supported way to write: a task that does so and then lets
-   * validation refuse the result would otherwise leave a mutated object in the
-   * provider's in-memory store.
-   */
-  transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void>
-  listPending(status?: PendingStatus): Promise<PendingRecord[]>
-  savePending(record: PendingRecord): Promise<void>
-  /**
-   * Atomically transition a pending record exactly once.
-   * @param expectedClaimId - when given, the transition applies only while the
-   * record is STILL claimed by this approver (P2-2, v14). A record resolved or
-   * re-claimed by another writer is left untouched and reported as
-   * `applied: false`, so an approve can never overwrite a concurrent reject.
-   */
-  tryResolvePending(id: string, status: Exclude<PendingStatus, 'pending'>, expectedClaimId?: string): Promise<PendingResolution>
-  /** Atomically mark a pending record as claimed by one approver, or return null. */
-  claimPending(id: string, claimId: string): Promise<PendingRecord | null>
-  /** Release this claim when the replay runner cannot complete. */
-  releasePendingClaim(id: string, claimId: string): Promise<void>
-}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {

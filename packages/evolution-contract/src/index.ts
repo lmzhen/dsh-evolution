@@ -54,3 +54,60 @@ export interface EvolutionPlatformAccess {
   readonly state: EvolutionStateStore
   readonly capabilities: EvolutionStateCapabilities
 }
+/** Legal kind of one pending write. The runtime source stays in state-storage. */
+export type PendingKind = 'memory' | 'skill' | 'capability'
+
+/** Legal status of one pending write. */
+export type PendingStatus = 'pending' | 'executing' | 'approved' | 'rejected'
+
+/** Per-session review counters. */
+export interface ReviewStateRecord {
+  turnsSinceMemory: number
+  turnsSinceSkill: number
+  lastTurn: number
+}
+
+/** Curator bookkeeping record. */
+export interface CuratorStateRecord {
+  lastRunAt: number
+  runCount: number
+  lastSummary: string
+  paused: boolean
+}
+
+/** One pending write. */
+export interface PendingRecord {
+  id: string
+  kind: PendingKind
+  summary: string
+  args: unknown
+  createdAt: string
+  status: PendingStatus
+  resolvedAt?: string | undefined
+  claimedBy?: string | undefined
+  claimedAt?: string | undefined
+  origin?: string | undefined
+  sessionId?: string | undefined
+  decidedBy?: { readonly channel: 'connection.fetch' | 'command'; readonly principal: 'owner'; readonly deploymentAllowsRemote: boolean } | undefined
+}
+
+/** Result of one atomic pending transition. */
+export interface PendingResolution {
+  record: PendingRecord | null
+  applied: boolean
+}
+
+/** Provider seam for durable evolution state; implementations own the medium. */
+export interface EvolutionStateStorage {
+  readonly name: string
+  loadReviewState(sessionId: string): Promise<ReviewStateRecord | null>
+  saveReviewState(sessionId: string, record: ReviewStateRecord): Promise<void>
+  loadCuratorState(): Promise<CuratorStateRecord | null>
+  saveCuratorState(record: CuratorStateRecord): Promise<void>
+  transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void>
+  listPending(status?: PendingStatus): Promise<PendingRecord[]>
+  savePending(record: PendingRecord): Promise<void>
+  tryResolvePending(id: string, status: Exclude<PendingStatus, 'pending'>, expectedClaimId?: string): Promise<PendingResolution>
+  claimPending(id: string, claimId: string): Promise<PendingRecord | null>
+  releasePendingClaim(id: string, claimId: string): Promise<void>
+}

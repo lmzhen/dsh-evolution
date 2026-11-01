@@ -25,7 +25,9 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "@deepseek-ai/dsh-evolution-contract": "workspace:^"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"
   }

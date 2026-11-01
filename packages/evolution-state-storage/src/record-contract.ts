@@ -17,6 +17,8 @@
  */
 
 import { CURATOR_STATE_TABLE, PENDING_TABLE, REVIEW_STATE_TABLE } from './constants.ts'
+import type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-contract'
+export type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-contract'
 
 /** The three seam tables a record can belong to. */
 export type SeamRecordTable = typeof REVIEW_STATE_TABLE | typeof CURATOR_STATE_TABLE | typeof PENDING_TABLE
@@ -42,15 +44,11 @@ const optionalString = (value: unknown): boolean => value === undefined || typeo
  * S2.9/1-10: this array is the ONE source of the vocabulary — the types, the write gate below and
  * the domain provider's schema all derive from it. A second literal copy is the E-10 drift class
  * this module exists to end. */
-export const PENDING_KINDS = ['memory', 'skill', 'capability'] as const
+export const PENDING_KINDS: readonly PendingKind[] = ['memory', 'skill', 'capability']
 /** 0.3.17 (S3.3, E-24): 'executing' = claimed, runner in flight — a fresh claim only takes
  * 'pending', and resolve accepts 'pending'/'executing', so a crash mid-approve can never
  * double-execute the runner. Same one-source rule as PENDING_KINDS. */
-export const PENDING_STATUSES = ['pending', 'executing', 'approved', 'rejected'] as const
-/** The legal kind of one pending record. */
-export type PendingKind = (typeof PENDING_KINDS)[number]
-/** The legal status of one pending record. */
-export type PendingStatus = (typeof PENDING_STATUSES)[number]
+export const PENDING_STATUSES: readonly PendingStatus[] = ['pending', 'executing', 'approved', 'rejected']
 /** Membership test for the write gate (per record per write, so the Set is worth it). */
 const PENDING_KIND_SET = new Set<string>(PENDING_KINDS)
 /** Membership test for the write gate. */
