@@ -337,7 +337,8 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
 
   const persist = async (): Promise<void> => {
     try {
-      // Read-modify-write under the io backend's cross-process lock. The file is the
+      // Read-modify-write under io.transact when the backend provides it; the node
+      // backend serializes in-process only. The file is the
       // BASE and only THIS process's rows are laid over it ("one writer per row"); the
       // single write a non-owner may make is the orphan verdict for a row whose owner is
       // gone. The row read inside this transaction IS the compare-and-swap: if its owner

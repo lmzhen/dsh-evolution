@@ -2,8 +2,9 @@
  * B3 / G4 (0.3.78): the family's single-instance contract, made explicit.
  *
  * Every persisted sidecar is written under TWO assumptions: the IO backend's
- * cross-process write lock serializes different processes, and exactly ONE
- * instance of each writer service exists per evolution home. The second half
+ * transact serializes different processes when the provider guarantees it (the
+ * node backend is process-local only), and exactly ONE instance of each writer
+ * service exists per evolution home. The second half
  * was implicit — `makeSerialQueue()` and the module-scope stores are
  * per-instance, so two rows writing one home interleave inside one file (the
  * "two instances, one file" class). This module makes that half enforceable: a
@@ -20,8 +21,9 @@
  * `claims` below is a module-scope Map: two ROWS over one home in ONE process
  * contend, while the SAME home in another process gets its own Map and is
  * granted the key. That is by construction, not a gap to close here — the
- * cross-process half of the contract is the IO backend's write lock
- * (`transactIo`, core/io.ts), which serializes a per-target read-modify-write.
+ * cross-process half of the contract is the IO backend's transact
+ * (`transactIo`, core/io.ts) when the provider guarantees it; the node backend
+ * is process-local, so a shared home across processes is not protected by it alone.
  * The FLOW2-1 finding was three call sites reading a GRANTED claim as "no other
  * process can be doing this work", so the caller contract is stated here:
  * - granted means "no other row OF THIS PROCESS owns the key";
