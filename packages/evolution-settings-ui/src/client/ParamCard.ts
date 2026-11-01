@@ -444,7 +444,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
             type: 'button',
             className: 'evolution-param-button',
             'data-primary': 'true',
-            disabled: locked || dirty.length === 0,
+            disabled: locked || blocked || dirty.length === 0,
             onClick: save,
           }, busy ? t('saving') : t('apply')),
         ),

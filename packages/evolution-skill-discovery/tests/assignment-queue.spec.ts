@@ -14,6 +14,19 @@ class Io implements EvolutionIoLike {
   async copy(from: string, to: string): Promise<void> { const value = this.files.get(from); if (value !== undefined) this.files.set(to, value) }
 }
 
+it('keeps both entries when concurrent writers start before load completes', async () => {
+  const io = new Io()
+  const queue = new JsonAssignmentQueue(io, 'queue.json')
+  const submission = { skillKey: 'k', threeFieldHash: 'h', modelInvocable: true }
+  await Promise.all([
+    queue.enqueue({ key: 'k1', submission, proposalDigest: 'p1', createdAt: 1 }),
+    queue.enqueue({ key: 'k2', submission, proposalDigest: 'p2', createdAt: 2 }),
+  ])
+  const reloaded = new JsonAssignmentQueue(io, 'queue.json')
+  await reloaded.load()
+  expect(reloaded.list().map(entry => entry.key).sort()).toEqual(['k1', 'k2'])
+})
+
 it('persists queued assignment across a new queue instance', async () => {
   const io = new Io()
   const first = new JsonAssignmentQueue(io, 'queue.json')

@@ -130,8 +130,8 @@ export function apply(ctx: Context, config: Config): void {
       if (agent === undefined) return searchUnavailable()
       const cwd = await workingDirectory.ensure(agent, signal)
       const view = await index.read({ cwd, scopeKey: String(agent.id), scope: agent, signal })
-      const viewPolicy = await policyFor(cwd)
-      const cached = await searchCache.get({ viewKey: view.viewKey, viewCatalogDigest: view.viewCatalogDigest, policyDigest: viewPolicy.digest(), discoveryMode: mode }, view.rows)
+      const viewPolicy = mode === 'off' ? undefined : await policyFor(cwd)
+      const cached = await searchCache.get({ viewKey: view.viewKey, viewCatalogDigest: view.viewCatalogDigest, policyDigest: viewPolicy?.digest() ?? 'off', discoveryMode: mode }, view.rows)
       if (cached === undefined) { searchHealthy = false; return { results: [], truncated: false, degraded: true, hint: 'Skill search index is unavailable. Use the full catalog or skill(name).' } }
       searchHealthy = true
       const result = await cached.index.search(query, options)

@@ -10,13 +10,14 @@ export function skillLibraryPort(skills: SkillLibrary): CommitPort {
   return {
     readSkill: name => skills.read(name),
     isArchived: async (name) => {
-      if (typeof archivedNames !== 'function') return false
+      if (typeof archivedNames !== 'function') throw new Error('SkillLibrary.archivedNames is unavailable; refusing to treat an unknown archive state as unarchived')
       const names = await archivedNames.call(skills)
       return names === null ? true : names.includes(name)
     },
     isNameOccupied: async (name) => {
       const probe = (skills as unknown as { skillDirExists?: (name: string) => Promise<boolean> }).skillDirExists
-      return typeof probe === 'function' ? await probe.call(skills, name) : false
+      if (typeof probe !== 'function') throw new Error('SkillLibrary.skillDirExists is unavailable; refusing to treat an unknown name as free')
+      return await probe.call(skills, name)
     },
     async readSupportFiles(name) {
       if (typeof skills.listSupportFiles !== 'function') return []

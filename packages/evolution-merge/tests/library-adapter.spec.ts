@@ -39,3 +39,9 @@ it('commits through SkillLibrary and archives the source', async () => {
   expect(await lib.read('target')).toContain('# target')
   expect(await readCommitReceipt(io, home, 'run-1')).toMatchObject({ target: 'target', sources: ['src'], at: 2000 })
 })
+
+it('fails closed when archive/name capabilities are unavailable', async () => {
+  const port = skillLibraryPort({} as unknown as SkillLibrary)
+  await expect(port.isArchived('src')).rejects.toThrow(/archivedNames is unavailable/)
+  await expect(port.isNameOccupied('src')).rejects.toThrow(/skillDirExists is unavailable/)
+})

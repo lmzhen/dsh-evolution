@@ -1,5 +1,7 @@
 // @tier ci-only
 import { expect, it } from 'vitest'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
@@ -28,4 +30,14 @@ it('exposes no search tool when searchEnabled is false', async () => {
   const ctx = await base()
   await ctx.plugin(mainEntry, { featureEpoch: 'e', mode: 'off', searchEnabled: false })
   expect(ctx.get('tools')?.get('skill_search')).toBeUndefined()
+})
+
+it('executes skill_search in mode:off without policy TDZ', async () => {
+  const ctx = await base()
+  await ctx.plugin(mainEntry, { featureEpoch: 'e', mode: 'off', searchEnabled: true })
+  const agent = { id: 'search-agent', session: { id: 'search-session', header: { cwd: process.cwd() } } } as unknown as Agent
+  const result = await ctx.get('tools')!.execute({ signal: new AbortController().signal, callId: ToolCallId('mode-off-search'), name: 'skill_search', arguments: { query: 'anything' }, agent })
+  const text = JSON.stringify(result.content)
+  expect(text).toContain('Found 0 skill result(s)')
+  expect(text).not.toContain('degraded')
 })

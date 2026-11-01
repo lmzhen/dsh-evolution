@@ -4,6 +4,12 @@ Skill auto-merge host surface: candidate screening through the vendored pipeline
 two-round child authoring, per-pair staging, pending approval, commit receipts and
 unit undo.
 
+> **Screening pipeline freeze:** the merge-engine screening pipeline ①–⑤ is specially
+> tuned. Its substantive flow (stage order, inputs/outputs, models, weights, thresholds,
+> filters, scoring, decisions, and any selection policy affecting candidate set/order)
+> must not change. Only packaging, loading, adapters, error boundaries, diagnostics and
+> tests may change, with parity evidence proving identical screening output.
+
 ## Surface
 
 - `/evolution merge <subcommand>` — canonical command.

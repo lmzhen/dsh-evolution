@@ -6,21 +6,22 @@ interface QueueFile { readonly schemaVersion: 1; readonly entries: readonly Assi
 /** Durable assignment queue; process-local cache over one JSON file. */
 export class JsonAssignmentQueue implements AssignmentQueue {
   private readonly entries = new Map<string, AssignmentQueueEntry>()
-  private loaded = false
+  private loadPromise: Promise<void> | undefined
   private readonly io: EvolutionIoLike
   private readonly path: string
   constructor(io: EvolutionIoLike, path: string) { this.io = io; this.path = path }
 
-  async load(): Promise<void> {
-    if (this.loaded) return
-    this.loaded = true
-    const content = await this.io.readText(this.path)
-    if (content === null) return
-    try {
-      const parsed = JSON.parse(content) as QueueFile
-      if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.entries)) return
-      for (const entry of parsed.entries) this.entries.set(entry.key, entry)
-    } catch { /* corrupt queue rebuilt from later submissions */ }
+  load(): Promise<void> {
+    this.loadPromise ??= (async () => {
+      const content = await this.io.readText(this.path)
+      if (content === null) return
+      try {
+        const parsed = JSON.parse(content) as QueueFile
+        if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.entries)) return
+        for (const entry of parsed.entries) this.entries.set(entry.key, entry)
+      } catch { /* corrupt queue rebuilt from later submissions */ }
+    })()
+    return this.loadPromise
   }
 
   private async persist(): Promise<void> { await this.io.writeText(this.path, JSON.stringify({ schemaVersion: 1, entries: [...this.entries.values()] })) }
