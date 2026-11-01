@@ -145,7 +145,11 @@ export class SkillUsageRegistry extends Service {
         const settled = reads.settledSignalOf(event, session.id)
         if (settled === null || settled.ok === false) return
         const settledName = skillReadNameOf(settled)
-        if (settledName !== undefined) {
+        // Review-leg sessions read skills to JUDGE them; that is not user demand.
+        // Support-file reads below already exclude the channel; the body read must
+        // use the same rule or review traffic inflates view_count and distorts the
+        // write-ghost/stale signals.
+        if (settledName !== undefined && !isReviewChannelSession(session.id)) {
           void this.observeRead(settledName).catch(() => {
             // Best-effort, as above.
           })

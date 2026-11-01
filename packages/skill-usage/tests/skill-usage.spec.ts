@@ -14,7 +14,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 // default-export their class.
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '../src/index.ts'
-import { eventsFile, loadUsage, nodeEvolutionIo, readEvolutionTimeline, saveUsage, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { clearReviewChannel, eventsFile, loadUsage, markReviewChannel, nodeEvolutionIo, readEvolutionTimeline, saveUsage, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 /** S2-P2-12: a settled `tool/result` frame — view counting moved to SETTLE, so
@@ -72,6 +72,24 @@ describe('skill-usage', () => {
     // A file read is demand for ONE file: it must not inflate the skill's view
     // counter (that one belongs to the `skill` load path).
     expect(record?.view_count ?? 0).toBe(0)
+  })
+
+  it('G6.2: a review-channel skill read does not bump view_count', async () => {
+    const root = await tempRoot('dsh-usage-review-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(SkillUsageRegistry, { root })
+    await ctx.skillUsage.record('demo', 'use')
+    markReviewChannel('review-session')
+    try {
+      ctx.emit('session/event', { id: 'review-session' } as never, { type: 'tool/call', data: { turn: 1, step: 1, callId: 'rv1', name: 'skill', arguments: '{"name":"demo"}' } } as never)
+      ctx.emit('session/event', { id: 'review-session' } as never, toolResult('rv1'))
+      await new Promise(resolve => setTimeout(resolve, 200))
+      expect((await ctx.skillUsage.report()).get('demo')?.view_count ?? 0).toBe(0)
+    } finally {
+      clearReviewChannel('review-session')
+    }
   })
 
   it('G6-S2/W8 fold: a plugin record and an unknown frame are tolerated read-only (never counted)', async () => {
