@@ -10,6 +10,12 @@ interface CatalogSource {
   readonly entries: readonly CatalogEntry[]
 }
 
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'skill-catalog': CatalogSource
+  }
+}
+
 /** Captured platform catalog; base text and source are kept verbatim. */
 export interface CatalogCapture {
   readonly text: string

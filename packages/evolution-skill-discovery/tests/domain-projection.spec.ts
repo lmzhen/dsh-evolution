@@ -5,12 +5,7 @@ import {
   buildDomainProjection,
   hiddenRecoverable,
   SkillSearchIndex,
-  domainGenerationMode,
   mergeDomainPolicy,
-  projectionBudgetMode,
-  shouldEmitAwareness,
-  shouldEmitDigest,
-  shouldHideCatalog,
   skillIndexRowOf,
   skillKeyOf,
   type DomainMapSnapshot,
@@ -107,22 +102,6 @@ describe('buildDomainProjection', () => {
   })
 })
 
-describe('session/budget projection policy', () => {
-  it('never hides in old/shadow/off sessions and dedupes digest', () => {
-    expect(shouldHideCatalog(undefined, 'e')).toBe(false)
-    expect(shouldHideCatalog({ discoveryMode: 'on', featureEpoch: 'old' }, 'new')).toBe(false)
-    expect(shouldHideCatalog({ discoveryMode: 'on', featureEpoch: 'new' }, 'new')).toBe(true)
-    expect(shouldEmitAwareness({ discoveryMode: 'shadow', featureEpoch: 'new' }, 'new')).toBe(true)
-    expect(shouldEmitDigest('a', 'a')).toBe(false)
-    expect(projectionBudgetMode(2200)).toBe('off')
-    expect(projectionBudgetMode(2600)).toBe('shadow')
-    expect(projectionBudgetMode(3000)).toBe('shadow')
-  expect(projectionBudgetMode(3000, true)).toBe('on')
-    expect(domainGenerationMode(100)).toBe('direct')
-  })
-})
-
-
 it('keeps managed non-modelInvocable, userInvocable-only, disabled, and injected text out of hidden/card exposure', () => {
   const nonModel = { ...summary('non-model', 'dsh-evolution', false) }
   const userOnly = { ...summary('user-only'), invocation: { modelInvocable: true, userInvocable: false } }
@@ -177,13 +156,5 @@ it('does not hide or count pinned managed skills', () => {
   expect(result.context).toContain('managed=0')
 })
 
-
-it('maps catalog token budgets to off/shadow/on at the boundaries', () => {
-  expect(projectionBudgetMode(2200)).toBe('off')
-  expect(projectionBudgetMode(2201)).toBe('shadow')
-  expect(projectionBudgetMode(2999)).toBe('shadow')
-  expect(projectionBudgetMode(3000)).toBe('shadow')
-  expect(projectionBudgetMode(3000, true)).toBe('on')
-})
 
 

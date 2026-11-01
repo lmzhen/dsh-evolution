@@ -16,7 +16,6 @@ export * from './domain-map.ts'
 
 export * from './projection.ts'
 
-export * from './adapter.ts'
 
 export * from './search.ts'
 
@@ -30,7 +29,6 @@ export * from './domain-description.ts'
 export * from './domain-quality.ts'
 
 export * from './domain-projection.ts'
-export * from './session-projection.ts'
 
 export * from './tool.ts'
 
@@ -40,16 +38,13 @@ export * from './assignment.ts'
 
 export * from './security.ts'
 
-export * from './session-store.ts'
 
-export * from './runtime.ts'
 
 export * from './assignment-sidecar.ts'
 
 
 export * from './awareness.ts'
 
-export * from './plugin.ts'
 
 export * from './worker.ts'
 

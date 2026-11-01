@@ -18,14 +18,6 @@
       "types": "./lib/types/main-entry.d.ts",
       "default": "./lib/main-entry.js"
     },
-    "./search": {
-      "types": "./lib/types/search-entry.d.ts",
-      "default": "./lib/search-entry.js"
-    },
-    "./domain": {
-      "types": "./lib/types/index.d.ts",
-      "default": "./lib/index.js"
-    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -38,7 +30,6 @@
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-evolution-contract": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
@@ -50,12 +41,9 @@
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-skill-filesystem": "workspace:^",
-    "@deepseek-ai/dsh-tool-skill": "workspace:^",
     "@deepseek-ai/dsh-evolution-contract": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^"
