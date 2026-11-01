@@ -1,4 +1,5 @@
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { makeSerialQueue } from '@deepseek-ai/dsh-evolution-core'
 import type { CatalogCapture } from './catalog-codec.ts'
 
 /** Durable record of one projection so it can be restored after restart. */
@@ -27,6 +28,8 @@ export class ProjectionJournal {
   private readonly io: EvolutionIoLike
   private readonly path: string
   private readonly maxRecords: number
+  private cache: JournalFile | undefined
+  private readonly serial = makeSerialQueue()
 
   constructor(io: EvolutionIoLike, path: string, options: { readonly maxRecords?: number | undefined } = {}) {
     this.io = io
@@ -35,42 +38,52 @@ export class ProjectionJournal {
   }
 
   private async read(): Promise<JournalFile> {
+    if (this.cache !== undefined) return this.cache
     const content = await this.io.readText(this.path)
-    if (content === null) return { schemaVersion: 1, records: {} }
+    if (content === null) { this.cache = { schemaVersion: 1, records: {} }; return this.cache }
     try {
       const parsed = JSON.parse(content) as { schemaVersion?: unknown; records?: unknown }
-      return parsed.schemaVersion === 1 && typeof parsed.records === 'object' && parsed.records !== null
+      this.cache = parsed.schemaVersion === 1 && typeof parsed.records === 'object' && parsed.records !== null
         ? { schemaVersion: 1, records: parsed.records as JournalFile['records'] }
         : { schemaVersion: 1, records: {} }
-    } catch { return { schemaVersion: 1, records: {} } }
+    } catch { this.cache = { schemaVersion: 1, records: {} } }
+    return this.cache
   }
 
   /** Persist one projection record; later records with the same key win. */
   async put(record: ProjectionJournalRecord): Promise<void> {
-    const current = await this.read()
-    const records = { ...current.records, [keyOf(record)]: record }
-    const ordered = Object.entries(records).sort((left, right) => right[1].createdAt - left[1].createdAt).slice(0, this.maxRecords)
-    await this.io.writeText(this.path, JSON.stringify({ schemaVersion: 1, records: Object.fromEntries(ordered) }))
+    await this.serial(async () => {
+      const current = await this.read()
+      const records = { ...current.records, [keyOf(record)]: record }
+      const ordered = Object.entries(records).sort((left, right) => right[1].createdAt - left[1].createdAt).slice(0, this.maxRecords)
+      this.cache = { schemaVersion: 1, records: Object.fromEntries(ordered) }
+      await this.io.writeText(this.path, JSON.stringify(this.cache))
+    })
   }
 
   /** @returns the exact projection record for one view/digest/codec, if present. */
   async get(sessionId: string, viewKey: string, projectionDigest: string, codecVersion: string): Promise<ProjectionJournalRecord | undefined> {
-    return (await this.read()).records[keyOf({ sessionId, viewKey, projectionDigest, codecVersion })]
+    return this.serial(async () => (await this.read()).records[keyOf({ sessionId, viewKey, projectionDigest, codecVersion })])
   }
 
   /** @returns newest record for a view, used when leaving ready without a known digest. */
   async latest(sessionId: string, viewKey: string, codecVersion: string): Promise<ProjectionJournalRecord | undefined> {
-    const matches = Object.values((await this.read()).records)
-      .filter(record => record.sessionId === sessionId && record.viewKey === viewKey && record.codecVersion === codecVersion)
-      .sort((left, right) => right.createdAt - left.createdAt)
-    return matches[0]
+    return this.serial(async () => {
+      const matches = Object.values((await this.read()).records)
+        .filter(record => record.sessionId === sessionId && record.viewKey === viewKey && record.codecVersion === codecVersion)
+        .sort((left, right) => right.createdAt - left.createdAt)
+      return matches[0]
+    })
   }
 
   /** Delete one record after a successful restore. */
   async remove(sessionId: string, viewKey: string, projectionDigest: string, codecVersion: string): Promise<void> {
-    const current = await this.read()
-    const records = { ...current.records }
-    delete records[keyOf({ sessionId, viewKey, projectionDigest, codecVersion })]
-    await this.io.writeText(this.path, JSON.stringify({ schemaVersion: 1, records }))
+    await this.serial(async () => {
+      const current = await this.read()
+      const records = { ...current.records }
+      delete records[keyOf({ sessionId, viewKey, projectionDigest, codecVersion })]
+      this.cache = { schemaVersion: 1, records }
+      await this.io.writeText(this.path, JSON.stringify(this.cache))
+    })
   }
 }
