@@ -1,4 +1,9 @@
 # Changelog
+## 0.31.0 (feature) — skill discovery architecture rework
+
+> **范围**：production root 切到 main-entry（search + domain projection + generation/confirm），search-entry 保留 search-only；shadow 自动晋升删除；catalog codec 保留平台全量 source.entries，projection 按 agent+digest 去重；平台格式/escapeText；assignment confirm、awareness、stale/quality/provenance/edge hash 收口。
+> **验证**：discovery 44 files/132 tests；tarball checker PASS（55 files，main=lib/main-entry.js）；本地 3080 hidden/多轮/restore/resume awareness 通过；用户授权 gh CI 发布。
+> **状态**：0.31.0 发布候选转正式；由 gh CI tag 路径发布。
 ## 0.30.43 (fix) — skill_search degraded-on-throw
 
 > **范围**：`skill_search` handler 捕获 allowedSkillKeys/search 异常，返回 degraded tool result，避免平台把 handler 异常归为 TOOL_OUTCOME_UNKNOWN。

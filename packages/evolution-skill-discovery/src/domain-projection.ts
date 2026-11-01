@@ -26,6 +26,7 @@ export interface DomainProjectionInput {
   readonly tokenBudget?: number | undefined
   readonly now?: number | undefined
   readonly staleAfterHours?: number | undefined
+  readonly descriptionStaleAfterHours?: number | undefined
   readonly maxVisibleDepth?: number | undefined
 }
 
@@ -48,7 +49,7 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
   if (mode === 'off') return projectCatalog({ entries: input.entries, rows: input.rows, activeManagedSkillKeys: new Set(), cards: [], viewKey: input.viewKey, scope: input.scope, mapVersion: input.mapVersion, policyDigest: input.policyDigest, viewCatalogDigest: input.viewCatalogDigest, adapterVersion: input.adapterVersion, projectionSchemaVersion: input.projectionSchemaVersion, discoveryMode: input.discoveryMode, complete: false })
   const staleByAge = input.staleAfterHours !== undefined && input.snapshot.domains.some(node => input.now !== undefined && input.now - node.updatedAt > input.staleAfterHours! * 3_600_000)
   const mapStale = input.mapStale === true || staleByAge
-  const structurallyComplete = input.complete && !mapStale && input.searchAvailable !== false
+  const structurallyComplete = input.complete
   if (!structurallyComplete) {
     return projectCatalog({
       entries: input.entries,
@@ -67,6 +68,9 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
     })
   }
   const rowByKey = new Map<SkillKey, SkillIndexRow>(input.rows.map(row => [row.skillKey, row]))
+  const staleEdgeDomains = new Set(input.snapshot.edges.filter(edge => edge.status === 'active' && edge.role === 'primary' && rowByKey.get(edge.skillKey) !== undefined && edge.skillHash !== rowByKey.get(edge.skillKey)!.threeFieldHash).map(edge => edge.domainId))
+  const linkedKeys = new Set(input.snapshot.edges.filter(edge => edge.status === 'active' || edge.status === 'pending').map(edge => edge.skillKey))
+  const unclassifiedCount = input.rows.filter(row => row.modelInvocable && !linkedKeys.has(row.skillKey)).length
   const domains = input.snapshot.domains.filter(node => node.status === 'active' || node.status === 'provisional')
   const cardDomains = domains
     .filter(node => node.parentIds.length <= (input.maxVisibleDepth ?? 3) - 1 && node.parentIds.length === 0)
@@ -81,10 +85,10 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
     let pendingCount = 0
     for (const edge of input.snapshot.edges) {
       if (edge.domainId !== node.id) continue
-      if (edge.status === 'pending') { pendingCount += 1; continue }
-      if (edge.status !== 'active') continue
       const row = rowByKey.get(edge.skillKey)
       if (row === undefined) continue
+      if (edge.status === 'pending') { pendingCount += 1; continue }
+      if (edge.status !== 'active') continue
       if (row.managed && row.modelInvocable && !row.protected && !row.pinned) managedModelInvocableCount += 1
       else if (!row.managed) externalCatalogCount += 1
     }
@@ -92,17 +96,18 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
       id: node.id,
       title: node.name,
       purpose: node.purpose.slice(0, 80),
-      descriptionStatus: node.descriptionStatus,
+      descriptionStatus: node.descriptionStatus === 'fresh' && input.descriptionStaleAfterHours !== undefined && input.now !== undefined && input.now - node.updatedAt > input.descriptionStaleAfterHours * 3_600_000 ? 'stale' : node.descriptionStatus,
       triggers: node.triggers.slice(0, 3),
       managedModelInvocableCount,
       externalCatalogCount,
       managedCount: managedModelInvocableCount,
       externalCount: externalCatalogCount,
       pendingCount,
+      unclassifiedCount,
       state: node.status === 'provisional' ? 'provisional' : 'active',
       asOf: new Date(node.updatedAt).toISOString(),
       mapVersion: input.mapVersion,
-      mapStale,
+      mapStale: mapStale || staleEdgeDomains.has(node.id),
     }
   })
   const budget = input.tokenBudget
@@ -117,10 +122,11 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
     const row = rowByKey.get(edge.skillKey)
     if (node === undefined || row === undefined) continue
     if (node.status !== 'active' || !cardIds.has(node.id) || !row.managed || !row.modelInvocable || row.protected || row.pinned) continue
+    if (edge.skillHash !== row.threeFieldHash) continue
     if (input.policy.disabled.has(node.id)) continue
     wouldHide.add(edge.skillKey)
   }
-  const activeManaged = mode === 'on' ? wouldHide : new Set<SkillKey>()
+  const activeManaged = mode === 'on' && !mapStale && input.searchAvailable !== false && input.policy.degraded.length === 0 ? wouldHide : new Set<SkillKey>()
   const projected = projectCatalog({
     entries: input.entries,
     rows: input.rows,
@@ -136,10 +142,5 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
     discoveryMode: input.discoveryMode,
     complete: true,
   })
-  return mode === 'on' ? projected : { ...projected, shadowHiddenNames: [...wouldHide], shadowRecoveredNames: [...wouldHide] }
-}
-
-/** @returns true when shadow evidence is sufficient to promote to on. */
-export function canPromoteShadow(input: { readonly samples: number; readonly hiddenRecoverableRate: number; readonly silentMisses: number }): boolean {
-  return input.samples >= 20 && input.hiddenRecoverableRate >= 1 && input.silentMisses === 0
+  return mode === 'on' ? projected : projected
 }

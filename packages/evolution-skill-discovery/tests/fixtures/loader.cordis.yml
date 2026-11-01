@@ -2,6 +2,7 @@
 - name: '@deepseek-ai/dsh-tools'
 - name: '@deepseek-ai/dsh-skill'
 - name: '@deepseek-ai/dsh-evolution-io'
+- name: './working-directory.ts'
 - name: './io-provider.ts'
 - name: '@deepseek-ai/dsh-evolution-skill-discovery'
   config:

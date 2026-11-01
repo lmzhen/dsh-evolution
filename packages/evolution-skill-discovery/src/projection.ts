@@ -23,6 +23,7 @@ export interface DomainCard {
   readonly managedCount: number
   readonly externalCount: number
   readonly pendingCount: number
+  readonly unclassifiedCount?: number | undefined
   readonly state: 'active' | 'provisional'
   readonly asOf: string
   readonly mapVersion: string
@@ -51,8 +52,6 @@ export interface ProjectionResult {
   readonly catalogEntries: readonly CatalogEntry[]
   readonly context: string
   readonly hiddenNames: readonly string[]
-  readonly shadowHiddenNames?: readonly string[]
-  readonly shadowRecoveredNames?: readonly string[]
   readonly scope: string
   readonly digest: string
   readonly complete: boolean
@@ -83,6 +82,8 @@ function renderCards(cards: readonly DomainCard[]): string {
       String(card.externalCatalogCount),
       ' pending=',
       String(card.pendingCount),
+      ' unclassified=',
+      String(card.unclassifiedCount ?? 0),
       ' state=',
       card.state,
       ' descriptionStatus=',

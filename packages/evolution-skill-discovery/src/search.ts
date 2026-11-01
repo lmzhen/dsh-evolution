@@ -86,7 +86,7 @@ function build(rows: readonly SkillIndexRow[]): MiniSearch<SearchDocument> {
   const seen = new Set<string>()
   const documents: SearchDocument[] = []
   for (const row of rows) {
-    if (!row.modelInvocable || row.protected || row.pinned || seen.has(row.skillKey)) continue
+    if (!row.modelInvocable || seen.has(row.skillKey)) continue
     seen.add(row.skillKey)
     documents.push({ id: row.skillKey, name: row.name, description: row.description, whenToUse: row.whenToUse ?? '' })
   }

@@ -75,9 +75,10 @@ export function validateDomainGeneration(input: DomainGenerationInput, proposal:
   const titles = new Set<string>()
   const domains: MintedDomain[] = []
   for (const candidate of proposal.domains) {
+    if (candidate === null || typeof candidate !== 'object') { errors.push('domain is not an object'); continue }
     const bad = forbiddenKeys(candidate)
     if (bad.length > 0) errors.push('forbidden fields: ' + bad.join(','))
-    if (!nonEmpty(candidate.title) || !nonEmpty(candidate.purpose)) errors.push('domain title/purpose is empty')
+    if (!nonEmpty(candidate.title) || !nonEmpty(candidate.purpose)) { errors.push('domain title/purpose is empty'); continue }
     if (!nonEmptyList(candidate.inScope) || !nonEmptyList(candidate.outOfScope) || !nonEmptyList(candidate.triggers)) errors.push('domain scope/triggers are empty')
     if (!Array.isArray(candidate.evidenceSkillKeys) || candidate.evidenceSkillKeys.length === 0) errors.push('domain evidence is empty')
     if (candidate.evidenceSkillKeys?.some(key => !known.has(key)) === true) errors.push('domain evidence references unknown skill')

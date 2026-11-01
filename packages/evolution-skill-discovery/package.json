@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-skill-discovery",
   "description": "Read model and view identity for evolution skill discovery",
-  "version": "0.30.43",
+  "version": "0.31.0",
   "publishConfig": {
     "access": "public"
   },
@@ -11,10 +11,18 @@
     "directory": "packages/evolution/evolution-skill-discovery"
   },
   "type": "module",
-  "main": "lib/index.js",
-  "types": "lib/types/index.d.ts",
+  "main": "lib/main-entry.js",
+  "types": "lib/types/main-entry.d.ts",
   "exports": {
     ".": {
+      "types": "./lib/types/main-entry.d.ts",
+      "default": "./lib/main-entry.js"
+    },
+    "./search": {
+      "types": "./lib/types/search-entry.d.ts",
+      "default": "./lib/search-entry.js"
+    },
+    "./domain": {
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },

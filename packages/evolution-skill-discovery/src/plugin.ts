@@ -14,8 +14,6 @@ import { bootstrapDomainMap } from './domain-bootstrap.ts'
 import type { DomainGenerationProposal, GenerationSkillFact } from './domain-generation.ts'
 import { buildDomainGenerationPrompt } from './domain-generation-prompt.ts'
 import { initialDomainMap, type DomainGenerationPort } from './domain-generation-service.ts'
-import { canPromoteShadow } from './domain-projection.ts'
-import { ShadowEvidenceStore } from './shadow-evidence.ts'
 import { mergeDomainPolicy } from './domain-policy.ts'
 import { policyDigestOf, skillKeyOf } from './identity.ts'
 import { SkillIndex, type SkillIndexQuery, type SkillIndexSource, type SkillIndexSourceSnapshot } from './index.ts'
@@ -37,11 +35,9 @@ export interface Config {
   readonly staleAfterHours?: number
   readonly mapStale?: boolean
   readonly searchAvailable?: boolean
-  readonly shadowEvidencePath?: string | undefined
   readonly domainMinDomains?: number
   readonly domainMaxDomains?: number
   readonly provisionalThreshold?: number
-  readonly shadowEvidence?: { readonly samples: number; readonly hiddenRecoverableRate: number; readonly silentMisses: number }
   readonly maxCards?: number
   readonly createClassificationEnabled?: boolean
   readonly bootstrapDomains?: DomainGenerationProposal
@@ -95,9 +91,6 @@ export function apply(ctx: Context, config: Config): void {
   const sessions = new DiscoverySessionStore(io, config.sessionPath ?? join(dshHome, 'evolution', 'discovery-sessions.json'))
   const policyMode: 'auto' | 'off' | 'on' = config.mode === 'shadow' || config.mode === undefined || config.mode === 'auto' ? 'auto' : config.mode
   const policy = mergeDomainPolicy({ mode: policyMode, pinDomains: config.pinDomains, disableDomains: config.disableDomains })
-  const shadowStore = new ShadowEvidenceStore(io, config.shadowEvidencePath ?? join(dshHome, 'evolution', 'shadow-evidence.json'))
-  let promoted = config.shadowEvidence !== undefined && canPromoteShadow(config.shadowEvidence)
-  void shadowStore.load().then(() => { if (shadowStore.canPromote()) promoted = true }).catch(() => {})
   const policyDigest = policyDigestOf({ globalPolicyRevision: 'config', effectivePolicy: { mode: policy.mode, pinned: policy.pinned, disabled: policy.disabled } })
   const runtime = new DiscoveryRuntime({
 
@@ -116,8 +109,6 @@ export function apply(ctx: Context, config: Config): void {
     staleAfterHours: config.staleAfterHours,
     mode: config.mode === 'auto' ? 'shadow' : config.mode === 'shadow' ? 'shadow' : config.mode === 'on' ? 'on' : 'off',
     autoMode: config.mode === 'auto',
-    promoted: () => promoted,
-    onProjection: (result) => { void shadowStore.record(result).then(() => { if (shadowStore.canPromote()) promoted = true }).catch(() => {}) },
     mapStale: config.mapStale ?? false,
     searchAvailable: config.searchAvailable ?? true,
   })

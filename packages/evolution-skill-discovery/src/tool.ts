@@ -5,18 +5,18 @@ import type { SkillSearch, SkillSearchQuery, SkillSearchResponse } from './searc
 
 /** Search dependency supplied by the composition; absent search degrades. */
 export interface SkillSearchProvider {
-  search(query: SkillSearchQuery, options?: { readonly allowedSkillKeys?: ReadonlySet<string> | undefined }, agent?: Agent | undefined): Promise<SkillSearchResponse>
+  search(query: SkillSearchQuery, options?: { readonly allowedSkillKeys?: ReadonlySet<string> | undefined }, agent?: Agent | undefined, signal?: AbortSignal | undefined): Promise<SkillSearchResponse>
   /** Optional current-view policy filter; called per tool call. */
-  allowedSkillKeys?(agent: Agent | undefined): ReadonlySet<string> | Promise<ReadonlySet<string>> | undefined
+  allowedSkillKeys?(agent: Agent | undefined, signal?: AbortSignal | undefined): ReadonlySet<string> | undefined | Promise<ReadonlySet<string> | undefined>
 }
 
 /** Static model-facing description; no dynamic domain list/tree. */
 export const SKILL_SEARCH_DESCRIPTION = 'Search skill summaries by name, description, or whenToUse when coverage is uncertain. Results are summaries, not bodies; a matching name can be loaded directly. Empty results are inconclusive; the full catalog remains available.'
 
 /** @returns response or a degraded hint; never silent empty on failure. */
-export async function searchWithDegraded(provider: SkillSearchProvider | undefined, query: SkillSearchQuery, allowedSkillKeys?: ReadonlySet<string> | undefined, agent?: Agent | undefined): Promise<SkillSearchResponse> {
+export async function searchWithDegraded(provider: SkillSearchProvider | undefined, query: SkillSearchQuery, allowedSkillKeys?: ReadonlySet<string> | undefined, agent?: Agent | undefined, signal?: AbortSignal | undefined): Promise<SkillSearchResponse> {
   if (provider === undefined) return { results: [], truncated: false, degraded: true, hint: 'Skill search is unavailable. Use the full catalog or load an exact skill by name with skill(name).' }
-  try { return await provider.search(query, allowedSkillKeys === undefined ? undefined : { allowedSkillKeys }, agent) } catch { return { results: [], truncated: false, degraded: true, hint: 'Skill search failed. Use the full catalog or load an exact skill by name with skill(name).' } }
+  try { return await provider.search(query, allowedSkillKeys === undefined ? undefined : { allowedSkillKeys }, agent, signal) } catch { return { results: [], truncated: false, degraded: true, hint: 'Skill search failed. Use the full catalog or load an exact skill by name with skill(name).' } }
 }
 
 function toToolResponse(response: SkillSearchResponse): { results: Array<{ name: string; description: string; whenToUse?: string; matchedBy?: string }>; truncated: boolean; fallback?: boolean; degraded?: boolean; hint?: string } {
@@ -89,8 +89,8 @@ export function registerSkillSearchTool(ctx: Context, provider: SkillSearchProvi
     },
     async execute(args, exec) {
       try {
-        const allowed = await provider?.allowedSkillKeys?.(exec.agent)
-        return toToolResponse(await searchWithDegraded(provider, { query: args.query, limit: args.limit }, allowed, exec.agent))
+        const allowed = await provider?.allowedSkillKeys?.(exec.agent, exec.signal)
+        return toToolResponse(await searchWithDegraded(provider, { query: args.query, limit: args.limit }, allowed, exec.agent, exec.signal))
       } catch (error) {
         return { results: [], truncated: false, degraded: true, hint: 'Skill search failed: ' + (error instanceof Error ? error.message : String(error)) }
       }

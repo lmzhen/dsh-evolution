@@ -27,7 +27,7 @@ Choose ${min}–${max} domains that help a model decide where to look. Domains a
 Each domain needs a name, one-sentence purpose, in-scope, out-of-scope, triggers, and evidence skill names copied from the input.
 Keep domains coherent, distinguishable, and recognizable from a task description; a single skill is not a domain. Do not invent skills or domains.
 Prefer clear boundaries over exhaustive coverage. Leave a skill unassigned when evidence is weak rather than forcing it. The caller assigns IDs.
-Return only the structured result.`
+Return only a JSON object with a "domains" array. Each domain must have title, purpose, inScope, outOfScope, triggers, and evidenceSkillKeys. No markdown fences and no prose.`
 }
 
 export const DOMAIN_GENERATION_PROMPT_V2 = buildDomainGenerationPrompt()

@@ -1,0 +1,456 @@
+{
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "name": "agent-skill-evolution-benchmarking",
+      "description": "Benchmark skill generation across agent frameworks.",
+      "whenToUse": "Use when Benchmark skill generation across agent frameworks.；中文任务：评测不同智能体框架的技能生成能力"
+    },
+    {
+      "name": "capability-claim-audit",
+      "description": "Check a tool's capability claims against its source.",
+      "whenToUse": "Use when Check a tool's capability claims against its source.；中文任务：核对工具的能力声明是否由源码支持"
+    },
+    {
+      "name": "capability-replication-audit",
+      "description": "Judge whether a port matches its upstream point by point.",
+      "whenToUse": "Use when Judge whether a port matches its upstream point by point.；中文任务：判断移植实现是否逐点匹配上游"
+    },
+    {
+      "name": "codebase-defect-audit",
+      "description": "Audit a codebase read-only and grade findings P0-P2.",
+      "whenToUse": "Use when Audit a codebase read-only and grade findings P0-P2.；中文任务：只读审计代码库缺陷并给出优先级"
+    },
+    {
+      "name": "docx-layout-and-figures",
+      "description": "Verify and fix Word layout, fonts, and figures in a .docx.",
+      "whenToUse": "Use when Verify and fix Word layout, fonts, and figures in a .docx.；中文任务：修复 Word 文档版式字体和图片"
+    },
+    {
+      "name": "dsh-context-visibility",
+      "description": "Decide what reaches a DSH model context and how to inject.",
+      "whenToUse": "Use when Decide what reaches a DSH model context and how to inject.；中文任务：控制哪些内容进入模型上下文"
+    },
+    {
+      "name": "dsh-desktop-source-build",
+      "description": "Build and run the DSH desktop from a source tarball.",
+      "whenToUse": "Use when Build and run the DSH desktop from a source tarball.；中文任务：从源码构建并运行桌面端"
+    },
+    {
+      "name": "dsh-evolution-client-ui",
+      "description": "家族客户端面：文案中文化、UI 接缝、像素取证与截图验收。",
+      "whenToUse": "Use when 家族客户端面：文案中文化、UI 接缝、像素取证与截图验收。；中文任务：修改进化插件的客户端界面"
+    },
+    {
+      "name": "dsh-evolution-defect-patterns",
+      "description": "家族已知缺陷模式：默认导出冲突、schema 分库、双挂载与静默降级。",
+      "whenToUse": "Use when 家族已知缺陷模式：默认导出冲突、schema 分库、双挂载与静默降级。；中文任务：识别进化插件的已知缺陷模式"
+    },
+    {
+      "name": "dsh-evolution-gates",
+      "description": "家族门禁与治理：加规则、判据重表达、豁免登记与 arming 自审。",
+      "whenToUse": "Use when 家族门禁与治理：加规则、判据重表达、豁免登记与 arming 自审。；中文任务：检查进化插件的门禁状态"
+    },
+    {
+      "name": "dsh-evolution-maintenance",
+      "description": "维护家族插件：发布/CI、客户端、门禁、审计与复核报告、参数、宿主重启。",
+      "whenToUse": "Use when 维护家族插件：发布/CI、客户端、门禁、审计与复核报告、参数、宿主重启。；中文任务：维护进化插件的发布和审计"
+    },
+    {
+      "name": "dsh-evolution-platform-seams",
+      "description": "改平台接缝前对齐事实：座位图、契约前置条件与上游对照。",
+      "whenToUse": "Use when 改平台接缝前对齐事实：座位图、契约前置条件与上游对照。；中文任务：对齐进化插件与平台接缝"
+    },
+    {
+      "name": "dsh-evolution-release",
+      "description": "发布与 CI：镜像→tag→npm 装机、dist-tags 复验；CI 步骤卡住时的取证。",
+      "whenToUse": "Use when 发布与 CI：镜像→tag→npm 装机、dist-tags 复验；CI 步骤卡住时的取证。；中文任务：发布进化插件并做真机验证"
+    },
+    {
+      "name": "dsh-evolution-skill-library",
+      "description": "技能库维护：伞化合并、拆分与 references 治理机制。",
+      "whenToUse": "Use when 技能库维护：伞化合并、拆分与 references 治理机制。；中文任务：把多个技能合并成伞化技能库"
+    },
+    {
+      "name": "dsh-plugin-compatibility",
+      "description": "Audit DSH plugins against a new release and fix what breaks.",
+      "whenToUse": "Use when Audit DSH plugins against a new release and fix what breaks.；中文任务：修复插件在新版本上的兼容问题"
+    },
+    {
+      "name": "dsh-plugin-discovery",
+      "description": "Rank DSH plugins from the live market catalog and GitHub.",
+      "whenToUse": "Use when Rank DSH plugins from the live market catalog and GitHub.；中文任务：从市场目录筛选 DSH 插件"
+    },
+    {
+      "name": "dsh-ptc-brace-prompt-failure",
+      "description": "Diagnose PTC prompt assembly crashes from tool braces.",
+      "whenToUse": "Use when Diagnose PTC prompt assembly crashes from tool braces.；中文任务：诊断 PTC 花括号导致的提示词崩溃"
+    },
+    {
+      "name": "dsh-session-forensics",
+      "description": "Locate where a DSH message or turn got stuck.",
+      "whenToUse": "Use when Locate where a DSH message or turn got stuck.；中文任务：定位 DSH 会话卡住的位置"
+    },
+    {
+      "name": "dsh-session-preset-repair",
+      "description": "Repair sessions that fail to resume after a preset rename.",
+      "whenToUse": "Use when Repair sessions that fail to resume after a preset rename.；中文任务：修复预设改名后会话无法恢复"
+    },
+    {
+      "name": "dsh-two-plane-maintenance",
+      "description": "Maintain two DSH planes sharing one DSH home safely.",
+      "whenToUse": "Use when Maintain two DSH planes sharing one DSH home safely.；中文任务：维护两个共享 home 的 DSH 平面"
+    },
+    {
+      "name": "eval-ambiguous",
+      "description": "Ambiguous eval source.",
+      "whenToUse": "Use when Ambiguous eval source."
+    },
+    {
+      "name": "eval-keep",
+      "description": "Cohesive skill for keep evaluation.",
+      "whenToUse": "Use when Cohesive skill for keep evaluation."
+    },
+    {
+      "name": "eval-mixed",
+      "description": "Mixed eval source.",
+      "whenToUse": "Use when Mixed eval source."
+    },
+    {
+      "name": "eval-source",
+      "description": "Eval source for extraction.",
+      "whenToUse": "Use when Eval source for extraction."
+    },
+    {
+      "name": "eval-target",
+      "description": "Eval target for extraction.",
+      "whenToUse": "Use when Eval target for extraction."
+    },
+    {
+      "name": "eval-unmanaged",
+      "description": "Eval unmanaged target.",
+      "whenToUse": "Use when Eval unmanaged target."
+    },
+    {
+      "name": "git-repo-sync",
+      "description": "Safely update or sync a local Git repo with its remote.",
+      "whenToUse": "Use when Safely update or sync a local Git repo with its remote.；中文任务：安全同步本地 Git 仓库"
+    },
+    {
+      "name": "inkos-harness",
+      "description": "Operate and maintain the local InkOS novel-writing harness.",
+      "whenToUse": "Use when Operate and maintain the local InkOS novel-writing harness.；中文任务：维护 InkOS 小说写作工具"
+    },
+    {
+      "name": "invention-point-mining",
+      "description": "Rank a codebase's technical points for patent filing.",
+      "whenToUse": "Use when Rank a codebase's technical points for patent filing.；中文任务：为专利申请挖掘代码技术点"
+    },
+    {
+      "name": "m1",
+      "description": "merge fixture for two equivalent skills",
+      "whenToUse": "Use when merge fixture for two equivalent skills"
+    },
+    {
+      "name": "m2",
+      "description": "merge fixture for two equivalent skills",
+      "whenToUse": "Use when merge fixture for two equivalent skills"
+    },
+    {
+      "name": "mobile-readable-docs",
+      "description": "Turn Markdown deliverables into phone-readable HTML.",
+      "whenToUse": "Use when Turn Markdown deliverables into phone-readable HTML.；中文任务：把 Markdown 文档转成手机可读 HTML"
+    },
+    {
+      "name": "platform-plugin-port-verification",
+      "description": "Prove a plugin port against a new platform release.",
+      "whenToUse": "Use when Prove a plugin port against a new platform release.；中文任务：验证插件移植到新平台后的行为"
+    },
+    {
+      "name": "reference-aligned-writing",
+      "description": "Merge long documents and align them to exemplars.",
+      "whenToUse": "Use when Merge long documents and align them to exemplars.；中文任务：按参考范文对齐长文档"
+    },
+    {
+      "name": "software-release-research",
+      "description": "Look up latest releases and verify local installs.",
+      "whenToUse": "Use when Look up latest releases and verify local installs.；中文任务：查询最新版本并核对本地安装"
+    },
+    {
+      "name": "theory-paper-log-audit",
+      "description": "Audit a theory paper against its source chat log.",
+      "whenToUse": "Use when Audit a theory paper against its source chat log.；中文任务：用聊天日志审计理论论文"
+    },
+    {
+      "name": "w4web-source",
+      "description": "W4 web source.",
+      "whenToUse": "Use when W4 web source.；中文任务：对比两个网页来源的差异"
+    },
+    {
+      "name": "w4web-target",
+      "description": "W4 web target.",
+      "whenToUse": "Use when W4 web target."
+    },
+    {
+      "name": "xiaohongshu-local-search",
+      "description": "Search Xiaohongshu notes and comments through local MCP.",
+      "whenToUse": "Use when Search Xiaohongshu notes and comments through local MCP.；中文任务：搜索小红书笔记和评论"
+    },
+    {
+      "name": "archify",
+      "description": "Create polished, validated architecture and workflow diagrams as standalone HTML.",
+      "whenToUse": "Use when the user asks to visualize system architecture or workflow diagrams."
+    }
+  ],
+  "queries": [
+    {
+      "query": "audit a codebase for defects and grade P0-P2",
+      "acceptable": [
+        "codebase-defect-audit"
+      ]
+    },
+    {
+      "query": "check a tool capability claim against its source",
+      "acceptable": [
+        "capability-claim-audit"
+      ]
+    },
+    {
+      "query": "judge whether a port matches upstream point by point",
+      "acceptable": [
+        "capability-replication-audit"
+      ]
+    },
+    {
+      "query": "fix word document layout fonts and figures",
+      "acceptable": [
+        "docx-layout-and-figures"
+      ]
+    },
+    {
+      "query": "diagnose where a DSH session got stuck",
+      "acceptable": [
+        "dsh-session-forensics"
+      ]
+    },
+    {
+      "query": "fix a DSH plugin compatibility problem on a new release",
+      "acceptable": [
+        "dsh-plugin-compatibility"
+      ]
+    },
+    {
+      "query": "turn markdown docs into mobile readable html",
+      "acceptable": [
+        "mobile-readable-docs"
+      ]
+    },
+    {
+      "query": "search xiaohongshu notes and comments",
+      "acceptable": [
+        "xiaohongshu-local-search"
+      ]
+    },
+    {
+      "query": "maintain two DSH planes sharing one home",
+      "acceptable": [
+        "dsh-two-plane-maintenance"
+      ]
+    },
+    {
+      "query": "merge multiple skills into one umbrella skill",
+      "acceptable": [
+        "dsh-evolution-skill-library"
+      ]
+    },
+    {
+      "query": "decide what reaches a DSH model context and how to inject it",
+      "acceptable": [
+        "dsh-context-visibility"
+      ]
+    }
+  ],
+  "noResultQuery": "quantum banana",
+  "queriesZh": [
+    {
+      "query": "评测不同智能体框架的技能生成能力",
+      "acceptable": [
+        "agent-skill-evolution-benchmarking"
+      ]
+    },
+    {
+      "query": "核对工具的能力声明是否由源码支持",
+      "acceptable": [
+        "capability-claim-audit"
+      ]
+    },
+    {
+      "query": "判断移植实现是否逐点匹配上游",
+      "acceptable": [
+        "capability-replication-audit"
+      ]
+    },
+    {
+      "query": "只读审计代码库缺陷并给出优先级",
+      "acceptable": [
+        "codebase-defect-audit"
+      ]
+    },
+    {
+      "query": "修复 Word 文档版式字体和图片",
+      "acceptable": [
+        "docx-layout-and-figures"
+      ]
+    },
+    {
+      "query": "控制哪些内容进入模型上下文",
+      "acceptable": [
+        "dsh-context-visibility"
+      ]
+    },
+    {
+      "query": "从源码构建并运行桌面端",
+      "acceptable": [
+        "dsh-desktop-source-build"
+      ]
+    },
+    {
+      "query": "修改进化插件的客户端界面",
+      "acceptable": [
+        "dsh-evolution-client-ui"
+      ]
+    },
+    {
+      "query": "识别进化插件的已知缺陷模式",
+      "acceptable": [
+        "dsh-evolution-defect-patterns"
+      ]
+    },
+    {
+      "query": "检查进化插件的门禁状态",
+      "acceptable": [
+        "dsh-evolution-gates"
+      ]
+    },
+    {
+      "query": "维护进化插件的发布和审计",
+      "acceptable": [
+        "dsh-evolution-maintenance"
+      ]
+    },
+    {
+      "query": "对齐进化插件与平台接缝",
+      "acceptable": [
+        "dsh-evolution-platform-seams"
+      ]
+    },
+    {
+      "query": "发布进化插件并做真机验证",
+      "acceptable": [
+        "dsh-evolution-release"
+      ]
+    },
+    {
+      "query": "把多个技能合并成伞化技能库",
+      "acceptable": [
+        "dsh-evolution-skill-library"
+      ]
+    },
+    {
+      "query": "修复插件在新版本上的兼容问题",
+      "acceptable": [
+        "dsh-plugin-compatibility"
+      ]
+    },
+    {
+      "query": "从市场目录筛选 DSH 插件",
+      "acceptable": [
+        "dsh-plugin-discovery"
+      ]
+    },
+    {
+      "query": "诊断 PTC 花括号导致的提示词崩溃",
+      "acceptable": [
+        "dsh-ptc-brace-prompt-failure"
+      ]
+    },
+    {
+      "query": "定位 DSH 会话卡住的位置",
+      "acceptable": [
+        "dsh-session-forensics"
+      ]
+    },
+    {
+      "query": "修复预设改名后会话无法恢复",
+      "acceptable": [
+        "dsh-session-preset-repair"
+      ]
+    },
+    {
+      "query": "维护两个共享 home 的 DSH 平面",
+      "acceptable": [
+        "dsh-two-plane-maintenance"
+      ]
+    },
+    {
+      "query": "安全同步本地 Git 仓库",
+      "acceptable": [
+        "git-repo-sync"
+      ]
+    },
+    {
+      "query": "维护 InkOS 小说写作工具",
+      "acceptable": [
+        "inkos-harness"
+      ]
+    },
+    {
+      "query": "为专利申请挖掘代码技术点",
+      "acceptable": [
+        "invention-point-mining"
+      ]
+    },
+    {
+      "query": "把 Markdown 文档转成手机可读 HTML",
+      "acceptable": [
+        "mobile-readable-docs"
+      ]
+    },
+    {
+      "query": "验证插件移植到新平台后的行为",
+      "acceptable": [
+        "platform-plugin-port-verification"
+      ]
+    },
+    {
+      "query": "按参考范文对齐长文档",
+      "acceptable": [
+        "reference-aligned-writing"
+      ]
+    },
+    {
+      "query": "查询最新版本并核对本地安装",
+      "acceptable": [
+        "software-release-research"
+      ]
+    },
+    {
+      "query": "用聊天日志审计理论论文",
+      "acceptable": [
+        "theory-paper-log-audit"
+      ]
+    },
+    {
+      "query": "搜索小红书笔记和评论",
+      "acceptable": [
+        "xiaohongshu-local-search"
+      ]
+    },
+    {
+      "query": "对比两个网页来源的差异",
+      "acceptable": [
+        "w4web-source"
+      ]
+    }
+  ]
+}

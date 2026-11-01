@@ -32,13 +32,13 @@ describe('SkillSearchIndex', () => {
     expect((await index.search({ query: 'manual-only' })).results).toHaveLength(0)
   })
 
-  it('does not index protected or pinned skills', async () => {
+  it('indexes protected and pinned skills; projection remains responsible for hiding', async () => {
     const pinnedRow = skillIndexRowOf(summary('pinned-skill'), true, false, true)
     const pinnedIndex = SkillSearchIndex.fromRows('v', [pinnedRow])
-    expect((await pinnedIndex.search({ query: 'pinned-skill' })).results).toHaveLength(0)
+    expect((await pinnedIndex.search({ query: 'pinned-skill' })).results.map(hit => hit.name)).toContain('pinned-skill')
     const protectedRow = skillIndexRowOf(summary('protected-skill'), true, true)
     const index = SkillSearchIndex.fromRows('v', [protectedRow])
-    expect((await index.search({ query: 'protected-skill' })).results).toHaveLength(0)
+    expect((await index.search({ query: 'protected-skill' })).results.map(hit => hit.name)).toContain('protected-skill')
   })
 
   it('keeps views isolated, caps limit, and marks stale after rebuild starts', async () => {
