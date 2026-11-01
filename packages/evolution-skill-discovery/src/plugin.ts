@@ -20,7 +20,6 @@ import { SkillIndex, type SkillIndexQuery, type SkillIndexSource, type SkillInde
 import { DiscoveryRuntime } from './runtime.ts'
 import { SkillSearchCache } from './search.ts'
 import { DiscoverySessionStore } from './session-store.ts'
-import { shouldInstallAwarenessOnResume } from './session-projection.ts'
 import { registerSkillSearchTool } from './tool.ts'
 
 /** Plugin config; paths are supplied by the composition, never guessed. */
@@ -114,12 +113,9 @@ export function apply(ctx: Context, config: Config): void {
   })
   ctx.on('agent/created', async ({ agent, source }) => {
     try {
+      if (config.mode !== 'off') installDiscoveryAwareness(agent.ctx)
       if (source === 'startup') {
         await sessions.put({ sessionId: String(agent.session.id), discoveryMode: config.mode === 'on' ? 'on' : config.mode === 'shadow' || config.mode === 'auto' ? 'shadow' : 'off', featureEpoch: config.featureEpoch })
-        if (config.mode !== 'off') installDiscoveryAwareness(agent.ctx)
-      } else {
-        const meta = await sessions.get(String(agent.session.id))
-        if (shouldInstallAwarenessOnResume(meta, config.featureEpoch)) installDiscoveryAwareness(agent.ctx)
       }
     } catch { /* discovery metadata must not block session creation */ }
   })

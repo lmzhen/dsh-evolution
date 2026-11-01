@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url'
  * `limits:` or it takes the defaults and belongs in this register.
  */
 const REGISTERED_DEFAULTS: Record<string, string> = {
+  'evolution-skill-discovery/src/main-entry.ts :: { config: {}, io, ctx, authority: authorityFrom({ origin: \'foreground\' }) }': 'read-only: production composition reads skills and the domain map; no skill writes',
   'evolution-commands/src/index.ts :: { authority: authorityFrom({ origin: \'foreground\' }), config: { root: skillsRootValue }, io: ioRegistry.provider() }': 'read-only: the commands listing',
   'evolution-commands/src/index.ts :: { authority: authorityFrom({ origin: \'foreground\' }), config: { root: skillsRootValue }, io: ioRegistry.provider() } #2': 'read-only: as above',
   'evolution-learning-graph/src/index.ts :: { authority: authorityFrom({ origin: \'foreground\' }), config: rawConfig, io: evolutionIoAdapter(() => io.provider()), ctx, threatExemptLabels: rawConfig.threatExemptLabels }': 'read-only: withSkills() serves reads and the graph read path',

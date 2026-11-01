@@ -60,7 +60,6 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-llm": "workspace:^",
-    "minisearch": "^7.2.0",
-    "@deepseek-ai/dsh-tools": "workspace:^"
+    "minisearch": "^7.2.0"
   }
 }
