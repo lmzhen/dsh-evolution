@@ -17,7 +17,6 @@ import {
   FORBIDDEN_CONTROL_KEYS,
   PROTECTED_BUILTIN_SKILLS,
   DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,
-  DEFAULT_MAX_OPS_PER_PLAN,
   DEFAULT_CURATOR_INTERVAL_HOURS,
   DEFAULT_STALE_AFTER_DAYS,
   EVOLUTION_WRITE_TOOLS,
@@ -56,7 +55,6 @@ export interface PolicySnapshot {
   memoryChars: number
   userChars: number
   skillContentChars: number
-  maxOpsPerPlan: number
   curatorIntervalHours: number
   staleAfterDays: number
   /** Write-behaviour stages (0.5.0, design §16.7) — see the Config schema. */
@@ -79,7 +77,6 @@ export interface Config {
   memoryChars?: number
   userChars?: number
   skillContentChars?: number
-  maxOpsPerPlan?: number
   curatorIntervalHours?: number
   staleAfterDays?: number
   archiveAfterDays?: number
@@ -110,7 +107,6 @@ export const Config: Schema<Config> = z.object({
   memoryChars: z.number().min(1).default(DEFAULT_MEMORY_CHAR_LIMIT),
   userChars: z.number().min(1).default(DEFAULT_USER_CHAR_LIMIT),
   skillContentChars: z.number().min(1).default(DEFAULT_SKILL_CONTENT_CHARS),
-  maxOpsPerPlan: z.number().min(1).default(DEFAULT_MAX_OPS_PER_PLAN),
   curatorIntervalHours: z.number().min(1).default(DEFAULT_CURATOR_INTERVAL_HOURS),
   staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS),
   archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS),
@@ -175,7 +171,6 @@ export class EvolutionPolicy extends Service {
       memoryChars: field('memoryChars', config.memoryChars, DEFAULT_MEMORY_CHAR_LIMIT),
       userChars: field('userChars', config.userChars, DEFAULT_USER_CHAR_LIMIT),
       skillContentChars: field('skillContentChars', config.skillContentChars, DEFAULT_SKILL_CONTENT_CHARS),
-      maxOpsPerPlan: field('maxOpsPerPlan', config.maxOpsPerPlan, DEFAULT_MAX_OPS_PER_PLAN),
       curatorIntervalHours: field('curatorIntervalHours', config.curatorIntervalHours, DEFAULT_CURATOR_INTERVAL_HOURS),
       staleAfterDays: field('staleAfterDays', config.staleAfterDays, DEFAULT_STALE_AFTER_DAYS),
       // V5-33 posture applied to the stage unions: the loader already rejects an

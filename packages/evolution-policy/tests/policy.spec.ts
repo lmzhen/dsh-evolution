@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionPolicy, { Config } from '../src/index.ts'
 import { POLICY_STAGE_DEFAULTS } from '@deepseek-ai/dsh-evolution-core'
-import { DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_MAX_OPS_PER_PLAN, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, PROTECTED_BUILTIN_SKILLS } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,  DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_SKILL_CONTENT_CHARS, PROTECTED_BUILTIN_SKILLS } from '@deepseek-ai/dsh-evolution-core'
 
 describe('evolution-policy', () => {
   it('is immutable to model-shaped mutation fields (P2-11: the ghost policy.json defense is gone)', async () => {
@@ -43,7 +43,6 @@ describe('evolution-policy', () => {
     expect(s.substantiveMinToolCalls).toBe(DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS)
     expect(s.substantiveMinUserChars).toBe(DEFAULT_SUBSTANTIVE_MIN_USER_CHARS)
     expect(s.substantiveMinAgentChars).toBe(DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS)
-    expect(s.maxOpsPerPlan).toBe(DEFAULT_MAX_OPS_PER_PLAN)
     expect(s.curatorIntervalHours).toBe(DEFAULT_CURATOR_INTERVAL_HOURS)
     expect(s.staleAfterDays).toBe(DEFAULT_STALE_AFTER_DAYS)
     expect(s.archiveAfterDays).toBe(DEFAULT_ARCHIVE_AFTER_DAYS)
@@ -82,7 +81,7 @@ describe('evolution-policy', () => {
   it('clamps every invalid numeric config value to its default (G3.1 matrix: 0/neg/NaN/Inf → default)', () => {
     type NumericField = 'reviewMemoryInterval' | 'reviewSkillInterval' | 'substantiveMinToolCalls'
       | 'substantiveMinUserChars' | 'substantiveMinAgentChars' | 'memoryChars' | 'userChars'
-      | 'skillContentChars' | 'maxOpsPerPlan' | 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays'
+      | 'skillContentChars' | 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays'
     const defaults: Array<[NumericField, number]> = [
       ['reviewMemoryInterval', DEFAULT_REVIEW_MEMORY_INTERVAL],
       ['reviewSkillInterval', DEFAULT_REVIEW_SKILL_INTERVAL],
@@ -92,7 +91,6 @@ describe('evolution-policy', () => {
       ['memoryChars', DEFAULT_MEMORY_CHAR_LIMIT],
       ['userChars', DEFAULT_USER_CHAR_LIMIT],
       ['skillContentChars', DEFAULT_SKILL_CONTENT_CHARS],
-      ['maxOpsPerPlan', DEFAULT_MAX_OPS_PER_PLAN],
       ['curatorIntervalHours', DEFAULT_CURATOR_INTERVAL_HOURS],
       ['staleAfterDays', DEFAULT_STALE_AFTER_DAYS],
       ['archiveAfterDays', DEFAULT_ARCHIVE_AFTER_DAYS],
@@ -110,7 +108,6 @@ describe('evolution-policy', () => {
       memoryChars: value,
       userChars: value,
       skillContentChars: value,
-      maxOpsPerPlan: value,
       curatorIntervalHours: value,
       staleAfterDays: value,
       archiveAfterDays: value,
@@ -136,7 +133,6 @@ describe('evolution-policy', () => {
       memoryChars: 3000,
       userChars: 2000,
       skillContentChars: 2000,
-      maxOpsPerPlan: 10,
       curatorIntervalHours: 200,
       staleAfterDays: 40,
       archiveAfterDays: 120,
@@ -150,7 +146,6 @@ describe('evolution-policy', () => {
     expect(s.memoryChars).toBe(3000)
     expect(s.userChars).toBe(2000)
     expect(s.skillContentChars).toBe(2000)
-    expect(s.maxOpsPerPlan).toBe(10)
     expect(s.curatorIntervalHours).toBe(200)
     expect(s.staleAfterDays).toBe(40)
     expect(s.archiveAfterDays).toBe(120)
@@ -159,7 +154,6 @@ describe('evolution-policy', () => {
   it('rejects 0/negative at the schema level but lets NaN/Infinity through (G3.1 .min(1))', () => {
     const parse = (input: unknown): unknown => (Config as unknown as (i: unknown) => unknown)(input)
     expect(() => parse({ reviewMemoryInterval: 0 })).toThrow()
-    expect(() => parse({ maxOpsPerPlan: -1 })).toThrow()
     // NaN and +Infinity are NOT rejected by `z.number().min(1)` — they
     // penetrate the schema and are caught by the assembly-time clamp instead.
     const nanResult = parse({ reviewMemoryInterval: NaN }) as { reviewMemoryInterval: number }

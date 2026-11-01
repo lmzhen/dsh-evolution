@@ -300,7 +300,6 @@ function reviewPolicy() {
     substantiveMinAgentChars: 0,
     reviewMemoryInterval: 1,
     reviewSkillInterval: 1,
-    maxOpsPerPlan: 5,
     protectedSkillNames: [] as string[],
     memoryChars: 10_000,
     userChars: 10_000,
