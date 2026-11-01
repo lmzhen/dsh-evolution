@@ -1046,6 +1046,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         try {
           ctx.emit('evolution/review-completed', { version: 1, reviewId: childId, sessionId: session.id, branchSessionId: childId, kind, status: collected.error !== undefined ? 'failed' : timedOut ? 'timeout' : controller.signal.aborted ? 'aborted' : 'completed', trigger: { reason, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars }, finalText: collected.finalText, actions: collected.actions, ...(collected.usage === undefined ? {} : { usage: collected.usage }), startedAt, finishedAt: Date.now(), ...(collected.error === undefined ? {} : { error: collected.error }) })
         } catch (emitError) { ctx.logger.warn('dsh-evolution-review: review-completed emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError))) }
+        try {
+          const ok = (action: typeof collected.actions[number]): boolean => action.status === 'ok'
+          ctx.emit('evolution/plan-applied', {
+            sessionId: String(session.id),
+            planId: String(childId),
+            memoryApplied: collected.actions.filter(action => action.type === 'memory' && ok(action)).length,
+            skillApplied: collected.actions.filter(action => action.type === 'skill' && ok(action)).length,
+            rejectedOps: collected.actions.filter(action => !ok(action)).length,
+            ...(collected.error === undefined ? {} : { executionError: collected.error }),
+          })
+        } catch (emitError) { ctx.logger.warn('dsh-evolution-review: plan-applied emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError))) }
       } catch (error) {
         offEvent()
         collected.error = error instanceof Error ? error.message : String(error)
