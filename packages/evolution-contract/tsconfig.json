@@ -6,5 +6,8 @@
   },
   "include": [
     "${configDir}/src"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" }
   ]
 }

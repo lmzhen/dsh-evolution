@@ -7,6 +7,8 @@
  * @module @deepseek-ai/dsh-evolution-contract
  */
 
+import type {} from '@deepseek-ai/cordis'
+
 /** Branded collection name so durable keys cannot be confused with prose. */
 export type EvolutionCollection = string & { readonly __evolutionCollection: unique symbol }
 
@@ -50,6 +52,13 @@ export interface EvolutionLifecycleService {
 }
 
 /** Optional platform capability: absent means the feature must declare its degradation. */
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Optional generic state store; a deployment without a provider keeps its legacy store. */
+    evolutionStateStore?: EvolutionStateStore
+  }
+}
+
 export interface EvolutionPlatformAccess {
   readonly state: EvolutionStateStore
   readonly capabilities: EvolutionStateCapabilities

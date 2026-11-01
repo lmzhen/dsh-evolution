@@ -42,6 +42,7 @@ import {
   type SeamRecordTable,
 } from '@deepseek-ai/dsh-evolution-state-storage'
 import { basename, dirname, isAbsolute, join } from 'node:path'
+import { JsonStateStore } from './state-store.ts'
 
 export const name = 'evolution-state-json'
 export const inject = ['evolutionStateStorage', 'evolutionIo']
@@ -1283,6 +1284,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   ctx.effect(() => ctx.evolutionStateStorage.registerProvider(provider), 'evolution-state-json.provider')
+  ctx.provide('evolutionStateStore', new JsonStateStore(io(), root))
 }
 
 export { JsonStateStore } from './state-store.ts'
