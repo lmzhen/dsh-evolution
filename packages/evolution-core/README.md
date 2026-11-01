@@ -50,7 +50,7 @@ section, and importing the package root is its only entry.
 
 ## Events (the family's own, process-local)
 
-Seven process events ride the cordis bus (`evolution-core/src/events.ts` declares the payloads;
+Eight process events ride the cordis bus (`evolution-core/src/events.ts` declares the payloads;
 producers call `ctx.emit`, consumers `ctx.on`). They are NOT session events — appending one to a
 session log made the session unresumable (A-line P0-1), which is why the payload file says so.
 
@@ -62,9 +62,10 @@ session log made the session unresumable (A-line P0-1), which is why the payload
 | `evolution/review-error` | emit (notification) | `evolution-review` failure paths |
 | `evolution/review-completed` | emit (notification) | `evolution-review` after a plugin branch settles |
 | `evolution/memory-applied` | emit (notification) | `memory` after a memory write |
+| `evolution/memory-provider-registered` | emit (notification) | `memory` when a provider registers |
 | `evolution/approval-decided` | emit (notification) | `evolution-approval` after an approval decision lands |
 
-Legacy `evolution/plan-applied` remains declared so old activity ledgers stay readable, but the current production tree has no plan emitter after the review subagent/plan path was removed.
+`evolution/plan-applied` is declared for old activity ledgers; `evolution-review` now emits it from a branch review once that branch settles, with real action counts. `reviewMode: "inject"` still emits none by design.
 
 The mode column is what the code does today: every one of them is an announcement, and each
 declaration carries it as a `@mode` tag (finding O-1, landed) — `verify-arch-guards`' rule **N33** checks that

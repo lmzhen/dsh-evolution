@@ -54,6 +54,13 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'evolution/memory-applied'(event: EvolutionMemoryAppliedEvent): void
+    /**
+     * A provider registered on the registry. An ANNOUNCEMENT for late consumers that mounted
+     * before the provider row; it decides nothing.
+     * @param event - the registered provider's name.
+     * @mode emit
+     */
+    'evolution/memory-provider-registered'(event: { readonly name: string }): void
   }
 }
 
@@ -122,6 +129,7 @@ export class MemoryRegistry extends Service {
       if (existing !== undefined) return existing
     }
     this.providers.set(provider.name, provider)
+    this.ctx.emit('evolution/memory-provider-registered', { name: provider.name })
     if (this.providerName && provider.name !== this.providerName && !this.providers.has(this.providerName) && !this.pinWarned) {
       this.pinWarned = true
       this.ctx.logger.warn(`memory: config.provider="${this.providerName}" is not registered (mounted: "${provider.name}"); memory reads and writes fail until that provider mounts`)

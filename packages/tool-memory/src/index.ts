@@ -14,9 +14,6 @@ import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, 
 export const name = 'tool-memory'
 
 /** Max characters of each echoed memory entry (single source for the Config default and the runtime slice). */
-/** G2.4/C3: the give-up bound of the snapshot retry — a NAMED ceiling, not a literal in the call. */
-const SNAPSHOT_RETRY_GIVE_UP_MS = 60_000
-
 const DEFAULT_ENTRY_PREVIEW_CHARS = 200
 
 
@@ -206,33 +203,11 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     }
     ctx.effect(() => ctx.on('evolution/memory-applied', () => { void refreshSnapshot() }), 'tool-memory.snapshot-refresh')
     // P2-07 (audit): cordis `inject` does not order sibling fibers — if the
-    // memory PROVIDER row applies after this row, the mount-time render threw
-    // (`memory: no provider registered`) and, with the write-sink listener as
-    // the only refresher, the snapshot stayed EMPTY for the whole process
-    // lifetime: pre-existing MEMORY.md/USER.md content never reached any
-    // session until someone performed a memory write. Retry on a short
-    // bounded interval until the first success, then stop; the effect
-    // disposal clears the timer on plugin unload.
-    if (snapshotText === '') {
-      const retryTimer = setInterval(() => {
-        void (async () => {
-          try {
-            snapshotText = await ctx.memory.renderContext()
-            if (snapshotText !== '') clearInterval(retryTimer)
-          } catch {
-            // Provider still not registered — keep waiting within the bound.
-          }
-        })()
-      }, 500)
-      // T2-06/A21: a MOUNT-TIME retry is not a service — it must never be a reason for the process
-      // to stay alive. Without this, a deployment whose memory provider is simply absent (the very
-      // shape P2-07 added the retry for) held the event loop for the whole 60s bound, so a one-shot
-      // CLI (dsh headless, /evolution …) lived up to a minute past its work. The give-up timer was
-      // already unref'd; the interval was the one holding the loop.
-      retryTimer.unref()
-      ctx.effect(() => () => { clearInterval(retryTimer) }, 'tool-memory.snapshot-retry')
-      setTimeout(() => { clearInterval(retryTimer) }, SNAPSHOT_RETRY_GIVE_UP_MS).unref()
-    }
+    // memory PROVIDER row applies after this row, the mount-time render throws
+    // (`memory: no provider registered`). The registry now announces the
+    // registration, so the snapshot refreshes on that event instead of a 500 ms
+    // retry that held a timer for up to 60 s.
+    ctx.effect(() => ctx.on('evolution/memory-provider-registered', () => { void refreshSnapshot() }), 'tool-memory.snapshot-ready')
   } else if (!memoryDisabled) {
     ctx.logger.warn('tool-memory: systemPrompt service not mounted; memory guidance and snapshot are not injected (the write tool still works)')
   }

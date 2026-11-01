@@ -8,7 +8,7 @@
  * as `{{cwd}}`. The stored bytes were never rewritten; the registration flag is the whole fix.
  */
 import { describe, expect, it } from 'vitest'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { renderContextSections } from '@deepseek-ai/dsh-system-prompt'
@@ -52,6 +52,26 @@ describe('tool-memory · literal prompt variables (G6-S2/W8)', () => {
     expect(text).toContain('Deploy template: {{APP_NAME}} on port {{PORT}}')
     expect(text).toContain('{{cwd}}')
     expect(text).not.toContain(root)
+  })
+
+  it('refreshes when the provider registers after the tool mounted', async () => {
+    const root = await tempRoot('dsh-evolution-tmp-')
+    await writeFile(join(root, 'MEMORY.md'), '- late provider fact\n')
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(ToolMemory, {})
+    expect(await snapshotText(ctx)).toBe('')
+    await ctx.plugin(MemoryFiles, { root })
+    let text = ''
+    for (let attempt = 0; attempt < 50 && !text.includes('late provider fact'); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      text = await snapshotText(ctx)
+    }
+    expect(text).toContain('late provider fact')
+    await ctx.fiber.dispose()
   })
 
   it('refresh path: an entry written after mount stays literal, and the file keeps its bytes', async () => {
