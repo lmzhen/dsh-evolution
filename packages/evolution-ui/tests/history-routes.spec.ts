@@ -17,7 +17,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import EvolutionCurator from '@deepseek-ai/dsh-evolution-curator'
 import { DEFAULT_SKILL_LIMITS, SkillLibrary, MAX_REQUEST_BODY_BYTES, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mountHostRoutes } from '../../test-support/host-route-harness.ts'
-import { SKILL_HISTORY_ROUTES, makeSkillHistoryRoutes } from '../src/routes.ts'
+import { SKILL_HISTORY_ROUTES, makeSkillHistoryRoutes } from '../src/panels/history/routes.ts'
 import { tempHome } from '../../test-support/temp-home.ts'
 
 describe('skill-history routes: the curator seam', () => {
@@ -182,7 +182,7 @@ describe('skill-history routes: the read/write surface', () => {
     // Transport refusals: an undeclared method falls through on the platform carrier (the exact route
     // owns GET only), while a missing name / bad body / malformed version stay the family's 400s.
     // No route may answer with the retired {error} envelope: the client parses {ok:false,code,message}.
-    const routesSource = readFileSync(fileURLToPath(new URL('../src/routes.ts', import.meta.url)), 'utf8')
+    const routesSource = readFileSync(fileURLToPath(new URL('../src/panels/history/routes.ts', import.meta.url)), 'utf8')
     expect(routesSource).not.toContain('{ error:')
     expect((await host.json(SKILL_HISTORY_ROUTES.versions, { method: 'POST' })).status).toBe(404)
     expect((await host.json(SKILL_HISTORY_ROUTES.versions)).status).toBe(400)

@@ -8,8 +8,8 @@
  * host table under the same key and with the same value.
  */
 import { describe, expect, it } from 'vitest'
-import { HOST_ROUTES } from '../src/client/api.ts'
-import { SKILL_HISTORY_ROUTES } from '../src/routes.ts'
+import { HOST_ROUTES } from '../src/panels/history/client/api.ts'
+import { SKILL_HISTORY_ROUTES } from '../src/panels/history/routes.ts'
 
 describe('skill-history: the two route tables agree', () => {
   it('mirrors every client route to the host route of the same name', () => {

@@ -17,7 +17,7 @@ declare module 'react' {
    * @param children - child nodes.
    * @returns the element the renderer consumes.
    */
-  export function createElement(type: unknown, props?: unknown, ...children: unknown[]): unknown
+  export function createElement(type: unknown, props?: unknown, ...children: unknown[]): any
   /**
    * Component-local state.
    * @param initial - the initial value.

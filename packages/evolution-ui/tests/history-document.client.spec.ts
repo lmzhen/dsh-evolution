@@ -17,8 +17,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
-import { DiffBody, PreviewBody, type DiffState, type DocumentFace } from '../src/client/document.ts'
-import { CSS } from '../src/client/styles.ts'
+import { DiffBody, PreviewBody, type DiffState, type DocumentFace } from '../src/panels/history/client/document.ts'
+import { CSS } from '../src/panels/history/client/styles.ts'
 
 // Same idiom as the settings-ui client specs: `react`'s own `createElement` resolves to an error
 // type in this package's linter program, so it is re-typed once here and called as `h`.

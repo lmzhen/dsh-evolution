@@ -17,13 +17,13 @@ declare module 'react' {
    * @param children - child nodes.
    * @returns the element the renderer consumes.
    */
-  export function createElement(type: unknown, props?: unknown, ...children: unknown[]): unknown
+  export function createElement(type: unknown, props?: unknown, ...children: unknown[]): any
   /**
    * Component-local state.
    * @param initial - the initial value.
    * @returns the current value and its setter.
    */
-  export function useState<S>(initial: S): [S, (next: S) => void]
+  export function useState<S>(initial: S | (() => S)): [S, (next: S | ((previous: S) => S)) => void]
   /**
    * A value that survives re-renders without causing one.
    * @param initial - the value the first render stores.

@@ -14,8 +14,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
-import { SkillHistoryPanel, type PanelFace } from '../src/client/Panel.ts'
-import type { SkillRow, VersionRow, VersionsPayload } from '../src/client/api.ts'
+import { SkillHistoryPanel, type PanelFace } from '../src/panels/history/client/Panel.ts'
+import type { SkillRow, VersionRow, VersionsPayload } from '../src/panels/history/client/api.ts'
 
 /** One in-flight read a spec resolves by hand. */
 interface Deferred<T> {

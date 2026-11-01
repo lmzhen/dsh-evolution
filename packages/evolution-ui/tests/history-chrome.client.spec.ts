@@ -15,10 +15,10 @@ import { describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
-import { note } from '../src/client/atoms.ts'
-import { skillLine, versionRow, type Copy } from '../src/client/chrome.ts'
-import { CSS } from '../src/client/styles.ts'
-import type { SkillRow, VersionRow } from '../src/client/api.ts'
+import { note } from '../src/panels/history/client/atoms.ts'
+import { skillLine, versionRow, type Copy } from '../src/panels/history/client/chrome.ts'
+import { CSS } from '../src/panels/history/client/styles.ts'
+import type { SkillRow, VersionRow } from '../src/panels/history/client/api.ts'
 
 /** The seat as the slot renderer hands it over: keys as words, so assertions name the exact copy. */
 const copy: Copy = {

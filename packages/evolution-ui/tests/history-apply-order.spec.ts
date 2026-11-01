@@ -7,8 +7,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import * as SkillHistory from '../src/index.ts'
-import { SKILL_HISTORY_ROUTES } from '../src/routes.ts'
+import * as SkillHistory from '../src/panels/history/host.ts'
+import { SKILL_HISTORY_ROUTES } from '../src/panels/history/routes.ts'
 import { provideHostConnection } from '../../test-support/host-route-harness.ts'
 
 const expected = (): string[] => [

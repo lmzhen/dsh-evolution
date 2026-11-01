@@ -8,9 +8,6 @@
       "path": "../evolution-merge-ui"
     },
     {
-      "path": "../evolution-skill-history"
-    },
-    {
       "path": "../evolution-skill-health"
     },
     {
@@ -18,6 +15,12 @@
     },
     {
       "path": "../evolution-client-kit"
+    },
+    {
+      "path": "../evolution-core"
+    },
+    {
+      "path": "../evolution-curator"
     }
   ]
 }

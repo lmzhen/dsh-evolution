@@ -5,7 +5,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { apply as applyMerge } from '@deepseek-ai/dsh-evolution-merge-ui'
-import { apply as applyHistory } from '@deepseek-ai/dsh-evolution-skill-history'
+import { apply as applyHistory } from './panels/history/host.ts'
 
 export const name = 'evolution-ui'
 /** No required service: every nested row resolves its own optional seats. */

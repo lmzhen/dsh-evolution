@@ -9,10 +9,10 @@
  * registry contribution to prove exactly that (HMR safety).
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { apply, PANEL_ORDER } from '../src/client/index.ts'
-import { NS, en, zh } from '../src/client/messages.ts'
+import { apply, PANEL_ORDER } from '../src/panels/history/client/index.ts'
+import { NS, en, zh } from '../src/panels/history/client/messages.ts'
 import type { PanelBodyOptions, PanelRowOptions } from '@deepseek-ai/dsh-evolution-client-kit'
-import { PANEL_ID } from '../src/client/ids.ts'
+import { PANEL_ID } from '../src/panels/history/client/ids.ts'
 
 /** A slots registry and locale seat that record contributions and hand back real disposers. */
 function fakeSeams(options: { refuseLocale?: boolean } = {}): {

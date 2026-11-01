@@ -2,7 +2,7 @@
 /** G3b：undoable 是**单元**属性 —— 同单元的条目必须同值（U1，今天必红的那条）。 */
 import { expect, it } from 'vitest'
 import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core'
-import { undoableFor, unitUndoableFlags } from '../src/unit-undoable.ts'
+import { undoableFor, unitUndoableFlags } from '../src/panels/history/unit-undoable.ts'
 
 const entry = (over: Partial<SkillVersion>): SkillVersion => ({ v: 1, at: 't', action: 'restructure', hash: 'h', chars: 1, ...over })
 

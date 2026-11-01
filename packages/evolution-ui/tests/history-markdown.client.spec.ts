@@ -11,7 +11,7 @@
  * rendered diff to raw source. The live panel is what caught it; these cases keep it caught.
  */
 import { describe, expect, it } from 'vitest'
-import { rendererOf } from '../src/client/markdown.ts'
+import { rendererOf } from '../src/panels/history/client/markdown.ts'
 
 describe('the renderer a module row carries', () => {
   it('accepts a memo wrapper, which is an object rather than a function', () => {

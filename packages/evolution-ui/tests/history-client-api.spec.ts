@@ -5,7 +5,7 @@
  * build and a live pass (see the README's known limitations).
  */
 import { describe, expect, it } from 'vitest'
-import { HOST_ROUTES, SkillHistoryRefusal, createSkillHistoryApi } from '../src/client/api.ts'
+import { HOST_ROUTES, SkillHistoryRefusal, createSkillHistoryApi } from '../src/panels/history/client/api.ts'
 
 /** What a stub records and the fetch it stands in for. */
 interface StubFetch {

@@ -47,8 +47,9 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-evolution-merge-ui": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-history": "workspace:^",
-    "@lmzhen/dsh-evolution-client-kit": "workspace:^"
+    "@lmzhen/dsh-evolution-client-kit": "workspace:^",
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-curator": "workspace:^"
   },
   "devDependencies": {
     "@types/react": "~18.3.1",
