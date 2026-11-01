@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.pkg.json",
+  "references": [
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../evolution-settings-ui"
+    },
+    {
+      "path": "../evolution-merge-ui"
+    },
+    {
+      "path": "../evolution-skill-history"
+    },
+    {
+      "path": "../evolution-skill-health"
+    },
+    {
+      "path": "../evolution-client-kit"
+    }
+  ]
+}

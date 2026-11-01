@@ -52,11 +52,11 @@ const allPatch = rowMap(
 const sharedIds = [...hostPatch.keys()].filter(id => presetPatch.has(id))
 const MODEL_TOOLS = ['tool-memory', 'tool-skill-manage', 'tool-session-query', 'evolution-skill-catalog']
 
-/** Rows that are neither infra nor model-facing: the settings UI carries a
- * BROWSER half only (its Host half registers nothing), so it cannot be
- * double-mounted as infra and exposes nothing to a model. Listed by name so a
- * new row of any class still fails the count below until it is decided here. */
-const CLIENT_ONLY_ROWS = ['evolution-settings-ui', 'evolution-skill-history', 'evolution-skill-health', 'evolution-merge-ui']
+/** Rows that are neither host infra nor model-facing: the UI umbrella makes its
+ * own host registration but stays out of the host-only and preset bundles, and
+ * the health panel ships disabled. Listed by name so a new row of any class
+ * still fails the count below until it is decided here. */
+const ALL_ONLY_ROWS = ['evolution-skill-health', 'evolution-ui']
 
 /** 0.28.0: the merge host row is all-only — it is infra for the full bundle but
  * deliberately stays out of the host-only and preset bundles. */
@@ -101,11 +101,11 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
     }
   })
 
-  it('all row set = host infra ∪ 4 model rows ∪ the client-only card row', () => {
-    expect(allPatch.size).toBe(hostPatch.size + MODEL_TOOLS.length + CLIENT_ONLY_ROWS.length + ALL_EXTRA_INFRA.length)
+  it('all row set = host infra ∪ 4 model rows ∪ the all-only UI rows', () => {
+    expect(allPatch.size).toBe(hostPatch.size + MODEL_TOOLS.length + ALL_ONLY_ROWS.length + ALL_EXTRA_INFRA.length)
     for (const id of ALL_EXTRA_INFRA) expect(hostPatch.has(id), `${id} must stay all-only`).toBe(false)
     for (const id of MODEL_TOOLS) expect(hostPatch.has(id)).toBe(false)
-    for (const id of CLIENT_ONLY_ROWS) expect(hostPatch.has(id), `${id} must stay out of the host bundle`).toBe(false)
+    for (const id of ALL_ONLY_ROWS) expect(hostPatch.has(id), `${id} must stay out of the host bundle`).toBe(false)
     for (const id of hostPatch.keys()) expect(allPatch.has(id)).toBe(true)
   })
 

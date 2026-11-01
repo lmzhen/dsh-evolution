@@ -130,22 +130,6 @@
     - id: evolution-replay
       name: '@deepseek-ai/dsh-evolution-replay'
 
-    # ── settings UI: browser cards for the parameter namespaces ──────────────
-    # Host half registers NOTHING; the cards are the browser half, keyed by the
-    # settings namespaces the rows above own (the tab dispatches one slot key
-    # per namespace the Host serves). Disabling this row removes the cards and
-    # changes no host-side behaviour.
-    - id: evolution-settings-ui
-      name: '@deepseek-ai/dsh-evolution-settings-ui'
-
-    # ── skill history: the sidebar panel over the content-version store ──────
-    # Host half mounts four loopback routes under /api/dsh-evolution/skill-history/*
-    # (the panel's only data path, and the same curator undo the slash command uses);
-    # the browser half is the left-sidebar panel row that reads them. Disabling this
-    # row removes the panel and its routes, and changes no other row's behaviour.
-    - id: evolution-skill-history
-      name: '@deepseek-ai/dsh-evolution-skill-history'
-
     # ── skill health: the sidebar panel over the linter's findings ───────────
     # Host half mounts ONE read-only route under /api/dsh-evolution/skill-health/rows
     # (the panel's only data path; it writes nothing). The browser half is the
@@ -156,16 +140,18 @@
       name: '@deepseek-ai/dsh-evolution-skill-health'
       disabled: true
 
+    # ── web UI: settings cards + skill history + merge panel ─────────────────
+    # Web UI umbrella: one row mounts the three panel rows (settings cards, skill history, merge panel).
+    # The packages stay installed as dependencies until their client code moves here; health stays its own disabled row.
+    - id: evolution-ui
+      name: '@deepseek-ai/dsh-evolution-ui'
+
     # ── skill merge: the merged-pair queues and the read-only panel ─────────────
     # Host half mounts four read-only routes under /api/dsh-evolution/merge/*
     # and the /merge command; run engine and staging tool mount from the same row.
     # The browser half is evolution-merge-ui; this row owns the permission/Config row.
     - id: evolution-merge
       name: '@deepseek-ai/dsh-evolution-merge'
-    # Browser half: the left-sidebar merge panel over the four read-only routes.
-    # Disabling this row removes the panel and changes no host-side behaviour.
-    - id: evolution-merge-ui
-      name: '@deepseek-ai/dsh-evolution-merge-ui'
 
 # ── cross-session recall: enable the native session-query index ─────────────
 # `tool-session-query` (above) exposes `session_search`; this overlay

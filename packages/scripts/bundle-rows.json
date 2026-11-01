@@ -490,21 +490,15 @@
       }
     },
     {
-      "id": "evolution-settings-ui",
-      "banners": {
-        "all": "    # ── settings UI: browser cards for the parameter namespaces ──────────────"
-      }
-    },
-    {
-      "id": "evolution-skill-history",
-      "banners": {
-        "all": "    # ── skill history: the sidebar panel over the content-version store ──────"
-      }
-    },
-    {
       "id": "evolution-skill-health",
       "banners": {
         "all": "    # ── skill health: the sidebar panel over the linter's findings ───────────"
+      }
+    },
+    {
+      "id": "evolution-ui",
+      "banners": {
+        "all": "    # ── web UI: settings cards + skill history + merge panel ─────────────────"
       }
     },
     {
@@ -1201,38 +1195,6 @@
       }
     },
     {
-      "id": "evolution-settings-ui",
-      "group": "evolution-settings-ui",
-      "forms": [
-        "all"
-      ],
-      "lead": [
-        "    # Host half registers NOTHING; the cards are the browser half, keyed by the",
-        "    # settings namespaces the rows above own (the tab dispatches one slot key",
-        "    # per namespace the Host serves). Disabling this row removes the cards and",
-        "    # changes no host-side behaviour."
-      ],
-      "body": [
-        "      name: '@deepseek-ai/dsh-evolution-settings-ui'"
-      ]
-    },
-    {
-      "id": "evolution-skill-history",
-      "group": "evolution-skill-history",
-      "forms": [
-        "all"
-      ],
-      "lead": [
-        "    # Host half mounts four loopback routes under /api/dsh-evolution/skill-history/*",
-        "    # (the panel's only data path, and the same curator undo the slash command uses);",
-        "    # the browser half is the left-sidebar panel row that reads them. Disabling this",
-        "    # row removes the panel and its routes, and changes no other row's behaviour."
-      ],
-      "body": [
-        "      name: '@deepseek-ai/dsh-evolution-skill-history'"
-      ]
-    },
-    {
       "id": "evolution-skill-health",
       "group": "evolution-skill-health",
       "forms": [
@@ -1251,6 +1213,20 @@
       ]
     },
     {
+      "id": "evolution-ui",
+      "group": "evolution-ui",
+      "forms": [
+        "all"
+      ],
+      "lead": [
+        "    # Web UI umbrella: one row mounts the three panel rows (settings cards, skill history, merge panel).",
+        "    # The packages stay installed as dependencies until their client code moves here; health stays its own disabled row."
+      ],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-ui'"
+      ]
+    },
+    {
       "id": "evolution-merge",
       "group": "evolution-merge",
       "forms": [
@@ -1265,20 +1241,6 @@
       ],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-merge'"
-      ]
-    },
-    {
-      "id": "evolution-merge-ui",
-      "group": "evolution-merge",
-      "forms": [
-        "all"
-      ],
-      "lead": [
-        "    # Browser half: the left-sidebar merge panel over the four read-only routes.",
-        "    # Disabling this row removes the panel and changes no host-side behaviour."
-      ],
-      "body": [
-        "      name: '@deepseek-ai/dsh-evolution-merge-ui'"
       ]
     },
     {
