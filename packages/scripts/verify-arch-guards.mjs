@@ -17,7 +17,7 @@
  *       in the tree: doctor probed `evolutionReview` for five releases with zero
  *       providers and the self-check silently lied (P0-1 class).
  *   N5. `evolution-core` is the kernel: it must not import any other family
- *       package except the L0 seams (state-storage, memory). Dependency
+ *       package except the L0 seams (state-storage, memory, contract). Dependency
  *       closure owns the full graph; this is the reverse-direction tripwire.
  *   N6. composition bundles (host/all/preset/agent) carry no runtime code —
  *       their substance is the manifest's YAML rows, so every src module
@@ -670,6 +670,7 @@ const COPY_RE = /interface\s+ApprovalPolicyLike|function\s+effectiveSessionPolic
 const FAMILY_IMPORT_RE = /from\s+['"](@deepseek-ai\/dsh-evolution-[a-z0-9-]+|@deepseek-ai\/dsh-memory)['"]/g
 const CORE_ALLOWED_FAMILY = new Set([
   '@deepseek-ai/dsh-evolution-core',
+  '@deepseek-ai/dsh-evolution-contract',
   '@deepseek-ai/dsh-evolution-state-storage',
   '@deepseek-ai/dsh-memory',
 ])

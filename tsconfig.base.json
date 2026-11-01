@@ -52,6 +52,7 @@
       "@deepseek-ai/dsh-evolution-commands": ["./packages/evolution/evolution-commands/src/index.ts"],
       "@deepseek-ai/dsh-evolution-learning-graph": ["./packages/evolution/evolution-learning-graph/src/index.ts"],
       "@deepseek-ai/dsh-evolution-maintenance": ["./packages/evolution/evolution-maintenance/src/index.ts"],
+      "@deepseek-ai/dsh-evolution-contract": ["./packages/evolution/evolution-contract/src/index.ts"],
       "@deepseek-ai/dsh-evolution-core": ["./packages/evolution/evolution-core/src/index.ts"],
       "@deepseek-ai/dsh-evolution-core/composition": ["./packages/evolution/evolution-core/src/composition/index.ts"],
       "@deepseek-ai/dsh-evolution-core/subagent": ["./packages/evolution/evolution-core/src/subagent/index.ts"],

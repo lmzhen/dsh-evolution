@@ -12,15 +12,9 @@
  * @module @deepseek-ai/dsh-evolution-core
  */
 
-/** One platform service the family probes, with the feature that goes quiet without it. */
-export interface PlatformServiceProbe {
-  /** The service key as `ctx.get` spells it. */
-  readonly service: string
-  /** The family feature that silently degrades when the service is absent. */
-  readonly feature: string
-  /** Where the probe runs. */
-  readonly side: 'host' | 'client'
-}
+import type { PlatformServiceProbe } from '@deepseek-ai/dsh-evolution-contract'
+
+export type { PlatformServiceProbe } from '@deepseek-ai/dsh-evolution-contract'
 
 /** The 30 probes, in service-name order (the guard checks this list against the tree). */
 export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.freeze([

@@ -10,6 +10,16 @@
 /** Branded collection name so durable keys cannot be confused with prose. */
 export type EvolutionCollection = string & { readonly __evolutionCollection: unique symbol }
 
+/** One platform service the family probes, with the feature that degrades without it. */
+export interface PlatformServiceProbe {
+  /** The service key as `ctx.get` spells it. */
+  readonly service: string
+  /** The family feature that degrades when the service is absent. */
+  readonly feature: string
+  /** Where the probe runs. */
+  readonly side: 'host' | 'client'
+}
+
 /** One durable record store; the provider owns locking, CAS and medium selection. */
 export interface EvolutionStateStore {
   /** Read one record; an absent record is undefined, a failed read throws. */
