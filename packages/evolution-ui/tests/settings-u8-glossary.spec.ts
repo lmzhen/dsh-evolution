@@ -8,7 +8,7 @@
  * dictionary VALUES (keys themselves, and comments, are not copy).
  */
 import { describe, expect, it } from 'vitest'
-import { en, zh } from '../src/client/messages.ts'
+import { en, zh } from '../src/panels/settings/messages.ts'
 
 /** Everything a reader can be shown, as one list. */
 const copy = [...Object.values(zh), ...Object.values(en)]

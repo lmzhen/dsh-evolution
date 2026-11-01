@@ -13,10 +13,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { createElement } from 'react'
-import { CLIENT_PARAM_SECTIONS } from '../src/client/generated-params.ts'
-import { formatText, type MessageKey } from '../src/client/messages.ts'
-import { RowConfigCard } from '../src/client/RowConfigCard.ts'
-import { invalidReason } from '../src/client/ParamCard.ts'
+import { CLIENT_PARAM_SECTIONS } from '../src/panels/settings/generated-params.ts'
+import { formatText, type MessageKey } from '../src/panels/settings/messages.ts'
+import { RowConfigCard } from '../src/panels/settings/RowConfigCard.ts'
+import { invalidReason } from '../src/panels/settings/ParamCard.ts'
 
 const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string => formatText(key, values)
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]

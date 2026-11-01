@@ -8,7 +8,7 @@
  * declared only on the section root (so the SAME card rendered unstyled on the Plugins page).
  */
 import { describe, expect, it } from 'vitest'
-import { CSS } from '../src/client/styles.ts'
+import { CSS } from '../src/panels/settings/styles.ts'
 import { TOKEN_CSS } from '@lmzhen/dsh-evolution-client-kit/tokens'
 
 describe('the settings stylesheet', () => {

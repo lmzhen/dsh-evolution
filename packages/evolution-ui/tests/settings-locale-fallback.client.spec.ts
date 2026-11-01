@@ -6,7 +6,7 @@
  * mounted, and through `message()` when it is not. An unknown language must therefore read English.
  */
 import { describe, expect, it } from 'vitest'
-import { en, message, zh } from '../src/client/messages.ts'
+import { en, message, zh } from '../src/panels/settings/messages.ts'
 
 describe('the settings card copy falls back to the platform locale', () => {
   it('resolves an unspecified language to English, and still answers Chinese on request', () => {

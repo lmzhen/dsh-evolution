@@ -4,7 +4,6 @@
  * @module @deepseek-ai/dsh-evolution-ui
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { apply as applySettings } from '@deepseek-ai/dsh-evolution-settings-ui'
 import { apply as applyMerge } from '@deepseek-ai/dsh-evolution-merge-ui'
 import { apply as applyHistory } from '@deepseek-ai/dsh-evolution-skill-history'
 
@@ -14,7 +13,6 @@ export const inject: string[] = []
 
 /** Mount the four panel host halves through their existing owners. */
 export function apply(ctx: Context): void {
-  applySettings()
   applyMerge()
   applyHistory(ctx)
 }

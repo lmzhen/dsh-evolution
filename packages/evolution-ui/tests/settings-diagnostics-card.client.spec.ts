@@ -14,9 +14,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { createElement } from 'react'
 import type { DiagnosticsView } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
 import type { RouteAnswer } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
-import { DiagnosticsCard } from '../src/client/DiagnosticsCard.ts'
+import { DiagnosticsCard } from '../src/panels/settings/DiagnosticsCard.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
-import { formatText } from '../src/client/messages.ts'
+import { formatText } from '../src/panels/settings/messages.ts'
 
 const t = (key: string, values?: Readonly<Record<string, string | number>>): string => formatText(key as never, values)
 

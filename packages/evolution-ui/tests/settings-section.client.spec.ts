@@ -16,10 +16,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
-import { apply, SECTION_ID } from '../src/client/index.ts'
-import { CLIENT_ROW_SEATS } from '../src/client/generated-params.ts'
-import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey } from '../src/client/seam.ts'
-import { createSourceCache, PROJECTION_FAILED, SEAT_MISSING, type SeatProbe } from '../src/client/source.ts'
+import { apply, SECTION_ID } from '../src/panels/settings/index.ts'
+import { CLIENT_ROW_SEATS } from '../src/panels/settings/generated-params.ts'
+import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey } from '../src/panels/settings/seam.ts'
+import { createSourceCache, PROJECTION_FAILED, SEAT_MISSING, type SeatProbe } from '../src/panels/settings/source.ts'
 
 /**
  * `createElement` narrowed for the renderer: this package carries its own minimal ambient React surface, so

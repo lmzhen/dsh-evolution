@@ -5,10 +5,10 @@
  * failed are three different states — the E7 lesson, asserted here so no later edit can merge them).
  */
 import { describe, expect, it, vi } from 'vitest'
-import { createApprovalApi, type PendingRow } from '../src/client/api.ts'
+import { createApprovalApi, type PendingRow } from '../src/panels/settings/api.ts'
 import {
   beginAction, collapsed, endAction, expanded, failed, INITIAL_PENDING_STATE, loaded, loading, noticed, previewArrived,
-} from '../src/client/pending-state.ts'
+} from '../src/panels/settings/pending-state.ts'
 import { ROUTES } from '@lmzhen/dsh-evolution-client-kit/generated/routes'
 
 const row = (over: Partial<PendingRow> = {}): PendingRow => ({

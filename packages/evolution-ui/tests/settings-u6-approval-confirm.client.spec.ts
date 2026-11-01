@@ -14,9 +14,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import type { ApprovalApi, PendingRow } from '../src/client/api.ts'
-import { formatText, type MessageKey } from '../src/client/messages.ts'
-import { PendingCard, confirmModeFrom, type PendingCardFace } from '../src/client/PendingCard.ts'
+import type { ApprovalApi, PendingRow } from '../src/panels/settings/api.ts'
+import { formatText, type MessageKey } from '../src/panels/settings/messages.ts'
+import { PendingCard, confirmModeFrom, type PendingCardFace } from '../src/panels/settings/PendingCard.ts'
 
 /** One row, the shape the pending window reports. */
 const row = (over: Partial<PendingRow> = {}): PendingRow => ({

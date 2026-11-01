@@ -8,10 +8,10 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import { createElement } from 'react'
-import { CSS } from '../src/client/styles.ts'
-import { formatText, message, type MessageKey } from '../src/client/messages.ts'
-import { PendingCard } from '../src/client/PendingCard.ts'
-import type { ApprovalApi } from '../src/client/api.ts'
+import { CSS } from '../src/panels/settings/styles.ts'
+import { formatText, message, type MessageKey } from '../src/panels/settings/messages.ts'
+import { PendingCard } from '../src/panels/settings/PendingCard.ts'
+import type { ApprovalApi } from '../src/panels/settings/api.ts'
 
 describe('U-7: the free accessibility baseline', () => {
   it('every focus ring is :focus-visible', () => {

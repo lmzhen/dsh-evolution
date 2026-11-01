@@ -5,9 +5,6 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../evolution-settings-ui"
-    },
-    {
       "path": "../evolution-merge-ui"
     },
     {
@@ -15,6 +12,9 @@
     },
     {
       "path": "../evolution-skill-health"
+    },
+    {
+      "path": "../evolution-client-kit"
     },
     {
       "path": "../evolution-client-kit"

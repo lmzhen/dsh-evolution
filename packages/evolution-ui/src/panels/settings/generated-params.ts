@@ -145,6 +145,6 @@ export interface ClientRowSeat {
 /** Every (bundle, row) pair the Plugins page can open a configuration page for. */
 export const CLIENT_ROW_SEATS: readonly ClientRowSeat[] = [
   { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-merge', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
-  { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-merge', 'evolution-review', 'memory-files'] },
-  { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-merge', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
+  { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files'] },
+  { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
 ]

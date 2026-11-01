@@ -24,7 +24,7 @@ export const ROW_CONFIG_SLOT = 'plugins.row.config'
  *
  * Spelled here because the page's own helper cannot be imported (a value import from
  * another plugin's client half is forbidden):
- * `ui-plugin-manager/src/client/config-ledger.ts:36` is the definition this mirrors.
+ * `ui-plugin-manager`'s config-ledger module is the definition this mirrors.
  * @param bundle - the bundle package name that declares the row.
  * @param rowId - the row id that bundle's patch declares.
  * @returns the `plugins.row.config` key.

@@ -3,7 +3,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/client
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { apply as applySettings } from '@deepseek-ai/dsh-evolution-settings-ui/client'
+import { apply as applySettings } from '../panels/settings/index.ts'
 import { apply as applyMerge } from '@deepseek-ai/dsh-evolution-merge-ui/client'
 import { apply as applyHistory } from '@deepseek-ai/dsh-evolution-skill-history/client'
 

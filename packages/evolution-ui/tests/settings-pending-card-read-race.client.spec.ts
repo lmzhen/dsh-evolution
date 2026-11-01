@@ -8,8 +8,8 @@
 import { describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
-import { formatText } from '../src/client/messages.ts'
-import { PendingCard, type PendingCardFace } from '../src/client/PendingCard.ts'
+import { formatText } from '../src/panels/settings/messages.ts'
+import { PendingCard, type PendingCardFace } from '../src/panels/settings/PendingCard.ts'
 
 // `createElement` narrowed for the renderer, exactly as PendingCard.client.spec.ts does: this package
 // carries its own minimal ambient React surface (no react package in the build tree), so the element

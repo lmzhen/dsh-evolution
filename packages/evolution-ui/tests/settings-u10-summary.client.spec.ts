@@ -15,8 +15,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
-import { FAMILY_VERSION, PACKAGE_PURPOSE } from '../src/client/generated-about.ts'
-import { SettingsSection } from '../src/client/SettingsSection.ts'
+import { FAMILY_VERSION, PACKAGE_PURPOSE } from '../src/panels/settings/generated-about.ts'
+import { SettingsSection } from '../src/panels/settings/SettingsSection.ts'
 
 /** `createElement` narrowed for the renderer (the package carries its own minimal ambient React surface). */
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]

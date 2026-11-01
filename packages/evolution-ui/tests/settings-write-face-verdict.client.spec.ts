@@ -6,7 +6,7 @@
 // CONSTANT `true`, so a refusal the platform reported was recorded as an accepted write. The
 // docblock above them already claimed they returned the verdict - the code did not.
 import { describe, expect, it } from 'vitest'
-import { writeFaceFor } from '../src/client/source.ts'
+import { writeFaceFor } from '../src/panels/settings/source.ts'
 
 const seat = (verdict: boolean) => ({
   getSnapshot: () => ({ status: 'ready' }),

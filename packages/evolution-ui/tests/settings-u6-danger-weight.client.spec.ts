@@ -16,9 +16,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import type { ApprovalApi, PendingRow } from '../src/client/api.ts'
-import { formatText, message, type MessageKey } from '../src/client/messages.ts'
-import { PendingCard } from '../src/client/PendingCard.ts'
+import type { ApprovalApi, PendingRow } from '../src/panels/settings/api.ts'
+import { formatText, message, type MessageKey } from '../src/panels/settings/messages.ts'
+import { PendingCard } from '../src/panels/settings/PendingCard.ts'
 
 const row: PendingRow = {
   id: 'p-1', kind: 'skill', summary: 'patch skill "alpha"',

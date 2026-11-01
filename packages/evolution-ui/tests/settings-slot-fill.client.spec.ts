@@ -5,7 +5,7 @@
  * are the ones a caller depends on: a supplied slot is substituted, an UNKNOWN one is left standing.
  */
 import { describe, expect, it } from 'vitest'
-import { en, fill, formatText } from '../src/client/messages.ts'
+import { en, fill, formatText } from '../src/panels/settings/messages.ts'
 
 describe('the single slot filler (G5 C4)', () => {
   it('substitutes every supplied slot', () => {

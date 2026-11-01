@@ -9,9 +9,9 @@
 import { describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { createElement } from 'react'
-import { CLIENT_PARAM_SECTIONS } from '../src/client/generated-params.ts'
-import { formatText, type MessageKey } from '../src/client/messages.ts'
-import { RowConfigCard } from '../src/client/RowConfigCard.ts'
+import { CLIENT_PARAM_SECTIONS } from '../src/panels/settings/generated-params.ts'
+import { formatText, type MessageKey } from '../src/panels/settings/messages.ts'
+import { RowConfigCard } from '../src/panels/settings/RowConfigCard.ts'
 
 const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string => formatText(key, values)
 const section = CLIENT_PARAM_SECTIONS.find(candidate => candidate.namespace === 'evolution-curator')
