@@ -1284,3 +1284,5 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
   ctx.effect(() => ctx.evolutionStateStorage.registerProvider(provider), 'evolution-state-json.provider')
 }
+
+export { JsonStateStore } from './state-store.ts'
