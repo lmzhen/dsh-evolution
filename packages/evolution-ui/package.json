@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-ui",
   "description": "Web UI umbrella for the evolution family: settings, merge, skill history and skill health panels",
-  "version": "0.32.0",
+  "version": "0.32.1",
   "publishConfig": {
     "access": "public"
   },

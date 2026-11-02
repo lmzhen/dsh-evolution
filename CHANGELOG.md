@@ -1,4 +1,8 @@
 # Changelog
+## 0.32.1 (fix) — evolution-all installs the evolution-ui it mounts
+
+> **范围**：`@lmzhen/dsh-evolution-all@0.32.0` 的 bundle patch 挂载 `evolution-ui`，但 package.json 未声明该依赖，真实 profile 安装后缺包。0.32.1 补齐 `evolution-all` 对 `evolution-ui` 的依赖；其余包内容与 0.32.0 相同。
+> **验证**：以 npm 0.32.0 真机安装复现缺包；修复后由 tag CI validate/publish，再在 web profile 复验 UI 路线。
 ## 0.32.0 (feature) — 36-package family: evolution-ui umbrella, contract/state seams, release-line cleanup
 
 > **范围**：`evolution-ui` 统一承载 settings 与 skill-history 面板，删除已迁移的 settings-ui / skill-history 包；新增 `evolution-contract`；state/IO、discovery、lifecycle、merge、memory/tools 及门禁随架构线收口；发布面由 37 包收敛到 36 包。
