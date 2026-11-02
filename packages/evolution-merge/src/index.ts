@@ -3,7 +3,7 @@ import z from '@deepseek-ai/schemastery'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
-type Context = CordisContext & HostContext
+type Context = Omit<CordisContext, 'logger'> & HostContext
 import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
