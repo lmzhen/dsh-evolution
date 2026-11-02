@@ -757,6 +757,26 @@ describe('layered installer', () => {
     expect(error?.stderr).not.toContain('--version')
   }, 20_000)
 
+  it('P2-38: npm files globs match ** as zero-or-more directories', async () => {
+    const helper = new URL('../../scripts/files-glob.mjs', import.meta.url).href
+    const body = [
+      `import { coveredByFiles } from ${JSON.stringify(helper)}`,
+      "const cases = [" ,
+      "  [['lib/**/*.js'], 'lib/index.js', true],",
+      "  [['lib/**/*.js'], 'lib/a/b.js', true],",
+      "  [['lib/*.js'], 'lib/a/b.js', false],",
+      "  [['lib/types/**/*.d.ts'], 'lib/types/index.d.ts', true],",
+      "  [['lib'], 'lib/index.js', true],",
+      "  [['**/*.js'], 'index.js', true],",
+      "  [['lib/**/index.js'], 'lib/index.js', true],",
+      "  [['lib/**/index.js'], 'lib/a/index.js', true],",
+      "]",
+      'process.stdout.write(JSON.stringify(cases.map(([files, rel]) => coveredByFiles(files, rel))))',
+    ].join('\n')
+    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', body])
+    expect(JSON.parse(stdout)).toEqual([true, true, false, true, true, true, true, true])
+  }, 20_000)
+
   it('P2-35: only a definite npm E404 is an absent package/version', async () => {
     const helper = new URL('../../scripts/npm-view.mjs', import.meta.url).href
     const body = [

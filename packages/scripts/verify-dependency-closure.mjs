@@ -40,6 +40,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, extname, join, relative, resolve } from 'node:path'
+import { coveredByFiles } from './files-glob.mjs'
 
 const root = process.argv[2]
 if (!root || !existsSync(root)) {
@@ -62,38 +63,7 @@ const offenders = []
 const unreferenced = []
 const undeclaredAssets = []
 
-/**
- * Does the manifest's \`files\` list cover this package-relative path? npm
- * semantics: an exact entry matches, a directory entry covers its subtree, and
- * a "star" matches inside one segment (the only glob npm documents there).
- */
-function coveredByFiles(list, rel) {
-  if (!Array.isArray(list)) return false
-  for (const raw of list) {
-    let pattern = String(raw)
-    if (pattern.startsWith('./')) pattern = pattern.slice(2)
-    if (pattern.endsWith('/')) pattern = pattern.slice(0, -1)
-    if (pattern === rel || rel.startsWith(pattern + '/')) return true
-    if (!pattern.includes('*')) continue
-    const segments = pattern.split('*')
-    let cursor = 0
-    let matched = true
-    for (let index = 0; index < segments.length; index += 1) {
-      const segment = segments[index]
-      if (index === 0) {
-        if (!rel.startsWith(segment)) { matched = false; break }
-        cursor = segment.length
-        continue
-      }
-      const found = rel.indexOf(segment, cursor)
-      if (found === -1) { matched = false; break }
-      if (index === segments.length - 1 && found + segment.length !== rel.length) { matched = false; break }
-      cursor = found + segment.length
-    }
-    if (matched) return true
-  }
-  return false
-}
+
 let inspected = 0
 let declarationCount = 0
 let assetCount = 0
@@ -214,7 +184,13 @@ for (const dir of readdirSync(root)) {
       if (!existsSync(abs) || !abs.startsWith(resolve(pkgDir))) continue
       const rel = relative(pkgDir, abs).split('\\').join('/')
       assetCount += 1
-      if (coveredByFiles(manifest.files, rel)) continue
+      // P2-38: a source asset is shipped through its built counterpart. Accept
+      // the lib/ (or lib/types/) path ONLY when that file actually exists, so
+      // this never turns a missing build output into a false pass.
+      const candidates = [rel]
+      if (rel.startsWith('src/')) candidates.push('lib/' + rel.slice(4), 'lib/types/' + rel.slice(4))
+      const shipped = candidates.filter(candidate => candidate === rel || existsSync(join(pkgDir, candidate)))
+      if (shipped.some(candidate => coveredByFiles(manifest.files, candidate))) continue
       undeclaredAssets.push({ pkg: dir, asset: rel, from: relative(pkgDir, file).split('\\').join('/') })
     }
   }
