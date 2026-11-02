@@ -121,7 +121,7 @@ export function apply(ctx: ClientContext): void {
   // each render and falls back to the shipped default. `getSnapshot` is synchronous BY DESIGN — the
   // card has no hook compartment, and a value captured once would pin the gate for the fiber's life.
   const approvalSource = sources.sourceFor('evolution-approval')
-  const confirmMode = (): 'auto' | 'ask' | 'timeout' => confirmModeFrom(approvalSource.getSnapshot().user)
+  const confirmMode = (): 'auto' | 'ask' => confirmModeFrom(approvalSource.getSnapshot().user)
   // T5-11/A66: the platform's own "this service arrived" channel. The lazy probe alone left a card
   // that had already rendered its "no settings surface" state stuck there when the shell mounted
   // LATER (nothing tells React to read again), and the row's subscription was never attached. The

@@ -30,7 +30,7 @@ export interface PendingCardFace {
    * U-6 (registry `approvalConfirm`): read PER RENDER, like the entry's own seat probe — a value
    * captured once would pin the gate for the life of the fiber. Absent ⇒ the shipped default `auto`.
    */
-  confirmMode?: () => 'auto' | 'ask' | 'timeout'
+  confirmMode?: () => 'auto' | 'ask'
   /** G5/W7 S4: the command-face fallback rendered with an unreachable/unauthenticated failure. */
   fallback?: FallbackHint | undefined
 }
@@ -43,9 +43,10 @@ export interface PendingCardFace {
  * future version must not silently turn the confirmation ON, and a typo must not turn it off. The
  * independent review flagged that this reader had no case at all (P2-11).
  */
-export function confirmModeFrom(user: unknown): 'auto' | 'ask' | 'timeout' {
+export function confirmModeFrom(user: unknown): 'auto' | 'ask' {
   const value = typeof user === 'object' && user !== null ? (user as Record<string, unknown>).approvalConfirm : undefined
-  return value === 'ask' || value === 'timeout' ? value : 'auto'
+  // A legacy `timeout` value migrates to `ask`; it never falls back to auto-execute.
+  return value === 'ask' || value === 'timeout' ? 'ask' : 'auto'
 }
 
 /** Which word one age bucket gets; an unknown bucket falls back to the count form. */

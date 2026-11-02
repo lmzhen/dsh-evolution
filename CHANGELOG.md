@@ -1,7 +1,7 @@
 # Changelog
 ## Unreleased — Batch 0: delete create-time assignment and shadow dead paths
 
-> **范围**：删除 create-time assignment/classification 全链路（service/queue/sidecar/worker/tests/exports/config/command confirm）、shadow/auto 模式、maxVisibleDepth、canHide/hiddenRecoverable；map 仅保留显式只读 experimental，mode 收敛为 off|on；删除 cross-process 声明，统一诚实 single-process。旧 pending/map 数据只读归档，不自动 apply。
+> **范围**：删除 create-time assignment/classification 全链路（service/queue/sidecar/worker/tests/exports/config/command confirm）、shadow/auto 模式、maxVisibleDepth、canHide/hiddenRecoverable；map 仅保留显式只读 experimental，mode 收敛为 off|on；删除 cross-process 声明，统一诚实 single-process；approvalConfirm 不再暴露/接受新 timeout（旧值迁移为 ask，控制面实现后再恢复）。旧 pending/map 数据只读归档，不自动 apply。
 > **验证**：main-entry 实际加载通过；待 mirror CI 的 tsc/组测试/门禁复核；本轮无发布。
 ## 0.32.3 (fix) — discovery MAP-007 restore/journal and projection dedupe P0s
 

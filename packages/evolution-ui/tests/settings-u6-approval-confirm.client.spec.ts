@@ -37,7 +37,7 @@ const windowStub = (waiting: readonly PendingRow[]) =>
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
 /** One face over a scripted api, with the gate mode the registry would report. */
-function face(api: Partial<ApprovalApi>, mode: 'auto' | 'ask' | 'timeout'): PendingCardFace {
+function face(api: Partial<ApprovalApi>, mode: 'auto' | 'ask'): PendingCardFace {
   const complete: ApprovalApi = {
     pending: windowStub([row()]),
     approve: async () => ({ ok: true, data: null }),
@@ -62,7 +62,8 @@ describe('U-6: the approval confirmation gate (registry approvalConfirm)', () =>
     // The reader the entry wires into the card's face. One definition, exported, so the mapping is
     // judgeable without mounting the plugin entry — the review found this path had no case at all.
     expect(confirmModeFrom({ approvalConfirm: 'ask' })).toBe('ask')
-    expect(confirmModeFrom({ approvalConfirm: 'timeout' })).toBe('timeout')
+    // A legacy `timeout` migrates to ask; it must never become auto-execute.
+    expect(confirmModeFrom({ approvalConfirm: 'timeout' })).toBe('ask')
     expect(confirmModeFrom({ approvalConfirm: 'auto' })).toBe('auto')
     // Defaults: no user layer, an empty one, junk, or a value a FUTURE version might write.
     expect(confirmModeFrom(undefined)).toBe('auto')
