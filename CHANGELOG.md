@@ -1,4 +1,8 @@
 # Changelog
+## Unreleased — Batch 0: delete create-time assignment and shadow dead paths
+
+> **范围**：删除 create-time assignment/classification 全链路（service/queue/sidecar/worker/tests/exports/config/command confirm）；map 仅保留显式只读 experimental。shadow 分支删除作为同批后续项，未在本提交完成。旧 pending/map 数据只读归档，不自动 apply。
+> **验证**：main-entry 实际加载通过；待 mirror CI 的 tsc/组测试/门禁复核；本轮无发布。
 ## 0.32.3 (fix) — discovery MAP-007 restore/journal and projection dedupe P0s
 
 > **范围**：修复审计确认的两个 mode:on P0：restore 被旧 session catalog/journal 记录覆盖、projected-only 冷会话 fail-open 成 hidden；以及 compaction/restart 同 digest 重复追加投影。同步补齐 description stale producer、search health fail-open、card-only projection、per-window policy 与 EVAL 语料规模/top3 断言。

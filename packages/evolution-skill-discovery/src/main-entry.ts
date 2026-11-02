@@ -24,10 +24,6 @@ import { buildGenerationRequest, resolveGenerationPort } from './generation-comp
 import { DOMAIN_GENERATION_PROMPT_VERSION, buildDomainGenerationPrompt } from './domain-generation-prompt.ts'
 import { ViewSnapshotStore } from './view-snapshot-store.ts'
 import { skillKeyOf } from './identity.ts'
-import { DomainAssignmentService } from './assignment.ts'
-import { JsonAssignmentQueue } from './assignment-queue.ts'
-import { AssignmentWorker } from './worker.ts'
-import { installAssignmentSidecar } from './assignment-sidecar.ts'
 import { installDiscoveryAwareness } from './awareness.ts'
 import { markStaleDescriptions, refreshStaleDescriptions } from './description-refresh.ts'
 
@@ -39,9 +35,6 @@ export interface Config {
   readonly domainMapPath?: string | undefined
   readonly projectionJournalPath?: string | undefined
   readonly viewSnapshotPath?: string | undefined
-  readonly assignmentQueuePath?: string | undefined
-  readonly createClassificationEnabled?: boolean | undefined
-  readonly provisionalThreshold?: number | undefined
   readonly mapReferenceCwd?: string | undefined
   readonly mapReferenceScope?: string | undefined
   readonly generationProvider?: string | undefined
@@ -180,11 +173,6 @@ export function apply(ctx: Context, config: Config): void {
     descriptionStaleAfterHours,
     isFrozen: async agent => snapshots.isFrozen(String(agent.session.id), config.featureEpoch),
   })
-  const queue = new JsonAssignmentQueue(io, config.assignmentQueuePath ?? join(root, 'evolution', 'assignment-queue.json'), ctx.get('evolutionStateStore'))
-  const assignment = new DomainAssignmentService(queue, map, { createClassificationEnabled: config.createClassificationEnabled ?? false, ...config.provisionalThreshold === undefined ? {} : { provisionalThreshold: config.provisionalThreshold }, now: Date.now })
-  const worker = new AssignmentWorker(assignment, queue)
-  void queue.load().then(() => worker.drain()).catch(() => { ctx.logger.warn('evolution-skill-discovery: assignment queue load failed; queued work stays for the next start') })
-  installAssignmentSidecar(ctx, assignment, { onSubmitted: () => { void worker.drain().catch(error => { ctx.logger.warn('evolution-skill-discovery: assignment drain failed: ' + (error instanceof Error ? error.message : String(error))) }) } })
   ctx.on('agent/created', async ({ agent, source: start }) => {
     try { installDiscoveryAwareness(agent.ctx as Context) } catch (error) { ctx.logger.warn('evolution-skill-discovery: awareness install failed: ' + (error instanceof Error ? error.message : String(error))) }
     if (start !== 'startup') return
@@ -223,13 +211,7 @@ export function apply(ctx: Context, config: Config): void {
           const report = runtime.report(agent)
           return { kind: 'success' as const, text: 'discovery mode=' + mode + '; view=' + view.viewKey + '; phase=' + state.phase + ' map=' + state.map + ' search=' + state.search + ' policy=' + state.policy + ' last=' + report.action + (state.reasons.length === 0 ? '' : ' reasons=' + state.reasons.join(',')) + '\n' + rows.join('\n') }
         }
-        if (action === 'confirm') {
-          const domainId = rawInput.trim().split(/\s+/)[1]
-          if (domainId === undefined) return { kind: 'error' as const, text: 'Usage: /skill-domain confirm <id>' }
-          const confirmed = await assignment.confirm(domainId)
-          return confirmed ? { kind: 'success' as const, text: 'Confirmed domain ' + domainId + '.' } : { kind: 'error' as const, text: 'Unknown or non-provisional domain: ' + domainId }
-        }
-        if (action !== 'generate') return { kind: 'error' as const, text: 'Usage: /skill-domain status | generate | confirm <id>' }
+        if (action !== 'generate') return { kind: 'error' as const, text: 'Usage: /skill-domain status | generate' }
         if (coordinator === undefined) return { kind: 'error' as const, text: 'Generation is unavailable: no llm/generation port is mounted.' }
         if (config.mapReferenceCwd === undefined) return { kind: 'error' as const, text: 'No mapReferenceCwd configured; refusing to generate a global map from the caller view.' }
         const view = await index.read({ cwd: config.mapReferenceCwd, scopeKey: config.mapReferenceScope ?? String(agent.id), scope: agent })

@@ -33,7 +33,6 @@ export * from './domain-projection.ts'
 
 export * from './tool.ts'
 
-export * from './assignment.ts'
 
 
 
@@ -41,7 +40,6 @@ export * from './security.ts'
 
 
 
-export * from './assignment-sidecar.ts'
 
 
 export * from './awareness.ts'
@@ -53,7 +51,6 @@ export * from './domain-bootstrap.ts'
 
 export * from './domain-generation-service.ts'
 
-export * from './assignment-queue.ts'
 
 
 export * from './domain-generation-prompt.ts'

@@ -4,7 +4,7 @@ Read model and view identity for evolution skill discovery (Program B, PLAN-DISC
 
 ## Status
 
-The package has a real `apply`, is referenced by the `evolution-all` bundle row, and is booted from a test `cordis.yml` through the Loader. The model-facing surface is `skill_search` plus injected domain cards; `skill_domains` remains OUT-006/UI-001 and is not registered. DomainMap bootstrap, persistent assignment queue, prompt constants, and the v0 gates are implemented. The optional command surface is `/skill-domain list` and `/skill-domain confirm <id>` for provisional domains; approval is optional (default: no approval). Approval-completed enqueue seam and preset-scope coverage are covered; remaining strength work is shadow silent-miss evidence. Shadow sampling and promotion evidence, disabled-domain search e2e, and Loader boot are covered in tests.
+The package has a real `apply`, is referenced by the `evolution-all` bundle row, and is booted from a test `cordis.yml` through the Loader. The model-facing surface is `skill_search` plus injected, read-only domain cards. DomainMap bootstrap, explicit generation, and projection are implemented. Create-time assignment/classification and shadow mode are not shipped; provisional domains are not auto-promoted. The command surface is `/skill-domain status | generate`. The map plane is explicit experimental: default `mode:off`, no catalog rewrite or hidden skills.
 
 ## Contract
 
