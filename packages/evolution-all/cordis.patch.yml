@@ -140,9 +140,9 @@
       name: '@deepseek-ai/dsh-evolution-skill-health'
       disabled: true
 
-    # ── web UI: settings cards + skill history + merge panel ─────────────────
-    # Web UI umbrella: one row mounts the three panel rows (settings cards, skill history, merge panel).
-    # The packages stay installed as dependencies until their client code moves here; health stays its own disabled row.
+    # ── web UI: settings cards + skill history ───────────────────────────────
+    # Web UI umbrella: this row mounts the settings cards and skill-history panels.
+    # The merge panel is the separate client-only evolution-merge-ui package; health stays its own disabled row.
     - id: evolution-ui
       name: '@deepseek-ai/dsh-evolution-ui'
 

@@ -9,4 +9,4 @@
 export const FAMILY_VERSION = '0.32.3'
 
 /** What this surface is for, in one line. */
-export const PACKAGE_PURPOSE = 'Web UI umbrella for the evolution family: settings, merge, skill history and skill health panels'
+export const PACKAGE_PURPOSE = 'Web UI umbrella for the evolution family: settings and skill-history panels'

@@ -498,7 +498,7 @@
     {
       "id": "evolution-ui",
       "banners": {
-        "all": "    # ── web UI: settings cards + skill history + merge panel ─────────────────"
+        "all": "    # ── web UI: settings cards + skill history ───────────────────────────────"
       }
     },
     {
@@ -1219,8 +1219,8 @@
         "all"
       ],
       "lead": [
-        "    # Web UI umbrella: one row mounts the three panel rows (settings cards, skill history, merge panel).",
-        "    # The packages stay installed as dependencies until their client code moves here; health stays its own disabled row."
+        "    # Web UI umbrella: this row mounts the settings cards and skill-history panels.",
+        "    # The merge panel is the separate client-only evolution-merge-ui package; health stays its own disabled row."
       ],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-ui'"

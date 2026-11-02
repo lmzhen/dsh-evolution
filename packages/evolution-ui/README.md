@@ -1,8 +1,8 @@
 # @deepseek-ai/dsh-evolution-ui
 
-Web UI umbrella for the evolution family. The settings and skill-history panels now live here; the merge panel still delegates to its package until that client code moves.
+Web UI umbrella for the evolution family. This package registers two client panels: the settings section and skill history.
 
 ## Known Limitations and Deferred Work
 
-- The merge panel is still a dependency and is mounted through its `apply` export.
+- The merge panel is the separate client-only `@deepseek-ai/dsh-evolution-merge-ui` package; it is not mounted by this umbrella.
 - The skill-health panel stays a separate disabled row; it is not enabled by this umbrella.
