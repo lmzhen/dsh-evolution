@@ -26,7 +26,10 @@ async function fixture(options: { missingEntry?: boolean } = {}) {
   }, null, 2))
   if (options.missingEntry !== true) await writeFile(join(packageDir, 'index.js'), 'export const ok = true\n')
   await writeFile(join(packageDir, 'cordis.patch.yml'), '- insert: []\n')
-  execFileSync('tar', ['-czf', join(dist, 'packed-fixture.tgz'), '-C', src, 'package'])
+  // GNU tar on Windows treats `C:` in an absolute -f/-C argument as a remote
+  // host (`tar (child): Cannot connect to C:`). Relative paths + cwd avoid the
+  // colon entirely, so the fixture is portable across GNU tar and bsdtar.
+  execFileSync('tar', ['-czf', 'dist/packed-fixture.tgz', '-C', 'src', 'package'], { cwd: root })
   await writeFile(join(dist, 'manifest.json'), JSON.stringify({ '@lmzhen/packed-fixture': 'packed-fixture.tgz' }))
   return { root, dist, platform }
 }
