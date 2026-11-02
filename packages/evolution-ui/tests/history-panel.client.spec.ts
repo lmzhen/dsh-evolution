@@ -162,6 +162,24 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     expect(screen.queryByText('late')).toBeNull()
   })
 
+  it('P2-30: a stale read cannot erase a newer generation that is already ready', async () => {
+    const slow = deferred<{ v: number; display: string; chars: number; truncated: boolean }>()
+    const loadBody = vi.fn((name: string, v: number) => name === 'alpha'
+      ? slow.promise
+      : Promise.resolve({ v, display: '# body-of-' + name, chars: 5, truncated: false }))
+    render(createElement(SkillHistoryPanel, makeFace({ loadBody })))
+    await openSkill('alpha')
+    const previews = (): HTMLElement[] => screen.getAllByRole('button', { name: /^preview\./ })
+    fireEvent.click(previews()[0]!)
+    await waitFor(() => { expect(loadBody).toHaveBeenCalledWith('alpha', 1) })
+    await openSkill('beta')
+    fireEvent.click(previews()[0]!)
+    await screen.findByText('# body-of-beta')
+    slow.resolve({ v: 1, display: '# late-alpha', chars: 4, truncated: false })
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(screen.queryByText('# body-of-beta')).not.toBeNull()
+  })
+
   it('points at the left column while nothing is selected, and reports a refusal instead of still reading (T5-09)', async () => {
     const view = render(createElement(SkillHistoryPanel, makeFace({
       loadVersions: async () => { throw new Error('boom') },

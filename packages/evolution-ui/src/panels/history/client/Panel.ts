@@ -187,23 +187,23 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     const ticket = readTicket.current + 1
     readTicket.current = ticket
     if (kind === 'diff') {
-      setDiffs(current => new Map(current).set(v, { kind: 'loading' }))
+      setDiffs(current => new Map(current).set(v, { kind: 'loading', ticket }))
       void face.loadDiff(name, v).then((diff) => {
-        if (readTicket.current !== ticket) { setDiffs(current => without(current, v)); return }
-        setDiffs(current => new Map(current).set(v, { kind: 'ready', diff }))
+        if (readTicket.current !== ticket) { setDiffs(current => dropIfTicket(current, v, ticket)); return }
+        setDiffs(current => new Map(current).set(v, { kind: 'ready', diff, ticket }))
       }).catch((error: unknown) => {
-        if (readTicket.current !== ticket) { setDiffs(current => without(current, v)); return }
-        setDiffs(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error) }))
+        if (readTicket.current !== ticket) { setDiffs(current => dropIfTicket(current, v, ticket)); return }
+        setDiffs(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error), ticket }))
       })
       return
     }
-    setBodies(current => new Map(current).set(v, { kind: 'loading' }))
+    setBodies(current => new Map(current).set(v, { kind: 'loading', ticket }))
     void face.loadBody(name, v).then((body) => {
-      if (readTicket.current !== ticket) { setBodies(current => without(current, v)); return }
-      setBodies(current => new Map(current).set(v, { kind: 'ready', body }))
+      if (readTicket.current !== ticket) { setBodies(current => dropIfTicket(current, v, ticket)); return }
+      setBodies(current => new Map(current).set(v, { kind: 'ready', body, ticket }))
     }).catch((error: unknown) => {
-      if (readTicket.current !== ticket) { setBodies(current => without(current, v)); return }
-      setBodies(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error) }))
+      if (readTicket.current !== ticket) { setBodies(current => dropIfTicket(current, v, ticket)); return }
+      setBodies(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error), ticket }))
     })
   }
 
@@ -283,15 +283,19 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
 }
 
 /**
- * The lazy-read cache without one key.
+ * Drop a superseded lazy read ONLY if the entry still belongs to that read.
  *
- * A read that a later toggle superseded must leave nothing behind: `loading` is not an answer, and
- * the cache also serves as the \u201cdo not read twice\u201d guard, so an abandoned entry would refuse every
- * later read of that row and leave it saying \u201cloading\u201d until the page is reloaded.
+ * P2-30: deleting by version key alone let a stale reply erase a NEWER read that
+ * had already reached `ready`, leaving the expanded row blank with no retry path.
  * @param current - the cache.
  * @param key - the version whose entry is dropped.
- * @returns a new cache without that key.
+ * @param ticket - the read that is being abandoned.
+ * @returns a new cache without that entry, or the current cache when it is not ours.
  */
+function dropIfTicket<K, V extends { readonly ticket?: number | undefined }>(current: ReadonlyMap<K, V>, key: K, ticket: number): ReadonlyMap<K, V> {
+  return current.get(key)?.ticket === ticket ? without(current, key) : current
+}
+
 function without<K, V>(current: ReadonlyMap<K, V>, key: K): Map<K, V> {
   const next = new Map(current)
   next.delete(key)

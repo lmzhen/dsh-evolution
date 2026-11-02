@@ -22,10 +22,10 @@ import type { Copy } from './chrome.ts'
 import { renderMarkdown, type MarkdownWords } from './markdown.ts'
 
 /** What one expanded diff holds: the change, still loading, or a refusal. */
-export type DiffState = { kind: 'loading' } | { kind: 'ready'; diff: VersionDiffRow } | { kind: 'failed'; message: string }
+export type DiffState = { kind: 'loading'; ticket?: number } | { kind: 'ready'; diff: VersionDiffRow; ticket?: number } | { kind: 'failed'; message: string; ticket?: number }
 
 /** What one expanded preview holds. */
-export type BodyState = { kind: 'loading' } | { kind: 'ready'; body: VersionBodyRow } | { kind: 'failed'; message: string }
+export type BodyState = { kind: 'loading'; ticket?: number } | { kind: 'ready'; body: VersionBodyRow; ticket?: number } | { kind: 'failed'; message: string; ticket?: number }
 
 /** What the reading face needs: the dictionary seat, plus the two words the platform renderer takes. */
 export interface DocumentFace extends Copy {
