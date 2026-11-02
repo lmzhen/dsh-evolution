@@ -17,18 +17,27 @@ export function parseCommand(defs: readonly CommandDef[], argv: readonly string[
   const [verb, ...rest] = argv
   if (verb === undefined || verb === 'help' || verb === '--help' || verb === '-h') return { ok: true, id: 'help', values: {}, help: true }
   const candidates = defs.filter(item => item.words.includes(verb))
-  const def = candidates.find(item => rest.filter(token => token.startsWith('--')).every(token => item.flags.some(flag => flag.name === token.slice(2)))) ?? candidates[0]
+  const def = candidates.find(item => rest.filter(token => token.startsWith('--')).every(token => {
+    const name = token.slice(2).split('=')[0] ?? ''
+    return item.flags.some(flag => flag.name === name)
+  })) ?? candidates[0]
   if (def === undefined) return { ok: false, code: 'usage', message: 'unknown command: ' + verb }
   const values: Record<string, string | true> = {}
   const positional: string[] = []
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] as string
     if (!token.startsWith('--')) { positional.push(token); continue }
-    const name = token.slice(2)
+    const eq = token.indexOf('=')
+    const name = (eq < 0 ? token : token.slice(0, eq)).slice(2)
+    const inline = eq < 0 ? undefined : token.slice(eq + 1)
     const flag = def.flags.find(item => item.name === name)
     if (flag === undefined) return { ok: false, code: 'usage', message: 'unknown flag: --' + name }
-    if (flag.kind === 'boolean') values[name] = true
+    if (flag.kind === 'boolean') {
+      if (inline !== undefined) return { ok: false, code: 'usage', message: 'flag does not take a value: --' + name }
+      values[name] = true
+    }
     else {
+      if (inline !== undefined) { values[name] = inline; continue }
       const value = rest[index + 1]
       if (value === undefined || value.startsWith('--')) return { ok: false, code: 'usage', message: 'missing value for --' + name }
       values[name] = value; index += 1

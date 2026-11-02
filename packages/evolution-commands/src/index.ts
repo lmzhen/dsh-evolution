@@ -436,7 +436,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         // G7.4/C7: the ONE parser answers the shape.
         const pendingParsed = parseSubcommand(input)
-        if (!isParseFailure(pendingParsed) && pendingParsed.name === 'pending') {
+        if (!isParseFailure(pendingParsed) && pendingParsed.name === 'pending'
+          && pendingParsed.positionals.length === 0
+          && [...pendingParsed.flags.keys()].every(flag => flag === 'detail')) {
           // 0.3.17 (S3.3): 'executing' rows (a previous approve crashed
           // mid-run) stay visible — approve will refuse to re-run them.
           // v29 CMD-05: the two lists come from independent provider
@@ -1623,7 +1625,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         // G7.4/C7: the ONE parser answers the shape (flag order and `=` tolerated, F-4).
         const paramsParsed = parseSubcommand(input)
-        if (!isParseFailure(paramsParsed) && paramsParsed.name === 'params') {
+        if (!isParseFailure(paramsParsed) && paramsParsed.name === 'params'
+          && paramsParsed.positionals.length === 0
+          && [...paramsParsed.flags.keys()].every(flag => flag === 'group' || flag === 'json')) {
           // S4.1: the READ face over the registry. Read-only and 0-token — the
           // text renders in the command surface, exactly like `maintain --facts`.
           const provider = ctx.get('settings') as SettingsProviderLike | undefined

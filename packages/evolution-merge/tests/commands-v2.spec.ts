@@ -40,6 +40,13 @@ it('force/expired/retry switches keep positional args', () => {
   assert.deepEqual(command(['discard', 'id']), { verb: 'discard', id: 'id' })
 })
 
+it('P2-26: accepts --flag=value in the merge parser', () => {
+  assert.deepEqual(command(['skipped', '--restore=id']), { verb: 'skipped', restore: 'id' })
+  assert.deepEqual(command(['resume', '--clear=id']), { verb: 'resume', clear: 'id' })
+  assert.deepEqual(command(['undo', 'target', '--run=r1']), { verb: 'undo', target: 'target', run: 'r1' })
+  assert.equal(parseMergeCommand(['pending', '--expired=yes']).ok, false)
+})
+
 it('rejects unknown flags and missing args', () => {
   assert.equal(parseMergeCommand(['discard']).ok, false)
   assert.equal(parseMergeCommand(['resume', '--nope']).ok, false)
