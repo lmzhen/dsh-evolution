@@ -105,6 +105,20 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     phase: 'running', approval: options.approval.mergeApproval ? 'pending' : 'approved',
     createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString(),
   })
+  const writeFailureMeta = async (stopReason: 'failed'): Promise<void> => {
+    try {
+      await writeRunMeta(options.io, options.home, {
+        version: 1, runId: handle.id, pid: process.pid,
+        ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }),
+        ...(options.pairKey === undefined ? {} : { pairKey: options.pairKey }),
+        ...(options.stagingRef === undefined ? {} : { stagingRef: options.stagingRef }),
+        pairCount: options.pairCount ?? (options.pairKey === undefined ? 0 : 1),
+        phase: 'settled', approval: 'approved', stopReason,
+        createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString(),
+      })
+    } catch { /* best-effort: the registry settle below remains authoritative */ }
+  }
+
   const finish = async (): Promise<WithMergeRunResult> => {
     let draft: MergeRunReportDraft
     const runController = new AbortController()
@@ -180,12 +194,14 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
       reportPath = await writeMergeReport(options.io, options.home, report)
     } catch (error) {
       await options.registry.settle(handle.id, { state: 'failed', failure: 'report write failed: ' + (error instanceof Error ? error.message : String(error)) })
+      await writeFailureMeta('failed')
       return { ok: false, runId: handle.id, message: 'report write failed' }
     }
     try {
       await draft.finalize?.()
     } catch (error) {
       await options.registry.settle(handle.id, { state: 'failed', resultRef: reportPath, failure: 'post-report finalize failed: ' + (error instanceof Error ? error.message : String(error)) })
+      await writeFailureMeta('failed')
       return { ok: false, runId: handle.id, message: 'post-report finalize failed', reportPath }
     }
     const runState = report.stopReason === 'completed'

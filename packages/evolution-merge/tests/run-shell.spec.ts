@@ -147,3 +147,20 @@ it('still writes a failed report when the body throws', async () => {
   const report = await readMergeReport(io, home, 'run-1')
   expect(report).toMatchObject({ kind: 'present', value: { stopReason: 'failed', notes: ['run body failed: round boom'] } })
 })
+
+it('P2-21: a finalize failure still leaves a settled run-meta, not a phantom pending approval', async () => {
+  const home = await tempRoot('dsh-merge-run-shell-finalize-fail-')
+  const io = nodeEvolutionIo()
+  const reg = registry()
+  const result = await withMergeRun({
+    io, home, registry: reg, command: 'approve', approval: { platformWrite: true, mergeApproval: true }, now: () => 200, pairKey: 'a\u0000b',
+    async body() {
+      return { stopReason: 'completed', scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 1, skipped: 0 } }, pairs: [], totals: { merged: 0, kept: 0, pending: 0, failed: 0 }, notes: [], finalize: async () => { throw new Error('finalize fixture') } }
+    },
+  })
+  expect(result.ok).toBe(false)
+  const meta = await readRunMeta(io, home, 'run-1')
+  expect(meta?.phase).toBe('settled')
+  expect(meta?.approval).toBe('approved')
+  expect(meta?.stopReason).toBe('failed')
+})
