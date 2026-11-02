@@ -67,17 +67,25 @@ export class EvolutionState extends Service {
     // That used to be a warn-once at the first state access; the judgement is that it belongs here, because
     // after the first read the deployment has already operated on the wrong medium. The pin is THIS row
     // config, which is exactly why the registry cannot make this call itself — it never sees the pin.
-    if (this.providerName === '' && ctx.evolutionStateStorage.providerNames().length > 1) {
-      const names = ctx.evolutionStateStorage.providerNames().join(', ')
-      throw new Error(
-        'evolution-state: ' + String(ctx.evolutionStateStorage.providerNames().length) + ' state providers are registered (' + names
-        + ') and this row pins none, so the effective medium would be registration order — a silent'
-        + ' rebind that leaves existing state on disk and unreadable. Pin one: provider: <name>.',
-      )
-    }
+    this.assertProviderChoice()
+  }
+
+  /** P2-5: the multi-provider refusal is not a mount-time-only check. A provider
+   * registered after this row mounted used to make registration order the effective
+   * medium with no pin — exactly the silent rebind the mount check exists to stop. */
+  private assertProviderChoice(): void {
+    if (this.providerName !== '') return
+    const names = this.ctx.evolutionStateStorage.providerNames()
+    if (names.length <= 1) return
+    throw new Error(
+      'evolution-state: ' + String(names.length) + ' state providers are registered (' + names.join(', ')
+      + ') and this row pins none, so the effective medium would be registration order — a silent'
+      + ' rebind that leaves existing state on disk and unreadable. Pin one: provider: <name>.',
+    )
   }
 
   private storage(): EvolutionStateStorage {
+    this.assertProviderChoice()
     return this.ctx.evolutionStateStorage.provider(this.providerName || undefined)
   }
 

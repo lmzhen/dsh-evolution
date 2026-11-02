@@ -46,6 +46,15 @@ describe('evolution-state', () => {
     await expect(ctx.plugin(EvolutionState)).rejects.toThrow(/pins none/)
   })
 
+  it('P2-5: a provider registered AFTER the row mounts is still refused without a pin', async () => {
+    const home = await tempRoot('dsh-state-late-provider-')
+    const ctx = await mountStateStack(home)
+    await ctx.plugin(EvolutionState)
+    const json = ctx.evolutionStateStorage.provider('json')
+    ctx.evolutionStateStorage.registerProvider({ ...json, name: 'domain' })
+    expect(() => ctx.evolutionState.loadReviewState('s1')).toThrow(/pins none/)
+  })
+
   it('G2b/2b.1: one provider needs no pin, and a pin clears the refusal', async () => {
     const home = await tempRoot('dsh-state-uniform-')
     const ctx = await mountStateStack(home)
