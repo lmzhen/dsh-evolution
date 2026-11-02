@@ -244,7 +244,7 @@ export interface DoctorReport {
    * per-session install reported `none` and the action ladder advised
    * installing `all` — which double-mounts the preset's model rows (the
    * exact conflict this report flags). */
-  installForm: 'full' | 'host' | 'preset' | 'layered' | 'preset-only' | 'none'
+  installForm: 'full' | 'human-gated' | 'host' | 'preset' | 'layered' | 'preset-only' | 'none'
   /** The PRODUCT form the install form implies (0.3.77, C axis). `variant` =
    * session-level opt-in: the model tools live in the Evolution preset, so a
    * session on any platform original preset carries none of the family and the
@@ -639,7 +639,7 @@ async function legacyMigrationRow(ctx: { get(name: string): unknown }, home: str
 
 export async function diagnose(
   ctx: { get(name: string): unknown },
-  options: { home?: string; mounted?: MountedProfile } = {},
+  options: { home?: string; mounted?: MountedProfile; runs?: { readonly running: number; readonly orphaned: number } } = {},
 ): Promise<DoctorReport> {
   const home = options.home ?? evolutionRoot()
   const mounted = options.mounted
@@ -775,13 +775,15 @@ export async function diagnose(
     }
   }
 
-  const installForm: DoctorReport['installForm'] = full ? 'full' : preset ? 'preset' : layered ? 'layered' : host ? 'host' : presetDirInstalled ? 'preset-only' : 'none'
+  const approval = ctx.get('evolutionApproval') as { readonly isEnabled?: boolean } | undefined
+  const humanGated = approval?.isEnabled === true
+  const installForm: DoctorReport['installForm'] = full || preset ? (humanGated ? 'human-gated' : full ? 'full' : 'preset') : layered ? 'layered' : host ? 'host' : presetDirInstalled ? 'preset-only' : 'none'
   // 0.3.77 (C axis): the install form in PRODUCT terms. The distinction decides
   // whether a platform original preset session is a family session at all — the
   // cross-session rows carry `sessionScoped: true` and answer it per session.
   const deploymentForm: DoctorReport['deploymentForm'] = installForm === 'layered'
     ? 'variant'
-    : installForm === 'full' || installForm === 'preset' ? 'attach' : installForm === 'host' ? 'host-only' : installForm === 'preset-only' ? 'preset-only' : 'none'
+    : installForm === 'full' || installForm === 'preset' || installForm === 'human-gated' ? 'attach' : installForm === 'host' ? 'host-only' : installForm === 'preset-only' ? 'preset-only' : 'none'
 
   // OPT-22 (2026-09): only real double-mount rows drive the action ladder's
   // "keep exactly one" advice. The enumeration/manifest DEGRADED detail also
@@ -869,7 +871,7 @@ export async function diagnose(
   // rest of the profile surface; the mounted identity is handed in by the caller (one probe for it
   // exists in preset-source.ts — doctor must not add a second).
   // G6/W8 tail: one view for every doctor face (text / --json / diagnostics route / client card).
-  const view = buildDoctorView(await assembleDoctorInputs(ctx as unknown as Parameters<typeof assembleDoctorInputs>[0]))
+  const view = buildDoctorView(await assembleDoctorInputs(ctx as unknown as Parameters<typeof assembleDoctorInputs>[0], options.runs === undefined ? {} : { runs: options.runs }))
   // Plan §2.3: evolution-commands owns the global doctor; the merge plugin contributes one line
   // built from ITS DoctorView envelope. A missing merge row is an honest unknown, not silence.
   const merge = await mergeDoctorLine(ctx)

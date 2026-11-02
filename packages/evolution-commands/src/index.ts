@@ -1761,7 +1761,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const mounted = mountedForDoctor === undefined
             ? {}
             : { mounted: { profile: mountedForDoctor.profile, dir: mountedForDoctor.profileDir, bundles: mountedForDoctor.bundles } }
-          const report = await diagnose(ctx, { home: evolutionRoot(), ...mounted })
+          const report = await diagnose(ctx, { home: evolutionRoot(), ...mounted, runs: doctorRuns() })
           // G6/W8 tail: --json answers the frozen DiagnosticsView (schemaVersion 2), the SAME object
           // the diagnostics route/client card consume.
           if (input === 'doctor --json') return ok(JSON.stringify(report.view, null, 2))

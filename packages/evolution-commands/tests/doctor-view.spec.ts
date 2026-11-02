@@ -181,6 +181,21 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     }
   })
 
+  it('P2-24: detects M2 when approval is enabled on a full bundle', async () => {
+    const ctx = new Context()
+    ctx.provide('agentPresets', {
+      list: async () => [{ id: REVIEWER_PRESET_ID }, { id: MAINTAINER_PRESET_ID }],
+      composedPreset: () => 'standard',
+    })
+    ctx.provide('subagents', { getProvider: () => undefined })
+    ctx.provide('pluginManager', { listBundles: async () => [{ name: '@deepseek-ai/dsh-evolution-all' }] })
+    ctx.provide('evolutionApproval', { isEnabled: true })
+    const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z') })
+    expect(assembled.form).toMatchObject({ id: 'M2', confidence: 'declared' })
+    const view = buildDoctorView(assembled)
+    expect(view.runtime.find(row => row.key === 'install-form-detected')?.detail).toContain('人工审批包')
+  })
+
   it('detects M4 when the host bundle plus the family agent preset are installed', async () => {
     const ctx = new Context()
     ctx.provide('agentPresets', {

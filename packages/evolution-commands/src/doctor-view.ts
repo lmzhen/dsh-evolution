@@ -104,7 +104,7 @@ const RUNTIME_LABELS: Readonly<Record<string, string>> = {
  */
 const FORM_WORDS: Readonly<Record<InstallFormId, string>> = Object.freeze({
   M1: '完整功能包',
-  M2: '后台自动化包',
+  M2: '人工审批包',
   M3: '会话预设包',
   M4: '分层安装',
 })
@@ -213,7 +213,7 @@ function runtimeOf(inputs: DoctorInputs): DiagnosticRow[] {
       ? { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务探测', status: 'ok', detail: '探测表中的服务均已挂载' }
       : { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务探测', status: 'warn', detail: '缺少：' + missing.join('、'), remedy: '安装行（evolution-host/evolution-all）或检查 profile 行。' },
     inputs.runs.orphaned > 0
-      ? { key: 'runs', label: RUNTIME_LABELS.runs ?? '运行登记', status: 'warn', detail: 'running=' + String(inputs.runs.running) + '，orphaned=' + String(inputs.runs.orphaned), remedy: '运行 /evolution runs 收敛遗留运行。' }
+      ? { key: 'runs', label: RUNTIME_LABELS.runs ?? '运行登记', status: 'warn', detail: 'running=' + String(inputs.runs.running) + '，orphaned=' + String(inputs.runs.orphaned), remedy: '运行 /evolution maintain status 查看并收敛遗留运行。' }
       : { key: 'runs', label: RUNTIME_LABELS.runs ?? '运行登记', status: 'ok', detail: 'running=' + String(inputs.runs.running) + '，orphaned=0' },
     pairingRow(inputs),
     inputs.form.confidence === 'declared'
@@ -339,8 +339,10 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
   // M4 (host + generated family preset): the preset row is installed into the profile patch and the
   // registry reports the family preset id; a host-only face (M3) does not.
   const hasFamilyPreset = listed.some(entry => typeof entry.id === 'string' && EVOLUTION_PRESET_IDS.includes(entry.id as never))
+  const approval = get('evolutionApproval') as { readonly isEnabled?: boolean } | undefined
+  const humanGated = approval?.isEnabled === true
   const detectedForm: DoctorInputs['form'] = hasAll || hasPreset
-    ? { id: 'M1', evidence: [hasAll ? 'bundle dsh-evolution-all installed' : 'bundle dsh-evolution-preset installed'], confidence: 'declared' }
+    ? { id: humanGated ? 'M2' : 'M1', evidence: [hasAll ? 'bundle dsh-evolution-all installed' : 'bundle dsh-evolution-preset installed', ...(humanGated ? ['approval.enabled: true'] : [])], confidence: 'declared' }
     : hasHost
       ? hasFamilyPreset
         ? { id: 'M4', evidence: ['bundle dsh-evolution-host installed', 'family agent preset registered'], confidence: 'declared' }
