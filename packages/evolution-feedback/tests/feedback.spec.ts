@@ -79,6 +79,25 @@ describe('evolution-feedback', () => {
 
   })
 
+  it('P2-25: a future boot cache is discarded, not allowed to freeze the score', async () => {
+    const home = await tempHome('dsh-feedback-future-cache-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const io = ctx.evolutionIo.provider('node')
+    const cachePath = join(home, 'evolution', 'feedback.json')
+    const eventsPath = join(home, 'evolution', 'events.json')
+    await io.writeText(cachePath, JSON.stringify({ version: 2, lastSeq: 100, skills: { 'stale-skill': { positive: 9, negative: 0 } }, sessions: {} }))
+    await io.writeText(eventsPath, eventLog([logEvent(1, 'fresh-skill', 'positive')]))
+    const feedback = new Feedback.EvolutionFeedback(io, home)
+    await feedback.restore(io)
+    expect(feedback.score('fresh-skill', 'skill')).toBe(1)
+    expect(feedback.score('stale-skill', 'skill')).toBe(0)
+    const repaired = JSON.parse(await readFile(cachePath, 'utf8')) as { lastSeq: number }
+    expect(repaired.lastSeq).toBe(1)
+    await feedback.waitIdle()
+  })
+
   it('a record made before restore settles survives the restore (merge, not replace)', async () => {
     const home = await tempHome('dsh-feedback-race-')
     const ctx = new Context()

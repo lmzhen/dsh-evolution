@@ -233,7 +233,9 @@ export class EvolutionFeedback {
       // of the retained window — using it would silently fabricate a partial
       // fold; fall back to the full fold (an unrecoverable band stays lost,
       // but the result is never WRONG).
-      const usableCache = cache && cache.lastSeq >= floor - 1 ? cache : null
+      // P2-25: a cache AHEAD of the retained timeline (the log was cleared) is not
+      // usable: its stale lastSeq would skip every new event <= that value.
+      const usableCache = cache && cache.lastSeq >= floor - 1 && cache.lastSeq <= maxSeq ? cache : null
       const truth = usableCache ? foldWithDelta(usableCache, events, this.warn) : foldFeedbackState(events, this.warn)
       // PLAN S1.4 (2026-09-16), narrowing the rc.66 "memory wins per record"
       // rule: memory wins ONLY for targets whose append is still in flight —
@@ -292,7 +294,7 @@ export class EvolutionFeedback {
         // the cache is disposable, so the last COMPLETE fold stays in place and a
         // later boot with the archive repaired still folds the band it dropped.
         this.warnOnce(TRUNCATED_TIMELINE_WARN)
-      } else if (maxSeq > 0 && (!cache || cache.lastSeq < maxSeq)) {
+      } else if (maxSeq > 0 && (!cache || cache.lastSeq !== maxSeq)) {
         try {
           await io.writeText(path, JSON.stringify({ version: CACHE_VERSION, lastSeq: maxSeq, ...truth }, null, 2))
         } catch {
