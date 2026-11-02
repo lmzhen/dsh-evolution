@@ -14,11 +14,12 @@ inputs:
     required: true
   install_smoke:
     description: >-
-      'true' additionally installs the packed family into a throwaway
-      DSH_HOME with the family's own installer and lets the profile guard
-      judge the result. The desktop job sets it: the Electron cold-boot
-      assertion needs the signed app (a real-machine step), while the WINDOWS
-      half of the install path is exactly what CI can own.
+      'true' additionally installs the PACKED dist tarballs into a throwaway
+      consumer node_modules, imports every package's declared entry and checks
+      its bundle patch asset. This is the bytes a user actually receives; the
+      source-overlay installer smoke was a different claim. The desktop job
+      sets it; the Electron cold-boot assertion still needs the signed app (a
+      real-machine step).
     required: false
     default: 'false'
   artifact_suffix:
@@ -458,23 +459,16 @@ runs:
         node packages/evolution/scripts/verify-verdict-records.mjs packages/evolution
         node packages/evolution/scripts/verify-check-registry.mjs packages/evolution --strict
 
-    - name: Install smoke into a throwaway DSH_HOME (desktop plane)
+    - name: "Install smoke: packed tarballs into a throwaway consumer"
       if: inputs.install_smoke == 'true'
       shell: bash
       working-directory: upstream
-      env:
-        NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
-        # G7 §2.3: the Windows half of the install path. The Electron cold-boot assertion needs
-        # the signed app and stays a real-machine step (recorded in the G2/G3 design docs); what a
-        # runner CAN own is that the installer produces a profile its own guard accepts on Windows
-        # paths — bundle row, preset row, journal, and no double mount.
-        HOME_DIR="$(mktemp -d)"
-        node packages/evolution/scripts/install-layered.mjs \
-          --home "$HOME_DIR" --profile web --mode layered
-        node packages/evolution/scripts/verify-profile-bundles.mjs "$HOME_DIR/profiles/web"
-        test -f "$HOME_DIR/profiles/web/.evolution-install.json"
-        test -f "$HOME_DIR/profiles/web/cordis.patch.yml"
+        # P2-33: install the PACKED family, not the source overlay. Every tarball is unpacked
+        # into a consumer node_modules; platform/runtime deps resolve from this build tree. A
+        # missing lib file, export target or bundle patch fails before publish - the exact class
+        # that shipped green while install-layered was proving only the source tree.
+        node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist
 
     - name: Publish dry-run
       shell: bash
