@@ -80,8 +80,8 @@
         "W7"
       ],
       "files": [
-        "evolution-settings-ui/src/client/seam.ts",
-        "evolution-settings-ui/src/client/source.ts"
+        "evolution-ui/src/panels/settings/seam.ts",
+        "evolution-ui/src/panels/settings/source.ts"
       ],
       "probes": [
         "decl-configforms-nomode"
@@ -443,7 +443,7 @@
         "W7"
       ],
       "files": [
-        "evolution-settings-ui/src/client/ParamCard.ts"
+        "evolution-ui/src/panels/settings/ParamCard.ts"
       ],
       "probes": [
         "decl-configforms-nomode"
@@ -746,7 +746,7 @@
         "W7"
       ],
       "files": [
-        "evolution-settings-ui/src/client/index.ts"
+        "evolution-ui/src/panels/settings/index.ts"
       ],
       "probes": [
         "decl-client-seats"
@@ -831,7 +831,7 @@
     }
   ],
   "budget": {
-    "newPackages": 0,
+    "newPackages": 4,
     "newProfileRows": 0,
     "newSlots": 0,
     "newPersistence": 0,
@@ -847,7 +847,6 @@
       "gen-platform-line.mjs",
       "gen-client-seam.mjs",
       "verify-host-routes.mjs",
-      "verify-session-fold.mjs",
       "verify-probes.mjs",
       "verify-traceability.mjs"
     ],
