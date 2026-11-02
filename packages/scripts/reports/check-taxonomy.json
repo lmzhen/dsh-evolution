@@ -738,9 +738,6 @@
         "evolution-skill-catalog::tests/catalog.spec.ts",
         "evolution-skill-catalog::tests/io-preference.spec.ts",
         "evolution-skill-catalog::tests/rank-contract.spec.ts",
-        "evolution-skill-discovery::tests/assignment-queue.spec.ts",
-        "evolution-skill-discovery::tests/assignment-sidecar.spec.ts",
-        "evolution-skill-discovery::tests/assignment.spec.ts",
         "evolution-skill-discovery::tests/awareness.spec.ts",
         "evolution-skill-discovery::tests/discovery.spec.ts",
         "evolution-skill-discovery::tests/domain-bootstrap.spec.ts",
@@ -1673,9 +1670,6 @@
         "evolution-skill-catalog::tests/catalog.spec.ts",
         "evolution-skill-catalog::tests/io-preference.spec.ts",
         "evolution-skill-catalog::tests/rank-contract.spec.ts",
-        "evolution-skill-discovery::tests/assignment-queue.spec.ts",
-        "evolution-skill-discovery::tests/assignment-sidecar.spec.ts",
-        "evolution-skill-discovery::tests/assignment.spec.ts",
         "evolution-skill-discovery::tests/awareness.spec.ts",
         "evolution-skill-discovery::tests/discovery.spec.ts",
         "evolution-skill-discovery::tests/domain-bootstrap.spec.ts",
@@ -1852,7 +1846,7 @@
     },
     "ci-only": {
       "gates": 12,
-      "specs": 77
+      "specs": 74
     },
     "full(ci=off)": {
       "gates": 57,
@@ -1860,12 +1854,12 @@
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 432
+      "specs": 429
     }
   },
   "specs": {
-    "total": 432,
-    "marked": 432,
+    "total": 429,
+    "marked": 429,
     "unmarked": 0
   }
 }
