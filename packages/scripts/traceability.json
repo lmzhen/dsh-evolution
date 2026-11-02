@@ -31,7 +31,7 @@
         "evolution-maintenance/src/orchestrate.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-review-inject-fallback"
       ],
       "gates": [
         "gate-03",

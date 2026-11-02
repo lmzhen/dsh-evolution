@@ -78,6 +78,17 @@
       "mutation": "packages/evolution-core/tests/session-fold.mutation.json",
       "evidence": "A",
       "note": "model/plugin-record/unknown classification; plugin records tolerated read-only; malformed frames never throw"
+    },
+    {
+      "id": "beh-review-inject-fallback",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-review/tests/review.spec.ts"
+      ],
+      "mutation": "packages/evolution-review/tests/review-inject.mutation.json",
+      "evidence": "A",
+      "note": "reviewMode default inject; the parent delivers against its own warm prefix"
     }
   ]
 }
