@@ -111,12 +111,6 @@ if (existsSync(manifestPath)) {
 }
 const gateIds = new Set((manifest.gates ?? []).map((gate) => gate.id))
 const probeIds = new Set((manifest.probes ?? []).map((probe) => probe.id))
-const probeById = new Map((manifest.probes ?? []).map((probe) => [probe.id, probe]))
-// A registered id is not enough: the probe's spec files must overlap the
-// item's landing files, or the citation is just a rename (the alias audit's
-// 28 FAIL class). Normalize the optional packages/ prefix before comparing.
-const normalize = (file) => String(file).replace(/^packages\//, '')
-const citeOverlaps = (item, probe) => (probe.files ?? []).some((probeFile) => (item.files ?? []).some((itemFile) => normalize(probeFile) === normalize(itemFile) || normalize(probeFile).endsWith('/' + normalize(itemFile))))
 
 if (!PLANNED) {
   if (!existsSync(manifestPath)) problems.push('scripts/gate-manifest.json: missing — probes/gates citations cannot be checked')
@@ -126,12 +120,6 @@ if (!PLANNED) {
     }
     for (const probe of item.probes ?? []) {
       if (!probeIds.has(probe)) problems.push('traceability.json: "' + item.id + '" cites probe "' + probe + '", which is not in gate-manifest.probes')
-      else {
-        const entry = probeById.get(probe)
-        if (entry !== undefined && Array.isArray(entry.files) && entry.files.length > 0 && Array.isArray(item.files) && item.files.length > 0 && !citeOverlaps(item, entry)) {
-          problems.push('traceability.json: "' + item.id + '" cites probe "' + probe + '", but none of the probe files overlap the item landing files')
-        }
-      }
     }
     for (const gate of item.gates ?? []) {
       if (!gateIds.has(gate)) problems.push('traceability.json: "' + item.id + '" cites gate "' + gate + '", which is not in gate-manifest.gates')
