@@ -52,6 +52,26 @@ it('projects the proposal seam into the payload', async () => {
   expect(body.data.proposals[0]?.id).toBe('extract-run-1-source')
 })
 
+it('P2-12: a non-array healthView is unavailable, not a complete empty scan', async () => {
+  const route = makeSkillHealthRoutes({ getCurator: () => ({ healthView: async () => ({ rows: [] }) }) }, AUDIT)[0]!
+  const response = await route.fetch(new Request('http://localhost' + ROUTES.rows, { method: 'GET' }))
+  const body = await response.json() as { data: { rows: unknown[]; truncated: boolean; scan: { status: string } } }
+  expect(body.data.rows).toEqual([])
+  expect(body.data.truncated).toBe(true)
+  expect(body.data.scan.status).toBe('unavailable')
+})
+
+it('P2-12: a proposal seam that answers undefined is unavailable, not empty', async () => {
+  const route = makeSkillHealthRoutes({
+    getCurator: () => ({ healthView: async () => [] }),
+    getProposals: () => undefined,
+  }, AUDIT)[0]!
+  const response = await route.fetch(new Request('http://localhost' + ROUTES.rows, { method: 'GET' }))
+  const body = await response.json() as { data: { proposals: unknown[]; proposalStatus: string } }
+  expect(body.data.proposals).toEqual([])
+  expect(body.data.proposalStatus).toBe('unavailable')
+})
+
 it('says unavailable when no proposal seam is mounted', async () => {
   const route = makeSkillHealthRoutes({ getCurator: () => ({ healthView: async () => [] }) }, AUDIT)[0]!
   const response = await route.fetch(new Request('http://localhost' + ROUTES.rows, { method: 'GET' }))

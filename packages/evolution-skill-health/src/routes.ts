@@ -112,19 +112,25 @@ export function makeSkillHealthRoutes(
       if (request.method !== 'GET') return methodNotAllowed(['GET'])
       const curator = deps.getCurator()
       const view = curator?.healthView === undefined ? undefined : await curator.healthView()
-      const rows = Array.isArray(view) ? toRouteRows(view as Parameters<typeof toRouteRows>[0]) : []
-      const proposals = await deps.getProposals?.() ?? []
+      // P2-12: "the probe exists" is not "the reading is available". A malformed
+      // (non-array) healthView must not read as a complete empty scan, and a
+      // proposal seam that answers undefined is unavailable, not empty.
+      const scanComplete = Array.isArray(view)
+      const rows = scanComplete ? toRouteRows(view as Parameters<typeof toRouteRows>[0]) : []
+      const proposalsRead = await deps.getProposals?.()
+      const proposals = Array.isArray(proposalsRead) ? proposalsRead : []
+      const proposalStatus = Array.isArray(proposalsRead) ? 'available' : 'unavailable'
       // W6 §3: every family route answers the SAME envelope (the shared client route-client
       // classifies 2xx as {ok,data}); the old bare {rows,truncated} body was a second wire shape.
       return json(200, {
         ok: true,
         data: {
           rows,
-          truncated: view === undefined,
+          truncated: !scanComplete,
           readAt: Date.now(),
-          scan: { status: view === undefined ? 'unavailable' : 'complete' },
+          scan: { status: scanComplete ? 'complete' : 'unavailable' },
           proposals,
-          proposalStatus: deps.getProposals === undefined ? 'unavailable' : 'available',
+          proposalStatus,
         },
       })
     },
