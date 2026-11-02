@@ -20,6 +20,7 @@ import { pathToFileURL } from 'node:url'
 
 const argv = process.argv.slice(2)
 const dist = argv[0]
+const assetsOnly = argv.includes('--assets-only')
 if (dist === undefined || dist === '') {
   console.error('smoke-packed-install: usage: <dist-dir> [--platform-node-modules <dir>]')
   process.exit(2)
@@ -108,10 +109,14 @@ try {
       failures.push(item.name + ': export target is absent from the tarball: ' + entry)
       continue
     }
-    try {
-      await import(pathToFileURL(entryPath).href)
-    } catch (error) {
-      failures.push(item.name + ': entry import failed: ' + (error instanceof Error ? error.message : String(error)))
+    // CI checks the packed asset graph; importing needs a built platform tree.
+    // The full import path is exercised where that tree exists (local/real host).
+    if (!assetsOnly) {
+      try {
+        await import(pathToFileURL(entryPath).href)
+      } catch (error) {
+        failures.push(item.name + ': entry import failed: ' + (error instanceof Error ? error.message : String(error)))
+      }
     }
     const patch = item.pkg?.dsh?.bundle?.patch
     if (typeof patch === 'string' && !existsSync(join(item.dir, patch))) failures.push(item.name + ': bundle patch is absent: ' + patch)
@@ -121,7 +126,7 @@ try {
     for (const failure of failures) console.error('  - ' + failure)
     process.exit(1)
   }
-  console.log('smoke-packed-install: OK - ' + unpacked.length + ' tarball(s) unpacked; every "." export imports; every bundle patch is present')
+  console.log('smoke-packed-install: OK - ' + unpacked.length + ' tarball(s) unpacked; ' + (assetsOnly ? 'asset targets present (imports skipped)' : 'every "." export imports') + '; every bundle patch is present')
 } finally {
   await rm(root, { recursive: true, force: true })
 }

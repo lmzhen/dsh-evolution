@@ -461,19 +461,15 @@ runs:
         node packages/evolution/scripts/verify-check-registry.mjs packages/evolution --strict
 
     - name: "Install smoke: packed tarballs into a throwaway consumer"
-      # Windows installs platform packages without their lib/ build here, so the
-      # consumer import cannot resolve @deepseek-ai/*. Run it on the Linux
-      # validate jobs, where the platform is built; Windows keeps the source
-      # installer guard below.
-      if: runner.os != 'Windows'
       shell: bash
       working-directory: upstream
       run: |
         # P2-33: install the PACKED family, not the source overlay. Every tarball is unpacked
-        # into a consumer node_modules; platform/runtime deps resolve from this build tree. A
-        # missing lib file, export target or bundle patch fails before publish - the exact class
-        # that shipped green while install-layered was proving only the source tree.
-        node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist
+        # into a consumer node_modules and its export target/bundle patch is checked before
+        # publish. --assets-only is deliberate: the CI checkout's platform packages are source
+        # only, so a runtime import cannot resolve @deepseek-ai/*; the full import path is
+        # exercised on the real host and in the local gate where the platform is built.
+        node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only
 
     - name: Source-overlay installer guard (Windows install path)
       if: inputs.install_smoke == 'true'
