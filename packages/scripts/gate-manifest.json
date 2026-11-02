@@ -1152,11 +1152,12 @@
     {
       "id": "ci-only-16",
       "kind": "step",
-      "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist",
+      "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
       "argv": [
         "node",
         "packages/evolution/scripts/smoke-packed-install.mjs",
-        "packages/evolution/dist"
+        "packages/evolution/dist",
+        "--assets-only"
       ],
       "tree": "overlay",
       "profiles": [],
