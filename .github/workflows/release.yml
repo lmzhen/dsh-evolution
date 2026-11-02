@@ -7,6 +7,7 @@ name: release
 # `gh api repos/<owner>/<repo>/commits/vN --jq .sha`.
 
 on:
+  workflow_dispatch:
   pull_request:
     # R-12: docs-only PRs skip the full build (a one-line README edit used to
     # cost two full overlay+test+pack runs). The PUSH trigger intentionally
