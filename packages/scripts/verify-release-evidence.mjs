@@ -17,16 +17,20 @@ import { readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.m
 import { familyVersion } from './lib-family-version.mjs'
 
 const argv = process.argv.slice(2)
-const file = argv.find((arg) => !arg.startsWith('--'))
+const VALUE_FLAGS = new Set(['--commit', '--tag'])
+const file = argv.find((arg, index) => !arg.startsWith('--') && !VALUE_FLAGS.has(argv[index - 1]))
+const valueOf = (name) => { const index = argv.indexOf(name); const value = index >= 0 ? argv[index + 1] : undefined; return value !== undefined && !value.startsWith('--') ? value : '' }
 const release = argv.includes('--release')
 const json = argv.includes('--json')
-if (file === undefined) { console.error('verify-release-evidence: usage: <release-evidence.json> [--release] [--json]'); process.exit(2) }
+const expectedCommit = valueOf('--commit')
+const expectedTag = valueOf('--tag')
+if (file === undefined) { console.error('verify-release-evidence: usage: <release-evidence.json> [--release] [--json] [--commit <sha>] [--tag <v...>]'); process.exit(2) }
 const path = resolve(file)
 if (!existsSync(path)) { console.error('verify-release-evidence: no evidence at ' + path + ' (cannot decide)'); process.exit(2) }
 let evidence
 try { evidence = JSON.parse(readFileSync(path, 'utf8')) } catch (error) { console.error('verify-release-evidence: unreadable evidence (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
 const expectedFamilyVersion = release ? familyVersion(resolve(dirname(fileURLToPath(import.meta.url)), '..')) : null
-const problems = validateReleaseEvidence(evidence, { release, ...(expectedFamilyVersion === null ? {} : { expectedFamilyVersion }), ...(release ? { maxAgeMs: 7 * 24 * 60 * 60 * 1000 } : {}) })
+const problems = validateReleaseEvidence(evidence, { release, ...(expectedFamilyVersion === null ? {} : { expectedFamilyVersion }), ...(release ? { maxAgeMs: 7 * 24 * 60 * 60 * 1000 } : {}), ...(expectedCommit === '' ? {} : { expectedCommit }), ...(expectedTag === '' ? {} : { expectedTag }) })
 if (release && expectedFamilyVersion === null) problems.push('current family version could not be read from the tree')
 // W3: the evidence's platform line must agree with the ONE platform-line.json, never a hand copy.
 // In the publish job there is no checkout (only the dist/scripts artifacts), so prepare-release ships

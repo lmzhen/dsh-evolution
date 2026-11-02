@@ -115,6 +115,10 @@ export function validateReleaseEvidence(evidence, options = {}) {
   if (!nonEmptyString(evidence.familyVersion)) problems.push('familyVersion is required')
   if (nonEmptyString(options.expectedFamilyVersion) && evidence.familyVersion !== options.expectedFamilyVersion) problems.push('release: familyVersion ' + String(evidence.familyVersion) + ' does not match the current tree ' + options.expectedFamilyVersion)
   if (release && (!nonEmptyString(evidence.generatedAt) || Number.isNaN(Date.parse(evidence.generatedAt)))) problems.push('release: generatedAt must be an ISO 8601 timestamp')
+  if (release && (typeof evidence.commit !== 'string' || !GIT_SHA.test(evidence.commit))) problems.push('release: commit must be the git sha the evidence was measured on')
+  if (release && (typeof evidence.tag !== 'string' || !evidence.tag.startsWith('v'))) problems.push('release: tag must start with v')
+  if (release && nonEmptyString(options.expectedCommit) && evidence.commit !== options.expectedCommit) problems.push('release: commit ' + String(evidence.commit) + ' does not match the current checkout ' + options.expectedCommit)
+  if (release && nonEmptyString(options.expectedTag) && evidence.tag !== options.expectedTag) problems.push('release: tag ' + String(evidence.tag) + ' does not match the release tag ' + options.expectedTag)
   if (release && nonEmptyString(evidence.generatedAt) && Number.isInteger(options.maxAgeMs) && Date.now() - Date.parse(evidence.generatedAt) > options.maxAgeMs) problems.push('release: generatedAt is older than ' + String(options.maxAgeMs) + 'ms — regenerate the evidence for this build')
   const line = evidence.platformLine
   if (!isObject(line) || !nonEmptyString(line.version) || !nonEmptyString(line.peersRange) || !nonEmptyString(line.enginesRange)) problems.push('platformLine must carry version/peersRange/enginesRange')
@@ -125,7 +129,16 @@ export function validateReleaseEvidence(evidence, options = {}) {
   }
   if (!Array.isArray(evidence.frozenLines) || evidence.frozenLines.length === 0) problems.push('frozenLines must name the frozen line(s)')
   if (!Array.isArray(evidence.spikes)) problems.push('spikes must be an array')
-  else evidence.spikes.forEach((spike, index) => problems.push(...validateSpikeEvidence(spike, 'spikes[' + String(index) + ']')))
+  else evidence.spikes.forEach((spike, index) => {
+    const at = 'spikes[' + String(index) + ']'
+    problems.push(...validateSpikeEvidence(spike, at))
+    if (release && nonEmptyString(spike?.startedAt) && Number.isInteger(options.maxAgeMs)) {
+      const started = Date.parse(spike.startedAt)
+      const generated = Date.parse(evidence.generatedAt)
+      if (Number.isFinite(started) && Number.isFinite(generated) && started > generated) problems.push('release: ' + at + '.startedAt is later than generatedAt')
+      if (Number.isFinite(started) && Date.now() - started > options.maxAgeMs) problems.push('release: ' + at + '.startedAt is older than ' + String(options.maxAgeMs) + 'ms — re-run the rehearsal for this build')
+    }
+  })
   if (evidence.traceability !== undefined && evidence.traceability !== null) {
     const trace = evidence.traceability
     if (!isObject(trace) || !isObject(trace.universe)) problems.push('traceability.universe must carry A/B/C counts')

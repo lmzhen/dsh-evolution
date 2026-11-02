@@ -26,15 +26,17 @@ const flag = (name) => { const index = argv.indexOf(name); const value = index >
 // P2-39: a positional is any token that is neither a flag nor the VALUE of a
 // value-taking flag. The previous list missed --gates-from-manifest, so a
 // flags-first invocation read its profile ("ci") as the evidence path.
-const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest'])
+const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--commit', '--tag'])
 const file = argv.find((arg, index) => !arg.startsWith('--') && !VALUE_FLAGS.has(argv[index - 1]))
 const rehearsalPath = flag('--rehearsal')
 const ciFace = flag('--ci-face') || process.env.GITHUB_WORKFLOW_REF || ''
 const os = flag('--os') || process.env.RUNNER_OS || ''
 const gatesFromManifest = flag('--gates-from-manifest')
+const commit = flag('--commit')
+const tag = flag('--tag')
 const release = argv.includes('--release')
 const check = argv.includes('--check')
-if (file === undefined || file === '') { console.error('assemble-release-evidence: usage: <release-evidence.json> --rehearsal <inputs.json> [--ci-face <ref>] [--os <os>] [--release] [--check]'); process.exit(2) }
+if (file === undefined || file === '') { console.error('assemble-release-evidence: usage: <release-evidence.json> --rehearsal <inputs.json> [--ci-face <ref>] [--os <os>] [--commit <sha>] [--tag <v...>] [--release] [--check]'); process.exit(2) }
 const evidencePath = resolve(file)
 if (!existsSync(evidencePath)) { console.error('assemble-release-evidence: no staging evidence at ' + evidencePath + ' (cannot decide)'); process.exit(2) }
 let evidence
@@ -70,9 +72,11 @@ const assembled = {
   traceability: rehearsal.traceability ?? evidence.traceability,
   faces: rehearsal.faces ?? evidence.faces,
   ciFace: ciFace === '' ? evidence.ciFace : { os: os === '' ? 'unknown' : os, workflowRef: ciFace },
+  ...(commit === '' ? {} : { commit }),
+  ...(tag === '' ? {} : { tag }),
 }
 const expectedFamilyVersion = release ? familyVersion(resolve(dirname(fileURLToPath(import.meta.url)), '..')) : null
-problems.push(...validateReleaseEvidence(assembled, { release, ...(expectedFamilyVersion === null ? {} : { expectedFamilyVersion }), ...(release ? { maxAgeMs: 7 * 24 * 60 * 60 * 1000 } : {}) }))
+problems.push(...validateReleaseEvidence(assembled, { release, ...(expectedFamilyVersion === null ? {} : { expectedFamilyVersion }), ...(release ? { maxAgeMs: 7 * 24 * 60 * 60 * 1000 } : {}), ...(commit === '' ? {} : { expectedCommit: commit }), ...(tag === '' ? {} : { expectedTag: tag }) }))
 if (release && expectedFamilyVersion === null) problems.push('current family version could not be read from the tree')
 if (problems.length > 0) { for (const problem of problems) console.error('  - ' + problem); console.error('assemble-release-evidence: ' + problems.length + ' problem(s)'); process.exit(1) }
 if (!check) writeFileSync(evidencePath, JSON.stringify(assembled, null, 2) + '\n')

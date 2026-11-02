@@ -38,7 +38,7 @@ const FAMILY_VERSION = (JSON.parse(readFileSync(new URL('../package.json', impor
 const PLATFORM_LINE = { version: '0.2.1-rc.3', floor: '0.2.1-rc.2', peersRange: '^0.2.1-rc.2', enginesRange: '>=0.2.1-rc.2 <0.2.2-0', upstreamRef: 'dsh-v0.2.1-rc.3' }
 
 function spike(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.1-rc.3', familyVersion: FAMILY_VERSION, startedAt: '2026-10-19T00:00:00.000Z', readings: { route: 200 }, ...overrides }
+  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.1-rc.3', familyVersion: FAMILY_VERSION, startedAt: new Date(Date.now() - 3_600_000).toISOString(), readings: { route: 200 }, ...overrides }
 }
 
 function staging(): Record<string, unknown> {
@@ -57,6 +57,8 @@ function staging(): Record<string, unknown> {
 function releasable(): Record<string, unknown> {
   return {
     ...staging(),
+    commit: 'a'.repeat(40),
+    tag: 'v' + FAMILY_VERSION,
     ciFace: { os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' },
     gates: [{ id: 'gate-01', ok: true, reading: 'passed' }],
     spikes: SPIKE_IDS.map(id => spike(id)),
@@ -113,6 +115,24 @@ describe('release-evidence schema v2', () => {
       const doc = releasable()
       mutate(doc)
       expect(validateReleaseEvidence(doc, { release: true }), label).not.toEqual([])
+    }
+  })
+
+  it('P1-13: release evidence binds commit/tag and rejects stale spikes', () => {
+    const opts = { release: true, maxAgeMs: 7 * 24 * 60 * 60 * 1000 }
+    expect(validateReleaseEvidence(releasable(), opts)).toEqual([])
+    const cases: Array<[string, (doc: Record<string, unknown>) => void, Record<string, unknown>?]> = [
+      ['missing commit', (doc) => { delete doc.commit }],
+      ['missing tag', (doc) => { delete doc.tag }],
+      ['stale spike', (doc) => { (doc.spikes as Array<Record<string, unknown>>)[0]!.startedAt = new Date(Date.now() - 30 * 86_400_000).toISOString() }],
+      ['future spike', (doc) => { (doc.spikes as Array<Record<string, unknown>>)[0]!.startedAt = new Date(Date.now() + 86_400_000).toISOString() }],
+      ['commit mismatch', (doc) => { doc.commit = 'b'.repeat(40) }, { expectedCommit: 'a'.repeat(40) }],
+      ['tag mismatch', (doc) => { doc.tag = 'v9.9.9' }, { expectedTag: 'v' + FAMILY_VERSION }],
+    ]
+    for (const [label, mutate, extra] of cases) {
+      const doc = releasable()
+      mutate(doc)
+      expect(validateReleaseEvidence(doc, { ...opts, ...(extra ?? {}) }), label).not.toEqual([])
     }
   })
 
@@ -175,7 +195,7 @@ describe('release-evidence assembly (W3 injection)', () => {
     traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52 },
   })
   it('merges the rehearsal planes, the CI face and the manifest gate ledger', async () => {
-    const result = await runAssemble(staging(), rehearsalInputs(), ['--gates-from-manifest', 'ci', '--ci-face', 'release.yml@refs/tags/v0.27.0', '--os', 'linux'])
+    const result = await runAssemble(staging(), rehearsalInputs(), ['--gates-from-manifest', 'ci', '--ci-face', 'release.yml@refs/tags/v0.27.0', '--os', 'linux', '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION])
     expect(result.code).toBe(0)
     expect(result.doc.spikes).toHaveLength(4)
     expect(result.doc.gates.length).toBeGreaterThan(0)
