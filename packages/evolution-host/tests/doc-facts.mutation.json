@@ -1,0 +1,12 @@
+{
+  "probe": "decl-doc-facts",
+  "edits": [
+    {
+      "file": "packages/scripts/verify-doc-facts.mjs",
+      "find": "process.exit(result.violations.length > 0 && strict ? 1 : 0)",
+      "replace": "process.exit(0)"
+    }
+  ],
+  "expect": "red",
+  "note": "a doc single-source violation in --strict mode must exit 1, never 0"
+}

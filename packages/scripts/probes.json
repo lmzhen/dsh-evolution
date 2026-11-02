@@ -232,6 +232,39 @@
       "mutation": "packages/skill-usage/tests/plugin-record-not-dispatch.mutation.json",
       "evidence": "A",
       "note": "plugin records are never normalized as dispatches, so consumers cannot count them"
+    },
+    {
+      "id": "decl-platform-ranges",
+      "kind": "decl",
+      "owner": "architect-01",
+      "files": [
+        "packages/evolution-host/tests/platform-range.spec.ts"
+      ],
+      "mutation": "packages/evolution-host/tests/platform-ranges.mutation.json",
+      "evidence": "A",
+      "note": "platform peer/engine/vendored ranges and no-silence checks fail loud"
+    },
+    {
+      "id": "decl-doc-facts",
+      "kind": "decl",
+      "owner": "architect-01",
+      "files": [
+        "packages/evolution-host/tests/guard-scripts.spec.ts"
+      ],
+      "mutation": "packages/evolution-host/tests/doc-facts.mutation.json",
+      "evidence": "A",
+      "note": "doc facts are single-sourced; strict violations and machine drift exit 1"
+    },
+    {
+      "id": "beh-installer-layered",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-host/tests/installer.spec.ts"
+      ],
+      "mutation": "packages/evolution-host/tests/installer-layered.mutation.json",
+      "evidence": "A",
+      "note": "layered install writes host bundle + agent preset row into the profile patch the platform reads"
     }
   ]
 }

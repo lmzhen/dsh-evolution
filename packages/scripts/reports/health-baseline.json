@@ -2,7 +2,7 @@
   "unit": "chars",
   "scope": "references markdown file count",
   "corpora": {
-    "user": 38,
+    "user": 0,
     "platform": 0
   },
   "values": {
@@ -18,8 +18,8 @@
     },
     "body-oversize": {
       "platformHits": 0,
-      "userHits": 4,
-      "userHitRate": 0.10526315789473684
+      "userHits": 0,
+      "userHitRate": 0
     },
     "stamp-density": {
       "platformHits": 0,
@@ -28,10 +28,15 @@
     },
     "body-without-support": {
       "platformHits": 0,
-      "userHits": 3,
-      "userHitRate": 0.07894736842105263
+      "userHits": 0,
+      "userHitRate": 0
     },
     "references-sprawl": {
+      "platformHits": 0,
+      "userHits": 0,
+      "userHitRate": 0
+    },
+    "scope-overloaded": {
       "platformHits": 0,
       "userHits": 0,
       "userHitRate": 0

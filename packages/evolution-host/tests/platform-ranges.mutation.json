@@ -1,0 +1,12 @@
+{
+  "probe": "decl-platform-ranges",
+  "edits": [
+    {
+      "file": "packages/scripts/verify-platform-ranges.mjs",
+      "find": "  for (const problem of problems) console.error('  - ' + problem)\n  process.exit(1)",
+      "replace": "  for (const problem of problems) console.error('  - ' + problem)\n  process.exit(0)"
+    }
+  ],
+  "expect": "red",
+  "note": "a drifted platform range/engines must exit 1; exit 0 silences the guard"
+}

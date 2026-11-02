@@ -127,7 +127,7 @@
     },
     {
       "id": "A-08",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W8"
       ],
@@ -135,30 +135,30 @@
         "evolution-core/src/errors.ts",
         "INSTALL.md"
       ],
-      "probes": [],
+      "probes": [
+        "decl-doc-facts"
+      ],
       "gates": [
         "gate-17"
       ],
-      "evidence": "A",
-      "trigger": "gate-17 (verify-doc-facts) is the executable check; no standalone unit probe",
-      "note": "Deferred by the G8b probe audit: the executable evidence is the named gate, not a unit probe."
+      "evidence": "A"
     },
     {
       "id": "A-09",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W2"
       ],
       "files": [
         "evolution-core/src/platform-line.generated.ts"
       ],
-      "probes": [],
-      "gates": [
-        "gate-11"
+      "probes": [
+        "decl-platform-ranges"
       ],
-      "evidence": "A",
-      "trigger": "gate-27 (verify-platform-ranges) is the executable check; no standalone unit probe",
-      "note": "Deferred by the G8b probe audit: the executable evidence is the named gate, not a unit probe."
+      "gates": [
+        "gate-27"
+      ],
+      "evidence": "A"
     },
     {
       "id": "A-10",
@@ -243,37 +243,37 @@
     },
     {
       "id": "A-15",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W9"
       ],
       "files": [
         "packages/scripts/verify-host-routes.mjs"
       ],
-      "probes": [
-        "beh-hmr-double-apply"
-      ],
+      "probes": [],
       "gates": [
         "gate-53"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "trigger": "gate-53 (verify-host-routes) is the executable check; the cited HMR probe does not execute that guard",
+      "note": "Deferred by the G8b probe audit: guard-only, no unit probe executes verify-host-routes.mjs."
     },
     {
       "id": "A-16",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W10"
       ],
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [],
+      "probes": [
+        "beh-installer-layered"
+      ],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C",
-      "trigger": "real-host installation/re-composition spike evidence (C); no executable probe registered",
-      "note": "Deferred by the G8b probe audit: evidence C cannot be represented by an A-level probe."
+      "evidence": "C"
     },
     {
       "id": "A-17",
@@ -296,7 +296,7 @@
     },
     {
       "id": "A-18",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W3",
         "W8"
@@ -304,13 +304,13 @@
       "files": [
         "packages/scripts/verify-doc-facts.mjs"
       ],
-      "probes": [],
+      "probes": [
+        "decl-doc-facts"
+      ],
       "gates": [
         "gate-17"
       ],
-      "evidence": "A",
-      "trigger": "gate-17 (verify-doc-facts) is the executable check; no standalone unit probe",
-      "note": "Deferred by the G8b probe audit: the executable evidence is the named gate, not a unit probe."
+      "evidence": "A"
     },
     {
       "id": "A-19",
@@ -366,7 +366,7 @@
     },
     {
       "id": "A-22",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W3",
         "W10"
@@ -374,13 +374,13 @@
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [],
+      "probes": [
+        "beh-installer-layered"
+      ],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C",
-      "trigger": "real-host installation/re-composition spike evidence (C); no executable probe registered",
-      "note": "Deferred by the G8b probe audit: evidence C cannot be represented by an A-level probe."
+      "evidence": "C"
     },
     {
       "id": "B-01",
@@ -508,20 +508,20 @@
     },
     {
       "id": "B-09",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W2"
       ],
       "files": [
         "evolution-core/package.json"
       ],
-      "probes": [],
-      "gates": [
-        "gate-11"
+      "probes": [
+        "decl-platform-ranges"
       ],
-      "evidence": "A",
-      "trigger": "gate-27 (verify-platform-ranges) owns engines.dsh/staged manifest checks; platform-line-grid does not read engines.dsh",
-      "note": "Deferred by the G8b probe audit: gate-level coverage, no engine-window unit probe."
+      "gates": [
+        "gate-27"
+      ],
+      "evidence": "A"
     },
     {
       "id": "B-10",
@@ -624,10 +624,10 @@
         "packages/scripts/verify-platform-ranges.mjs"
       ],
       "probes": [
-        "decl-platform-line-grid"
+        "decl-platform-ranges"
       ],
       "gates": [
-        "gate-11"
+        "gate-27"
       ],
       "evidence": "A"
     },
@@ -803,7 +803,8 @@
       ],
       "probes": [],
       "gates": [
-        "gate-42"
+        "gate-49",
+        "ci-only-18"
       ],
       "evidence": "A",
       "trigger": "gate-49 (verify-mutations) + ci-only-18 (verify-probes); runner behavior has no standalone unit probe",
@@ -811,7 +812,7 @@
     },
     {
       "id": "C-12",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W3",
         "W10"
@@ -819,13 +820,13 @@
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [],
+      "probes": [
+        "beh-installer-layered"
+      ],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C",
-      "trigger": "real-host installation/re-composition spike evidence (C); no executable probe registered",
-      "note": "Deferred by the G8b probe audit: evidence C cannot be represented by an A-level probe."
+      "evidence": "C"
     }
   ],
   "budget": {

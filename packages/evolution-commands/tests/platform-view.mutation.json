@@ -3,8 +3,8 @@
   "edits": [
     {
       "file": "packages/evolution-commands/src/platform-view.ts",
-      "find": "if (read === undefined) return undefined",
-      "replace": "if (read === undefined) return [] as readonly T[]"
+      "find": "async function arrayOf<T>(read: (() => unknown) | undefined): Promise<readonly T[] | undefined> {\n  if (read === undefined) return undefined",
+      "replace": "async function arrayOf<T>(read: (() => unknown) | undefined): Promise<readonly T[] | undefined> {\n  if (read === undefined) return [] as readonly T[]"
     }
   ],
   "expect": "red",
