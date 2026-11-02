@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-ui",
   "description": "Web UI umbrella for the evolution family: settings, merge, skill history and skill health panels",
-  "version": "0.32.1",
+  "version": "0.32.2",
   "publishConfig": {
     "access": "public"
   },
@@ -46,7 +46,6 @@
     "react": "^18.2.0"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-merge-ui": "workspace:^",
     "@lmzhen/dsh-evolution-client-kit": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-curator": "workspace:^"

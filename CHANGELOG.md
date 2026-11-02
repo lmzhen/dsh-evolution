@@ -1,4 +1,8 @@
 # Changelog
+## 0.32.2 (fix) — evolution-ui stops requiring merge-ui client subpath
+
+> **范围**：真机 web 启动时 `@lmzhen/dsh-evolution-ui/client.js` 的 `require("@lmzhen/dsh-evolution-merge-ui/client")` 无法被 client module loader 解析，导致 web boot 失败。0.32.2 让 UI 只承载 settings + skill-history；merge 面板仍由独立的 evolution-merge-ui 行提供，避免重复挂载。
+> **验证**：0.32.1 在 web profile 复现 boot import failed；修复后重打包、tag CI、再安装到 web 验证面板与路由。
 ## 0.32.1 (fix) — evolution-all installs the evolution-ui it mounts
 
 > **范围**：`@lmzhen/dsh-evolution-all@0.32.0` 的 bundle patch 挂载 `evolution-ui`，但 package.json 未声明该依赖，真实 profile 安装后缺包。0.32.1 补齐 `evolution-all` 对 `evolution-ui` 的依赖；其余包内容与 0.32.0 相同。
