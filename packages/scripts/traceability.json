@@ -625,7 +625,7 @@
         "packages/scripts/verify-platform-ranges.mjs"
       ],
       "probes": [
-        "verify-platform-ranges"
+        "decl-platform-line-grid"
       ],
       "gates": [
         "gate-11"
@@ -679,7 +679,7 @@
         "evolution-core/src/http-routes.ts"
       ],
       "probes": [
-        "beh-hostroute-owner-only"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-53"
@@ -715,7 +715,7 @@
         "evolution-core/src/platform-line.generated.ts"
       ],
       "probes": [
-        "decl-engines-window"
+        "decl-platform-line-grid"
       ],
       "gates": [
         "gate-11"
@@ -767,7 +767,7 @@
         "evolution-core/src/diagnostics.ts"
       ],
       "probes": [
-        "diagnostics-route"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-03"
@@ -785,7 +785,7 @@
         "evolution-core/src/http-routes.ts"
       ],
       "probes": [
-        "beh-hostroute-owner-only"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-53"
