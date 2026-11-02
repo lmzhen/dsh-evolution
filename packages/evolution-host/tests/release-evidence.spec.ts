@@ -205,6 +205,18 @@ describe('release-evidence assembly (W3 injection)', () => {
     expect(result.doc.traceability.covered).toBe(52)
     expect(validateReleaseEvidence(result.doc, { release: true }).some(problem => problem.includes('synthetic manifest reading'))).toBe(true)
   })
+  it('accepts a real run-gates ledger instead of the synthetic manifest rows', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assemble-gates-report-'))
+    const report = join(dir, 'gates.json')
+    await writeFile(report, JSON.stringify({ gates: [{ id: 'gate-01', verdict: 'pass', reading: 'run-gates local', criterionEvaluated: true }] }), 'utf8')
+    try {
+      const result = await runAssemble(staging(), rehearsalInputs(), ['--gates-report', report, '--ci-face', 'release.yml@refs/tags/v' + FAMILY_VERSION, '--os', 'linux', '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION])
+      expect(result.code).toBe(0)
+      expect(result.doc.gates).toEqual([{ id: 'gate-01', ok: true, reading: 'run-gates local', criterionEvaluated: true }])
+      expect(validateReleaseEvidence(result.doc, { release: true })).toEqual([])
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+
   it('P2-39: flags-first invocation still finds the evidence file', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'assemble-evidence-order-'))
     const evidencePath = join(dir, 'release-evidence.json')
