@@ -71,8 +71,8 @@
     },
     "covered": 52,
     "total": 52,
-    "planned": true,
-    "source": "gate-55 --planned on the current tree"
+    "planned": false,
+    "source": "gate-55 --strict on the current tree"
   },
   "faces": {
     "web": {

@@ -1537,6 +1537,17 @@
       "mutation": "packages/evolution-host/tests/doc-facts.mutation.json",
       "evidence": "A",
       "note": "doc facts are single-sourced; strict violations and machine drift exit 1"
+    },
+    {
+      "id": "beh-installer-layered",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-host/tests/installer.spec.ts"
+      ],
+      "mutation": "packages/evolution-host/tests/installer-layered.mutation.json",
+      "evidence": "A",
+      "note": "layered install writes host bundle + agent preset row into the profile patch the platform reads"
     }
   ]
 }

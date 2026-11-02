@@ -1,0 +1,12 @@
+{
+  "probe": "beh-installer-layered",
+  "edits": [
+    {
+      "file": "packages/scripts/install-layered.mjs",
+      "find": "return join(profileDirectory(home, profile), 'cordis.patch.yml')",
+      "replace": "return join(profileDirectory(home, profile), 'cordis.patch.bak.yml')"
+    }
+  ],
+  "expect": "red",
+  "note": "the layered installer must write the profile patch to cordis.patch.yml, the file the platform reads"
+}

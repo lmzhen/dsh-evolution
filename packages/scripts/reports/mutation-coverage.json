@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-02T23:01:32.136Z",
+  "generatedAt": "2026-11-02T23:24:27.660Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -25,6 +25,18 @@
       "probe": "beh-host-route-registration",
       "signature": "f763826887b1f1bdb3bc7d6b9b71e3892ff5aa7fa46d3c256961150703f51ebd",
       "provenAt": "2026-11-02T22:55:47.720Z",
+      "tree": "overlay"
+    },
+    {
+      "probe": "beh-installer-layered",
+      "signature": "89db64711820752f22e5d0aad150ed17ccf8e0a0499107ba6e92f86c2f4ab2ce",
+      "provenAt": "2026-11-02T23:24:27.653Z",
+      "tree": "overlay"
+    },
+    {
+      "probe": "beh-memory-interpolation",
+      "signature": "e4c8b73c741680b6a705a7c0abce39a29ff4ce237e43632232f8ca7818704e1d",
+      "provenAt": "2026-11-02T23:21:55.034Z",
       "tree": "overlay"
     },
     {

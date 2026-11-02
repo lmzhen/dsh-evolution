@@ -260,20 +260,20 @@
     },
     {
       "id": "A-16",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W10"
       ],
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [],
-      "gates": [
-        "gate-04"
+      "probes": [
+        "beh-installer-layered"
       ],
-      "evidence": "C",
-      "trigger": "installer.spec exists but its full-file baseline is red in the local overlay (NO GREEN BASELINE); no stamped probe",
-      "note": "Deferred by the G8b probe audit: a red-baseline spec cannot prove a mutation red."
+      "gates": [
+        "ci-only-10"
+      ],
+      "evidence": "C"
     },
     {
       "id": "A-17",
@@ -291,7 +291,7 @@
         "gate-03"
       ],
       "evidence": "A",
-      "trigger": "packages/test-support/host-route-harness.ts is test support; the product behavior is covered by beh-host-route-registration (gate-01/gate-03)",
+      "trigger": "packages/test-support/host-route-harness.ts is test support, imported by beh-approval-owner-audit and beh-hmr-double-apply; no product invariant of its own",
       "note": "Deferred by the G8b probe audit: the harness has no product invariant of its own."
     },
     {
@@ -366,7 +366,7 @@
     },
     {
       "id": "A-22",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W3",
         "W10"
@@ -374,13 +374,13 @@
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [],
-      "gates": [
-        "gate-04"
+      "probes": [
+        "beh-installer-layered"
       ],
-      "evidence": "C",
-      "trigger": "installer.spec exists but its full-file baseline is red in the local overlay (NO GREEN BASELINE); no stamped probe",
-      "note": "Deferred by the G8b probe audit: a red-baseline spec cannot prove a mutation red."
+      "gates": [
+        "ci-only-10"
+      ],
+      "evidence": "C"
     },
     {
       "id": "B-01",
@@ -803,16 +803,15 @@
       ],
       "probes": [],
       "gates": [
-        "gate-49",
         "ci-only-18"
       ],
       "evidence": "A",
-      "trigger": "gate-49 (verify-mutations) + ci-only-18 (verify-probes); runner behavior has no standalone unit probe",
+      "trigger": "ci-only-18 runs verify-probes; the mutation runner is overlay-only (gate-49 cannot decide in the mirror)",
       "note": "Deferred by the G8b probe audit: the executable evidence is the runner gates, not a unit probe."
     },
     {
       "id": "C-12",
-      "disposition": "deferred",
+      "disposition": "adopted",
       "design": [
         "W3",
         "W10"
@@ -820,13 +819,13 @@
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [],
-      "gates": [
-        "gate-04"
+      "probes": [
+        "beh-installer-layered"
       ],
-      "evidence": "C",
-      "trigger": "installer.spec exists but its full-file baseline is red in the local overlay (NO GREEN BASELINE); no stamped probe",
-      "note": "Deferred by the G8b probe audit: a red-baseline spec cannot prove a mutation red."
+      "gates": [
+        "ci-only-10"
+      ],
+      "evidence": "C"
     }
   ],
   "budget": {

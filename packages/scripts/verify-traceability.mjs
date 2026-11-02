@@ -57,6 +57,7 @@ if (items.length === 0) {
   process.exit(2)
 }
 
+const FACTS = 'scripts/traceability.json'
 const seen = new Set()
 let previousIndex = -1
 for (const item of items) {
@@ -99,8 +100,10 @@ for (const id of universeIds) {
 // overlay's packages/evolution), so resolve against root and one level up.
 const resolveFile = (rel) => {
   for (const base of [root, resolve(root, '..')]) {
-    const path = join(base, rel)
-    if (existsSync(path)) return path
+    for (const candidate of [rel, rel.replace(/^packages\//, '')]) {
+      const path = join(base, candidate)
+      if (existsSync(path)) return path
+    }
   }
   return undefined
 }
@@ -166,8 +169,6 @@ function measureBudget(packagesRoot) {
     newSubpaths: Math.max(0, coreExports - BASELINE.coreExports),
   }
 }
-const FACTS = 'scripts/traceability.json'
-
 if (problems.length > 0) {
   if (JSON_OUT) console.log(JSON.stringify({ ok: false, planned: PLANNED, problems, warnings }, null, 2))
   else {
