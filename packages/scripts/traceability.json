@@ -127,7 +127,7 @@
     },
     {
       "id": "A-08",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W8"
       ],
@@ -135,30 +135,30 @@
         "evolution-core/src/errors.ts",
         "INSTALL.md"
       ],
-      "probes": [
-        "doc-facts"
-      ],
+      "probes": [],
       "gates": [
         "gate-17"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "trigger": "gate-17 (verify-doc-facts) is the executable check; no standalone unit probe",
+      "note": "Deferred by the G8b probe audit: the executable evidence is the named gate, not a unit probe."
     },
     {
       "id": "A-09",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W2"
       ],
       "files": [
         "evolution-core/src/platform-line.generated.ts"
       ],
-      "probes": [
-        "verify-platform-ranges"
-      ],
+      "probes": [],
       "gates": [
         "gate-11"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "trigger": "gate-27 (verify-platform-ranges) is the executable check; no standalone unit probe",
+      "note": "Deferred by the G8b probe audit: the executable evidence is the named gate, not a unit probe."
     },
     {
       "id": "A-10",
@@ -296,7 +296,7 @@
     },
     {
       "id": "A-18",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W3",
         "W8"
@@ -304,13 +304,13 @@
       "files": [
         "packages/scripts/verify-doc-facts.mjs"
       ],
-      "probes": [
-        "doc-facts"
-      ],
+      "probes": [],
       "gates": [
         "gate-17"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "trigger": "gate-17 (verify-doc-facts) is the executable check; no standalone unit probe",
+      "note": "Deferred by the G8b probe audit: the executable evidence is the named gate, not a unit probe."
     },
     {
       "id": "A-19",
@@ -349,7 +349,7 @@
     },
     {
       "id": "A-21",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W7",
         "W10"
@@ -357,13 +357,13 @@
       "files": [
         "packages/scripts/gen-client-seam.mjs"
       ],
-      "probes": [
-        "decl-client-artifacts"
-      ],
+      "probes": [],
       "gates": [
         "gate-54"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "trigger": "gate-54 (gen-client-seam --check) is the executable check; no standalone unit probe",
+      "note": "Deferred by the G8b probe audit: the executable evidence is the named gate, not a unit probe."
     },
     {
       "id": "A-22",
