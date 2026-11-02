@@ -60,13 +60,12 @@ per-platform status matrix are single-sourced in [`INSTALL.md`](INSTALL.md).
 | `evolution-agent` | Agent preset: standard tools + the four model rows (`memory` / `skill_manage` / session search / skill catalog) |
 | `evolution-preset` | Compatibility one-click bundle (`cordis.yml` standalone, `cordis.patch.yml` overlay) |
 | `evolution-all` | Full-functionality bundle — DEFAULT install (infra + model tools, profile-root) |
-| `evolution-skill-history` | Browser-only sidebar panel (技能历史): the skills that recorded content versions, the body chain and the support-file chain apart, and one restore per body version — its Host half mounts the four loopback routes the panel reads |
+| `evolution-ui` | Browser umbrella: the skill-history panel (技能历史 — content-version body chain, support-file chain and one restore per body version, with its four loopback routes) plus the settings section (自进化 — one card per parameter namespace) |
 | `evolution-skill-health` | Browser-only sidebar panel (技能健康) — **name claimed, content pending**: what the linter found aggregated by rule, four states (healthy / warn / needs-restructure / **unreadable, never folded into healthy**), and the line it was measured on |
 | `evolution-skill-discovery` | Read-only skill index + domain map: domain cards, lexical `skill_search`, provisional assignment/shadow evidence; `mode: off` by default and no `skill_domains` tool |
 | `evolution-merge` | Skill auto-merge Host/command surface: candidate screening, two-round child authoring, pending approvals, staging/commit receipts and unit undo — mounts `/evolution merge` (and the 0.29 `/merge` alias) plus four read-only routes |
 | `evolution-merge-ui` | Browser-only sidebar panel (技能合并): pending / retry / skipped queues, read-only row projection from the merge routes; commands stay CLI text |
 | `evolution-merge-engine` | Vendored byte-identical skill-merge Node pipeline engine: the original 8-stage scan, two-round prompts, LSH/ranker/judge chain; consumed by the merge Host adapter |
-| `evolution-settings-ui` | Browser-only settings section (自进化): one card per parameter namespace, Chinese card titles / field labels / hints typed from the registry (plus optional `valueLabels` for enum options), styles injected at runtime |
 
 ## Installation
 
