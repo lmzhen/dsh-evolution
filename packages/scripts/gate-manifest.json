@@ -1438,6 +1438,17 @@
       "mutation": "packages/evolution-commands/tests/platform-view.mutation.json",
       "evidence": "A",
       "note": "absent/throwing/misshaped platform surfaces answer undefined; bundle/plugin/configuration/preset readers"
+    },
+    {
+      "id": "decl-client-seats",
+      "kind": "decl",
+      "owner": "client-frontend-01",
+      "files": [
+        "packages/evolution-host/tests/guard-scripts.spec.ts"
+      ],
+      "mutation": "packages/evolution-host/tests/client-seats.mutation.json",
+      "evidence": "A",
+      "note": "client inject names are provided and read; every registry row has a generated card and a bundle seat"
     }
   ]
 }

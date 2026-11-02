@@ -1,0 +1,12 @@
+{
+  "probe": "decl-client-seats",
+  "edits": [
+    {
+      "file": "packages/scripts/verify-client-seats.mjs",
+      "find": "if (!cards.has(owner)) problems.push(owner + ': has registry rows but no card in the generated client view — the operator can never edit it')",
+      "replace": "if (!cards.has(owner)) void 0"
+    }
+  ],
+  "expect": "red",
+  "note": "the seat guard must fail when a registry row has no card in the generated client view"
+}
