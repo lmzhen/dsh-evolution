@@ -7,11 +7,12 @@ import { readTextOrNull } from './domain/read-probe.ts'
 import { createHash } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { probeList, readTreeLock, runsFile, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { probeList, readTreeLock, readUnitJournal, runsFile, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { migrationJournalPath, migrationReportPath, v2BackupPath } from './domain/state-bootstrap.ts'
 import { readMergeSnapshot } from './domain/merge-snapshot.ts'
 import { validateArtifacts, type RowState, type RunState, type JournalState, type EvidenceState, type StagingState } from './domain/consistency.ts'
 import { readJournal } from './domain/commit-journal-store.ts'
+import { readCommitReceipt } from './commit-receipt.ts'
 import { stagingRoot } from './staging.ts'
 import { readReconcileReport, type ReconcileReport } from './domain/reconcile.ts'
 import type { DoctorView } from './wire.ts'
@@ -81,9 +82,6 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
     const raw = await io.readText(join(home, 'merge', 'recovery.json'))
     if (raw !== null) for (const report of JSON.parse(raw) as readonly { readonly runId?: string; readonly ok?: boolean }[]) if (report.ok === true && report.runId !== undefined) recoveryRuns.add(report.runId)
   } catch {}
-  const receiptRuns = new Set<string>()
-  const receiptDir = await probeList(io, join(home, 'merge', 'receipts'))
-  if (receiptDir.kind === 'present') for (const name of receiptDir.value) receiptRuns.add(name)
   const invalid: { id: string; reason: string }[] = []
   if (snapshot.blocked !== undefined) invalid.push({ id: 'state', reason: snapshot.blocked.code })
   for (const item of snapshot.rows) {
@@ -92,9 +90,10 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
     const artifactRow: RowState = row.state === 'approved' ? 'approved' : row.state === 'fuse' ? 'fuse' : row.state
     const run: RunState = runId === undefined ? 'none' : row.state === 'pending' ? 'awaiting-approval' : 'running'
     const staging: StagingState = item.stage === null ? (row.state === 'fuse' ? 'missing' : 'none') : item.stage.state === 'present' || item.stage.state === 'reserved' ? 'kept' : row.state === 'fuse' ? 'missing' : 'none'
-    const phase = runId === undefined ? null : await readJournal(io, home, runId)
-    const journal: JournalState = phase === null ? 'none' : phase.phase === 'prepared' ? 'prepared' : phase.phase === 'target-written' || phase.phase === 'sources-archived' ? 'committing' : phase.phase === 'committed' ? 'committed' : phase.phase === 'rolled-back' ? 'rolled-back' : 'failed'
-    const evidence: EvidenceState = runId !== undefined && await readTextOrNull(io, join(home, 'merge', 'receipts', runId + '.json')) !== null ? 'receipt' : 'none'
+    const receipt = runId === undefined ? null : await readCommitReceipt(io, home, runId)
+    const phase = receipt !== null ? await readUnitJournal(io, home, receipt.unitId) : runId === undefined ? null : await readJournal(io, home, runId)
+    const journal: JournalState = phase === null ? 'none' : phase.phase === 'prepared' || phase.phase === 'target-pending' ? 'prepared' : phase.phase === 'target-written' || phase.phase === 'sources-archived' || phase.phase === 'support-pending' || phase.phase === 'source-archiving' ? 'committing' : phase.phase === 'committed' ? 'committed' : phase.phase === 'rolled-back' ? 'rolled-back' : 'failed'
+    const evidence: EvidenceState = receipt === null ? 'none' : 'receipt'
     const result = validateArtifacts({ row: artifactRow, run, staging, journal, evidence, activeRuns: run === 'running' || run === 'awaiting-approval' ? 1 : 0, ...(runId !== undefined && recoveryRuns.has(runId) ? { recovery: true } : {}) })
     if (!result.ok) invalid.push({ id: row.id, reason: result.reason ?? 'not-allowed' })
   }

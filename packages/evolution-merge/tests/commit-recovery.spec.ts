@@ -5,15 +5,14 @@ import { join } from 'node:path'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { recoverCommitJournals } from '../src/commit-recovery.ts'
-import { snapshotPath, skillBodyPath } from '../src/commit-snapshot.ts'
 import { durableReceiptPath } from '../src/commit-receipt.ts'
+
+const skillBodyPath = (root: string, name: string): string => join(root, name, 'SKILL.md')
 
 it('reports manual-required instead of writing the target after a crash', async () => {
   const home = await tempRoot('dsh-merge-recovery-')
   const io = nodeEvolutionIo()
   const runId = 'run-1'
-  const snapshot = { runId, target: 'umbrella', create: false, sources: ['a', 'b'], targetBody: 'old body', sourceBodies: [{ name: 'a', body: 'a body' }], at: '2026-10-22T00:00:00.000Z' }
-  await io.writeText(snapshotPath(home, runId), JSON.stringify(snapshot))
   const root = join(home, 'skills')
   await io.writeText(skillBodyPath(root, 'umbrella'), 'new body')
   await io.writeText(join(home, 'merge', 'journals', runId + '.json'), JSON.stringify({ runId, target: 'umbrella', create: false, sources: ['a', 'b'], phase: 'target-written', updatedAt: 'x' }))
@@ -30,8 +29,6 @@ it('trusts a commit receipt over a stale journal', async () => {
   const io = nodeEvolutionIo()
   const runId = 'run-1'
   const root = join(home, 'skills')
-  const snapshot = { runId, target: 'umbrella', create: true, sources: ['a'], targetBody: null, sourceBodies: [{ name: 'a', body: 'old' }], at: 'x' }
-  await io.writeText(snapshotPath(home, runId), JSON.stringify(snapshot))
   await io.writeText(skillBodyPath(root, 'umbrella'), 'committed body')
   await io.writeText(durableReceiptPath(home, runId, runId), JSON.stringify({ runId, unitId: 'u1', target: 'umbrella', create: true, sources: ['a'], archived: ['a'], at: 1 }))
   await io.writeText(join(home, 'merge', 'journals', runId + '.json'), JSON.stringify({ runId, target: 'umbrella', create: true, sources: ['a'], phase: 'sources-archived', updatedAt: 'x' }))
@@ -47,8 +44,6 @@ it('does not remove or write a created target during manual recovery', async () 
   const io = nodeEvolutionIo()
   const runId = 'run-1'
   const root = join(home, 'skills')
-  const snapshot = { runId, target: 'ghost', create: true, sources: ['a'], targetBody: null, sourceBodies: [{ name: 'a', body: 'a' }], at: 'x' }
-  await io.writeText(snapshotPath(home, runId), JSON.stringify(snapshot))
   const dir = join(root, 'ghost')
   await io.writeText(join(dir, 'notes.txt'), 'leftover')
   await io.remove(join(dir, 'notes.txt'))

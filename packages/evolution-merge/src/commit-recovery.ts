@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { CommitJournal } from './domain/commit-journal.ts'
 import { writeJournal } from './domain/commit-journal-store.ts'
-import { snapshotPath } from './commit-snapshot.ts'
 import { readCommitReceipt } from './commit-receipt.ts'
 import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
 
@@ -15,7 +14,6 @@ export interface CommitRecoveryReport {
   readonly target?: string
   readonly sources?: readonly string[]
   readonly journalPath?: string
-  readonly snapshotPath?: string
   readonly unitId?: string
 }
 
@@ -62,7 +60,7 @@ export async function recoverCommitJournals(
     if (journal.phase === 'failed' || journal.phase === 'rolled-back') continue
     reports.push({
       runId: journal.runId, phase: journal.phase, action: 'manual-required', ok: false,
-      target: journal.target, sources: journal.sources, journalPath: path, snapshotPath: snapshotPath(home, journal.runId),
+      target: journal.target, sources: journal.sources, journalPath: path,
     })
     } catch (error) {
       reports.push({ runId: file.replace(/\.json$/, ''), phase: 'unknown', action: 'recovery-error: ' + (error instanceof Error ? error.message : String(error)), ok: false, journalPath: path })

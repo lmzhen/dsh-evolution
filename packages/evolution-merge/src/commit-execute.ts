@@ -9,7 +9,6 @@ import { writeCommitReceipt, type CommitReceipt } from './commit-receipt.ts'
 import { pairKey } from './contracts.ts'
 import { writeJournal } from './domain/commit-journal-store.ts'
 import { evidenceSha256 as digestEvidence } from './domain/evidence-hash.ts'
-import { snapshotPath } from './commit-snapshot.ts'
 import type { UnitTransaction, UnitPlan } from '@deepseek-ai/dsh-evolution-core'
 
 export interface CommitPort extends CommitAssemblyPort {
@@ -116,7 +115,6 @@ export async function commitStagedRun(
   }
   try {
     await writeCommitReceipt(io, home, receipt)
-    try { await io.remove(snapshotPath(home, runId)) } catch { /* committed journal is the record */ }
     return { ok: true, plan: assembled.plan, result, receipt, ...(warning === undefined ? {} : { warning }) }
   } catch (error) {
     return {
