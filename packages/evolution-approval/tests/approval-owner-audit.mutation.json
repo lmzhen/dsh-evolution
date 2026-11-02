@@ -1,0 +1,12 @@
+{
+  "probe": "beh-approval-owner-audit",
+  "edits": [
+    {
+      "file": "packages/evolution-approval/src/routes.ts",
+      "find": "return await decide(current => approval.approve(current, audit), id)",
+      "replace": "return await decide(current => approval.approve(current, { ...audit, deploymentAllowsRemote: false }), id)"
+    }
+  ],
+  "expect": "red",
+  "note": "the route must carry the platform admission audit unchanged; remote deployments must report true"
+}

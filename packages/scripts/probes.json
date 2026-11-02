@@ -199,6 +199,17 @@
       "mutation": "packages/evolution-host/tests/platform-contract.mutation.json",
       "evidence": "A",
       "note": "platform contract anchors and semantics fail loudly on an empty upstream tree"
+    },
+    {
+      "id": "beh-approval-owner-audit",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-approval/tests/routes.spec.ts"
+      ],
+      "mutation": "packages/evolution-approval/tests/approval-owner-audit.mutation.json",
+      "evidence": "A",
+      "note": "approval routes carry the registration DecisionAudit (owner-only, remote truth) into approve/reject"
     }
   ]
 }

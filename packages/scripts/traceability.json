@@ -224,7 +224,7 @@
         "packages/scripts/verify-host-routes.mjs"
       ],
       "probes": [
-        "beh-hostroute-owner-only"
+        "beh-approval-owner-audit"
       ],
       "gates": [
         "gate-53"
@@ -463,7 +463,7 @@
         "evolution-core/src/http-routes.ts"
       ],
       "probes": [
-        "beh-hostroute-owner-only"
+        "beh-approval-owner-audit"
       ],
       "gates": [
         "gate-53"
