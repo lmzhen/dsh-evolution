@@ -29,6 +29,10 @@ inputs:
     description: Node major version for the build/test gate.
     required: false
     default: '24'
+  upload_artifacts:
+    description: Upload the packed dist/scripts artifacts for publish.
+    required: false
+    default: 'true'
 
   npm_scope:
     description: >-
@@ -481,12 +485,14 @@ runs:
           --dry-run
 
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: ${{ inputs.upload_artifacts == 'true' }}
       with:
         name: evolution-dist-${{ inputs.artifact_suffix }}
         path: upstream/packages/evolution/dist
         retention-days: 14
 
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: ${{ inputs.upload_artifacts == 'true' }}
       with:
         name: evolution-scripts-${{ inputs.artifact_suffix }}
         path: upstream/packages/evolution/scripts
