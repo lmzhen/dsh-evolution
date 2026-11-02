@@ -70,6 +70,15 @@ describe('staged-window expiry (T4-09/A51)', () => {
     expect(ran).toEqual([])
   })
 
+  it('P2-22: approving an expired record directly refuses and never runs it', async () => {
+    const { ctx, ran } = await mountApproval(1000)
+    const id = await stage(ctx, new Date(Date.now() - 60_000).toISOString())
+    const outcome = await ctx.evolutionApproval.approve(id)
+    expect(outcome.ok).toBe(false)
+    expect(ran).toEqual([])
+    expect((await ctx.evolutionState.listPending('rejected')).some(item => item.id === id)).toBe(true)
+  })
+
   it('a FRESH record survives the sweep (the TTL is a bound, not a flush)', async () => {
     const { ctx } = await mountApproval(60_000)
     const id = await stage(ctx)

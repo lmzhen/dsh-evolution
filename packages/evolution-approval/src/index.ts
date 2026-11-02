@@ -453,7 +453,10 @@ export class EvolutionApproval extends Service {
       // An unparseable timestamp is NOT stale evidence: the record stays for the operator (the same
       // posture the ordering helper takes — a missing timestamp must not decide anything).
       if (!Number.isFinite(stagedAt) || stagedAt > cutoff) continue
-      const resolution = await this.state().tryResolvePending(record.id, 'rejected')
+      const claimId = this.newClaimId()
+      const claimed = await this.state().claimPending(record.id, claimId)
+      if (!claimed) continue
+      const resolution = await this.state().tryResolvePending(record.id, 'rejected', claimId)
       if (resolution.applied) expired.push(record.id)
     }
     if (expired.length > 0) {
@@ -470,6 +473,9 @@ export class EvolutionApproval extends Service {
   }
 
   async approve(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }> {
+    // P2-22: the TTL is a gate on EVERY decision, not only on list(). A caller
+    // holding an id must not execute a record the window already closed.
+    await this.expireStale()
     return await this.dedupe(`approve:${id}`, () => this.doApprove(id, audit))
   }
 
