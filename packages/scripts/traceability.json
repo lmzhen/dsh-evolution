@@ -697,7 +697,7 @@
         "evolution-core/src/run-registry.ts"
       ],
       "probes": [
-        "orphan-run"
+        "beh-run-registry"
       ],
       "gates": [
         "gate-03"

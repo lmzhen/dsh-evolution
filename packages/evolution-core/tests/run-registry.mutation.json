@@ -1,0 +1,12 @@
+{
+  "probe": "beh-run-registry",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/run-registry.ts",
+      "find": "if (row === undefined || TERMINAL.has(row.state)) return",
+      "replace": "if (row === undefined) return"
+    }
+  ],
+  "expect": "red",
+  "note": "settle is terminal-once: a cancel that raced a failure must not flip the answer"
+}

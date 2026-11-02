@@ -1405,6 +1405,17 @@
       "mutation": "packages/tool-memory/tests/memory-interpolation.mutation.json",
       "evidence": "A",
       "note": "memory snapshot and guidance register interpolate:false; stored braces stay verbatim through mount and refresh"
+    },
+    {
+      "id": "beh-run-registry",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-core/tests/run-registry.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/run-registry.mutation.json",
+      "evidence": "A",
+      "note": "terminal-once settle, orphan convergence, supersede idempotence, per-kind history cap"
     }
   ]
 }
