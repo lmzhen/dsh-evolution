@@ -15,7 +15,7 @@ import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } fro
 import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const argv = process.argv.slice(2)
@@ -62,7 +62,8 @@ try {
     if (!existsSync(file)) throw new Error('tarball missing: ' + file)
     const staging = join(root, 'unpack-' + String(unpacked.length))
     await mkdir(staging, { recursive: true })
-    execFileSync('tar', ['-xzf', file, '-C', staging], { stdio: 'pipe' })
+    // Same Windows/GNU-tar rule as the fixture: no absolute C: in argv.
+    execFileSync('tar', ['-xzf', relative(root, file), '-C', relative(root, staging)], { cwd: root, stdio: 'pipe' })
     const packageDir = join(staging, 'package')
     const pkg = JSON.parse(await readFile(join(packageDir, 'package.json'), 'utf8'))
     if (typeof pkg.name !== 'string' || !pkg.name.startsWith('@')) throw new Error('tarball has no scoped package name: ' + file)
