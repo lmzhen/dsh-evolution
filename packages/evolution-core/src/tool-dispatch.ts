@@ -458,15 +458,28 @@ function parsedArguments(signal: ToolDispatchSignal): Record<string, unknown> | 
   return parsed as Record<string, unknown>
 }
 
-/** The path-shaped argument of a file tool, when it carries one. */
-function readPathArgument(signal: ToolDispatchSignal): string | null {
-  const record = parsedArguments(signal)
+/** The path-shaped argument of one already-parsed call, when it carries one. */
+function readPathFromRecord(record: Record<string, unknown> | null): string | null {
   if (record === null) return null
   for (const key of ['file_path', 'path', 'file', 'target']) {
     const value = record[key]
     if (typeof value === 'string' && value.trim() !== '') return value
   }
   return null
+}
+
+/** The path-shaped argument of a file tool, when it carries one. */
+function readPathArgument(signal: ToolDispatchSignal): string | null {
+  return readPathFromRecord(parsedArguments(signal))
+}
+
+/** The path one dispatch names, for the read-evidence projection. */
+export function dispatchPathOf(step: { arguments: unknown }): string | null {
+  let parsed: unknown = step.arguments
+  if (typeof parsed === 'string') {
+    try { parsed = JSON.parse(parsed) as unknown } catch { return null }
+  }
+  return parsed !== null && typeof parsed === 'object' ? readPathFromRecord(parsed as Record<string, unknown>) : null
 }
 
 /**
@@ -479,14 +492,8 @@ function readPathArgument(signal: ToolDispatchSignal): string | null {
  * @returns the skill name and the skill-root-relative path, or `null` when the
  *   dispatch is not a support-file read. Pure: no IO, no service lookup.
  */
-export function supportFileReadOf(
-  signal: ToolDispatchSignal,
-  options: { toolNames: readonly string[]; root: string },
-): SupportReadHit | null {
-  if (!options.toolNames.includes(signal.name)) return null
-  if (signal.ok === false) return null
-  const raw = readPathArgument(signal)
-  if (raw === null) return null
+/** Attribute one raw path string to a skill support file (pure; no IO). */
+export function supportFileReadFromPath(raw: string, options: { root: string }): SupportReadHit | null {
   const normalized = raw.replace(/\\/g, '/').trim()
   if (normalized === '' || normalized.split('/').includes('..')) return null
   const root = options.root.replace(/\\/g, '/').replace(/\/+$/, '')
@@ -508,6 +515,16 @@ export function supportFileReadOf(
   if (skill === undefined || dir === undefined || parts.length < 3) return null
   if (!CITATION_SUPPORT_DIRS.includes(dir)) return null
   return { skill: skill.trim(), rel: parts.slice(1).join('/') }
+}
+
+export function supportFileReadOf(
+  signal: ToolDispatchSignal,
+  options: { toolNames: readonly string[]; root: string },
+): SupportReadHit | null {
+  if (!options.toolNames.includes(signal.name)) return null
+  if (signal.ok === false) return null
+  const raw = readPathArgument(signal)
+  return raw === null ? null : supportFileReadFromPath(raw, options)
 }
 
 export function skillReadNameOf(signal: ToolDispatchSignal): string | undefined {
@@ -543,6 +560,22 @@ export function collectReadSkillNames(events: Iterable<{ type: string; data?: un
     if (name !== undefined) names.add(name)
   }
   return names
+}
+
+/** Every skill support file this log read through a non-failed configured file tool. */
+export function collectReadSupportFiles(
+  events: Iterable<{ type: string; data?: unknown }>,
+  options: { toolNames: readonly string[]; root: string },
+): Map<string, Set<string>> {
+  const reads = new Map<string, Set<string>>()
+  for (const signal of foldToolDispatches(events)) {
+    const hit = supportFileReadOf(signal, options)
+    if (hit === null) continue
+    const set = reads.get(hit.skill) ?? new Set<string>()
+    set.add(hit.rel)
+    reads.set(hit.skill, set)
+  }
+  return reads
 }
 
 /** Tool names that touch the skill library at all — the review's skill-signal set. */

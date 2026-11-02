@@ -104,6 +104,8 @@ export interface SkillWriteGateServices {
   readonly confirm: WriteConfirm | undefined
   /** Names this session read successfully; `undefined` when the session log is not readable. */
   readonly readNames: ReadonlySet<string> | undefined
+  /** Support files this session read, per skill; `undefined` when no evidence. */
+  readonly readSupportFiles?: ReadonlyMap<string, ReadonlySet<string>> | undefined
   /** Report a degraded gate; must not throw. */
   readonly warn: (message: string) => void
   /** The registry's `skillWriteConfirm`; `auto` (the default) skips the question. */
@@ -131,6 +133,7 @@ export function skillWriteGateContext(
     origin: request.origin,
     protectedNames: protectedSkillNamesOf(services.policy),
     readNames: services.readNames,
+    ...(services.readSupportFiles === undefined ? {} : { readSupportFiles: services.readSupportFiles }),
     confirm: services.confirm,
     ...(services.confirmMode === undefined ? {} : { confirmMode: services.confirmMode }),
     ...(services.confirmTimeoutSeconds === undefined ? {} : { confirmTimeoutSeconds: services.confirmTimeoutSeconds }),
@@ -155,6 +158,8 @@ export interface WriteGateContext {
   readonly protectedNames: readonly string[] | undefined
   /** Names this session read successfully; `undefined` when the session log is not readable. */
   readonly readNames: ReadonlySet<string> | undefined
+  /** Support files this session read, per skill; `undefined` when no evidence. */
+  readonly readSupportFiles?: ReadonlyMap<string, ReadonlySet<string>> | undefined
   /** The human confirm seam — read only by the gates that apply to `'admission'`. */
   readonly confirm: WriteConfirm | undefined
   /** The registry's `skillWriteConfirm`: `auto` (the default) skips the question entirely. */
@@ -178,6 +183,8 @@ interface GateArgs {
   readonly name: string
   /** `delete` with this set is a merge into an umbrella, not a bare archive. */
   readonly absorbedInto: string | undefined
+  /** The support-file path this action writes, normalized; absent for body writes. */
+  readonly filePath: string | undefined
   /** The raw arguments object, for the scalar shape gate. */
   readonly scalars: Record<string, unknown>
 }
@@ -217,6 +224,7 @@ function gateArgsOf(args: unknown): GateArgs {
     // (`args.absorbed_into ? { absorbedInto } : {}`) — so `''` performs a BARE archive and must not
     // borrow the merge exemption (review 2026-09-26, P1).
     absorbedInto: typeof absorbedInto === 'string' && absorbedInto.trim() !== '' ? absorbedInto : undefined,
+    filePath: typeof scalars.file_path === 'string' && scalars.file_path.trim() !== '' ? scalars.file_path.replace(/\\/g, '/').replace(/^\.\//, '') : undefined,
     scalars,
   }
 }
@@ -302,7 +310,7 @@ const POLICY_PROTECTION: WriteGate = {
 const READ_BEFORE_WRITE: WriteGate = {
   id: 'read-before-write',
   appliesTo: ['admission'],
-  run: ({ view, origin, readNames, warn }) => {
+  run: ({ view, origin, readNames, readSupportFiles, warn }) => {
     if (origin === 'foreground') return null
     if (readNames === undefined) {
       warn('skill_manage: the read-before-write check could not run for this call — the session log is not readable here, so the write is allowed.')
@@ -313,6 +321,17 @@ const READ_BEFORE_WRITE: WriteGate = {
     // E-318 would send the model to read a skill for a call that cannot work (review 2026-09-26,
     // P2). The rule's default-to-`patch` (V6-26) stays where it belongs, on the plan path.
     if (view.action === undefined) return null
+    // P2-27: a support-file write is judged on THAT FILE, not on the skill body.
+    // Reading the SKILL.md does not mean the model saw references/x.md.
+    if ((view.action === 'write_file' || view.action === 'remove_file') && view.filePath !== undefined) {
+      if (readSupportFiles === undefined) {
+        warn('skill_manage: the support-file read check could not run for this call — no support-file read evidence; the write is allowed.')
+      } else if (readSupportFiles.get(view.name)?.has(view.filePath) === true) {
+        return null
+      } else {
+        return errorText('e-326-support-write-without-a-read', { a1: view.name, a2: view.filePath })
+      }
+    }
     if (!isUnreadWrite({ action: view.action, name: view.name }, readNames)) return null
     return errorText('e-318-skill-write-without-a-read', { a1: view.name })
   },

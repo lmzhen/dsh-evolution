@@ -25,8 +25,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Session } from '@deepseek-ai/dsh-session'
-import { collectReadSkillNames } from './tool-dispatch.ts'
-import { sessionReadNames } from './session-projection.ts'
+import { collectReadSkillNames, collectReadSupportFiles, DEFAULT_SUPPORT_READ_TOOL_NAMES, supportFileReadFromPath } from './tool-dispatch.ts'
+import { installEvolutionProjections, isProjectableSession, sessionReadNames } from './session-projection.ts'
 
 /**
  * The family's OWN structural view of a session log, for a caller that holds no platform `Session`
@@ -63,6 +63,51 @@ export function sessionReadSkillNames(ctx: Context, session: EvolutionSessionLog
   if (projected !== undefined) return projected
   const events = session.readEvents?.()
   return events === undefined ? undefined : collectReadSkillNames(events)
+}
+
+/** The deployment's file-read evidence inputs: its skills root and file-tool names. */
+export interface SupportReadOptions {
+  readonly root: string
+  readonly toolNames?: readonly string[] | undefined
+}
+
+/**
+ * Skill support files ONE session read through a non-failed file tool (P2-27).
+ *
+ * Same two readers as {@link sessionReadSkillNames}: the family projection first,
+ * then the structural log view. `undefined` means "no evidence", not "nothing was
+ * read" - the write gate then keeps its fail-open posture.
+ * @param ctx - a context of the runtime.
+ * @param session - the session whose reads are wanted.
+ * @param options - the skills root and the configured file-tool names.
+ * @returns skill -> set of skill-root-relative support paths.
+ */
+export function sessionReadSupportFiles(
+  ctx: Context,
+  session: EvolutionSessionLogView | undefined,
+  options: SupportReadOptions,
+): ReadonlyMap<string, ReadonlySet<string>> | undefined {
+  if (session === undefined) return undefined
+  if (isProjectableSession(session as Session)) {
+    installEvolutionProjections(ctx)
+    const state = ctx.get('sessionProjections')?.stateOf(session as Session, 'evolutionReads')
+    if (state !== undefined) {
+      const toolNames = options.toolNames ?? DEFAULT_SUPPORT_READ_TOOL_NAMES
+      const reads = new Map<string, Set<string>>()
+      for (const entry of state.reads) {
+        if (entry.failed || typeof entry.file !== 'string') continue
+        if (entry.tool !== undefined && !toolNames.includes(entry.tool)) continue
+        const hit = supportFileReadFromPath(entry.file, { root: options.root })
+        if (hit === null) continue
+        const set = reads.get(hit.skill) ?? new Set<string>()
+        set.add(hit.rel)
+        reads.set(hit.skill, set)
+      }
+      return reads
+    }
+  }
+  const events = session.readEvents?.()
+  return events === undefined ? undefined : collectReadSupportFiles(events, { toolNames: options.toolNames ?? DEFAULT_SUPPORT_READ_TOOL_NAMES, root: options.root })
 }
 
 /** Actions whose target must have been read first (create is authorship, so it is exempt). */

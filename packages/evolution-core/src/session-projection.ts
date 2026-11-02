@@ -25,7 +25,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { isBookkeepingFrame, type EvidenceIndex } from './evidence.ts'
-import { dispatchStepOf, isSkillReadToolName, skillReadNameOf } from './tool-dispatch.ts'
+import { dispatchPathOf, dispatchStepOf, isSkillReadToolName, skillReadNameOf } from './tool-dispatch.ts'
 import { foldTurnEvent, initialTurnFold, type TurnFoldState, type TurnSignals } from './signals.ts'
 
 /** Time of the newest event folded for one session; 0 for a log with no event. */
@@ -120,7 +120,7 @@ export const evolutionEvidenceProjection: ProjectionDefinition<'evolutionEvidenc
  * @param session - the value a caller holds as its session.
  * @returns true when the registry can fold this object.
  */
-function isProjectableSession(session: unknown): session is Session {
+export function isProjectableSession(session: unknown): session is Session {
   if (session === null || typeof session !== 'object') return false
   const candidate = session as Partial<Session>
   // The two accessors are named on purpose: they ARE the fold contract the registry needs, and
@@ -142,7 +142,7 @@ function isProjectableSession(session: unknown): session is Session {
  */
 export interface EvolutionReadsState {
   /** Read dispatches seen so far, in first-seen order. */
-  readonly reads: readonly { readonly key: string; readonly skill: string | null; readonly failed: boolean }[]
+  readonly reads: readonly { readonly key: string; readonly skill: string | null; readonly failed: boolean; readonly file?: string | null | undefined; readonly tool?: string | undefined }[]
 }
 
 /**
@@ -202,6 +202,8 @@ const readsStateSchema = z.object({
     key: z.string(),
     skill: z.string().nullable(),
     failed: z.boolean(),
+    file: z.string().nullable().optional(),
+    tool: z.string().optional(),
   }).strict()),
 }).strict()
 
@@ -266,7 +268,7 @@ export const evolutionReadsProjection: ProjectionDefinition<'evolutionReads'> = 
       const failed = !step.outcome.ok
       if (entry.failed === failed) return state
       const reads = [...state.reads]
-      reads[at] = { key: entry.key, skill: entry.skill, failed }
+      reads[at] = { key: entry.key, skill: entry.skill, failed, ...(entry.file === undefined ? {} : { file: entry.file }), ...(entry.tool === undefined ? {} : { tool: entry.tool }) }
       return { reads }
     }
     // An event with no name only SETTLES a dispatch: it can flip the failure flag of one already
@@ -274,6 +276,13 @@ export const evolutionReadsProjection: ProjectionDefinition<'evolutionReads'> = 
     if (step.name === '') return settled()
     // A replayed open of a tracked dispatch: keep the first entry, still honour its outcome.
     if (at >= 0) return settled()
+    // A dispatch naming a path is a candidate SUPPORT-FILE read (P2-27). The
+    // projection stores the raw path; the gate maps it to a skill later, when it
+    // knows the deployment's root and file-tool names.
+    const file = dispatchPathOf(step)
+    if (file !== null) {
+      return { reads: [...state.reads.slice(-511), { key: step.key, skill: null, failed: step.outcome?.ok === false, file, tool: step.name }] }
+    }
     // Only a read-capable tool is worth a state entry: the reader answers skill names, and a
     // state that tracked every dispatch would grow with the session.
     if (!isSkillReadToolName(step.name)) return state

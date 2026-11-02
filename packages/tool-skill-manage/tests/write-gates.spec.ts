@@ -36,6 +36,15 @@ function readFrames(name: string, failed = false): readonly unknown[] {
   ]
 }
 
+/** The frames the platform logs for one file read (the read tool names file_path). */
+function fileReadFrames(path: string, failed = false): readonly unknown[] {
+  const callId = 'read-' + Math.random().toString(36).slice(2)
+  return [
+    { type: 'tool/call', data: { callId, name: 'read', arguments: JSON.stringify({ file_path: path }) } },
+    { type: 'tool/result', data: { isError: failed, message: { source: { callId }, content: [] } } },
+  ]
+}
+
 function skillBody(name: string, body = 'Body.'): string {
   return `---\nname: ${name}\ndescription: write gate fixture\n---\n${body}\n`
 }
@@ -162,6 +171,24 @@ describe('write gates: read-before-write (E-318)', () => {
     expect(valueOf(refused).ok).toBe(false)
     expect(valueOf(refused).message).toContain('skill_manage patch requires new_string')
     expect(valueOf(refused).message).not.toContain('E-318')
+  })
+})
+
+describe('write gates: support-file read (P2-27)', () => {
+  it('refuses to overwrite a support file the session only knows through SKILL.md', async () => {
+    const { ctx, root } = await setup()
+    await createTarget(ctx, 'support-gate')
+    const created = await callTool(ctx, { action: 'write_file', name: 'support-gate', file_path: 'references/x.md', file_content: 'original' }, sessionOf(undefined))
+    expect(valueOf(created).ok, valueOf(created).message).toBe(true)
+    const path = join(root, 'skills', 'support-gate', 'references', 'x.md')
+    const refused = await callTool(ctx, { action: 'write_file', name: 'support-gate', file_path: 'references/x.md', file_content: 'blind' }, sessionOf('subagent', readFrames('support-gate')))
+    expect(valueOf(refused).ok).toBe(false)
+    expect(valueOf(refused).message).toContain('E-326')
+    expect(valueOf(refused).message).toContain('references/x.md')
+    expect(await readFile(path, 'utf8')).toBe('original')
+    const allowed = await callTool(ctx, { action: 'write_file', name: 'support-gate', file_path: 'references/x.md', file_content: 'seen' }, sessionOf('subagent', fileReadFrames(path)))
+    expect(valueOf(allowed).ok, valueOf(allowed).message).toBe(true)
+    expect(await readFile(path, 'utf8')).toBe('seen')
   })
 })
 

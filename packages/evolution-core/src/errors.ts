@@ -59,6 +59,8 @@ export const EVOLUTION_ERRORS = Object.freeze({
     'E-317: 技能 "%a1%" 未被%a2% —— 确认提示被拒绝或关闭，因此没有写入任何内容。每次创建与裸删除都会出现该提示；只有操作者要求时才重复调用。',
   'e-318-skill-write-without-a-read':
     'E-318: 本会话没有读取技能 "%a1%"，因此拒绝这次写入。请先用 `skill` 工具读取它（失败的读取不算），然后重复该写入。',
+  'e-326-support-write-without-a-read':
+    'E-326: 本会话没有读取技能 "%a1%" 的支撑文件 "%a2%"，因此拒绝这次写入。只读技能正文不算读过支撑文件；请先读取该文件（失败的读取不算），然后重复该写入。',
   // 0.12.0: the confirmation's own deadline (`skillWriteConfirm: 'timeout'`).
   'e-320-the-profile-home-is-not':
     'E-320: 本宿主没有报告 profile home，因此无法定位旧设置文档。/evolution migrate 读取 `<profile home>/settings.yaml.imported`；请在由 profile 启动的会话里运行。',
