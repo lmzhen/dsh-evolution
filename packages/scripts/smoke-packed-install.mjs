@@ -47,12 +47,26 @@ const link = async (target, path) => {
   await mkdir(dirname(path), { recursive: true })
   await symlink(target, path, process.platform === 'win32' ? 'junction' : 'dir')
 }
-await link(join(platformNodeModules, '@deepseek-ai'), join(modules, '@deepseek-ai'))
-// Ordinary runtime deps (yaml, zod, react, ...) come from the build tree too;
-// the family scope is the tarballs under test, never the workspace copies.
-for (const entry of await readdir(platformNodeModules, { withFileTypes: true })) {
-  if ((!entry.isDirectory() && !entry.isSymbolicLink()) || entry.name.startsWith('.') || entry.name.startsWith('@')) continue
-  await link(join(platformNodeModules, entry.name), join(modules, entry.name))
+// pnpm layouts differ: CI sometimes hoists only to .pnpm/node_modules, and
+// Windows does not put yaml/@scope at node_modules' top level. Merge per
+// package, preferring the physical .pnpm/node_modules tree; linking the whole
+// scope from the top level would hide a partial scope and create broken links.
+const platformRoots = [join(platformNodeModules, '.pnpm', 'node_modules'), platformNodeModules]
+  .filter(root => existsSync(root))
+for (const platformRoot of platformRoots) {
+  const scope = join(platformRoot, '@deepseek-ai')
+  if (existsSync(scope)) {
+    for (const entry of await readdir(scope, { withFileTypes: true })) {
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
+      await link(join(scope, entry.name), join(modules, '@deepseek-ai', entry.name))
+    }
+  }
+  // Ordinary runtime deps (yaml, zod, react, ...) come from the build tree
+  // too; the family scope is the tarballs under test, never workspace copies.
+  for (const entry of await readdir(platformRoot, { withFileTypes: true })) {
+    if ((!entry.isDirectory() && !entry.isSymbolicLink()) || entry.name.startsWith('.') || entry.name.startsWith('@')) continue
+    await link(join(platformRoot, entry.name), join(modules, entry.name))
+  }
 }
 
 const unpacked = []

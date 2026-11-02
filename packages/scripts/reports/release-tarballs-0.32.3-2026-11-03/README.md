@@ -15,4 +15,12 @@ Result: 36 tarballs, audit exit 0.
 - `sha256.txt` — per-tarball sha256.
 - `summary.txt` — package count, manifest sha256, mirror HEAD at capture.
 
-The tarball's merge bundle contains the P1-6 fix (`parentRunId: options.runId`) and the P2-20 undeclared staged-file check. Platform consumer import smoke is still CI-only: this machine's harness node_modules lacks the installed platform packages, and the flat mirror cannot build standalone (overlay tsconfig references).
+The tarball's merge bundle contains the P1-6 fix (`parentRunId: options.runId`) and the P2-20 undeclared staged-file check.
+
+`packed-consumer-smoke.txt`: all 36 tarballs unpacked into a throwaway consumer, every `.` export imported, every bundle patch present. Command:
+
+```
+node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules node_modules
+```
+
+The flat mirror still cannot build standalone (overlay tsconfig references); these bytes came from the harness overlay.

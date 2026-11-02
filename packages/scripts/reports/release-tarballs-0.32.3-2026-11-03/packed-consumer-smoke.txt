@@ -1,0 +1,1 @@
+smoke-packed-install: OK - 36 tarball(s) unpacked; every "." export imports; every bundle patch is present
