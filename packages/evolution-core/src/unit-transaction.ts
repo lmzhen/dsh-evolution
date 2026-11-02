@@ -5,6 +5,7 @@ import { acquireTreeWriteLock, type TreeLock } from "./tree-lock.ts";
 import {
   readUnitEvidence,
   readUnitReceipt,
+  readUnitIndex,
   readUnitSnapshot,
   unitStorageKey,
   writeUnitEvidence,
@@ -144,9 +145,6 @@ function canonicalJson(value: unknown): string {
 }
 export function unitEvidenceDigest(evidence: UnitEvidenceRecord): string {
   return createHash("sha256").update(canonicalJson({ ...evidence, at: 0, mutations: 0 })).digest("hex")
-}
-function evidenceDigest(evidence: UnitEvidenceRecord): string {
-  return createHash("sha256").update(JSON.stringify({ ...evidence, at: 0, mutations: 0 }, null, 2) + "\n").digest("hex");
 }
 
 export class UnitTransactions implements UnitTransaction {
@@ -370,7 +368,7 @@ export class UnitTransactions implements UnitTransaction {
         at: this.now(),
       };
       if (!(await lock.assertHeld())) throw new Error("unit-fence-lost");
-      const evidenceSha256 = evidenceDigest(evidence);
+      const evidenceSha256 = unitEvidenceDigest(evidence);
       await writeUnitEvidence(this.options.io, this.options.home, evidence);
       await writeUnitReceipt(this.options.io, this.options.home, {
         schemaVersion: 1, unitId: prepared.unitId, runId: stored.plan.runId, planDigest: stored.digest,
@@ -394,7 +392,8 @@ export class UnitTransactions implements UnitTransaction {
 
   async verify(ref: { unitId: string } | { runId: string }) {
     if ("unitId" in ref) return await readUnitEvidence(this.options.io, this.options.home, ref.unitId);
-    const all = await Promise.all([...this.prepared.keys()].map(async (id) => readUnitEvidence(this.options.io, this.options.home, id)));
+    const entries = (await readUnitIndex(this.options.io, this.options.home)).filter(entry => entry.runId === ref.runId);
+    const all = await Promise.all(entries.map(async (entry) => readUnitEvidence(this.options.io, this.options.home, entry.unitId)));
     const found = all.filter((item): item is UnitEvidenceRecord => item !== null && item.runId === ref.runId);
     const only = found[0];
     return found.length === 0 ? null : found.length === 1 ? (only ?? null) : found;
@@ -461,7 +460,7 @@ export class UnitTransactions implements UnitTransaction {
       ...(snapshot.validationPlan === undefined ? {} : { validationPlan: snapshot.validationPlan }),
       at: this.now(),
     };
-    if (receipt?.evidenceSha256 !== undefined && evidenceDigest(evidence) !== receipt.evidenceSha256)
+    if (receipt?.evidenceSha256 !== undefined && unitEvidenceDigest(evidence) !== receipt.evidenceSha256)
       return { ok: false as const, code: "unit-rollback-blocked" as const, message: "receipt evidence hash does not match rebuilt evidence" };
     await writeUnitEvidence(this.options.io, this.options.home, evidence);
     if (journal.phase !== "committed")

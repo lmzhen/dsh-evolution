@@ -4,8 +4,9 @@ import { expect, it } from 'vitest'
 import { unitEvidencePath } from '@deepseek-ai/dsh-evolution-core'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { UnitTransactions, type UnitBackend, type UnitPlan } from '../src/unit-transaction.ts'
+import { UnitTransactions, unitEvidenceDigest, type UnitBackend, type UnitPlan } from '../src/unit-transaction.ts'
 import { readUnitJournal, writeUnitJournal } from '../src/unit-journal.ts'
+import { readUnitReceipt } from '../src/unit-storage.ts'
 
 function backend(tree: Map<string, string>): UnitBackend {
   return {
@@ -45,6 +46,9 @@ it('prepares, commits and returns stored evidence', async () => {
   if (!committed.ok) return
   expect(committed.evidence.target.after).toBe('new')
   expect(await tx.verify({ unitId: prepared.prepared.unitId })).toEqual(committed.evidence)
+  expect(await tx.verify({ runId: committed.evidence.runId })).toEqual(committed.evidence)
+  const receipt = await readUnitReceipt(io, home, prepared.prepared.unitId)
+  expect(receipt?.evidenceSha256).toBe(unitEvidenceDigest(committed.evidence))
   const journal = await readUnitJournal(io, home, prepared.prepared.unitId)
   expect(journal?.phase).toBe('committed')
   expect(journal?.checkpoints?.map(item => item.source)).toEqual(['beta'])
