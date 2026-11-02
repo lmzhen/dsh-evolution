@@ -239,4 +239,35 @@ describe('ProjectionRuntime', () => {
     expect(restarted.report().action).toBe('none')
   })
 
+
+  it('adds domain cards even when no skill is hidden', async () => {
+    const cardsOnly = { ...snapshot, edges: [] } as DomainMapSnapshot
+    const map = { read: async () => cardsOnly } as DomainMapStore
+    const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
+    const applied = await rt.project(agent(), decision())
+    const contexts = applied.kind === 'enter' ? applied.messages.filter(message => message.source.kind === 'evolution-skill-projection') : []
+    expect(contexts).toHaveLength(1)
+    expect(catalogText(applied)).toContain('<skill_domains>')
+    expect(rt.report().action).toBe('applied')
+  })
+
+
+  it('resolves policy per working directory for two windows', async () => {
+    const map = { read: async () => snapshot } as DomainMapStore
+    const disabled = new DomainPolicyStore({ global: { mode: 'on' }, workspace: { disableDomains: ['d1'] } })
+    const enabled = new DomainPolicyStore({ global: { mode: 'on' } })
+    const rt = new ProjectionRuntime({
+      skillIndexSource: source, map, policy: enabled, policyFor: async cwd => cwd === '/a' ? disabled : enabled,
+      journal: new ProjectionJournal(memoryIo(), 'journal.json'),
+      workingDirectory: { ensure: async agent => agent.id === 'a' ? '/a' : '/b' },
+      featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on',
+    })
+    const aAgent = { id: 'a', session: { id: 'sa' } } as unknown as Agent
+    const bAgent = { id: 'b', session: { id: 'sb' } } as unknown as Agent
+    const a = await rt.project(aAgent, decision())
+    const b = await rt.project(bAgent, decision())
+    expect(catalogText(a)).toContain('- `alpha`:')
+    expect(catalogText(b)).not.toContain('- `alpha`:')
+  })
+
 })
