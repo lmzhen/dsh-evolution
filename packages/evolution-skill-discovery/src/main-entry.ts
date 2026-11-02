@@ -29,7 +29,7 @@ import { JsonAssignmentQueue } from './assignment-queue.ts'
 import { AssignmentWorker } from './worker.ts'
 import { installAssignmentSidecar } from './assignment-sidecar.ts'
 import { installDiscoveryAwareness } from './awareness.ts'
-import { refreshStaleDescriptions } from './description-refresh.ts'
+import { markStaleDescriptions, refreshStaleDescriptions } from './description-refresh.ts'
 
 /** Main production config. */
 export interface Config {
@@ -147,6 +147,7 @@ export function apply(ctx: Context, config: Config): void {
   if (mode === 'off') return
 
   const map = new DomainMapFileStore(io, config.domainMapPath ?? join(root, 'evolution', 'domain-map.json'))
+  const descriptionStaleAfterHours = config.descriptionStaleAfterHours ?? 24 * 7
   const journal = new ProjectionJournal(io, config.projectionJournalPath ?? join(root, 'evolution', 'projection-journal.json'))
   const snapshots = new ViewSnapshotStore(io, config.viewSnapshotPath ?? join(root, 'evolution', 'view-snapshots.json'))
   const globalPolicy: DomainPolicyLayer = { mode: mode === 'shadow' ? 'auto' : mode, pinDomains: config.pinDomains, disableDomains: config.disableDomains }
@@ -173,7 +174,7 @@ export function apply(ctx: Context, config: Config): void {
     ...config.tokenBudget === undefined ? {} : { tokenBudget: config.tokenBudget },
     searchAvailable: () => searchHealthy && config.searchEnabled !== false,
     ...config.staleAfterHours === undefined ? {} : { staleAfterHours: config.staleAfterHours },
-    ...config.descriptionStaleAfterHours === undefined ? {} : { descriptionStaleAfterHours: config.descriptionStaleAfterHours },
+    descriptionStaleAfterHours,
     isFrozen: async agent => snapshots.isFrozen(String(agent.session.id), config.featureEpoch),
   })
   const queue = new JsonAssignmentQueue(io, config.assignmentQueuePath ?? join(root, 'evolution', 'assignment-queue.json'), ctx.get('evolutionStateStore'))
@@ -188,6 +189,8 @@ export function apply(ctx: Context, config: Config): void {
       const cwd = await workingDirectory.ensure(agent)
       const view = await index.read({ cwd, scopeKey: String(agent.id), scope: agent })
       await snapshots.put({ sessionId: String(agent.session.id), viewKey: view.viewKey, cwd, viewCatalogDigest: view.viewCatalogDigest, mapVersion: '0', configDigest: 'production', featureEpoch: config.featureEpoch, createdAt: Date.now() })
+      const marked = await markStaleDescriptions(map, descriptionStaleAfterHours)
+      if (marked > 0) ctx.logger.info('evolution-skill-discovery: marked ' + marked + ' aged domain descriptions stale')
       const refreshed = await refreshStaleDescriptions(map)
       if (refreshed > 0) ctx.logger.info('evolution-skill-discovery: refreshed ' + refreshed + ' stale domain descriptions')
     } catch (error) {

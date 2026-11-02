@@ -7,6 +7,23 @@ function nextMapVersion(version: string): string {
 }
 
 /**
+ * Mark aged fresh descriptions stale so the refresh pass has a producer.
+ * @param store - domain map store.
+ * @param maxAgeHours - age threshold; undefined disables the producer.
+ * @param now - clock for deterministic tests.
+ * @returns number of domains marked stale.
+ */
+export async function markStaleDescriptions(store: DomainMapStore, maxAgeHours: number | undefined, now = Date.now()): Promise<number> {
+  if (maxAgeHours === undefined || maxAgeHours < 0) return 0
+  const snapshot = await store.read()
+  const aged = snapshot.domains.filter(node => node.descriptionStatus === 'fresh' && node.updatedAt > 0 && now - node.updatedAt > maxAgeHours * 3_600_000)
+  if (aged.length === 0) return 0
+  const domains = snapshot.domains.map(node => aged.includes(node) ? { ...node, descriptionStatus: 'stale' as const } : node)
+  await store.commit(snapshot.mapVersion, { mapVersion: nextMapVersion(snapshot.mapVersion), domains, edges: snapshot.edges })
+  return aged.length
+}
+
+/**
  * Re-render stale domain descriptions from their definition fields.
  * @param store - domain map store.
  * @returns number of refreshed domains.

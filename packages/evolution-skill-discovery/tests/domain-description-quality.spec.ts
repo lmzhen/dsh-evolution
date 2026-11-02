@@ -1,6 +1,6 @@
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
-import { descriptionHashOf, descriptionIsServable, evaluateDomainQuality, renderDomainDescription, shouldRegenerateDescription, type DomainNode, type SkillDomainEdge, type SkillKey } from '../src/index.ts'
+import { descriptionHashOf, descriptionIsServable, evaluateDomainQuality, markStaleDescriptions, refreshStaleDescriptions, renderDomainDescription, shouldRegenerateDescription, type DomainMapStore, type DomainNode, type SkillDomainEdge, type SkillKey } from '../src/index.ts'
 
 function node(id: string, purpose = 'distinct purpose', triggers: string[] = ['alpha']): DomainNode {
   return { id, name: id, purpose, description: 'old', inScope: ['alpha', 'beta'], outOfScope: ['gamma'], triggers, parentIds: [], status: 'active', version: 1, createdAt: 0, updatedAt: 0, descriptionHash: 'old', descriptionVersion: 1, descriptionStatus: 'fresh', provenance: {}, quality: {} }
@@ -19,6 +19,23 @@ describe('description lifecycle', () => {
     const b = descriptionHashOf({ id: 'd', descriptionVersion: 1 }, [{ id: 'c1', descriptionVersion: 3 }])
     expect(a).not.toBe(b)
     expect(renderDomainDescription(node('d'))).not.toContain('skill-')
+  })
+})
+
+describe('description refresh producer', () => {
+  it('marks aged fresh descriptions stale and refreshes them', async () => {
+    const now = 10 * 24 * 3_600_000
+    const aged = { ...node('aged'), updatedAt: now - 2 * 24 * 3_600_000 }
+    let snapshot = { mapVersion: '1', domains: [aged], edges: [] as SkillDomainEdge[] }
+    const store = {
+      read: async () => snapshot,
+      commit: async (_expected: string, next: typeof snapshot) => { snapshot = next; return next },
+      rollback: async () => snapshot,
+    } as DomainMapStore
+    expect(await markStaleDescriptions(store, 24, now)).toBe(1)
+    expect(snapshot.domains[0]!.descriptionStatus).toBe('stale')
+    expect(await refreshStaleDescriptions(store)).toBe(1)
+    expect(snapshot.domains[0]!.descriptionStatus).toBe('fresh')
   })
 })
 

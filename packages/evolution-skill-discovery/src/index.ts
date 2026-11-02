@@ -26,6 +26,7 @@ export * from './domain-policy.ts'
 export * from './domain-generation.ts'
 
 export * from './domain-description.ts'
+export * from './description-refresh.ts'
 export * from './domain-quality.ts'
 
 export * from './domain-projection.ts'

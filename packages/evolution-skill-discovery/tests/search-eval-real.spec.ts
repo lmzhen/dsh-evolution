@@ -9,11 +9,13 @@ interface Fixture { schemaVersion: number; skills: Array<{ name: string; descrip
 it('replays the real managed-skill corpus with task queries', async () => {
   const fixture = JSON.parse(await readFile(new URL('./fixtures/search-eval-real.json', import.meta.url), 'utf8')) as Fixture
   expect(fixture.schemaVersion).toBe(1)
-  expect(fixture.skills.length).toBeGreaterThanOrEqual(30)
+  expect(fixture.skills.length).toBeGreaterThanOrEqual(40)
+  expect(fixture.skills.length).toBeLessThanOrEqual(100)
   expect(fixture.queries.length).toBeGreaterThanOrEqual(10)
   expect(fixture.queriesZh).toHaveLength(30)
   const rows = fixture.skills.map(skill => skillIndexRowOf({ ...skill, invocation: { modelInvocable: true, userInvocable: true }, source: 'user-dsh', provider: 'dsh-evolution' } as SkillSummary, false))
   const index = SkillSearchIndex.fromRows('eval-real', rows)
+  let englishTop3 = 0
   for (const query of fixture.queries) {
     const names = (await index.search({ query: query.query, limit: 5 })).results.map(result => result.name)
     expect(names.some(name => query.acceptable.includes(name)), query.query + ' => ' + names.join(',')).toBe(true)
