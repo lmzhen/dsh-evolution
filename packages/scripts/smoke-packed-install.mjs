@@ -11,7 +11,7 @@
  *
  * Usage: node smoke-packed-install.mjs <dist-dir> [--platform-node-modules <dir>]
  */
-import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -62,8 +62,12 @@ try {
     if (!existsSync(file)) throw new Error('tarball missing: ' + file)
     const staging = join(root, 'unpack-' + String(unpacked.length))
     await mkdir(staging, { recursive: true })
-    // Same Windows/GNU-tar rule as the fixture: no absolute C: in argv.
-    execFileSync('tar', ['-xzf', relative(root, file), '-C', relative(root, staging)], { cwd: root, stdio: 'pipe' })
+    // CI puts temp on C: and dist on D:, so path.relative() still returns an
+    // absolute drive path across the drives. Copy the tarball into the temp
+    // root first; both -f and -C are then relative under one cwd.
+    const local = join(root, 'packed-' + String(unpacked.length) + '.tgz')
+    await copyFile(file, local)
+    execFileSync('tar', ['-xzf', relative(root, local), '-C', relative(root, staging)], { cwd: root, stdio: 'pipe' })
     const packageDir = join(staging, 'package')
     const pkg = JSON.parse(await readFile(join(packageDir, 'package.json'), 'utf8'))
     if (typeof pkg.name !== 'string' || !pkg.name.startsWith('@')) throw new Error('tarball has no scoped package name: ' + file)
