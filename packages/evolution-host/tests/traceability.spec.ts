@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.setConfig({ testTimeout: 30_000 })
 import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -79,6 +79,17 @@ describe('verify-traceability: the ledger can fail', () => {
       expect(result.code).toBe(1)
       expect(result.stderr).toContain('canonical order')
     } finally { await rm(rootC, { recursive: true, force: true }) }
+  })
+
+  it('strict mode rejects probe aliases as evidence', async () => {
+    const asset = { ...real, probeAliases: { 'beh-channel-settle': 'beh-subagent-channel-outcomes' } }
+    const root = await fixture(asset)
+    try {
+      await copyFile(fileURLToPath(new URL('../../scripts/gate-manifest.json', import.meta.url)), join(root, 'scripts', 'gate-manifest.json'))
+      const result = await runGate(root, ['--strict'])
+      expect(result.code).toBe(1)
+      expect(result.stderr).toContain('probeAliases is a design alias')
+    } finally { await rm(root, { recursive: true, force: true }) }
   })
 
   it('an empty matrix cannot decide (exit 2), and a disposition without a reason is a violation', async () => {
