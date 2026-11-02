@@ -1,0 +1,12 @@
+{
+  "probe": "beh-restrictor-allowset",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/restrictor.ts",
+      "find": "if (presets.composedPreset(agent.ctx) !== presetId) return",
+      "replace": "if (presets.composedPreset(agent.ctx) === presetId) return"
+    }
+  ],
+  "expect": "red",
+  "note": "the restrictor must restrict only children composed with its own preset"
+}

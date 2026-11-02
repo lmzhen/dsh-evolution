@@ -1372,6 +1372,17 @@
       "mutation": "packages/evolution-review/tests/review-inject.mutation.json",
       "evidence": "A",
       "note": "reviewMode default inject; the parent delivers against its own warm prefix"
+    },
+    {
+      "id": "beh-restrictor-allowset",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-core/tests/restrictor.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/restrictor.mutation.json",
+      "evidence": "A",
+      "note": "allow/deny sets reach only children composed with the restricted preset; effect owns cleanup"
     }
   ]
 }

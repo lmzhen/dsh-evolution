@@ -644,7 +644,7 @@
         "evolution-core/src/restrictor.ts"
       ],
       "probes": [
-        "beh-restricted-preset-allowset"
+        "beh-restrictor-allowset"
       ],
       "gates": [
         "gate-03"
