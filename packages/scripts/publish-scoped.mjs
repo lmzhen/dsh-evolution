@@ -13,7 +13,7 @@
  *   node packages/scripts/publish-scoped.mjs --no-provenance
  */
 import { createHash } from 'node:crypto'
-import { viewOutcome } from './lib/npm-view.mjs'
+import { viewOutcome } from './npm-view.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'

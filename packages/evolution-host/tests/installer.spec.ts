@@ -746,7 +746,7 @@ describe('layered installer', () => {
   }, 20_000)
 
   it('P2-35: only a definite npm E404 is an absent package/version', async () => {
-    const helper = new URL('../../scripts/lib/npm-view.mjs', import.meta.url).href
+    const helper = new URL('../../scripts/npm-view.mjs', import.meta.url).href
     const body = [
       `import { viewOutcome, isAbsentViewError } from ${JSON.stringify(helper)}`,
       "const fail = text => () => { const error = new Error('command failed'); error.stderr = text; throw error }",
