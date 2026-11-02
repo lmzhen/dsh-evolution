@@ -10,7 +10,7 @@ it('passes the production merge_stage allow-list to the runtime', () => {
   expect(source).toContain("allow: ['merge_stage']")
 })
 
-it('mounts routes, command and merge_stage with a minimal host context', async () => {
+it('mounts routes and merge_stage, without the removed /merge alias, with a minimal host context', async () => {
   const home = await tempRoot('dsh-merge-plugin-')
   const io = nodeEvolutionIo()
   const previous = process.env.DSH_HOME
@@ -61,8 +61,7 @@ it('mounts routes, command and merge_stage with a minimal host context', async (
     expect(routes.map(route => route.path).sort()).toEqual([
       '/api/dsh-evolution/merge/body', '/api/dsh-evolution/merge/history', '/api/dsh-evolution/merge/rows', '/api/dsh-evolution/merge/view',
     ])
-    expect(commands).toHaveLength(1)
-    expect(commands[0]).toMatchObject({ name: 'merge' })
+    expect(commands).toHaveLength(0)
     expect(tools).toHaveLength(1)
     expect(tools[0]).toMatchObject({ name: 'merge_stage' })
     const service = provided.get('evolutionMerge') as { run?: unknown; doctorFact?: unknown } | undefined

@@ -131,7 +131,7 @@ it('carries stage and run id in the code line when they exist', () => {
 
 it('passes agentless through the command runner instead of faking a parent', async () => {
   const seen: unknown[] = []
-  const command = createMergeCommand({ async execute(_command, context) { seen.push(context); return { ok: true, text: 'ok' } } })
+  const command = createMergeCommand({ async execute(_command, context) { seen.push(context); return { ok: true, text: 'ok' } } }, '0.31.0')
   await command.handler({ rawInput: 'status' })
   await command.handler({ rawInput: 'status', agent: { session: 's1' } })
   expect(seen).toEqual([{ agentless: true }, { parent: { session: 's1' } }])

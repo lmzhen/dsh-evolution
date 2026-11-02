@@ -7,7 +7,7 @@ import { createMergeCommand, createReadOnlyMergeService, runMergeCommand } from 
 
 it('dispatches read-only verbs and rejects missing ones', async () => {
   const { home, io } = await makeV4Home([])
-  const command = createMergeCommand(createReadOnlyMergeService(io, home))
+  const command = createMergeCommand(createReadOnlyMergeService(io, home), '0.31.0')
   expect(command.name).toBe('merge')
   const status = await command.handler({ rawInput: '/merge status' })
   expect(status).toMatchObject({ kind: 'success' })
@@ -26,7 +26,7 @@ it('accepts the /evolution merge prefix through the shared runner', async () => 
 })
 
 it('renders a runtime failure as three lines with next', async () => {
-  const command = createMergeCommand({ async execute() { throw new Error('boom') } })
+  const command = createMergeCommand({ async execute() { throw new Error('boom') } }, '0.31.0')
   const result = await command.handler({ rawInput: 'scan' })
   expect(result.kind).toBe('error')
   expect(result.text.split('\n')).toHaveLength(3)
@@ -37,7 +37,12 @@ it('passes the invoking agent through to the service', async () => {
   let seen: unknown
   const command = createMergeCommand({
     async execute(_command, context) { seen = context; return { ok: true, text: 'ok' } },
-  })
+  }, '0.31.0')
   await command.handler({ rawInput: 'scan', agent: { session: 's1' } })
   expect(seen).toEqual({ parent: { session: 's1' } })
+})
+
+it('removes the deprecated /merge alias at 0.32.0', () => {
+  const command = createMergeCommand({ async execute() { return { ok: true, text: 'ok' } } }, '0.32.0')
+  expect(command).toBeNull()
 })
