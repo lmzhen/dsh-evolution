@@ -15,6 +15,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { createElement } from 'react'
 import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
 import { SkillHistoryPanel, type PanelFace } from '../src/panels/history/client/Panel.ts'
+import { zh } from '../src/panels/history/client/messages.ts'
 import type { SkillRow, VersionRow, VersionsPayload } from '../src/panels/history/client/api.ts'
 
 /** One in-flight read a spec resolves by hand. */
@@ -71,6 +72,17 @@ async function openSkill(name: string): Promise<void> {
 }
 
 afterEach(cleanup)
+
+it('P1-12: a failed read renders the shared failure sentence and the command fallback', async () => {
+  render(createElement(SkillHistoryPanel, makeFace({
+    t: key => zh[key] ?? key,
+    loadSkills: async () => { throw new Error('boom') },
+  })))
+  await waitFor(() => { expect(document.body.textContent).toContain('读取失败') })
+  expect(document.body.textContent).toContain('/evolution restore')
+  expect(document.body.textContent).not.toContain('failureServer')
+  expect(document.body.textContent).not.toContain('fallbackHint')
+})
 
 describe('skill-history panel: the state machine a renderer can see', () => {
   it('keeps the curator\'s sentence while the rows are read again', async () => {
