@@ -193,7 +193,7 @@ for (const seat of seats) {
   lines.push('  { bundle: ' + single(seat.bundle) + ', rows: [' + seat.rows.map(single).join(', ') + '] },')
 }
 lines.push(']', '')
-const target = join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts')
+const target = join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts')
 const document = lines.join('\n')
 const previous = existsSync(target) ? readFileSync(target, 'utf8') : null
 const fieldCount = ordered.reduce((total, [, fields]) => total + fields.length, 0)
