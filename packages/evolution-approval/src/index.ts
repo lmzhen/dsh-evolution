@@ -202,7 +202,6 @@ declare module '@deepseek-ai/cordis' {
      * Emitted after an approval decision has been durably recorded.
      * @mode emit
      */
-    'evolution/approval-decided'(payload: { readonly record: PendingRecord; readonly action: 'approve' | 'reject'; readonly ok: boolean }): void
   }
 }
 
@@ -769,7 +768,6 @@ export class EvolutionApproval extends Service {
     // the kind — a reviewer acting on several batches can tell them apart.
     if (resolution.record === null) return { ok: false, message: `已批准写入「${id}」已重放，但了结记录返回空记录：请核验该写入。` }
     await this.recordDecision(resolution.record, audit)
-    this.ctx.emit('evolution/approval-decided', { record: resolution.record, action: 'approve', ok: true })
     return { ok: true, message: `已批准 ${record.kind} 写入「${id}」（${record.summary}）。` }
   }
 }

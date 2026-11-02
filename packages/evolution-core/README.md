@@ -63,7 +63,6 @@ session log made the session unresumable (A-line P0-1), which is why the payload
 | `evolution/review-completed` | emit (notification) | `evolution-review` after a plugin branch settles |
 | `evolution/memory-applied` | emit (notification) | `memory` after a memory write |
 | `evolution/memory-provider-registered` | emit (notification) | `memory` when a provider registers |
-| `evolution/approval-decided` | emit (notification) | `evolution-approval` after an approval decision lands |
 
 `evolution/plan-applied` is declared for old activity ledgers; `evolution-review` now emits it from a branch review once that branch settles, with real action counts. `reviewMode: "inject"` still emits none by design.
 
