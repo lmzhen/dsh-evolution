@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { validateReleaseEvidence } from './lib-release-evidence.mjs'
+import { familyVersion } from './lib-family-version.mjs'
 
 const argv = process.argv.slice(2)
 const flag = (name) => { const index = argv.indexOf(name); const value = index >= 0 ? argv[index + 1] : undefined; return value !== undefined && !value.startsWith('--') ? value : '' }
@@ -66,7 +67,9 @@ const assembled = {
   faces: rehearsal.faces ?? evidence.faces,
   ciFace: ciFace === '' ? evidence.ciFace : { os: os === '' ? 'unknown' : os, workflowRef: ciFace },
 }
-problems.push(...validateReleaseEvidence(assembled, { release }))
+const expectedFamilyVersion = release ? familyVersion(resolve(dirname(fileURLToPath(import.meta.url)), '..')) : null
+problems.push(...validateReleaseEvidence(assembled, { release, ...(expectedFamilyVersion === null ? {} : { expectedFamilyVersion }), ...(release ? { maxAgeMs: 7 * 24 * 60 * 60 * 1000 } : {}) }))
+if (release && expectedFamilyVersion === null) problems.push('current family version could not be read from the tree')
 if (problems.length > 0) { for (const problem of problems) console.error('  - ' + problem); console.error('assemble-release-evidence: ' + problems.length + ' problem(s)'); process.exit(1) }
 if (!check) writeFileSync(evidencePath, JSON.stringify(assembled, null, 2) + '\n')
 console.log('assemble-release-evidence: ' + (check ? 'checked' : 'wrote') + ' ' + evidencePath + ' (spikes ' + assembled.spikes.length + ', gates ' + assembled.gates.length + ', traceability ' + (assembled.traceability === null ? 'none' : String(assembled.traceability.covered) + '/' + String(assembled.traceability.total)) + ')')

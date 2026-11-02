@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from 'vitest'
 vi.setConfig({ testTimeout: 30_000 })
 import { execFile } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -33,22 +34,23 @@ const validateSpikeEvidence = validateSpikeEvidenceRaw as (spike: unknown, where
 const run = promisify(execFile)
 const script = fileURLToPath(new URL('../../scripts/verify-release-evidence.mjs', import.meta.url))
 const assembleScript = fileURLToPath(new URL('../../scripts/assemble-release-evidence.mjs', import.meta.url))
+const FAMILY_VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version
 const PLATFORM_LINE = { version: '0.2.1-rc.3', floor: '0.2.1-rc.2', peersRange: '^0.2.1-rc.2', enginesRange: '>=0.2.1-rc.2 <0.2.2-0', upstreamRef: 'dsh-v0.2.1-rc.3' }
 
 function spike(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.1-rc.3', familyVersion: '0.27.0', startedAt: '2026-10-19T00:00:00.000Z', readings: { route: 200 }, ...overrides }
+  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.1-rc.3', familyVersion: FAMILY_VERSION, startedAt: '2026-10-19T00:00:00.000Z', readings: { route: 200 }, ...overrides }
 }
 
 function staging(): Record<string, unknown> {
   return releaseEvidenceSkeleton({
-    familyVersion: '0.27.0',
+    familyVersion: FAMILY_VERSION,
     platformLine: PLATFORM_LINE,
     semverVersion: '7.8.5',
     ciFace: null,
     manifests: { count: 32, enginesRange: PLATFORM_LINE.enginesRange, peerRange: PLATFORM_LINE.peersRange },
     gates: [],
     frozenLines: ['0.2.0'],
-    generatedAt: '2026-10-19T00:00:00.000Z',
+    generatedAt: new Date().toISOString(),
   })
 }
 
@@ -112,6 +114,15 @@ describe('release-evidence schema v2', () => {
       mutate(doc)
       expect(validateReleaseEvidence(doc, { release: true }), label).not.toEqual([])
     }
+  })
+
+  it('P1-13: the release gate refuses a stale family snapshot', async () => {
+    const stale = releasable()
+    stale.familyVersion = '0.27.0'
+    stale.spikes = SPIKE_IDS.map(id => spike(id, { familyVersion: '0.27.0' }))
+    const result = await runGuard(stale)
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain('does not match the current tree')
   })
 
   it('one spike record: a blocked/failed verdict must name what stopped it', () => {

@@ -11,8 +11,10 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { EVIDENCE_SCHEMA_VERSION, validateReleaseEvidence } from './lib-release-evidence.mjs'
 import { readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
+import { familyVersion } from './lib-family-version.mjs'
 
 const argv = process.argv.slice(2)
 const file = argv.find((arg) => !arg.startsWith('--'))
@@ -23,7 +25,9 @@ const path = resolve(file)
 if (!existsSync(path)) { console.error('verify-release-evidence: no evidence at ' + path + ' (cannot decide)'); process.exit(2) }
 let evidence
 try { evidence = JSON.parse(readFileSync(path, 'utf8')) } catch (error) { console.error('verify-release-evidence: unreadable evidence (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
-const problems = validateReleaseEvidence(evidence, { release })
+const expectedFamilyVersion = release ? familyVersion(resolve(dirname(fileURLToPath(import.meta.url)), '..')) : null
+const problems = validateReleaseEvidence(evidence, { release, ...(expectedFamilyVersion === null ? {} : { expectedFamilyVersion }), ...(release ? { maxAgeMs: 7 * 24 * 60 * 60 * 1000 } : {}) })
+if (release && expectedFamilyVersion === null) problems.push('current family version could not be read from the tree')
 // W3: the evidence's platform line must agree with the ONE platform-line.json, never a hand copy.
 // In the publish job there is no checkout (only the dist/scripts artifacts), so prepare-release ships
 // platform-line.json next to the evidence — prefer that sibling and fall back to resolving the tree.

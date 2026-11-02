@@ -113,6 +113,9 @@ export function validateReleaseEvidence(evidence, options = {}) {
   if (!isObject(evidence)) return ['release-evidence: not an object']
   if (evidence.schemaVersion !== EVIDENCE_SCHEMA_VERSION) problems.push('schemaVersion must be ' + String(EVIDENCE_SCHEMA_VERSION))
   if (!nonEmptyString(evidence.familyVersion)) problems.push('familyVersion is required')
+  if (nonEmptyString(options.expectedFamilyVersion) && evidence.familyVersion !== options.expectedFamilyVersion) problems.push('release: familyVersion ' + String(evidence.familyVersion) + ' does not match the current tree ' + options.expectedFamilyVersion)
+  if (release && (!nonEmptyString(evidence.generatedAt) || Number.isNaN(Date.parse(evidence.generatedAt)))) problems.push('release: generatedAt must be an ISO 8601 timestamp')
+  if (release && nonEmptyString(evidence.generatedAt) && Number.isInteger(options.maxAgeMs) && Date.now() - Date.parse(evidence.generatedAt) > options.maxAgeMs) problems.push('release: generatedAt is older than ' + String(options.maxAgeMs) + 'ms — regenerate the evidence for this build')
   const line = evidence.platformLine
   if (!isObject(line) || !nonEmptyString(line.version) || !nonEmptyString(line.peersRange) || !nonEmptyString(line.enginesRange)) problems.push('platformLine must carry version/peersRange/enginesRange')
   if (!isObject(evidence.manifests) || !Number.isInteger(evidence.manifests.count) || evidence.manifests.count <= 0) problems.push('manifests.count must be a positive integer')
@@ -145,6 +148,7 @@ export function validateReleaseEvidence(evidence, options = {}) {
       const spike = byId.get(id)
       if (spike === undefined) problems.push('release: missing spike ' + id)
       else if (spike.verdict !== 'pass') problems.push('release: spike ' + id + ' is ' + String(spike.verdict) + ' (blocked/fail are not passes)')
+      if (spike !== undefined && spike.familyVersion !== evidence.familyVersion) problems.push('release: spike ' + id + ' was measured on ' + String(spike.familyVersion) + ', not ' + String(evidence.familyVersion))
     }
     if (evidence.traceability === undefined || evidence.traceability === null) problems.push('release: traceability reading is required')
     else if (evidence.traceability.covered !== TRACEABILITY_TOTAL) problems.push('release: traceability must cover all ' + String(TRACEABILITY_TOTAL) + ' items')
