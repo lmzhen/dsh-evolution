@@ -29,3 +29,14 @@ it('freezes legacy sessions and older epochs', async () => {
   await store.put({ ...snapshot, viewKey: 'v2' }, { overwrite: true })
   expect((await store.get('s1'))?.viewKey).toBe('v2')
 })
+
+it('P2-8: concurrent puts for different sessions both survive', async () => {
+  const store = new ViewSnapshotStore(io(), 'snapshots.json')
+  const base = { viewKey: 'v1', cwd: '/w', viewCatalogDigest: 'c', mapVersion: 'm', configDigest: 'cfg', featureEpoch: 'e', createdAt: 1 }
+  await Promise.all([
+    store.put({ sessionId: 'a', ...base }),
+    store.put({ sessionId: 'b', ...base }),
+  ])
+  expect(await store.get('a')).toBeDefined()
+  expect(await store.get('b')).toBeDefined()
+})

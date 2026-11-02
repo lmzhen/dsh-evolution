@@ -72,6 +72,12 @@ describe('SkillSearchIndex', () => {
     const key = { viewKey: 'v', viewCatalogDigest: 'c1', policyDigest: 'p1', discoveryMode: 'on' }
     const first = await cache.get(key, rows(['alpha']))
     expect(first?.stale).toBe(false)
+    // P2-9: a long host must not grow one MiniSearch engine per session without bound.
+    const bounded = new SkillSearchCache({ maxEntries: 2 })
+    await bounded.get({ viewKey: 'v1', viewCatalogDigest: 'c1', policyDigest: 'p1', discoveryMode: 'on' }, rows(['alpha']))
+    await bounded.get({ viewKey: 'v2', viewCatalogDigest: 'c2', policyDigest: 'p1', discoveryMode: 'on' }, rows(['alpha']))
+    await bounded.get({ viewKey: 'v3', viewCatalogDigest: 'c3', policyDigest: 'p1', discoveryMode: 'on' }, rows(['alpha']))
+    expect(bounded.size).toBe(2)
     const second = await cache.get(key, rows(['beta']))
     expect(second?.index).toBe(first?.index)
     cache.invalidate('v')

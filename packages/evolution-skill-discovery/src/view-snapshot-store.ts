@@ -18,11 +18,36 @@ interface SnapshotFile { readonly schemaVersion: 1; readonly sessions: Readonly<
 export class ViewSnapshotStore {
   private readonly io: EvolutionIoLike
   private readonly path: string
+  private serial: Promise<void> = Promise.resolve()
 
   constructor(io: EvolutionIoLike, path: string) { this.io = io; this.path = path }
 
   private async read(): Promise<SnapshotFile> {
-    const content = await this.io.readText(this.path)
+    return this.decode(await this.io.readText(this.path))
+  }
+
+  /** Persist one session snapshot; first writer wins unless overwrite is explicit. */
+  async put(snapshot: ViewSnapshot, options: { readonly overwrite?: boolean | undefined } = {}): Promise<void> {
+    const apply = (raw: string | null): string | null => {
+      const current = this.decode(raw)
+      if (current.sessions[snapshot.sessionId] !== undefined && options.overwrite !== true) return raw
+      const sessions = { ...current.sessions, [snapshot.sessionId]: { viewKey: snapshot.viewKey, cwd: snapshot.cwd, viewCatalogDigest: snapshot.viewCatalogDigest, mapVersion: snapshot.mapVersion, configDigest: snapshot.configDigest, featureEpoch: snapshot.featureEpoch, createdAt: snapshot.createdAt } }
+      return JSON.stringify({ schemaVersion: 1, sessions })
+    }
+    if (this.io.transact !== undefined) {
+      await this.io.transact(this.path, current => apply(current))
+      return
+    }
+    const task = async (): Promise<void> => {
+      const current = await this.io.readText(this.path)
+      const next = apply(current)
+      if (next !== null && next !== current) await this.io.writeText(this.path, next)
+    }
+    this.serial = this.serial.then(task, task)
+    await this.serial
+  }
+
+  private decode(content: string | null): SnapshotFile {
     if (content === null) return { schemaVersion: 1, sessions: {} }
     try {
       const parsed = JSON.parse(content) as { schemaVersion?: unknown; sessions?: unknown }
@@ -30,14 +55,6 @@ export class ViewSnapshotStore {
         ? { schemaVersion: 1, sessions: parsed.sessions as SnapshotFile['sessions'] }
         : { schemaVersion: 1, sessions: {} }
     } catch { return { schemaVersion: 1, sessions: {} } }
-  }
-
-  /** Persist one session snapshot; first writer wins unless overwrite is explicit. */
-  async put(snapshot: ViewSnapshot, options: { readonly overwrite?: boolean | undefined } = {}): Promise<void> {
-    const current = await this.read()
-    if (current.sessions[snapshot.sessionId] !== undefined && options.overwrite !== true) return
-    const sessions = { ...current.sessions, [snapshot.sessionId]: { viewKey: snapshot.viewKey, cwd: snapshot.cwd, viewCatalogDigest: snapshot.viewCatalogDigest, mapVersion: snapshot.mapVersion, configDigest: snapshot.configDigest, featureEpoch: snapshot.featureEpoch, createdAt: snapshot.createdAt } }
-    await this.io.writeText(this.path, JSON.stringify({ schemaVersion: 1, sessions }))
   }
 
   /** @returns frozen snapshot for one session, if recorded. */

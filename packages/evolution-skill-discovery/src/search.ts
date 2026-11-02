@@ -169,6 +169,14 @@ interface CacheEntry {
 /** Per-view cache keyed by searchIndexKey; never shares one engine across views. */
 export class SkillSearchCache {
   private readonly entries = new Map<string, CacheEntry>()
+  private readonly maxEntries: number
+
+  constructor(options: { readonly maxEntries?: number | undefined } = {}) {
+    this.maxEntries = Math.max(1, Math.floor(options.maxEntries ?? 32))
+  }
+
+  /** @returns the current number of cached view indices (bounded by maxEntries). */
+  get size(): number { return this.entries.size }
 
   /**
    * Get or build one view index. A failed rebuild retains the previous engine
@@ -187,10 +195,19 @@ export class SkillSearchCache {
       discoveryMode: key.discoveryMode,
     })
     const existing = this.entries.get(cacheKey)
-    if (existing !== undefined) return { index: existing.index, stale: false }
+    if (existing !== undefined) {
+      this.entries.delete(cacheKey)
+      this.entries.set(cacheKey, existing)
+      return { index: existing.index, stale: false }
+    }
     try {
       const index = SkillSearchIndex.fromRows(key.viewKey, rows)
       this.entries.set(cacheKey, { key: cacheKey, viewKey: key.viewKey, index })
+      while (this.entries.size > this.maxEntries) {
+        const oldest = this.entries.keys().next().value
+        if (oldest === undefined) break
+        this.entries.delete(oldest)
+      }
       return { index, stale: false }
     } catch {
       const old = [...this.entries.values()].find(entry => entry.viewKey === key.viewKey)
