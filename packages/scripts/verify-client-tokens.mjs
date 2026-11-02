@@ -44,7 +44,8 @@ function clientSources(pkgDir) {
       else if (entry.name.endsWith('.ts') && entry.name !== 'tokens.ts') out.push(full)
     }
   }
-  walk(pkgDir + '/src/client')
+  if (existsSync(pkgDir + '/src/client')) walk(pkgDir + '/src/client')
+  if (existsSync(pkgDir + '/src/panels')) walk(pkgDir + '/src/panels')
   return out
 }
 
