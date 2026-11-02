@@ -74,7 +74,6 @@
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
         "evolution-commands::tests/parse.spec.ts",
-        "evolution-contract::tests/state-store.contract.spec.ts",
         "evolution-core::tests/citations.spec.ts",
         "evolution-core::tests/content-hash.spec.ts",
         "evolution-core::tests/contracts.spec.ts",
@@ -124,6 +123,7 @@
         "evolution-merge-ui::tests/settings.client.spec.ts",
         "evolution-merge-ui::tests/sorting-panel.client.spec.ts",
         "evolution-merge-ui::tests/sorting.client.spec.ts",
+        "evolution-merge::tests/authoring-manifest.spec.ts",
         "evolution-policy::tests/protected-skills.spec.ts",
         "evolution-review::tests/plugin-branch.integration.spec.ts",
         "evolution-review::tests/redact.spec.ts",
@@ -132,7 +132,6 @@
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
         "evolution-skill-health::tests/routes.spec.ts",
-        "evolution-state-json::tests/state-store.spec.ts",
         "evolution-state-storage::tests/cap-rules.spec.ts",
         "evolution-state-storage::tests/constants.spec.ts",
         "evolution-state-storage::tests/record-contract.spec.ts",
@@ -290,7 +289,6 @@
         "evolution-commands::tests/policy-set.spec.ts",
         "evolution-commands::tests/registry-identity.spec.ts",
         "evolution-commands::tests/registry.spec.ts",
-        "evolution-contract::tests/state-store.contract.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
         "evolution-core::tests/audit-locked-baseline.spec.ts",
         "evolution-core::tests/citations.spec.ts",
@@ -429,6 +427,7 @@
         "evolution-host::tests/installer-preset-base.spec.ts",
         "evolution-host::tests/installer.spec.ts",
         "evolution-host::tests/layout-sync.spec.ts",
+        "evolution-host::tests/packed-install.spec.ts",
         "evolution-host::tests/release-evidence.spec.ts",
         "evolution-host::tests/s4-hmr-double-apply.spec.ts",
         "evolution-host::tests/sidecar-inventory.spec.ts",
@@ -460,6 +459,7 @@
         "evolution-merge-ui::tests/sorting.client.spec.ts",
         "evolution-merge::tests/approve-command.spec.ts",
         "evolution-merge::tests/authoring-flow.spec.ts",
+        "evolution-merge::tests/authoring-manifest.spec.ts",
         "evolution-merge::tests/channel-adapter.spec.ts",
         "evolution-merge::tests/channel-port.spec.ts",
         "evolution-merge::tests/claim.spec.ts",
@@ -541,6 +541,7 @@
         "evolution-merge::tests/select-policy.spec.ts",
         "evolution-merge::tests/skipped.spec.ts",
         "evolution-merge::tests/stage-cleanup-failure.spec.ts",
+        "evolution-merge::tests/stage-cleanup.spec.ts",
         "evolution-merge::tests/stage-tool.spec.ts",
         "evolution-merge::tests/staged-tree.spec.ts",
         "evolution-merge::tests/staging-cleanup.spec.ts",
@@ -583,7 +584,6 @@
         "evolution-state-json::tests/record-gate.spec.ts",
         "evolution-state-json::tests/root-resolution.spec.ts",
         "evolution-state-json::tests/shape-gate.spec.ts",
-        "evolution-state-json::tests/state-store.spec.ts",
         "evolution-state-json::tests/transact-guard.spec.ts",
         "evolution-state-json::tests/transact.spec.ts",
         "evolution-state-storage::tests/cap-rules.spec.ts",
@@ -702,9 +702,9 @@
         "ci-only-06",
         "ci-only-07",
         "ci-only-08",
-        "ci-only-16",
         "ci-only-17",
         "ci-only-18",
+        "ci-only-19",
         "line-identity-ci"
       ],
       "specs": [
@@ -867,7 +867,6 @@
         "evolution-commands::tests/policy-set.spec.ts",
         "evolution-commands::tests/registry-identity.spec.ts",
         "evolution-commands::tests/registry.spec.ts",
-        "evolution-contract::tests/state-store.contract.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
         "evolution-core::tests/audit-locked-baseline.spec.ts",
         "evolution-core::tests/citations.spec.ts",
@@ -1006,6 +1005,7 @@
         "evolution-host::tests/installer-preset-base.spec.ts",
         "evolution-host::tests/installer.spec.ts",
         "evolution-host::tests/layout-sync.spec.ts",
+        "evolution-host::tests/packed-install.spec.ts",
         "evolution-host::tests/release-evidence.spec.ts",
         "evolution-host::tests/s4-hmr-double-apply.spec.ts",
         "evolution-host::tests/sidecar-inventory.spec.ts",
@@ -1037,6 +1037,7 @@
         "evolution-merge-ui::tests/sorting.client.spec.ts",
         "evolution-merge::tests/approve-command.spec.ts",
         "evolution-merge::tests/authoring-flow.spec.ts",
+        "evolution-merge::tests/authoring-manifest.spec.ts",
         "evolution-merge::tests/channel-adapter.spec.ts",
         "evolution-merge::tests/channel-port.spec.ts",
         "evolution-merge::tests/claim.spec.ts",
@@ -1118,6 +1119,7 @@
         "evolution-merge::tests/select-policy.spec.ts",
         "evolution-merge::tests/skipped.spec.ts",
         "evolution-merge::tests/stage-cleanup-failure.spec.ts",
+        "evolution-merge::tests/stage-cleanup.spec.ts",
         "evolution-merge::tests/stage-tool.spec.ts",
         "evolution-merge::tests/staged-tree.spec.ts",
         "evolution-merge::tests/staging-cleanup.spec.ts",
@@ -1160,7 +1162,6 @@
         "evolution-state-json::tests/record-gate.spec.ts",
         "evolution-state-json::tests/root-resolution.spec.ts",
         "evolution-state-json::tests/shape-gate.spec.ts",
-        "evolution-state-json::tests/state-store.spec.ts",
         "evolution-state-json::tests/transact-guard.spec.ts",
         "evolution-state-json::tests/transact.spec.ts",
         "evolution-state-storage::tests/cap-rules.spec.ts",
@@ -1281,9 +1282,9 @@
         "ci-only-06",
         "ci-only-07",
         "ci-only-08",
-        "ci-only-16",
         "ci-only-17",
         "ci-only-18",
+        "ci-only-19",
         "gate-01",
         "gate-02",
         "gate-03",
@@ -1368,7 +1369,6 @@
         "evolution-commands::tests/policy-set.spec.ts",
         "evolution-commands::tests/registry-identity.spec.ts",
         "evolution-commands::tests/registry.spec.ts",
-        "evolution-contract::tests/state-store.contract.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
         "evolution-core::tests/audit-locked-baseline.spec.ts",
         "evolution-core::tests/citations.spec.ts",
@@ -1519,6 +1519,7 @@
         "evolution-host::tests/installer-preset-base.spec.ts",
         "evolution-host::tests/installer.spec.ts",
         "evolution-host::tests/layout-sync.spec.ts",
+        "evolution-host::tests/packed-install.spec.ts",
         "evolution-host::tests/platform-range.spec.ts",
         "evolution-host::tests/profile-override.spec.ts",
         "evolution-host::tests/release-evidence.spec.ts",
@@ -1555,6 +1556,7 @@
         "evolution-merge-ui::tests/sorting.client.spec.ts",
         "evolution-merge::tests/approve-command.spec.ts",
         "evolution-merge::tests/authoring-flow.spec.ts",
+        "evolution-merge::tests/authoring-manifest.spec.ts",
         "evolution-merge::tests/channel-adapter.spec.ts",
         "evolution-merge::tests/channel-port.spec.ts",
         "evolution-merge::tests/claim.spec.ts",
@@ -1636,6 +1638,7 @@
         "evolution-merge::tests/select-policy.spec.ts",
         "evolution-merge::tests/skipped.spec.ts",
         "evolution-merge::tests/stage-cleanup-failure.spec.ts",
+        "evolution-merge::tests/stage-cleanup.spec.ts",
         "evolution-merge::tests/stage-tool.spec.ts",
         "evolution-merge::tests/staged-tree.spec.ts",
         "evolution-merge::tests/staging-cleanup.spec.ts",
@@ -1712,7 +1715,6 @@
         "evolution-state-json::tests/record-gate.spec.ts",
         "evolution-state-json::tests/root-resolution.spec.ts",
         "evolution-state-json::tests/shape-gate.spec.ts",
-        "evolution-state-json::tests/state-store.spec.ts",
         "evolution-state-json::tests/transact-guard.spec.ts",
         "evolution-state-json::tests/transact.spec.ts",
         "evolution-state-storage::tests/cap-rules.spec.ts",
@@ -1838,11 +1840,11 @@
   "counts": {
     "fast": {
       "gates": 57,
-      "specs": 76
+      "specs": 75
     },
     "pre-tag": {
       "gates": 57,
-      "specs": 355
+      "specs": 356
     },
     "ci-only": {
       "gates": 12,
@@ -1850,16 +1852,16 @@
     },
     "full(ci=off)": {
       "gates": 57,
-      "specs": 355
+      "specs": 356
     },
     "full(ci=on)": {
       "gates": 69,
-      "specs": 429
+      "specs": 430
     }
   },
   "specs": {
-    "total": 429,
-    "marked": 429,
+    "total": 430,
+    "marked": 430,
     "unmarked": 0
   }
 }

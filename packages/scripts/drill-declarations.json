@@ -313,6 +313,9 @@
       "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-51",
       "evidence": "the bed manifest is roster-derived: breaking the derived relPath root makes the committed artifact stale and --check must red (the same mutation the checkMutations record pins; --only proves it and stamps provenAt/provenSha)."
     },
+    "ci-only-19": {
+      "noDrillReason": "requirements matrix coverage: the mutation would need a synthetic requirements matrix beyond this row's fixture; the counterpart verify-requirements/requirements.selftest self-tests cover the registry contract"
+    },
     "gate-52": {
       "noDrillReason": "architecture guard: negative source scan; a mutation would need a synthetic tree beyond this gate's own fixtures"
     },

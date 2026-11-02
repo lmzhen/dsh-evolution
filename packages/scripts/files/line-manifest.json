@@ -1,5 +1,5 @@
 {
-  "pin": "02547e18",
+  "pin": "1fd51344",
   "bed": {
     "mono": "overlay"
   },
@@ -28,6 +28,11 @@
       "id": "@deepseek-ai/dsh-evolution-commands",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-commands"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-contract",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-contract"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-core",
@@ -85,11 +90,6 @@
       "relPath": "packages/evolution/evolution-merge-ui"
     },
     {
-      "id": "@deepseek-ai/dsh-evolution-plan-validator",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-plan-validator"
-    },
-    {
       "id": "@deepseek-ai/dsh-evolution-policy",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-policy"
@@ -110,24 +110,19 @@
       "relPath": "packages/evolution/evolution-review"
     },
     {
-      "id": "@deepseek-ai/dsh-evolution-settings-ui",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-settings-ui"
-    },
-    {
       "id": "@deepseek-ai/dsh-evolution-skill-catalog",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-skill-catalog"
     },
     {
+      "id": "@deepseek-ai/dsh-evolution-skill-discovery",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-skill-discovery"
+    },
+    {
       "id": "@deepseek-ai/dsh-evolution-skill-health",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-skill-health"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-skill-history",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-skill-history"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-state",
@@ -153,6 +148,11 @@
       "id": "@deepseek-ai/dsh-evolution-threat",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-threat"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-ui",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-ui"
     },
     {
       "id": "@lmzhen/dsh-evolution-client-kit",

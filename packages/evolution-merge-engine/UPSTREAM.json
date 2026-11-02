@@ -24,6 +24,18 @@
       "patchedSha256": "885ad65a600da93f2bf1c7571e7a93bcc080694ae3f7ba02f0e70b74665d531f",
       "patchedBytes": 2761,
       "reason": "normalize candidate paths to <skill>/SKILL.md so parity is independent of the corpus absolute prefix; test-only."
+    },
+    {
+      "path": "node/src/corpus.js",
+      "patchedSha256": "6210baa0439c10d50f4729b38822b0706c6dd0fb742dfdc3063083bc87cfe442",
+      "patchedBytes": 3920,
+      "reason": "preserve frontmatter whenToUse as corpus metadata (0.30.39 root-cause fix); additive field, filtering stages unchanged."
+    },
+    {
+      "path": "node/src/extract.js",
+      "patchedSha256": "df90f4d7dd1022f6906329bbb859d91ad3906e2be15dad050ee429e3930d3a96",
+      "patchedBytes": 1341,
+      "reason": "include whenToUse in the head extract so merge prompts see the caller trigger (0.30.39); prompt input only, filter pipeline unchanged."
     }
   ],
   "versionVector": {

@@ -297,15 +297,6 @@
       "marker": "transactIo(io, pairIndexPath(home)",
       "state": [],
       "note": "pairKey → result/runId/target index; RMW under the same IO lock so two merge runs cannot lose each other's entries."
-    },
-    {
-      "id": "state-store-collections",
-      "path": "<evolutionHome>/state-store/<collection>.json",
-      "writer": "evolution-state-json/src/state-store.ts",
-      "serializedBy": "transact",
-      "marker": "transactIo(this.io, this.path(collection)",
-      "state": [],
-      "note": "Generic contract StateStore collections (one file per collection); provider serial queue plus transactIo. cross-process false on the node backend."
     }
   ]
 }

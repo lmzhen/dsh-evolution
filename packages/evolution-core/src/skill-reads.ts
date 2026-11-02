@@ -74,6 +74,8 @@ export interface SupportReadOptions {
 /**
  * Skill support files ONE session read through a non-failed file tool (P2-27).
  *
+ * platform-declaration anchor: `sessionProjections` is declared by
+ * `@deepseek-ai/dsh-session-projection` (its registry; capability-probed here).
  * Same two readers as {@link sessionReadSkillNames}: the family projection first,
  * then the structural log view. `undefined` means "no evidence", not "nothing was
  * read" - the write gate then keeps its fail-open posture.

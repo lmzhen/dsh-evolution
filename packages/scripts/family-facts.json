@@ -240,6 +240,11 @@
               "owner": "ci"
             },
             {
+              "script": "gen-requirements.mjs",
+              "reason": "generated requirements view freshness --check (the CI job owns the non-strict gate view)",
+              "owner": "ci"
+            },
+            {
               "script": "inject-evolution-paths.mjs",
               "reason": "workflow plumbing: injects the mirror alias paths into the released upstream tsconfig (overlay setup, not a family check)",
               "owner": "ci"
@@ -265,8 +270,18 @@
               "owner": "ci"
             },
             {
+              "script": "requirements.selftest.mjs",
+              "reason": "requirements registry self-test (a CI-only contract fixture)",
+              "owner": "ci"
+            },
+            {
               "script": "run-load-sensitive.mjs",
               "reason": "load-sensitive lock group runner (local-runner registered; the action runs it at pinned concurrency)",
+              "owner": "ci"
+            },
+            {
+              "script": "smoke-packed-install.mjs",
+              "reason": "P2-33 packed-tarball consumer smoke: unpacks dist tarballs and imports every declared entry",
               "owner": "ci"
             },
             {
@@ -277,6 +292,11 @@
             {
               "script": "verify-probes.mjs",
               "reason": "probe registry schema lint; the CI job executes it, the mirror local lane has no platform overlay",
+              "owner": "ci"
+            },
+            {
+              "script": "verify-requirements.mjs",
+              "reason": "requirements matrix coverage; the CI job executes it after gen-requirements",
               "owner": "ci"
             }
           ]
@@ -660,7 +680,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "ccfb84d2430660cae75616e7507511963379f91cc457de93312fd3e346641e6e",
+        "sha256": "daa724defdd8cfee9998ae230d5f752d54260faa015419893fe8e94cd0cd0e0b",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1048,16 +1068,21 @@
           },
           {
             "id": "ci-only-16",
-            "tier": "ci-only",
-            "criterion": "verify-layout-sync"
+            "tier": "unmapped",
+            "criterion": "smoke-packed-install"
           },
           {
             "id": "ci-only-17",
             "tier": "ci-only",
-            "criterion": "verify-probes"
+            "criterion": "verify-layout-sync"
           },
           {
             "id": "ci-only-18",
+            "tier": "ci-only",
+            "criterion": "verify-probes"
+          },
+          {
+            "id": "ci-only-19",
             "tier": "ci-only",
             "criterion": "verify-requirements"
           },
@@ -1103,7 +1128,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 80,
+            "rowsWithoutIt": 81,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -1813,6 +1838,12 @@
           {
             "id": "ci-only-15",
             "reasonRef": "scripts/gate-manifest.json#ci-only-15",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-16",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-16",
             "expiry": "0.26.0",
             "owner": "scripts"
           }

@@ -1040,8 +1040,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "reason": "generated requirements view freshness --check (the CI job owns the non-strict gate view)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-09",
@@ -1132,8 +1132,8 @@
       ],
       "tree": "overlay",
       "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.26.0"
+      "reason": "requirements registry self-test (a CI-only contract fixture)",
+      "owner": "ci"
     },
     {
       "id": "ci-only-15",
@@ -1151,6 +1151,20 @@
     },
     {
       "id": "ci-only-16",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/smoke-packed-install.mjs",
+        "packages/evolution/dist"
+      ],
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "P2-33 packed-tarball consumer smoke: unpacks dist tarballs and imports every declared entry",
+      "owner": "ci"
+    },
+    {
+      "id": "ci-only-17",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
       "argv": [
@@ -1169,7 +1183,7 @@
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
     {
-      "id": "ci-only-17",
+      "id": "ci-only-18",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
       "argv": [
@@ -1185,7 +1199,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-18",
+      "id": "ci-only-19",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
       "argv": [
@@ -1197,8 +1211,8 @@
       "profiles": [
         "ci"
       ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.26.0"
+      "reason": "requirements matrix coverage; the CI job executes it after gen-requirements",
+      "owner": "ci"
     },
     {
       "id": "line-identity-ci",

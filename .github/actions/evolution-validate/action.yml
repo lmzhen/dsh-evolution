@@ -470,6 +470,21 @@ runs:
         # that shipped green while install-layered was proving only the source tree.
         node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist
 
+    - name: Source-overlay installer guard (Windows install path)
+      if: inputs.install_smoke == 'true'
+      shell: bash
+      working-directory: upstream
+      run: |
+        # Kept alongside the packed smoke: this one still proves the Windows
+        # installer shape (bundle row, preset row, journal, no double mount).
+        # It is NOT the packed-family evidence; see the step above for that.
+        HOME_DIR="$(mktemp -d)"
+        node packages/evolution/scripts/install-layered.mjs \
+          --home "$HOME_DIR" --profile web --mode layered
+        node packages/evolution/scripts/verify-profile-bundles.mjs "$HOME_DIR/profiles/web"
+        test -f "$HOME_DIR/profiles/web/.evolution-install.json"
+        test -f "$HOME_DIR/profiles/web/cordis.patch.yml"
+
     - name: Publish dry-run
       shell: bash
       working-directory: upstream

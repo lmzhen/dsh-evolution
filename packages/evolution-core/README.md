@@ -93,6 +93,7 @@ consumer — so the `@mode` target stays at six (decision 10, provisional: keep)
 | `E-309` / `E-310` | your write lost a revision race, or the settings service refused it (the reason is included) | re-read with `/evolution params` and retry |
 | `E-317` | you declined the confirmation the tool asked before creating or deleting a skill (a foreground create or bare delete asks when `skillWriteConfirm` is `ask` or `timeout`; the default `auto` does not ask at all) | nothing was written; repeat the call if you do want it |
 | `E-318` | a write without a read: the session never loaded that skill, so the write is refused (skills only; the foreground operator session is exempt) | load it with the `skill` tool, then repeat the write |
+| `E-326` | a support-file write without reading THAT file: reading `SKILL.md` is not evidence for `references/x.md` | read the exact support file, then repeat the write |
 | `E-320` | the profile home is not reported by this host, so the legacy settings document cannot be located | run the command in a session whose profile home is set |
 | `E-321` | no evolution-io provider is mounted, so the legacy settings document cannot be read | mount the `evolution-io-node` row |
 | `E-322` | a cross-field parameter constraint would be broken (the field, its floor and the attempted value are included) | raise the value to the named floor, or lower the sibling first |
@@ -100,7 +101,7 @@ consumer — so the `@mode` target stays at six (decision 10, provisional: keep)
 | `E-324` | a restricted preset could not be created (parent preset read, YAML parse, register, or restrictor mount failed; the reason is included) | run `/evolution doctor` to see the preset id, allow set and failure reason; the review/maintenance channel stays unavailable until it is fixed |
 | `E-325` | the host data plane is unavailable: no connection service, so panel/approval routes are not registered | use `/evolution pending`, `approve`, `reject` (same service methods) and run `/evolution doctor` |
 | `E-319` | the confirmation before a create or bare delete went unanswered for `skillWriteConfirmTimeoutSeconds` (`skillWriteConfirm: 'timeout'`), so the write was cancelled | set `skillWriteConfirm` to `auto` (write without asking), keep `ask` (wait until answered), or raise the timeout |
-Symptom → next step; the exact text of every code (`E-301`–`E-325`) is stored once in
+Symptom → next step; the exact text of every code (`E-301`–`E-326`) is stored once in
 
 ## 单元与撤销（本包负责的契约）
 
