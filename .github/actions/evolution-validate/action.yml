@@ -158,7 +158,7 @@ runs:
         # family specs; the released tree does not carry that harness, which is why the pre-2026-10-15 line
         # was green here for every release up to v0.26.15. A check that needs "this machine has X" belongs
         # to local/pre-tag (see the policy-only step below for the half that legitimately runs in CI).
-        node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000
+        node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=${{ runner.os == 'Windows' && 1 || 2 }} --testTimeout=30000
         node node_modules/oxlint/bin/oxlint -c packages/evolution/oxlint.release.json packages/evolution --ignore-pattern '**/tests/**' --ignore-pattern '**/vendor/**' --ignore-pattern '**/scripts/**' -A style
 
     # G7 (0.17.0): the D-9 test-file typecheck step is GONE with the baseline job — it ran the
