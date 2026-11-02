@@ -1,4 +1,7 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
+
+type Context = CordisContext & HostContext
 import type { ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core'
 import type { DomainAssignmentService } from './assignment.ts'

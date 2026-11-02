@@ -9,7 +9,10 @@
  * @module @deepseek-ai/dsh-evolution-maintenance-tools
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
+
+type Context = CordisContext & HostContext
 import { authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'

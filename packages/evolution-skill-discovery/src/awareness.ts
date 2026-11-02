@@ -1,4 +1,7 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
+
+type Context = CordisContext & HostContext
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 
 /** Static 1–2 sentence awareness; no domain list/tree. */

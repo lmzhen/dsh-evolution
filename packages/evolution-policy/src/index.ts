@@ -5,7 +5,11 @@
  */
 
 import { asRecord } from '@deepseek-ai/dsh-evolution-core'
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Service } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
+
+type Context = CordisContext & HostContext
 import type { ToolGuard } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'

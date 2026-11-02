@@ -4,7 +4,10 @@
  */
 
 import { asRecord } from '@deepseek-ai/dsh-evolution-core'
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
+
+type Context = CordisContext & HostContext
 import z from '@deepseek-ai/schemastery'
 import { DEFAULT_THREAT_MAX_SCAN_CHARS, EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { ScanOptions } from '@deepseek-ai/dsh-evolution-core'

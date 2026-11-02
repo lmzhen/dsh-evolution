@@ -1,4 +1,7 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
+
+type Context = CordisContext & HostContext
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -178,7 +181,7 @@ export function apply(ctx: Context, config: Config): void {
   void queue.load().then(() => worker.drain()).catch(() => { ctx.logger.warn('evolution-skill-discovery: assignment queue load failed; queued work stays for the next start') })
   installAssignmentSidecar(ctx, assignment, { onSubmitted: () => { void worker.drain().catch(error => { ctx.logger.warn('evolution-skill-discovery: assignment drain failed: ' + (error instanceof Error ? error.message : String(error))) }) } })
   ctx.on('agent/created', async ({ agent, source: start }) => {
-    try { installDiscoveryAwareness(agent.ctx) } catch (error) { ctx.logger.warn('evolution-skill-discovery: awareness install failed: ' + (error instanceof Error ? error.message : String(error))) }
+    try { installDiscoveryAwareness(agent.ctx as Context) } catch (error) { ctx.logger.warn('evolution-skill-discovery: awareness install failed: ' + (error instanceof Error ? error.message : String(error))) }
     if (start !== 'startup') return
     try {
       const cwd = await workingDirectory.ensure(agent)

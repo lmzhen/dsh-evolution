@@ -21,7 +21,10 @@
  */
 
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
+
+type Context = CordisContext & HostContext
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionIoAdapter, evolutionRoot, isPresent, isUnknown, listEventArchives, parseEvolutionEvents, probeText, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
