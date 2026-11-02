@@ -6,7 +6,7 @@
  * page's state instead of the bound hook and therefore holding no subscription of its own.
  * `summary` answers the page's one-line slot: a row's description fallback, which stays
  * empty until the row actually overrides something, exactly as the page expects.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import { createElement, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'

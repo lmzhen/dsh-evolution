@@ -1,6 +1,6 @@
 /**
  * Browser half: one left-sidebar panel row (技能历史) and the main-column body it opens.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

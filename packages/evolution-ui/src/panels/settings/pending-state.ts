@@ -5,7 +5,7 @@
  * The one rule worth naming: LOADING and EMPTY are different states with different copy. The skill
  * history panel shipped them merged once and a reader could not tell "nothing is staged" from "the
  * answer has not arrived" (E7).
- * @module @deepseek-ai/dsh-evolution-settings-ui/client/pending-state
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client/pending-state
  */
 import type { PendingRow, PreviewAnswer } from './api.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'

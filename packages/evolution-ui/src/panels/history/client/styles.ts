@@ -23,7 +23,7 @@
  *   only, and the platform’s own surfaces never read it). The step is relative, so the panel scales
  *   with the shell, not with the conversation: the dense list needs it — at the raw chrome size
  *   `dsh-evolution-maintenance` truncates in 264px.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 

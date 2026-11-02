@@ -9,7 +9,7 @@
  *
  * The words are NOT this module's: the face passes its locale dictionary in, because the platform
  * component takes its chrome as props.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, useMemo } from 'react'
 import type { ReactNode } from 'react'

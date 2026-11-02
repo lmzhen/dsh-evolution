@@ -24,7 +24,7 @@
  *
  * A row the Host does not serve renders nothing, and a deployment that drops this row
  * shows no section at all: the pair carries no Host-side behaviour.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createApprovalApi } from './api.ts'

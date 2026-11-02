@@ -13,7 +13,7 @@
  *
  * It degrades rather than blanking: when the platform's renderer cannot be reached, the exact text is
  * shown instead, and the reader can still read the version.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, useState, type ReactNode } from 'react'
 import { button, note } from './atoms.ts'

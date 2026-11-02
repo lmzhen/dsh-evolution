@@ -16,7 +16,7 @@
  * The field metrics (8px/10px input padding, 8px radius, 12px/6px paddings and
  * gaps) follow the platform's own settings fields: `ui-primitives/Input.module.css`
  * and `ui-settings-plugins/.../fields.module.css` both use an 8px field radius.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 

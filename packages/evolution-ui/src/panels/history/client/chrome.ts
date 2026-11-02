@@ -9,7 +9,7 @@
  *
  * The reading face — a version rendered as a document, and the rendered diff — lives in
  * `document.ts`; the two faces share the scale in `tokens.ts` and nothing else (§15.2 L2b).
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, type ReactNode } from 'react'
 import { button, chip, note } from './atoms.ts'

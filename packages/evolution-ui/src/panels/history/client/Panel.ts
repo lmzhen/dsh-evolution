@@ -7,7 +7,7 @@
  * which reads are in flight — and the two rules that only a state machine can hold: a read takes a
  * ticket so a slow reply cannot land on another skill, and a write reports its own result instead of
  * being erased by the read that follows it.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { emptyState, groupHeading, notice, panelHead, searchField, skillLine, versionRow, type Copy, type OpenKind } from './chrome.ts'

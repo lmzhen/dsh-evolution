@@ -8,7 +8,7 @@
  * registration hosting a keyed card slot, the keyed `plugins.row.config` seat the
  * Plugins page opens per row, the client settings seat (`configForms`, one form per
  * Host plugin entry id), and the locale seat the section's copy resolves through.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 
 import type { ReactNode } from 'react'

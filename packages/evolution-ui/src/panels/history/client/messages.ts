@@ -4,7 +4,7 @@
  * Client copy is locale-owned: the entry label, the group headings, the actions, the version facts
  * (action words, relative time, deltas) and the status lines all resolve here, and the panel carries
  * no literal string of its own. Facts come from the host; only the WORDS live here.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 
 /** The locale namespace this bundle registers. */

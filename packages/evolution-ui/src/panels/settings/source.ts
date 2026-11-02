@@ -20,7 +20,7 @@
  * The seat itself is probed LAZILY: `apply()` runs before the settings shell may be active
  * (the shell declares `settings.section` and provides `configForms`), so reading the seat at
  * apply time would capture `undefined` for the whole life of the fiber.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike } from './seam.ts'
 

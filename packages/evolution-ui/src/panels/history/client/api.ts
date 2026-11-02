@@ -4,7 +4,7 @@
  * G5/W7: the paths come from the generated client route table (rendered from evolution-core
  * HOST_ROUTES), and the transport classifier is the shared generated route-client — the browser half
  * can no longer drift from the host table or grow a second HTTP vocabulary.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { ROUTES } from '@lmzhen/dsh-evolution-client-kit/generated/routes'
 import { failureMessage, requestJson } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'

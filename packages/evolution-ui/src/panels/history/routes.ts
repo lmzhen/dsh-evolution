@@ -9,7 +9,7 @@
  * Layering: this module maps a route to a USE CASE and does nothing else. "Which artifact does this
  * version hold" and "how do the two chains split" live in evolution-core; the only write is
  * curator.undo. The panel never writes the skill tree itself.
- * @module @deepseek-ai/dsh-evolution-skill-history/routes
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/routes
  */
 
 import type { Context } from '@deepseek-ai/cordis'

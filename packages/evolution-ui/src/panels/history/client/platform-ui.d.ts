@@ -12,7 +12,7 @@
  * module table (`PLATFORM_MODULES`, which seeds `@deepseek-ai/dsh-client-ui-primitives`), so the
  * module is reached the same way `react` is — at runtime, by a bare `require` the bundler leaves
  * alone because `@deepseek-ai/*` is external.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 
 /** The CJS require the client bundle runs with (injected by the platform's module loader). */

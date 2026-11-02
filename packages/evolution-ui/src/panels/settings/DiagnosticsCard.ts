@@ -8,7 +8,7 @@
  * a plain-language summary. The view's documentation facts are a CLI/JSON concern and are
  * deliberately NOT rendered here (0.27.2 real-machine feedback: a settings page is not a spec
  * sheet; the runtime window is the whole reading).
- * @module @deepseek-ai/dsh-evolution-settings-ui/client/DiagnosticsCard
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client/DiagnosticsCard
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DiagnosticRow, DiagnosticsView } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'

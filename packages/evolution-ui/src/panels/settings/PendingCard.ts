@@ -10,7 +10,7 @@
  *
  * Every decision re-reads the window instead of predicting the outcome: the host owns the state, and a
  * refusal is shown with the host's own sentence.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client/PendingCard
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client/PendingCard
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { FallbackHint } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'

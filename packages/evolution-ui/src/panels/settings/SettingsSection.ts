@@ -6,7 +6,7 @@
  * child slots it declared in its registration. The cards themselves are separate
  * registrations keyed by namespace, so a namespace the Host does not serve simply
  * renders nothing and a deployment that drops this row loses the whole section.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import { createElement, type ReactNode } from 'react'
 import { FAMILY_VERSION, PACKAGE_PURPOSE } from './generated-about.ts'

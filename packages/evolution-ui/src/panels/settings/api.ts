@@ -4,7 +4,7 @@
  * Structural types on purpose: the browser half cannot import the host package at runtime, so the row
  * shape is declared by what the route hands over. Every answer — including a refusal — is parsed the
  * same way, because a refusal is a business answer the card shows as a sentence, not a transport error.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client/api
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client/api
  */
 import { ROUTES } from '@lmzhen/dsh-evolution-client-kit/generated/routes'
 import { requestJson, type RouteAnswer } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'

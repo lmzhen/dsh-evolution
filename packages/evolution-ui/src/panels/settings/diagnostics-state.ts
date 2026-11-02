@@ -4,7 +4,7 @@
  *
  * The Host route is the SAME `buildDoctorView` the CLI prints (W6/W8), so this client owns no facts
  * and no computation — it only renders.
- * @module @deepseek-ai/dsh-evolution-settings-ui/client/diagnostics-state
+ * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client/diagnostics-state
  */
 import { ROUTES } from '@lmzhen/dsh-evolution-client-kit/generated/routes'
 import { requestJson, type RouteAnswer } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'

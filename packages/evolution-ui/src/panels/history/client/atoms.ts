@@ -8,7 +8,7 @@
  * notice — and the stylesheet answers once per kind.
  *
  * No words live here: an atom takes the copy its caller already resolved.
- * @module @deepseek-ai/dsh-evolution-skill-history/client
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, type ReactNode } from 'react'
 

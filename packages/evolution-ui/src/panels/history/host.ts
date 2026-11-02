@@ -9,7 +9,7 @@
  * The version FACTS come from evolution-core (which artifact a version holds, how the body chain and
  * the support-file chain split) and the only write is the curator's undo, so this row carries no state
  * of its own: unloading it removes the routes and leaves the feature's data untouched.
- * @module @deepseek-ai/dsh-evolution-skill-history
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history
  */
 import type { Context } from '@deepseek-ai/cordis'
 // Activates the Context merges this row reads. Type-only: the platform packages stay dev-time edges.
