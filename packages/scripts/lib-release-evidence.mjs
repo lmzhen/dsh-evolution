@@ -155,6 +155,10 @@ export function validateReleaseEvidence(evidence, options = {}) {
     if (!Array.isArray(evidence.gates) || evidence.gates.length === 0) problems.push('release: gate readings are required')
     else for (const gate of evidence.gates) {
       if (!isObject(gate) || !nonEmptyString(gate.id) || typeof gate.ok !== 'boolean') problems.push('release: every gate reading needs an id and a boolean ok')
+      else {
+        if (gate.ok !== true) problems.push('release: gate ' + gate.id + ' is not a pass')
+        if (gate.synthetic === true) problems.push('release: gate ' + gate.id + ' is a synthetic manifest reading; pass --gates-report with the run-gates ledger')
+      }
     }
     const byId = new Map((evidence.spikes ?? []).map((spike) => [spike?.spike, spike]))
     for (const id of SPIKE_IDS) {

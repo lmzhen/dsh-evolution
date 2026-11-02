@@ -1,64 +1,65 @@
 {
-  "note": "W10/W11 rehearsal readings for v0.27.0 (measured 2026-10-19 on isolated 0.2.1-rc.2 host; see reports/.../execution/G8-* evidence). CI adds the face identity and gate ledger.",
-  "familyVersion": "0.27.0",
+  "note": "W10/W11 rehearsal readings for v0.32.3, measured 2026-11-03 on an isolated 0.2.1-rc.3 web host (127.0.0.1:3083) from the npm-installed family; API readings in scripts/reports/real-host-0.32.3-2026-11-03/api-readings.json. S4 is the family-side dispose/re-apply contract test (live HMR needs a dev host).",
+  "familyVersion": "0.32.3",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
-      "face": "headless",
-      "hostVersion": "0.2.1-rc.2",
-      "familyVersion": "0.27.0",
-      "startedAt": "2026-10-19T03:41:22.000+08:00",
+      "face": "web",
+      "hostVersion": "0.2.1-rc.3",
+      "familyVersion": "0.32.3",
+      "startedAt": "2026-11-03T02:51:53.000+08:00",
       "readings": {
-        "readDocumentRows": 32,
-        "standardBytes": 5310,
-        "ensure": "ready",
+        "skillHistoryRows": 27,
+        "skillHistoryBytes": 22213,
+        "ownerStatus": 200,
         "resolveBroken": false,
-        "reviewerDocRows": 33,
-        "restrictorRow": "present",
-        "ensureIdempotent": true
+        "ensureIdempotent": true,
+        "note": "three consecutive owner GETs returned the same 27-row projection"
       }
     },
     {
       "spike": "S2",
       "verdict": "pass",
       "face": "web",
-      "hostVersion": "0.2.1-rc.2",
-      "familyVersion": "0.27.0",
-      "startedAt": "2026-10-19T02:22:00.000+08:00",
+      "hostVersion": "0.2.1-rc.3",
+      "familyVersion": "0.32.3",
+      "startedAt": "2026-11-03T02:51:53.000+08:00",
       "readings": {
-        "ownerIndex": 200,
         "ownerDiagnostics": 200,
         "anonymous": 401,
-        "plainHttpOnTlsPort": "refused",
+        "plainHttpOnTlsPort": "not applicable: loopback http",
         "carrier": "connection.fetch"
       }
     },
     {
       "spike": "S3",
       "verdict": "pass",
-      "face": "headless",
-      "hostVersion": "0.2.1-rc.2",
-      "familyVersion": "0.27.0",
-      "startedAt": "2026-10-19T02:33:00.000+08:00",
+      "face": "web",
+      "hostVersion": "0.2.1-rc.3",
+      "familyVersion": "0.32.3",
+      "startedAt": "2026-11-03T02:51:53.000+08:00",
       "readings": {
-        "semverVersion": "7.8.5",
-        "gridRows": 9,
-        "expectedColumnMatches": true
+        "semverVersion": "0.2.1-rc.3",
+        "familyVersion": "0.32.3",
+        "diagnosticsSchemaVersion": 2,
+        "gridRows": 8,
+        "expectedColumnMatches": true,
+        "mergeWireVersion": 1
       }
     },
     {
       "spike": "S4",
       "verdict": "pass",
       "face": "headless",
-      "hostVersion": "0.2.1-rc.2",
-      "familyVersion": "0.27.0",
-      "startedAt": "2026-10-19T02:53:00.000+08:00",
+      "hostVersion": "0.2.1-rc.3",
+      "familyVersion": "0.32.3",
+      "startedAt": "2026-11-03T02:51:53.000+08:00",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
         "repeatedPrepareIdempotent": true,
-        "note": "live HMR needs a dev host; family-side dispose/re-apply contract replaces it (W10 §6)"
+        "note": "s4-hmr-double-apply.spec.ts 2/2 on the current tree; live HMR needs a dev host, family-side contract replaces it"
       }
     }
   ],
@@ -70,55 +71,14 @@
     },
     "covered": 52,
     "total": 52,
-    "planned": true
+    "planned": true,
+    "source": "gate-55 --planned on the current tree"
   },
   "faces": {
     "web": {
       "diagnosticsSchemaVersion": 2,
       "facts": 7,
       "runtime": 8
-    },
-    "clientSmoke": {
-      "settingsCards": "pass",
-      "paramSave": "pass",
-      "skillHistoryPanel": "pass",
-      "remoteTls": "pass"
-    },
-    "m1m4": {
-      "M1": "pass",
-      "M2": "pass",
-      "M3": "pass",
-      "M4": "pass"
-    },
-    "clientConsole": {
-      "face": "web",
-      "version": "0.27.3",
-      "host": "127.0.0.1:3080",
-      "chrome": "Chrome/155.0.8059.82",
-      "steps": [
-        "home",
-        "settings-evolution",
-        "diagnostics-card"
-      ],
-      "consoleErrors": 0,
-      "exceptions": 0,
-      "diagnostics": {
-        "schemaVersion": 2,
-        "facts": 7,
-        "runtime": 8
-      },
-      "familyVersionFact": "0.27.3",
-      "installForm": "完整功能包（安装内容已声明）",
-      "aboutLine": "0.27.3 · Web settings cards for the evolution family's parameter namespaces",
-      "diagnosticsCard": {
-        "badge": "1 项需要注意",
-        "environmentFactsRendered": false,
-        "technicalDetailsRendered": false,
-        "runtimeRows": 8,
-        "refreshWorks": true
-      },
-      "evidence": "execution/assets/real-machine-0.27.3/real-machine-0.27.3.json",
-      "evidenceScript": "real-machine verification script (CDP): diagnostics API + settings card scope/refresh + about line"
     }
   }
 }

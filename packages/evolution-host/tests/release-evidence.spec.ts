@@ -108,6 +108,8 @@ describe('release-evidence schema v2', () => {
       ['failed spike without signature', (doc) => { (doc.spikes as Array<Record<string, unknown>>)[2]!.verdict = 'fail' }],
       ['missing ci face', (doc) => { doc.ciFace = null }],
       ['empty gate ledger', (doc) => { doc.gates = [] }],
+      ['failed gate', (doc) => { (doc.gates as Array<Record<string, unknown>>)[0]!.ok = false }],
+      ['synthetic gate', (doc) => { (doc.gates as Array<Record<string, unknown>>)[0]!.synthetic = true }],
       ['short traceability', (doc) => { (doc.traceability as Record<string, unknown>).covered = 51 }],
       ['wrong universe', (doc) => { (doc.traceability as Record<string, unknown>).universe = { A: 22, B: 18, C: 11 } }],
     ]
@@ -201,7 +203,7 @@ describe('release-evidence assembly (W3 injection)', () => {
     expect(result.doc.gates.length).toBeGreaterThan(0)
     expect(result.doc.ciFace).toEqual({ os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' })
     expect(result.doc.traceability.covered).toBe(52)
-    expect(validateReleaseEvidence(result.doc, { release: true })).toEqual([])
+    expect(validateReleaseEvidence(result.doc, { release: true }).some(problem => problem.includes('synthetic manifest reading'))).toBe(true)
   })
   it('P2-39: flags-first invocation still finds the evidence file', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'assemble-evidence-order-'))

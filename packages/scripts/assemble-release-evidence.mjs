@@ -26,17 +26,18 @@ const flag = (name) => { const index = argv.indexOf(name); const value = index >
 // P2-39: a positional is any token that is neither a flag nor the VALUE of a
 // value-taking flag. The previous list missed --gates-from-manifest, so a
 // flags-first invocation read its profile ("ci") as the evidence path.
-const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--commit', '--tag'])
+const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--gates-report', '--commit', '--tag'])
 const file = argv.find((arg, index) => !arg.startsWith('--') && !VALUE_FLAGS.has(argv[index - 1]))
 const rehearsalPath = flag('--rehearsal')
 const ciFace = flag('--ci-face') || process.env.GITHUB_WORKFLOW_REF || ''
 const os = flag('--os') || process.env.RUNNER_OS || ''
 const gatesFromManifest = flag('--gates-from-manifest')
+const gatesReport = flag('--gates-report')
 const commit = flag('--commit')
 const tag = flag('--tag')
 const release = argv.includes('--release')
 const check = argv.includes('--check')
-if (file === undefined || file === '') { console.error('assemble-release-evidence: usage: <release-evidence.json> --rehearsal <inputs.json> [--ci-face <ref>] [--os <os>] [--commit <sha>] [--tag <v...>] [--release] [--check]'); process.exit(2) }
+if (file === undefined || file === '') { console.error('assemble-release-evidence: usage: <release-evidence.json> --rehearsal <inputs.json> [--ci-face <ref>] [--os <os>] [--gates-report <run-gates.json>] [--commit <sha>] [--tag <v...>] [--release] [--check]'); process.exit(2) }
 const evidencePath = resolve(file)
 if (!existsSync(evidencePath)) { console.error('assemble-release-evidence: no staging evidence at ' + evidencePath + ' (cannot decide)'); process.exit(2) }
 let evidence
@@ -51,13 +52,21 @@ let gates = Array.isArray(rehearsal.gates) ? rehearsal.gates : []
 // W3: the CI gate ledger is the set of manifest rows this run's compat-check job executed — the
 // step that writes the evidence runs only after the whole guard chain passed, so each row's
 // reading names the producing job instead of inventing a per-command transcript.
-if (gatesFromManifest !== '') {
+if (gatesReport !== '') {
+  try {
+    const report = JSON.parse(readFileSync(resolve(gatesReport), 'utf8'))
+    const rows = Array.isArray(report) ? report : Array.isArray(report.gates) ? report.gates : []
+    gates = rows.map((row) => ({ id: String(row.id ?? row.subject ?? 'unknown'), ok: row.verdict === undefined ? row.ok === true : row.verdict === 'pass', reading: String(row.reading ?? row.detail ?? row.verdict ?? ''), ...(row.criterionEvaluated === true ? { criterionEvaluated: true } : {}) }))
+  } catch (error) {
+    problems.push('gate report could not be read for --gates-report: ' + (error instanceof Error ? error.message : String(error)))
+  }
+} else if (gatesFromManifest !== '') {
   const scriptsDir = dirname(fileURLToPath(import.meta.url))
   try {
     const manifest = JSON.parse(readFileSync(join(scriptsDir, 'gate-manifest.json'), 'utf8'))
     gates = (manifest.gates ?? [])
       .filter((gate) => Array.isArray(gate.profiles) && gate.profiles.includes(gatesFromManifest))
-      .map((gate) => ({ id: gate.id, ok: true, reading: 'compat-check job passed (guards ran before this evidence step)' }))
+      .map((gate) => ({ id: gate.id, ok: true, synthetic: true, reading: 'compat-check job passed (guards ran before this evidence step)' }))
   } catch (error) {
     problems.push('gate-manifest.json could not be read for --gates-from-manifest: ' + (error instanceof Error ? error.message : String(error)))
   }

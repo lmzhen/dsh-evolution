@@ -1,0 +1,24 @@
+{
+  "measuredAt": "2026-11-03T02:51:53.4173780+08:00",
+  "host": "http://127.0.0.1:3083",
+  "familyVersion": "0.32.3",
+  "platformLine": "0.2.1-rc.3（最低兼容 0.2.1-rc.2）",
+  "diagnosticsSchemaVersion": 2,
+  "diagnosticsFacts": 7,
+  "diagnosticsRuntime": 8,
+  "diagnosticsRuntimeStatuses": [
+    "host-surface:ok",
+    "install-form-detected:ok",
+    "platform-pairing:ok",
+    "platform-services:ok",
+    "restricted-preset:warn",
+    "runs:ok",
+    "session-fold:ok",
+    "subagent-channel:ok"
+  ],
+  "skillHistoryRows": 27,
+  "skillHistoryBytes": 22213,
+  "mergeWireVersion": 1,
+  "mergeApproval": false,
+  "anonymousStatus": 401
+}
