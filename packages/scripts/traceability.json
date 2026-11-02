@@ -509,20 +509,20 @@
     },
     {
       "id": "B-09",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W2"
       ],
       "files": [
         "evolution-core/package.json"
       ],
-      "probes": [
-        "decl-engines-window"
-      ],
+      "probes": [],
       "gates": [
         "gate-11"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "trigger": "gate-27 (verify-platform-ranges) owns engines.dsh/staged manifest checks; platform-line-grid does not read engines.dsh",
+      "note": "Deferred by the G8b probe audit: gate-level coverage, no engine-window unit probe."
     },
     {
       "id": "B-10",
@@ -794,7 +794,7 @@
     },
     {
       "id": "C-11",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W9"
       ],
@@ -802,14 +802,13 @@
         "packages/scripts/verify-probes.mjs",
         "packages/scripts/verify-mutations.mjs"
       ],
-      "probes": [
-        "verify-probes",
-        "verify-mutations"
-      ],
+      "probes": [],
       "gates": [
         "gate-42"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "trigger": "gate-49 (verify-mutations) + ci-only-18 (verify-probes); runner behavior has no standalone unit probe",
+      "note": "Deferred by the G8b probe audit: the executable evidence is the runner gates, not a unit probe."
     },
     {
       "id": "C-12",
