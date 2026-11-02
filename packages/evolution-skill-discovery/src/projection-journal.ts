@@ -88,11 +88,11 @@ export class ProjectionJournal {
   }
 
   /** Delete every record for one session/view after a successful restore. */
-  async removeView(sessionId: string, viewKey: string, codecVersion: string): Promise<void> {
+  async removeView(sessionId: string, viewKey: string, _codecVersion: string): Promise<void> {
     await this.serial(async () => {
       const current = await this.read()
       const records = Object.fromEntries(Object.entries(current.records).filter(([, record]) =>
-        record.sessionId !== sessionId || record.viewKey !== viewKey || record.codecVersion !== codecVersion))
+        record.sessionId !== sessionId || record.viewKey !== viewKey))
       this.cache = { schemaVersion: 1, records }
       await this.io.writeText(this.path, JSON.stringify(this.cache))
     })

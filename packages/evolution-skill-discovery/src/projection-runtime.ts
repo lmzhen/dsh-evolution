@@ -14,6 +14,12 @@ export interface WorkingDirectoryPort {
   ensure(agent: Agent, signal?: AbortSignal | undefined): Promise<string>
 }
 
+/** Bounded catalog/projection history from the evolution-core projection unit. */
+export interface ProjectionHistoryView {
+  readonly catalogs: readonly { readonly text: string; readonly entries: readonly { readonly name: string; readonly description: string }[]; readonly update: boolean }[]
+  readonly digests: readonly string[]
+}
+
 /** Inputs for the per-view projection runtime. */
 export interface ProjectionRuntimePorts {
   readonly skillIndexSource: SkillIndexSource
@@ -22,6 +28,7 @@ export interface ProjectionRuntimePorts {
   readonly policyFor?: ((cwd: string) => Promise<DomainPolicyStore>) | undefined
   readonly journal: ProjectionJournal
   readonly workingDirectory: WorkingDirectoryPort
+  readonly history?: ((agent: Agent) => ProjectionHistoryView | undefined) | undefined
   readonly featureEpoch: string
   readonly codecVersion: string
   readonly adapterVersion: string
@@ -62,7 +69,21 @@ function fullCatalogText(capture: CatalogCapture): string {
   return catalogText(renderCatalog(capture, capture.entries))
 }
 
-function sessionCatalogCapture(agent: Agent): CatalogCapture | undefined {
+function captureOfFrame(frame: ProjectionHistoryView['catalogs'][number]): CatalogCapture {
+  return { text: frame.text, source: { kind: 'skill-catalog', form: 'catalog', ...(frame.update ? { update: true as const } : {}), entries: frame.entries }, entries: frame.entries, update: frame.update }
+}
+
+function sessionCatalogCapture(agent: Agent, history?: ProjectionHistoryView | undefined): CatalogCapture | undefined {
+  if (history !== undefined && history.catalogs.length > 0) {
+    let full: CatalogCapture | undefined
+    let projected: CatalogCapture | undefined
+    for (const frame of history.catalogs) {
+      const capture = captureOfFrame(frame)
+      projected = capture
+      if (catalogText({ content: [{ type: 'text', text: frame.text }] }) === fullCatalogText(capture)) full = capture
+    }
+    return full ?? projected
+  }
   const readEvents = (agent.session as { readEvents?: () => Iterable<{ type: string; data?: unknown }> }).readEvents
   if (readEvents === undefined) return undefined
   let full: CatalogCapture | undefined
@@ -85,10 +106,10 @@ function fullCaptureOf(capture: CatalogCapture): CatalogCapture | undefined {
 }
 
 /** Digest of every projection context already present in session history. */
-function sessionProjectionDigests(agent: Agent): ReadonlySet<string> {
+function sessionProjectionDigests(agent: Agent, history?: ProjectionHistoryView | undefined): ReadonlySet<string> {
+  const digests = new Set<string>(history?.digests ?? [])
   const readEvents = (agent.session as { readEvents?: () => Iterable<{ type: string; data?: unknown }> }).readEvents
-  if (readEvents === undefined) return new Set()
-  const digests = new Set<string>()
+  if (readEvents === undefined) return digests
   for (const event of readEvents()) {
     if (event.type !== 'user/message' || typeof event.data !== 'object' || event.data === null) continue
     const message = event.data as UserMessage
@@ -124,8 +145,9 @@ export class ProjectionRuntime {
 
   private async restore(agent: Agent, viewKey: string, decision: PreStepDecision, currentCapture?: CatalogCapture): Promise<PreStepDecision> {
     const record = await this.ports.journal.latest(String(agent.id), viewKey, this.ports.codecVersion)
-    const sessionBase = sessionCatalogCapture(agent)
-    const fullSession = sessionBase !== undefined && sessionBase.text === fullCatalogText(sessionBase) ? sessionBase : undefined
+    const history = this.ports.history?.(agent)
+    const sessionBase = sessionCatalogCapture(agent, history)
+    const fullSession = sessionBase === undefined ? undefined : (sessionBase.text === fullCatalogText(sessionBase) ? sessionBase : fullCaptureOf(sessionBase))
     const projectedCurrent = currentCapture !== undefined && currentCapture.text !== fullCatalogText(currentCapture)
     const fullCurrent = currentCapture === undefined ? undefined : fullCaptureOf(currentCapture)
     // A journal record is the base used by the newest projection; prefer it over an
@@ -187,7 +209,8 @@ export class ProjectionRuntime {
     if (this.ports.isFrozen !== undefined && await this.ports.isFrozen(agent)) return decision
     const { view, snapshot, policy, policyDigest, state } = await this.readState(agent, signal)
     const currentCapture = captureDecisionCatalog(decision)
-    const seen = new Set(sessionProjectionDigests(agent))
+    const history = this.ports.history?.(agent)
+    const seen = new Set(sessionProjectionDigests(agent, history))
     if (decision.kind === 'enter') {
       for (const message of decision.messages) {
         if (message.source.kind !== 'evolution-skill-projection') continue
@@ -199,7 +222,7 @@ export class ProjectionRuntime {
     if (previous.action === 'applied' && previous.digest !== '') seen.add(previous.digest)
     let capture = currentCapture
     if (capture === undefined) capture = (await this.ports.journal.latest(String(agent.id), view.viewKey, this.ports.codecVersion))?.base
-    if (capture === undefined) capture = sessionCatalogCapture(agent)
+    if (capture === undefined) capture = sessionCatalogCapture(agent, history)
     if (!canProject(state) || snapshot === undefined) return this.restore(agent, view.viewKey, decision, currentCapture)
     if (capture === undefined) { this.mark(agent, 'blocked', ''); return decision }
     const projection = buildDomainProjection({

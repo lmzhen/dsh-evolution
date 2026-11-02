@@ -270,4 +270,29 @@ describe('ProjectionRuntime', () => {
     expect(catalogText(b)).not.toContain('- `alpha`:')
   })
 
+
+  it('restores and dedupes through the real projection-history port without readEvents', async () => {
+    const map = { read: async () => snapshot } as DomainMapStore
+    const journal = new ProjectionJournal(memoryIo(), 'journal.json')
+    const frame = { text, entries: [{ name: 'alpha', description: 'alpha description' }, { name: 'beta', description: 'beta description' }], update: false }
+    const agentWithoutLog = { id: 'projection-history', session: { id: 's' } } as unknown as Agent
+    const rt = new ProjectionRuntime({
+      skillIndexSource: source, map, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal,
+      workingDirectory: { ensure: async () => '/w' }, history: () => ({ catalogs: [frame], digests: [] }),
+      featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on',
+    })
+    const applied = await rt.project(agentWithoutLog, decision())
+    const context = applied.kind === 'enter' ? applied.messages.find(message => message.source.kind === 'evolution-skill-projection') : undefined
+    const digest = context === undefined ? undefined : (context.source as { digest?: string }).digest
+    expect(digest).toBeDefined()
+    const restarted = new ProjectionRuntime({
+      skillIndexSource: source, map: { read: async () => { throw new Error('broken') } } as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal,
+      workingDirectory: { ensure: async () => '/w' }, history: () => ({ catalogs: [frame], digests: digest === undefined ? [] : [digest] }),
+      featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on',
+    })
+    const restored = await restarted.project(agentWithoutLog, applied)
+    expect(catalogText(restored)).toContain('- alpha:')
+    expect(catalogText(restored)).not.toContain('evolution-skill-projection')
+  })
+
 })

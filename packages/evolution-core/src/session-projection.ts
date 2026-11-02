@@ -164,14 +164,38 @@ export interface EvolutionSignalsState {
   readonly turn: TurnFoldState
 }
 
+/** One captured skill-catalog message, bounded for the projection-restore reader. */
+export interface EvolutionCatalogFrame {
+  readonly text: string
+  readonly entries: readonly { readonly name: string; readonly description: string }[]
+  readonly update: boolean
+}
+
+/** The bounded catalog/projection history the discovery runtime reads for restore and dedupe. */
+export interface EvolutionProjectionHistoryState {
+  readonly catalogs: readonly EvolutionCatalogFrame[]
+  readonly digests: readonly string[]
+}
+
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     /** The skill names one session read, for the read-before-write gate and the review plan path. */
     evolutionReads: EvolutionReadsState
+    /** Catalog/projection frames and digests, newest last; bounded so the state cannot grow with the session. */
+    evolutionProjectionHistory: EvolutionProjectionHistoryState
     /** The open turn's window signals, for the review cadence. */
     evolutionSignals: EvolutionSignalsState
   }
 }
+
+const projectionHistorySchema = z.object({
+  catalogs: z.array(z.object({
+    text: z.string(),
+    entries: z.array(z.object({ name: z.string(), description: z.string() }).strict()).max(512),
+    update: z.boolean(),
+  }).strict()).max(8),
+  digests: z.array(z.string()).max(64),
+}).strict()
 
 const readsStateSchema = z.object({
   reads: z.array(z.object({
@@ -195,6 +219,31 @@ const signalsStateSchema = z.object({
     opened: z.array(z.string()),
   }).strict(),
 }).strict()
+
+/** The `evolutionProjectionHistory` unit (host-only). */
+export const evolutionProjectionHistoryProjection: ProjectionDefinition<'evolutionProjectionHistory'> = {
+  key: 'evolutionProjectionHistory',
+  stateVersion: 1,
+  stateSchema: projectionHistorySchema,
+  init: () => ({ catalogs: [], digests: [] }),
+  apply: (state, event) => {
+    const frame: { type: string; data?: unknown } = event
+    if (frame.type !== 'user/message' || typeof frame.data !== 'object' || frame.data === null) return state
+    const message = frame.data as { content?: unknown; source?: unknown }
+    const source = message.source as { kind?: unknown; form?: unknown; update?: unknown; entries?: unknown; digest?: unknown } | undefined
+    if (source === undefined || typeof source !== 'object') return state
+    if (source.kind === 'evolution-skill-projection' && typeof source.digest === 'string') {
+      if (state.digests.includes(source.digest)) return state
+      return { catalogs: state.catalogs, digests: [...state.digests, source.digest].slice(-64) }
+    }
+    if (source.kind !== 'skill-catalog' || source.form !== 'catalog' || !Array.isArray(source.entries)) return state
+    if (!Array.isArray(message.content)) return state
+    const text = message.content.map(block => block !== null && typeof block === 'object' && (block as { type?: unknown }).type === 'text' ? String((block as { text?: unknown }).text ?? '') : '').join('')
+    if (!text.includes('<available_skills>') || !text.includes('</available_skills>')) return state
+    const entries = source.entries.filter((entry): entry is { name: string; description: string } => entry !== null && typeof entry === 'object' && typeof (entry as { name?: unknown }).name === 'string' && typeof (entry as { description?: unknown }).description === 'string').map(entry => ({ name: entry.name, description: entry.description }))
+    return { catalogs: [...state.catalogs, { text, entries, update: source.update === true }].slice(-8), digests: state.digests }
+  },
+}
 
 /** The `evolutionReads` unit (host-only: no client view is registered for it). */
 export const evolutionReadsProjection: ProjectionDefinition<'evolutionReads'> = {
@@ -276,6 +325,7 @@ export function installEvolutionProjections(ctx: Context): void {
     registry.register(evolutionActivityProjection)
     registry.register(evolutionEvidenceProjection)
     registry.register(evolutionReadsProjection)
+    registry.register(evolutionProjectionHistoryProjection)
     registry.register(evolutionSignalsProjection)
   }
   // Already-mounted registry first: a reader that runs in the same tick as its own mount

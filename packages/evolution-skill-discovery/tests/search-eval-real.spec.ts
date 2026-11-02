@@ -19,7 +19,10 @@ it('replays the real managed-skill corpus with task queries', async () => {
   for (const query of fixture.queries) {
     const names = (await index.search({ query: query.query, limit: 5 })).results.map(result => result.name)
     expect(names.some(name => query.acceptable.includes(name)), query.query + ' => ' + names.join(',')).toBe(true)
+    const top3 = (await index.search({ query: query.query, limit: 3 })).results.map(result => result.name)
+    if (top3.some(name => query.acceptable.includes(name))) englishTop3 += 1
   }
+  expect(englishTop3).toBeGreaterThanOrEqual(Math.ceil(fixture.queries.length * 0.8))
   for (const query of fixture.queriesZh) {
     const top3 = (await index.search({ query: query.query, limit: 3 })).results.map(result => result.name)
     const top5 = (await index.search({ query: query.query, limit: 5 })).results.map(result => result.name)
