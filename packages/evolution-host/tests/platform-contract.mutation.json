@@ -1,0 +1,12 @@
+{
+  "probe": "decl-platform-contract",
+  "edits": [
+    {
+      "file": "packages/scripts/verify-platform-contract.mjs",
+      "find": "console.error('verify-platform-contract: this is the upgrade diff — decide per difference (see docs/upstream-contract-checklist.md — a working-copy asset: it is gitignored, so a CI checkout has no copy), then record it in the anchor table of this script.')\n  process.exit(1)",
+      "replace": "console.error('verify-platform-contract: this is the upgrade diff — decide per difference (see docs/upstream-contract-checklist.md — a working-copy asset: it is gitignored, so a CI checkout has no copy), then record it in the anchor table of this script.')\n  process.exit(0)"
+    }
+  ],
+  "expect": "red",
+  "note": "an empty/missing upstream anchor table must fail, not exit 0"
+}

@@ -170,7 +170,7 @@
         "packages/scripts/verify-platform-contract.mjs"
       ],
       "probes": [
-        "verify-platform-contract"
+        "decl-platform-contract"
       ],
       "gates": [
         "gate-12"

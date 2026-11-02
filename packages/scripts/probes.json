@@ -188,6 +188,17 @@
       "mutation": "packages/evolution-host/tests/dependency-closure.mutation.json",
       "evidence": "A",
       "note": "both directions of the cross-package dependency closure, including undeclared value imports"
+    },
+    {
+      "id": "decl-platform-contract",
+      "kind": "decl",
+      "owner": "architect-01",
+      "files": [
+        "packages/evolution-host/tests/guard-scripts.spec.ts"
+      ],
+      "mutation": "packages/evolution-host/tests/platform-contract.mutation.json",
+      "evidence": "A",
+      "note": "platform contract anchors and semantics fail loudly on an empty upstream tree"
     }
   ]
 }
