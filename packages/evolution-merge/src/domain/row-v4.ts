@@ -28,6 +28,7 @@ export type V4Event =
   | { readonly type: 'approved'; readonly runId: string }
   | { readonly type: 'auto-approved'; readonly decision: MergeDecision; readonly target: string; readonly runId?: string }
   | { readonly type: 'staged'; readonly stagingRef?: string; readonly stagingExpiresAt?: number }
+  | { readonly type: 'run-attached'; readonly runId: string }
   | { readonly type: 'committed'; readonly unitId: CommitUnitRef }
   | { readonly type: 'skipped'; readonly reason: string; readonly origin?: RowOriginV4; readonly skipSource?: string }
   | { readonly type: 'mark-skipped-expired'; readonly at: number }
@@ -80,6 +81,7 @@ export function transitionV4(row: V4Row, event: V4Event, expectedVersion: number
       if (event.type === 'superseded') return { ok: true, row: null, version: expectedVersion + 1 }
       return illegal('pending/' + event.type)
     case 'approved':
+      if (event.type === 'run-attached') return { ok: true, row: advance(row, at, { runId: event.runId }), version: expectedVersion + 1 }
       if (event.type === 'staged') return { ok: true, row: advance(row, at, { state: 'fuse', ...(event.stagingRef === undefined ? {} : { stagingRef: event.stagingRef }), ...(event.stagingExpiresAt === undefined ? {} : { stagingExpiresAt: event.stagingExpiresAt }) }), version: expectedVersion + 1 }
       if (event.type === 'committed') return { ok: true, row: null, version: expectedVersion + 1 }
       if (event.type === 'skipped') return { ok: true, row: advance(row, at, { state: 'skipped', reason: event.reason, ...(event.skipSource === undefined ? {} : { skipSource: event.skipSource }) }), version: expectedVersion + 1 }
@@ -89,6 +91,7 @@ export function transitionV4(row: V4Row, event: V4Event, expectedVersion: number
       if (event.type === 'superseded') return { ok: true, row: null, version: expectedVersion + 1 }
       return illegal('approved/' + event.type)
     case 'fuse':
+      if (event.type === 'run-attached') return { ok: true, row: advance(row, at, { runId: event.runId }), version: expectedVersion + 1 }
       if (event.type === 'committed') return { ok: true, row: null, version: expectedVersion + 1 }
       if (event.type === 'skipped') return { ok: true, row: advance(row, at, { state: 'skipped', reason: event.reason, ...(event.skipSource === undefined ? {} : { skipSource: event.skipSource }) }), version: expectedVersion + 1 }
       if (event.type === 'failed') return { ok: true, row: advance(row, at, { state: 'fuse', failure: event.failure, attempts: row.attempts + 1 }), version: expectedVersion + 1 }

@@ -6,6 +6,7 @@ import { errorText, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core
 import { loadMergeState } from './state.ts'
 import { runScanCommand } from './scan-command.ts'
 import { withMergeRun, type MergeRegistryPort, type WithMergeRunResult } from './run-shell.ts'
+import { attachRunToRow } from './domain/row-run.ts'
 import type { ScanPorts, ScanRound2Outcome } from './scan-run.ts'
 import type { MergeDecision, MergeRow } from './contracts.ts'
 import { recordRound2Outcome } from './round2-outcome.ts'
@@ -91,6 +92,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
     parentRunId, now: options.now,
     ...(options.detached === true ? { detached: true } : {}),
     async body(ctx) {
+      await attachRunToRow(options.io, options.home, row.id, ctx.runId)
       await ctx.stage('author', { done: 0, total: 1 })
       let outcome
       try {

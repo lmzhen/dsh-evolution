@@ -3,7 +3,7 @@ import { seedRow } from './support/seed-row.ts'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { loadMergeState, pairKey, rowIdOf, runApproveCommand, type MergeDecision, type MergeRegistryPort, type MergeRow } from '../src/index.ts'
+import { loadMergeState, pairKey, rowIdOf, runApproveCommand, runResumeCommand, type MergeDecision, type MergeRegistryPort, type MergeRow } from '../src/index.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const DECISION: MergeDecision = { shouldMerge: true, mode: 'merge-into-existing', target: 'a', sources: ['a', 'b'], rationale: 'same' }
@@ -54,6 +54,37 @@ it('carries the reserved staging ref into round2 instead of inventing a second k
     },
   })
   expect(seen).toBe('stage-A')
+})
+
+it('P1-8: attaches the in-flight child run to the row before round2', async () => {
+  const home = await tempRoot('dsh-merge-approve-attach-')
+  const io = nodeEvolutionIo()
+  const row = await pending(home)
+  let started: () => void = () => {}
+  const began = new Promise<void>(resolve => { started = resolve })
+  let release: () => void = () => {}
+  const hold = new Promise<void>(resolve => { release = resolve })
+  const liveRegistry: MergeRegistryPort = {
+    async begin() { return { id: 'run-live', signal: new AbortController().signal, startedAt: 100 } },
+    async stage() {},
+    async settle() {},
+  }
+  const approving = runApproveCommand({
+    io, home, registry: liveRegistry, rowId: row.id, platformWrite: true, now: () => 200,
+    ports: { async round2() { started(); await hold; return { kind: 'failed', failure: { stage: 'author', code: 'merge-failed', message: 'fixture', retryable: true, retryFrom: 'agent2' } } } },
+  })
+  await began
+  const attached = (await loadMergeState(io, home)).state.rows.find(item => item.id === row.id)
+  expect(attached?.runId).toBe('run-live')
+  const resumed = await runResumeCommand({
+    io, home, registry: liveRegistry, rowId: row.id, platformWrite: true, now: () => 200,
+    isOwnerActive: async id => id === 'run-live',
+    ports: { async screening() { return [] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'failed' } } },
+  })
+  expect(resumed.ok).toBe(false)
+  expect(resumed.ok ? '' : resumed.message).toContain('运行中的 run')
+  release()
+  await approving
 })
 
 it('refuses a second approve and leaves no pending row', async () => {

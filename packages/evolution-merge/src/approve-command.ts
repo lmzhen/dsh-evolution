@@ -11,6 +11,7 @@ import { v4ToLegacy } from './domain/row-v4.ts'
 import { loadMergeState } from './state.ts'
 import type { MergeRegistryPort, WithMergeRunResult } from './run-shell.ts'
 import { withMergeRun } from './run-shell.ts'
+import { attachRunToRow } from './domain/row-run.ts'
 import type { ScanRound2Outcome } from './scan-run.ts'
 import { recordRound2Outcome } from './round2-outcome.ts'
 import { failure } from './domain/errors.ts'
@@ -73,6 +74,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
     now: options.now,
     ...(options.detached === true ? { detached: true } : {}),
     async body(ctx) {
+      await attachRunToRow(options.io, options.home, row.id, ctx.runId)
       const stage = (name: RunStage) => ctx.stage(name, { done: 0, total: 1 })
       await stage('author')
       let outcome: ScanRound2Outcome
