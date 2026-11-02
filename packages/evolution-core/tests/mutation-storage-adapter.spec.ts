@@ -1,7 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
 import { sep } from 'node:path'
-import { readUnitJournal, unitJournalPort, unitSnapshotPort, type EvolutionIoLike, type MutationJournalRecord, type MutationSnapshot } from '@deepseek-ai/dsh-evolution-core'
+import { pruneTreeChangeUnits, readUnitJournal, readUnitSnapshot, unitJournalPort, unitSnapshotPort, type EvolutionIoLike, type MutationJournalRecord, type MutationSnapshot } from '@deepseek-ai/dsh-evolution-core'
 
 class MemoryIo implements EvolutionIoLike {
   readonly files = new Map<string, string>()
@@ -35,6 +35,8 @@ describe('unit storage adapters', () => {
     await port.write(SNAP)
     const read = await port.read('u-1')
     expect(read).toEqual(SNAP)
+    expect(await readUnitSnapshot(io, HOME, 'u-1', 'skill')).not.toBeNull()
+    expect(await readUnitSnapshot(io, HOME, 'u-1')).toBeNull()
   })
 
   it('persists undone state', async () => {
@@ -53,20 +55,34 @@ describe('unit storage adapters', () => {
     expect(prepared.map(item => item.unitId)).toEqual(['prepared'])
   })
 
-  it('writes the shared unit journal, not a second store', async () => {
+  it('writes the skill-owned unit journal', async () => {
     const io = new MemoryIo()
     const port = unitJournalPort(io, HOME)
     const record: MutationJournalRecord = { unitId: 'u-1', phase: 'committed', changed: ['D:/skills/source/SKILL.md'] }
     await port.write(record)
-    const journal = await readUnitJournal(io, HOME, 'u-1')
+    const journal = await readUnitJournal(io, HOME, 'u-1', 'skill')
     expect(journal?.unitId).toBe('u-1')
     expect(journal?.phase).toBe('committed')
+    expect(journal?.kind).toBe('tree-change')
+    expect(await readUnitJournal(io, HOME, 'u-1')).toBeNull()
+  })
+
+  it('prunes only terminal tree-change snapshots past the retention cap', async () => {
+    const io = new MemoryIo()
+    const port = unitSnapshotPort(io, HOME)
+    await port.write({ ...SNAP, unitId: 'old', createdAt: 1 })
+    await port.write({ ...SNAP, unitId: 'new', createdAt: 2 })
+    await port.write({ ...SNAP, unitId: 'prepared', state: 'prepared', createdAt: 3 })
+    expect(await pruneTreeChangeUnits(io, HOME, 1)).toBe(1)
+    expect(await readUnitSnapshot(io, HOME, 'old', 'skill')).toBeNull()
+    expect(await readUnitSnapshot(io, HOME, 'new', 'skill')).not.toBeNull()
+    expect(await readUnitSnapshot(io, HOME, 'prepared', 'skill')).not.toBeNull()
   })
 
   it('maps undone to the journal rolled-back phase', async () => {
     const io = new MemoryIo()
     const port = unitJournalPort(io, HOME)
     await port.write({ unitId: 'u-2', phase: 'undone', changed: [] })
-    expect((await readUnitJournal(io, HOME, 'u-2'))?.phase).toBe('rolled-back')
+    expect((await readUnitJournal(io, HOME, 'u-2', 'skill'))?.phase).toBe('rolled-back')
   })
 })

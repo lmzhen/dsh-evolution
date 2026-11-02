@@ -61,12 +61,14 @@ export function unitStorageKey(unitId: string): string {
   return createHash('sha256').update(unitId).digest('hex')
 }
 
-export function unitSnapshotsDir(home: string): string {
-  return join(home, 'merge', 'unit-snapshots')
+export type UnitStoreScope = 'merge' | 'skill'
+
+export function unitSnapshotsDir(home: string, scope: UnitStoreScope = 'merge'): string {
+  return scope === 'merge' ? join(home, 'merge', 'unit-snapshots') : join(home, 'units', 'skill', 'snapshots')
 }
 
-export function unitSnapshotPath(home: string, unitId: string): string {
-  return join(unitSnapshotsDir(home), unitStorageKey(unitId) + '.json')
+export function unitSnapshotPath(home: string, unitId: string, scope: UnitStoreScope = 'merge'): string {
+  return join(unitSnapshotsDir(home, scope), unitStorageKey(unitId) + '.json')
 }
 
 export function unitEvidencePath(home: string, unitId: string): string {
@@ -77,16 +79,16 @@ export function unitIndexPath(home: string): string {
   return join(home, 'merge', 'unit-index.json')
 }
 
-export async function writeUnitSnapshot(io: EvolutionIoLike, home: string, snapshot: UnitSnapshot): Promise<string> {
-  const path = unitSnapshotPath(home, snapshot.unitId)
+export async function writeUnitSnapshot(io: EvolutionIoLike, home: string, snapshot: UnitSnapshot, scope: UnitStoreScope = 'merge'): Promise<string> {
+  const path = unitSnapshotPath(home, snapshot.unitId, scope)
   const content = JSON.stringify(snapshot, null, 2) + '\n'
   if (io.transact !== undefined) await io.transact(path, () => content)
   else await io.writeText(path, content)
   return path
 }
 
-export async function readUnitSnapshot(io: EvolutionIoLike, home: string, unitId: string): Promise<UnitSnapshot | null> {
-  const raw = await io.readText(unitSnapshotPath(home, unitId))
+export async function readUnitSnapshot(io: EvolutionIoLike, home: string, unitId: string, scope: UnitStoreScope = 'merge'): Promise<UnitSnapshot | null> {
+  const raw = await io.readText(unitSnapshotPath(home, unitId, scope))
   if (raw === null) return null
   try { return JSON.parse(raw) as UnitSnapshot } catch { return null }
 }

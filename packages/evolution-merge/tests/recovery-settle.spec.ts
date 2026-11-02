@@ -49,6 +49,16 @@ it('load() materializes the orphan verdict, then recovery upgrades it to succeed
   expect(await readRunMeta(io, home, 'run-1')).toMatchObject({ phase: 'settled', stopReason: 'interrupted' })
 })
 
+it('ignores a legacy tree-change journal left in the merge directory (P1-4)', async () => {
+  const home = await tempRoot('dsh-recovery-skill-unit-')
+  const io = nodeEvolutionIo()
+  await mkdir(join(home, 'merge', 'unit-journals'), { recursive: true })
+  await writeFile(join(home, 'merge', 'unit-journals', 'u.json'), JSON.stringify({ ...journal, kind: 'tree-change', phase: 'prepared' }))
+  const reports = await recoverCommitUnits({ io, home, unit: fakeUnit(), now: () => 6 })
+  expect(reports).toHaveLength(1)
+  expect(reports[0]).toMatchObject({ action: 'none', ok: true, code: 'skill-unit-skipped' })
+})
+
 it('does not re-project a committed unit that already has an undo receipt', async () => {
   const home = await homeWithRun({ id: 'run-1', kind: 'merge', state: 'running', startedAt: 1, pid: 999_999 })
   const io = nodeEvolutionIo()
@@ -101,4 +111,13 @@ it('the projection settles through settleRecovered, not the owner-only settle', 
   })
   expect(result).toMatchObject({ ok: true, action: 'projected' })
   expect(calls).toEqual(['settleRecovered:run-1:succeeded'])
+})
+
+it('ignores a pre-marker tree-change journal (runId === unitId) as well (P1-4 legacy)', async () => {
+  const home = await tempRoot('dsh-recovery-skill-unit-legacy-')
+  const io = nodeEvolutionIo()
+  await mkdir(join(home, 'merge', 'unit-journals'), { recursive: true })
+  await writeFile(join(home, 'merge', 'unit-journals', 'u.json'), JSON.stringify({ ...journal, kind: undefined, unitId: 'u-skill', runId: 'u-skill', phase: 'prepared' }))
+  const reports = await recoverCommitUnits({ io, home, unit: fakeUnit(), now: () => 6 })
+  expect(reports[0]).toMatchObject({ action: 'none', ok: true, code: 'skill-unit-skipped' })
 })

@@ -49,6 +49,9 @@ export async function recoverCommitUnits(options: {
     let journal: UnitJournal | null = null
     try { journal = JSON.parse(await options.io.readText(join(dir, file)) ?? '') as UnitJournal } catch { journal = null }
     if (journal === null || typeof journal.unitId !== 'string') continue
+    // P1-4: legacy tree-change journals may still sit in the merge directory; they are ordinary
+    // skill units, never merge runs. Never finalize/rollback/project them as a merge.
+    if (journal.kind === 'tree-change' || (journal.kind === undefined && journal.runId === journal.unitId)) { reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch: branchOf(journal.phase as string), action: 'none', ok: true, code: 'skill-unit-skipped' }); continue }
     if (options.isActive?.(journal.runId) === true) { reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch: branchOf(journal.phase as string), action: 'none', ok: true, code: 'skipped-active-run' }); continue }
     const evidence = await readUnitEvidence(options.io, options.home, journal.unitId)
     // An undo is the newest durable fact. Recovery must not re-project a committed unit

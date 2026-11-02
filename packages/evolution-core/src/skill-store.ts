@@ -52,7 +52,7 @@ import { supportRefs } from './support-refs.ts'
 import { selectSections } from './section-selection.ts'
 import { MutationUnit, fileMutationLock, type MutationResult, type MutationUnitHooks } from './mutation-unit.ts'
 import { SkillModel } from './skill-model.ts'
-import { unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
+import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
 import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
@@ -902,7 +902,9 @@ export class SkillLibrary {
       journal: unitJournalPort(this.io, home),
       snapshots: unitSnapshotPort(this.io, home),
     })
-    return await unit.recoverPrepared()
+    const results = await unit.recoverPrepared()
+    await pruneTreeChangeUnits(this.io, home).catch(() => {})
+    return results
   }
 
   /**

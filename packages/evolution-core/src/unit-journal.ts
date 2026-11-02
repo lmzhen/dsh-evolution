@@ -38,11 +38,15 @@ export interface UnitJournal {
   readonly storageKey: string
   readonly snapshotSha256: string
   readonly checkpoints?: readonly UnitJournalCheckpoint[]
+  readonly kind?: 'merge' | 'tree-change'
   readonly updatedAt: number
 }
 
-export function unitJournalPath(home: string, unitId: string): string {
-  return join(home, 'merge', 'unit-journals', createHash('sha256').update(unitId).digest('hex') + '.json')
+export type UnitJournalScope = 'merge' | 'skill'
+
+export function unitJournalPath(home: string, unitId: string, scope: UnitJournalScope = 'merge'): string {
+  const base = scope === 'merge' ? join(home, 'merge', 'unit-journals') : join(home, 'units', 'skill', 'journals')
+  return join(base, createHash('sha256').update(unitId).digest('hex') + '.json')
 }
 
 export function unitJournalPhaseRank(phase: UnitJournalPhase): number {
@@ -55,16 +59,16 @@ export function assertUnitJournalTransition(from: UnitJournalPhase, to: UnitJour
   if (unitJournalPhaseRank(to) <= unitJournalPhaseRank(from)) throw new Error('unit-journal-nonmonotonic:' + from + '->' + to)
 }
 
-export async function writeUnitJournal(io: EvolutionIoLike, home: string, journal: UnitJournal): Promise<string> {
-  const path = unitJournalPath(home, journal.unitId)
+export async function writeUnitJournal(io: EvolutionIoLike, home: string, journal: UnitJournal, scope: UnitJournalScope = 'merge'): Promise<string> {
+  const path = unitJournalPath(home, journal.unitId, scope)
   const content = JSON.stringify(journal, null, 2) + '\n'
   if (io.transact !== undefined) await io.transact(path, () => content)
   else await io.writeText(path, content)
   return path
 }
 
-export async function readUnitJournal(io: EvolutionIoLike, home: string, unitId: string): Promise<UnitJournal | null> {
-  const raw = await io.readText(unitJournalPath(home, unitId))
+export async function readUnitJournal(io: EvolutionIoLike, home: string, unitId: string, scope: UnitJournalScope = 'merge'): Promise<UnitJournal | null> {
+  const raw = await io.readText(unitJournalPath(home, unitId, scope))
   if (raw === null) return null
   try { return JSON.parse(raw) as UnitJournal } catch { return null }
 }
