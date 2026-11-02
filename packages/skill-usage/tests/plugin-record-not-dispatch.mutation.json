@@ -1,0 +1,12 @@
+{
+  "probe": "beh-plugin-record-not-dispatch",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/tool-dispatch.ts",
+      "find": "if (!DISPATCH_EVENT_TYPE_SET.has(event.type)) return null",
+      "replace": "if (!DISPATCH_EVENT_TYPE_SET.has(event.type) && !event.type.startsWith('plugin:')) return null"
+    }
+  ],
+  "expect": "red",
+  "note": "a plugin record is not a dispatch: normalizer.advance must answer null even when its data looks like a tool call"
+}

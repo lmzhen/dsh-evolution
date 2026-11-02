@@ -221,6 +221,17 @@
       "mutation": "packages/evolution-ui/tests/settings-configforms.mutation.json",
       "evidence": "A",
       "note": "settings card reads optional configForms seat; absent seat renders read-only, late seat revives the card"
+    },
+    {
+      "id": "beh-plugin-record-not-dispatch",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/skill-usage/tests/skill-usage.spec.ts"
+      ],
+      "mutation": "packages/skill-usage/tests/plugin-record-not-dispatch.mutation.json",
+      "evidence": "A",
+      "note": "plugin records are never normalized as dispatches, so consumers cannot count them"
     }
   ]
 }

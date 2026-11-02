@@ -14,7 +14,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 // default-export their class.
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import SkillUsageRegistry from '../src/index.ts'
-import { clearReviewChannel, eventsFile, loadUsage, markReviewChannel, nodeEvolutionIo, readEvolutionTimeline, saveUsage, skillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { clearReviewChannel, eventsFile, loadUsage, markReviewChannel, nodeEvolutionIo, readEvolutionTimeline, saveUsage, skillsRoot, ToolDispatchNormalizer } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 /** S2-P2-12: a settled `tool/result` frame — view counting moved to SETTLE, so
@@ -110,6 +110,15 @@ describe('skill-usage', () => {
     const record = (await ctx.skillUsage.report()).get('demo')
     expect(record?.view_count ?? 0).toBe(0)
     expect(record?.support_reads).toBeUndefined()
+  })
+
+  it('the normalizer never admits a plugin record as a dispatch', () => {
+    const normalizer = new ToolDispatchNormalizer({ maxTracked: 4 })
+    const signal = normalizer.advance({
+      type: 'plugin:evolution.review',
+      data: { turn: 1, step: 1, callId: 'p1', name: 'skill', arguments: '{"name":"demo"}' },
+    })
+    expect(signal).toBeNull()
   })
 
   it('V6-43: the telemetry listener is registered through an effect (HMR disposal ownership, 0.3.37)', async () => {

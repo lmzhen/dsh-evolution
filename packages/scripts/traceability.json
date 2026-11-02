@@ -189,7 +189,7 @@
         "skill-usage/src/index.ts"
       ],
       "probes": [
-        "beh-fold-ignore-pluginrecord"
+        "beh-plugin-record-not-dispatch"
       ],
       "gates": [
         "gate-03"
@@ -411,7 +411,7 @@
         "skill-usage/src/index.ts"
       ],
       "probes": [
-        "beh-fold-ignore-pluginrecord"
+        "beh-plugin-record-not-dispatch"
       ],
       "gates": [
         "gate-03"
