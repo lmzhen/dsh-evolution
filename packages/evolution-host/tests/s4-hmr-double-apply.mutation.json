@@ -1,0 +1,12 @@
+{
+  "probe": "beh-hmr-double-apply",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/http-routes.ts",
+      "find": "for (const dispose of disposers) {\n          try { void dispose() } catch { /* a failed disposer must not mask the others */ }",
+      "replace": "for (const dispose of disposers.slice(0, 0)) {\n          try { void dispose() } catch { /* a failed disposer must not mask the others */ }"
+    }
+  ],
+  "expect": "red",
+  "note": "dispose must release every registered route; skipping the disposer leaves the first cycle mounted"
+}

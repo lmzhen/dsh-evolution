@@ -251,7 +251,7 @@
         "packages/scripts/verify-host-routes.mjs"
       ],
       "probes": [
-        "beh-hmr-apply-idempotent"
+        "beh-hmr-double-apply"
       ],
       "gates": [
         "gate-53"

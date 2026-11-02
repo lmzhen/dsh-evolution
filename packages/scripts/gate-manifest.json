@@ -1383,6 +1383,17 @@
       "mutation": "packages/evolution-core/tests/restrictor.mutation.json",
       "evidence": "A",
       "note": "allow/deny sets reach only children composed with the restricted preset; effect owns cleanup"
+    },
+    {
+      "id": "beh-hmr-double-apply",
+      "kind": "beh",
+      "owner": "client-frontend-01",
+      "files": [
+        "packages/evolution-host/tests/s4-hmr-double-apply.spec.ts"
+      ],
+      "mutation": "packages/evolution-host/tests/s4-hmr-double-apply.mutation.json",
+      "evidence": "A",
+      "note": "dispose releases every route; re-apply on the same connection registers no duplicate path"
     }
   ]
 }
