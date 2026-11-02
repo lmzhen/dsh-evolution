@@ -84,7 +84,7 @@
         "evolution-ui/src/panels/settings/source.ts"
       ],
       "probes": [
-        "decl-configforms-nomode"
+        "decl-configforms-seat"
       ],
       "gates": [
         "gate-03"
@@ -446,7 +446,7 @@
         "evolution-ui/src/panels/settings/ParamCard.ts"
       ],
       "probes": [
-        "decl-configforms-nomode"
+        "decl-configforms-seat"
       ],
       "gates": [
         "gate-03"

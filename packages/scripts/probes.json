@@ -210,6 +210,17 @@
       "mutation": "packages/evolution-approval/tests/approval-owner-audit.mutation.json",
       "evidence": "A",
       "note": "approval routes carry the registration DecisionAudit (owner-only, remote truth) into approve/reject"
+    },
+    {
+      "id": "decl-configforms-seat",
+      "kind": "decl",
+      "owner": "client-frontend-01",
+      "files": [
+        "packages/evolution-ui/tests/settings-section.client.spec.ts"
+      ],
+      "mutation": "packages/evolution-ui/tests/settings-configforms.mutation.json",
+      "evidence": "A",
+      "note": "settings card reads optional configForms seat; absent seat renders read-only, late seat revives the card"
     }
   ]
 }

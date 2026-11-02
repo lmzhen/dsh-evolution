@@ -1,0 +1,12 @@
+{
+  "probe": "decl-configforms-seat",
+  "edits": [
+    {
+      "file": "packages/evolution-ui/src/panels/settings/index.ts",
+      "find": "const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined",
+      "replace": "const probe: SeatProbe = (): ConfigFormsSeat | undefined => undefined"
+    }
+  ],
+  "expect": "red",
+  "note": "the settings card must read the optional configForms seat; undefined means read-only, not a silent override"
+}
