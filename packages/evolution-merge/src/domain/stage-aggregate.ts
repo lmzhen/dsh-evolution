@@ -242,7 +242,9 @@ export async function cleanupStage(io: EvolutionIoLike, home: string, now: numbe
   const refs = new Set<string>()
   const indexRoot = join(home, 'merge', 'staging-index')
   const names = await io.exists(indexRoot) ? await listOrEmpty(io, indexRoot) : []
-  for (const name of names.slice(0, limit)) {
+  // P1-7: refs must be collected from EVERY index before deleting run trees; the
+  // limit only bounds how many orphan run dirs one sweep removes, never the ref set.
+  for (const name of names) {
     if (!name.endsWith('.json')) continue
     const raw = await readTextOrNull(io, join(indexRoot, name))
     if (raw === null) continue
