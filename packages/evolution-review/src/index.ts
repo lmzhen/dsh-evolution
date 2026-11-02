@@ -994,7 +994,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const startedAt = Date.now()
     const controller = new AbortController()
     let timedOut = false
-    const timer = setTimeout(() => { timedOut = true; controller.abort() }, rawConfig.reviewTimeoutMs ?? DEFAULT_REVIEW_TIMEOUT_MS)
+    const timeoutDone = Promise.withResolvers<void>()
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+      timeoutDone.resolve()
+      handle?.agent.cancel({ kind: 'hook', reason: 'evolution-review-timeout' })
+    }, config.reviewTimeoutMs)
     let handle: Awaited<ReturnType<typeof ctx.agents.create>> | undefined
     try {
       const presets = ctx.get('agentPresets') as { resolve(id?: string): Promise<{ id: string }>; mount(target: Context, id?: string): Promise<unknown> } | undefined
@@ -1040,7 +1046,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       try {
         const prompt = kind === 'memory' ? BRANCH_MEMORY_PROMPT : COMPLETION_SKILL_REVIEW_PROMPT
         handle.agent.followup(createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'user' } }))
-        await handle.agent.whenIdle()
+        const idle = handle.agent.whenIdle().catch(error => {
+          if (collected.error === undefined) collected.error = error instanceof Error ? error.message : String(error)
+        })
+        await Promise.race([idle, timeoutDone.promise])
+        if (timedOut) handle.agent.cancel({ kind: 'hook', reason: 'evolution-review-timeout' })
         offEvent()
         if (collected.finalText.trim() !== '') deliverMessage(agent, collected.finalText, 'branch review result', false)
         try {
