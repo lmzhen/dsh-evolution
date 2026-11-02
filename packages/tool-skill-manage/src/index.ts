@@ -1003,19 +1003,26 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const mutating = !isReadOnlyAction(action) && !(action === 'extract' && args.dry_run === true)
       // Any non-foreground writer (review channel OR delegated subagent) is an
       // agent-authored skill and must enter the lifecycle as such.
-      if (name && action === 'create') {
-        // Authorship, not a content patch (rc.44 M3-3.3): the record must
-        // EXIST from birth (created_at anchors now, quality surfaces read it)
-        // but patch_count stays 0. Agent-authored creations additionally mark
-        // created_by so the curator owns them. 0.3.18 (E-70): both in one
-        // atomic transact — no null window between ensure and mark.
-        await ctx.skillUsage.ensureRecordCreated(name, origin !== 'foreground')
+      // P2-28: the skill bytes are ALREADY durable here. Usage bookkeeping is
+      // audit metadata; a failure must not turn a landed write into a retry that
+      // reports "already exists". Warn and keep the write result authoritative.
+      try {
+        if (name && action === 'create') {
+          // Authorship, not a content patch (rc.44 M3-3.3): the record must
+          // EXIST from birth (created_at anchors now, quality surfaces read it)
+          // but patch_count stays 0. Agent-authored creations additionally mark
+          // created_by so the curator owns them. 0.3.18 (E-70): both in one
+          // atomic transact — no null window between ensure and mark.
+          await ctx.skillUsage.ensureRecordCreated(name, origin !== 'foreground')
+        }
+        if (name && action === 'delete') await ctx.skillUsage.markArchived(name)
+        // Create is authorship, not a content patch (rc.44 M3-3.3): it must not
+        // inflate patch_count (and through it the mutation-maturity factor).
+        // 0.3.18 (E-68): a no-op patch (old===new) must not count either.
+        else if (name && mutating && action !== 'create' && result.noop !== true) await ctx.skillUsage.record(name, 'patch')
+      } catch (error) {
+        ctx.logger.warn('evolution skill_manage: usage bookkeeping failed after the write landed: ' + (error instanceof Error ? error.message : String(error)))
       }
-      if (name && action === 'delete') await ctx.skillUsage.markArchived(name)
-      // Create is authorship, not a content patch (rc.44 M3-3.3): it must not
-      // inflate patch_count (and through it the mutation-maturity factor).
-      // 0.3.18 (E-68): a no-op patch (old===new) must not count either.
-      else if (name && mutating && action !== 'create' && result.noop !== true) await ctx.skillUsage.record(name, 'patch')
       // The mutation event is emitted by SkillLibrary itself (decision C):
       // every write path — tool, curator, graph, restore — now covers the
       // catalog invalidation from a single sink.

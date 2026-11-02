@@ -91,6 +91,22 @@ describe('tool-skill-manage', () => {
     await ctx.fiber.dispose()
   })
 
+  it('P2-28: usage bookkeeping failure does not turn a landed create into a tool failure', async () => {
+    const { ctx } = await setup()
+    try {
+      ;(ctx.skillUsage as unknown as { ensureRecordCreated: () => Promise<void> }).ensureRecordCreated = async () => { throw new Error('usage down') }
+      const result = await ctx.tools.execute({
+        callId: ToolCallId('p2-28'), name: 'skill_manage',
+        arguments: { action: 'create', name: 'p2-28-skill', content: SKILL.replace('boundary-skill', 'p2-28-skill') },
+        agent: fakeAgent(undefined), signal: new AbortController().signal,
+      })
+      expect(result.isError).toBe(false)
+      expect((result.value as { message?: string } | undefined)?.message ?? '').not.toContain('usage down')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('B4: the guidance carries the policy protected list, and reads it at every assembly', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
