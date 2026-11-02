@@ -1,0 +1,7 @@
+scope:    @deepseek-ai
+mode:     layered
+form:     variant (session opt-in: original presets carry no family rows)
+profile:  web (D:\dsh-lab-install-0323b\profiles\web)
+bundle:   @deepseek-ai/dsh-evolution-host
+copied:   36 evolution packages
+preset:   preset-evolution → D:\dsh-lab-install-0323b\profiles\web\cordis.patch.yml

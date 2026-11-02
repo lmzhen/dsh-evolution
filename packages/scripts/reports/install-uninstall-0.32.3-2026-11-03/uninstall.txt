@@ -1,0 +1,5 @@
+uninstall mode:     layered
+profile:  web (D:\dsh-lab-install-0323b\profiles\web)
+bundle:   @deepseek-ai/dsh-evolution-host
+packages: 36
+preset:   true

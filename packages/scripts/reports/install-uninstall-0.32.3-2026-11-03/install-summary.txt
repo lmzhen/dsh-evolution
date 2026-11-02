@@ -1,0 +1,1 @@
+installed_evolution_dirs=30 journal=True preset_rows=1
