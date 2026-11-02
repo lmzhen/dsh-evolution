@@ -62,7 +62,7 @@ function releasable(): Record<string, unknown> {
     ciFace: { os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' },
     gates: [{ id: 'gate-01', ok: true, reading: 'passed', criterionEvaluated: true }],
     spikes: SPIKE_IDS.map(id => spike(id)),
-    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52 },
+    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false },
   }
 }
 
@@ -195,7 +195,7 @@ async function runAssemble(
 describe('release-evidence assembly (W3 injection)', () => {
   const rehearsalInputs = () => ({
     spikes: SPIKE_IDS.map(id => spike(id)),
-    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52 },
+    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false },
   })
   it('merges the rehearsal planes, the CI face and the manifest gate ledger', async () => {
     const result = await runAssemble(staging(), rehearsalInputs(), ['--gates-from-manifest', 'ci', '--ci-face', 'release.yml@refs/tags/v0.27.0', '--os', 'linux', '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION])

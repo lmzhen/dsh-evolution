@@ -173,7 +173,7 @@
         "decl-platform-contract"
       ],
       "gates": [
-        "gate-12"
+        "gate-18"
       ],
       "evidence": "A"
     },
@@ -717,7 +717,7 @@
         "decl-platform-line-grid"
       ],
       "gates": [
-        "gate-11"
+        "gate-12"
       ],
       "evidence": "A"
     },

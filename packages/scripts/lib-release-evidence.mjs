@@ -148,7 +148,7 @@ export function validateReleaseEvidence(evidence, options = {}) {
       }
       if (!Number.isInteger(trace.covered) || trace.covered <= 0) problems.push('traceability.covered must report the covered item count')
       if (!Number.isInteger(trace.total) || trace.total !== TRACEABILITY_TOTAL) problems.push('traceability.total must be ' + String(TRACEABILITY_TOTAL))
-      if (trace.planned === true) problems.push('traceability reading must come from strict mode, not --planned')
+      if (trace.planned !== false) problems.push('traceability reading must declare planned:false (strict mode)')
     }
   }
   if (release) {
