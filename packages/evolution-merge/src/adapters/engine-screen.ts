@@ -22,7 +22,7 @@ export interface EngineScreenPort {
     readonly cfg?: Record<string, unknown>
     readonly signal?: AbortSignal
     readonly onProgress?: (p: { stage: string; done?: number; total?: number }) => void
-    readonly runner?: (prompt: string, cfg?: Record<string, unknown>) => Promise<string>
+    readonly runner?: (prompt: string, cfg?: Record<string, unknown>, signal?: AbortSignal | undefined) => Promise<string>
   }): Promise<EngineScreenResult>
 }
 
@@ -41,7 +41,7 @@ export interface EngineScreeningDeps {
   readonly engine: EngineScreenPort
   readonly select: (report: Record<string, unknown>) => CandidateSelection
   readonly cfg?: Record<string, unknown>
-  readonly runner?: (prompt: string, cfg?: Record<string, unknown>) => Promise<string>
+  readonly runner?: (prompt: string, cfg?: Record<string, unknown>, signal?: AbortSignal | undefined) => Promise<string>
   readonly onSelection?: (selection: CandidateSelection, runId: string, cards: readonly SkillCard[]) => Promise<void>
 }
 
@@ -65,11 +65,12 @@ export function createEngineScreening(deps: EngineScreeningDeps) {
   return async (cards: readonly SkillCard[], runId: string, signal: AbortSignal): Promise<readonly MergeCandidate[]> => {
     const corpusDir = await snapshotCards(deps.io, deps.home, runId, cards)
     const outDir = join(deps.home, 'merge', 'runs', runId, 'engine')
+    const runner = deps.runner === undefined ? undefined : (prompt: string, cfg?: Record<string, unknown>) => deps.runner!(prompt, cfg, signal)
     const result = await deps.engine.screen({
       corpusDir,
       outDir,
       ...(deps.cfg === undefined ? {} : { cfg: deps.cfg }),
-      ...(deps.runner === undefined ? {} : { runner: deps.runner }),
+      ...(runner === undefined ? {} : { runner }),
       signal,
     })
     if (!result.ok) {

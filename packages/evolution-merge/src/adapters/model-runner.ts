@@ -35,9 +35,12 @@ function append(chunk: LlmChunkLike, text: string): string {
   return text
 }
 
-export function createEngineRunner(llm: LlmServiceLike, route: () => ModelRoute): (prompt: string) => Promise<string> {
-  return async (prompt: string): Promise<string> => {
+export function createEngineRunner(llm: LlmServiceLike, route: () => ModelRoute): (prompt: string, cfg?: Record<string, unknown>, signal?: AbortSignal | undefined) => Promise<string> {
+  return async (prompt: string, cfg?: Record<string, unknown>, runSignal?: AbortSignal | undefined): Promise<string> => {
     const selection = route()
+    const timeout = Number(cfg?.timeoutMs)
+    const timeoutSignal = Number.isFinite(timeout) && timeout > 0 ? AbortSignal.timeout(timeout) : undefined
+    const signal = runSignal === undefined ? timeoutSignal : timeoutSignal === undefined ? runSignal : (typeof AbortSignal.any === 'function' ? AbortSignal.any([runSignal, timeoutSignal]) : runSignal)
     let text = ''
     if (llm.stream !== undefined) {
       for await (const chunk of llm.stream({
@@ -45,14 +48,16 @@ export function createEngineRunner(llm: LlmServiceLike, route: () => ModelRoute)
         model: selection.model,
         messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
         temperature: 0,
+        ...(signal === undefined ? {} : { signal }),
       })) text = append(chunk, text)
       return text
     }
     if (llm.prepareCall === undefined) throw new Error('llm service has neither stream nor prepareCall')
-    const call = await llm.prepareCall({ provider: normalizeProviderKey(selection.provider), model: selection.model, temperature: 0 })
+    const call = await llm.prepareCall({ provider: normalizeProviderKey(selection.provider), model: selection.model, temperature: 0 }, signal)
     for await (const chunk of call.stream({
       ...call.config,
       messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+      ...(signal === undefined ? {} : { signal }),
     })) text = append(chunk, text)
     return text
   }
