@@ -1389,7 +1389,7 @@
           "gate-44": [
             {
               "mutate": {
-                "file": "packages/evolution-settings-ui/src/client/generated-params.ts",
+                "file": "packages/evolution-ui/src/panels/settings/generated-params.ts",
                 "find": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'number', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },",
                 "replace": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'slider', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },"
               },
@@ -1441,7 +1441,7 @@
           "gate-26": [
             {
               "mutate": {
-                "file": "packages/evolution-settings-ui/src/client/PendingCard.ts",
+                "file": "packages/evolution-ui/src/panels/settings/PendingCard.ts",
                 "find": "import type { ApprovalApi, PendingRow } from './api.ts'",
                 "replace": "import type { ApprovalApi, PendingRow } from './api.ts'\nconst TOKEN_PROBE = 'var(--evo-does-not-exist)'"
               },
@@ -1517,7 +1517,7 @@
           "gate-30": [
             {
               "mutate": {
-                "file": "packages/evolution-settings-ui/src/client/PendingCard.ts",
+                "file": "packages/evolution-ui/src/panels/settings/PendingCard.ts",
                 "find": "import type { ApprovalApi, PendingRow } from './api.ts'",
                 "replace": "import type { ApprovalApi, PendingRow } from './api.ts'\nconst FACE_PROBE = 'dsh web'"
               },
@@ -1556,7 +1556,7 @@
           "gate-25": [
             {
               "mutate": {
-                "file": "packages/evolution-settings-ui/src/client/generated-params.ts",
+                "file": "packages/evolution-ui/src/panels/settings/generated-params.ts",
                 "find": "{ bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage']",
                 "replace": "{ bundle: '@probe/not-a-family-bundle', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage']"
               },
