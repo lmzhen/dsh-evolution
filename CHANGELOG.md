@@ -2,7 +2,7 @@
 ## 0.32.3 (fix) — discovery MAP-007 restore/journal and projection dedupe P0s
 
 > **范围**：修复审计确认的两个 mode:on P0：restore 被旧 session catalog/journal 记录覆盖、projected-only 冷会话 fail-open 成 hidden；以及 compaction/restart 同 digest 重复追加投影。同步补齐 description stale producer、search health fail-open、card-only projection、per-window policy 与 EVAL 语料规模/top3 断言。
-> **验证**：discovery 114/114、core projection 7/7、discovery tsc clean；draft PR #6/#7 的 Node 22、Node 24、Windows desktop 全绿，publish 按设计跳过。
+> **验证**：discovery 115/115、core projection 7/7、discovery tsc clean；draft PR #6/#7 的 Node 22、Node 24、Windows desktop 全绿，publish 按设计跳过。
 > **状态**：EVAL-010 沿用既有用户 waiver（两个独立子模型 judge，30/30 agreement）；未新增人工标签。
 ## 0.32.2 (fix) — evolution-ui stops requiring merge-ui client subpath
 
