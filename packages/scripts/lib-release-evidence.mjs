@@ -26,6 +26,58 @@ const TRACEABILITY_TOTAL = TRACEABILITY_UNIVERSE.A + TRACEABILITY_UNIVERSE.B + T
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
 const nonEmptyString = (value) => typeof value === 'string' && value.trim() !== ''
 
+/** EvidenceEnvelope v1: one run's proof, bound to the artifact it measured. */
+export const EVIDENCE_ENVELOPE_SCHEMA_VERSION = 1
+export const EVIDENCE_ENVELOPE_KINDS = Object.freeze(['release', 'install', 'rollback', 'e1', 'diagnostic'])
+const SHA256 = /^[a-f0-9]{64}$/
+const GIT_SHA = /^[a-f0-9]{7,40}$/
+
+/**
+ * Validate one EvidenceEnvelope.
+ * @param envelope - candidate envelope.
+ * @param where - label used in the problems.
+ * @returns problem strings; empty means valid.
+ */
+export function validateEvidenceEnvelope(envelope, where = 'evidence-envelope') {
+  const problems = []
+  if (!isObject(envelope)) return [where + ': not an object']
+  if (envelope.schemaVersion !== EVIDENCE_ENVELOPE_SCHEMA_VERSION) problems.push(where + ': schemaVersion must be ' + String(EVIDENCE_ENVELOPE_SCHEMA_VERSION))
+  if (!EVIDENCE_ENVELOPE_KINDS.includes(envelope.kind)) problems.push(where + ': kind must be one of ' + EVIDENCE_ENVELOPE_KINDS.join('/'))
+  if (!nonEmptyString(envelope.familyVersion)) problems.push(where + ': familyVersion is required')
+  if (typeof envelope.artifactSha256 !== 'string' || !SHA256.test(envelope.artifactSha256)) problems.push(where + ': artifactSha256 must be a lowercase sha256')
+  if (typeof envelope.commit !== 'string' || !GIT_SHA.test(envelope.commit)) problems.push(where + ': commit must be a git sha')
+  if (!nonEmptyString(envelope.tag) || !envelope.tag.startsWith('v')) problems.push(where + ': tag must start with v')
+  const host = envelope.host
+  if (!isObject(host) || !nonEmptyString(host.os) || !nonEmptyString(host.node) || !nonEmptyString(host.dshVersion) || !nonEmptyString(host.profile)) problems.push(where + ': host must carry os/node/dshVersion/profile')
+  if (typeof envelope.inputsSha256 !== 'string' || !SHA256.test(envelope.inputsSha256)) problems.push(where + ': inputsSha256 must be a lowercase sha256')
+  if (!nonEmptyString(envelope.producer)) problems.push(where + ': producer is required')
+  if (!nonEmptyString(envelope.command)) problems.push(where + ': command is required')
+  if (!nonEmptyString(envelope.startedAt) || Number.isNaN(Date.parse(envelope.startedAt))) problems.push(where + ': startedAt must be an ISO 8601 timestamp')
+  if (!nonEmptyString(envelope.finishedAt) || Number.isNaN(Date.parse(envelope.finishedAt))) problems.push(where + ': finishedAt must be an ISO 8601 timestamp')
+  if (nonEmptyString(envelope.startedAt) && nonEmptyString(envelope.finishedAt) && Date.parse(envelope.finishedAt) < Date.parse(envelope.startedAt)) problems.push(where + ': finishedAt must not precede startedAt')
+  if (!Number.isInteger(envelope.exitCode)) problems.push(where + ': exitCode must be an integer')
+  if (!Array.isArray(envelope.results) || envelope.results.length === 0) problems.push(where + ': results must be non-empty')
+  else envelope.results.forEach((result, index) => {
+    const at = where + '.results[' + String(index) + ']'
+    if (!isObject(result) || !nonEmptyString(result.id)) { problems.push(at + ': id is required'); return }
+    if (!['pass', 'fail', 'cannot-decide'].includes(result.verdict)) problems.push(at + ': verdict must be pass/fail/cannot-decide')
+    if (typeof result.criterionEvaluated !== 'boolean') problems.push(at + ': criterionEvaluated must be boolean')
+    if (!isObject(result.readings)) problems.push(at + ': readings must be an object')
+    if (result.verdict === 'pass' && result.criterionEvaluated !== true) problems.push(at + ': pass requires criterionEvaluated=true')
+    if ((result.verdict === 'fail' || result.verdict === 'cannot-decide') && !nonEmptyString(result.cause)) problems.push(at + ': fail/cannot-decide requires a cause')
+  })
+  return problems
+}
+
+/**
+ * Build a schema-valid envelope from collector inputs (validation is separate).
+ * @param inputs - envelope fields without schemaVersion.
+ * @returns a deep-copied schemaVersion 1 envelope.
+ */
+export function createEvidenceEnvelope(inputs) {
+  return { schemaVersion: EVIDENCE_ENVELOPE_SCHEMA_VERSION, ...inputs }
+}
+
 /**
  * Validate one spike evidence record (W10 §2 shape).
  * @param spike - candidate record.
