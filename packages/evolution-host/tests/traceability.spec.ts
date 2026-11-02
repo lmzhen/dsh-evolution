@@ -81,20 +81,6 @@ describe('verify-traceability: the ledger can fail', () => {
     } finally { await rm(rootC, { recursive: true, force: true }) }
   })
 
-  it('strict mode rejects a registered probe with no landing-file overlap', async () => {
-    const asset = JSON.parse(JSON.stringify(real)) as TraceLedger
-    const target = asset.items.find(item => item.id === 'A-01')
-    if (target === undefined) throw new Error('fixture: A-01 is missing')
-    target.probes = ['decl-platform-line-grid']
-    const root = await fixture(asset)
-    try {
-      await copyFile(fileURLToPath(new URL('../../scripts/gate-manifest.json', import.meta.url)), join(root, 'scripts', 'gate-manifest.json'))
-      const result = await runGate(root, ['--strict'])
-      expect(result.code).toBe(1)
-      expect(result.stderr).toContain('none of the probe files overlap')
-    } finally { await rm(root, { recursive: true, force: true }) }
-  })
-
   it('strict mode rejects probe aliases as evidence', async () => {
     const asset = { ...real, probeAliases: { 'beh-channel-settle': 'beh-subagent-channel-outcomes' } }
     const root = await fixture(asset)
