@@ -13,12 +13,15 @@
         "evolution-review/src/index.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-channel-settle"
+      ]
     },
     {
       "id": "A-02",
@@ -31,13 +34,16 @@
         "evolution-maintenance/src/orchestrate.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03",
         "gate-52"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-channel-settle"
+      ]
     },
     {
       "id": "A-03",
@@ -49,12 +55,15 @@
         "evolution-core/src/subagent/channel.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-52"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-channel-settle"
+      ]
     },
     {
       "id": "A-04",
@@ -66,12 +75,15 @@
         "evolution-core/src/tool-dispatch.ts"
       ],
       "probes": [
-        "beh-inbox-notify-order"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "legacyProbes": [
+        "beh-inbox-notify-order"
+      ]
     },
     {
       "id": "A-05",
@@ -84,12 +96,15 @@
         "evolution-ui/src/panels/settings/source.ts"
       ],
       "probes": [
-        "decl-configforms-nomode"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "decl-configforms-nomode"
+      ]
     },
     {
       "id": "A-06",
@@ -101,12 +116,15 @@
         "evolution-core/src/params.ts"
       ],
       "probes": [
-        "decl-bundleinfo-semantics"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "legacyProbes": [
+        "decl-bundleinfo-semantics"
+      ]
     },
     {
       "id": "A-07",
@@ -118,12 +136,15 @@
         "packages/scripts/verify-dependency-closure.mjs"
       ],
       "probes": [
-        "verify-dependency-closure"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-06"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "verify-dependency-closure"
+      ]
     },
     {
       "id": "A-08",
@@ -136,12 +157,15 @@
         "INSTALL.md"
       ],
       "probes": [
-        "doc-facts"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-17"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "doc-facts"
+      ]
     },
     {
       "id": "A-09",
@@ -153,12 +177,15 @@
         "evolution-core/src/platform-line.generated.ts"
       ],
       "probes": [
-        "verify-platform-ranges"
+        "decl-platform-line-grid"
       ],
       "gates": [
         "gate-11"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "verify-platform-ranges"
+      ]
     },
     {
       "id": "A-10",
@@ -170,12 +197,15 @@
         "packages/scripts/verify-platform-contract.mjs"
       ],
       "probes": [
-        "verify-platform-contract"
+        "decl-platform-line-grid"
       ],
       "gates": [
         "gate-12"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "verify-platform-contract"
+      ]
     },
     {
       "id": "A-11",
@@ -189,12 +219,15 @@
         "skill-usage/src/index.ts"
       ],
       "probes": [
-        "beh-fold-ignore-pluginrecord"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-fold-ignore-pluginrecord"
+      ]
     },
     {
       "id": "A-12",
@@ -206,12 +239,15 @@
         "evolution-core/src/tool-dispatch.ts"
       ],
       "probes": [
-        "beh-inbox-notify-order"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "legacyProbes": [
+        "beh-inbox-notify-order"
+      ]
     },
     {
       "id": "A-13",
@@ -224,12 +260,15 @@
         "packages/scripts/verify-host-routes.mjs"
       ],
       "probes": [
-        "beh-hostroute-owner-only"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-53"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-hostroute-owner-only"
+      ]
     },
     {
       "id": "A-14",
@@ -251,12 +290,15 @@
         "packages/scripts/verify-host-routes.mjs"
       ],
       "probes": [
-        "beh-hmr-apply-idempotent"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-53"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "legacyProbes": [
+        "beh-hmr-apply-idempotent"
+      ]
     },
     {
       "id": "A-16",
@@ -268,12 +310,15 @@
         "packages/scripts/install-layered.mjs"
       ],
       "probes": [
-        "S2-spike"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "legacyProbes": [
+        "S2-spike"
+      ]
     },
     {
       "id": "A-17",
@@ -286,13 +331,16 @@
         "packages/test-support/host-route-harness.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-01",
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-channel-settle"
+      ]
     },
     {
       "id": "A-18",
@@ -305,12 +353,15 @@
         "packages/scripts/verify-doc-facts.mjs"
       ],
       "probes": [
-        "doc-facts"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-17"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "doc-facts"
+      ]
     },
     {
       "id": "A-19",
@@ -322,12 +373,15 @@
         "evolution-core/src/subagent/readiness.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "legacyProbes": [
+        "beh-channel-settle"
+      ]
     },
     {
       "id": "A-20",
@@ -339,13 +393,16 @@
         "evolution-core/src/session-fold.ts"
       ],
       "probes": [
-        "beh-fold-ignore-pluginrecord",
-        "beh-inbox-notify-order"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-fold-ignore-pluginrecord",
+        "beh-inbox-notify-order"
+      ]
     },
     {
       "id": "A-21",
@@ -358,12 +415,15 @@
         "packages/scripts/gen-client-seam.mjs"
       ],
       "probes": [
-        "decl-client-artifacts"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-54"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "decl-client-artifacts"
+      ]
     },
     {
       "id": "A-22",
@@ -376,12 +436,15 @@
         "packages/scripts/install-layered.mjs"
       ],
       "probes": [
-        "install-matrix"
+        "decl-composer-single-source"
       ],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "legacyProbes": [
+        "install-matrix"
+      ]
     },
     {
       "id": "B-01",
@@ -393,12 +456,15 @@
         "evolution-core/src/subagent/channel.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-52"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-channel-settle"
+      ]
     },
     {
       "id": "B-02",
@@ -411,12 +477,15 @@
         "skill-usage/src/index.ts"
       ],
       "probes": [
-        "beh-fold-ignore-pluginrecord"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-fold-ignore-pluginrecord"
+      ]
     },
     {
       "id": "B-03",
@@ -429,12 +498,15 @@
         "evolution-core/src/memory-store.ts"
       ],
       "probes": [
-        "beh-prompt-literal"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-prompt-literal"
+      ]
     },
     {
       "id": "B-04",
@@ -446,12 +518,15 @@
         "evolution-ui/src/panels/settings/ParamCard.ts"
       ],
       "probes": [
-        "decl-configforms-nomode"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "decl-configforms-nomode"
+      ]
     },
     {
       "id": "B-05",
@@ -463,12 +538,15 @@
         "evolution-core/src/http-routes.ts"
       ],
       "probes": [
-        "beh-hostroute-owner-only"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-53"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "legacyProbes": [
+        "beh-hostroute-owner-only"
+      ]
     },
     {
       "id": "B-06",
@@ -500,12 +578,15 @@
         "evolution-commands/src/doctor-view.ts"
       ],
       "probes": [
-        "diagnostics-route"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "diagnostics-route"
+      ]
     },
     {
       "id": "B-09",
@@ -517,12 +598,15 @@
         "evolution-core/package.json"
       ],
       "probes": [
-        "decl-engines-window"
+        "decl-platform-line-grid"
       ],
       "gates": [
         "gate-11"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "decl-engines-window"
+      ]
     },
     {
       "id": "B-10",
@@ -625,12 +709,15 @@
         "packages/scripts/verify-platform-ranges.mjs"
       ],
       "probes": [
-        "verify-platform-ranges"
+        "decl-platform-line-grid"
       ],
       "gates": [
         "gate-11"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "verify-platform-ranges"
+      ]
     },
     {
       "id": "C-02",
@@ -644,12 +731,15 @@
         "evolution-core/src/restrictor.ts"
       ],
       "probes": [
-        "beh-restricted-preset-allowset"
+        "beh-restricted-preset-lifecycle"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-restricted-preset-allowset"
+      ]
     },
     {
       "id": "C-03",
@@ -662,12 +752,15 @@
         "evolution-core/src/session-fold.ts"
       ],
       "probes": [
-        "beh-fold-ignore-pluginrecord"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-fold-ignore-pluginrecord"
+      ]
     },
     {
       "id": "C-04",
@@ -679,12 +772,15 @@
         "evolution-core/src/http-routes.ts"
       ],
       "probes": [
-        "beh-hostroute-owner-only"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-53"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-hostroute-owner-only"
+      ]
     },
     {
       "id": "C-05",
@@ -697,12 +793,15 @@
         "evolution-core/src/run-registry.ts"
       ],
       "probes": [
-        "orphan-run"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "legacyProbes": [
+        "orphan-run"
+      ]
     },
     {
       "id": "C-06",
@@ -715,12 +814,15 @@
         "evolution-core/src/platform-line.generated.ts"
       ],
       "probes": [
-        "decl-engines-window"
+        "decl-platform-line-grid"
       ],
       "gates": [
         "gate-11"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "decl-engines-window"
+      ]
     },
     {
       "id": "C-07",
@@ -732,12 +834,15 @@
         "evolution-core/src/memory-store.ts"
       ],
       "probes": [
-        "beh-prompt-literal"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "beh-prompt-literal"
+      ]
     },
     {
       "id": "C-08",
@@ -749,12 +854,15 @@
         "evolution-ui/src/panels/settings/index.ts"
       ],
       "probes": [
-        "decl-client-seats"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "decl-client-seats"
+      ]
     },
     {
       "id": "C-09",
@@ -767,12 +875,15 @@
         "evolution-core/src/diagnostics.ts"
       ],
       "probes": [
-        "diagnostics-route"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "diagnostics-route"
+      ]
     },
     {
       "id": "C-10",
@@ -785,12 +896,15 @@
         "evolution-core/src/http-routes.ts"
       ],
       "probes": [
-        "beh-hostroute-owner-only"
+        "beh-host-route-registration"
       ],
       "gates": [
         "gate-53"
       ],
-      "evidence": "B"
+      "evidence": "B",
+      "legacyProbes": [
+        "beh-hostroute-owner-only"
+      ]
     },
     {
       "id": "C-11",
@@ -803,13 +917,16 @@
         "packages/scripts/verify-mutations.mjs"
       ],
       "probes": [
-        "verify-probes",
-        "verify-mutations"
+        "decl-contracts-surface"
       ],
       "gates": [
         "gate-42"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "legacyProbes": [
+        "verify-probes",
+        "verify-mutations"
+      ]
     },
     {
       "id": "C-12",
@@ -822,12 +939,15 @@
         "packages/scripts/install-layered.mjs"
       ],
       "probes": [
-        "install-matrix"
+        "decl-composer-single-source"
       ],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "legacyProbes": [
+        "install-matrix"
+      ]
     }
   ],
   "budget": {
@@ -854,5 +974,29 @@
       "semver",
       "@deepseek-ai/cordis-plugin-loader"
     ]
+  },
+  "probeAliases": {
+    "beh-channel-settle": "beh-subagent-channel-outcomes",
+    "beh-inbox-notify-order": "beh-subagent-channel-outcomes",
+    "decl-configforms-nomode": "decl-contracts-surface",
+    "decl-bundleinfo-semantics": "decl-contracts-surface",
+    "verify-dependency-closure": "decl-contracts-surface",
+    "doc-facts": "decl-contracts-surface",
+    "verify-platform-ranges": "decl-platform-line-grid",
+    "verify-platform-contract": "decl-platform-line-grid",
+    "beh-fold-ignore-pluginrecord": "beh-subagent-channel-outcomes",
+    "beh-hostroute-owner-only": "beh-host-route-registration",
+    "beh-hmr-apply-idempotent": "beh-host-route-registration",
+    "S2-spike": "beh-host-route-registration",
+    "decl-client-artifacts": "decl-contracts-surface",
+    "install-matrix": "decl-composer-single-source",
+    "beh-prompt-literal": "decl-contracts-surface",
+    "beh-restricted-preset-allowset": "beh-restricted-preset-lifecycle",
+    "decl-engines-window": "decl-platform-line-grid",
+    "orphan-run": "beh-subagent-channel-outcomes",
+    "decl-client-seats": "decl-contracts-surface",
+    "diagnostics-route": "beh-host-route-registration",
+    "verify-probes": "decl-contracts-surface",
+    "verify-mutations": "decl-contracts-surface"
   }
 }
