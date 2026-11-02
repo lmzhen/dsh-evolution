@@ -166,6 +166,17 @@
       "mutation": "packages/evolution-host/tests/client-seats.mutation.json",
       "evidence": "A",
       "note": "client inject names are provided and read; every registry row has a generated card and a bundle seat"
+    },
+    {
+      "id": "beh-review-notice",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-review/tests/review-notice.spec.ts"
+      ],
+      "mutation": "packages/evolution-review/tests/review-notice.mutation.json",
+      "evidence": "A",
+      "note": "one outstanding review notice per session; durable source identity; result notices are not prompts; stale discard cannot settle current"
     }
   ]
 }

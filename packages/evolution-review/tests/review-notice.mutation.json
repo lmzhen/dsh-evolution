@@ -1,0 +1,12 @@
+{
+  "probe": "beh-review-notice",
+  "edits": [
+    {
+      "file": "packages/evolution-review/src/review-notice.ts",
+      "find": "return source.summary === undefined || !source.summary.startsWith(REVIEW_RESULT_SUMMARY)",
+      "replace": "return true"
+    }
+  ],
+  "expect": "red",
+  "note": "a result notice must not be adopted as an outstanding review prompt"
+}
