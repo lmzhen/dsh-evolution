@@ -1,5 +1,4 @@
-import type { EvolutionIoLike } from './io.ts'
-import { isCommittedWarning, transactIo } from './io.ts'
+import { isCommittedWarning, type EvolutionIoLike } from './io.ts'
 
 /** The four persistent writer kinds the family permits. */
 export type WriteUnitKind = 'skill' | 'state' | 'merge' | 'curator'
@@ -29,8 +28,13 @@ export interface WriteKernelResult {
 
 export interface WriteKernelOptions {
   readonly io: EvolutionIoLike
-  readonly transact?: typeof transactIo | undefined
+  readonly transact?: ((io: EvolutionIoLike, path: string, task: (current: string | null) => string | null | Promise<string | null>) => Promise<void>) | undefined
   readonly now?: (() => number) | undefined
+}
+
+export interface WriteOneOptions {
+  /** false is the create-under-root-lock retry seam: a mismatch defers instead of failing. */
+  readonly guardBaseline?: boolean | undefined
 }
 
 /**
@@ -40,12 +44,12 @@ export interface WriteKernelOptions {
  */
 export class WriteKernel {
   private readonly io: EvolutionIoLike
-  private readonly transact: typeof transactIo
+  private readonly transact: WriteKernelOptions['transact']
   private readonly now: () => number
 
   constructor(options: WriteKernelOptions) {
     this.io = options.io
-    this.transact = options.transact ?? transactIo
+    this.transact = options.transact
     this.now = options.now ?? Date.now
   }
 
@@ -54,24 +58,43 @@ export class WriteKernel {
 
   /**
    * Write one target only if the current bytes still equal the baseline.
-   * A conflict performs no write.
+   * A conflict performs no write. With guardBaseline:false a stale callback
+   * defers (returns the current bytes) so a retrying transact can re-observe;
+   * if no retry ever writes, the result is still a conflict.
    */
-  async writeOne(target: WriteTarget): Promise<WriteKernelResult> {
+  async writeOne(target: WriteTarget, options: WriteOneOptions = {}): Promise<WriteKernelResult> {
+    const guard = options.guardBaseline !== false
+    let wrote = false
+    let deferred = false
     let conflict = false
-    try {
-      await this.transact(this.io, target.path, current => {
-        if (current !== target.expected) {
+    const task = (current: string | null): string | null => {
+      if (current !== target.expected) {
+        if (guard) {
           conflict = true
           throw Object.assign(new Error('concurrent modification detected: ' + target.path), { noWrite: true })
         }
-        return target.next
-      })
+        deferred = true
+        return current
+      }
+      wrote = true
+      return target.next
+    }
+    try {
+      if (this.transact !== undefined) await this.transact(this.io, target.path, task)
+      else if (this.io.transact !== undefined) await this.io.transact(target.path, task)
+      else {
+        const current = await this.io.readText(target.path)
+        const next = task(current)
+        if (next === null && current !== null) await this.io.remove(target.path)
+        else if (next !== null && next !== current) await this.io.writeText(target.path, next)
+      }
     } catch (error) {
       if (conflict) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: error instanceof Error ? error.message : String(error), target: target.path }] }
       if (isCommittedWarning(error)) return { ok: true, changed: [target.path], errors: [], warnings: [error instanceof Error ? error.message : String(error)] }
       return { ok: false, changed: [], errors: [{ code: 'write-failed', message: error instanceof Error ? error.message : String(error), target: target.path }] }
     }
-    if (conflict) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: 'concurrent modification detected: ' + target.path, target: target.path }] }
+    if (conflict || (!wrote && deferred)) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: 'concurrent modification detected: ' + target.path, target: target.path }] }
+    if (!wrote) return { ok: false, changed: [], errors: [{ code: 'write-failed', message: 'transaction did not invoke the write task: ' + target.path, target: target.path }] }
     return { ok: true, changed: [target.path], errors: [] }
   }
 
@@ -83,20 +106,18 @@ export class WriteKernel {
   async commit(targets: readonly WriteTarget[]): Promise<WriteKernelResult> {
     for (const target of targets) {
       const current = await this.io.readText(target.path)
-      if (current !== target.expected) {
-        return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: 'target changed after plan: ' + target.path, target: target.path }] }
-      }
+      if (current !== target.expected) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: 'target changed after plan: ' + target.path, target: target.path }] }
     }
     const written: WriteTarget[] = []
     for (const target of targets) {
       const result = await this.writeOne(target)
       if (!result.ok) {
         const compensation = await this.compensate(written)
-        return { ok: false, changed: written.map(target => target.path), errors: [...result.errors, ...compensation] }
+        return { ok: false, changed: written.map(item => item.path), errors: [...result.errors, ...compensation] }
       }
       written.push(target)
     }
-    return { ok: true, changed: written.map(target => target.path), errors: [] }
+    return { ok: true, changed: written.map(item => item.path), errors: [] }
   }
 
   /**

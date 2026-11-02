@@ -240,6 +240,7 @@ export class MutationUnit {
   private readonly hooks: MutationUnitHooks | undefined
   private readonly validateWrite: ((op: TreeChangeOp) => string | null) | undefined
   private readonly kernel: WriteKernel
+  private readonly transactGuard: boolean
   private readonly now: () => number
 
   constructor(options: MutationUnitOptions) {
@@ -251,6 +252,7 @@ export class MutationUnit {
     this.snapshots = options.snapshots
     this.hooks = options.hooks
     this.validateWrite = options.validateWrite
+    this.transactGuard = options.transactGuard !== false
     this.now = options.now ?? Date.now
     const transact = options.transact
     this.kernel = new WriteKernel({ io: this.io, ...(transact === undefined ? {} : { transact }), now: this.now })
@@ -490,7 +492,7 @@ export class MutationUnit {
   }
 
   private async applyOp(op: TreeChangeOp, baseline: string | null): Promise<string[]> {
-    const result = await this.kernel.writeOne({ path: op.target, expected: baseline, next: op.kind === 'delete' ? null : op.content, ...op.skill === undefined ? {} : { skill: op.skill } })
+    const result = await this.kernel.writeOne({ path: op.target, expected: baseline, next: op.kind === 'delete' ? null : op.content, ...op.skill === undefined ? {} : { skill: op.skill } }, { guardBaseline: this.transactGuard })
     if (!result.ok) throw Object.assign(new Error(result.errors[0]?.message ?? 'write failed: ' + op.target), { noWrite: true })
     return [...(result.warnings ?? [])]
   }
