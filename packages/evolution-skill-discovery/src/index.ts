@@ -45,7 +45,6 @@ export * from './security.ts'
 export * from './awareness.ts'
 
 
-export * from './worker.ts'
 
 export * from './domain-bootstrap.ts'
 
