@@ -6,7 +6,7 @@
  */
 
 /** The family version this surface belongs to. */
-export const FAMILY_VERSION = '0.32.2'
+export const FAMILY_VERSION = '0.32.3'
 
 /** What this surface is for, in one line. */
 export const PACKAGE_PURPOSE = 'Web UI umbrella for the evolution family: settings, merge, skill history and skill health panels'

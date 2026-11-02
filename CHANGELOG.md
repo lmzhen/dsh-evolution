@@ -1,4 +1,9 @@
 # Changelog
+## 0.32.3 (fix) — discovery MAP-007 restore/journal and projection dedupe P0s
+
+> **范围**：修复审计确认的两个 mode:on P0：restore 被旧 session catalog/journal 记录覆盖、projected-only 冷会话 fail-open 成 hidden；以及 compaction/restart 同 digest 重复追加投影。同步补齐 description stale producer、search health fail-open、card-only projection、per-window policy 与 EVAL 语料规模/top3 断言。
+> **验证**：discovery 112/112、projection runtime 16/16、discovery tsc clean；draft PR #6/#7 的 Node 22、Node 24、Windows desktop 全绿，publish 按设计跳过。
+> **状态**：EVAL-010 沿用既有用户 waiver（两个独立子模型 judge，30/30 agreement）；未新增人工标签。
 ## 0.32.2 (fix) — evolution-ui stops requiring merge-ui client subpath
 
 > **范围**：真机 web 启动时 `@lmzhen/dsh-evolution-ui/client.js` 的 `require("@lmzhen/dsh-evolution-merge-ui/client")` 无法被 client module loader 解析，导致 web boot 失败。0.32.2 让 UI 只承载 settings + skill-history；merge 面板仍由独立的 evolution-merge-ui 行提供，避免重复挂载。
