@@ -341,9 +341,9 @@ export function profilePatchPath(home, profile = 'web') {
   return join(profileDirectory(home, profile), 'cordis.patch.yml')
 }
 
-function scopedName(packageName) {
-  return packageName.startsWith(`${EVOLUTION_SCOPE}/`)
-    ? packageName.slice(EVOLUTION_SCOPE.length + 1)
+export function scopedName(packageName, scope = EVOLUTION_SCOPE) {
+  return packageName.startsWith(`${scope}/`)
+    ? packageName.slice(scope.length + 1)
     : packageName
 }
 
@@ -533,7 +533,7 @@ async function copyAllEvolutionPackages(profileDir, dryRun) {
     // The shared client kit is a community-scope library even in a @deepseek-ai tree; keep its
     // declared scope so the browser bundle's import resolves to the copy this installer writes.
     const destinationScope = packageName.startsWith('@lmzhen/') ? '@lmzhen' : EVOLUTION_SCOPE
-    const destination = join(profileDir, 'node_modules', destinationScope, scopedName(packageName))
+    const destination = join(profileDir, 'node_modules', destinationScope, scopedName(packageName, destinationScope))
     copies.push({ packageName, source, destination })
     if (!dryRun) await copyPackage(source, destination)
   }
@@ -600,10 +600,12 @@ async function removeCopiedEvolutionPackages(profileDir, dryRun = false) {
     if (!dryRun) await rm(join(scopeDir, entry.name), { recursive: true, force: true })
     removed += 1
   }
-  // The shared client kit is community-scoped even in a @deepseek-ai install.
-  const communityKit = join(profileDir, 'node_modules', '@lmzhen', 'dsh-evolution-client-kit')
-  if (existsSync(communityKit)) {
-    if (!dryRun) await rm(communityKit, { recursive: true, force: true })
+  // Only the legacy nested copy belongs to the installer. The canonical
+  // @lmzhen/dsh-evolution-client-kit may be a pnpm-installed dependency of the
+  // profile; the journal path removes exactly what this run copied.
+  const legacyNestedKit = join(profileDir, 'node_modules', '@lmzhen', '@lmzhen', 'dsh-evolution-client-kit')
+  if (existsSync(legacyNestedKit)) {
+    if (!dryRun) await rm(legacyNestedKit, { recursive: true, force: true })
     removed += 1
   }
   return removed
@@ -1106,11 +1108,11 @@ export async function uninstall(options = {}) {
       if (journalScope !== EVOLUTION_SCOPE) {
         console.warn(`install-layered: journal was written under scope "${journalScope}" but EVOLUTION_SCOPE is "${EVOLUTION_SCOPE}" — removing from "${journalScope}" (set EVOLUTION_SCOPE=${journalScope} to silence this warning)`)
       }
-      const scopeDir = join(profileDir, 'node_modules', journalScope)
       const recorded = journal.copied.filter(name => typeof name === 'string' && name.length > 0)
       if (!dryRun) {
         for (const fullName of recorded) {
-          await rm(join(scopeDir, fullName.slice(fullName.lastIndexOf('/') + 1)), { recursive: true, force: true })
+          const packageScope = fullName.startsWith('@') ? fullName.slice(0, fullName.indexOf('/')) : journalScope
+          await rm(join(profileDir, 'node_modules', packageScope, fullName.slice(fullName.lastIndexOf('/') + 1)), { recursive: true, force: true })
         }
       }
       result.removedPackages = recorded.length

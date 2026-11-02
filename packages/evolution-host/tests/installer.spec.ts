@@ -10,9 +10,15 @@ import { fileURLToPath } from 'node:url'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { cordisRows, insertedRows, rowId, rowIds } from '../../test-support/cordis-rows.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { scopedName } from '../../scripts/install-layered.mjs'
 
 const run = promisify(execFile)
 const installer = fileURLToPath(new URL('../../scripts/install-layered.mjs', import.meta.url))
+
+it('P1-14: scope stripping uses the destination scope, so the community kit is not nested', () => {
+  expect(scopedName('@lmzhen/dsh-evolution-client-kit', '@lmzhen')).toBe('dsh-evolution-client-kit')
+  expect(scopedName('@deepseek-ai/dsh-evolution-host', '@deepseek-ai')).toBe('dsh-evolution-host')
+})
 
 async function runInstaller(home: string, mode: string, profile = 'evo-test', extra: string[] = [], env: Record<string, string> = {}) {
   return run(process.execPath, [installer, '--mode', mode, '--profile', profile, '--home', home, ...extra], { env: { ...process.env, ...env } })
