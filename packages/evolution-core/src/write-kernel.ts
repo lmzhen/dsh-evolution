@@ -87,7 +87,7 @@ export class WriteKernel {
       if (isCommittedWarning(error)) return { warnings: [error instanceof Error ? error.message : String(error)] }
       throw error
     }
-    if (!invoked) throw new Error('transaction did not invoke the write task: ' + target.path)
+    if (!invoked) throw new Error('internal error: the write transaction for ' + target.path + ' did not invoke the task; no write was performed')
     return {}
   }
 

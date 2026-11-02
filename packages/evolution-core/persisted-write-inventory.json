@@ -87,7 +87,7 @@
       "path": "<evolutionHome>/<review|curator|pending>-state.json",
       "writer": "evolution-state-json/src/index.ts",
       "serializedBy": "transact",
-      "marker": "transactIo(io(), join(root, file)",
+      "marker": "new WriteKernel({ io: io() }).run({ path: join(root, file)",
       "state": [],
       "note": "The durable state stack (review/curator/pending). S4.4/O-6 moved its three warn/rewrite sets into the provider instance (QuarantineMemory), so no module-scope N12 store remains here."
     },
