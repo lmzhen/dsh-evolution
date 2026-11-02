@@ -500,7 +500,7 @@
         "evolution-commands/src/doctor-view.ts"
       ],
       "probes": [
-        "diagnostics-route"
+        "beh-doctor-view"
       ],
       "gates": [
         "gate-03"

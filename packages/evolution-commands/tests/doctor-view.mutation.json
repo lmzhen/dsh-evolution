@@ -1,0 +1,12 @@
+{
+  "probe": "beh-doctor-view",
+  "edits": [
+    {
+      "file": "packages/evolution-commands/src/doctor-view.ts",
+      "find": "schemaVersion: DIAGNOSTICS_VIEW_SCHEMA_VERSION,",
+      "replace": "schemaVersion: 1,"
+    }
+  ],
+  "expect": "red",
+  "note": "the diagnostics view schemaVersion must stay 2; the 7+8 shape is frozen"
+}

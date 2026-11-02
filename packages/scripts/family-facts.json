@@ -680,7 +680,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "a731917974f5358816d94ea67d060ff2f3b3ec0bfc6747285bc407651d95746f",
+        "sha256": "5ad6c87fbb609e541de569be829696890ff9a889e62894989478294963e40be9",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",

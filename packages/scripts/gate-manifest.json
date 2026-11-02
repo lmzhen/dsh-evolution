@@ -1416,6 +1416,17 @@
       "mutation": "packages/evolution-core/tests/run-registry.mutation.json",
       "evidence": "A",
       "note": "terminal-once settle, orphan convergence, supersede idempotence, per-kind history cap"
+    },
+    {
+      "id": "beh-doctor-view",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-commands/tests/doctor-view.spec.ts"
+      ],
+      "mutation": "packages/evolution-commands/tests/doctor-view.mutation.json",
+      "evidence": "A",
+      "note": "diagnostics view schemaVersion 2 with frozen 7 facts + 8 runtime rows; unreadable providers named"
     }
   ]
 }
