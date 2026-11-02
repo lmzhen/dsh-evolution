@@ -179,6 +179,35 @@ jobs:
           # script resolves it — \`packages/evolution/node_modules\` is on that path.
           npm install --prefix packages/evolution --no-save --no-package-lock --ignore-scripts --no-audit --no-fund tar@7
 
+      - name: Re-assemble release evidence with the real CI job ledger
+        shell: bash
+        env:
+          PLATFORM_LINE_RESULT: ${{ needs['platform-line'].result }}
+          COMPAT_CHECK_RESULT: ${{ needs['compat-check'].result }}
+          COMPAT_CHECK_NODE22_RESULT: ${{ needs['compat-check-node22'].result }}
+          DESKTOP_INSTALL_RESULT: ${{ needs['desktop-install'].result }}
+        run: |
+          # P1-13: the staging ledger assembled in compat-check is synthetic. This
+          # jobs-level ledger is the real result of THIS run's required jobs; the
+          # per-gate transcript still has to come from a future gate-runner artifact,
+          # but these rows are not fabricated ok:true values.
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const rows = [
+            ['platform-line', process.env.PLATFORM_LINE_RESULT],
+            ['compat-check', process.env.COMPAT_CHECK_RESULT],
+            ['compat-check-node22', process.env.COMPAT_CHECK_NODE22_RESULT],
+            ['desktop-install', process.env.DESKTOP_INSTALL_RESULT],
+          ].map(([id, result]) => ({ id, ok: result === 'success', reading: 'GitHub Actions job ' + id + ' result=' + result, criterionEvaluated: true }))
+          fs.writeFileSync('ci-gates.json', JSON.stringify({ gates: rows }, null, 2) + '\n')
+          NODE
+
+          node packages/evolution/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json \
+            --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json \
+            --gates-report ci-gates.json \
+            --ci-face "$GITHUB_WORKFLOW_REF" --os "$RUNNER_OS" \
+            --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --release
+
       - name: Check the release evidence before publishing
         shell: bash
         run: |
