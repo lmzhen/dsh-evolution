@@ -1418,7 +1418,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes, command and merge_stage with a minimal host context",
+      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes and merge_stage, without the removed /merge alias, with a minimal host context",
       "note": "plugin mount"
     },
     {
@@ -1427,7 +1427,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes, command and merge_stage with a minimal host context",
+      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes and merge_stage, without the removed /merge alias, with a minimal host context",
       "note": "single command registration"
     },
     {
@@ -1445,7 +1445,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes, command and merge_stage with a minimal host context",
+      "ref": "evolution-merge/tests/plugin.spec.ts#mounts routes and merge_stage, without the removed /merge alias, with a minimal host context",
       "note": "read-only routes"
     },
     {
