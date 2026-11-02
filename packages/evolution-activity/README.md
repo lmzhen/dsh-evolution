@@ -20,7 +20,7 @@ durability lives here; a storage-domain table is deferred until a consumer needs
 
 ## Known limitations
 
-- Each event lands through `transactIo` (like `feedback.json`), so append cycles are cross-process atomic at the single-write granularity; the read-modify-write of one event is serialized in-process and atomic on disk. A multi-record batch is still one event at a time: no batch transaction exists.
+- Each event lands through `transactIo` (like `feedback.json`); append cycles are serialized in-process and atomic on disk inside that process. The shipped IO backend is single-process, so no cross-process guarantee is claimed. A multi-record batch is still one event at a time: no batch transaction exists.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
 

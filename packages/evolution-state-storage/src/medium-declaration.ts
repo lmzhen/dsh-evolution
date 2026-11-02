@@ -1,17 +1,13 @@
 /**
  * G2b/2b.3: which medium carries each record type, and what PROCESS SCOPE that medium actually gives.
  *
- * The family has two serialization layers and only ever wrote one of them down, for the json provider: the
- * IO backend cross-process transact lock (first layer) and the caller own in-process chain (second). The
- * domain medium inherits its answer from whatever backend the platform storage facility routes, and nothing
- * stated it. So this file states it - and the criterion is the family one: a CLAIM must be produced by a
- * capability that can be DISPROVED. processScopeViolations takes the io the provider writes through and
- * reports every claim of cross-process that the io cannot back up.
+ * The shipped IO backend declares single-process: its transaction serializes one process only.
+ * The domain medium inherits whatever backend the platform storage facility routes, and that is also
+ * single-process in this tree. This file states the weaker truth. processScopeViolations takes the io the
+ * provider writes through and reports every claim of cross-process that the io cannot back up.
  *
- * MIGRATION NOTE: the plan allows naming storage-sqlite for a cross-process record type. That package does
- * not exist in this tree (0 hits), so today every entry is either backed by the IO transact lock or
- * declares single-process. When a backend carrying its own cross-process guarantee lands, it is named here
- * and the reasoning moves with it - one declaration, not two.
+ * MIGRATION NOTE: when a platform backend carrying its own cross-process guarantee lands, name it here and
+ * move the reasoning with it - one declaration, not two.
  *
  * @module @deepseek-ai/dsh-evolution-state-storage/medium-declaration
  */
@@ -31,20 +27,20 @@ export const MEDIUM_PROCESS_DECLARATION: readonly MediumProcessClaim[] = [
   {
     record: 'review_state',
     medium: 'json',
-    scope: 'cross-process',
-    because: 'the json provider serializes through the IO backend transact lock, as its README states',
+    scope: 'single-process',
+    because: 'the shipped IO backend declares single-process; no cross-process medium exists in this tree',
   },
   {
     record: 'curator_state',
     medium: 'json',
-    scope: 'cross-process',
-    because: 'same provider and same lock as review_state; the run bookkeeping rides the same write path',
+    scope: 'single-process',
+    because: 'same provider and same single-process write path as review_state',
   },
   {
     record: 'pending',
     medium: 'json',
-    scope: 'cross-process',
-    because: 'a staged write is claimed by name across processes, so it needs the lock more than the other two',
+    scope: 'single-process',
+    because: 'the shipped IO backend has no cross-process claim primitive; a staged write is serialized only in-process',
   },
   {
     record: 'evolution-domain',
@@ -63,11 +59,12 @@ export interface ProcessScopeProbe {
 /**
  * Falsify the declaration against a capability reading.
  * @param io - the io backend the medium writes through, or undefined when none is mounted.
+ * @param declaration - claims to falsify; defaults to the shipped declaration.
  * @returns one message per claim the capability cannot back up; empty when every claim holds.
  */
-export function processScopeViolations(io: ProcessScopeProbe | undefined): readonly string[] {
+export function processScopeViolations(io: ProcessScopeProbe | undefined, declaration: readonly MediumProcessClaim[] = MEDIUM_PROCESS_DECLARATION): readonly string[] {
   const backed = io?.processScope === 'cross-process'
-  return MEDIUM_PROCESS_DECLARATION
+  return declaration
     .filter(claim => claim.scope === 'cross-process' && !backed)
     .map(claim => claim.record + ' claims cross-process (' + claim.because + ') but the mounted io declares ' + (io?.processScope ?? 'no process scope'))
 }

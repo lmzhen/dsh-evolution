@@ -20,7 +20,7 @@ section, and importing the package root is its only entry.
   sweeper exists yet). Measured on a 3.6 KB skill written 41 times: a 5.7 KB index over 20 entries and
   41 blob files totalling 150 KB (41x the live body); unchanged writes add nothing. Plan disk accordingly
   or remove `.history/blobs` entries by hand.
-- Skill-library writes are serialized in-process; cross-process writers to the SAME skill file must go through the single-file paths (`update`, `patch`, `writeSupportFile`). The full concurrency model, its two-phase exceptions and their provenance are in Notes and history.
+- Skill-library writes are serialized **in-process**. The shipped IO backend declares single-process; a second process sharing `DSH_HOME` is unsupported. The full concurrency model, its two-phase exceptions and their provenance are in Notes and history.
 
 **Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
 
@@ -44,9 +44,9 @@ section, and importing the package root is its only entry.
 - `create` is INSIDE the serial chain and, when a transact backend is bound, its exists check runs inside the same per-file transact (v18); `archive`/`consolidate` are rename-based two-phase paths and stay outside the single-file serial chain.
 - **v18 residual (updated):** `create`, `removeSupportFile` and `setPinned` now run on the serial chain (`removeSupportFile`'s delete also goes through the per-file transact), so the remaining single-file residual is the protection TOCTOU (a marker check outside the transact) and the multi-file two-phase paths `archive`/`consolidate`/`restructure`.
 - The race needs a concurrent mutator on the SAME skill file/package; the exposure is acknowledged and the protection check is the next candidate (see the v18 optimization plan, E-5).
-- When the backend provides `transact` (nodeEvolutionIo and the io adapter do), the constructor binds it BY DEFAULT since 0.3.27: the single-file entry points (`update`, `patch`, `writeSupportFile`, and each per-file piece of `restructure`) run their read→write inside the cross-process lock for every instantiation, so same-file concurrent writes from different processes no longer resolve to last-writer-wins there.
+- The constructor binds the IO backend's `transact` by default since 0.3.27: the single-file entry points (`update`, `patch`, `writeSupportFile`, and each per-file piece of `restructure`) run their read→write inside that transaction. The shipped backend is **single-process**, so this does not protect two processes sharing `DSH_HOME`.
 - The two-phase paths deliberately stay outside that lock: `create`'s exists probe runs inside the transact when a transact backend is bound (v18), so only a transact-less custom backend can still double-pass the probe across processes; `archive`/`consolidate` are rename-based with best-effort rollback (an archive loser's rollback surfaces the raw failure when the source vanished), and `restructure`'s multi-file swap can expose an interleaved tree to a concurrent reader.
-- These residual windows are documented rather than locked: cross-process writers to the SAME skill file should serialize through the single-file paths above.
+- These residual windows are documented rather than locked. The shipped backend is single-process; cross-process writers to the same skill file are unsupported and must not be treated as serialized.
 
 ## Events (the family's own, process-local)
 

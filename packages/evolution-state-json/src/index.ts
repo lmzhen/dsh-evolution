@@ -241,9 +241,10 @@ function gateScan(file: string, parsed: unknown): Array<[string, unknown]> {
 }
 
 /**
- * Cross-process JSON-file RMW (v3-audit M-8): every read-modify-write state
- * mutation runs inside the IO backend's transact lock (via transactIo) so a
- * second process sharing DSH_HOME cannot interleave its claim/resolve.
+ * In-process JSON-file RMW (v3-audit M-8): every read-modify-write state
+ * mutation runs inside the IO backend's transact lock (via transactIo). The
+ * shipped backend is single-process; a second process sharing DSH_HOME is not
+ * coordinated and must not be assumed safe.
  * `task` returns the next value; null = ENSURE-ABSENT (the file is deleted
  * when it exists — the parity of the transact seam, V6-32). For a record-map
  * file the return must be null or a plain object map of records, and an
