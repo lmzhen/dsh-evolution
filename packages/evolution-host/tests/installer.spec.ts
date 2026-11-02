@@ -14,6 +14,18 @@ import { scopedName } from '../../scripts/install-layered.mjs'
 
 const run = promisify(execFile)
 const installer = fileURLToPath(new URL('../../scripts/install-layered.mjs', import.meta.url))
+const installerUrl = new URL('../../scripts/install-layered.mjs', import.meta.url).href
+
+/** Evaluate a value inside a fresh node process that imported the installer. */
+async function callInstaller(body: string): Promise<unknown> {
+  const script = [
+    `import * as installer from ${JSON.stringify(installerUrl)}`,
+    `const value = await (async () => { ${body} })()`,
+    'process.stdout.write(Buffer.from(JSON.stringify(value), "utf8").toString("base64"))',
+  ].join('\n')
+  const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
+  return JSON.parse(Buffer.from(stdout, 'base64').toString('utf8'))
+}
 
 it('P1-14: scope stripping uses the destination scope, so the community kit is not nested', () => {
   expect(scopedName('@lmzhen/dsh-evolution-client-kit', '@lmzhen')).toBe('dsh-evolution-client-kit')
@@ -766,6 +778,29 @@ describe('layered installer', () => {
       .then(() => null, (caught: unknown) => caught as { stderr?: string })
     expect(error?.stderr).toContain('--otp requires a value')
   }, 20_000)
+
+  it('P2-37: copyPackage swaps through a recoverable previous tree and clears other-pid residue', async () => {
+    const home = await tempRoot('dsh-copy-swap-')
+    const source = join(home, 'source')
+    const destination = join(home, 'pkg')
+    await mkdir(source, { recursive: true })
+    await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'new' }))
+    await mkdir(destination, { recursive: true })
+    await writeFile(join(destination, 'package.json'), JSON.stringify({ name: 'old' }))
+    await mkdir(destination + '.staging-999999', { recursive: true })
+    await mkdir(destination + '.previous-999999', { recursive: true })
+    await callInstaller(`await installer.copyPackage(${JSON.stringify(source)}, ${JSON.stringify(destination)}); return 1`)
+    expect(JSON.parse(await readFile(join(destination, 'package.json'), 'utf8')).name).toBe('new')
+    expect(existsSync(destination + '.staging-999999')).toBe(false)
+    expect(existsSync(destination + '.previous-999999')).toBe(false)
+    // Crash state: the old tree was moved aside and the destination is missing.
+    await rm(destination, { recursive: true, force: true })
+    await mkdir(destination + '.previous-777777', { recursive: true })
+    await writeFile(join(destination + '.previous-777777', 'package.json'), JSON.stringify({ name: 'rescued' }))
+    await callInstaller(`await installer.copyPackage(${JSON.stringify(source)}, ${JSON.stringify(destination)}); return 1`)
+    expect(JSON.parse(await readFile(join(destination, 'package.json'), 'utf8')).name).toBe('new')
+    expect(existsSync(destination + '.previous-777777')).toBe(false)
+  }, 30_000)
 
   it('INST-02 + D-11: copyPackage skips release tarballs; a bare --groups is refused', async () => {
     // `copyPackage` is module-private and the installer exports no seam for it

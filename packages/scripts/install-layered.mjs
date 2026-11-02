@@ -369,15 +369,39 @@ async function writeManifestAtomic(manifestPath, contents) {
   await rename(tmp, manifestPath)
 }
 
-async function copyPackage(source, destination) {
+/**
+ * Remove or recover swap residue left by an interrupted copy.
+ *
+ * P2-37: a crash between "old tree moved aside" and "staged tree renamed in"
+ * leaves NO destination and a `.previous-*` tree. The next run restores it before
+ * copying again. Staging dirs from other pids are deleted once the destination
+ * exists (an old pid can never own a live tree again).
+ * @param destination - the package directory about to be replaced.
+ */
+async function recoverCopySwap(destination) {
+  const parent = dirname(destination)
+  const base = destination.slice(parent.length + 1)
+  let entries
+  try { entries = await readdir(parent) } catch { return }
+  for (const entry of entries) {
+    if (!entry.startsWith(base + '.previous-') && !entry.startsWith(base + '.staging-')) continue
+    const path = join(parent, entry)
+    if (entry.startsWith(base + '.previous-') && !existsSync(destination)) {
+      await rename(path, destination)
+      continue
+    }
+    await rm(path, { recursive: true, force: true })
+  }
+}
+
+export async function copyPackage(source, destination) {
   await mkdir(dirname(destination), { recursive: true })
-  // P2-22a (audit): stage the copy into a sibling `.staging-<pid>` directory
-  // FIRST, then swap. The former in-place `cp(force)` over a LIVE mounted
-  // package tree left a torn/mixed package set behind any mid-copy crash or
-  // Windows EPERM/EBUSY while the manifest still mounted the bundle. The
-  // swap window is one rm+rename per package; a crash before it leaves the
-  // PREVIOUS tree intact plus a `.staging-*` residue the next run removes.
+  // P2-22a/P2-37: stage the copy into a sibling `.staging-<pid>` FIRST, then
+  // swap via `.previous-<pid>`. A crash before the swap leaves the previous
+  // tree intact; a crash inside the two renames is recoverable on the next run.
   const staging = `${destination}.staging-${process.pid}`
+  const previous = `${destination}.previous-${process.pid}`
+  await recoverCopySwap(destination)
   await rm(staging, { recursive: true, force: true })
   await cp(source, staging, {
     recursive: true,
@@ -398,8 +422,24 @@ async function copyPackage(source, destination) {
         && !base.endsWith('.tgz')
     },
   })
-  await rm(destination, { recursive: true, force: true })
-  await rename(staging, destination)
+  // Swap: move the live tree aside atomically, then rename the staged tree in.
+  // On failure restore the old tree so the package is never missing.
+  let movedAside = false
+  try {
+    if (existsSync(destination)) {
+      await rm(previous, { recursive: true, force: true })
+      await rename(destination, previous)
+      movedAside = true
+    }
+    await rename(staging, destination)
+  } catch (error) {
+    if (!existsSync(destination) && existsSync(previous)) {
+      try { await rename(previous, destination) } catch { /* the next run's recoverCopySwap retries */ }
+    }
+    throw error
+  } finally {
+    if (movedAside) await rm(previous, { recursive: true, force: true })
+  }
 }
 
 /** D-4 (v18): upstream `initProfile` seeds a named profile with its template
