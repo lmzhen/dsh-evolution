@@ -575,7 +575,7 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
     await run(process.execPath, [paramGen, root], { encoding: 'utf8' })
     // The guard also checks the generated CLIENT VIEW, so a root that claims to be
     // complete has to carry it too (this fixture is the "everything current" case).
-    await mkdir(join(root, 'evolution-settings-ui', 'src', 'client'), { recursive: true })
+    await mkdir(join(root, 'evolution-ui', 'src', 'panels', 'settings'), { recursive: true })
     await run(process.execPath, [paramViewGen, root], { encoding: 'utf8' })
     const current = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
     expect(current.stdout).toContain('verify-param-registry: OK')
@@ -595,7 +595,7 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
     const root = await tempRoot('guard-registry-client-')
     await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
     await mkdir(join(root, 'evolution-review'), { recursive: true })
-    await mkdir(join(root, 'evolution-settings-ui', 'src', 'client'), { recursive: true })
+    await mkdir(join(root, 'evolution-ui', 'src', 'panels', 'settings'), { recursive: true })
     const namespaces = "export const PARAM_NAMESPACES = Object.freeze({\n  'evolution-review': 'review',\n})\n"
     await writeFile(join(root, 'evolution-core', 'src', 'params.ts'),
       registrySource([entryLine('reviewSkillInterval'), entryLine('reviewEnabled')]) + namespaces, 'utf8')
@@ -603,7 +603,7 @@ describe('parameter registry guard (G1/S1.3 sentry)', () => {
     await run(process.execPath, [paramViewGen, root], { encoding: 'utf8' })
     const fresh = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
     expect(fresh.stdout).toContain('verify-param-registry: OK')
-    const view = join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts')
+    const view = join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts')
     await writeFile(view, readFileSync(view, 'utf8').replace("label: '审查间隔'", "label: '手改过的名字'"), 'utf8')
     const stale = await run(process.execPath, [paramGuard, root, '--strict'], { encoding: 'utf8' })
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
@@ -822,14 +822,15 @@ describe('client-seat guard (G2 sentry)', () => {
     await mkdir(join(root, 'evolution-core', 'src'), { recursive: true })
     const namespaces = "export const PARAM_NAMESPACES = Object.freeze({\n  'evolution-review': 'evolution-review',\n})\n"
     await writeFile(join(root, 'evolution-core', 'src', 'params.ts'), registrySource([entryLine('reviewSkillInterval')]) + namespaces, 'utf8')
-    await mkdir(join(root, 'evolution-settings-ui', 'src', 'client'), { recursive: true })
-    await writeFile(join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts'),
+    await mkdir(join(root, 'evolution-ui', 'src', 'panels', 'settings'), { recursive: true })
+    await mkdir(join(root, 'evolution-ui', 'src', 'client'), { recursive: true })
+    await writeFile(join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts'),
       "export const CLIENT_PARAM_SECTIONS = [\n  { namespace: 'evolution-review', fields: [] },\n]\n\n" +
       "export const CLIENT_ROW_SEATS = [\n  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-review'] },\n]\n", 'utf8')
     // The view's own package declares a client half; its entry requires no service (the
     // guard accepts an empty inject and only demands the declaration exists).
-    await writeFile(join(root, 'evolution-settings-ui', 'src', 'client', 'index.ts'), 'export const inject: string[] = []\n', 'utf8')
-    await writeFile(join(root, 'evolution-settings-ui', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-evolution-settings-ui', dsh: { client: { platform: 'web' } } }), 'utf8')
+    await writeFile(join(root, 'evolution-ui', 'src', 'client', 'index.ts'), 'export const inject: string[] = []\n', 'utf8')
+    await writeFile(join(root, 'evolution-ui', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-evolution-ui', dsh: { client: { platform: 'web' } } }), 'utf8')
     // The seat names a bundle package, so the fixture carries the bundle manifest too.
     await mkdir(join(root, 'evolution-all'), { recursive: true })
     await writeFile(join(root, 'evolution-all', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-evolution-all', dsh: { bundle: { patch: './cordis.patch.yml' } } }).replace('evolution-all', 'evolution-all'), 'utf8')
@@ -868,7 +869,7 @@ describe('client-seat guard (G2 sentry)', () => {
     // D: an informational edge to a client package the target line does not ship.
     await client(root, 'phantom-edge', "export const inject = ['slots']", 'export const use = seam.slots', ['@deepseek-ai/dsh-client-ui-gone'])
     // C: an E3 row whose card never made it into the generated view.
-    await writeFile(join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts'),
+    await writeFile(join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts'),
       'export const CLIENT_PARAM_SECTIONS = []\n\nexport const CLIENT_ROW_SEATS = []\n', 'utf8')
     const failed = await run(process.execPath, [clientSeats, root, '--upstream', join(root, 'upstream'), '--strict'], { encoding: 'utf8' })
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
@@ -884,7 +885,7 @@ describe('client-seat guard (G2 sentry)', () => {
   // operator can never open, so the guard refuses it even when every source agrees with itself.
   it('E5: rejects a card whose row no bundle mounts', async () => {
     const root = await fixture()
-    await writeFile(join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts'),
+    await writeFile(join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts'),
       "export const CLIENT_PARAM_SECTIONS = [\n  { namespace: 'evolution-review', fields: [] },\n]\n\nexport const CLIENT_ROW_SEATS = []\n", 'utf8')
     const failed = await run(process.execPath, [clientSeats, root, '--upstream', join(root, 'upstream'), '--strict'], { encoding: 'utf8' })
       .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
