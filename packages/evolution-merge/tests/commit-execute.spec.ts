@@ -59,6 +59,27 @@ it('commits through the UnitTransaction branch without calling commitMerge', asy
   expect(result.receipt).toMatchObject({ unitId: 'u-unit', archived: ['a', 'b'] })
 })
 
+it('P1-6: prepares the unit under the canonical parent run id, not the stage key', async () => {
+  const home = await tempRoot('dsh-merge-commit-parent-')
+  const io = nodeEvolutionIo()
+  expect((await createStaging(io, home, input('run-1/pairs/abc'))).ok).toBe(true)
+  expect((await writeStagedFile(io, home, 'run-1/pairs/abc', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
+  let preparedRunId = ''
+  const unit = {
+    async prepare(plan: { runId: string; unitId?: string }) { preparedRunId = plan.runId; return { ok: true as const, prepared: { unitId: 'u-parent', planDigest: 'd1' } } },
+    async commit() { return { ok: true as const, evidence: { unitId: 'u-parent', runId: 'run-parent', planDigest: 'd1', state: 'complete' as const, target: { before: null, after: BODY('umbrella'), supportDigest: '', created: true }, sources: [{ name: 'a', before: BODY('a'), after: null, archived: true, absorbedInto: 'umbrella' }, { name: 'b', before: BODY('b'), after: null, archived: true, absorbedInto: 'umbrella' }], mutations: 3, at: 1 } } },
+    async verify() { return null },
+    async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
+    async cancel() { return { ok: false, phase: 'none' as const } },
+  }
+  const result = await commitStagedRun(io, home, 'run-1/pairs/abc', {
+    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async commitMerge() { throw new Error('old path must not run') },
+  }, { origin: 'foreground', summary: 'merge', now: () => 2000, parentRunId: 'run-parent', unit: unit as never })
+  expect(result.ok, result.ok ? '' : result.message).toBe(true)
+  expect(preparedRunId).toBe('run-parent')
+})
+
 it('passes the abort signal to the unit and keeps a landed commit when finalize fails', async () => {
   const home = await tempRoot('dsh-merge-commit-unit-signal-')
   const io = nodeEvolutionIo()
