@@ -48,6 +48,9 @@ try {
   console.error('verify-traceability: unreadable ledger (' + (error instanceof Error ? error.message : String(error)) + ') — exit 2')
   process.exit(2)
 }
+if (!PLANNED && ledger.probeAliases !== undefined) {
+  problems.push('traceability.json: top-level probeAliases is a design alias, not executable evidence — register each probe (spec + mutation) or use --planned')
+}
 const items = Array.isArray(ledger.items) ? ledger.items : []
 if (items.length === 0) {
   console.error('verify-traceability: the ledger carries zero items — an empty matrix is not a pass (exit 2)')
@@ -74,6 +77,9 @@ for (const item of items) {
     if (needsCoverage && (!Array.isArray(item[field]) || item[field].length === 0)) {
       problems.push('traceability.json: "' + id + '" is ' + disposition + ' but names no ' + field + ' — an adopted item must say where it landed and what proves it')
     }
+  }
+  if (!PLANNED && item.legacyProbes !== undefined) {
+    problems.push('traceability.json: "' + id + '" uses legacyProbes — a design alias is not a registered probe; register the spec + mutation or use --planned')
   }
   if ((disposition === 'deferred' || disposition === 'rejected') && typeof item.trigger !== 'string' && typeof item.note !== 'string') {
     problems.push('traceability.json: "' + id + '" is ' + disposition + ' without a trigger or note — a silent skip is not a disposition')
