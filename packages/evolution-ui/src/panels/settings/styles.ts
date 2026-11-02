@@ -21,7 +21,7 @@
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 
 /** Tag id that makes the injection idempotent. */
-export const CSS_TAG_ID = '@deepseek-ai/dsh-evolution-settings-ui/settings.css'
+export const CSS_TAG_ID = '@deepseek-ai/dsh-evolution-ui/settings.css'
 
 /** The stylesheet the section injects once. */
 export const CSS = [
@@ -132,7 +132,7 @@ export function injectStyles(host?: StyleHost): () => void {
   if (doc === undefined) return () => {}
   if (doc.querySelector('style[data-plugin-css="' + CSS_TAG_ID + '"]') !== null) return () => {}
   const tag = doc.createElement('style')
-  tag.dataset.plugin = '@deepseek-ai/dsh-evolution-settings-ui'
+  tag.dataset.plugin = '@deepseek-ai/dsh-evolution-ui'
   tag.dataset.pluginCss = CSS_TAG_ID
   tag.textContent = CSS
   doc.head.appendChild(tag)
