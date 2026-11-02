@@ -183,6 +183,22 @@ describe('release-evidence assembly (W3 injection)', () => {
     expect(result.doc.traceability.covered).toBe(52)
     expect(validateReleaseEvidence(result.doc, { release: true })).toEqual([])
   })
+  it('P2-39: flags-first invocation still finds the evidence file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assemble-evidence-order-'))
+    const evidencePath = join(dir, 'release-evidence.json')
+    const inputsPath = join(dir, 'rehearsal.json')
+    await writeFile(evidencePath, JSON.stringify(staging()), 'utf8')
+    await writeFile(inputsPath, JSON.stringify(rehearsalInputs()), 'utf8')
+    const result = await run(process.execPath, [assembleScript, '--gates-from-manifest', 'ci', '--rehearsal', inputsPath, '--ci-face', 'release.yml@refs/tags/v0.27.0', '--os', 'linux', evidencePath], { encoding: 'utf8' })
+      .then(out => ({ code: 0, stdout: out.stdout, stderr: out.stderr }))
+      .catch((error: unknown) => { const failure = execFailure(error); return { code: failure.code ?? 1, stdout: failure.stdout ?? '', stderr: failure.stderr ?? '' } })
+    expect(result.code).toBe(0)
+    const doc = JSON.parse(await readFile(evidencePath, 'utf8')) as EvidenceDoc
+    expect(doc.spikes).toHaveLength(4)
+    expect(doc.ciFace).toEqual({ os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' })
+    await rm(dir, { recursive: true, force: true })
+  })
+
   it('refuses a rehearsal snapshot that is not release-complete', async () => {
     const inputs = rehearsalInputs()
     inputs.spikes.pop()

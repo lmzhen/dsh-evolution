@@ -23,7 +23,11 @@ import { familyVersion } from './lib-family-version.mjs'
 
 const argv = process.argv.slice(2)
 const flag = (name) => { const index = argv.indexOf(name); const value = index >= 0 ? argv[index + 1] : undefined; return value !== undefined && !value.startsWith('--') ? value : '' }
-const file = argv.find((arg) => !arg.startsWith('--') && arg !== flag('--rehearsal') && arg !== flag('--ci-face') && arg !== flag('--os'))
+// P2-39: a positional is any token that is neither a flag nor the VALUE of a
+// value-taking flag. The previous list missed --gates-from-manifest, so a
+// flags-first invocation read its profile ("ci") as the evidence path.
+const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest'])
+const file = argv.find((arg, index) => !arg.startsWith('--') && !VALUE_FLAGS.has(argv[index - 1]))
 const rehearsalPath = flag('--rehearsal')
 const ciFace = flag('--ci-face') || process.env.GITHUB_WORKFLOW_REF || ''
 const os = flag('--os') || process.env.RUNNER_OS || ''
