@@ -1,7 +1,7 @@
 # Changelog
-## Unreleased — Batch A: WriteKernel + MutationUnit adapter
+## Unreleased — Batch A: WriteKernel + MutationUnit/state adapters
 
-> **范围**：新增 WriteKernel CAS/补偿原语；MutationUnit 的 applyOp/rollback 走 kernel，修复 P1-1/P1-2。四 writer 后续按同一 kernel 接入。
+> **范围**：新增 WriteKernel CAS/补偿原语；MutationUnit 的 applyOp/rollback 走 kernel，修复 P1-1/P1-2。MutationUnit 已接；state jsonTransact 已接 kernel.run；merge/curator 后续。
 > **验证**：真实 MutationUnit probe P1-1/P1-2 转绿；待 mirror CI 的 tsc/组测试/门禁。
 > **发布**：不可发版。
 

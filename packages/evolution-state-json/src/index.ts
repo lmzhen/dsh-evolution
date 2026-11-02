@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, WriteKernel, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
   assertCloneable,
   canClaimPending,
@@ -360,7 +360,7 @@ export async function jsonTransact<T>(
     memory: QuarantineMemory
   },
 ): Promise<void> {
-  await transactIo(io(), join(root, file), async (current) => {
+  await new WriteKernel({ io: io() }).run({ path: join(root, file) }, async current => {
     let parsed: T | null = null
     if (current !== null) {
       try {

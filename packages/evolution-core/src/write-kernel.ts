@@ -57,6 +57,41 @@ export class WriteKernel {
   clock(): number { return this.now() }
 
   /**
+   * Run a read-modify-write task inside the same transaction seam. Unlike
+   * writeOne, task errors keep their type (state files rely on WRITE_GATE_ERROR_NAME)
+   * and only committed-only failures become warnings. expected is optional because
+   * the state medium passes the task the locked current value itself.
+   */
+  async run(target: { readonly path: string; readonly expected?: string | null | undefined }, task: (current: string | null) => string | null | Promise<string | null>): Promise<{ readonly warnings?: readonly string[] | undefined }> {
+    let invoked = false
+    let conflict = false
+    const invoke = async (current: string | null): Promise<string | null> => {
+      if (target.expected !== undefined && current !== target.expected) {
+        conflict = true
+        throw Object.assign(new Error('concurrent modification detected: ' + target.path), { noWrite: true })
+      }
+      invoked = true
+      return await task(current)
+    }
+    try {
+      if (this.transact !== undefined) await this.transact(this.io, target.path, invoke)
+      else if (this.io.transact !== undefined) await this.io.transact(target.path, invoke)
+      else {
+        const current = await this.io.readText(target.path)
+        const next = await invoke(current)
+        if (next === null && current !== null) await this.io.remove(target.path)
+        else if (next !== null && next !== current) await this.io.writeText(target.path, next)
+      }
+    } catch (error) {
+      if (conflict) throw Object.assign(new Error('concurrent modification detected: ' + target.path), { noWrite: true })
+      if (isCommittedWarning(error)) return { warnings: [error instanceof Error ? error.message : String(error)] }
+      throw error
+    }
+    if (!invoked) throw new Error('transaction did not invoke the write task: ' + target.path)
+    return {}
+  }
+
+  /**
    * Write one target only if the current bytes still equal the baseline.
    * A conflict performs no write. With guardBaseline:false a stale callback
    * defers (returns the current bytes) so a retrying transact can re-observe;
