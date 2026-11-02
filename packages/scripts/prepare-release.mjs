@@ -594,6 +594,7 @@ writeFileSync(join(distNext, 'manifest.json'), JSON.stringify(Object.fromEntries
 
 const nameByDir = Object.fromEntries(tarballs.map(item => [item.dir, item.name]))
 const publishGroups = [
+  ['evolution-contract'],
   ['evolution-core'],
   // 0.23.0: the byte-seat implementation (G2 S4). It implements the `evolution-io` seat, so it
   // rides that group; the table must cover every staged tarball (P2-39 above).
@@ -602,7 +603,6 @@ const publishGroups = [
   ['evolution-state'],
   ['memory', 'memory-files', 'skill-usage'],
   ['evolution-policy', 'evolution-approval', 'evolution-threat'],
-  ['evolution-plan-validator'],
   ['evolution-maintenance'],
   ['tool-memory', 'tool-skill-manage'],
   ['evolution-review', 'evolution-curator', 'evolution-commands'],
@@ -610,19 +610,13 @@ const publishGroups = [
   // G1: the shared browser kit. Client-only and dependency-free in the family;
   // every sidebar panel depends on it, so it publishes before them.
   ['evolution-client-kit'],
-  // G4/S4.4: the settings cards. A client-only package (its Host half registers
-  // nothing), so it has no family dependency to order after — but the bundle in
-  // the next group depends on it, and the table must cover every staged tarball.
-  ['evolution-settings-ui'],
-  // 0.11.0: the skill-history surface. Also client-only in order (its Host half mounts routes
-  // but depends on nothing the family orders), and the bundles below depend on it too.
-  ['evolution-skill-history'],
   // 0.25.0: the skill-health surface. Client-only in order too (one read-only route, no infra row).
   ['evolution-skill-health'],
   ['evolution-skill-discovery'],
   // 0.28.0: the merge host + client surfaces. Both depend only on core/cordis; the bundle below
   // mounts their rows.
   ['evolution-merge-engine', 'evolution-merge', 'evolution-merge-ui'],
+  ['evolution-ui'],
   ['evolution-host', 'evolution-preset', 'evolution-agent', 'evolution-all'],
 ]
 // P2-39 (v11): the hardcoded table MUST equal the staged tarballs — a stale
