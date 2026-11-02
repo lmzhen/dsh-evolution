@@ -60,7 +60,7 @@ function releasable(): Record<string, unknown> {
     commit: 'a'.repeat(40),
     tag: 'v' + FAMILY_VERSION,
     ciFace: { os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' },
-    gates: [{ id: 'gate-01', ok: true, reading: 'passed' }],
+    gates: [{ id: 'gate-01', ok: true, reading: 'passed', criterionEvaluated: true }],
     spikes: SPIKE_IDS.map(id => spike(id)),
     traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52 },
   }
@@ -110,6 +110,7 @@ describe('release-evidence schema v2', () => {
       ['empty gate ledger', (doc) => { doc.gates = [] }],
       ['failed gate', (doc) => { (doc.gates as Array<Record<string, unknown>>)[0]!.ok = false }],
       ['synthetic gate', (doc) => { (doc.gates as Array<Record<string, unknown>>)[0]!.synthetic = true }],
+      ['unevaluated pass', (doc) => { delete (doc.gates as Array<Record<string, unknown>>)[0]!.criterionEvaluated }],
       ['short traceability', (doc) => { (doc.traceability as Record<string, unknown>).covered = 51 }],
       ['wrong universe', (doc) => { (doc.traceability as Record<string, unknown>).universe = { A: 22, B: 18, C: 11 } }],
     ]
