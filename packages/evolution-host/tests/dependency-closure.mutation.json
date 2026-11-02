@@ -1,0 +1,12 @@
+{
+  "probe": "decl-dependency-closure",
+  "edits": [
+    {
+      "file": "packages/scripts/verify-dependency-closure.mjs",
+      "find": "if (!covered) offenders.push({ pkg: dir, name, kind: usage.value ? 'value' : 'type-only' })",
+      "replace": "if (false) offenders.push({ pkg: dir, name, kind: usage.value ? 'value' : 'type-only' })"
+    }
+  ],
+  "expect": "red",
+  "note": "an undeclared cross-package import must be reported as an offender"
+}

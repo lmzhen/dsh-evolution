@@ -118,7 +118,7 @@
         "packages/scripts/verify-dependency-closure.mjs"
       ],
       "probes": [
-        "verify-dependency-closure"
+        "decl-dependency-closure"
       ],
       "gates": [
         "gate-06"
