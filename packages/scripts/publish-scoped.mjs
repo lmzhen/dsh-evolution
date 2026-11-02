@@ -13,6 +13,7 @@
  *   node packages/scripts/publish-scoped.mjs --no-provenance
  */
 import { createHash } from 'node:crypto'
+import { viewOutcome } from './lib/npm-view.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
@@ -103,21 +104,24 @@ function integrityOf(tarball) {
   return `sha512-${digest}`
 }
 
+function viewFailure(what, outcome) {
+  const detail = outcome.kind === 'error' && outcome.error !== undefined
+    ? String(outcome.error?.stderr ?? '') + String(outcome.error?.message ?? '')
+    : ''
+  throw new Error(`publish-scoped: npm view failed for ${what} — the registry could not answer; refusing to infer "absent". ${detail.trim()}`)
+}
+
 function viewIntegrity(name, version) {
-  try {
-    return JSON.parse(npm(['view', `${name}@${version}`, 'dist.integrity', '--json'], { stdio: ['ignore', 'pipe', 'pipe'] }))
-  } catch {
-    return undefined
-  }
+  const outcome = viewOutcome(() => npm(['view', `${name}@${version}`, 'dist.integrity', '--json'], { stdio: ['ignore', 'pipe', 'pipe'] }))
+  if (outcome.kind === 'absent') return undefined
+  if (outcome.kind === 'error') return viewFailure(`${name}@${version}`, outcome)
+  return JSON.parse(outcome.stdout)
 }
 
 function packageExists(name) {
-  try {
-    npm(['view', name, 'version', '--json'], { stdio: ['ignore', 'pipe', 'ignore'] })
-    return true
-  } catch {
-    return false
-  }
+  const outcome = viewOutcome(() => npm(['view', name, 'version', '--json'], { stdio: ['ignore', 'pipe', 'ignore'] }))
+  if (outcome.kind === 'error') return viewFailure(name, outcome)
+  return outcome.kind === 'present'
 }
 
 function publish(tarball) {

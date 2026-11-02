@@ -745,6 +745,18 @@ describe('layered installer', () => {
     expect(error?.stderr).not.toContain('--version')
   }, 20_000)
 
+  it('P2-35: only a definite npm E404 is an absent package/version', async () => {
+    const helper = new URL('../../scripts/lib/npm-view.mjs', import.meta.url).href
+    const body = [
+      `import { viewOutcome, isAbsentViewError } from ${JSON.stringify(helper)}`,
+      "const fail = text => () => { const error = new Error('command failed'); error.stderr = text; throw error }",
+      "const value = [viewOutcome(() => 'sha512-x').kind, viewOutcome(fail('npm ERR! code E404')).kind, viewOutcome(fail('npm ERR! code ETIMEDOUT')).kind, isAbsentViewError({ message: '404 Not Found' }), isAbsentViewError({ message: 'E401 Unauthorized' })]",
+      'process.stdout.write(JSON.stringify(value))',
+    ].join('\n')
+    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', body])
+    expect(JSON.parse(stdout)).toEqual(['present', 'absent', 'error', true, false])
+  }, 20_000)
+
   it('INST-05: a bare --otp hands npm no OTP value (the next flag is not one)', async () => {
     // Same shape as above: the guard throws before dist/manifest.json is read,
     // so no release tree is needed. Before INST-05 `--otp --dry-run` handed
