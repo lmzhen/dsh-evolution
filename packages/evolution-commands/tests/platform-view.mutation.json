@@ -1,0 +1,12 @@
+{
+  "probe": "decl-platform-view",
+  "edits": [
+    {
+      "file": "packages/evolution-commands/src/platform-view.ts",
+      "find": "if (read === undefined) return undefined",
+      "replace": "if (read === undefined) return [] as readonly T[]"
+    }
+  ],
+  "expect": "red",
+  "note": "an absent platform surface must answer undefined, never an empty array that reads as a real answer"
+}

@@ -144,6 +144,17 @@
       "mutation": "packages/evolution-commands/tests/doctor-view.mutation.json",
       "evidence": "A",
       "note": "diagnostics view schemaVersion 2 with frozen 7 facts + 8 runtime rows; unreadable providers named"
+    },
+    {
+      "id": "decl-platform-view",
+      "kind": "decl",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-commands/tests/platform-view.spec.ts"
+      ],
+      "mutation": "packages/evolution-commands/tests/platform-view.mutation.json",
+      "evidence": "A",
+      "note": "absent/throwing/misshaped platform surfaces answer undefined; bundle/plugin/configuration/preset readers"
     }
   ]
 }

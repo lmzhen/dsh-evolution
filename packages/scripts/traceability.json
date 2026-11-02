@@ -101,7 +101,7 @@
         "evolution-core/src/params.ts"
       ],
       "probes": [
-        "decl-bundleinfo-semantics"
+        "decl-platform-view"
       ],
       "gates": [
         "gate-03"
