@@ -110,6 +110,23 @@ describe('MutationUnit executor', () => {
     expect(io.files.get('source/SKILL.md')).toBe('CONCURRENT')
   })
 
+  it('P2-1: writes the committed snapshot before the committed journal', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    const order: string[] = []
+    const snapshots: MutationSnapshotPort = {
+      async write(snapshot) { order.push('snapshot:' + snapshot.state) },
+      async read() { return null },
+      async listPrepared() { return [] },
+    }
+    const result = await unit(io, {
+      snapshots,
+      journal: { async write(record) { order.push('journal:' + record.phase) } },
+    }).apply(request())
+    expect(result.ok).toBe(true)
+    expect(order.indexOf('snapshot:committed')).toBeGreaterThan(-1)
+    expect(order.indexOf('journal:committed')).toBeGreaterThan(order.indexOf('snapshot:committed'))
+  })
+
   it('rolls back a later write failure', async () => {
     const io = new MemoryIo()
     io.files.set('source/SKILL.md', 'old-a')

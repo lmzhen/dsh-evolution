@@ -332,8 +332,10 @@ export class MutationUnit {
           }
         }
         await bestEffort(async () => this.journal?.write({ unitId, phase: 'unit-written', changed, target: primary, roots: validation.roots.map(root => root.name) }))
-        await bestEffort(async () => this.journal?.write({ unitId, phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
+        // P2-1: the committed snapshot is the recovery authority. Write it BEFORE the journal's
+        // committed phase so a crash in this window recovers as committed, never rolled back.
         if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now() }))
+        await bestEffort(async () => this.journal?.write({ unitId, phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
         try {
           await this.hooks?.committed?.({ unitId, changed, ops: eventOps, roots: validation.roots.map(root => root.name) })
         } catch {
