@@ -277,7 +277,7 @@
     },
     {
       "id": "A-17",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W5",
         "W7"
@@ -285,14 +285,14 @@
       "files": [
         "packages/test-support/host-route-harness.ts"
       ],
-      "probes": [
-        "beh-channel-settle"
-      ],
+      "probes": [],
       "gates": [
         "gate-01",
         "gate-03"
       ],
-      "evidence": "A"
+      "evidence": "A",
+      "trigger": "packages/test-support/host-route-harness.ts is test support; the product behavior is covered by beh-host-route-registration (gate-01/gate-03)",
+      "note": "Deferred by the G8b probe audit: the harness has no product invariant of its own."
     },
     {
       "id": "A-18",
