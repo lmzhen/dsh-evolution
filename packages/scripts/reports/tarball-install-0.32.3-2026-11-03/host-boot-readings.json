@@ -1,0 +1,14 @@
+{
+  "measuredAt": "2026-11-03T03:10:27.0017543+08:00",
+  "host": "http://127.0.0.1:3084",
+  "installForm": "完整功能包（安装内容已声明）",
+  "familyVersion": "0.32.3",
+  "platformLine": "0.2.1-rc.3（最低兼容 0.2.1-rc.2）",
+  "diagnosticsStatus": 200,
+  "diagnosticsSchemaVersion": 2,
+  "diagnosticsFacts": 7,
+  "diagnosticsRuntime": 8,
+  "mergeStatus": 200,
+  "mergeWireVersion": 1,
+  "anonymousStatus": 401
+}
