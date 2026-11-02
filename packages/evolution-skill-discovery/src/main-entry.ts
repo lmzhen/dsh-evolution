@@ -25,7 +25,7 @@ import { DOMAIN_GENERATION_PROMPT_VERSION, buildDomainGenerationPrompt } from '.
 import { ViewSnapshotStore } from './view-snapshot-store.ts'
 import { skillKeyOf } from './identity.ts'
 import { installDiscoveryAwareness } from './awareness.ts'
-import { markStaleDescriptions, refreshStaleDescriptions } from './description-refresh.ts'
+import { refreshAgedDescriptions } from './description-refresh.ts'
 
 /** Main production config. */
 export interface Config {
@@ -181,10 +181,11 @@ export function apply(ctx: Context, config: Config): void {
       const cwd = await workingDirectory.ensure(agent)
       const view = await index.read({ cwd, scopeKey: String(agent.id), scope: agent })
       await snapshots.put({ sessionId: String(agent.session.id), viewKey: view.viewKey, cwd, viewCatalogDigest: view.viewCatalogDigest, mapVersion: '0', configDigest: 'production', featureEpoch: config.featureEpoch, createdAt: Date.now() })
-      const marked = await markStaleDescriptions(map, descriptionStaleAfterHours)
-      if (marked > 0) ctx.logger.info('evolution-skill-discovery: marked ' + marked + ' aged domain descriptions stale')
-      const refreshed = await refreshStaleDescriptions(map)
-      if (refreshed > 0) ctx.logger.info('evolution-skill-discovery: refreshed ' + refreshed + ' stale domain descriptions')
+      // ONE read/commit for the two description producers (P2-14): two calls
+      // bumped mapVersion on every session start, even when only marking ran.
+      const aged = await refreshAgedDescriptions(map, descriptionStaleAfterHours)
+      if (aged.marked > 0) ctx.logger.info('evolution-skill-discovery: marked ' + aged.marked + ' aged domain descriptions stale')
+      if (aged.refreshed > 0) ctx.logger.info('evolution-skill-discovery: refreshed ' + aged.refreshed + ' stale domain descriptions')
     } catch (error) {
       ctx.logger.warn('evolution-skill-discovery: initial view snapshot failed: ' + (error instanceof Error ? error.message : String(error)))
     }

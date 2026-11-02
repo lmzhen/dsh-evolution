@@ -14,11 +14,20 @@ export interface DomainNode {
   readonly version: number
   readonly createdAt: number
   readonly updatedAt: number
+  /** When the description last changed; absent on maps written before this field. */
+  readonly descriptionUpdatedAt?: number | undefined
   readonly descriptionHash: string
   readonly descriptionVersion: number
   readonly descriptionStatus: 'fresh' | 'stale' | 'failed'
   readonly provenance: Readonly<Record<string, string>>
   readonly quality: Readonly<Record<string, number>>
+}
+
+/** The next CAS version. ONE implementation: non-numeric versions get a suffix,
+ * never NaN, and every writer advances the same way. */
+export function nextMapVersion(version: string): string {
+  const numeric = Number(version)
+  return Number.isSafeInteger(numeric) && numeric >= 0 ? String(numeric + 1) : version + '.1'
 }
 
 /** One skill-domain edge; skillKey is the global identity, not a display name. */

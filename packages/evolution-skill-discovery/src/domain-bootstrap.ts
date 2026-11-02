@@ -1,4 +1,4 @@
-import type { DomainMapSnapshot, DomainMapStore, DomainNode, SkillDomainEdge } from './domain-map.ts'
+import { nextMapVersion, type DomainMapSnapshot, type DomainMapStore, type DomainNode, type SkillDomainEdge } from './domain-map.ts'
 import type { DomainGenerationProposal, GenerationSkillFact } from './domain-generation.ts'
 import { validateDomainGeneration } from './domain-generation.ts'
 import type { SkillKey } from './identity.ts'
@@ -49,7 +49,7 @@ export async function bootstrapDomainMapWithFacts(
     id: domain.id, name: domain.title, purpose: domain.purpose, description: domain.purpose,
     inScope: domain.inScope, outOfScope: domain.outOfScope, triggers: domain.triggers, parentIds: [],
     status: 'provisional', version: 1, createdAt: now, updatedAt: now,
-    descriptionHash: 'bootstrap', descriptionVersion: 1, descriptionStatus: 'fresh',
+    descriptionHash: 'bootstrap', descriptionVersion: 1, descriptionStatus: 'fresh', descriptionUpdatedAt: now,
     provenance: { source: 'llm', promptVersion: provenance.promptVersion, sourceDigest: provenance.sourceDigest, model: provenance.model, runId: provenance.runId }, quality: qualityOf(domain),
   }))
   const primary = new Set<SkillKey>()
@@ -63,7 +63,7 @@ export async function bootstrapDomainMapWithFacts(
       edges.push({ skillKey: fact.skillKey, domainId: checked.domains[domainIndex]!.id, role, confidence: 1, source: 'create', skillHash: fact.threeFieldHash, mapVersion: expectedMapVersion, status: 'active', assignedAt: now })
     }
   }
-  return store.commit(expectedMapVersion, { mapVersion: String(Number(expectedMapVersion) + 1), domains, edges })
+  return store.commit(expectedMapVersion, { mapVersion: nextMapVersion(expectedMapVersion), domains, edges })
 }
 
 /**

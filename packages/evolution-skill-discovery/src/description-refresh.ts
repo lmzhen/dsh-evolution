@@ -1,10 +1,5 @@
-import type { DomainMapStore } from './domain-map.ts'
+import { nextMapVersion, type DomainMapStore } from './domain-map.ts'
 import { descriptionHashOf, renderDomainDescription } from './domain-description.ts'
-
-function nextMapVersion(version: string): string {
-  const numeric = Number(version)
-  return Number.isSafeInteger(numeric) && numeric >= 0 ? String(numeric + 1) : version + '.1'
-}
 
 /**
  * Mark aged fresh descriptions stale so the refresh pass has a producer.
@@ -16,11 +11,39 @@ function nextMapVersion(version: string): string {
 export async function markStaleDescriptions(store: DomainMapStore, maxAgeHours: number | undefined, now = Date.now()): Promise<number> {
   if (maxAgeHours === undefined || maxAgeHours < 0) return 0
   const snapshot = await store.read()
-  const aged = snapshot.domains.filter(node => node.descriptionStatus === 'fresh' && node.updatedAt > 0 && now - node.updatedAt > maxAgeHours * 3_600_000)
+  const aged = snapshot.domains.filter(node => node.descriptionStatus === 'fresh' && (node.descriptionUpdatedAt ?? node.updatedAt) > 0 && now - (node.descriptionUpdatedAt ?? node.updatedAt) > maxAgeHours * 3_600_000)
   if (aged.length === 0) return 0
   const domains = snapshot.domains.map(node => aged.includes(node) ? { ...node, descriptionStatus: 'stale' as const } : node)
   await store.commit(snapshot.mapVersion, { mapVersion: nextMapVersion(snapshot.mapVersion), domains, edges: snapshot.edges })
   return aged.length
+}
+
+/**
+ * Mark aged descriptions stale AND refresh every stale description in ONE
+ * read/commit. Session start used to call the two producers back to back, so a
+ * single start bumped mapVersion twice (P2-14).
+ * @param store - domain map store.
+ * @param maxAgeHours - age threshold; undefined disables the producer.
+ * @param now - clock for deterministic tests.
+ * @returns counts of marked and refreshed domains.
+ */
+export async function refreshAgedDescriptions(store: DomainMapStore, maxAgeHours: number | undefined, now = Date.now()): Promise<{ marked: number; refreshed: number }> {
+  if (maxAgeHours === undefined || maxAgeHours < 0) return { marked: 0, refreshed: 0 }
+  const snapshot = await store.read()
+  const aged = new Set(snapshot.domains.filter(node => node.descriptionStatus === 'fresh' && (node.descriptionUpdatedAt ?? node.updatedAt) > 0 && now - (node.descriptionUpdatedAt ?? node.updatedAt) > maxAgeHours * 3_600_000).map(node => node.id))
+  const stale = snapshot.domains.filter(node => node.descriptionStatus === 'stale' || aged.has(node.id))
+  if (stale.length === 0) return { marked: 0, refreshed: 0 }
+  const staleIds = new Set(stale.map(node => node.id))
+  const domains = snapshot.domains.map(node => !staleIds.has(node.id) ? node : {
+    ...node,
+    description: renderDomainDescription(node),
+    descriptionHash: descriptionHashOf(node, snapshot.domains.filter(child => child.parentIds.includes(node.id))),
+    descriptionVersion: node.descriptionVersion + 1,
+    descriptionStatus: 'fresh' as const,
+    descriptionUpdatedAt: now,
+  })
+  await store.commit(snapshot.mapVersion, { mapVersion: nextMapVersion(snapshot.mapVersion), domains, edges: snapshot.edges })
+  return { marked: aged.size, refreshed: stale.length }
 }
 
 /**
@@ -39,7 +62,7 @@ export async function refreshStaleDescriptions(store: DomainMapStore): Promise<n
     descriptionHash: descriptionHashOf(node, snapshot.domains.filter(child => child.parentIds.includes(node.id))),
     descriptionVersion: node.descriptionVersion + 1,
     descriptionStatus: 'fresh' as const,
-    updatedAt: now,
+    descriptionUpdatedAt: now,
   })
   await store.commit(snapshot.mapVersion, { mapVersion: nextMapVersion(snapshot.mapVersion), domains, edges: snapshot.edges })
   return stale.length

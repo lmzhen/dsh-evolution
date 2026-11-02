@@ -85,7 +85,7 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
       id: node.id,
       title: node.name,
       purpose: node.purpose.slice(0, 80),
-      descriptionStatus: node.descriptionStatus === 'fresh' && input.descriptionStaleAfterHours !== undefined && input.now !== undefined && input.now - node.updatedAt > input.descriptionStaleAfterHours * 3_600_000 ? 'stale' : node.descriptionStatus,
+      descriptionStatus: node.descriptionStatus === 'fresh' && input.descriptionStaleAfterHours !== undefined && input.now !== undefined && input.now - (node.descriptionUpdatedAt ?? node.updatedAt) > input.descriptionStaleAfterHours * 3_600_000 ? 'stale' : node.descriptionStatus,
       triggers: node.triggers.slice(0, 3),
       managedModelInvocableCount,
       externalCatalogCount,
