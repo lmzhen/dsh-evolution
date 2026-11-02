@@ -91,7 +91,9 @@ export function parseCursor(cursor: string, snapshot: MergeSnapshot): number {
   try { const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { revision?: unknown; offset?: unknown }; if (value.revision !== snapshot.queueRevision || typeof value.offset !== 'number' || value.offset < 0) throw new Error('stale') ; return value.offset } catch { throw new Error('queue cursor is stale; reload') }
 }
 export function buildQueuePage(snapshot: MergeSnapshot, queue: QueueId, expiredOnly: boolean, cursor?: string, limit = 50): QueuePage {
-  const selected = snapshot.rows.filter(row => row.queue === queue && (queue === 'skipped' ? true : expiredOnly ? row.expired : !row.expired))
+  // P2-17: skipped rows are a normal queue. Expired ones belong to the expired bucket
+  // (counts.expired); the default list must not show them beside an active badge.
+  const selected = snapshot.rows.filter(row => row.queue === queue && (expiredOnly ? row.expired : !row.expired))
   const offset = cursor === undefined ? 0 : parseCursor(cursor, snapshot)
   const page = selected.slice(offset, offset + Math.max(0, Math.min(200, limit)))
   const next = offset + page.length < selected.length ? encodeCursor(snapshot, offset + page.length) : undefined

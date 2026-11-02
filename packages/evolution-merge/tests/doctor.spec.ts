@@ -8,7 +8,7 @@ import { makeV4Home, v3Row } from './support/schema4-home.ts'
 import { journalPath } from '../src/domain/commit-journal-store.ts'
 import { mergeDoctor, mergeDoctorFact, pairKey, rowIdOf } from '../src/index.ts'
 import { readMergeSnapshot } from '../src/domain/merge-snapshot.ts'
-import { buildDoctorView } from '../src/surface/merge-view.ts'
+import { buildDoctorView, buildQueuePage } from '../src/surface/merge-view.ts'
 import { mergeStatePath } from '../src/state.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
@@ -34,6 +34,13 @@ it('counts a skipped-ttl expired row in the doctor state line', async () => {
   const state = rows.find(item => item.key === 'state')
   expect(state?.detail).toContain('expired 1')
   expect(state?.detail).toContain('skipped 0')
+})
+
+it('P2-17: expired skipped rows leave the active skipped page', async () => {
+  const v4 = await makeV4Home([v3Row({ id: 's1', state: 'skipped', reason: 'agent keep', expiredAt: Date.parse(AT) } as never)])
+  const snapshot = await readMergeSnapshot({ io: v4.io, home: v4.home, runs: [], approval: false })
+  expect(buildQueuePage(snapshot, 'skipped', false).rows).toHaveLength(0)
+  expect(buildQueuePage(snapshot, 'skipped', true).rows).toHaveLength(1)
 })
 
 it('exposes host-only E-323 to the doctor view and fact', async () => {
