@@ -56,6 +56,24 @@ describe('MergeStore', () => {
     expect(store.read().current.rows).toEqual([])
   })
 
+  it('P2-16: recovers the queue after a blocked rows response', async () => {
+    let blocked = true
+    const rows = vi.fn(async () => blocked
+      ? ({ ok: false, failure: { kind: 'blocked', code: 'merge-state-blocked', readiness: { code: 'merge-state-migration-blocked', message: 'raw' } } } as MergeOutcome<QueuePage>)
+      : ({ ok: true, payload: { queue: 'pending', expiredOnly: false, items: [row('r1')], counts: view().counts } } as MergeOutcome<QueuePage>))
+    const store = new MergeStore(source({ rows }), { view: view(), rows: [row('old')] })
+    await store.loadQueue('pending', false)
+    expect(store.read().viewState).toBe('blocked')
+    expect(store.read().current.status).toBe('idle')
+    blocked = false
+    await store.loadView(false)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(store.read().viewState).toBe('ready')
+    expect(store.read().current.status).toBe('ready')
+    expect(store.read().current.rows.map(item => item.id)).toEqual(['r1'])
+  })
+
   it('appends pages with an opaque cursor', async () => {
     const pages = new Map<string | undefined, QueuePage>([
       [undefined, { queue: 'pending', expiredOnly: false, items: [row('p1')], counts: view().counts, nextCursor: 'cursor-2' }],

@@ -111,7 +111,9 @@ export class MergeStore {
       this.set({ ...this.snapshot, viewState: 'error', viewFailure: outcome.failure })
       return
     }
+    const wasBlocked = this.snapshot.viewState === 'blocked'
     this.set({ ...this.snapshot, view: outcome.payload, viewState: 'ready', viewFailure: undefined })
+    if (wasBlocked && this.snapshot.current.status === 'idle') void this.loadQueue(this.snapshot.queue, this.snapshot.expiredOnly)
   }
 
   async loadQueue(queue: MergeQueue, expiredOnly: boolean, cursor?: string): Promise<void> {
@@ -126,6 +128,8 @@ export class MergeStore {
     if (this.disposed || token !== this.tokens.get(key)) return
     if (!outcome.ok) {
       if (outcome.failure.kind === 'blocked') {
+        // P2-16: a blocked rows read must not leave the cache in `loading`.
+        for (const key of this.cache.keys()) this.cache.set(key, { status: 'idle', rows: [] })
         this.set({ ...this.snapshot, viewState: 'blocked', viewFailure: outcome.failure, current: { status: 'idle', rows: [] } })
         return
       }
