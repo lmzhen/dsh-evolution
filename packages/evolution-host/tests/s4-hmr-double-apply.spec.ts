@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
-import * as SkillHistory from '../../evolution-skill-history/src/index.ts'
+import * as SkillHistory from '../../evolution-ui/src/panels/history/host.ts'
 import { HOST_ROUTES } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { provideHostConnection } from '../../test-support/host-route-harness.ts'
 
