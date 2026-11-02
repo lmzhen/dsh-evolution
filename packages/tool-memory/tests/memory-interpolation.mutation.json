@@ -1,0 +1,12 @@
+{
+  "probe": "beh-memory-interpolation",
+  "edits": [
+    {
+      "file": "packages/tool-memory/src/index.ts",
+      "find": "text: () => snapshotText,\n      interpolate: false,",
+      "replace": "text: () => snapshotText,\n      interpolate: true,"
+    }
+  ],
+  "expect": "red",
+  "note": "stored memory text is data: the snapshot must never be interpolated as a prompt template"
+}

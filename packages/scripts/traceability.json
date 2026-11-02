@@ -429,7 +429,7 @@
         "evolution-core/src/memory-store.ts"
       ],
       "probes": [
-        "beh-prompt-literal"
+        "beh-memory-interpolation"
       ],
       "gates": [
         "gate-03"
@@ -732,7 +732,7 @@
         "evolution-core/src/memory-store.ts"
       ],
       "probes": [
-        "beh-prompt-literal"
+        "beh-memory-interpolation"
       ],
       "gates": [
         "gate-03"

@@ -1394,6 +1394,17 @@
       "mutation": "packages/evolution-host/tests/s4-hmr-double-apply.mutation.json",
       "evidence": "A",
       "note": "dispose releases every route; re-apply on the same connection registers no duplicate path"
+    },
+    {
+      "id": "beh-memory-interpolation",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/tool-memory/tests/memory-interpolation.spec.ts"
+      ],
+      "mutation": "packages/tool-memory/tests/memory-interpolation.mutation.json",
+      "evidence": "A",
+      "note": "memory snapshot and guidance register interpolate:false; stored braces stay verbatim through mount and refresh"
     }
   ]
 }
