@@ -427,7 +427,7 @@ except two registered exceptions. The rule is **N31** and its implementation is 
 exception nobody mounts any more fails too. The two exception rows below ARE the register — a third
 unprefixed key cannot be added without a row here, and a row without a mount fails.
 
-Prefixed keys: `evolutionIo` · `evolutionStateStorage` · `evolutionStateStore` · `evolutionState` ·
+Prefixed keys: `evolutionIo` · `evolutionStateStorage` · `evolutionState` ·
 `evolutionPolicy` · `evolutionApproval` · `evolutionCurator` · `evolutionFeedback` ·
 `evolutionReplay` · `evolutionMemoryBudget`.
 
