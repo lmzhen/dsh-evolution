@@ -1,4 +1,9 @@
 # Changelog
+## 0.32.0 (feature) — 36-package family: evolution-ui umbrella, contract/state seams, release-line cleanup
+
+> **范围**：`evolution-ui` 统一承载 settings 与 skill-history 面板，删除已迁移的 settings-ui / skill-history 包；新增 `evolution-contract`；state/IO、discovery、lifecycle、merge、memory/tools 及门禁随架构线收口；发布面由 37 包收敛到 36 包。
+> **验证**：draft PR CI 的 `validate (released upstream)` 与 `desktop install (windows)` 通过；`publish` 在无 tag 时按设计跳过。正式 tag 的 validate/publish 仍以本次 CI 结果为准。
+> **状态**：0.32.0 正式发布批次；merge-engine 筛选 pipeline ①–⑤ 冻结未改。
 ## 0.31.1 (fix) — P0 hotfixes: discovery search, assignment queue, merge fail-closed, UI tokens
 
 > **范围**：mode:off 下 skill_search 不再解析未初始化的 policy；assignment queue 改 single-flight load，避免并发丢队；merge library 归档/名字能力缺失改 fail-closed；settings 保存按钮受 blocked 约束；merge/skill-health 死亡 token 更正；core 注释不再宣称 node backend 跨进程锁；merge-engine 筛选 pipeline 冻结文档。

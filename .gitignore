@@ -22,3 +22,8 @@ dist.next/
 # `gen-line-manifest --check` reported stale on a tree nobody had touched. Un-ignore the ONE file;
 # the rule above stays as it is (tightening it is a separate repo-hygiene item). Anchoring is the load-bearing half: git cannot re-include a file whose PARENT DIRECTORY is excluded, so `files/` had to become `/files/` (root only) for this line to mean anything.
 !packages/scripts/files/line-manifest.json
+
+# Local scratch and generated parity output (never publish or commit).
+/tmp-session.jsonl
+/undefined/
+packages/evolution-merge-engine/vendor/out/
