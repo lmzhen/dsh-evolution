@@ -88,6 +88,9 @@ describe('evolution-curator single-instance contract', () => {
     const rolledBack = await yielded.restoreSnapshot()
     expect(rolledBack.ok).toBe(false)
     expect(rolledBack.message).toContain('instance-held')
+    const undoneUnit = await yielded.undoUnit('some-skill')
+    expect(undoneUnit.ok).toBe(false)
+    expect(undoneUnit.message).toContain('instance-held')
     // The holder row is unaffected: its own control plane never sees the claim
     // refusal (this restore fails for the ordinary missing-skill reason).
     const holderRestore = await first.evolutionCurator.restore('missing-skill')

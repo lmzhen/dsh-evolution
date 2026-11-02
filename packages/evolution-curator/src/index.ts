@@ -2409,6 +2409,16 @@ export class EvolutionCurator extends Service {
   }
 
   async undoUnit(name: string, unitId?: string): Promise<SkillActionResult> {
+    const release = await this.acquireMutex()
+    try {
+      if (!this.holdsInstance) return this.instanceHeldRefusal('undo-unit')
+      return await this.undoUnitMutate(name, unitId)
+    } finally {
+      release()
+    }
+  }
+
+  private async undoUnitMutate(name: string, unitId?: string): Promise<SkillActionResult> {
     const versions = await this.skills.listVersions(name)
     if (versions.length === 0) return { ok: false, message: `技能「${name}」还没有记录内容版本 —— 没有可撤销的。` }
     const live = await this.skills.read(name)
