@@ -116,7 +116,7 @@ const CHANNELS = [
   { name: 'deployment-carriers', file: join(root, 'evolution-policy', 'src', 'index.ts') },
   { name: 'command-face', file: join(root, 'evolution-commands', 'src', 'params.ts') },
   { name: 'doctor-face', file: join(root, 'evolution-commands', 'src', 'doctor.ts') },
-  { name: 'client-field-list', file: join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts') },
+  { name: 'client-field-list', file: join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts') },
 ]
 
 const problems = []
@@ -248,7 +248,7 @@ for (const owner of e3Owners) {
 }
 // The generated artifacts must carry EXACTLY the ids they are generated from:
 // the client field list is the E3 rows, the document is every row.
-const clientFile = join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts')
+const clientFile = join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts')
 if (existsSync(clientFile)) {
   const text = readFileSync(clientFile, 'utf8')
   const listed = new Set([...text.matchAll(/\{ id: '([^']+)'/g)].map(match => match[1]))

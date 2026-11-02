@@ -102,7 +102,7 @@ console.log(`normalize-mirror: ${changed} manifest(s) aligned to ${VERSION}`)
 
 // A version bump is also a change to the GENERATED client constant (the settings about line).
 // Regenerating here keeps the bump one command; the CI guard (gen-about --check) stays the judge.
-const aboutTarget = join(packagesRoot, 'evolution-settings-ui/src/client/generated-about.ts')
+const aboutTarget = join(packagesRoot, 'evolution-ui/src/panels/settings/generated-about.ts')
 const about = renderAbout(packagesRoot)
 if (about === null) {
   console.log('normalize-mirror: generated-about not armed in this layout — nothing to regenerate')

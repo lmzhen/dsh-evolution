@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url'
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 /** Where the generated copy lives inside the package. */
-const RELATIVE = 'evolution-settings-ui/src/client/generated-about.ts'
+const RELATIVE = 'evolution-ui/src/panels/settings/generated-about.ts'
 
 /**
  * Find the repository root that owns `package.json`: the mirror layout keeps it two levels above
@@ -73,7 +73,7 @@ export function renderAbout(root) {
   // version fact (lib-doc-facts.mjs). Throwing here would redden every overlay build forever.
   if (repo === null) return null
   const version = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version
-  const pkg = JSON.parse(readFileSync(join(resolve(root), 'evolution-settings-ui', 'package.json'), 'utf8'))
+  const pkg = JSON.parse(readFileSync(join(resolve(root), 'evolution-ui', 'package.json'), 'utf8'))
   const purpose = String(pkg.description ?? '')
   return [
     '/**',

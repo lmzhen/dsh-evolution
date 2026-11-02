@@ -27,7 +27,7 @@ const here = resolve(new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z
 const problems = []
 
 const readFields = () => {
-  const text = readFileSync(join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts'), 'utf8')
+  const text = readFileSync(join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts'), 'utf8')
   const fields = []
   const re = /\{\s*id: '([^']+)',[\s\S]*?control: '(number|switch|select|text)'/g
   let match
@@ -39,7 +39,7 @@ const fields = readFields()
 if (fields.length === 0) problems.push('the generated client view carries no field — is generated-params.ts stale?')
 
 // A: declared => rendered.
-const card = stripComments(readFileSync(join(root, 'evolution-settings-ui', 'src', 'client', 'ParamCard.ts'), 'utf8'))
+const card = stripComments(readFileSync(join(root, 'evolution-ui', 'src', 'panels', 'settings', 'ParamCard.ts'), 'utf8'))
 for (const kind of new Set(fields.map((field) => field.control))) {
   if (!new RegExp("control === '" + kind + "'").test(card)) {
     problems.push('control "' + kind + '" is declared by the generated view but ParamCard.ts renders no branch for it')

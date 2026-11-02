@@ -369,9 +369,9 @@ const namespaceOwners = new Set([...(namespaceBlock?.[1] ?? '').matchAll(/^\s*'(
 const owners = new Set([...registry.matchAll(/^\s*\{ id: '[^']+',[^\n]*tier: 'E3'[^\n]*owner: '([^']+)'/gm)]
   .map(match => match[1])
   .filter(owner => namespaceOwners.has(owner)))
-const generated = join(root, 'evolution-settings-ui', 'src', 'client', 'generated-params.ts')
+const generated = join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts')
 if (!existsSync(generated)) {
-  problems.push('evolution-settings-ui: no generated client view (run gen-param-client-view.mjs)')
+  problems.push('evolution-ui: no generated client view (run gen-param-client-view.mjs)')
 } else {
   const view = readFileSync(generated, 'utf8')
   const cards = new Set([...view.matchAll(/namespace: '([^']+)'/g)].map(match => match[1]))

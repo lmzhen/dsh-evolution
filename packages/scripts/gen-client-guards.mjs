@@ -23,8 +23,8 @@ if (unknown.length > 0) {
 
 const SOURCE = join(rootArg, 'evolution-core/src/guards.ts')
 const TARGETS = [
-  join(rootArg, 'evolution-settings-ui/src/client/guards.ts'),
-  join(rootArg, 'evolution-skill-history/src/client/guards.ts'),
+  join(rootArg, 'evolution-ui/src/panels/settings/guards.ts'),
+  join(rootArg, 'evolution-ui/src/panels/history/client/guards.ts'),
 ]
 const NL = String.fromCharCode(10)
 const source = readFileSync(SOURCE, 'utf8')

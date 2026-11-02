@@ -86,9 +86,13 @@ for (const entry of readdirSync(root, { withFileTypes: true })) {
 }
 if (scanned === 0) problems.push('scanned 0 business sources under ' + root + ' — the guard would be silent')
 
-for (const pkg of ['evolution-approval', 'evolution-skill-history', 'evolution-skill-health']) {
-  const routesFile = join(root, pkg, 'src', 'routes.ts')
-  if (!existsSync(routesFile)) { problems.push(pkg + ': routes.ts is missing'); continue }
+for (const [pkg, rel] of [
+  ['evolution-approval', 'src/routes.ts'],
+  ['evolution-ui', 'src/panels/history/routes.ts'],
+  ['evolution-skill-health', 'src/routes.ts'],
+]) {
+  const routesFile = join(root, pkg, rel)
+  if (!existsSync(routesFile)) { problems.push(pkg + ': ' + rel + ' is missing'); continue }
   const source = readFileSync(routesFile, 'utf8')
   if (!/from '@deepseek-ai\/dsh-evolution-core\/http-routes'/.test(source) || !/HOST_ROUTES/.test(source)) {
     problems.push(pkg + ': routes.ts must import HOST_ROUTES from core/http-routes')

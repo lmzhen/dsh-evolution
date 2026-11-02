@@ -450,7 +450,7 @@ const PLATFORM_CITE_BASELINE = new Map([
   ['evolution-review/src/index.ts', 4],
   ['evolution-review/src/review-notice.ts', 1],
   ['evolution-review/tests/review.spec.ts', 1],
-  ['evolution-settings-ui/src/client/seam.ts', 1],
+  ['evolution-ui/src/panels/settings/seam.ts', 1],
   ['memory-files/src/index.ts', 1],
   ['scripts/gen-param-client-view.mjs', 1],
   ['scripts/install-layered.mjs', 2],
@@ -1179,7 +1179,7 @@ const WRITE_CALL = /\b(writeFile|writeFileSync|appendFile|appendFileSync|createW
 const SERVICE_CAPTURE_RE = /^(?: {0,2}|\t)(?:const|let|var)\s+([A-Za-z_$][\w$]*)[^=\n]*=[ \t]*ctx\.get\(/gm
 
 /** The ONE module allowed to define an observable source (N30). */
-const OBSERVABLE_OWNER = 'evolution-settings-ui/src/client/source.ts'
+const OBSERVABLE_OWNER = 'evolution-ui/src/panels/settings/source.ts'
 
 /** A snapshot accessor written in a client half: only the owner module may spell one (N30). */
 const SNAPSHOT_DEFINITION_RE = /\bgetSnapshot\s*[:=]/g

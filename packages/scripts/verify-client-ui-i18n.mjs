@@ -83,7 +83,7 @@ function literalChildren(text) {
 }
 
 const root = process.argv[2] ?? 'packages'
-const halves = ['evolution-settings-ui/src/client', 'evolution-skill-history/src/client']
+const halves = ['evolution-ui/src/panels/settings', 'evolution-ui/src/panels/history/client']
 const problems = []
 let scanned = 0
 
