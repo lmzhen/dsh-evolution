@@ -25,6 +25,10 @@ inputs:
     description: Suffix for the uploaded artifacts (baseline / released)
     required: false
     default: baseline
+  node_version:
+    description: Node major version for the build/test gate.
+    required: false
+    default: '24'
 
   npm_scope:
     description: >-
@@ -96,7 +100,7 @@ runs:
 
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
-        node-version: '24'
+        node-version: ${{ inputs.node_version }}
         cache: pnpm
         cache-dependency-path: upstream/pnpm-lock.yaml
 

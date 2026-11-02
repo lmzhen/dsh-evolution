@@ -75,9 +75,13 @@ jobs:
   # job is a hard requirement of `publish` — a released-upstream
   # incompatibility now blocks the release instead of merely failing a run.
   compat-check:
-    name: validate (released upstream)
+    name: validate (released upstream, node ${{ matrix.node }})
     needs: platform-line
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
     # R-12: same cap as the baseline validate job.
     timeout-minutes: 60
     steps:
@@ -89,7 +93,8 @@ jobs:
         with:
           upstream_repo: ${{ env.UPSTREAM_REPO }}
           upstream_ref: ${{ needs.platform-line.outputs.upstream_ref }}
-          artifact_suffix: released
+          node_version: ${{ matrix.node }}
+          artifact_suffix: ${{ matrix.node == '24' && 'released' || format('released-node{0}', matrix.node) }}
           npm_scope: ${{ env.NPM_SCOPE }}
 
   # G7 §2.3: the desktop plane. The Electron cold-boot assertion itself stays a real-machine
