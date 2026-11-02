@@ -31,6 +31,23 @@ it('authors a staged tree, passes the gate and commits', async () => {
   expect(await readCommitReceipt(io, home, 'run-1')).toMatchObject({ unitId: 'u-1', target: 'umbrella' })
 })
 
+it('P2-20: rejects a staged support file the clean JSON manifest omitted', async () => {
+  const home = await tempRoot('dsh-merge-authoring-undeclared-')
+  const io = nodeEvolutionIo()
+  const result = await runAuthoring({
+    io, home, runId: 'run-undeclared', target: 'umbrella', cards, commitPort: port(), now: () => 200, summary: 'merge',
+    async author(staging) {
+      await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella'))
+      await writeStagedFile(io, staging.home, staging.runId, 'references/new.md', '# new\n')
+      return JSON.stringify({ files: ['SKILL.md'] })
+    },
+  })
+  expect(result.ok).toBe(false)
+  if (result.ok) return
+  expect(result.code).toBe('merge-validation')
+  expect(result.findings?.some(finding => finding.rule === 'q09-undeclared')).toBe(true)
+})
+
 it('ignores unrelated skills when scanning the participating cards for threats', async () => {
   const home = await tempRoot('dsh-merge-authoring-participants-')
   const io = nodeEvolutionIo()

@@ -14,7 +14,7 @@ export interface ValidationPlan {
   readonly files: readonly StagedFile[]
   readonly supportFiles: readonly { readonly path: string; readonly digest: string; readonly source: string }[]
   readonly manifestFiles: readonly string[]
-  readonly q09: { readonly forwardRefs: readonly string[]; readonly reverseRefs: readonly string[]; readonly orphanFiles: readonly string[] }
+  readonly q09: { readonly forwardRefs: readonly string[]; readonly reverseRefs: readonly string[]; readonly orphanFiles: readonly string[]; readonly undeclaredFiles: readonly string[] }
   readonly supportConflicts: readonly { readonly path: string; readonly sources: readonly string[] }[]
   readonly threat: { readonly body: boolean; readonly files: readonly string[] }
   readonly sourceRevisions: Readonly<Record<string, string>>
@@ -54,6 +54,9 @@ export function buildValidationPlan(input: {
   const reverseRefs = files.map(file => file.path).filter(path => path !== 'SKILL.md' && !refs.has(path) && manifest.has(path)).sort()
   const existing = new Set(input.existingSupport ?? [])
   const orphanFiles = [...existing].filter(path => !staged.has(path)).sort()
+  // P2-20: a clean JSON subset must not exempt the staged files it omitted.
+  // Existing target support files stay exempt (round 2 legitimately updates them).
+  const undeclaredFiles = [...staged].filter(path => path !== 'SKILL.md' && !manifest.has(path) && !existing.has(path)).sort()
   const byPath = new Map<string, { contents: Set<string>; sources: string[] }>()
   // Conflict means TWO SKILLS contributing different bytes at one path. Staged edits and
   // the target's previous file are not conflicts: the target file is a CAS baseline that
@@ -71,16 +74,17 @@ export function buildValidationPlan(input: {
   const sourceThreatFiles = participantCards.flatMap(card => (card.files ?? []).filter(file => scanContentThreats(file.content) !== null).map(file => card.name + '/' + file.path))
   const threat = { body: scanContentThreats(input.tree.body) !== null || participantCards.some(card => scanContentThreats(card.body) !== null), files: [...files.filter(file => scanContentThreats(file.content) !== null).map(file => file.path), ...sourceThreatFiles] }
   const sourceRevisions = input.sourceRevisions ?? Object.fromEntries(participantCards.map(card => [card.name, digest(card.body)]))
-  const revision = digest(JSON.stringify({ target: input.target, body: digest(input.tree.body), files: files.map(file => [file.path, file.digest]), q09: { forwardRefs, reverseRefs, orphanFiles }, supportConflicts, threat, sourceRevisions, targetRevision: input.targetRevision ?? null }))
+  const revision = digest(JSON.stringify({ target: input.target, body: digest(input.tree.body), files: files.map(file => [file.path, file.digest]), q09: { forwardRefs, reverseRefs, orphanFiles, undeclaredFiles }, supportConflicts, threat, sourceRevisions, targetRevision: input.targetRevision ?? null }))
   const findings: RuleFinding[] = []
   const stageDigest = digest(JSON.stringify(files.map(file => [file.path, file.digest])))
   if (forwardRefs.length > 0) findings.push({ rule: 'q09-forward', path: forwardRefs.join(','), severity: 'block', message: 'body references unstaged support' })
   if (reverseRefs.length > 0) findings.push({ rule: 'q09-reverse', path: reverseRefs.join(','), severity: 'block', message: 'staged manifest file is not referenced by body' })
   if (orphanFiles.length > 0) findings.push({ rule: 'q09-orphan', path: orphanFiles.join(','), severity: 'block', message: 'target tree support is not declared by plan' })
+  if (undeclaredFiles.length > 0) findings.push({ rule: 'q09-undeclared', path: undeclaredFiles.join(','), severity: 'block', message: 'staged support file is not declared by the authoring manifest' })
   if (supportConflicts.length > 0) findings.push({ rule: 'support-conflict', path: supportConflicts.map(item => item.path).join(','), severity: 'block', message: 'same support path has different contents' })
   if (threat.body) findings.push({ rule: 'threat', path: 'SKILL.md', severity: 'block', message: 'body tripped content threat scanner' })
   for (const path of threat.files) findings.push({ rule: 'threat', path, severity: 'block', message: 'support file tripped content threat scanner' })
   if (Buffer.byteLength(input.tree.body, 'utf8') > input.limits.skillLimits.maxSkillFileBytes) findings.push({ rule: 'limit', path: 'SKILL.md', severity: 'block', message: 'body exceeds maxSkillFileBytes' })
   for (const file of files) if (file.bytes > input.limits.skillLimits.maxSkillFileBytes) findings.push({ rule: 'limit', path: file.path, severity: 'block', message: 'file exceeds maxSkillFileBytes' })
-  return { planVersion: 1, stageDigest, target: input.target, body: input.tree.body, files, supportFiles, manifestFiles, q09: { forwardRefs, reverseRefs, orphanFiles }, supportConflicts, threat, sourceRevisions, targetRevision: input.targetRevision ?? null, limitsDigest: input.limits.limitsDigest, ...(input.promptVersion === undefined ? {} : { promptVersion: input.promptVersion }), ...(input.promptHash === undefined ? {} : { promptHash: input.promptHash }), revision, findings }
+  return { planVersion: 1, stageDigest, target: input.target, body: input.tree.body, files, supportFiles, manifestFiles, q09: { forwardRefs, reverseRefs, orphanFiles, undeclaredFiles }, supportConflicts, threat, sourceRevisions, targetRevision: input.targetRevision ?? null, limitsDigest: input.limits.limitsDigest, ...(input.promptVersion === undefined ? {} : { promptVersion: input.promptVersion }), ...(input.promptHash === undefined ? {} : { promptHash: input.promptHash }), revision, findings }
 }
