@@ -1,5 +1,5 @@
 /** One policy layer; only these fields are user-editable. */
-export type DomainPolicyMode = 'off' | 'auto' | 'on'
+export type DomainPolicyMode = 'off' | 'on'
 
 export interface DomainPolicyLayer {
   readonly mode?: DomainPolicyMode | undefined
@@ -26,7 +26,7 @@ export class DomainPolicyValidationError extends Error {
 }
 
 const ALLOWED = new Set(['mode', 'pinDomains', 'disableDomains', 'revision'])
-const MODES = new Set<DomainPolicyMode>(['off', 'auto', 'on'])
+const MODES = new Set<DomainPolicyMode>(['off', 'on'])
 
 function checkLayer(layer: DomainPolicyLayer): void {
   for (const key of Object.keys(layer)) if (!ALLOWED.has(key)) throw new DomainPolicyValidationError('unsupported policy field ' + key)

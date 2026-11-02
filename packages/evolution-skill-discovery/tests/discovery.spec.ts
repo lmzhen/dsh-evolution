@@ -47,7 +47,7 @@ describe('identity', () => {
     const row = skillIndexRowOf(summary('alpha'), true)
     const catalog = catalogRevisionOf([row], true)
     const view = viewCatalogDigestOf('v', [row], true)
-    const policy = policyDigestOf({ globalPolicyRevision: '1', effectivePolicy: { mode: 'auto' } })
+    const policy = policyDigestOf({ globalPolicyRevision: '1', effectivePolicy: { mode: 'on' } })
     expect(view).toBe(viewCatalogDigestOf('v', [row], true))
     expect(projectionDigestOf({ viewKey: 'v', mapVersion: 'm', policyDigest: policy, viewCatalogDigest: view, adapterVersion: 'a', projectionSchemaVersion: 'p', discoveryMode: 'full' }))
       .not.toBe(projectionDigestOf({ viewKey: 'v', mapVersion: 'm2', policyDigest: policy, viewCatalogDigest: view, adapterVersion: 'a', projectionSchemaVersion: 'p', discoveryMode: 'full' }))
@@ -104,9 +104,9 @@ it('EVAL-007 invalidates identity on view/policy/projection changes', () => {
 
 
 it('policyDigest canonicalizes Set content instead of serializing to {}', () => {
-  const left = policyDigestOf({ globalPolicyRevision: 'g', effectivePolicy: { mode: 'auto', disabled: new Set(['a']) } })
-  const right = policyDigestOf({ globalPolicyRevision: 'g', effectivePolicy: { mode: 'auto', disabled: new Set(['b']) } })
-  const same = policyDigestOf({ globalPolicyRevision: 'g', effectivePolicy: { mode: 'auto', disabled: new Set(['a']) } })
+  const left = policyDigestOf({ globalPolicyRevision: 'g', effectivePolicy: { mode: 'on', disabled: new Set(['a']) } })
+  const right = policyDigestOf({ globalPolicyRevision: 'g', effectivePolicy: { mode: 'on', disabled: new Set(['b']) } })
+  const same = policyDigestOf({ globalPolicyRevision: 'g', effectivePolicy: { mode: 'on', disabled: new Set(['a']) } })
   expect(left).not.toBe(right)
   expect(left).toBe(same)
 })

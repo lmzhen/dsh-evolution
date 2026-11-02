@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import {
   buildDomainProjection,
-  hiddenRecoverable,
-  SkillSearchIndex,
   mergeDomainPolicy,
   skillIndexRowOf,
   skillKeyOf,
@@ -45,23 +43,13 @@ describe('buildDomainProjection', () => {
     const managed = new Set(rows.filter(row => row.managed).map(row => row.name))
     const visibleManaged = result.catalogEntries.filter(entry => managed.has(entry.name)).map(entry => entry.name)
     expect([...result.hiddenNames, ...visibleManaged].sort()).toEqual([...managed].sort())
-    expect(hiddenRecoverable(result.hiddenNames, new Set(['alpha']))).toBe(true)
-    expect(hiddenRecoverable(result.hiddenNames, new Set())).toBe(false)
-    const search = SkillSearchIndex.fromRows('v', rows)
-    const hits = (await search.search({ query: 'alpha' })).results.map(hit => hit.name)
-    expect(hiddenRecoverable(result.hiddenNames, new Set(hits))).toBe(true)
   })
 
-  it('does not hide in off/shadow mode; shadow still renders awareness', () => {
+  it('does not hide in off mode', () => {
     const off = buildDomainProjection({ ...input(), mode: 'off' })
     expect(off.complete).toBe(false)
     expect(off.hiddenNames).toEqual([])
     expect(off.catalogEntries).toHaveLength(4)
-    const shadow = buildDomainProjection({ ...input(), mode: 'shadow' })
-    expect(shadow.complete).toBe(true)
-    expect(shadow.hiddenNames).toEqual([])
-    expect(shadow.catalogEntries).toHaveLength(4)
-    expect(shadow.context).toContain('d1')
   })
 
   it('fails open on structural stale, missing map, or unavailable search', () => {

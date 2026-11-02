@@ -20,7 +20,7 @@ export interface ViewState {
 /** Inputs used to derive one view state. */
 export interface ViewStateInput {
   readonly viewKey: string
-  readonly mode: 'off' | 'shadow' | 'on'
+  readonly mode: 'off' | 'on'
   readonly map: MapState
   readonly search: SearchState
   readonly policy: PolicyState
@@ -34,7 +34,7 @@ export interface ViewStateInput {
 /**
  * Derive one view's state without consulting another view.
  * @param input - per-view health and identity.
- * @returns state with reasons; hidden safety is evaluated by canHide.
+ * @returns state with reasons; card rendering is gated by canProject.
  */
 export function deriveViewState(input: ViewStateInput): ViewState {
   const reasons = [...(input.reasons ?? [])]
@@ -51,11 +51,6 @@ export function deriveViewState(input: ViewStateInput): ViewState {
     return { ...input, phase: 'degraded', reasons }
   }
   return { ...input, phase: 'ready', reasons }
-}
-
-/** @returns true only when this view may hide catalog entries. */
-export function canHide(state: ViewState): boolean {
-  return state.phase === 'ready' && state.map === 'ready' && state.search === 'ready' && state.policy === 'ready'
 }
 
 /** @returns true when this view may render cards, even if hiding is blocked. */

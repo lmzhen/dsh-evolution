@@ -11,7 +11,7 @@ export interface DomainProjectionInput {
   readonly complete: boolean
   readonly mapStale?: boolean | undefined
   readonly searchAvailable?: boolean | undefined
-  readonly mode?: 'off' | 'shadow' | 'on' | undefined
+  readonly mode?: 'off' | 'on' | undefined
   readonly snapshot: DomainMapSnapshot
   readonly policy: EffectiveDomainPolicy
   readonly viewKey: string
@@ -27,21 +27,10 @@ export interface DomainProjectionInput {
   readonly now?: number | undefined
   readonly staleAfterHours?: number | undefined
   readonly descriptionStaleAfterHours?: number | undefined
-  readonly maxVisibleDepth?: number | undefined
 }
 
 function qualityPasses(node: DomainNode, domains: readonly DomainNode[]): boolean {
   return evaluateDomainQuality(node, domains.filter(peer => peer.id !== node.id)).passed
-}
-
-/**
- * Build L1 cards and the hidden set for one view, then delegate the pure
- * catalog rewrite. Structural staleness fails open; description staleness does not.
- * @param input - rows, domain facts, policy, and identity inputs.
- * @returns projection result with cards and hidden names.
- */
-export function hiddenRecoverable(hiddenNames: readonly string[], searchResultNames: ReadonlySet<string>): boolean {
-  return hiddenNames.every(name => searchResultNames.has(name))
 }
 
 export function buildDomainProjection(input: DomainProjectionInput): ProjectionResult {
@@ -73,7 +62,7 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
   const unclassifiedCount = input.rows.filter(row => row.modelInvocable && !linkedKeys.has(row.skillKey)).length
   const domains = input.snapshot.domains.filter(node => node.status === 'active' || node.status === 'provisional')
   const cardDomains = domains
-    .filter(node => node.parentIds.length <= (input.maxVisibleDepth ?? 3) - 1 && node.parentIds.length === 0)
+    .filter(node => node.parentIds.length === 0)
     .filter(node => !input.policy.disabled.has(node.id))
     .filter(node => input.policy.pinned.has(node.id) || qualityPasses(node, domains))
     .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
@@ -142,6 +131,6 @@ export function buildDomainProjection(input: DomainProjectionInput): ProjectionR
     discoveryMode: input.discoveryMode,
     complete: true,
   })
-  return mode === 'on' ? projected : projected
+  return projected
 }
 

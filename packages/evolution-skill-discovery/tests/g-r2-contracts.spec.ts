@@ -8,7 +8,6 @@ import {
   ProjectionJournal,
   ViewStateRegistry,
   applyCapturedProjection,
-  canHide,
   canProject,
   captureCatalog,
   deriveViewState,
@@ -52,11 +51,8 @@ describe('ViewState', () => {
   const base = { viewKey: 'v1', mode: 'on' as const, mapVersion: 'm', policyDigest: 'p', viewCatalogDigest: 'c' }
 
   it('keeps per-view readiness and blocks hiding on search degradation', () => {
-    const ready = deriveViewState({ ...base, map: 'ready', search: 'ready', policy: 'ready', catalogComplete: true })
     const degraded = deriveViewState({ ...base, viewKey: 'v2', map: 'ready', search: 'degraded', policy: 'ready', catalogComplete: true })
-    expect(canHide(ready)).toBe(true)
     expect(canProject(degraded)).toBe(true)
-    expect(canHide(degraded)).toBe(false)
   })
 
   it('does not let one view authorize another and bounds the registry', () => {

@@ -14,7 +14,7 @@ describe('domain policy', () => {
   it('merges mode/disable/pin with disable precedence and degraded unknown ids', () => {
     const known = new Set(['a', 'b', 'c', 'd'])
     const policy = mergeDomainPolicy(
-      { mode: 'auto', disableDomains: ['a'], pinDomains: ['b'], revision: 'g' },
+      { mode: 'on', disableDomains: ['a'], pinDomains: ['b'], revision: 'g' },
       { mode: 'on', disableDomains: ['c'], pinDomains: ['a'], revision: 'w' },
       { disableDomains: ['b'], pinDomains: ['d'] },
       known,

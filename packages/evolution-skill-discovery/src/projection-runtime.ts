@@ -33,7 +33,7 @@ export interface ProjectionRuntimePorts {
   readonly codecVersion: string
   readonly adapterVersion: string
   readonly projectionSchemaVersion: string
-  readonly mode: 'off' | 'shadow' | 'on'
+  readonly mode: 'off' | 'on'
   readonly maxCards?: number | undefined
   readonly tokenBudget?: number | undefined
   readonly searchAvailable?: (() => boolean) | undefined
@@ -57,8 +57,8 @@ export interface ProjectionReport {
   readonly at: number
 }
 
-function effectiveMode(mode: 'off' | 'auto' | 'on'): 'off' | 'shadow' | 'on' {
-  return mode === 'off' ? 'off' : mode === 'auto' ? 'shadow' : 'on'
+function effectiveMode(mode: 'off' | 'on'): 'off' | 'on' {
+  return mode
 }
 
 function catalogText(message: { content: readonly { type: string; text?: string }[] }): string {

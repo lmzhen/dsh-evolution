@@ -6,7 +6,7 @@ import type { SkillIndexRow } from './identity.ts'
 
 /** Inputs for the production generation port composition. */
 export interface GenerationCompositionInput {
-  readonly mode: 'off' | 'shadow' | 'on'
+  readonly mode: 'off' | 'on'
   readonly llm?: LlmStreamService | undefined
   readonly provider: string
   readonly model: string

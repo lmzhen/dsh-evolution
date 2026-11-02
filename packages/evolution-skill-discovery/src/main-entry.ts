@@ -30,7 +30,7 @@ import { markStaleDescriptions, refreshStaleDescriptions } from './description-r
 /** Main production config. */
 export interface Config {
   readonly featureEpoch: string
-  readonly mode?: 'off' | 'shadow' | 'on' | undefined
+  readonly mode?: 'off' | 'on' | undefined
   readonly searchEnabled?: boolean | undefined
   readonly domainMapPath?: string | undefined
   readonly projectionJournalPath?: string | undefined
@@ -96,7 +96,7 @@ export function apply(ctx: Context, config: Config): void {
   const workingDirectory = ctx.get('workingDirectory') as WorkingDirectoryService | undefined
   if (workingDirectory === undefined) throw new Error('evolution-skill-discovery: workingDirectory service is required')
   const root = evolutionRoot()
-  let mode: 'off' | 'shadow' | 'on' = config.mode ?? 'off'
+  let mode: 'off' | 'on' = config.mode ?? 'off'
   let generation = undefined as ReturnType<typeof resolveGenerationPort>
   if (mode !== 'off') {
     generation = resolveGenerationPort({
@@ -144,7 +144,7 @@ export function apply(ctx: Context, config: Config): void {
   const descriptionStaleAfterHours = config.descriptionStaleAfterHours ?? 24 * 7
   const journal = new ProjectionJournal(io, config.projectionJournalPath ?? join(root, 'evolution', 'projection-journal.json'))
   const snapshots = new ViewSnapshotStore(io, config.viewSnapshotPath ?? join(root, 'evolution', 'view-snapshots.json'))
-  const globalPolicy: DomainPolicyLayer = { mode: mode === 'shadow' ? 'auto' : mode, pinDomains: config.pinDomains, disableDomains: config.disableDomains }
+  const globalPolicy: DomainPolicyLayer = { mode, pinDomains: config.pinDomains, disableDomains: config.disableDomains }
   const policy = new DomainPolicyStore({ global: globalPolicy, ...config.workspacePolicy === undefined ? {} : { workspace: config.workspacePolicy }, ...config.scopePolicy === undefined ? {} : { scope: config.scopePolicy } })
   const readLayer = async (cwd: string, path: string | undefined): Promise<DomainPolicyLayer | undefined> => {
     if (path === undefined) return undefined
