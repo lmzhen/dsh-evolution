@@ -18,6 +18,7 @@
  * Usage: node <scripts-dir>/verify-verdict-records.mjs
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { validate } from './lib-verdict.mjs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -113,10 +114,14 @@ if (healthy !== null) {
   if (healthy.parsed.violations.length > 0) note('healthy-control: record contract violations: ' + healthy.parsed.violations.slice(0, 2).join(' | '))
 }
 
+// (5) CONTRACT: an unevaluated pass must be unrepresentable.
+const unevaluated = validate({ id: 'probe-pass', check: 'check', criterion: 'criterion', verdict: 'pass', criterionEvaluated: false, identity: { face: 'headless', channel: 'cli', platformLine: 'line', adapterSha: 'a', policySha: 'p', familyVersion: 'v', readerSha: 'r', scope: 's', tree: 'mirror', lane: 'local', ci: 'off' } })
+if (!unevaluated.some((violation) => violation.includes('unevaluated check cannot pass'))) note('pass-without-evaluation: the VerdictRecord contract accepted criterionEvaluated=false')
+
 if (failures.length > 0) {
   console.error('verify-verdict-records: ' + failures.length + ' failed assertion(s) - the probe tree is kept at ' + root)
   for (const failure of failures) console.error('  - ' + failure)
   process.exit(1)
 }
 rmSync(root, { recursive: true, force: true })
-console.log('verify-verdict-records: OK - ' + copied + ' file(s) copied, 4 case(s): empty-manifest / profile-mismatch / unusable-argv (placeholder + no-argv + non-command) => cannot-decide + missing + exit 2; healthy-control => pass + exit 0')
+console.log('verify-verdict-records: OK - ' + copied + ' file(s) copied, 4 case(s): empty-manifest / profile-mismatch / unusable-argv (placeholder + no-argv + non-command) => cannot-decide + missing + exit 2; healthy-control => pass + exit 0; contract => unevaluated pass rejected')

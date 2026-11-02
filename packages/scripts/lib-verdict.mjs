@@ -25,6 +25,11 @@ export function validate(record, path = "record") {
   }
   if (typeof record?.criterionEvaluated !== "boolean") v.push(path + ".criterionEvaluated must be boolean");
   const kind = record?.cause?.kind;
+  // P2-36: "pass" is a claim that the criterion WAS evaluated and held. An
+  // unevaluated pass is not a weaker pass - it is not a verdict at all.
+  if (record?.verdict === "pass" && record.criterionEvaluated !== true) {
+    v.push(path + ".criterionEvaluated must be true when verdict=pass (an unevaluated check cannot pass)");
+  }
   if (record?.verdict === "fail") {
     if (record.criterionEvaluated === true && !FAIL_EVALUATED_KINDS.includes(kind)) v.push(path + ".cause.kind must be one of " + FAIL_EVALUATED_KINDS.join("|") + " when verdict=fail and criterionEvaluated=true (got " + String(kind) + ")");
     if (record.criterionEvaluated === false && !FAIL_UNEVALUATED_KINDS.includes(kind)) v.push(path + ".cause.kind must be one of " + FAIL_UNEVALUATED_KINDS.join("|") + " when verdict=fail and criterionEvaluated=false (got " + String(kind) + ")");
