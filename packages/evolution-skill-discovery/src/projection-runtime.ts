@@ -65,6 +65,7 @@ function fullCatalogText(capture: CatalogCapture): string {
 function sessionCatalogCapture(agent: Agent): CatalogCapture | undefined {
   const readEvents = (agent.session as { readEvents?: () => Iterable<{ type: string; data?: unknown }> }).readEvents
   if (readEvents === undefined) return undefined
+  let full: CatalogCapture | undefined
   let projected: CatalogCapture | undefined
   for (const event of readEvents()) {
     if (event.type !== 'user/message' || typeof event.data !== 'object' || event.data === null) continue
@@ -73,9 +74,29 @@ function sessionCatalogCapture(agent: Agent): CatalogCapture | undefined {
     const capture = captureCatalog(message)
     if (capture === undefined) continue
     projected = capture
-    if (catalogText(message) === fullCatalogText(capture)) return capture
+    if (catalogText(message) === fullCatalogText(capture)) full = capture
   }
-  return projected
+  return full ?? projected
+}
+
+/** The full platform catalog carried by a (possibly projected) capture. */
+function fullCaptureOf(capture: CatalogCapture): CatalogCapture | undefined {
+  return captureCatalog(renderCatalog(capture, capture.entries))
+}
+
+/** Digest of every projection context already present in session history. */
+function sessionProjectionDigests(agent: Agent): ReadonlySet<string> {
+  const readEvents = (agent.session as { readEvents?: () => Iterable<{ type: string; data?: unknown }> }).readEvents
+  if (readEvents === undefined) return new Set()
+  const digests = new Set<string>()
+  for (const event of readEvents()) {
+    if (event.type !== 'user/message' || typeof event.data !== 'object' || event.data === null) continue
+    const message = event.data as UserMessage
+    if (message.source.kind !== 'evolution-skill-projection') continue
+    const digest = (message.source as { digest?: unknown }).digest
+    if (typeof digest === 'string') digests.add(digest)
+  }
+  return digests
 }
 
 /** Per-view projection runtime; no global readiness and no history edits. */
@@ -106,7 +127,12 @@ export class ProjectionRuntime {
     const sessionBase = sessionCatalogCapture(agent)
     const fullSession = sessionBase !== undefined && sessionBase.text === fullCatalogText(sessionBase) ? sessionBase : undefined
     const projectedCurrent = currentCapture !== undefined && currentCapture.text !== fullCatalogText(currentCapture)
-    const durable = projectedCurrent ? fullSession ?? record?.base : currentCapture ?? fullSession ?? record?.base
+    const fullCurrent = currentCapture === undefined ? undefined : fullCaptureOf(currentCapture)
+    // A journal record is the base used by the newest projection; prefer it over an
+    // older full catalog still present in session history.
+    const durable = projectedCurrent
+      ? record?.base ?? fullSession ?? fullCurrent
+      : fullCurrent ?? fullSession ?? record?.base
     if (durable === undefined) { this.mark(agent, 'blocked', ''); return decision }
     const fullText = fullCatalogText(durable)
     const previous = this.report(agent)
@@ -114,7 +140,8 @@ export class ProjectionRuntime {
     const restored = currentCapture === undefined
       ? applyRestoreUpdate(decision, durable)
       : restoreCapturedProjection(decision, durable)
-    if (record !== undefined) await this.ports.journal.remove(record.sessionId, record.viewKey, record.projectionDigest, record.codecVersion)
+    // Old records for the same view must not resurrect after a restart.
+    await this.ports.journal.removeView(String(agent.id), viewKey, this.ports.codecVersion)
     this.mark(agent, 'restored', record?.projectionDigest ?? '', fullText)
     return restored
   }
@@ -160,6 +187,16 @@ export class ProjectionRuntime {
     if (this.ports.isFrozen !== undefined && await this.ports.isFrozen(agent)) return decision
     const { view, snapshot, policy, policyDigest, state } = await this.readState(agent, signal)
     const currentCapture = captureDecisionCatalog(decision)
+    const seen = new Set(sessionProjectionDigests(agent))
+    if (decision.kind === 'enter') {
+      for (const message of decision.messages) {
+        if (message.source.kind !== 'evolution-skill-projection') continue
+        const digest = (message.source as { digest?: unknown }).digest
+        if (typeof digest === 'string') seen.add(digest)
+      }
+    }
+    const previous = this.report(agent)
+    if (previous.action === 'applied' && previous.digest !== '') seen.add(previous.digest)
     let capture = currentCapture
     if (capture === undefined) capture = (await this.ports.journal.latest(String(agent.id), view.viewKey, this.ports.codecVersion))?.base
     if (capture === undefined) capture = sessionCatalogCapture(agent)
@@ -179,8 +216,10 @@ export class ProjectionRuntime {
     if (!projection.complete) return this.restore(agent, view.viewKey, decision, currentCapture)
     const expected = renderCatalog(capture, projection.catalogEntries)
     const expectedText = expected.content.map(block => block.type === 'text' ? block.text : '').join('')
-    if (currentCapture !== undefined && currentCapture.text === expectedText) return decision
-    const previous = this.report(agent)
+    if (currentCapture !== undefined && currentCapture.text === expectedText) {
+      return seen.has(projection.digest) ? decision : applyProjectedDecision(decision, currentCapture, projection, seen)
+    }
+    if (currentCapture === undefined && seen.has(projection.digest)) return decision
     if (currentCapture === undefined && previous.action === 'applied' && previous.digest === projection.digest && previous.content === expectedText) return decision
     await this.ports.journal.put({
       sessionId: String(agent.id), viewKey: view.viewKey, projectionDigest: projection.digest,
@@ -188,6 +227,6 @@ export class ProjectionRuntime {
       base: capture, createdAt: Date.now(),
     })
     this.mark(agent, 'applied', projection.digest, expectedText)
-    return currentCapture === undefined ? applyReplacementDecision(decision, capture.source.entries, projection) : applyProjectedDecision(decision, capture, projection)
+    return currentCapture === undefined ? applyReplacementDecision(decision, capture.source.entries, projection, seen) : applyProjectedDecision(decision, capture, projection, seen)
   }
 }

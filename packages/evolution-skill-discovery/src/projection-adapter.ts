@@ -61,8 +61,9 @@ export function restoreCapturedProjection(decision: PreStepDecision, capture: Ca
  * @param result - projection result.
  * @returns decision with replacement catalog plus optional context.
  */
-export function applyReplacementDecision(decision: PreStepDecision, sourceEntries: readonly CatalogEntry[], result: ProjectionResult): PreStepDecision {
+export function applyReplacementDecision(decision: PreStepDecision, sourceEntries: readonly CatalogEntry[], result: ProjectionResult, seen?: ReadonlySet<string> | undefined): PreStepDecision {
   if (decision.kind !== 'enter') return decision
+  if (seen?.has(result.digest) === true) return decision
   const update = renderCatalogUpdate(sourceEntries, result.catalogEntries)
   const context = renderProjectionContext(result)
   const messages = context === undefined ? [...decision.messages, update] : [...decision.messages, update, context]
@@ -102,10 +103,10 @@ export function renderProjectionContext(result: ProjectionResult): UserMessage |
  * @param result - complete projection.
  * @returns new decision; unchanged when no catalog exists.
  */
-export function applyProjectedDecision(decision: PreStepDecision, capture: CatalogCapture, result: ProjectionResult): PreStepDecision {
+export function applyProjectedDecision(decision: PreStepDecision, capture: CatalogCapture, result: ProjectionResult, seen?: ReadonlySet<string> | undefined): PreStepDecision {
   const withCatalog = applyCapturedProjection(decision, capture, result.catalogEntries)
   const context = renderProjectionContext(result)
   if (context === undefined || withCatalog.kind !== 'enter') return withCatalog
-  const duplicate = withCatalog.messages.some(message => message.source.kind === 'evolution-skill-projection' && message.source.digest === result.digest)
+  const duplicate = withCatalog.messages.some(message => message.source.kind === 'evolution-skill-projection' && message.source.digest === result.digest) || seen?.has(result.digest) === true
   return duplicate ? withCatalog : { ...withCatalog, messages: [...withCatalog.messages, context] }
 }

@@ -39,3 +39,13 @@ it('remove deletes only the exact record', async () => {
   await journal.remove('s', 'v1', 'd', '1')
   expect(await journal.get('s', 'v1', 'd', '1')).toBeUndefined()
 })
+it('removeView deletes every record for one session/view', async () => {
+  const io = new Io()
+  const journal = new ProjectionJournal(io, 'journal.json')
+  await journal.put({ ...record('s', 'v1', 1), projectionDigest: 'one' })
+  await journal.put({ ...record('s', 'v1', 2), projectionDigest: 'two' })
+  await journal.put(record('s', 'v2', 3))
+  await journal.removeView('s', 'v1', '1')
+  expect(await journal.latest('s', 'v1', '1')).toBeUndefined()
+  expect(await journal.latest('s', 'v2', '1')).toMatchObject({ viewKey: 'v2' })
+})

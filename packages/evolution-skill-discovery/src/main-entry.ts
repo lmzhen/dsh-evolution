@@ -116,7 +116,8 @@ export function apply(ctx: Context, config: Config): void {
     })
   }
   const searchCache = new SkillSearchCache()
-  let searchHealthy = true
+  // Fail open until the index proves it can serve: a session that never searches must not hide skills.
+  let searchHealthy = false
   const search = {
     async allowedSkillKeys(agent?: Agent | undefined, signal?: AbortSignal | undefined): Promise<ReadonlySet<string> | undefined> {
       if (mode === 'off' || agent === undefined) return undefined

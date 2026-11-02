@@ -178,4 +178,65 @@ describe('ProjectionRuntime', () => {
     const original = decision()
     expect(await rt.project(agent(), original)).toBe(original)
   })
+
+  it('applies one projection context when a full catalog is re-sent (compaction)', async () => {
+    const map = { read: async () => snapshot } as DomainMapStore
+    const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
+    const first = await rt.project(agent(), decision())
+    const second = await rt.project(agent(), decision())
+    const firstContexts = first.kind === 'enter' ? first.messages.filter(message => message.source.kind === 'evolution-skill-projection') : []
+    const secondContexts = second.kind === 'enter' ? second.messages.filter(message => message.source.kind === 'evolution-skill-projection') : []
+    expect(firstContexts).toHaveLength(1)
+    expect(secondContexts).toHaveLength(0)
+    expect(catalogText(first)).toContain('- `beta`:')
+    expect(catalogText(second)).toContain('- `beta`:')
+  })
+
+  it('restores from the newest journal base instead of the first full catalog in session history', async () => {
+    const gamma = summary('gamma')
+    const allSource = { ...source, snapshot: async () => ({ skills: [alpha, beta, gamma], complete: true }) }
+    const allSnapshot = { ...snapshot, edges: [{ ...edge(skillKeyOf(alpha)), skillHash: skillIndexRowOf(alpha, true).threeFieldHash }] }
+    const body = (names: readonly string[]) => ['<system-reminder>', 'REUSABLE', '<available_skills>', ...names.map(name => '- ' + name + ': ' + name + ' description'), '</available_skills>', 'FOOTER', '</system-reminder>'].join('\n')
+    const catalog = (names: readonly string[]): PreStepDecision => ({ kind: 'enter', messages: [createUserMessage({ content: [{ type: 'text', text: body(names) }], source: { kind: 'skill-catalog', form: 'catalog', entries: names.map(name => ({ name, description: name + ' description' })) } })] })
+    const t1 = catalog(['alpha', 'beta'])
+    const t2 = catalog(['alpha', 'beta', 'gamma'])
+    const events = [t1, t2].flatMap(item => item.kind === 'enter' ? item.messages.map(message => ({ type: 'user/message', data: message })) : [])
+    const sessionAgent = { id: 'newest-base', session: { id: 's', readEvents: () => events } } as unknown as Agent
+    const journal = new ProjectionJournal(memoryIo(), 'journal.json')
+    const map = { read: async () => allSnapshot } as DomainMapStore
+    const rt = new ProjectionRuntime({ skillIndexSource: allSource, map, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal, workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
+    const applied = await rt.project(sessionAgent, t2)
+    expect(catalogText(applied)).not.toContain('- `alpha`:')
+    const restarted = new ProjectionRuntime({ skillIndexSource: allSource, map: { read: async () => { throw new Error('broken') } } as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal, workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
+    const restored = await restarted.project(sessionAgent, applied)
+    expect(catalogText(restored)).toContain('- gamma:')
+    expect(catalogText(restored)).toContain('- alpha:')
+  })
+
+  it('restores a projected-only cold session from its full source entries instead of blocking', async () => {
+    const map = { read: async () => snapshot } as DomainMapStore
+    const journal = new ProjectionJournal(memoryIo(), 'journal.json')
+    const cold = { id: 'cold-projected', session: { id: 's' } } as unknown as Agent
+    const applied = await runtime(map, journal).project(cold, decision())
+    const restarted = new ProjectionRuntime({ skillIndexSource: source, map: { read: async () => { throw new Error('broken') } } as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal: new ProjectionJournal(memoryIo(), 'empty.json'), workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
+    const restored = await restarted.project(cold, applied)
+    expect(restarted.report().action).toBe('restored')
+    expect(catalogText(restored)).toContain('- `alpha`:')
+  })
+
+  it('does not re-append a replacement catalog on a restarted runtime with the same session digest', async () => {
+    const map = { read: async () => snapshot } as DomainMapStore
+    const journal = new ProjectionJournal(memoryIo(), 'journal.json')
+    const sessionAgent = { id: 'restart-replay', session: { id: 's', readEvents: () => [] } } as unknown as Agent
+    const first = await runtime(map, journal).project(sessionAgent, decision())
+    const message = first.kind === 'enter' ? first.messages.find(item => item.source.kind === 'evolution-skill-projection') : undefined
+    expect(message).toBeDefined()
+    const session = { id: 's', readEvents: () => message === undefined ? [] : [{ type: 'user/message', data: message }] }
+    const replayAgent = { id: 'restart-replay', session } as unknown as Agent
+    const restarted = runtime(map, journal)
+    const replay = await restarted.project(replayAgent, { kind: 'enter', messages: [] })
+    expect(catalogText(replay)).toBe('')
+    expect(restarted.report().action).toBe('none')
+  })
+
 })
