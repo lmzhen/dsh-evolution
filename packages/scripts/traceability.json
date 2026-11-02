@@ -339,8 +339,7 @@
         "evolution-core/src/session-fold.ts"
       ],
       "probes": [
-        "beh-session-fold",
-        "beh-inbox-notify-order"
+        "beh-session-fold"
       ],
       "gates": [
         "gate-03"
