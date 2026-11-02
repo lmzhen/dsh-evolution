@@ -271,6 +271,24 @@ describe('ProjectionRuntime', () => {
   })
 
 
+  it('P2-10: a real Session without history fails open with a warning instead of silently blocking', async () => {
+    const warnings: string[] = []
+    const map = { read: async () => snapshot } as DomainMapStore
+    const rt = new ProjectionRuntime({
+      skillIndexSource: source, map, policy: new DomainPolicyStore({ global: { mode: 'on' } }),
+      journal: new ProjectionJournal(memoryIo(), 'journal.json'),
+      workingDirectory: { ensure: async () => '/w' },
+      warn: message => warnings.push(message),
+      featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on',
+    })
+    // A platform Session has no readEvents; this is the shape production hands over.
+    const real = { id: 'real-session', session: { id: 's' } } as unknown as Agent
+    const decision: PreStepDecision = { kind: 'enter', messages: [] }
+    expect(await rt.project(real, decision)).toBe(decision)
+    expect(warnings.some(line => line.includes('failing open'))).toBe(true)
+    expect(rt.report(real).action).toBe('none')
+  })
+
   it('restores and dedupes through the real projection-history port without readEvents', async () => {
     const map = { read: async () => snapshot } as DomainMapStore
     const journal = new ProjectionJournal(memoryIo(), 'journal.json')

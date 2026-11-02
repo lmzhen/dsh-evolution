@@ -29,6 +29,8 @@ export interface ProjectionRuntimePorts {
   readonly journal: ProjectionJournal
   readonly workingDirectory: WorkingDirectoryPort
   readonly history?: ((agent: Agent) => ProjectionHistoryView | undefined) | undefined
+  /** Degraded-path warning sink; absence is silent for tests that do not care. */
+  readonly warn?: ((message: string) => void) | undefined
   readonly featureEpoch: string
   readonly codecVersion: string
   readonly adapterVersion: string
@@ -126,11 +128,22 @@ export class ProjectionRuntime {
   private readonly states = new ViewStateRegistry()
   private last: ProjectionReport = { action: 'none', digest: '', at: 0 }
   private readonly lastByAgent = new Map<string, ProjectionReport>()
+  private warnedMissingHistory = false
 
   constructor(ports: ProjectionRuntimePorts) { this.ports = ports }
 
   /** @returns last action for one agent, or the latest process-wide action. */
   report(agent?: Agent | undefined): ProjectionReport { return agent === undefined ? this.last : this.lastByAgent.get(String(agent.id)) ?? this.last }
+
+  private hasStructuralLog(agent: Agent): boolean {
+    return typeof (agent.session as { readEvents?: unknown }).readEvents === 'function'
+  }
+
+  private warnMissingHistory(): void {
+    if (this.warnedMissingHistory) return
+    this.warnedMissingHistory = true
+    this.ports.warn?.('evolution-skill-discovery: no sessionProjections history and no structural readEvents for this session — catalog restore/dedupe is unavailable; failing open (mount the projection registry to keep replacement dedupe)')
+  }
 
   private mark(agent: Agent, action: ProjectionReport['action'], digest: string, content = ''): void {
     const report = { action, digest, content, at: Date.now() }
@@ -155,7 +168,11 @@ export class ProjectionRuntime {
     const durable = projectedCurrent
       ? record?.base ?? fullSession ?? fullCurrent
       : fullCurrent ?? fullSession ?? record?.base
-    if (durable === undefined) { this.mark(agent, 'blocked', ''); return decision }
+    if (durable === undefined) {
+      if (history === undefined && !this.hasStructuralLog(agent)) { this.warnMissingHistory(); return decision }
+      this.mark(agent, 'blocked', '')
+      return decision
+    }
     const fullText = fullCatalogText(durable)
     const previous = this.report(agent)
     if (previous.action === 'restored' && previous.content === fullText) return decision
@@ -210,6 +227,7 @@ export class ProjectionRuntime {
     const { view, snapshot, policy, policyDigest, state } = await this.readState(agent, signal)
     const currentCapture = captureDecisionCatalog(decision)
     const history = this.ports.history?.(agent)
+    if (history === undefined && !this.hasStructuralLog(agent)) this.warnMissingHistory()
     const seen = new Set(sessionProjectionDigests(agent, history))
     if (decision.kind === 'enter') {
       for (const message of decision.messages) {
@@ -224,7 +242,11 @@ export class ProjectionRuntime {
     if (capture === undefined) capture = (await this.ports.journal.latest(String(agent.id), view.viewKey, this.ports.codecVersion))?.base
     if (capture === undefined) capture = sessionCatalogCapture(agent, history)
     if (!canProject(state) || snapshot === undefined) return this.restore(agent, view.viewKey, decision, currentCapture)
-    if (capture === undefined) { this.mark(agent, 'blocked', ''); return decision }
+    if (capture === undefined) {
+      if (history === undefined && !this.hasStructuralLog(agent)) return decision
+      this.mark(agent, 'blocked', '')
+      return decision
+    }
     const projection = buildDomainProjection({
       entries: capture.entries, rows: view.rows, complete: view.complete, snapshot, policy,
       viewKey: view.viewKey, scope: String(agent.id), mapVersion: snapshot.mapVersion,

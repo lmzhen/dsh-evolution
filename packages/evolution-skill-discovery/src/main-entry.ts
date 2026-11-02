@@ -165,6 +165,7 @@ export function apply(ctx: Context, config: Config): void {
   const runtime = new ProjectionRuntime({
     skillIndexSource: source, map, policy, policyFor, journal, workingDirectory,
     history: agent => projections?.stateOf(agent.session, 'evolutionProjectionHistory'),
+    warn: message => ctx.logger.warn(message),
     featureEpoch: config.featureEpoch, codecVersion: '1', adapterVersion: '1', projectionSchemaVersion: '1', mode,
     ...config.maxCards === undefined ? {} : { maxCards: config.maxCards },
     ...config.tokenBudget === undefined ? {} : { tokenBudget: config.tokenBudget },
