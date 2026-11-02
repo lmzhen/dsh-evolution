@@ -13,7 +13,7 @@
         "evolution-review/src/index.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
@@ -49,7 +49,7 @@
         "evolution-core/src/subagent/channel.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-52"
@@ -322,7 +322,7 @@
         "evolution-core/src/subagent/readiness.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-03"
@@ -392,7 +392,7 @@
         "evolution-core/src/subagent/channel.ts"
       ],
       "probes": [
-        "beh-channel-settle"
+        "beh-subagent-channel-outcomes"
       ],
       "gates": [
         "gate-52"
