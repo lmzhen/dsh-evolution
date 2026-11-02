@@ -461,7 +461,11 @@ runs:
         node packages/evolution/scripts/verify-check-registry.mjs packages/evolution --strict
 
     - name: "Install smoke: packed tarballs into a throwaway consumer"
-      if: inputs.install_smoke == 'true'
+      # Windows installs platform packages without their lib/ build here, so the
+      # consumer import cannot resolve @deepseek-ai/*. Run it on the Linux
+      # validate jobs, where the platform is built; Windows keeps the source
+      # installer guard below.
+      if: runner.os != 'Windows'
       shell: bash
       working-directory: upstream
       run: |
