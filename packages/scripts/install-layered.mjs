@@ -434,6 +434,22 @@ function profileSeed(profile) {
     : DEFAULT_SEED_TEMPLATE
 }
 
+/**
+ * The bundle rows a base check must judge when the profile does not exist yet.
+ *
+ * P2-34: a fresh profile has no manifest, so `profileBundleRows` answered `[]` and
+ * `--base cordis` was refused as "no web-app" BEFORE the seed that would have created
+ * it. A not-yet-created profile therefore reports the seed's rows; an existing manifest
+ * (even one with no bundles) stays authoritative.
+ * @param home - the evolution home.
+ * @param profile - the profile name.
+ * @returns the bundle rows the profile will mount.
+ */
+export function prospectiveProfileBundles(home, profile) {
+  const dir = profileDirectory(home, profile)
+  return existsSync(join(dir, 'package.json')) ? profileBundleRows(dir) : [...profileSeed(profile).bundles]
+}
+
 async function ensureProfile(home, profile) {
   const dir = profileDirectory(home, profile)
   await mkdir(dir, { recursive: true })
@@ -1271,11 +1287,11 @@ export async function install(options = {}) {
     // Runs before `profileDir` exists as a binding, so it is resolved here; a
     // not-yet-created profile has no bundle rows to read — that is "no web-app",
     // not a crash.
-    const bundleDir = profileDirectory(home, profile)
     // The installability judgement asks the SAME question doctor asks (`profileBundles`): which
-    // bundles does this profile mount. `detectInstalledBundles` filters to the FAMILY bundle tails,
-    // so it can never answer `dsh-web-app` and refused every `--base cordis` install (G6 review, P1).
-    const bundles = profileBundleRows(bundleDir)
+    // bundles does this profile mount. A fresh profile has no manifest yet; it will carry the
+    // seed's rows, so that is the answer to judge (P2-34) — otherwise cordis was refused before
+    // the seed that provides dsh-web-app.
+    const bundles = prospectiveProfileBundles(home, profile)
     const reason = baseUnavailableReason({ name: entry.base, ...AGENT_PRESET_BASES[entry.base] }, bundles)
     if (reason !== undefined) throw new Error(`install-layered: ${reason}`)
   }

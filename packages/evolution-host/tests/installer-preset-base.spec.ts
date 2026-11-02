@@ -415,6 +415,16 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(existsSync(join(home, 'profiles'))).toBe(false)
   })
 
+  it('P2-34: a FRESH web profile is judged by its seed rows, not by an absent manifest', async () => {
+    const home = await tempRoot('dsh-preset-fresh-seed-')
+    const fresh = await callInstaller(`return installer.prospectiveProfileBundles(${JSON.stringify(home)}, 'web')`)
+    expect(fresh).toEqual(expect.arrayContaining(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']))
+    // An EXISTING manifest stays authoritative even when it declares no bundles.
+    await mkdir(join(home, 'profiles', 'web'), { recursive: true })
+    await writeFile(join(home, 'profiles', 'web', 'package.json'), JSON.stringify({ dsh: { profile: { bundles: [] } } }))
+    expect(await callInstaller(`return installer.prospectiveProfileBundles(${JSON.stringify(home)}, 'web')`)).toEqual([])
+  })
+
   it('refuses an unknown base by name, before any write', async () => {
     const home = await tempRoot('dsh-preset-base-unknown-')
     const error = await runInstaller(home, 'agent', ['--base', 'nonsense'])
