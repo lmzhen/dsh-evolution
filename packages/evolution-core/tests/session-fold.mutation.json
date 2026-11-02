@@ -1,0 +1,12 @@
+{
+  "probe": "beh-session-fold",
+  "edits": [
+    {
+      "file": "packages/evolution-core/src/session-fold.ts",
+      "find": "return event.ignorable === true ? 'plugin-record' : 'unknown'",
+      "replace": "return 'plugin-record'"
+    }
+  ],
+  "expect": "red",
+  "note": "a plugin: type without ignorable:true must classify unknown; this mutation makes it a plugin-record"
+}

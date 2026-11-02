@@ -339,7 +339,7 @@
         "evolution-core/src/session-fold.ts"
       ],
       "probes": [
-        "beh-fold-ignore-pluginrecord",
+        "beh-session-fold",
         "beh-inbox-notify-order"
       ],
       "gates": [
@@ -662,7 +662,7 @@
         "evolution-core/src/session-fold.ts"
       ],
       "probes": [
-        "beh-fold-ignore-pluginrecord"
+        "beh-session-fold"
       ],
       "gates": [
         "gate-03"

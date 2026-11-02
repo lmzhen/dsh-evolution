@@ -1350,6 +1350,17 @@
       "mutation": "packages/evolution-core/tests/host-routes.mutation.json",
       "evidence": "A",
       "note": "connection.fetch registration + caller-fiber disposer + audit snapshot + E-325"
+    },
+    {
+      "id": "beh-session-fold",
+      "kind": "beh",
+      "owner": "platform-backend-01",
+      "files": [
+        "packages/evolution-core/tests/session-fold.spec.ts"
+      ],
+      "mutation": "packages/evolution-core/tests/session-fold.mutation.json",
+      "evidence": "A",
+      "note": "model/plugin-record/unknown classification; plugin records tolerated read-only; malformed frames never throw"
     }
   ]
 }
