@@ -12,6 +12,7 @@
  */
 
 import type { ReactNode } from 'react'
+import type { ConfigFormLike as KitConfigFormLike, ConfigFormSnapshotLike as KitConfigFormSnapshotLike, ConfigPathOpLike } from '@lmzhen/dsh-evolution-client-kit'
 
 /** Our card slot, hosted by the section this bundle registers. */
 export const CARD_SLOT = 'evolution.namespace.card'
@@ -79,33 +80,14 @@ export interface ParamSectionSource {
   revive(): void
 }
 
-/** One ordered field operation, as the client settings seat takes them. */
-export interface SettingsPathOpLike {
-  readonly op: 'set' | 'unset'
-  readonly path: readonly string[]
-  readonly value?: unknown
-}
+/** One ordered field operation; client-kit owns the shape. */
+export type SettingsPathOpLike = ConfigPathOpLike
 
-/** One row's client form state, as `configForms.get(entryId)` reports it. */
-export interface ConfigFormSnapshotLike<T = Record<string, unknown>> {
-  status: 'loading' | 'ready' | 'unavailable'
-  value: T | undefined
-  /** Composition layer the Host resolved `value` over; what a cleared field reverts to. */
-  base: unknown
-  /** Raw user layer: a key's PRESENCE marks the override. */
-  user: unknown
-  revision: number | undefined
-  writable: boolean
-}
+/** One row's client form state; client-kit owns the shape. */
+export type ConfigFormSnapshotLike<T = Record<string, unknown>> = KitConfigFormSnapshotLike<T>
 
-/** One row's client write face (0.2.x `configForms`). */
-export interface ConfigFormLike<T = Record<string, unknown>> {
-  getSnapshot(): ConfigFormSnapshotLike<T>
-  subscribe(listener: () => void): () => void
-  set(field: string, value: unknown): Promise<boolean>
-  unset(field: string): Promise<boolean>
-  mutate(ops: readonly SettingsPathOpLike[], expectedRevision?: number): Promise<boolean>
-}
+/** One row's client write face; client-kit owns the shape. */
+export type ConfigFormLike<T = Record<string, unknown>> = KitConfigFormLike<T>
 
 /**
  * The client settings seat, probed rather than injected: a deployment may compose the

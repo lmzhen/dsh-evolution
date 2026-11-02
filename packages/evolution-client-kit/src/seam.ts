@@ -43,18 +43,31 @@ export interface ClientSeam {
   locale: LocaleSeat
 }
 
-/** One client settings row's readable/writable face (platform configForms). */
-export interface ConfigFormSnapshotLike {
-  status: 'loading' | 'ready' | 'unavailable'
-  value: Record<string, unknown> | undefined
-  writable: boolean
-  revision?: number
+/** One atomic path operation on a config form (the platform's mutate vocabulary). */
+export interface ConfigPathOpLike {
+  readonly op: 'set' | 'unset'
+  readonly path: readonly string[]
+  readonly value?: unknown
 }
-export interface ConfigFormLike {
-  getSnapshot(): ConfigFormSnapshotLike
+
+/** One client settings row's readable/writable face (platform configForms). */
+export interface ConfigFormSnapshotLike<T = Record<string, unknown>> {
+  status: 'loading' | 'ready' | 'unavailable'
+  value: T | undefined
+  /** Composition layer the Host resolved `value` over; what a cleared field reverts to. */
+  base: unknown
+  /** Raw user layer: a key's PRESENCE marks the override. */
+  user: unknown
+  writable: boolean
+  revision: number | undefined
+}
+export interface ConfigFormLike<T = Record<string, unknown>> {
+  getSnapshot(): ConfigFormSnapshotLike<T>
   subscribe(listener: () => void): () => void
   set(field: string, value: unknown): Promise<boolean>
   unset(field: string): Promise<boolean>
+  /** Atomic multi-field save; `expectedRevision` is the read the caller is replacing. */
+  mutate(ops: readonly ConfigPathOpLike[], expectedRevision?: number): Promise<boolean>
 }
 export interface ConfigFormsSeat { get(entryId: string): ConfigFormLike }
 export interface SettingsFace {

@@ -76,11 +76,13 @@ class FakeForm implements ConfigFormLike {
   private listeners = new Set<() => void>()
   private snapshot: ReturnType<FakeForm['snapshotOf']>
   constructor(value: Record<string, unknown>) { this.value = value; this.snapshot = this.snapshotOf() }
-  private snapshotOf() { return { status: 'ready' as const, value: this.value, writable: this.writable } }
+  private revision = 1
+  private snapshotOf() { return { status: 'ready' as const, value: this.value, base: this.value, user: this.value, writable: this.writable, revision: this.revision } }
   getSnapshot = () => this.snapshot
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   async set(field: string, value: unknown): Promise<boolean> { this.calls.push([field, value]); this.value = { ...this.value, [field]: value }; this.snapshot = this.snapshotOf(); for (const listener of this.listeners) listener(); return true }
   async unset(field: string): Promise<boolean> { this.calls.push([field, undefined]); this.value = { ...this.value, [field]: undefined }; this.snapshot = this.snapshotOf(); for (const listener of this.listeners) listener(); return true }
+  async mutate(ops: readonly { op: 'set' | 'unset'; path: readonly string[]; value?: unknown }[]): Promise<boolean> { for (const op of ops) { if (op.op === 'set') await this.set(op.path[0] ?? '', op.value); else await this.unset(op.path[0] ?? '') } return true }
 }
 const view = (capability = true): MergeViewPayload => ({
   counts: { verify: 0, pending: 0, fuse: 0, skipped: 0 }, expired: 0,

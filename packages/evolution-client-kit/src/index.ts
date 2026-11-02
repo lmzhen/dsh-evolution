@@ -1,5 +1,5 @@
 /** Shared browser seams and panel lifecycle for the evolution family. */
-export type { ClientSeam, ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, LocaleSeat, PanelBodyOptions, PanelRowOptions, SettingsFace, SlotsSeat } from './seam.ts'
+export type { ClientSeam, ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ConfigPathOpLike, LocaleSeat, PanelBodyOptions, PanelRowOptions, SettingsFace, SlotsSeat } from './seam.ts'
 export { registerSidebarPanel, type SidebarPanelSpec, type Translate } from './panel.ts'
 export { panelWorkspaceId } from './workspace.ts'
 export { ROUTES } from './generated/routes.generated.ts'
