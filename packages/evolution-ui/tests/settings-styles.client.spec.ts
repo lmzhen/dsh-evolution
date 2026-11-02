@@ -8,7 +8,7 @@
  * declared only on the section root (so the SAME card rendered unstyled on the Plugins page).
  */
 import { describe, expect, it } from 'vitest'
-import { CSS } from '../src/panels/settings/styles.ts'
+import { CSS, CSS_TAG_ID, injectStyles } from '../src/panels/settings/styles.ts'
 import { TOKEN_CSS } from '@lmzhen/dsh-evolution-client-kit/tokens'
 
 describe('the settings stylesheet', () => {
@@ -40,4 +40,19 @@ describe('the settings stylesheet', () => {
     expect(tokenRule).toContain('.evolution-param-card')
     expect(tokenRule).toContain('.evolution-params')
   })
+})
+
+it('P2-29: a new owner replaces the tag so the old disposer cannot unstyle it', () => {
+  document.head.innerHTML = ''
+  const old = document.createElement('style')
+  old.setAttribute('data-plugin-css', CSS_TAG_ID)
+  document.head.appendChild(old)
+  const dispose = injectStyles(document as never)
+  const tags = document.querySelectorAll('style[data-plugin-css="' + CSS_TAG_ID + '"]')
+  expect(tags).toHaveLength(1)
+  expect(tags[0]).not.toBe(old)
+  old.remove()
+  expect(document.querySelectorAll('style[data-plugin-css="' + CSS_TAG_ID + '"]')).toHaveLength(1)
+  dispose()
+  expect(document.querySelectorAll('style[data-plugin-css="' + CSS_TAG_ID + '"]')).toHaveLength(0)
 })

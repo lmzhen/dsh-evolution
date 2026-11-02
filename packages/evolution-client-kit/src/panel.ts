@@ -37,7 +37,10 @@ function interpolate(text: string, values?: Readonly<Record<string, string | num
 
 function injectStyles(doc: Document | undefined, css: string, tagId: string): () => void {
   if (doc === undefined) return () => {}
-  if (doc.querySelector('style[data-plugin-css="' + tagId + '"]') !== null) return () => {}
+  const previous = doc.querySelector('style[data-plugin-css="' + tagId + '"]')
+  // P2-29: a new owner must OUTLIVE the old owner's disposer. Replace the tag
+  // instead of reusing it: the old disposer then removes a detached node.
+  previous?.remove()
   const tag = doc.createElement('style')
   tag.setAttribute('data-plugin-css', tagId)
   tag.textContent = css

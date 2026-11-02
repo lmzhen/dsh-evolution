@@ -130,7 +130,10 @@ interface StyleHost {
 export function injectStyles(host?: StyleHost): () => void {
   const doc = host ?? (globalThis as { document?: StyleHost }).document
   if (doc === undefined) return () => {}
-  if (doc.querySelector('style[data-plugin-css="' + CSS_TAG_ID + '"]') !== null) return () => {}
+  const previous = doc.querySelector('style[data-plugin-css="' + CSS_TAG_ID + '"]')
+  // P2-29: replace, don't reuse — the old owner's disposer must not be able to
+  // remove the stylesheet the surviving owner is rendering with.
+  previous?.remove()
   const tag = doc.createElement('style')
   tag.dataset.plugin = '@deepseek-ai/dsh-evolution-ui'
   tag.dataset.pluginCss = CSS_TAG_ID
