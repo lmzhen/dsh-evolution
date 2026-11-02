@@ -48,6 +48,24 @@ it('P2-20: rejects a staged support file the clean JSON manifest omitted', async
   expect(result.findings?.some(finding => finding.rule === 'q09-undeclared')).toBe(true)
 })
 
+it('P1-6: the scan path commits under the ROW run id, not the staged key', async () => {
+  const home = await tempRoot('dsh-merge-authoring-parent-run-')
+  const io = nodeEvolutionIo()
+  let preparedRunId = ''
+  const unit = {
+    async prepare(plan: { runId: string }) { preparedRunId = plan.runId; return { ok: true as const, prepared: { unitId: 'u-scan', planDigest: 'd1' } } },
+    async commit() { return { ok: true as const, evidence: { unitId: 'u-scan', runId: preparedRunId, planDigest: 'd1', state: 'complete' as const, target: { before: null, after: BODY('umbrella'), supportDigest: '', created: true }, sources: [], mutations: 1, at: 1 } } },
+    async verify() { return null },
+    async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
+    async cancel() { return { ok: false, phase: 'none' as const } },
+  }
+  const result = await runAuthoring({
+    io, home, runId: 'run-row', stageKey: 'run-row/pairs/abc', target: 'umbrella', cards, commitPort: port(), now: () => 200, summary: 'merge', unit: unit as never,
+    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) },
+  })
+  expect(result.ok, result.ok ? '' : result.message).toBe(true)
+  expect(preparedRunId).toBe('run-row')
+})
 it('ignores unrelated skills when scanning the participating cards for threats', async () => {
   const home = await tempRoot('dsh-merge-authoring-participants-')
   const io = nodeEvolutionIo()

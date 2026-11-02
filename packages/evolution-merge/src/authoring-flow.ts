@@ -107,6 +107,10 @@ export async function runAuthoring(options: RunAuthoringOptions): Promise<Author
   const lengths = { bodyBytes: Buffer.byteLength(tree.value.body, 'utf8'), fileBytes: tree.value.files.reduce((sum, file) => sum + Buffer.byteLength(file.content, 'utf8'), 0), totalBytes: Buffer.byteLength(tree.value.body, 'utf8') + tree.value.files.reduce((sum, file) => sum + Buffer.byteLength(file.content, 'utf8'), 0) }
   if (hasBlockingFinding(findings)) return { ok: false, code: findings.some(finding => finding.rule === 'limit') ? 'merge-over-limit' : 'merge-validation', message: 'staged tree failed the rule gate', findings, lengths }
   const commit = await commitStagedRun(options.io, options.home, stageKey, options.commitPort, {
+    // P1-6: the staged key is `run-1/pairs/abc`; the ROW's run id is the parent.
+    // Without it the scan path writes its unit journal/receipt under the staged
+    // address, so crash recovery looks for a run that was never registered.
+    parentRunId: options.runId,
     origin: 'foreground',
     summary: options.summary,
     now: options.now,
