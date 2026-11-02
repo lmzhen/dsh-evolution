@@ -260,20 +260,20 @@
     },
     {
       "id": "A-16",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W10"
       ],
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [
-        "S2-spike"
-      ],
+      "probes": [],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "trigger": "real-host installation/re-composition spike evidence (C); no executable probe registered",
+      "note": "Deferred by the G8b probe audit: evidence C cannot be represented by an A-level probe."
     },
     {
       "id": "A-17",
@@ -367,7 +367,7 @@
     },
     {
       "id": "A-22",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W3",
         "W10"
@@ -375,13 +375,13 @@
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [
-        "install-matrix"
-      ],
+      "probes": [],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "trigger": "real-host installation/re-composition spike evidence (C); no executable probe registered",
+      "note": "Deferred by the G8b probe audit: evidence C cannot be represented by an A-level probe."
     },
     {
       "id": "B-01",
@@ -813,7 +813,7 @@
     },
     {
       "id": "C-12",
-      "disposition": "adopted",
+      "disposition": "deferred",
       "design": [
         "W3",
         "W10"
@@ -821,13 +821,13 @@
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [
-        "install-matrix"
-      ],
+      "probes": [],
       "gates": [
         "gate-04"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "trigger": "real-host installation/re-composition spike evidence (C); no executable probe registered",
+      "note": "Deferred by the G8b probe audit: evidence C cannot be represented by an A-level probe."
     }
   ],
   "budget": {
