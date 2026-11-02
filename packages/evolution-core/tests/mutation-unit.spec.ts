@@ -82,6 +82,34 @@ describe('MutationUnit executor', () => {
     expect(io.files.get('source/SKILL.md')).toBe('other')
   })
 
+  it('P1-1: re-checks the baseline inside the bound transact', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    let mutated = false
+    const transact = (async (backend: EvolutionIoLike, path: string, task: (current: string | null) => string | null | Promise<string | null>) => {
+      const memory = backend as MemoryIo
+      if (!mutated) { mutated = true; memory.files.set(path, 'CONCURRENT') }
+      const next = await task(await memory.readText(path))
+      if (next === null) memory.files.delete(path)
+      else memory.files.set(path, next)
+    }) as never
+    const result = await new MutationUnit({ io, limits: LIMITS, transact }).apply(request())
+    expect(result.ok).toBe(false)
+    expect(io.files.get('source/SKILL.md')).toBe('CONCURRENT')
+  })
+
+  it('P1-2: a conflict inside io.transact does not roll stale bytes back over the concurrent write', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    ;(io as unknown as { transact: (path: string, task: (current: string | null) => string | null | Promise<string | null>) => Promise<void> }).transact = async (path, task) => {
+      io.files.set(path, 'CONCURRENT')
+      const next = await task(await io.readText(path))
+      if (next === null) io.files.delete(path)
+      else io.files.set(path, next)
+    }
+    const result = await unit(io).apply(request())
+    expect(result.ok).toBe(false)
+    expect(io.files.get('source/SKILL.md')).toBe('CONCURRENT')
+  })
+
   it('rolls back a later write failure', async () => {
     const io = new MemoryIo()
     io.files.set('source/SKILL.md', 'old-a')

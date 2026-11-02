@@ -1,4 +1,10 @@
 # Changelog
+## Unreleased — Batch A: WriteKernel + MutationUnit adapter
+
+> **范围**：新增 WriteKernel CAS/补偿原语；MutationUnit 的 applyOp/rollback 走 kernel，修复 P1-1/P1-2。四 writer 后续按同一 kernel 接入。
+> **验证**：真实 MutationUnit probe P1-1/P1-2 转绿；待 mirror CI 的 tsc/组测试/门禁。
+> **发布**：不可发版。
+
 ## Unreleased — Batch 0: delete create-time assignment and shadow dead paths
 
 > **范围**：删除 create-time assignment/classification 全链路（service/queue/sidecar/worker/tests/exports/config/command confirm）、shadow/auto 模式、maxVisibleDepth、canHide/hiddenRecoverable；map 仅保留显式只读 experimental，mode 收敛为 off|on；删除 cross-process 声明，统一诚实 single-process；approvalConfirm 不再暴露新 timeout（旧值迁移为 ask，控制面实现后再恢复）；新增 EvidenceEnvelope v1 schema/collector 与 self-test（gate 接入留到 Batch D）。旧 pending/map 数据只读归档，不自动 apply。

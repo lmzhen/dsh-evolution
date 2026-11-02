@@ -1,6 +1,7 @@
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isCommittedWarning, isProcessAlive, type transactIo } from './io.ts'
+import { WriteKernel } from './write-kernel.ts'
 
 export interface MutationRoot {
   name: string
@@ -199,7 +200,7 @@ export interface MutationUnitOptions {
   hooks?: MutationUnitHooks
   validateWrite?: (op: TreeChangeOp) => string | null
   transact?: typeof transactIo
-  /** Whether the io.transact callback re-checks the baseline. Default true; create sets false under its outer root lock. */
+  /** @deprecated the kernel always re-checks the baseline; kept for source compatibility. */
   transactGuard?: boolean
   now?: () => number
 }
@@ -238,8 +239,7 @@ export class MutationUnit {
   private readonly snapshots: MutationSnapshotPort | undefined
   private readonly hooks: MutationUnitHooks | undefined
   private readonly validateWrite: ((op: TreeChangeOp) => string | null) | undefined
-  private readonly transact: typeof transactIo | undefined
-  private readonly transactGuard: boolean
+  private readonly kernel: WriteKernel
   private readonly now: () => number
 
   constructor(options: MutationUnitOptions) {
@@ -251,9 +251,9 @@ export class MutationUnit {
     this.snapshots = options.snapshots
     this.hooks = options.hooks
     this.validateWrite = options.validateWrite
-    this.transact = options.transact
-    this.transactGuard = options.transactGuard ?? true
     this.now = options.now ?? Date.now
+    const transact = options.transact
+    this.kernel = new WriteKernel({ io: this.io, ...(transact === undefined ? {} : { transact }), now: this.now })
   }
 
   preview(request: MutationRequest): MutationPreviewResult {
@@ -290,7 +290,7 @@ export class MutationUnit {
           warnings.push(error instanceof Error ? error.message : String(error))
         }
       }
-      const snapshots: Array<{ target: string; before: string | null; baseline: string | null }> = []
+      const snapshots: Array<{ target: string; before: string | null; after: string | null; baseline: string | null }> = []
       try {
         for (const op of validation.ops) {
           const current = await this.io.readText(op.target)
@@ -298,7 +298,7 @@ export class MutationUnit {
           if (current !== baseline) {
             return { ok: false, unitId, dryRun: false, changed, errors: [{ code: 'cas-drift', message: 'target changed after plan', target: op.target }] }
           }
-          snapshots.push({ target: op.target, before: current, baseline })
+          snapshots.push({ target: op.target, before: current, after: op.kind === 'write' ? op.content : null, baseline })
         }
         for (const op of validation.ops) {
           const refusal = this.validateWrite?.(op) ?? null
@@ -320,7 +320,8 @@ export class MutationUnit {
           const snapshot = snapshots.find(entry => entry.target === op.target)
           if (snapshot === undefined) throw new Error('snapshot missing for ' + op.target)
           try {
-            await this.applyOp(op, snapshot.baseline)
+            const opWarnings = await this.applyOp(op, snapshot.baseline)
+            warnings.push(...opWarnings)
             changed.push(op.target)
           } catch (error) {
             if ((error as { noWrite?: boolean } | undefined)?.noWrite !== true) changed.push(op.target)
@@ -488,43 +489,16 @@ export class MutationUnit {
     })
   }
 
-  private async applyOp(op: TreeChangeOp, baseline: string | null): Promise<void> {
-    if (this.transact !== undefined && op.kind === 'write') {
-      let ran = false
-      await this.transact(this.io, op.target, () => {
-        ran = true
-        return op.content
-      })
-      if (!ran) throw new Error('internal error: the write transaction did not invoke the task; no write was performed')
-      return
-    }
-
-    const next = op.kind === 'delete' ? null : op.content
-    if (this.io.transact !== undefined) {
-      let conflict = false
-      let wrote = false
-      await this.io.transact(op.target, current => {
-        if (current !== baseline) {
-          if (this.transactGuard) throw new Error('concurrent modification detected: ' + op.target)
-          conflict = true
-          return current
-        }
-        wrote = true
-        return next
-      })
-      if (conflict && !wrote) throw Object.assign(new Error('concurrent modification detected: ' + op.target), { noWrite: true })
-      return
-    }
-    const current = await this.io.readText(op.target)
-    if (current !== baseline) throw new Error('concurrent modification detected: ' + op.target)
-    if (next === null) await this.io.remove(op.target)
-    else await this.io.writeText(op.target, next)
+  private async applyOp(op: TreeChangeOp, baseline: string | null): Promise<string[]> {
+    const result = await this.kernel.writeOne({ path: op.target, expected: baseline, next: op.kind === 'delete' ? null : op.content, ...op.skill === undefined ? {} : { skill: op.skill } })
+    if (!result.ok) throw Object.assign(new Error(result.errors[0]?.message ?? 'write failed: ' + op.target), { noWrite: true })
+    return [...(result.warnings ?? [])]
   }
 
-  private async rollback(snapshots: ReadonlyArray<{ target: string; before: string | null }>): Promise<void> {
+  private async rollback(snapshots: ReadonlyArray<{ target: string; before: string | null; after: string | null }>): Promise<void> {
     for (const snapshot of [...snapshots].reverse()) {
-      if (snapshot.before === null) await this.io.remove(snapshot.target)
-      else await this.io.writeText(snapshot.target, snapshot.before)
+      const result = await this.kernel.restore({ path: snapshot.target, before: snapshot.before, after: snapshot.after })
+      if (!result.ok) throw new Error(result.errors[0]?.message ?? 'rollback failed: ' + snapshot.target)
     }
   }
 }
