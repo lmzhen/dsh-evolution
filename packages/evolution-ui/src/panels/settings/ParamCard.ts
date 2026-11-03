@@ -196,7 +196,7 @@ function controlId(field: ClientParamField): string {
 
 /** One field's control, typed from the registry. */
 function FieldControl(props: FieldBlockProps): ReactNode {
-  const { field, text } = props
+  const { field, text, lang } = props
   const id = controlId(field)
   // U-4: an unacceptable value must SAY so — invalid state plus a described explanation node.
   const common = {

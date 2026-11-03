@@ -8,6 +8,7 @@ import { en, NS, zh } from './messages.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
 import { PANEL_ORDER } from './ids.ts'
+export { PANEL_ORDER }
 import { WorkbenchNav, WorkbenchPage, WORKBENCH_CSS, WORKBENCH_ID, type WorkbenchFace, type WorkbenchNavFace } from './Workbench.ts'
 
 /** Required client services: the slot registry and the locale seat. */

@@ -44,7 +44,7 @@ describe('U-3: decoration only when it carries information', () => {
   it('draws one heading per distinct generated group', () => {
     const view = page({})
     const headings = [...view.container.querySelectorAll('.evolution-param-group')].map(node => node.textContent)
-    expect(headings).toEqual([...new Set(fields.map(field => field.group))])
+    expect(headings).toEqual([...new Set(fields.map(field => field.groupLabel))])
     cleanup()
   })
 })

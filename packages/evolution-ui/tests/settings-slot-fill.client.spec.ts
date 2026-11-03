@@ -5,7 +5,7 @@
  * are the ones a caller depends on: a supplied slot is substituted, an UNKNOWN one is left standing.
  */
 import { describe, expect, it } from 'vitest'
-import { en, fill, formatText } from '../src/panels/settings/messages.ts'
+import { fill, formatText, zh } from '../src/panels/settings/messages.ts'
 
 describe('the single slot filler (G5 C4)', () => {
   it('substitutes every supplied slot', () => {
@@ -19,7 +19,7 @@ describe('the single slot filler (G5 C4)', () => {
   })
 
   it('answers the resolved copy through formatText, the spec-side twin of the seat translator', () => {
-    expect(formatText('changed', { n: 3 })).toBe(en.changed.replace('{n}', '3'))
-    expect(formatText('changed')).toBe(en.changed)
+    expect(formatText('changed', { n: 3 })).toBe(zh.changed.replace('{n}', '3'))
+    expect(formatText('changed')).toBe(zh.changed)
   })
 })

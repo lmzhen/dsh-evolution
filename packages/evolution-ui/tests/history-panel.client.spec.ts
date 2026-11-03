@@ -79,7 +79,7 @@ it('P1-12: a failed read renders the shared failure sentence and the command fal
     loadSkills: async () => { throw new Error('boom') },
   })))
   await waitFor(() => { expect(document.body.textContent).toContain('读取失败') })
-  expect(document.body.textContent).toContain('/evolution restore')
+  expect(document.body.textContent).toContain('/evolution skill undo')
   expect(document.body.textContent).not.toContain('failureServer')
   expect(document.body.textContent).not.toContain('fallbackHint')
 })
