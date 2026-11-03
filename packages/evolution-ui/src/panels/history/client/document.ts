@@ -111,7 +111,7 @@ function diffView(face: DocumentFace, diff: VersionDiffRow, mode: 'source' | 're
  */
 export function PreviewBody(props: { face: DocumentFace; body: BodyState }): ReactNode {
   const { face, body } = props
-  if (body.kind === 'loading') return note({ children: face.t('diff.loading') })
+  if (body.kind === 'loading') return note({ children: face.t('preview.loading') })
   if (body.kind === 'failed') return note({ error: true, children: body.message })
   const rendered = renderMarkdown(body.body.display, face.markdownWords)
   return createElement('div', { className: 'evo-doc-preview' },
