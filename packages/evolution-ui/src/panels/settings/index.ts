@@ -17,7 +17,7 @@ import { DiagnosticsCard, type DiagnosticsCardFace } from './DiagnosticsCard.ts'
 import { createDiagnosticsApi } from './diagnostics-state.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
-import { ParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
+import { PluginParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
 import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
 import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { SettingsSection } from './SettingsSection.ts'
@@ -32,7 +32,7 @@ import { injectStyles } from './styles.ts'
  * no error, no section, no UI — and the family is also installed without a settings
  * surface. It is probed instead, and the cards say what is missing.
  */
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'settingsScope', 'connection']
 
 /** Section id and nav order (the platform's own sections sit at 0/10/15/20). */
 export const SECTION_ID = 'evolution'
@@ -148,7 +148,7 @@ export function apply(ctx: ClientContext): void {
         order: index * 10,
         locale: NS,
         inject: face,
-      }, ParamCard)
+      }, PluginParamCard)
     })
   }
 

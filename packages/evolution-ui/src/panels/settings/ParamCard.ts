@@ -13,7 +13,7 @@
  * typed from the registry (\`control\`), so booleans are switches, enums are
  * selects and numbers are numeric inputs with the unit shown beside the label.
  */
-import { createElement, useEffect, useState, type ReactNode } from 'react'
+import { createElement, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
 /**
@@ -504,6 +504,34 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
  * @param props - the card data, its callbacks, and the bound row hook.
  * @returns the card.
  */
+/**
+ * Platform card-face wrapper: `settings.plugin.item` injects the face but does NOT bind
+ * the `use<Name>` hook compartment, so this component owns the one stable external-store
+ * subscription the section card gets from its renderer.
+ * @param props - the injected card face.
+ * @returns the card with its live row snapshot.
+ */
+export function PluginParamCard(props: ParamCardFace): ReactNode {
+  const source = (props as { hooks?: { paramSection?: ParamSectionSource } }).hooks?.paramSection
+  if (source === undefined) {
+    return ParamCardView({
+      namespace: props.namespace, fields: props.fields, t: props.t,
+      ...(props.lang === undefined ? {} : { lang: props.lang }), mutateOnce: props.mutateOnce, clear: props.clear,
+      snapshot: { status: 'unavailable', value: undefined, user: undefined, writable: false, base: undefined, reason: 'seat-missing' },
+    })
+  }
+  const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot)
+  return ParamCardView({
+    namespace: props.namespace,
+    fields: props.fields,
+    t: props.t,
+    ...(props.lang === undefined ? {} : { lang: props.lang }),
+    mutateOnce: props.mutateOnce,
+    clear: props.clear,
+    snapshot,
+  })
+}
+
 export function ParamCard(props: ParamCardProps): ReactNode {
   return ParamCardView({
     namespace: props.namespace,

@@ -37,4 +37,6 @@ declare module 'react' {
    * @param deps - dependency list the renderer compares between renders.
    */
   export function useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void
+  /** Subscribe to an external store; React 18's contract. */
+  export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) => () => void, getSnapshot: () => T, getServerSnapshot?: () => T): T
 }
