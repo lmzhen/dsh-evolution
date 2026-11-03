@@ -65,15 +65,25 @@ export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly
     const skill = skillOf(props.params)
     if (skill !== undefined) setSelectedSkill(skill)
   }, [props.params, props.revision])
+  const viewOrder: readonly WorkbenchView[] = ['history', 'pending', 'merge', 'health']
+  const onTabKey = (event: { key: string; preventDefault: () => void }, current: WorkbenchView): void => {
+    const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+    if (delta === 0 && event.key !== 'Home' && event.key !== 'End') return
+    event.preventDefault()
+    const index = viewOrder.indexOf(current)
+    const next = event.key === 'Home' ? viewOrder[0]! : event.key === 'End' ? viewOrder[viewOrder.length - 1]! : viewOrder[(index + delta + viewOrder.length) % viewOrder.length]!
+    setView(next)
+    requestAnimationFrame(() => { document.getElementById('evo-workbench-tab-' + next)?.focus() })
+  }
   const focusRevision = props.revision === lastRevision.current ? props.revision : undefined
   return createElement('section', { className: PAGE_SURFACE_CLASS + ' evo-workbench', 'data-page': view },
     createElement('div', { className: 'evo-workbench-head' },
       createElement('h1', { className: 'evo-workbench-title' }, props.t('entry.label')),
       createElement('div', { className: 'evo-workbench-tabs', role: 'tablist', 'aria-label': props.t('entry.label') },
-        createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'history' ? 'true' : 'false', 'data-active': view === 'history' ? 'true' : undefined, onClick: () => { setView('history') } }, props.t('workbench.history')),
-        createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'pending' ? 'true' : 'false', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { setView('pending') } }, props.t('workbench.pending')),
-        createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'merge' ? 'true' : 'false', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { setView('merge') } }, props.t('workbench.merge')),
-        createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'health' ? 'true' : 'false', 'data-active': view === 'health' ? 'true' : undefined, onClick: () => { setView('health') } }, props.t('workbench.health')),
+        createElement('button', { id: 'evo-workbench-tab-history', type: 'button', role: 'tab', tabIndex: view === 'history' ? 0 : -1, 'aria-selected': view === 'history' ? 'true' : 'false', 'data-active': view === 'history' ? 'true' : undefined, onClick: () => { setView('history') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'history') } }, props.t('workbench.history')),
+        createElement('button', { id: 'evo-workbench-tab-pending', type: 'button', role: 'tab', tabIndex: view === 'pending' ? 0 : -1, 'aria-selected': view === 'pending' ? 'true' : 'false', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { setView('pending') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'pending') } }, props.t('workbench.pending')),
+        createElement('button', { id: 'evo-workbench-tab-merge', type: 'button', role: 'tab', tabIndex: view === 'merge' ? 0 : -1, 'aria-selected': view === 'merge' ? 'true' : 'false', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { setView('merge') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'merge') } }, props.t('workbench.merge')),
+        createElement('button', { id: 'evo-workbench-tab-health', type: 'button', role: 'tab', tabIndex: view === 'health' ? 0 : -1, 'aria-selected': view === 'health' ? 'true' : 'false', 'data-active': view === 'health' ? 'true' : undefined, onClick: () => { setView('health') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'health') } }, props.t('workbench.health')),
       ),
     ),
     createElement('div', { className: 'evo-workbench-body' },
