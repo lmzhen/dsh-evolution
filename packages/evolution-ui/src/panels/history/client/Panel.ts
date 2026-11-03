@@ -27,6 +27,9 @@ export interface PanelFace extends Copy {
   readonly loadDiff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly loadBody: (name: string, v: number) => Promise<VersionBodyRow>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
+  /** One explicit navigation request: select this skill when the revision is new. */
+  readonly focusSkill?: string | undefined
+  readonly focusRevision?: number | undefined
 }
 
 /** The one expanded row. */
@@ -145,6 +148,11 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     reloadSkills()
     if (selected !== undefined) showVersions(selected)
   }
+
+  useEffect(() => {
+    if (face.focusSkill === undefined || face.focusSkill === '') return
+    showVersions(face.focusSkill)
+  }, [face.focusSkill, face.focusRevision])
 
   const restore = (v: number, unitId?: string): void => {
     if (selected === undefined) return
