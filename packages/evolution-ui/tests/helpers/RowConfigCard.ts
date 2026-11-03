@@ -9,11 +9,11 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import { createElement, type ReactNode } from 'react'
-import type { ClientParamField } from './generated-params.ts'
-import type { MessageKey } from './messages.ts'
-import { fieldKeyOf, ParamCardView } from './ParamCard.ts'
-import { isSection, sectionSnapshotOf } from './source.ts'
-import type { RowConfigViewProps } from './seam.ts'
+import type { ClientParamField } from '../../src/panels/settings/generated-params.ts'
+import type { MessageKey } from '../../src/panels/settings/messages.ts'
+import { fieldKeyOf, ParamCardView } from '../../src/panels/settings/ParamCard.ts'
+import { isSection, sectionSnapshotOf } from '../../src/panels/settings/source.ts'
+import type { RowConfigViewProps } from '../../src/panels/settings/seam.ts'
 
 /** The inject face every row registration carries (the page supplies `view` and `form`). */
 export interface RowConfigFace {

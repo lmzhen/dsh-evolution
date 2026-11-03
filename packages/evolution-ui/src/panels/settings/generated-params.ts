@@ -143,20 +143,3 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
   },
 ]
 
-
-/**
- * One bundle that mounts family rows: the plugins.row.config key of a row is
- * <bundle package name>#<row id>. The names are the SOURCE-plane spellings -
- * the release rescopes them with every other package literal.
- */
-export interface ClientRowSeat {
-  bundle: string
-  rows: readonly string[]
-}
-
-/** Every (bundle, row) pair the Plugins page can open a configuration page for. */
-export const CLIENT_ROW_SEATS: readonly ClientRowSeat[] = [
-  { bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-merge', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
-  { bundle: '@deepseek-ai/dsh-evolution-host', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-merge', 'evolution-review', 'memory-files'] },
-  { bundle: '@deepseek-ai/dsh-evolution-preset', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-merge', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage'] },
-]

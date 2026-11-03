@@ -1,29 +1,14 @@
 /**
- * Browser half: one settings section ("自进化") hosting one card per family row, plus the
- * Plugins page's per-row configuration entry for each of those rows.
+ * Browser half: parameter cards register on the platform's Plugins surface
+ * (`settings.plugin.item`); the family-owned `settings.section` is now only the
+ * diagnostics card. Pending decisions live in `evolution.workbench`.
  *
- * Until 0.7.0 the cards lived inside the platform's own 插件 section, because
- * this bundle injected `@deepseek-ai/dsh-client-ui-settings-plugins` and claimed
- * its keyed `settings.plugin.item` slot. The parameters are not a plugin
- * inventory though — the other feature areas (market, skins, Web plugins, side
- * cards) each register their OWN section, so this bundle does the same: inject
- * the settings shell, register `settings.section`, and host the cards in a keyed
- * child slot of that section.
+ * The join key is the row's ENTRY ID — the platform derives a settings namespace from
+ * the Loader entry id, and that id is the registry's owner name — so the card, the
+ * seat lookup and the page key all spell one id. The legacy namespace strings in the
+ * registry (`evolution-memory`, …) are the G3 migration source, never a live lookup key.
  *
- * Since G2 that section is one of TWO render sites for the same card body. The other is
- * the platform's Plugins page: each family row can be opened there, and the page renders
- * whatever a plugin registered under key `<bundle package name>#<row id>`
- * (`plugins.row.config`). The page owns that entry's subscription and hands the row's form
- * in, so that path needs no seat of ours; our own section binds the same card to the
- * client settings seat (`configForms`).
- *
- * The join key is the row's ENTRY ID — the platform derives a settings namespace from the
- * Loader entry id, and that id is the registry's owner name — so the card, the seat lookup
- * and the page key all spell one id. The legacy namespace strings in the registry
- * (`evolution-memory`, …) are the G3 migration source, never a live lookup key.
- *
- * A row the Host does not serve renders nothing, and a deployment that drops this row
- * shows no section at all: the pair carries no Host-side behaviour.
+ * A row the Host does not serve renders nothing.
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

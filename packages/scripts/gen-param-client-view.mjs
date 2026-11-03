@@ -259,28 +259,11 @@ for (const [namespace, fields] of ordered) {
 }
 lines.push(']', '')
 lines.push('')
-lines.push('/**')
-lines.push(' * One bundle that mounts family rows: the plugins.row.config key of a row is')
-lines.push(' * <bundle package name>#<row id>. The names are the SOURCE-plane spellings -')
-lines.push(' * the release rescopes them with every other package literal.')
-lines.push(' */')
-lines.push('export interface ClientRowSeat {')
-lines.push('  bundle: string')
-lines.push('  rows: readonly string[]')
-lines.push('}')
-lines.push('')
-lines.push('/** Every (bundle, row) pair the Plugins page can open a configuration page for. */')
-lines.push('export const CLIENT_ROW_SEATS: readonly ClientRowSeat[] = [')
-for (const seat of seats) {
-  lines.push('  { bundle: ' + single(seat.bundle) + ', rows: [' + seat.rows.map(single).join(', ') + '] },')
-}
-lines.push(']', '')
 const target = join(root, 'evolution-ui', 'src', 'panels', 'settings', 'generated-params.ts')
 const document = lines.join('\n')
 const previous = existsSync(target) ? readFileSync(target, 'utf8') : null
 const fieldCount = ordered.reduce((total, [, fields]) => total + fields.length, 0)
-const summary = ordered.length + ' namespace(s), ' + fieldCount + ' field(s), ' +
-  seats.length + ' bundle seat(s) over ' + seats.reduce((total, seat) => total + seat.rows.length, 0) + ' row(s)'
+const summary = ordered.length + ' namespace(s), ' + fieldCount + ' field(s)'
 if (previous === document) {
   console.log('gen-param-client-view: up to date — ' + summary)
   process.exit(0)

@@ -5,9 +5,8 @@
  * seams it consumes instead of importing another plugin's values (forbidden by the
  * client bundle-purity rule) or its types (which would drag the platform sources
  * into this project). The shapes are the shell's contract: a `settings.section`
- * registration hosting a keyed card slot, the keyed `plugins.row.config` seat the
- * Plugins page opens per row, the client settings seat (`configForms`, one form per
- * Host plugin entry id), and the locale seat the section's copy resolves through.
+ * registration hosting a keyed card slot, the client settings seat (`configForms`,
+ * one form per Host plugin entry id), and the locale seat the section's copy resolves through.
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 
@@ -16,23 +15,6 @@ import type { ConfigFormLike as KitConfigFormLike, ConfigFormSnapshotLike as Kit
 
 /** Our card slot, hosted by the section this bundle registers. */
 export const CARD_SLOT = 'evolution.namespace.card'
-
-/** The Plugins page's per-row configuration seat (declared by `ui-plugin-manager`). */
-export const ROW_CONFIG_SLOT = 'plugins.row.config'
-
-/**
- * The key the Plugins page files a row's configuration under.
- *
- * Spelled here because the page's own helper cannot be imported (a value import from
- * another plugin's client half is forbidden):
- * `ui-plugin-manager`'s config-ledger module is the definition this mirrors.
- * @param bundle - the bundle package name that declares the row.
- * @param rowId - the row id that bundle's patch declares.
- * @returns the `plugins.row.config` key.
- */
-export function rowConfigKey(bundle: string, rowId: string): string {
-  return bundle + '#' + rowId
-}
 
 /**
  * The pending-window card's slot key.
@@ -107,14 +89,6 @@ export interface SlotRegisterOptions {
   inject: () => unknown
 }
 
-/** Registration options the Plugins page's per-row config seat takes. */
-export interface RowSeatRegisterOptions {
-  name: typeof ROW_CONFIG_SLOT
-  /** `<bundle package name>#<row id>`, as the page's ledger builds it. */
-  key: string
-  inject: () => unknown
-}
-
 /** Options a `settings.section` registration carries (the shell's own shape). */
 export interface SectionRegisterOptions {
   name: 'settings.section'
@@ -141,10 +115,8 @@ export interface SectionFace {
 }
 
 /**
- * The values and commands the Plugins page passes to a `plugins.row.config` entry:
- * the page owns the subscription (it re-renders the entry), so the entry renders from
- * `state` and writes through `mutate`. Both views receive this face; `summary` uses it
- * only to say whether anything is overridden.
+ * The face the test helper uses to render a parameter card with a page-owned form:
+ * the helper renders from `state` and writes through `mutate`.
  */
 export interface RowConfigViewProps {
   /** `summary` is the row's one-line description fallback; `page` is the whole form. */
@@ -170,7 +142,7 @@ export interface ClientSeam {
   slots: {
     inject(name: string, callback: () => Generator<unknown, void, unknown>): unknown
     register(
-      options: SlotRegisterOptions | RowSeatRegisterOptions | SectionRegisterOptions,
+      options: SlotRegisterOptions | SectionRegisterOptions,
       component: (props: never) => unknown,
     ): () => void
   }
