@@ -152,6 +152,11 @@
     # The browser half is evolution-merge-ui; this row owns the permission/Config row.
     - id: evolution-merge
       name: '@deepseek-ai/dsh-evolution-merge'
+    # Client-only workbench view: this row has a valid host half (apply/no-op) so the
+    # Loader exposes the package to the client-modules scan; the view itself registers
+    # into evolution.workbench.view.
+    - id: evolution-merge-ui
+      name: '@deepseek-ai/dsh-evolution-merge-ui'
 
 # ── cross-session recall: enable the native session-query index ─────────────
 # `tool-session-query` (above) exposes `session_search`; this overlay

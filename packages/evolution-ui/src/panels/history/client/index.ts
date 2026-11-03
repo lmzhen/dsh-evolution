@@ -16,7 +16,7 @@ export { PANEL_ORDER }
 import { WorkbenchNav, WorkbenchPage, WORKBENCH_CSS, WORKBENCH_ID, type WorkbenchFace, type WorkbenchNavFace } from './Workbench.ts'
 
 /** Required client services: the slot registry and the locale seat. */
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'layout']
 
 interface PageSlots {
   inject(name: string, body: () => Generator<() => void, void, void>): unknown

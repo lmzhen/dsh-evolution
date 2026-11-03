@@ -52,7 +52,7 @@ function skillOf(params: WorkbenchOwner['params']): string | undefined {
  * @param props - page owner props plus the injected history face.
  * @returns the page surface.
  */
-export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly renderSlot: (name: string, owner: Record<string, unknown>) => ReactNode }): ReactNode {
+export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly renderSlot?: (name: string, owner: Record<string, unknown>) => ReactNode }): ReactNode {
   const [selectedSkill, setSelectedSkill] = useState<string | undefined>(undefined)
   const [view, setView] = useState<WorkbenchView>('history')
   const lastRevision = useRef<number | undefined>(undefined)
@@ -84,7 +84,7 @@ export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly
           : null,
       // The feature list stays mounted while another view is active; each view hides itself.
       createElement('div', { hidden: view !== 'merge' && view !== 'health', className: 'evo-workbench-feature' },
-        props.renderSlot('evolution.workbench.view', { activeView: view })),
+        props.renderSlot?.('evolution.workbench.view', { activeView: view }) ?? null),
     ),
   )
 }
