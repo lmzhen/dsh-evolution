@@ -66,3 +66,36 @@ export async function saveSettings(options: {
   }
   return failure === undefined ? { written, readback } : { written, readback, failure }
 }
+
+/** The platform binder face; one call per namespace is the whole contract. */
+export interface SettingsBinderLike {
+  bind<T>(spec: { readonly namespace: string }): SettingsScopeLike
+}
+
+/** One cached namespace gateway. */
+export interface SettingsGateway {
+  readonly scope: SettingsScopeLike
+  /** Save through this gateway's cached scope. */
+  save(ops: readonly ConfigPathOpLike[]): Promise<SettingsSaveResult>
+}
+
+/**
+ * Bind each namespace once and reuse that scope for every later save.
+ * @param binder - the platform settings-scope service.
+ * @param api - the mutation transport.
+ * @returns a lookup that creates one gateway per namespace.
+ */
+export function createSettingsGatewayCache(binder: SettingsBinderLike, api: SettingsMutationApi): (namespace: string) => SettingsGateway {
+  const cache = new Map<string, SettingsGateway>()
+  return (namespace) => {
+    const existing = cache.get(namespace)
+    if (existing !== undefined) return existing
+    const scope = binder.bind({ namespace })
+    const gateway: SettingsGateway = {
+      scope,
+      save: async ops => await saveSettings({ namespace, scope, api, ops }),
+    }
+    cache.set(namespace, gateway)
+    return gateway
+  }
+}
