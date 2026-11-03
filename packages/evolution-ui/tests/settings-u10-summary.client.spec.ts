@@ -15,7 +15,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
-import { FAMILY_VERSION, PACKAGE_PURPOSE } from '../src/panels/settings/generated-about.ts'
+import { FAMILY_VERSION } from '../src/panels/settings/generated-about.ts'
+import { message } from '../src/panels/settings/messages.ts'
 import { SettingsSection } from '../src/panels/settings/SettingsSection.ts'
 
 /** `createElement` narrowed for the renderer (the package carries its own minimal ambient React surface). */
@@ -23,7 +24,7 @@ const h = createElement as unknown as (type: unknown, props: unknown) => Paramet
 
 /** The section's inject face, reduced to what the component reads. */
 const face = {
-  t: (key: string): string => key,
+  t: (key: string): string => message(key as never),
   renderSlot: (): null => null,
 }
 
@@ -34,6 +35,6 @@ describe('the section decision line (U-10)', () => {
     render(h(SettingsSection, face))
     const about = screen.getByText(new RegExp(FAMILY_VERSION.split('.').join('\\.')))
     expect(about.textContent).toContain(FAMILY_VERSION)
-    expect(about.textContent).toContain(PACKAGE_PURPOSE)
+    expect(about.textContent).toContain(message('aboutPurpose'))
   })
 })

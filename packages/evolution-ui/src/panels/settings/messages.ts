@@ -16,6 +16,7 @@ export const NS = 'evolution-settings'
 export const zh = {
   title: '自进化',
   subtitle: '待你决定的写入在最上面；下面按功能列出你能改的参数，没有列出的由安装时的配置决定。',
+  aboutPurpose: '自进化设置与技能历史',
   overridden: '已覆盖',
   deployment: '默认',
   loading: '正在读取设置…',
@@ -110,6 +111,7 @@ export const zh = {
 export const en: Record<keyof typeof zh, string> = {
   title: 'Self-evolution',
   subtitle: 'Writes waiting for your decision come first; the changeable parameters are listed by feature below, and anything not listed comes from the deployment configuration.',
+  aboutPurpose: 'Self-evolution settings and skill history',
   overridden: 'Overridden',
   deployment: 'default',
   loading: 'reading settings…',
