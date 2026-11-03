@@ -4,7 +4,7 @@
 
 ## 先决条件
 
-- DeepSeek Harness：当前验证线为 **DSH `0.2.1-rc.3`**，发布包接受的最低平台版本为 `^0.2.1-rc.2`。
+- DeepSeek Harness：新工作台/参数面的验证线是**同时包含 `layout.page`、`sidebar.pages` 与 `settingsScope` 的平台构建**（当前开发树）。`0.2.1-rc.3` 只有旧的 `configForms`、没有 `layout.page`，只能用于 host/headless 兼容检查，不能作为新 UI 的验证线。
 - Node.js `^22.19.0` 或 `>=24.0.0`。
 - 可用的 `pnpm`：`dsh plugin` 会把 add/remove 转发给 pnpm。
 - 一个能正常启动的 `dsh` profile。桌面 GUI 使用 `desktop`，Web/headless 通常使用 `web`。
