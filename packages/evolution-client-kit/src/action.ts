@@ -49,6 +49,7 @@ export async function copyAction(
   confirm?: (action: ActionRef) => boolean,
 ): Promise<CopyStatus> {
   if (action.enabled === false) return 'idle'
+  if (confirm !== undefined && !confirm(action)) return 'idle'
   if (action.confirm !== undefined && !action.confirm(action)) return 'idle'
   try {
     return await writeClipboard(action.command) ? 'copied' : 'failed'

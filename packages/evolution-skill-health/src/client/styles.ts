@@ -47,10 +47,10 @@ export const CSS = [
   ':where(' + root + ' [data-role="stat-label"]) { color: var(--dsw-alias-label-tertiary); }',
   ':where(' + root + ' [data-role="group-title"]) { margin: 0; font-weight: 500; }',
   ':where(' + root + ' [data-role="rule-table"]) { display: table; width: 100%; border-collapse: collapse; border: var(--evo-hairline-width) solid var(--dsw-alias-border-l1); border-radius: var(--evo-radius-control); overflow: hidden; }',
-  ':where(' + root + ' [data-role="rule-row"]) { border-top: var(--evo-hairline-width) solid var(--dsw-alias-border-l1); }
-  :where(' + root + ' [data-role="rule-row"] > th, ' + root + ' [data-role="rule-row"] > td) { padding: var(--evo-space-6) var(--evo-space-10); text-align: left; vertical-align: top; }
-  :where(' + root + ' [data-role="rule-row"] > th:first-child) { width: minmax(9rem, 13rem); }
-  :where(' + root + ' [data-role="rule-row"] > th:last-child, ' + root + ' [data-role="rule-row"] > td:last-child) { width: 4rem; text-align: right; }',
+  ':where(' + root + ' [data-role="rule-row"]) { border-top: var(--evo-hairline-width) solid var(--dsw-alias-border-l1); }',
+  ':where(' + root + ' [data-role="rule-row"] > th, ' + root + ' [data-role="rule-row"] > td) { padding: var(--evo-space-6) var(--evo-space-10); text-align: left; vertical-align: top; }',
+  ':where(' + root + ' [data-role="rule-row"] > th:first-child) { width: minmax(9rem, 13rem); }',
+  ':where(' + root + ' [data-role="rule-row"] > th:last-child, ' + root + ' [data-role="rule-row"] > td:last-child) { width: 4rem; text-align: right; }',
   ':where(' + root + ' [data-role="rule-row"][data-tone="warn"]) { box-shadow: inset var(--evo-hairline-marker) 0 0 var(--dsw-alias-state-warn-primary); }',
   ':where(' + root + ' [data-role="rule-row"][data-tone="error"]) { box-shadow: inset var(--evo-hairline-marker) 0 0 var(--dsw-alias-state-error-primary); }',
   ':where(' + root + ' [data-role="rule-row"][data-tone="unreadable"]) { box-shadow: inset var(--evo-hairline-marker) 0 0 var(--evo-tone-quiet); }',

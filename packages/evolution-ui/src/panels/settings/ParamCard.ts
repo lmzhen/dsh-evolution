@@ -509,7 +509,7 @@ export function ParamCard(props: ParamCardProps): ReactNode {
     namespace: props.namespace,
     fields: props.fields,
     t: props.t,
-    lang: props.lang,
+    ...(props.lang === undefined ? {} : { lang: props.lang }),
     mutateOnce: props.mutateOnce,
     clear: props.clear,
     snapshot: props.useParamSection((state: ParamSectionSnapshot) => state),

@@ -69,7 +69,7 @@ export async function saveSettings(options: {
 
 /** The platform binder face; one call per namespace is the whole contract. */
 export interface SettingsBinderLike {
-  bind<T>(spec: { readonly namespace: string }): SettingsScopeLike
+  bind(spec: { readonly namespace: string }): SettingsScopeLike
 }
 
 /** One cached namespace gateway. */

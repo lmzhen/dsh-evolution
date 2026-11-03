@@ -10,7 +10,7 @@ import { fill as settingsFill, message as settingsMessage, NS as SETTINGS_NS } f
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { en, NS, zh } from './messages.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
-import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
+import type { PanelFace } from './Panel.ts'
 import { PANEL_ORDER } from './ids.ts'
 export { PANEL_ORDER }
 import { WorkbenchNav, WorkbenchPage, WORKBENCH_CSS, WORKBENCH_ID, type WorkbenchFace, type WorkbenchNavFace } from './Workbench.ts'

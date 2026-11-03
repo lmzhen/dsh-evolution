@@ -89,6 +89,15 @@ export interface SlotRegisterOptions {
   inject: () => unknown
 }
 
+/** Registration options the platform's Plugins list takes for one parameter card. */
+export interface PluginItemRegisterOptions {
+  name: 'settings.plugin.item'
+  id: string
+  order: number
+  locale: string
+  inject: () => unknown
+}
+
 /** Options a `settings.section` registration carries (the shell's own shape). */
 export interface SectionRegisterOptions {
   name: 'settings.section'
@@ -142,7 +151,7 @@ export interface ClientSeam {
   slots: {
     inject(name: string, callback: () => Generator<unknown, void, unknown>): unknown
     register(
-      options: SlotRegisterOptions | SectionRegisterOptions,
+      options: SlotRegisterOptions | PluginItemRegisterOptions | SectionRegisterOptions,
       component: (props: never) => unknown,
     ): () => void
   }

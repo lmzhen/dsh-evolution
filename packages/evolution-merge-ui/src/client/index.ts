@@ -1,6 +1,6 @@
 /** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { type ReactElement } from 'react'
+import type { ReactNode } from 'react'
 import { panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import type { ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
@@ -13,9 +13,7 @@ import { CSS, CSS_TAG_ID } from './styles.ts'
 export const inject = ['slots', 'locale']
 
 /** The view component receives the workbench's activeView marker alongside its face. */
-function MergeView(props: MergeFace & { activeView?: string }): ReactElement | null {
-  return props.activeView === 'merge' ? MergePanel(props) : null
-}
+function MergeView(props: MergeFace & { activeView?: string }): ReactNode { return props.activeView === 'merge' ? MergePanel(props) : null }
 
 /**
  * Register the merge view on the workbench page.
@@ -28,7 +26,7 @@ export function apply(ctx: ClientContext): void {
     namespace: NS,
     dictionaries: { zh, en },
     styles: { css: CSS, tagId: CSS_TAG_ID },
-    component: MergeView as unknown as (props: never) => ReactElement,
+    component: MergeView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {
       const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
       let seat: ConfigFormsSeat | undefined
