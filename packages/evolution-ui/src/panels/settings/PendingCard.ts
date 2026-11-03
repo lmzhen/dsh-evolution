@@ -94,6 +94,13 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   const [armed, setArmed] = useState<string | null>(null)
   const [state, setState] = useState<PendingState>(INITIAL_PENDING_STATE)
   const [open, setOpen] = useState(true)
+  // P2-3: an empty window collapses itself; a window that gains rows opens so the decision is visible.
+  const viewKind = state.view.kind
+  const rowCount = state.view.kind === 'ready' ? state.view.rows.length : 0
+  useEffect(() => {
+    if (viewKind === 'empty') setOpen(false)
+    else if (viewKind === 'ready' && rowCount > 0) setOpen(true)
+  }, [viewKind, rowCount])
   // The card reads the LATEST state from a holder rather than through an update function: the ambient
   // React surface this package carries has no updater form, and an action's answer arrives after an
   // await, when the render that started it is long gone.
@@ -330,19 +337,19 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       'aria-expanded': open,
     },
     createElement('span', { className: 'evolution-param-card-title' }, t('approvalTitle')),
+    state.view.kind === 'empty' ? createElement('span', { className: 'evolution-param-count', role: 'status' }, t('approvalEmpty')) : null,
     waiting === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalCount', { n: waiting })),
     running === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalRunningCount', { n: running })),
     createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼')),
+    // The refresh control lives outside the disclosure: an empty/collapsed window still needs a way
+    // to pick up a write staged elsewhere without reopening the card first.
+    createElement('div', { className: 'evolution-param-actions' },
+      createElement('button', {
+        className: 'evolution-param-button',
+        type: 'button',
+        onClick: () => { void load() },
+      }, t('approvalRefresh'))),
     open
-      ? createElement('div', { className: 'evolution-param-body' },
-        // T5-04/A59: the explicit re-read. The reader who staged a write from the session can pull
-        // the window without leaving the partition.
-        createElement('div', { className: 'evolution-param-actions' },
-          createElement('button', {
-            className: 'evolution-param-button',
-            type: 'button',
-            onClick: () => { void load() },
-          }, t('approvalRefresh'))),
-        body())
+      ? createElement('div', { className: 'evolution-param-body' }, body())
       : null)
 }
