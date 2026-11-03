@@ -10,7 +10,7 @@ The plugin and `autoStart` default to enabled. An hourly timer checks due-ness; 
 
 `staleAfterDays` defaults to 30 and `archiveAfterDays` to 90, with archive required to be at least the stale threshold. The optional `llmReview` pass defaults off. Idle activity gates, protected/referenced names, unmanaged/builtin scope, health thresholds, and model limits are listed in [PARAMETERS.md](../PARAMETERS.md).
 
-`root` must point at the same skill tree used by the catalog and write tools. `intervalHours` remains a readable deprecated alias of `curatorIntervalHours`; writes to the old name are refused.
+`root` must point at the same skill tree used by the catalog and write tools. `intervalHours` remains a readable deprecated alias of `curatorIntervalHours`; writes to the old name are refused (G0/S0.3).
 
 ## Failure boundary
 

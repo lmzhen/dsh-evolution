@@ -27,4 +27,4 @@ The package emits `evolution/review-scheduled`, `evolution/review-completed` (br
 
 **Unimplemented metadata:** `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth`, and `reviewToolAllow` may still appear in generated parameter/bundle metadata, but this plugin does not read them. Do not rely on them for provider selection, context limits, delegation depth, or tool restrictions. `reviewTimeoutMs` is implemented.
 
-`memoryInterval` and `skillInterval` remain readable deprecated aliases of `reviewMemoryInterval` and `reviewSkillInterval`; writes to the old names are refused.
+`memoryInterval` and `skillInterval` remain readable deprecated aliases of `reviewMemoryInterval` and `reviewSkillInterval`; writes to the old names are refused (G0/S0.3).

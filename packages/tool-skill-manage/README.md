@@ -18,4 +18,4 @@ The four authoring caps are tighten-only at the user layer: `skillContentChars`,
 
 History keeps the configured number of content versions per skill. Older version entries leave the index, but their stored blobs currently have no automatic sweep, so long-lived libraries can retain historical bytes.
 
-`maxSkillContentChars` remains a readable deprecated alias of `skillContentChars`; writes to the old name are refused.
+`maxSkillContentChars` remains a readable deprecated alias of `skillContentChars`; writes to the old name are refused (G0/S0.3).

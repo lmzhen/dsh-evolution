@@ -14,4 +14,4 @@ Default layered memory provider backed by `MEMORY.md` and `USER.md`. It register
 
 An explicit row/user value wins. Otherwise an already mounted evolution-policy budget takes precedence over the package fallback. The row budget controls what the store enforces; the policy budget controls what review plans against, so an explicit mismatch is warned about and surfaced by doctor.
 
-`memoryCharLimit` and `userCharLimit` remain readable deprecated aliases of `memoryChars` and `userChars`; writes to the old names are refused. `threatExemptLabels` is deployment security configuration and defaults to empty.
+`memoryCharLimit` and `userCharLimit` remain readable deprecated aliases of `memoryChars` and `userChars`; writes to the old names are refused (G0/S0.3). `threatExemptLabels` is deployment security configuration and defaults to empty.
