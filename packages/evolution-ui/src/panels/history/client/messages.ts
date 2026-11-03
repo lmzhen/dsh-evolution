@@ -14,6 +14,8 @@ export const NS = 'evolution-skill-history'
 export const zh: Record<string, string> = {
   'entry.label': '技能历史',
   title: '技能历史',
+  'workbench.history': '技能历史',
+  'workbench.pending': '待批',
   hint: '每次技能写入留下的内容版本。回退只改 SKILL.md 正文，标记、使用计数与策展状态不变。内容相同的版本会同时标「当前」。',
   search: '按名字或描述筛选',
   'search.none': '没有匹配的技能。',
@@ -102,6 +104,8 @@ export const zh: Record<string, string> = {
 export const en: Record<string, string> = {
   'entry.label': 'Skill history',
   title: 'Skill history',
+  'workbench.history': 'Skill history',
+  'workbench.pending': 'Pending',
   hint: 'The content versions every skill write leaves behind. Restoring changes the SKILL.md body only: markers, usage counts and curation state stay as they are. Versions holding the same content are all marked “current”.',
   search: 'Filter by name or description',
   'search.none': 'No skill matches.',

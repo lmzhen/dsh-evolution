@@ -6,6 +6,7 @@ import { cleanup, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { WorkbenchPage } from '../src/panels/history/client/Workbench.ts'
 import type { PanelFace } from '../src/panels/history/client/Panel.ts'
+import type { PendingCardFace } from '../src/panels/settings/PendingCard.ts'
 
 afterEach(cleanup)
 
@@ -22,6 +23,18 @@ function face(loadVersions = vi.fn(async () => ({ content: [], support: [] }))):
   }
 }
 
+const pendingFace = (): PendingCardFace => ({
+  t: (key: string) => key,
+  api: {
+    pending: async () => ({ ok: true, data: [] }),
+    approve: async () => ({ ok: true, data: null }),
+    reject: async () => ({ ok: true, data: null }),
+    release: async () => ({ ok: true, data: null }),
+    preview: async () => ({ ok: true, data: { available: false, reason: 'n/a' } }),
+  },
+  confirmMode: () => 'auto',
+})
+
 describe('history workbench', () => {
   it('consumes one explicit revision and does not replay it on a plain rerender', async () => {
     const loadVersions = vi.fn(async () => ({ content: [], support: [] }))
@@ -32,6 +45,7 @@ describe('history workbench', () => {
       revision: 1,
       t: (key: string) => key,
       history,
+      pending: pendingFace(),
     }))
     await waitFor(() => { expect(loadVersions).toHaveBeenCalledWith('alpha') })
     view.rerender(createElement(WorkbenchPage, {
@@ -40,6 +54,7 @@ describe('history workbench', () => {
       revision: 1,
       t: (key: string) => key,
       history,
+      pending: pendingFace(),
     }))
     expect(loadVersions).toHaveBeenCalledTimes(1)
     view.rerender(createElement(WorkbenchPage, {
@@ -48,6 +63,7 @@ describe('history workbench', () => {
       revision: 2,
       t: (key: string) => key,
       history,
+      pending: pendingFace(),
     }))
     await waitFor(() => { expect(loadVersions).toHaveBeenCalledWith('beta') })
   })

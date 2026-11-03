@@ -27,9 +27,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { createApprovalApi } from './api.ts'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
-import { PendingCard, confirmModeFrom, type PendingCardFace } from './PendingCard.ts'
 import { DiagnosticsCard, type DiagnosticsCardFace } from './DiagnosticsCard.ts'
 import { createDiagnosticsApi } from './diagnostics-state.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
@@ -122,11 +120,6 @@ export function apply(ctx: ClientContext): void {
   const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined
   const sources = createSourceCache(probe)
   ctx.effect(() => () => { sources.dispose() }, 'evolution-settings: sources')
-  // U-6 (registry `approvalConfirm`): the pending card reads the approval row's own user layer on
-  // each render and falls back to the shipped default. `getSnapshot` is synchronous BY DESIGN — the
-  // card has no hook compartment, and a value captured once would pin the gate for the fiber's life.
-  const approvalSource = sources.sourceFor('evolution-approval')
-  const confirmMode = (): 'auto' | 'ask' => confirmModeFrom(approvalSource.getSnapshot().user)
   // T5-11/A66: the platform's own "this service arrived" channel. The lazy probe alone left a card
   // that had already rendered its "no settings surface" state stuck there when the shell mounted
   // LATER (nothing tells React to read again), and the row's subscription was never attached. The
@@ -173,14 +166,8 @@ export function apply(ctx: ClientContext): void {
   }
 
 
-  // The staged-write window and diagnostics stay in the family section; parameters do not.
+  // Diagnostics stays in the family section until the workbench takes it over.
   seam.slots.inject(CARD_SLOT, function* () {
-    const api = createApprovalApi((input, init) => fetch(input, init))
-    yield seam.slots.register({
-      name: CARD_SLOT,
-      key: PENDING_CARD_KEY,
-      inject: (): PendingCardFace => ({ t, api, confirmMode, fallback: FALLBACKS.approval }),
-    }, PendingCard)
     const diagApi = createDiagnosticsApi((input, init) => fetch(input, init))
     yield seam.slots.register({
       name: CARD_SLOT,

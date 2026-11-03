@@ -4,6 +4,10 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
+import { createApprovalApi } from '../../settings/api.ts'
+import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
+import { fill as settingsFill, message as settingsMessage, NS as SETTINGS_NS } from '../../settings/messages.ts'
+import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { en, NS, zh } from './messages.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
@@ -78,6 +82,18 @@ export function apply(ctx: ClientContext): void {
     undo: api.undo,
     markdownWords: { copy: t('markdown.copy'), copied: t('markdown.copied'), footnotes: t('markdown.footnotes') },
   })
+  const pendingT = (key: string, values?: Readonly<Record<string, string | number>>): string => {
+    let template: string
+    try { template = seam.locale.bind(SETTINGS_NS)(key) } catch { template = settingsMessage(key as never) }
+    return values === undefined ? template : settingsFill(template, values)
+  }
+  const confirmMode = (): 'auto' | 'ask' => {
+    try {
+      const form = (ctx as unknown as { get?: (name: string) => unknown }).get?.('configForms') as { get?: (ns: string) => { getSnapshot?: () => { user?: unknown } } } | undefined
+      return confirmModeFrom(form?.get?.('evolution-approval')?.getSnapshot?.().user)
+    } catch { return 'auto' }
+  }
+  const pendingFace = (): PendingCardFace => ({ t: pendingT, api: createApprovalApi((input, init) => fetch(input, init)), confirmMode, fallback: FALLBACKS.approval })
   const label = (): string => t('entry.label')
 
   seam.slots.inject('sidebar.pages', function* () {
@@ -93,7 +109,7 @@ export function apply(ctx: ClientContext): void {
     yield seam.slots.register({
       name: 'layout.page',
       key: WORKBENCH_ID,
-      inject: (): WorkbenchFace => ({ t, history: historyFace() }),
+      inject: (): WorkbenchFace => ({ t, history: historyFace(), pending: pendingFace() }),
     }, WorkbenchPage as unknown as (props: never) => unknown)
   })
 }

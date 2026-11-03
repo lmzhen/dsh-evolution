@@ -10,7 +10,7 @@
  */
 import { createElement, type ReactNode } from 'react'
 import { FAMILY_VERSION, PACKAGE_PURPOSE } from './generated-about.ts'
-import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type SectionFace } from './seam.ts'
+import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, type SectionFace } from './seam.ts'
 
 /**
  * Render the section.
@@ -28,15 +28,6 @@ export function SettingsSection(face: SectionFace): ReactNode {
     // Both values are GENERATED (gen-about.mjs) from the files that own them; the browser half carries
     // constants because it cannot read a package.json and cannot import core (build-client.mjs keeps
     // every @deepseek-ai/* specifier external).
-    // The staged-write window is not a setting, so it is not one of CLIENT_PARAM_SECTIONS — but it rides
-    // this same keyed slot, and a keyed slot renders ONLY the keys a section asks for: registering it is
-    // not enough (0.16.0 shipped exactly that bug — the card had no `renderSlot` naming its key, so it
-    // never appeared). It comes FIRST because it is the one card here that waits on a decision.
-    createElement(
-      'div',
-      { key: PENDING_CARD_KEY, className: 'evolution-params-group' },
-      face.renderSlot(CARD_SLOT, {}, { entryKey: PENDING_CARD_KEY }),
-    ),
     // G5/W7 S7: the diagnostics card (read-only; same view the CLI prints) sits after the staged-write
     // window and before the parameter cards.
     createElement(

@@ -18,7 +18,7 @@ import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { apply, SECTION_ID } from '../src/panels/settings/index.ts'
 import { CLIENT_PARAM_SECTIONS } from '../src/panels/settings/generated-params.ts'
-import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY } from '../src/panels/settings/seam.ts'
+import { CARD_SLOT, DIAGNOSTICS_CARD_KEY } from '../src/panels/settings/seam.ts'
 import { createSourceCache, PROJECTION_FAILED, SEAT_MISSING, type SeatProbe } from '../src/panels/settings/source.ts'
 
 /**
@@ -136,7 +136,7 @@ describe('the evolution settings section', () => {
     const section = registrations.find(row => row.id === SECTION_ID)
     expect(section).toBeDefined()
     const cardKeys = registrations.filter(row => row.name === CARD_SLOT).map(row => row.key)
-    expect(cardKeys).toEqual([PENDING_CARD_KEY, DIAGNOSTICS_CARD_KEY])
+    expect(cardKeys).toEqual([DIAGNOSTICS_CARD_KEY])
 
     const asked: string[] = []
     const face = {
@@ -151,9 +151,9 @@ describe('the evolution settings section', () => {
     }
     render(h(section?.component, face))
     for (const key of cardKeys) expect(asked).toContain(key)
-    // The staged-write window is the only card here that waits on a decision, so it leads.
-    expect(asked[0]).toBe(PENDING_CARD_KEY)
-    expect(document.querySelector('[data-slot-key="' + PENDING_CARD_KEY + '"]')).not.toBeNull()
+    // The staged-write window moved to the workbench; only diagnostics remains here.
+    expect(asked).toEqual([DIAGNOSTICS_CARD_KEY])
+    expect(document.querySelector('[data-slot-key="' + DIAGNOSTICS_CARD_KEY + '"]')).not.toBeNull()
     cleanup()
   })
 

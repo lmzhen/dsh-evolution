@@ -7,6 +7,7 @@ import { createElement, useEffect, useRef, useState, type ReactNode } from 'reac
 import { PAGE_SURFACE_CLASS } from '@lmzhen/dsh-evolution-client-kit'
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
+import { PendingCard, type PendingCardFace } from '../../settings/PendingCard.ts'
 
 /** Stable page id used by the sidebar row, the page slot key, and navigation params. */
 export const WORKBENCH_ID = 'evolution.workbench'
@@ -22,7 +23,11 @@ export interface WorkbenchOwner {
 export interface WorkbenchFace {
   readonly t: (key: string) => string
   readonly history: PanelFace
+  readonly pending: PendingCardFace
 }
+
+/** The two views the workbench owns today. */
+export type WorkbenchView = 'history' | 'pending'
 
 /** Sidebar row owner props supplied by the platform list slot. */
 export interface WorkbenchNavOwner {
@@ -49,21 +54,29 @@ function skillOf(params: WorkbenchOwner['params']): string | undefined {
  */
 export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace): ReactNode {
   const [selectedSkill, setSelectedSkill] = useState<string | undefined>(undefined)
+  const [view, setView] = useState<WorkbenchView>('history')
   const lastRevision = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (props.revision === undefined || props.revision === lastRevision.current) return
     lastRevision.current = props.revision
-    if (props.params?.['view'] !== 'history') return
+    if (props.params?.['view'] === 'pending') { setView('pending'); return }
+    setView('history')
     const skill = skillOf(props.params)
     if (skill !== undefined) setSelectedSkill(skill)
   }, [props.params, props.revision])
   const focusRevision = props.revision === lastRevision.current ? props.revision : undefined
-  return createElement('section', { className: PAGE_SURFACE_CLASS + ' evo-workbench', 'data-page': 'history' },
+  return createElement('section', { className: PAGE_SURFACE_CLASS + ' evo-workbench', 'data-page': view },
     createElement('div', { className: 'evo-workbench-head' },
       createElement('h1', { className: 'evo-workbench-title' }, props.t('entry.label')),
+      createElement('div', { className: 'evo-workbench-tabs', role: 'tablist', 'aria-label': props.t('entry.label') },
+        createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'history' ? 'true' : 'false', 'data-active': view === 'history' ? 'true' : undefined, onClick: () => { setView('history') } }, props.t('workbench.history')),
+        createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'pending' ? 'true' : 'false', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { setView('pending') } }, props.t('workbench.pending')),
+      ),
     ),
     createElement('div', { className: 'evo-workbench-body' },
-      createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision }),
+      view === 'history'
+        ? createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision })
+        : createElement(PendingCard, props.pending),
     ),
   )
 }
@@ -88,7 +101,11 @@ export function WorkbenchNav(props: WorkbenchNavOwner & WorkbenchNavFace): React
 export const WORKBENCH_CSS = [
   tokenVars('.evo-workbench'),
   '.evo-workbench{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0}',
-  '.evo-workbench-head{display:flex;align-items:center;padding:var(--evo-space-12) var(--evo-space-16);border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
+  '.evo-workbench-head{display:flex;align-items:center;justify-content:space-between;gap:var(--evo-space-16);padding:var(--evo-space-12) var(--evo-space-16);border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
+  '.evo-workbench-tabs{display:flex;gap:var(--evo-space-4)}',
+  '.evo-workbench-tabs button{padding:var(--evo-space-4) var(--evo-space-8);border:0;border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:var(--evo-type-sm);cursor:pointer}',
+  '.evo-workbench-tabs button[data-active="true"]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+  '.evo-workbench-tabs button:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evo-workbench-title{margin:0;font-size:var(--evo-type-lg);font-weight:600;line-height:var(--evo-leading-base)}',
   '.evo-workbench-body{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}',
   '.evo-workbench-nav{display:flex;width:100%;align-items:center;gap:var(--evo-space-8);padding:var(--evo-space-6) var(--evo-space-12);border:0;border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:var(--evo-type-sm);text-align:left;cursor:pointer}',
