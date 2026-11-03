@@ -27,7 +27,7 @@ export interface WorkbenchFace {
 }
 
 /** The two views the workbench owns today. */
-export type WorkbenchView = 'history' | 'pending'
+export type WorkbenchView = 'history' | 'pending' | 'merge' | 'health'
 
 /** Sidebar row owner props supplied by the platform list slot. */
 export interface WorkbenchNavOwner {
@@ -52,14 +52,15 @@ function skillOf(params: WorkbenchOwner['params']): string | undefined {
  * @param props - page owner props plus the injected history face.
  * @returns the page surface.
  */
-export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace): ReactNode {
+export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly renderSlot: (name: string, owner: Record<string, unknown>) => ReactNode }): ReactNode {
   const [selectedSkill, setSelectedSkill] = useState<string | undefined>(undefined)
   const [view, setView] = useState<WorkbenchView>('history')
   const lastRevision = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (props.revision === undefined || props.revision === lastRevision.current) return
     lastRevision.current = props.revision
-    if (props.params?.['view'] === 'pending') { setView('pending'); return }
+    const requested = props.params?.['view']
+    if (requested === 'pending' || requested === 'merge' || requested === 'health') { setView(requested); return }
     setView('history')
     const skill = skillOf(props.params)
     if (skill !== undefined) setSelectedSkill(skill)
@@ -71,12 +72,16 @@ export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace): ReactNode 
       createElement('div', { className: 'evo-workbench-tabs', role: 'tablist', 'aria-label': props.t('entry.label') },
         createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'history' ? 'true' : 'false', 'data-active': view === 'history' ? 'true' : undefined, onClick: () => { setView('history') } }, props.t('workbench.history')),
         createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'pending' ? 'true' : 'false', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { setView('pending') } }, props.t('workbench.pending')),
+        createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'merge' ? 'true' : 'false', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { setView('merge') } }, props.t('workbench.merge')),
+        createElement('button', { type: 'button', role: 'tab', 'aria-selected': view === 'health' ? 'true' : 'false', 'data-active': view === 'health' ? 'true' : undefined, onClick: () => { setView('health') } }, props.t('workbench.health')),
       ),
     ),
     createElement('div', { className: 'evo-workbench-body' },
       view === 'history'
         ? createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision })
-        : createElement(PendingCard, props.pending),
+        : view === 'pending'
+          ? createElement(PendingCard, props.pending)
+          : createElement('div', { hidden: false, className: 'evo-workbench-feature' }, props.renderSlot('evolution.workbench.view', { activeView: view })),
     ),
   )
 }

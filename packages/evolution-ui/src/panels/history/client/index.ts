@@ -109,6 +109,7 @@ export function apply(ctx: ClientContext): void {
     yield seam.slots.register({
       name: 'layout.page',
       key: WORKBENCH_ID,
+      children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
       inject: (): WorkbenchFace => ({ t, history: historyFace(), pending: pendingFace() }),
     }, WorkbenchPage as unknown as (props: never) => unknown)
   })

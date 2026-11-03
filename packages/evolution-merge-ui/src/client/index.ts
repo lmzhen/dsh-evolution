@@ -1,7 +1,7 @@
-/** Browser half: one sidebar row and the read-only Batch 4 panel. */
+/** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { createElement, type ReactElement } from 'react'
-import { panelWorkspaceId, registerSidebarPanel } from '@lmzhen/dsh-evolution-client-kit'
+import { type ReactElement } from 'react'
+import { panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import type { ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
@@ -12,28 +12,24 @@ import { CSS, CSS_TAG_ID } from './styles.ts'
 
 export const inject = ['slots', 'locale']
 
-function PanelIcon(props: { size?: number; active?: boolean } = {}): ReactElement {
-  const size = typeof props.size === 'number' && props.size > 0 ? props.size : 16
-  return createElement('svg', {
-    'aria-hidden': 'true', width: String(size), height: String(size), viewBox: '0 0 16 16',
-    fill: 'none', stroke: 'currentColor', strokeWidth: '1.5', strokeLinecap: 'round', strokeLinejoin: 'round',
-  }, createElement('path', { d: 'M3 4h10M3 8h6M3 12h8' }))
+/** The view component receives the workbench's activeView marker alongside its face. */
+function MergeView(props: MergeFace & { activeView?: string }): ReactElement | null {
+  return props.activeView === 'merge' ? MergePanel(props) : null
 }
 
 /**
- * Register the merge row and its keyed main body through the shared panel lifecycle.
+ * Register the merge view on the workbench page.
  * @param ctx - the client context.
  */
 export function apply(ctx: ClientContext): void {
-  registerSidebarPanel<MergeFace>(ctx, {
+  registerWorkbenchView<MergeFace>(ctx, {
     id: PANEL_ID,
     order: PANEL_ORDER,
     namespace: NS,
     dictionaries: { zh, en },
     styles: { css: CSS, tagId: CSS_TAG_ID },
-    icon: PanelIcon,
-    component: MergePanel as unknown as (props: never) => ReactElement,
-    body: t => {
+    component: MergeView as unknown as (props: never) => ReactElement,
+    face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {
       const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
       let seat: ConfigFormsSeat | undefined
       try { seat = (ctx as unknown as { get?: (name: string) => unknown }).get?.('configForms') as ConfigFormsSeat | undefined } catch { seat = undefined }

@@ -1,7 +1,7 @@
 # @lmzhen/dsh-evolution-ui
 
-Browser UI umbrella for the evolution settings section and skill-history panel. It ships in `all`, not in `host` or the compatibility `preset`.
+Browser UI umbrella for the evolution family. It ships in `all`, not in `host` or the compatibility `preset`.
 
-The settings surface exposes approval, diagnostics, parameter, and row-configuration cards. Skill history reads versions/diffs and the host history routes. The browser bundle registers both panels through client-kit; the host entry mounts the history host half.
+The UI has one workbench page with four views — skill history, pending decisions, skill merge, and skill health — plus a small diagnostics card in the settings section. Parameter cards register on the platform's Plugins surface (`settings.plugin.item`); this bundle owns no second parameter page. The browser bundle registers the workbench page and the feature views; the host entry mounts the history host half.
 
-These panels require the browser client slots used by the Web/desktop GUI. Headless or TUI sessions do not gain a separate panel surface. Client availability does not change the underlying command or service behavior.
+Pending decisions, merge commands, and health findings are read-only in the browser except for the approval decisions the host routes expose. Headless or TUI sessions do not gain a separate panel surface.

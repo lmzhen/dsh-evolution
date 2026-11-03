@@ -17,7 +17,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 # 重启 dsh
 ```
 
-`all` 在每个会话挂载记忆和技能工具，并提供设置页、技能历史与技能合并面板。设置页和侧栏面板只在 Web/桌面 GUI 显示。
+`all` 在每个会话挂载记忆和技能工具，并在 Web/桌面 GUI 提供进化工作台（技能历史/待批/合并/健康）；参数在平台「内置插件 → 插件配置」中编辑，设置分区只保留诊断。TUI 不显示这些视图。
 
 安装后执行：
 
@@ -122,5 +122,5 @@ node packages/scripts/install-layered.mjs --profile web --mode layered --home "$
 
 - **`/evolution` 不存在**：先确认当前 profile、安装命令是否成功以及是否重启；此时无法先跑 doctor。检查可用的 `dsh --profile <p> --dump-config` 和启动日志，必要时重装。
 - **没有 `memory` / `skill_manage`**：当前可能是 host；改用 all 或分层预设。
-- **UI 不出现**：确认使用 all + Web/桌面 GUI，并检查客户端与连接服务。host/preset/分层不带这些面板。
+- **UI 不出现**：确认使用 all + Web/桌面 GUI，并检查客户端与连接服务。host/preset/分层不挂载进化工作台和诊断卡。
 - **启动报重复注册**：同一 profile 挂了多个家族形态；移除多余 bundle 和分层预设行后重启。

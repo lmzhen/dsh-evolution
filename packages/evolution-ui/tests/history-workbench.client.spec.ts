@@ -46,6 +46,7 @@ describe('history workbench', () => {
       t: (key: string) => key,
       history,
       pending: pendingFace(),
+      renderSlot: () => null,
     }))
     await waitFor(() => { expect(loadVersions).toHaveBeenCalledWith('alpha') })
     view.rerender(createElement(WorkbenchPage, {
@@ -55,6 +56,7 @@ describe('history workbench', () => {
       t: (key: string) => key,
       history,
       pending: pendingFace(),
+      renderSlot: () => null,
     }))
     expect(loadVersions).toHaveBeenCalledTimes(1)
     view.rerender(createElement(WorkbenchPage, {
@@ -64,6 +66,7 @@ describe('history workbench', () => {
       t: (key: string) => key,
       history,
       pending: pendingFace(),
+      renderSlot: () => null,
     }))
     await waitFor(() => { expect(loadVersions).toHaveBeenCalledWith('beta') })
   })

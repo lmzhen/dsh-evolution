@@ -1,6 +1,6 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 
-interface LayoutSeat { selectPanel(panelId: string): void }
+interface LayoutSeat { openPage(pageId: string, params?: Record<string, string>): void }
 interface SlotSeat { inject(name: string, factory: () => unknown): void }
 
 /** Fail loud when the injected client seats are absent, instead of leaving a PENDING row. */
@@ -10,7 +10,7 @@ export function requireHealthSeats(ctx: ClientContext): void {
 }
 
 /** The one place the panel crosses into the platform layout seat. */
-export function openSkillHistory(ctx: ClientContext): void {
+export function openSkillHistory(ctx: ClientContext, name?: string): void {
   const layout = (ctx as ClientContext & { layout: LayoutSeat }).layout
-  layout.selectPanel('skill-history')
+  layout.openPage('evolution.workbench', name === undefined ? { view: 'history' } : { view: 'history', skillName: name })
 }
