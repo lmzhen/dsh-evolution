@@ -36,6 +36,8 @@ export interface ParamCardFace {
   namespace: string
   fields: readonly ClientParamField[]
   t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
+  /** Current UI language for generated labels; omitted defaults to zh. */
+  lang?: () => ParamLanguage
   /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). The returned boolean IS
    * the Host's verdict (contract C2/G5): `true` = accepted, `false` = refused after its recovery read. */
   mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<boolean>
@@ -51,6 +53,24 @@ export interface ParamCardFace {
 export type ParamCardProps = Omit<ParamCardFace, 'hooks'> & {
   /** Bound from \`hooks.paramSection\` by the renderer. */
   readonly useParamSection: <T>(selector: (state: ParamSectionSnapshot) => T) => T
+}
+
+/** Generated-copy language. */
+export type ParamLanguage = 'zh' | 'en'
+
+/** Resolve one field's user-language label. */
+function labelOf(field: ClientParamField, lang: ParamLanguage): string {
+  return lang === 'en' ? (field.labelEn ?? field.label) : field.label
+}
+
+/** Resolve one field's user-language hint. */
+function hintOf(field: ClientParamField, lang: ParamLanguage): string {
+  return lang === 'en' ? (field.hintEn ?? field.doc) : field.hint
+}
+
+/** Resolve one field's user-language group heading. */
+function groupOf(field: ClientParamField, lang: ParamLanguage): string {
+  return lang === 'en' ? (field.groupLabelEn ?? field.group) : (field.groupLabel ?? field.group)
 }
 
 /** The op list a save hands to the seat — the seam's own shape, never a second vocabulary. */
@@ -107,6 +127,7 @@ import { isRecord as isSection } from './guards.ts'
 
 interface FieldBlockProps {
   field: ClientParamField
+  lang: ParamLanguage
   text: string
   overridden: boolean
   /** The card is busy (a save or another reset is in flight). */
@@ -207,7 +228,7 @@ function FieldControl(props: FieldBlockProps): ReactNode {
       // The option TEXT comes from the registry's display names; the option VALUE stays
       // the raw spelling the settings document stores (a translation here would write a
       // value the Host does not know).
-      ...field.values.map((value, index) => createElement('option', { key: value, value }, field.valueLabels[index] ?? value)),
+      ...field.values.map((value, index) => createElement('option', { key: value, value }, (lang === 'en' ? (field.valueLabelsEn ?? field.valueLabels) : field.valueLabels)[index] ?? value)),
     ])
   }
   return createElement('input', {
@@ -220,11 +241,12 @@ function FieldControl(props: FieldBlockProps): ReactNode {
 
 /** One parameter field: label, control, hint, and its reset-to-deployment action. */
 function FieldBlock(props: FieldBlockProps): ReactNode {
-  const { field, t } = props
-  const unit = field.unit === '' ? null : createElement('span', { className: 'evolution-param-unit' }, '（' + field.unit + '）')
+  const { field, t, lang } = props
+  const unitText = lang === 'en' ? (field.unitEn ?? field.unit) : field.unit
+  const unit = unitText === '' ? null : createElement('span', { className: 'evolution-param-unit' }, (lang === 'en' ? ' (' : '（') + unitText + (lang === 'en' ? ')' : '）'))
   return createElement('div', { className: 'evolution-param-field' },
     createElement('div', { className: 'evolution-param-label' },
-      createElement('label', { htmlFor: controlId(field) }, field.label === '' ? field.id : field.label),
+      createElement('label', { htmlFor: controlId(field) }, labelOf(field, lang) === '' ? field.id : labelOf(field, lang)),
       unit,
       // U-3: the chip IS the information "this field is overridden" — printing "deployment default" on
       // every untouched field is ten chips of zero information on the curator row alone.
@@ -233,7 +255,7 @@ function FieldBlock(props: FieldBlockProps): ReactNode {
         : null,
     ),
     FieldControl(props),
-    createElement('p', { className: 'evolution-param-hint' }, field.hint === '' ? field.doc : field.hint),
+    createElement('p', { className: 'evolution-param-hint' }, hintOf(field, lang) === '' ? field.doc : hintOf(field, lang)),
     props.invalid === null
       ? null
       : createElement('p', { id: controlId(field) + '-invalid', className: 'evolution-param-error', role: 'status' }, t(props.invalid)),
@@ -262,6 +284,8 @@ export interface ParamCardViewProps {
   namespace: string
   fields: readonly ClientParamField[]
   t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
+  /** Current UI language for generated labels; omitted defaults to zh. */
+  lang?: () => ParamLanguage
   /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). */
   mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<boolean>
   /** Ask the scope to drop one override; resolves when the scope answered, not when it landed. */
@@ -277,6 +301,7 @@ export interface ParamCardViewProps {
  */
 export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const { t, fields, mutateOnce, clear, namespace, snapshot } = props
+  const lang: ParamLanguage = props.lang?.() ?? 'zh'
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -415,11 +440,12 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
           // distinct group (the table is ordered, so a change of group is the whole rule).
           : fields.flatMap((field, index) => [
             index === 0 || fields[index - 1]?.group !== field.group
-              ? createElement('h3', { key: 'group-' + field.group, className: 'evolution-param-group' }, field.group)
+              ? createElement('h3', { key: 'group-' + field.group, className: 'evolution-param-group' }, groupOf(field, lang))
               : null,
             createElement(FieldBlock, {
               key: field.id,
               field,
+              lang,
               text: textOf(field),
               overridden: Object.hasOwn(user, keyOf(field)),
               disabled: locked,
@@ -465,6 +491,7 @@ export function ParamCard(props: ParamCardProps): ReactNode {
     namespace: props.namespace,
     fields: props.fields,
     t: props.t,
+    lang: props.lang,
     mutateOnce: props.mutateOnce,
     clear: props.clear,
     snapshot: props.useParamSection((state: ParamSectionSnapshot) => state),

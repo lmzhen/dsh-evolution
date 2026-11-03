@@ -25,6 +25,70 @@ function single(value) {
   return "'" + String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"
 }
 
+/** English display text for the generated parameter cards. The registry keeps its Chinese UI tail as the single source; these are the language twin. */
+const FIELD_LABEL_EN = {
+  'evolution-approval.enabled': 'Enable approval pipeline',
+  'evolution-approval.pendingTtlMs': 'Pending expiry',
+  approvalConfirm: 'Confirm before approving',
+  'evolution-commands.maintainHandoffOnSettle': 'Hand off after a scan',
+  curatorIntervalHours: 'Tidy-up interval',
+  staleAfterDays: 'Days until stale',
+  archiveAfterDays: 'Archive after stale',
+  minIdleHours: 'Minimum idle time',
+  minIdleFailOpen: 'Run without activity signal',
+  llmReview: 'Let the model nominate',
+  curatorReviewMaxTokens: 'Model token budget',
+  curatorReviewTimeoutMs: 'Model review timeout',
+  healthSoftBodyChars: 'Body length reference',
+  healthStampDensityPerKb: 'Log-like density threshold',
+  healthChurnMinPatches: 'Write-only threshold',
+  mergeApproval: 'Merge approval',
+  mergeSkippedTtlDays: 'Keep skipped pairs',
+  mergeRunTimeoutMinutes: 'Run time limit',
+  reviewSkillInterval: 'Skill review interval',
+  reviewMemoryInterval: 'Memory review interval',
+  skillReviewTrigger: 'Skill review trigger',
+  skillReviewCompletionMinToolCalls: 'Minimum tool calls on completion',
+  reviewEnabled: 'Enable automatic review',
+  reviewMode: 'Review location',
+  reviewWakeInject: 'Notify on deferred result',
+  reviewNotice: 'Result notice',
+  memoryChars: 'Memory store limit',
+  userChars: 'User profile limit',
+  addDatePrefix: 'Prefix memory entries with date',
+  maxConsolidationFailures: 'Consolidation retries',
+  entryPreviewChars: 'Memory preview length',
+  skillContentChars: 'Skill body limit',
+  maxSkillFileBytes: 'Support file size limit',
+  maxSkillNameLength: 'Skill name length limit',
+  maxDescriptionLength: 'Description length limit',
+  descriptionStrict: 'Reject invalid descriptions',
+  strictCrossSource: 'Reject external references',
+  citationPolicy: 'Citation check',
+  supportFileCharPolicy: 'Oversize support file',
+  skillWriteConfirm: 'Confirm before writing',
+  skillWriteConfirmTimeoutSeconds: 'Confirmation timeout',
+}
+/** Display names for the closed group axis. */
+const UNIT_EN = { '处': 'patches', '处/KB': 'per KB', '次': 'calls', '分钟': 'min', '毫秒': 'ms', '秒': 's', '天': 'days', '小时': 'hours', '字符': 'chars', '字节': 'bytes', 'token': 'tokens' }
+/** Display names for the closed group axis. */
+const GROUP_LABELS = {
+  deployment: ['默认', 'Defaults'],
+  'write-caps': ['写入上限', 'Write limits'],
+  curator: ['技能整理', 'Skill tidy-up'],
+  merge: ['合并', 'Merge'],
+  review: ['审查', 'Review'],
+  memory: ['记忆', 'Memory'],
+}
+/** Display names for enum values, per field. */
+const VALUE_LABELS_EN = {
+  approvalConfirm: ['Execute directly', 'Ask first'],
+  skillReviewTrigger: ['By interval', 'On completion', 'Both'],
+  reviewMode: ['In this session', 'Background branch'],
+  citationPolicy: ['Verify first', 'Refuse'],
+  supportFileCharPolicy: ['Warn only', 'Refuse write'],
+  skillWriteConfirm: ['Write directly', 'Wait for answer', 'Cancel on timeout'],
+}
 const argv = process.argv.slice(2)
 const rootArg = argv.find(arg => !arg.startsWith('--'))
 const root = resolve(rootArg ?? 'packages')
@@ -60,13 +124,19 @@ for (const entry of registry.entries) {
     group: entry.group,
     doc: entry.summary,
     label: entry.label ?? '',
+    labelEn: FIELD_LABEL_EN[entry.id] ?? entry.label ?? entry.id,
     hint: entry.hint ?? '',
+    hintEn: entry.summary,
+    groupLabel: GROUP_LABELS[entry.group]?.[0] ?? entry.group,
+    groupLabelEn: GROUP_LABELS[entry.group]?.[1] ?? entry.group,
     control: entry.control ?? 'text',
     unit: entry.unit ?? '',
+    unitEn: UNIT_EN[entry.unit ?? ''] ?? entry.unit ?? '',
     values: (entry.values ?? '').split('|').filter(Boolean),
     // Display names for `values`, same order; an empty list keeps the raw value as the
     // option text (older registries have no valueLabels at all).
     valueLabels: (entry.valueLabels ?? '').split('|').filter(Boolean),
+    valueLabelsEn: VALUE_LABELS_EN[entry.id] ?? (entry.valueLabels ?? '').split('|').filter(Boolean),
     // U-4: the cross-field constraint travels with the field, so the CARD can refuse a violating
     // pair before a save is attempted. It is declared once in the registry (params.ts) and the Host
     // write path derives the same check from that same column.
@@ -124,22 +194,34 @@ const lines = [
   "export interface ClientParamField {",
   "  id: string",
   "  group: string",
+  "  /** User-language group heading. */",
+  "  groupLabel: string",
+  "  /** English group heading. */",
+  "  groupLabelEn: string",
   "  /** U-4: the sibling id this field may not go below (an empty string when the row declares no relation). */",
   "  atLeast: string",
   "  /** The registry summary (English), kept for parity with PARAMETERS.md. */",
   "  doc: string",
   "  /** Card label, from the registry UI tail (Chinese). */",
   "  label: string",
+  "  /** English card label (the registry UI tail is Chinese). */",
+  "  labelEn: string",
   "  /** Card help text, from the registry UI tail (Chinese). */",
   "  hint: string",
+  "  /** English help text. */",
+  "  hintEn: string",
   "  /** Which control the card renders. */",
   "  control: 'number' | 'switch' | 'select' | 'text'",
   "  /** Unit suffix for a number field ('' when it carries none). */",
   "  unit: string",
+  "  /** English unit suffix. */",
+  "  unitEn: string",
   "  /** Allowed values for a select field ([] otherwise). */",
   "  values: readonly string[]",
   "  /** Display names for `values`, same order ([] shows the raw value). */",
   "  valueLabels: readonly string[]",
+  "  /** English display names for `values`, same order. */",
+  "  valueLabelsEn: readonly string[]",
   "}",
   "",
   "/** One card: the settings namespace it writes through, the SEAT key its source is looked up by,",
@@ -165,9 +247,9 @@ for (const [namespace, fields] of ordered) {
   for (const field of fields) {
     const values = '[' + field.values.map(single).join(', ') + ']'
     const valueLabels = '[' + field.valueLabels.map(single).join(', ') + ']'
-    lines.push('      { id: ' + single(field.id) + ', group: ' + single(field.group) + ', doc: ' + single(field.doc) +
-      ', label: ' + single(field.label) + ', hint: ' + single(field.hint) + ', control: ' + single(field.control) +
-      ', unit: ' + single(field.unit) + ', values: ' + values + ', valueLabels: ' + valueLabels +
+    lines.push('      { id: ' + single(field.id) + ', group: ' + single(field.group) + ', groupLabel: ' + single(field.groupLabel) + ', groupLabelEn: ' + single(field.groupLabelEn) + ', doc: ' + single(field.doc) +
+      ', label: ' + single(field.label) + ', labelEn: ' + single(field.labelEn) + ', hint: ' + single(field.hint) + ', hintEn: ' + single(field.hintEn) + ', control: ' + single(field.control) +
+      ', unit: ' + single(field.unit) + ', unitEn: ' + single(field.unitEn) + ', values: ' + values + ', valueLabels: ' + valueLabels + ', valueLabelsEn: ' + '[' + (field.valueLabelsEn ?? []).map(single).join(', ') + ']' +
       // U-4: the cross-field column is rendered explicitly, like every other key here — a field object
       // that carries it and a renderer that drops it would be the same silent loss the card exists for.
       ', atLeast: ' + single(field.atLeast ?? '') + ' },')

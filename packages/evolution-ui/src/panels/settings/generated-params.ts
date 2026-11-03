@@ -9,22 +9,34 @@
 export interface ClientParamField {
   id: string
   group: string
+  /** User-language group heading. */
+  groupLabel: string
+  /** English group heading. */
+  groupLabelEn: string
   /** U-4: the sibling id this field may not go below (an empty string when the row declares no relation). */
   atLeast: string
   /** The registry summary (English), kept for parity with PARAMETERS.md. */
   doc: string
   /** Card label, from the registry UI tail (Chinese). */
   label: string
+  /** English card label (the registry UI tail is Chinese). */
+  labelEn: string
   /** Card help text, from the registry UI tail (Chinese). */
   hint: string
+  /** English help text. */
+  hintEn: string
   /** Which control the card renders. */
   control: 'number' | 'switch' | 'select' | 'text'
   /** Unit suffix for a number field ('' when it carries none). */
   unit: string
+  /** English unit suffix. */
+  unitEn: string
   /** Allowed values for a select field ([] otherwise). */
   values: readonly string[]
   /** Display names for `values`, same order ([] shows the raw value). */
   valueLabels: readonly string[]
+  /** English display names for `values`, same order. */
+  valueLabelsEn: readonly string[]
 }
 
 /** One card: the settings namespace it writes through, the SEAT key its source is looked up by,
@@ -44,89 +56,89 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
     namespace: 'evolution-approval',
     seatKey: 'evolution-approval',
     fields: [
-      { id: 'evolution-approval.enabled', group: 'deployment', doc: 'Master approval switch: run the approval pipeline for foreground writes.', label: '启用批准流水线', hint: '关闭后前台写入不再经批准。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'number', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },
-      { id: 'approvalConfirm', group: 'write-caps', doc: 'What the confirmation before an APPROVE does: execute immediately, or ask first.', label: '批准前先确认', hint: '点「批准」时要不要再确认一次：直接执行 / 先确认。默认直接执行（不打断批量批准）。', control: 'select', unit: '', values: ['auto', 'ask'], valueLabels: ['直接执行', '先确认'], atLeast: '' },
+      { id: 'evolution-approval.enabled', group: 'deployment', groupLabel: '默认', groupLabelEn: 'Defaults', doc: 'Master approval switch: run the approval pipeline for foreground writes.', label: '启用批准流水线', labelEn: 'Enable approval pipeline', hint: '关闭后前台写入不再经批准。', hintEn: 'Master approval switch: run the approval pipeline for foreground writes.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', groupLabel: '默认', groupLabelEn: 'Defaults', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', labelEn: 'Pending expiry', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', hintEn: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', control: 'number', unit: '毫秒', unitEn: 'ms', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'approvalConfirm', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'What the confirmation before an APPROVE does: execute immediately, or ask first.', label: '批准前先确认', labelEn: 'Confirm before approving', hint: '点「批准」时要不要再确认一次：直接执行 / 先确认。默认直接执行（不打断批量批准）。', hintEn: 'What the confirmation before an APPROVE does: execute immediately, or ask first.', control: 'select', unit: '', unitEn: '', values: ['auto', 'ask'], valueLabels: ['直接执行', '先确认'], valueLabelsEn: ['Execute directly', 'Ask first'], atLeast: '' },
     ],
   },
   {
     namespace: 'evolution-commands',
     seatKey: 'evolution-commands',
     fields: [
-      { id: 'evolution-commands.maintainHandoffOnSettle', group: 'deployment', doc: 'Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run.', label: '扫描完成后自动交接', hint: '维护扫描成功结束后，自动把报告交给模型（等同 maintain handoff）；默认关闭，每次成功扫描会多花一次模型调用。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
+      { id: 'evolution-commands.maintainHandoffOnSettle', group: 'deployment', groupLabel: '默认', groupLabelEn: 'Defaults', doc: 'Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run.', label: '扫描完成后自动交接', labelEn: 'Hand off after a scan', hint: '维护扫描成功结束后，自动把报告交给模型（等同 maintain handoff）；默认关闭，每次成功扫描会多花一次模型调用。', hintEn: 'Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
     ],
   },
   {
     namespace: 'evolution-curator',
     seatKey: 'evolution-curator',
     fields: [
-      { id: 'curatorIntervalHours', group: 'curator', doc: 'Minimum hours between deterministic curation passes.', label: '自动整理间隔', hint: '两次自动整理之间至少间隔多少小时。', control: 'number', unit: '小时', values: [], valueLabels: [], atLeast: '' },
-      { id: 'staleAfterDays', group: 'curator', doc: 'Inactive days before a skill counts as stale.', label: '多久没用算过时', hint: '技能连续多少天没被用到就算过时。', control: 'number', unit: '天', values: [], valueLabels: [], atLeast: '' },
-      { id: 'archiveAfterDays', group: 'curator', doc: 'Inactive days before a stale skill is archived (must be >= staleAfterDays).', label: '过时后归档', hint: '过时技能再过多少天移入归档（不能小于上一项）。', control: 'number', unit: '天', values: [], valueLabels: [], atLeast: 'staleAfterDays' },
-      { id: 'minIdleHours', group: 'curator', doc: 'Idle hours required before an automatic curation pass runs.', label: '最少空闲时长', hint: '你至少多少小时没用，才运行自动整理。', control: 'number', unit: '小时', values: [], valueLabels: [], atLeast: '' },
-      { id: 'minIdleFailOpen', group: 'curator', doc: 'Let the idle gate open when the activity probe is unavailable.', label: '检测不到活动也运行', hint: '无法判断你是否空闲时，仍然运行自动整理。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'llmReview', group: 'curator', doc: 'Enable the LLM nomination pass on top of the deterministic lifecycle.', label: '用模型挑选', hint: '在固定规则之外，再用模型挑一遍候选项。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'curatorReviewMaxTokens', group: 'curator', doc: 'Token budget of the curator LLM review.', label: '模型处理上限', hint: '每次用模型挑选时最多消耗多少 token。', control: 'number', unit: 'token', values: [], valueLabels: [], atLeast: '' },
-      { id: 'curatorReviewTimeoutMs', group: 'curator', doc: 'Wall-clock bound of the curator LLM review.', label: '模型处理超时', hint: '一次模型挑选最长允许运行多久。', control: 'number', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },
-      { id: 'healthSoftBodyChars', group: 'curator', doc: 'Body character line the health view judges against.', label: '正文长度参考值', hint: '技能正文超过多少字符算偏长（只用于健康提示）。', control: 'number', unit: '字符', values: [], valueLabels: [], atLeast: '' },
-      { id: 'healthStampDensityPerKb', group: 'curator', doc: 'Stamp density per KB that flags log-like content in a body.', label: '日志化判定阈值', hint: '每 KB 出现多少个时间标记，就判为「像日志」。', control: 'number', unit: '处/KB', values: [], valueLabels: [], atLeast: '' },
-      { id: 'healthChurnMinPatches', group: 'curator', doc: 'Patches without a read that flag a write-ghost skill.', label: '只写不读判定次数', hint: '连续多少次改动都没有被读取，就判为「只写不读」。', control: 'number', unit: '处', values: [], valueLabels: [], atLeast: '' },
+      { id: 'curatorIntervalHours', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Minimum hours between deterministic curation passes.', label: '自动整理间隔', labelEn: 'Tidy-up interval', hint: '两次自动整理之间至少间隔多少小时。', hintEn: 'Minimum hours between deterministic curation passes.', control: 'number', unit: '小时', unitEn: 'hours', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'staleAfterDays', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Inactive days before a skill counts as stale.', label: '多久没用算过时', labelEn: 'Days until stale', hint: '技能连续多少天没被用到就算过时。', hintEn: 'Inactive days before a skill counts as stale.', control: 'number', unit: '天', unitEn: 'days', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'archiveAfterDays', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Inactive days before a stale skill is archived (must be >= staleAfterDays).', label: '过时后归档', labelEn: 'Archive after stale', hint: '过时技能再过多少天移入归档（不能小于上一项）。', hintEn: 'Inactive days before a stale skill is archived (must be >= staleAfterDays).', control: 'number', unit: '天', unitEn: 'days', values: [], valueLabels: [], valueLabelsEn: [], atLeast: 'staleAfterDays' },
+      { id: 'minIdleHours', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Idle hours required before an automatic curation pass runs.', label: '最少空闲时长', labelEn: 'Minimum idle time', hint: '你至少多少小时没用，才运行自动整理。', hintEn: 'Idle hours required before an automatic curation pass runs.', control: 'number', unit: '小时', unitEn: 'hours', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'minIdleFailOpen', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Let the idle gate open when the activity probe is unavailable.', label: '检测不到活动也运行', labelEn: 'Run without activity signal', hint: '无法判断你是否空闲时，仍然运行自动整理。', hintEn: 'Let the idle gate open when the activity probe is unavailable.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'llmReview', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Enable the LLM nomination pass on top of the deterministic lifecycle.', label: '用模型挑选', labelEn: 'Let the model nominate', hint: '在固定规则之外，再用模型挑一遍候选项。', hintEn: 'Enable the LLM nomination pass on top of the deterministic lifecycle.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'curatorReviewMaxTokens', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Token budget of the curator LLM review.', label: '模型处理上限', labelEn: 'Model token budget', hint: '每次用模型挑选时最多消耗多少 token。', hintEn: 'Token budget of the curator LLM review.', control: 'number', unit: 'token', unitEn: 'tokens', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'curatorReviewTimeoutMs', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Wall-clock bound of the curator LLM review.', label: '模型处理超时', labelEn: 'Model review timeout', hint: '一次模型挑选最长允许运行多久。', hintEn: 'Wall-clock bound of the curator LLM review.', control: 'number', unit: '毫秒', unitEn: 'ms', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'healthSoftBodyChars', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Body character line the health view judges against.', label: '正文长度参考值', labelEn: 'Body length reference', hint: '技能正文超过多少字符算偏长（只用于健康提示）。', hintEn: 'Body character line the health view judges against.', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'healthStampDensityPerKb', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Stamp density per KB that flags log-like content in a body.', label: '日志化判定阈值', labelEn: 'Log-like density threshold', hint: '每 KB 出现多少个时间标记，就判为「像日志」。', hintEn: 'Stamp density per KB that flags log-like content in a body.', control: 'number', unit: '处/KB', unitEn: 'per KB', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'healthChurnMinPatches', group: 'curator', groupLabel: '技能整理', groupLabelEn: 'Skill tidy-up', doc: 'Patches without a read that flag a write-ghost skill.', label: '只写不读判定次数', labelEn: 'Write-only threshold', hint: '连续多少次改动都没有被读取，就判为「只写不读」。', hintEn: 'Patches without a read that flag a write-ghost skill.', control: 'number', unit: '处', unitEn: 'patches', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
     ],
   },
   {
     namespace: 'evolution-merge',
     seatKey: 'evolution-merge',
     fields: [
-      { id: 'mergeApproval', group: 'merge', doc: 'Pause after round 1 and put the pair in the pending queue instead of authoring round 2 automatically.', label: '合并审批', hint: '开启后，第一轮判定完先停下、进入待批准清单；关闭则直接进入第二轮合并。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'mergeSkippedTtlDays', group: 'merge', doc: 'Days a skipped pair stays out of screening; 0 means it never expires.', label: '无需合并保留天数', hint: '判定无需合并的对，多少天内不再参与筛选；0 表示一直保留。', control: 'number', unit: '天', values: [], valueLabels: [], atLeast: '' },
-      { id: 'mergeRunTimeoutMinutes', group: 'merge', doc: 'Wall-clock budget of one merge run; 0 means no limit.', label: '单次运行上限', hint: '一次合并运行最多持续多少分钟；0 表示不设上限。', control: 'number', unit: '分钟', values: [], valueLabels: [], atLeast: '' },
+      { id: 'mergeApproval', group: 'merge', groupLabel: '合并', groupLabelEn: 'Merge', doc: 'Pause after round 1 and put the pair in the pending queue instead of authoring round 2 automatically.', label: '合并审批', labelEn: 'Merge approval', hint: '开启后，第一轮判定完先停下、进入待批准清单；关闭则直接进入第二轮合并。', hintEn: 'Pause after round 1 and put the pair in the pending queue instead of authoring round 2 automatically.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'mergeSkippedTtlDays', group: 'merge', groupLabel: '合并', groupLabelEn: 'Merge', doc: 'Days a skipped pair stays out of screening; 0 means it never expires.', label: '无需合并保留天数', labelEn: 'Keep skipped pairs', hint: '判定无需合并的对，多少天内不再参与筛选；0 表示一直保留。', hintEn: 'Days a skipped pair stays out of screening; 0 means it never expires.', control: 'number', unit: '天', unitEn: 'days', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'mergeRunTimeoutMinutes', group: 'merge', groupLabel: '合并', groupLabelEn: 'Merge', doc: 'Wall-clock budget of one merge run; 0 means no limit.', label: '单次运行上限', labelEn: 'Run time limit', hint: '一次合并运行最多持续多少分钟；0 表示不设上限。', hintEn: 'Wall-clock budget of one merge run; 0 means no limit.', control: 'number', unit: '分钟', unitEn: 'min', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
     ],
   },
   {
     namespace: 'evolution-review',
     seatKey: 'evolution-review',
     fields: [
-      { id: 'reviewSkillInterval', group: 'review', doc: 'Tool calls between skill-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself used a skill.', label: '技能检查间隔', hint: '每累计多少次工具调用检查一次技能：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到技能则只算 1 次。', control: 'number', unit: '次', values: [], valueLabels: [], atLeast: '' },
-      { id: 'reviewMemoryInterval', group: 'review', doc: 'Tool calls between memory-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself touched memory.', label: '记忆检查间隔', hint: '每累计多少次工具调用检查一次记忆：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到记忆则只算 1 次。', control: 'number', unit: '次', values: [], valueLabels: [], atLeast: '' },
-      { id: 'skillReviewTrigger', group: 'review', doc: 'Which channel may inject a skill review (cadence, completion, both).', label: '技能检查时机', hint: '什么时候检查技能：按间隔／按任务完成／两者。', control: 'select', unit: '', values: ['cadence', 'completion', 'both'], valueLabels: ['按间隔', '按任务完成', '两者'], atLeast: '' },
-      { id: 'skillReviewCompletionMinToolCalls', group: 'review', doc: 'Tool calls a task needs before the completion channel injects.', label: '完成时的最少工具调用', hint: '选「按任务完成」时，任务至少用了几次工具才检查。', control: 'number', unit: '次', values: [], valueLabels: [], atLeast: '' },
-      { id: 'reviewEnabled', group: 'review', doc: 'Master switch for the review plugin.', label: '启用自动检查', hint: '关闭后不再自动回顾会话。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'reviewMode', group: 'review', doc: 'Run the review in the parent session (inject), on a subagent, or in a background branch.', label: '运行位置', hint: '在哪里运行检查：在当前会话里／交给子代理／后台分支。', control: 'select', unit: '', values: ['inject', 'branch'], valueLabels: ['在当前会话里', '后台分支'], atLeast: '' },
-      { id: 'reviewWakeInject', group: 'review', doc: 'Deliver the deferred review as a waking follow-up message.', label: '延后结果发提醒', hint: '会话空闲时，把延后的检查结果作为一条提醒发给你。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'reviewNotice', group: 'review', doc: 'Deliver result notices into the parent conversation.', label: '结果通知', hint: '关闭后检查结果不再写进对话；检查本身照常运行，结果留在审计记录里。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
+      { id: 'reviewSkillInterval', group: 'review', groupLabel: '审查', groupLabelEn: 'Review', doc: 'Tool calls between skill-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself used a skill.', label: '技能检查间隔', labelEn: 'Skill review interval', hint: '每累计多少次工具调用检查一次技能：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到技能则只算 1 次。', hintEn: 'Tool calls between skill-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself used a skill.', control: 'number', unit: '次', unitEn: 'calls', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'reviewMemoryInterval', group: 'review', groupLabel: '审查', groupLabelEn: 'Review', doc: 'Tool calls between memory-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself touched memory.', label: '记忆检查间隔', labelEn: 'Memory review interval', hint: '每累计多少次工具调用检查一次记忆：一轮按该轮工具调用数累加（一轮没有工具调用也算 1 次），本轮本身用到记忆则只算 1 次。', hintEn: 'Tool calls between memory-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself touched memory.', control: 'number', unit: '次', unitEn: 'calls', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'skillReviewTrigger', group: 'review', groupLabel: '审查', groupLabelEn: 'Review', doc: 'Which channel may inject a skill review (cadence, completion, both).', label: '技能检查时机', labelEn: 'Skill review trigger', hint: '什么时候检查技能：按间隔／按任务完成／两者。', hintEn: 'Which channel may inject a skill review (cadence, completion, both).', control: 'select', unit: '', unitEn: '', values: ['cadence', 'completion', 'both'], valueLabels: ['按间隔', '按任务完成', '两者'], valueLabelsEn: ['By interval', 'On completion', 'Both'], atLeast: '' },
+      { id: 'skillReviewCompletionMinToolCalls', group: 'review', groupLabel: '审查', groupLabelEn: 'Review', doc: 'Tool calls a task needs before the completion channel injects.', label: '完成时的最少工具调用', labelEn: 'Minimum tool calls on completion', hint: '选「按任务完成」时，任务至少用了几次工具才检查。', hintEn: 'Tool calls a task needs before the completion channel injects.', control: 'number', unit: '次', unitEn: 'calls', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'reviewEnabled', group: 'review', groupLabel: '审查', groupLabelEn: 'Review', doc: 'Master switch for the review plugin.', label: '启用自动检查', labelEn: 'Enable automatic review', hint: '关闭后不再自动回顾会话。', hintEn: 'Master switch for the review plugin.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'reviewMode', group: 'review', groupLabel: '审查', groupLabelEn: 'Review', doc: 'Run the review in the parent session (inject), on a subagent, or in a background branch.', label: '运行位置', labelEn: 'Review location', hint: '在哪里运行检查：在当前会话里／交给子代理／后台分支。', hintEn: 'Run the review in the parent session (inject), on a subagent, or in a background branch.', control: 'select', unit: '', unitEn: '', values: ['inject', 'branch'], valueLabels: ['在当前会话里', '后台分支'], valueLabelsEn: ['In this session', 'Background branch'], atLeast: '' },
+      { id: 'reviewWakeInject', group: 'review', groupLabel: '审查', groupLabelEn: 'Review', doc: 'Deliver the deferred review as a waking follow-up message.', label: '延后结果发提醒', labelEn: 'Notify on deferred result', hint: '会话空闲时，把延后的检查结果作为一条提醒发给你。', hintEn: 'Deliver the deferred review as a waking follow-up message.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'reviewNotice', group: 'review', groupLabel: '审查', groupLabelEn: 'Review', doc: 'Deliver result notices into the parent conversation.', label: '结果通知', labelEn: 'Result notice', hint: '关闭后检查结果不再写进对话；检查本身照常运行，结果留在审计记录里。', hintEn: 'Deliver result notices into the parent conversation.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
     ],
   },
   {
     namespace: 'memory-files',
     seatKey: 'memory-files',
     fields: [
-      { id: 'memoryChars', group: 'memory', doc: 'Character budget the memory store enforces for MEMORY.md.', label: '记忆库上限', hint: '长期记忆文件（MEMORY.md）最多多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [], atLeast: '' },
-      { id: 'userChars', group: 'memory', doc: 'Character budget the memory store enforces for USER.md.', label: '用户画像上限', hint: '用户画像文件（USER.md）最多多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [], atLeast: '' },
-      { id: 'addDatePrefix', group: 'memory', doc: 'Prefix stored memory entries with their date heading.', label: '记忆条目加日期', hint: '写入时在条目开头加上日期。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'maxConsolidationFailures', group: 'memory', doc: 'Consolidation failures one turn tolerates before the tool gives up.', label: '合并失败重试', hint: '合并记忆连续失败多少次后停止。', control: 'number', unit: '次', values: [], valueLabels: [], atLeast: '' },
+      { id: 'memoryChars', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Character budget the memory store enforces for MEMORY.md.', label: '记忆库上限', labelEn: 'Memory store limit', hint: '长期记忆文件（MEMORY.md）最多多少字符。', hintEn: 'Character budget the memory store enforces for MEMORY.md.', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'userChars', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Character budget the memory store enforces for USER.md.', label: '用户画像上限', labelEn: 'User profile limit', hint: '用户画像文件（USER.md）最多多少字符。', hintEn: 'Character budget the memory store enforces for USER.md.', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'addDatePrefix', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Prefix stored memory entries with their date heading.', label: '记忆条目加日期', labelEn: 'Prefix memory entries with date', hint: '写入时在条目开头加上日期。', hintEn: 'Prefix stored memory entries with their date heading.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'maxConsolidationFailures', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Consolidation failures one turn tolerates before the tool gives up.', label: '合并失败重试', labelEn: 'Consolidation retries', hint: '合并记忆连续失败多少次后停止。', hintEn: 'Consolidation failures one turn tolerates before the tool gives up.', control: 'number', unit: '次', unitEn: 'calls', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
     ],
   },
   {
     namespace: 'tool-memory',
     seatKey: 'tool-memory',
     fields: [
-      { id: 'entryPreviewChars', group: 'memory', doc: 'Characters of one memory entry shown in a tool result preview.', label: '记忆预览长度', hint: '列表里每条记忆最多显示多少字符。', control: 'number', unit: '字符', values: [], valueLabels: [], atLeast: '' },
+      { id: 'entryPreviewChars', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Characters of one memory entry shown in a tool result preview.', label: '记忆预览长度', labelEn: 'Memory preview length', hint: '列表里每条记忆最多显示多少字符。', hintEn: 'Characters of one memory entry shown in a tool result preview.', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
     ],
   },
   {
     namespace: 'tool-skill-manage',
     seatKey: 'tool-skill-manage',
     fields: [
-      { id: 'skillContentChars', group: 'write-caps', doc: 'Character cap on a SKILL.md body (tighten-only).', label: '技能文件正文上限', hint: '技能 Markdown 正文最多多少字符（只能调小）。', control: 'number', unit: '字符', values: [], valueLabels: [], atLeast: '' },
-      { id: 'maxSkillFileBytes', group: 'write-caps', doc: 'Byte cap on one support file (tighten-only).', label: '附带文件大小上限', hint: '技能附带文件单个最大多少字节（只能调小）。', control: 'number', unit: '字节', values: [], valueLabels: [], atLeast: '' },
-      { id: 'maxSkillNameLength', group: 'write-caps', doc: 'Character cap on a skill name (tighten-only).', label: '技能名长度上限', hint: '技能名最多多少字符（只能调小）。', control: 'number', unit: '字符', values: [], valueLabels: [], atLeast: '' },
-      { id: 'maxDescriptionLength', group: 'write-caps', doc: 'Character cap on a skill description (tighten-only).', label: '技能描述长度上限', hint: '技能描述最多多少字符（只能调小）。', control: 'number', unit: '字符', values: [], valueLabels: [], atLeast: '' },
-      { id: 'descriptionStrict', group: 'write-caps', doc: 'Refuse a description over the authoring bar instead of advising.', label: '描述不合规即拒绝', hint: '描述不符合要求时直接拒绝写入（默认只提醒）。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'strictCrossSource', group: 'write-caps', doc: 'Refuse writes whose catalog entry resolves outside the family.', label: '引用外部内容即拒绝', hint: '技能引用了本插件之外的文件时拒绝写入。', control: 'switch', unit: '', values: [], valueLabels: [], atLeast: '' },
-      { id: 'citationPolicy', group: 'write-caps', doc: 'Refuse a move that would leave a dangling reference, or verify it.', label: '引用检查方式', hint: '移动或合并技能时怎么处理引用：先检查／直接拒绝。', control: 'select', unit: '', values: ['verify', 'refuse'], valueLabels: ['先检查', '直接拒绝'], atLeast: '' },
-      { id: 'supportFileCharPolicy', group: 'write-caps', doc: 'Warn about an oversize support file, or refuse the write.', label: '附带文件超限时', hint: '附带文件超出上限时：只提醒／拒绝写入。', control: 'select', unit: '', values: ['report', 'enforce'], valueLabels: ['只提醒', '拒绝写入'], atLeast: '' },
-      { id: 'skillWriteConfirm', group: 'write-caps', doc: 'What the one confirmation before a create or a bare delete does: write straight through, wait for an answer, or cancel the write when nobody answers within the timeout.', label: '写入前是否确认', hint: '新建或删除技能前要不要问你：直接写入／一直等你回答／超时未答就取消这次写入。', control: 'select', unit: '', values: ['auto', 'ask', 'timeout'], valueLabels: ['不弹窗直接写入', '一直等待回答', '超时自动取消'], atLeast: '' },
-      { id: 'skillWriteConfirmTimeoutSeconds', group: 'write-caps', doc: 'Seconds the confirmation waits for an answer in timeout mode before the write is cancelled.', label: '确认等待秒数', hint: '选「超时自动取消」时，等多少秒没人回答就取消这次写入。', control: 'number', unit: '秒', values: [], valueLabels: [], atLeast: '' },
+      { id: 'skillContentChars', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Character cap on a SKILL.md body (tighten-only).', label: '技能文件正文上限', labelEn: 'Skill body limit', hint: '技能 Markdown 正文最多多少字符（只能调小）。', hintEn: 'Character cap on a SKILL.md body (tighten-only).', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'maxSkillFileBytes', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Byte cap on one support file (tighten-only).', label: '附带文件大小上限', labelEn: 'Support file size limit', hint: '技能附带文件单个最大多少字节（只能调小）。', hintEn: 'Byte cap on one support file (tighten-only).', control: 'number', unit: '字节', unitEn: 'bytes', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'maxSkillNameLength', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Character cap on a skill name (tighten-only).', label: '技能名长度上限', labelEn: 'Skill name length limit', hint: '技能名最多多少字符（只能调小）。', hintEn: 'Character cap on a skill name (tighten-only).', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'maxDescriptionLength', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Character cap on a skill description (tighten-only).', label: '技能描述长度上限', labelEn: 'Description length limit', hint: '技能描述最多多少字符（只能调小）。', hintEn: 'Character cap on a skill description (tighten-only).', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'descriptionStrict', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Refuse a description over the authoring bar instead of advising.', label: '描述不合规即拒绝', labelEn: 'Reject invalid descriptions', hint: '描述不符合要求时直接拒绝写入（默认只提醒）。', hintEn: 'Refuse a description over the authoring bar instead of advising.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'strictCrossSource', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Refuse writes whose catalog entry resolves outside the family.', label: '引用外部内容即拒绝', labelEn: 'Reject external references', hint: '技能引用了本插件之外的文件时拒绝写入。', hintEn: 'Refuse writes whose catalog entry resolves outside the family.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'citationPolicy', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Refuse a move that would leave a dangling reference, or verify it.', label: '引用检查方式', labelEn: 'Citation check', hint: '移动或合并技能时怎么处理引用：先检查／直接拒绝。', hintEn: 'Refuse a move that would leave a dangling reference, or verify it.', control: 'select', unit: '', unitEn: '', values: ['verify', 'refuse'], valueLabels: ['先检查', '直接拒绝'], valueLabelsEn: ['Verify first', 'Refuse'], atLeast: '' },
+      { id: 'supportFileCharPolicy', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Warn about an oversize support file, or refuse the write.', label: '附带文件超限时', labelEn: 'Oversize support file', hint: '附带文件超出上限时：只提醒／拒绝写入。', hintEn: 'Warn about an oversize support file, or refuse the write.', control: 'select', unit: '', unitEn: '', values: ['report', 'enforce'], valueLabels: ['只提醒', '拒绝写入'], valueLabelsEn: ['Warn only', 'Refuse write'], atLeast: '' },
+      { id: 'skillWriteConfirm', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'What the one confirmation before a create or a bare delete does: write straight through, wait for an answer, or cancel the write when nobody answers within the timeout.', label: '写入前是否确认', labelEn: 'Confirm before writing', hint: '新建或删除技能前要不要问你：直接写入／一直等你回答／超时未答就取消这次写入。', hintEn: 'What the one confirmation before a create or a bare delete does: write straight through, wait for an answer, or cancel the write when nobody answers within the timeout.', control: 'select', unit: '', unitEn: '', values: ['auto', 'ask', 'timeout'], valueLabels: ['不弹窗直接写入', '一直等待回答', '超时自动取消'], valueLabelsEn: ['Write directly', 'Wait for answer', 'Cancel on timeout'], atLeast: '' },
+      { id: 'skillWriteConfirmTimeoutSeconds', group: 'write-caps', groupLabel: '写入上限', groupLabelEn: 'Write limits', doc: 'Seconds the confirmation waits for an answer in timeout mode before the write is cancelled.', label: '确认等待秒数', labelEn: 'Confirmation timeout', hint: '选「超时自动取消」时，等多少秒没人回答就取消这次写入。', hintEn: 'Seconds the confirmation waits for an answer in timeout mode before the write is cancelled.', control: 'number', unit: '秒', unitEn: 's', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
     ],
   },
 ]

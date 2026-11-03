@@ -34,7 +34,7 @@ import { DiagnosticsCard, type DiagnosticsCardFace } from './DiagnosticsCard.ts'
 import { createDiagnosticsApi } from './diagnostics-state.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
-import { ParamCard, type ParamCardFace } from './ParamCard.ts'
+import { ParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
 import { RowConfigCard, type RowConfigFace } from './RowConfigCard.ts'
 import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey, type ClientSeam, type ConfigFormsSeat, type ParamSectionSource } from './seam.ts'
 import { SettingsSection } from './SettingsSection.ts'
@@ -107,6 +107,12 @@ export function apply(ctx: ClientContext): void {
   // sites used to write `t('changed').replace('{n}', …)` seven times.
   const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string =>
     values === undefined ? translate(key) : fill(translate(key), values)
+  const language = (): ParamLanguage => {
+    try {
+      const active = (ctx as unknown as { locale?: { getLocale?: () => { active?: string } } }).locale?.getLocale?.().active
+      return active === 'en' ? 'en' : 'zh'
+    } catch { return 'zh' }
+  }
   // G2: the client settings seat, probed LAZILY (see `inject`). Without a seat every card
   // renders the stated empty state and the Plugins page says the same — never a blank card
   // and never a thrown render. The probe must not be captured here: this row may activate
@@ -152,6 +158,7 @@ export function apply(ctx: ClientContext): void {
         namespace: section.namespace,
         fields: section.fields,
         t,
+        lang: language,
         mutateOnce,
         clear,
         hooks: { paramSection: source },
@@ -187,7 +194,7 @@ export function apply(ctx: ClientContext): void {
       for (const rowId of seat.rows) {
         const section = CLIENT_PARAM_SECTIONS.find(candidate => candidate.namespace === rowId)
         if (section === undefined) continue
-        const face = (): RowConfigFace => ({ namespace: rowId, fields: section.fields, t })
+        const face = (): RowConfigFace => ({ namespace: rowId, fields: section.fields, t, lang: language })
         yield seam.slots.register({
           name: ROW_CONFIG_SLOT,
           key: rowConfigKey(seat.bundle, rowId),

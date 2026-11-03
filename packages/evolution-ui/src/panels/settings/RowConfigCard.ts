@@ -21,6 +21,8 @@ export interface RowConfigFace {
   namespace: string
   fields: readonly ClientParamField[]
   t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
+  /** Current UI language for generated labels; omitted defaults to zh. */
+  lang?: () => 'zh' | 'en'
 }
 
 /** Props one row entry is rendered with: the page's seat plus this row's own face. */
@@ -43,7 +45,7 @@ function overridden(user: unknown, fields: readonly ClientParamField[], namespac
  * @returns the entry; `summary` renders nothing for an untouched row (the page then keeps the row's own description).
  */
 export function RowConfigCard(props: RowConfigCardProps): ReactNode {
-  const { t, fields, namespace, view, form } = props
+  const { t, fields, namespace, view, form, lang } = props
   if (form === undefined) {
     // The page renders an entry only for a row it lists; no form means the deployment did
     // not compose the settings surface, so the page view says so instead of drawing dead controls.
@@ -57,6 +59,7 @@ export function RowConfigCard(props: RowConfigCardProps): ReactNode {
     namespace,
     fields,
     t,
+    lang,
     snapshot: sectionSnapshotOf(form.state),
     // T5-01/A56: ONE fenced write per SAVE. The fence stays (it is what keeps a concurrent editor
     // from being overwritten) — it just covers the whole op list instead of one field at a time, and
