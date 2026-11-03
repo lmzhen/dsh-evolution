@@ -180,6 +180,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     if (view.kind === 'failed') return createElement('p', { className: 'evolution-param-error', role: 'status' }, failureText(view.failure, translate))
     if (view.kind === 'unavailable') return createElement('p', { className: 'evolution-param-error', role: 'status' }, t('approvalPreviewNone') + view.reason)
     const facts: ReactNode[] = [
+      createElement('span', { className: 'evolution-param-fact', key: 'path' }, t('approvalPreviewPath', { path: view.answer.path })),
       createElement('span', { className: 'evolution-param-fact', key: 'added' }, t('approvalDiffAdded', { n: view.answer.linesAdded })),
       createElement('span', { className: 'evolution-param-fact', key: 'removed' }, t('approvalDiffRemoved', { n: view.answer.linesRemoved })),
       ...view.answer.truncated ? [createElement('span', { className: 'evolution-param-fact', key: 'cut' }, t('approvalDiffCut'))] : [],
@@ -246,7 +247,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
           setArmed(null)
           decide(entry.id, action)
         },
-      }, busy ? t('approvalLoading') : t(label))
+      }, busy ? t(action === 'approve' ? 'approvalApproving' : 'approvalRejecting') : t(label))
     return createElement('div', { className: 'evolution-param-field', key: entry.id },
       createElement('div', { className: 'evolution-param-label' },
         createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
