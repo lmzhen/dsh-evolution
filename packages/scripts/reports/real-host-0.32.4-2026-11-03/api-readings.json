@@ -1,0 +1,16 @@
+{
+  "measuredAt": "2026-11-03T02:01:58.131Z",
+  "host": "http://127.0.0.1:3086",
+  "installForm": "0.32.4 dist tarballs (tag run 41559831333), isolated web profile",
+  "familyVersion": "0.32.4",
+  "platformLine": "0.2.1-rc.3（最低兼容 0.2.1-rc.2）",
+  "diagnosticsSchemaVersion": 2,
+  "diagnosticsFacts": 7,
+  "diagnosticsRuntime": 8,
+  "skillHistoryRows": 27,
+  "skillHistoryBytes": 22412,
+  "skillHistoryIdempotent": true,
+  "mergeWireVersion": 1,
+  "anonymousStatus": 401,
+  "s4": "s4-hmr-double-apply.spec.ts 2/2"
+}
