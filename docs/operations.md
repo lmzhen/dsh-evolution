@@ -6,15 +6,15 @@
 /evolution doctor
 ```
 
-安装/升级后、功能不对时，先跑这一条。它会告诉你：装的是哪种形态、平台/家族版本、连接和服务状态。它不能证明 memory/skill 工具真的可用，工具是否可用仍要实际写一次/改一次。
+装完、升级完、或者觉得功能不对，先跑这一条。它会打印安装形态、平台/家族版本、连接和服务状态。它不能证明 memory/skill 工具真的能用；要验证工具，还是得写一次、改一次。
 
-## 它会自己做什么
+## 后台在做什么
 
-- **复盘**：all 形态下累计约 10 次工具调用后，在任务收尾时多跑一轮；默认开；host 形态不跑。
-- **整理**：宿主启动约 10 秒后判断，之后每小时查一次；满 168 小时且空闲约 2 小时才跑，默认开。
-- **合并**：不会自动扫描；你主动 scan/pair 或后台提议时才发生。
+- 复盘：all 形态下，累计约 10 次工具调用、任务收尾时多跑一轮。默认开，host 不跑。
+- 整理：宿主启动约 10 秒后判断一次，之后每小时查一次；满 168 小时、空闲约 2 小时才真正跑。默认开。
+- 合并：不会自己扫描。你主动 scan/pair，或者后台给出提议时才会发生。
 
-## 日常看什么
+## 平时看什么
 
 | 想看 | 命令 |
 |---|---|
@@ -26,7 +26,7 @@
 | 技能结构健康 | `/evolution skills health` |
 | 最近技能变更 | `/evolution mutations` |
 
-## 数据在哪里
+## 数据在哪
 
 | 路径 | 内容 |
 |---|---|
@@ -35,14 +35,14 @@
 | `$DSH_HOME/skills/` | 技能树 |
 | `$DSH_HOME/skills/.history/` | 技能版本 |
 | `$DSH_HOME/evolution/` | 审查、整理、运行记录、合并状态（`evolution/merge/`） |
-| `$DSH_HOME/merge/` | 技能事务的撤销日志/快照（用 undo/合并撤销时需要） |
+| `$DSH_HOME/merge/` | 技能事务的撤销日志/快照（undo 和合并撤销需要） |
 | `$DSH_HOME/profiles/<profile>/cordis.patch.yml` | 审批、预算、频率等设置 |
 
-备份这些位置：`memories/`、`skills/`、`evolution/`、`merge/`，以及 profile 的 `cordis.patch.yml`（设置在里面）。
+备份这几个位置：`memories/`、`skills/`、`evolution/`、`merge/`，再加上 profile 的 `cordis.patch.yml`。设置也在里面，别只备份技能。
 
 ## 备份
 
-最稳妥：停宿主，整体备份 `$DSH_HOME`。如果只想备份家族数据：
+最省事的办法是停掉宿主，整个备份 `$DSH_HOME`。只想备份家族数据的话：
 
 ```bash
 # 先停宿主
@@ -54,14 +54,14 @@ cp -a "$DSH_HOME/memories" "$DSH_HOME/skills" "$DSH_HOME/evolution" "$DSH_HOME/m
 
 ## 升级
 
-**先平台，后家族。** 平台和家族的版本是配套的；反过来升级会失败。
+先平台，后家族。版本是配套的，反过来升级会失败。
 
-1. 读目标版本 `CHANGELOG.md`；
+1. 读目标版本的 `CHANGELOG.md`；
 2. 备份 `$DSH_HOME`；
-3. 升级 DeepSeek Harness 并重启；
+3. 升级 DeepSeek Harness，重启；
 4. 升级家族 bundle：`dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.32.5`；
-5. 重启后 `/evolution doctor`；
-6. 做一次记忆写入 + 一次技能改动。
+5. 重启后跑 `/evolution doctor`；
+6. 写一次记忆、改一次技能，确认工具真的能用。
 
 ## 卸载
 
@@ -69,18 +69,16 @@ cp -a "$DSH_HOME/memories" "$DSH_HOME/skills" "$DSH_HOME/evolution" "$DSH_HOME/m
 dsh plugin --profile web remove @lmzhen/dsh-evolution-all
 ```
 
-卸载只移除插件；`$DSH_HOME` 下的数据和 profile 设置保留。恢复时把 `memories/`、`skills/`、`evolution/`、`merge/` 和 profile 的 `cordis.patch.yml` 放回原位，再重启。分层用户先清掉 profile patch 里的预设行，避免残留引用。
+卸载只移除插件，`$DSH_HOME` 下的数据和 profile 设置都还在。要恢复，把 `memories/`、`skills/`、`evolution/`、`merge/` 和 profile 的 `cordis.patch.yml` 放回原位，再重启。分层用户先清掉 profile patch 里的预设行，避免残留引用。
 
 ## 长任务
 
-- `maintain`、`merge scan/pair` 是异步的，会返回 run id；用 status/report 看。
-- 运行记录读不到时，命令会明确说“不可读”，不会假装没有运行。
-- 宿主重启后，未完成的任务会按恢复逻辑处理。
+`maintain`、`merge scan/pair` 是异步的，会返回 run id；用 status/report 看进度。运行记录读不到时，命令会直接说“不可读”，不会假装没跑过。宿主重启后，没完成的任务按恢复逻辑处理。
 
-## 升级后检查（按形态）
+## 升级后检查
 
-- [ ] `/evolution doctor` 的版本/形态正确
-- [ ] all：记忆工具/技能工具在预期会话出现，技能历史能打开、能 undo，设置页能打开
+- [ ] `/evolution doctor` 的版本、形态正确
+- [ ] all：记忆/技能工具在预期会话出现，技能历史能打开、能 undo，设置页能打开
 - [ ] host：整理/报告可用；不要期待自动复盘或记忆/技能工具
 - [ ] preset/分层：命令和工具按预期出现；没有设置页/侧栏是正常的
-- [ ] 审批（如开启）能审批/拒绝；合并模型目录仍在（如使用 merge）
+- [ ] 审批（如果开了）能批/拒；合并模型目录还在（如果用了 merge）

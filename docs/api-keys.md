@@ -1,10 +1,8 @@
 # 需要模型 / API key 的功能
 
-## 先给结论
+dsh-evolution 不自己保存 API key。需要模型的功能都走 DeepSeek Harness 的 `llm` 服务；只要 DSH 里配好一个可用的模型提供方，家族功能就跟着用。
 
-dsh-evolution **不自己保存 API key**。需要模型的功能都走 DeepSeek Harness 的 `llm` 服务；你只要在 DSH 里配好一个可用的模型提供方，家族功能就用它。
-
-最常用的是 DeepSeek 官方：配一个 `DEEPSEEK_API_KEY`（或通过模型设置页保存），下面这些功能就能用。
+最常用的是 DeepSeek 官方：配一个 `DEEPSEEK_API_KEY`，或者在模型设置页里保存，下面这些功能就能用。
 
 ## 哪些功能需要模型
 

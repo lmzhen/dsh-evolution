@@ -1,23 +1,7 @@
 # @lmzhen/dsh-evolution-commands
 
-> `/evolution` 命令入口。
+`/evolution` 命令的入口。日常用的 doctor、pending、curator、merge、skill history 都在这里。
 
-## 你会看到
-
-`/evolution doctor`、`pending`、`curator`、`merge`、`skill history` 等。
-
-## 什么时候会用到
-
-日常管理和排障时。
-
-## 默认 / 前提
-
-随 all/host/preset 安装自动注册。
-
-## 边界
-
-没有 `commands` 服务时整条命令不存在。
-
-分层/variant 的命令面差异单源在 [INSTALL.md](../INSTALL.md)。
+它随 all/host/preset 安装注册；没有 `commands` 服务时整条命令不存在。分层和变体的命令面差异，以 [INSTALL.md](../INSTALL.md) 为准。
 
 > 旧的 consolidate 已从用户面退役；合并请用 `merge`。
