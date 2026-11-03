@@ -216,6 +216,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
           })
           setLastReadAt(payload.readAt)
           setScan(payload.scan)
+          setFailed(undefined)
         } else setFailed(outcome.failure)
       })
       .catch(() => { if (live) setFailed({ kind: 'server', status: 0 }) })

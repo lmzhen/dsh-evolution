@@ -229,6 +229,9 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       createElement('pre', { className: 'evolution-param-diff' }, ...lines.length === 0 ? ['±'] : lines))
   }
 
+  const summaryLine = (entry: PendingRow): string => entry.verb === undefined || entry.target === undefined
+    ? entry.summary
+    : t(VERB_KEYS[entry.verb] ?? 'approvalVerbUpdate') + ' ' + entry.target + (entry.operationCount !== undefined && entry.operationCount > 1 ? ' ×' + String(entry.operationCount) : '')
   const row = (entry: PendingRow): ReactNode => {
     // T4-05/A47: a running record is NOT waiting for a decision — its write effect may already have
     // landed — so the two decisions are absent and the row says what to do instead (the CLI's own
@@ -237,9 +240,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       return createElement('div', { className: 'evolution-param-field', key: entry.id },
         createElement('div', { className: 'evolution-param-label' },
           createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
-          createElement('span', { className: 'evolution-param-value', title: entry.summary }, entry.verb === undefined || entry.target === undefined
-            ? entry.summary
-            : t(VERB_KEYS[entry.verb] ?? 'approvalVerbUpdate') + ' ' + entry.target + (entry.operationCount !== undefined && entry.operationCount > 1 ? ' ×' + String(entry.operationCount) : ''))),
+          createElement('span', { className: 'evolution-param-value', title: entry.summary }, summaryLine(entry))),
         createElement('p', { className: 'evolution-param-hint' }, age(entry)),
         createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalExecuting')),
         entry.claimedBy === undefined ? null : createElement('p', { className: 'evolution-param-hint' }, entry.claimedBy),
@@ -274,13 +275,13 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     return createElement('div', { className: 'evolution-param-field', key: entry.id },
       createElement('div', { className: 'evolution-param-label' },
         createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
-        createElement('span', { className: 'evolution-param-value' }, entry.summary)),
+        createElement('span', { className: 'evolution-param-value', title: entry.summary }, summaryLine(entry))),
       createElement('p', { className: 'evolution-param-hint' }, age(entry)),
       armed === entry.id
         ? createElement('p', { className: 'evolution-param-note', role: 'status' },
           // The sentence gets its OWN element: a bare text child shares the paragraph with the two
           // buttons, and an assertion on it then has to fight the query's own-text rule (U-6 fixture).
-          createElement('span', { className: 'evolution-param-value' }, t('approvalConfirmNamed', { n: entry.summary })),
+          createElement('span', { className: 'evolution-param-value' }, t('approvalConfirmNamed', { n: summaryLine(entry) })),
           createElement('button', {
             className: 'evolution-param-button',
             type: 'button',

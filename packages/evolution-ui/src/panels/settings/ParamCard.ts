@@ -481,7 +481,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
           createElement('button', {
             type: 'button',
             className: 'evolution-param-button',
-            disabled: busy || dirty.length === 0 || blocked,
+            disabled: busy || dirty.length === 0,
             onClick: () => { setDraft({}); setError('') },
           }, t('discard')),
           createElement('button', {

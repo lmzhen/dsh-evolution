@@ -92,6 +92,12 @@ export function apply(ctx: ClientContext): void {
   const confirmMode = (): 'auto' | 'ask' => {
     try { return confirmModeFrom(settingsSeat.get('evolution-approval')?.getSnapshot().user) } catch { return 'auto' }
   }
+  const hasView = (view: 'merge' | 'health'): boolean => {
+    try {
+      const entries = (seam.slots as unknown as { entries?: (name: string) => Array<{ options?: { id?: string } }> }).entries?.('evolution.workbench.view') ?? []
+      return entries.some(entry => entry.options?.id === (view === 'merge' ? 'merge' : 'skill-health'))
+    } catch { return false }
+  }
   const pendingFace = (): PendingCardFace => ({ t: pendingT, api: createApprovalApi((input, init) => fetch(input, init)), confirmMode, fallback: FALLBACKS.approval })
   const label = (): string => t('entry.label')
 
@@ -109,7 +115,7 @@ export function apply(ctx: ClientContext): void {
       name: 'layout.page',
       key: WORKBENCH_ID,
       children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
-      inject: (): WorkbenchFace => ({ t, history: historyFace(), pending: pendingFace() }),
+      inject: (): WorkbenchFace => ({ t, history: historyFace(), pending: pendingFace(), hasView }),
     }, WorkbenchPage as unknown as (props: never) => unknown)
   })
 }
