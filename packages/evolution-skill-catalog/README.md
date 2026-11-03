@@ -1,8 +1,22 @@
 # @lmzhen/dsh-evolution-skill-catalog
 
-把家族技能发布到平台技能目录，让 Agent 能像用普通技能一样发现和加载它们。用户不用直接操作。
+> 让 Agent 能在技能目录里看到家族技能。
 
-它随 all/分层安装自动工作。手工改过技能目录后，可能需要 `/evolution skills refresh` 让 Agent 重新读取。
+## 你会看到
+
+Agent 能像用普通技能一样发现/使用它们；用户不用直接操作。
+
+## 什么时候会用到
+
+每次 Agent 查技能时。
+
+## 默认 / 前提
+
+随 all/分层安装自动工作。
+
+## 边界
+
+手工改技能目录后，可能需要 `/evolution skills refresh`。
 
 ## 维护者参考（用户可跳过）
 

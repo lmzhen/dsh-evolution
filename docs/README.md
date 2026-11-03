@@ -1,6 +1,6 @@
 # dsh-evolution 用户手册
 
-这里只讲使用者需要知道的东西。服务名、内部 API、包分层不在这里；维护者文档在 `docs/developer/`。
+这套文档只讲你会看到、会操作、会受影响的东西。服务名、内部 API、包分层不在这里；维护者文档在 docs/developer/。
 
 ## 从哪里开始
 
@@ -15,18 +15,22 @@
 | 哪些功能要模型/API key | [API key 与模型](api-keys.md) |
 | 哪里不对 | [排障](troubleshooting.md) |
 
-## 几个常见场景
+## 最常见的三条路径
 
-第一次用：装 all，重启，跑 `/evolution doctor`，让 Agent 记一条项目事实，开新会话确认它还在。
+### 第一次用
 
-让 Agent 自己改进：正常干活。任务收尾可能复盘；技能放久了会被整理；启用了合并（需要本地模型）时，重叠技能会进队列。偶尔看看 `/evolution pending`、`/evolution curator status`、`/evolution merge pending`。
+安装 all、重启、执行 /evolution doctor、让 Agent 记住一条项目事实，再开新会话确认它还在。
 
-不放心自动写：打开审批。之后可暂存的记忆/技能写入会停下来等你批准；批准后仍然可以撤销。
+### 让 Agent 自己改进
+
+正常干活。到自然节点它会复盘；技能过时会被整理；如果你启用了合并（需本地模型），重叠技能会进入队列。偶尔看 /evolution pending、/evolution curator status、/evolution merge pending。
+
+### 不放心自动写
+
+打开审批。之后每次记忆/技能写入都会停在待批窗口，由你批准或拒绝；批准后也可以撤销。
 
 ## 文档边界
 
-这套文档面向使用者，不承诺内部实现细节。
-
-安装形态、平台线、版本这些会变的东西，以 README/INSTALL 的当前版本为准。
-
-维护者文档：[架构](developer/architecture.md)、[开发](developer/development.md)、[单元与撤销](developer/units-and-undo.md)。
+- 本目录面向使用者；不承诺内部实现细节。
+- 安装形态、平台线、版本等会变的事实，以 README/INSTALL 的当前版本为准。
+- 维护者文档：[架构](developer/architecture.md)、[开发](developer/development.md)、[单元与撤销](developer/units-and-undo.md)。

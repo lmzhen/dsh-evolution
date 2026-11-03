@@ -1,5 +1,19 @@
 # @lmzhen/dsh-evolution-maintenance
 
-手动维护扫描，高级功能。用 `/evolution maintain` 触发，status/report/cancel 管运行。
+> 手动维护扫描（高级）。
 
-它异步跑，返回 run id；只生成扫描结果和维护计划，不改技能内容。日常不需要跑。
+## 你会看到
+
+`/evolution maintain` 及 status/report/cancel。
+
+## 什么时候会用到
+
+你想主动扫一遍技能库/生成维护计划时。
+
+## 默认 / 前提
+
+异步运行，返回 run id。
+
+## 边界
+
+日常不需要跑；不改技能内容。
