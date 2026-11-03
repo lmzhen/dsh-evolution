@@ -1,4 +1,9 @@
 # Changelog
+## 0.32.4 (chore) — G8b evidence hardening (no runtime src change)
+
+> **范围**：将 G8b 52 项 traceability 的证据层收口：24 个真实 probe 全部有唯一 mutation 锚点并由 overlay 运行盖章；签名绑定 spec+fixture+mutation target；gate-55 改为 strict；release evidence 拒绝 planned 读数；安装/文档/平台范围/渠道消费者改指向真实 probe。  
+> **验证**：mirror 与 overlay-shaped root 的 `verify-traceability --strict` 均 52/52；CI run 41549797855（Node22/24、Windows desktop）全 success；独立审计 7/7 PASS（C-06 gate 修正后）。  
+> **发布**：0.32.4 为证据层补丁；`packages/*/src` 相对 0.32.3 无差异，runtime artifact 与 0.32.3 相同。  
 ## Unreleased — Batch A: WriteKernel + MutationUnit/state adapters
 
 > **范围**：新增 WriteKernel CAS/补偿原语；MutationUnit 的 applyOp/rollback 走 kernel，修复 P1-1/P1-2。MutationUnit 已接；state jsonTransact 已接 kernel.run；merge/curator 后续。
