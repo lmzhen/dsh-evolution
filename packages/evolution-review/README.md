@@ -1,6 +1,6 @@
 # @lmzhen/dsh-evolution-review
 
-> 后台复盘：在自然节点回顾对话并给改进建议。
+> 后台复盘：在任务收尾时回顾对话并给改进建议。
 
 ## 你会看到
 
@@ -8,11 +8,11 @@
 
 ## 什么时候会用到
 
-Agent 干完一段活、达到节奏时。
+累计约 10 次工具调用、任务收尾时。
 
 ## 默认 / 前提
 
-默认在会话内、按 cadence 触发。
+默认在会话内，按约 10 次工具调用触发；会叫醒模型多跑一轮。
 
 ## 边界
 
@@ -20,4 +20,4 @@ Agent 干完一段活、达到节奏时。
 
 ## 维护者参考：参数别名（G0/S0.3）
 
-`memoryInterval` → `reviewMemoryInterval`；`skillInterval` → `reviewSkillInterval`。旧名仍可读，写入会拒绝。
+`memoryInterval` 映射为 `reviewMemoryInterval`；`skillInterval` 映射为 `reviewSkillInterval`。旧名仍可读，写入会拒绝。

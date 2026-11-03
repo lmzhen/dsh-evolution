@@ -21,7 +21,7 @@ dsh-evolution **不自己保存 API key**。需要模型的功能都走 DeepSeek
 
 ## 怎么配：Web / 桌面
 
-1. 打开 DSH 的 **设置 → 模型（Models）**。
+1. 打开 DSH 的 **设置里的「模型（Models）」**。
 2. 选择 DeepSeek（或你已有的 provider）；没有就新增一个。
 3. 在 API key 输入框填入 key，保存。
 4. 回到会话，选一个使用该 provider 的模型。

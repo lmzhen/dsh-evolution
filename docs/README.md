@@ -7,7 +7,7 @@
 | 你现在的状态 | 读这篇 |
 |---|---|
 | 刚听说，想知道值不值得装 | [功能说明](features.md) |
-| 准备安装 | [入门](getting-started.md) → [安装与升级](../INSTALL.md) |
+| 准备安装 | [入门](getting-started.md)、[安装与升级](../INSTALL.md) |
 | 已经装好，想日常使用 | [日常使用](getting-started.md) |
 | 想调审批/预算/频率 | [设置](configuration.md) |
 | 命令记不住 | [命令](commands.md) |
@@ -19,7 +19,7 @@
 
 ### 第一次用
 
-安装 all → 重启 → 执行 /evolution doctor → 让 Agent 记住一条项目事实 → 开新会话确认它还在。
+安装 all、重启、执行 /evolution doctor、让 Agent 记住一条项目事实，再开新会话确认它还在。
 
 ### 让 Agent 自己改进
 
