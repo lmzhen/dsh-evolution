@@ -100,3 +100,5 @@ Command surface includes the preset install row:
 The install-form semantics and the variant command-face difference are single-sourced in [INSTALL.md](INSTALL.md); this section cites that home instead of restating it. The root publish/install details are in the repository [INSTALL.md](../INSTALL.md).
 
 The family uses declared gates rather than trusting a green test run. A column nobody has written yet is not a pass; an unevaluated criterion is not a pass. Gate declarations live in `scripts/family-facts.json`; the command table lives in `CONTRIBUTING.md`.
+
+> 旧的 consolidate 已从用户面退役；合并请用 `merge`。
