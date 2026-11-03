@@ -1,19 +1,13 @@
 # @lmzhen/dsh-evolution-io-node
 
-> 内部组件，提供本地文件读写。
+Local `node:fs` IO provider. It registers as `node` and declares itself the default provider for the family IO registry.
 
-## 你会看到
+Writes use a durable temporary file followed by rename. Missing files read as absent; permission and other real IO failures remain errors instead of being mistaken for an empty store.
 
-没有命令、面板或工具入口。
+## Process boundary
 
-## 什么时候会用到
+The backend guarantees serialization of writes to the same path **within one process only**. It does not provide a cross-process read-modify-write lock. A deployment that shares a directory between processes must use a platform `ctx.fs` provider that explicitly declares cross-process scope; the Node backend alone is insufficient.
 
-只在排障存储问题时。
+Crash atomicity and mutual exclusion are separate properties: temporary-file plus rename gives the former, not the latter.
 
-## 默认 / 前提
-
-随 all/host 安装自动工作。
-
-## 边界
-
-数据在本地；不是云存储。
+There is no command, panel, cloud replication, or remote storage implementation in this package.

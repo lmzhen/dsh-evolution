@@ -1,19 +1,13 @@
 # @lmzhen/dsh-evolution-state-json
 
-> 内部组件，默认的本地状态存储。
+Default JSON state provider over the family IO seam. It stores review, curator, and pending records without requiring the platform storage-domain service.
 
-## 你会看到
+`root` defaults to the evolution home. The principal files are `review-state.json`, `curator-state.json`, and `pending-state.json`; the pre-split `pending.json` is read-only legacy input that is retired after migration.
 
-没有命令、面板或工具入口。
+## Retention and corruption behavior
 
-## 什么时候会用到
+Resolved pending records are capped at 200 in the live map. Older records move to `pending-state-archive.json`, whose own history rotates to a `.bak` sidecar after 5,000 records. Pending/executing work is not trimmed by the resolved cap. Review cadence state is capped at 500 sessions.
 
-只在排障状态时。
+Malformed state is not accepted as an empty store. The provider preserves the original bytes in a `.corrupt` copy when possible and fails loudly so a later save cannot silently overwrite recoverable state. Quarantine copies have a bounded rescue window handled by the Node IO backend.
 
-## 默认 / 前提
-
-默认启用。
-
-## 边界
-
-损坏文件会被隔离，不会静默覆盖。
+Read-modify-write safety depends on the selected IO backend. The shipped Node backend serializes within one process only; see [evolution-io-node](../evolution-io-node/README.md) before sharing one home between processes.

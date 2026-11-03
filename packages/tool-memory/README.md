@@ -1,19 +1,19 @@
 # @lmzhen/dsh-tool-memory
 
-> Agent 写记忆的工具。
+Model-facing `memory` tool plus durable-memory guidance and snapshot sections for the system prompt.
 
-## 你会看到
+## Tool contract
 
-你对 Agent 说“记住…”，它写入项目记忆/用户画像。
+`target` selects `memory` for agent notes or `user` for stable user-profile facts. Actions are `add`, `replace`, and `remove`. `facts` and `content` are aliases; supplying different non-blank values for both is rejected.
 
-## 什么时候会用到
+Use one `operations` array for a batch. The batch is evaluated against the final result so removal/replacement can free budget before additions. Add requires content; replace requires matching old text and new content; remove requires matching old text. Empty batches and malformed operations are rejected before approval.
 
-你想让 Agent 跨会话记住事实/偏好时。
+## Defaults and boundaries
 
-## 默认 / 前提
+- `memoryEnabled`: default `true`; disabling removes the model tool and prompt sections while retaining an explicit refusal runner for previously staged writes.
+- `entryPreviewChars`: default 200 characters per entry in the tool response; this does not truncate stored content.
+- `memoryChars` and `userChars`: enforced by the selected provider, not by this tool; see [memory-files](../memory-files/README.md).
 
-all/分层预设才有；host 没有。
+When ordinary approval is enabled, a write can return `pending_id` instead of executing immediately. An effective platform session policy of `never` bypasses staging as designed.
 
-## 边界
-
-审批开启时会先进入待批。
+Guidance and snapshot injection require the optional `systemPrompt` service. Without it, the write tool still works but memory context is not injected. Successful writes through the memory registry refresh the snapshot, including graph and background-review writes.

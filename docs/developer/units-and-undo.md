@@ -1,6 +1,6 @@
 # 单元、撤销与版本：技能历史的底层规则
 
-这一页面向要改 `evolution-core` / `evolution-curator` / 技能历史的人，解释“一次树改动为什么会留下多条记录”“怎么整体撤销”“跨技能时怎么判断安全”。不涉及目录物理布局。
+这一页面向要改 `evolution-core` / `evolution-curator` / 技能历史的人，解释树改动为何产生多条记录、如何按单元撤销，以及跨技能撤销的安全判定。不涉及目录物理布局。
 
 ## 1. 一个单元 = 一次树改动
 
@@ -43,4 +43,4 @@ pnpm exec vitest run <unit-head/unit-members spec> --maxWorkers=1
 ## 6. 回退
 
 - 单文件：`git checkout -- <path>`（先确认在哪个 checkout）。
-- 单元级：用 `undoUnit` 本身；它拒绝时不会留下半成品。
+- 单元级：用 `undoUnit` 本身。预检拒绝时零写；执行期支撑文件或正文写入失败不做补偿回滚，可能只完成部分路径，结果会列出已回退项，此时应从备份恢复。

@@ -1,30 +1,18 @@
-# @lmzhen/dsh-evolution-agent
+# @lmzhen/dsh-evolution-agent-preset
 
-> 分层安装用的 Evolution 预设。
+Composition package for the layered Evolution agent preset. Its substance is `agent.cordis.yml` and `bases.json`; the JavaScript entry has no runtime API.
 
-## 你会看到
+Install `evolution-host` first, then generate the preset with `/evolution preset install`. Only sessions that select an Evolution preset receive the memory/skill model tools. Original platform presets receive no evolution behavior, although the host-level `/evolution` management commands remain visible.
 
-新建会话时选择 Evolution；只有该会话有记忆/技能工具。
+The layered preset is mutually exclusive with `all`, `preset`, and another host bundle. This package is not a standalone `dsh plugin add` install target.
 
-## 什么时候会用到
-
-你只想在部分会话给工具时。
-
-## 默认 / 前提
-
-需要先装 host；与 all/preset 互斥。
-
-## 边界
-
-不是 `dsh plugin add` 的安装目标。
-
-## 维护者参考（用户可跳过）
+## Preset bases
 
 | `--base` | Platform base patch (read verbatim) | Preset id | Row id | Display copy |
 |---|---|---|---|---|
 | `standard` | `presets/standard.patch.yml` | `evolution` | `preset-evolution` | Evolution |
 | `ptc` | `presets/ptc.patch.yml` | `evolution-ptc` | `preset-evolution-ptc` | Evolution PTC |
 | `cordis` | `presets/cordis.patch.yml` | `evolution-cordis` | `preset-evolution-cordis` | Evolution Cordis |
-| `minimal` | `presets/minimal.patch.yml` | `evolution-minimal` | `preset-evolution-minimal` | Evolution Minimal（unsupported） |
+| `minimal` | `presets/minimal.patch.yml` | `evolution-minimal` | `preset-evolution-minimal` | Evolution Minimal (unsupported) |
 
-`cordis` 需要 `dynamicCordisRunner`；`minimal` 不支持。
+`cordis` requires `dynamicCordisRunner`; `minimal` is unsupported.

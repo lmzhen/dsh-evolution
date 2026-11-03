@@ -1,19 +1,9 @@
 # @lmzhen/dsh-evolution-state-domain
 
-> 内部可选组件，默认不启用。
+Optional `storageDomain` provider for review, curator, and pending state. It is disabled in the shipped bundle patches and requires the platform `storageDomain` service.
 
-## 你会看到
+The provider defines three schema-validated tables: `review_state`, `curator_state`, and `pending`. The configured domain facility determines the actual medium, which can be JSON, SQLite, remote RPC, or another supported backend; this package does not imply that all state resides in `$DSH_HOME`.
 
-没有命令、面板或工具入口。
+Transient open failures receive a bounded retry; deterministic schema/version/backend failures surface immediately. Pending claim/resolve transitions and the shared caps match the JSON provider. Resolved pending history is capped at 200 and review cadence state at 500 sessions, but domain mode does not create the JSON `pending-state-archive.json` sidecar.
 
-## 什么时候会用到
-
-只有部署方要换存储介质时。
-
-## 默认 / 前提
-
-默认关闭；需要额外服务。
-
-## 边界
-
-普通用户不需要开。
+When both state providers are mounted, pin `provider: domain` on the `evolution-state` row. Leaving the choice to registration order is rejected by the facade.

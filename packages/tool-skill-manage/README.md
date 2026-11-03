@@ -1,23 +1,21 @@
 # @lmzhen/dsh-tool-skill-manage
 
-> Agent 写技能的工具（创建/修补/归档/合并入口）。
+Model-facing `skill_manage` tool for reading and mutating reusable skills. It ships in `all` and the layered/full model-tool presets, not in host-only.
 
-## 你会看到
+## Actions
 
-用户看到的是 Agent 创建/修改技能；改错可看历史/撤销。
+`review`, `list`, `create`, `edit`, `update`, `patch`, `delete`, `write_file`, `remove_file`, `restructure`, `extract`, `pin`, and `unpin`.
 
-## 什么时候会用到
+Create/edit/update take a complete `SKILL.md`; patch replaces the first anchor unless `replace_all=true`. Support files are addressed by `file_path`. Restructure moves a body section into a support file; extract moves a reusable part into an existing owner skill. Delete archives to `.archive`, with `absorbed_into` recording an umbrella where applicable.
 
-你让 Agent 把做法写成技能，或它自己改进时。
+Created or edited skill files require valid YAML frontmatter. Protected bundled/hub skills reject mutation; pinned skills reject deletion and are read-only to background review.
 
-## 默认 / 前提
+## Write controls
 
-all/分层预设才有；host 没有。
+The four authoring caps are tighten-only at the user layer: `skillContentChars`, `maxSkillFileBytes`, `maxSkillNameLength`, and `maxDescriptionLength`. `descriptionStrict`, `strictCrossSource`, citation/reference policy, support-file policy, version retention, and threat exemptions are described in [PARAMETERS.md](../PARAMETERS.md).
 
-## 边界
+`skillWriteConfirm` defaults to `auto`, so unattended runs do not park on a question. `ask` waits for an answer; `timeout` cancels after `skillWriteConfirmTimeoutSeconds`. Ordinary approval can instead return a `pending_id` for replay through the approval service.
 
-写入有保护；删除是归档。
+History keeps the configured number of content versions per skill. Older version entries leave the index, but their stored blobs currently have no automatic sweep, so long-lived libraries can retain historical bytes.
 
-## 维护者参考：参数别名（G0/S0.3）
-
-`maxSkillContentChars` 映射为 `skillContentChars`。旧名仍可读，写入会拒绝。
+`maxSkillContentChars` remains a readable deprecated alias of `skillContentChars`; writes to the old name are refused.

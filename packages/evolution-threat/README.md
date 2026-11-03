@@ -1,19 +1,17 @@
 # @lmzhen/dsh-evolution-threat
 
-> 内部安全组件，写入前扫描注入/密钥/外泄等威胁。
+Write-time threat guard for the family model-writing tools. It is enabled by default and runs even when ordinary write approval is disabled.
 
-## 你会看到
+## Actual coverage
 
-用户看到的是写入被拒时的提示。
+The guard scans calls whose tool name belongs to the family `EVOLUTION_WRITE_TOOLS` set. Memory calls scan `facts` and `content`, including entries in `operations[]`; skill calls scan `content`, `file_content`, and `new_string`. A matching threat label denies the allowed execution through `tools.guard`.
 
-## 什么时候会用到
+This is not a scan of every internal write. Curator jobs, merge orchestration, direct provider calls, generic file tools, and other paths outside the guarded tool set are not covered by this package.
 
-每次写记忆/技能前。
+## Configuration and limits
 
-## 默认 / 前提
+- `enabled`: mounts the guard; default `true`.
+- `maxScanChars`: normalized characters scanned per field; default 65,536. Values below the overlap-safe floor fall back to the default.
+- `threatExemptLabels`: deployment-declared benign labels; default empty. These labels affect the scan and must be treated as security configuration.
 
-默认开启；审批关闭也扫描。
-
-## 边界
-
-规则集手工维护，不保证穷尽。
+The rule set is manually maintained and is not exhaustive. It is one write-control layer, not a general sandbox or a guarantee that every secret, injection, or exfiltration attempt will be detected.

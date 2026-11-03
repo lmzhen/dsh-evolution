@@ -1,23 +1,17 @@
 # @lmzhen/dsh-memory-files
 
-> 内部组件，把记忆存到 `MEMORY.md`/`USER.md`。
+Default layered memory provider backed by `MEMORY.md` and `USER.md`. It registers as `files` and publishes the effective memory-budget view used by diagnostics.
 
-## 你会看到
+`root` defaults to `$DSH_HOME/memories`. The store enforces its character budget on the final result and refuses overflow rather than silently truncating an entry. Batch writes are serialized within the provider; cross-process safety still depends on the selected IO backend.
 
-用户看到的是记忆被记住/自动带回来。
+## Budgets and defaults
 
-## 什么时候会用到
+- `memoryChars`: fallback default 2,200 characters for `MEMORY.md`.
+- `userChars`: fallback default 1,375 characters for `USER.md`.
+- `addDatePrefix`: default `false`.
+- `maxConsolidationFailures`: default 3 failures before the model is told to stop retrying.
+- `providerName`: default `files`.
 
-每次写记忆、新会话注入时。
+An explicit row/user value wins. Otherwise an already mounted evolution-policy budget takes precedence over the package fallback. The row budget controls what the store enforces; the policy budget controls what review plans against, so an explicit mismatch is warned about and surfaced by doctor.
 
-## 默认 / 前提
-
-随记忆功能自动工作。
-
-## 边界
-
-预算写满会拒绝，不会静默截断。
-
-## 维护者参考：参数别名（G0/S0.3）
-
-`memoryCharLimit` 映射为 `memoryChars`；`userCharLimit` 映射为 `userChars`。旧名仍可读，写入会拒绝。
+`memoryCharLimit` and `userCharLimit` remain readable deprecated aliases of `memoryChars` and `userChars`; writes to the old names are refused. `threatExemptLabels` is deployment security configuration and defaults to empty.

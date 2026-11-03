@@ -1,19 +1,27 @@
 # @lmzhen/dsh-evolution-approval
 
-> 审批窗口：让可暂存的记忆/技能写入等你批准。
+Staged approval service for memory and skill writes. It records a proposed mutation, then replays the registered runner only after an operator approves it.
 
-## 你会看到
+## Operator surface
 
-`/evolution pending`、`approve`、`reject`，以及设置页待批卡。
+Use `/evolution pending`, `approve <id>`, and `reject <id>`. The settings UI can show the pending queue and, when the owning tool registered a preview, a before/after diff without executing the write.
 
-## 什么时候会用到
+`/evolution release <id>` is different from approval. It returns an orphaned `executing` record to `pending` after a crashed approval. A live foreign process or an in-flight local decision blocks release.
 
-你打开审批后，可暂存的 memory/skill 写入。
+## Defaults
 
-## 默认 / 前提
+| Setting | Default | Effect |
+|---|---|---|
+| `enabled` | `false` | Writes proceed without this staged queue. |
+| `stageForeground` | `true` | Once enabled, foreground writes also stage unless the effective session policy is `never`. |
+| `pendingTtlMs` | `0` | Pending records never expire automatically. |
+| `approvalConfirm` | `auto` | Approving does not add a second confirmation by default. |
 
-默认关闭；打开后生效。
+A positive `pendingTtlMs` closes expired records as `rejected` and never executes them. Expiry is evaluated on queue reads and decisions, not by a background timer.
 
-## 边界
+## Boundaries
 
-只覆盖 memory/skill 工具写；整理器/合并器自己的写不经过审批。批准/拒绝是人工决定；`release` 不是批准。待批主要在有设置页的形态里可见，通知/收件箱还不完整。
+- Background-review writes require a registered replay runner. Staging a record without one is not a usable approval flow.
+- Curator and merge writes have their own controls; they do not pass through this ordinary memory/skill approval queue.
+- Before using `release`, verify whether the original runner already landed the write and what effect it had. Approving the returned record replays that operation, which may be non-idempotent.
+- Resolved history is bounded by the state provider. The JSON provider archives older resolved records; the domain provider does not create that JSON archive sidecar.

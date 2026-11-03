@@ -1,19 +1,18 @@
 # @lmzhen/dsh-evolution-activity
 
-> 内部组件，记录计划执行结果。
+Internal plugin that persists evolution process events into `$DSH_HOME/evolution/activity.json`.
 
-## 你会看到
+## What it records
 
-没有直接命令/面板；数据供报告/回放。
+- `evolution/plan-applied`: accepted, rejected, skipped, and failed operation counts for a reviewed plan.
+- `evolution/review-completed`: the review status, trigger, text, actions, timing, and model usage when supplied.
 
-## 什么时候会用到
+The versioned sidecar contains separate `items` and `reviews` arrays. `maxItems` bounds each array and defaults to 200; values below 1 are rejected by the loader.
 
-只在看报告/排障时。
+## Consumers and failure behavior
 
-## 默认 / 前提
+There is no direct command or panel. `evolution-replay` reads plan records, while other diagnostics can read the persisted review history without a live session.
 
-随审查/回放自动工作。
+Persistence starts after an `evolutionIo` provider mounts. Appends are best effort: a write failure is logged after the upstream operation has already completed. Before an append replaces unreadable or foreign-version bytes, the writer attempts to preserve them in a `.corrupt` copy and refuses the append if that rescue fails.
 
-## 边界
-
-普通用户不需要操作。
+The concurrency guarantee comes from the selected IO backend. The shipped Node backend is single-process; see [evolution-io-node](../evolution-io-node/README.md).

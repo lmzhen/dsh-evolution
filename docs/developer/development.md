@@ -36,8 +36,18 @@ node packages/scripts/run-gates.mjs local --only gate-XX
 
 ## 4. 文档规则
 
-- 用户文档在 `README.md`/`README.zh.md`/`INSTALL.md`/`docs/`；包文档在各包 README。
-- 不复制事实：安装形态、命令表、参数表、事件表、平台线各有唯一 home；其它文档引用。
+用户文档在 `README.md`/`README.zh.md`/`INSTALL.md`/`docs/`；包文档在各包 README。跨文件事实先登记 `packages/scripts/family-facts.json` 的 home，再决定写哪里。
+
+| 事实 | 唯一 home | 其他文档的写法 |
+|---|---|---|
+| 安装形态对会话的精确影响 | `packages/INSTALL.md` | 根 README 与 `INSTALL.md` 只保留选择摘要并链接 |
+| 命令注册与用户用法 | 注册事实在 `evolution-commands/src/registry.ts` 和 merge 的命令定义；用户说明在 `docs/commands.md` | 其他文档只列常用入口并链接，不另维护全量表 |
+| 参数 id、默认值、分组和生效时机 | core `params.ts` 及生成物 | `docs/configuration.md` 只写用户可改项和边界 |
+| 功能触发、条件与限制 | `docs/features.md` | 入门和索引引用，不重复整套规则 |
+| 数据路径、备份、升级后恢复 | `docs/operations.md` | 其他文档链接，不复制路径表 |
+| 包职责与持久数据分工 | `docs/developer/architecture.md` | 包 README 写包内机制，不另画全家族数据图 |
+
+- 中英文 README 表达同一事实和边界；修改一侧时必须同步另一侧。
 - 过时内容直接删，不要保留“历史版本”段落；历史在 CHANGELOG/git。
 - 命令/参数以代码注册为准，不以 README 为准。
 
@@ -48,7 +58,7 @@ node packages/scripts/run-gates.mjs local --only gate-XX
 1. 在 core `params.ts` 注册（id、namespace、exposure、type、默认值）。
 2. 在消费包 Config 里声明同名键；E3 才会进设置卡。
 3. 设置页生成物 `generated-params.ts` 由脚本重建；不要手改。
-4. 更新 `docs/configuration.md` 和包 README。
+4. 用户可改参数更新 `docs/configuration.md`；包内机制写入包 README。默认值只在各自 home 保留一份。
 
 ### 加工具
 

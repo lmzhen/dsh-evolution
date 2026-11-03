@@ -1,19 +1,13 @@
 # @lmzhen/dsh-evolution-replay
 
-> 计划回放/排行（高级）。
+Scores and ranks recorded plan outcomes; it does not re-execute a plan.
 
-## 你会看到
+`/evolution replay` compares live `evolution/plan-applied` records together with a one-time backfill from the activity sidecar. Scores use accepted/rejected operations, evidence, and estimated input cost. Execution failures and unread-skill skips remain visible in the report rather than being silently scored as clean zero-operation plans.
 
-`/evolution replay`。
+`maxPlans` defaults to 50. The weight fields are `accepted`, `rejectedPenalty`, `evidence`, and `cost`; see [PARAMETERS.md](../PARAMETERS.md) for their deployment tier and ownership.
 
-## 什么时候会用到
+## Data availability
 
-你想比较历史计划效果时。
+Default inject-mode review emits no `plan-applied`, so it produces no plan-based replay data. Branch review emits that event. An empty leaderboard therefore does not prove that no reviews ran.
 
-## 默认 / 前提
-
-只在有审查/计划数据时才有内容。
-
-## 边界
-
-默认 inject 复盘不产生回放数据。
+Unreadable activity bytes and failed backfill reads are carried as explicit report qualifications; neither is presented as a clean empty history.

@@ -1,21 +1,9 @@
 # @lmzhen/dsh-evolution-all
 
-> 默认完整安装形态。
+Default full installation bundle. It mounts the host automation and the profile-root memory/skill model rows so every session receives the family tools and prompt guidance without selecting a separate preset.
 
-## 你会看到
+The full form also includes the settings and skill-history UI plus the read-only merge sidebar. The skill-health panel ships but is disabled by default.
 
-每个会话有记忆/技能工具；设置页、技能历史、合并面板；健康面板可选。
+Use this form for the normal full installation. It is mutually exclusive with `host`, the one-click `preset`, and the layered `host + Evolution preset` form because their shared rows must not mount twice.
 
-## 什么时候会用到
-
-大多数用户。
-
-## 默认 / 前提
-
-默认推荐；与 host/preset/分层互斥。
-
-## 边界
-
-审批默认关闭；健康面板默认关闭。
-
-> DEFAULT install: all = infra + model tools; host = shrink path.
+Ordinary memory/skill approval is disabled by default. Merge has its own approval and platform-write controls.

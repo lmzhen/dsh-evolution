@@ -1,19 +1,9 @@
 # @lmzhen/dsh-evolution-io
 
-> 内部组件，负责文件读写。
+Provider registry for the family IO seam. This package does not itself read or write files.
 
-## 你会看到
+Backends register an `EvolutionIo` implementation under a provider name. Consumers can request a named provider or resolve the default: the first explicitly declared default wins, with registration order as the fallback when no default was declared. Resolving a missing name or an empty registry throws an actionable error.
 
-没有命令、面板或工具入口。
+Re-registering the identical provider object is idempotent for remount/HMR; a different object under the same name fails loudly. Disposal handles are generation-scoped so an old handle cannot remove a newer registration.
 
-## 什么时候会用到
-
-只在排障存储问题时。
-
-## 默认 / 前提
-
-由本地 IO 自动提供。
-
-## 边界
-
-不改变用户操作。
+There is no command, panel, or model tool. The shipped local backend is [evolution-io-node](../evolution-io-node/README.md).

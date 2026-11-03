@@ -1,19 +1,7 @@
 # @lmzhen/dsh-evolution-merge-ui
 
-> 合并面板：看待批队列、A/B 正文和历史。
+Browser sidebar for skill merge queues, A/B bodies, and history. It ships only in the `all` installation form.
 
-## 你会看到
+The panel is read-only. Action buttons copy the appropriate `/evolution merge` or `/evolution doctor` command; they do not approve, execute, or undo a merge in the browser.
 
-左侧栏「技能合并」；动作按钮复制命令。
-
-## 什么时候会用到
-
-你想看合并提议/历史时。
-
-## 默认 / 前提
-
-只有 all 安装形态带这个面板。
-
-## 边界
-
-面板只读；实际合并用命令。
+The host entry intentionally registers nothing. The Loader discovers the `dsh.client` manifest and serves the browser bundle, which uses the shared client-kit panel lifecycle and the four merge read routes.

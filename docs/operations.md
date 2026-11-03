@@ -1,86 +1,101 @@
 # 日常运维
 
-## 先看诊断
+本文是家族数据路径、备份和恢复的唯一入口。安装命令见 [../INSTALL.md](../INSTALL.md)，完整命令见 [commands.md](commands.md)。
+
+## 诊断与日常检查
 
 ```text
 /evolution doctor
 ```
 
-安装/升级后、功能不对时，先跑这一条。它会告诉你：装的是哪种形态、平台/家族版本、连接和服务状态。它不能证明 memory/skill 工具真的可用，工具是否可用仍要实际写一次/改一次。
+`doctor` 检查安装形态、平台/家族版本、连接和服务状态，不能证明 `memory` / `skill_manage` 实际可用；工具仍需通过一次真实写入验证。
 
-## 它会自己做什么
+常用只读命令：
 
-- **复盘**：all 形态下累计约 10 次工具调用后，在任务收尾时多跑一轮；默认开；host 形态不跑。
-- **整理**：宿主启动约 10 秒后判断，之后每小时查一次；满 168 小时且空闲约 2 小时才跑，默认开。
-- **合并**：不会自动扫描；你主动 scan/pair 或后台提议时才发生。
-
-## 日常看什么
-
-| 想看 | 命令 |
+| 目标 | 命令 |
 |---|---|
-| 等待审批的写入 | `/evolution pending` |
-| 自动整理状态 | `/evolution curator status` |
-| 整理报告 | `/evolution curator report` |
-| 合并队列 | `/evolution merge pending` |
+| 暂存写入 | `/evolution pending [--detail]` |
+| 整理状态和报告 | `/evolution curator status`、`/evolution curator report` |
+| 合并状态和报告 | `/evolution merge status [runId]`、`/evolution merge report [runId]` |
 | 技能历史 | `/evolution skill history <name>` |
 | 技能结构健康 | `/evolution skills health` |
 | 最近技能变更 | `/evolution mutations` |
 
-## 数据在哪里
+## 自动行为
+
+- **复盘**：默认开启，按实质信号和活动量加权间隔触发，不是固定消息数；host 不触发。详见 [configuration.md](configuration.md#自动复盘)。
+- **整理**：启动约 10 秒后开始判断，之后每小时检查；默认满足 168 小时间隔和 2 小时空闲才运行。
+- **合并**：不会自动扫描。由 `/evolution merge scan`、`pair` 或明确的后续操作驱动，和整理器分开。
+
+## 数据路径
 
 | 路径 | 内容 |
 |---|---|
 | `$DSH_HOME/memories/MEMORY.md` | 项目记忆 |
 | `$DSH_HOME/memories/USER.md` | 用户画像 |
-| `$DSH_HOME/skills/` | 技能树 |
-| `$DSH_HOME/skills/.history/` | 技能版本 |
-| `$DSH_HOME/evolution/` | 审查、整理、运行记录、合并状态（`evolution/merge/`） |
-| `$DSH_HOME/merge/` | 技能事务的撤销日志/快照（用 undo/合并撤销时需要） |
-| `$DSH_HOME/profiles/<profile>/cordis.patch.yml` | 审批、预算、频率等设置 |
+| `$DSH_HOME/skills/` | 技能树、归档及 `.history/` 版本数据 |
+| `$DSH_HOME/evolution/` | 复盘、整理、运行记录，以及 `evolution/merge/` 合并状态与回执 |
+| `$DSH_HOME/units/skill/` | 当前技能单元的 `journals/` 与 `snapshots/`，用于 `--unit` 撤销和 prepared-unit 恢复 |
+| `$DSH_HOME/merge/` | 旧版树改动快照的兼容回退，不是当前单元存储主目录 |
+| `$DSH_HOME/settings.yaml` | GUI 和 `/evolution policy set` 写入的 E3 用户设置 |
+| `$DSH_HOME/profiles/<profile>/cordis.patch.yml` | 部署配置、行级覆盖及分层 Evolution 预设行 |
 
-备份这些位置：`memories/`、`skills/`、`evolution/`、`merge/`，以及 profile 的 `cordis.patch.yml`（设置在里面）。
+`settings.yaml` 与 profile patch 不是同一份配置，不能只备份其中一个。
 
 ## 备份
 
-最稳妥：停宿主，整体备份 `$DSH_HOME`。如果只想备份家族数据：
+最稳妥的方式是停止宿主后整体备份 `$DSH_HOME`。只备份家族数据时，至少包含五个数据目录、`settings.yaml` 和 `profiles/`：
 
 ```bash
-# 先停宿主
-# Linux/macOS
-cp -a "$DSH_HOME/memories" "$DSH_HOME/skills" "$DSH_HOME/evolution" "$DSH_HOME/merge" "$DSH_HOME/profiles" /backup/evolution/
-# Windows PowerShell
-# Copy-Item "$env:DSH_HOME\memories","$env:DSH_HOME\skills","$env:DSH_HOME\evolution","$env:DSH_HOME\merge","$env:DSH_HOME\profiles" -Destination D:\backup\evolution -Recurse
+# 先停宿主；Linux/macOS
+mkdir -p /backup/evolution
+cp -a "$DSH_HOME/memories" "$DSH_HOME/skills" "$DSH_HOME/evolution" "$DSH_HOME/units" "$DSH_HOME/merge" "$DSH_HOME/settings.yaml" "$DSH_HOME/profiles" /backup/evolution/
 ```
 
-## 升级
-
-**先平台，后家族。** 平台和家族的版本是配套的；反过来升级会失败。
-
-1. 读目标版本 `CHANGELOG.md`；
-2. 备份 `$DSH_HOME`；
-3. 升级 DeepSeek Harness 并重启；
-4. 升级家族 bundle：`dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.32.5`；
-5. 重启后 `/evolution doctor`；
-6. 做一次记忆写入 + 一次技能改动。
-
-## 卸载
-
-```bash
-dsh plugin --profile web remove @lmzhen/dsh-evolution-all
+```powershell
+# 先停宿主；Windows PowerShell
+New-Item -ItemType Directory -Force D:\backup\evolution | Out-Null
+Copy-Item "$env:DSH_HOME\memories","$env:DSH_HOME\skills","$env:DSH_HOME\evolution","$env:DSH_HOME\units","$env:DSH_HOME\merge","$env:DSH_HOME\settings.yaml","$env:DSH_HOME\profiles" -Destination D:\backup\evolution -Recurse
 ```
 
-卸载只移除插件；`$DSH_HOME` 下的数据和 profile 设置保留。恢复时把 `memories/`、`skills/`、`evolution/`、`merge/` 和 profile 的 `cordis.patch.yml` 放回原位，再重启。分层用户先清掉 profile patch 里的预设行，避免残留引用。
+这个选择性清单不包含模型凭据。需要完整迁移时，停止宿主并备份整个 home，而不是只复制这几个家族路径。
 
-## 长任务
+## 恢复与回退
 
-- `maintain`、`merge scan/pair` 是异步的，会返回 run id；用 status/report 看。
-- 运行记录读不到时，命令会明确说“不可读”，不会假装没有运行。
-- 宿主重启后，未完成的任务会按恢复逻辑处理。
+### 从备份恢复
 
-## 升级后检查（按形态）
+1. 停止宿主。
+2. 先备份当前 `$DSH_HOME`，避免恢复过程覆盖仍需保留的新数据。
+3. 按原相对位置恢复 `memories/`、`skills/`、`evolution/`、`units/`、`merge/`、`settings.yaml` 和所需的 profile patch。
+4. 若恢复后不再使用分层预设，删除 patch 中残留的 Evolution 预设行；若更换安装形态，先移除旧 bundle。
+5. 重启并运行 `/evolution doctor`，再实际验证一次记忆和技能写入。
 
-- [ ] `/evolution doctor` 的版本/形态正确
-- [ ] all：记忆工具/技能工具在预期会话出现，技能历史能打开、能 undo，设置页能打开
-- [ ] host：整理/报告可用；不要期待自动复盘或记忆/技能工具
-- [ ] preset/分层：命令和工具按预期出现；没有设置页/侧栏是正常的
-- [ ] 审批（如开启）能审批/拒绝；合并模型目录仍在（如使用 merge）
+### 命令级回退
+
+| 目标 | 命令与边界 |
+|---|---|
+| 回退技能正文 | `/evolution skill undo <name> [--to v<N>]`；普通 undo 不恢复支撑文件 |
+| 回退一个事务单元 | `/evolution skill undo <name> --unit <id>`；预检拒绝时零写，执行期失败可能部分完成并列出已回退路径 |
+| 恢复已归档技能 | `/evolution skill restore <name>` |
+| 回退整棵技能树 | `/evolution restore`；只使用最近一次快照 |
+| 撤销一次合并 | `/evolution merge undo <target> --run <id>`；按 run 撤销，不等同于 skill undo |
+
+命令级回退不能替代任意时间点的备份。尤其不要把普通 `skill undo` 当作 references 文件或整棵技能树的回滚。
+
+## 升级与卸载
+
+升级必须先平台、后家族，命令和版本见 [../INSTALL.md](../INSTALL.md#升级)。升级前按本文备份；升级后检查：
+
+- [ ] `/evolution doctor` 显示正确的版本和安装形态。
+- [ ] all：记忆/技能工具可用，技能历史可打开，普通 undo 和设置页符合预期。
+- [ ] host：整理和报告可用；不期待自动复盘或 `memory` / `skill_manage`。
+- [ ] preset/分层：命令和工具按预期出现；没有设置页和侧栏属于正常形态差异。
+- [ ] 开启审批时能批准和拒绝；使用合并时本地模型目录仍可读取。
+
+卸载不会删除上述家族数据、`settings.yaml` 或 profile patch。分层安装还要清理预设行，具体命令见 [../INSTALL.md](../INSTALL.md#卸载)。
+
+## 长任务与运行记录
+
+- `maintain`、`merge scan/pair` 异步返回 run id；用各自的 `status`、`report`、`cancel` 管理。
+- 运行记录不可读时，命令应明确报告不可读，不能把读取失败当成“没有运行”。
+- 重启后检查 run 的实际状态。恢复逻辑会处理可恢复记录，但不能据此假定所有中断任务都已成功完成。

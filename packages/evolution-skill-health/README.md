@@ -1,19 +1,9 @@
 # @lmzhen/dsh-evolution-skill-health
 
-> 技能健康面板（可选）。
+Optional read-only skill-health route and browser sidebar. The `all` bundle ships it disabled by default.
 
-## 你会看到
+The panel projects curator health findings, proposal reports, protection markers, hard-cap hits, and available dimensions such as body size, support files, churn, and stamp density. It reports structural problems and duplicates; it does not repair skills.
 
-`/evolution skills health`；侧栏「技能健康」。
+Unreadable skills are not presented as healthy. An unavailable scan or proposal read is marked unavailable/truncated rather than returned as a clean empty result. The `references-sprawl` rule is named but its count is suppressed until its threshold is calibrated.
 
-## 什么时候会用到
-
-你想看结构问题/重复/超长时。
-
-## 默认 / 前提
-
-完整包里默认关闭。
-
-## 边界
-
-不修技能，只报告。
+The host package owns one GET route. The browser package registers the sidebar through client-kit; applying fixes requires the relevant curator or skill-management surface, not this panel.

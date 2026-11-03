@@ -1,19 +1,14 @@
 # @lmzhen/dsh-skill-usage
 
-> 内部组件，统计技能使用/读取次数。
+Usage telemetry service for skill authorship and demand. It records use/view/patch counters, archive state, support-file reads, and feedback-owned quality fields for curator and health calculations.
 
-## 你会看到
+Session dispatch observation counts a successfully settled skill read once and excludes review-leg traffic. Reads of unknown skills do not create usage records; creation/authorship paths must seed the record first. The first observed library read also attempts to append an observation-window event to the evolution timeline.
 
-没有直接命令/面板；数据供整理/健康判断。
+## Configuration and limits
 
-## 什么时候会用到
+- `root`: skill tree and usage sidecar root; empty uses the shared default.
+- `eventsHome`: event timeline home; empty uses the normal evolution root.
+- `sessionScoped`: when true, observe only sessions carrying the family model rows; shipped bundles set the appropriate scope.
+- `supportReadToolNames`: file-reading tools whose successful calls can be attributed to support files.
 
-只在看报告时。
-
-## 默认 / 前提
-
-随家族自动工作。
-
-## 边界
-
-普通用户不需要操作。
+Telemetry persistence and the observation-window timeline append are best effort and logged on failure. There is no direct command or panel; consumers read `report()` or the resulting curator/health views.

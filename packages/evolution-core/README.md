@@ -1,69 +1,55 @@
 # @lmzhen/dsh-evolution-core
 
-> 内部引擎，支撑记忆、技能、历史、恢复和审批。
+Shared library for the evolution family: skill and memory stores, write kernels and mutation units, prompts, projections, event types, composition helpers, HTTP route helpers, history, recovery, and parameter definitions.
 
-## 你会看到
+The root entry is a library, not a user-facing command. The package also exposes `./composition`, `./subagent`, `./http-routes`, and `./restrictor` subpaths.
 
-没有直接入口；用户看到的是记忆、技能、历史和撤销。
-
-## 什么时候会用到
-
-每次 Agent 写记忆/技能、看历史、恢复时。
-
-## 默认 / 前提
-
-随 all/host/分层安装自动工作。
-
-## 边界
-
-普通用户不需要知道其中的事务/状态机。
-
-## 维护者参考（用户可跳过）
+`./restrictor` is a function plugin for restricted presets. It requires a `presetId` and a non-empty `allow` or `deny` set, then applies `tools.restrict()` in matching child-agent scopes. It constrains inherited tools, not the preset mount scope itself.
 
 ## Events (the family's own, process-local)
 
-| 事件 | the `@mode` | 用途 |
+| Event | the `@mode` | Purpose |
 |---|---|---|
-| `evolution/skill-mutated` | emit (one-way) | 技能树写入后失效目录缓存 |
-| `evolution/skills-refresh` | emit (one-way) | `/evolution skills refresh` 显式刷新 |
-| `evolution/review-scheduled` | emit (one-way) | 审查已安排 |
-| `evolution/review-completed` | emit (one-way) | branch 审查完成 |
-| `evolution/review-error` | emit (one-way) | 审查流水线失败 |
-| `evolution/plan-applied` | emit (one-way) | 计划执行结果 |
-| `evolution/memory-applied` | emit (one-way) | 记忆写入成功 |
-| `evolution/memory-provider-registered` | emit (one-way) | 记忆 provider 注册 |
+| `evolution/skill-mutated` | emit (one-way) | Invalidate catalog state after a skill-tree write. |
+| `evolution/skills-refresh` | emit (one-way) | Explicitly refresh the catalog after `/evolution skills refresh`. |
+| `evolution/review-scheduled` | emit (one-way) | A review was scheduled. |
+| `evolution/review-completed` | emit (one-way) | A branch review completed, including failure/timeout status when known. |
+| `evolution/review-error` | emit (one-way) | The review pipeline failed. |
+| `evolution/plan-applied` | emit (one-way) | A reviewed plan produced an execution result. |
+| `evolution/memory-applied` | emit (one-way) | A memory write succeeded through the registry sink. |
+| `evolution/memory-provider-registered` | emit (one-way) | A memory provider became available. |
 
-预设 id：`evolution`、`evolution-ptc`、`evolution-cordis`、`evolution-minimal`、`evolution-reviewer-readonly`、`evolution-maintainer-readonly`。
+Preset ids: `evolution`, `evolution-ptc`, `evolution-cordis`, `evolution-minimal`, `evolution-reviewer-readonly`, `evolution-maintainer-readonly`.
 
-## 维护者参考：错误码表（用户可跳过）
+## Error codes
 
-(`E-301`–`E-326`)：命令/服务不可用时的明确提示；具体文案在 `src/errors.ts`。
+(`E-301`–`E-326`) identify unavailable services and command/settings failures. Exact message templates live in `src/errors.ts`.
 
-| 代码 | 含义 |
+| Code | Meaning |
 |---|---|
-| `E-301` | 批准服务未挂载 |
-| `E-302` | 策展服务未挂载 |
-| `E-303` | 回放服务未挂载 |
-| `E-304` | 批准服务版本过旧 |
-| `E-305` | 调用无 agent/投递通道 |
-| `E-306` | 前台写入无法回放 |
-| `E-307` | 设置分区/修订不可读 |
-| `E-308` | 未知参数分组 |
-| `E-309` | 参数修订冲突 |
-| `E-310` | 设置服务拒绝写入 |
-| `E-311` | 无设置服务 |
-| `E-312` | 参数写入失败 |
-| `E-313` | 未知参数 id |
-| `E-314` | 部署参数不可从会话写 |
-| `E-315` | 参数无用户层 |
-| `E-316` | 命名空间未注册 |
-| `E-317` | 技能写入未确认 |
-| `E-318` | 技能未读先写 |
-| `E-319` | 确认超时取消 |
-| `E-320` | 无 profile home |
-| `E-321` | 无 evolution-io |
-| `E-322` | 参数跨字段约束 |
-| `E-323` | 子代理通道不可用 |
-| `E-324` | 受限 preset 不可用 |
-| `E-325` | Host 数据面不可用 |
-| `E-326` | 支撑文件未读先写 |
+| `E-301` | Approval service is not mounted. |
+| `E-302` | Curator service is not mounted. |
+| `E-303` | Replay service is not mounted. |
+| `E-304` | Approval service is too old. |
+| `E-305` | Invocation has no agent or delivery channel. |
+| `E-306` | Foreground write cannot be replayed. |
+| `E-307` | Settings namespace or revision cannot be read. |
+| `E-308` | Unknown parameter group. |
+| `E-309` | Parameter revision conflict. |
+| `E-310` | Settings service rejected the write. |
+| `E-311` | Settings service is unavailable. |
+| `E-312` | Parameter write failed. |
+| `E-313` | Unknown parameter id. |
+| `E-314` | Deployment parameter cannot be written from a session. |
+| `E-315` | Parameter has no user layer. |
+| `E-316` | Namespace is not registered. |
+| `E-317` | Skill write was not confirmed. |
+| `E-318` | Skill was not read before writing. |
+| `E-319` | Confirmation timed out and cancelled the write. |
+| `E-320` | Profile home is unavailable. |
+| `E-321` | Evolution IO is unavailable. |
+| `E-322` | Parameter cross-field constraint failed. |
+| `E-323` | Subagent channel is unavailable. |
+| `E-324` | Restricted preset is unavailable. |
+| `E-325` | Host data plane is unavailable. |
+| `E-326` | Support file was not read before writing. |

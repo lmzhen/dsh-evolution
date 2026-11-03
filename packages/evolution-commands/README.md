@@ -1,23 +1,11 @@
 # @lmzhen/dsh-evolution-commands
 
-> `/evolution` 命令入口。
+Host command surface for the `/evolution` namespace: diagnostics, pending approvals, curator operations, maintenance, skill history, parameters, merge dispatch, migration, and preset installation.
 
-## 你会看到
+The canonical user command reference is [docs/commands.md](../../docs/commands.md); the package map and preset-install spelling live in [packages/README.md](../README.md). Do not maintain a second command table here.
 
-`/evolution doctor`、`pending`、`curator`、`merge`、`skill history` 等。
+The command row ships with `all`, `host`, and `preset`. If the platform `commands` service is absent, the `/evolution` namespace is not registered.
 
-## 什么时候会用到
+Under a layered/variant installation, original-preset sessions still see the management commands even though they do not carry the family model rows. That accepted difference and the mutual-exclusion rules are single-sourced in [INSTALL.md](../INSTALL.md).
 
-日常管理和排障时。
-
-## 默认 / 前提
-
-随 all/host/preset 安装自动注册。
-
-## 边界
-
-没有 `commands` 服务时整条命令不存在。
-
-分层/variant 的命令面差异单源在 [INSTALL.md](../INSTALL.md)。
-
-> 旧的 consolidate 已从用户面退役；合并请用 `merge`。
+The old `consolidate` command is retired; use `merge` for skill merging.

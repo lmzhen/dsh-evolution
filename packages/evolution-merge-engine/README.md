@@ -1,19 +1,15 @@
 # @lmzhen/dsh-evolution-merge-engine
 
-> 内部组件，为合并筛选候选。
+Pure merge-engine library used by `evolution-merge`. It has no Cordis plugin row, command, panel, or standalone model tool.
 
-## 你会看到
+## Library surface
 
-没有命令、面板或工具入口。
+The entry exports the vendored `runPipeline`, `runScan`, stage composition and configuration helpers, plus local `screen`, `probe`, `ensureModels`, and report-mapping functions. `screen` can run with a platform model runner for judge stages or with the vendored fallback path. `probe` reports configured model/judge/ranker availability; it is not proof that a real provider completed a merge.
 
-## 什么时候会用到
+Model directories and registry files are resolved from the configured model root. Missing required models are reported by default; `ensureModels` is the explicit resolution/provisioning path and honors the engine auto-provision and offline settings.
 
-只在合并运行时。
+## Screening pipeline freeze
 
-## 默认 / 前提
+Stages ①–⑤ are specially tuned and frozen. Do not fork their substantive behavior, prompts, scoring, thresholds, or stage semantics in this package. Update the vendored upstream as a unit and require parity; changes outside that frozen pipeline must remain wrapper-only and must not alter screening results.
 
-随合并功能自动工作。
-
-## 边界
-
-普通用户不需要知道筛选细节。
+Vendor documentation, fixtures, golden reports, and generated parity output are upstream/test material, not this package's user documentation.

@@ -1,19 +1,9 @@
 # @lmzhen/dsh-evolution-preset
 
-> 兼容一键安装形态。
+Compatibility one-click bundle for existing configurations. New installations should normally use `evolution-all`.
 
-## 你会看到
+Like `all`, it mounts model tools at profile root so every session receives them. It does not include the settings/skill-history UI umbrella, merge sidebar, or skill-health panel.
 
-接近 all，但没有设置页/健康面板。
+This bundle is mutually exclusive with `all`, `host`, and the layered Evolution preset. Use [INSTALL.md](../INSTALL.md) for the attach/variant semantics and upgrade path.
 
-## 什么时候会用到
-
-从旧配置迁移时。
-
-## 默认 / 前提
-
-与 all/host/分层互斥。
-
-## 边界
-
-不是新装默认；优先 all。
+The package also ships a standalone `cordis.yml`. That standalone composition intentionally omits the `evolution-maintenance/tools` row; add it explicitly if a standalone deployment needs `maintenance_probe`.

@@ -30,9 +30,9 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 | `evolution-maintenance` | `maintenance_probe` tool + maintain scan/facts/validation |
 | `evolution-curator` | Lifecycle curation, restore/history/undo, health view, reports |
 | `evolution-learning-graph` | `/graph` view/detail/edit/delete over skills + memory |
-| `evolution-activity` | Activity ledger for plan/review events |
+| `evolution-activity` | Bounded activity sidecar for plan and review outcomes |
 | `evolution-feedback` | Feedback store, quality fold; no in-family producer |
-| `evolution-replay` | Plan ranking/compare and activity backfill |
+| `evolution-replay` | Scores recorded plan outcomes and backfills activity history; does not re-execute plans |
 
 ### Skill ecosystem
 
@@ -67,7 +67,7 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 
 ## Command and tool entry points
 
-User-facing surfaces are documented once in [docs/commands.md](../docs/commands.md). Summary: `/evolution` (30 table entries), `/graph`, `/skill-domain` (mode:on), and 6 model tools (`memory`, `skill_manage`, `skill_search`, `session_search`, `maintenance_probe`, `merge_stage`).
+User-facing surfaces are documented once in [docs/commands.md](../docs/commands.md). Summary: `/evolution` (30 table entries), `/graph`, and `/skill-domain` (mode:on). Family model-tool entries are `memory`, `skill_manage`, `skill_search`, `maintenance_probe`, and the merge-child-only `merge_stage`; the bundles also mount the platform session-query tools.
 
 ## State and IO
 
@@ -101,7 +101,7 @@ The install-form semantics and the variant command-face difference are single-so
 
 The family uses declared gates rather than trusting a green test run. A column nobody has written yet is not a pass; an unevaluated criterion is not a pass. Gate declarations live in `scripts/family-facts.json`; the command table lives in `CONTRIBUTING.md`.
 
-> 旧的 consolidate 已从用户面退役；合并请用 `merge`。
+> The old `consolidate` surface is retired; use `merge` for skill merging.
 
 ## Configuration dials
 

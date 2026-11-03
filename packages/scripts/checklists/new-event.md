@@ -10,8 +10,10 @@ Skeleton: `templates/event/producer-consumer.ts.tmpl`.
 
 ## Checklist
 
-- [ ] Emit through the injected io surface (`io.emit('evolution/<name>', payload)`),
-      never `ctx.emit` on a platform bus the family does not own.
+- [ ] Emit through the owning Cordis context (`ctx.emit('evolution/<name>', payload)`,
+      or `this.ctx.emit` inside a service) and subscribe through the corresponding
+      context (`ctx.on` / `ioCtx.on`). Do not call `io.emit`: the evolution IO seam
+      has no event-emit method.
 - [ ] Ship the consumer in the same change, or register the event as an
       external-contract observation log with its reason. —
       *`verify-event-pairing.mjs` reports every emit with no `ctx.on`/`io.on`

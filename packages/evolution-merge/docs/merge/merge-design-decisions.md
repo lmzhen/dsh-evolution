@@ -3,7 +3,7 @@
 > 状态：已裁决。本文优先于 integration-discussion.md 与 merge-architecture-optimization.md 中与本文冲突的旧表述。
 > 范围：D1–D4（落地审计，原文保留）＋ D5–D13（按 docs/merge-architecture-review.md §10 Lead 拍板扩写：ADR-1 事务/锁/恢复、ADR-2 包与版本、ADR-4 迁移/兼容/保留）。
 > 依据：reviews/61-landing-gap-audit.md、reviews/62-integration-coverage-matrix.md、merge-architecture-review.md §10、task-36/41 平台/后端评审与 ADR-1 终裁。
-> 边界：查询/命令/UI（ADR-3）归 merge-functional-spec-v2.md 与 merge-wire-contract.md；engine 边界归 merge-engine-boundary.md；RG/K 门禁归 merge-architecture-gates.md。本文只扩 ADR-1/2/4。
+> 边界：ADR-3 的当前需求状态见 packages/REQUIREMENTS.md，查询/命令/UI 实现见 packages/evolution-merge/src/；engine 实现见 packages/evolution-merge-engine/src/，RG/K 门禁脚本见 packages/scripts/。历史文件 merge-wire-contract.md、merge-engine-boundary.md、merge-architecture-gates.md 未保留在仓库。本文只扩 ADR-1/2/4。
 
 ## D1 staging 时序：decide 之后
 
@@ -343,6 +343,6 @@
 
 ## 未决与归属
 
-- **归属**：本文件只裁 ADR-1/2/4；查询/命令/UI 归 merge-functional-spec-v2.md 与 merge-wire-contract.md；engine pinned/parity/fallback 归 merge-engine-boundary.md；RG0–RG8/K1–K12/迁移/运维/scale 归 merge-architecture-gates.md。
+- **归属**：本文件只裁 ADR-1/2/4；ADR-3 的需求文本归 merge-functional-spec-v2.md，当前需求状态见 packages/REQUIREMENTS.md，实现见 packages/evolution-merge/src/；engine 实现见 packages/evolution-merge-engine/src/；RG0–RG8/K1–K12/迁移/运维/scale 的当前门禁脚本见 packages/scripts/。历史文件 merge-wire-contract.md、merge-engine-boundary.md、merge-architecture-gates.md 未保留在仓库。
 - **残余风险（接受并记录）**：tree fence 的 holder 判别仅 pid+startedAt（Windows 无 pid start 校验），epoch fencing 只能防"被夺后继续写"，不能防"夺锁误判"；已写入 README 已知限制候选。
 - **未定数值**：unit 单条体积/总存储预算、1000 次与 90 天的联合清理批次、0.30.16 与 0.30.17 的切分点，由 RG5/发布计划定，不得改变本节下限。

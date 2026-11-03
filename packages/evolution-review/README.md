@@ -1,23 +1,30 @@
 # @lmzhen/dsh-evolution-review
 
-> 后台复盘：在任务收尾时回顾对话并给改进建议。
+Session review orchestration. It measures completed turns, defers due reviews to the appropriate task boundary, and delivers a memory or skill review prompt.
 
-## 你会看到
+## Trigger model
 
-偶尔出现在会话里的复盘提示；不是每句话都跑。
+Review is enabled by default. The memory and skill cadence intervals both default to 10 tool calls. A turn advances by its tool-call count, with the minimum/skill-use rules implemented by the shared review signal fold.
 
-## 什么时候会用到
+A cadence threshold reached during a task is latched; the review runs when the conversation completes rather than interrupting in the middle of the task. The default `skillReviewTrigger` is `cadence`. `completion` or `both` additionally allows one completion-channel skill review after a qualifying long session. Both channels are mutually exclusive at one boundary.
 
-累计约 10 次工具调用、任务收尾时。
+Subagent-origin, background-visibility, and review-child sessions are excluded. Variant deployments also require the session to carry the family model rows.
 
-## 默认 / 前提
+## Delivery modes
 
-默认在会话内，按约 10 次工具调用触发；会叫醒模型多跑一轮。
+| Mode | Behavior | Recorded history |
+|---|---|---|
+| `inject` (default) | Sends the review prompt into the parent session. `reviewWakeInject=true` uses a waking follow-up when available. | Emits `review-scheduled`; does **not** emit `plan-applied`, so plan-based activity/replay stays empty. |
+| `branch` | Creates a child agent with a seed from the live session log and delivers the result to the parent. | Emits `review-completed` and `plan-applied`, including failure/timeout status when known. |
 
-## 边界
+Branch mode requires `agents`. It is a temporary platform-gap path with trade-offs among durable-log governance, parent prefix-cache reuse, and workspace pollution; it is not the default product path.
 
-子会话模式需要 agents；当前有已知通知边界。
+`reviewNotice=true` allows result notices. It does not suppress an inject-mode review prompt, because that prompt is the review itself.
 
-## 维护者参考：参数别名（G0/S0.3）
+## Events and limits
 
-`memoryInterval` 映射为 `reviewMemoryInterval`；`skillInterval` 映射为 `reviewSkillInterval`。旧名仍可读，写入会拒绝。
+The package emits `evolution/review-scheduled`, `evolution/review-completed` (branch), `evolution/review-error`, and branch-mode `evolution/plan-applied`. `reviewTimeoutMs` bounds the branch run. Review cadence state is persisted when `evolution-state` is available; without it, cadence can reset between turns.
+
+**Unimplemented metadata:** `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth`, and `reviewToolAllow` may still appear in generated parameter/bundle metadata, but this plugin does not read them. Do not rely on them for provider selection, context limits, delegation depth, or tool restrictions. `reviewTimeoutMs` is implemented.
+
+`memoryInterval` and `skillInterval` remain readable deprecated aliases of `reviewMemoryInterval` and `reviewSkillInterval`; writes to the old names are refused.

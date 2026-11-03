@@ -1,23 +1,17 @@
 # @lmzhen/dsh-evolution-curator
 
-> 自动整理技能库：标 stale、归档、合并近重复。
+Skill lifecycle service for stale detection, archiving, optional LLM nomination, snapshots, history, restore, and unit undo.
 
-## 你会看到
+Use `/evolution curator status`, `report`, or `run` for inspection and manual operation. Archive/restore/history/undo commands operate on the corresponding stored records; deleting a skill through curation means archiving, not hard deletion.
 
-`/evolution curator status/report/run`；归档/恢复/历史/撤销。
+## Defaults and scheduling
 
-## 什么时候会用到
+The plugin and `autoStart` default to enabled. An hourly timer checks due-ness; `curatorIntervalHours` defaults to 168 hours. Pause/resume overrides the startup schedule until that persisted override is cleared.
 
-技能变多、长期不用、出现重复时。
+`staleAfterDays` defaults to 30 and `archiveAfterDays` to 90, with archive required to be at least the stale threshold. The optional `llmReview` pass defaults off. Idle activity gates, protected/referenced names, unmanaged/builtin scope, health thresholds, and model limits are listed in [PARAMETERS.md](../PARAMETERS.md).
 
-## 默认 / 前提
+`root` must point at the same skill tree used by the catalog and write tools. `intervalHours` remains a readable deprecated alias of `curatorIntervalHours`; writes to the old name are refused.
 
-默认定期跑；可暂停。整理完成不一定在对话里通知，技能可能直接从列表消失；通知/收件箱仍不完整。
+## Failure boundary
 
-## 边界
-
-先快照；失败只写报告，不会自动回滚整棵树。删除是归档，不会硬删。
-
-## 维护者参考：参数别名（G0/S0.3）
-
-`intervalHours` 映射为 `curatorIntervalHours`。旧名仍可读，写入会拒绝。
+A mutating pass takes snapshots and supports explicit restore/undo. That is not a promise that every failed run automatically rolls back the whole tree; inspect the run report and use the explicit recovery operation when needed. Notifications may be incomplete, so an archived skill can disappear from the catalog without a conversation notice.

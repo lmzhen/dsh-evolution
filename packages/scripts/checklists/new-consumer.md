@@ -36,7 +36,9 @@ Skeleton: `templates/event/producer-consumer.ts.tmpl`.
       validity domain. — *N12 fails an unregistered store.*
 - [ ] **Modality-blind**: read `ToolDispatchSignal` names/counts, never
       `signal.kind`. — *N17.*
-- [ ] Writes go through `transact` (file lock) if the sidecar is shared; the
-      single-process assumption is registered, not implied.
+- [ ] Writes go through `transact`. The default Node provider serializes RMW only
+      within one process; it is not a file lock. Cross-process exclusion requires a
+      provider explicitly declaring `processScope: 'cross-process'`; otherwise keep
+      the single-process boundary explicit.
 - [ ] Test the gate both ways: an original-preset session is skipped, a family
       session is served (see `evolution-core/tests/opt-in.spec.ts`).

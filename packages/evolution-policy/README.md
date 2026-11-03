@@ -1,19 +1,9 @@
 # @lmzhen/dsh-evolution-policy
 
-> 内部安全组件，阻止模型改策略/提示词等控制面。
+Immutable policy snapshot and monotonic tool guard for the family control plane.
 
-## 你会看到
+For the guarded memory/skill write tools, it rejects arguments containing forbidden control keys, including matching keys inside `operations[]`. This prevents a model plan from changing policy, prompt, routing, or similar control settings through a write payload.
 
-用户看不到直接入口；只会在模型试图改控制面时看到拒绝。
+It is not a general sandbox: it protects the declared control keys on the guarded tool calls and does not replace platform permissions or the threat scanner.
 
-## 什么时候会用到
-
-当 Agent 试图写策略/提示词/路由时。
-
-## 默认 / 前提
-
-随家族自动工作。
-
-## 边界
-
-它不是通用沙箱，只保护控制键。
+Review, memory, curator, and write-stage defaults carried by the snapshot are documented in [PARAMETERS.md](../PARAMETERS.md). There is no direct user command or panel.

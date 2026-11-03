@@ -188,11 +188,11 @@ GAP-UI-01..07 仍有效；本表只补 v2.1 的新增/细化条目。
 
 - 四队列/四 tab、命令动作语义、后台 run、L0/L1/L2 路由、审批三句话、pending 收敛、target 优先/不 partial/undo/归档/历史、保护尺/唯一写者/审计最小面、三态/focus、doctor/安装形态。
 - v2 既有四条 DEC 是功能侧：staging 时序、undo 形状、审计 1+N、单文件例外。
-- v2.1 契约冻结（ADR-3/Lead §10.3）属功能侧：wireVersion=1 的 7 信封、ActionRef[]、CommandSpec/CommandSurface、summary 三槽、四队列 active/expired、GET 零写/Reconcile 显式、host 只给事实/code；字段细节以 merge-wire-contract.md 为唯一源。
+- v2.1 契约冻结（ADR-3/Lead §10.3）属功能侧：wireVersion=1 的 7 信封、ActionRef[]、CommandSpec/CommandSurface、summary 三槽、四队列 active/expired、GET 零写/Reconcile 显式、host 只给事实/code；字段细节的历史归属为 merge-wire-contract.md，该文件未保留在仓库，当前需求状态以 packages/REQUIREMENTS.md 为准，实现以 packages/evolution-merge/src/ 为准。
 
 ### 6.2 实现侧（自由）
 
-- 路由路径与字段名细节以 merge-wire-contract.md 为准；组件结构、样式、tab 实现自由。信封集合与语义按 ADR-3 冻结，不得改回三队列/单 MergeView。
+- 路由路径与字段名的历史细节原归 merge-wire-contract.md；该文件未保留在仓库，当前实现以 packages/evolution-merge/src/merge-routes.ts 与 surface/merge-view.ts 为准。组件结构、样式、tab 实现自由。信封集合与语义按 ADR-3 冻结，不得改回三队列/单 MergeView。
 - 状态文件 schema/布局：v2 允许单 merge-state.json 例外；不得新增 state-storage 三表；必须满足损坏/迁移/备份验收。
 - 提交内部快照/事务/回滚实现；但目标优先、无 partial、恢复不清已提交 merge 是功能不变量。
 - 锁机制可自由；必须满足同 home 同 target 串行与 curator 写锁。
@@ -238,7 +238,7 @@ GAP-UI-01..07 仍有效；本表只补 v2.1 的新增/细化条目。
 - 多代/整树 restore 后 superseded 展示：未决。
 - 历史基线 v1 的细节：未决；数据单文件的备份/恢复/迁移按 Lead §10.4/本文件 §10.5 约束（last-known-good + 原子替换 + 损坏 note + 迁移 dry-run，否则不接受单文件）。
 - P2 清单见 61 §9.2，不阻塞本 v2 的 P0/P1 收口。
-- wire 字段细节（7 信封字段/ActionRef/CommandSurface 具体形状）由 merge-wire-contract.md 冻结；本文件只冻结语义与验收。冲突时行为以本文件为准，字段名以 wire 契约为准。
+- wire 字段细节（7 信封字段/ActionRef/CommandSurface 具体形状）的历史归属为 merge-wire-contract.md；该文件未保留在仓库。当前需求状态以 packages/REQUIREMENTS.md 为准，字段实现以 packages/evolution-merge/src/ 为准；本文件只冻结语义与验收。
 - engine 内部化另开 ADR（本轮按 Lead §10.2 保持 pinned 私有库 + parity）。
 - 0.31 旧 UI 兼容面与 0.32 切换点：0.32 同版本切 UI 并删旧面，禁止长期双面并行（Lead §10.2/本文件 §10.5）。
 
@@ -251,7 +251,7 @@ GAP-UI-01..07 仍有效；本表只补 v2.1 的新增/细化条目。
 - **视图分开**：Facts、QueuePage（含同次读 counts）、RunView+RunDetail、RunsView、BodyView、HistoryView、DoctorView 各自版本化；status/runs 用 RunView，不得塞进 QueuePage；doctor 独立，面板不请求 doctor 路由。
 - **版本**：wireVersion=1（整型），7 个信封全部携带；state schemaVersion 另计；客户端对每个信封浅校验，不符进本地化 failed 态（非空/非白屏）。
 - **ActionRef[]**：{id, command（完整串含 /evolution）, confirm, enabled, disabledReason?}；label 由 client 按 id+行上下文映射；confirm：reject/discard/restore/pair=true，approve/retry=false；disabledReason 闭集：expired/invalid/not-retryable/source-gone/owned/unavailable。
-- **CommandSpec/CommandSurface**：字段名以 wire §10 为准——CommandSurface{wireVersion:1,prefix:'/evolution merge',commands,fallback}；CommandSpec 含 id/words/flags/positional/summary/readOnly/needsRun/defaults/rowActions/fallback，不放 inputSchema/actions；handler 以 CommandId→Handler 独立 map 注入；surface 可 JSON 往返；/merge 在 0.30.18 保留，0.31 弃用提示，0.32 删除。
+- **CommandSpec/CommandSurface**：当前字段归属见 packages/evolution-merge/src/command-defs.ts 与 surface/merge-view.ts（历史 wire §10 未保留）；本条记录当时冻结的形状——CommandSurface{wireVersion:1,prefix:'/evolution merge',commands,fallback}；CommandSpec 含 id/words/flags/positional/summary/readOnly/needsRun/defaults/rowActions/fallback，不放 inputSchema/actions；handler 以 CommandId→Handler 独立 map 注入；surface 可 JSON 往返；/merge 在 0.30.18 保留，0.31 弃用提示，0.32 删除。
 
 > 去重与覆盖语义（2026-10-25）：V2-* 行是规范变更记录，GAP-* 行是验收权威；同一主题以 GAP 行为唯一计分，V2-* 不重复计分。“覆盖”分两种：真改写按 v2 判；仅适用/细化按 v1 + 补充判据判。
 - **host/client 分界**：host 只给事实与 code，不出 label/cells/中文占位/本地化句子；client 管 locale、三态、focus、tab/cursor/filter、复制/确认、ActionRef label 映射；client 不拼命令、不按 approval 开关过滤动作。
@@ -300,11 +300,11 @@ GAP-UI-01..07 仍有效；本表只补 v2.1 的新增/细化条目。
 
 ### 10.6 文档归属与边界
 
-- merge-wire-contract.md（frontend）：冻结 7 信封字段、ActionRef、CommandSurface 具体形状；与本节冲突时行为以本节为准、字段名以 wire 契约为准。
+- packages/REQUIREMENTS.md：当前需求状态；字段、命令与查询实现分别见 packages/evolution-merge/src/command-defs.ts、commands.ts、merge-routes.ts 与 surface/merge-view.ts。历史文件 merge-wire-contract.md 未保留在仓库。
 - merge-design-decisions.md（platform-backend）：ADR-1/2/4 事务/锁/包/迁移细节。
-- merge-architecture-gates.md（platform-fitness-reviewer）：RG0–RG8/K1–K12/迁移/运维/scale。
+- packages/scripts/：RG0–RG8/K1–K12/迁移/运维/scale 的当前门禁脚本。历史文件 merge-architecture-gates.md 未保留在仓库。
 - 本文件：只冻结用户可见行为与验收；不写实现/字段细节。
-- merge-architecture-optimization.md：方案层，评审后由 chief-architect 按 Lead §6 改写，不作为验收基线。
+- 历史方案 merge-architecture-optimization.md 未保留在仓库，不作为验收基线。
 
 ### 10.7 状态映射（gap → 目标版本）
 

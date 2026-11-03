@@ -1,19 +1,5 @@
 # @lmzhen/dsh-evolution-contract
 
-> 内部组件，普通用户不需要直接使用。
+Pure cross-package TypeScript contracts for state, events, platform probes, pending records, and lifecycle services.
 
-## 你会看到
-
-没有命令、面板或工具入口。
-
-## 什么时候会用到
-
-只在排障或开发时才会接触到。
-
-## 默认 / 前提
-
-随家族自动工作。
-
-## 边界
-
-它只是共享类型契约，不改变任何用户操作。
+This is a library, not a Cordis plugin: it registers no runtime service and mounts no command, panel, or tool. Implementation packages own behavior; this package only prevents independently written contract copies from drifting.

@@ -1,19 +1,9 @@
 # @lmzhen/dsh-memory
 
-> 内部组件，把记忆请求转给实际存储。
+Memory provider registry. It delegates reads, batch writes, snapshots, and context rendering to the selected provider; it does not implement a memory file format itself.
 
-## 你会看到
+`provider` pins a provider by name. Empty uses the first registered provider; a named miss throws instead of silently writing through another store. Re-registering the identical provider object is idempotent, while a different object under the same name fails loudly.
 
-没有直接命令/面板。
+Successful writes through this registry emit `evolution/memory-applied`, including writes that bypass the foreground memory tool. Provider registration emits `evolution/memory-provider-registered` so prompt snapshots can initialize after a late mount.
 
-## 什么时候会用到
-
-只在排障记忆时。
-
-## 默认 / 前提
-
-随记忆功能自动工作。
-
-## 边界
-
-普通用户不需要操作。
+The model-facing tool lives in [tool-memory](../tool-memory/README.md), and the default local provider lives in [memory-files](../memory-files/README.md). This package has no direct command or panel.

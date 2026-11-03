@@ -1,19 +1,21 @@
 # @lmzhen/dsh-evolution-merge
 
-> 技能合并：把重叠技能合成一个；默认自动接受，独立于普通写入审批。
+Skill merge service with candidate screening, two-round authoring, pending/skipped queues, staged model work, commit orchestration, recovery, and undo.
 
-## 你会看到
+Use `/evolution merge …` for operations. `merge_stage` is the model-facing staging tool. The sidebar supplied by `evolution-merge-ui` is read-only and copies commands rather than executing a merge itself.
 
-`/evolution merge …` 命令与侧栏合并面板。
+## Control axes
 
-## 什么时候会用到
+| Setting | Default | Meaning |
+|---|---|---|
+| `mergeApproval` | `false` | Do not pause after round 1 for merge-specific approval. |
+| `mergeSkippedTtlDays` | `0` | Skipped pairs never expire automatically. |
+| `mergeRunTimeoutMinutes` | `0` | No overall run timeout. |
+| `mergePairTimeoutMinutes` | `15` | Bound one pair round. |
+| `mergeModelsRoot` | empty | Must be configured to the local model root for the shipped engine path. |
 
-你主动合并，或后台提出合并建议时。
+For scan, the model root contains `potion-multilingual-128M-int8` and `potion-multilingual-128M-pca64-int8`. Missing required models fail explicitly; this package does not silently provision them. Ordinary pair skips this local candidate-screening dependency, but its round 1 and authoring still require the child-session model channel rather than scan's stub fallback.
 
-## 默认 / 前提
+Merge approval is independent of the ordinary memory/skill approval queue. `platformWrite` is not a user configuration key or an admission check in this package: the current implementation derives a same-named value from the ordinary approval capability and includes it in run reports and snapshots. Actual write execution depends on host capability preparation and the merge state machine; neither that projected field nor `mergeApproval:false` proves that every environment permits writes.
 
-需要本地合并模型；没有模型会明确报错。默认 `mergeApproval=false`，合并会自动接受并写入；打开审批才会等你批准/拒绝。
-
-## 边界
-
-合并是独立流程，不走普通写入审批；面板只读；合并结果可撤销。
+Four read-only host routes expose view, rows, body, and history data. `merge/run` and `merge/runs` are declared but not implemented. Committed merges have durable receipts for undo; recovery and reconcile report blocked or interrupted state rather than hiding it.

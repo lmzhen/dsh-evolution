@@ -26,8 +26,8 @@ $DSH_HOME 文件（memories / skills / evolution / merge）
 
 | 组 | 包 | 职责 |
 |---|---|---|
-| 基础 | contract/core/io/io-node/state-storage/state-json/state-domain/state/policy/threat | 类型、IO、状态、事务、策略、威胁、技能/记忆底座 |
-| 合并 | merge/merge-engine/approval | 合并域 + 引擎 + 审批 |
+| 基础 | contract/core/io/io-node/state-storage/state-json/state-domain/state/policy/threat/approval | 类型、IO、状态、事务、策略、威胁、技能/记忆底座与可暂存写审批 |
+| 合并 | merge/merge-engine | 合并域 + 引擎 |
 | 审查自动化 | review/maintenance/curator/learning-graph/activity/feedback/replay | 审查、维护、整理、图、账本、反馈、回放 |
 | 技能生态 | skill-catalog/skill-discovery/skill-health/skill-usage/tool-skill-manage | 目录、检索/域卡、健康、用量、写入工具 |
 | 命令与 UI | commands/ui/merge-ui/client-kit | 命令面、设置/历史、合并面板、客户端基础 |
@@ -61,8 +61,8 @@ memory 工具 / /graph memory edit
 ### 3.3 合并
 
 ```text
-/evolution merge scan|pair
-  → 引擎 screen（stub 或 deepseek judge）
+/evolution merge scan → 引擎 screen（stub 或 deepseek judge）
+/evolution merge pair  → 直接指定技能对，round1 使用子会话模型
   → PairLedger：pending 或 auto-approved
   → 两轮 authoring（merge_stage 只给绑定子代理）
   → staged tree 校验
@@ -105,7 +105,9 @@ policy 的 `tools.guard` 只拦 6 个控制键；threat 只扫描 memory/skill �
 | `evolution/runs.json` | 长任务登记 |
 | `evolution/approval/pending.json` | 待批/执行中 |
 | `evolution/reports/` | 维护/整理报告 |
-| `merge/` | 合并运行、staging、回执 |
+| `evolution/merge/` | merge 运行状态、staging、提交回执与合并事务记录 |
+| `units/skill/` | 当前技能单元的 journals/snapshots，用于单元撤销与恢复 |
+| `merge/` | 旧版树改动快照的兼容回退；不属于 merge 的运行状态或当前单元主存储 |
 
 ## 7. 不变量（改代码前先读）
 

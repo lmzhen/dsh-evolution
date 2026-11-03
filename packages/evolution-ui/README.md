@@ -1,19 +1,7 @@
 # @lmzhen/dsh-evolution-ui
 
-> 设置页「自进化」与技能历史面板。
+Browser UI umbrella for the evolution settings section and skill-history panel. It ships in `all`, not in `host` or the compatibility `preset`.
 
-## 你会看到
+The settings surface exposes approval, diagnostics, parameter, and row-configuration cards. Skill history reads versions/diffs and the host history routes. The browser bundle registers both panels through client-kit; the host entry mounts the history host half.
 
-设置里的「自进化」（审批、记忆、复盘、整理卡片）；侧栏「技能历史」。只有 all + Web/桌面 GUI 有。
-
-## 什么时候会用到
-
-调设置、看技能版本/撤销时。
-
-## 默认 / 前提
-
-随 all 安装；host/preset 不带。
-
-## 边界
-
-缺少客户端槽位时只读或不可见。
+These panels require the browser client slots used by the Web/desktop GUI. Headless or TUI sessions do not gain a separate panel surface. Client availability does not change the underlying command or service behavior.

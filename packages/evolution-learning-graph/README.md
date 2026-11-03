@@ -1,19 +1,20 @@
 # @lmzhen/dsh-evolution-learning-graph
 
-> 知识图：把技能和记忆当作节点浏览/编辑。
+Top-level `/graph` command for inspecting and editing a graph of skill and memory nodes. This is not `/evolution graph`.
 
-## 你会看到
+## Commands and node identity
 
-`/graph` 目录、detail、edit、delete。
+- `/graph` lists nodes, `related` and `memory_skill` edges, and a density summary.
+- `/graph detail <nodeId>` reads one node.
+- `/graph edit <nodeId> <text>` replaces a skill body or memory entry.
+- `/graph delete <nodeId>` archives a skill or removes a memory entry.
 
-## 什么时候会用到
+A skill node id is its directory name. A memory node id identifies `memory` or `user` plus an entry index and snapshot token; edit/delete rejects a stale snapshot instead of modifying whichever entry later moved into that index.
 
-你想从图的角度看/整理知识时。
+## Write semantics and limits
 
-## 默认 / 前提
+**Skill deletion archives; memory deletion removes the entry.** These are different operations and must not be read as one retention policy.
 
-随 all 安装。
+Writes use the same approval seam and library gates as the corresponding memory/skill tools. A host-only assembly may lack the replay runner; if a write would stage and no runner exists, the command refuses before creating an unapprovable record.
 
-## 边界
-
-不是日常必需；删除是归档。
+Node and edge blocks each render at most 200 lines plus an explicit overflow marker; the density footer retains the true totals. Skill reads are batched, and unreadable bodies reduce the available edges rather than being presented as a complete graph.

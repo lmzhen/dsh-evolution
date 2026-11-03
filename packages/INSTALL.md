@@ -41,7 +41,8 @@ The three bundles insert the same infrastructure rows. Mounting two double-regis
 - Under variant, `/evolution` commands remain visible globally; automatic behavior is session-gated.
 - `skill-health` is disabled in the `all` bundle by default.
 - `merge/run` and `merge/runs` paths are declared but not implemented.
-- `reviewToolAllow` appears in bundle YAML but is not read by the review plugin.
+- `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth`, and `reviewToolAllow` appear in the generated parameter table/bundle metadata but are not read by the review plugin. Do not rely on them for provider selection, context limits, delegation depth, or tool restrictions. `reviewTimeoutMs` is implemented.
+- The local `evolution-io-node` backend guarantees same-path serialization only within one process. Cross-process read-modify-write over a shared home requires the platform `ctx.fs` provider; the Node backend alone is not a cross-process lock.
 
 ## Upgrade runbook (platform first)
 
@@ -63,4 +64,4 @@ Preset bases and preconditions are single-sourced in [evolution-agent/README.md]
 
 ## Merge control axes
 
-The merge settings are three axes, not one switch: approval, platform-write capability, and the local model root. The two booleans are `mergeApproval`, `platformWrite`; the model root is `mergeModelsRoot`.
+The operator controls are `mergeApproval` and, for scan, the local model root `mergeModelsRoot`. Ordinary pair does not use that local screening dependency, but still requires the child-session model channel. `platformWrite` also appears in compatibility projections and run reports, but it is not a user configuration key or an admission check in the merge package; do not use it as proof that a write is permitted.

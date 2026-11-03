@@ -11,15 +11,19 @@ Skeleton: `templates/command/registry-row.ts.tmpl`.
       (`{ usage, summary }`) plus its handler branch. The registry is the single
       source for the command table, the input hint and the emitted help text — a
       second list anywhere is the bug this rule set exists for.
+- [ ] Merge exception: for `/evolution merge ...`, edit `MERGE_COMMAND_DEFS` in
+      `packages/evolution-merge/src/command-defs.ts` and the parser/dispatch under
+      `packages/evolution-merge/src/`, not only the ordinary registry. `/evolution`
+      forwards the whole merge input to `evolutionMerge` before its ordinary branches.
 - [ ] `summary` is non-empty and starts with a verb; `usage` carries the real
       argument shapes (`<id>`, `[--plan <runId>]`, `| `-separated choices). —
       *registry.spec.ts fails an empty summary.*
-- [ ] The command table in `packages/README.md` §Command reference must match the
-      renderer byte-for-byte. The README is the fact's home: edit it there, do not
-      copy the table anywhere else (the root README had already drifted to the
-      pre-0.3.77 `--base` form). — *registry.spec.ts (T-WD2) fails on a missing,
-      changed or extra row; `verify-doc-facts.mjs` (N19 `command-surface`) fails a
-      second table or the stale row.*
+- [ ] Update the user reference in `docs/commands.md` for the new syntax and keep
+      the canonical preset-install row in `packages/README.md`; do not add a second
+      full command table to the root README. — *`verify-command-table.mjs` checks
+      registry/dispatch parity; `registry.spec.ts` (T-WD2) requires non-empty
+      summaries; `verify-doc-facts.mjs` (N19 `command-surface`) pins the canonical
+      preset-install row.*
 - [ ] Read-only commands say so and take no approval path; a command that writes
       goes through the same staged/approval surface as every other mutation.
       Exception (E-70, `tool-skill-manage`): a lifecycle-flag flip (pin/unpin) stays

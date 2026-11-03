@@ -1,73 +1,74 @@
-# 设置：只改你真正会在意的
+# 设置
 
-大多数默认值可以直接用。真正值得改的只有四类：审批、记忆预算、复盘频率、整理频率。
+常用设置是审批、记忆预算、复盘频率和整理频率。完整参数及 E0–E4 写入面见 [../packages/PARAMETERS.md](../packages/PARAMETERS.md)。
 
-## 审批
+## 审批与写入确认
 
-默认关闭。打开后，只有记忆/技能写入停在待批窗口；整理器的归档/合并和合并提交不走审批。
+审批默认关闭。开启后，可暂存的 memory/skill 写入进入待批窗口；整理器的生命周期动作和技能合并有各自控制，不要与这套写入审批混为一谈。
 
-| 设置 | 默认 | 说明 |
+| 设置 | 默认值 | 说明 |
 |---|---|---|
-| 启用审批 | 否 | 打开后写入需要你 approve/reject |
-| 批准时再确认 | 自动 | `auto` 直接执行；`ask` 再问一次 |
-| 待批保留时间 | 永久 | 过期会按拒绝处理；一般不用改 |
+| `evolution-approval.enabled` | `false` | 是否启用暂存审批 |
+| `approvalConfirm` | `auto` | 批准时直接执行；`ask` 会再确认一次 |
+| `evolution-approval.pendingTtlMs` | `0` | 待批保留毫秒数；0 表示永不过期，过期会关闭为拒绝且不执行 |
 
-设置入口：**设置里的「自进化」中的审批**（只有 `all` 安装形态 + Web 客户端才有这个设置页）。
+技能创建和裸删另有一次确认，与暂存审批独立：
 
-## 写入确认（创建/删除技能）
-
-| 设置 | 默认 | 说明 |
+| 设置 | 默认值 | 说明 |
 |---|---|---|
-| `skillWriteConfirm` | `auto` | 新建/裸删技能前是否问；`ask` 会等，`timeout` 会在超时后取消 |
-| 确认超时 | 120 秒 | 仅 `timeout` 模式使用 |
-
-审批管的是“记忆/技能写入排队”；这个确认管的是“创建/删除技能前先问一句”，两者可以分开。
+| `skillWriteConfirm` | `auto` | `auto` 直接写；`ask` 一直等待；`timeout` 超时未答则取消 |
+| `skillWriteConfirmTimeoutSeconds` | `120` | 仅 `timeout` 模式使用的等待秒数 |
 
 ## 记忆预算
 
-| 设置 | 默认 | 说明 |
+| 设置 | 默认值 | 说明 |
 |---|---:|---|
-| `memoryChars` | 2200 | 项目记忆 `MEMORY.md` 的字符预算 |
-| `userChars` | 1375 | 用户画像 `USER.md` 的字符预算 |
+| `memoryChars` | 2200 | `MEMORY.md` 的字符预算 |
+| `userChars` | 1375 | `USER.md` 的字符预算 |
 
-预算写满时，新增会被拒绝；删除/替换类操作仍可执行。用量到 80% 左右开始出现存储提示；改小预算不会立刻删内容，下一次写入时才按新预算判断。
+用量达到约 80% 后会出现存储提示。预算写满时新增会被拒绝；替换只有在未触发超限保护且替换后仍满足预算时才能执行。
 
-## 复盘
+调低预算不会立即删改现有内容。若已有单条记忆超过新上限，**删除是恢复通道**；此时 replace 不会绕开保护，先删除或缩短超限条目，再继续写入。
 
-| 设置 | 默认 | 说明 |
+## 自动复盘
+
+| 设置 | 默认值 | 说明 |
 |---|---|---|
-| `reviewEnabled` | 是 | 总开关 |
-| `reviewMode` | `inject` | 在会话内复盘；`branch` 另起子会话 |
-| `reviewMemoryInterval` | 10 | 累计多少次工具调用触发记忆复盘 |
-| `reviewSkillInterval` | 10 | 累计多少次工具调用触发技能复盘 |
-| `skillReviewTrigger` | `cadence` | 只按节奏、只按完成、或两者；完成阈值默认 20 |
+| `reviewEnabled` | `true` | 自动复盘总开关 |
+| `reviewMode` | `inject` | 在当前会话内复盘；`branch` 使用后台子会话 |
+| `reviewMemoryInterval` | `10` | 记忆复盘的活动量间隔 |
+| `reviewSkillInterval` | `10` | 技能复盘的活动量间隔 |
+| `skillReviewTrigger` | `cadence` | 技能复盘按节奏、按完成或两者；完成通道阈值默认 20 次工具调用 |
 
-**建议**：默认 `inject` 最稳；它在任务收尾时触发（累计约 10 次工具调用），会叫醒模型多跑一轮。`branch` 是另一套运行方式，需要额外支持；当前还有已知通知边界。频率不想被干扰就调大，或直接关掉。
+间隔不是用户消息数。`inject` 会在父会话追加复盘；`branch` 需要子会话支持，并有独立的通知边界。cadence 的实质信号与加权规则、completion 的原生工具调用计数差异见 [功能指南](features.md#复盘)。
 
-## 整理
+host 形态没有 `memory` / `skill_manage` 等家族模型行，自动复盘和用量统计的会话门控不会命中。
 
-| 设置 | 默认 | 说明 |
-|---|---|---|
-| `curatorIntervalHours` | 168 | 自动整理间隔（小时） |
-| `staleAfterDays` | 30 | 多久不用算 stale |
-| `archiveAfterDays` | 90 | 多久不用归档 |
-| `minIdleHours` | 2 | 你空闲多久后才自动整理 |
+## 技能整理
 
-整理先快照；失败只写报告，不会自动把整棵技能树回滚；需要时用 `/evolution restore`。归档不是硬删除。
+| 设置 | 默认值 | 说明 |
+|---|---:|---|
+| `curatorIntervalHours` | 168 | 自动整理的最小间隔（小时） |
+| `staleAfterDays` | 30 | 多少天未使用后视为陈旧 |
+| `archiveAfterDays` | 90 | 多少天未使用后进入归档，必须不小于 staleAfterDays |
+| `minIdleHours` | 2 | 自动整理要求的空闲小时数 |
 
-## 技能数量增长后的检索（默认关闭）
+启动后先经过默认 10 秒宽限期，再每小时检查是否到期。`curator pause/resume` 的运行时选择优先于启动默认值。默认 `llmReview=false` 时，整理器只做确定性生命周期维护；开启后可以产生 LLM consolidation 提名。独立 merge 才走 `merge scan/pair` 的候选、运行与提交流程。
 
-`skill_search` 本身是独立可用的基础检索。这里默认关闭的是 discovery 的域卡/目录裁剪：它适合技能数量增长、完整目录不再合适时使用，需要模型/投影条件，并由支持人员开启。除非你明确需要，否则不要开。
+## 技能发现域
 
-## 合并（需要本地模型）
+`skill_search` 的本地基础检索独立可用。默认关闭的是 discovery 的发现域生成和目录裁剪：`mode=off`。高级启用需同时核对 `featureEpoch`；`mode=on` 需要可用 LLM，`/skill-domain generate` 还需要 `mapReferenceCwd`，否则会拒绝从调用者视图生成全局图。完整高级配置见 [evolution-skill-discovery README](../packages/evolution-skill-discovery/README.md)。
 
-合并需要一个本地筛选模型目录。没有配置时，`/evolution merge doctor` 会提示，`merge scan` 会失败；不会自动下载模型，也不会假装成功。
+## 技能合并
 
-如果你不用合并，完全不用管这一节。默认 `mergeApproval=false`：合并会自动接受并写入；想每次人工审批就打开它。
+scan 需要 `mergeModelsRoot` 指向本地 potion 模型目录。未配置时 `/evolution merge doctor` 会提示，`merge scan` 会失败；不会自动下载。普通 pair 不经过本地候选筛选，但其 round1/authoring 需要子会话模型，不能使用 scan 的 stub 降级。
 
-## 在哪里改
+`mergeApproval` 默认 `false`，表示第一轮后不进入人工待批；设为 `true` 才会进入 pending。审批、宿主写入能力和模型条件是不同前提，不能用其中一个替代其它条件。
 
-- 设置里的「自进化」：审批、记忆、复盘、整理等常用项；
-- `/evolution params --group <group>`：看当前值和来源；常用组是 `review`、`memory`、`curator`、`merge`。
+## 设置写在哪里
 
-> 设置页写入的就是 profile 的 `cordis.patch.yml`；不要同时手改同一个文件，避免互相覆盖。以 `doctor`/`params` 显示的实际值为准。
+- **E3 用户设置**：通过 Web/桌面 GUI 的「设置 → 自进化」或 `/evolution policy set` 写入 `$DSH_HOME/settings.yaml`。设置页只在 all 安装形态提供。
+- **E1/E2 部署配置**：写在 Cordis 配置或 `profiles/<profile>/cordis.patch.yml`。分层预设行也在该 patch 中。
+- **查看实际值**：使用 `/evolution params [--group <name>]`，它会区分用户覆盖、部署值和未注册来源。
+
+不要同时在 GUI 和文本编辑器里写同一个设置文件。备份时必须同时覆盖 `settings.yaml` 与 profile patch，步骤见 [operations.md](operations.md#备份)。

@@ -1,19 +1,9 @@
 # @lmzhen/dsh-evolution-host
 
-> 安装形态：只要自动化，不给模型写工具。
+Infrastructure-only installation bundle for background automation and management without the general memory/skill-authoring model rows.
 
-## 你会看到
+It mounts review, curator, approval/state, activity, replay, merge, maintenance, graph, and command infrastructure, but not `memory`, `skill_manage`, or the evolution skill catalog used by the full model-tool forms.
 
-后台复盘、整理、报告；没有 memory/skill_manage 工具。
+Host-only still exposes the read-only `maintenance_probe` and the merge-child-only `merge_stage` model tools. During the author phase, `merge_stage` supports staging writes and copies; it is not a read-only or generally available user tool. The host distinction is the absence of the general memory/skill-authoring model rows, not the absence of every model tool.
 
-## 什么时候会用到
-
-你不想让模型自己写记忆/技能时。
-
-## 默认 / 前提
-
-与 all/preset/分层互斥。
-
-## 边界
-
-不是完整形态；要写记忆/技能请用 all 或分层预设。
+Use `all` or the layered Evolution preset when sessions need memory and skill authoring. `host` is mutually exclusive with `all`, `preset`, and a layered host-plus-preset installation.
