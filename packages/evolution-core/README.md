@@ -24,13 +24,13 @@
 
 | 事件 | the `@mode` | 用途 |
 |---|---|---|
-| `evolution/skill-mutated` | emit | 技能树写入后失效目录缓存 |
-| `evolution/skills-refresh` | emit | `/evolution skills refresh` 显式刷新 |
-| `evolution/review-scheduled` | emit | 审查已安排 |
-| `evolution/review-completed` | emit | branch 审查完成 |
-| `evolution/review-error` | emit | 审查流水线失败 |
-| `evolution/plan-applied` | emit | 计划执行结果 |
-| `evolution/memory-applied` | emit | 记忆写入成功 |
-| `evolution/memory-provider-registered` | emit | 记忆 provider 注册 |
+| `evolution/skill-mutated` | emit (one-way) | 技能树写入后失效目录缓存 |
+| `evolution/skills-refresh` | emit (one-way) | `/evolution skills refresh` 显式刷新 |
+| `evolution/review-scheduled` | emit (one-way) | 审查已安排 |
+| `evolution/review-completed` | emit (one-way) | branch 审查完成 |
+| `evolution/review-error` | emit (one-way) | 审查流水线失败 |
+| `evolution/plan-applied` | emit (one-way) | 计划执行结果 |
+| `evolution/memory-applied` | emit (one-way) | 记忆写入成功 |
+| `evolution/memory-provider-registered` | emit (one-way) | 记忆 provider 注册 |
 
 预设 id：`evolution`、`evolution-ptc`、`evolution-cordis`、`evolution-minimal`、`evolution-reviewer-readonly`、`evolution-maintainer-readonly`。
