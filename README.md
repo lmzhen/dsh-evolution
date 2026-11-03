@@ -50,14 +50,16 @@ First, a correction: **a skill is not a pipeline.** Creation does not have to fo
 
 The useful split is by responsibility:
 
-| Surface | Who/when | Output | Not responsible for |
+| Surface | Who/when | Output | Current boundary |
 |---|---|---|---|
-| Authoring | explicit user request, or the agent judges a workflow worth keeping | new skill, rewrite, patch, support files | publishing the catalog, cleaning old skills |
-| Supply | platform skill catalog and model loading | a visible catalog and full body | executing the skill, guaranteeing selection |
-| Structure | on demand, when a skill is too long, overlapping or outdated | split, merge, migrated skill | deciding which skills leave the library |
-| Curation | time/idle schedule | stale/archive, near-duplicate merge | creating a new skill from scratch |
-| Control | every write; approval when enabled | gates, approval, versions, undo | covering curator/merge writes with approval |
-| Diagnosis | troubleshooting and long-term maintenance | status, health, references, relationships | repairing skills automatically |
+| Authoring | explicit user request, or the agent judges a workflow worth keeping | new skill, rewrite, patch, support files | create/edit/archive exist; versions and undo are the necessary companion |
+| Retrieval | when the library grows and the full catalog stops fitting well | search results, domain cards, a trimmed catalog | `skill_search` works independently; domain cards need discovery, off by default |
+| Structure | on demand, when a skill is too long, overlapping or outdated | split, merge, migrated skill | merge is a separate flow; it does not use the ordinary write approval |
+| Curation | time/idle schedule | stale/archive, near-duplicate merge | scheduling and reports exist; notification/inbox is incomplete |
+| Control | every write; approval when enabled | gates, approval, versions, undo | approval covers staged memory/skill writes only |
+| Diagnosis | troubleshooting and long-term maintenance | status, health, references, relationships | reports only; doctor cannot replace a real write test |
+
+The six surfaces are not equally mature: authoring and versioned rollback are relatively complete; retrieval, domain cards, curation notifications, merge defaults and cross-form UI are still basic or conditional. This section describes the division of responsibility, not a claim that every surface is finished.
 
 ### 1. Authoring: turn experience into a skill, or change an existing one
 
@@ -70,15 +72,15 @@ This is the write surface. It answers: how does a working practice become someth
 
 This surface is about writing the skill correctly. It does not make the skill visible to the model, and it does not clean up old skills.
 
-### 2. Supply and use: make the right skill available at the right time
+### 2. When the library grows: an optional retrieval/trimming mode
 
-This surface answers: how does a written skill get discovered and loaded?
+This surface is not about "making the model use the right skill at the right time." It answers a narrower question: **when automatically generated skills become numerous enough that handing the model the full catalog stops working well, is there an alternative mode?**
 
-- the plugin publishes the skill tree as a catalog; the model loads the full body through the platform's native `skill` tool;
-- the description, trigger conditions and frontmatter determine whether the skill is selected;
-- when the library is large, `skill_search` provides basic retrieval; the fuller domain cards require discovery, which is off by default.
+- By default, the plugin publishes the skill tree to the platform catalog; the model loads the full body by name through the platform's native `skill` tool. By default it publishes the visible skill catalog and does not trim it on demand.
+- As the library grows, `skill_search` provides retrieval, and discovery's domain cards/trimming provide another organization, so the model does not have to see every skill at once.
+- This is not the default path: `skill_search` is a separate tool; domain cards and trimming require discovery to be enabled and depend on model/projection conditions. Discovery is off by default.
 
-The boundary matters: **the plugin does not execute a skill and does not choose every step for the model.** It supplies the catalog, the body and optional retrieval; the model and the tools it calls execute. If the model did not load a skill, that may be a weak description, a trigger mismatch, or simply a task that did not need it. It is not automatically a plugin failure.
+So this is a **conditional, optional capability**, not a guarantee that the plugin picks the right skill on every task. If the model did not load a skill, that may be a weak description, a trigger mismatch, or simply a task that did not need it. The plugin supplies the catalog, body, search and trimming; execution is still done by the model and the tools it calls.
 
 ### 3. Structural refactoring: split, merge, migrate
 
@@ -86,9 +88,9 @@ This surface answers: the skill exists, but its shape is wrong. It is an on-dema
 
 - **Split**: a skill is too long or covers too many jobs; create a parent and children, or move details into references;
 - **Merge**: two skills overlap heavily; combine them into one more complete skill;
-- **Migrate/rewrite**: bring old formats, paths or section structures into the current shape.
+- **Rewrite/migrate**: bring old formats, paths or section structures into the current shape; today this is done mainly through rewrite/patch, not a separate migration engine.
 
-Splitting and merging use the same gates, approval and versions as authoring. A merge is not "the end of the lifecycle"; it is one restructuring of duplicate material. These operations usually appear after a library has grown, not for every skill.
+Splitting and rewriting through `skill_manage` use the ordinary write gates, approval and versions; `restructure`/`extract` from `/evolution` are a separate command path, and their approval point should not be assumed identical to `skill_manage`. Merge is a separate flow with its own candidate screening, commit and receipt; it is not covered by the ordinary write approval. A merge is not "the end of the lifecycle"; it is one restructuring of duplicate material. These operations usually appear after a library has grown, not for every skill.
 
 ### 4. Keeping the library usable
 
@@ -96,31 +98,36 @@ This surface answers: which skills are still useful, and which should leave.
 
 - usage evidence comes from views, patches and support-file reads;
 - the curator marks stale skills and archives them on a time/idle schedule, and merges near-duplicates; it archives rather than hard-deletes;
-- pin/protection markers can keep selected skills out of curation;
+- pin/protection markers are intended to keep selected skills out of curation; the exact coverage depends on the current implementation;
 - health, drift and graph views are observations: they report, they do not repair.
 
 The distinction is: **refactoring changes the shape of one skill or a group; curation decides which skills remain in the library.** Merging happens when there is duplication; curation happens when skills go unused or degrade. They are not consecutive steps on one line.
 
-### 5. Control, rollback and explanation
+The current implementation already has scheduled curation and reports, but notification/explanation is incomplete: a curation run may not announce itself in the conversation, and a skill may simply disappear from the list. This surface is closer to "background execution plus reports" than to a complete inbox experience.
 
-This surface answers: why should a user trust the model to change its own skills?
+### 5. Balancing semantic automation with user attention
 
+This surface is not "why should the user trust the model?" It is the more practical question: **when the model makes more and more semantic decisions and the user's time and attention are limited, how do we keep automation inside the range the user is willing to accept?**
+
+The design split is:
+
+- low-risk, reversible actions can be automatic, so the user does not approve every detail;
+- critical writes can wait for human confirmation, saving attention for the moments that matter;
+- skill writes leave versions; deletion is an archive; a single skill can be undone, the whole tree restored;
 - writes pass structural gates, policy protection and threat scanning;
-- approval can be enabled; it covers staged memory/skill writes, not the curator's or merger's own writes;
-- every write leaves a version; one skill can be undone, the whole tree can be restored, archives can be recovered;
-- reports and diagnostics explain what happened instead of leaving the user to guess.
+- reports and diagnostics try to explain what happened, instead of making the user infer it from results.
 
-This is not a "skill feature"; it is the trust layer that makes the other surfaces safe to hand to a model. It runs across every write, not at one stage.
+The current implementation does not fully deliver that balance: approval is off by default, covers only staged memory/skill writes, and does not cover the curator's or merger's own writes; pending work is mainly visible in forms that have the settings page, without a complete notification/inbox; explainability is concentrated in reports and commands rather than every action. This section describes the design direction and current coverage, not a claim that the balance is complete.
 
 ### 6. Observation and diagnosis
 
 This surface answers: what is going on right now?
 
-- `/evolution doctor` shows install form, version, connections and feature state;
+- `/evolution doctor` shows install form, version, connections and service state; it cannot prove that memory/skill tools actually work, so a real write or edit is still the verification;
 - health, drift, graph and reports show structure, references, usage and relationships;
-- these are for troubleshooting and long-term maintenance, not daily task entry points, and they do not replace actually writing a memory or changing a skill.
+- these are for troubleshooting and long-term maintenance, not daily task entry points, and they do not replace a real write test.
 
-**In one line: authoring keeps the practice, supply lets the model use it, refactoring gives it the right shape, curation decides what stays, control makes it reversible, and diagnosis explains it.** They can be combined in any order; they are not six mandatory stages.
+**In one line: authoring keeps the practice, retrieval keeps a large library findable, refactoring gives it the right shape, curation decides what stays, control makes it reversible, and diagnosis explains it.** They can be combined in any order; they are not six mandatory stages.
 
 ## Install
 
