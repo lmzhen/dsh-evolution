@@ -8,7 +8,7 @@ dsh-evolution is built around **automated skill generation and full-lifecycle sk
 
 The model should get better at doing work *your* way: your machine, project conventions, habits, and the details of your recurring tasks. Once general capability is strong enough, the valuable layer becomes a private skill set that grows with the variety and complexity of your work. Managing that set by hand does not scale.
 
-The plugin turns **create → use → review → patch → split → merge → archive → restore** into an auditable loop. It uses the model's semantic ability to run that loop where possible, gives the user a choice to approve critical writes, and makes deletion an archive rather than a hard delete.
+The plugin treats skill creation, use, review, patching, splitting, merging, archiving and restoring as a set of auditable capabilities, not a fixed sequence. It uses the model's semantic ability to run them where possible, gives the user a choice to approve critical writes, and makes deletion an archive rather than a hard delete.
 
 ## What is a skill?
 
@@ -44,6 +44,84 @@ The plugin does include a memory module, but it deliberately inverts the usual "
 
 The trade-off is deliberate: **memory should be small and complete; skills should be specific rather than generic.**
 
+## What skill-facing capabilities does it provide?
+
+First, a correction: **a skill is not a pipeline.** Creation does not have to follow use, review does not always produce a skill, curation may not run for weeks, and merging only matters once duplicates have accumulated. Presenting these as `create, use, review, patch, split, merge, archive, restore` suggests a sequence every skill must follow; in practice they are different work surfaces used by different actors at different times.
+
+The useful split is by responsibility:
+
+| Surface | Who/when | Output | Not responsible for |
+|---|---|---|---|
+| Authoring | explicit user request, or the agent judges a workflow worth keeping | new skill, rewrite, patch, support files | publishing the catalog, cleaning old skills |
+| Supply | platform skill catalog and model loading | a visible catalog and full body | executing the skill, guaranteeing selection |
+| Structure | on demand, when a skill is too long, overlapping or outdated | split, merge, migrated skill | deciding which skills leave the library |
+| Curation | time/idle schedule | stale/archive, near-duplicate merge | creating a new skill from scratch |
+| Control | every write; approval when enabled | gates, approval, versions, undo | covering curator/merge writes with approval |
+| Diagnosis | troubleshooting and long-term maintenance | status, health, references, relationships | repairing skills automatically |
+
+### 1. Authoring: turn experience into a skill, or change an existing one
+
+This is the write surface. It answers: how does a working practice become something the model can reuse?
+
+- The user asks for a skill to be written, or the agent decides a workflow is worth keeping;
+- `skill_manage` creates, edits, patches and archives skills; support files under references, scripts, templates and assets are written here too;
+- a long skill can be split: `restructure` moves sections into references, `extract` turns a section into a child skill or reference;
+- every write goes through the gates and leaves a version; deletion is an archive.
+
+This surface is about writing the skill correctly. It does not make the skill visible to the model, and it does not clean up old skills.
+
+### 2. Supply and use: make the right skill available at the right time
+
+This surface answers: how does a written skill get discovered and loaded?
+
+- the plugin publishes the skill tree as a catalog; the model loads the full body through the platform's native `skill` tool;
+- the description, trigger conditions and frontmatter determine whether the skill is selected;
+- when the library is large, `skill_search` provides basic retrieval; the fuller domain cards require discovery, which is off by default.
+
+The boundary matters: **the plugin does not execute a skill and does not choose every step for the model.** It supplies the catalog, the body and optional retrieval; the model and the tools it calls execute. If the model did not load a skill, that may be a weak description, a trigger mismatch, or simply a task that did not need it. It is not automatically a plugin failure.
+
+### 3. Structural refactoring: split, merge, migrate
+
+This surface answers: the skill exists, but its shape is wrong. It is an on-demand edit, not a daily lifecycle step.
+
+- **Split**: a skill is too long or covers too many jobs; create a parent and children, or move details into references;
+- **Merge**: two skills overlap heavily; combine them into one more complete skill;
+- **Migrate/rewrite**: bring old formats, paths or section structures into the current shape.
+
+Splitting and merging use the same gates, approval and versions as authoring. A merge is not "the end of the lifecycle"; it is one restructuring of duplicate material. These operations usually appear after a library has grown, not for every skill.
+
+### 4. Keeping the library usable
+
+This surface answers: which skills are still useful, and which should leave.
+
+- usage evidence comes from views, patches and support-file reads;
+- the curator marks stale skills and archives them on a time/idle schedule, and merges near-duplicates; it archives rather than hard-deletes;
+- pin/protection markers can keep selected skills out of curation;
+- health, drift and graph views are observations: they report, they do not repair.
+
+The distinction is: **refactoring changes the shape of one skill or a group; curation decides which skills remain in the library.** Merging happens when there is duplication; curation happens when skills go unused or degrade. They are not consecutive steps on one line.
+
+### 5. Control, rollback and explanation
+
+This surface answers: why should a user trust the model to change its own skills?
+
+- writes pass structural gates, policy protection and threat scanning;
+- approval can be enabled; it covers staged memory/skill writes, not the curator's or merger's own writes;
+- every write leaves a version; one skill can be undone, the whole tree can be restored, archives can be recovered;
+- reports and diagnostics explain what happened instead of leaving the user to guess.
+
+This is not a "skill feature"; it is the trust layer that makes the other surfaces safe to hand to a model. It runs across every write, not at one stage.
+
+### 6. Observation and diagnosis
+
+This surface answers: what is going on right now?
+
+- `/evolution doctor` shows install form, version, connections and feature state;
+- health, drift, graph and reports show structure, references, usage and relationships;
+- these are for troubleshooting and long-term maintenance, not daily task entry points, and they do not replace actually writing a memory or changing a skill.
+
+**In one line: authoring keeps the practice, supply lets the model use it, refactoring gives it the right shape, curation decides what stays, control makes it reversible, and diagnosis explains it.** They can be combined in any order; they are not six mandatory stages.
+
 ## Install
 
 ```bash
@@ -56,7 +134,7 @@ After the restart, ask the agent to remember something:
 
 > Remember that this repository uses pnpm and tests run with `pnpm test`.
 
-Then open a new session. The fact is already there. That is the smallest useful loop: **remember → reuse → improve**.
+Then open a new session. The fact is already there. That is the smallest useful loop: **remember, reuse, improve**.
 
 ## Four ways to use it
 
@@ -143,7 +221,7 @@ The platform line is one supported generation; older prerelease lines fail at de
 - [Settings](docs/configuration.md) — approval, budgets, cadence.
 - [Model/API keys](docs/api-keys.md) — which features need a model, and how to configure it.
 - [Operations](docs/operations.md) — backup, upgrade, uninstall, doctor.
-- [Troubleshooting](docs/troubleshooting.md) — symptom → action.
+- [Troubleshooting](docs/troubleshooting.md) — symptoms and the matching action.
 - [Install details](INSTALL.md) — the four forms and upgrade order.
 - For maintainers only: `packages/README.md` (package map and canonical facts; not user documentation).
 
