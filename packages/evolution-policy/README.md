@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-policy
 
-> 不可变策略快照 + 控制平面写 guard。
+> 内部安全组件，阻止模型改策略/提示词等控制面。
 
-## 它做什么
+## 你会看到
 
-把 18 个配置项冻结成 19 字段快照；tools.guard 拒绝 memory/skill 参数中的 6 个控制键（含 operations 内层）。
+用户看不到直接入口；只会在模型试图改控制面时看到拒绝。
 
-## 入口
+## 什么时候会用到
 
-ctx.evolutionPolicy.get()；tools.guard。
+当 Agent 试图写策略/提示词/路由时。
 
-## 依赖与默认
+## 默认 / 前提
 
-可选 tools 服务；无 tools 时 guard 不注册。
+随家族自动工作。
 
 ## 边界
 
-只拦控制键，不是通用沙箱；数值会 clamp；模型不能改快照。
-
-## 代码位置
-
-`src/index.ts`
+它不是通用沙箱，只保护控制键。

@@ -1,94 +1,121 @@
-# dsh-evolution：给 DeepSeek Harness 的自进化记忆与技能
+# dsh-evolution
 
-[English](./README.md) · 中文
+给 DeepSeek Harness 的自进化记忆与技能。
 
-**一次安装：Agent 会记住项目，持续改进自己的技能，并把每次改动留下可审计的痕迹。**
+装一次，之后 Agent 可以：
 
-这是 **36 个可组合 Cordis 插件**，不是模型、不是托管服务，也没有独立 GUI。模型只能写记忆和技能；策略、提示词、路由、状态和审计历史属于控制面，它改不了。
+- **记住你的项目**：决策、命令、偏好，下次会话自动带回来；
+- **改进自己的技能**：创建、修补、拆分、合并技能，带历史和撤销；
+- **主动复盘**：在自然节点把“刚才发生了什么”变成改进计划，不用你每次提醒；
+- **始终在你控制下**：每次写入都可以等你审批；删除是归档，不是硬删。
 
-当前家族版本：**0.32.4**。平台线与依赖窗口见下文「兼容与版本」。
+它不是模型，也不是托管服务；数据都在你的 `$DSH_HOME` 下。
 
-## 先跑起来
+## 安装
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
-# 重启 dsh，让 profile 重新组合
+# 重启 dsh，然后在任意会话：
 /evolution doctor
 ```
 
-默认 `all` 是完整形态。只要自动化、不要记忆/技能工具，用 `host`；只想在部分会话给工具，用 `host` + Evolution 预设。**一个 profile 只能挂一种**，挂两种会在启动时报重复注册。
+重启后，让 Agent 记一件事：
 
-## 装完你会得到什么
+> 记住：这个仓库用 pnpm，测试命令是 `pnpm test`。
 
-| 能力 | 它做什么 | 在哪里看 |
+然后开一个新会话，这条事实已经在了。最小的闭环就是：**记住 → 复用 → 改进**。
+
+## 四种用法
+
+| 你想怎样 | 装什么 | 你会得到 |
 |---|---|---|
-| 记忆 | 项目事实/偏好写进 `MEMORY.md` / `USER.md`，新会话自动带快照 | 设置页参数卡、`memory` 工具 |
-| 技能 | 模型创建/修补/搬段/归档技能；每次写入有门禁、可审批、有版本 | `skill_manage`、技能历史侧栏 |
-| 审查 | 会话边界做后台回顾；默认 inject，不另起子代理 | `/evolution params`、review-state 文件 |
-| 整理 | 确定性的 stale/归档/合并；可选 LLM 提名 | `/evolution curator …`、报告 |
-| 合并 | 筛选 → 两轮 authoring → 暂存 → 审批 → 提交 → 撤销 | `/evolution merge …`、合并面板 |
-| 控制面 | 威胁扫描、不可变策略、可选审批 | 审批卡、`/evolution pending` |
-| 可观测 | 活动账本、回放排行、健康、用量、学习图 | `/evolution replay`、`/graph`、健康面板 |
+| 完整体验（推荐） | `@lmzhen/dsh-evolution-all` | 每个会话都有记忆/技能工具，外加设置页和面板 |
+| 只要自动化，不要模型写权限 | `@lmzhen/dsh-evolution-host` | 整理、报告照跑；Agent 不能写记忆/技能，review/用量也不生效 |
+| 只在部分会话给工具 | `host` + `agent-preset` + `/evolution preset install` | 只有选中 Evolution 预设的会话有工具，其它会话不受影响 |
+| 旧的一键配置 | `@lmzhen/dsh-evolution-preset` | 兼容形态；没有设置页和三个侧栏面板 |
 
-## 选安装形态（四选一）
+**一个 profile 只能挂一种**；换形态先卸载再装。每种形态对会话的精确影响单源在 [packages/INSTALL.md](packages/INSTALL.md)，这里不重复。
 
-| 形态 | 安装 | 模型工具 | 说明 |
-|---|---|---|---|
-| **all（默认）** | `dsh-evolution-all` | 每个会话 | 完整功能；无 preset 步骤 |
-| host | `dsh-evolution-host` | 只有 `maintenance_probe`、`merge_stage` | 只要后台自动化 |
-| preset（兼容） | `dsh-evolution-preset` | 每个会话 | 兼容旧配置；无设置/健康两行 |
-| 分层 | `host` + `/evolution preset install` | 只有选中 Evolution 预设的会话 | 与 all/preset 互斥 |
+## 你实际会用的功能
 
-`all`、`host`、`preset`、分层预设不能同挂。要缩配：先卸载，再装另一种。
+### 记忆
 
-## 命令与工具
+让 Agent 记住一条事实，或者它自己注意到。它会写 `$DSH_HOME/memories/MEMORY.md` / `USER.md`，新会话自动带一段快照。预算可以在设置里改。
 
-主命令面：`/evolution`（30 条表项，展开 36 个叶子）、`/graph`；`/skill-domain` 只在 discovery `mode: on` 时注册。`/merge` 兼容别名在 0.32 已移除。
+### 技能
 
-| 面 | 入口 |
+让 Agent 把重复流程写成技能。它可以创建、修补、拆分、合并、归档。改错了用 `/evolution skill history <name>` 看版本，`/evolution skill undo <name>` 退回。
+
+### 后台复盘
+
+在自然节点，Agent 回顾刚才发生了什么，给出改进建议。默认在会话内做，不是每句话都打断你。频率可调，也可以关掉。
+
+### 自动整理
+
+整理器定期把过时技能标 stale、把不再用的归档、把近重复的合并。它先快照，删除是归档；用 `/evolution curator status` 和 `/evolution curator report` 看它做了什么。
+
+### 技能合并
+
+两个技能重叠时，Agent 可以提议合并。**默认会自动合并并写入**；打开审批才会等你批准/拒绝。合并结果可以撤销；面板只读，展示队列并复制命令。
+
+### 审批
+
+默认关闭。打开后，每次记忆/技能写入都等你批。日常就三条：`/evolution pending`、`/evolution approve <id>`、`/evolution reject <id>`。
+
+## 日常命令
+
+| 命令 | 什么时候用 |
 |---|---|
-| 预设安装 | 见 [命令手册](docs/commands.md) 的 preset install 行 |
-| 审批 | `/evolution pending`、`approve <id>`、`reject <id>` |
-| 诊断 | `/evolution doctor [--json]` |
-| 整理 | `/evolution curator status|scope|report|run` |
-| 合并 | `/evolution merge scan|pair|status|approve|resume|undo|doctor` |
-| 模型工具 | `memory`、`skill_manage`、`skill_search`、`session_search`、`maintenance_probe`、`merge_stage` |
+| `/evolution doctor` | 安装/升级后，或怀疑功能没挂上 |
+| `/evolution pending` | 看等待审批的写入 |
+| `/evolution skill history <name>` | 看/撤销技能改动 |
+| `/evolution curator status` | 看自动整理是否到期 |
+| `/evolution merge pending` | 看合并提议 |
+| `/graph` | 浏览/编辑技能与记忆图 |
 
-## 兼容与版本
+还有高级命令（维护扫描、回放、预设安装、章节抽取），在 [docs/commands.md](docs/commands.md) 里；日常不用。
+
+## 值得改的设置
+
+- **审批**：开/关；批准时是否再问一次（只有 all + Web 有设置页）。
+- **记忆预算**：项目记忆和用户画像各留多少。
+- **复盘频率**：多久回顾一次，或关掉。
+- **整理间隔**：多久清理/合并一次。
+
+其它都有合理默认；完整用户向参数见 [docs/configuration.md](docs/configuration.md)。
+
+## 隐私与安全
+
+- 无遥测、无托管服务；数据在 `$DSH_HOME`。
+- 模型只能写记忆和技能；内部策略、提示词和审计记录模型改不了。
+- 删除技能是归档；恢复和撤销是显式操作。合并有回执。
+- 写入前有威胁扫描；审批关着也照扫。
+
+## 兼容性
 
 | | 取值 |
 |---|---|
 | 验证平台线 | **`0.2.1-rc.3`** |
-| 声明依赖窗口 | `^0.2.1-rc.2` |
-| 家族版本 | `0.32.4` |
+| 发布依赖窗口 | `^0.2.1-rc.2` |
+| 家族版本 | `0.32.5` |
 | Node | 22.19+ 或 24+ |
 
-平台线只支持这一条；更早的预发布线在依赖解析阶段就失败，这是支持窗口，不是 bug。
-
-安装形态对会话的影响、variant 的命令面差异，单源在 [packages/INSTALL.md](packages/INSTALL.md)。
-
-## 安全边界
-
-- **状态是 single-process**：本地 `node:fs` provider，不伪造跨进程锁/WAL。
-- **不自动晋升 shadow**：影子写入必须显式提交。
-- **不硬删除技能**：删除=归档；恢复/单元撤销是显式操作。
-- **审批可选，门禁始终在**：审批关了，写门禁和威胁扫描仍然执行。
-- **无遥测**：数据只在你自己的 `$DSH_HOME`。
-
-## 已知限制
-
-- `host` 本来就没有 memory/skill 工具。
-- `skill-health` 在 all 中默认 disabled。
-- `skill-discovery` 默认 `mode: off`，只留 `skill_search`。
-- `merge/run`、`merge/runs` 只有路径常量，没有实现。
-- `reviewToolAllow` 是死配置，代码不读。
-- feedback 族内没有生产者/消费者；activity/replay 只在 branch 审查模式收到事件。
-- `/merge` 别名已移除；`/evolution consolidate` 已退出用户面。
+平台线只支持这一代；更早的预发布线会在依赖解析阶段失败。安装细节见 [INSTALL.md](INSTALL.md)。
 
 ## 文档
 
-- [docs/](docs/README.md)：入门、功能地图、命令手册、配置、运维、排障、架构、开发。
-- [INSTALL.md](INSTALL.md)：安装/升级/卸载/验证。
-- [packages/README.md](packages/README.md)：包地图与维护者参考。
-- [CHANGELOG.md](CHANGELOG.md)：发布历史。
-- [CONTRIBUTING.md](CONTRIBUTING.md)：贡献者门禁与规则。
+- [入门](docs/getting-started.md)：10 分钟从安装到第一次记住。
+- [功能说明](docs/features.md)：从用户视角看五条回路。
+- [命令](docs/commands.md)：日常与高级命令。
+- [设置](docs/configuration.md)：审批、预算、频率。
+- [模型/API key](docs/api-keys.md)：哪些功能要模型、怎么配。
+- [运维](docs/operations.md)：备份、升级、卸载、doctor。
+- [排障](docs/troubleshooting.md)：症状 → 动作。
+- [安装细节](INSTALL.md)：四种形态与升级顺序。
+
+## 已知边界
+
+- **host** 形态没有记忆/技能工具；这是它的用途。要写记忆/技能，用 all 或分层预设。
+- 审批默认关闭；要人工闸门就打开。
+- 技能健康面板在完整包里默认关闭；它是可选项。
+- 需要模型或本地合并模型的功能，失败会明确报错，不会假装成功。

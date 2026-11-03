@@ -1,142 +1,73 @@
-# 配置：把默认行为调到适合你
+# 设置：只改你真正会在意的
 
-配置分三层：
+大多数默认值可以直接用。真正值得改的只有四类：审批、记忆预算、复盘频率、整理频率。
 
-1. **安装形态**（M1–M4）：决定模型有没有工具、哪些会话有。
-2. **行配置**：bundle YAML 或 profile 配置里的键，控制每个插件的开关/预算/间隔。
-3. **设置页卡片**：已注册为 E3 的参数，可以在 设置 → 自进化 里改；写入走平台 `settings.update`。
+## 审批
 
-> 不是所有键都能在设置页改。E3 才有卡片；部署级/只读键要改 profile 配置并重启。
+默认关闭。打开后，只有记忆/技能写入停在待批窗口；整理器的归档/合并和合并提交不走审批。
 
-## 1. 四种模式（M1–M4）
+| 设置 | 默认 | 说明 |
+|---|---|---|
+| 启用审批 | 否 | 打开后写入需要你 approve/reject |
+| 批准时再确认 | 自动 | `auto` 直接执行；`ask` 再问一次 |
+| 待批保留时间 | 永久 | 过期会按拒绝处理；一般不用改 |
 
-| 模式 | 安装 | 模型工具 | 典型用途 |
-|---|---|---|---|
-| **M1 全自动（默认）** | `all` | 每个会话都有 | 日常使用，信任模型自动写 |
-| **M2 人审** | `all` + `approval.enabled: true` | 每个会话都有 | 每次写入先审批 |
-| **M3 只装底座** | `host` | 无 memory/skill_manage | 只要自动审查/整理，不给写工具 |
-| **M4 分层** | `host` + `/evolution preset install` | 只有选中 Evolution 预设的会话 | 按会话给工具 |
+设置入口：**设置 → 自进化 → 审批**（只有 `all` 安装形态 + Web 客户端才有这个设置页）。
 
-`all`/`host`/`preset`/分层预设互斥，不能同挂。
+## 写入确认（创建/删除技能）
 
-## 2. 审批
+| 设置 | 默认 | 说明 |
+|---|---|---|
+| `skillWriteConfirm` | `auto` | 新建/裸删技能前是否问；`ask` 会等，`timeout` 会在超时后取消 |
+| 确认超时 | 120 秒 | 仅 `timeout` 模式使用 |
 
-默认关闭。打开后：
+审批管的是“记忆/技能写入排队”；这个确认管的是“创建/删除技能前先问一句”，两者可以分开。
 
-```yaml
-approval:
-  enabled: true
-  # 可选：pending 的存活时间；0 = 永不过期
-  pendingTtlMs: 0
-  # create/裸 delete 的人工确认：auto | ask | timeout
-  approvalConfirm: auto
-```
+## 记忆预算
 
-- 审批只影响**可暂存**的写入；memory、skill 有 runner。
-- 批准后由 runner 回放；拒绝不会执行。
-- `release` 只用于回收“执行中但持有者已死”的记录；它不是批准。
-- 约束：暂存依赖 `evolutionState` 服务；没有状态时不能暂存。
-
-## 3. 记忆预算
-
-在设置 → 自进化 → 参数卡「记忆」，或 memory-files 行：
-
-| 键 | 默认 | 含义 |
+| 设置 | 默认 | 说明 |
 |---|---:|---|
-| `memoryChars` | 2200 | 项目记忆预算 |
-| `userChars` | 1375 | 用户画像预算 |
-| `addDatePrefix` | false | 新条目是否带日期前缀 |
-| `maxConsolidationFailures` | 3 | 合并失败退避阈值 |
-| `entryPreviewChars` | 200 | `tool-memory`：memory 工具回显条目截断 |
-| `memoryEnabled` | true | `tool-memory`：关掉后不注册工具/提示（仍注册拒绝式 runner） |
+| `memoryChars` | 2200 | 项目记忆 `MEMORY.md` 的字符预算 |
+| `userChars` | 1375 | 用户画像 `USER.md` 的字符预算 |
 
-预算有优先级：显式配置 > 已挂载 policy > 默认。显式值与 policy 不一致会 warn。数值会 clamp/floor，不会把小数写进 integer schema。
+预算写满时，新增会被拒绝；删除/替换类操作仍可执行。用量到 80% 左右开始出现存储提示；改小预算不会立刻删内容，下一次写入时才按新预算判断。
 
-## 4. 审查
+## 复盘
 
-| 键 | 默认 | 说明 |
+| 设置 | 默认 | 说明 |
 |---|---|---|
-| `reviewEnabled` | true | 总开关 |
-| `reviewMode` | inject | inject（会话内）/ branch（子会话） |
-| `reviewMemoryInterval` | 由 cadence 决定 | 记忆触发间隔 |
-| `reviewSkillInterval` | 由 cadence 决定 | 技能触发间隔 |
-| `skillReviewTrigger` | cadence | cadence / completion |
-| `skillReviewCompletionMinToolCalls` | 默认值 | completion 通道阈值 |
-| `reviewToolAllow` | — | **当前是死配置**；代码不读取，不要依赖 |
+| `reviewEnabled` | 是 | 总开关 |
+| `reviewMode` | `inject` | 在会话内复盘；`branch` 另起子会话 |
+| `reviewMemoryInterval` | 10 | 累计多少次工具调用触发记忆复盘 |
+| `reviewSkillInterval` | 10 | 累计多少次工具调用触发技能复盘 |
+| `skillReviewTrigger` | `cadence` | 只按节奏、只按完成、或两者；完成阈值默认 20 |
 
-`branch` 需要 agents 服务；结果通知在当前版本有一个已知边界：`REVIEW_RESULT_SUMMARY` 没有生产者，branch 结果可能被当成提示占用未结窗口。
+**建议**：默认 `inject` 最稳；它在任务收尾时触发（累计约 10 次工具调用），会叫醒模型多跑一轮。`branch` 是另一套运行方式，需要额外支持；当前还有已知通知边界。频率不想被干扰就调大，或直接关掉。
 
-## 5. 技能整理（curator）
+## 整理
 
-| 键 | 默认 | 说明 |
+| 设置 | 默认 | 说明 |
 |---|---|---|
-| `enabled` | true | false 只关自动调度，手动 run 仍可用 |
-| `curatorIntervalHours` | 168 | 自动整理间隔（旧名 `intervalHours` 只读） |
-| `autoStart` | true | 启动宽限后是否自动跑 |
-| `bootGraceSeconds` | 默认 | 启动宽限 |
-| `llmReview` | false | 是否用 LLM 提名；需要 llm 服务 |
-| `curatorReviewTimeoutMs` | 默认 | LLM 提名超时 |
+| `curatorIntervalHours` | 168 | 自动整理间隔（小时） |
+| `staleAfterDays` | 30 | 多久不用算 stale |
+| `archiveAfterDays` | 90 | 多久不用归档 |
+| `minIdleHours` | 2 | 你空闲多久后才自动整理 |
 
-整理先快照；失败回滚状态；归档不是硬删除。
+整理先快照；失败只写报告，不会自动把整棵技能树回滚；需要时用 `/evolution restore`。归档不是硬删除。
 
-## 6. 技能发现（discovery）
+## 技能检索增强（默认关闭）
 
-**默认 `mode: off`**。off 时只保留 `skill_search` 工具；域图、agent/pre-step 投影、awareness、描述刷新、`/skill-domain` 都不注册。
+默认关闭。开启后 Agent 在技能很多时更容易找到相关的；它不会改变你日常要用的命令。除非你明确需要，否则不要开；开启条件由支持人员配置。
 
-要开启：
+## 合并（需要本地模型）
 
-```yaml
-skill-discovery:
-  mode: on
-  featureEpoch: v1
-  mapReferenceCwd: /path/to/reference/view
-  searchEnabled: true
-```
+合并需要一个本地筛选模型目录。没有配置时，`/evolution merge doctor` 会提示，`merge scan` 会失败；不会自动下载模型，也不会假装成功。
 
-- `mode: on` 需要 `llm` 服务；缺了会直接抛 `llm-unavailable`，不是降级。
-- `generate` 只对空地图生效；必须配 `mapReferenceCwd`。
-- 域策略只认 `mode`/`pinDomains`/`disableDomains`/`revision`；未知域 id 记 degraded。
+如果你不用合并，完全不用管这一节。默认 `mergeApproval=false`：合并会自动接受并写入；想每次人工审批就打开它。
 
-## 7. 技能合并
+## 在哪里改
 
-| 键 | 说明 |
-|---|---|
-| `mergeApproval` | true=等待审批；false=自动批准 |
-| `mergeModelsRoot` | 本地 potion 模型目录；不配会 fail loud |
-| `mergeMaxPairs` / 其他 engine 参数 | 白名单四键；未知键直接抛 |
+- 设置 → 自进化：审批、记忆、复盘、整理等常用项；
+- `/evolution params --group <group>`：看当前值和来源；常用组是 `review`、`memory`、`curator`、`merge`。
 
-模型不会自动下载；缺模型时 `/evolution doctor` 会提示。
-
-## 8. 状态介质
-
-默认 JSON：
-
-```yaml
-evolutionState:
-  provider: json
-```
-
-可选 domain（需要 `storageDomain`）：
-
-```yaml
-evolution-state-domain:
-  # 行本身默认 disabled；启用前确认宿主有 storageDomain
-evolutionState:
-  provider: domain
-```
-
-多个 provider 同时注册且没有 pin 时，state 门面会直接抛错，避免静默选错介质。
-
-## 9. 技能健康 / 会话范围
-
-- 技能健康行在 all 中 `disabled: true`；要开就显式启用该行。
-- `sessionScoped: true` 时，审查/用量只统计“会话能看到 skill_manage/memory”的会话；host-only 永远不命中，这是设计。
-
-## 10. 配置改完怎么确认
-
-```text
-/evolution doctor
-/evolution params --group <group>
-```
-
-`doctor` 看安装形态/行/服务；`params` 看参数当前值、来源（默认/用户/policy）、是否已注册。
+> 设置页写入的就是 profile 的 `cordis.patch.yml`；不要同时手改同一个文件，避免互相覆盖。以 `doctor`/`params` 显示的实际值为准。

@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-skill-discovery
 
-> 技能检索 + 域卡投影 + 域图（默认关闭）。
+> 技能检索增强（默认关闭）。
 
-## 它做什么
+## 你会看到
 
-skill_search 工具；/skill-domain status/generate；agent/pre-step 域卡与 available_skills 裁剪；agent/created 快照/描述刷新；域图/策略/搜索索引/LLM 生成。
+开启后 Agent 更容易在大量技能中找到相关的；默认只保留基础检索。
 
-## 入口
+## 什么时候会用到
 
-skill_search；/skill-domain（mode:on）；模型上下文投影。
+技能很多、需要域卡/自动域图时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 skills/commands/sessionProjections/llm（mode:on 时）；featureEpoch 必填。
+默认 `mode: off`。
 
 ## 边界
 
-默认 mode:off，只留 skill_search；off 时域卡/命令/投影/描述刷新都不注册；on 缺 llm 直接抛。
-
-## 代码位置
-
-`src/main-entry.ts, src/tool.ts, src/projection-runtime.ts`
+开启需要模型/投影条件；缺条件会启动失败。

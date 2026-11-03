@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-skill-health
 
-> 只读技能健康路由 + 侧栏面板。
+> 技能健康面板（可选）。
 
-## 它做什么
+## 你会看到
 
-GET /api/dsh-evolution/skill-health/rows；curator.healthView 投影；5 类统计、按技能队列、按规则聚合、语义提议卡；默认 disabled。
+`/evolution skills health`；侧栏「技能健康」。
 
-## 入口
+## 什么时候会用到
 
-健康路由；侧栏「技能健康」。
+你想看结构问题/重复/超长时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 connection + curator + evolutionIo（提议）。
+完整包里默认关闭。
 
 ## 边界
 
-all 中 disabled；无 curator 回 unavailable；失败文案键有已知不匹配；/health 客户端不调用；行 disabled 时客户端加载语义未验证。
-
-## 代码位置
-
-`src/index.ts, src/routes.ts, src/client/index.ts`
+不修技能，只报告。

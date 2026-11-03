@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-io-node
 
-> 本地 node:fs IO provider。
+> 内部组件，提供本地文件读写。
 
-## 它做什么
+## 你会看到
 
-把 core 的 nodeEvolutionIo 注册为默认 provider；原子写、重试、tmp 清理等实现都在 core。
+没有命令、面板或工具入口。
 
-## 入口
+## 什么时候会用到
 
-Cordis 行 evolution-io-node。
+只在排障存储问题时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 evolution-io。
+随 all/host 安装自动工作。
 
 ## 边界
 
-模块级单例；只保证 single-process；无 Config。
-
-## 代码位置
-
-`src/index.ts`
+数据在本地；不是云存储。

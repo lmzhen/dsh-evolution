@@ -1,4 +1,10 @@
 # Changelog
+## 0.32.5 (docs) — user-facing docs rewrite and Windows detached-test stabilization
+
+> **范围**：全量用户文档重写——根 README/中文 README/INSTALL/包 README/`docs/` 只保留终端用户可感功能；移除服务、路由、provider、门禁表等开发侧叙事；补正 preset 面板缺失、`restore` 只回最近快照、merge 默认自动接受、审批不覆盖 curator/merge、整理失败不自动回滚、review 每约 10 次工具调用在收尾触发、host 形态 review/usage 不生效等默认值。
+> **修复**：Windows desktop CI 的 `g0-detached.spec.ts` 固定 10s 轮询在负载下超时；改为等待 `settle:succeeded` 的确定完成信号（20s 上限），不再按固定预算猜收尾。
+> **验证**：`verify-doc-facts --strict` 0 违规；`gen-checks-fact --check` in sync；`verify-probes` 24/24；`verify-traceability --strict` 52/52；`g0-detached` 8/8。
+> **发布**：0.32.5 为文档/测试补丁；`packages/*/src` 相对 0.32.4 无差异。
 ## 0.32.4 (chore) — G8b evidence hardening (no runtime src change)
 
 > **范围**：将 G8b 52 项 traceability 的证据层收口：24 个真实 probe 全部有唯一 mutation 锚点并由 overlay 运行盖章；签名绑定 spec+fixture+mutation target；gate-55 改为 strict；release evidence 拒绝 planned 读数；安装/文档/平台范围/渠道消费者改指向真实 probe。  

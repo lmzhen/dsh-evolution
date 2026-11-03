@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-state-domain
 
-> 可选 storage-domain 状态介质（默认 disabled）。
+> 内部可选组件，默认不启用。
 
-## 它做什么
+## 你会看到
 
-用 zod 定义三表，提供有界 open、写边界、pending cap/重键、curator missing-key 恢复。
+没有命令、面板或工具入口。
 
-## 入口
+## 什么时候会用到
 
-Cordis 行 evolution-state-domain；启用后把 evolutionState.provider 改为 domain。
+只有部署方要换存储介质时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 storageDomain 服务。
+默认关闭；需要额外服务。
 
 ## 边界
 
-出货三份 patch 都 disabled；一条非法历史记录会让整个 domain open 失败；写路径会重键。
-
-## 代码位置
-
-`src/index.ts, src/compatibility.ts`
+普通用户不需要开。

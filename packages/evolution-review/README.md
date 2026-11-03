@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-review
 
-> 后台审查编排：节奏、投递、未结窗口、branch。
+> 后台复盘：在自然节点回顾对话并给改进建议。
 
-## 它做什么
+## 你会看到
 
-在会话边界判断记忆/技能触发，注入或起 branch 子会话；维护未结 notice 状态机；持久化 review-state；发布 review-scheduled/error 事件。
+偶尔出现在会话里的复盘提示；不是每句话都跑。
 
-## 入口
+## 什么时候会用到
 
-无命令/工具；自动注入；参数在 /evolution params。
+Agent 干完一段活、达到节奏时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 agents；可选 state/policy/settings/inbox；branch 需要 agentPresets/agentDefaultModel。
+默认在会话内、按 cadence 触发。
 
 ## 边界
 
-默认 inject；完成通道默认关；branch 的 plan-applied 计数恒 0；REVIEW_RESULT_SUMMARY 无生产者；reviewToolAllow 是死配置。
-
-## 代码位置
-
-`src/index.ts, src/review-notice.ts`
+子会话模式需要 agents；当前有已知通知边界。

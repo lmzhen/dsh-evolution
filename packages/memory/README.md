@@ -1,23 +1,19 @@
 # @lmzhen/dsh-memory
 
-> 记忆 provider 注册表服务。
+> 内部组件，把记忆请求转给实际存储。
 
-## 它做什么
+## 你会看到
 
-ctx.memory：registerProvider/provider/pin；read/applyBatch/renderContext 委托；写成功发 memory-applied；provider 注册发 memory-provider-registered。
+没有直接命令/面板。
 
-## 入口
+## 什么时候会用到
 
-ctx.memory。
+只在排障记忆时。
 
-## 依赖与默认
+## 默认 / 前提
 
-被 memory-files/tool-memory 使用。
+随记忆功能自动工作。
 
 ## 边界
 
-不存数据；无 provider 抛错；命名未命中不回退；第三方 provider 返回形状不校验。
-
-## 代码位置
-
-`src/index.ts`
+普通用户不需要操作。

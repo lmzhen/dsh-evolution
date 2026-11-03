@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-merge-engine
 
-> 纯库：合并筛选引擎与报告映射。
+> 内部组件，为合并筛选候选。
 
-## 它做什么
+## 你会看到
 
-提供 screen()、judge 包装、selectCandidates/report-map、vendored pipeline 和模型资产；无 apply/命令/路由/服务。
+没有命令、面板或工具入口。
 
-## 入口
+## 什么时候会用到
 
-无插件面；只被 evolution-merge import。
+只在合并运行时。
 
-## 依赖与默认
+## 默认 / 前提
 
-本地 potion 模型目录；deepseek judge 需要 runner。
+随合并功能自动工作。
 
 ## 边界
 
-不是插件；probe/ensureModels 生产未接线；引擎版本串是 0.29.0，不是包版本。
-
-## 代码位置
-
-`src/engine.js, src/report-map.js, src/index.js`
+普通用户不需要知道筛选细节。

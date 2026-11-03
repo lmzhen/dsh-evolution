@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-feedback
 
-> 反馈记录与质量回推服务。
+> 内部组件，记录反馈并回推质量。
 
-## 它做什么
+## 你会看到
 
-record() 乐观累加 + events.json 写锁；事件真值折叠；quality 回推 feedback_score/feedback_warn；启动缓存。
+没有直接命令/面板。
 
-## 入口
+## 什么时候会用到
 
-ctx.evolutionFeedback；族内无生产者。
+只有宿主/自定义命令调用时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 io/skillUsage 才能持久化/回推。
+默认无自动生产者。
 
 ## 边界
 
-没有默认调用方；无 io 只改内存；snapshot 仅测试；质量回推只对 kind=skill。
-
-## 代码位置
-
-`src/index.ts`
+普通用户不会直接看到。

@@ -1,23 +1,19 @@
 # @lmzhen/dsh-skill-usage
 
-> 技能用量遥测服务。
+> 内部组件，统计技能使用/读取次数。
 
-## 它做什么
+## 你会看到
 
-ctx.skillUsage：view/patch/support-read/use 计数；session/event 监听 settle；观测窗口锚点事件；串行 + 跨进程 transact。
+没有直接命令/面板；数据供整理/健康判断。
 
-## 入口
+## 什么时候会用到
 
-ctx.skillUsage；被 tool review/curator/maintenance/graph 读。
+只在看报告时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 evolutionIo；sessionScoped 时看会话工具可见性。
+随家族自动工作。
 
 ## 边界
 
-只对已存在记录计数；失败/未 settle 不计；review 会话排除；host-only 永不命中；use/view 的 record 分支无生产调用者。
-
-## 代码位置
-
-`src/index.ts`
+普通用户不需要操作。

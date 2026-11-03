@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-contract",
   "description": "Pure cross-package contracts for the dsh-evolution family: state, events, platform access and lifecycle services; no runtime implementation",
-  "version": "0.32.4",
+  "version": "0.32.5",
   "publishConfig": {
     "access": "public"
   },

@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-ui
 
-> 设置页「自进化」区段 + 技能历史面板 + 6 条历史路由。
+> 设置页「自进化」与技能历史面板。
 
-## 它做什么
+## 你会看到
 
-待批卡、诊断卡、8 张参数卡、Plugins 行配置；技能历史侧栏与 skills/versions/diff/body/undo/health 路由。
+设置 → 自进化（审批、记忆、复盘、整理卡片）；侧栏「技能历史」。
 
-## 入口
+## 什么时候会用到
 
-设置 → 自进化；侧栏「技能历史」；6 路由。
+调设置、看技能版本/撤销时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 slots/locale；历史路由还需要 connection；参数写需要 configForms seat。
+随 all 安装；host/preset 不带。
 
 ## 边界
 
-无 configForms 时只读；诊断卡只渲染 runtime 行；/health 客户端不调用；openHistory 丢 name。
-
-## 代码位置
-
-`src/panels/settings/index.ts, src/panels/history/host.ts`
+缺少客户端槽位时只读或不可见。

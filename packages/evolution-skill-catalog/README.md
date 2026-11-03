@@ -1,29 +1,25 @@
 # @lmzhen/dsh-evolution-skill-catalog
 
-> 把家族技能树发布成 ctx.skills provider。
+> 让 Agent 能在技能目录里看到家族技能。
 
-## 它做什么
+## 你会看到
 
-provider name=dsh-evolution，rank 390，source=user-dsh，影子平台 skill-filesystem；扫描技能树、解析 frontmatter 调用策略、include/exclude；skill-mutated/skills-refresh 失效缓存。
+Agent 能像用普通技能一样发现/使用它们；用户不用直接操作。
 
-## 入口
+## 什么时候会用到
 
-ctx.skills（模型经平台 skill 工具/目录间接看到）。
+每次 Agent 查技能时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 skills + evolutionIo。
+随 all/分层安装自动工作。
 
 ## 边界
 
-只读；out-of-band 变更不触发，需 skills refresh/重启；发布过滤会跳过坏名字/空描述；include/exclude 跨层可能失效。
+手工改技能目录后，可能需要 `/evolution skills refresh`。
 
-## 代码位置
-
-`src/index.ts`
-
-## 技能名与未决决策
+## 维护者参考（用户可跳过）
 
 The family's canonical name for a skill is its **directory name**.
 
-frontmatter 的 `name` 必须与目录名一致；不一致会被 validator 拒绝。**Decision 1 is open**：是否把 frontmatter 名作为发布名，仍是一个显式未决项，当前实现按目录名发布。
+**Decision 1 is open**：frontmatter 名是否作为发布名仍未决；当前按目录名发布。

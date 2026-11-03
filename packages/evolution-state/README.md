@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-state
 
-> 状态门面服务。
+> 内部组件，把状态读写转给实际存储。
 
-## 它做什么
+## 你会看到
 
-把 review/curator/pending 的 10 个方法转发给选中的 provider；构造时做 provider pin/多 provider 硬拒。
+没有命令、面板或工具入口。
 
-## 入口
+## 什么时候会用到
 
-ctx.evolutionState。
+只在排障状态时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 evolutionStateStorage 和具体 provider。
+随家族自动工作。
 
 ## 边界
 
-不拥有介质、不做 IO；pin 为空时可能懒验证；多 provider 未 pin 直接抛错。
-
-## 代码位置
-
-`src/index.ts`
+普通用户不需要操作。

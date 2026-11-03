@@ -1,88 +1,63 @@
-# 排障：先定位层级，再改配置
+# 排障：先定位，再改配置
 
-排障顺序固定：**安装形态 → 服务/行 → 命令/工具 → 数据/权限**。不要一上来改代码。
+顺序固定：**安装形态 → 功能有没有装上 → 命令/工具 → 数据/权限**。不要一上来改代码。
 
-## 1. 命令不存在
+## 1. 命令/工具不存在
 
-**症状**：输入 `/evolution` 没反应或提示未知命令。
+| 症状 | 先查 | 处理 |
+|---|---|---|
+| 输入 `/evolution` 没反应 | 安装形态 | 先 `/evolution doctor`；重装或换形态 |
+| 没有 `memory` / `skill_manage` | 装的是 host | 换 `all` 或分层预设 |
+| 只有部分会话有工具 | 分层预设 | 新建会话时选 Evolution 预设 |
 
-**原因/动作**：
+## 2. 审批没东西
 
-1. `commands` 服务没挂 → `/evolution doctor` 看行；先确认 bundle 行在。
-2. `evolution-commands` 行没启用 → 检查 profile patch/overlay。
-3. 分层形态（M4）在原始预设会话里：命令面仍可见，但自动行为被 sessionScoped 关掉；这是已接受差异，不是故障。
+- 审批默认关闭；没打开时写入直接执行，`pending` 当然是空。
+- 开了审批但看不到：审批相关功能没装上，先 doctor。
+- 待批有保留时间；过期按拒绝处理。
+- `release` 只回收执行中的孤儿，不是批准。
 
-## 2. 模型工具不存在
+## 3. 复盘/整理不跑
 
-| 形态 | 应该有什么 |
+- 复盘默认按阈值触发，不是每句话跑；看 `/evolution params --group review`。
+- host 形态一定不触发自动复盘（缺少记忆/技能工具，这是设计）；要看复盘请用 all。
+- 整理有间隔和空闲条件；`/evolution curator status` 看是否跳过。
+- 没有模型时，依赖模型的整理/复盘部分不会跑，只做确定性部分。
+
+## 4. 合并失败
+
+| 提示 | 处理 |
 |---|---|
-| all | memory、skill_manage、skill_search、session_search（peer 在时）、maintenance_probe、merge_stage |
-| host | 只有 maintenance_probe、merge_stage |
-| 分层 | 只有选中 Evolution 预设的会话有完整工具 |
+| 模型未配置 | 配置本地合并模型目录；不会自动下载 |
+| 合并未就绪 | 先 `/evolution doctor`，确认当前安装形态支持合并 |
+| 运行被占用 | 等当前 run 结束，或取消后重试 |
+| 没有会话/Agent | 在真实会话里跑，不要在没有 Agent 的上下文里跑 |
 
-**host 没有 memory/skill_manage 是设计**；要写记忆/技能请用 all 或分层预设。
+## 5. 面板/设置卡片不出现
 
-## 3. 待批窗口为空/不动
+- 设置区段只在 all + Web/桌面 GUI 出现；TUI/headless 没有，host/preset 也没有。
+- 历史面板需要连接服务；没有连接时面板读不到数据。
+- 只有 all 安装形态带合并面板；host/preset 没有。
+- 健康面板默认关闭；要显式启用。
 
-- 审批默认关闭；`approval.enabled` 没开时写入直接执行，pending 当然空。
-- 开了审批但服务/路由缺失：`/evolution doctor` 看 `evolution-approval` 行。
-- pending 有 TTL；过期会按 rejected 了结，不会执行。
-- `release` 只回收孤儿执行记录，不是批准。
+## 6. 数据坏了/丢失
 
-## 4. 审查不跑
+- 先备份 `$DSH_HOME`，不要手改 JSON。
+- 状态文件损坏会被隔离保留，不会当空覆盖。
+- 数据存储冲突时命令会直接报错；按 doctor 提示处理，不要手改 JSON。
+- 技能删除是归档，先用 `/evolution skill restore` 找；整树回退用 `/evolution restore`。
 
-- 默认 `reviewMode: inject` + cadence，不是每轮跑；看 `/evolution params --group evolution-review`。
-- `reviewEnabled=false` 或间隔未到。
-- 会话没有家族工具（host-only / 原始预设）时，`sessionScoped` 不计入。
-- branch 模式需要 agents；缺服务会不可用。
-- 已知：branch 结果的通知 summary 与 `REVIEW_RESULT_SUMMARY` 不一致，可能占用未结窗口；先切回 inject 验证。
+## 7. 版本/平台线
 
-## 5. 整理不跑/没效果
-
-- `enabled:false` 只关自动调度；手动 `curator run` 仍可跑。
-- 间隔门/活跃会话/first-run grace 会跳过；`curator status` 看 skip 原因。
-- 没有 llm 时 `llmReview` 不运行，只做确定性部分。
-- 没有可整理项时不会硬造变更。
-
-## 6. 合并报错
-
-| 错误 | 处理 |
-|---|---|
-| `merge-not-ready` | 没挂 `evolutionIo` / 状态未就绪；先 doctor |
-| 模型根未配置 | 配 `mergeModelsRoot`；不会自动下载 |
-| `E-323` | 宿主数据面/子代理能力缺失 |
-| `E-305` | 没有 session/agent；在真实会话里跑 |
-| `merge-parent-required` | approve/resume 缺 parent run |
-| `run-owns-row` | 该行仍被活动 run 持有；等/取消 |
-
-## 7. UI 面板/设置卡片不出现
-
-- 设置区段需要 `slots`/`locale`；`configForms` 缺失时卡片只读，不是消失。
-- 历史路由需要 `connection`；无 connection 时路由不注册。
-- 合并面板只在 all 的依赖闭包里；host/preset 没有。
-- 健康面板默认 disabled；要显式启用。
-- 失败块可能显示原始 key（skill-health 已知文案键问题），不是数据丢失。
-
-## 8. 状态损坏/迁移
-
-- state-json 读到坏文件会隔离 `.corrupt`，不会当空覆盖。
-- 旧 `pending.json` 只读兼容，成功后 rename `.migrated`。
-- 多 provider 未 pin：state 门面直接抛错；显式设 `provider`。
-- 不要手改 `runs.json`/`pending.json`；先备份，再让恢复逻辑处理。
-
-## 9. 版本/平台线
-
-- 平台线不跨线：当前家族线 0.2.1-rc.3，最低 0.2.1-rc.2；旧线在依赖解析就失败。
+- 当前验证线是 **DSH `0.2.1-rc.3`**，最低 `0.2.1-rc.2`；旧线不跨线。
 - 升级顺序：平台 → 家族；反过来会坏。
-- `/evolution doctor` 的家族版本应与安装包一致；不一致说明混合版本，重装。
+- `/evolution doctor` 的家族版本要和安装包一致；不一致说明混装，重装。
 
-## 10. 收集证据
+## 8. 收集证据
 
 ```text
-/evolution doctor --json
-/evolution maintain report
-/evolution merge doctor
+/evolution doctor
 /evolution curator report
 ```
 
-再加上 `$DSH_HOME/logs/` 的启动日志。不要只发“没反应”。
+再加上启动日志：Web home 一般在 `$DSH_HOME/logs/`；桌面 home 没有这个目录时，用桌面应用的日志入口。不要只发“没反应”。

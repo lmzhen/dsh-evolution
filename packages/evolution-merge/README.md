@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-merge
 
-> 技能合并域：扫描、两轮 authoring、提交、撤销、恢复。
+> 技能合并：把重叠技能合成一个，可审批、可撤销。
 
-## 它做什么
+## 你会看到
 
-evolutionMerge 服务 16 个 verb；merge_stage 工具；4 条只读路由；PairLedger、staging、UnitTransaction 提交、undo/recovery/reconcile/doctor。
+`/evolution merge …` 命令与侧栏合并面板。
 
-## 入口
+## 什么时候会用到
 
-ctx.evolutionMerge；/evolution merge …；merge_stage；4 路由。
+你主动合并，或后台提出合并建议时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 evolutionIo、commands、状态、merge-engine；模型根未配会 fail loud；筛选 pipeline 冻结。
+需要本地合并模型；没有模型会明确报错。
 
 ## 边界
 
-自身不注册 slash command（/merge 已移除）；run/runs 路由未实现；默认 detached；UI 只读。
-
-## 代码位置
-
-`src/index.ts, src/runtime.ts, src/merge-routes.ts`
+面板只读；合并结果可撤销。

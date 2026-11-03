@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-learning-graph
 
-> 技能 + 记忆学习图，/graph 命令。
+> 知识图：把技能和记忆当作节点浏览/编辑。
 
-## 它做什么
+## 你会看到
 
-/graph 目录、detail、edit、delete；技能写走 approval + write gate，记忆写走 memory.applyBatch；节点/边各 200 行上限。
+`/graph` 目录、detail、edit、delete。
 
-## 入口
+## 什么时候会用到
 
-/graph …。
+你想从图的角度看/整理知识时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 commands/skillUsage/memory/evolutionIo；写需要会话。
+随 all 安装。
 
 ## 边界
 
-不是 /evolution 子命令；编辑/删除需要审批落点；memory 节点受 E-21 快照校验；跨源保护由写门禁决定。
-
-## 代码位置
-
-`src/index.ts`
+不是日常必需；删除是归档。

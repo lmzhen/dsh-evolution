@@ -1,96 +1,120 @@
-# Installing dsh-evolution
+# 安装与升级
 
-Four install forms. `dsh-evolution-all` is the default; the other three are alternatives. **Never mount two forms in one profile**: they share infrastructure rows and the loader fails on duplicate ids.
+这份文档只管安装、升级、卸载和验证。每种安装形态对会话的精确影响，单源在 [packages/INSTALL.md](packages/INSTALL.md)。
 
-| Form | Bundle / preset | Model tools | Notes |
-|---|---|---|---|
-| All (default) | `dsh-evolution-all` | profile-wide | complete surface; no preset step |
-| Host + agent preset | `dsh-evolution-host` + Evolution preset | only sessions on the preset | per-session tools; exclusive with all/preset |
-| One-click | `dsh-evolution-preset` | profile-wide | compatibility form; no settings/health rows |
-| Agent only | Evolution preset | only sessions on the preset | requires the host bundle or agent packages |
+## 先决条件
 
-The canonical per-form semantics live in [packages/INSTALL.md](packages/INSTALL.md#install-forms). This file owns the commands and operational details.
+- DeepSeek Harness 平台线：**DSH `0.2.1-rc.3`**（发布包声明的最低版本为 `^0.2.1-rc.2`）。
+- Node 22.19+ 或 24+。
+- 能正常运行的 `dsh` profile。
+- 模型/API key：可选；自动复盘、LLM 整理、技能发现域生成需要。配置方式见 [docs/api-keys.md](docs/api-keys.md)。
 
-## Production install
-
-Community packages publish under `@lmzhen`; they are not official DeepSeek releases.
+## 默认安装（推荐）
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
-# restart dsh, then:
+# 重启 dsh
 /evolution doctor
 ```
 
-To shrink to infrastructure only:
+`all` 是完整体验：每个会话都有记忆、技能工具，外加设置页、技能历史、技能合并面板。适合大多数用户。
+
+## 只要自动化：host
 
 ```bash
 dsh plugin --profile web remove @lmzhen/dsh-evolution-all
 dsh plugin --profile web add @lmzhen/dsh-evolution-host
 ```
 
-Compatibility one-click form:
+`host` 会跑整理和报告，但**不注册** `memory` / `skill_manage` 工具；由于缺少这些工具，自动复盘和用量统计在该形态下也不会生效。适合“我不想让模型自己写记忆/技能，但想要后台整理”的场景。
+
+## 只在部分会话给工具：分层预设
+
+先装 host 和预设包：
+
+```bash
+dsh plugin --profile web add @lmzhen/dsh-evolution-host
+dsh plugin --profile web add @lmzhen/dsh-evolution-agent-preset
+# 重启 dsh
+```
+
+再生成 Evolution 预设：
+
+```text
+/evolution preset install
+```
+
+然后再重启一次 dsh。之后新建会话时选择 **Evolution** 预设；只有这些会话有记忆/技能工具。其它会话不受影响。
+
+默认基底是 `standard`；其它基底属于高级用法，普通用户不用管。
+
+> 分层预设与 `all` / `preset` 互斥，不能同挂。
+
+## 兼容一键：preset
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-preset
 ```
 
-Inside a source/overlay checkout the same packages use `@deepseek-ai`; those names do not resolve from npm.
+与 `all` 接近，但没有设置页和三个侧栏面板。适合从旧配置迁移；新装建议 `all`。
 
-## Install-form semantics
+## 验证
 
-**② attach** — full (`all`) or one-click (`preset`) — where every session, including a session on a platform original preset, carries the family model rows. **① variant** — layered (`host` + the generated Evolution preset, `--mode variant`) — where the model rows exist only inside the family preset; a session on an original preset gets no family behaviour (see the single-source statement in packages/INSTALL.md). Under ① variant the `/evolution` command face still appears globally; automatic paths are gated by `sessionAudited`.
-
-`host` alone is a third case: background automation only, no `memory` / `skill_manage` tools. The read-only `maintenance_probe` and the merge-child `merge_stage` remain.
-
-## Prerequisites
-
-- Validated platform line: **DSH `0.2.1-rc.3`**. Published `@deepseek-ai/dsh-*` ranges declare `^0.2.1-rc.2`.
-- Node 22.19+ or 24+.
-- A profile that can resolve the published bundle, or a source checkout for the local installer.
-
-## Source-checkout layered install
-
-```bash
-node packages/scripts/install-layered.mjs --profile web --mode layered --home "$DSH_HOME"
-```
-
-This copies the family packages into the profile and writes one `- insert:` preset row into the profile patch. Omit `--home` to use `$DSH_HOME` or `~/.dsh`.
-
-## Upgrade runbook (platform first)
-
-1. Read `CHANGELOG.md` for the target version.
-2. Back up `$DSH_HOME`.
-3. Upgrade the platform and restart; verify the host boots.
-4. Upgrade the family bundle (or uninstall + install to avoid stale rows).
-5. Restart and run `/evolution doctor`.
-6. Do one memory write and one skill write; verify approval/rollback if enabled.
-
-Do not upgrade the family before the platform: the peers/engines window is tied to the platform line.
-
-## Verify
-
-```bash
-dsh --profile web --dump-config | grep -c "id: evolution-"
+```text
 /evolution doctor
 ```
 
-Expect the rows for your chosen form and a doctor report naming the install form, platform line, family version, services, and runtime rows. A host-only install intentionally reports no memory/skill tools.
+看三件事：
 
-## Command fallbacks
+1. 安装形态是不是你选的那一种；
+2. 家族版本与平台线；
+3. 实际写一次记忆/改一次技能；doctor 不能证明工具存在，只能看形态/服务/scoped 探针。
 
-When a route or service is missing, the UI and commands fall back to copyable commands. The canonical table is in `packages/INSTALL.md`; the fallback text is generated into `evolution-client-kit`. If a fallback names a command that no longer exists, treat it as a documentation defect, not a supported path.
+再做一个最小读写：
 
-## Uninstall
+> 记住：这个项目用 pnpm。
+
+然后开新会话，看它是否自动带回来。
+
+## 升级
+
+**顺序：先平台，后家族。** 平台线和家族的依赖窗口绑定；反过来升级会遇到依赖解析失败。
+
+1. 读目标版本的 `CHANGELOG.md`。
+2. 备份 `$DSH_HOME`。
+3. 升级 DeepSeek Harness，重启，确认宿主正常。
+4. 升级家族 bundle。
+5. 重启后 `/evolution doctor`。
+6. 做一次记忆写入 + 一次技能改动，确认还能用。
+
+升级命令：
+
+```bash
+dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.32.5
+# 或先 remove 再 add，避免旧行残留
+```
+
+## 卸载
 
 ```bash
 dsh plugin --profile web remove @lmzhen/dsh-evolution-all
 ```
 
-Uninstall removes the rows; data under `$DSH_HOME` (memories, skills, state, reports, approval history) remains. Reinstall picks it up again.
+卸载只移除插件行。`$DSH_HOME` 下的记忆、技能、报告和审批历史保留；重新安装会接上。分层的用户注意：`/evolution preset install` 写进 profile patch 的预设行不会随卸载自动删除，残留可能导致下次启动失败；按安装器 `--uninstall` 清理，或手删 profile patch 里的预设块。
 
-## Troubleshooting quick reference
+> 桌面 GUI 用户把 `--profile web` 换成 `--profile desktop`；装错 profile 的典型症状是“装完什么都没出现”。
 
-- Command missing: `commands` service or the commands row is absent.
-- Tool missing: check the install form; host has no memory/skill tools.
-- Route 404: `connection` service missing or the row disabled.
-- Publish/install mismatch: check `/evolution doctor` family version and `npm view @lmzhen/dsh-evolution-all version`.
+## 从源码安装（高级）
+
+```bash
+node packages/scripts/install-layered.mjs --profile web --mode layered --home "$DSH_HOME"
+```
+
+源码安装器把家族包复制进 profile，并写入一条预设行。日常用户不需要走这条路径；生产安装用 `dsh plugin add`。
+
+## 常见安装问题
+
+- **命令不存在**：命令功能没装上，或装错 profile。先确认启动的是哪个 profile（`--profile web` 还是 `desktop`），检查 `dsh --profile <p> --dump-config` 和日志；命令都没了时 `/evolution doctor` 也跑不了，重装并重启。
+- **没有 memory/skill_manage 工具**：你可能装的是 host；换 all 或分层预设。
+- **UI 面板不出现**：缺少客户端/连接服务，或你装的是 host/preset；检查安装形态。
+- **启动报重复注册**：同一 profile 挂了两种形态；先卸载再去重。

@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-threat
 
-> 写入期威胁扫描 guard。
+> 内部安全组件，写入前扫描注入/密钥/外泄等威胁。
 
-## 它做什么
+## 你会看到
 
-扫描 memory 的 facts/content 和 skill_manage 的 content/file_content/new_string；覆盖注入、角色劫持、外泄、C2、持久化、密钥、隐形字符。
+用户看到的是写入被拒时的提示。
 
-## 入口
+## 什么时候会用到
 
-tools.guard。
+每次写记忆/技能前。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 tools 服务；enabled:false 时直接 return。
+默认开启；审批关闭也扫描。
 
 ## 边界
 
-只覆盖两个写工具；规则集手工维护，不证明穷尽；窗口下限 4097。
-
-## 代码位置
-
-`src/index.ts`
+规则集手工维护，不保证穷尽。

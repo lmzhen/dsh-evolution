@@ -1,168 +1,79 @@
-# 命令手册
+# 命令
 
-这一页只列“代码里真的注册了”的入口。`/merge` 在 0.32 已移除；`/evolution consolidate` 已退出用户面。
+你日常只需要记六条。其余命令是高级/维护用途，放在最后。
 
-## 1. 顶层命令
+## 日常六条
 
-| 命令 | 何时存在 | 用途 |
-|---|---|---|
-| `/evolution` | 挂载 `evolution-commands` + 平台 `commands` 服务 | 管理自进化：记忆/技能/审查/整理/合并入口 |
-| `/graph` | 挂载 `evolution-learning-graph` + 所需服务 | 查看/编辑技能与记忆图 |
-| `/skill-domain` | `evolution-skill-discovery` 的 `mode: on` + `commands` 服务 | 域图状态/一次性生成 |
-
-## 2. `/evolution` 全表
-
-| 子命令 | 说明 |
+| 命令 | 用途 |
 |---|---|
-| `merge <verb>` | 技能合并；16 个 verb 见 §3 |
-| `pending [--detail]` | 待批窗口；`--detail` 展开 staged args |
-| `approve <id>` | 批准待批写入 |
-| `reject <id>` | 拒绝待批写入 |
-| `release <id>` | 回收执行中但已失去持有者的 pending 记录 |
-| `doctor [--json]` | 诊断：安装形态、平台线、服务、行、待办 |
-| `curator run` | 手动整理（忽略自动间隔门） |
-| `curator pause` / `curator resume` | 暂停/恢复自动整理 |
-| `curator status` | 上次运行/下次到期 |
-| `curator report [id]` | 最近整理报告 |
-| `curator scope` | 当前会进入整理的技能范围 |
-| `mutations` | 最近 5 条技能变更 |
-| `restore` | 整树回滚到快照（staging 部署时拒绝） |
-| `skill restore <name>` | 从归档恢复单个技能 |
-| `skill history <name>` | 内容/支撑文件两条版本链 |
-| `skill undo <name> [--to vN|--unit <id>]` | 撤销单技能内容或跨技能单元 |
-| `skill pin <name>` / `unpin` | 固定/取消固定；不过审批 |
-| `propose` | 为超长技能写 keep 提案 |
-| `skills health` | 结构健康视图 |
-| `skills refresh` | 广播技能目录缓存失效 |
-| `learn [request]` | 向当前会话注入学习请求 |
-| `maintain [--timeout=<ms>]` | 异步维护扫描；返回 run id |
-| `maintain --facts` | 0-token 事实块预览 |
-| `maintain status [id]` | 运行状态 |
-| `maintain report [id]` | 运行报告 |
-| `maintain cancel [id]` | 取消本进程拥有的运行 |
-| `maintain handoff [id]` | 把报告指针注入会话 |
-| `migrate` | 旧设置命名空间迁移 |
-| `policy set <id> <value> [--expect <rev>]` | 写 E3 策略参数 |
-| `params [--group <g>] [--json]` | 参数注册表 |
-| `preset install [--base a,b]` | 生成 Evolution agent 预设行 |
-| `restructure <name> "<heading>" <to_file>` | 把章节移到 `references/` |
-| `extract <src> <tgt> "<heading>" [--apply]` | 抽取章节为子技能/引用 |
-| `replay` | 计划排行榜与比较报告 |
+| `/evolution doctor` | 安装/升级后检查；功能不对时先跑它 |
+| `/evolution pending` | 看等待审批的写入 |
+| `/evolution approve <id>` | 批准一条待批写入 |
+| `/evolution reject <id>` | 拒绝一条待批写入 |
+| `/evolution skill history <name>` | 看某个技能的版本 |
+| `/evolution skill undo <name>` | 撤回某个技能的上一次改动 |
 
-> 表项 30 条；展开嵌套后 36 个叶子。`/evolution` 无参或未知子命令会显示帮助/错误，不再假装成功。
+如果批准卡住了、记录显示“执行中”但确实没有在跑，用 `/evolution release <id>` 把它放回待批；它不是批准。
 
-## 3. `/evolution merge` 的 16 个 verb
+## 整理技能库
 
-| verb | 用途 |
+| 命令 | 用途 |
 |---|---|
-| `scan` | 全库扫描候选；默认后台 |
-| `pair <a> <b> [--force]` | 单对合并；`--force` 跳过第一轮直接给决定 |
-| `status [id]` | 运行详情 |
-| `report [id]` | 运行报告 |
-| `cancel [id]` | 取消运行 |
-| `runs` | 最近运行 |
-| `doctor` | 合并状态诊断 |
-| `reconcile` | 行状态唯一收敛写者；启动时也会自动跑 |
-| `pending [--expired]` | 待批行 |
-| `candidates [--retry <id>]` | 候选/重跑 verify 行 |
-| `approve <id>` | 批准 pending 行，进入第二轮 |
-| `reject <id>` | 拒绝 pending 行 |
-| `resume [id] [--clear <id>] [--retry]` | 重跑 verify/fuse |
-| `skipped [--restore <id>]` | 跳过队列/恢复 |
-| `discard <id>` | 丢弃行 |
-| `undo <target> --run <id>` | 按 run+target 反序撤销 |
+| `/evolution curator status` | 上次整理、下次到期、是否暂停 |
+| `/evolution curator report` | 上次整理做了什么 |
+| `/evolution curator run` | 现在跑一次（忽略间隔） |
+| `/evolution curator pause` | 暂停自动整理 |
+| `/evolution curator resume` | 恢复自动整理 |
+| `/evolution restore` | 整树回到最近一次快照；不能选快照 |
+| `/evolution skill restore <name>` | 从归档恢复单个技能 |
+| `/evolution skills health` | 看技能结构健康 |
 
-默认 `detached`：scan/pair/approve/resume 立即返回 runId；用 `status/report` 查看。
+## 合并技能
 
-## 4. 模型工具
+| 命令 | 用途 |
+|---|---|
+| `/evolution merge pending` | 看等待你决定的合并 |
+| `/evolution merge approve <id>` | 批准一个合并 |
+| `/evolution merge reject <id>` | 拒绝一个合并 |
+| `/evolution merge status <runId>` | 看合并进度 |
+| `/evolution merge undo <target> --run <id>` | 撤销这次合并的目标 |
+| `/evolution merge doctor` | 合并配置/模型/队列诊断 |
 
-| 工具 | 动作 | 什么时候有 |
-|---|---|---|
-| `memory` | add/replace/remove/operations；target=memory/user | all/preset/agent 预设；`memoryEnabled:false` 时不注册 |
-| `skill_manage` | review/list/create/edit/update/patch/delete/write_file/remove_file/restructure/extract/pin/unpin | 需要 tools+skillUsage+evolutionIo |
-| `skill_search` | query/limit | discovery 行；`mode:off` 仍可用，但不做策略过滤 |
-| `session_search` | 平台工具 | all 的 peer 行；host 不挂 |
-| `maintenance_probe` | signal/target | host/all/preset 的 maintenance tools 行 |
-| `merge_stage` | list/read/write/copy | 合并行；执行时要求 active merge child |
+合并默认自动接受并写入；`/evolution merge pending` 只在打开审批时才有等待项。合并面板只读：它显示队列、A/B 正文和历史，动作按钮复制命令。
 
-### `skill_manage` 的动作边界
+## 浏览 / 编辑知识图
 
-- `list`/`review`/`pin`/`unpin` 视为只读；pin/unpin 仍过准入闸门，但不过审批。
-- 写操作过门禁；审批开启时进入 pending，批准后 runner 回放。
-- `extract` 默认只出计划，但仍写一份 proposal report；`--apply` 才动树。
-- `restructure` 目标必须在 `references/` 下。
+- `/graph`：打开目录；
+- `/graph detail <nodeId>`：看节点详情；
+- `/graph edit <nodeId> <text>`：改节点；
+- `/graph delete <nodeId>`：删除（归档）。
 
-## 5. HTTP 路由（面板/客户端用）
+删除是归档；技能写入仍走同一套门禁。
 
-| 路径 | 方法 | 谁用 |
-|---|---|---|
-| `/api/dsh-evolution/diagnostics` | GET | 诊断卡、doctor |
-| `/api/dsh-evolution/approval/pending` | GET | 待批卡 |
-| `/api/dsh-evolution/approval/preview` | GET | 审批预览 |
-| `/api/dsh-evolution/approval/approve` | POST | 批准 |
-| `/api/dsh-evolution/approval/reject` | POST | 拒绝 |
-| `/api/dsh-evolution/skill-history/skills` | GET | 历史面板列表 |
-| `/api/dsh-evolution/skill-history/versions` | GET | 版本链 |
-| `/api/dsh-evolution/skill-history/versions/diff` | GET | 版本 diff |
-| `/api/dsh-evolution/skill-history/versions/body` | GET | 版本正文 |
-| `/api/dsh-evolution/skill-history/undo` | POST | 撤销 |
-| `/api/dsh-evolution/skill-history/health` | GET | 存活探针（客户端不调用） |
-| `/api/dsh-evolution/skill-health/rows` | GET | 健康面板（默认关） |
-| `/api/dsh-evolution/merge/view` | GET | 合并面板 |
-| `/api/dsh-evolution/merge/rows` | GET | 合并队列 |
-| `/api/dsh-evolution/merge/body` | GET | A/B 正文 |
-| `/api/dsh-evolution/merge/history` | GET | 历史 |
+## 高级命令（不常用）
 
-未实现：`/api/dsh-evolution/merge/run`、`/runs`（只有路径常量）。
+| 命令 | 什么时候用 |
+|---|---|
+| `/evolution maintain` | 手动触发一次维护扫描；异步返回 run id |
+| `/evolution maintain status/report/cancel` | 管维护运行 |
+| `/evolution mutations` | 最近技能变更 |
+| `/evolution skills refresh` | 手工改了技能目录后让 Agent 重新读取 |
+| `/evolution skill pin/unpin` | 固定技能，避免被整理 |
 
-## 6. 常用配方
+这些命令存在，但不需要背；用到时看 `/evolution` 帮助或本表。
 
-### 让模型记住一条规则
+## Agent 会自己用的工具
 
-```text
-记住：这个仓库的测试命令是 pnpm test，不要直接改 dist。
-```
+你不需要直接调模型工具。Agent 在需要时会用：
 
-### 创建技能
+- `memory`：写项目记忆/用户画像；
+- `skill_manage`：创建/修补/归档技能；
+- 技能检索：在技能多时找相关技能。
 
-```text
-把“发布前必须跑本地 gate”写成技能，名字 release-gate。
-```
+是否可用取决于安装形态：`host` 没有 `memory` / `skill_manage`，只有自动化；`all` 或分层预设才有完整工具。
 
-### 查看/回滚技能
+## 找不到命令时
 
-```text
-/evolution skill history release-gate
-/evolution skill undo release-gate
-```
-
-### 开启审批
-
-在设置 → 自进化 → 审批卡打开，或配置 `approval.enabled: true`；然后：
-
-```text
-/evolution pending
-/evolution approve <id>
-```
-
-### 合并两个技能
-
-```text
-/evolution merge pair skill-a skill-b
-/evolution merge status <runId>
-/evolution merge approve <rowId>
-```
-
-### 诊断
-
-```text
-/evolution doctor
-/evolution doctor --json
-```
-
-## 7. 失败时先看什么
-
-- 命令不存在：`commands` 服务或对应插件行没挂；`/evolution doctor` 先看行状态。
-- 工具不存在：`host` 形态本来就没有记忆/技能工具；检查安装形态。
-- 路由 404：`connection` 服务缺失，或该行 disabled。
-- 业务拒绝仍是 HTTP 200：读 `{ok:false, code, message}`，不要只看状态码。
+- 输入 `/evolution` 没反应：命令功能没装上，或安装形态不对；先 `/evolution doctor`。
+- 命令存在但报“未挂载”：对应功能没有随当前安装形态提供（常见于 merge/curator）。
+- 审批相关命令没东西：审批默认关闭，打开后才会有 pending。

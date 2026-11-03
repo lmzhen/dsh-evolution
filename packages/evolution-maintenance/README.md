@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-maintenance
 
-> 只读维护扫描：探针、事实块、计划校验。
+> 手动维护扫描（高级）。
 
-## 它做什么
+## 你会看到
 
-maintenance_probe 工具（只读深挖）；runMaintain 编排子代理扫描；--facts 0-token 预览；drift/enrichment/footprint/validate-plan。
+`/evolution maintain` 及 status/report/cancel。
 
-## 入口
+## 什么时候会用到
 
-maintenance_probe；/evolution maintain …。
+你想主动扫一遍技能库/生成维护计划时。
 
-## 依赖与默认
+## 默认 / 前提
 
-根导出是纯库；./tools 才是插件；需要 evolutionIo 才能读树。
+异步运行，返回 run id。
 
 ## 边界
 
-不写技能树；无 io 时探针返回 not-mounted 结果；footprint 未从根导出；一次扫描全树两遍、无缓存。
-
-## 代码位置
-
-`src/tools.ts, src/orchestrate.ts, src/validate-plan.ts`
+日常不需要跑；不改技能内容。

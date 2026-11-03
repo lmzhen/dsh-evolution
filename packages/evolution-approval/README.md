@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-approval
 
-> 写入审批服务：暂存、预览、批准/拒绝、TTL、release。
+> 审批窗口：让记忆/技能写入等你批准。
 
-## 它做什么
+## 你会看到
 
-提供 request/approve/reject/list、4 条 HTTP 路由、pending+executing 合并、preview diff、TTL 过期、孤儿 release、decision audit 和跨包 effectiveSessionPolicy。
+`/evolution pending`、`approve`、`reject`，以及设置页待批卡。
 
-## 入口
+## 什么时候会用到
 
-ctx.evolutionApproval；/evolution pending|approve|reject|release；4 路由。
+你打开审批后，每次可暂存的写入。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 evolutionState；审批默认 enabled:false。
+默认关闭；打开后生效。
 
 ## 边界
 
-关闭审批时写入直接执行；业务拒绝也是 HTTP 200；命令行 approve 不带 audit；release 不是批准。
-
-## 代码位置
-
-`src/index.ts, src/routes.ts`
+批准/拒绝是人工决定；`release` 不是批准。

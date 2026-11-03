@@ -1,23 +1,19 @@
 # @lmzhen/dsh-tool-skill-manage
 
-> 模型面 skill_manage 工具 + 写入闸门/审批。
+> Agent 写技能的工具（创建/修补/归档/合并入口）。
 
-## 它做什么
+## 你会看到
 
-13 个 action；写入门禁（argument/missing/policy/read-before-write/confirm）；审批暂存/preview/runner；guidance + 保护名单变量；配置收紧；create/extract/review。
+用户看到的是 Agent 创建/修改技能；改错可看历史/撤销。
 
-## 入口
+## 什么时候会用到
 
-skill_manage 工具。
+你让 Agent 把做法写成技能，或它自己改进时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 tools/skillUsage/evolutionIo；审批可选。
+all/分层预设才有；host 没有。
 
 ## 边界
 
-read-only action 不加计数；pin/unpin 不过审批；strictCrossSource 默认只 warn；extract dry_run 仍写提案；description 60 字默认只建议。
-
-## 代码位置
-
-`src/index.ts, src/write-gates.ts`
+写入有保护；删除是归档。

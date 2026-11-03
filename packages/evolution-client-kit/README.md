@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-client-kit
 
-> 客户端基础：面板生命周期、生成表、四态传输、token。
+> 内部组件，支撑侧栏面板与接口。
 
-## 它做什么
+## 你会看到
 
-registerSidebarPanel、样式注入、workspace 探测、生成 routes/contracts/states/fallbacks、家族 CSS tokens。
+没有命令、面板或工具入口。
 
-## 入口
+## 什么时候会用到
 
-被 evolution-ui/merge-ui/skill-health 消费。
+只在开发/排障面板时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 slots/locale/workspace；不是插件，无 dsh/apply。
+随客户端包自动工作。
 
 ## 边界
 
-slots 缺失会抛错；locale 被拒回退包内字典；生成表是镜像，不是权威。
-
-## 代码位置
-
-`src/panel.ts, src/tokens.ts, src/generated/*`
+普通用户不需要知道。

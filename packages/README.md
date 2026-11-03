@@ -81,7 +81,7 @@ The default state provider is `evolution-state-json`; `evolution-state-domain` i
 
 ## Development
 
-Build, test, gates and layout rules are in [docs/development.md](../docs/development.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
+Build, test, gates and layout rules are in [docs/developer/development.md](../docs/developer/development.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Canonical facts (single source)
 

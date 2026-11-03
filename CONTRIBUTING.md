@@ -6,7 +6,7 @@ This repository is the publication carrier. `packages/*` are the packages that s
 
 1. Edit `packages/<pkg>/…` in this mirror. Do not edit generated YAML, generated client tables, or `lib/` by hand.
 2. Run the focused spec in the overlay when the change touches platform services; pure library changes can run in the mirror.
-3. Run the family gate runner (the command and flags are in [docs/development.md](docs/development.md)). It writes one log per step and a summary.
+3. Run the family gate runner (the command and flags are in [docs/developer/development.md](docs/developer/development.md)). It writes one log per step and a summary.
 4. Put each conclusion in its one home. §Where a fact lives is the rule; a second copy fails the doc-facts gate.
 
 ## Where a fact lives
@@ -29,7 +29,7 @@ The canonical fact table is `packages/scripts/family-facts.json`. If you move a 
 
 ## The gate: all 81 steps
 
-The local profile runs the family gate runner (see [docs/development.md](docs/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from `packages/scripts/gate-manifest.json`; do not hand-edit it. If a row moves tier or command, change the manifest, regenerate, and update this appendix.
+The local profile runs the family gate runner (see [docs/developer/development.md](docs/developer/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from `packages/scripts/gate-manifest.json`; do not hand-edit it. If a row moves tier or command, change the manifest, regenerate, and update this appendix.
 
 | # | Command | Working tree |
 |---|---|---|

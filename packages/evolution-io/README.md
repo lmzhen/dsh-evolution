@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-io
 
-> IO provider 注册表。
+> 内部组件，负责文件读写。
 
-## 它做什么
+## 你会看到
 
-提供 ctx.evolutionIo，注册/选择 IO provider；同名不同对象会抛错，空注册表调用会报错并指路 evolution-io-node。
+没有命令、面板或工具入口。
 
-## 入口
+## 什么时候会用到
 
-ctx.evolutionIo；由 io-node 注册默认 provider。
+只在排障存储问题时。
 
-## 依赖与默认
+## 默认 / 前提
 
-被 memory-files/state-json/skill-catalog 等使用。
+由本地 IO 自动提供。
 
 ## 边界
 
-不实现文件 IO；跨进程语义由 provider 声明，当前 node provider 是 single-process。
-
-## 代码位置
-
-`src/index.ts`
+不改变用户操作。

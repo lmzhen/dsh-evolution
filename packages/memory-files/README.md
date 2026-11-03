@@ -1,23 +1,19 @@
 # @lmzhen/dsh-memory-files
 
-> 本地 MEMORY.md / USER.md provider + 预算服务。
+> 内部组件，把记忆存到 `MEMORY.md`/`USER.md`。
 
-## 它做什么
+## 你会看到
 
-注册 files provider；MemoryStore 文件语义（去重/日期前缀/预算/漂移/威胁/退避）；预算解析/clamp/floor；evolutionMemoryBudget；写串行。
+用户看到的是记忆被记住/自动带回来。
 
-## 入口
+## 什么时候会用到
 
-Cordis 行 memory-files；evolutionMemoryBudget。
+每次写记忆、新会话注入时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 memory + evolutionIo；可选 policy/settings。
+随记忆功能自动工作。
 
 ## 边界
 
-硬依赖 io；相对 root 解析；read 不进写队列；单进程；旧预算名仍保留但写入被拒。
-
-## 代码位置
-
-`src/index.ts`
+预算写满会拒绝，不会静默截断。

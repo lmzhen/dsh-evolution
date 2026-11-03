@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-replay
 
-> 计划排行榜/比较报告。
+> 计划回放/排行（高级）。
 
-## 它做什么
+## 你会看到
 
-从 activity/事件回填计划结果，按权重算分并输出比较报告；支持 corrupt/readFailed 限定句。
+`/evolution replay`。
 
-## 入口
+## 什么时候会用到
 
-ctx.evolutionReplay；/evolution replay。
+你想比较历史计划效果时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 activity/events；事件源主要来自 branch review。
+只在有审查/计划数据时才有内容。
 
 ## 边界
 
-单计划 margin=null；默认 inject 模式没有自动数据；权重 clamp；只出文本。
-
-## 代码位置
-
-`src/index.ts`
+默认 inject 复盘不产生回放数据。

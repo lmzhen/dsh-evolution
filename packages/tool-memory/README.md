@@ -1,23 +1,19 @@
 # @lmzhen/dsh-tool-memory
 
-> 模型面 memory 工具 + 两段提示。
+> Agent 写记忆的工具。
 
-## 它做什么
+## 你会看到
 
-memory 工具（add/replace/remove/operations）；guidance section；snapshot context；审批 runner；memory-applied 刷新；memoryEnabled/entryPreviewChars。
+你对 Agent 说“记住…”，它写入项目记忆/用户画像。
 
-## 入口
+## 什么时候会用到
 
-memory 工具；系统提示段。
+你想让 Agent 跨会话记住事实/偏好时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 tools + memory；systemPrompt 可选；approval 可选。
+all/分层预设才有；host 没有。
 
 ## 边界
 
-memoryEnabled:false 不注册工具/提示但保留拒绝式 runner；snapshot 为空时不注入；审批关闭时直接执行。
-
-## 代码位置
-
-`src/index.ts`
+审批开启时会先进入待批。

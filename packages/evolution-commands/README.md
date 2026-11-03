@@ -1,25 +1,21 @@
 # @lmzhen/dsh-evolution-commands
 
-> /evolution 命令面 + 诊断路由 + 运行登记。
+> `/evolution` 命令入口。
 
-## 它做什么
+## 你会看到
 
-注册 /evolution 30 条子命令、/api/dsh-evolution/diagnostics、runs.json、设置页抑制、旧设置迁移、learn/maintain/preset install/extract/restructure/params/policy/migrate。
+`/evolution doctor`、`pending`、`curator`、`merge`、`skill history` 等。
 
-## 入口
+## 什么时候会用到
 
-/evolution …；diagnostics GET。
+日常管理和排障时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 commands 服务；多数子命令还需要 approval/curator/merge/io。
+随 all/host/preset 安装自动注册。
 
 ## 边界
 
-未挂 commands 则整条命令不存在；maintain 异步；部分兜底文案与实际命令不一致；consolidate 已退役。
+没有 `commands` 服务时整条命令不存在。
 
-## 代码位置
-
-`src/index.ts, src/registry.ts, src/diagnostics-route.ts`
-
-安装形态与 variant 命令面差异单源在 [INSTALL.md](../INSTALL.md)。
+分层/variant 的命令面差异单源在 [INSTALL.md](../INSTALL.md)。

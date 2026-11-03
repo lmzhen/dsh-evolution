@@ -1,23 +1,19 @@
 # @lmzhen/dsh-evolution-curator
 
-> 技能生命周期整理服务。
+> 自动整理技能库：标 stale、归档、合并近重复。
 
-## 它做什么
+## 你会看到
 
-定时/手动 run；stale/归档/合并/usage 折叠；LLM 提名；pause/resume/status/scope/report；restore/history/undo/undoUnit/healthView。
+`/evolution curator status/report/run`；归档/恢复/历史/撤销。
 
-## 入口
+## 什么时候会用到
 
-ctx.evolutionCurator；/evolution curator …、skill restore/history/undo、restore、propose、skills health。
+技能变多、长期不用、出现重复时。
 
-## 依赖与默认
+## 默认 / 前提
 
-需要 io/state/usage；llm 可选；agents 可选（空闲门）。
+默认定期跑；可暂停。
 
 ## 边界
 
-enabled:false 只关自动调度；单实例 claim 仅进程内；consolidate 已无命令入口；先快照后写。
-
-## 代码位置
-
-`src/index.ts, src/unit-undo-plan.ts`
+先快照，删除是归档；不会硬删。
