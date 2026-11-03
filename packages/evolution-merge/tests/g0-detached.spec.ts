@@ -1,6 +1,6 @@
 import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { contentHash, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 import { tempRoot } from '../../test-support/temp-home.ts'
@@ -46,10 +46,13 @@ it('detached approve returns before round2 without holding the commit claim', as
   expect(contender).not.toBeNull()
   await contender?.release()
   release()
-  for (let i = 0; i < 2000 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
-  for (let i = 0; i < 2000 && !reg.calls.includes('settle:succeeded'); i += 1) await new Promise(resolve => setTimeout(resolve, 5))
-  expect((await loadMergeState(io, home)).state.rows).toEqual([])
-  expect(reg.calls).toContain('settle:succeeded')
+  // The detached body is still running: wait for its definitive completion signal
+  // (settle) instead of a fixed 10s race. Windows CI under load can exceed the old
+  // polling budget even though the run is healthy.
+  await vi.waitFor(async () => {
+    expect((await loadMergeState(io, home)).state.rows).toEqual([])
+    expect(reg.calls).toContain('settle:succeeded')
+  }, { timeout: 20_000, interval: 20 })
 })
 
 it('approve does not take the commit claim before commit', async () => {
