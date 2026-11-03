@@ -196,7 +196,7 @@ export async function view(): Promise<MergeOutcome<MergeViewPayload>> {
     startCommands: facts.startCommands,
     notes: [...facts.notes],
     degraded: facts.degraded,
-    ...(facts.last === null && facts.active === null ? {} : { latestRun: toRun(facts.last ?? facts.active!) }),
+    ...(facts.active === null && facts.last === null ? {} : { latestRun: toRun(facts.active ?? facts.last!) }),
     approval: { mergeApproval: facts.approval.mergeApproval, ...(platformWrite === undefined ? {} : { platformWrite }) },
   } }
 }
