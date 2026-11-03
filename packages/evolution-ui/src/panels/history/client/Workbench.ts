@@ -5,6 +5,7 @@
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import { PAGE_SURFACE_CLASS } from '@lmzhen/dsh-evolution-client-kit'
+import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
 
 /** Stable page id used by the sidebar row, the page slot key, and navigation params. */
@@ -85,6 +86,7 @@ export function WorkbenchNav(props: WorkbenchNavOwner & WorkbenchNavFace): React
 
 /** Workbench shell and sidebar row; colours come from the platform tokens. */
 export const WORKBENCH_CSS = [
+  tokenVars('.evo-workbench'),
   '.evo-workbench{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0}',
   '.evo-workbench-head{display:flex;align-items:center;padding:var(--evo-space-12) var(--evo-space-16);border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
   '.evo-workbench-title{margin:0;font-size:var(--evo-type-lg);font-weight:600;line-height:var(--evo-leading-base)}',

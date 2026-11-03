@@ -86,7 +86,9 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   // version number at B's name — a write against the wrong skill.
   const readTicket = useRef(0)
 
-  const failed = (error: unknown): void => {
+  const failureSource = useRef<'read' | 'write' | undefined>(undefined)
+  const failed = (error: unknown, source: 'read' | 'write' = 'read'): void => {
+    failureSource.current = source
     setNoteError(true)
     setNoteText(face.t('error.hint') + '\n' + face.t('error') + ': '
       + (error instanceof Error ? error.message : String(error)))
@@ -98,6 +100,15 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     setNoteText(message)
   }
 
+  /** A successful read clears only the read failure; a write result is not erased by a later read. */
+  const clearReadFailure = (): void => {
+    if (failureSource.current !== 'read') return
+    failureSource.current = undefined
+    setFailure(undefined)
+    setNoteError(false)
+    setNoteText(undefined)
+  }
+
   /** The sentence one failed read carries, in ONE place: every reader below reports the same way. */
   const failedMessage = (error: unknown): string => face.t('error') + ': ' + (error instanceof Error ? error.message : String(error))
 
@@ -105,7 +116,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const reloadSkills = (): void => {
     // `finally`, not `then`: a FAILED read is an answer too — the reader gets the empty list plus the
     // error sentence instead of a spinner that never stops.
-    void face.loadSkills().then(setSkills).catch(failed).finally(() => { setSkillsLoaded(true) })
+    void face.loadSkills().then((next) => { setSkills(next); clearReadFailure() }).catch(failed).finally(() => { setSkillsLoaded(true) })
   }
 
   /**
@@ -125,7 +136,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     setDiffs(new Map())
     setBodies(new Map())
     void face.loadVersions(name).then((next) => {
-      if (readTicket.current === ticket) setPayload(next)
+      if (readTicket.current === ticket) { setPayload(next); clearReadFailure() }
     }).catch((error: unknown) => {
       if (readTicket.current !== ticket) return
       // T5-09: the pane needs its own answer, not only the notice.
@@ -171,7 +182,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
         setNoteText(message + '\n' + face.t('error') + ': ' + (error instanceof Error ? error.message : String(error)))
       })
       succeeded(message)
-    }).catch(failed)
+    }).catch((error: unknown) => { failed(error, 'write') })
   }
 
   /**
