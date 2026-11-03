@@ -1,15 +1,48 @@
 # dsh-evolution
 
-Self-evolving memory and skills for DeepSeek Harness.
+> Task-oriented skill evolution for DeepSeek Harness: the model grows a private skill set for your environment, preferences and workflows.
 
-You install it once. From then on the agent can:
+## What this plugin is for
 
-- **remember your project** — decisions, commands, preferences — and bring them back in later sessions;
-- **improve its own skills** — create, patch, split and merge them, with history and undo;
-- **review its work** — periodically turn what happened into a plan, instead of waiting for you to notice;
-- **stay under your control** — every write can wait for your approval, and no write is a blind hard delete.
+dsh-evolution is built around **automated skill generation and full-lifecycle skill management**. It is for accumulating personal capability, not for making a model better at casual conversation.
 
-It is not a model or a hosted service. The data stays under your `$DSH_HOME`.
+The model should get better at doing work *your* way: your machine, project conventions, habits, and the details of your recurring tasks. Once general capability is strong enough, the valuable layer becomes a private skill set that grows with the variety and complexity of your work. Managing that set by hand does not scale.
+
+The plugin turns **create → use → review → patch → split → merge → archive → restore** into an auditable loop. It uses the model's semantic ability to run that loop where possible, gives the user a choice to approve critical writes, and makes deletion an archive rather than a hard delete.
+
+## What is a skill?
+
+Early language models rewarded precise prompts: a more professional question or instruction usually produced a more professional answer. That was the era of prompt engineering.
+
+Chain-of-thought changed the economics of single-step generation: the model can recall relevant terminology and standards inside its reasoning, so a fully specified persona-and-task prompt matters less. Tool calling then changed the task shape again. The model now completes a sequence of operations, and it still needs to know what to do first, what comes next, when it is done, and how to recover. The prompt becomes less like a character sheet and more like an **operating manual**.
+
+Different tasks need different manuals, and they cannot all live in the context window. The common industrial answer is to give the model different prompts per scenario and per step, wiring inputs and outputs into fixed workflows. Once models can select capabilities by name and description, another option appears: package the instructions themselves as a module that is discovered and loaded on demand. **A skill is such a packaged operating manual, plus the scripts, templates and reference files it needs.** The model finds it by name and description, loads it when relevant, and follows its steps.
+
+MCP and skills are not the same thing. MCP is a protocol for connecting tools and resources. A skill is the layer that tells the model when and in what order to use those tools, and what "done" means for this task.
+
+## Why this plugin exists
+
+Two changes are happening at the same time:
+
+1. **Generic skills are being absorbed into model capability.** Public, widely useful manuals increasingly become part of what the model already knows. One-shot completion of generic tasks is becoming normal, and the marginal value of a generic skill falls.
+2. **Models can now extract skills from execution traces.** Given real trajectories and clear feedback, a capable model can produce a usable operating manual.
+
+The consequence: **the marginal value of generic skills is falling; private skills are becoming the differentiator.**
+
+Real environments differ. Machines, project conventions, personal preferences and the details of complex tasks vary from user to user. After general capability is sufficient, the difference between a good and a mediocre result is often this private process knowledge. That knowledge grows, changes shape, and cannot be curated by hand. The plugin automates its generation and lifecycle with the model's semantic ability, while approval, versions, archives and undo keep the automation from running out of control.
+
+## How it relates to memory plugins
+
+They are almost entirely complementary.
+
+A typical memory plugin manages **facts**: who the user is, what the project is, what was decided. That helps in conversation and in task execution alike. This plugin manages **process**: how a job should be done, in what order, and to what standard. It is mainly for people who use Harness to get work done.
+
+The plugin does include a memory module, but it deliberately inverts the usual "retrieve on demand, grow without bound" design:
+
+- **A hard character cap.** When the cap is reached, new writes are refused; the model must delete, compact or merge existing entries to make room before writing again.
+- **Full injection into the context.** Memory is not retrieved on demand; it is injected in full. For a task-oriented plugin, a critical fact that is only fetched "when needed" may never be seen. Full injection guarantees the model sees it, and the cap keeps the injection bounded: large enough not to lose the essentials, small enough not to hurt model performance or blow up context cost.
+
+The trade-off is deliberate: **memory should be small and complete; skills should be specific rather than generic.**
 
 ## Install
 
