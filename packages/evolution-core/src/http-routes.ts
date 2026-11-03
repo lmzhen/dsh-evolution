@@ -12,6 +12,7 @@
  */
 
 import { isRecord } from './guards.ts'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 
 /** Largest request body a family route accepts; a bigger one reads as "no body" (400 from the handler). */
@@ -128,6 +129,51 @@ interface InjectingContext {
  * Routes carry the audit snapshot taken at registration time (deployment-level facts only — the
  * exact-route handler receives a Request, not the peer identity).
  */
+interface WebServerLike {
+  register(route: { kind: 'exact'; path: string; handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void> }): () => void
+}
+
+function isLoopback(address: string | undefined): boolean {
+  const value = address ?? ''
+  return value === '127.0.0.1' || value === '::1' || value === '::ffff:127.0.0.1'
+}
+
+function nodeRoute(route: ConnectionFetchRouteLike): { kind: 'exact'; path: string; handler: (req: IncomingMessage, res: ServerResponse) => Promise<void> } {
+  return {
+    kind: 'exact',
+    path: route.path,
+    handler: async (req, res) => {
+      if (!isLoopback(req.socket.remoteAddress)) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
+      try {
+        const chunks: Buffer[] = []
+        for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+        const headers = new Headers()
+        for (const [key, value] of Object.entries(req.headers)) {
+          if (value === undefined) continue
+          headers.set(key, Array.isArray(value) ? value.join(',') : value)
+        }
+        const method = req.method ?? 'GET'
+        const request = new Request(new URL(req.url ?? '/', 'http://127.0.0.1'), {
+          method,
+          headers,
+          ...(method === 'GET' || method === 'HEAD' || chunks.length === 0 ? {} : { body: Buffer.concat(chunks) as unknown as BodyInit }),
+        })
+        const response = await route.fetch(request)
+        res.statusCode = response.status
+        response.headers.forEach((value, key) => { try { res.setHeader(key, value) } catch { /* ignore forbidden node header */ } })
+        res.end(Buffer.from(await response.arrayBuffer()))
+      } catch (error) {
+        res.statusCode = 500
+        res.end(error instanceof Error ? error.message : String(error))
+      }
+    },
+  }
+}
+
 export function registerHostRoutes(
   owner: Context,
   build: (audit: DecisionAudit) => readonly ConnectionFetchRouteLike[],
@@ -136,14 +182,10 @@ export function registerHostRoutes(
   if (typeof injecting.inject !== 'function') throw new Error('host routes require a context that owns inject()')
   injecting.inject(['connection'], (scope: Context) => {
     const connection = (scope as unknown as { connection?: ConnectionServiceLike }).connection
-    if (connection === undefined || connection.fetch === undefined || typeof connection.fetch.register !== 'function') {
-      throw new Error('connection service is mounted without fetch.register()')
-    }
-    const register = connection.fetch.register.bind(connection.fetch)
     const audit: DecisionAudit = {
       channel: 'connection.fetch',
       principal: 'owner',
-      deploymentAllowsRemote: connection.allowsRemoteAuthorities === true,
+      deploymentAllowsRemote: connection?.allowsRemoteAuthorities === true,
     }
     const routes = build(audit)
     for (const route of routes) {
@@ -153,19 +195,35 @@ export function registerHostRoutes(
     }
     const effect = (scope as unknown as { effect?: InjectingContext['effect'] }).effect
     if (typeof effect !== 'function') throw new Error('connection scope has no effect() to own the registration')
-    effect.call(scope, () => {
-      const disposers: Array<() => Promise<void>> = []
-      try {
-        for (const route of routes) disposers.push(register(route))
-      } catch (error) {
-        for (const dispose of disposers) { try { void dispose() } catch { /* best-effort rollback */ } }
-        throw error
-      }
-      return () => {
-        for (const dispose of disposers) {
-          try { void dispose() } catch { /* a failed disposer must not mask the others */ }
+    if (connection?.fetch !== undefined && typeof connection.fetch.register === 'function') {
+      const register = connection.fetch.register.bind(connection.fetch)
+      effect.call(scope, () => {
+        const disposers: Array<() => Promise<void>> = []
+        try {
+          for (const route of routes) disposers.push(register(route))
+        } catch (error) {
+          for (const dispose of disposers) { try { void dispose() } catch { /* best-effort rollback */ } }
+          throw error
         }
-      }
+        return () => {
+          for (const dispose of disposers) {
+            try { void dispose() } catch { /* a failed disposer must not mask the others */ }
+          }
+        }
+      }, 'evolution-host-routes')
+      return
+    }
+    // Platform 0.2.x moved Host data-plane registration to connection.rpc. The family
+    // HTTP contract stays exact paths; a loopback-only webserver bridge preserves it
+    // without exposing these routes to remote authorities.
+    const web = ((scope as unknown as { get?: (name: string) => unknown }).get?.('webServer')
+      ?? (owner as unknown as { get?: (name: string) => unknown }).get?.('webServer')) as WebServerLike | undefined
+    if (web === undefined || typeof web.register !== 'function') {
+      throw new Error('connection service has no fetch.register(), and webServer is not mounted for the loopback host-route bridge')
+    }
+    effect.call(scope, () => {
+      const disposers = routes.map(route => web.register(nodeRoute(route)))
+      return () => { for (const dispose of disposers) { try { dispose() } catch { /* best-effort */ } } }
     }, 'evolution-host-routes')
   })
 }
