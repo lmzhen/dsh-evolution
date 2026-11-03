@@ -9,6 +9,7 @@ import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type LlmServiceLike } from './adapters/model-runner.ts'
 import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
 import { pairLedger, normalizePairLedger } from './domain/pair-ledger.ts'
@@ -162,6 +163,8 @@ function formatUnreadyError(): string {
 export const inject: string[] = []
 
 export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): void {
+  registerOwnerSettings(ctx, 'evolution-merge', Config)
+
   configureMergePresentation(ctx as unknown as MergePresentationContext)
   let params = resolveMergeParams(rawConfig)
   let mergeRun: ((rawInput: string, invocation?: { readonly agent?: unknown }) => Promise<MergeCommandResult>) | undefined
