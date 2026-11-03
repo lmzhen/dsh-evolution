@@ -15,6 +15,7 @@ export const ROUTES = {
     preview: '/api/dsh-evolution/approval/preview',
     approve: '/api/dsh-evolution/approval/approve',
     reject: '/api/dsh-evolution/approval/reject',
+    release: '/api/dsh-evolution/approval/release',
   },
   'skill-history': {
     skills: '/api/dsh-evolution/skill-history/skills',

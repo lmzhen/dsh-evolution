@@ -25,6 +25,7 @@ describe('U-7: the free accessibility baseline', () => {
       pending: async () => ({ ok: true, data: [] }),
       approve: async () => ({ ok: true, data: null }),
       reject: async () => ({ ok: true, data: null }),
+      release: async () => ({ ok: true, data: null }),
       preview: async () => ({ ok: true, data: { available: false, reason: 'n/a' } }),
     }
     const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string => formatText(key, values)

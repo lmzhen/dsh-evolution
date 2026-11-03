@@ -53,6 +53,8 @@ export interface ApprovalFace {
   list(status?: PendingStatus): Promise<PendingRecord[]>
   approve(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }>
   reject(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }>
+  /** Release an executing claim; absent on fixtures that only model approve/reject. */
+  release?(id: string): Promise<{ ok: boolean; message: string }>
   /** The preview the replayer of that kind registered, when it registered one. */
   previewOf(kind: PendingKind): WritePreview | undefined
 }
@@ -173,6 +175,18 @@ export function makeApprovalRoutes(approval: ApprovalFace, audit: DecisionAudit)
         const id = idOf(await readJsonObject(request))
         if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
         return await decide(current => approval.approve(current, audit), id)
+      },
+    },
+    {
+      path: APPROVAL_ROUTES.release,
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        if (request.method !== 'POST') return methodNotAllowed(['POST'])
+        const id = idOf(await readJsonObject(request))
+        if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
+        if (approval.release === undefined) return json(200, { ok: false, code: 'approval-refused', message: '这个部署没有提供 release' })
+        return await decide(current => approval.release!(current), id)
       },
     },
     {

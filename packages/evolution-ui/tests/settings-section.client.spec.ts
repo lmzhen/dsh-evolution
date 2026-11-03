@@ -17,8 +17,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { apply, SECTION_ID } from '../src/panels/settings/index.ts'
-import { CLIENT_ROW_SEATS } from '../src/panels/settings/generated-params.ts'
-import { CARD_SLOT, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey } from '../src/panels/settings/seam.ts'
+import { CLIENT_PARAM_SECTIONS } from '../src/panels/settings/generated-params.ts'
+import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY } from '../src/panels/settings/seam.ts'
 import { createSourceCache, PROJECTION_FAILED, SEAT_MISSING, type SeatProbe } from '../src/panels/settings/source.ts'
 
 /**
@@ -136,7 +136,7 @@ describe('the evolution settings section', () => {
     const section = registrations.find(row => row.id === SECTION_ID)
     expect(section).toBeDefined()
     const cardKeys = registrations.filter(row => row.name === CARD_SLOT).map(row => row.key)
-    expect(cardKeys.length).toBeGreaterThan(0)
+    expect(cardKeys).toEqual([PENDING_CARD_KEY, DIAGNOSTICS_CARD_KEY])
 
     const asked: string[] = []
     const face = {
@@ -157,20 +157,11 @@ describe('the evolution settings section', () => {
     cleanup()
   })
 
-  // G2: the platform's Plugins page opens a row's configuration through a keyed seat whose
-  // key is `<bundle package name>#<row id>`. The bundle names are the ones the release ships
-  // (the source-plane spelling is rescoped at publish), and every row the registry carries
-  // for a bundle must be registered or the page shows no form for it.
-  it('registers the per-row config seat for every (bundle, row) pair', () => {
+  it('registers every parameter card on the platform settings.plugin.item list', () => {
     const { ctx, registrations } = fakeShell()
     apply(ctx)
-    const keys = registrations.filter(row => row.name === ROW_CONFIG_SLOT).map(row => row.key)
-    expect(keys.length).toBeGreaterThan(0)
-    for (const seat of CLIENT_ROW_SEATS) {
-      for (const rowId of seat.rows) expect(keys).toContain(rowConfigKey(seat.bundle, rowId))
-    }
-    // One registration per key: a duplicate would render the row's form twice.
-    expect(new Set(keys).size).toBe(keys.length)
+    const items = registrations.filter(row => row.name === 'settings.plugin.item')
+    expect(items.map(row => row.id).sort()).toEqual(CLIENT_PARAM_SECTIONS.map(section => section.namespace).sort())
   })
 
   // G2: the settings seat is PROBED. A required inject for a service the deployment did not
@@ -181,17 +172,14 @@ describe('the evolution settings section', () => {
     const { ctx, registrations } = fakeShell({ seat: false })
     apply(ctx)
     const section = registrations.find(row => row.id === SECTION_ID)
-    const card = registrations.find(row => row.name === CARD_SLOT)
-    expect(section).toBeDefined()
+    const card = registrations.find(row => row.name === 'settings.plugin.item')
     expect(card).toBeDefined()
-    // Render it the way the shell does: the inject face plus the hook the renderer binds
-    // out of the face's `hooks` compartment.
     render(h(card?.component, {
       namespace: 'memory-files',
       fields: [],
       t: (key: string) => key,
-      write: async () => {},
-      clear: async () => {},
+      mutateOnce: async () => true,
+      clear: async () => true,
       useParamSection: (selector: (state: unknown) => unknown) => selector({ status: 'unavailable', value: undefined, user: undefined, writable: false, reason: 'seat-missing' }),
     }))
     expect(document.body.textContent).toContain('seatMissing')
@@ -314,7 +302,7 @@ describe('the row source the renderer binds', () => {
   it('T5-11/A66: a seat that arrives AFTER apply revives the card without a re-render', () => {
     const shell = fakeShell({ seatArrivesLater: true })
     apply(shell.ctx)
-    const card = shell.registrations.find(entry => entry.name === CARD_SLOT && entry.key !== undefined)
+    const card = shell.registrations.find(entry => entry.name === 'settings.plugin.item')
     if (card === undefined) throw new Error('the section registered no card')
     const face = card.inject() as {
       hooks?: { paramSection?: { getSnapshot: () => { status: string; reason?: string }; subscribe: (listener: () => void) => () => void } }

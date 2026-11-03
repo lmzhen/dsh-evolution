@@ -47,6 +47,7 @@ function face(api: Partial<ApprovalApi>): { t: (key: MessageKey) => string; api:
     pending: async () => ({ ok: true, data: [] }),
     approve: async () => ({ ok: true, data: null }),
     reject: async () => ({ ok: true, data: null }),
+    release: async () => ({ ok: true, data: null }),
     preview: async () => ({ ok: true, data: { available: false, reason: 'no preview in this fixture' } }),
     ...api,
   }
@@ -90,6 +91,16 @@ describe('the pending card', () => {
     expect(screen.getByText(message('approvalKindSkill'))).toBeDefined()
     expect(screen.getByText(message('approvalApprove'))).toBeDefined()
     expect(screen.getByText(message('approvalReject'))).toBeDefined()
+  })
+
+  it('offers release, not approve/reject, on an executing row', async () => {
+    const release = vi.fn(async () => ({ ok: true as const, data: null }))
+    mount(face({ pending: windowStub([], [row({ status: 'executing', claimedBy: 'pid-1' })]), release }))
+    await waitFor(() => { expect(screen.getByText(message('approvalRelease'))).toBeDefined() })
+    expect(screen.queryByText(message('approvalApprove'))).toBeNull()
+    expect(screen.queryByText(message('approvalReject'))).toBeNull()
+    fireEvent.click(screen.getByText(message('approvalRelease')))
+    await waitFor(() => { expect(release).toHaveBeenCalledWith('p-1') })
   })
 
   it('re-reads the window after a decision instead of editing the list', async () => {

@@ -68,6 +68,7 @@ export const HOST_ROUTES = {
     preview: '/api/dsh-evolution/approval/preview',
     approve: '/api/dsh-evolution/approval/approve',
     reject: '/api/dsh-evolution/approval/reject',
+    release: '/api/dsh-evolution/approval/release',
   },
   skillHistory: {
     skills: '/api/dsh-evolution/skill-history/skills',

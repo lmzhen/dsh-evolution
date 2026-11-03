@@ -28,15 +28,14 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createApprovalApi } from './api.ts'
-import { CLIENT_PARAM_SECTIONS, CLIENT_ROW_SEATS } from './generated-params.ts'
+import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
 import { PendingCard, confirmModeFrom, type PendingCardFace } from './PendingCard.ts'
 import { DiagnosticsCard, type DiagnosticsCardFace } from './DiagnosticsCard.ts'
 import { createDiagnosticsApi } from './diagnostics-state.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
 import { ParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
-import { RowConfigCard, type RowConfigFace } from './RowConfigCard.ts'
-import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, ROW_CONFIG_SLOT, rowConfigKey, type ClientSeam, type ConfigFormsSeat, type ParamSectionSource } from './seam.ts'
+import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type ClientSeam, type ConfigFormsSeat, type ParamSectionSource } from './seam.ts'
 import { SettingsSection } from './SettingsSection.ts'
 import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
 import { injectStyles } from './styles.ts'
@@ -148,59 +147,45 @@ export function apply(ctx: ClientContext): void {
     }, SettingsSection)
   })
 
-  seam.slots.inject(CARD_SLOT, function* () {
-    for (const section of CLIENT_PARAM_SECTIONS) {
-      // A73: the SEAT is looked up by its own key — the settings namespace below is the WRITE target
-      // (and the slot key), and a Host may key the two differently.
-      const source: ParamSectionSource = sources.sourceFor(section.seatKey)
-      const { mutateOnce, clear } = writeFaceFor(probe, section.namespace)
-      const face = (): ParamCardFace => ({
-        namespace: section.namespace,
-        fields: section.fields,
-        t,
-        lang: language,
-        mutateOnce,
-        clear,
-        hooks: { paramSection: source },
-      })
+  // Parameters are editable on the platform's Plugins surface only. One card per
+  // namespace, with the platform owning the list and the card chrome.
+  for (const [index, section] of CLIENT_PARAM_SECTIONS.entries()) {
+    const source: ParamSectionSource = sources.sourceFor(section.seatKey)
+    const { mutateOnce, clear } = writeFaceFor(probe, section.namespace)
+    const face = (): ParamCardFace => ({
+      namespace: section.namespace,
+      fields: section.fields,
+      t,
+      lang: language,
+      mutateOnce,
+      clear,
+      hooks: { paramSection: source },
+    })
+    seam.slots.inject('settings.plugin.item', function* () {
       yield seam.slots.register({
-        name: CARD_SLOT,
-        key: section.namespace,
+        name: 'settings.plugin.item',
+        id: section.namespace,
+        order: index * 10,
+        locale: NS,
         inject: face,
       }, ParamCard)
-    }
-    // The staged-write window rides in the same slot with its own key: one card, no namespace.
+    })
+  }
+
+
+  // The staged-write window and diagnostics stay in the family section; parameters do not.
+  seam.slots.inject(CARD_SLOT, function* () {
     const api = createApprovalApi((input, init) => fetch(input, init))
     yield seam.slots.register({
       name: CARD_SLOT,
       key: PENDING_CARD_KEY,
       inject: (): PendingCardFace => ({ t, api, confirmMode, fallback: FALLBACKS.approval }),
     }, PendingCard)
-    // G5/W7 S7: the read-only diagnostics card — the SAME view the CLI/--json prints, fetched
-    // through the generated route client; the command face is the fallback when the data plane is absent.
     const diagApi = createDiagnosticsApi((input, init) => fetch(input, init))
     yield seam.slots.register({
       name: CARD_SLOT,
       key: DIAGNOSTICS_CARD_KEY,
       inject: (): DiagnosticsCardFace => ({ t, api: diagApi, fallback: FALLBACKS.diagnostics }),
     }, DiagnosticsCard)
-  })
-  // G2: the platform's per-row configuration page. Its ledger keys an entry by
-  // `<bundle package name>#<row id>`, and the pairs come from the generated table (the
-  // bundle roster x the registry's rows) — no hand list here. A key whose bundle is not
-  // installed is inert: the page only looks up keys of the rows it lists.
-  seam.slots.inject(ROW_CONFIG_SLOT, function* () {
-    for (const seat of CLIENT_ROW_SEATS) {
-      for (const rowId of seat.rows) {
-        const section = CLIENT_PARAM_SECTIONS.find(candidate => candidate.namespace === rowId)
-        if (section === undefined) continue
-        const face = (): RowConfigFace => ({ namespace: rowId, fields: section.fields, t, lang: language })
-        yield seam.slots.register({
-          name: ROW_CONFIG_SLOT,
-          key: rowConfigKey(seat.bundle, rowId),
-          inject: face,
-        }, RowConfigCard)
-      }
-    }
   })
 }

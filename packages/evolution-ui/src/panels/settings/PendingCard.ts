@@ -135,10 +135,10 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     return () => { window.removeEventListener('focus', onFocus) }
   }, [])
 
-  const decide = (id: string, action: 'approve' | 'reject'): void => {
+  const decide = (id: string, action: 'approve' | 'reject' | 'release'): void => {
     apply(current => beginAction(current, id))
     void (async () => {
-      const answer = action === 'approve' ? await api.approve(id) : await api.reject(id)
+      const answer = action === 'approve' ? await api.approve(id) : action === 'reject' ? await api.reject(id) : await api.release(id)
       if (!answer.ok) {
         apply(current => noticed(endAction(current, id), failureText(answer.failure, translate)))
         return
@@ -218,7 +218,14 @@ export function PendingCard(props: PendingCardFace): ReactNode {
           createElement('span', { className: 'evolution-param-value' }, entry.summary)),
         createElement('p', { className: 'evolution-param-hint' }, age(entry)),
         createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalExecuting')),
-        entry.claimedBy === undefined ? null : createElement('p', { className: 'evolution-param-hint' }, entry.claimedBy))
+        entry.claimedBy === undefined ? null : createElement('p', { className: 'evolution-param-hint' }, entry.claimedBy),
+        createElement('div', { className: 'evolution-param-actions' },
+          createElement('button', {
+            className: 'evolution-param-button',
+            type: 'button',
+            disabled: state.busy.includes(entry.id),
+            onClick: () => { decide(entry.id, 'release') },
+          }, state.busy.includes(entry.id) ? t('approvalReleasing') : t('approvalRelease'))))
     }
     const busy = state.busy.includes(entry.id)
     // U-6: the weight of the action is part of the decision. Approve is the destructive one (it

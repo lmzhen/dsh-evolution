@@ -10,7 +10,6 @@
  */
 import { createElement, type ReactNode } from 'react'
 import { FAMILY_VERSION, PACKAGE_PURPOSE } from './generated-about.ts'
-import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
 import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type SectionFace } from './seam.ts'
 
 /**
@@ -45,11 +44,5 @@ export function SettingsSection(face: SectionFace): ReactNode {
       { key: DIAGNOSTICS_CARD_KEY, className: 'evolution-params-group' },
       face.renderSlot(CARD_SLOT, {}, { entryKey: DIAGNOSTICS_CARD_KEY }),
     ),
-    ...CLIENT_PARAM_SECTIONS.map(section_ =>
-      createElement(
-        'div',
-        { key: section_.namespace, className: 'evolution-params-group' },
-        face.renderSlot(CARD_SLOT, {}, { entryKey: section_.namespace }),
-      )),
   )
 }

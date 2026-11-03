@@ -63,6 +63,8 @@ export interface ApprovalApi {
   approve: (id: string) => Promise<ApprovalAnswer<unknown>>
   /** Close one staged write without replaying it. */
   reject: (id: string) => Promise<ApprovalAnswer<unknown>>
+  /** Put an EXECUTING claim back into the pending window without replaying it. */
+  release: (id: string) => Promise<ApprovalAnswer<unknown>>
   /** What that staged write would store, resolved by the host without running it. */
   preview: (id: string) => Promise<ApprovalAnswer<PreviewAnswer>>
 }
@@ -82,6 +84,7 @@ export function createApprovalApi(doFetch: typeof fetch): ApprovalApi {
     ),
     approve: async id => await post(ROUTES.approval.approve, id),
     reject: async id => await post(ROUTES.approval.reject, id),
+    release: async id => await post(ROUTES.approval.release, id),
     preview: async id => await requestJson<PreviewAnswer>(doFetch, ROUTES.approval.preview + '?id=' + encodeURIComponent(id)),
   }
 }

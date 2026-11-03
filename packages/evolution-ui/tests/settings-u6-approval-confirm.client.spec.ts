@@ -42,6 +42,7 @@ function face(api: Partial<ApprovalApi>, mode: 'auto' | 'ask'): PendingCardFace 
     pending: windowStub([row()]),
     approve: async () => ({ ok: true, data: null }),
     reject: async () => ({ ok: true, data: null }),
+    release: async () => ({ ok: true, data: null }),
     preview: async () => ({ ok: true, data: { available: false, reason: 'no preview in this fixture' } }),
     ...api,
   }
