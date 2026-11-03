@@ -266,8 +266,9 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
                 ? t('proposal.owner.covered') + (proposal.owner.name === undefined ? '' : ': ' + proposal.owner.name)
                 : t('proposal.owner.owner-gap') + (proposal.owner.neededOwner === undefined ? '' : ': ' + proposal.owner.neededOwner))),
             createElement('p', { 'data-role': 'proposal-status' }, t('proposal.status.' + proposal.status)),
-            proposal.provenance === undefined ? null : createElement('p', { 'data-role': 'proposal-provenance' },
-              proposal.provenance.promptVersion + (proposal.provenance.model === undefined ? '' : ' · ' + proposal.provenance.model) + ' · ' + proposal.provenance.runId + ' · ' + new Date(proposal.provenance.at).toLocaleString() + (proposal.provenance.promptHash === undefined ? '' : ' · #' + proposal.provenance.promptHash.slice(0, 8))),
+            proposal.provenance === undefined ? null : createElement('details', { 'data-role': 'proposal-provenance' },
+              createElement('summary', null, t('proposal.provenance')),
+              createElement('p', null, proposal.provenance.promptVersion + (proposal.provenance.model === undefined ? '' : ' · ' + proposal.provenance.model) + ' · ' + proposal.provenance.runId + ' · ' + new Date(proposal.provenance.at).toLocaleString() + (proposal.provenance.promptHash === undefined ? '' : ' · #' + proposal.provenance.promptHash.slice(0, 8)))),
             proposal.residual === undefined || proposal.residual.trim() === '' ? null : createElement('p', { 'data-role': 'proposal-kept' },
               t('proposal.kept') + ': ' + proposal.residual.trim().slice(0, 160)),
             (proposal.parts ?? []).length === 0 ? null : createElement('p', { 'data-role': 'proposal-reusable' },

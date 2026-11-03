@@ -87,24 +87,30 @@ function runNode(view: MergeViewPayload, t: Translate, copy: (command: string) =
   if (run === undefined) return null
   const report = run.actions.find(action => action.id === 'report')
   const reportEnabled = report?.enabled === true
+  const internals = [
+    createElement('span', { key: 'id', 'data-role': 'run-id', title: run.id }, t('run.id') + ' ' + run.id),
+    run.stage === undefined ? null : createElement('span', { key: 'stage', 'data-role': 'run-stage' }, t('stage.' + run.stage)),
+    run.endedAt === undefined ? null : createElement('span', { key: 'ended', 'data-role': 'run-ended' }, t('run.endedAt') + ' ' + new Date(run.endedAt).toLocaleString()),
+    run.failure === undefined ? null : createElement('span', { key: 'failure', 'data-role': 'run-failure', title: run.failure.detail }, t('run.failure') + ' ' + run.failure.code),
+    run.currentPairKey === undefined ? null : createElement('span', { key: 'pair', 'data-role': 'run-current-pair' }, t('run.currentPair') + ' ' + run.currentPairKey),
+    run.parentRunId === undefined ? null : createElement('span', { key: 'parent', 'data-role': 'run-parent' }, t('run.parent') + ' ' + run.parentRunId),
+    run.resultRef === undefined ? null : createElement('span', { key: 'ref', 'data-role': 'run-result-ref', title: run.resultRef }, t('run.resultRef')),
+  ]
   return createElement('div', { 'data-role': 'run-strip', 'data-run-state': run.state },
-    createElement('span', { 'data-role': 'run-id', title: run.id }, t('run.id') + ' ' + run.id),
     createElement('span', { 'data-role': 'run-state' }, t('run.state') + ' ' + t('run.' + run.state)),
-    run.stage === undefined ? null : createElement('span', { 'data-role': 'run-stage' }, t('stage.' + run.stage)),
     run.progress === null || run.progress === undefined ? null : createElement('span', { 'data-role': 'run-progress' }, t('run.progress') + ' ' + String(run.progress.done) + '/' + String(run.progress.total)),
-    run.endedAt === undefined ? null : createElement('span', { 'data-role': 'run-ended' }, t('run.endedAt') + ' ' + new Date(run.endedAt).toLocaleString()),
-    run.failure === undefined ? null : createElement('span', { 'data-role': 'run-failure', title: run.failure.detail }, t('run.failure') + ' ' + run.failure.code),
-    run.currentPairKey === undefined ? null : createElement('span', { 'data-role': 'run-current-pair' }, t('run.currentPair') + ' ' + run.currentPairKey),
-    run.parentRunId === undefined ? null : createElement('span', { 'data-role': 'run-parent' }, t('run.parent') + ' ' + run.parentRunId),
-    run.resultRef === undefined ? null : createElement('span', { 'data-role': 'run-result-ref', title: run.resultRef }, t('run.resultRef')),
     createElement('button', { type: 'button', 'data-role': 'run-report', 'data-action': 'report', disabled: !reportEnabled, title: reportEnabled ? (report?.command ?? t('run.report')) : t('run.noReport'), onClick: () => { if (reportEnabled && report !== undefined) copy(report.command) } }, t('run.report')),
     ...run.actions.filter(action => action.id !== 'report').map(action => createElement('button', {
       key: action.id, type: 'button', 'data-role': 'run-action', 'data-action': action.id, disabled: !action.enabled,
       title: action.disabledReason === undefined ? action.command : t('disabled.' + action.disabledReason),
       onClick: () => { if (action.enabled) copy(action.command) },
     }, t('action.' + action.id))),
+    createElement('details', { 'data-role': 'run-details' },
+      createElement('summary', null, t('run.details')),
+      ...internals),
   )
 }
+
 function ReadOnlySetting({ section, label, value, disabled, missing, note, link, t }: { section: string; label: string; value: boolean | undefined; disabled: boolean; missing: boolean; note?: string; link?: boolean; t: Translate }): ReactNode {
   const text = missing ? t('settings.capabilityMissing') : disabled ? t('settings.capabilityDisabled') : value === true ? t('settings.on') : t('settings.off')
   return createElement('div', { 'data-role': 'settings-section', 'data-section': section, 'data-disabled': missing || disabled ? 'true' : 'false' },
