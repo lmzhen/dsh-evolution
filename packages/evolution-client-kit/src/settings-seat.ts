@@ -47,8 +47,9 @@ export function createSettingsSeat(ctx: ContextLike): ConfigFormsSeat {
     get<T>(namespace: string): ConfigFormLike<T> | undefined {
       const cached = forms.get(namespace)
       if (cached !== undefined) return cached as ConfigFormLike<T>
-      const binder = ctx.get?.('settingsScope') as BinderLike | undefined
-      const connection = ctx.get?.('connection') as ConnectionLike | undefined
+      const direct = ctx as unknown as { settingsScope?: BinderLike; connection?: ConnectionLike }
+      const binder = direct.settingsScope ?? ctx.get?.('settingsScope') as BinderLike | undefined
+      const connection = direct.connection ?? ctx.get?.('connection') as ConnectionLike | undefined
       if (binder === undefined || connection === undefined) return undefined
       const scope = binder.bind({ namespace })
       const form: ConfigFormLike<T> = {
