@@ -19,3 +19,5 @@
 没有 `commands` 服务时整条命令不存在。
 
 分层/variant 的命令面差异单源在 [INSTALL.md](../INSTALL.md)。
+
+> 旧的 consolidate 已从用户面退役；合并请用 `merge`。

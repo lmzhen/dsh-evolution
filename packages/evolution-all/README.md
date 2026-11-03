@@ -17,3 +17,5 @@
 ## 边界
 
 审批默认关闭；健康面板默认关闭。
+
+> DEFAULT install: all = infra + model tools; host = shrink path.
