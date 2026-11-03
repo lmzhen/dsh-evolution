@@ -81,7 +81,10 @@ export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly
         ? createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision })
         : view === 'pending'
           ? createElement(PendingCard, props.pending)
-          : createElement('div', { hidden: false, className: 'evo-workbench-feature' }, props.renderSlot('evolution.workbench.view', { activeView: view })),
+          : null,
+      // The feature list stays mounted while another view is active; each view hides itself.
+      createElement('div', { hidden: view !== 'merge' && view !== 'health', className: 'evo-workbench-feature' },
+        props.renderSlot('evolution.workbench.view', { activeView: view })),
     ),
   )
 }
