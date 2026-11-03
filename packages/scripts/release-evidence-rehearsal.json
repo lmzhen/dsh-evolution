@@ -1,21 +1,21 @@
 {
-  "note": "W10/W11 rehearsal readings for v0.32.3, measured 2026-11-03 on an isolated 0.2.1-rc.3 web host (127.0.0.1:3083) from the npm-installed family; API readings in scripts/reports/real-host-0.32.3-2026-11-03/api-readings.json. S4 is the family-side dispose/re-apply contract test (live HMR needs a dev host).",
-  "familyVersion": "0.32.3",
+  "note": "W10/W11 rehearsal readings for v0.32.4, measured 2026-11-03 on an isolated 0.2.1-rc.3 web host (127.0.0.1:3086) from the 0.32.4 dist tarballs packed by tag run 41554904861. S4 is the family-side dispose/re-apply contract test (live HMR needs a dev host).",
+  "familyVersion": "0.32.4",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.32.3",
-      "startedAt": "2026-11-03T02:51:53.000+08:00",
+      "familyVersion": "0.32.4",
+      "startedAt": "2026-11-03T01:26:51.734Z",
       "readings": {
         "skillHistoryRows": 27,
-        "skillHistoryBytes": 22213,
+        "skillHistoryBytes": 22412,
         "ownerStatus": 200,
         "resolveBroken": false,
         "ensureIdempotent": true,
-        "note": "three consecutive owner GETs returned the same 27-row projection"
+        "note": "three consecutive owner GETs returned the same 27-row projection (identical sha256)"
       }
     },
     {
@@ -23,8 +23,8 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.32.3",
-      "startedAt": "2026-11-03T02:51:53.000+08:00",
+      "familyVersion": "0.32.4",
+      "startedAt": "2026-11-03T01:26:51.734Z",
       "readings": {
         "ownerDiagnostics": 200,
         "anonymous": 401,
@@ -37,11 +37,11 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.32.3",
-      "startedAt": "2026-11-03T02:51:53.000+08:00",
+      "familyVersion": "0.32.4",
+      "startedAt": "2026-11-03T01:26:51.734Z",
       "readings": {
         "semverVersion": "0.2.1-rc.3",
-        "familyVersion": "0.32.3",
+        "familyVersion": "0.32.4",
         "diagnosticsSchemaVersion": 2,
         "gridRows": 8,
         "expectedColumnMatches": true,
@@ -53,8 +53,8 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.32.3",
-      "startedAt": "2026-11-03T02:51:53.000+08:00",
+      "familyVersion": "0.32.4",
+      "startedAt": "2026-11-03T01:26:51.734Z",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
