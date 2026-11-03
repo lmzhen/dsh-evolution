@@ -18,7 +18,8 @@ import { createDiagnosticsApi } from './diagnostics-state.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
 import { ParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
-import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type ClientSeam, type ConfigFormsSeat, type ParamSectionSource } from './seam.ts'
+import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
+import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { SettingsSection } from './SettingsSection.ts'
 import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
 import { injectStyles } from './styles.ts'
@@ -102,7 +103,8 @@ export function apply(ctx: ClientContext): void {
   // and a captured `undefined` would pin every card to the empty state for the life of the
   // fiber. `sourceFor` reads the probe on each render, when the shell is necessarily active.
   // platform-declaration anchor: the platform’s `configForms` seat (optional; undefined ⇒ the panel renders read-only)
-  const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined
+  const seat = createSettingsSeat(ctx)
+  const probe: SeatProbe = () => seat
   const sources = createSourceCache(probe)
   ctx.effect(() => () => { sources.dispose() }, 'evolution-settings: sources')
   // T5-11/A66: the platform's own "this service arrived" channel. The lazy probe alone left a card
@@ -112,7 +114,7 @@ export function apply(ctx: ClientContext): void {
   // exposes this as `inject`; the seat is an optional one (a deployment may compose the family with
   // no settings surface), so it goes through a narrow structural view rather than a declared edge.
   const seatInjection = ctx as unknown as { inject?: (names: readonly string[], callback: () => void) => unknown }
-  seatInjection.inject?.(['configForms'], () => { sources.revive() })
+  seatInjection.inject?.(['settingsScope'], () => { sources.revive() })
 
   seam.slots.inject('settings.section', function* () {
     yield seam.slots.register({

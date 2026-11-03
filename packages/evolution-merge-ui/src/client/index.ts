@@ -1,9 +1,8 @@
 /** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
-import { panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
+import { createSettingsSeat, panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
-import type { ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, en, zh } from './messages.ts'
 import { MergePanel, type MergeFace } from './Panel.ts'
@@ -29,14 +28,13 @@ export function apply(ctx: ClientContext): void {
     component: MergeView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {
       const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
-      let seat: ConfigFormsSeat | undefined
-      try { seat = (ctx as unknown as { get?: (name: string) => unknown }).get?.('configForms') as ConfigFormsSeat | undefined } catch { seat = undefined }
+      const seat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
       const workspaceId = panelWorkspaceId(ctx)
       return {
         store: new MergeStore(source),
         t,
         doctorCommand: '/evolution doctor',
-        settings: { ...(seat === undefined ? {} : { merge: seat.get('evolution-merge'), platform: seat.get('evolution-approval') }) },
+        settings: { ...(seat.get('evolution-merge') === undefined ? {} : { merge: seat.get('evolution-merge')! }), ...(seat.get('evolution-approval') === undefined ? {} : { platform: seat.get('evolution-approval')! }) },
         ...(workspaceId === undefined ? {} : { workspaceId }),
       }
     },

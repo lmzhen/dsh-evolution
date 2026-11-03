@@ -79,6 +79,10 @@ function fakeShell(options: { seat?: boolean; refuseLocale?: boolean; seatArrive
   const injections: Array<() => void> = []
   /** Whether the settings seat is composed yet (T5-11/A66: it may arrive after this bundle). */
   let arrived = options.seatArrivesLater !== true
+  const snapshot = { status: 'ready', value: {}, base: undefined, user: {}, revision: 1, writable: true }
+  const scope = { getSnapshot: () => snapshot, subscribe: () => () => {}, load: async () => {}, set: async () => {}, unset: async () => {} }
+  const settingsScope = { bind: () => scope }
+  const connection = { api: { settings: { mutate: async () => ({ result: { ok: true } }) } } }
   const seat = fakeSeat()
   const ctx = {
     effect: (fn: () => unknown): (() => void) => {
@@ -98,7 +102,12 @@ function fakeShell(options: { seat?: boolean; refuseLocale?: boolean; seatArrive
     // runs on every read, so a fresh seat per call would hide a binding bug.
     // T5-11/A66: the seat can be absent at apply time and composed later, which is the shape the
     // arrival channel exists for.
-    get: (name: string) => name === 'configForms' && options.seat !== false && arrived ? seat : undefined,
+    get: (name: string) => {
+      if (options.seat === false || !arrived) return undefined
+      if (name === 'settingsScope') return settingsScope
+      if (name === 'connection') return connection
+      return undefined
+    },
     inject: (_names: readonly string[], callback: () => void) => { injections.push(callback) },
     slots: {
       inject: (_name: string, callback: () => Generator<unknown, void, unknown>): void => {

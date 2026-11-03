@@ -78,7 +78,7 @@ export type ConfigFormLike<T = Record<string, unknown>> = KitConfigFormLike<T>
  */
 export interface ConfigFormsSeat {
   /** One Host plugin entry id to its form. */
-  get<T>(entryId: string): ConfigFormLike<T>
+  get<T>(entryId: string): ConfigFormLike<T> | undefined
 }
 
 /** Registration options the keyed card slot under our own section takes. */

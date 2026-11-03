@@ -5,6 +5,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
+import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import { fill as settingsFill, message as settingsMessage, NS as SETTINGS_NS } from '../../settings/messages.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
@@ -87,11 +88,9 @@ export function apply(ctx: ClientContext): void {
     try { template = seam.locale.bind(SETTINGS_NS)(key) } catch { template = settingsMessage(key as never) }
     return values === undefined ? template : settingsFill(template, values)
   }
+  const settingsSeat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
   const confirmMode = (): 'auto' | 'ask' => {
-    try {
-      const form = (ctx as unknown as { get?: (name: string) => unknown }).get?.('configForms') as { get?: (ns: string) => { getSnapshot?: () => { user?: unknown } } } | undefined
-      return confirmModeFrom(form?.get?.('evolution-approval')?.getSnapshot?.().user)
-    } catch { return 'auto' }
+    try { return confirmModeFrom(settingsSeat.get('evolution-approval')?.getSnapshot().user) } catch { return 'auto' }
   }
   const pendingFace = (): PendingCardFace => ({ t: pendingT, api: createApprovalApi((input, init) => fetch(input, init)), confirmMode, fallback: FALLBACKS.approval })
   const label = (): string => t('entry.label')

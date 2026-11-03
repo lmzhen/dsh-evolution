@@ -136,7 +136,7 @@ export function sourceFor(probe: SeatProbe, namespace: string): ParamSectionSour
     const seat = probe()
     if (seat === undefined) return
     const next = seat.get<Record<string, unknown>>(namespace)
-    if (next === form) return
+    if (next === undefined || next === form) return
     // A replaced form means the old subscription belongs to a dead seat.
     offForm?.()
     offForm = undefined

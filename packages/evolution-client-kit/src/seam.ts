@@ -69,7 +69,7 @@ export interface ConfigFormLike<T = Record<string, unknown>> {
   /** Atomic multi-field save; `expectedRevision` is the read the caller is replacing. */
   mutate(ops: readonly ConfigPathOpLike[], expectedRevision?: number): Promise<boolean>
 }
-export interface ConfigFormsSeat { get(entryId: string): ConfigFormLike }
+export interface ConfigFormsSeat { get<T = Record<string, unknown>>(entryId: string): ConfigFormLike<T> | undefined }
 export interface SettingsFace {
   merge?: ConfigFormLike
   platform?: ConfigFormLike
