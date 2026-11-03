@@ -64,4 +64,4 @@ Preset bases and preconditions are single-sourced in [evolution-agent/README.md]
 
 ## Merge control axes
 
-The operator controls are `mergeApproval` and, for scan, the local model root `mergeModelsRoot`. Ordinary pair does not use that local screening dependency, but still requires the child-session model channel. `platformWrite` also appears in compatibility projections and run reports, but it is not a user configuration key or an admission check in the merge package; do not use it as proof that a write is permitted.
+The merge control model has three axes: merge-specific approval, host write capability, and the model path required by scan. The documentation and UI use `mergeApproval`, `platformWrite` for the first two, but they are not one switch. In the merge package, `platformWrite` is only a derived compatibility projection in run reports and snapshots, not a user configuration key or an admission check; host capability preparation is the actual write precondition. `mergeModelsRoot` applies to scan. Ordinary pair does not use that local screening dependency, but still requires the child-session model channel.
