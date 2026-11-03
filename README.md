@@ -1,19 +1,60 @@
 # dsh-evolution
 
-Memory and skill management for DeepSeek Harness.
+## What is this plugin for?
 
-## Purpose
+The plugin is designed to generate skills automatically and manage their full lifecycle, with an emphasis on retaining capabilities that are specific to a user and a project. It is task-oriented: the model builds and maintains a private set of skills for the user's environment, preferences and working procedures, improving its fit for those tasks.
 
-dsh-evolution preserves project facts across sessions and turns reusable task procedures into skills. It provides memory writes, skill generation and maintenance, task review, library curation, skill merging, write approval, versioned undo and diagnostics.
+That lifecycle includes creation, discovery, use, revision after review, restructuring, merging, archiving and restoration. These are independent capabilities rather than stages every skill must pass through. The plugin also provides budgeted memory for project facts and user preferences across sessions.
 
-It is intended for Harness users who maintain project conventions, working preferences and specialized procedures over time. It does not train a model or provide a hosted model service. Features that require model judgment use the model provider configured in DSH.
+It does not modify or train the model, and it does not provide a hosted model service. DSH's configured model performs the semantic work, while the plugin's write gates, snapshots, history and approval mechanisms constrain changes and recovery.
 
-## Memory and skills
+## What is a skill?
 
-- **Memory** stores project facts and user preferences, such as build commands, directory constraints and release requirements. Project memory and the user profile have separate character budgets and are injected into later sessions within those budgets.
-- **A skill** describes how to perform a class of task. It consists of a `SKILL.md` body and optional scripts, templates and reference files. The model discovers skills by name and description, then loads them when relevant.
+Early language models generated text autoregressively. Questions, instructions and answers were linked statistically, so prompts that described the domain, task and constraints precisely usually improved the result. That relationship was a foundation of early prompt engineering.
 
-Memory records which facts to retain; a skill records how to perform the work. MCP connects tools and resources, while a skill organizes the steps and completion criteria for using them.
+Chain-of-thought and stronger model capabilities reduced the need for exhaustive prompts in some single-step tasks: the model could recall terminology and conventions during reasoning. Tool calling then changed the objective again. Instead of producing one piece of content, the model had to complete a sequence of operations. Execution order, tool constraints, completion criteria and failure recovery still needed explicit instructions. The prompt increasingly resembled an operating manual rather than a complete description of one desired answer.
+
+Different tasks need different manuals, and they cannot all remain in context. One approach is to connect step-specific prompts and inputs and outputs into a fixed workflow. Another is to package a manual as a module that the model can discover by name and description and load when relevant. That module is a skill. In DSH, a skill normally consists of a `SKILL.md` body and optional scripts, templates and reference files, loaded through the native `skill` tool.
+
+Skills and MCP belong to different layers. MCP is a protocol for connecting tools and resources; a skill describes when to use those capabilities, in what order, and what counts as done. The plugin manages procedural knowledge, not tool connectivity itself.
+
+## Why build this plugin?
+
+Two related changes are taking place:
+
+1. **The marginal value of some general-purpose skills is falling.** Public, common operating procedures are increasingly being absorbed into model capability through training. Maintaining a separate manual for those tasks yields less benefit, although this does not make every general-purpose skill obsolete.
+2. **Models are becoming capable of extracting operating procedures from execution traces.** With real trajectories and clear feedback, a model can organize the steps, constraints and corrections from a task into a reusable skill. This plugin uses that capability during review and skill writing. The output still passes structural checks and may require human approval; it is not assumed to be correct merely because a model produced it.
+
+At the same time, every user's machine, project conventions, preferences and complex task details remain different. Once general capability is sufficient, the decisive knowledge is often valid only for one person or one project. A private skill set grows with task variety and complexity, and it also develops duplication, staleness and structural problems. Maintaining all of that manually does not scale.
+
+The plugin therefore uses the model's semantic ability to automate the generation and maintenance work that is suitable for automation, while retaining human control and recovery paths. Its objective is not unrestricted skill accumulation, but a useful, inspectable and maintainable private skill set built from real work.
+
+## How does it relate to memory plugins?
+
+The two are largely complementary. A typical memory plugin manages facts: who the user is, what the project is, and what was decided. This plugin is more concerned with process: how a class of task should be performed, in what order, and to what standard. It is intended primarily for people who use Harness to get work done.
+
+The plugin also contains a memory module, but its design differs from the familiar retrieve-on-demand, continuously growing model:
+
+- **Memory has a hard character budget.** The default budgets for project memory in `MEMORY.md` and the user profile in `USER.md` are 2200 and 1375 characters. If a batch would exceed the budget, it is refused rather than silently truncated. The model must delete or compact existing entries before adding new ones. After the budget is lowered, replacement can also be refused when an existing entry exceeds the new limit; deletion is then the recovery path.
+- **Memory is supplied as a snapshot instead of relying only on deliberate retrieval.** This keeps critical project facts visible during a task instead of depending on the model to search for them.
+
+Snapshot injection does not mean that every persisted byte necessarily reaches the model context. Entries matched by threat scanning are filtered, and abnormally large files are skipped. The character budget bounds injection size; it is not a guarantee that every task avoids performance loss or additional context cost. The design keeps critical facts within a bounded context while using skills to maintain procedural knowledge.
+
+## What capabilities does it provide?
+
+Each capability below has a corresponding code entry point. They have different triggers and should not be read as a pipeline that runs for every task.
+
+| Capability | Current behavior and defaults |
+|---|---|
+| Skill generation and updates | The agent can create and patch skills through `skill_manage`. By default, review prompts ask the model to generate or update skills at an interval of ten weighted tool calls after substantive cadence signals, delivered at a task boundary; a review does not have to produce a new skill |
+| Skill catalog and search | The full catalog is published by default and loaded through the native `skill` tool; `skill_search` provides local retrieval, while discovery domain cards and catalog trimming are off by default |
+| Library curation | Curator performs deterministic lifecycle maintenance on interval and idle conditions, marking stale skills and archiving them; LLM-nominated consolidation is a separate option |
+| Skill merge | Started with `/evolution merge scan` or `pair`. Scan requires local potion models and can fall back to stub without an LLM; ordinary pair does not require potion, but round 1/authoring requires a child-session model. Initiated runs are auto-approved by default, with `mergeApproval` available for manual approval |
+| Memory | Available in `all`, `preset` and selected layered-preset sessions. Project memory and user-profile budgets default to 2200 and 1375 characters; new writes are refused at the limit rather than silently truncated |
+| Write approval and recovery | Ordinary write approval is off by default and stages memory and skill writes when enabled; curator and merge use their own controls. Skill history, body undo, unit undo and archive restore have different scopes, and execution-time failures do not guarantee complete rollback |
+| Diagnostics and UI | `/evolution doctor`, curation reports, skill health and a knowledge graph are available; `all` provides settings, skill history and a merge panel on Web/desktop GUI, while the health panel is disabled by default |
+
+See [Feature reference](docs/features.md) for triggers, failure behavior and limits.
 
 ## Install
 
@@ -28,21 +69,6 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 For the desktop GUI, replace `--profile web` with `--profile desktop`. After installation, ask the agent to remember a project fact and open a new session to verify that it is injected. `doctor` checks the installation form and service state; it does not replace an actual read/write check.
 
 The full source layout reports<!-- gen:install-counts --> 35 packages installed (the published list is 36; the agent preset is separate)<!-- /gen:install-counts -->.
-
-## Capabilities
-
-| Capability | Current behavior and defaults |
-|---|---|
-| Memory | Available in `all`, `preset` and selected layered-preset sessions. Project memory and user-profile budgets default to 2200 and 1375 characters; new writes are refused at the limit rather than silently truncated |
-| Skill writes and versions | The agent can create, patch, split and archive skills; history, body undo and archive restore are available |
-| Skill catalog and search | The full catalog is published by default and loaded through the native `skill` tool; `skill_search` provides local retrieval, while domain cards and catalog trimming are off by default |
-| Task review | Enabled by default at an interval of ten weighted tool calls, delivered at a task boundary when substantive task signals are present; it uses the session model and can create a skill or prompt a patch to one used in the session |
-| Library curation | Deterministic curation marks stale skills and archives them on interval and idle conditions; LLM-nominated consolidation is a separate option |
-| Skill merge | Started with `/evolution merge scan` or `pair`. Scan requires local potion models and can fall back to stub without an LLM; ordinary pair does not require potion, but round 1/authoring requires a child-session model. Initiated runs are auto-approved by default, with `mergeApproval` available for manual approval |
-| Write approval | Off by default; when enabled, it stages ordinary memory and skill writes. Curator writes and merge commits do not use this approval path |
-| Diagnostics and UI | `/evolution doctor`, curation reports, skill health and a knowledge graph are available; `all` provides settings, skill history and a merge panel on Web/desktop GUI, while the health panel is disabled by default |
-
-See [Feature reference](docs/features.md) for triggers, failure behavior and limits.
 
 ## Installation forms
 
