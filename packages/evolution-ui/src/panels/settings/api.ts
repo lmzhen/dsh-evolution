@@ -19,6 +19,11 @@ export interface PendingRow {
   readonly age: { readonly unit: string; readonly n: number }
   readonly status: 'pending' | 'executing' | 'approved' | 'rejected'
   readonly claimedBy?: string | undefined
+  /** Structured summary from the host; absent on older rows. */
+  readonly verb?: string | undefined
+  readonly target?: string | undefined
+  readonly operationCount?: number | undefined
+  readonly actions?: readonly string[] | undefined
 }
 
 /** One windowed hunk of a previewed change: the region the write would touch. */

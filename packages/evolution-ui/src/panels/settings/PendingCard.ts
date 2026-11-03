@@ -59,6 +59,20 @@ const AGE_KEYS: Readonly<Record<string, MessageKey>> = Object.freeze({
 })
 
 /** Which word one staged kind gets. */
+/** Verbs the host can report; unknown verbs fall back to the raw word. */
+const VERB_KEYS: Readonly<Record<string, MessageKey>> = Object.freeze({
+  add: 'approvalVerbAdd',
+  create: 'approvalVerbCreate',
+  update: 'approvalVerbUpdate',
+  replace: 'approvalVerbUpdate',
+  patch: 'approvalVerbUpdate',
+  remove: 'approvalVerbRemove',
+  delete: 'approvalVerbDelete',
+  archive: 'approvalVerbArchive',
+  restore: 'approvalVerbRestore',
+  merge: 'approvalVerbMerge',
+})
+
 const KIND_KEYS: Readonly<Record<PendingRow['kind'], MessageKey>> = Object.freeze({
   memory: 'approvalKindMemory',
   skill: 'approvalKindSkill',
@@ -216,7 +230,9 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       return createElement('div', { className: 'evolution-param-field', key: entry.id },
         createElement('div', { className: 'evolution-param-label' },
           createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
-          createElement('span', { className: 'evolution-param-value' }, entry.summary)),
+          createElement('span', { className: 'evolution-param-value', title: entry.summary }, entry.verb === undefined || entry.target === undefined
+            ? entry.summary
+            : t(VERB_KEYS[entry.verb] ?? 'approvalVerbUpdate') + ' ' + entry.target + (entry.operationCount !== undefined && entry.operationCount > 1 ? ' ×' + String(entry.operationCount) : ''))),
         createElement('p', { className: 'evolution-param-hint' }, age(entry)),
         createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalExecuting')),
         entry.claimedBy === undefined ? null : createElement('p', { className: 'evolution-param-hint' }, entry.claimedBy),

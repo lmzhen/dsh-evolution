@@ -40,6 +40,11 @@ export interface PendingRow {
   readonly status: PendingStatus
   /** Present on a claimed-but-unfinished approve: the operator clears it by rejecting (doctor says so too). */
   readonly claimedBy?: string | undefined
+  /** Structured summary derived from the staged args; the raw summary stays for details. */
+  readonly verb: string
+  readonly target: string
+  readonly operationCount: number
+  readonly actions: readonly string[]
 }
 
 /**
@@ -67,6 +72,27 @@ export interface ApprovalFace {
  * reported the same way rather than escaping as an empty 500, because the operator's next step
  * ("reject it", "retry") is only actionable if the reason is visible.
  */
+function structuredOf(record: PendingRecord): { verb: string; target: string; operationCount: number; actions: readonly string[] } {
+  const args = record.args as { target?: unknown; operations?: unknown[]; action?: unknown; operation?: { action?: unknown; name?: unknown } } | undefined
+  if (record.kind === 'memory') {
+    const operations = Array.isArray(args?.operations) ? args.operations : []
+    const first = operations[0] as { action?: unknown } | undefined
+    return {
+      verb: typeof first?.action === 'string' ? first.action : typeof args?.action === 'string' ? args.action : 'update',
+      target: typeof args?.target === 'string' ? args.target : 'memory',
+      operationCount: operations.length === 0 ? 1 : operations.length,
+      actions: record.status === 'executing' ? ['release'] : ['approve', 'reject'],
+    }
+  }
+  const operation = args?.operation
+  return {
+    verb: typeof operation?.action === 'string' ? operation.action : 'update',
+    target: typeof operation?.name === 'string' ? operation.name : record.summary,
+    operationCount: 1,
+    actions: record.status === 'executing' ? ['release'] : ['approve', 'reject'],
+  }
+}
+
 async function decide(
   run: (id: string) => Promise<{ ok: boolean; message: string }>,
   id: string,
@@ -118,6 +144,7 @@ export function makeApprovalRoutes(approval: ApprovalFace, audit: DecisionAudit)
             age: elapsedSince(record.createdAt, Date.now()),
             status: record.status,
             ...record.claimedBy === undefined ? {} : { claimedBy: record.claimedBy },
+            ...structuredOf(record),
           }))
           return json(200, { ok: true, data: rows })
         } catch (error) {
