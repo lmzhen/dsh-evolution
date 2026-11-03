@@ -375,6 +375,7 @@ if (!existsSync(generated)) {
 } else {
   const view = readFileSync(generated, 'utf8')
   const cards = new Set([...view.matchAll(/namespace: '([^']+)'/g)].map(match => match[1]))
+  const platformCardSurface = !view.includes('CLIENT_ROW_SEATS')
   const seats = new Set([...view.matchAll(/^\s*\{ bundle: '[^']+', rows: \[([^\]]*)\]/gm)].flatMap(match =>
     match[1].split(',').map(part => part.trim().replace(/^'|'$/g, '')).filter(Boolean)))
   for (const owner of owners) {
@@ -383,6 +384,7 @@ if (!existsSync(generated)) {
   for (const row of seats) {
     if (!owners.has(row)) problems.push('client view: seat row "' + row + '" is not an owner the registry carries')
   }
+  if (platformCardSurface && seats.size > 0) problems.push('client view: platform-card surface must not carry bundle row seats')
   const patchOwners = new Set(packages.filter(pkg => pkg.manifest.dsh?.bundle?.patch !== undefined).map(pkg => pkg.manifest.name))
   for (const match of view.matchAll(/\{ bundle: '([^']+)'/g)) {
     if (!patchOwners.has(match[1])) problems.push('client view: seat bundle "' + match[1] + '" is not a family bundle package')
@@ -390,7 +392,7 @@ if (!existsSync(generated)) {
   // E5 (0.21.0 / G2): a card exists only for a row a bundle mounts. The row's `card` names its own
   // id, so a carded namespace missing from every seat is a card that can never render.
   for (const card of cards) {
-    if (!seats.has(card)) problems.push('client view: card namespace "' + card + '" is mounted by no bundle row — that card can never render (see scripts/bundle-rows.json)')
+    if (!platformCardSurface && !seats.has(card)) problems.push('client view: card namespace "' + card + '" is mounted by no bundle row — that card can never render (see scripts/bundle-rows.json)')
   }
   notes.push(owners.size + ' registered row(s), ' + cards.size + ' card(s), ' + seats.size + ' seat row(s)')
 }
