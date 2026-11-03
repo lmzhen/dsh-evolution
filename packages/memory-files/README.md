@@ -17,3 +17,7 @@
 ## 边界
 
 预算写满会拒绝，不会静默截断。
+
+## 维护者参考：参数别名（G0/S0.3）
+
+`memoryCharLimit` → `memoryChars`；`userCharLimit` → `userChars`。旧名仍可读，写入会拒绝。

@@ -17,3 +17,7 @@ all/分层预设才有；host 没有。
 ## 边界
 
 写入有保护；删除是归档。
+
+## 维护者参考：参数别名（G0/S0.3）
+
+`maxSkillContentChars` → `skillContentChars`。旧名仍可读，写入会拒绝。

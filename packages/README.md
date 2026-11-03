@@ -102,3 +102,7 @@ The install-form semantics and the variant command-face difference are single-so
 The family uses declared gates rather than trusting a green test run. A column nobody has written yet is not a pass; an unevaluated criterion is not a pass. Gate declarations live in `scripts/family-facts.json`; the command table lives in `CONTRIBUTING.md`.
 
 > 旧的 consolidate 已从用户面退役；合并请用 `merge`。
+
+## Configuration dials
+
+Maintainer map of the user-facing dials: **autonomy** (approval), **curatorBackground** (curator schedule), **memoryInjection** (memory prompt), **threatStrictness** (write scan). Each dial names fields that exist in the owning package; do not document a ghost field.

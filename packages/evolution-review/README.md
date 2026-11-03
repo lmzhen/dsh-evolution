@@ -17,3 +17,7 @@ Agent 干完一段活、达到节奏时。
 ## 边界
 
 子会话模式需要 agents；当前有已知通知边界。
+
+## 维护者参考：参数别名（G0/S0.3）
+
+`memoryInterval` → `reviewMemoryInterval`；`skillInterval` → `reviewSkillInterval`。旧名仍可读，写入会拒绝。

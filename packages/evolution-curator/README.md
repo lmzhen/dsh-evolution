@@ -17,3 +17,7 @@
 ## 边界
 
 先快照，删除是归档；不会硬删。
+
+## 维护者参考：参数别名（G0/S0.3）
+
+`intervalHours` → `curatorIntervalHours`。旧名仍可读，写入会拒绝。
