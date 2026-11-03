@@ -54,3 +54,13 @@ The three bundles insert the same infrastructure rows. Mounting two double-regis
 Fallbacks cover `approval`, `skill-history`, and `diagnostics`; current examples include `/evolution pending`, `/evolution restore`, `/evolution skills`, and `/evolution merge`. The generated table lives in evolution-client-kit; if a fallback names a retired command, treat it as a documentation defect.
 
 Preset bases and preconditions are single-sourced in [evolution-agent/README.md](evolution-agent/README.md).
+
+## Installer flags
+
+`install-layered.mjs` accepts: `--mode`, `--profile`, `--base`, `--home`, `--dry-run`, `--force`, `--check-presets`, `--uninstall`, `--help`.
+
+`--mode` chooses host/agent/layered/oneclick; `--base` is repeatable; `--dry-run` reports changes without writing.
+
+## Merge control axes
+
+The merge settings are three axes, not one switch: approval, platform-write capability, and the local model root. The two booleans are `mergeApproval`, `platformWrite`; the model root is `mergeModelsRoot`.
