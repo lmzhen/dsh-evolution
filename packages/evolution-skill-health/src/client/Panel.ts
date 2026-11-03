@@ -88,6 +88,15 @@ export interface HealthFace {
 /** Kinds in the order the summary reads them. */
 const KINDS = ['healthy', 'warn', 'needs-restructure', 'error', 'unreadable'] as const
 
+/** UI tone per verdict; the CSS keys are ok/warn/error/unreadable. */
+const TONE: Readonly<Record<HealthRow['verdict'], string>> = Object.freeze({
+  healthy: 'ok',
+  warn: 'warn',
+  'needs-restructure': 'warn',
+  error: 'error',
+  unreadable: 'unreadable',
+})
+
 /** One row per rule, with the skills that carry it — the view the report is actually read in. */
 function byRule(rows: readonly HealthRow[]): Array<{ rule: string; count: number; skills: string[] }> {
   const table = new Map<string, { rule: string; count: number; skills: string[] }>()
@@ -124,6 +133,10 @@ function skillQueue(face: HealthFace, t: (key: string) => string): ReactNode {
       createElement('span', { 'data-role': 'skill-verdict' }, t('verdict.' + row.verdict)),
       createElement('span', { 'data-role': 'skill-findings' }, row.findings.length === 0 ? t('findings.none') : row.findings.map(finding => finding.rule).join(' / ')),
       createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + ': ' + String(row.dims?.bodyChars ?? t('dims.unknown')) + ' · ' + t('dims.support') + ': ' + String(row.dims?.supportFiles ?? t('dims.unknown'))),
+      createElement('span', { 'data-role': 'skill-row-actions' },
+        createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(row.name) } }, t('action.history')),
+        createElement('button', { type: 'button', 'data-role': 'action-copy', onClick: () => { if (typeof navigator !== 'undefined' && navigator.clipboard !== undefined) void navigator.clipboard.writeText('/evolution skill history ' + row.name).catch(() => {}) } }, t('action.copy')),
+      ),
     )),
   )
 }
@@ -132,38 +145,22 @@ function skillQueue(face: HealthFace, t: (key: string) => string): ReactNode {
 function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
   const rows = byRule(face.rows)
   const cell = (role: string, children: ReactNode, key?: string): ReactNode =>
-    createElement('div', key === undefined ? { 'data-role': role } : { 'data-role': role, key }, children)
-  return createElement('div', { 'data-role': 'rule-table' },
-    createElement('div', { 'data-role': 'rule-row', 'data-role-head': 'true' },
-      createElement('div', { 'data-role': 'rule-name' }, t('col.rule')),
-      createElement('div', { 'data-role': 'skills' }, t('col.skills')),
-      createElement('div', { 'data-role': 'rule-count' }, t('col.count')),
-    ),
-    rows.map(entry => createElement('div', {
+    createElement('td', key === undefined ? { 'data-role': role } : { 'data-role': role, key }, children)
+  return createElement('table', { 'data-role': 'rule-table' },
+    createElement('thead', null, createElement('tr', { 'data-role': 'rule-head' },
+      createElement('th', { scope: 'col', 'data-role': 'rule-name' }, t('col.rule')),
+      createElement('th', { scope: 'col', 'data-role': 'skills' }, t('col.skills')),
+      createElement('th', { scope: 'col', 'data-role': 'rule-count' }, t('col.count')),
+    )),
+    createElement('tbody', null, rows.map(entry => createElement('tr', {
       key: entry.rule,
       'data-role': 'rule-row',
-      'data-tone': worstVerdict(face, entry.skills),
+      'data-tone': TONE[worstVerdict(face, entry.skills) as HealthRow['verdict']],
     },
     cell('rule-name', entry.rule),
     cell('skills', entry.skills.map((name, i) => createElement('span', { 'data-role': 'skill-pill', key: name + ':' + String(i), title: name }, name))),
     cell('rule-count', entry.count === 0 ? t('count.notCalibrated') : String(entry.count)),
-    )),
-  )
-}
-
-/** Per-skill actions: open history, copy the CLI command, and the disabled extract entry. */
-function skillActions(face: HealthFace, t: (key: string) => string): ReactNode {
-  const names = [...new Set(face.rows.map(row => row.name))]
-  const copy = (name: string): void => {
-    const text = '/evolution skill history ' + name
-    if (typeof navigator !== 'undefined' && navigator.clipboard !== undefined) void navigator.clipboard.writeText(text).catch(() => {})
-  }
-  return createElement('div', { 'data-role': 'skill-actions' },
-    ...names.map(name => createElement('div', { key: name, 'data-role': 'skill-action-row' },
-      createElement('span', { 'data-role': 'skill-action-name' }, name),
-      createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(name) } }, t('action.history')),
-      createElement('button', { type: 'button', 'data-role': 'action-copy', onClick: () => { copy(name) } }, t('action.copy')),
-    )),
+    ))),
   )
 }
 
@@ -231,7 +228,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
   // bar carries the severity. A verdict with no rows still shows its zero — silence would read as
   // 'not checked' rather than 'nothing found'.
   const stats = createElement('div', { 'data-role': 'stats' },
-    KINDS.map(kind => createElement('div', { key: kind, 'data-role': 'stat', 'data-tone': kind },
+    KINDS.map(kind => createElement('div', { key: kind, 'data-role': 'stat', 'data-tone': TONE[kind] },
       createElement('div', { 'data-role': 'stat-value' }, String(counts.get(kind) ?? 0)),
       createElement('div', { 'data-role': 'stat-label' }, t('verdict.' + kind)),
     )),
@@ -243,7 +240,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
       createElement('button', { type: 'button', 'data-role': 'refresh', disabled: loading, onClick: () => { load() } }, t('refresh')),
     ),
     createElement('p', { 'data-role': 'hint' }, t('hint')),
-    stats,
+    loading ? null : stats,
     loading ? createElement('p', { 'data-role': 'note' }, t('loading')) : null,
     view.truncated ? createElement('p', { 'data-role': 'note' }, t('scan.truncated')) : null,
     failed === undefined ? null : createElement('div', { 'data-role': 'note' }, failureBlock(t, failed)),
@@ -288,7 +285,6 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
     skillQueue(view, t),
     createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')),
     ruleTable(view, t),
-    skillActions(view, t),
     view.rows.filter((row: HealthRow) => row.verdict === 'unreadable').map((row: HealthRow) =>
       createElement('p', { key: row.name + ':unreadable', 'data-role': 'note' }, row.name + ' — ' + t('unreadable.note'))),
     view.rows.filter((row: HealthRow) => row.protection !== undefined && row.protection !== null).map((row: HealthRow) =>

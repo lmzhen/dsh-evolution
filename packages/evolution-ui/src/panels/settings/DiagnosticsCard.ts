@@ -62,6 +62,7 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   // card's own copy keys stay typed, so the two meet at this one boundary.
   const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => t(key as MessageKey, values)
   const [state, setState] = useState<DiagnosticsState>({ phase: 'loading' })
+  const [refreshing, setRefreshing] = useState(false)
   // Collapsible like every other card in the section (same head geometry, same chevron); it starts
   // open because its summary IS the reading the reader opened the section for.
   const [open, setOpen] = useState(true)
@@ -71,11 +72,12 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   const read = (keepView: boolean): void => {
     const current = ticket.current + 1
     ticket.current = current
-    if (!keepView) setState({ phase: 'loading' })
+    if (keepView) setRefreshing(true)
+    else setState({ phase: 'loading' })
     void api.view().then((answer) => {
       if (ticket.current !== current) return
       setState(answer.ok ? { phase: 'ready', view: answer.data } : { phase: 'failed', failure: answer.failure })
-    })
+    }).finally(() => { if (ticket.current === current) setRefreshing(false) })
   }
   useEffect(() => {
     read(false)
@@ -121,7 +123,7 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
     return createElement('div', {},
       createElement('p', { className: 'evolution-param-note' }, t('diagSubtitle')),
       createElement('div', { className: 'evolution-param-actions' },
-        createElement('button', { type: 'button', className: 'evolution-param-button', onClick: refresh, 'data-action': 'diag-refresh' }, t('diagRefresh')),
+        createElement('button', { type: 'button', className: 'evolution-param-button', onClick: refresh, disabled: refreshing, 'data-action': 'diag-refresh' }, t(refreshing ? 'diagRefreshing' : 'diagRefresh')),
       ),
       runtime(view),
       view.runtime.length === 0 ? createElement('p', { className: 'evolution-param-note' }, t('diagNoRows')) : null,
