@@ -1,5 +1,5 @@
 /** Batch 4 merge panel: keyed read store, four tabs, local overlays, localized errors. */
-import { createElement, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type DragEvent, type MouseEvent, type ReactNode } from 'react'
+import { createElement, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
@@ -192,7 +192,13 @@ function rowNode(row: MergeRowView, store: MergeStore, t: Translate, copy: (comm
   }, t('action.' + action.id)))
   return createElement('div', {
     key: row.id, 'data-role': 'row', 'data-row-id': row.id, 'data-row-state': row.state, 'data-row-queue': row.queue,
-    draggable: true, title: t('sort.drag'),
+    draggable: true, tabIndex: 0, title: t('sort.drag'), 'aria-haspopup': 'menu',
+    onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
+      event.preventDefault()
+      const box = event.currentTarget.getBoundingClientRect()
+      sort.menu(row.id, box.left + 12, box.top + 12)
+    },
     onDragStart: (event: DragEvent<HTMLDivElement>) => { if (event.dataTransfer != null) { event.dataTransfer.setData('text/plain', row.id); event.dataTransfer.effectAllowed = 'move' } sort.start(row.id) },
     onDragOver: (event: DragEvent<HTMLDivElement>) => { event.preventDefault(); if (event.dataTransfer != null) event.dataTransfer.dropEffect = 'move'; sort.over(event) },
     onDrop: (event: DragEvent<HTMLDivElement>) => { event.preventDefault(); sort.drop(row.id) },
@@ -331,7 +337,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const activeFailure = viewFailure !== undefined ? viewFailure : queue.status === 'error' ? queue.failure : undefined
   const overlay = snapshot.overlay
   const menuStyle = menu === undefined ? undefined : {
-    position: 'fixed', zIndex: 70, minWidth: 'var(--evo-measure-read)',
+    position: 'fixed', zIndex: 70, minWidth: '160px', maxWidth: 'min(320px, calc(100vw - 16px))',
     left: String(Math.min(menu.x, Math.max(0, (globalThis.innerWidth || 1440) - 180))) + 'px',
     top: String(Math.min(menu.y, Math.max(0, (globalThis.innerHeight || 800) - 110))) + 'px',
   }
