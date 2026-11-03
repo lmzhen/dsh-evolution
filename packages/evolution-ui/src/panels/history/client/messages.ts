@@ -190,9 +190,8 @@ export const en: Record<string, string> = {
  * @param key - the message key.
  * @returns the copy, or the key itself when neither dictionary carries it.
  */
-export function message(key: string, language: 'zh' | 'en' = 'en'): string {
-  // G5: the fallback is the PLATFORM's FALLBACK_LOCALE (`DEFAULT_CASES`/`en` in dsh-client-locale),
-  // not Chinese: an unknown or absent locale must read English, like every other platform surface.
+export function message(key: string, language: 'zh' | 'en' = 'zh'): string {
+  // The fallback is the platform's FALLBACK_LOCALE (zh), shared by every family panel.
   const dictionary = language === 'zh' ? zh : en
   return dictionary[key] ?? key
 }

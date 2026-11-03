@@ -115,13 +115,12 @@ describe('skill-history client bundle: what it contributes, and what it takes ba
     expect(document.querySelectorAll('style[data-plugin-css]')).toHaveLength(1)
     // Reported, not swallowed: the failure names the namespace and says what the reader now sees.
     expect(seams.warnings.some(line => line.includes(NS) && line.includes('falls back to the bundle'))).toBe(true)
-    // The label resolves through the bundle's own copy instead of the raw key name, and that copy is
-    // the ENGLISH one: the platform's FALLBACK_LOCALE is `en` (dsh-client-locale), so an absent or
-    // refused locale seat must read English, not Chinese.
+    // The label resolves through the bundle's own copy instead of the raw key name; the family
+    // uses the platform FALLBACK_LOCALE (zh) for every panel when no locale seat answers.
     expect(seams.rows[0]?.label()).not.toBe('entry.label')
     expect(seams.rows[0]?.label()).toBeTypeOf('string')
-    expect(seams.rows[0]?.label()).toBe(en['entry.label'])
-    expect(seams.rows[0]?.label()).not.toBe(zh['entry.label'])
+    expect(seams.rows[0]?.label()).toBe(zh['entry.label'])
+    expect(seams.rows[0]?.label()).not.toBe(en['entry.label'])
   })
 
   it('leaves nothing behind when the bundle is disposed', () => {

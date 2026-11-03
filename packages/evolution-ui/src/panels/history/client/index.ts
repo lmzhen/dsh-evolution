@@ -46,7 +46,6 @@ export function apply(ctx: ClientContext): void {
     order: PANEL_ORDER,
     namespace: NS,
     dictionaries: { zh, en },
-    fallback: 'en',
     styles: { css: CSS, tagId: CSS_TAG_ID },
     icon: PanelIcon,
     component: SkillHistoryPanel as unknown as (props: never) => ReturnType<typeof createElement>,

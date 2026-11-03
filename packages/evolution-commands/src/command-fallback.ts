@@ -29,7 +29,7 @@ export const COMMAND_FALLBACKS: Readonly<Record<CommandFallbackSurface, CommandF
     command: '/evolution pending … /evolution approve <id> … /evolution reject <id> … /evolution release <id>',
   },
   'skill-history': {
-    command: '/evolution restore <name> [v]（查看：/evolution skills history <name>）',
+    command: '/evolution skill undo <name> [--to v<N>]（查看：/evolution skill history <name>）',
   },
   'skill-health': {
     command: '/evolution skills refresh（健康行：/evolution doctor）',
