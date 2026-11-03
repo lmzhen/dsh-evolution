@@ -4,130 +4,105 @@
 
 ## What this plugin is for
 
-dsh-evolution is built around **automated skill generation and full-lifecycle skill management**. It is for accumulating personal capability, not for making a model better at casual conversation.
+The first time you ask an agent to do something, you explain a lot: which package manager the project uses, what checks must pass before a release, which directory not to touch, where to look when something fails. By the tenth time, those explanations have settled, but the model still does not know them. You repeat yourself, or you do the work yourself.
 
-The model should get better at doing work *your* way: your machine, project conventions, habits, and the details of your recurring tasks. Once general capability is strong enough, the valuable layer becomes a private skill set that grows with the variety and complexity of your work. Managing that set by hand does not scale.
+A general model can learn how to publish an npm package. It cannot know that your repository requires three specific scripts before a release, or that one branch must never be touched. That is not general capability; it is process knowledge that only holds for this person and this project. dsh-evolution is meant to keep that kind of knowledge: it turns a working practice into a skill, brings the skill back on the next similar task, and lets it be revised or retired as the work changes.
 
-The plugin treats skill creation, use, review, patching, splitting, merging, archiving and restoring as a set of auditable capabilities, not a fixed sequence. It uses the model's semantic ability to run them where possible, gives the user a choice to approve critical writes, and makes deletion an archive rather than a hard delete.
+It is not a plugin for making the model smarter, and it is not a general skill marketplace. It is a private skill mechanism for people who use Harness to get work done, not for casual chat.
 
 ## What is a skill?
 
-Early language models rewarded precise prompts: a more professional question or instruction usually produced a more professional answer. That was the era of prompt engineering.
+Prompt engineering began as a way to state a request precisely: persona, task, format, examples, all in one prompt. The more professional the prompt, the more professional the answer tended to be.
 
-Chain-of-thought changed the economics of single-step generation: the model can recall relevant terminology and standards inside its reasoning, so a fully specified persona-and-task prompt matters less. Tool calling then changed the task shape again. The model now completes a sequence of operations, and it still needs to know what to do first, what comes next, when it is done, and how to recover. The prompt becomes less like a character sheet and more like an **operating manual**.
+Chain-of-thought changed the economics of single-step generation. The model could recall terminology and standards inside its reasoning, so a fully specified persona-and-task prompt mattered less. Tool calling changed the shape of the work again. The model now completes a sequence of operations, and it still needs to know what comes first, what comes next, what counts as done, and how to recover. At that point the prompt looks less like a character sheet and more like an operating manual.
 
-Different tasks need different manuals, and they cannot all live in the context window. The common industrial answer is to give the model different prompts per scenario and per step, wiring inputs and outputs into fixed workflows. Once models can select capabilities by name and description, another option appears: package the instructions themselves as a module that is discovered and loaded on demand. **A skill is such a packaged operating manual, plus the scripts, templates and reference files it needs.** The model finds it by name and description, loads it when relevant, and follows its steps.
+Different tasks need different manuals, and they cannot all live in the context window. The usual industry answer is to give the model different prompts per scenario and per step, wiring inputs and outputs into fixed workflows. Once a model can select capabilities by name and description, another option appears: package the instructions themselves as a module that is discovered and loaded on demand. A skill is that module: an operating manual for the model, plus the scripts, templates and reference files it needs. The model finds it by name and description, loads it when relevant, and follows its steps.
 
 MCP and skills are not the same thing. MCP is a protocol for connecting tools and resources. A skill is the layer that tells the model when and in what order to use those tools, and what "done" means for this task.
 
 ## Why this plugin exists
 
-Two changes are happening at the same time:
+Two changes are happening at once.
 
-1. **Generic skills are being absorbed into model capability.** Public, widely useful manuals increasingly become part of what the model already knows. One-shot completion of generic tasks is becoming normal, and the marginal value of a generic skill falls.
-2. **Models can now extract skills from execution traces.** Given real trajectories and clear feedback, a capable model can produce a usable operating manual.
+First, the value of generic skills is falling. Public, widely useful manuals are being absorbed into model capability. One-shot completion of generic tasks is becoming normal, and a separate generic skill buys less and less.
 
-The consequence: **the marginal value of generic skills is falling; private skills are becoming the differentiator.**
+Second, models can now extract skills from execution traces. Given real trajectories and clear feedback, a capable model can produce a usable manual. Work that used to require a person to organize is now partly within the model's reach.
 
-Real environments differ. Machines, project conventions, personal preferences and the details of complex tasks vary from user to user. After general capability is sufficient, the difference between a good and a mediocre result is often this private process knowledge. That knowledge grows, changes shape, and cannot be curated by hand. The plugin automates its generation and lifecycle with the model's semantic ability, while approval, versions, archives and undo keep the automation from running out of control.
+The conclusion is not that skills are dead. It is that generic skills matter less and private skills matter more. Every user has a different machine, project, set of preferences and set of task details. After general capability is sufficient, the difference between a good and a mediocre result is often knowledge that only holds for that person or that project. That knowledge grows, changes shape, duplicates itself and goes stale. Curating it by hand does not scale.
+
+The plugin hands that work to the model's semantic ability, while keeping the automation bounded: writes pass gates, deletions can be recovered, and the user can step in at the points that matter.
 
 ## How it relates to memory plugins
 
-They are almost entirely complementary.
+They are mostly complementary.
 
-A typical memory plugin manages **facts**: who the user is, what the project is, what was decided. That helps in conversation and in task execution alike. This plugin manages **process**: how a job should be done, in what order, and to what standard. It is mainly for people who use Harness to get work done.
+A memory plugin manages facts: who the user is, what the project is, what was decided. That helps in conversation and in task execution alike. This plugin manages process: how a job should be done, in what order, and to what standard. It is for people who use Harness to finish work.
 
-The plugin does include a memory module, but it deliberately inverts the usual "retrieve on demand, grow without bound" design:
+The plugin does include a memory module, but it deliberately goes against the usual "retrieve on demand, grow forever" design. Memory has a hard character limit: once it is full, new writes are refused, and the model must delete, compact or merge existing entries before writing again. Memory is also injected in full, not retrieved on demand. The reason is simple: this is a task-oriented plugin. If a critical fact is only fetched "when needed," the model may never see it. Full injection guarantees it sees the fact, and the hard limit keeps the injection bounded, so it does not drown the context or burn an unreasonable number of tokens.
 
-- **A hard character cap.** When the cap is reached, new writes are refused; the model must delete, compact or merge existing entries to make room before writing again.
-- **Full injection into the context.** Memory is not retrieved on demand; it is injected in full. For a task-oriented plugin, a critical fact that is only fetched "when needed" may never be seen. Full injection guarantees the model sees it, and the cap keeps the injection bounded: large enough not to lose the essentials, small enough not to hurt model performance or blow up context cost.
+The trade-off is deliberate: memory should be small and complete; skills should be specific rather than generic.
 
-The trade-off is deliberate: **memory should be small and complete; skills should be specific rather than generic.**
+## What it can do with skills
 
-## What skill-facing capabilities does it provide?
+These capabilities share one job: skills form while work is happening, then get used and maintained. The starting point is a review at a threshold. When a task has run long enough, the review decides whether the process contains something worth keeping. If it does, the model creates or updates a skill. Everything else exists to make that loop work.
 
-First, a correction: **a skill is not a pipeline.** Creation does not have to follow use, review does not always produce a skill, curation may not run for weeks, and merging only matters once duplicates have accumulated. Presenting these as `create, use, review, patch, split, merge, archive, restore` suggests a sequence every skill must follow; in practice they are different work surfaces used by different actors at different times.
+| Part | Role | What the user sees |
+|---|---|---|
+| Automatic generation | Main loop | A review at a threshold; if the work contains a reusable practice, a skill is created or updated |
+| Use | After generation | The model finds and loads the relevant skill on the next similar task |
+| Update after use | After a task | A skill used in the session turns out to be incomplete or outdated; the review patches it |
+| Structure | On demand | A skill that is too long or overlapping is split, merged or rewritten |
+| Lifecycle | Long term | Stale or duplicate skills are archived or deduplicated, and can be restored |
+| Safety | Read/write boundary | Checks before writes; optional approval; versions, undo and restore |
+| Diagnosis | Support | Doctor and reports show status, structure and relationships |
 
-The useful split is by responsibility:
+### Automatic generation: from work to skill
 
-| Surface | Who/when | Output | Current boundary |
-|---|---|---|---|
-| Authoring | explicit user request, or the agent judges a workflow worth keeping | new skill, rewrite, patch, support files | create/edit/archive exist; versions and undo are the necessary companion |
-| Retrieval | when the library grows and the full catalog stops fitting well | search results, domain cards, a trimmed catalog | `skill_search` works independently; domain cards need discovery, off by default |
-| Structure | on demand, when a skill is too long, overlapping or outdated | split, merge, migrated skill | merge is a separate flow; it does not use the ordinary write approval |
-| Curation | time/idle schedule | stale/archive, near-duplicate merge | scheduling and reports exist; notification/inbox is incomplete |
-| Control | every write; approval when enabled | gates, approval, versions, undo | approval covers staged memory/skill writes only |
-| Diagnosis | troubleshooting and long-term maintenance | status, health, references, relationships | reports only; doctor cannot replace a real write test |
+By default, after roughly ten tool calls and at the end of a task, a review looks at the session and asks whether it contains a reusable practice. If it does, the model creates a skill or updates an existing one. The threshold and trigger can be adjusted, but the order is fixed: a real task trajectory comes first, and the decision to keep something comes second.
 
-The six surfaces are not equally mature: authoring and versioned rollback are relatively complete; retrieval, domain cards, curation notifications, merge defaults and cross-form UI are still basic or conditional. This section describes the division of responsibility, not a claim that every surface is finished.
+The model does the writing; the user does not call a write tool. Restructuring is used only when a skill is too long, and checks and versions exist so that automatic writes can be reversed. What the user gets is not "a tool was called"; it is a usable practice the next time the same kind of task comes up.
 
-### 1. Authoring: turn experience into a skill, or change an existing one
+### Use: let the model find it next time
 
-This is the write surface. It answers: how does a working practice become something the model can reuse?
+Once a skill exists, the next problem is discovery. By default, the plugin publishes the whole skill catalog to the platform, and the model loads a skill body by name through the native `skill` tool. The plugin does not trim the catalog on demand.
 
-- The user asks for a skill to be written, or the agent decides a workflow is worth keeping;
-- `skill_manage` creates, edits, patches and archives skills; support files under references, scripts, templates and assets are written here too;
-- a long skill can be split: `restructure` moves sections into references, `extract` turns a section into a child skill or reference;
-- every write goes through the gates and leaves a version; deletion is an archive.
+As the library grows, a full catalog stops being a good deal. At that point `skill_search` can retrieve candidates, and discovery's domain cards and catalog trimming can change what the model sees at once. That second option is off by default and depends on model and projection conditions. It solves "how to find something in a large library," not "guarantee the right skill is chosen"; execution still belongs to the model and the tools it calls.
 
-This surface is about writing the skill correctly. It does not make the skill visible to the model, and it does not clean up old skills.
+### Update after use: write the correction back
 
-### 2. When the library grows: an optional retrieval/trimming mode
+A review does more than create new skills. It checks which skills were actually loaded or used in the session. If one is missing a step, has gone stale, or conflicts with the user's preferences, the review patches that skill before considering a new one. A new skill is created only when no existing skill can absorb the lesson.
 
-This surface is not about "making the model use the right skill at the right time." It answers a narrower question: **when automatically generated skills become numerous enough that handing the model the full catalog stops working well, is there an alternative mode?**
+This is not a live edit in the middle of a task. The fix lands at the next review, triggered by the threshold or the end of the task. The review only changes skills it actually loaded or used; creating a new skill for a new class of task is the exception. In the current implementation, "used" is tracked mainly through the platform's `skill` tool. Whole-library views through management tools do not count as a per-skill read, and direct writes are not hard-blocked; they still depend on the model following the read-before-write rule. That is the current boundary.
 
-- By default, the plugin publishes the skill tree to the platform catalog; the model loads the full body by name through the platform's native `skill` tool. By default it publishes the visible skill catalog and does not trim it on demand.
-- As the library grows, `skill_search` provides retrieval, and discovery's domain cards/trimming provide another organization, so the model does not have to see every skill at once.
-- This is not the default path: `skill_search` is a separate tool; domain cards and trimming require discovery to be enabled and depend on model/projection conditions. Discovery is off by default.
+### Structure: split, merge, rewrite
 
-So this is a **conditional, optional capability**, not a guarantee that the plugin picks the right skill on every task. If the model did not load a skill, that may be a weak description, a trigger mismatch, or simply a task that did not need it. The plugin supplies the catalog, body, search and trimming; execution is still done by the model and the tools it calls.
+A generated skill will not always have the right shape. If it is too long or covers too many jobs, split it. If two skills overlap heavily, merge them. If a skill uses an old format, path or section structure, rewrite or migrate it.
 
-### 3. Structural refactoring: split, merge, migrate
+These are on-demand repairs, not steps every skill must go through. Splitting and rewriting go through normal writes; the split and extract commands under `/evolution` are a separate path, and their approval point is not necessarily identical. Merge is its own flow, with candidate screening, a commit and a receipt; it does not use ordinary write approval.
 
-This surface answers: the skill exists, but its shape is wrong. It is an on-demand edit, not a daily lifecycle step.
+### Lifecycle: libraries age
 
-- **Split**: a skill is too long or covers too many jobs; create a parent and children, or move details into references;
-- **Merge**: two skills overlap heavily; combine them into one more complete skill;
-- **Rewrite/migrate**: bring old formats, paths or section structures into the current shape; today this is done mainly through rewrite/patch, not a separate migration engine.
+After a while, the problem shifts from "what should be written" to "what should stay."
 
-Splitting and rewriting through `skill_manage` use the ordinary write gates, approval and versions; `restructure`/`extract` from `/evolution` are a separate command path, and their approval point should not be assumed identical to `skill_manage`. Merge is a separate flow with its own candidate screening, commit and receipt; it is not covered by the ordinary write approval. A merge is not "the end of the lifecycle"; it is one restructuring of duplicate material. These operations usually appear after a library has grown, not for every skill.
+The curator marks stale skills and archives them on a time and idle schedule, and merges near-duplicates. It snapshots first; on failure it writes a report and does not roll back the whole tree. Restore is explicit. Deletion is an archive, not a hard delete.
 
-### 4. Keeping the library usable
+Pin and protection markers are meant to keep selected skills out of automatic curation. The exact coverage depends on the current implementation. Curation has scheduling and reports, but notification and explanation are incomplete: a run may not announce itself in the conversation, and a skill may simply disappear from the list.
 
-This surface answers: which skills are still useful, and which should leave.
+### Safety: where automation stops
 
-- usage evidence comes from views, patches and support-file reads;
-- the curator marks stale skills and archives them on a time/idle schedule, and merges near-duplicates; it archives rather than hard-deletes;
-- pin/protection markers are intended to keep selected skills out of curation; the exact coverage depends on the current implementation;
-- health, drift and graph views are observations: they report, they do not repair.
+Automatic generation means the model judges and writes on its own, so the write boundary matters.
 
-The distinction is: **refactoring changes the shape of one skill or a group; curation decides which skills remain in the library.** Merging happens when there is duplication; curation happens when skills go unused or degrade. They are not consecutive steps on one line.
+The question is not whether the user trusts the model. It is where automation should stop when the model makes more semantic decisions and the user has limited time and attention. Low-risk, reversible actions can run automatically. Critical writes can wait for a person. Skill writes leave versions; deletion is an archive; one skill can be undone and the whole tree restored. Writes pass structural gates, policy protection and threat scanning.
 
-The current implementation already has scheduled curation and reports, but notification/explanation is incomplete: a curation run may not announce itself in the conversation, and a skill may simply disappear from the list. This surface is closer to "background execution plus reports" than to a complete inbox experience.
+The current implementation does not fully deliver that balance. Approval is off by default and covers only staged memory/skill writes. The curator's and merger's own writes do not pass through it. Pending work is mainly visible in forms that have a settings page; notification and an inbox are incomplete.
 
-### 5. Balancing semantic automation with user attention
+### Diagnosis: check that it is working
 
-This surface is not "why should the user trust the model?" It is the more practical question: **when the model makes more and more semantic decisions and the user's time and attention are limited, how do we keep automation inside the range the user is willing to accept?**
+`/evolution doctor` shows the install form, version, connections and service state. It cannot prove that memory/skill tools actually work; a real write or edit is still the test.
 
-The design split is:
+Health, drift, the knowledge graph and reports show another layer: structure, references, usage and relationships. They are for troubleshooting and long-term maintenance, not daily entry points, and they do not repair anything automatically.
 
-- low-risk, reversible actions can be automatic, so the user does not approve every detail;
-- critical writes can wait for human confirmation, saving attention for the moments that matter;
-- skill writes leave versions; deletion is an archive; a single skill can be undone, the whole tree restored;
-- writes pass structural gates, policy protection and threat scanning;
-- reports and diagnostics try to explain what happened, instead of making the user infer it from results.
-
-The current implementation does not fully deliver that balance: approval is off by default, covers only staged memory/skill writes, and does not cover the curator's or merger's own writes; pending work is mainly visible in forms that have the settings page, without a complete notification/inbox; explainability is concentrated in reports and commands rather than every action. This section describes the design direction and current coverage, not a claim that the balance is complete.
-
-### 6. Observation and diagnosis
-
-This surface answers: what is going on right now?
-
-- `/evolution doctor` shows install form, version, connections and service state; it cannot prove that memory/skill tools actually work, so a real write or edit is still the verification;
-- health, drift, graph and reports show structure, references, usage and relationships;
-- these are for troubleshooting and long-term maintenance, not daily task entry points, and they do not replace a real write test.
-
-**In one line: authoring keeps the practice, retrieval keeps a large library findable, refactoring gives it the right shape, curation decides what stays, control makes it reversible, and diagnosis explains it.** They can be combined in any order; they are not six mandatory stages.
+These capabilities have a natural order in use, but not a mandatory workflow, and they are not equally mature. Automatic generation and versioned rollback are the main path; retrieval, domain cards, curation notifications, merge defaults and cross-form UI are still basic or conditional.
 
 ## Install
 
@@ -141,73 +116,55 @@ After the restart, ask the agent to remember something:
 
 > Remember that this repository uses pnpm and tests run with `pnpm test`.
 
-Then open a new session. The fact is already there. That is the smallest useful loop: **remember, reuse, improve**.
+Open a new session. If the fact is still there, the basic loop works. Try the rest after that.
 
-## Four ways to use it
+## Forms
 
-| What you want | Install | What you get |
+| What you want | Install | What changes |
 |---|---|---|
-| The full experience (recommended) | `@lmzhen/dsh-evolution-all` | memory and skill tools in every session, plus settings and panels |
-| Automation only, no model write tools | `@lmzhen/dsh-evolution-host` | curation and reports run; the agent cannot write memory/skills, and review/usage do not apply |
-| Tools only in selected sessions | `host` + `agent-preset` + `/evolution preset install` | the Evolution preset carries the tools; other sessions stay untouched |
-| Old one-click setup | `@lmzhen/dsh-evolution-preset` | compatibility form; no settings or sidebar panels |
+| Full use | `@lmzhen/dsh-evolution-all` | memory and skill tools in every session, plus settings and panels |
+| Automation only | `@lmzhen/dsh-evolution-host` | curation and reports run; the agent cannot write memory/skills, and review/usage do not run |
+| Tools in selected sessions | `host` + `agent-preset` + `/evolution preset install` | only sessions using the Evolution preset get the tools |
+| Migration from the old setup | `@lmzhen/dsh-evolution-preset` | close to all, without the settings page or three sidebars |
 
-Do not mount two forms in one profile. Uninstall one before installing another. The precise per-form semantics live in [packages/INSTALL.md](packages/INSTALL.md); this page does not restate them.
+Only one form per profile. Uninstall before switching. The exact differences are in [packages/INSTALL.md](packages/INSTALL.md).
 
-## What you will actually use
+## Day to day
 
-### Memory
+Memory is the simple part. Ask the agent to remember a fact, or let it decide one is worth keeping. It writes to `MEMORY.md` and `USER.md` under `$DSH_HOME/memories/`, and later sessions get a snapshot. The budget is configurable in settings.
 
-Ask the agent to remember a fact, or let it notice one. It writes `MEMORY.md` / `USER.md` under `$DSH_HOME/memories/`; later sessions get a short snapshot automatically. You can cap the size in settings (all + Web setup).
+Skills are the working part. The agent writes a repeated procedure down, then patches, splits or archives it. Use `/evolution skill history <name>` to inspect versions and `/evolution skill undo <name>` to go back. Deletion is an archive.
 
-### Skills
+Review and curation run in the background. Review adds one model round at the end of a task, after roughly ten tool calls by default; raise the interval or turn it off if that is too much. Curation archives stale skills and merges near-duplicates on a time and idle schedule. It snapshots first and archives instead of deleting. It may not announce itself in the conversation, so check `/evolution curator status` and `/evolution curator report`.
 
-Ask the agent to turn a repeated procedure into a skill. It can create, patch, split, merge and archive skills. Use `/evolution skill history <name>` and `/evolution skill undo <name>` when a change was wrong.
+Merge is separate. When two skills overlap, they can be combined. The default accepts and writes the merge automatically; turn on `mergeApproval` if you want to confirm each one. It needs a local merge model and will not download one. Merge has its own flow and does not use ordinary write approval.
 
-### Review
+Approval is off by default. When on, it covers staged memory/skill writes only; the curator's and merger's own writes do not go through it. The everyday commands are `/evolution pending`, `/evolution approve <id>` and `/evolution reject <id>`.
 
-At natural checkpoints the agent reviews what just happened and proposes an improvement. It runs in the session by default; it is not a per-message interruption. You can change the cadence or turn it off.
+## Commands
 
-### Curation
-
-A periodic curator marks stale skills, archives what stopped being used, and merges near-duplicates. It snapshots first and archives instead of hard-deleting. Use `/evolution curator status` and `/evolution curator report` to see what it did.
-
-### Merge
-
-If you enable merging (it needs a local model), overlapping skills can be proposed for a merge. By default the merge is accepted automatically and committed; turn on approval if you want to approve or reject each one. The result can be undone. The merge panel is read-only; it shows the queue and copies the command.
-
-### Approval
-
-Approval is off by default. Turn it on when you want every memory/skill write to wait for you. Then `/evolution pending`, `/evolution approve <id>` and `/evolution reject <id>` are the whole workflow.
-
-## Everyday commands
-
-| Command | When to use it |
+| Command | When you need it |
 |---|---|
 | `/evolution doctor` | after install/upgrade, or when something looks missing |
 | `/evolution pending` | see writes waiting for approval |
 | `/evolution skill history <name>` | inspect or undo a skill change |
-| `/evolution curator status` | see whether automatic cleanup is due |
-| `/evolution merge pending` | review merge proposals |
-| `/graph` | browse and edit the skill/memory graph |
+| `/evolution curator status` | check whether curation is due |
+| `/evolution merge pending` | see the merge queue |
+| `/graph` | browse and edit the skill and memory graph |
 
-There are advanced commands too (maintenance scans, replay, presets, extraction). They are documented in [docs/commands.md](docs/commands.md); you do not need them for daily use.
+Advanced commands (maintenance scans, replay, preset install, extraction) are in [docs/commands.md](docs/commands.md). You do not need them for daily use.
 
-## Settings you may want to change
+## Settings
 
-- **Approval**: on/off, and whether approving asks again (only in the all + Web setup).
-- **Memory budget**: how much project memory and user profile to keep.
-- **Review cadence**: how often the agent reflects, or turn it off.
-- **Curator interval**: how often stale skills are archived/merged.
+Most defaults are fine. The ones people actually change are approval, memory budget, review interval and curation interval.
 
-Everything else has a sensible default. The full list of user-facing knobs is in [docs/configuration.md](docs/configuration.md).
+The settings page exists only in the all + Web setup. Host, preset and layered use commands or the profile config instead. The full list is in [docs/configuration.md](docs/configuration.md).
 
 ## Privacy and safety
 
-- No telemetry and no hosted service; data is written under `$DSH_HOME`.
-- The model can write memory and skills only. Policy, prompts, routing and audit history are not model-writable.
-- A skill delete archives; restore and undo are explicit. A merge keeps its receipt.
-- Threat scanning runs before memory/skill writes, even when approval is off.
+No telemetry and no hosted service. Data stays under `$DSH_HOME`.
+
+The model can write memory and skills, but not policy, prompts, routing or audit history. Skill deletion is an archive; restore and undo are explicit. Merge keeps a receipt. Threat scanning runs before memory/skill writes, even when approval is off.
 
 ## Compatibility
 
@@ -218,24 +175,24 @@ Everything else has a sensible default. The full list of user-facing knobs is in
 | Family version | `0.32.5` |
 | Node | 22.19+ or 24+ |
 
-The platform line is one supported generation; older prerelease lines fail at dependency resolution. Current install details are in [INSTALL.md](INSTALL.md).
+Only this platform generation is supported; older prerelease lines fail at dependency resolution. Install details are in [INSTALL.md](INSTALL.md).
 
 ## Documentation
 
-- [Start here](docs/getting-started.md) — 10 minutes from install to the first remembered fact.
-- [What it does](docs/features.md) — the five loops, told from the user side.
+- [Start here](docs/getting-started.md) — install, first memory, first skill.
+- [What it does](docs/features.md) — memory, skills, review, curation and merge in practice.
 - [Commands](docs/commands.md) — everyday and advanced commands.
-- [Settings](docs/configuration.md) — approval, budgets, cadence.
+- [Settings](docs/configuration.md) — approval, budgets, intervals.
 - [Model/API keys](docs/api-keys.md) — which features need a model, and how to configure it.
 - [Operations](docs/operations.md) — backup, upgrade, uninstall, doctor.
 - [Troubleshooting](docs/troubleshooting.md) — symptoms and the matching action.
 - [Install details](INSTALL.md) — the four forms and upgrade order.
-- For maintainers only: `packages/README.md` (package map and canonical facts; not user documentation).
+- Maintainers only: `packages/README.md` contains the package map and canonical facts, not user documentation.
 
 ## Known boundaries
 
-- The **host** form has no memory/skill tools, and its automatic review/usage do not run. Use all (or the layered preset) if you want those.
-- Approval is off by default; turn it on if you want a human gate.
-- Only the **all** form ships the settings page and the three sidebar panels; preset and host do not.
-- The skill-health panel ships disabled in the full bundle; enabling it is a configuration change, not a daily switch.
+- Host has no memory/skill tools, and its automatic review/usage do not run. Use all or the layered preset for those.
+- Approval is off by default, and even when on it covers staged memory/skill writes only.
+- The settings page and three sidebars ship only with all + Web.
+- The skill-health panel is disabled by default in the full bundle.
 - If a feature needs a model or a local merge model, it fails with a message instead of pretending to work.
