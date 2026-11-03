@@ -1,20 +1,23 @@
-# @deepseek-ai/dsh-evolution-policy
+# @lmzhen/dsh-evolution-policy
 
-Immutable evolution policy service: the frozen `PolicySnapshot` the review and curation legs read
-their dials from, plus the `tools.guard` refusal of a control-plane key in a write.
+> 不可变策略快照 + 控制平面写 guard。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: the rows that read the snapshot own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-policy` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset`.
+把 18 个配置项冻结成 19 字段快照；tools.guard 拒绝 memory/skill 参数中的 6 个控制键（含 operations 内层）。
 
-## Known limitations
+## 入口
 
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+ctx.evolutionPolicy.get()；tools.guard。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 依赖与默认
 
-## Notes and history
+可选 tools 服务；无 tools 时 guard 不注册。
 
+## 边界
 
+只拦控制键，不是通用沙箱；数值会 clamp；模型不能改快照。
+
+## 代码位置
+
+`src/index.ts`

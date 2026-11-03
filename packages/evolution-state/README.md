@@ -1,24 +1,23 @@
-# @deepseek-ai/dsh-evolution-state
+# @lmzhen/dsh-evolution-state
 
-Durable evolution state consumer: it owns no medium and performs no IO — a provider registered in
-`ctx.evolutionStateStorage` does.
+> 状态门面服务。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: the rows that read this state own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-state` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset` (all pin `provider: json`).
+把 review/curator/pending 的 10 个方法转发给选中的 provider；构造时做 provider pin/多 provider 硬拒。
 
-## Configuration
+## 入口
 
-- `provider` (`''` default, or `json` / `domain`): pins the provider for every operation; empty = first registered wins.
+ctx.evolutionState。
 
-## Known limitations
+## 依赖与默认
 
-- An empty pin with two providers mounted resolves by REGISTRATION ORDER (one warn per ambiguous period): enabling the domain row in an overlay rebinds every operation to an empty medium while the state on disk under the other provider becomes invisible (`/evolution pending` empty, approve misses).
+需要 evolutionStateStorage 和具体 provider。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 边界
 
-## Notes and history
+不拥有介质、不做 IO；pin 为空时可能懒验证；多 provider 未 pin 直接抛错。
 
-- `provider` pins the registry to one provider name; a pinned name is checked at mount once any provider has registered (S-07).
+## 代码位置
+
+`src/index.ts`

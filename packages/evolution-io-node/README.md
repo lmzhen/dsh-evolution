@@ -1,20 +1,23 @@
-# @deepseek-ai/dsh-evolution-io-node
+# @lmzhen/dsh-evolution-io-node
 
-Local atomic node:fs IO provider: registers the `node` backend into `ctx.evolutionIo`; the
-implementation is core's `nodeEvolutionIo()` (this package adds the name).
+> 本地 node:fs IO provider。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: the rows that write through this backend own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-io-node` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset`.
+把 core 的 nodeEvolutionIo 注册为默认 provider；原子写、重试、tmp 清理等实现都在 core。
 
-## Known limitations
+## 入口
 
-- Local node:fs provider. Remote or shared media requires another `ctx.evolutionIo` provider.
+Cordis 行 evolution-io-node。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 依赖与默认
 
-## Notes and history
+需要 evolution-io。
 
+## 边界
 
+模块级单例；只保证 single-process；无 Config。
+
+## 代码位置
+
+`src/index.ts`

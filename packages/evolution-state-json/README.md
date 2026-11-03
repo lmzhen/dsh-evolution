@@ -1,28 +1,23 @@
-# @deepseek-ai/dsh-evolution-state-json
+# @lmzhen/dsh-evolution-state-json
 
-JSON-file evolution state provider over the IO seam: review, curator and pending records are JSON
-files under the state root, so the medium behind `ctx.evolutionIo` can change without a format
-change.
+> 默认 JSON 状态介质。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: the rows that read this state own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-state-json` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset` (it is the medium they pin).
+实现 10 个 state seam 方法；jsonTransact 崩溃安全读写、坏文件 .corrupt 隔离、旧 pending.json 只读退休、pending 归档/容量告警、review 会话 cap。
 
-## Configuration
+## 入口
 
-- `root`: the directory the state files live in; `''` means the evolution home.
+Cordis 行 evolution-state-json；evolutionState provider=json。
 
-## Known limitations
+## 依赖与默认
 
-- Both tables are capped (200 pending, 500 sessions), and past the pending cap the DOMAIN provider deletes instead of archiving: this provider keeps an audit sidecar. The `updatedAt` stamp is stripped on read, so the consumer-facing record shape is unchanged.
-- All shipped JSON media are **single-process**: the IO backend has no cross-process lock. A second process sharing `DSH_HOME` is not coordinated; route multi-process deployments to a platform-provided cross-process backend before relying on this provider.
+需要 evolutionIo 和 evolutionStateStorage。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 边界
 
-## Notes and history
+单进程；相对 root 按 CWD 解析；坏文件不会被当空覆盖；不提供用户命令。
 
-- P2-4 (v15): the live pending map is BOUNDED — resolved (approved/rejected) records are kept to the most recent `PENDING_RESOLVED_CAP` (200, seam constant in `evolution-state-storage`); the oldest by `resolvedAt` rotate into the `pending-state-archive.json` sidecar (with `.bak` rotation), which is JSON-provider-specific.
-- V25-11 (v25): the review-state table is likewise BOUNDED: `REVIEW_STATE_SESSION_CAP` (500, seam constant) rows keyed by session; on every save the least-recently-active sessions (provider-stamped `updatedAt`, stored on disk only) are pruned.
-- The JSON provider serializes writers inside one process only (the internal transact wrapper is not public API, audit v10 S-03). It does **not** claim cross-process safety; the shipped IO backend declares single-process.
+## 代码位置
+
+`src/index.ts`

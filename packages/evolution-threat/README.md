@@ -1,28 +1,23 @@
-# @deepseek-ai/dsh-evolution-threat
+# @lmzhen/dsh-evolution-threat
 
-Write-time threat guard for evolution tools: one monotonic `tools.guard()` scans the payload of
-every evolution write tool and refuses the call on a pattern hit. It registers no prompt or tool
-schema — a denial is its only model-visible effect.
+> 写入期威胁扫描 guard。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: a refused write is the only thing the model notices.
-- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-threat` row, in `evolution-host`/`evolution-all`/one-click `evolution-preset`.
+扫描 memory 的 facts/content 和 skill_manage 的 content/file_content/new_string；覆盖注入、角色劫持、外泄、C2、持久化、密钥、隐形字符。
 
-## Configuration
+## 入口
 
-- `enabled` (default `true`): master switch; off installs no guard.
-- `maxScanChars` — `65536` — the scan window size in normalized characters. Legal range is `>= 4097` — a smaller window cannot guarantee full-coverage scanning (the overlap floor is `PATTERN_OVERLAP + 1` in evolution-core), so the schema rejects it at load and the assembly clamp falls back to the default. The whole text is always scanned in overlapping windows; this value is not a total cap.
-- `threatExemptLabels` (default `[]`): pattern labels the deployment knows to be benign. The exemption surface is per config site: this guard row, the tool-skill-manage row, the evolution-commands row (its own SkillLibrary for the command write paths), the evolution-learning-graph row (its own SkillLibrary for the graph edit/delete write channel) and the memory store options each carry their OWN list and must be set separately. A label exempted only on the store side still blocks here.
+tools.guard。
 
-## Known limitations
+## 依赖与默认
 
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+需要 tools 服务；enabled:false 时直接 return。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 边界
 
-## Notes and history
+只覆盖两个写工具；规则集手工维护，不证明穷尽；窗口下限 4097。
 
-- P2-4 (v14) closed the store-vs-guard asymmetry for the STORE gates (`SkillLibrary`/`MemoryStore` options)
-- (v17 audit: the evolution-commands site was missing from this enumeration; the evolution-learning-graph site was missing from it as well.)
+## 代码位置
+
+`src/index.ts`

@@ -1,330 +1,96 @@
 # Installing dsh-evolution
 
-Four supported install forms. **`dsh-evolution-all` is the DEFAULT** (most
-complete, no preset step); the other three are alternatives. Never mount two
-of the bundles in one profile — they insert the same infrastructure rows and
-the cordis loader fails loud on duplicate ids.
+Four install forms. `dsh-evolution-all` is the default; the other three are alternatives. **Never mount two forms in one profile**: they share infrastructure rows and the loader fails on duplicate ids.
 
 | Form | Bundle / preset | Model tools | Notes |
 |---|---|---|---|
-| **All (default)** | `dsh-evolution-all` | profile-wide | infra + `memory`/`skill_manage` + guidance, no preset step |
-| Host + agent preset | `dsh-evolution-host` + `Evolution` agent preset | only sessions selecting the preset | recommended when tools must be opt-in |
-| One-click | `dsh-evolution-preset` compatibility bundle | profile-wide | one-shot compatibility form |
-| Agent only | `Evolution` agent preset | only sessions selecting the preset | requires the host bundle (or the agent-preset packages) installed separately |
+| All (default) | `dsh-evolution-all` | profile-wide | complete surface; no preset step |
+| Host + agent preset | `dsh-evolution-host` + Evolution preset | only sessions on the preset | per-session tools; exclusive with all/preset |
+| One-click | `dsh-evolution-preset` | profile-wide | compatibility form; no settings/health rows |
+| Agent only | Evolution preset | only sessions on the preset | requires the host bundle or agent packages |
 
-> ⚠️ **`dsh-evolution-all`, `dsh-evolution-host` and `dsh-evolution-preset`
-> are mutually exclusive in one profile**, and the layered `Evolution` agent
-> preset is exclusive with `dsh-evolution-all` / `dsh-evolution-preset` (the
-> same four model rows would double-mount). They share the self-evolution
-> infrastructure rows, so mounting two double-registers that infrastructure
-> and the loader aborts at startup. Choose ONE form per profile; the repo's
-> `packages/scripts/verify-profile-bundles.mjs` checks the bundle rows.
->
-> Note (S3-A2): installing `dsh-evolution-all` also pulls in the
-> `dsh-evolution-agent-preset` container as a hard dependency. That package is
-> an install-form EXCLUSIVE with `all` — its rows are never mounted in an
-> `all` profile; the dependency exists only as a forward dependency-closure
-> guard (pinned by `packages/evolution-all/tests/all.spec.ts`), and the
-> layered installer refuses to combine the two forms regardless.
+The canonical per-form semantics live in [packages/INSTALL.md](packages/INSTALL.md#install-forms). This file owns the commands and operational details.
 
-The install-form semantics (what each form does to a session) and the
-per-form verification status against the validated platform line are
-single-sourced in `packages/INSTALL.md` ("Install forms"); this root copy
-owns the source-install commands and the scope details. The installer also
-accepts the product-form aliases `--mode variant` (= `layered`) and
-`--mode attach` (= `oneclick`).
+## Production install
 
-## Production install (published bundles)
-
-Community bundles under the personal scope `@lmzhen` — `all` is the DEFAULT
-form, `host` is the shrink path, and the one-click `preset` is the legacy
-compatibility path:
+Community packages publish under `@lmzhen`; they are not official DeepSeek releases.
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
+# restart dsh, then:
+/evolution doctor
+```
+
+To shrink to infrastructure only:
+
+```bash
+dsh plugin --profile web remove @lmzhen/dsh-evolution-all
 dsh plugin --profile web add @lmzhen/dsh-evolution-host
+```
+
+Compatibility one-click form:
+
+```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-preset
 ```
 
-> Community-published `@lmzhen/*` packages are not official DeepSeek
-> releases.
+Inside a source/overlay checkout the same packages use `@deepseek-ai`; those names do not resolve from npm.
 
-Inside a source/overlay checkout the same bundles live under the `@deepseek-ai`
-scope (publishing rewrites the scope to `@lmzhen`); those names resolve only
-there, never from npm:
+## Install-form semantics
 
-```bash
-dsh plugin --profile web add @deepseek-ai/dsh-evolution-host
-```
+**② attach** — full (`all`) or one-click (`preset`) — where every session, including a session on a platform original preset, carries the family model rows. **① variant** — layered (`host` + the generated Evolution preset, `--mode variant`) — where the model rows exist only inside the family preset; a session on an original preset gets no family behaviour (see the single-source statement in packages/INSTALL.md). Under ① variant the `/evolution` command face still appears globally; automatic paths are gated by `sessionAudited`.
 
-The agent preset is assembled by the installer (`install-layered.mjs`) or by
-`/evolution preset install`, and the result is ONE `- insert:` row in the target
-profile's own patch layer (`<home>/profiles/<profile>/cordis.patch.yml`).
-0.2.x removed the preset DIRECTORY: there is no `.agent-presets/` tree to hand-copy
-into any more, so the V6-03 hazard (a hand-copied DELTA mounting as the COMPLETE
-composition) cannot be triggered that way. The row-level detail has one home:
-`packages/INSTALL.md` § Layered install.
-The npm-only path is `/evolution preset install [--base <name>[,<name>...]]`,
-which reads the same `evolution-agent/bases.json` table and generates one
-variant per named base in a single pass (each base's preset id and metadata
-file come from that table).
+`host` alone is a third case: background automation only, no `memory` / `skill_manage` tools. The read-only `maintenance_probe` and the merge-child `merge_stage` remain.
 
 ## Prerequisites
 
-- **Validated platform line: DSH `0.2.0-rc.2`.** The published
-  `@deepseek-ai/dsh-*` dependency ranges are `^0.2.0-rc.1` (`PLATFORM_FLOOR`),
-  and node-semver's prerelease rule admits this line including its earlier rc
-  but no earlier line, so an older platform fails at dependency resolution
-  rather than at runtime. Both values live in
-  `.github/workflows/release.yml` — the floor is what the ranges declare, the
-  tested line is what the gate builds against — and
-  `packages/scripts/verify-platform-ranges.mjs` re-derives the floor from the
-  staged manifests.
-- A DeepSeek Harness checkout that resolves the evolution workspace packages,
-  or the published community bundle `@lmzhen/dsh-evolution-host` available to
-  pnpm (see **Production install**).
-- For the local installer below: Node 22.19+ or 24+ (the repository's
-  `engines` floor: `^22.19.0 || >=24.0.0`) and the source checkout.
+- Validated platform line: **DSH `0.2.1-rc.3`**. Published `@deepseek-ai/dsh-*` ranges declare `^0.2.1-rc.2`.
+- Node 22.19+ or 24+.
+- A profile that can resolve the published bundle, or a source checkout for the local installer.
 
-## Layered install (host + agent preset — local development)
+## Source-checkout layered install
 
 ```bash
-node packages/scripts/install-layered.mjs \
-  --profile web \
-  --mode layered \
-  --home "$DSH_HOME"
+node packages/scripts/install-layered.mjs --profile web --mode layered --home "$DSH_HOME"
 ```
 
-Omit `--home` to use `$DSH_HOME` or `~/.dsh`.
+This copies the family packages into the profile and writes one `- insert:` preset row into the profile patch. Omit `--home` to use `$DSH_HOME` or `~/.dsh`.
 
-This performs:
+## Upgrade runbook (platform first)
 
-1. copies every evolution package (including a built `lib/` when present) into
-   `<home>/profiles/<profile>/node_modules/@deepseek-ai/...`;
-2. adds `@deepseek-ai/dsh-evolution-host` to
-   `<home>/profiles/<profile>/package.json` `dsh.profile.bundles`;
-3. writes the `Evolution` agent-preset ROW into
-   `<home>/profiles/<profile>/cordis.patch.yml` as one `- insert:` block
-   (`--base ptc` writes the ptc variant's row `preset-evolution-ptc` instead — the
-   base names both the platform base patch the rows are read from and the row id,
-   and the table behind both is `evolution-agent/bases.json`; 0.2.x removed the
-   preset directory, so no `.agent-presets/` tree is produced).
+1. Read `CHANGELOG.md` for the target version.
+2. Back up `$DSH_HOME`.
+3. Upgrade the platform and restart; verify the host boots.
+4. Upgrade the family bundle (or uninstall + install to avoid stale rows).
+5. Restart and run `/evolution doctor`.
+6. Do one memory write and one skill write; verify approval/rollback if enabled.
 
-The copied scope comes from `EVOLUTION_SCOPE` (default `@deepseek-ai`, the
-overlay scope). With `EVOLUTION_SCOPE=@lmzhen` the installer reads the
-`prepare-release.mjs --scope @lmzhen` staging under
-`packages/.release-staging` and refuses a staging that is missing, stale, or
-built for another scope.
+Do not upgrade the family before the platform: the peers/engines window is tied to the platform line.
 
-The installer is source-layout aware: if a package's `lib/index.js` has not
-been built yet it prints an `unbuilt:` warning. Boot such a profile with the
-TS loader used by the source checkout, or build the evolution packages first.
-Published-bundle installs are unaffected.
-
-Dry run:
+## Verify
 
 ```bash
-node packages/scripts/install-layered.mjs \
-  --profile web --mode layered --dry-run
+dsh --profile web --dump-config | grep -c "id: evolution-"
+/evolution doctor
 ```
 
-Uninstall the layered layout while keeping user data:
+Expect the rows for your chosen form and a doctor report naming the install form, platform line, family version, services, and runtime rows. A host-only install intentionally reports no memory/skill tools.
+
+## Command fallbacks
+
+When a route or service is missing, the UI and commands fall back to copyable commands. The canonical table is in `packages/INSTALL.md`; the fallback text is generated into `evolution-client-kit`. If a fallback names a command that no longer exists, treat it as a documentation defect, not a supported path.
+
+## Uninstall
 
 ```bash
-node packages/scripts/install-layered.mjs --profile web --mode layered --uninstall
+dsh plugin --profile web remove @lmzhen/dsh-evolution-all
 ```
 
-Only the profile rows (the agent preset is one of them) and the copied packages
-are removed. Memory, skills, state, reports, and approval history remain.
+Uninstall removes the rows; data under `$DSH_HOME` (memories, skills, state, reports, approval history) remains. Reinstall picks it up again.
 
-**Boundary of this source-checkout path on a CLI-only host** (measured 2026-10-09): the
-installer copies the family's own 31 packages into the profile, so a row whose `name` points at
-a PLATFORM package resolves only when that package is reachable from the profile. Under the
-desktop app it is; under a bare `dsh` CLI home it is not, and the loader says so plainly —
-`dsh: warning: 1 entry did not activate — tool-session-query … failed to import`. The production
-path above has no such boundary: the published bundle manifest declares those platform packages
-as dependencies, so pnpm installs them into the profile. Seeing that warning here, add the named
-package to the profile or switch to the production install.
+## Troubleshooting quick reference
 
-## Host-only install
-
-```bash
-node packages/scripts/install-layered.mjs \
-  --profile web --mode host
-```
-
-Sessions get background evolution automation, approval, review, curator, merge,
-and observability, but no `memory`/`skill_manage` tools.
-
-## Merge surface
-
-The host and one-click bundles also mount the **merge** surface: `/evolution merge` in a
-Session (`/merge` remains a 0.29 compatibility alias). The same command face answers
-`/evolution merge status / pending / approve <id> / report` when the browser panel is
-unavailable. The browser panel (`evolution-merge-ui`) is mounted in the `all` bundle only.
-The engine needs local `potion-multilingual-128M-int8` and `potion-multilingual-128M-pca64-int8`
-directories under `mergeModelsRoot`; `/evolution doctor`
-warns when they are missing. There is no auto provisioning.
-
-## Agent-only install
-
-```bash
-node packages/scripts/install-layered.mjs \
-  --profile web --mode agent --force
-```
-
-Assumes the host bundle is already installed or the tool services resolve from
-another source.
-
-## One-click compatibility install (legacy)
-
-```bash
-node packages/scripts/install-layered.mjs \
-  --profile web --mode oneclick
-```
-
-Equivalent to the legacy `dsh-evolution-preset` profile bundle.
-
-## Profile override examples
-
-Add these to `<home>/profiles/<profile>/cordis.patch.yml`.
-
-### Disable background review
-
-```yaml
-- id: evolution-review
-  disabled: true
-```
-
-### Enable staged approval
-
-```yaml
-- id: evolution-approval
-  config:
-    enabled: true
-    stageForeground: true
-```
-
-With staging on, the three destructive curator writes that the skill runner
-cannot replay — `/evolution consolidate`, `/evolution restore` (whole tree) and
-`/evolution skill restore <name>` — answer `E-306` instead of writing straight
-through the gate; since 0.3.83 `/evolution restructure` answers the same code
-when the invocation carries no session to attribute a staged record to. Set
-`stageForeground: false` (or use a session whose approval policy is `never`) to
-run them directly and deliberately.
-
-### Override memory/skill roots
-
-The skill tree is read/written by EIGHT rows. Since 0.3.64 they all read the
-SAME key `root`. The old `skillsRoot` key (`evolution-commands`,
-`evolution-review` and `evolution-maintenance-tools` still declare it) was
-retired at 0.3.65: setting it now FAILS THE LOAD with "config \"skillsRoot\"
-was removed after 0.3.65 — rename the key to \"root\"", so a deployment cannot
-keep pointing at a root nobody reads. Setting only
-`skill-usage.root` moves the `.usage.json` sidecar but NOT the skill tree, so
-telemetry silently targets a different directory. Keep every row below on the
-same path (and set `memory-files.root` for the memory files):
-
-```yaml
-- id: memory-files
-  config:
-    root: /srv/agent-data/memories
-
-- id: tool-skill-manage
-  config: { root: /srv/agent-data/skills }
-- id: evolution-skill-catalog
-  config: { root: /srv/agent-data/skills }
-- id: skill-usage
-  config: { root: /srv/agent-data/skills }
-- id: evolution-curator
-  config: { root: /srv/agent-data/skills }
-- id: evolution-learning-graph
-  config: { root: /srv/agent-data/skills }
-- id: evolution-commands
-  config: { root: /srv/agent-data/skills }
-- id: evolution-review
-  config: { root: /srv/agent-data/skills }
-- id: evolution-maintenance-tools
-  config: { root: /srv/agent-data/skills }
-```
-
-### Use JSON state even when a storage-domain exists
-
-```yaml
-- id: evolution-state
-  config:
-    provider: json
-```
-
-### Extend review subagent tools
-
-The default `reviewToolAllow` is exactly `[skill]` (the DSH tool catalog exposes
-the plain `skill` tool only). Extending it adds tools to the review subagent's
-filter:
-
-```yaml
-- id: evolution-review
-  config:
-    # V5-25 (0.3.32): the DSH tool catalog exposes the plain `skill` tool only —
-    # `skill_search`/`skill_load` (Hermes-era) do not exist on this platform.
-    reviewToolAllow: [skill]
-```
-
-## Verification
-
-Composed profile tree:
-
-```bash
-dsh --profile <profile> --dump-config
-```
-
-Runtime tests (run them in the merged upstream checkout, not in this mirror):
-
-```bash
-vitest run packages/evolution/evolution-host/tests/installation-matrix.spec.ts
-vitest run packages/evolution/tool-memory/tests/anchored-compat.spec.ts
-vitest run packages/evolution/evolution-review/tests/anchored-smoke.spec.ts
-```
-
-> Dual-layout note (G5.5): the installer commands above run HERE, in the flat
-> mirror (`packages/scripts/...`). The vitest paths are the merged-tree form:
-> type-checking and the suites run in the upstream checkout (the CI overlay
-> built from the platform tag), which hosts the same sources under
-> `packages/evolution/<pkg>/` and whose `tsconfig.base.json` /
-> `tsconfig.host.json` carry the alias lines those paths need (see
-> `packages/README.md`, "Development: the two layouts and their tsconfigs").
-> This mirror ships no
-> toolchain of its own. The mirror is the authoring AND publication tree since
-> 0.3.83 and the publish chain no longer copies a second tree over it; the
-> former dev tree `D:/dsh/deepseek-harness` is stale and carries an
-> `AUTHORING-MOVED.md` marker. `packages/scripts/**` is the one cross-tree
-> obligation left: the publish chain's version guard compares it byte-for-byte
-> against that stale checkout's copy, so a script change here is mirrored
-> there before a release (0.3.83 reconciled 58 drifted files).
-
-Uninstalling only removes the profile row (the agent preset is that row) and the
-copied packages; memory, skills, state, reports, and approval history remain
-under `$DSH_HOME`.
-
-## Capability evolution (retired in 0.3.66)
-
-`evolution-capability` was removed from this repository. It staged a Creator-mode
-capability package (an object carrying `code.host` / `code.client` halves) into
-the same pending queue as memory and skills, without executing anything:
-approval recorded intent only, and activation stayed a manual Creator-mode step.
-
-It was retired because that split cannot work. An approval that does not gate
-execution is a log, and the owner of the log is not the owner of the effect; the
-dynamic-package lifecycle (`cordis_define` / `cordis_run`, its approval, and its
-run history) belongs to the platform Creator mode, which is where a capability is
-created and activated. The package never had a production consumer either — no
-bundle mounted it, no model-facing tool reached it, and its only in-tree caller
-was the install document.
-
-The last published version, `@lmzhen/dsh-evolution-capability@0.3.65`, remains
-installable from npm; no later version is published. Do not add the row to a
-profile — nothing maintains it. Records staged by an install that used it
-(≤0.3.65) stay readable: they still appear in `/evolution pending`, where approve
-records intent and reject drops them. Capability-shaped work belongs either in
-Creator mode or, when the durable artifact is knowledge rather than code, in
-`memory` and `skills`.
+- Command missing: `commands` service or the commands row is absent.
+- Tool missing: check the install form; host has no memory/skill tools.
+- Route 404: `connection` service missing or the row disabled.
+- Publish/install mismatch: check `/evolution doctor` family version and `npm view @lmzhen/dsh-evolution-all version`.

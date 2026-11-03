@@ -374,8 +374,14 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     // document may present a DIFFERENT line as the validated one. The claim idioms are PAIRED
     // with the pinned version instead of forbidding a version string: a document may legitimately
     // mention an older line while comparing lines or recording history (README.md:275 does).
-    const version = /^\s*PLATFORM_VERSION:\s*(\S+)\s*$/m.exec(text)?.[1]
-    const floor = /^\s*PLATFORM_FLOOR:\s*(\S+)\s*$/m.exec(text)?.[1]
+    let version
+    let floor
+    if (machine.file.endsWith('.json')) {
+      try { const line = JSON.parse(text); version = line.version; floor = line.floor } catch { /* reported as unarmed */ }
+    } else {
+      version = /^\s*PLATFORM_VERSION:\s*(\S+)\s*$/m.exec(text)?.[1]
+      floor = /^\s*PLATFORM_FLOOR:\s*(\S+)\s*$/m.exec(text)?.[1]
+    }
     if (version === undefined) {
       // The owner is a REPO-scope asset. A tree that does not carry the family repository root —
       // a build overlay that mirrors only packages/evolution and finds the PLATFORM's own

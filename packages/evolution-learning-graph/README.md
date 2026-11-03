@@ -1,31 +1,23 @@
-# @deepseek-ai/dsh-evolution-learning-graph
+# @lmzhen/dsh-evolution-learning-graph
 
-Learning graph over skills and memory
+> 技能 + 记忆学习图，/graph 命令。
 
-## Graph surface
+## 它做什么
 
-`/graph` renders the learning graph. A skill node is its name; a memory node is `memory:<source>:<index>`, where `<source>` is `memory`|`user` and `<index>` is the position in that file's entries.
+/graph 目录、detail、edit、delete；技能写走 approval + write gate，记忆写走 memory.applyBatch；节点/边各 200 行上限。
 
-Memory node ids carry a trailing snapshot token (`memory:<source>:<index>:<snapshot>` — an 8-hex digest of the node label's first line). It exists so `graph edit`/`graph delete` can detect index drift: any memory write between the last render and the command shifts indices, and a stale id is rejected (requiring a re-run of `/graph`) instead of mutating a different entry.
+## 入口
 
-Memory→skill edges are word-level, not substring: the entry is tokenized on non-letter/digit/hyphen runs and a skill name links only when it is a whole token. This prevents a skill named `run` from linking the words `running`/`grunt`.
+/graph …。
 
-**`graph edit`/`graph delete` route through the evolution approval seam** when mounted (soft-probed: the write executes directly when absent) — for BOTH skill nodes and memory nodes. Each approved/executed edit bumps the skill's patch counter and a delete archives it, matching `skill_manage` — including the no-op gate: an edit whose content is byte-equivalent to the current file (`noop`) writes nothing and does not bump the patch counter, exactly as `skill_manage` treats an unchanged update/patch.
+## 依赖与默认
 
-## Model surface
+需要 commands/skillUsage/memory/evolutionIo；写需要会话。
 
-- **Model-visible:** nothing of its own: no prompt section and no tool schema; `/graph` is a human command, and consumers own the model-visible effects.
-- **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family-level rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-learning-graph` row, carried by the `evolution-host`, `evolution-all` and one-click `evolution-preset` bundles.
+## 边界
 
-## Known limitations
+不是 /evolution 子命令；编辑/删除需要审批落点；memory 节点受 E-21 快照校验；跨源保护由写门禁决定。
 
-- The memory drift snapshot covers only the node label (first line, first 80 chars): a change confined to a later line of the same entry is not detected, because the rendered node label is the comparison anchor.
-- A hand-typed bare `memory:<source>:<index>` id has no snapshot and skips the drift check (legacy path; the rendered ids always carry the snapshot).
+## 代码位置
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
-## Notes and history
-
-- `graph edit`/`graph delete` route through the evolution approval seam when it is mounted (soft-probed; the write executes directly when it is absent): for BOTH skill nodes and memory nodes (P2-6, v15; memory staged args mirror the `memory` tool runner's replay shape).
-- Before staging, the seam's `hasRunner` is checked (P2-7, v15): with approval enabled, a session policy that is not `never`, and the write actually staging (foreground stages per approval `stageForeground`; subagent origins always stage), a missing replay runner's row (tool-skill-manage / tool-memory) refuses the write; allow-direct combinations execute unchanged instead of creating a pending record no approver could replay.
-- The command invocation's session rides the approval request (v12 N1), so a `never`-policy session stages nothing instead of deriving every graph write as foreground.
+`src/index.ts`

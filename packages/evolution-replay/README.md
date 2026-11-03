@@ -1,18 +1,23 @@
-# @deepseek-ai/dsh-evolution-replay
+# @lmzhen/dsh-evolution-replay
 
-Replay/A-B evaluation primitives for evolution plans: it reads the activity sidecar back,
-compares plan outcomes and provides the `evolutionReplay` service behind `evolution
-replay`.
+> 计划排行榜/比较报告。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: no prompt section and no tool schema; `/evolution replay` is a human command; consumers own the model-visible effects.
-- **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-replay` row, carried by the `evolution-host`, `evolution-all` and one-click `evolution-preset` bundles.
+从 activity/事件回填计划结果，按权重算分并输出比较报告；支持 corrupt/readFailed 限定句。
 
-## Known limitations
+## 入口
 
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
-- **The activity-sidecar verdict is per read, and an unanswered read is its own state.** When `apply()` meets bytes this build cannot read as the current format, every `compare()` result carries `sourceCorrupt: true` and its report states the leaderboard is NOT the recorded history (an empty list does not mean nothing happened); a later successful read clears the qualification (a repaired sidecar plus an io reload (HMR / plugin restart)), while the corruption stays observable through the one warn `apply()` emits at mark time. A read that **THREW** (the io failed, or no state could be produced at all) is neither verdict: `compare()` then carries `sourceReadFailure: <message>` and its report says the read FAILED — never "nothing was recorded". Any ANSWERED read (clean or corrupt) retires that failure, so both qualifications describe the current read rather than latching.
+ctx.evolutionReplay；/evolution replay。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 依赖与默认
+
+需要 activity/events；事件源主要来自 branch review。
+
+## 边界
+
+单计划 margin=null；默认 inject 模式没有自动数据；权重 clamp；只出文本。
+
+## 代码位置
+
+`src/index.ts`

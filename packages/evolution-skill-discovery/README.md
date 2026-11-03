@@ -1,17 +1,23 @@
-# @deepseek-ai/dsh-evolution-skill-discovery
+# @lmzhen/dsh-evolution-skill-discovery
 
-Read model and view identity for evolution skill discovery (Program B, PLAN-DISC-001).
+> 技能检索 + 域卡投影 + 域图（默认关闭）。
 
-## Status
+## 它做什么
 
-The package has a real `apply`, is referenced by the `evolution-all` bundle row, and is booted from a test `cordis.yml` through the Loader. The model-facing surface is `skill_search` plus injected, read-only domain cards. DomainMap bootstrap, explicit generation, and projection are implemented. Create-time assignment/classification and shadow mode are not shipped; provisional domains are not auto-promoted. The command surface is `/skill-domain status | generate`. The map plane is explicit experimental: default `mode:off`, no catalog rewrite or hidden skills.
+skill_search 工具；/skill-domain status/generate；agent/pre-step 域卡与 available_skills 裁剪；agent/created 快照/描述刷新；域图/策略/搜索索引/LLM 生成。
 
-## Contract
+## 入口
 
-- `SkillIndex` reads a source's `ctx.skills`-shaped snapshot and a managed-skill key set; it does not register a provider or cache a second catalog.
-- `viewKey/viewCatalogDigest/catalogRevision/policyDigest/projectionDigest/searchIndexKey` are deterministic SHA-256 identities.
-- Incomplete snapshots keep `complete:false`; callers must fail open, not hide skills.
+skill_search；/skill-domain（mode:on）；模型上下文投影。
 
-## Verification
+## 依赖与默认
 
-`pnpm exec vitest run packages/evolution/evolution-skill-discovery/tests/discovery.spec.ts --maxWorkers=1`
+需要 skills/commands/sessionProjections/llm（mode:on 时）；featureEpoch 必填。
+
+## 边界
+
+默认 mode:off，只留 skill_search；off 时域卡/命令/投影/描述刷新都不注册；on 缺 llm 直接抛。
+
+## 代码位置
+
+`src/main-entry.ts, src/tool.ts, src/projection-runtime.ts`

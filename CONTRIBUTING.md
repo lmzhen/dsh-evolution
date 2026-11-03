@@ -1,85 +1,35 @@
-# Contributing to the dsh-evolution family
+# Contributing to dsh-evolution
 
-This repository (the **flat mirror**) is the publication carrier: `packages/*`
-are the packages that ship, and the root documents — `README.md`,
-`README.zh.md`, `INSTALL.md`, `CHANGELOG.md`, this file — are the user-facing
-surface. The CI validation tree is the platform checkout's
-`packages/evolution/`, kept byte-identical to `packages/*` before a release.
-Edit HERE (the mirror is the authoring tree since 0.3.83) and copy the result
-into that validation tree, then run the gate: the `sync-dev-to-mirror` /
-`sync-mirror-to-dev` helpers belong to the retired dual-line workflow and the
-stale side must never be copied back over this one.
+This repository is the publication carrier. `packages/*` are the packages that ship; the root documents and `docs/` are the user-facing surface. The validation overlay is a separate copy of the same sources under the platform checkout; edit the mirror, then copy into the overlay only to run platform-coupled checks.
 
 ## Start here
 
-1. **Edit in this mirror** (`packages/<pkg>/…`) — since 0.3.83 it is both the
-   authoring and the publication tree, so nothing is copied over it.
-2. **Copy the change into the validation checkout**. Type-checking and the
-   suites run where the same sources live at `packages/evolution/<pkg>/…` (the
-   CI overlay built from the platform tag). The machine-local
-   `D:/dsh/deepseek-harness` checkout is the stale former dev tree and is never
-   a source to copy from.
-3. **Run the gate**. `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` executes
-   all 58 steps and writes one log per step plus a summary (§The gate has
-   the table and says which step runs in which tree).
-4. **Decide where your words live**. §Where a fact is allowed to live is the
-   rule that fails a conclusion stated in two documents (N19).
+1. Edit `packages/<pkg>/…` in this mirror. Do not edit generated YAML, generated client tables, or `lib/` by hand.
+2. Run the focused spec in the overlay when the change touches platform services; pure library changes can run in the mirror.
+3. Run the family gate runner (the command and flags are in [docs/development.md](docs/development.md)). It writes one log per step and a summary.
+4. Put each conclusion in its one home. §Where a fact lives is the rule; a second copy fails the doc-facts gate.
 
-## Where a fact is allowed to live (G5, 0.3.78)
-
-The same conclusion used to be written in the root README, the package README,
-the install documents and the CHANGELOG, so it drifted where no build could see
-it — 0.3.77 left the root README still promising other presets the shared
-automation after the variant form made that false, and the agent README kept
-denying that a cordis base exists after `bases.json` grew one. (This file has to
-describe those claims without quoting them: the strings themselves are the
-forbidden copies.) Three layers, one owner each:
+## Where a fact lives
 
 | Layer | What it holds | Where it lives |
 |---|---|---|
-| **Conclusion** | what a user must know | ONE document — a README, or `INSTALL.md` for install-form facts |
-| **Reason** | why it changed | `CHANGELOG.md` version sections (released sections are history, never rewritten) |
-| **Mechanism** | how it works | the code docblock next to the code |
+| Conclusion | what a user must know | one document: a README, or `INSTALL.md` for install-form facts |
+| Mechanism | how it works | package README or architecture doc |
+| Declaration | what runs / what is registered | the generator, manifest or registry that produces it |
+| History | what changed and why | `CHANGELOG.md` and git |
 
-A fact that wants a second home gets a **citation** instead. The registry is
-`packages/scripts/family-facts.json`; each entry names the fact's ONE home, the
-sentences that must be there (`must`, with `unique: true` meaning "the home
-only"), the claims forbidden everywhere else (`forbid`), the documents that must
-cite the home (`cites`), and the machine owner that re-derives the value
-(`machine`). Checked values today: the `--base` table
-(`evolution-agent/bases.json`), the catalog-cap reach
-(`evolution-core/row-overrides.json`), the doctor's reported deployment forms
-(`evolution-commands/src/doctor.ts`) and the rendered command table.
+The canonical fact table is `packages/scripts/family-facts.json`. If you move a fact, update the home named there; do not restate it elsewhere. The user docs are not a second source.
 
-- Run it: `node packages/scripts/verify-doc-facts.mjs packages --strict`
-- It is also architecture rule **N19** inside `verify-arch-guards.mjs`, so the
-  58-step gate runs it on every batch; a second copy fails and names both files.
-- `packages/docs/**` is gitignored: it is a source of material, never a home.
-  Move the conclusion into a tracked document before citing it.
+## Tests
 
-### Adding a fact to the registry
+- Use the family Vitest config; pass `--testTimeout=30000`.
+- Tiers: `fast` (no spawn/real wait/wall-clock assertions), `pre-tag` (no wall-clock assertions), `ci-only` (needs the platform line). Do not move a check to a faster tier to make it green.
+- Run a single spec by file; an entire directory can exceed the default timeout for reasons unrelated to the change.
+- A green process is not a pass by itself: the declared criterion must be evaluated. An unevaluated criterion is not a pass.
 
-1. Pick the home document that a reader would already open for that subject.
-2. Add the entry: `id`, `title`, `home` (tree-relative), `must` (the exact
-   sentence, copied from the home), `forbid` (the drifted claim, with its reason),
-   `cites` (the documents that must now point at the home), and `machine` when a
-   file owns the value.
-3. Make the home say it, make the other documents cite it — do not copy.
-4. `node packages/scripts/verify-doc-facts.mjs packages --strict` must be 0, and
-   the gate's step 5 must stay green.
+## The gate: all 81 steps
 
-## Adding a new surface (G6)
-
-Package, preset base, subcommand, event, session consumer, architecture rule:
-each has a copyable skeleton and a checklist whose steps name the guard that
-fails when the step is skipped — see
-[`packages/scripts/checklists/index.md`](./packages/scripts/checklists/index.md).
-A step without a guard is not a step: if nothing fails, say it in prose instead
-of pretending it is checked.
-
-## The gate
-
-Run from the two trees (never reorder or rename these steps):
+The local profile runs the family gate runner (see [docs/development.md](docs/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from `packages/scripts/gate-manifest.json`; do not hand-edit it. If a row moves tier or command, change the manifest, regenerate, and update this appendix.
 
 | # | Command | Working tree |
 |---|---|---|
@@ -95,9 +45,9 @@ Run from the two trees (never reorder or rename these steps):
 | 10 | `node packages/scripts/verify-param-registry.mjs packages --strict` | mirror |
 | 11 | `node packages/scripts/verify-bundle-rows.mjs packages --strict` | mirror |
 | 12 | `node packages/scripts/verify-param-channel-parity.mjs packages --strict` | mirror |
-| 13 | `node D:/dsh/audit-v37/check-tsconfigs.cjs` | machine-local (outside this repo) |
-| 14 | `node D:/dsh/audit-v37/check-manifests.cjs` | machine-local (outside this repo) |
-| 15 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | `D:/dsh` (machine-local) |
+| 13 | `node D:/dsh/audit-v37/check-tsconfigs.cjs` | machine-local |
+| 14 | `node D:/dsh/audit-v37/check-manifests.cjs` | machine-local |
+| 15 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | machine-local |
 | 16 | `node packages/scripts/verify-profile-bundles.mjs --self-test` | mirror |
 | 17 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
 | 18 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/dsh-upstream-0.2.1-rc.3` | mirror |
@@ -127,7 +77,7 @@ Run from the two trees (never reorder or rename these steps):
 | 42 | `node packages/scripts/verify-bounds.mjs packages`（G2.4/C3：**一个锁、一个上界**——A 凡出现 instance-idiom（instanceHome／holdsInstance／claimInstance／single-flight）又自造模块级守卫且**不**消费 claimInstance ⇒ 必红；B 计时调用（setTimeout／setInterval／AbortSignal.timeout／sleep）里出现**裸毫秒字面量** ⇒ 必红，超时常量**跨包重值**只报告。drill：注入自造锁 ⇒ 点名；注入 `setTimeout(f, 5000)` ⇒ 点名；撤回即绿） | mirror |
 | 43 | `node packages/scripts/verify-io-discipline.mjs packages`（G2.2/C4：**写门面是通往磁盘的唯一一道门**——域内 src 不得裸调 rmSync／unlinkSync／renameSync／copyFileSync／writeFileSync／mkdirSync 或裸异步 rm(／unlink(／rename(／copyFile(；**方法调用**（io().rename(、this.io.remove(）放行；介质＝evolution-core/src/io.ts ＋ evolution-io-node 的 src。drill：往域内注入一个 rmSync ⇒ 点名必红；撤回即绿） | mirror |
 | 44 | `node packages/scripts/verify-declarations.mjs packages`（G4/C5+C6：**声明了就必被渲染，例外必须显式**——A 生成视图里每个字段的 control 必须在 ParamCard.ts 有渲染分支；B **双向**对账 C6 表 `scripts/client-exceptions.json`（`{fieldId, reason, owner}`）：无平台件的 switch/select 字段**必须**在表里（缺 ⇒ 必红），表里**不得有**生成视图已不带的陈旧条目（有 ⇒ 必红）；C reason／owner 非空、id 唯一。drill：删一条例外 ⇒ 点名必红；加一条陈旧条目 ⇒ 必红） | mirror |
-| 45 | `node packages/scripts/verify-graph-edges.mjs --self-test`（P0′ 读路径：技能"参见边"的解析与悬空检查门禁 —— 自证形进 CI；活根形 `--report` 只留 local/pre-tag，CI 无技能根会 exit 2。三态：0=边>0且悬空=0／1=悬空·自指·形态非法／2=CANNOT DECIDE；无降级读器，运行时读器不可用即 exit 2 且不给数字）| mirror |
+| 45 | `node packages/scripts/verify-graph-edges.mjs --self-test`（P0′ 读路径：技能"参见边"的解析与悬空检查门禁 —— 自证形进 CI；活根形 `--report` 只留 local/pre-tag，CI 无技能根会 exit 2。三态：0=边>0且悬空=0／1=悬空·自指·形态非法／2=CANNOT DECIDE；无降级读器，运行时读器不可用即 exit 2 且不给数字） | mirror |
 | 46 | `node packages/scripts/gen-check-taxonomy.mjs packages --check`（G2/M1 视图：把「门禁 × 档位 × spec」的普查视图从**声明面生成**出来（`--report` 人读、`--json` 机读）；`--check` 判生成物与声明面一致。**空档位必须 exit 2**——一个跑不到任何 spec 的档不是"干净"，是真空） | mirror |
 | 47 | `node packages/scripts/verify-verdict-records.mjs packages`（G1/C7 判决记录：夹具四例＋健康对照——输入置空时每条 check 必须 `cannot-decide` 且 `missing≠∅` 且 **exit 2**；判决与理由必须同源，读数只计 `criterionEvaluated===true ∧ verdict==='fail'` 并按 `cause.kind` 分列） | mirror |
 | 48 | `node packages/scripts/verify-check-registry.mjs packages --strict`（七轴总账：闭包／可执行性／到期／**mutation 覆盖（读 reports/mutation-coverage.json 的签名台账，6 探针逐条）**／**生产者接线（每条 check.requires 的 producer 必须有 manifest 行或 CI action 执行）**／真空证伪／占位符——在册的轴计数与实测不符即红，闭包破了即红） | mirror |
@@ -141,65 +91,35 @@ Run from the two trees (never reorder or rename these steps):
 | 56 | `node packages/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json`（W2/W3/W10/W11 发布证据：schemaVersion=2、platformLine 与 platform-line.json 逐字、manifests 范围一致；`--release` 时另要求 ciFace/gates/S1–S4 全 pass/52 项 traceability 全覆——blocked 不算 pass。缺文件/不可解析→**exit 2**） | mirror |
 | 57 | `node packages/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json --gates-from-manifest ci --ci-face ci --os ci`（W3/W10 发布证据装配：把 pack 写出的 schema-2 骨架与本仓演练快照（S1–S4 spike 证据 + W11 52 项 traceability）合并，并写入 CI face 与本次 compat-check 已执行的 gate 台账；`--release` 在 publish 前复验；缺输入/不合格→exit 1/2） | mirror |
 | 58 | `node packages/evolution-merge-engine/verify-upstream.mjs`（engine 发布 parity：UPSTREAM.json 的逐文件 bytes/sha256 与 testPatchSet 的 patchedBytes/patchedSha256 必须全等；缺文件/不匹配→exit 1。GAP-P0-05 的发布门禁） | mirror |
+| 59 | node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^$RANGE" | overlay |
+| 60 | node packages/evolution/scripts/gen-about.mjs packages/evolution --check | overlay |
+| 61 | node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check | overlay |
+| 62 | node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check | overlay |
+| 63 | node packages/evolution/scripts/gen-client-tokens.mjs packages/evolution --check | overlay |
+| 64 | node packages/evolution/scripts/gen-param-client-view.mjs packages/evolution --check | overlay |
+| 65 | node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check | overlay |
+| 66 | node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check | overlay |
+| 67 | node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json | mirror |
+| 68 | node packages/evolution/scripts/install-layered.mjs --home "$HOME_DIR" --profile web --mode layered | overlay |
+| 69 | node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json | overlay |
+| 70 | node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}" | overlay |
+| 71 | node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run | overlay |
+| 72 | node packages/evolution/scripts/requirements.selftest.mjs | overlay |
+| 73 | node packages/evolution/scripts/run-load-sensitive.mjs . | overlay |
+| 74 | node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only | overlay |
+| 75 | node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts | overlay |
+| 76 | node packages/evolution/scripts/verify-probes.mjs packages/evolution | overlay |
+| 77 | node packages/evolution/scripts/verify-requirements.mjs packages/evolution | overlay |
+| 78 | node packages/scripts/verify-line-identity.mjs --policy-only --strict | mirror |
+| 79 | node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict | mirror |
+| 80 | node packages/evolution/scripts/verify-graph-edges.mjs --report | overlay |
+| 81 | node packages/scripts/verify-health-admission.mjs | mirror |
 
-The canonical runner is `node D:/dsh/audit-v42/run-baseline.mjs <prefix>` (it
-writes one log per step plus a summary, and prints the step names it ran, so a
-drift between this table and the executed set is visible in every gate log).
+## Pull request checklist
 
-The three machine-local rows below (13-15) are registered in
-`verify-gate-manifest.mjs`'s `MACHINE_LOCAL` table with the step that ports them —
-the table may not cite an absolute path that no register covers:
-steps 13-15 check tsconfig registration, manifest version uniformity and mirror↔overlay parity. Each row
-names its absolute path precisely because these three are NOT shipped guards
-(citing a bare script name here would claim a guard the repository does not
-have). They are part of the executed gate because no in-repo script covers those
-three checks today; a portable replacement belongs in `packages/scripts` if the
-workspace is ever used from another machine.
-
-`verify-layout-sync.mjs` is **retired from this table** but NOT from the
-release path: the publish chain still executes it as its step 2 version guard,
-comparing `packages/scripts/**` against the stale checkout's copy — a drifted
-script pair ABORTS the release before any commit or tag (0.3.83 hit exactly
-that: 58 drifted files, fixed by copying the mirror's scripts over the stale
-side). Its other half, the dev→mirror robocopy, is gone with the dual-line
-workflow (running it would overwrite this tree).
-
-The stale tree is `D:/dsh/deepseek-harness` (a platform checkout at `548aa30`
-whose `packages/evolution/*` predates this mirror). It carries an
-`AUTHORING-MOVED.md` marker at its root pointing here, and the drift between the
-two trees is measurable at any time with a **machine-local, warn-only** probe:
-`node D:/dsh/audit-v44/two-tree-drift.mjs` (per-package file hashes; it never
-exits non-zero). It is deliberately NOT a shipped guard — an in-repo script
-cannot assume a second tree exists — which is the same reason rows 8-10 above
-name absolute paths.
-
-`verify-doc-facts.mjs` runs standalone for the same check rule N19 makes, and
-`verify-platform-contract.mjs --upstream <tree>` audits the platform anchors
-(its failures are recorded platform drift, not family drift).
-
-### House rules
-
-- Rule ids are **append-only**: docs and registers cite them, so a landed id is
-  never reused or renumbered.
-- Scripts under `packages/scripts/` are outside oxlint: their correctness is
-  proven by fixtures in `packages/evolution-host/tests/guard-scripts.spec.ts`.
-- A new gate lands in warn mode for one release before `--strict` is wired.
-- No corpse, no rule: every guard names the incident it exists for.
-
-### 客户端半：hooks 区约定（G4/4.0 · S5-01）
-
-- 客户端组件（evolution-settings-ui／evolution-skill-history 等 src/client 下的组件函数）必须把**全部 hook 无条件写在函数顶部**，条件分支只决定**输出**；hook 调用不得出现在任何 `return`（含提前 return）之后。
-- 理由：两个调用方都以普通函数形式调用同一组件时共享同一条 hook 序列，hook 数量随渲染状态变化会直接触发 React invariant（实测三条迁移路径全崩）。
-- 待补：静态门禁（hook 不得出现在 return 之后）拟随 G0 的判据线一起落地；在此之前本约定由评审把关。
-
-### 门禁 profile 的两个口径（G0/0.5）
-
-- 家族里 **pre-tag** 有两个口径，过去由两个脚本各自实现（同一个词、两个集合、两个数字都对）：**声明口径**＝行上 `profiles` 里字面声明 pre-tag（`gen-check-taxonomy` 用它）；**并集口径**＝`local ∪ ci`（`run-gates pre-tag` 用它）。
-- 两个口径现在都取自同一个**投影模块**（导出 `declaredPreTag` 与 `supersetPreTag`）—— 任何脚本都不得再自行推导这两个集合；模块路径见 policy fact。
-- 两个口径的**当前条数**不在本文件复述：取真实值请跑检查分类器与门禁运行器各自的报告/清单开关（两个脚本都在 packages/scripts 下，勿在此处复述它们的文件名或数字）（陈述有一个家，抄一遍就多一份会漂的副本）。
-- 行上的 profile 字面量必须在词表内（`local`／`pre-tag`／`ci`）；写错的字面量**不是被忽略**，而是由 `unknownProfiles` 点名（静默丢行会让一条门禁悄悄脱离运行集）。
-
-### 发布之后的字节一致核对（G0/0.4b）
-
-- **发布之后**由发布流程自己的一步承担：抓取 registry 上刚发布的字节，与本地 dist 里那份**逐字节比对**（sha256），不一致即红并点名包；抓不到即"无法判定"（离线／尚未上架），**不得计入通过**。步骤见 `.github/workflows/release.yml` 的 post-publish 步骤（本文不复述脚本文件名与用法，避免出现"点了名却没有执行点"的陈述）。
-- 为什么不在 pre-tag：那一刻"registry 上是什么"**原则上不可判定**，塞进去只会再产生一次"无法判定被写成通过"。
+- [ ] The change is in the right package, not a new micro-package for one file.
+- [ ] Generated surfaces were regenerated, not hand-edited.
+- [ ] Focused specs and the relevant tier pass.
+- [ ] `verify-doc-facts` and strict traceability pass when their inputs changed; `verify-probes` runs in the CI lane or with the probe fixtures.
+- [ ] User-facing docs are updated; stale paragraphs are deleted, not archived in place.
+- [ ] No secrets, local home paths, or one-off reports are committed.

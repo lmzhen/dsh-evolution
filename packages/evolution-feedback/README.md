@@ -1,27 +1,23 @@
-# @deepseek-ai/dsh-evolution-feedback
+# @lmzhen/dsh-evolution-feedback
 
-Feedback-to-quality scoring: durable through `ctx.evolutionIo`; skill feedback feeds the
-FEEDBACK-OWNED `feedback_score`/`feedback_warn` pair.
+> 反馈记录与质量回推服务。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: the usage-record readers own it.
-- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-feedback` row, `evolution-host`/`evolution-all`/`evolution-preset`.
+record() 乐观累加 + events.json 写锁；事件真值折叠；quality 回推 feedback_score/feedback_warn；启动缓存。
 
-## Configuration
+## 入口
 
-- `qualityWarnThreshold` (default `-0.25`): score below which the pair flips to warned.
-- `path`: boot-cache path; `''` means `$DSH_HOME/evolution/feedback.json` (the event log is not affected).
+ctx.evolutionFeedback；族内无生产者。
 
-## Known limitations
+## 依赖与默认
 
-- Lifecycle and scope views read `quality_warn || feedback_warn`, so negative feedback shortens the stale window even though the curator recomputes `quality_warn`.
+需要 io/skillUsage 才能持久化/回推。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 边界
 
-## Notes and history
+没有默认调用方；无 io 只改内存；snapshot 仅测试；质量回推只对 kind=skill。
 
-- Persists through the IO seam; quality propagation into skill usage requires BOTH the `skillUsage` service and a mounted IO backend: with no `evolutionIo` the push returns before touching the persistent usage sidecar (S4.6), so an optimistic in-memory score never lands there unconfirmed.
-- The in-memory-wins window of a log refold is the IN-FLIGHT append window only, counted PER TARGET (two appends for one target in flight at once both stay protected, and the no-io path never enters it): a settled target folds from the log truth, so another process sharing `DSH_HOME` is not overwritten by this process's stale record (S1.4).
-- P1-1 (v15): feedback writes the FEEDBACK-OWNED `feedback_score`/`feedback_warn` usage fields.
+## 代码位置
+
+`src/index.ts`

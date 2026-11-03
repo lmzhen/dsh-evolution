@@ -1,34 +1,25 @@
-# @deepseek-ai/dsh-evolution-commands
+# @lmzhen/dsh-evolution-commands
 
-Human commands for the evolution family: it registers the `/evolution …` command surface
-and its help text, and drives the other rows from a command. It adds no automatic
-background behaviour of its own.
+> /evolution 命令面 + 诊断路由 + 运行登记。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** two direct tokens, both injected as user messages in this session — the `/evolution learn` injection (the full learning guidance) and the `maintain handoff` injection (a one-line POINTER to a finished maintenance report plus a report-only protocol: read the file, report per item, change nothing until the operator approves). **Command output never reaches model history**: `/evolution maintain` and every other subcommand answer in the client only. Everything else adds no tokens.
-- **Prompt prefix / KV cache:** independent of request-prefix construction — it does not alter the assembled prompt or tool list; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-commands` row, carried by the `evolution-host`, `evolution-all` and `evolution-preset` bundles.
+注册 /evolution 30 条子命令、/api/dsh-evolution/diagnostics、runs.json、设置页抑制、旧设置迁移、learn/maintain/preset install/extract/restructure/params/policy/migrate。
 
-## Command reference
+## 入口
 
-The full `/evolution` subcommand table is single-sourced in the family README's **Command reference** section (`packages/README.md` in the source repository; it is named here instead of linked because a repo-relative markdown link out of this package would be dead inside the npm published tree). It is rendered from the subcommand registry (`src/registry.ts`, the same single source as the `/evolution` input-declaration hint and the bare-command help output), and `tests/registry.spec.ts` (T-WD2) pins that rendered table byte-for-byte.
+/evolution …；diagnostics GET。
 
-## Known limitations
+## 依赖与默认
 
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
-- **`/evolution maintain` runs in the BACKGROUND (0.19.0).** The command answers with a run id and the scan keeps working: read it with `/evolution maintain report [<id>]` (a run that produced nothing answers "no result" instead of an empty plan) or `/evolution maintain status [<id>]` (in flight plus the recent terminal states). Since 0.20.0 the id may be **omitted** on `report`, `cancel` and `handoff`: it then means the newest run in this home, and an unreadable `runs.json` answers "the run index is not readable" for that form rather than guessing. The run's lifetime belongs to this plugin through `evolution-core`'s run registry, **not** to the request that started it: the desktop shell ends a request at ~305 s (measured four times) while the same scan completes in 949.7 s on the web plane, and `maintainTimeoutMs` (default 600000) bounds the run itself. **Cancelling the request no longer stops the scan** — use `/evolution maintain cancel <id>`, or unmount the row. The plan is written once at settle to `<evolutionHome>/reports/maintain-<runId>.{json,md}`, under the same per-home reports window the curator's reports use.
-- **`maintain handoff` is a SOFT gate (0.20.0, accepted).** The injected protocol asks the model to report and wait for the user's reply, and "what was approved" lives only in that conversation — the family keeps no approval record of its own. Escalate to the existing `evolution-approval` channel when unattended bulk skill edits, a multi-person audit trail, or non-repudiation become requirements.
-- **`maintain handoff` reports a run whose state is not `succeeded` as "ready" when a report file exists (0.20.0, accepted).** A failed or cancelled run writes the same `.json`/`.md` pair (the failure text is the report), so the injection fires and the protocol's first line — read the file — is what tells the model what happened. Tightening it to `succeeded` only is a behavior choice, not a defect fix.
-- **The injected pointer names the `.md` digest without re-probing it (0.20.0, accepted).** `reportDigestPath` swaps the `.json` suffix; the writer emits both files in one settle, so a hand-deleted `.md` beside a live `.json` would name a missing file.
-- **The id-less forms repeat the same resolve skeleton three times (0.20.0, recorded).** `report`, `cancel` and `handoff` each run `syncRuns` → id-less `newestRun` → three-state error reporting; the wording is shared through `unreadableIndex`/`unreadableForId`, the skeleton is not. Extracting one resolver is the next batch's refactor.
-- **Cross-plane run state is eventual, and the shared index is the truth for runs this process does not own (0.19.1).** Two hosts sharing one `DSH_HOME` (the desktop app and a `dsh web` plane) read and write `evolution/runs.json` together. `begin()` resolves only after its row is in that index, so a plane reading the answer "started" finds the run; a run another plane owns is re-read at this plane's **next** read, and it stops being live in exactly two ways — its owner settled it (that terminal state is adopted) or its owner died (converged to `failed(orphan)`, with the reason spelled out). Runs this process owns keep memory as the truth. No timer and no heartbeat sits behind this: 0.19.0 skipped ids it already knew, which left an observing plane reporting `running` forever and refusing its own `maintain` until it restarted. The rule is monotonic on BOTH sides (0.19.2): the read side adopts a terminal row, and the write side never puts a row this process does not own back to `running` over the terminal state its owner wrote — so a settled run cannot be resurrected by this plane's own later write. Two hosts sharing one home must be on the SAME machine: `isProcessAlive(pid)` does not cross machines. Structurally (0.19.3) a row has **exactly one writer — the process that started it**: this process's rows live in its own map, every other row is whatever the index says (rebuilt on each read), and a settled row is **never** shown as running again — a stale writer that puts `running` back is refused on read and repaired on the next write.
-- **① variant form: the `/evolution …` command face is visible in every session** (accepted, not fixed). Commands are registered in scope layers, and the family registers once on the host plane, so a session on a platform original preset still lists the management-only subcommands even though no automatic family behaviour reaches it. The difference and its reasoning are single-sourced in `INSTALL.md` ("Known difference").
+需要 commands 服务；多数子命令还需要 approval/curator/merge/io。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 边界
 
-## Notes and history
+未挂 commands 则整条命令不存在；maintain 异步；部分兜底文案与实际命令不一致；consolidate 已退役。
 
-- P2-22 (v11) correction: this package's direct model-visible tokens are the `/evolution learn` injection (the full learning guidance) and — since 0.20.0 — the `maintain handoff` injection (a report pointer plus the report-only protocol). Both are injected as user messages in this session; see **Model surface** above for the current count.
-- **① variant form: the `/evolution …` command face is visible in every session** (accepted, not fixed: 0.3.78).
-- The injection goes through the agent's waking primitive (`followup`, falling back to `inject` when the host lacks it), **called on the agent instance**: the platform's `Agent.followup` is a prototype method (`this.send(...)`), so a detached reference throws and queues nothing (0.3.73 fix; the same shape is pinned by rule N13b in `packages/scripts/verify-arch-guards.mjs`, which masks comments and string literals before matching and self-tests its detector at startup).
+## 代码位置
+
+`src/index.ts, src/registry.ts, src/diagnostics-route.ts`
+
+安装形态与 variant 命令面差异单源在 [INSTALL.md](../INSTALL.md)。

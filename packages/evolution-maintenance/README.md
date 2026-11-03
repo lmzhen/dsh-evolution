@@ -1,32 +1,23 @@
-# @deepseek-ai/dsh-evolution-maintenance
+# @lmzhen/dsh-evolution-maintenance
 
-Skill-library drift-scanning determinism surface for the maintenance subagent: it assembles the
-skill snapshot, renders the mechanical-facts block and runs the scan → subagent → validate
-chain behind `/evolution maintain` (`evolution-core` `drift-signals`).
+> 只读维护扫描：探针、事实块、计划校验。
 
-- `snapshotFromLibrary`: assemble a plain skill snapshot from a SkillLibrary-like reader.
-- `renderFacts`: canonical `MECHANICAL_FACTS` block (version + joint signature + redaction).
+## 它做什么
 
-## Model surface
+maintenance_probe 工具（只读深挖）；runMaintain 编排子代理扫描；--facts 0-token 预览；drift/enrichment/footprint/validate-plan。
 
-- **Model-visible:** the read-only `maintenance_probe` tool schema (`evolution-maintenance/tools`), mounted for every session.
-- **Prompt prefix / KV cache:** no system-prompt section of its own; family-level rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-maintenance/tools` row (host/all/preset); the orchestration is consumed by `evolution-commands` (`/evolution maintain`).
+## 入口
 
-## Known limitations
+maintenance_probe；/evolution maintain …。
 
-- Phase 1-2 expose no service beyond the command surface: the chain (scan → render → subagent → validate) is wired through `/evolution maintain`.
-- **The scan's lifetime is the RUN's, not the request's (0.19.0).** `/evolution maintain` starts a run through `evolution-core`'s run registry and answers with a pointer; `evolution-commands` writes the resulting plan to `<evolutionHome>/reports/maintain-<runId>.{json,md}` — this package persists no report of its own. Measured: 949.7 s end to end on the web plane, ~305 s of REQUEST lifetime on the desktop shell (which used to abort the scan; it no longer does). `maintainTimeoutMs` (default 600000) bounds the run, and a run that produced nothing is recorded as such rather than as an empty plan. The published inventory of long runs is `packages/README.md` §"Long-running work", rendered from `evolution-core/src/long-runs.ts`.
-- **Plan validation is instance-granular (§3 completeness).** Notes stay id-level: one mention explains away every instance of that id.
-- **A budget-capped dedup scan is reported, never silently shortened.**
-- `maintenance_probe` is readable by every session; maintenance subagents reach it through the orchestrate `toolFilter` allow-list.
-- The model-visible template (`MAINTAIN_PROMPT`) and the subagent output instruction (`MAINTAIN_OUTPUT_INSTRUCTION`, V10 F-16) ship in `evolution-core` `PROMPT_BUNDLE`; the joint-signature mismatch protocol is honored by `renderFacts` callers, not by this package alone.
+## 依赖与默认
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+根导出是纯库；./tools 才是插件；需要 evolutionIo 才能读树。
 
-## Notes and history
+## 边界
 
-- (design 011: the maintenance-subagent design paper, archived in git history).
-- The facts block renders one line per skill, so ONE signal id can be `over` on several skills: every `over` instance (`skill::id`; a library-level signal renders once and keeps the bare id) must be covered by plan evidence or named in a note, so a plan that advises one skill no longer zero-explains the same signal on its siblings (P2-4, 0.3.83).
-- `maintenance_probe` appends "note: dedup scan truncated at the pair-comparison budget; groups may be incomplete" and the `dedup_group` signal value carries the same qualification (P2-8, 0.3.83).
-- V10 (F-02): orchestrate soft-probes the tools registry before spawning and degrades the filter to `skill`-only (declared in the subagent prompt) when the tool row is not mounted, instead of failing the spawn; an explicit `toolAllow` option bypasses the probe.
+不写技能树；无 io 时探针返回 not-mounted 结果；footprint 未从根导出；一次扫描全树两遍、无缓存。
+
+## 代码位置
+
+`src/tools.ts, src/orchestrate.ts, src/validate-plan.ts`

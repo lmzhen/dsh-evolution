@@ -1,99 +1,34 @@
-# @deepseek-ai/dsh-evolution-agent-preset
+# @lmzhen/dsh-evolution-agent
 
-Agent preset exposing memory and skill evolution tools to a session
+> Evolution agent 预设的内容包（不是 bundle）。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: the delta registers no prompt and no tool schema; it mounts the four model rows (`tool-memory`, `tool-skill-manage`, `tool-session-query`, `evolution-skill-catalog`), which own what the model sees.
-- **Prompt prefix / KV cache:** the composed preset is the platform's own base composition plus this delta; this package adds no prompt text of its own. Family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the agent preset DELTA (`agent.cordis.yml`), installed by `install-layered.mjs` (agent/layered modes) or `/evolution preset install`; not a profile row.
+提供 5 行预设 delta 和 4 个基底表（standard/ptc/cordis/minimal）；由 /evolution preset install 或 install-layered 写入 profile patch。
+
+## 入口
+
+/evolution preset install [--base …]；install-layered --mode layered/agent。
+
+## 依赖与默认
+
+需要 host 或 agent-preset 包提供模型行；不是 dsh.bundle，plugin add 不会挂它。
+
+## 边界
+
+cordis 需要 dynamicCordisRunner；minimal unsupported（平台 minimal 没有 tool-skill 行）；与 all/preset 互斥。
+
+## 代码位置
+
+`agent.cordis.yml, bases.json`
 
 ## Preset variants
 
-`agent.cordis.yml` here is a DELTA: the four evolution model-tool rows and nothing else.
-The installed preset is GENERATED at install time by `packages/scripts/install-layered.mjs`
-(agent / layered modes) or by `/evolution preset install`, which prepends the RUNTIME platform
-composition the `--base` names and writes the result as ONE `- insert:` row in the target
-profile's own patch layer (`<home>/profiles/<profile>/cordis.patch.yml`). No platform row is
-vendored — the preset follows whichever platform the user actually has. 0.2.x removed the preset
-DIRECTORY: a preset is an ordinary composition row (`packages/preset/agent-preset/src/index.ts`),
-so no `.agent-presets/` tree is produced any more.
-
 | `--base` | Platform base patch (read verbatim) | Preset id | Row id | Display copy |
 |---|---|---|---|---|
-| `standard` (default) | `presets/standard.patch.yml` | `evolution` | `preset-evolution` | `Evolution` |
-| `ptc` | `presets/ptc.patch.yml` | `evolution-ptc` | `preset-evolution-ptc` | `Evolution PTC` |
-| `cordis` (`requires: dynamicCordisRunner`) | `presets/cordis.patch.yml` | `evolution-cordis` | `preset-evolution-cordis` | `Evolution Cordis` |
-| `minimal` (unsupported) | — | `evolution-minimal` | `preset-evolution-minimal` | `Evolution Minimal` |
+| `standard` | `presets/standard.patch.yml` | `evolution` | `preset-evolution` | Evolution |
+| `ptc` | `presets/ptc.patch.yml` | `evolution-ptc` | `preset-evolution-ptc` | Evolution PTC |
+| `cordis` | `presets/cordis.patch.yml` | `evolution-cordis` | `preset-evolution-cordis` | Evolution Cordis |
+| `minimal` | `presets/minimal.patch.yml` | `evolution-minimal` | `preset-evolution-minimal` | Evolution Minimal（unsupported） |
 
-The base patches are the platform's own shipped presets
-(`packages/bundle/web-app/presets/<base>.patch.yml`); inside the desktop app they live in
-`resources/app.asar`, so `DSH_AGENT_PRESET_ROOT` can point at a same-version copy.
-
-There is no metadata FILE any more. A declarative row carries its own display copy, and the
-platform renders an id it did not ship from the row itself
-(`packages/preset/agent-preset-registry/src/display.ts`), so both install paths write `name`,
-`description` and `order` into the row out of `bases.json` `display` — a variant without them
-shows the bare id. The four former `preset*.yml` files were deleted with the directory
-mechanism.
-
-`bases.json` in this package is the single table behind every column above: the installer
-(`AGENT_PRESET_BASES`) and the host command (`/evolution preset install --base <name>`) both
-read THIS file, so a base cannot be half-added (a directory one consumer knows about and
-another does not) and the two install paths cannot disagree. It also carries `default`. A base whose
-runtime composition is absent (an older platform with no `ptc` preset, a preset root that does
-not carry it) is REFUSED with a named error; it is never composed from another base. The V10-14
-`tool-skill` catalog-cap injection (`injectToolSkillCap`) runs on the composed output
-for every base, and the row-collision guard still fails loud when a delta row id appears in the
-platform composition.
-
-### PTC base (`--base ptc`)
-
-Composes the platform's `ptc` preset (the standard coding agent with `run_code` as the model's
-composition surface) plus this delta, so the family's `memory`, `skill_manage` and
-`session_search` entry points reach a PTC session.
-
-Known limitations of this base:
-
-- **Tools are SDK members, not schemas.** PTC presents only `run_code` plus a generated SDK, and
-  the model may call `run_code` alone; every family tool is reached as a member inside a code
-  program. Prompt text that names a family tool as directly callable is a model-facing wording
-  question owned by the persona / tool-description packages, not by this container.
-- **A deployment without a code runtime refuses the preset at mount**, naming
-  `tool-presentation`; that row and its requirement come from the platform `ptc` preset and are
-  not something this variant can soften.
-- **Both install paths produce this variant**. The npm command and the source installer read the same `bases.json`.
-- **Tool-use observation under PTC** depends on the family reading dispatches through
-  `evolution-core`'s dispatch normalizer rather than matching a platform event vocabulary; a
-  consumer that matches `tool/call` directly goes blind in this mode (the arch guard rejects that
-  form).
-
-## Known limitations
-
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
-
-### Base coverage
-
-`bases.json` carries four bases and is the single table behind the installer
-(`AGENT_PRESET_BASES`), `/evolution preset install --base <name>` and the table
-above: `standard` (default), `ptc`, `cordis` and `minimal`. Two of them carry a
-precondition the table itself declares, and both install paths refuse them by
-name when it is unmet — the preset is never composed from another base:
-
-- `cordis`: `requires: { service: 'dynamicCordisRunner' }`. The cordis preset's
-  extra row is `tool-cordis`, which injects `dynamicCordisRunner`, and that
-  service is mounted only by the `web-app` bundle. A cordis-based preset on a
-  headless, ACP or SDK profile would mount a row whose injection cannot be
-  satisfied, and a preset row that never activates is refused at mount time
-  rather than degraded. Cordis sessions otherwise get the family through the
-  profile-wide `all` install, which needs no variant.
-- `minimal`: `unsupported`: the platform minimal composition is only persona +
-  persistent-shell, so it mounts no skill or file tool rows for the family to
-  write through (see `packages/INSTALL.md` §Platform mode × self-evolution).
-
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
-
-## Notes and history
-
-- **Both install paths produce this variant** (0.3.75): `/evolution preset install --base ptc` (npm, `evolution-commands`) and `install-layered.mjs --base ptc` (source checkout) read the same `bases.json` and write the ptc row `preset-evolution-ptc` into the target profile's patch layer (0.2.x removed the `.agent-presets/` directory these paths used to write into). It still only composes a platform that actually ships the `ptc` preset; a `standard`-only runtime is refused by name.
-- The V10-14 `tool-skill` catalog-cap injection (`injectToolSkillCap`) runs on the composed output for every base, and the row-collision guard still fails loud when a delta row id appears in the platform composition.
+`cordis` 需要 `dynamicCordisRunner`；`minimal` 没有平台 tool-skill 行，不支持。

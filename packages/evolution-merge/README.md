@@ -1,53 +1,23 @@
-# @deepseek-ai/dsh-evolution-merge
+# @lmzhen/dsh-evolution-merge
 
-Skill auto-merge host surface: candidate screening through the vendored pipeline,
-two-round child authoring, per-pair staging, pending approval, commit receipts and
-unit undo.
+> 技能合并域：扫描、两轮 authoring、提交、撤销、恢复。
 
-> **Screening pipeline freeze:** the merge-engine screening pipeline ①–⑤ is specially
-> tuned. Its substantive flow (stage order, inputs/outputs, models, weights, thresholds,
-> filters, scoring, decisions, and any selection policy affecting candidate set/order)
-> must not change. Only packaging, loading, adapters, error boundaries, diagnostics and
-> tests may change, with parity evidence proving identical screening output.
+## 它做什么
 
-## Surface
+evolutionMerge 服务 16 个 verb；merge_stage 工具；4 条只读路由；PairLedger、staging、UnitTransaction 提交、undo/recovery/reconcile/doctor。
 
-- `/evolution merge <subcommand>` — canonical command.
-- `/merge <subcommand>` — compatibility alias; registered through 0.30, deprecated in 0.31, removed in 0.32.
-- Four read-only routes under `/api/dsh-evolution/merge/*`.
+## 入口
 
-```text
-/evolution merge scan | pair [--force] <a> <b> | candidates [--retry <id>] |
-  status [id] | pending [--expired] | report [id] |
-  approve <id> | reject <id> | resume [id] [--clear <id>] [--retry] |
-  skipped [--restore <id>] | doctor | runs | cancel [id] | undo <target> --run <id> |
-  reconcile
-```
+ctx.evolutionMerge；/evolution merge …；merge_stage；4 路由。
 
-`/evolution merge` help lists 19 read/write surface commands plus the `reconcile`
-maintenance command; `doctor` and `reconcile` stay off the frozen CommandSurface v1.
+## 依赖与默认
 
-## Models
+需要 evolutionIo、commands、状态、merge-engine；模型根未配会 fail loud；筛选 pipeline 冻结。
 
-The engine needs local `potion-multilingual-128M-int8` and
-`potion-multilingual-128M-pca64-int8` directories under `mergeModelsRoot`.
-No auto provisioning; missing models fail loud and `/evolution doctor` warns.
-`SKILL_MERGE_MODELS_ROOT` is an engine-internal test/CLI knob, not a host
-configuration surface.
+## 边界
 
-## Read-only panel
+自身不注册 slash command（/merge 已移除）；run/runs 路由未实现；默认 detached；UI 只读。
 
-The browser panel is `@deepseek-ai/dsh-evolution-merge-ui`, mounted by the
-`all` bundle only. The host row is mounted by `all`, `host` and `preset`.
-## Reconcile
+## 代码位置
 
-`/evolution merge reconcile` is the one writer of row-state convergence: skipped-TTL
-expiry, approved→fuse continuation when the stage tree is usable, stage-lost demotion to a
-retryable fuse row, and source-gone clearing (only when the live library is non-empty).
-Every run writes `<home>/merge/reconcile.json`; `/evolution merge doctor` and the global
-`/evolution doctor` merge line consume that report. Snapshots and the four GET routes
-derive (for example an expired stage) but never persist.
-
-Runtime command failures use three lines — `code:` (with stage/run id), `hint:`, `next:`.
-A missing parent run answers `merge-parent-required` (with an E-305 hint); an invocation
-that carried no agent answers the typed `no-agent` code.
+`src/index.ts, src/runtime.ts, src/merge-routes.ts`

@@ -1,36 +1,23 @@
-# dsh-evolution-all
+# @lmzhen/dsh-evolution-all
 
-**DEFAULT install** — full-functionality evolution bundle for the
-`@lmzhen/dsh-evolution` plugin family.
+> 全量默认 bundle。
 
-```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all@<ver>
-```
+## 它做什么
 
-**Compatibility.** Validated platform line: DSH `0.2.0-rc.2`; the `@deepseek-ai/dsh-*` dependency window is `^0.2.0-rc.1`. A prerelease range does not cross lines — install this bundle on that line only (family-level statement and history: the repository README's Compatibility section).
+28 条 insert + 2 覆盖：host 的基础设施 + memory/skill_manage/session_search/skill_catalog/skill_discovery + UI + 健康行（disabled）。
 
-## Model surface
+## 入口
 
-- **Model-visible:** its profile-root rows (`memory`, `skill_manage`, `session_search`, the skill catalog (feeding the `skill` tool's catalog section), the SKILLS/MEMORY guidance injection, plus `maintenance_probe`) active in **every** session.
-- **Prompt prefix / KV cache:** those rows enter the request prefix (the guidance sections in particular); this bundle itself adds no prompt; family-level rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — this IS the mount at profile-root level: the host automation (review, curator, approval, threat checks, memory/skill storage, observability) plus the model rows, with no agent-preset step and no session choice; exclusive with `evolution-host`, the one-click `evolution-preset` bundle and the layered preset.
+dsh plugin add @lmzhen/dsh-evolution-all。
 
-## Package selection = the shrink path
+## 依赖与默认
 
-| Bundle | Row set | Notes |
-|---|---|---|
-| `@lmzhen/dsh-evolution-all` | infra + 4 model tools + the client settings section (+ read-only `maintenance_probe`) | **DEFAULT** — most complete first |
-| `@lmzhen/dsh-evolution-host` | infra only | Same automation, no memory/skill model tools (evolution without exposing `memory`/`skill_manage`); `maintenance_probe` ships with it |
-| `@lmzhen/dsh-evolution-preset` | ≡ all's infra + model rows (no client settings row) | one-click **compatibility** form, kept for legacy |
+与 host/preset/分层互斥；session_search 需要平台 peer。
 
-## Known limitations
+## 边界
 
-- **These are ALTERNATIVE install targets.** Mounting two (e.g. `all` + `host`) fails loud at startup (`invariants: already registered`): install exactly one; to drop the memory/skill tools, uninstall `all` and install `host`.
+健康面板默认关；discovery 默认 off；审批默认关；与 host/preset 不能同挂。
 
-## Advanced: per-session tools (layered)
+## 代码位置
 
-For tools only in *selected* sessions, use the layered path: install `@lmzhen/dsh-evolution-host`, then `/evolution preset install` (or `install-layered --mode agent`) to generate the Evolution agent preset, and pick it per session. **`all` and the layered preset are also exclusive** — mounting both double-mounts the model rows.
-
-For fine-grained control (e.g. a profile overlay), see the family README — `packages/README.md` in the source repository (named, not linked: a repo-relative link would be dead inside the npm published tree).
-
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+`cordis.patch.yml, package.json`

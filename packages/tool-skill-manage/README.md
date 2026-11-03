@@ -1,126 +1,23 @@
-# @deepseek-ai/dsh-tool-skill-manage
+# @lmzhen/dsh-tool-skill-manage
 
-Model-facing `skill_manage` tool: it exposes skill-library mutations to the model and
-routes them through the evolution approval seam when one is mounted; it owns neither the
-library nor its lifecycle rules.
+> 模型面 skill_manage 工具 + 写入闸门/审批。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** the `skill_manage` tool schema and its success/validation messages; result tokens scale with what is returned. The skills-guidance section (`evolution-skills-guidance`) ends with the policy's protected-skill list, carried by the prompt variable `evolution_skill_guard`: the provider runs at EVERY assembly (a policy change needs no reload), and an empty list leaves the section byte-identical to the guidance alone, so the guidance's prefix-cache behaviour is unchanged.
-- **Prompt prefix / KV cache:** the tool schema is prefix-stable, and skill writes do not alter the current request prompt; catalog invalidation affects the next request; family rules: `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `tool-skill-manage` row, carried by the `evolution-all` and one-click `evolution-preset` bundles and the Evolution agent preset delta.
+13 个 action；写入门禁（argument/missing/policy/read-before-write/confirm）；审批暂存/preview/runner；guidance + 保护名单变量；配置收紧；create/extract/review。
 
-## Safety model
+## 入口
 
-### Write gates
+skill_manage 工具。
 
-Every mutation THROUGH THIS TOOL passes ONE ordered admission sequence (`src/write-gates.ts`): the
-scalar argument shape, the required arguments per action, the policy's protected list,
-read-before-write, and the operator confirmation. The
-ADMISSION point runs the sequence before the approval seam, so a write that is refused is never
-staged for approval and never spends the operator's attention; the EXECUTION point (`executeCore`)
-re-runs the gates a replay or a direct write can still fail, because a replay's stored arguments
-passed no schema and the protected list can change while a record sits pending. Both points read the
-same table, so they cannot diverge.
+## 依赖与默认
 
-The sequence covers the MODEL tool path. The family's other writers reach their own library
-handles: the `/evolution` and `/graph` command face writes what the operator typed (the operator is
-the authority there), the review's plan executor writes a plan its own filter already screened
-(`filterUnreadSkillOps`), and a record staged outside this tool replays into the execution point
-without re-deciding the admission-only gates — there is no writing session to read.
+需要 tools/skillUsage/evolutionIo；审批可选。
 
-Read-before-write is admission-only (the replayed record has no writing session): a non-foreground
-write whose target the session never read is refused with `E-318`, and only a read that did not fail
-counts. A session log the tool cannot read proceeds with one warning rather than blocking every
-autonomous write.
+## 边界
 
-A foreground `create`, or a bare foreground `delete`, is the ONE write this tool puts to a human
-before writing; a `delete` carrying `absorbed_into` is the merge protocol and does not ask. WHAT
-that confirmation does is the `skillWriteConfirm` parameter (`/evolution params`, and the
-技能写入规则 card):
+read-only action 不加计数；pin/unpin 不过审批；strictCrossSource 默认只 warn；extract dry_run 仍写提案；description 60 字默认只建议。
 
-| Mode | What happens |
-|---|---|
-| `auto` (**the default**) | the write proceeds with no prompt — an unattended run (a background pass, a scheduled review, a headless session) must not park a tool call on a question nobody will answer |
-| `ask` | the question waits for as long as it takes; the answer is `Create`/`Delete` to proceed, `Cancel` (or a dismissed card) to refuse with `E-317` |
-| `timeout` | the question is asked with a deadline of `skillWriteConfirmTimeoutSeconds` (default 120 s); an unanswered prompt cancels the write with `E-319`, which names the three knobs |
+## 代码位置
 
-**One human gate per write (T2-10/A25).** When the approval seam is mounted, enabled and will stage
-this write (a background-origin write, or a deployment with `stageForeground`), the confirmation is
-SKIPPED — the approval window is the stronger gate (it holds the bytes until someone decides and replays
-them), and asking first as well asked the same question twice for one foreground write. The confirmation
-still fires exactly once when there is no such seam. A session whose approval policy is `never` has
-opted out of interrupts altogether; the seam allows the write outright there, which is that instruction
-rather than two gates collapsing into none.
-
-The deadline is enforced by the gate itself, not only by the abort signal it hands the question
-service: a prompt that outlives it returns anyway, and the timer is unref'd and cleared, so an
-answered prompt leaves neither a parked call nor a live timer behind. This gate is UX, not a
-security door: it is admission-only (a replayed record already carries the human release that staged
-it), and — in the two modes that ask at all — an unmounted question service, a caller that is not
-the registry's exact live root agent, or a failing ask all PROCEED with one warning. The shipped
-`auto` mode asks nothing, so it never reaches those fallbacks; the operator's own session stays the
-authority that asked for the write.
-
-### Approval seam
-
-Mutations (create/edit/update/patch/delete/write_file/remove_file/restructure) pass through the evolution approval seam when `evolution-approval` is mounted; approved/staged writes are replayed by the registered runner with the library origin preserved. The admission gates run BEFORE that boundary, so a write that cannot execute is refused, never staged for approval.
-
-### pin/unpin: explicit exception
-
-`pin` and `unpin` are deliberately **outside** the approval seam. Pinning only lifts/restores the curator-lifecycle freeze (a lifecycle flag, never content) and is fully reversible by the same tool. Routing it through `policy:'ask'` would let a staged-but-never-approved request hold the library in a pinned state invisibly. Tradeoff accepted: no approval on a lifecycle-flag flip; if product policy changes, pin/unpin should be wired into the same staging path as `patch`.
-
-## Configuration
-
-- `maxSkillContentChars` / `maxSkillFileBytes` bound SKILL.md reads and support-file writes on this row.
-- Deprecated name (G0/S0.3): `maxSkillContentChars` is the legacy spelling of the
-  policy row's `skillContentChars` (canonical id). The two are not auto-synchronised with it: this row's value is what
-  the write paths use, and since 0.6.0 the user settings layer can override it
-  per user. Reading the legacy name still works; writing it is refused. Removal was planned for 0.7.0 and is deferred:
-  the alias still ships, so no later version is claimed here.
-
-### Description length: the three numbers
-
-A skill description is measured against three different bounds. They are not interchangeable, and
-only the second one refuses a write:
-
-| Bound | Value | Source | What it does |
-|---|---|---|---|
-| Authoring bar | 60 chars | `AUTHORING_DESCRIPTION_BAR` (the upstream 60-char rule) | advisory feedback on every create/edit/update; `descriptionStrict: true` turns it into a refusal |
-| Family storage ceiling | 1024 chars | `MAX_DESCRIPTION_LENGTH`, lowered per deployment by this row's `maxDescriptionLength` | the hard validation limit — the ONLY refusal threshold of the three |
-| Platform catalog view | 500 chars by default | `catalogDescriptionMaxLength` on the platform's `tool-skill` row (`PLATFORM_CATALOG_DESCRIPTION_DEFAULT`) | truncates the description in the skill catalog the model reads; the family's own rows set that field to 60 (`evolution-host`, `evolution-all` and `evolution-preset` each carry it, and the composer injects it onto a generated preset row too), so 500 governs only a composition that overrides none of them; `packages/README.md` states which of those rows takes effect per install form |
-
-The third row is a view, not a rule: a description the family accepts can still be cut in a catalog
-viewer, which is why the authoring feedback names the bar rather than treating the cut as a limit.
-
-### The create-time duplicate hint
-
-A `create` compares its candidate against the library listing before it writes, over the name +
-description projection (core `nearDuplicateSummaries`, at `SUMMARY_DUPLICATE_HINT_THRESHOLD`), and
-names the closest existing skills in the same "Authoring check" block. Three properties are
-deliberate: it adds no read of its own (`library.list()` already reads every SKILL.md to parse
-its frontmatter — that listing is what publishes `description` — and the hint never calls
-`library.read`, never holds a body and never compares content); it is a HINT (the write proceeds
-— only the model's next decision changes); and a listing failure degrades to a named line instead of
-silence, because "nothing similar was checked" and "nothing similar exists" must not look alike. The
-library-wide BODY scan stays where it was, in the `review` action.
-
-### The retention line
-
-A whole-body replacement that keeps less than half of the previous SKILL.md says so in the same result
-message (`Content kept 26% of the previous body (2104 of 8123 characters); the replaced version is
-preserved in this skill's history.`). It is computed where the write path still holds both bodies — the
-library's own in-lock read, core `contentRetentionFeedback` — because a caller re-reading the file
-would race the writers the library serializes. Like the duplicate hint it is FEEDBACK, not a gate: no ratio
-refuses a write, small skills stay quiet (a 40-character skill cut in half is not news), and patches,
-support-file writes, creates and archives have no ratio to report.
-
-## Known limitations
-
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
-
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
-
-## Notes and history
-
-- pin/unpin: explicit exception (0.3.18, E-70)
+`src/index.ts, src/write-gates.ts`

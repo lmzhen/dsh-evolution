@@ -36,7 +36,8 @@
       ".release-staging.next",
       ".release-staging.previous",
       "dist.next",
-      ".git"
+      ".git",
+      "vendor"
     ]
   },
   "facts": [
@@ -175,6 +176,11 @@
               "script": "gen-line-manifest.mjs",
               "reason": "the bed manifest is generated from the MIRROR and ships from there; the validate job checks out the platform repo and copies only packages/evolution/**, so the committed artifact never reaches that tree (tried in CI on 2026-10-15: the generator derives ROOT from its own location, scanned packages/packages and died MODULE_NOT_FOUND; porcelain then saw the regenerated file as untracked)",
               "expiry": "release gate: the three-part sequence (generate -> git status --porcelain -- **/files/line-manifest.json -> --check) runs in the mirror local/pre-tag gate; revisit if the release job ever ships the mirror packages/scripts tree into the checkout"
+            },
+            {
+              "script": "verify-health-admission.mjs",
+              "reason": "needs both local health corpora; on a machine without them it must report CANNOT DECIDE rather than pass",
+              "expiry": "release gate: run it in the mirror local/pre-tag lane and record the reading; move into the action if a CI corpus is ever required"
             }
           ],
           "machineLocal": [
@@ -193,12 +199,6 @@
             {
               "script": "mirror-sync.mjs",
               "reason": "mirror <-> overlay parity check",
-              "expiry": "S1.8 follow-up: port into packages/scripts",
-              "owner": "toolchain"
-            },
-            {
-              "script": "run-baseline.mjs",
-              "reason": "the canonical local runner that executes this table",
               "expiry": "S1.8 follow-up: port into packages/scripts",
               "owner": "toolchain"
             }
@@ -307,7 +307,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 58 steps",
+          "text": "all 81 steps",
           "unique": true
         }
       ],
@@ -320,14 +320,14 @@
       "home": "README.md",
       "machine": {
         "kind": "platform-version",
-        "file": "../.github/workflows/release.yml"
+        "file": "../platform-line.json"
       },
       "must": [
         {
-          "text": "**Validated platform line: DSH `0.2.0-rc.2`.**"
+          "text": "**Validated platform line: DSH `0.2.1-rc.3`.**"
         },
         {
-          "text": "`^0.2.0-rc.1`"
+          "text": "`^0.2.1-rc.2`"
         }
       ],
       "forbid": [
@@ -579,7 +579,7 @@
         "adapter": {
           "script": "lib-line.mjs",
           "sha256": "1931db3d233c642d15bb2994408e917a70819800fa876cbe03446566bf12dbcb",
-          "expectedLine": "0.2.0-rc.2",
+          "expectedLine": "0.2.1-rc.3",
           "extendsExternal": {
             "path": "D:/dsh/_tools/lib-line.mjs",
             "sha256": "1931db3d233c642d15bb2994408e917a70819800fa876cbe03446566bf12dbcb"

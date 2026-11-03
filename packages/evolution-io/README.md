@@ -1,20 +1,23 @@
-# @deepseek-ai/dsh-evolution-io
+# @lmzhen/dsh-evolution-io
 
-IO seam for evolution providers: the registry the file-backed family stores (`memory-files`,
-`skill-usage`, `evolution-activity`) write through.
+> IO provider 注册表。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: the rows that write through this seam own the injection.
-- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `evolution-io` row, `evolution-host`/`evolution-all`/`evolution-preset`; a seam backed by `evolution-io-node`.
+提供 ctx.evolutionIo，注册/选择 IO provider；同名不同对象会抛错，空注册表调用会报错并指路 evolution-io-node。
 
-## Known limitations
+## 入口
 
-- No known durable consumer gaps at this time. Runtime contracts are covered by package and boundary tests.
+ctx.evolutionIo；由 io-node 注册默认 provider。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 依赖与默认
 
-## Notes and history
+被 memory-files/state-json/skill-catalog 等使用。
 
+## 边界
 
+不实现文件 IO；跨进程语义由 provider 声明，当前 node provider 是 single-process。
+
+## 代码位置
+
+`src/index.ts`

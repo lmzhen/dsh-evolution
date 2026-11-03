@@ -1,33 +1,23 @@
-# @deepseek-ai/dsh-memory-files
+# @lmzhen/dsh-memory-files
 
-Local layered memory provider: registers the `files` provider into `ctx.memory` over the IO seam.
+> 本地 MEMORY.md / USER.md provider + 预算服务。
 
-## Model surface
+## 它做什么
 
-- **Model-visible:** nothing of its own: `tool-memory` owns the tool and the injection.
-- **Prompt prefix / KV cache:** unchanged by this package: family-level rules single-sourced in `packages/README.md` §"Model-visible prompt prefix and the KV cache".
-- **Mount it?** yes — the `memory-files` provider row, in `evolution-host`/`evolution-all`/one-click `evolution-preset`.
+注册 files provider；MemoryStore 文件语义（去重/日期前缀/预算/漂移/威胁/退避）；预算解析/clamp/floor；evolutionMemoryBudget；写串行。
 
-## Configuration
+## 入口
 
-- `providerName` (default `files`): the registered name.
-- `memoryCharLimit` / `userCharLimit` (`2200` / `1375`) the budget the STORE enforces per target.
-  Deprecated names (G0/S0.3): the canonical ids are the policy row's `memoryChars` /
-  `userChars` (what the review planner reads). The two sides are not
-  auto-synchronised — `/evolution doctor` reports the divergence (`budgetIssues`).
-  Reading the legacy names still works; writing them is refused. Removal was planned for 0.7.0 and is deferred:
-  both aliases still ship, so no later version is claimed here.
-- `root`: directory override; `''` means `$DSH_HOME/memories`.
-- `addDatePrefix` / `maxConsolidationFailures` (`false` / `3`) date prefixes on entries; consolidation failures one turn tolerates.
-- `threatExemptLabels` (default `[]`): benign threat labels for the MEMORY store (per-site rule in `evolution-threat`).
+Cordis 行 memory-files；evolutionMemoryBudget。
 
-## Known limitations
+## 依赖与默认
 
-- **The memory budget is configured in two places.** `memoryCharLimit`/`userCharLimit` (this package) is what the STORE enforces; `evolution-policy`'s `memoryChars`/`userChars` is what the review pipeline PLANS against. An unset limit follows the mounted policy, an explicit value wins, a contradiction warns once at load; `/evolution doctor` re-checks the pair at run time.
-- Nothing selects this provider implicitly: with `memory.provider` empty the FIRST registered provider serves every read/write: set the pin or row order decides.
+需要 memory + evolutionIo；可选 policy/settings。
 
-**Runtime invariant:** No companion is published. The platform auto-assembles nothing and the family mounts no `<pkg>/invariant` cordis row, so a companion here would never execute (v37 S2.1 / I-3).
+## 边界
 
-## Notes and history
+硬依赖 io；相对 root 解析；read 不进写队列；单进程；旧预算名仍保留但写入被拒。
 
-- `memory.provider` pins the registry to one name (V27 G6.3), and with the pin empty the FIRST registered provider serves every read/write: so with two providers mounted, set the pin or the choice is row order.
+## 代码位置
+
+`src/index.ts`

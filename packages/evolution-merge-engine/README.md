@@ -1,13 +1,23 @@
-# @deepseek-ai/dsh-evolution-merge-engine
+# @lmzhen/dsh-evolution-merge-engine
 
-Vendored skill-merge Node pipeline engine used by `@deepseek-ai/dsh-evolution-merge`.
-The package is a pinned, byte-identical copy of the upstream engine; it is not a
-public product surface.
+> 纯库：合并筛选引擎与报告映射。
 
-- Version: 0.30.15
-- Upstream: `skill-merge` pipeline engine
-- License: MIT (see LICENSE/NOTICE when present)
+## 它做什么
 
-**Screening pipeline freeze:** stages ①–⑤ are specially tuned. Their substantive flow — stage order, inputs/outputs, models, weights, thresholds, filters, scoring and decisions, including any selection policy that changes candidate sets or ordering — must not be modified. Packaging, loading, adapters, error boundaries, diagnostics, IO and tests may change only with parity evidence proving identical candidate sets, order, scores and decisions.
+提供 screen()、judge 包装、selectCandidates/report-map、vendored pipeline 和模型资产；无 apply/命令/路由/服务。
 
-Do not fork the screening pipeline in place. If the pinned upstream must be replaced, re-run the merge parity checks and prove identical screening output before release. Non-screening packaging may be restructured without changing the pipeline.
+## 入口
+
+无插件面；只被 evolution-merge import。
+
+## 依赖与默认
+
+本地 potion 模型目录；deepseek judge 需要 runner。
+
+## 边界
+
+不是插件；probe/ensureModels 生产未接线；引擎版本串是 0.29.0，不是包版本。
+
+## 代码位置
+
+`src/engine.js, src/report-map.js, src/index.js`
