@@ -905,6 +905,272 @@
       ]
     },
     {
+      "id": "gate-59",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-60",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/gen-about.mjs packages/evolution --check",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-61",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-62",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-63",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/gen-client-tokens.mjs packages/evolution --check",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-64",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/gen-param-client-view.mjs packages/evolution --check",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-65",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-66",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-67",
+      "kind": "step",
+      "human": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
+      "argv": null,
+      "tree": "mirror",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+    },
+    {
+      "id": "gate-68",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+    },
+    {
+      "id": "gate-69",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+    },
+    {
+      "id": "gate-70",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+    },
+    {
+      "id": "gate-71",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+    },
+    {
+      "id": "gate-72",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/requirements.selftest.mjs",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-73",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/run-load-sensitive.mjs .",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+    },
+    {
+      "id": "gate-74",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-75",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell",
+      "localSafe": false,
+      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
+    },
+    {
+      "id": "gate-76",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-77",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-78",
+      "kind": "script",
+      "human": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
+      "argv": null,
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-79",
+      "kind": "script",
+      "human": "node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict",
+      "argv": null,
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
+      "id": "gate-80",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-graph-edges.mjs --report",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell",
+      "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test"
+    },
+    {
+      "id": "gate-81",
+      "kind": "script",
+      "human": "node packages/scripts/verify-health-admission.mjs",
+      "argv": null,
+      "tree": "mirror",
+      "profiles": [
+        "local"
+      ],
+      "argvProblem": "no-command-in-cell"
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",

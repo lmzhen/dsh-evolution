@@ -348,6 +348,94 @@
     },
     "ci-only-15": {
       "noDrillReason": "load-sensitive execution gate: the pinned-concurrency run is itself the falsifiable probe; a separate mutation fixture would duplicate it"
+    },
+    "gate-59": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-60": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-61": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-62": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-63": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-64": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-65": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-66": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-67": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-68": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-69": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-70": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-71": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-72": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-73": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-74": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-75": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-76": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-77": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-78": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-79": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
+    },
+    "gate-81": {
+      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
+      "owner": "ci"
     }
   }
 }
