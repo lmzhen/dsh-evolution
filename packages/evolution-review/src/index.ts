@@ -16,7 +16,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-review': { kind: 'evolution-review' } & ContextFormed
   }
 }
-import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-tools'
 import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
@@ -1019,7 +1019,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         sessionId: childId,
         parentAgent: agent,
         seed,
-        inheritedEventCount: SessionLogOffset(seed.length),
+        // The session API changed the branded log-offset type across platform lines; the value is
+        // still the inherited event count, so keep the payload numeric and erase the old brand.
+        inheritedEventCount: seed.length as unknown as never,
         meta: { parentSession: session.id, isSeeded: true, ...(agentPreset === undefined ? {} : { agentPreset }) },
         ...(current === undefined ? {} : { agentOptions: { provider: current.provider, model: current.model } }),
         ...(setup === undefined ? {} : { setup }),
