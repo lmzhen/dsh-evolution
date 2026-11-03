@@ -7,6 +7,7 @@ export const zh: Record<string, string> = {
   'start.pair': '复制配对命令模板',
   'degraded': '读模型降级：',
   'copied': '已复制：',
+  'copyFailed': '复制失败：浏览器没有接受剪贴板写入。',
   'row.noSummary': '无摘要',
   'overlay.body': '正文',
   'hint': '手动触发；后台逐对判定。这里只读，不写技能。',
@@ -22,6 +23,7 @@ export const zh: Record<string, string> = {
   'empty.fuse': '没有待合并的对。',
   'empty.skipped': '没有标记为无需合并的对。',
   'loading': '正在读取…',
+  'refreshing': '刷新中，下面仍是上次结果…',
   'refresh': '刷新',
   'loadMore': '加载更多',
   'approval.on': '审批开：合并前需人工批准。',
@@ -205,6 +207,7 @@ export const en: Record<string, string> = {
   'start.pair': 'Copy pair command template',
   'degraded': 'Degraded read model:',
   'copied': 'Copied:',
+  'copyFailed': 'Copy failed: the browser did not accept the clipboard write.',
   'row.noSummary': 'No summary',
   'overlay.body': 'Body',
   'hint': 'Manual only; pairs are judged in the background. Read-only here.',
@@ -220,6 +223,7 @@ export const en: Record<string, string> = {
   'empty.fuse': 'No pairs ready to merge.',
   'empty.skipped': 'No pairs marked as not worth merging.',
   'loading': 'Loading…',
+  'refreshing': 'Refreshing; the rows below are the previous result…',
   'refresh': 'Refresh',
   'loadMore': 'Load more',
   'approval.on': 'Approval on: merges wait for a human.',
@@ -399,12 +403,14 @@ Object.assign(zh, {
   'settings.saved': '已保存',
   'settings.saveFailed': '保存失败',
   'settings.openPlatform': '打开平台设置',
+  'settings.openPlatformPath': '设置 → 内置插件 → 插件配置 → 技能自动合并',
   'settings.live': '可直接在此保存；platformWrite 能力来自宿主。',
 })
 Object.assign(en, {
   'settings.saved': 'Saved',
   'settings.saveFailed': 'Save failed',
   'settings.openPlatform': 'Open platform settings',
+  'settings.openPlatformPath': 'Settings → Built-in plugins → Plugin configuration → Skill auto-merge',
   'settings.live': 'Save directly here; platformWrite capability comes from the host.',
 })
 Object.assign(zh, {

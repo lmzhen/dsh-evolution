@@ -10,6 +10,8 @@ export interface MergeSource {
 export type QueueStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 export interface QueueState {
   status: QueueStatus
+  /** A background refresh is in flight; the old rows remain visible. */
+  refreshing?: boolean | undefined
   rows: MergeRowView[]
   nextCursor?: string | undefined
   failure?: MergeFailure | undefined
@@ -121,7 +123,12 @@ export class MergeStore {
     const token = (this.tokens.get(key) ?? 0) + 1
     this.tokens.set(key, token)
     const previous = this.cache.get(key)
-    const next: QueueState = cursor === undefined ? { status: 'loading', rows: [] } : { status: 'loading', rows: previous?.rows ?? [], ...(previous?.nextCursor === undefined ? {} : { nextCursor: previous.nextCursor }) }
+    const keepRows = cursor === undefined && (previous?.rows.length ?? 0) > 0
+    const next: QueueState = cursor === undefined
+      ? keepRows
+        ? { status: 'ready', refreshing: true, rows: previous!.rows, ...(previous!.nextCursor === undefined ? {} : { nextCursor: previous!.nextCursor }) }
+        : { status: 'loading', rows: [] }
+      : { status: 'loading', rows: previous?.rows ?? [], ...(previous?.nextCursor === undefined ? {} : { nextCursor: previous.nextCursor }) }
     this.cache.set(key, next)
     if (this.isCurrent(queue, expiredOnly)) this.set({ ...this.snapshot, current: next })
     const outcome = await this.source.rows(queue, cursor, queue === 'pending' && expiredOnly)
@@ -133,13 +140,15 @@ export class MergeStore {
         this.set({ ...this.snapshot, viewState: 'blocked', viewFailure: outcome.failure, current: { status: 'idle', rows: [] } })
         return
       }
-      const failed: QueueState = { status: 'error', rows: [], failure: outcome.failure }
+      const failed: QueueState = keepRows
+        ? { status: 'ready', refreshing: false, rows: previous!.rows, failure: outcome.failure }
+        : { status: 'error', rows: [], failure: outcome.failure }
       this.cache.set(key, failed)
       if (this.isCurrent(queue, expiredOnly)) this.set({ ...this.snapshot, current: failed })
       return
     }
     const items = cursor === undefined ? outcome.payload.items : [...(previous?.rows ?? []), ...outcome.payload.items]
-    const ready: QueueState = { status: items.length === 0 ? 'empty' : 'ready', rows: items, ...(outcome.payload.nextCursor === undefined ? {} : { nextCursor: outcome.payload.nextCursor }) }
+    const ready: QueueState = { status: items.length === 0 ? 'empty' : 'ready', refreshing: false, rows: items, ...(outcome.payload.nextCursor === undefined ? {} : { nextCursor: outcome.payload.nextCursor }) }
     this.cache.set(key, ready)
     if (this.isCurrent(queue, expiredOnly)) this.set({ ...this.snapshot, current: ready, expiredOnly, queue })
   }

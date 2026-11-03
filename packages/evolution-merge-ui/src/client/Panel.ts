@@ -111,7 +111,7 @@ function ReadOnlySetting({ section, label, value, disabled, missing, note, link,
     createElement('span', { 'data-role': 'settings-label' }, label),
     createElement('span', { 'data-role': 'settings-value', 'data-value': missing ? 'missing' : disabled ? 'unavailable' : value === true ? 'on' : 'off' }, text),
     note === undefined ? null : createElement('span', { 'data-role': 'settings-note' }, note),
-    link === true ? createElement('a', { 'data-role': 'settings-link', href: '#/settings', onClick: () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: ',', code: 'Comma', ctrlKey: true, altKey: true, bubbles: true })) } }, t('settings.openPlatform')) : null,
+    link === true ? createElement('span', { 'data-role': 'settings-link' }, t('settings.openPlatformPath')) : null,
   )
 }
 function EditableSetting({ form, field, label, fallback, capability, t }: { form: ConfigFormLike; field: string; label: string; fallback: boolean; capability: boolean; t: Translate }): ReactNode {
@@ -133,8 +133,9 @@ function EditableSetting({ form, field, label, fallback, capability, t }: { form
   }
   if (!fieldPresent) return createElement(ReadOnlySetting, { section: 'platform-write', label, value: fallback, disabled: !capability, missing: false, note: t('settings.platformWriteLinkHint'), link: true, t })
   return createElement('div', { 'data-role': 'settings-section', 'data-section': field === 'mergeApproval' ? 'merge-approval' : 'platform-write', ...(disabled ? { 'data-disabled': 'true' } : {}) },
-    createElement('label', { 'data-role': 'settings-label' }, label),
+    createElement('label', { 'data-role': 'settings-label', htmlFor: 'merge-setting-' + field }, label),
     createElement('input', {
+      id: 'merge-setting-' + field, 'aria-label': label,
       type: 'checkbox', role: 'switch', 'data-role': 'settings-toggle', 'data-field': field,
       'data-value': value ? 'on' : 'off', checked: value, disabled,
       onChange: () => { void toggle() },
@@ -156,9 +157,6 @@ function SettingsCard({ view, settings, t }: { view: MergeViewPayload; settings?
       ? createElement(ReadOnlySetting, { section: 'merge-approval', label: t('settings.mergeApproval'), value: mergeFallback, disabled: false, missing: false, t })
       : createElement(EditableSetting, { form: settings.merge, field: 'mergeApproval', label: t('settings.mergeApproval'), fallback: mergeFallback, capability: mergeCapability, t }),
     createElement(ReadOnlySetting, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, note: t('settings.platformWriteLinkHint'), link: true, t }),
-    settings?.merge === undefined
-      ? createElement('a', { 'data-role': 'settings-link', href: '#/settings' }, t('settings.openPlatform'))
-      : null,
     createElement('p', { 'data-role': 'settings-readonly' }, settings?.merge === undefined ? t('settings.readonly') : t('settings.live')),
   )
 }
@@ -263,13 +261,23 @@ function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Tra
 export function MergePanel(face: MergeFace): ReactNode {
   const { store, t } = face
   const snapshot: StoreSnapshot = useSyncExternalStore(store.subscribe, store.read, store.read)
-  const [copied, setCopied] = useState<string | undefined>(undefined)
+  const [copyState, setCopyState] = useState<{ kind: 'idle' | 'copied' | 'failed'; text?: string }>({ kind: 'idle' })
   const [orders, setOrders] = useState<Record<string, readonly string[]>>({})
   const [dragId, setDragId] = useState<string | undefined>(undefined)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | undefined>(undefined)
   const workspaceId = resolveWorkspaceId(face.workspaceId)
   const orderStore = useMemo(() => createRowOrderStore(), [])
-  const copy = (command: string): void => { void navigator.clipboard.writeText(command); setCopied(command) }
+  const copy = (command: string): void => {
+    void (async () => {
+      try {
+        if (navigator.clipboard?.writeText === undefined) throw new Error('clipboard unavailable')
+        await navigator.clipboard.writeText(command)
+        setCopyState({ kind: 'copied', text: command })
+      } catch {
+        setCopyState({ kind: 'failed', text: command })
+      }
+    })()
+  }
   const doctorCommand = face.doctorCommand ?? DOCTOR_COMMAND
   useEffect(() => { store.start(); return () => { store.dispose() } }, [store])
   useEffect(() => {
@@ -353,9 +361,11 @@ export function MergePanel(face: MergeFace): ReactNode {
           runNode(view, t, copy),
           tabs,
           expiredToggle,
-          snapshot.viewState === 'loading' || queue.status === 'loading' ? createElement('p', { 'data-role': 'note' }, t('loading')) : null,
+          snapshot.viewState === 'loading' || queue.status === 'loading' ? createElement('p', { 'data-role': 'note' }, t('loading')) : queue.refreshing === true ? createElement('p', { 'data-role': 'note', role: 'status' }, t('refreshing')) : null,
           activeFailure === undefined ? null : failureNode(t, activeFailure, fallback, copy),
-          copied === undefined ? null : createElement('p', { 'data-role': 'copied', role: 'status' }, t('copied') + ' ' + copied),
+          copyState.kind === 'idle' ? null : copyState.kind === 'copied'
+            ? createElement('p', { 'data-role': 'copied', role: 'status' }, t('copied') + ' ' + (copyState.text ?? ''))
+            : createElement('p', { 'data-role': 'copy-failed', role: 'alert' }, t('copyFailed')),
           list,
           empty,
           queue.nextCursor === undefined || uiState !== 'ready' ? null : createElement('button', { type: 'button', 'data-role': 'load-more', disabled: queue.status === 'loading', onClick: () => { store.loadMore() } }, t('loadMore')),
