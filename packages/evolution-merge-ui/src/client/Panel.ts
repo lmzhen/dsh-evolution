@@ -5,15 +5,12 @@ import { platformModal } from './platform-modal.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
-import type { ConfigFormLike, SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
+import type { SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
 import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, rowOrderKey, type RowOrderEdge } from './sorting.ts'
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
 export interface MergeFace { store: MergeStore; t: Translate; doctorCommand?: string; settings?: SettingsFace; workspaceId?: string }
-export async function saveSetting(form: ConfigFormLike, field: string, value: boolean): Promise<boolean> {
-  try { return await form.set(field, value) } catch { return false }
-}
 const QUEUES: MergeQueue[] = ['verify', 'pending', 'fuse', 'skipped']
 const DOCTOR_COMMAND = '/evolution doctor'
 
@@ -121,50 +118,17 @@ function ReadOnlySetting({ section, label, value, disabled, missing, note, link,
     link === true ? createElement('span', { 'data-role': 'settings-link' }, t('settings.openPlatformPath')) : null,
   )
 }
-function EditableSetting({ form, field, label, fallback, capability, t }: { form: ConfigFormLike; field: string; label: string; fallback: boolean; capability: boolean; t: Translate }): ReactNode {
-  const subscribe = useCallback((listener: () => void) => form.subscribe(listener), [form])
-  const readSnapshot = useCallback(() => form['getSnapshot'](), [form])
-  const snapshot = useSyncExternalStore(subscribe, readSnapshot, readSnapshot)
-  const fieldPresent = snapshot.status !== 'ready' || snapshot.value === undefined || Object.prototype.hasOwnProperty.call(snapshot.value, field)
-  const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState<'saved' | 'failed' | undefined>(undefined)
-  const value = snapshot.status === 'ready' && typeof snapshot.value?.[field] === 'boolean' ? snapshot.value[field] : fallback
-  const disabled = !capability || busy || snapshot.status !== 'ready' || !snapshot.writable
-  const toggle = async (): Promise<void> => {
-    if (disabled) return
-    setBusy(true)
-    setSaved(undefined)
-    const ok = await saveSetting(form, field, !value)
-    setBusy(false)
-    setSaved(ok ? 'saved' : 'failed')
-  }
-  if (!fieldPresent) return createElement(ReadOnlySetting, { section: 'platform-write', label, value: fallback, disabled: !capability, missing: false, note: t('settings.platformWriteLinkHint'), link: true, t })
-  return createElement('div', { 'data-role': 'settings-section', 'data-section': field === 'mergeApproval' ? 'merge-approval' : 'platform-write', ...(disabled ? { 'data-disabled': 'true' } : {}) },
-    createElement('label', { 'data-role': 'settings-label', htmlFor: 'merge-setting-' + field }, label),
-    createElement('input', {
-      id: 'merge-setting-' + field, 'aria-label': label,
-      type: 'checkbox', role: 'switch', 'data-role': 'settings-toggle', 'data-field': field,
-      'data-value': value ? 'on' : 'off', checked: value, disabled,
-      onChange: () => { void toggle() },
-    }),
-    createElement('span', { 'data-role': 'settings-value' }, value ? t('settings.on') : t('settings.off')),
-    ...(saved === undefined ? [] : [createElement('span', { 'data-role': 'settings-save-state', 'data-save': saved }, t(saved === 'saved' ? 'settings.saved' : 'settings.saveFailed'))]),
-  )
-}
-function SettingsCard({ view, settings, t }: { view: MergeViewPayload; settings?: SettingsFace | undefined; t: Translate }): ReactNode {
+function SettingsCard({ view, t }: { view: MergeViewPayload; t: Translate }): ReactNode {
   const platform = view.approval.platformWrite
-  const platformCapability = platform?.capability ?? settings?.platform !== undefined
+  const platformCapability = platform?.capability === true
   const platformFallback = platform?.enabled ?? false
-  const mergeCapability = settings?.merge !== undefined
   const mergeFallback = view.approval.mergeApproval
   return createElement('div', { 'data-role': 'settings-card' },
     createElement('h3', { 'data-role': 'settings-title' }, t('settings.title')),
     createElement('p', { 'data-role': 'settings-hint' }, t('settings.hint')),
-    settings?.merge === undefined
-      ? createElement(ReadOnlySetting, { section: 'merge-approval', label: t('settings.mergeApproval'), value: mergeFallback, disabled: false, missing: false, t })
-      : createElement(EditableSetting, { form: settings.merge, field: 'mergeApproval', label: t('settings.mergeApproval'), fallback: mergeFallback, capability: mergeCapability, t }),
+    createElement(ReadOnlySetting, { section: 'merge-approval', label: t('settings.mergeApproval'), value: mergeFallback, disabled: false, missing: false, note: t('settings.mergeApprovalPath'), link: true, t }),
     createElement(ReadOnlySetting, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, note: t('settings.platformWriteLinkHint'), link: true, t }),
-    createElement('p', { 'data-role': 'settings-readonly' }, settings?.merge === undefined ? t('settings.readonly') : t('settings.live')),
+    createElement('p', { 'data-role': 'settings-readonly' }, t('settings.readonly')),
   )
 }
 interface RowSortHandlers {
@@ -409,7 +373,7 @@ export function MergePanel(face: MergeFace): ReactNode {
             createElement('button', { type: 'button', 'data-role': 'start-pair', onClick: () => { copy(view.startCommands.pair) } }, t('start.pair')),
           ),
           view.degraded ? createElement('p', { 'data-role': 'degraded' }, t('degraded') + ' ' + view.notes.join(',')) : null,
-          createElement(SettingsCard, { view, settings: face.settings, t }),
+          createElement(SettingsCard, { view, t }),
           runNode(view, t, copy),
           tabs,
           expiredToggle,
