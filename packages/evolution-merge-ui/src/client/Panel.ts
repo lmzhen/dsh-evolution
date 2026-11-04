@@ -139,16 +139,19 @@ interface RowSortHandlers {
   menu(id: string, x: number, y: number): void
 }
 function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => void, sort: RowSortHandlers, openBody: (name: string, side: 'live' | 'archive', rowId: string | undefined) => void): ReactNode {
-  const facts = [
+  const first = [
     row.target === undefined ? undefined : t('row.target') + ' ' + row.target,
+    row.failure === undefined ? undefined : t('row.failure') + ' ' + row.failure.code + (row.failure.retryable ? '' : ' · ' + t('row.noRetry')),
+    row.expired === undefined ? undefined : t('row.expired') + ' ' + t('expired.' + row.expired),
+    row.reasonCode === undefined && row.reason === undefined ? undefined : t('row.reason') + ' ' + reasonText(t, row.reasonCode, row.reason ?? ''),
+  ].filter((value): value is string => value !== undefined).join(' · ')
+  const details = [
+    t('row.id') + ' ' + row.id,
     row.targetActual === undefined ? undefined : t('row.actualTarget') + ' ' + row.targetActual,
     row.verifySubState === undefined ? undefined : t('row.verify') + ' ' + t('verify.' + row.verifySubState),
     row.origin === undefined ? undefined : t('row.origin') + ' ' + t('origin.' + row.origin),
     row.attempts === undefined ? undefined : t('row.attempts') + ' ' + String(row.attempts),
     row.confidence === undefined ? undefined : t('row.confidence') + ' ' + row.confidence.toFixed(2),
-    row.failure === undefined ? undefined : t('row.failure') + ' ' + row.failure.code + (row.failure.retryable ? '' : ' · ' + t('row.noRetry')),
-    row.expired === undefined ? undefined : t('row.expired') + ' ' + t('expired.' + row.expired),
-    row.reasonCode === undefined && row.reason === undefined ? undefined : t('row.reason') + ' ' + reasonText(t, row.reasonCode, row.reason ?? ''),
   ].filter((value): value is string => value !== undefined).join(' · ')
   const actions = row.actions.map(action => createElement('button', {
     key: action.id, type: 'button', 'data-role': 'row-action', 'data-action': action.id,
@@ -177,11 +180,11 @@ function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => voi
   },
     createElement('div', null,
       createElement('div', { 'data-role': 'row-label' }, row.label),
-      createElement('div', { 'data-role': 'row-id', title: row.id }, t('row.id') + ' ' + row.id),
       createElement('div', { 'data-role': 'row-meta' }, t('state.' + row.state) + (row.stage === null ? '' : ' · ' + t('stage.' + row.stage))),
       stageNode(row, t),
       summaryNode(row, t),
-      facts === '' ? null : createElement('div', { 'data-role': 'row-facts' }, facts),
+      first === '' ? null : createElement('div', { 'data-role': 'row-facts' }, first),
+      createElement('details', { 'data-role': 'row-details' }, createElement('summary', null, t('row.details')), createElement('p', null, details)),
     ),
     createElement('div', null,
       createElement('div', { 'data-role': 'row-meta' }, new Date(row.updatedAt).toLocaleString()),
@@ -190,8 +193,8 @@ function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => voi
           const bodyA = row.bodies?.find(body => body.name === row.a)
           const bodyB = row.bodies?.find(body => body.name === row.b)
           return [
-            bodyA === undefined ? null : createElement('button', { key: 'a', type: 'button', 'data-role': 'body-a', 'aria-label': t('body.' + bodyA.side) + ' ' + bodyA.name, title: t('body.' + bodyA.side) + ' ' + bodyA.name, onClick: () => { openBody(bodyA.name, bodyA.side, bodyA.rowId) } }, 'A'),
-            bodyB === undefined ? null : createElement('button', { key: 'b', type: 'button', 'data-role': 'body-b', 'aria-label': t('body.' + bodyB.side) + ' ' + bodyB.name, title: t('body.' + bodyB.side) + ' ' + bodyB.name, onClick: () => { openBody(bodyB.name, bodyB.side, bodyB.rowId) } }, 'B'),
+            bodyA === undefined ? null : createElement('button', { key: 'a', type: 'button', 'data-role': 'body-a', 'aria-label': t('body.' + bodyA.side) + ' ' + bodyA.name, title: t('body.' + bodyA.side) + ' ' + bodyA.name, onClick: () => { openBody(bodyA.name, bodyA.side, bodyA.rowId) } }, 'A · ' + bodyA.name),
+            bodyB === undefined ? null : createElement('button', { key: 'b', type: 'button', 'data-role': 'body-b', 'aria-label': t('body.' + bodyB.side) + ' ' + bodyB.name, title: t('body.' + bodyB.side) + ' ' + bodyB.name, onClick: () => { openBody(bodyB.name, bodyB.side, bodyB.rowId) } }, 'B · ' + bodyB.name),
           ]
         })(),
         actions,
