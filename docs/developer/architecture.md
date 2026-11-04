@@ -7,7 +7,7 @@
   │  /evolution …        memory / skill_manage / skill_search / merge_stage
   │  设置页/侧栏面板       HTTP 路由
   ▼
-命令与 UI 层      evolution-commands · evolution-ui · evolution-merge-ui · evolution-client-kit
+命令与 UI 层      evolution-commands · evolution-ui（工作台+参数卡）· evolution-merge-ui · evolution-client-kit
   ▼
 领域服务层        review · curator · merge · approval · learning-graph · skill-health · skill-usage
   ▼
@@ -30,7 +30,7 @@ $DSH_HOME 文件（memories / skills / evolution / merge）
 | 合并 | merge/merge-engine | 合并域 + 引擎 |
 | 审查自动化 | review/maintenance/curator/learning-graph/activity/feedback/replay | 审查、维护、整理、图、账本、反馈、回放 |
 | 技能生态 | skill-catalog/skill-discovery/skill-health/skill-usage/tool-skill-manage | 目录、检索/域卡、健康、用量、写入工具 |
-| 命令与 UI | commands/ui/merge-ui/client-kit | 命令面、设置/历史、合并面板、客户端基础 |
+| 命令与 UI | commands/ui/merge-ui/client-kit | 命令面、工作台页、平台插件参数卡、合并视图、客户端基础 |
 | 安装形态 | host/all/preset/agent | 基础设施/全量/兼容/预设 delta |
 | 记忆与工具 | memory/memory-files/tool-memory | 记忆注册表、文件 provider、模型工具 |
 
