@@ -126,20 +126,21 @@ export function makeMergeRoutes(
         const id = query.get('id')
         const name = query.get('name')
         const side = query.get('side')
-        if (id !== null && name !== null) return bad('id and name are mutually exclusive')
         if ((id === null || id === '') && (name === null || name === '')) return json(404, { wireVersion: 1, code: 'merge-body-not-found', message: 'merge body requires id or name' })
         if (source.snapshot !== undefined) {
           const snapshot = await source.snapshot()
           if (snapshot.blocked !== undefined) return json(503, { wireVersion: 1, code: 'merge-state-blocked', readiness: snapshot.blocked.readiness })
           // Body/history are read-only projections of already-written files; a host without
           // the live agent data plane can still read past reports and archived bodies.
-          const refs = id !== null && id !== '' ? snapshot.bodyRefs.filter(ref => ref.rowId === id) : snapshot.bodyRefs.filter(ref => ref.name === name)
+          const refs = snapshot.bodyRefs.filter(ref =>
+            (id === null || id === '' || ref.rowId === id)
+            && (name === null || name === '' || ref.name === name)
+            && (side !== 'live' && side !== 'archive' ? true : ref.side === side))
           if (refs.length === 0) return json(404, { wireVersion: 1, code: 'merge-body-not-found', message: 'merge body not found' })
-          if (name !== null && refs.length > 1) return bad('name matches multiple merge rows')
+          if (refs.length > 1) return bad('merge body is ambiguous; pass id, name and side')
           const row = snapshot.rows.find(item => item.row.id === refs[0]!.rowId)
           if (row?.stage?.state === 'lost' || row?.stage?.state === 'expired') return json(404, { wireVersion: 1, code: 'merge-body-not-found', message: 'merge stage is lost' })
-          const sideFilter = side === 'a' ? 'live' : side === 'b' ? 'archive' : side === 'live' || side === 'archive' ? side : undefined
-          const ref = (sideFilter === undefined ? refs[0] : refs.find(item => item.side === sideFilter)) ?? refs[0]!
+          const ref = refs[0]!
           const content = source.bodyRef === undefined ? null : await source.bodyRef(ref)
           return json(200, buildBodyView(snapshot, ref, content ?? ''))
         }

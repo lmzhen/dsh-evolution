@@ -106,3 +106,28 @@ it('returns a typed 503 on all four panel GETs when state is not ready', async (
     expect(await response.json(), path).toMatchObject({ wireVersion: 1, code: 'merge-state-blocked', readiness: { code: 'merge-state-migration-required' } })
   }
 })
+
+it('resolves a body by row id + source name + side, and refuses ambiguity', async () => {
+  const snapshot = {
+    readAt: 1,
+    rows: [{ row: { id: 'mr_x' }, stage: null }],
+    bodyRefs: [
+      { rowId: 'mr_x', name: 'm1', side: 'live' },
+      { rowId: 'mr_x', name: 'm2', side: 'live' },
+    ],
+  } as never
+  const stateRoutes = makeMergeRoutes({ getSource: () => ({ snapshot: async () => snapshot, bodyRef: async (ref) => '# ' + ref.name }) }, audit)
+  const get = async (path: string) => {
+    const route = stateRoutes.find(item => item.path === path.split('?')[0])
+    if (route === undefined) throw new Error('missing route')
+    return await route.fetch(new Request('http://local' + path))
+  }
+  const b = await (await get(MERGE_ROUTES.body + '?id=mr_x&name=m2&side=live')).json() as { name: string; text: string }
+  expect(b).toMatchObject({ name: 'm2', text: '# m2' })
+  const byName = await (await get(MERGE_ROUTES.body + '?name=m2')).json() as { name: string; text: string }
+  expect(byName).toMatchObject({ name: 'm2', text: '# m2' })
+  expect((await get(MERGE_ROUTES.body + '?id=mr_x&name=m3&side=live')).status).toBe(404)
+  const ambiguous = await get(MERGE_ROUTES.body + '?id=mr_x&side=live')
+  expect(ambiguous.status).toBe(400)
+  expect((await ambiguous.json() as { message: string }).message).toContain('ambiguous')
+})

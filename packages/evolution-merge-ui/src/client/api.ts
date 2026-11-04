@@ -210,10 +210,12 @@ export async function rows(queue: MergeQueue, cursor?: string, expiredOnly = fal
 }
 
 export async function body(name: string, side: 'live' | 'archive', rowId?: string): Promise<MergeOutcome<MergeBody>> {
-  const url = HOST_ROUTES.body + (rowId === undefined ? '?name=' + encodeURIComponent(name) : '?id=' + encodeURIComponent(rowId)) + '&side=' + side
+  const query = new URLSearchParams({ name, side })
+  if (rowId !== undefined) query.set('id', rowId)
+  const url = HOST_ROUTES.body + '?' + query.toString()
   const answer = await requestWire<WireBody>(url)
   if (!answer.ok) {
-    if (answer.failure.kind === 'problem' && answer.failure.code === 'bad-query' && (answer.failure.message ?? '').includes('multiple merge rows')) {
+    if (answer.failure.kind === 'problem' && answer.failure.code === 'bad-query' && (answer.failure.message ?? '').includes('ambiguous')) {
       return { ok: false, failure: { ...answer.failure, code: 'body-ambiguous' } }
     }
     return answer
