@@ -125,16 +125,18 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
    * @param name - the skill to open.
    * @param onFailure - what to do with a failed read.
    */
-  const showVersions = (name: string, onFailure: (error: unknown) => void = failed): void => {
+  const showVersions = (name: string, onFailure: (error: unknown) => void = failed, keepContent = false): void => {
     const ticket = readTicket.current + 1
     readTicket.current = ticket
     setSelected(name)
-    setPayload(undefined)
-    setVersionsFailed(undefined)
-    setPending(undefined)
-    setExpanded(undefined)
-    setDiffs(new Map())
-    setBodies(new Map())
+    if (!keepContent) {
+      setPayload(undefined)
+      setVersionsFailed(undefined)
+      setPending(undefined)
+      setExpanded(undefined)
+      setDiffs(new Map())
+      setBodies(new Map())
+    }
     void face.loadVersions(name).then((next) => {
       if (readTicket.current === ticket) { setPayload(next); clearReadFailure() }
     }).catch((error: unknown) => {
@@ -157,7 +159,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   /** What the refresh control does: both reads again, and the sentence stays. */
   const refresh = (): void => {
     reloadSkills()
-    if (selected !== undefined) showVersions(selected)
+    if (selected !== undefined) showVersions(selected, failed, true)
   }
 
   useEffect(() => {

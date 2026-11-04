@@ -49,6 +49,19 @@ describe('MergeStore', () => {
     expect(store.read().current.rows).toHaveLength(1)
   })
 
+  it('a failed background view read keeps the readable view and rows', async () => {
+    const read = vi.fn()
+      .mockResolvedValueOnce({ ok: true, payload: view() } as MergeOutcome<MergeViewPayload>)
+      .mockResolvedValueOnce({ ok: false, failure: problem('view-lost') } as MergeOutcome<MergeViewPayload>)
+    const store = new MergeStore(source({ view: read }), { view: view(), rows: [row('r1')] })
+    await store.loadView()
+    expect(store.read().viewState).toBe('ready')
+    await store.loadView()
+    expect(store.read().viewState).toBe('ready')
+    expect(store.read().current.rows).toHaveLength(1)
+    expect(store.read().viewFailure).toMatchObject({ code: 'view-lost' })
+  })
+
   it('moves the whole panel to blocked and clears rows', async () => {
     const store = new MergeStore(source({ view: vi.fn(async () => ({ ok: false, failure: { kind: 'blocked', code: 'merge-state-blocked', readiness: { code: 'merge-state-migration-blocked', message: 'raw' } } } as MergeOutcome<MergeViewPayload>)) }), { view: view(), rows: [row('r1')] })
     await store.loadView()

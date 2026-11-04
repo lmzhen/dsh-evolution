@@ -55,6 +55,7 @@ export class MergeStore {
   private overlayToken = 0
   private snapshot: StoreSnapshot
   private started = false
+  private loadedView = false
   private disposed = false
 
   constructor(source: MergeSource, initial: MergeStoreInitial = {}) {
@@ -114,9 +115,13 @@ export class MergeStore {
         for (const key of this.cache.keys()) this.cache.set(key, { status: 'idle', rows: [] })
         return
       }
-      this.set({ ...this.snapshot, viewState: 'error', viewFailure: outcome.failure, viewRefreshing: false })
+      // A failed BACKGROUND refresh keeps the readable view and reports an inline error;
+      // only a first load with nothing to read may enter the error state.
+      const keeping = this.loadedView
+      this.set({ ...this.snapshot, viewState: keeping ? 'ready' : 'error', viewFailure: outcome.failure, viewRefreshing: false })
       return
     }
+    this.loadedView = true
     const wasBlocked = this.snapshot.viewState === 'blocked'
     this.set({ ...this.snapshot, view: outcome.payload, viewState: 'ready', viewFailure: undefined, viewRefreshing: false })
     if (wasBlocked && this.snapshot.current.status === 'idle') void this.loadQueue(this.snapshot.queue, this.snapshot.expiredOnly)
