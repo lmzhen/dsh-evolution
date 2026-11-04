@@ -116,4 +116,5 @@ export const CSS = [
   '.evo-doc-tag{position:absolute;left:var(--evo-space-8);top:var(--evo-space-8);color:var(--dsw-alias-label-tertiary)}',
   '.evo-doc-line-add{color:var(--evo-tone-success)}',
   '.evo-doc-line-del{color:var(--evo-tone-danger)}',
+  '@media (max-width:720px){.evo-hist-root{flex-direction:column}.evo-hist-aside{flex:0 0 auto;width:100%;max-height:42%;border-right:0;border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}.evo-hist-row{max-width:none}}',
 ].join('\n')

@@ -10,7 +10,7 @@ export const CSS = [
   '.' + CSS_TAG_ID + ' [data-role="stat"] { border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); padding:var(--evo-space-6) var(--evo-space-10); min-width:calc(var(--evo-space-16) * 4); }',
   '.' + CSS_TAG_ID + ' [data-role="stat-value"] { font-size:var(--evo-type-lg); font-weight:600; }',
   '.' + CSS_TAG_ID + ' [data-role="stat-label"] { font-size:var(--evo-type-xs); color:var(--dsw-alias-label-tertiary); }',
-  '.' + CSS_TAG_ID + ' [data-role="tabs"] { display:flex; gap:var(--evo-space-6); border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); }',
+  '.' + CSS_TAG_ID + ' [data-role="tabs"] { display:flex; flex-wrap:wrap; gap:var(--evo-space-6); border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); }',
   '.' + CSS_TAG_ID + ' [data-role="tab"] { background:none; border:0; border-bottom:var(--evo-hairline-width) solid transparent; padding:var(--evo-space-6) var(--evo-space-8); cursor:pointer; color:inherit; }',
   '.' + CSS_TAG_ID + ' [data-role="tab"][data-active="true"] { border-bottom-color:var(--dsw-alias-brand-primary); }',
   '.' + CSS_TAG_ID + ' button:focus-visible { outline:2px solid currentColor !important; outline-offset:2px; box-shadow:0 0 0 2px currentColor !important; }',

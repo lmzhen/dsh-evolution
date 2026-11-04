@@ -133,4 +133,5 @@ export const WORKBENCH_CSS = [
   '.evo-workbench-nav{display:flex;width:100%;align-items:center;gap:var(--evo-space-8);padding:var(--evo-space-6) var(--evo-space-12);border:0;border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:var(--evo-type-sm);text-align:left;cursor:pointer}',
   '.evo-workbench-nav:hover,.evo-workbench-nav[data-active="true"]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
   '.evo-workbench-nav:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
+  '@media (max-width:720px){.evo-workbench-head{flex-wrap:wrap}.evo-workbench-tabs{flex-wrap:wrap}}',
 ].join('')
