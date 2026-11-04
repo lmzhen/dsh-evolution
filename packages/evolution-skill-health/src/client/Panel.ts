@@ -226,15 +226,16 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
   // The parent rebuilds this face object on every render; depending on the object would
   // re-run the effect, keep `loading` true forever and flash the loading note beside loaded rows.
   const firstLoad = useRef(false)
+  const readTicket = useRef(0)
   /** One read trigger for first paint and the refresh button; the latest answer wins. */
   const load = (): (() => void) => {
     const read = face.loadRows
     if (read === undefined) return () => {}
-    let live = true
+    const ticket = ++readTicket.current
     setLoading(true)
     read()
       .then((outcome) => {
-        if (!live) return
+        if (ticket !== readTicket.current) return
         if (outcome.ok) {
           const payload = outcome.payload
           setView({
@@ -250,9 +251,9 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
           setFailed(undefined)
         } else setFailed(outcome.failure)
       })
-      .catch(() => { if (live) setFailed({ kind: 'server', status: 0 }) })
-      .finally(() => { if (live) setLoading(false) })
-    return () => { live = false }
+      .catch(() => { if (ticket === readTicket.current) setFailed({ kind: 'server', status: 0 }) })
+      .finally(() => { if (ticket === readTicket.current) setLoading(false) })
+    return () => {}
   }
   useEffect(() => {
     if (firstLoad.current || face.loadRows === undefined) return
