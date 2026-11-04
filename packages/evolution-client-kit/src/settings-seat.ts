@@ -57,7 +57,7 @@ async function write(namespace: string, ops: readonly ConfigPathOpLike[], expect
 }
 
 function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
-  let snapshot: FamilySnapshot = { ...EMPTY, status: 'loading', reason: 'loading' }
+  let snapshot: FamilySnapshot = { ...EMPTY, reason: 'seat-missing' }
   const listeners = new Set<() => void>()
   let started = false
   let listening = false
