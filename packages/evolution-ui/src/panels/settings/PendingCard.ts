@@ -278,6 +278,9 @@ export function PendingCard(props: PendingCardFace): ReactNode {
         createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
         createElement('span', { className: 'evolution-param-value', title: entry.summary }, summaryLine(entry))),
       createElement('p', { className: 'evolution-param-hint' }, age(entry)),
+      createElement('details', { className: 'evolution-param-details' },
+        createElement('summary', null, t('approvalRawSummary')),
+        createElement('p', { className: 'evolution-param-hint' }, entry.summary)),
       armed === entry.id
         ? createElement('p', { className: 'evolution-param-note', role: 'status' },
           // The sentence gets its OWN element: a bare text child shares the paragraph with the two
