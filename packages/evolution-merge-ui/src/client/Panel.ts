@@ -226,8 +226,8 @@ function rowNode(row: MergeRowView, store: MergeStore, t: Translate, copy: (comm
           const bodyA = row.bodies?.find(body => body.name === row.a)
           const bodyB = row.bodies?.find(body => body.name === row.b)
           return [
-            bodyA === undefined ? null : createElement('button', { key: 'a', type: 'button', 'data-role': 'body-a', onClick: () => { void store.openBody(bodyA.name, bodyA.side, bodyA.rowId) } }, 'A'),
-            bodyB === undefined ? null : createElement('button', { key: 'b', type: 'button', 'data-role': 'body-b', onClick: () => { void store.openBody(bodyB.name, bodyB.side, bodyB.rowId) } }, 'B'),
+            bodyA === undefined ? null : createElement('button', { key: 'a', type: 'button', 'data-role': 'body-a', 'aria-label': t('body.' + bodyA.side) + ' ' + bodyA.name, title: t('body.' + bodyA.side) + ' ' + bodyA.name, onClick: () => { void store.openBody(bodyA.name, bodyA.side, bodyA.rowId) } }, 'A'),
+            bodyB === undefined ? null : createElement('button', { key: 'b', type: 'button', 'data-role': 'body-b', 'aria-label': t('body.' + bodyB.side) + ' ' + bodyB.name, title: t('body.' + bodyB.side) + ' ' + bodyB.name, onClick: () => { void store.openBody(bodyB.name, bodyB.side, bodyB.rowId) } }, 'B'),
           ]
         })(),
         actions,
@@ -236,10 +236,10 @@ function rowNode(row: MergeRowView, store: MergeStore, t: Translate, copy: (comm
   )
 }
 function bodyNode(overlay: Extract<OverlayState, { kind: 'body' }>, t: Translate, onClose: () => void): ReactNode {
-  return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'body', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('overlay.body') },
+  return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'body', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('overlay.body'), onKeyDown: (event: KeyboardEvent<HTMLElement>) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } } },
     createElement('div', { 'data-role': 'overlay-head' },
       createElement('h3', { 'data-role': 'overlay-title' }, t('overlay.body') + ' · ' + overlay.name),
-      createElement('button', { type: 'button', 'data-role': 'overlay-close', onClick: onClose }, t('close')),
+      createElement('button', { type: 'button', 'data-role': 'overlay-close', autoFocus: true, onClick: onClose }, t('close')),
     ),
     createElement('p', { 'data-role': 'overlay-meta' }, t('body.' + overlay.side) + ' · ' + (overlay.status === 'ready' ? t('body.totalBytes') + ' ' + String(overlay.body?.totalBytes ?? 0) : '')),
     overlay.status === 'loading' ? createElement('p', { 'data-role': 'overlay-loading' }, t('loading')) : null,
@@ -253,7 +253,7 @@ function bodyNode(overlay: Extract<OverlayState, { kind: 'body' }>, t: Translate
   )
 }
 function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Translate, onClose: () => void): ReactNode {
-  return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'history', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('history') },
+  return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'history', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('history'), onKeyDown: (event: KeyboardEvent<HTMLElement>) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } } },
     createElement('div', { 'data-role': 'overlay-head' },
       createElement('h3', { 'data-role': 'overlay-title' }, t('history')),
       createElement('button', { type: 'button', 'data-role': 'overlay-close', onClick: onClose }, t('close')),
@@ -331,14 +331,24 @@ export function MergePanel(face: MergeFace): ReactNode {
     saveOrder(pinRow(visibleRows.map(row => row.id), menu.id, edge))
     setMenu(undefined)
   }
+  const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, current: (typeof QUEUES)[number]): void => {
+    const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+    if (delta === 0) return
+    event.preventDefault()
+    const index = QUEUES.indexOf(current)
+    const next = QUEUES[(index + delta + QUEUES.length) % QUEUES.length]!
+    store.select(next)
+    requestAnimationFrame(() => { document.getElementById('merge-tab-' + next)?.focus() })
+  }
   const tabs = createElement('div', { 'data-role': 'tabs', role: 'tablist' }, QUEUES.map(item => createElement('button', {
-    key: item, type: 'button', role: 'tab', 'aria-selected': snapshot.queue === item ? 'true' : 'false', 'data-role': 'tab', 'data-active': snapshot.queue === item ? 'true' : 'false',
+    key: item, id: 'merge-tab-' + item, type: 'button', role: 'tab', 'aria-selected': snapshot.queue === item ? 'true' : 'false', 'aria-controls': 'merge-rows', tabIndex: snapshot.queue === item ? 0 : -1, 'data-role': 'tab', 'data-active': snapshot.queue === item ? 'true' : 'false',
     onClick: () => { setMenu(undefined); store.select(item) },
+    onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => { onTabKey(event, item) },
   }, t('tab.' + item) + ' ' + String(view.counts[item]))))
   const expiredToggle = snapshot.queue === 'pending' ? createElement('button', {
     type: 'button', role: 'switch', 'aria-checked': snapshot.expiredOnly ? 'true' : 'false', 'data-role': 'expired-toggle', 'data-active': snapshot.expiredOnly ? 'true' : 'false', onClick: () => { store.toggleExpired() },
   }, t('tab.expired') + ' ' + String(view.expired)) : null
-  const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows' }, visibleRows.map(row => rowNode(row, store, t, copy, sortHandlers))) : null
+  const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => rowNode(row, store, t, copy, sortHandlers))) : null
   const empty = uiState === 'empty' ? createElement('div', null, createElement('p', { 'data-role': 'note' }, t('empty.' + snapshot.queue)), createElement('p', { 'data-role': 'empty-scope' }, t('empty.scope'))) : null
   const activeFailure = viewFailure !== undefined ? viewFailure : queue.status === 'error' ? queue.failure : undefined
   const overlay = snapshot.overlay
