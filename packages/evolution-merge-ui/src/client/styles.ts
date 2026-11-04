@@ -23,7 +23,7 @@ export const CSS = [
   '.' + CSS_TAG_ID + ' [data-role="fallback"] { display:flex; gap:var(--evo-space-6); flex-wrap:wrap; }',
   '.' + CSS_TAG_ID + ' [data-role="overlay"] { position:fixed; z-index:60; top:8vh; left:50%; transform:translateX(-50%); width:min(820px, calc(100vw - 64px)); max-height:78vh; overflow:auto; display:flex; flex-direction:column; gap:var(--evo-space-8); padding:var(--evo-space-12); border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); background:var(--dsw-alias-bg-layer-1); box-shadow:0 0 var(--evo-space-8) var(--dsw-alias-border-l2); }',
   '.evo-merge-modal { width:min(820px, calc(100vw - 48px)); max-width:calc(100vw - 48px); max-height:min(78vh, 720px); }',
-  '.evo-merge-modal [data-role="overlay"][data-platform-modal] { position:static; z-index:auto; top:auto; left:auto; transform:none; width:auto; box-sizing:border-box; max-height:none; overflow:auto; padding:20px 24px; border:0; border-radius:0; background:transparent; box-shadow:none; gap:var(--evo-space-8); }',
+  '.evo-merge-modal [data-role="overlay"][data-platform-modal] { position:static; z-index:auto; top:auto; left:auto; transform:none; width:auto; box-sizing:border-box; max-height:none; overflow:auto; padding:var(--evo-space-20); border:0; border-radius:0; background:transparent; box-shadow:none; gap:var(--evo-space-8); }',
   '.evo-merge-modal [data-role="overlay-head"] { display:flex; align-items:center; justify-content:space-between; gap:var(--evo-space-8); }',
   '.evo-merge-modal [data-role="overlay-title"] { margin:0; font-size:var(--evo-type-lg); }',
   '.evo-merge-modal [data-role="body-text"] { margin:0; max-height:52vh; overflow:auto; white-space:pre-wrap; }',
