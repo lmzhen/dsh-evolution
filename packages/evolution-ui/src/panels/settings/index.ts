@@ -17,7 +17,7 @@ import { DiagnosticsCard, type DiagnosticsCardFace } from './DiagnosticsCard.ts'
 import { createDiagnosticsApi } from './diagnostics-state.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
-import { PluginParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
+import { PluginParamCard, registerPluginParamSource, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
 import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
 import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { SettingsSection } from './SettingsSection.ts'
@@ -32,7 +32,7 @@ import { injectStyles } from './styles.ts'
  * no error, no section, no UI — and the family is also installed without a settings
  * surface. It is probed instead, and the cards say what is missing.
  */
-export const inject = ['slots', 'locale', 'settingsScope', 'connection']
+export const inject = ['slots', 'locale', 'remote']
 
 /** Section id and nav order (the platform's own sections sit at 0/10/15/20). */
 export const SECTION_ID = 'evolution'
@@ -114,7 +114,7 @@ export function apply(ctx: ClientContext): void {
   // exposes this as `inject`; the seat is an optional one (a deployment may compose the family with
   // no settings surface), so it goes through a narrow structural view rather than a declared edge.
   const seatInjection = ctx as unknown as { inject?: (names: readonly string[], callback: () => void) => unknown }
-  seatInjection.inject?.(['settingsScope'], () => { sources.revive() })
+  seatInjection.inject?.(['remote'], () => { sources.revive() })
 
   seam.slots.inject('settings.section', function* () {
     yield seam.slots.register({
@@ -131,6 +131,7 @@ export function apply(ctx: ClientContext): void {
   // namespace, with the platform owning the list and the card chrome.
   for (const [index, section] of CLIENT_PARAM_SECTIONS.entries()) {
     const source: ParamSectionSource = sources.sourceFor(section.seatKey)
+    registerPluginParamSource(section.namespace, source)
     const { mutateOnce, clear } = writeFaceFor(probe, section.namespace)
     const face = (): ParamCardFace => ({
       namespace: section.namespace,

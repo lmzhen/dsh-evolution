@@ -14,6 +14,7 @@ import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
 import { makeDiagnosticsRoutes } from './diagnostics-route.ts'
+import { makeSettingsRoutes } from './settings-route.ts'
 import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
@@ -1877,9 +1878,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // G6/W8: the diagnostics route is the browser face of the SAME view the CLI/--json renders.
   // registerHostRoutes waits on the platform's connection carrier and owns the route effect (W6);
   // a host without it stays inert (the command face keeps working).
-  registerHostRoutes(ctx, () => makeDiagnosticsRoutes(() => assembleDoctorInputs(ctx, {
-    runs: doctorRuns(),
-  })))
+  registerHostRoutes(ctx, () => [
+    ...makeDiagnosticsRoutes(() => assembleDoctorInputs(ctx, {
+      runs: doctorRuns(),
+    })),
+    ...makeSettingsRoutes(() => ctx.get('settings') as never),
+  ])
   void (async () => {
     const loader = (ctx.root as { loader?: { await?(): Promise<unknown> } }).loader
     try { await loader?.await?.() } catch { /* the loader reports its own failure; ours only needs a moment to try */ }

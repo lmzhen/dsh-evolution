@@ -511,8 +511,21 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
  * @param props - the injected card face.
  * @returns the card with its live row snapshot.
  */
+const pluginSources = new Map<string, ParamSectionSource>()
+
+/**
+ * Register a plugin-surface form source by namespace. The platform's
+ * `settings.plugin.item` slot does not bind the card's `hooks` compartment, so
+ * the owning settings apply hands the stable source here instead.
+ * @param namespace - settings namespace.
+ * @param source - the stable external-store source.
+ */
+export function registerPluginParamSource(namespace: string, source: ParamSectionSource): void {
+  pluginSources.set(namespace, source)
+}
+
 export function PluginParamCard(props: ParamCardFace): ReactNode {
-  const source = (props as { hooks?: { paramSection?: ParamSectionSource } }).hooks?.paramSection
+  const source = (props as { hooks?: { paramSection?: ParamSectionSource } }).hooks?.paramSection ?? pluginSources.get(props.namespace)
   if (source === undefined) {
     return ParamCardView({
       namespace: props.namespace, fields: props.fields, t: props.t,

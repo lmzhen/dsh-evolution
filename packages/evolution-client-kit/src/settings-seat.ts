@@ -1,84 +1,112 @@
 /**
- * The platform settings-scope seat, adapted to the card's form shape.
+ * Family settings data plane, adapted to the card's form shape.
  *
- * The platform removed `configForms`; the live seat is `ctx.settingsScope.bind({ namespace })`.
- * Reads keep the scope's stable snapshot; writes use ONE revision-fenced
- * `connection.api.settings.mutate` call and then reload the scope, so the card can
- * distinguish "write accepted" from "readback landed".
+ * The platform RPC only serves its own namespace allowlist, so `connection.api.settings`
+ * cannot read family namespaces even though the host settings provider has them.
+ * These forms talk to the family's exact routes, which call the SAME platform
+ * settings provider (schema validation, revision fencing, redaction and storage
+ * stay platform-owned).
  * @module @lmzhen/dsh-evolution-client-kit
  */
 import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ConfigPathOpLike } from './seam.ts'
 
-interface ScopeSnapshotLike {
-  status: 'loading' | 'ready' | 'unavailable'
-  value: Record<string, unknown> | undefined
-  base: unknown
-  user: unknown
-  writable: boolean
-  revision: number | undefined
+interface FamilySnapshot extends ConfigFormSnapshotLike<Record<string, unknown>> {
+  reason?: string
 }
-interface ScopeLike {
-  getSnapshot(): ScopeSnapshotLike
-  subscribe(listener: () => void): () => void
-  load(): Promise<void>
-  set(field: string, value: unknown): Promise<void>
-  unset(field: string): Promise<void>
+interface ContextLike {
+  get?: (name: string) => unknown
+  remote?: { $on?: (event: string, listener: (namespace: string) => void) => () => void }
 }
-interface BinderLike { bind(spec: { namespace: string }): ScopeLike }
-interface ConnectionLike {
-  api: {
-    settings: {
-      mutate(spec: { ns: string; ops: readonly ConfigPathOpLike[]; expectedRevision?: number }): Promise<{ result: { ok: boolean } }>
-    }
+
+const SETTINGS_DESCRIBE = '/api/dsh-evolution/settings/describe'
+const SETTINGS_MUTATE = '/api/dsh-evolution/settings/mutate'
+
+const EMPTY: FamilySnapshot = Object.freeze({
+  status: 'unavailable', value: undefined, user: undefined, writable: false, base: undefined, revision: undefined, reason: 'transport',
+})
+
+function snapshotFrom(value: unknown, ns: string): FamilySnapshot {
+  if (typeof value !== 'object' || value === null) return EMPTY
+  const list = (value as { namespaces?: unknown }).namespaces
+  if (!Array.isArray(list)) return EMPTY
+  const item = list.find(candidate => typeof candidate === 'object' && candidate !== null && (candidate as { ns?: unknown }).ns === ns) as FamilySnapshot | undefined
+  return item === undefined ? { ...EMPTY, reason: 'not-served' } : item
+}
+
+async function describe(namespace: string): Promise<FamilySnapshot> {
+  try {
+    const response = await fetch(SETTINGS_DESCRIBE, { headers: { accept: 'application/json' } })
+    if (!response.ok) return EMPTY
+    const body = await response.json() as { ok?: boolean; data?: unknown }
+    if (body.ok !== true) return EMPTY
+    return snapshotFrom(body.data, namespace)
+  } catch { return EMPTY }
+}
+
+async function write(namespace: string, ops: readonly ConfigPathOpLike[], expectedRevision?: number): Promise<{ ok: boolean; snapshot?: FamilySnapshot }> {
+  try {
+    const response = await fetch(SETTINGS_MUTATE, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ ns: namespace, ops, ...(expectedRevision === undefined ? {} : { expectedRevision }) }),
+    })
+    if (!response.ok) return { ok: false }
+    const body = await response.json() as { ok?: boolean; data?: unknown }
+    return { ok: body.ok === true, snapshot: snapshotFrom(body.data, namespace) }
+  } catch { return { ok: false } }
+}
+
+function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
+  let snapshot: FamilySnapshot = { ...EMPTY, status: 'loading', reason: 'loading' }
+  const listeners = new Set<() => void>()
+  let started = false
+  let listening = false
+  const notify = (): void => { for (const listener of listeners) listener() }
+  const refresh = async (): Promise<void> => {
+    snapshot = await describe(namespace)
+    notify()
   }
+  const start = (): void => {
+    if (started) return
+    started = true
+    if (!listening) {
+      listening = true
+      ctx.remote?.$on?.('settings/document-updated', (changed) => { if (changed === namespace) void refresh() })
+    }
+    void refresh()
+  }
+  const form: ConfigFormLike = {
+    getSnapshot: () => snapshot as ConfigFormSnapshotLike,
+    subscribe: (listener) => {
+      listeners.add(listener)
+      start()
+      return () => { listeners.delete(listener) }
+    },
+    set: async (field, value) => (await form.mutate([{ op: 'set', path: [field], value }])),
+    unset: async (field) => (await form.mutate([{ op: 'unset', path: [field] }])),
+    mutate: async (ops, expectedRevision) => {
+      const revision = expectedRevision ?? snapshot.revision
+      const outcome = await write(namespace, ops, revision)
+      if (outcome.snapshot !== undefined) { snapshot = outcome.snapshot; notify() }
+      else await refresh()
+      return outcome.ok
+    },
+  }
+  return form
 }
-interface ContextLike { get?: (name: string) => unknown }
 
 /**
- * Build one cached form per namespace over the platform settings scope.
- * The binder/connection are looked up on every `get` so a later-composed settings
- * surface is picked up without capturing an undefined seat at apply time.
- * @param ctx - the client plugin context.
- * @returns the seat; without the platform services each lookup is undefined.
+ * Build one cached form per family namespace over the family settings routes.
+ * @param ctx - the client plugin context (remote subscription is optional).
+ * @returns the seat; each namespace is served by /api/dsh-evolution/settings/*.
  */
 export function createSettingsSeat(ctx: ContextLike): ConfigFormsSeat {
   const forms = new Map<string, ConfigFormLike>()
   return {
     get<T>(namespace: string): ConfigFormLike<T> | undefined {
-      const cached = forms.get(namespace)
-      if (cached !== undefined) return cached as ConfigFormLike<T>
-      const direct = ctx as unknown as { settingsScope?: BinderLike; connection?: ConnectionLike }
-      const binder = direct.settingsScope ?? ctx.get?.('settingsScope') as BinderLike | undefined
-      const connection = direct.connection ?? ctx.get?.('connection') as ConnectionLike | undefined
-      if (binder === undefined || connection === undefined) return undefined
-      const scope = binder.bind({ namespace })
-      const form: ConfigFormLike<T> = {
-        getSnapshot: (): ConfigFormSnapshotLike<T> => scope.getSnapshot() as unknown as ConfigFormSnapshotLike<T>,
-        subscribe: (listener) => scope.subscribe(listener),
-        set: async (field, value) => {
-          try { await scope.set(field, value); return true } catch { return false }
-        },
-        unset: async (field) => {
-          try { await scope.unset(field); return true } catch { return false }
-        },
-        mutate: async (ops, expectedRevision) => {
-          try {
-            const revision = expectedRevision ?? scope.getSnapshot().revision
-            const response = await connection.api.settings.mutate({
-              ns: namespace,
-              ops,
-              ...(revision === undefined ? {} : { expectedRevision: revision }),
-            })
-            await scope.load()
-            return response.result.ok
-          } catch {
-            await scope.load()
-            return false
-          }
-        },
-      }
-      forms.set(namespace, form as ConfigFormLike)
-      return form
+      let form = forms.get(namespace)
+      if (form === undefined) { form = createForm(namespace, ctx); forms.set(namespace, form) }
+      return form as ConfigFormLike<T>
     },
   }
 }

@@ -93,6 +93,10 @@ export const HOST_ROUTES = {
   diagnostics: {
     view: '/api/dsh-evolution/diagnostics',
   },
+  settings: {
+    describe: '/api/dsh-evolution/settings/describe',
+    mutate: '/api/dsh-evolution/settings/mutate',
+  },
 } as const
 
 export type HostSurface =
