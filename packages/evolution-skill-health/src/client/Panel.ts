@@ -157,6 +157,8 @@ function skillQueue(face: HealthFace, t: (key: string) => string): ReactNode {
       createElement('span', { 'data-role': 'skill-name' }, row.name),
       createElement('span', { 'data-role': 'skill-verdict' }, t('verdict.' + row.verdict)),
       createElement('span', { 'data-role': 'skill-findings' }, row.findings.length === 0 ? t('findings.none') : row.findings.map(finding => ruleName(t, finding.rule)).join(' / ')),
+      row.verdict === 'unreadable' ? createElement('span', { 'data-role': 'skill-unreadable-note' }, t('unreadable.note')) : null,
+      row.protection === undefined || row.protection === null ? null : createElement('span', { 'data-role': 'skill-protection' }, t('protected') + ': ' + row.protection),
       createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + ': ' + String(row.dims?.bodyChars ?? t('dims.unknown')) + ' · ' + t('dims.support') + ': ' + String(row.dims?.supportFiles ?? t('dims.unknown'))),
       createElement('span', { 'data-role': 'skill-row-actions' },
         createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(row.name) } }, t('action.history')),
@@ -331,9 +333,5 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
       ? createElement('div', { id: 'evo-health-skills', role: 'tabpanel' }, skillQueue(view, t))
       : createElement('div', { id: 'evo-health-rules', role: 'tabpanel' },
         createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')), ruleTable(view, t)),
-    view.rows.filter((row: HealthRow) => row.verdict === 'unreadable').map((row: HealthRow) =>
-      createElement('p', { key: row.name + ':unreadable', 'data-role': 'note' }, row.name + ' — ' + t('unreadable.note'))),
-    view.rows.filter((row: HealthRow) => row.protection !== undefined && row.protection !== null).map((row: HealthRow) =>
-      createElement('p', { key: row.name + ':protected', 'data-role': 'note' }, row.name + ' — ' + t('protected'))),
   )
 }
