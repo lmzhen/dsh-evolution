@@ -12,15 +12,12 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { createElement, type ReactNode } from 'react'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
-import { DiagnosticsCard, type DiagnosticsCardFace } from './DiagnosticsCard.ts'
-import { createDiagnosticsApi } from './diagnostics-state.ts'
-import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
-import { PluginParamCard, registerPluginParamSource, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
-import { CARD_SLOT, DIAGNOSTICS_CARD_KEY, PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
+import { PluginParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
+import { PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
 import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
-import { SettingsSection } from './SettingsSection.ts'
 import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
 import { injectStyles } from './styles.ts'
 
@@ -116,24 +113,10 @@ export function apply(ctx: ClientContext): void {
   const seatInjection = ctx as unknown as { inject?: (names: readonly string[], callback: () => void) => unknown }
   seatInjection.inject?.(['remote'], () => { sources.revive() })
 
-  seam.slots.inject('settings.section', function* () {
-    yield seam.slots.register({
-      name: 'settings.section',
-      id: SECTION_ID,
-      order: SECTION_ORDER,
-      label: () => t('title'),
-      locale: NS,
-      children: { [CARD_SLOT]: { kind: 'keyed', scope: 'root' } },
-    }, SettingsSection)
-  })
-
-  // Parameters are editable on the platform's Plugins surface only. One card per
-  // namespace, with the platform owning the list and the card chrome.
-  for (const [index, section] of CLIENT_PARAM_SECTIONS.entries()) {
+  const cards: ParamCardFace[] = CLIENT_PARAM_SECTIONS.map((section) => {
     const source: ParamSectionSource = sources.sourceFor(section.seatKey)
-    registerPluginParamSource(section.namespace, source)
     const { mutateOnce, clear } = writeFaceFor(probe, section.namespace)
-    const face = (): ParamCardFace => ({
+    return {
       namespace: section.namespace,
       fields: section.fields,
       t,
@@ -141,26 +124,23 @@ export function apply(ctx: ClientContext): void {
       mutateOnce,
       clear,
       hooks: { paramSection: source },
-    })
-    seam.slots.inject('settings.plugin.item', function* () {
-      yield seam.slots.register({
-        name: 'settings.plugin.item',
-        id: section.namespace,
-        order: index * 10,
-        locale: NS,
-        inject: face,
-      }, PluginParamCard)
-    })
-  }
-
-
-  // Diagnostics stays in the family section until the workbench takes it over.
-  seam.slots.inject(CARD_SLOT, function* () {
-    const diagApi = createDiagnosticsApi((input, init) => fetch(input, init))
-    yield seam.slots.register({
-      name: CARD_SLOT,
-      key: DIAGNOSTICS_CARD_KEY,
-      inject: (): DiagnosticsCardFace => ({ t, api: diagApi, fallback: FALLBACKS.diagnostics }),
-    }, DiagnosticsCard)
+    }
   })
+  seam.slots.inject('settings.plugins.tab', function* () {
+    yield seam.slots.register({
+      name: 'settings.plugins.tab',
+      id: SECTION_ID,
+      order: SECTION_ORDER,
+      label: () => t('title'),
+      locale: NS,
+      inject: () => ({ cards }),
+    }, EvolutionSettingsTab as unknown as (props: never) => unknown)
+  })
+}
+
+/** One family tab: every parameter card lives inside the platform's Plugins page. */
+function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[] }): ReactNode {
+  return createElement('div', { className: 'evolution-settings-tab' },
+    ...props.cards.map((face, index) => createElement(PluginParamCard, { key: face.namespace + ':' + String(index), ...face })),
+  )
 }

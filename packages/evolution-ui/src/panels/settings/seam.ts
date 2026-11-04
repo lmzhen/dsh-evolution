@@ -98,6 +98,16 @@ export interface PluginItemRegisterOptions {
   inject: () => unknown
 }
 
+/** Options a `settings.plugins.tab` contribution carries (rc.3 plugin settings page). */
+export interface PluginsTabRegisterOptions {
+  name: 'settings.plugins.tab'
+  id: string
+  order: number
+  label: () => string
+  locale: string
+  inject: () => unknown
+}
+
 /** Options a `settings.section` registration carries (the shell's own shape). */
 export interface SectionRegisterOptions {
   name: 'settings.section'
@@ -151,7 +161,7 @@ export interface ClientSeam {
   slots: {
     inject(name: string, callback: () => Generator<unknown, void, unknown>): unknown
     register(
-      options: SlotRegisterOptions | PluginItemRegisterOptions | SectionRegisterOptions,
+      options: SlotRegisterOptions | PluginItemRegisterOptions | PluginsTabRegisterOptions | SectionRegisterOptions,
       component: (props: never) => unknown,
     ): () => void
   }

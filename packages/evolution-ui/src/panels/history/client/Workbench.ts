@@ -8,6 +8,7 @@ import { PAGE_SURFACE_CLASS } from '@lmzhen/dsh-evolution-client-kit'
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
 import { PendingCard, type PendingCardFace } from '../../settings/PendingCard.ts'
+import { DiagnosticsCard, type DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
 
 /** Stable page id used by the sidebar row, the page slot key, and navigation params. */
 export const WORKBENCH_ID = 'evolution.workbench'
@@ -17,12 +18,13 @@ export interface WorkbenchFace {
   readonly t: (key: string) => string
   readonly history: PanelFace
   readonly pending: PendingCardFace
+  readonly diagnostics: DiagnosticsCardFace
   /** Whether a feature view is actually mounted (health is disabled by default). */
   readonly hasView?: (view: 'merge' | 'health') => boolean
 }
 
 /** The two views the workbench owns today. */
-export type WorkbenchView = 'history' | 'pending' | 'merge' | 'health'
+export type WorkbenchView = 'history' | 'pending' | 'merge' | 'health' | 'diagnostics'
 
 /** Sidebar row injected face. */
 export interface WorkbenchNavFace {
@@ -44,7 +46,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
     setView('history')
     setFocusRevision(value => value + 1)
   }
-  const viewOrder: readonly WorkbenchView[] = ['history', 'pending', 'merge', 'health']
+  const viewOrder: readonly WorkbenchView[] = ['history', 'pending', 'merge', 'health', 'diagnostics']
   const onTabKey = (event: { key: string; preventDefault: () => void }, current: WorkbenchView): void => {
     const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
     if (delta === 0 && event.key !== 'Home' && event.key !== 'End') return
@@ -64,6 +66,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
         createElement('button', { id: 'evo-workbench-tab-pending', type: 'button', role: 'tab', tabIndex: view === 'pending' ? 0 : -1, 'aria-selected': view === 'pending' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { setView('pending') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'pending') } }, props.t('workbench.pending')),
         !hasMerge ? null : createElement('button', { id: 'evo-workbench-tab-merge', type: 'button', role: 'tab', tabIndex: view === 'merge' ? 0 : -1, 'aria-selected': view === 'merge' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { setView('merge') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'merge') } }, props.t('workbench.merge')),
         !hasHealth ? null : createElement('button', { id: 'evo-workbench-tab-health', type: 'button', role: 'tab', tabIndex: view === 'health' ? 0 : -1, 'aria-selected': view === 'health' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'health' ? 'true' : undefined, onClick: () => { setView('health') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'health') } }, props.t('workbench.health')),
+        createElement('button', { id: 'evo-workbench-tab-diagnostics', type: 'button', role: 'tab', tabIndex: view === 'diagnostics' ? 0 : -1, 'aria-selected': view === 'diagnostics' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'diagnostics' ? 'true' : undefined, onClick: () => { setView('diagnostics') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'diagnostics') } }, props.t('workbench.diagnostics')),
       ),
     ),
     createElement('div', { className: 'evo-workbench-body', id: 'evo-workbench-panel', role: 'tabpanel' },
@@ -71,7 +74,9 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
         ? createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision })
         : view === 'pending'
           ? createElement(PendingCard, props.pending)
-          : null,
+          : view === 'diagnostics'
+            ? createElement(DiagnosticsCard, props.diagnostics)
+            : null,
       // The feature list stays mounted while another view is active; each view hides itself.
       createElement('div', { hidden: view !== 'merge' && view !== 'health', className: 'evo-workbench-feature' },
         props.renderSlot?.('evolution.workbench.view', { activeView: view, openHistory }) ?? null),
@@ -98,6 +103,7 @@ export const WORKBENCH_CSS = [
   '.evo-workbench-tabs button:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evo-workbench-title{margin:0;font-size:var(--evo-type-lg);font-weight:600;line-height:var(--evo-leading-base)}',
   '.evo-workbench-body{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}',
+  '.evo-workbench-body>.evolution-param-card{flex:1;min-width:0;overflow:auto}',
   '.evo-workbench-nav{display:flex;width:100%;align-items:center;gap:var(--evo-space-8);padding:var(--evo-space-6) var(--evo-space-12);border:0;border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:var(--evo-type-sm);text-align:left;cursor:pointer}',
   '.evo-workbench-nav:hover,.evo-workbench-nav[data-active="true"]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
   '.evo-workbench-nav:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',

@@ -104,7 +104,7 @@ describe('history client bundle: what it contributes, and what it takes back', (
     const seams = fakeSeams()
     apply(seams.ctx as never)
     const face = seams.faces[0] as { t: unknown; history: Record<string, unknown> }
-    expect(Object.keys(face).sort()).toEqual(['hasView', 'history', 'pending', 't'])
+    expect(Object.keys(face).sort()).toEqual(['diagnostics', 'hasView', 'history', 'pending', 't'])
     expect(Object.keys(face.history).sort()).toEqual(['format', 'loadBody', 'loadDiff', 'loadSkills', 'loadVersions', 'markdownWords', 't', 'undo'])
   })
 

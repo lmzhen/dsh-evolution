@@ -7,6 +7,8 @@ import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
 import { createSettingsSeat, registerSidebarPanel, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
+import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
+import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
 import { fill as settingsFill, message as settingsMessage, NS as SETTINGS_NS } from '../../settings/messages.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { en, NS, zh } from './messages.ts'
@@ -58,6 +60,7 @@ export function apply(ctx: ClientContext): void {
     markdownWords: { copy: t('markdown.copy'), copied: t('markdown.copied'), footnotes: t('markdown.footnotes') },
   })
   const pendingFace = (): PendingCardFace => ({ t: pendingT, api: createApprovalApi((input, init) => fetch(input, init)), confirmMode, fallback: FALLBACKS.approval })
+  const diagnosticsFace = (): DiagnosticsCardFace => ({ t: pendingT, api: createDiagnosticsApi((input, init) => fetch(input, init)), fallback: FALLBACKS.diagnostics })
 
   registerSidebarPanel<WorkbenchFace>(ctx, {
     id: WORKBENCH_ID,
@@ -67,7 +70,7 @@ export function apply(ctx: ClientContext): void {
     styles: { css: CSS + WORKBENCH_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
     component: WorkbenchPage as unknown as (props: never) => unknown,
-    body: (t): WorkbenchFace => ({ t, history: historyFace(t), pending: pendingFace(), hasView }),
+    body: (t): WorkbenchFace => ({ t, history: historyFace(t), pending: pendingFace(), diagnostics: diagnosticsFace(), hasView }),
     children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
   })
 }
