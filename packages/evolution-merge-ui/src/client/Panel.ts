@@ -234,8 +234,19 @@ function rowNode(row: MergeRowView, store: MergeStore, t: Translate, copy: (comm
     ),
   )
 }
+const overlayKey = (event: KeyboardEvent<HTMLElement>, onClose: () => void): void => {
+  if (event.key === 'Escape') { event.preventDefault(); onClose(); return }
+  if (event.key !== 'Tab') return
+  const nodes = [...event.currentTarget.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(node => !node.hasAttribute('disabled'))
+  if (nodes.length === 0) return
+  const first = nodes[0]!
+  const last = nodes[nodes.length - 1]!
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+}
+
 function bodyNode(overlay: Extract<OverlayState, { kind: 'body' }>, t: Translate, onClose: () => void): ReactNode {
-  return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'body', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('overlay.body'), onKeyDown: (event: KeyboardEvent<HTMLElement>) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } } },
+  return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'body', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('overlay.body'), onKeyDown: (event: KeyboardEvent<HTMLElement>) => { overlayKey(event, onClose) } },
     createElement('div', { 'data-role': 'overlay-head' },
       createElement('h3', { 'data-role': 'overlay-title' }, t('overlay.body') + ' · ' + overlay.name),
       createElement('button', { type: 'button', 'data-role': 'overlay-close', autoFocus: true, onClick: onClose }, t('close')),

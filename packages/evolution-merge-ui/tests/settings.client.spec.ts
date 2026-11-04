@@ -34,7 +34,7 @@ it('copies row actions and honors the confirm gate on the production panel', asy
   root.unmount(); host.remove()
 })
 
-it('asks for confirmation before copying a confirm action', async () => {
+it('copies a confirm action immediately without native confirm', async () => {
   const command = '/evolution merge skipped --restore mr_confirm'
   const row: MergeRowView = {
     id: 'mr_confirm', pairKey: 'mr_confirm', a: 'alpha', b: 'beta', state: 'pending', queue: 'pending', stage: null, label: 'alpha + beta',
@@ -45,16 +45,10 @@ it('asks for confirmation before copying a confirm action', async () => {
   const store = new MergeStore(confirmSource, { view: view(), rows: [row] })
   const writeText = vi.fn(async () => {})
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
-  const confirm = vi.fn(() => false)
-  Object.defineProperty(globalThis, 'confirm', { configurable: true, value: confirm })
   const host = document.createElement('div'); document.body.append(host)
   const root = createRoot(host)
   await act(async () => { root.render(createElement(MergePanel, { store, t: key => key })) })
   const button = host.querySelector('[data-role="row-action"]') as HTMLButtonElement
-  await act(async () => { button.click() })
-  expect(confirm).toHaveBeenCalled()
-  expect(writeText).not.toHaveBeenCalled()
-  confirm.mockReturnValue(true)
   await act(async () => { button.click() })
   expect(writeText).toHaveBeenCalledWith(command)
   root.unmount(); host.remove()
