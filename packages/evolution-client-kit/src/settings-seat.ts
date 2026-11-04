@@ -71,7 +71,8 @@ function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
     started = true
     if (!listening) {
       listening = true
-      ctx.remote?.$on?.('settings/document-updated', (changed) => { if (changed === namespace) void refresh() })
+      const remote = (ctx as { get?: (name: string) => unknown }).get?.('remote') as { $on?: (event: string, listener: (namespace: string) => void) => () => void } | undefined
+      remote?.$on?.('settings/document-updated', (changed) => { if (changed === namespace) void refresh() })
     }
     void refresh()
   }
