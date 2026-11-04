@@ -97,7 +97,9 @@ it('renders mergeApproval and platformWrite as read-only owner rows', async () =
   expect(el.querySelector('[data-role="settings-readonly"]')?.textContent).toBe('settings.readonly')
   expect(el.querySelector('input[data-field="mergeApproval"]')).toBeNull()
   expect(el.querySelector('input[data-field="enabled"]')).toBeNull()
-  expect(sections[0]?.querySelector('[data-role="settings-link"]')?.textContent).toBe('settings.openPlatformPath')
+  expect(el.querySelectorAll('[data-role="settings-path"]')).toHaveLength(1)
+  expect(el.querySelector('[data-role="settings-path"]')?.textContent).toBe('settings.openPlatformPath')
+  expect(el.querySelector('[data-role="settings-link"]')).toBeNull()
 })
 
 it('disables platformWrite when capability is false and never derives it from mergeApproval', async () => {

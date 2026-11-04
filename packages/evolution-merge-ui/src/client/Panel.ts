@@ -132,8 +132,9 @@ function SettingsCard({ view, t }: { view: MergeViewPayload; t: Translate }): Re
   return createElement('div', { 'data-role': 'settings-card' },
     createElement('h3', { 'data-role': 'settings-title' }, t('settings.title')),
     createElement('p', { 'data-role': 'settings-hint' }, t('settings.hint')),
-    createElement(ReadOnlySetting, { section: 'merge-approval', label: t('settings.mergeApproval'), value: mergeFallback, disabled: false, missing: false, note: t('settings.mergeApprovalPath'), link: true, t }),
-    createElement(ReadOnlySetting, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, note: t('settings.platformWriteLinkHint'), link: true, t }),
+    createElement('p', { 'data-role': 'settings-path' }, t('settings.openPlatformPath')),
+    createElement(ReadOnlySetting, { section: 'merge-approval', label: t('settings.mergeApproval'), value: mergeFallback, disabled: false, missing: false, t }),
+    createElement(ReadOnlySetting, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, note: t('settings.platformWriteLinkHint'), t }),
     createElement('p', { 'data-role': 'settings-readonly' }, t('settings.readonly')),
   )
 }

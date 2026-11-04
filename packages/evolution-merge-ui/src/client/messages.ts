@@ -168,7 +168,7 @@ Object.assign(zh, {
   'settings.capabilityMissing': '宿主未提供该能力',
   'settings.capabilityDisabled': '当前部署不可用',
   'settings.readonly': '只读显示；修改请到平台设置页。',
-  'settings.mergeApprovalPath': '设置 → 插件 → 自进化 → 技能自动合并',
+
   'run.title': '运行',
   'run.id': '运行编号',
   'run.state': '状态',
@@ -372,7 +372,7 @@ Object.assign(en, {
   'settings.capabilityMissing': 'Host did not provide this capability',
   'settings.capabilityDisabled': 'Not available in this deployment',
   'settings.readonly': 'Read-only here; edit in platform settings.',
-  'settings.mergeApprovalPath': 'Settings → Plugins → Evolution → Skill auto-merge',
+
   'run.title': 'Run',
   'run.id': 'Run ID',
   'run.state': 'State',
@@ -411,14 +411,14 @@ Object.assign(zh, {
   'settings.saved': '已保存',
   'settings.saveFailed': '保存失败',
   'settings.openPlatform': '打开平台设置',
-  'settings.openPlatformPath': '设置 → 内置插件 → 插件配置 → 技能自动合并',
+  'settings.openPlatformPath': '设置 → 内置插件 → 自进化 → 技能自动合并',
   'settings.live': '可直接在此保存；platformWrite 能力来自宿主。',
 })
 Object.assign(en, {
   'settings.saved': 'Saved',
   'settings.saveFailed': 'Save failed',
   'settings.openPlatform': 'Open platform settings',
-  'settings.openPlatformPath': 'Settings → Built-in plugins → Plugin configuration → Skill auto-merge',
+  'settings.openPlatformPath': 'Settings → Built-in plugins → Evolution → Skill auto-merge',
   'settings.live': 'Save directly here; platformWrite capability comes from the host.',
 })
 Object.assign(zh, {
