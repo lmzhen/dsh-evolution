@@ -80,8 +80,13 @@ export interface MergeRuntimeDeps {
   readonly registry: MergeRegistryPort
   readonly skills: SkillLibrary
   readonly now: () => number
-  readonly params: MergeParams
-  readonly platformWrite: boolean
+  /** Live params: re-resolve at each operation, never cache an apply-time value. */
+  readonly getParams?: () => MergeParams
+  /** Legacy fixture shape; used only when getParams is absent. */
+  readonly params?: MergeParams
+  readonly getPlatformWrite?: () => boolean
+  /** Legacy fixture shape; used only when getPlatformWrite is absent. */
+  readonly platformWrite?: boolean
   readonly channel: ConversationChannelLike
   readonly hostCapabilities?: HostCapabilities
   readonly parent: unknown
@@ -121,13 +126,19 @@ export function unitFor(deps: MergeRuntimeDeps): UnitTransaction | undefined {
 export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService {
   const readOnly = createReadOnlyMergeService(deps.io, deps.home)
   const timeout = deps.timeoutMinutes > 0 ? deps.timeoutMinutes : undefined
-  const common = {
+  const paramsOf = (): MergeParams => {
+    if (deps.getParams !== undefined) return deps.getParams()
+    if (deps.params !== undefined) return deps.params
+    throw new Error('merge runtime requires getParams or params')
+  }
+  const platformWriteOf = (): boolean => deps.getPlatformWrite?.() ?? deps.platformWrite ?? false
+  const common = () => ({
     io: deps.io, home: deps.home, registry: deps.registry,
-    platformWrite: deps.platformWrite, now: deps.now,
+    platformWrite: platformWriteOf(), now: deps.now,
     ...(deps.model === undefined ? {} : { model: deps.model }),
     ...(deps.isOwnerActive === undefined ? {} : { isOwnerActive: deps.isOwnerActive }),
     ...(timeout === undefined ? {} : { timeoutMinutes: timeout }),
-  }
+  })
   const stage = deps.stage
   const stageHooks = stage === undefined ? {} : {
     onChild: (context: StageToolContext) => { stage.bind(context) },
@@ -138,6 +149,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       const parent = context?.parent ?? deps.parent
       const agentless = context?.agentless === true
       const detached = deps.detached !== false
+      const params = paramsOf()
       if (command.verb === 'pair') {
         const signal = new AbortController().signal
         if (command.a === command.b) return fail('pair', 'pair-same-source', 'merge pair 需要两个不同技能源：' + command.a, '重新指定两个不同的 family-managed 技能')
@@ -192,9 +204,9 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           return fail('pair', 'pair-fuse', '该 pair 已在待合并队列，可复用决策重跑', '运行 /evolution merge resume --retry ' + (existing.runId ?? existing.id), existing.runId)
         }
         const forced = command.force === true ? forcedDecisionFor(command.a, command.b) : undefined
-        const approval = deps.params.mergeApproval
+        const approval = params.mergeApproval
         const result = await runScanCommand({
-          ...common,
+          ...common(),
           approval,
           cards,
           ...(detached ? { detached: true } : {}),
@@ -204,10 +216,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
               screening: () => Promise.resolve(pair),
               channel: deps.channel, parent, allow: deps.allow,
               ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
-              timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
+              timeoutMs: params.mergePairTimeoutMinutes * 60_000,
               approval,
               commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
-            ...(deps.params.limitsSnapshot === undefined ? {} : { limits: deps.params.limitsSnapshot.skillLimits }),
+            ...(params.limitsSnapshot === undefined ? {} : { limits: params.limitsSnapshot.skillLimits }),
               ...(deps.isBlocked === undefined ? {} : { isBlocked: deps.isBlocked }),
               ...stageHooks,
             })
@@ -231,7 +243,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           .filter(card => card.managed === true && card.protectedBy == null && !blocked.has(card.name))
           .map(card => card.name))
         const loadedState = await loadMergeState(deps.io, deps.home)
-        const skipped = skippedPairKeys(loadedState.state.rows, deps.params.mergeSkippedTtlDays, deps.now())
+        const skipped = skippedPairKeys(loadedState.state.rows, params.mergeSkippedTtlDays, deps.now())
         const held = new Set(loadedState.state.rows.filter(row => row.queue === 'pending' || row.queue === 'fuse'
           || (row.queue === 'verify' && (row.runId !== undefined && deps.now() - Date.parse(row.updatedAt) < 10 * 60_000 || !canRetry(row))))
           .map(row => row.pairKey))
@@ -239,8 +251,8 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           .filter(row => row.state === 'pending' || row.state === 'approved' || row.state === 'fuse' || row.state === 'skipped')
           .map(row => 'conflict:' + row.state + ':' + row.pairKey + ':' + row.id)
         const result = await runScanCommand({
-          ...common,
-          approval: deps.params.mergeApproval,
+          ...common(),
+          approval: params.mergeApproval,
           notes,
           cards,
           ...(detached ? { detached: true } : {}),
@@ -267,10 +279,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             },
             channel: deps.channel, parent, allow: deps.allow,
             ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
-            timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
-            approval: deps.params.mergeApproval,
+            timeoutMs: params.mergePairTimeoutMinutes * 60_000,
+            approval: params.mergeApproval,
             commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
-            ...(deps.params.limitsSnapshot === undefined ? {} : { limits: deps.params.limitsSnapshot.skillLimits }),
+            ...(params.limitsSnapshot === undefined ? {} : { limits: params.limitsSnapshot.skillLimits }),
             ...(deps.isBlocked === undefined ? {} : { isBlocked: deps.isBlocked }),
             ...stageHooks,
           }),
@@ -290,8 +302,8 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const cards = await deps.cards(signal)
         const pairCandidate: MergeCandidate = { a: row.a, b: row.b }
         const result = await runScanCommand({
-          ...common,
-          approval: deps.params.mergeApproval,
+          ...common(),
+          approval: params.mergeApproval,
           notes: ['candidates --retry ' + row.id],
           cards,
           makePorts: runId => createChannelScanPorts({
@@ -303,10 +315,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             },
             channel: deps.channel, parent, allow: deps.allow,
             ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
-            timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
-            approval: deps.params.mergeApproval,
+            timeoutMs: params.mergePairTimeoutMinutes * 60_000,
+            approval: params.mergeApproval,
             commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
-            ...(deps.params.limitsSnapshot === undefined ? {} : { limits: deps.params.limitsSnapshot.skillLimits }),
+            ...(params.limitsSnapshot === undefined ? {} : { limits: params.limitsSnapshot.skillLimits }),
             ...(deps.isBlocked === undefined ? {} : { isBlocked: deps.isBlocked }),
             ...stageHooks,
           }),
@@ -335,7 +347,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const managed = cards === undefined || cards.length === 0 ? undefined : new Set(cards.map(card => card.name))
         const live = cards === undefined || cards.length === 0 ? undefined : liveRowFactsOf(cards)
         try {
-          const report = await reconcileMergeState({ io: deps.io, home: deps.home, now: deps.now, ttlDays: deps.params.mergeSkippedTtlDays, ...(managed === undefined ? {} : { managed }), ...(live === undefined ? {} : { live }) })
+          const report = await reconcileMergeState({ io: deps.io, home: deps.home, now: deps.now, ttlDays: params.mergeSkippedTtlDays, ...(managed === undefined ? {} : { managed }), ...(live === undefined ? {} : { live }) })
           if (report.state === 'blocked') return fail('reconcile', report.code ?? 'merge-state-blocked', report.message ?? '合并状态不可读', '先修复合并状态，再运行 /evolution merge doctor')
           return { ok: true, text: formatReconcileReport(report) }
         } catch (error) {
@@ -343,14 +355,14 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         }
       }
       if (command.verb === 'doctor') {
-        const rows = await mergeDoctor(deps.io, deps.home, deps.params.mergeModelsRoot)
+        const rows = await mergeDoctor(deps.io, deps.home, params.mergeModelsRoot)
         return { ok: true, text: rows.map(row => row.key + ' [' + row.status + '] ' + row.label + '：' + row.detail).join('\n') }
       }
       if (command.verb === 'report' || command.verb === 'runs' || command.verb === 'cancel') {
         const registry = deps.registry as unknown as RunRegistry
         if (command.verb === 'runs') {
           const mergeRuns = registry.runs('merge')
-          const snapshot = await readMergeSnapshot({ io: deps.io, home: deps.home, runs: mergeRuns, approval: deps.params.mergeApproval, now: deps.now })
+          const snapshot = await readMergeSnapshot({ io: deps.io, home: deps.home, runs: mergeRuns, approval: params.mergeApproval, now: deps.now })
           return { ok: true, text: formatRunsView(buildRunsView(snapshot)) }
         }
         if (command.verb === 'cancel') {
@@ -439,27 +451,27 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           round2: () => failed('author', 'resume-needs-child', 'fuse resume needs a new child'),
         }
         const result = await runResumeCommand({
-          ...common, rowId: row.id, ports: basePorts, approval: deps.params.mergeApproval,
+          ...common(), rowId: row.id, ports: basePorts, approval: params.mergeApproval,
           ...(agentless ? { agentless: true } : {}),
           ...(detached ? { detached: true } : {}),
-          pairTimeoutMinutes: deps.params.mergePairTimeoutMinutes,
+          pairTimeoutMinutes: params.mergePairTimeoutMinutes,
           ...(deps.isOwnerActive === undefined ? {} : { isOwnerActive: deps.isOwnerActive }),
           makePorts: runId => createChannelScanPorts({
             io: deps.io, home: deps.home, runId, cards, screening: pair,
             channel: deps.channel, parent, allow: deps.allow,
             ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
-            timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
-            approval: deps.params.mergeApproval, commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
-            ...(deps.params.limitsSnapshot === undefined ? {} : { limits: deps.params.limitsSnapshot.skillLimits }),
+            timeoutMs: params.mergePairTimeoutMinutes * 60_000,
+            approval: params.mergeApproval, commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
+            ...(params.limitsSnapshot === undefined ? {} : { limits: params.limitsSnapshot.skillLimits }),
             ...(deps.isBlocked === undefined ? {} : { isBlocked: deps.isBlocked }),
           }),
           round2WithRun: createNewChildRound2({
             io: deps.io, home: deps.home, cards, channel: deps.channel, parent,
             parentRunId: (runId: string) => runId,
             allow: deps.allow, ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
-            timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
+            timeoutMs: params.mergePairTimeoutMinutes * 60_000,
             commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
-            ...(deps.params.limitsSnapshot === undefined ? {} : { limits: deps.params.limitsSnapshot.skillLimits }),
+            ...(params.limitsSnapshot === undefined ? {} : { limits: params.limitsSnapshot.skillLimits }),
             ...(deps.isBlocked === undefined ? {} : { isBlocked: deps.isBlocked }),
             ...stageHooks,
           }),
@@ -551,20 +563,20 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           }
         }
         const result = await runApproveCommand({
-          ...common,
+          ...common(),
           rowId: command.id,
           ...(agentless ? { agentless: true } : {}),
           ...(detached ? { detached: true } : {}),
-          pairTimeoutMinutes: deps.params.mergePairTimeoutMinutes,
+          pairTimeoutMinutes: params.mergePairTimeoutMinutes,
           ports: {
             stage: createStageForCards({ io: deps.io, home: deps.home, runId: command.id, cards, now: deps.now }),
             round2: createNewChildRound2({
               io: deps.io, home: deps.home, cards, channel: deps.channel, parent,
               parentRunId: (runId: string) => runId,
               allow: deps.allow, ...(deps.cwd === undefined ? {} : { cwd: deps.cwd }),
-              timeoutMs: deps.params.mergePairTimeoutMinutes * 60_000,
+              timeoutMs: params.mergePairTimeoutMinutes * 60_000,
               commitPort: skillLibraryPort(deps.skills), now: deps.now, ...(unitFor(deps) === undefined ? {} : { unit: unitFor(deps) }),
-            ...(deps.params.limitsSnapshot === undefined ? {} : { limits: deps.params.limitsSnapshot.skillLimits }),
+            ...(params.limitsSnapshot === undefined ? {} : { limits: params.limitsSnapshot.skillLimits }),
               ...(deps.isBlocked === undefined ? {} : { isBlocked: deps.isBlocked }),
               ...stageHooks,
             }),
@@ -582,7 +594,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const found = runs?.find(item => item.id === command.id) ?? registry.find(command.id)
         if (found !== undefined && found.kind === 'merge') {
           // CLI consumer of the RunDetail envelope: current pair, per-pair outcome, stop reason.
-          const snapshot = await readMergeSnapshot({ io: deps.io, home: deps.home, runs: runs !== undefined && runs.some(item => item.id === found.id) ? runs : [...(runs ?? []), found], approval: deps.params.mergeApproval, now: deps.now })
+          const snapshot = await readMergeSnapshot({ io: deps.io, home: deps.home, runs: runs !== undefined && runs.some(item => item.id === found.id) ? runs : [...(runs ?? []), found], approval: params.mergeApproval, now: deps.now })
           if (snapshot.blocked !== undefined) return fail('status', snapshot.blocked.code, snapshot.blocked.message, '先修复合并状态（/evolution merge doctor），再查看运行')
           const detail = buildRunDetail(snapshot, found.id)
           if (detail === null) return fail('status', 'run-not-found', '找不到 merge run ' + found.id, '运行 /evolution merge runs 查看运行列表')
@@ -597,7 +609,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const list = cards ?? await deps.cards(new AbortController().signal).catch(() => [])
         return list.length === 0 ? undefined : liveRowFactsOf(list)
       }
-      const text = await handleReadOnlyMergeCommand(command, deps.io, deps.home, cards, runs, deps.params.mergeApproval, liveForRead)
+      const text = await handleReadOnlyMergeCommand(command, deps.io, deps.home, cards, runs, params.mergeApproval, liveForRead)
       if (text !== null) return { ok: true, text }
       return readOnly.execute(command)
     },

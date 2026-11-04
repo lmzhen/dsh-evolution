@@ -29,3 +29,12 @@ it('accepts overrides and rejects bad shapes loudly', () => {
   })
   expect(getterOverrides).toEqual({ mergeApproval: true, mergeSkippedTtlDays: 3, mergeRunTimeoutMinutes: 9, mergePairTimeoutMinutes: 15, mergeModelsRoot: '', platformWrite: false })
 })
+
+it('re-reads a volatile getter on every resolve', () => {
+  const live = { value: false, get() { return this.value } }
+  const config = { mergeApproval: live }
+  expect(resolveMergeParams(config).mergeApproval).toBe(false)
+  live.value = true
+  expect(resolveMergeParams(config).mergeApproval).toBe(true)
+  expect(config.mergeApproval.get()).toBe(true)
+})

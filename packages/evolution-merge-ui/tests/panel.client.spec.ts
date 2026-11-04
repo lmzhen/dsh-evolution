@@ -13,7 +13,7 @@ const view = (): MergeViewPayload => ({
   tabs: [{ queue: 'verify', count: 0 }, { queue: 'pending', count: 2 }, { queue: 'fuse', count: 1 }, { queue: 'skipped', count: 0 }],
   commands: ['/evolution merge status'], startCommands: { scan: '/evolution merge scan', pair: '/evolution merge pair <a> <b>' },
   notes: [], degraded: false, approval: { mergeApproval: true, platformWrite: { enabled: false, capability: true } },
-  latestRun: { id: 'run-1', state: 'succeeded', stage: 'commit', progress: { done: 2, total: 2 }, startedAt: 1, endedAt: 2, resultRef: '/home/reports/run-1.json', failure: { stage: 'settle', code: 'run-failed', retryable: false }, actions: [{ id: 'report', command: '/evolution merge report run-1', confirm: false, enabled: true }] },
+  lastRun: { id: 'run-1', state: 'succeeded', stage: 'commit', progress: { done: 2, total: 2 }, startedAt: 1, endedAt: 2, resultRef: '/home/reports/run-1.json', failure: { stage: 'settle', code: 'run-failed', retryable: false }, actions: [{ id: 'report', command: '/evolution merge report run-1', confirm: false, enabled: true }] },
 })
 const row = (): MergeRowView => ({
   id: 'mr_pending', pairKey: 'mr_pending', a: 'alpha', b: 'beta', state: 'pending', queue: 'pending', stage: null, label: 'alpha + beta',

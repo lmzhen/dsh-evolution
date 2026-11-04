@@ -17,7 +17,7 @@ export interface MergeRunView {
 export interface MergeViewPayload {
   counts: MergeCounts; expired: number; tabs: { queue: MergeQueue; count: number }[]
   commands: string[]; startCommands: { scan: string; pair: string }
-  notes: string[]; degraded: boolean; latestRun?: MergeRunView; approval: MergeApproval
+  notes: string[]; degraded: boolean; activeRun?: MergeRunView; lastRun?: MergeRunView; approval: MergeApproval
 }
 export interface RowActionView { id: string; command: string; confirm: boolean; enabled: boolean; disabledReason?: string }
 export interface MergeStageView { state: StageState; expiresAt?: number }
@@ -196,7 +196,8 @@ export async function view(): Promise<MergeOutcome<MergeViewPayload>> {
     startCommands: facts.startCommands,
     notes: [...facts.notes],
     degraded: facts.degraded,
-    ...(facts.active === null && facts.last === null ? {} : { latestRun: toRun(facts.active ?? facts.last!) }),
+    ...(facts.active === null ? {} : { activeRun: toRun(facts.active) }),
+    ...(facts.last === null ? {} : { lastRun: toRun(facts.last) }),
     approval: { mergeApproval: facts.approval.mergeApproval, ...(platformWrite === undefined ? {} : { platformWrite }) },
   } }
 }

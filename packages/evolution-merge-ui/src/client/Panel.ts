@@ -3,7 +3,7 @@ import { createElement, useEffect, useMemo, useRef, useState, useSyncExternalSto
 import { CSS_TAG_ID } from './styles.ts'
 import { platformModal } from './platform-modal.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
-import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
+import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeRunView, type MergeViewPayload } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
 import type { SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
 import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, rowOrderKey, type RowOrderEdge } from './sorting.ts'
@@ -81,8 +81,14 @@ function stageNode(row: MergeRowView, t: Translate): ReactNode {
   return createElement('span', { 'data-role': 'stage-badge', 'data-stage': stage.state, 'data-tone': tone }, t('stage.state.' + stage.state) + expiry)
 }
 function runNode(view: MergeViewPayload, t: Translate, copy: (command: string) => void): ReactNode {
-  const run = view.latestRun
-  if (run === undefined) return null
+  const active = view.activeRun
+  const last = view.lastRun
+  if (active === undefined && last === undefined) return null
+  return createElement('div', { 'data-role': 'run-strips' },
+    active === undefined ? null : runStrip(active, t, copy, 'active'),
+    last === undefined ? null : runStrip(last, t, copy, 'last'))
+}
+function runStrip(run: MergeRunView, t: Translate, copy: (command: string) => void, role: 'active' | 'last'): ReactNode {
   const report = run.actions.find(action => action.id === 'report')
   const reportEnabled = report?.enabled === true
   const internals = [
@@ -94,7 +100,7 @@ function runNode(view: MergeViewPayload, t: Translate, copy: (command: string) =
     run.parentRunId === undefined ? null : createElement('span', { key: 'parent', 'data-role': 'run-parent' }, t('run.parent') + ' ' + run.parentRunId),
     run.resultRef === undefined ? null : createElement('span', { key: 'ref', 'data-role': 'run-result-ref', title: run.resultRef }, t('run.resultRef')),
   ]
-  return createElement('div', { 'data-role': 'run-strip', 'data-run-state': run.state },
+  return createElement('div', { 'data-role': 'run-strip', 'data-run-role': role, 'data-run-state': run.state },
     createElement('span', { 'data-role': 'run-state' }, t('run.state') + ' ' + t('run.' + run.state)),
     run.progress === null || run.progress === undefined ? null : createElement('span', { 'data-role': 'run-progress' }, t('run.progress') + ' ' + String(run.progress.done) + '/' + String(run.progress.total)),
     createElement('button', { type: 'button', 'data-role': 'run-report', 'data-action': 'report', disabled: !reportEnabled, title: reportEnabled ? (report?.command ?? t('run.report')) : t('run.noReport'), onClick: () => { if (reportEnabled && report !== undefined) copy(report.command) } }, t('run.report')),

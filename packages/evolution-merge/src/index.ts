@@ -166,7 +166,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
   registerOwnerSettings(ctx, 'evolution-merge', Config)
 
   configureMergePresentation(ctx as unknown as MergePresentationContext)
-  let params = resolveMergeParams(rawConfig)
+  const startupParams = resolveMergeParams(rawConfig)
   let mergeRun: ((rawInput: string, invocation?: { readonly agent?: unknown }) => Promise<MergeCommandResult>) | undefined
   let source: MergeRouteSource | undefined
   let doctorFact: (() => Promise<MergeDoctorFact>) | undefined
@@ -211,9 +211,11 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     }, 'evolution-merge: restore supersede')
     const policySnapshot = (ctx as unknown as { get(name: string): unknown }).get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined
     const limitsSnapshot = resolveLimitsSnapshot(policySnapshot?.get?.())
-    const hostApproval = (ctx as unknown as { get(name: string): unknown }).get('evolutionApproval') as { readonly platformWrite?: boolean } | undefined
-    const platformWrite = typeof hostApproval?.platformWrite === 'boolean' ? hostApproval.platformWrite : (params.platformWrite ?? false)
-    params = { ...params, limitsSnapshot, platformWrite }
+    const getPlatformWrite = (): boolean => {
+      const hostApproval = (ctx as unknown as { get(name: string): unknown }).get('evolutionApproval') as { readonly platformWrite?: boolean } | undefined
+      return typeof hostApproval?.platformWrite === 'boolean' ? hostApproval.platformWrite : (resolveMergeParams(rawConfig).platformWrite ?? false)
+    }
+    const getParams = () => ({ ...resolveMergeParams(rawConfig), limitsSnapshot, platformWrite: getPlatformWrite() })
     const skills = newSkillLibrary({
       io, ctx, authority: authorityFrom({ origin: 'subagent' }),
       limits: limitsSnapshot.skillLimits,
@@ -241,7 +243,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
           const pending = v4.state.rows.some(row => row.state === 'pending')
           const library = pending ? await cards().catch(() => []) : []
           const live = library.length === 0 ? undefined : liveRowFactsOf(library)
-          const reconciled = await reconcileMergeState({ io, home, now: () => Date.now(), ttlDays: params.mergeSkippedTtlDays, ...(live === undefined ? {} : { live }) })
+          const reconciled = await reconcileMergeState({ io, home, now: () => Date.now(), ttlDays: getParams().mergeSkippedTtlDays, ...(live === undefined ? {} : { live }) })
           if (reconciled.actions.length > 0) ctx.logger?.info?.('merge reconcile: ' + String(reconciled.actions.length) + ' action(s)')
           await transactIo(io, reportsSweepLockTarget(), async () => {
             await sweepReports({ io, dir: join(home, 'reports'), buckets: [{ prefix: 'merge-', keep: 20 }], owner: 'evolution-merge', warn: message => ctx.logger.warn(message) })
@@ -257,7 +259,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       return state.kind === 'unavailable' ? { code: 'E-323' as const, detail: state.reason } : undefined
     })
     const stage = new StageToolRegistry()
-    const engineInput = resolveEngineInput({ modelsRoot: params.mergeModelsRoot })
+    const engineInput = resolveEngineInput({ modelsRoot: startupParams.mergeModelsRoot })
     const engineConfig = engineConfigFromRoot(engineInput.modelsRoot)
     const llm = (ctx as unknown as { get(name: string): unknown }).get('llm') as LlmServiceLike | undefined
     const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
@@ -295,7 +297,8 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     })
     source = {
       async snapshot() {
-        return await readMergeSnapshot({ io, home, runs: runs.runs('merge'), approval: params.mergeApproval, platformWrite, hostOnly: hostCapabilities.hostOnly, live: async () => liveRowFactsOf(await readSkillCards(skills)), history: async (): Promise<readonly HistoryItem[]> => {
+        const current = getParams()
+        return await readMergeSnapshot({ io, home, runs: runs.runs('merge'), approval: current.mergeApproval, platformWrite: getPlatformWrite(), hostOnly: hostCapabilities.hostOnly, live: async () => liveRowFactsOf(await readSkillCards(skills)), history: async (): Promise<readonly HistoryItem[]> => {
           const items = new Map<string, HistoryItem>()
           const receipts = [...await readCommitReceipts(io, home)].sort((a, b) => a.at - b.at)
           const generationOf = new Map(receipts.map((receipt, index) => [receipt.runId, index + 1]))
@@ -319,7 +322,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         } })
       },
       async bodyRef(ref: BodyRef) { return await resolveBody(io, home, ref, async () => ref.side === 'archive' ? await skills.readArchived(ref.name) : await skills.read(ref.name)) },
-      approval() { return params.mergeApproval },
+      approval() { return getParams().mergeApproval },
       readiness() { return ready },
       commands() {
         return ['merge scan', 'merge doctor', 'merge status', 'merge pending', 'merge skipped', 'merge report', 'merge runs', 'merge cancel', 'merge reconcile']
@@ -334,9 +337,9 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const commands = scope.get('commands') as { register(definition: unknown): () => void } | undefined
     if (commands === undefined) return
     const runtime = createMergeRuntime({
-      io, home, registry: runs, skills, now: () => Date.now(), params, platformWrite,
+      io, home, registry: runs, skills, now: () => Date.now(), getParams, getPlatformWrite,
       ...(defaultModel === undefined ? {} : { model: defaultModel.currentSelection().model }),
-      channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: params.mergeRunTimeoutMinutes,
+      channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: startupParams.mergeRunTimeoutMinutes,
       hostCapabilities,
       isBlocked: async (name) => {
         const curator = (ctx as unknown as { get(key: string): unknown }).get('evolutionCurator') as { isBlocked?: (name: string) => Promise<boolean> } | undefined

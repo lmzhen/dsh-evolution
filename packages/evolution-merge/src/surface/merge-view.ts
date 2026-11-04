@@ -80,9 +80,11 @@ function runView(run: SnapshotRun, readAt: number, includeResultRef = false): Ru
   const stopReason = run.meta?.stopReason ?? (record.state === 'cancelled' ? 'cancelled' : record.state === 'failed' ? 'failed' : record.state === 'succeeded' ? 'completed' : undefined)
   // The maker records progress while running; a terminal run that actually produced pairs
   // must not keep the last in-flight 0/N. The UI shows what happened, not the last tick.
-  const progress = record.progress === undefined ? null : {
-    done: state === 'succeeded' || state === 'undone' ? Math.max(record.progress.done, run.pairs.length) : record.progress.done,
-    total: record.progress.total,
+  const reportPairs = run.report?.processedPairs?.length ?? run.report?.pairs.length
+  const terminal = state === 'succeeded' || state === 'undone'
+  const progress = record.progress === undefined && reportPairs === undefined ? null : {
+    done: terminal ? Math.max(record.progress?.done ?? 0, reportPairs ?? 0, run.pairs.length) : record.progress?.done ?? reportPairs ?? 0,
+    total: record.progress?.total ?? reportPairs ?? 0,
   }
   return { wireVersion: 1, readAt, id: record.id, state, command: record.command ?? 'scan', ...(record.stage === undefined ? {} : { stage: record.stage }), progress, startedAt: record.startedAt, ...(record.endedAt === undefined ? {} : { endedAt: record.endedAt }), ...(stopReason === undefined ? {} : { stopReason }), ...(record.failure === undefined ? {} : { failure: { stage: 'settle', code: 'run-failed', retryable: false, retryFrom: 'none', detail: record.failure } }), ...(record.parentRunId === undefined ? {} : { parentRunId: record.parentRunId }), ...(run.pairs[0]?.pairKey === undefined ? {} : { currentPairKey: run.pairs[0].pairKey }), ...(record.resultRef === undefined ? {} : { resultRef: record.resultRef }), actions: [{ id: 'status', command: base + 'status ' + record.id, confirm: false, enabled: true }, { id: 'report', command: base + 'report ' + record.id, confirm: false, enabled: record.resultRef !== undefined }, { id: 'cancel', command: base + 'cancel ' + record.id, confirm: false, enabled: record.state === 'running' }] }
 }
