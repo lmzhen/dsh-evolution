@@ -1,4 +1,10 @@
 # Changelog
+## 0.34.0 (ui) — merge decisions, live config, workbench store
+
+> **范围**：合并 body 按 rowId+source+side 定位；mergeApproval/platformWrite 改为操作级 live config；新增 family-owned `merge/decision`，UI 行内批准/拒绝调用真实 Agent，复制命令降为辅助；Workbench 状态移入 registration face 持有的 store；设置 seat 去模块 WeakMap，补 generation/remote 退订/stale readback；待批 preview/action 独立 generation；排序 key 加 expiredOnly 与可见排序按钮；健康 load 单调 ticket；诊断页脚与单一设置路径。
+> **验证**：全量 focused 219 files / 739 tests 通过；g34 真机 A/B（m4 正文正确）、mergeApproval 免重启、approve 生成真实 run 并成功、E-305、Workbench 重挂载、768/深色/200%、归档日期、全量 focused 通过。
+> **已知边界**：真实 reject 因 engine 对现有 fixture 均判 keep，未造出 pending；readback stale 仅有组件/适配层证据。
+
 ## 0.33.0 (ui) — rc.3 workbench, settings ask gate, merge/health closure
 
 > **范围**：工作台统一到 rc3 `sidebar.panellist` + keyed `main`，历史/待批/合并/健康/诊断为内部视图；设置改为单个 `settings.plugins.tab`；合并弹层用平台 Modal、行首只留决策事实；健康规则名白话化、proposal/owner 分层，单技能不可读降级为 unreadable 行而不是整表 400。
