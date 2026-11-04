@@ -1,6 +1,7 @@
 /** Batch 4 merge panel: keyed read store, four tabs, local overlays, localized errors. */
 import { createElement, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore,  type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
+import { platformModal } from './platform-modal.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
@@ -246,10 +247,15 @@ const overlayKey = (event: KeyboardEvent<HTMLElement>, onClose: () => void): voi
 }
 
 function bodyNode(overlay: Extract<OverlayState, { kind: 'body' }>, t: Translate, onClose: () => void): ReactNode {
-  return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'body', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('overlay.body'), onKeyDown: (event: KeyboardEvent<HTMLElement>) => { overlayKey(event, onClose) } },
+  const Modal = platformModal()
+  const title = t('overlay.body') + ' · ' + overlay.name
+  const inner = createElement('section', {
+    'data-role': 'overlay', 'data-overlay': 'body', 'aria-label': title,
+    ...(Modal === undefined ? { role: 'dialog', 'aria-modal': 'true', onKeyDown: (event: KeyboardEvent<HTMLElement>) => { overlayKey(event, onClose) } } : { 'data-platform-modal': 'true' }),
+  },
     createElement('div', { 'data-role': 'overlay-head' },
-      createElement('h3', { 'data-role': 'overlay-title' }, t('overlay.body') + ' · ' + overlay.name),
-      createElement('button', { type: 'button', 'data-role': 'overlay-close', autoFocus: true, onClick: onClose }, t('close')),
+      createElement('h3', { 'data-role': 'overlay-title' }, title),
+      createElement('button', { type: 'button', 'data-role': 'overlay-close', ...(Modal === undefined ? { autoFocus: true } : { 'data-modal-autofocus': 'true' }), onClick: onClose }, t('close')),
     ),
     createElement('p', { 'data-role': 'overlay-meta' }, t('body.' + overlay.side) + ' · ' + (overlay.status === 'ready' ? t('body.totalBytes') + ' ' + String(overlay.body?.totalBytes ?? 0) : '')),
     overlay.status === 'loading' ? createElement('p', { 'data-role': 'overlay-loading' }, t('loading')) : null,
@@ -261,12 +267,18 @@ function bodyNode(overlay: Extract<OverlayState, { kind: 'body' }>, t: Translate
         )
       : null,
   )
+  return Modal === undefined ? inner : createElement(Modal, { open: true, onClose, title, closeLabel: t('close'), headless: true, className: 'evo-merge-modal' }, inner)
 }
 function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Translate, onClose: () => void): ReactNode {
-  return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'history', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('history'), onKeyDown: (event: KeyboardEvent<HTMLElement>) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } } },
+  const Modal = platformModal()
+  const title = t('history')
+  const inner = createElement('section', {
+    'data-role': 'overlay', 'data-overlay': 'history', 'aria-label': title,
+    ...(Modal === undefined ? { role: 'dialog', 'aria-modal': 'true', onKeyDown: (event: KeyboardEvent<HTMLElement>) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } } } : { 'data-platform-modal': 'true' }),
+  },
     createElement('div', { 'data-role': 'overlay-head' },
-      createElement('h3', { 'data-role': 'overlay-title' }, t('history')),
-      createElement('button', { type: 'button', 'data-role': 'overlay-close', autoFocus: true, onClick: onClose }, t('close')),
+      createElement('h3', { 'data-role': 'overlay-title' }, title),
+      createElement('button', { type: 'button', 'data-role': 'overlay-close', ...(Modal === undefined ? { autoFocus: true } : { 'data-modal-autofocus': 'true' }), onClick: onClose }, t('close')),
     ),
     overlay.status === 'loading' ? createElement('p', { 'data-role': 'overlay-loading' }, t('loading')) : null,
     overlay.status === 'error' && overlay.failure !== undefined ? failureNode(t, overlay.failure, [], () => {}) : null,
@@ -278,6 +290,7 @@ function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Tra
           )))
       : null,
   )
+  return Modal === undefined ? inner : createElement(Modal, { open: true, onClose, title, closeLabel: t('close'), headless: true, className: 'evo-merge-modal' }, inner)
 }
 
 export function MergePanel(face: MergeFace): ReactNode {
