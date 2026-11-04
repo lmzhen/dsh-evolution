@@ -6,7 +6,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { apply as applySettings } from '../panels/settings/index.ts'
 import { apply as applyHistory } from '../panels/history/client/index.ts'
 
-export const inject = ['slots', 'locale', 'layout', 'remote']
+export const inject = ['slots', 'locale', 'layout']
 
 /** Register every panel through the shared client-kit lifecycle. */
 export function apply(ctx: Context): void {
