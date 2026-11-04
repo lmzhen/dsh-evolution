@@ -1,5 +1,5 @@
 /** Batch 4 merge panel: keyed read store, four tabs, local overlays, localized errors. */
-import { createElement, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { createElement, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore,  type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
@@ -173,7 +173,7 @@ interface RowSortHandlers {
   end(): void
   menu(id: string, x: number, y: number): void
 }
-function rowNode(row: MergeRowView, store: MergeStore, t: Translate, copy: (command: string) => void, sort: RowSortHandlers): ReactNode {
+function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => void, sort: RowSortHandlers, openBody: (name: string, side: 'live' | 'archive', rowId: string | undefined) => void): ReactNode {
   const facts = [
     row.target === undefined ? undefined : t('row.target') + ' ' + row.target,
     row.targetActual === undefined ? undefined : t('row.actualTarget') + ' ' + row.targetActual,
@@ -225,8 +225,8 @@ function rowNode(row: MergeRowView, store: MergeStore, t: Translate, copy: (comm
           const bodyA = row.bodies?.find(body => body.name === row.a)
           const bodyB = row.bodies?.find(body => body.name === row.b)
           return [
-            bodyA === undefined ? null : createElement('button', { key: 'a', type: 'button', 'data-role': 'body-a', 'aria-label': t('body.' + bodyA.side) + ' ' + bodyA.name, title: t('body.' + bodyA.side) + ' ' + bodyA.name, onClick: () => { void store.openBody(bodyA.name, bodyA.side, bodyA.rowId) } }, 'A'),
-            bodyB === undefined ? null : createElement('button', { key: 'b', type: 'button', 'data-role': 'body-b', 'aria-label': t('body.' + bodyB.side) + ' ' + bodyB.name, title: t('body.' + bodyB.side) + ' ' + bodyB.name, onClick: () => { void store.openBody(bodyB.name, bodyB.side, bodyB.rowId) } }, 'B'),
+            bodyA === undefined ? null : createElement('button', { key: 'a', type: 'button', 'data-role': 'body-a', 'aria-label': t('body.' + bodyA.side) + ' ' + bodyA.name, title: t('body.' + bodyA.side) + ' ' + bodyA.name, onClick: () => { openBody(bodyA.name, bodyA.side, bodyA.rowId) } }, 'A'),
+            bodyB === undefined ? null : createElement('button', { key: 'b', type: 'button', 'data-role': 'body-b', 'aria-label': t('body.' + bodyB.side) + ' ' + bodyB.name, title: t('body.' + bodyB.side) + ' ' + bodyB.name, onClick: () => { openBody(bodyB.name, bodyB.side, bodyB.rowId) } }, 'B'),
           ]
         })(),
         actions,
@@ -287,6 +287,11 @@ export function MergePanel(face: MergeFace): ReactNode {
   const [orders, setOrders] = useState<Record<string, readonly string[]>>({})
   const [dragId, setDragId] = useState<string | undefined>(undefined)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | undefined>(undefined)
+  const returnFocus = useRef<HTMLElement | null>(null)
+  const captureFocus = (): void => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }
+  const openBody = (name: string, side: 'live' | 'archive', rowId: string | undefined): void => { captureFocus(); void store.openBody(name, side, rowId) }
+  const openHistory = (): void => { captureFocus(); void store.openHistory() }
+  const closeOverlay = (): void => { store.closeOverlay(); requestAnimationFrame(() => { returnFocus.current?.focus() }) }
   const workspaceId = resolveWorkspaceId(face.workspaceId)
   const orderStore = useMemo(() => createRowOrderStore(), [])
   const copy = (command: string): void => {
@@ -359,7 +364,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const expiredToggle = snapshot.queue === 'pending' ? createElement('button', {
     type: 'button', role: 'switch', 'aria-checked': snapshot.expiredOnly ? 'true' : 'false', 'data-role': 'expired-toggle', 'data-active': snapshot.expiredOnly ? 'true' : 'false', onClick: () => { store.toggleExpired() },
   }, t('tab.expired') + ' ' + String(view.expired)) : null
-  const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => rowNode(row, store, t, copy, sortHandlers))) : null
+  const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => rowNode(row, t, copy, sortHandlers, openBody))) : null
   const empty = uiState === 'empty' ? createElement('div', null, createElement('p', { 'data-role': 'note' }, t('empty.' + snapshot.queue)), createElement('p', { 'data-role': 'empty-scope' }, t('empty.scope'))) : null
   const activeFailure = viewFailure !== undefined ? viewFailure : queue.status === 'error' ? queue.failure : undefined
   const overlay = snapshot.overlay
@@ -402,9 +407,9 @@ export function MergePanel(face: MergeFace): ReactNode {
           list,
           empty,
           queue.nextCursor === undefined || uiState !== 'ready' ? null : createElement('button', { type: 'button', 'data-role': 'load-more', disabled: queue.status === 'loading', onClick: () => { store.loadMore() } }, t('loadMore')),
-          createElement('button', { type: 'button', 'data-role': 'history', onClick: () => { void store.openHistory() } }, t('history')),
+          createElement('button', { type: 'button', 'data-role': 'history', onClick: () => { openHistory() } }, t('history')),
           createElement('button', { type: 'button', 'data-role': 'doctor', onClick: () => { copy(doctorCommand) } }, t('doctor.open')),
-          overlay === undefined ? null : overlay.kind === 'body' ? bodyNode(overlay, t, () => { store.closeOverlay() }) : historyNode(overlay, t, () => { store.closeOverlay() }),
+          overlay === undefined ? null : overlay.kind === 'body' ? bodyNode(overlay, t, closeOverlay) : historyNode(overlay, t, closeOverlay),
           createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { store.refresh() } }, t('refresh')),
           menuNode,
         ),
