@@ -192,7 +192,6 @@ function rowNode(row: MergeRowView, store: MergeStore, t: Translate, copy: (comm
     disabled: !action.enabled,
     onClick: () => {
       if (!action.enabled) return
-      if (action.confirm && globalThis.confirm !== undefined && !globalThis.confirm(t('action.confirm') + ' ' + (t('action.' + action.id) || action.id))) return
       copy(action.command)
     },
   }, t('action.' + action.id)))

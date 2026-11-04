@@ -102,13 +102,19 @@ function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
  * @param ctx - the client plugin context (remote subscription is optional).
  * @returns the seat; each namespace is served by /api/dsh-evolution/settings/*.
  */
+const seats = new WeakMap<object, ConfigFormsSeat>()
+
 export function createSettingsSeat(ctx: ContextLike): ConfigFormsSeat {
+  const cached = seats.get(ctx as object)
+  if (cached !== undefined) return cached
   const forms = new Map<string, ConfigFormLike>()
-  return {
+  const seat: ConfigFormsSeat = {
     get<T>(namespace: string): ConfigFormLike<T> | undefined {
       let form = forms.get(namespace)
       if (form === undefined) { form = createForm(namespace, ctx); forms.set(namespace, form) }
       return form as ConfigFormLike<T>
     },
   }
+  seats.set(ctx as object, seat)
+  return seat
 }

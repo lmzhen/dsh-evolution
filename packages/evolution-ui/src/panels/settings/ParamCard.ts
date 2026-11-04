@@ -522,15 +522,11 @@ export function registerPluginParamSource(namespace: string, source: ParamSectio
   pluginSources.set(namespace, source)
 }
 
+const MISSING_SNAPSHOT = { status: 'unavailable' as const, value: undefined, user: undefined, writable: false, base: undefined, reason: 'seat-missing' as const }
+const MISSING_SOURCE: ParamSectionSource = { getSnapshot: () => MISSING_SNAPSHOT, subscribe: () => () => {}, revive: () => {} }
+
 export function PluginParamCard(props: ParamCardFace): ReactNode {
-  const source = (props as { hooks?: { paramSection?: ParamSectionSource } }).hooks?.paramSection ?? pluginSources.get(props.namespace)
-  if (source === undefined) {
-    return ParamCardView({
-      namespace: props.namespace, fields: props.fields, t: props.t,
-      ...(props.lang === undefined ? {} : { lang: props.lang }), mutateOnce: props.mutateOnce, clear: props.clear,
-      snapshot: { status: 'unavailable', value: undefined, user: undefined, writable: false, base: undefined, reason: 'seat-missing' },
-    })
-  }
+  const source = (props as { hooks?: { paramSection?: ParamSectionSource } }).hooks?.paramSection ?? pluginSources.get(props.namespace) ?? MISSING_SOURCE
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot)
   return ParamCardView({
     namespace: props.namespace,
