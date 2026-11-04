@@ -16,9 +16,9 @@ export function resolveWorkspaceId(workspaceId: string | null | undefined): stri
   return value === '' ? 'local' : value
 }
 
-/** Stable localStorage key for one workspace and queue. */
-export function rowOrderKey(workspaceId: string | null | undefined, queue: MergeQueue): string {
-  return PREFIX + ':' + encodeURIComponent(resolveWorkspaceId(workspaceId)) + ':' + queue
+/** Stable localStorage key for one workspace, queue and expired filter. */
+export function rowOrderKey(workspaceId: string | null | undefined, queue: MergeQueue, expiredOnly = false): string {
+  return PREFIX + ':' + encodeURIComponent(resolveWorkspaceId(workspaceId)) + ':' + queue + (expiredOnly ? ':expired' : ':live')
 }
 
 function defaultStorage(): StorageLike | undefined {
@@ -49,17 +49,17 @@ function normalize(raw: string | null): readonly string[] {
 
 /** One tab's persisted order; failures degrade to an empty (wire) order. */
 export function createRowOrderStore(storage: StorageLike | undefined = defaultStorage()): {
-  read(workspaceId: string | null | undefined, queue: MergeQueue): readonly string[]
-  write(workspaceId: string | null | undefined, queue: MergeQueue, ids: readonly string[]): void
+  read(workspaceId: string | null | undefined, queue: MergeQueue, expiredOnly?: boolean): readonly string[]
+  write(workspaceId: string | null | undefined, queue: MergeQueue, ids: readonly string[], expiredOnly?: boolean): void
 } {
   return {
-    read(workspaceId, queue) {
+    read(workspaceId, queue, expiredOnly = false) {
       if (storage === undefined) return []
-      try { return normalize(storage.getItem(rowOrderKey(workspaceId, queue))) } catch { return [] }
+      try { return normalize(storage.getItem(rowOrderKey(workspaceId, queue, expiredOnly))) } catch { return [] }
     },
-    write(workspaceId, queue, ids) {
+    write(workspaceId, queue, ids, expiredOnly = false) {
       if (storage === undefined) return
-      try { storage.setItem(rowOrderKey(workspaceId, queue), JSON.stringify(ids)) } catch { /* quota/private mode: display-only best effort */ }
+      try { storage.setItem(rowOrderKey(workspaceId, queue, expiredOnly), JSON.stringify(ids)) } catch { /* quota/private mode: display-only best effort */ }
     },
   }
 }

@@ -17,7 +17,13 @@ it('RG7 UI consumes wireVersion, ActionRef, and imports no write model', () => {
   expect(all).not.toContain('@deepseek-ai/dsh-evolution-core')
   expect(all).not.toContain('transactRows')
   expect(all).not.toContain('upsertRow')
-  expect(all).not.toMatch(/method:\s*['"]POST['"]/)
+  // v3 H2: the UI owns exactly ONE write: the decision route (rowId + verb + sessionId).
+  // Commands remain copy-only; any second POST is a second write model and fails here.
+  const posts = all.match(/method:\s*['"]POST['"]/g) ?? []
+  expect(posts).toHaveLength(1)
+  const apiSource = readFileSync(join(clientRoot, 'api.ts'), 'utf8')
+  expect(apiSource).toContain("replace(/body$/, 'decision')")
+  expect(apiSource).toContain('rowId, verb, sessionId')
   const deps = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).dependencies ?? {}
   expect(Object.keys(deps).some(name => name.includes('dsh-evolution-merge') || name.includes('dsh-evolution-core'))).toBe(false)
 })

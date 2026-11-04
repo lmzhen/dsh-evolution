@@ -204,6 +204,13 @@ function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => voi
     createElement('div', null,
       createElement('div', { 'data-role': 'row-meta' }, new Date(row.updatedAt).toLocaleString()),
       createElement('div', { 'data-role': 'row-actions' },
+        createElement('button', {
+          type: 'button', 'data-role': 'row-sort', 'aria-haspopup': 'menu', title: t('sort.menu'),
+          onClick: (event: MouseEvent<HTMLButtonElement>) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            sort.menu(row.id, rect.left, rect.bottom)
+          },
+        }, t('sort.menu')),
         (() => {
           const bodyA = row.bodies?.find(body => body.name === row.a)
           const bodyB = row.bodies?.find(body => body.name === row.b)
@@ -334,12 +341,12 @@ export function MergePanel(face: MergeFace): ReactNode {
   const viewFailure = snapshot.viewState === 'error' ? snapshot.viewFailure : undefined
   const queue: QueueState = snapshot.current
   const uiState = blocked !== undefined ? 'blocked' : viewFailure !== undefined ? 'error' : snapshot.viewState === 'loading' ? 'loading' : queue.status === 'error' ? 'error' : queue.status === 'loading' ? 'loading' : queue.status === 'empty' ? 'empty' : 'ready'
-  const orderKey = rowOrderKey(workspaceId, snapshot.queue)
-  const visibleOrder = orders[orderKey] ?? orderStore.read(workspaceId, snapshot.queue)
+  const orderKey = rowOrderKey(workspaceId, snapshot.queue, snapshot.expiredOnly)
+  const visibleOrder = orders[orderKey] ?? orderStore.read(workspaceId, snapshot.queue, snapshot.expiredOnly)
   const visibleRows = orderRows(queue.rows, visibleOrder)
   const saveOrder = (ids: readonly string[]): void => {
     setOrders(previous => ({ ...previous, [orderKey]: ids }))
-    orderStore.write(workspaceId, snapshot.queue, ids)
+    orderStore.write(workspaceId, snapshot.queue, ids, snapshot.expiredOnly)
   }
   const sortHandlers: RowSortHandlers = {
     start: (id) => { setDragId(id) },
