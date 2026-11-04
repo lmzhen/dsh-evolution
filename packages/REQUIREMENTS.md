@@ -688,7 +688,7 @@ approve 前重新 resolve/校验；source-gone 从 active 队列清除；target-
 | FR-UI-04 | satisfied | P1 | v1 | evolution-merge-ui | 无需合并 tab 显示原因（一句话）和 skill1/skill2 两个正文只读入口；归档源从归档读取；空态文案写清“机械追加 vs 两轮合成” |
 | FR-UI-05 | satisfied | P0 | v1 | evolution-merge-ui | 待批准 tab 显示 pending id + 三句话摘要 + requestedTarget + 复制 approve/reject + “无现场/已过期”筛选 |
 | FR-UI-06 | satisfied | P2 | v1 | evolution-merge-ui | 无需合并支持拖动/右键置顶/置底；排序只影响展示并可持久化 |
-| FR-UI-07 | satisfied | P1 | v1 | evolution-merge-ui | 移出无需合并是复制 restore 命令到剪贴板（不直接写库）；复制 merge 命令同理；需确认；该交互是对 U1 #3“移出按钮”的只读面板替代，已在 §8 记录 |
+| FR-UI-07 | satisfied | P1 | v1 | evolution-merge-ui | 移出无需合并是复制 restore 命令到剪贴板（不直接写库）；复制 merge 命令同理并显示成功/失败；该交互是对 U1 #3“移出按钮”的只读面板替代，已在 §8 记录 |
 | FR-UI-08 | satisfied | P0 | v1 | evolution-merge-ui | 面板只读：无写按钮、无直接执行、无自建写路由 |
 | FR-UI-09 | satisfied | P0 | v1 | evolution-merge-ui | UI 三态互斥：读取中/空/失败 |
 | FR-UI-10 | satisfied | P0 | v1 | evolution-merge-ui | 失败态/E-325 有可读文案；不渲染裸 locale key；服务缺失给命令 fallback + doctor 指引 |
@@ -744,9 +744,9 @@ approve 前重新 resolve/校验；source-gone 从 active 队列清除；target-
 
 - AC-1 刷新/重开仍保留顺序 → pass (A)
 
-### FR-UI-07 移出无需合并是复制 restore 命令到剪贴板（不直接写库）；复制 merge 命令同理；需确认；该交互是对 U1 #3“移出按钮”的只读面...
+### FR-UI-07 移出无需合并是复制 restore 命令到剪贴板（不直接写库）；复制 merge 命令同理并显示成功/失败；该交互是对 U1 #3“移出按钮”的只读面...
 
-移出无需合并是复制 restore 命令到剪贴板（不直接写库）；复制 merge 命令同理；需确认；该交互是对 U1 #3“移出按钮”的只读面板替代，已在 §8 记录
+移出无需合并是复制 restore 命令到剪贴板（不直接写库）；复制 merge 命令同理并显示成功/失败；该交互是对 U1 #3“移出按钮”的只读面板替代，已在 §8 记录
 
 - AC-1 无写按钮；确认框；复制正确；文档 §8 已记录只读偏离（文档项不单独计分） → pass (A)
 

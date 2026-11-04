@@ -2437,7 +2437,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge-ui/tests/settings.client.spec.ts#asks for confirmation before copying a confirm action",
+      "ref": "evolution-merge-ui/tests/settings.client.spec.ts#copies a confirm action immediately without native confirm",
       "note": "final-audit decisive"
     },
     {
