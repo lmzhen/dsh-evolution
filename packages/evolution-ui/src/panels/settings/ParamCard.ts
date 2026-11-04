@@ -518,24 +518,11 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
  * @param props - the injected card face.
  * @returns the card with its live row snapshot.
  */
-const pluginSources = new Map<string, ParamSectionSource>()
-
-/**
- * Register a plugin-surface form source by namespace. The platform's
- * `settings.plugin.item` slot does not bind the card's `hooks` compartment, so
- * the owning settings apply hands the stable source here instead.
- * @param namespace - settings namespace.
- * @param source - the stable external-store source.
- */
-export function registerPluginParamSource(namespace: string, source: ParamSectionSource): void {
-  pluginSources.set(namespace, source)
-}
-
 const MISSING_SNAPSHOT = { status: 'unavailable' as const, value: undefined, user: undefined, writable: false, base: undefined, reason: 'seat-missing' as const }
 const MISSING_SOURCE: ParamSectionSource = { getSnapshot: () => MISSING_SNAPSHOT, subscribe: () => () => {}, revive: () => {} }
 
 export function PluginParamCard(props: ParamCardFace): ReactNode {
-  const source = (props as { hooks?: { paramSection?: ParamSectionSource } }).hooks?.paramSection ?? pluginSources.get(props.namespace) ?? MISSING_SOURCE
+  const source = (props as { hooks?: { paramSection?: ParamSectionSource } }).hooks?.paramSection ?? MISSING_SOURCE
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot)
   return ParamCardView({
     namespace: props.namespace,
