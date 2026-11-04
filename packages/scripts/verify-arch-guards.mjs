@@ -2076,10 +2076,10 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
       && clientHostOffenders('const text = readFile(path)').length === 0],
     // N29: the INCIDENT shape (a seat captured in the apply body) AND the two shapes that must pass —
     // the callable probe that replaced it, and a per-call read inside a callback body.
-    ['N29', () => platformServiceCaptures("  const configForms = ctx.get('configForms') as ConfigFormsSeat | undefined").length === 1
-      && platformServiceCaptures("  const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined").length === 0
-      && platformServiceCaptures("    const seat = ctx.get('configForms')\n    if (seat === undefined) return").length === 0
-      && platformServiceCaptures("//  const configForms = ctx.get('configForms') in prose only").length === 0
+    ['N29', () => platformServiceCaptures("  const scope = ctx.get('settingsScope') as SettingsScope | undefined").length === 1
+      && platformServiceCaptures("  const probe: SeatProbe = (): SettingsScope | undefined => ctx.get('settingsScope') as SettingsScope | undefined").length === 0
+      && platformServiceCaptures("    const scope = ctx.get('settingsScope')\n    if (scope === undefined) return").length === 0
+      && platformServiceCaptures("//  const scope = ctx.get('settingsScope') in prose only").length === 0
       && platformServiceCaptures("const seam = ctx as unknown as ClientSeam").length === 0],
     // N30: the incident shape (a source object built inline), the reference form that must pass, and
     // the same mistake written as a call inside the compartment.

@@ -6,8 +6,9 @@
  * Three ways a client row dies, all silent on the platform (a required cordis inject has
  * no timeout: the row stays PENDING forever and its UI simply never appears):
  *
- *   A. the inject names a service no plugin provides any more (`settingsScope` was removed
- *      in 0.1.7-alpha.1 and replaced by `configForms`);
+ *   A. the inject names a service no plugin provides any more (`configForms` was the
+ *      0.2.0 line's seat; the dev line provides `settingsScope`, and family settings
+ *      cards read the owned `/api/dsh-evolution/settings/*` routes);
  *   B. the inject keeps a name the bundle no longer READS — the leftover of a seam change,
  *      which is the same pending-forever failure with a dead constant as its cause;
  *   C. the row has E3 fields but no seat in the generated client view, or no bundle that
