@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { act } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
 import { createElement } from 'react'
 import { SkillHealthPanel } from '../src/client/Panel.ts'
@@ -14,9 +13,10 @@ async function renderFace(proposalStatus: HealthFace['proposalStatus']): Promise
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
-  await act(async () => { root.render(createElement(SkillHealthPanel, face(proposalStatus))) })
+  root.render(createElement(SkillHealthPanel, face(proposalStatus)))
+  await new Promise(resolve => { setTimeout(resolve, 0) })
   const text = host.textContent ?? ''
-  act(() => { root.unmount() })
+  root.unmount()
   host.remove()
   return text
 }
