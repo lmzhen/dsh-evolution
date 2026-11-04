@@ -90,6 +90,16 @@ export interface HealthFace {
 const KINDS = ['healthy', 'warn', 'needs-restructure', 'error', 'unreadable'] as const
 
 /** UI tone per verdict; the CSS keys are ok/warn/error/unreadable. */
+const RULE_KEYS = new Set(['unreadable-skill', 'body-oversize-2x', 'body-oversize', 'stamp-density', 'body-without-support', 'references-sprawl', 'scope-overloaded', 'write-ghost'])
+
+/** A rule speaks the operator's language; an unknown rule keeps its raw id rather than inventing one. */
+function ruleName(t: (key: string) => string, rule: string): string {
+  if (!RULE_KEYS.has(rule)) return rule
+  const key = 'rule.' + rule
+  const label = t(key)
+  return label === key ? rule : label
+}
+
 const TONE: Readonly<Record<HealthRow['verdict'], string>> = Object.freeze({
   healthy: 'ok',
   warn: 'warn',
@@ -146,7 +156,7 @@ function skillQueue(face: HealthFace, t: (key: string) => string): ReactNode {
     ...rows.map(row => createElement('div', { key: row.name, 'data-role': 'skill-row', 'data-tone': row.verdict },
       createElement('span', { 'data-role': 'skill-name' }, row.name),
       createElement('span', { 'data-role': 'skill-verdict' }, t('verdict.' + row.verdict)),
-      createElement('span', { 'data-role': 'skill-findings' }, row.findings.length === 0 ? t('findings.none') : row.findings.map(finding => finding.rule).join(' / ')),
+      createElement('span', { 'data-role': 'skill-findings' }, row.findings.length === 0 ? t('findings.none') : row.findings.map(finding => ruleName(t, finding.rule)).join(' / ')),
       createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + ': ' + String(row.dims?.bodyChars ?? t('dims.unknown')) + ' · ' + t('dims.support') + ': ' + String(row.dims?.supportFiles ?? t('dims.unknown'))),
       createElement('span', { 'data-role': 'skill-row-actions' },
         createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(row.name) } }, t('action.history')),
@@ -172,7 +182,7 @@ function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
       'data-role': 'rule-row',
       'data-tone': TONE[worstVerdict(face, entry.skills) as HealthRow['verdict']],
     },
-    cell('rule-name', entry.rule),
+    cell('rule-name', ruleName(t, entry.rule)),
     cell('skills', entry.skills.map((name, i) => createElement('span', { 'data-role': 'skill-pill', key: name + ':' + String(i), title: name }, name))),
     cell('rule-count', entry.count === 0 ? t('count.notCalibrated') : String(entry.count)),
     ))),
