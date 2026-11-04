@@ -443,8 +443,6 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     },
     createElement('span', { className: 'evolution-param-card-title' }, title),
     changed === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('changed', { n: changed })),
-    // G5/W7 S5: one fixed line — every family row writes the HOST configuration, for every session.
-    createElement('span', { className: 'evolution-param-dest' }, t('writeTargetHost')),
     createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼'),
     ),
     open

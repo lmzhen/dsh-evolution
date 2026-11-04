@@ -142,6 +142,14 @@ function isLoopback(address: string | undefined): boolean {
   return value === '127.0.0.1' || value === '::1' || value === '::ffff:127.0.0.1'
 }
 
+function sameOrigin(origin: string | undefined, host: string | undefined): boolean {
+  if (origin === undefined) return true
+  try {
+    const parsed = new URL(origin)
+    return isLoopback(parsed.hostname) && host !== undefined && parsed.host === host
+  } catch { return false }
+}
+
 function nodeRoute(route: ConnectionFetchRouteLike): { kind: 'exact'; path: string; handler: (req: IncomingMessage, res: ServerResponse) => Promise<void> } {
   return {
     kind: 'exact',
@@ -152,6 +160,23 @@ function nodeRoute(route: ConnectionFetchRouteLike): { kind: 'exact'; path: stri
         res.end('forbidden')
         return
       }
+      if (!sameOrigin(req.headers.origin, req.headers.host)) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
+      const fetchSite = req.headers['sec-fetch-site']
+      if (fetchSite !== undefined && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
+      const method = req.method ?? 'GET'
+      if (method !== 'GET' && method !== 'HEAD' && !(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) {
+        res.statusCode = 415
+        res.end('json required')
+        return
+      }
       try {
         const chunks: Buffer[] = []
         for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
@@ -160,7 +185,6 @@ function nodeRoute(route: ConnectionFetchRouteLike): { kind: 'exact'; path: stri
           if (value === undefined) continue
           headers.set(key, Array.isArray(value) ? value.join(',') : value)
         }
-        const method = req.method ?? 'GET'
         const request = new Request(new URL(req.url ?? '/', 'http://127.0.0.1'), {
           method,
           headers,

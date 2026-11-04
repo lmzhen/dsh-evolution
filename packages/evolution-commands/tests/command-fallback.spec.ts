@@ -14,6 +14,7 @@ const HOST_SURFACE_IDS: Readonly<Record<string, string>> = {
   skillHealth: 'skill-health',
   merge: 'merge',
   diagnostics: 'diagnostics',
+  settings: 'settings',
 }
 
 describe('COMMAND_FALLBACKS', () => {

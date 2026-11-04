@@ -256,7 +256,7 @@ function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Tra
   return createElement('section', { 'data-role': 'overlay', 'data-overlay': 'history', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('history'), onKeyDown: (event: KeyboardEvent<HTMLElement>) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } } },
     createElement('div', { 'data-role': 'overlay-head' },
       createElement('h3', { 'data-role': 'overlay-title' }, t('history')),
-      createElement('button', { type: 'button', 'data-role': 'overlay-close', onClick: onClose }, t('close')),
+      createElement('button', { type: 'button', 'data-role': 'overlay-close', autoFocus: true, onClick: onClose }, t('close')),
     ),
     overlay.status === 'loading' ? createElement('p', { 'data-role': 'overlay-loading' }, t('loading')) : null,
     overlay.status === 'error' && overlay.failure !== undefined ? failureNode(t, overlay.failure, [], () => {}) : null,
@@ -333,10 +333,11 @@ export function MergePanel(face: MergeFace): ReactNode {
   }
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, current: (typeof QUEUES)[number]): void => {
     const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-    if (delta === 0) return
+    const isEdge = event.key === 'Home' || event.key === 'End'
+    if (delta === 0 && !isEdge) return
     event.preventDefault()
     const index = QUEUES.indexOf(current)
-    const next = QUEUES[(index + delta + QUEUES.length) % QUEUES.length]!
+    const next = event.key === 'Home' ? QUEUES[0]! : event.key === 'End' ? QUEUES[QUEUES.length - 1]! : QUEUES[(index + delta + QUEUES.length) % QUEUES.length]!
     store.select(next)
     requestAnimationFrame(() => { document.getElementById('merge-tab-' + next)?.focus() })
   }

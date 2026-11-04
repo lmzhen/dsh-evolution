@@ -330,7 +330,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   const rows = state.view.kind === 'ready' ? state.view.rows : []
   const waiting = rows.filter(entry => entry.status !== 'executing').length
   const running = rows.length - waiting
-  return createElement('section', { className: 'evolution-param-card' },
+  return createElement('section', { className: 'evolution-param-card', 'data-confirm-mode': confirmMode },
     createElement('button', {
       className: 'evolution-param-head',
       type: 'button',

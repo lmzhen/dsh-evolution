@@ -33,16 +33,16 @@ function page(options: { user?: Record<string, unknown>; base?: Record<string, u
 }
 
 describe('U-5/S5: where the value comes from, and where a save goes', () => {
-  it('states the ONE write target on every render — host configuration, all sessions — and never as a refusal', () => {
+  it('keeps the write target out of the repeated card head and never as a refusal', () => {
     const view = page()
-    expect(view.container.textContent).toContain(t('writeTargetHost'))
+    expect(view.container.textContent).not.toContain(t('writeTargetHost'))
     expect(view.container.textContent).not.toContain(t('refused'))
     cleanup()
   })
 
-  it('works on a snapshot without any mode field (the platform fact is gone, the write face is not)', () => {
+  it('works on a snapshot without any mode field and keeps the head free of the write-target line', () => {
     const view = page({ user: { [FIELD.id]: 'x' } })
-    expect(view.container.textContent).toContain(t('writeTargetHost'))
+    expect(view.container.textContent).not.toContain(t('writeTargetHost'))
     cleanup()
   })
 

@@ -89,9 +89,15 @@ export function apply(ctx: ClientContext): void {
     return values === undefined ? template : settingsFill(template, values)
   }
   const settingsSeat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
-  const confirmMode = (): 'auto' | 'ask' => {
-    try { return confirmModeFrom(settingsSeat.get('evolution-approval')?.getSnapshot().user) } catch { return 'auto' }
-  }
+  // U-6: unknown must never mean "auto-execute". The form starts at `ask`; the family
+  // describe answers with the user layer and flips to auto only when the operator chose it.
+  let approvalConfirmMode: 'auto' | 'ask' = 'ask'
+  const approvalForm = settingsSeat.get('evolution-approval')
+  const stopApprovalWatch = approvalForm?.subscribe(() => {
+    approvalConfirmMode = confirmModeFrom(approvalForm.getSnapshot().user)
+  })
+  if (stopApprovalWatch !== undefined) ctx.effect(() => stopApprovalWatch, 'evolution-history: approval confirm mode')
+  const confirmMode = (): 'auto' | 'ask' => approvalConfirmMode
   const hasView = (view: 'merge' | 'health'): boolean => {
     try {
       const entries = (seam.slots as unknown as { entries?: (name: string) => Array<{ options?: { id?: string } }> }).entries?.('evolution.workbench.view') ?? []

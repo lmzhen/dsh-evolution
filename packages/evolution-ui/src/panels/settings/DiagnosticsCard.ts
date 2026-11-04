@@ -64,8 +64,8 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   const [state, setState] = useState<DiagnosticsState>({ phase: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
   // Collapsible like every other card in the section (same head geometry, same chevron); it starts
-  // open because its summary IS the reading the reader opened the section for.
-  const [open, setOpen] = useState(true)
+  // closed so a diagnostic read never dominates the section before the operator asks for it.
+  const [open, setOpen] = useState(false)
   // A read ticket: a slow answer that arrives after the reader refreshed is dropped, never rendered
   // over a newer one (the same rule the pending card's preview follows).
   const ticket = useRef(0)

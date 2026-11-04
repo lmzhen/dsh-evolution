@@ -39,6 +39,7 @@ const SURFACE_IDS = {
   skillHealth: 'skill-health',
   merge: 'merge',
   diagnostics: 'diagnostics',
+  settings: 'settings',
 }
 
 /** Read HOST_ROUTES: built lib first (R13), constrained source fallback for mirror checkouts. */

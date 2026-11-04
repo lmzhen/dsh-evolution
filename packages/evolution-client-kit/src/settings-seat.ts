@@ -9,6 +9,7 @@
  * @module @lmzhen/dsh-evolution-client-kit
  */
 import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ConfigPathOpLike } from './seam.ts'
+import { ROUTES } from './generated/routes.generated.ts'
 
 interface FamilySnapshot extends ConfigFormSnapshotLike<Record<string, unknown>> {
   reason?: string
@@ -18,8 +19,8 @@ interface ContextLike {
   remote?: { $on?: (event: string, listener: (namespace: string) => void) => () => void }
 }
 
-const SETTINGS_DESCRIBE = '/api/dsh-evolution/settings/describe'
-const SETTINGS_MUTATE = '/api/dsh-evolution/settings/mutate'
+const SETTINGS_DESCRIBE = ROUTES.settings.describe
+const SETTINGS_MUTATE = ROUTES.settings.mutate
 
 const EMPTY: FamilySnapshot = Object.freeze({
   status: 'unavailable', value: undefined, user: undefined, writable: false, base: undefined, revision: undefined, reason: 'transport',

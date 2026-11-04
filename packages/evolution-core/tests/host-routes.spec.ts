@@ -52,7 +52,7 @@ describe('host route registration (G4-S1)', () => {
     registerHostRoutes(missing.owner as never, () => routes)
     // Internal registration invariants carry their own message (N21 keeps the E-3xx table the only
     // place a CODE is spelled); the user-facing E-325 lives in hostSurface's unavailable value.
-    expect(() => missing.injected[0]?.run(missing.scope)).toThrow(/connection service is mounted without fetch\.register\(\)/)
+    expect(() => missing.injected[0]?.run(missing.scope)).toThrow(/connection service has no fetch\.register\(\)/)
     const h = harness()
     registerHostRoutes(h.owner as never, () => ([{ path: '/dsh-evolution/approval/pending', methods: ['GET'], requestBody: 'buffered', fetch: async () => new Response('') }] as never))
     expect(() => h.injected[0]?.run(h.scope)).toThrow(/host route path must carry the \/api\/dsh-evolution\/ prefix/)

@@ -100,7 +100,7 @@ export function makeSettingsRoutes(getProvider: () => SettingsProviderLike | und
         try {
           await provider.mutate(ns, ops as never, expectedRevision as number | undefined)
           const descriptor = provider.describe({ redactSecrets: true }).find(item => item.ns === ns)
-          return json(200, { ok: true, data: snapshotOf(provider, descriptor) })
+          return json(200, { ok: true, data: { writable: provider.writable, namespaces: [{ ns, ...snapshotOf(provider, descriptor) }] } })
         } catch (error) {
           const code = (error as { code?: unknown } | null)?.code
           if (code === 'SETTINGS_CONFLICT') {

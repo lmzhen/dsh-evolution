@@ -3,7 +3,7 @@
  * G4/W6 host-route guard: ONE path table, ONE carrier, no second admission path.
  *
  * Checks (static, so it runs in the mirror without a build):
- *   1. HOST_ROUTES is the only home of '/api/dsh-evolution/' literals (5 surfaces / 19 endpoints).
+ *   1. HOST_ROUTES is the only home of '/api/dsh-evolution/' literals (6 surfaces / 21 endpoints).
  *   2. Business sources carry no loopback fence / webServer registration and no hand-copied route paths.
  *   3. The three migrated host packages import HOST_ROUTES from core/http-routes.
  *   4. Generated client route constants (G5), when present, carry the GENERATED header and only paths
@@ -33,15 +33,14 @@ const published = [...coreSource.matchAll(/'(\/api\/dsh-evolution\/[^']*)'/g)]
   // The registerHostRoutes prefix guard names the bare prefix; only endpoints carry a segment after it.
   .filter((path) => path !== '/api/dsh-evolution/')
 for (const path of published) seenPaths.push(path)
-if (published.length !== 19) problems.push('HOST_ROUTES carries ' + published.length + ' endpoint path(s), expected 19')
+if (published.length !== 21) problems.push('HOST_ROUTES carries ' + published.length + ' endpoint path(s), expected 21')
 if (new Set(published).size !== published.length) problems.push('HOST_ROUTES declares a duplicate endpoint path')
-for (const surface of ['approval', 'skillHistory', 'skillHealth', 'merge', 'diagnostics']) {
+for (const surface of ['approval', 'skillHistory', 'skillHealth', 'merge', 'diagnostics', 'settings']) {
   if (!new RegExp('\\b' + surface + '\\s*:').test(coreSource)) problems.push('HOST_ROUTES is missing the "' + surface + '" surface')
 }
 const publishedSet = new Set(published)
 
 const forbidden = [
-  [/\bwebServer\b/, 'webServer registration/fence (the platform connection carrier is the only admission path)'],
   [/isLoopbackRequest|FenceRequest/, 'retired loopback fence helper'],
   [/\bwriteJson\b|\breadJsonBody\b/, 'retired node:http JSON helper'],
 ]

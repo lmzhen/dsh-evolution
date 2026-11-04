@@ -20,6 +20,14 @@ import { formatText } from '../src/panels/settings/messages.ts'
 
 const t = (key: string, values?: Readonly<Record<string, string | number>>): string => formatText(key as never, values)
 
+/** The card starts collapsed; open it before asserting its body. */
+const renderCard = (props: Parameters<typeof DiagnosticsCard>[0]): ReturnType<typeof render> => {
+  const result = render(createElement(DiagnosticsCard, props))
+  const head = document.querySelector('.evolution-param-head')
+  if (head !== null) fireEvent.click(head)
+  return result
+}
+
 const view: DiagnosticsView = {
   schemaVersion: 2,
   generatedAt: '2026-10-19T00:00:00.000Z',
@@ -43,7 +51,7 @@ describe('diagnostics card', () => {
   it('renders loading first, then a summary plus the runtime rows — and never the view facts', async () => {
     let resolve: ((answer: RouteAnswer<DiagnosticsView>) => void) | undefined
     const api = { view: vi.fn(() => new Promise<RouteAnswer<DiagnosticsView>>((done) => { resolve = done })) }
-    render(createElement(DiagnosticsCard, { t, api, fallback: FALLBACKS.diagnostics }))
+    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
     expect(screen.getByText('正在读取…')).toBeTruthy()
     await act(async () => { resolve?.(ok(view)) })
     await waitFor(() => { expect(screen.getByText('运行状态')).toBeTruthy() })
@@ -67,26 +75,26 @@ describe('diagnostics card', () => {
       runtime: [{ key: 'host-surface', label: 'Host 数据面', status: 'ok', detail: '已挂载 12/12' }],
     }
     const api = { view: vi.fn(async () => ok(healthy)) }
-    render(createElement(DiagnosticsCard, { t, api, fallback: FALLBACKS.diagnostics }))
+    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('运行正常')).toBeTruthy() })
   })
 
   it('says so when the view carries no runtime row', async () => {
     const api = { view: vi.fn(async () => ok({ ...view, runtime: [] })) }
-    render(createElement(DiagnosticsCard, { t, api, fallback: FALLBACKS.diagnostics }))
+    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('没有可显示的运行状态')).toBeTruthy() })
   })
 
   it('renders a failed read as the shared failure block with the command fallback', async () => {
     const api = { view: vi.fn(async () => ({ ok: false as const, failure: { kind: 'unmounted' as const, status: 404 } })) }
-    render(createElement(DiagnosticsCard, { t, api, fallback: FALLBACKS.diagnostics }))
+    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('该功能没有挂载。')).toBeTruthy() })
     expect(screen.getByText('可以改用命令：/evolution doctor')).toBeTruthy()
   })
 
   it('reads once on mount and only again on an explicit refresh', async () => {
     const api = { view: vi.fn(async () => ok(view)) }
-    render(createElement(DiagnosticsCard, { t, api, fallback: FALLBACKS.diagnostics }))
+    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(api.view).toHaveBeenCalledTimes(1) })
     await act(async () => { fireEvent.click(screen.getByText('刷新')) })
     await waitFor(() => { expect(api.view).toHaveBeenCalledTimes(2) })
