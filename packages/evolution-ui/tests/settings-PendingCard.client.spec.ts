@@ -62,7 +62,9 @@ const h = createElement as unknown as (type: unknown, props: unknown) => Paramet
 
 /** Render one card. */
 function mount(props: { t: (key: MessageKey) => string; api: ApprovalApi }): void {
-  render(h(PendingCard, props))
+  // This spec is about the card wiring, not the ask gate: decisions are one-click here.
+  // The ask gate has its own spec (settings-u6-approval-confirm).
+  render(h(PendingCard, { ...props, confirmMode: () => 'auto' }))
 }
 
 describe('the pending card', () => {
