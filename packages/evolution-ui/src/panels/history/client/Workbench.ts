@@ -46,7 +46,11 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
     setView('history')
     setFocusRevision(value => value + 1)
   }
-  const viewOrder: readonly WorkbenchView[] = ['history', 'pending', 'merge', 'health', 'diagnostics']
+  const hasMerge = props.hasView?.('merge') ?? true
+  const hasHealth = props.hasView?.('health') ?? true
+  // Keyboard order contains only tabs that actually rendered; a hidden view has no button to land on.
+  const viewOrder: readonly WorkbenchView[] = (['history', 'pending', 'merge', 'health', 'diagnostics'] as const)
+    .filter(value => (value !== 'merge' || hasMerge) && (value !== 'health' || hasHealth))
   const onTabKey = (event: { key: string; preventDefault: () => void }, current: WorkbenchView): void => {
     const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
     if (delta === 0 && event.key !== 'Home' && event.key !== 'End') return
@@ -56,8 +60,6 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
     setView(next)
     requestAnimationFrame(() => { document.getElementById('evo-workbench-tab-' + next)?.focus() })
   }
-  const hasMerge = props.hasView?.('merge') ?? true
-  const hasHealth = props.hasView?.('health') ?? true
   return createElement('section', { className: PAGE_SURFACE_CLASS + ' evo-workbench', 'data-page': view },
     createElement('div', { className: 'evo-workbench-head' },
       createElement('h1', { className: 'evo-workbench-title' }, props.t('entry.label')),

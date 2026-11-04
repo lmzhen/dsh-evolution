@@ -2,7 +2,7 @@
 // @vitest-environment jsdom
 /** The workbench owns view/selection and exposes one openHistory callback to child views. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { WorkbenchPage } from '../src/panels/history/client/Workbench.ts'
 import type { PanelFace } from '../src/panels/history/client/Panel.ts'
@@ -36,6 +36,20 @@ const pendingFace = (): PendingCardFace => ({
 })
 
 describe('history workbench', () => {
+  it('moves keyboard focus only across tabs that are actually visible', async () => {
+    const view = render(createElement(WorkbenchPage, {
+      t: (key: string) => key,
+      history: face(),
+      pending: pendingFace(),
+      hasView: (name: string) => name !== 'merge' && name !== 'health',
+    }))
+    const historyTab = document.getElementById('evo-workbench-tab-history')!
+    fireEvent.keyDown(historyTab, { key: 'ArrowRight' })
+    await waitFor(() => { expect(document.activeElement?.id).toBe('evo-workbench-tab-pending') })
+    expect(document.getElementById('evo-workbench-tab-pending')?.getAttribute('aria-selected')).toBe('true')
+    view.unmount()
+  })
+
   it('opens history through the owner callback, including a repeated same-skill navigation', async () => {
     const loadVersions = vi.fn(async () => ({ content: [], support: [] }))
     let owner: { openHistory?: (name: string) => void } = {}
