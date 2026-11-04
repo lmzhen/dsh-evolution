@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-skill-discovery",
   "description": "Read model and view identity for evolution skill discovery",
-  "version": "0.32.5",
+  "version": "0.32.6",
   "publishConfig": {
     "access": "public"
   },

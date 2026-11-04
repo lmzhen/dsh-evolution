@@ -52,7 +52,7 @@ The three bundles insert the same infrastructure rows. Mounting two double-regis
 
 ## Command fallbacks
 
-Fallbacks cover `approval`, `skill-history`, and `diagnostics`; current examples include `/evolution pending`, `/evolution restore`, `/evolution skills`, and `/evolution merge`. The generated table lives in evolution-client-kit; if a fallback names a retired command, treat it as a documentation defect.
+Fallbacks cover `approval`, `skill-history`, `skill-health`, `merge`, `diagnostics`, and `settings`; examples include `/evolution pending`, `/evolution restore`, `/evolution skills`, `/evolution merge`, `/evolution doctor`, and `/evolution policy` (`/evolution policy set <id> <value>`). The generated table lives in evolution-client-kit; if a fallback names a retired command, treat it as a documentation defect.
 
 Preset bases and preconditions are single-sourced in [evolution-agent/README.md](evolution-agent/README.md).
 

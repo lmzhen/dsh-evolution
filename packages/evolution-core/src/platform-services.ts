@@ -24,7 +24,6 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'approval', feature: 'the platform approval policy the approval row shadows', side: 'host' },
   { service: 'commands', feature: 'the /skill-domain confirmation command surface', side: 'host' },
   { service: 'configEditor', feature: 'the params view inherited-vs-override column', side: 'host' },
-  { service: 'configForms', feature: 'the settings card seat (its section renders read-only without it)', side: 'client' },
   { service: 'evolutionApproval', feature: 'pending writes: list, approve and reject from the command surface', side: 'host' },
   { service: 'evolutionCurator', feature: '/evolution curator subcommands, skill undo and history', side: 'host' },
   { service: 'evolutionIo', feature: 'every durable read and write (the IO seam)', side: 'host' },

@@ -81,7 +81,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-preset
 4. 升级家族 bundle：
 
 ```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.32.5
+dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.32.6
 ```
 
 5. 重启后运行 `/evolution doctor`，再实际写一次记忆、改一次技能。
@@ -123,4 +123,5 @@ node packages/scripts/install-layered.mjs --profile web --mode layered --home "$
 - **`/evolution` 不存在**：先确认当前 profile、安装命令是否成功以及是否重启；此时无法先跑 doctor。检查可用的 `dsh --profile <p> --dump-config` 和启动日志，必要时重装。
 - **没有 `memory` / `skill_manage`**：当前可能是 host；改用 all 或分层预设。
 - **UI 不出现**：确认使用 all + Web/桌面 GUI，并检查客户端与连接服务。host/preset/分层不挂载进化工作台和诊断卡。
+- **设置面板不可用**：参数仍可用 `/evolution policy` 查看、`/evolution policy set <id> <value>` 修改；它走宿主的 settings 服务，不会另建存储。
 - **启动报重复注册**：同一 profile 挂了多个家族形态；移除多余 bundle 和分层预设行后重启。

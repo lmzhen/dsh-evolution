@@ -1,4 +1,11 @@
 # Changelog
+## 0.32.6 (ui) — G0–G7 workbench and family settings surface
+
+> **范围**：G0–G7 前端综合优化——历史/待批/合并/健康统一进工作台；合并、健康迁为工作台子视图；设置区改为平台插件卡 + 八个 family 参数卡，参数数据面走 family 自有 exact 路由（底层仍是平台 settings provider）。
+> **修复**：参数保存/恢复默认后回读不再把卡片打成 unavailable；`approvalConfirm=ask` 在唯一待批界面真实生效（默认安全值为 ask）；正文/历史弹层加 autoFocus、Escape、Tab 焦点循环与关闭后焦点归还；family settings surface 纳入生成器、命令回退与契约计数；源码线 webServer fallback 补 Origin / Sec-Fetch-Site / content-type admission fence；发布脚本同步改写 `dsh.resolverDependencies` 到发布 scope。
+> **界面**：窄窗口内容断点、200% 缩放可读、诊断默认收起、卡头不再重复保存去向、复制动作给出成功/失败反馈、合并 tabs 支持 Home/End 与 aria-controls、A/B 正文按钮有可访问名。
+> **验证**：UI + 核心契约 + 命令回退 + merge settings 162/162；`verify-host-routes` 21 endpoints / 6 surfaces 绿；36 包 `smoke-packed-install` OK；真实 web 宿主 8 namespace、保存/回读、409 冲突、恢复默认通过；1440/1024/768 dark/200% 与触摸切换有截图证据。
+> **已知边界**：`test:web` 平台 e2e 仍有 67 个文件失败未归因；merge undo 只有后端实现/部分单测，无真实 pair→commit→undo 证据。
 ## 0.32.5 (docs) — user-facing docs rewrite and Windows detached-test stabilization
 
 > **范围**：全量用户文档重写——根 README/中文 README/INSTALL/包 README/`docs/` 只保留终端用户可感功能；移除服务、路由、provider、门禁表等开发侧叙事；补正 preset 面板缺失、`restore` 只回最近快照、merge 默认自动接受、审批不覆盖 curator/merge、整理失败不自动回滚、review 每约 10 次工具调用在收尾触发、host 形态 review/usage 不生效等默认值。
