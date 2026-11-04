@@ -3,12 +3,13 @@
  * without creating another page or a second navigation registry.
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
-import { createElement, useState, type ReactNode } from 'react'
+import { createElement, useEffect, useSyncExternalStore, type ReactNode } from 'react'
 import { PAGE_SURFACE_CLASS } from '@lmzhen/dsh-evolution-client-kit'
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
 import { PendingCard, type PendingCardFace } from '../../settings/PendingCard.ts'
 import { DiagnosticsCard, type DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
+import type { WorkbenchStore, WorkbenchView } from './WorkbenchStore.ts'
 
 /** Stable page id used by the sidebar row, the page slot key, and navigation params. */
 export const WORKBENCH_ID = 'evolution.workbench'
@@ -16,6 +17,7 @@ export const WORKBENCH_ID = 'evolution.workbench'
 /** Injected face: copy plus the history view's data callbacks. */
 export interface WorkbenchFace {
   readonly t: (key: string) => string
+  readonly store: WorkbenchStore
   readonly history: PanelFace
   readonly pending: PendingCardFace
   readonly diagnostics: DiagnosticsCardFace
@@ -23,8 +25,7 @@ export interface WorkbenchFace {
   readonly hasView?: (view: 'merge' | 'health') => boolean
 }
 
-/** The two views the workbench owns today. */
-export type WorkbenchView = 'history' | 'pending' | 'merge' | 'health' | 'diagnostics'
+export type { WorkbenchView } from './WorkbenchStore.ts'
 
 /** Sidebar row injected face. */
 export interface WorkbenchNavFace {
@@ -38,16 +39,16 @@ export interface WorkbenchNavFace {
  * @returns the page surface.
  */
 export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (name: string, owner: Record<string, unknown>) => ReactNode }): ReactNode {
-  const [selectedSkill, setSelectedSkill] = useState<string | undefined>(undefined)
-  const [view, setView] = useState<WorkbenchView>('history')
-  const [focusRevision, setFocusRevision] = useState(0)
-  const openHistory = (skill: string | undefined): void => {
-    setSelectedSkill(skill)
-    setView('history')
-    setFocusRevision(value => value + 1)
-  }
+  const state = useSyncExternalStore(props.store.subscribe, props.store.getState, props.store.getState)
+  const view = state.view
+  const selectedSkill = state.selectedSkill
+  const focusRevision = state.focusRevision
+  const openHistory = (skill: string | undefined): void => { props.store.openHistory(skill) }
   const hasMerge = props.hasView?.('merge') ?? true
   const hasHealth = props.hasView?.('health') ?? true
+  useEffect(() => {
+    if ((view === 'merge' && !hasMerge) || (view === 'health' && !hasHealth)) props.store.setView('history')
+  }, [view, hasMerge, hasHealth, props.store])
   // Keyboard order contains only tabs that actually rendered; a hidden view has no button to land on.
   const viewOrder: readonly WorkbenchView[] = (['history', 'pending', 'merge', 'health', 'diagnostics'] as const)
     .filter(value => (value !== 'merge' || hasMerge) && (value !== 'health' || hasHealth))
@@ -57,18 +58,18 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
     event.preventDefault()
     const index = viewOrder.indexOf(current)
     const next = event.key === 'Home' ? viewOrder[0]! : event.key === 'End' ? viewOrder[viewOrder.length - 1]! : viewOrder[(index + delta + viewOrder.length) % viewOrder.length]!
-    setView(next)
+    props.store.setView(next)
     requestAnimationFrame(() => { document.getElementById('evo-workbench-tab-' + next)?.focus() })
   }
   return createElement('section', { className: PAGE_SURFACE_CLASS + ' evo-workbench', 'data-page': view },
     createElement('div', { className: 'evo-workbench-head' },
       createElement('h1', { className: 'evo-workbench-title' }, props.t('entry.label')),
       createElement('div', { className: 'evo-workbench-tabs', role: 'tablist', 'aria-label': props.t('entry.label') },
-        createElement('button', { id: 'evo-workbench-tab-history', type: 'button', role: 'tab', tabIndex: view === 'history' ? 0 : -1, 'aria-selected': view === 'history' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'history' ? 'true' : undefined, onClick: () => { setView('history') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'history') } }, props.t('workbench.history')),
-        createElement('button', { id: 'evo-workbench-tab-pending', type: 'button', role: 'tab', tabIndex: view === 'pending' ? 0 : -1, 'aria-selected': view === 'pending' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { setView('pending') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'pending') } }, props.t('workbench.pending')),
-        !hasMerge ? null : createElement('button', { id: 'evo-workbench-tab-merge', type: 'button', role: 'tab', tabIndex: view === 'merge' ? 0 : -1, 'aria-selected': view === 'merge' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { setView('merge') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'merge') } }, props.t('workbench.merge')),
-        !hasHealth ? null : createElement('button', { id: 'evo-workbench-tab-health', type: 'button', role: 'tab', tabIndex: view === 'health' ? 0 : -1, 'aria-selected': view === 'health' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'health' ? 'true' : undefined, onClick: () => { setView('health') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'health') } }, props.t('workbench.health')),
-        createElement('button', { id: 'evo-workbench-tab-diagnostics', type: 'button', role: 'tab', tabIndex: view === 'diagnostics' ? 0 : -1, 'aria-selected': view === 'diagnostics' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'diagnostics' ? 'true' : undefined, onClick: () => { setView('diagnostics') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'diagnostics') } }, props.t('workbench.diagnostics')),
+        createElement('button', { id: 'evo-workbench-tab-history', type: 'button', role: 'tab', tabIndex: view === 'history' ? 0 : -1, 'aria-selected': view === 'history' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'history' ? 'true' : undefined, onClick: () => { props.store.setView('history') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'history') } }, props.t('workbench.history')),
+        createElement('button', { id: 'evo-workbench-tab-pending', type: 'button', role: 'tab', tabIndex: view === 'pending' ? 0 : -1, 'aria-selected': view === 'pending' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { props.store.setView('pending') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'pending') } }, props.t('workbench.pending')),
+        !hasMerge ? null : createElement('button', { id: 'evo-workbench-tab-merge', type: 'button', role: 'tab', tabIndex: view === 'merge' ? 0 : -1, 'aria-selected': view === 'merge' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { props.store.setView('merge') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'merge') } }, props.t('workbench.merge')),
+        !hasHealth ? null : createElement('button', { id: 'evo-workbench-tab-health', type: 'button', role: 'tab', tabIndex: view === 'health' ? 0 : -1, 'aria-selected': view === 'health' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'health' ? 'true' : undefined, onClick: () => { props.store.setView('health') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'health') } }, props.t('workbench.health')),
+        createElement('button', { id: 'evo-workbench-tab-diagnostics', type: 'button', role: 'tab', tabIndex: view === 'diagnostics' ? 0 : -1, 'aria-selected': view === 'diagnostics' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'diagnostics' ? 'true' : undefined, onClick: () => { props.store.setView('diagnostics') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'diagnostics') } }, props.t('workbench.diagnostics')),
       ),
     ),
     createElement('div', { className: 'evo-workbench-body', id: 'evo-workbench-panel', role: 'tabpanel' },

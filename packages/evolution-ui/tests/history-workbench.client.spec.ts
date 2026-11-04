@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { WorkbenchPage } from '../src/panels/history/client/Workbench.ts'
+import { createWorkbenchStore } from '../src/panels/history/client/WorkbenchStore.ts'
 import type { PanelFace } from '../src/panels/history/client/Panel.ts'
 import type { PendingCardFace } from '../src/panels/settings/PendingCard.ts'
 
@@ -39,6 +40,7 @@ describe('history workbench', () => {
   it('moves keyboard focus only across tabs that are actually visible', async () => {
     const view = render(createElement(WorkbenchPage, {
       t: (key: string) => key,
+      store: createWorkbenchStore(),
       history: face(),
       pending: pendingFace(),
       hasView: (name: string) => name !== 'merge' && name !== 'health',
@@ -55,6 +57,7 @@ describe('history workbench', () => {
     let owner: { openHistory?: (name: string) => void } = {}
     const view = render(createElement(WorkbenchPage, {
       t: (key: string) => key,
+      store: createWorkbenchStore(),
       history: face(loadVersions),
       pending: pendingFace(),
       renderSlot: (_name: string, next: Record<string, unknown>) => { owner = next as typeof owner; return null },
@@ -67,5 +70,17 @@ describe('history workbench', () => {
     await act(async () => { owner.openHistory?.('beta') })
     await waitFor(() => { expect(loadVersions).toHaveBeenCalledWith('beta') })
     view.unmount()
+  })
+
+  it('restores the view after a remount from the registration-owned store', async () => {
+    const store = createWorkbenchStore()
+    const props = { t: (key: string) => key, store, history: face(), pending: pendingFace() }
+    const first = render(createElement(WorkbenchPage, props))
+    fireEvent.click(document.getElementById('evo-workbench-tab-pending')!)
+    expect(document.getElementById('evo-workbench-tab-pending')?.getAttribute('aria-selected')).toBe('true')
+    first.unmount()
+    const second = render(createElement(WorkbenchPage, props))
+    expect(document.getElementById('evo-workbench-tab-pending')?.getAttribute('aria-selected')).toBe('true')
+    second.unmount()
   })
 })

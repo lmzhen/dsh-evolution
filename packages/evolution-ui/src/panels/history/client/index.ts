@@ -17,6 +17,7 @@ import type { PanelFace } from './Panel.ts'
 import { PANEL_ORDER } from './ids.ts'
 export { PANEL_ORDER }
 import { WorkbenchIcon, WorkbenchPage, WORKBENCH_CSS, WORKBENCH_ID, type WorkbenchFace } from './Workbench.ts'
+import { createWorkbenchStore } from './WorkbenchStore.ts'
 
 /** Required client services: the slot registry and the locale seat. */
 export const inject = ['slots', 'locale']
@@ -62,15 +63,17 @@ export function apply(ctx: ClientContext): void {
   const pendingFace = (): PendingCardFace => ({ t: pendingT, api: createApprovalApi((input, init) => fetch(input, init)), confirmMode, fallback: FALLBACKS.approval })
   const diagnosticsFace = (): DiagnosticsCardFace => ({ t: pendingT, api: createDiagnosticsApi((input, init) => fetch(input, init)), fallback: FALLBACKS.diagnostics })
 
+  const workbenchStore = createWorkbenchStore()
   registerSidebarPanel<WorkbenchFace>(ctx, {
     id: WORKBENCH_ID,
+    store: workbenchStore,
     order: PANEL_ORDER,
     namespace: NS,
     dictionaries: { zh, en },
     styles: { css: CSS + WORKBENCH_CSS + PAGE_SURFACE_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
     component: WorkbenchPage as unknown as (props: never) => unknown,
-    body: (t): WorkbenchFace => ({ t, history: historyFace(t), pending: pendingFace(), diagnostics: diagnosticsFace(), hasView }),
+    body: (t): WorkbenchFace => ({ t, store: workbenchStore, history: historyFace(t), pending: pendingFace(), diagnostics: diagnosticsFace(), hasView }),
     children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
   })
 }
