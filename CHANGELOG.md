@@ -1,4 +1,11 @@
 # Changelog
+## 0.33.0 (ui) — rc.3 workbench, settings ask gate, merge/health closure
+
+> **范围**：工作台统一到 rc3 `sidebar.panellist` + keyed `main`，历史/待批/合并/健康/诊断为内部视图；设置改为单个 `settings.plugins.tab`；合并弹层用平台 Modal、行首只留决策事实；健康规则名白话化、proposal/owner 分层，单技能不可读降级为 unreadable 行而不是整表 400。
+> **修复**：设置保存区分 written/readback，unknown `approvalConfirm` 按 ask；后台刷新保留旧内容；删除 `pluginSources` 模块级 Map 与合并页第二审批面；Workbench tab 键盘顺序只遍历可见视图；health loading 不再常驻。
+> **验证**：0.33.0 36 tarball packed smoke OK；干净 rc3 profile 36 包一致、dump-config exit 0、31 family row；真实设置保存/409/reset、审批拒绝/批准、merge commit→undo、健康 warning/unreadable、触屏 Modal 均有真机证据。
+> **已知边界**：本地全量 vitest 剩 5 个 `@tier ci-only` 失败，由 CI 平台夹具负责；proposal stale 服务端当前不产生该状态，组件分支已有测试。
+
 ## 0.32.6 (ui) — G0–G7 workbench and family settings surface
 
 > **范围**：G0–G7 前端综合优化——历史/待批/合并/健康统一进工作台；合并、健康迁为工作台子视图；设置区改为平台插件卡 + 八个 family 参数卡，参数数据面走 family 自有 exact 路由（底层仍是平台 settings provider）。
