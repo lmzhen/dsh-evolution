@@ -2086,7 +2086,16 @@ export class EvolutionCurator extends Service {
     // tell 'nothing is wrong' from 'nothing could be read', and the panel has no denominator.
     type HealthRow = Awaited<ReturnType<EvolutionCurator['healthView']>>[number]
     const rows: HealthRow[] = []
-    for (const summary of await this.skills.model.list()) {
+    // One unreadable SKILL.md used to make model.list() reject, which the route surfaced as
+    // HTTP 400 and hid every other skill. Falling back to the tree names keeps the scan: each
+    // failed skill then arrives at assessHealth() === null and becomes an unreadable row.
+    let summaries: ReadonlyArray<{ name: string; protectedBy: string | null }>
+    try {
+      summaries = await this.skills.model.list()
+    } catch {
+      summaries = (await this.skills.treeNames()).map((name: string) => ({ name, protectedBy: null }))
+    }
+    for (const summary of summaries) {
       const record = usage.get(summary.name)
       const assessment = await this.skills.assessHealth(summary.name, thresholds, observed && record ? {
         patchCount: record.patch_count,
