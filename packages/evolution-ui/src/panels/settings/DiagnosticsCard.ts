@@ -127,6 +127,8 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
       ),
       runtime(view),
       view.runtime.length === 0 ? createElement('p', { className: 'evolution-param-note' }, t('diagNoRows')) : null,
+      createElement('p', { className: 'evolution-param-note', 'data-role': 'diag-purpose' }, t('diagPurpose')),
+      createElement('p', { className: 'evolution-param-hint', 'data-role': 'diag-footer' }, t('diagFooter', { version: String(view.schemaVersion), at: new Date(view.generatedAt).toLocaleString() })),
     )
   }
   return createElement('section', { className: 'evolution-param-card', 'data-card': 'diagnostics' }, header,
