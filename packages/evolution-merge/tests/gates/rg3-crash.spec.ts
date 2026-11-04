@@ -1,10 +1,11 @@
 // @tier pre-tag
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo, UnitTransactions, type UnitBackend } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
+import { spawnTsx } from '../../../test-support/tsx-launcher.ts'
 
 const POINTS = ['prepared', 'target-pending', 'target-applied', 'target-written', 'source-archiving', 'sources-archived', 'unit-written', 'committed'] as const
 
@@ -40,7 +41,7 @@ await tx.commit(p.prepared)
     await mkdir(join(home, 'tree'), { recursive: true })
     await writeFile(join(home, 'tree', 'alpha'), 'old')
     await writeFile(join(home, 'tree', 'beta'), 'beta')
-    const child = spawn(join(process.cwd(), 'node_modules', '.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx'), [scriptPath], { shell: true, stdio: 'ignore' })
+    const child = spawnTsx(scriptPath)
     const pid = Number(await waitFor(pidPath, 20_000))
     const killed = process.platform === 'win32'
       ? spawnSync('taskkill', ['/F', '/PID', String(pid)], { encoding: 'utf8' })

@@ -1,10 +1,10 @@
 // @tier pre-tag
-import { spawn } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { spawnTsx } from '../../test-support/tsx-launcher.ts'
 import { MutationUnit } from '../src/mutation-unit.ts'
 import { unitJournalPort, unitSnapshotPort } from '../src/mutation-storage-adapter.ts'
 
@@ -48,8 +48,7 @@ const result = await unit.apply({ name: 'source', roots: [{ name: 'source', prot
 ], origin: 'foreground', auditAction: 'extract', auditSummary: 'crash', eventAction: 'extract', unitId: 'crash-unit' })
 if (!result.ok) process.exit(2)
 `, 'utf8')
-  const tsx = process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
-  const child = spawn(join(process.cwd(), 'node_modules', '.bin', tsx), [scriptPath], { shell: true, stdio: 'ignore' })
+  const child = spawnTsx(scriptPath)
   const pid = Number(await waitFor(pidPath, 20_000))
   process.kill(pid, 'SIGKILL')
   await new Promise<void>(resolve => child.once('exit', () => { resolve() }))

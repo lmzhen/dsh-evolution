@@ -1,10 +1,10 @@
 // @tier pre-tag
-import { spawn } from 'node:child_process'
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
+import { spawnTsx } from '../../test-support/tsx-launcher.ts'
 import { resolveUnitAuthority } from '../src/unit-recovery.ts'
 
 async function waitFor(path: string, timeoutMs: number): Promise<string> {
@@ -34,8 +34,7 @@ const p = await tx.prepare({ runId: 'run-1', pairKey: 'alpha', target: 'alpha', 
 if (!p.ok) process.exit(2)
 await tx.commit(p.prepared)
 `)
-  const tsx = process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
-  const child = spawn(join(process.cwd(), 'node_modules', '.bin', tsx), [scriptPath], { shell: true, stdio: 'ignore' })
+  const child = spawnTsx(scriptPath)
   const pid = Number(await waitFor(pidPath, 20_000))
   process.kill(pid, 'SIGKILL')
   await new Promise<void>(resolve => child.once('exit', () => { resolve() }))

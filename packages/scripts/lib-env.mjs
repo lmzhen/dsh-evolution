@@ -66,11 +66,13 @@ export function npmGlobalRoot(env = process.env) {
   return candidates.find((dir) => existsSync(dir)) ?? candidates[0]
 }
 
-/** The external line resolver adapter (the ONLY place that knows the resolution order). */
+/** The line resolver adapter: repo-owned first, optional env/machine override after (it is the only place that knows the resolution order). */
 export function adapterCandidates(env = process.env) {
   const workspace = resolve(REPO_ROOT, "..")
   const list = []
   if (typeof env.FAMILY_LINE_ADAPTER === "string" && env.FAMILY_LINE_ADAPTER !== "") list.push(resolve(env.FAMILY_LINE_ADAPTER))
+  // Repo-owned adapter first: the test bed must not require a machine-only _tools file.
+  list.push(join(SCRIPTS_DIR, "line-adapter.mjs"))
   list.push(join(workspace, "_tools", "lib-line.mjs"))
   list.push(join(homedir(), "dsh", "_tools", "lib-line.mjs"))
   return unique(list)

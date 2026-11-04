@@ -8,7 +8,8 @@
 // Lane: FAMILY_TIER=<lane> (explicit). The lane list is NOT a constant here: it is the
 // testing-policy fact's cumulative chain (R71: full is the execution lane, ci-only joins it
 // when ci=on). Membership filtering arrives with the taxonomy view.
-// Adapter: the machine line resolver must be pinned and printable; when it cannot be read the config
+// Adapter: the repo-owned line resolver (packages/scripts/line-adapter.mjs) must be readable and
+// printable; an env override (FAMILY_LINE_ADAPTER) is optional. When it cannot be read the config
 // refuses to run (exit 2, CANNOT DECIDE) instead of letting a platform TypeError look like a broken
 // environment. FAMILY_ALLOW_ABSENT_ADAPTER=1 downgrades that refusal to a printed warning.
 import { createHash } from "node:crypto";
@@ -49,9 +50,9 @@ if (!LANES.includes(tier)) {
 // policy fact owns (adapter.expectedLine), never a human sentence - and the resolver pin (sha8).
 // A missing expected line is CANNOT DECIDE: "unknown" cannot be compared, and a reading nobody
 // can compare is not a pass. The comparison itself is verify-line-identity's判决, not this line.
-// 遗留⑤: never a machine path — env FAMILY_LINE_ADAPTER first, then the workspace sibling;
-// the loader below still refuses by name when none exists (FAMILY_ALLOW_ABSENT_ADAPTER=1 keeps the
-// old escape hatch for a deliberate replay without the adapter).
+// The repo adapter is the default; env FAMILY_LINE_ADAPTER only overrides it for a replay.
+// The loader still refuses by name when neither is readable (FAMILY_ALLOW_ABSENT_ADAPTER=1 keeps
+// the escape hatch for a deliberate replay without an adapter).
 const ADAPTER = resolveAdapter() ?? adapterCandidates()[0];
 const platformLine = policyFact?.machine?.adapter?.expectedLine;
 if (typeof platformLine !== "string" || platformLine.trim() === "") {

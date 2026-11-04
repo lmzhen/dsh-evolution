@@ -1,9 +1,9 @@
 // @tier pre-tag
-import { spawn } from 'node:child_process'
 import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { tempRoot } from '../../../test-support/temp-home.ts'
+import { spawnTsx } from '../../../test-support/tsx-launcher.ts'
 
 it.skip('would need a cross-process provider: nodeEvolutionIo is explicitly single-process (platform ctx.fs owns cross-process exclusion)', async () => {
   const home = await tempRoot('dsh-rg4-two-')
@@ -23,8 +23,7 @@ await writeFile(join(home, 'winners', String(process.pid)), 'win')
 await new Promise(resolve => setTimeout(resolve, 2000))
 await r.lock.release()
 `)
-  const bin = join(process.cwd(), 'node_modules', '.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx')
-  const child = () => new Promise<number>((resolve) => { const c = spawn(bin, [script, home], { shell: true, stdio: 'ignore' }); c.once('exit', code => resolve(code ?? 1)) })
+  const child = () => new Promise<number>((resolve) => { const c = spawnTsx(script, [home]); c.once('exit', code => resolve(code ?? 1)) })
   const first = child()
   for (let i = 0; i < 2000; i += 1) { if ((await readdir(join(home, 'winners')).catch(() => [])).length > 0) break; await new Promise(resolve => setTimeout(resolve, 25)) }
   const second = child()
