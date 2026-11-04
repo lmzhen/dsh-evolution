@@ -125,6 +125,8 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   // Without it a slow read that lands after a newer one writes its stale window over the fresh one
   // (measured: the focused re-read resolved first, then the mount read landed and replaced the rows).
   const readTicket = useRef(0)
+  const previewTicket = useRef(0)
+  const actionTickets = useRef(new Map<string, number>())
 
   const load = async (): Promise<void> => {
     apply(loading)
@@ -158,9 +160,13 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   }, [])
 
   const decide = (id: string, action: 'approve' | 'reject' | 'release'): void => {
+    if (latest.current.busy.includes(id)) return
+    const ticket = (actionTickets.current.get(id) ?? 0) + 1
+    actionTickets.current.set(id, ticket)
     apply(current => beginAction(current, id))
     void (async () => {
       const answer = action === 'approve' ? await api.approve(id) : action === 'reject' ? await api.reject(id) : await api.release(id)
+      if (actionTickets.current.get(id) !== ticket) return
       if (!answer.ok) {
         apply(current => noticed(endAction(current, id), failureText(answer.failure, translate)))
         return
@@ -180,7 +186,9 @@ export function PendingCard(props: PendingCardFace): ReactNode {
 
   /** Ask the host what this record would store; the answer lands only if the row is still open. */
   const loadPreview = async (id: string): Promise<void> => {
+    const ticket = ++previewTicket.current
     const answer = await api.preview(id)
+    if (ticket !== previewTicket.current || latest.current.open !== id) return
     const view: PreviewView = answer.ok
       ? answer.data.available ? { kind: 'ready', answer: answer.data } : { kind: 'unavailable', reason: answer.data.reason }
       : { kind: 'failed', failure: answer.failure }
@@ -212,7 +220,9 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     // restarts at 0, so with two hunks the second old-0 collided with the first and React reused
     // the wrong node (a line of one hunk shown in place of another). The data source returns at
     // most one hunk today, so this is a consistency debt being paid before it can bite.
+    const multiHunk = view.answer.hunks.length > 1 || view.answer.hunks.some(hunk => hunk.path !== view.answer.path)
     for (const [hunkIndex, hunk] of view.answer.hunks.entries()) {
+      if (multiHunk) lines.push(createElement('div', { key: 'hunk-' + String(hunkIndex), className: 'evolution-param-hunk-path', 'data-role': 'hunk-path' }, hunk.path))
       for (const [index, line] of hunk.oldText.split('\n').entries()) {
         if (hunk.oldText === '' && line === '') continue
         lines.push(createElement('div', { key: 'old-' + String(hunkIndex) + '-' + String(index), className: 'evolution-param-line-del' }, '- ' + line))
