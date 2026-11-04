@@ -10,7 +10,7 @@ import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, ro
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
-export interface MergeFace { store: MergeStore; t: Translate; doctorCommand?: string; settings?: SettingsFace; workspaceId?: string }
+export interface MergeFace { store: MergeStore; t: Translate; doctorCommand?: string; settings?: SettingsFace; workspaceId?: string; decide?: (rowId: string, verb: 'approve' | 'reject') => Promise<{ ok: boolean; message: string }> }
 const QUEUES: MergeQueue[] = ['verify', 'pending', 'fuse', 'skipped']
 const DOCTOR_COMMAND = '/evolution doctor'
 
@@ -144,7 +144,7 @@ interface RowSortHandlers {
   end(): void
   menu(id: string, x: number, y: number): void
 }
-function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => void, sort: RowSortHandlers, openBody: (name: string, side: 'live' | 'archive', rowId: string | undefined) => void): ReactNode {
+function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => void, sort: RowSortHandlers, openBody: (name: string, side: 'live' | 'archive', rowId: string | undefined) => void, onDecide: ((rowId: string, verb: 'approve' | 'reject') => void) | undefined, busy: boolean): ReactNode {
   const first = [
     row.target === undefined ? undefined : t('row.target') + ' ' + row.target,
     row.failure === undefined ? undefined : t('row.failure') + ' ' + row.failure.code + (row.failure.retryable ? '' : ' · ' + t('row.noRetry')),
@@ -159,16 +159,25 @@ function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => voi
     row.attempts === undefined ? undefined : t('row.attempts') + ' ' + String(row.attempts),
     row.confidence === undefined ? undefined : t('row.confidence') + ' ' + row.confidence.toFixed(2),
   ].filter((value): value is string => value !== undefined).join(' · ')
-  const actions = row.actions.map(action => createElement('button', {
-    key: action.id, type: 'button', 'data-role': 'row-action', 'data-action': action.id,
-    ...(action.disabledReason === undefined ? {} : { 'data-disabled-reason': action.disabledReason }),
-    title: action.disabledReason === undefined ? action.command : t('disabled.' + action.disabledReason),
-    disabled: !action.enabled,
-    onClick: () => {
-      if (!action.enabled) return
-      copy(action.command)
-    },
-  }, t('action.' + action.id)))
+  const actions = row.actions.flatMap(action => {
+    const decision = (action.id === 'approve' || action.id === 'reject') && onDecide !== undefined
+    const primary = createElement('button', {
+      key: action.id, type: 'button', 'data-role': decision ? 'row-decision' : 'row-action', 'data-action': action.id,
+      ...(action.disabledReason === undefined ? {} : { 'data-disabled-reason': action.disabledReason }),
+      title: action.command,
+      disabled: !action.enabled || busy,
+      onClick: () => {
+        if (!action.enabled || busy) return
+        if (decision) onDecide!(row.id, action.id as 'approve' | 'reject')
+        else copy(action.command)
+      },
+    }, decision ? t('decision.' + action.id) : t('action.' + action.id))
+    if (!decision) return [primary]
+    return [primary, createElement('button', {
+      key: action.id + '-copy', type: 'button', 'data-role': 'row-copy', 'data-action': action.id + '-copy',
+      title: action.command, disabled: busy, onClick: () => { if (!busy) copy(action.command) },
+    }, t('row.copy'))]
+  })
   return createElement('div', {
     key: row.id, 'data-role': 'row', 'data-row-id': row.id, 'data-row-state': row.state, 'data-row-queue': row.queue,
     draggable: true, tabIndex: 0, title: t('sort.drag'), 'aria-haspopup': 'menu',
@@ -272,6 +281,8 @@ export function MergePanel(face: MergeFace): ReactNode {
   const [copyState, setCopyState] = useState<{ kind: 'idle' | 'copied' | 'failed'; text?: string }>({ kind: 'idle' })
   const [orders, setOrders] = useState<Record<string, readonly string[]>>({})
   const [dragId, setDragId] = useState<string | undefined>(undefined)
+  const [deciding, setDeciding] = useState<string | undefined>(undefined)
+  const [decisionNotice, setDecisionNotice] = useState<{ rowId: string; ok: boolean; message: string } | undefined>(undefined)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | undefined>(undefined)
   const returnFocus = useRef<HTMLElement | null>(null)
   const captureFocus = (): void => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }
@@ -280,6 +291,21 @@ export function MergePanel(face: MergeFace): ReactNode {
   const closeOverlay = (): void => { store.closeOverlay(); requestAnimationFrame(() => { returnFocus.current?.focus() }) }
   const workspaceId = resolveWorkspaceId(face.workspaceId)
   const orderStore = useMemo(() => createRowOrderStore(), [])
+  const decideRow = (rowId: string, verb: 'approve' | 'reject'): void => {
+    if (face.decide === undefined) return
+    setDeciding(rowId)
+    void (async () => {
+      try {
+        const result = await face.decide!(rowId, verb)
+        setDecisionNotice({ rowId, ...result })
+        store.refresh()
+      } catch (error) {
+        setDecisionNotice({ rowId, ok: false, message: error instanceof Error ? error.message : String(error) })
+      } finally {
+        setDeciding(undefined)
+      }
+    })()
+  }
   const copy = (command: string): void => {
     void (async () => {
       try {
@@ -350,7 +376,8 @@ export function MergePanel(face: MergeFace): ReactNode {
   const expiredToggle = snapshot.queue === 'pending' ? createElement('button', {
     type: 'button', role: 'switch', 'aria-checked': snapshot.expiredOnly ? 'true' : 'false', 'data-role': 'expired-toggle', 'data-active': snapshot.expiredOnly ? 'true' : 'false', onClick: () => { store.toggleExpired() },
   }, t('tab.expired') + ' ' + String(view.expired)) : null
-  const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => rowNode(row, t, copy, sortHandlers, openBody))) : null
+  const notice = decisionNotice === undefined ? null : createElement('p', { 'data-role': 'decision-notice', 'data-ok': decisionNotice.ok ? 'true' : 'false' }, decisionNotice.message)
+  const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => rowNode(row, t, copy, sortHandlers, openBody, face.decide === undefined ? undefined : decideRow, deciding === row.id))) : null
   const empty = uiState === 'empty' ? createElement('div', null, createElement('p', { 'data-role': 'note' }, t('empty.' + snapshot.queue)), createElement('p', { 'data-role': 'empty-scope' }, t('empty.scope'))) : null
   const staleViewFailure = snapshot.viewState === 'ready' ? snapshot.viewFailure : undefined
   const activeFailure = viewFailure !== undefined ? viewFailure : staleViewFailure !== undefined ? staleViewFailure : queue.status === 'error' ? queue.failure : undefined
@@ -391,6 +418,7 @@ export function MergePanel(face: MergeFace): ReactNode {
           copyState.kind === 'idle' ? null : copyState.kind === 'copied'
             ? createElement('p', { 'data-role': 'copied', role: 'status' }, t('copied') + ' ' + (copyState.text ?? ''))
             : createElement('p', { 'data-role': 'copy-failed', role: 'alert' }, t('copyFailed')),
+          notice,
           list,
           empty,
           queue.nextCursor === undefined || uiState !== 'ready' ? null : createElement('button', { type: 'button', 'data-role': 'load-more', disabled: queue.status === 'loading', onClick: () => { store.loadMore() } }, t('loadMore')),

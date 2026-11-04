@@ -9,7 +9,7 @@ import { MergePanel, type MergeFace } from './Panel.ts'
 import { MergeStore, type MergeSource } from './MergeStore.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'sessions', 'locale']
 
 /** The view component receives the workbench's activeView marker alongside its face. */
 function MergeView(props: MergeFace & { activeView?: string }): ReactNode { return props.activeView === 'merge' ? MergePanel(props) : null }
@@ -30,11 +30,25 @@ export function apply(ctx: ClientContext): void {
       const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
       const seat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
       const workspaceId = panelWorkspaceId(ctx)
+      const currentSessionId = (): string | undefined => {
+        const sessions = (ctx as unknown as { sessions?: { list?: { getSnapshot?: () => { byId?: Record<string, { id?: string; retainedBy?: { mainView?: number } }> } } } }).sessions
+        const byId = sessions?.list?.getSnapshot?.().byId
+        if (byId === undefined) return undefined
+        return Object.values(byId).find(session => (session.retainedBy?.mainView ?? 0) > 0)?.id
+      }
       return {
         store: new MergeStore(source),
         t,
         doctorCommand: '/evolution doctor',
         settings: { ...(seat.get('evolution-merge') === undefined ? {} : { merge: seat.get('evolution-merge')! }), ...(seat.get('evolution-approval') === undefined ? {} : { platform: seat.get('evolution-approval')! }) },
+        decide: async (rowId: string, verb: 'approve' | 'reject') => {
+          const sessionId = currentSessionId()
+          if (sessionId === undefined) return { ok: false, message: '没有当前会话；请打开会话后重试' }
+          const result = await api.decide(rowId, verb, sessionId)
+          if (result.ok) return result.payload
+          const failure = result.failure
+          return { ok: false, message: 'message' in failure && typeof failure.message === 'string' ? failure.message : '审批请求失败' }
+        },
         ...(workspaceId === undefined ? {} : { workspaceId }),
       }
     },

@@ -168,6 +168,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
   configureMergePresentation(ctx as unknown as MergePresentationContext)
   const startupParams = resolveMergeParams(rawConfig)
   let mergeRun: ((rawInput: string, invocation?: { readonly agent?: unknown }) => Promise<MergeCommandResult>) | undefined
+  let decide: ((request: { rowId: string; verb: 'approve' | 'reject'; sessionId: string }) => Promise<{ ok: boolean; message: string; code?: string; runId?: string }>) | undefined
   let source: MergeRouteSource | undefined
   let doctorFact: (() => Promise<MergeDoctorFact>) | undefined
   const mergeService = {
@@ -184,7 +185,13 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
   if (typeof mergeContext.provide === 'function') {
     ;(mergeContext as unknown as { provide(name: string, value: unknown): void }).provide('evolutionMerge', mergeService)
   }
-  registerHostRoutes(ctx, audit => makeMergeRoutes({ getSource: () => source }, audit))
+  registerHostRoutes(ctx, audit => makeMergeRoutes({
+    getSource: () => source,
+    decide: async (request, _audit) => {
+      if (decide === undefined) return { ok: false, code: 'E-305', message: '合并服务尚未完成挂载' }
+      return await decide(request)
+    },
+  }, audit))
   ctx.inject(['commands', 'evolutionIo'], (scope) => {
     const registry = scope.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
     if (registry === undefined) return
@@ -365,6 +372,15 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       const allowedWhenBlocked = /(?:^|\s)(doctor|status|pending|skipped|report|runs|reconcile)(?:\s|$)/.test(rawInput)
       if (!state.ok && !allowedWhenBlocked) return { ok: false, text: formatMergeError(commandError('merge', state.code, state.message, '先修复合并状态（/evolution merge doctor），再重试')) }
       return runMergeCommand(runtime, rawInput, invocation)
+    }
+    const agents = (ctx as unknown as { get(name: string): unknown }).get('agents') as { get(id: string): unknown } | undefined
+    decide = async ({ rowId, verb, sessionId }) => {
+      const agent = agents?.get(sessionId)
+      if (agent === undefined || agent === null) {
+        return { ok: false, code: 'E-305', message: '当前会话没有可用的 Agent；请在会话打开时操作，或复制命令到 CLI 执行' }
+      }
+      const result = await mergeService.run('/evolution merge ' + verb + ' ' + rowId, { agent })
+      return { ok: result.ok, message: result.text }
     }
     const command = createMergeCommand(runtime)
     if (command !== null) scope.effect(() => commands.register(command), 'evolution-merge: command')

@@ -14,11 +14,25 @@ import { buildBodyView, buildFacts as buildSnapshotFacts, buildHistoryView, buil
 
 const MERGE_PATHS = HOST_ROUTES.merge as { view: string; rows: string; body?: string; history?: string }
 const MERGE_BASE = MERGE_PATHS.view.slice(0, -'view'.length)
-export const MERGE_ROUTES: { view: `/api/dsh-evolution/${string}`; rows: `/api/dsh-evolution/${string}`; body: `/api/dsh-evolution/${string}`; history: `/api/dsh-evolution/${string}` } = {
+export const MERGE_ROUTES: { view: `/api/dsh-evolution/${string}`; rows: `/api/dsh-evolution/${string}`; body: `/api/dsh-evolution/${string}`; history: `/api/dsh-evolution/${string}`; decision: `/api/dsh-evolution/${string}` } = {
   view: MERGE_PATHS.view as `/api/dsh-evolution/${string}`,
   rows: MERGE_PATHS.rows as `/api/dsh-evolution/${string}`,
   body: (MERGE_PATHS.body ?? MERGE_BASE + 'body') as `/api/dsh-evolution/${string}`,
   history: (MERGE_PATHS.history ?? MERGE_BASE + 'history') as `/api/dsh-evolution/${string}`,
+  decision: (MERGE_BASE + 'decision') as `/api/dsh-evolution/${string}`,
+}
+
+export interface MergeDecisionRequest {
+  readonly rowId: string
+  readonly verb: 'approve' | 'reject'
+  readonly sessionId: string
+}
+
+export interface MergeDecisionResult {
+  readonly ok: boolean
+  readonly message: string
+  readonly code?: string
+  readonly runId?: string
 }
 
 export interface MergeHistoryItem {
@@ -44,7 +58,10 @@ export interface MergeRouteSource {
 }
 
 export function makeMergeRoutes(
-  deps: { getSource: () => MergeRouteSource | undefined },
+  deps: {
+    getSource: () => MergeRouteSource | undefined
+    decide?: (request: MergeDecisionRequest, audit: DecisionAudit) => Promise<MergeDecisionResult>
+  },
   _audit: DecisionAudit,
 ): ConnectionFetchRouteLike[] {
   const absent = () => json(404, { wireVersion: 1, code: 'E-325', message: 'merge service is not mounted' })
@@ -170,6 +187,24 @@ export function makeMergeRoutes(
         const readiness = await notReady(source)
         if (readiness !== null) return readiness
         return json(200, toHistoryView(await source.history?.() ?? [], Date.now()))
+      },
+    },
+    {
+      path: MERGE_ROUTES.decision,
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        if (request.method !== 'POST') return methodNotAllowed(['POST'])
+        if (deps.decide === undefined) return absent()
+        let body: unknown
+        try { body = await request.json() } catch { return bad('decision body must be JSON') }
+        if (typeof body !== 'object' || body === null) return bad('decision body must be an object')
+        const input = body as { rowId?: unknown; verb?: unknown; sessionId?: unknown }
+        if (typeof input.rowId !== 'string' || input.rowId === '') return bad('rowId is required')
+        if (input.verb !== 'approve' && input.verb !== 'reject') return bad('verb must be approve or reject')
+        if (typeof input.sessionId !== 'string' || input.sessionId === '') return bad('sessionId is required')
+        const result = await deps.decide({ rowId: input.rowId, verb: input.verb, sessionId: input.sessionId }, _audit)
+        return json(result.ok ? 200 : result.code === 'E-305' ? 409 : 400, { wireVersion: 1, ...result })
       },
     },
   ]

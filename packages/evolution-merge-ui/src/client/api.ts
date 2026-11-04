@@ -224,6 +224,22 @@ export async function body(name: string, side: 'live' | 'archive', rowId?: strin
   return { ok: true, payload: { name: answer.payload.name, side: answer.payload.side, text: answer.payload.text, markdown: answer.payload.markdown, truncated: answer.payload.truncated, totalBytes: answer.payload.totalBytes } }
 }
 
+export interface MergeDecisionOutcome { readonly ok: boolean; readonly message: string; readonly code?: string; readonly runId?: string }
+
+export async function decide(rowId: string, verb: 'approve' | 'reject', sessionId: string): Promise<MergeOutcome<MergeDecisionOutcome>> {
+  const path = HOST_ROUTES.body.replace(/body$/, 'decision')
+  let response: Response
+  try {
+    response = await fetch(path, { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify({ rowId, verb, sessionId }) })
+  } catch { return { ok: false, failure: problem('server', 0) } }
+  let body: unknown
+  try { body = await response.json() } catch { return { ok: false, failure: problem('server', response.status) } }
+  if (typeof body !== 'object' || body === null) return { ok: false, failure: problem('server', response.status) }
+  const record = body as { wireVersion?: unknown; ok?: unknown; message?: unknown; code?: unknown; runId?: unknown }
+  if (record.wireVersion !== 1 || typeof record.ok !== 'boolean' || typeof record.message !== 'string') return { ok: false, failure: problem('wire-version', response.status) }
+  return { ok: true, payload: { ok: record.ok, message: record.message, ...(typeof record.code === 'string' ? { code: record.code } : {}), ...(typeof record.runId === 'string' ? { runId: record.runId } : {}) } }
+}
+
 export async function history(): Promise<MergeOutcome<{ items: MergeHistoryItem[] }>> {
   const answer = await requestWire<WireHistory>(HOST_ROUTES.history)
   return answer.ok

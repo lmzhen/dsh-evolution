@@ -131,3 +131,19 @@ it('resolves a body by row id + source name + side, and refuses ambiguity', asyn
   expect(ambiguous.status).toBe(400)
   expect((await ambiguous.json() as { message: string }).message).toContain('ambiguous')
 })
+
+it('decides through the injected real-agent callback', async () => {
+  const decided: string[] = []
+  const routes = makeMergeRoutes({
+    getSource: () => source,
+    decide: async (request) => { decided.push(request.rowId + ':' + request.verb + ':' + request.sessionId); return { ok: true, message: 'decided', runId: 'r9' } },
+  }, audit)
+  const route = routes.find(item => item.path === MERGE_ROUTES.decision)
+  if (route === undefined) throw new Error('missing decision route')
+  const response = await route.fetch(new Request('http://local' + MERGE_ROUTES.decision, { method: 'POST', body: JSON.stringify({ rowId: 'mr_x', verb: 'approve', sessionId: 's1' }) }))
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ wireVersion: 1, ok: true, message: 'decided', runId: 'r9' })
+  expect(decided).toEqual(['mr_x:approve:s1'])
+  const bad = await route.fetch(new Request('http://local' + MERGE_ROUTES.decision, { method: 'POST', body: JSON.stringify({ rowId: 'mr_x', verb: 'drop', sessionId: 's1' }) }))
+  expect(bad.status).toBe(400)
+})
