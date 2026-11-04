@@ -1,21 +1,21 @@
 {
-  "note": "W10/W11 rehearsal readings for v0.32.6, measured 2026-11-04T05:22:11.636Z on an isolated 0.2.1-rc.3 release web host (127.0.0.1:3098, token-authenticated) from the 0.32.6 overlay install. S4 is the family-side dispose/re-apply contract test (live HMR needs a dev host).",
-  "familyVersion": "0.32.6",
+  "note": "W10/W11 rehearsal readings for v0.33.0, measured 2026-11-04T14:08Z on an isolated 0.2.1-rc.3 clean profile from the 0.33.0 tarballs; S4 is the family-side dispose/re-apply contract test (2/2).",
+  "familyVersion": "0.33.0",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.32.6",
-      "startedAt": "2026-11-04T05:22:11.636Z",
+      "familyVersion": "0.33.0",
+      "startedAt": "2026-11-04T14:08:51.915Z",
       "readings": {
-        "skillHistoryRows": 0,
-        "skillHistoryBytes": 21,
+        "skillHistoryRows": 6,
+        "skillHistoryBytes": 3941,
         "ownerStatus": 200,
         "resolveBroken": false,
         "ensureIdempotent": true,
-        "note": "three consecutive owner GETs returned the same 0-row projection (identical sha256 45b93ccefd22e5ec)"
+        "note": "three consecutive owner GETs returned the same 6-row projection on the 0.33.0 clean profile"
       }
     },
     {
@@ -23,8 +23,8 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.32.6",
-      "startedAt": "2026-11-04T05:22:11.636Z",
+      "familyVersion": "0.33.0",
+      "startedAt": "2026-11-04T14:08:51.915Z",
       "readings": {
         "ownerDiagnostics": 200,
         "anonymous": 401,
@@ -37,11 +37,11 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.32.6",
-      "startedAt": "2026-11-04T05:22:11.636Z",
+      "familyVersion": "0.33.0",
+      "startedAt": "2026-11-04T14:08:51.915Z",
       "readings": {
         "semverVersion": "0.2.1-rc.3",
-        "familyVersion": "0.32.6",
+        "familyVersion": "0.33.0",
         "diagnosticsSchemaVersion": 2,
         "gridRows": 8,
         "expectedColumnMatches": true,
@@ -53,13 +53,13 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.32.6",
-      "startedAt": "2026-11-04T05:22:11.636Z",
+      "familyVersion": "0.33.0",
+      "startedAt": "2026-11-04T14:08:51.915Z",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
         "repeatedPrepareIdempotent": true,
-        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.32.6 overlay tree; live HMR needs a dev host, family-side contract replaces it"
+        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.33.0 overlay tree; live HMR needs a dev host, family-side contract replaces it"
       }
     }
   ],
