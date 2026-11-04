@@ -67,7 +67,6 @@ export function apply(ctx: ClientContext): void {
   const workbenchStore = createWorkbenchStore()
   registerSidebarPanel<WorkbenchFace>(ctx, {
     id: WORKBENCH_ID,
-    store: workbenchStore,
     order: PANEL_ORDER,
     namespace: NS,
     dictionaries: { zh, en },
