@@ -29,4 +29,27 @@ describe('G4/4.1: the write face reports the host verdict', () => {
     expect(await writeFaceFor(probeOf(true), 'evolution-curator').mutateOnce([])).toBe(true)
     expect(await writeFaceFor(() => undefined, 'evolution-curator').mutateOnce([])).toBe(false)
   })
+
+  it('separates written from readback, and reports a stale read as failed', async () => {
+    let revision: number | undefined = 1
+    const live = {
+      getSnapshot: () => ({ status: 'ready', revision }),
+      subscribe: () => () => {},
+      set: async () => true,
+      unset: async () => true,
+      mutate: async () => { revision = 2; return true },
+    }
+    const accepted = await writeFaceFor((() => ({ get: () => live })) as unknown as Probe, 'evolution-curator').saveOnce([])
+    expect(accepted).toMatchObject({ written: true, readback: 'ok' })
+
+    const stale = {
+      getSnapshot: () => ({ status: 'ready', revision: 1 }),
+      subscribe: () => () => {},
+      set: async () => true,
+      unset: async () => true,
+      mutate: async () => true,
+    }
+    const notReadBack = await writeFaceFor((() => ({ get: () => stale })) as unknown as Probe, 'evolution-curator').saveOnce([])
+    expect(notReadBack).toMatchObject({ written: true, readback: 'failed' })
+  })
 })

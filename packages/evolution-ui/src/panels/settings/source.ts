@@ -22,7 +22,7 @@
  * apply time would capture `undefined` for the whole life of the fiber.
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
-import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike } from './seam.ts'
+import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike, SettingsSaveResult } from './seam.ts'
 
 /** What a card shows when this UI found no settings seat at all. */
 export const SEAT_MISSING: ParamSectionSnapshot = Object.freeze({
@@ -184,9 +184,25 @@ export function sourceFor(probe: SeatProbe, namespace: string): ParamSectionSour
  */
 export function writeFaceFor(probe: SeatProbe, namespace: string): {
   mutateOnce: (ops: readonly SettingsPathOpLike[]) => Promise<boolean>
+  saveOnce: (ops: readonly SettingsPathOpLike[]) => Promise<SettingsSaveResult>
   clear: (field: string) => Promise<boolean>
 } {
   const form = (): ConfigFormLike | undefined => probe()?.get<Record<string, unknown>>(namespace)
+  const saveOnce = async (ops: readonly SettingsPathOpLike[]): Promise<SettingsSaveResult> => {
+    const seat = form()
+    if (seat === undefined) return { written: false, readback: 'failed', kind: 'transport' }
+    const before = seat.getSnapshot().revision
+    let written = false
+    try {
+      written = await seat.mutate(ops)
+    } catch (failure) {
+      return { written: false, readback: 'failed', kind: 'transport', failure }
+    }
+    const snapshot = seat.getSnapshot()
+    if (!written) return { written: false, readback: 'failed', kind: 'conflict' }
+    if (snapshot.status !== 'ready') return { written: true, readback: 'failed', kind: 'transport' }
+    return { written: true, readback: snapshot.revision !== before ? 'ok' : 'failed' }
+  }
   return {
     // T5-01/A56: ONE save = ONE atomic write, on BOTH faces. The Plugins page used to send one fenced
     // `mutate` per field with the revision it read at RENDER time, so the second field of any
@@ -203,8 +219,9 @@ export function writeFaceFor(probe: SeatProbe, namespace: string): {
       // G4/4.1: forward the HOST verdict. The seat returns Promise<boolean> (seam.ts:106-107);
       // this wrapper used to discard it and answer true, so a refusal the platform reported was
       // recorded as an accepted write (measured: platform false -> mutateOnce true).
-      return await seat.mutate(ops)
+      return (await saveOnce(ops)).written
     },
+    saveOnce,
     clear: async (field) => {
       const seat = form()
       if (seat === undefined) return false

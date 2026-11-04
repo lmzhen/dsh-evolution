@@ -115,13 +115,14 @@ export function apply(ctx: ClientContext): void {
 
   const cards: ParamCardFace[] = CLIENT_PARAM_SECTIONS.map((section) => {
     const source: ParamSectionSource = sources.sourceFor(section.seatKey)
-    const { mutateOnce, clear } = writeFaceFor(probe, section.namespace)
+    const { mutateOnce, saveOnce, clear } = writeFaceFor(probe, section.namespace)
     return {
       namespace: section.namespace,
       fields: section.fields,
       t,
       lang: language,
       mutateOnce,
+      saveOnce,
       clear,
       hooks: { paramSection: source },
     }

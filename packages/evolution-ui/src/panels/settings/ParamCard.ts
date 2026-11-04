@@ -21,8 +21,8 @@ import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
  * scope performs a recovery read before it resolves), so this record carries only what the effect
  * needs to render: whether it was accepted, and whether it was a reset (which reads differently).
  */
-type PendingWrite = { readonly accepted: boolean; readonly resets: boolean; readonly field?: string }
-import type { ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike } from './seam.ts'
+type PendingWrite = { readonly accepted: boolean; readonly resets: boolean; readonly field?: string; readonly readbackFailed?: boolean; readonly kind?: 'conflict' | 'transport' | 'validation' }
+import type { ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike, SettingsSaveResult } from './seam.ts'
 
 /**
  * Injected face: plain data and callbacks, plus the hook seat.
@@ -41,6 +41,8 @@ export interface ParamCardFace {
   /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). The returned boolean IS
    * the Host's verdict (contract C2/G5): `true` = accepted, `false` = refused after its recovery read. */
   mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<boolean>
+  /** Structured write result; when present the card distinguishes acceptance from readback. */
+  saveOnce?: (ops: readonly SettingsParamOp[]) => Promise<SettingsSaveResult>
   clear: (field: string) => Promise<boolean>
   hooks: { paramSection: ParamSectionSource }
 }
@@ -288,6 +290,7 @@ export interface ParamCardViewProps {
   lang?: () => ParamLanguage
   /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). */
   mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<boolean>
+  saveOnce?: (ops: readonly SettingsParamOp[]) => Promise<SettingsSaveResult>
   /** Ask the scope to drop one override; resolves when the scope answered, not when it landed. */
   clear: (field: string) => Promise<boolean>
   /** The current row state, from whichever source owns it (the bound hook or the page). */
@@ -300,7 +303,7 @@ export interface ParamCardViewProps {
  * @returns the card.
  */
 export function ParamCardView(props: ParamCardViewProps): ReactNode {
-  const { t, fields, mutateOnce, clear, namespace, snapshot } = props
+  const { t, fields, mutateOnce, saveOnce, clear, namespace, snapshot } = props
   const lang: ParamLanguage = props.lang?.() ?? 'zh'
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>({})
@@ -334,10 +337,14 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     // requested values read a REFUSED write as accepted whenever the value already matched (a
     // concurrent editor, or a field the operator had already overridden) — the exact "refused but
     // reported as saved" defect. The platform resolves `false` for a refusal, so trust it.
+    if (pending.readbackFailed === true) {
+      setError(t('saveReadbackFailed'))
+      return
+    }
     if (!pending.accepted) {
       // A refused reset reads differently from a refused save: in the first the row still shows the
       // operator's value, which is what a reader who clicked "restore default" needs to be told.
-      setError(t(pending.resets ? 'resetRefused' : 'refused'))
+      setError(t(pending.resets ? 'resetRefused' : pending.kind === 'conflict' ? 'saveConflict' : 'refused'))
       return
     }
     if (pending.accepted) {
@@ -424,8 +431,10 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
         // which the Plugins page fenced with the render-time revision — the second field was then
         // refused by the host and its change silently did not land.
         const ops: SettingsParamOp[] = dirty.map(field => ({ op: 'set', path: [keyOf(field)], value: parseFor(field.control, textOf(field)) }))
-        const accepted = await mutateOnce(ops)
-        setPending({ accepted, resets: false })
+        const result = saveOnce === undefined
+          ? { written: await mutateOnce(ops), readback: 'ok' as const }
+          : await saveOnce(ops)
+        setPending({ accepted: result.written && result.readback === 'ok', readbackFailed: result.written && result.readback === 'failed', ...(result.kind === undefined ? {} : { kind: result.kind }), resets: false })
       } catch (caught) {
         // Transport-level failures (and any future shell that rejects): keep the draft
         // so nothing the operator typed is lost.
@@ -534,6 +543,7 @@ export function PluginParamCard(props: ParamCardFace): ReactNode {
     t: props.t,
     ...(props.lang === undefined ? {} : { lang: props.lang }),
     mutateOnce: props.mutateOnce,
+    ...(props.saveOnce === undefined ? {} : { saveOnce: props.saveOnce }),
     clear: props.clear,
     snapshot,
   })
@@ -546,6 +556,7 @@ export function ParamCard(props: ParamCardProps): ReactNode {
     t: props.t,
     ...(props.lang === undefined ? {} : { lang: props.lang }),
     mutateOnce: props.mutateOnce,
+    ...(props.saveOnce === undefined ? {} : { saveOnce: props.saveOnce }),
     clear: props.clear,
     snapshot: props.useParamSection((state: ParamSectionSnapshot) => state),
   })

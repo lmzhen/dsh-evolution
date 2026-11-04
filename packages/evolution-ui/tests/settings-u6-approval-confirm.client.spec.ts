@@ -59,20 +59,20 @@ const named = (): string => formatText('approvalConfirmNamed', { n: row().summar
 afterEach(() => { cleanup() })
 
 describe('U-6: the approval confirmation gate (registry approvalConfirm)', () => {
-  it('reads the gate word out of a user layer, defaulting to auto for anything else (P2-11)', () => {
+  it('reads the gate word out of a user layer, defaulting to ask for anything unknown (P2-11)', () => {
     // The reader the entry wires into the card's face. One definition, exported, so the mapping is
     // judgeable without mounting the plugin entry — the review found this path had no case at all.
     expect(confirmModeFrom({ approvalConfirm: 'ask' })).toBe('ask')
     // A legacy `timeout` migrates to ask; it must never become auto-execute.
     expect(confirmModeFrom({ approvalConfirm: 'timeout' })).toBe('ask')
     expect(confirmModeFrom({ approvalConfirm: 'auto' })).toBe('auto')
-    // Defaults: no user layer, an empty one, junk, or a value a FUTURE version might write.
-    expect(confirmModeFrom(undefined)).toBe('auto')
-    expect(confirmModeFrom({})).toBe('auto')
-    expect(confirmModeFrom(null)).toBe('auto')
-    expect(confirmModeFrom('ask')).toBe('auto')
-    expect(confirmModeFrom({ approvalConfirm: 'ASK' })).toBe('auto')
-    expect(confirmModeFrom({ approvalConfirm: 'always' })).toBe('auto')
+    // Unknown / unloaded / junk all take the safe branch; only explicit auto may one-click.
+    expect(confirmModeFrom(undefined)).toBe('ask')
+    expect(confirmModeFrom({})).toBe('ask')
+    expect(confirmModeFrom(null)).toBe('ask')
+    expect(confirmModeFrom('ask')).toBe('ask')
+    expect(confirmModeFrom({ approvalConfirm: 'ASK' })).toBe('ask')
+    expect(confirmModeFrom({ approvalConfirm: 'always' })).toBe('ask')
   })
 
   it('auto (the shipped default) decides on ONE click and shows no confirmation', async () => {

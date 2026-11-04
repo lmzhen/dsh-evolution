@@ -45,8 +45,9 @@ export interface PendingCardFace {
  */
 export function confirmModeFrom(user: unknown): 'auto' | 'ask' {
   const value = typeof user === 'object' && user !== null ? (user as Record<string, unknown>).approvalConfirm : undefined
-  // A legacy `timeout` value migrates to `ask`; it never falls back to auto-execute.
-  return value === 'ask' || value === 'timeout' ? 'ask' : 'auto'
+  // Only an explicit `auto` may execute without a confirmation. Unknown, unloaded or
+  // legacy `timeout` all take the safe branch; a legacy timeout must not auto-execute.
+  return value === 'auto' ? 'auto' : 'ask'
 }
 
 /** Which word one age bucket gets; an unknown bucket falls back to the count form. */
@@ -90,7 +91,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => t(key as MessageKey, values)
   // U-6: which entry is ARMED for a second click. `auto` (the default) never arms: an approval batch
   // must not be interrupted by a confirmation nobody asked for (31 号 §U-6 的风险行).
-  const confirmMode = props.confirmMode?.() ?? 'auto'
+  const confirmMode = props.confirmMode?.() ?? 'ask'
   const [armed, setArmed] = useState<string | null>(null)
   const [state, setState] = useState<PendingState>(INITIAL_PENDING_STATE)
   const [open, setOpen] = useState(true)

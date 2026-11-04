@@ -29,6 +29,14 @@ export const PENDING_CARD_KEY = 'approval-pending'
 /** The diagnostics card's slot key: read-only, no settings namespace (its data comes from HOST_ROUTES.diagnostics). */
 export const DIAGNOSTICS_CARD_KEY = 'diagnostics'
 
+/** Structured result of one settings write, separating acceptance from readback. */
+export interface SettingsSaveResult {
+  readonly written: boolean
+  readonly readback: 'ok' | 'failed'
+  readonly kind?: 'conflict' | 'transport' | 'validation'
+  readonly failure?: unknown
+}
+
 /** Snapshot of one settings row, as the client seat reports it. */
 export interface ParamSectionSnapshot {
   status: 'loading' | 'ready' | 'unavailable'
