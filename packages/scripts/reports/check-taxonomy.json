@@ -656,6 +656,7 @@
         "evolution-ui::tests/history-routes.spec.ts",
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
         "evolution-ui::tests/history-unit-undoable.spec.ts",
+        "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
@@ -1268,6 +1269,7 @@
         "evolution-ui::tests/history-routes.spec.ts",
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
         "evolution-ui::tests/history-unit-undoable.spec.ts",
+        "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
@@ -1856,6 +1858,7 @@
         "evolution-ui::tests/history-routes.spec.ts",
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
         "evolution-ui::tests/history-unit-undoable.spec.ts",
+        "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
@@ -1980,7 +1983,7 @@
     },
     "pre-tag": {
       "gates": 74,
-      "specs": 356
+      "specs": 357
     },
     "ci-only": {
       "gates": 12,
@@ -1988,16 +1991,16 @@
     },
     "full(ci=off)": {
       "gates": 74,
-      "specs": 356
+      "specs": 357
     },
     "full(ci=on)": {
       "gates": 86,
-      "specs": 430
+      "specs": 431
     }
   },
   "specs": {
-    "total": 430,
-    "marked": 430,
+    "total": 431,
+    "marked": 431,
     "unmarked": 0
   }
 }
