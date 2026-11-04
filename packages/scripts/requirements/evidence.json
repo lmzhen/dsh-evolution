@@ -2086,7 +2086,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/gates/rg5-get-zero-write.spec.ts#four panel routes only call read methods on the source",
+      "ref": "evolution-merge/tests/gates/rg5-get-zero-write.spec.ts#four panel GET routes only call read methods on the source",
       "note": "combined anchor set (audit re-check)"
     },
     {
