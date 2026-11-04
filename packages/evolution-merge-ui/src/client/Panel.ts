@@ -1,5 +1,5 @@
 /** Batch 4 merge panel: keyed read store, four tabs, local overlays, localized errors. */
-import { createElement, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore,  type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { createElement, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
 import { platformModal } from './platform-modal.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
