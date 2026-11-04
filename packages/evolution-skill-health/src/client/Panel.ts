@@ -12,6 +12,7 @@ import { createElement, useEffect, useState, type ReactNode } from 'react'
 // The stylesheet is scoped to this class; without it on the root element the panel renders unstyled.
 import { CSS_TAG_ID } from './styles.ts'
 import type { HealthOutcome } from './api.ts'
+import { platformSegmentedTabs } from './platform-tabs.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
@@ -209,6 +210,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
   const [loading, setLoading] = useState(face.loadRows !== undefined && face.loaded !== true)
   const [lastReadAt, setLastReadAt] = useState<number | undefined>(face.readAt)
   const [scan, setScan] = useState(face.scan)
+  const [viewMode, setViewMode] = useState<'skills' | 'rules'>('skills')
   /** One read trigger for first paint and the refresh button; the latest answer wins. */
   const load = (): (() => void) => {
     const read = face.loadRows
@@ -295,9 +297,26 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
         }),
       )
       : null,
-    skillQueue(view, t),
-    createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')),
-    ruleTable(view, t),
+    (() => {
+      const Tabs = platformSegmentedTabs()
+      const items = [
+        { value: 'skills', label: t('group.bySkill'), id: 'evo-health-tab-skills', panelId: 'evo-health-skills' },
+        { value: 'rules', label: t('group.byRule'), id: 'evo-health-tab-rules', panelId: 'evo-health-rules' },
+      ] as const
+      if (Tabs !== undefined) {
+        return createElement(Tabs as never, { items, value: viewMode, onChange: (next: string) => { setViewMode(next === 'rules' ? 'rules' : 'skills') }, label: t('group.byRule') })
+      }
+      return createElement('div', { role: 'tablist', 'data-role': 'view-tabs' },
+        items.map(item => createElement('button', {
+          key: item.value, type: 'button', role: 'tab', 'aria-selected': viewMode === item.value ? 'true' : 'false',
+          'aria-controls': item.panelId, id: item.id,
+          onClick: () => { setViewMode(item.value === 'rules' ? 'rules' : 'skills') },
+        }, item.label)))
+    })(),
+    viewMode === 'skills'
+      ? createElement('div', { id: 'evo-health-skills', role: 'tabpanel' }, skillQueue(view, t))
+      : createElement('div', { id: 'evo-health-rules', role: 'tabpanel' },
+        createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')), ruleTable(view, t)),
     view.rows.filter((row: HealthRow) => row.verdict === 'unreadable').map((row: HealthRow) =>
       createElement('p', { key: row.name + ':unreadable', 'data-role': 'note' }, row.name + ' — ' + t('unreadable.note'))),
     view.rows.filter((row: HealthRow) => row.protection !== undefined && row.protection !== null).map((row: HealthRow) =>
