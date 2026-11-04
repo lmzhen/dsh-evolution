@@ -5,7 +5,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
-import { createSettingsSeat, registerSidebarPanel, type Translate } from '@lmzhen/dsh-evolution-client-kit'
+import { createSettingsSeat, registerSidebarPanel, PAGE_SURFACE_CSS, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
 import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
@@ -67,7 +67,7 @@ export function apply(ctx: ClientContext): void {
     order: PANEL_ORDER,
     namespace: NS,
     dictionaries: { zh, en },
-    styles: { css: CSS + WORKBENCH_CSS, tagId: CSS_TAG_ID },
+    styles: { css: CSS + WORKBENCH_CSS + PAGE_SURFACE_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
     component: WorkbenchPage as unknown as (props: never) => unknown,
     body: (t): WorkbenchFace => ({ t, history: historyFace(t), pending: pendingFace(), diagnostics: diagnosticsFace(), hasView }),
