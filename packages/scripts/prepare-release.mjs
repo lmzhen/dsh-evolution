@@ -230,6 +230,9 @@ function rewriteScopedText(text, names) {
   if (!scope) return text
   let out = text
   for (const name of names) out = out.split(name).join(scopedPackageName(name))
+  // JSDoc module tags and generated client ids spell the family package name without
+  // passing through the dependency map; rescope the whole family prefix as a backstop.
+  if (out.includes('@deepseek-ai/dsh-evolution-')) out = out.split('@deepseek-ai/dsh-evolution-').join(scope + '/dsh-evolution-')
   return out
 }
 
