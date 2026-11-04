@@ -149,10 +149,11 @@ export function makeMergeRoutes(
           if (snapshot.blocked !== undefined) return json(503, { wireVersion: 1, code: 'merge-state-blocked', readiness: snapshot.blocked.readiness })
           // Body/history are read-only projections of already-written files; a host without
           // the live agent data plane can still read past reports and archived bodies.
+          const sideFilter = side === 'a' ? 'live' : side === 'b' ? 'archive' : side === 'live' || side === 'archive' ? side : undefined
           const refs = snapshot.bodyRefs.filter(ref =>
             (id === null || id === '' || ref.rowId === id)
             && (name === null || name === '' || ref.name === name)
-            && (side !== 'live' && side !== 'archive' ? true : ref.side === side))
+            && (sideFilter === undefined || ref.side === sideFilter))
           if (refs.length === 0) return json(404, { wireVersion: 1, code: 'merge-body-not-found', message: 'merge body not found' })
           if (refs.length > 1) return bad('merge body is ambiguous; pass id, name and side')
           const row = snapshot.rows.find(item => item.row.id === refs[0]!.rowId)

@@ -18,7 +18,7 @@ it('GET reads write zero bytes through state/run I/O', async () => {
   expect(writes).toBe(0)
 })
 
-it('four panel routes only call read methods on the source', async () => {
+it('four panel GET routes only call read methods on the source', async () => {
   let reads = 0
   const source: MergeRouteSource = {
     async rows() { reads += 1; return [] },
@@ -35,5 +35,9 @@ it('four panel routes only call read methods on the source', async () => {
     await route.fetch(new Request('http://local' + path))
   }
   expect(reads).toBeGreaterThan(0)
-  expect(routes.every(route => route.methods?.every(method => method === 'GET'))).toBe(true)
+  const panelPaths = new Set([MERGE_ROUTES.view, MERGE_ROUTES.rows, MERGE_ROUTES.body, MERGE_ROUTES.history])
+  const panels = routes.filter(route => panelPaths.has(route.path))
+  expect(panels).toHaveLength(4)
+  expect(panels.every(route => route.methods?.every(method => method === 'GET'))).toBe(true)
+  expect(routes.find(route => route.path === MERGE_ROUTES.decision)?.methods).toEqual(['POST'])
 })

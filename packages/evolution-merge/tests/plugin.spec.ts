@@ -59,7 +59,7 @@ it('mounts routes and merge_stage, without the removed /merge alias, with a mini
   try {
     apply(ctx as never, {})
     expect(routes.map(route => route.path).sort()).toEqual([
-      '/api/dsh-evolution/merge/body', '/api/dsh-evolution/merge/history', '/api/dsh-evolution/merge/rows', '/api/dsh-evolution/merge/view',
+      '/api/dsh-evolution/merge/body', '/api/dsh-evolution/merge/decision', '/api/dsh-evolution/merge/history', '/api/dsh-evolution/merge/rows', '/api/dsh-evolution/merge/view',
     ])
     expect(commands).toHaveLength(0)
     expect(tools).toHaveLength(1)

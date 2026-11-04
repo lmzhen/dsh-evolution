@@ -37,7 +37,9 @@ it('serves the four panel GETs and body semantics', async () => {
   const body = await find(source, MERGE_ROUTES.body).fetch(new Request('http://local' + MERGE_ROUTES.body + '?id=r1&side=a'))
   expect(body.status).toBe(200)
   expect((await body.json() as { text: string }).text).toBe('body text')
-  for (const query of ['?id=r1&name=a', '?id=missing', '?name=missing']) {
+  const named = await find(source, MERGE_ROUTES.body).fetch(new Request('http://local' + MERGE_ROUTES.body + '?id=r1&name=a'))
+  expect(named.status).toBe(200)
+  for (const query of ['?id=missing', '?name=missing']) {
     const r = await find(source, MERGE_ROUTES.body).fetch(new Request('http://local' + MERGE_ROUTES.body + query))
     expect([400, 404]).toContain(r.status)
   }
