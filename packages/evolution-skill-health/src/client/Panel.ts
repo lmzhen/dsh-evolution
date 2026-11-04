@@ -275,6 +275,9 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
     view.proposalStatus === 'unavailable' && (view.proposals ?? []).length === 0
       ? createElement('p', { 'data-role': 'note' }, t('proposal.unavailable'))
       : null,
+    view.proposalStatus === 'stale' && (view.proposals ?? []).length === 0
+      ? createElement('p', { 'data-role': 'note' }, t('proposal.stale'))
+      : null,
     (view.proposals ?? []).length > 0
       ? createElement('div', { 'data-role': 'proposals' },
         createElement('h3', { 'data-role': 'group-title' }, t('group.proposals')),
@@ -285,14 +288,15 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
             ? undefined
             : '/evolution extract ' + proposal.source + ' ' + target + ' "' + heading + '" --plan'
           return createElement('div', { key: proposal.id, 'data-role': 'proposal' },
-            createElement('p', { 'data-role': 'proposal-summary' }, proposal.source + ' — ' + t('proposal.outcome.' + proposal.outcome) + ' · ' +
-              (proposal.owner.mode === 'covered'
-                ? t('proposal.owner.covered') + (proposal.owner.name === undefined ? '' : ': ' + proposal.owner.name)
-                : t('proposal.owner.owner-gap') + (proposal.owner.neededOwner === undefined ? '' : ': ' + proposal.owner.neededOwner))),
+            createElement('p', { 'data-role': 'proposal-summary' }, proposal.source + ' — ' + t('proposal.outcome.' + proposal.outcome)),
             createElement('p', { 'data-role': 'proposal-status' }, t('proposal.status.' + proposal.status)),
-            proposal.provenance === undefined ? null : createElement('details', { 'data-role': 'proposal-provenance' },
+            createElement('details', { 'data-role': 'proposal-provenance' },
               createElement('summary', null, t('proposal.provenance')),
-              createElement('p', null, proposal.provenance.promptVersion + (proposal.provenance.model === undefined ? '' : ' · ' + proposal.provenance.model) + ' · ' + proposal.provenance.runId + ' · ' + new Date(proposal.provenance.at).toLocaleString() + (proposal.provenance.promptHash === undefined ? '' : ' · #' + proposal.provenance.promptHash.slice(0, 8)))),
+              createElement('p', { 'data-role': 'proposal-owner' }, t('proposal.owner') + ': ' +
+                (proposal.owner.mode === 'covered'
+                  ? t('proposal.owner.covered') + (proposal.owner.name === undefined ? '' : ': ' + proposal.owner.name)
+                  : t('proposal.owner.owner-gap') + (proposal.owner.neededOwner === undefined ? '' : ': ' + proposal.owner.neededOwner))),
+              proposal.provenance === undefined ? null : createElement('p', null, proposal.provenance.promptVersion + (proposal.provenance.model === undefined ? '' : ' · ' + proposal.provenance.model) + ' · ' + proposal.provenance.runId + ' · ' + new Date(proposal.provenance.at).toLocaleString() + (proposal.provenance.promptHash === undefined ? '' : ' · #' + proposal.provenance.promptHash.slice(0, 8)))),
             proposal.residual === undefined || proposal.residual.trim() === '' ? null : createElement('p', { 'data-role': 'proposal-kept' },
               t('proposal.kept') + ': ' + proposal.residual.trim().slice(0, 160)),
             (proposal.parts ?? []).length === 0 ? null : createElement('p', { 'data-role': 'proposal-reusable' },
