@@ -3,7 +3,7 @@
  * without creating another page or a second navigation registry.
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
-import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createElement, useState, type ReactNode } from 'react'
 import { PAGE_SURFACE_CLASS } from '@lmzhen/dsh-evolution-client-kit'
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
@@ -11,13 +11,6 @@ import { PendingCard, type PendingCardFace } from '../../settings/PendingCard.ts
 
 /** Stable page id used by the sidebar row, the page slot key, and navigation params. */
 export const WORKBENCH_ID = 'evolution.workbench'
-
-/** Owner props supplied by the platform page slot. */
-export interface WorkbenchOwner {
-  readonly pageId: string
-  readonly params?: Readonly<Record<string, string | number | boolean | null>> | undefined
-  readonly revision?: number | undefined
-}
 
 /** Injected face: copy plus the history view's data callbacks. */
 export interface WorkbenchFace {
@@ -31,21 +24,9 @@ export interface WorkbenchFace {
 /** The two views the workbench owns today. */
 export type WorkbenchView = 'history' | 'pending' | 'merge' | 'health'
 
-/** Sidebar row owner props supplied by the platform list slot. */
-export interface WorkbenchNavOwner {
-  readonly activePageId: string | null
-  readonly openPage: (pageId: string) => void
-}
-
 /** Sidebar row injected face. */
 export interface WorkbenchNavFace {
   readonly t: (key: string) => string
-}
-
-/** Convert a navigation params value to a skill name only when it is a non-empty string. */
-function skillOf(params: WorkbenchOwner['params']): string | undefined {
-  const value = params?.['skillName']
-  return typeof value === 'string' && value !== '' ? value : undefined
 }
 
 /**
@@ -54,19 +35,15 @@ function skillOf(params: WorkbenchOwner['params']): string | undefined {
  * @param props - page owner props plus the injected history face.
  * @returns the page surface.
  */
-export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly renderSlot?: (name: string, owner: Record<string, unknown>) => ReactNode }): ReactNode {
+export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (name: string, owner: Record<string, unknown>) => ReactNode }): ReactNode {
   const [selectedSkill, setSelectedSkill] = useState<string | undefined>(undefined)
   const [view, setView] = useState<WorkbenchView>('history')
-  const lastRevision = useRef<number | undefined>(undefined)
-  useEffect(() => {
-    if (props.revision === undefined || props.revision === lastRevision.current) return
-    lastRevision.current = props.revision
-    const requested = props.params?.['view']
-    if (requested === 'pending' || requested === 'merge' || requested === 'health') { setView(requested); return }
+  const [focusRevision, setFocusRevision] = useState(0)
+  const openHistory = (skill: string | undefined): void => {
+    setSelectedSkill(skill)
     setView('history')
-    const skill = skillOf(props.params)
-    if (skill !== undefined) setSelectedSkill(skill)
-  }, [props.params, props.revision])
+    setFocusRevision(value => value + 1)
+  }
   const viewOrder: readonly WorkbenchView[] = ['history', 'pending', 'merge', 'health']
   const onTabKey = (event: { key: string; preventDefault: () => void }, current: WorkbenchView): void => {
     const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
@@ -79,7 +56,6 @@ export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly
   }
   const hasMerge = props.hasView?.('merge') ?? true
   const hasHealth = props.hasView?.('health') ?? true
-  const focusRevision = props.revision === lastRevision.current ? props.revision : undefined
   return createElement('section', { className: PAGE_SURFACE_CLASS + ' evo-workbench', 'data-page': view },
     createElement('div', { className: 'evo-workbench-head' },
       createElement('h1', { className: 'evo-workbench-title' }, props.t('entry.label')),
@@ -98,25 +74,17 @@ export function WorkbenchPage(props: WorkbenchOwner & WorkbenchFace & { readonly
           : null,
       // The feature list stays mounted while another view is active; each view hides itself.
       createElement('div', { hidden: view !== 'merge' && view !== 'health', className: 'evo-workbench-feature' },
-        props.renderSlot?.('evolution.workbench.view', { activeView: view }) ?? null),
+        props.renderSlot?.('evolution.workbench.view', { activeView: view, openHistory }) ?? null),
     ),
   )
 }
 
-/**
- * Render the sidebar entry that opens the workbench.
- * @param props - active page id, opener, and copy.
- * @returns the row button.
- */
-export function WorkbenchNav(props: WorkbenchNavOwner & WorkbenchNavFace): ReactNode {
-  const active = props.activePageId === WORKBENCH_ID
-  return createElement('button', {
-    type: 'button',
-    className: 'evo-workbench-nav',
-    'data-active': active ? 'true' : undefined,
-    'aria-current': active ? 'page' : undefined,
-    onClick: () => { props.openPage(WORKBENCH_ID) },
-  }, props.t('entry.label'))
+/** The sidebar icon; the platform renders the row label, tooltip and active state. */
+export function WorkbenchIcon(props: { size?: number; active?: boolean }): ReactNode {
+  const size = props.size ?? 16
+  return createElement('svg', { width: size, height: size, viewBox: '0 0 16 16', 'aria-hidden': 'true', focusable: 'false' },
+    createElement('path', { d: 'M2 3.5h12M2 8h12M2 12.5h8', fill: 'none', stroke: 'currentColor', 'stroke-width': props.active === true ? 1.7 : 1.4, 'stroke-linecap': 'round' }),
+  )
 }
 
 /** Workbench shell and sidebar row; colours come from the platform tokens. */

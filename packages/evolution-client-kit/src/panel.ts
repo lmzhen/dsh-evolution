@@ -28,6 +28,10 @@ export interface SidebarPanelSpec<Face> {
   component: (props: never) => ReactNode
   /** The body face factory; receives the bound translator. */
   body: (t: Translate) => Face
+  /** Child slots the main keyed occupant declares (the rc.3 main contract). */
+  children?: Readonly<Record<string, { readonly kind: 'list' | 'keyed'; readonly scope: 'root' }>>
+  /** Optional store owned by this registration; the platform binds it to the occupant. */
+  store?: unknown
 }
 
 function interpolate(text: string, values?: Readonly<Record<string, string | number>>): string {
@@ -83,7 +87,13 @@ export function registerSidebarPanel<Face>(ctx: ClientContext, spec: SidebarPane
       spec.icon as (props: never) => ReactNode,
     )
     yield seam.slots.register(
-      { name: 'main', key: spec.id, inject: (): Face => spec.body(t) },
+      {
+        name: 'main',
+        key: spec.id,
+        inject: (): Face => spec.body(t),
+        ...(spec.children === undefined ? {} : { children: spec.children }),
+        ...(spec.store === undefined ? {} : { store: spec.store }),
+      },
       spec.component,
     )
   })

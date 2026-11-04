@@ -3,9 +3,10 @@
 /**
  * What the bundle registers, and that all of it comes back.
  *
- * The history bundle contributes one sidebar task-page row, one keyed workbench
- * page, and one locale namespace. The fake registry records those three exact
- * names so a regression to the removed panel seats fails here.
+ * The history bundle contributes one platform sidebar row and one keyed main
+ * occupant that declares the workbench view child slot, plus one locale
+ * namespace. The fake registry records those exact names so the removed
+ * layout.page / sidebar.pages seats cannot creep back.
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { apply, PANEL_ORDER } from '../src/panels/history/client/index.ts'
@@ -19,6 +20,7 @@ interface SlotOptions {
   order?: number
   label?: () => string
   inject?: () => unknown
+  children?: Record<string, unknown>
 }
 
 function fakeSeams(options: { refuseLocale?: boolean } = {}): {
@@ -43,11 +45,11 @@ function fakeSeams(options: { refuseLocale?: boolean } = {}): {
       return () => { for (const dispose of mine.reverse()) dispose() }
     },
     register(options: SlotOptions, _component: unknown): () => void {
-      if (options.name === 'sidebar.pages') rows.push(options)
-      else if (options.name === 'layout.page') { pages.push(options); faces.push(options.inject?.()) }
+      if (options.name === 'sidebar.panellist') rows.push(options)
+      else if (options.name === 'main') { pages.push(options); faces.push(options.inject?.()) }
       return () => {
-        if (options.name === 'sidebar.pages') rows.splice(rows.indexOf(options), 1)
-        else if (options.name === 'layout.page') pages.splice(pages.indexOf(options), 1)
+        if (options.name === 'sidebar.panellist') rows.splice(rows.indexOf(options), 1)
+        else if (options.name === 'main') pages.splice(pages.indexOf(options), 1)
       }
     },
   }
@@ -82,15 +84,18 @@ afterEach(() => {
 })
 
 describe('history client bundle: what it contributes, and what it takes back', () => {
-  it('contributes one task-page row, one keyed page and one locale namespace', () => {
+  it('contributes one sidebar row, one keyed main occupant and one locale namespace', () => {
     const seams = fakeSeams()
     apply(seams.ctx as never)
     expect(seams.rows).toHaveLength(1)
+    expect(seams.rows[0]?.name).toBe('sidebar.panellist')
     expect(seams.rows[0]?.id).toBe(WORKBENCH_ID)
     expect(seams.rows[0]?.order).toBe(PANEL_ORDER)
     expect(typeof seams.rows[0]?.label?.()).toBe('string')
     expect(seams.pages).toHaveLength(1)
+    expect(seams.pages[0]?.name).toBe('main')
     expect(seams.pages[0]?.key).toBe(WORKBENCH_ID)
+    expect(seams.pages[0]?.children).toEqual({ 'evolution.workbench.view': { kind: 'list', scope: 'root' } })
     expect(seams.namespaces).toEqual([NS])
     expect(document.querySelectorAll('style[data-plugin-css]')).toHaveLength(1)
   })

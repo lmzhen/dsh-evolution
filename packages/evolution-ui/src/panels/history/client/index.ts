@@ -5,7 +5,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
-import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
+import { createSettingsSeat, registerSidebarPanel, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import { fill as settingsFill, message as settingsMessage, NS as SETTINGS_NS } from '../../settings/messages.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
@@ -14,80 +14,17 @@ import { CSS, CSS_TAG_ID } from './styles.ts'
 import type { PanelFace } from './Panel.ts'
 import { PANEL_ORDER } from './ids.ts'
 export { PANEL_ORDER }
-import { WorkbenchNav, WorkbenchPage, WORKBENCH_CSS, WORKBENCH_ID, type WorkbenchFace, type WorkbenchNavFace } from './Workbench.ts'
+import { WorkbenchIcon, WorkbenchPage, WORKBENCH_CSS, WORKBENCH_ID, type WorkbenchFace } from './Workbench.ts'
 
 /** Required client services: the slot registry and the locale seat. */
-export const inject = ['slots', 'locale', 'layout']
-
-interface PageSlots {
-  inject(name: string, body: () => Generator<() => void, void, void>): unknown
-  register(options: Record<string, unknown>, component: (props: never) => unknown): () => void
-}
-interface PageSeam {
-  slots: PageSlots
-  locale: {
-    register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void
-    bind(namespace: string): (key: string) => string
-  }
-}
-
-function injectStyles(documentRef: Document | undefined, css: string): () => void {
-  if (documentRef === undefined) return () => {}
-  const selector = 'style[data-plugin-css="' + CSS_TAG_ID + '"]'
-  documentRef.querySelector(selector)?.remove()
-  const tag = documentRef.createElement('style')
-  tag.setAttribute('data-plugin-css', CSS_TAG_ID)
-  tag.textContent = css
-  documentRef.head.appendChild(tag)
-  return () => { tag.remove() }
-}
+export const inject = ['slots', 'locale']
 
 /**
- * Register the locale namespace, the workbench page, and its sidebar entry.
+ * Register the locale namespace, the workbench main occupant and its sidebar row.
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
-  const seam = ctx as unknown as PageSeam
   const api = createSkillHistoryApi()
-  let registered = false
-  ctx.effect(() => {
-    try {
-      const dispose = seam.locale.register(NS, { zh, en })
-      registered = true
-      return dispose
-    } catch (error) {
-      ctx.logger.warn(NS + ': the locale seat refused the dictionary (' + String(error) + '); the workbench falls back to the bundle copy')
-      return () => {}
-    }
-  }, NS + ': locale')
-  ctx.effect(() => injectStyles(typeof document === 'undefined' ? undefined : document, CSS + WORKBENCH_CSS), NS + ': styles')
-
-  const fallback = zh
-  const lookup = (key: string): string => {
-    const own = fallback[key] ?? key
-    if (!registered) return own
-    try { return seam.locale.bind(NS)(key) } catch { return own }
-  }
-  const t = (key: string, values?: Record<string, string | number>): string => {
-    const template = lookup(key)
-    if (values === undefined) return template
-    return template.replace(/\{(\w+)\}/g, (match: string, slot: string) => values[slot] === undefined ? match : String(values[slot]))
-  }
-  const historyFace = (): PanelFace => ({
-    t,
-    format: (key, values) => t(key, values),
-    loadSkills: api.skills,
-    loadVersions: api.versions,
-    loadDiff: api.diff,
-    loadBody: api.body,
-    undo: api.undo,
-    markdownWords: { copy: t('markdown.copy'), copied: t('markdown.copied'), footnotes: t('markdown.footnotes') },
-  })
-  const pendingT = (key: string, values?: Readonly<Record<string, string | number>>): string => {
-    let template: string
-    try { template = seam.locale.bind(SETTINGS_NS)(key) } catch { template = settingsMessage(key as never) }
-    return values === undefined ? template : settingsFill(template, values)
-  }
   const settingsSeat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
   // U-6: unknown must never mean "auto-execute". The form starts at `ask`; the family
   // describe answers with the user layer and flips to auto only when the operator chose it.
@@ -98,30 +35,39 @@ export function apply(ctx: ClientContext): void {
   })
   if (stopApprovalWatch !== undefined) ctx.effect(() => stopApprovalWatch, 'evolution-history: approval confirm mode')
   const confirmMode = (): 'auto' | 'ask' => approvalConfirmMode
+
   const hasView = (view: 'merge' | 'health'): boolean => {
     try {
-      const entries = (seam.slots as unknown as { entries?: (name: string) => Array<{ options?: { id?: string } }> }).entries?.('evolution.workbench.view') ?? []
+      const entries = (ctx as unknown as { slots?: { entries?: (name: string) => Array<{ options?: { id?: string } }> } }).slots?.entries?.('evolution.workbench.view') ?? []
       return entries.some(entry => entry.options?.id === (view === 'merge' ? 'merge' : 'skill-health'))
     } catch { return false }
   }
-  const pendingFace = (): PendingCardFace => ({ t: pendingT, api: createApprovalApi((input, init) => fetch(input, init)), confirmMode, fallback: FALLBACKS.approval })
-  const label = (): string => t('entry.label')
-
-  seam.slots.inject('sidebar.pages', function* () {
-    yield seam.slots.register({
-      name: 'sidebar.pages',
-      id: WORKBENCH_ID,
-      order: PANEL_ORDER,
-      label,
-      inject: (): WorkbenchNavFace => ({ t }),
-    }, WorkbenchNav as unknown as (props: never) => unknown)
+  const pendingT = (key: string, values?: Readonly<Record<string, string | number>>): string => {
+    let template: string
+    try { template = (ctx as unknown as { locale: { bind(ns: string): (key: string) => string } }).locale.bind(SETTINGS_NS)(key) } catch { template = settingsMessage(key as never) }
+    return values === undefined ? template : settingsFill(template, values)
+  }
+  const historyFace = (t: Translate): PanelFace => ({
+    t,
+    format: (key, values) => t(key, values),
+    loadSkills: api.skills,
+    loadVersions: api.versions,
+    loadDiff: api.diff,
+    loadBody: api.body,
+    undo: api.undo,
+    markdownWords: { copy: t('markdown.copy'), copied: t('markdown.copied'), footnotes: t('markdown.footnotes') },
   })
-  seam.slots.inject('layout.page', function* () {
-    yield seam.slots.register({
-      name: 'layout.page',
-      key: WORKBENCH_ID,
-      children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
-      inject: (): WorkbenchFace => ({ t, history: historyFace(), pending: pendingFace(), hasView }),
-    }, WorkbenchPage as unknown as (props: never) => unknown)
+  const pendingFace = (): PendingCardFace => ({ t: pendingT, api: createApprovalApi((input, init) => fetch(input, init)), confirmMode, fallback: FALLBACKS.approval })
+
+  registerSidebarPanel<WorkbenchFace>(ctx, {
+    id: WORKBENCH_ID,
+    order: PANEL_ORDER,
+    namespace: NS,
+    dictionaries: { zh, en },
+    styles: { css: CSS + WORKBENCH_CSS, tagId: CSS_TAG_ID },
+    icon: WorkbenchIcon,
+    component: WorkbenchPage as unknown as (props: never) => unknown,
+    body: (t): WorkbenchFace => ({ t, history: historyFace(t), pending: pendingFace(), hasView }),
+    children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
   })
 }

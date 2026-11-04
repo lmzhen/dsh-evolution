@@ -10,10 +10,10 @@ import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, en, zh } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
-import { openSkillHistory, requireHealthSeats } from './seats.ts'
+import { requireHealthSeats } from './seats.ts'
 
 /** Required client services: the slot registry, locale seat and page navigation. */
-export const inject = ['slots', 'locale', 'layout']
+export const inject = ['slots', 'locale']
 
 /** The host half hands the panel a way to read its rows (a read-only route on the host side). */
 export type HealthFaceLoader = () => Promise<HealthFace>
@@ -21,8 +21,9 @@ export type HealthFaceLoader = () => Promise<HealthFace>
 export { PANEL_ID, PANEL_ORDER }
 
 /** The view component receives the workbench's activeView marker alongside its face. */
-function HealthView(props: HealthFace & { activeView?: string }): ReactNode {
-  return props.activeView === 'health' ? SkillHealthPanel(props) : null
+function HealthView(props: HealthFace & { activeView?: string; openHistory?: (name: string) => void }): ReactNode {
+  if (props.activeView !== 'health') return null
+  return props.openHistory === undefined ? SkillHealthPanel(props) : SkillHealthPanel({ ...props, openHistory: props.openHistory })
 }
 
 /**
@@ -40,7 +41,6 @@ export function apply(ctx: ClientContext): void {
     component: HealthView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => ({
       rows: [], proposals: [], truncated: false, loaded: false, proposalStatus: 'unavailable', loadRows: api.rows,
-      openHistory: (name: string) => { openSkillHistory(ctx, name) },
       t,
     }),
   })

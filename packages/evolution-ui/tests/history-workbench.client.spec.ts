@@ -1,8 +1,8 @@
 // @tier pre-tag
 // @vitest-environment jsdom
-/** The workbench consumes explicit navigation exactly once and keeps the page mounted. */
+/** The workbench owns view/selection and exposes one openHistory callback to child views. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { WorkbenchPage } from '../src/panels/history/client/Workbench.ts'
 import type { PanelFace } from '../src/panels/history/client/Panel.ts'
@@ -36,38 +36,22 @@ const pendingFace = (): PendingCardFace => ({
 })
 
 describe('history workbench', () => {
-  it('consumes one explicit revision and does not replay it on a plain rerender', async () => {
+  it('opens history through the owner callback, including a repeated same-skill navigation', async () => {
     const loadVersions = vi.fn(async () => ({ content: [], support: [] }))
-    const history = face(loadVersions)
+    let owner: { openHistory?: (name: string) => void } = {}
     const view = render(createElement(WorkbenchPage, {
-      pageId: 'evolution.workbench',
-      params: { view: 'history', skillName: 'alpha' },
-      revision: 1,
       t: (key: string) => key,
-      history,
+      history: face(loadVersions),
       pending: pendingFace(),
-      renderSlot: () => null,
+      renderSlot: (_name: string, next: Record<string, unknown>) => { owner = next as typeof owner; return null },
     }))
+    await act(async () => { owner.openHistory?.('alpha') })
     await waitFor(() => { expect(loadVersions).toHaveBeenCalledWith('alpha') })
-    view.rerender(createElement(WorkbenchPage, {
-      pageId: 'evolution.workbench',
-      params: { view: 'history', skillName: 'alpha' },
-      revision: 1,
-      t: (key: string) => key,
-      history,
-      pending: pendingFace(),
-      renderSlot: () => null,
-    }))
-    expect(loadVersions).toHaveBeenCalledTimes(1)
-    view.rerender(createElement(WorkbenchPage, {
-      pageId: 'evolution.workbench',
-      params: { view: 'history', skillName: 'beta' },
-      revision: 2,
-      t: (key: string) => key,
-      history,
-      pending: pendingFace(),
-      renderSlot: () => null,
-    }))
+    const firstCalls = loadVersions.mock.calls.length
+    await act(async () => { owner.openHistory?.('alpha') })
+    await waitFor(() => { expect(loadVersions.mock.calls.length).toBeGreaterThan(firstCalls) })
+    await act(async () => { owner.openHistory?.('beta') })
     await waitFor(() => { expect(loadVersions).toHaveBeenCalledWith('beta') })
+    view.unmount()
   })
 })
