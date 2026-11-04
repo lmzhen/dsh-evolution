@@ -53,10 +53,11 @@ const sharedIds = [...hostPatch.keys()].filter(id => presetPatch.has(id))
 const MODEL_TOOLS = ['tool-memory', 'tool-skill-manage', 'tool-session-query', 'evolution-skill-catalog']
 
 /** Rows that are neither host infra nor model-facing: the UI umbrella makes its
- * own host registration but stays out of the host-only and preset bundles, and
- * the health panel ships disabled. Listed by name so a new row of any class
- * still fails the count below until it is decided here. */
-const ALL_ONLY_ROWS = ['evolution-skill-health', 'evolution-ui']
+ * own host registration but stays out of the host-only and preset bundles; the
+ * merge view is a client-only package row for the workbench slot; the health
+ * panel ships disabled. Listed by name so a new row of any class still fails the
+ * count below until it is decided here. */
+const ALL_ONLY_ROWS = ['evolution-skill-health', 'evolution-ui', 'evolution-merge-ui']
 
 /** 0.28.0: the merge host row is all-only — it is infra for the full bundle but
  * deliberately stays out of the host-only and preset bundles. */

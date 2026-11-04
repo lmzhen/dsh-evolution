@@ -506,6 +506,12 @@
       "banners": {
         "all": "    # ── skill merge: the merged-pair queues and the read-only panel ─────────────"
       }
+    },
+    {
+      "id": "evolution-merge-ui",
+      "banners": {
+        "all": "    # ── web UI: the merge view inside the workbench ────────────────────────────"
+      }
     }
   ],
   "rows": [
@@ -1241,6 +1247,20 @@
       ],
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-merge'"
+      ]
+    },
+    {
+      "id": "evolution-merge-ui",
+      "group": "evolution-merge-ui",
+      "forms": [
+        "all"
+      ],
+      "lead": [
+        "    # Client-only merge view: a valid host half (apply/no-op) keeps the package",
+        "    # visible to the client-modules scan; the view registers into evolution.workbench.view."
+      ],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-merge-ui'"
       ]
     },
     {
