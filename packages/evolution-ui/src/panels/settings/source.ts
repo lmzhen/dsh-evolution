@@ -66,7 +66,7 @@ export function sectionSnapshotOf(snapshot: ConfigFormSnapshotLike): ParamSectio
     base: isSection(snapshot.base) ? snapshot.base : undefined,
     // G5/W7 S5: the platform's `mode` is no longer modelled — every family row writes the host
     // configuration (the card states that once, as a fixed line). An unavailable row is not-served.
-    ...snapshot.status === 'unavailable' ? { reason: 'not-served' as const } : {},
+    ...snapshot.status === 'unavailable' ? { reason: ((snapshot as { reason?: string }).reason ?? 'not-served') as 'not-served' } : {},
   }
 }
 

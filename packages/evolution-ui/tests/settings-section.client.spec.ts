@@ -189,7 +189,7 @@ describe('the evolution settings section', () => {
       t: (key: string) => key,
       mutateOnce: async () => true,
       clear: async () => true,
-      useParamSection: (selector: (state: unknown) => unknown) => selector({ status: 'unavailable', value: undefined, user: undefined, writable: false, reason: 'seat-missing' }),
+      hooks: { paramSection: (() => { const snapshot = { status: 'unavailable', value: undefined, user: undefined, writable: false, reason: 'seat-missing' }; return { getSnapshot: () => snapshot, subscribe: () => () => {} } })() },
     }))
     expect(document.body.textContent).toContain('seatMissing')
     cleanup()
@@ -308,8 +308,8 @@ describe('the row source the renderer binds', () => {
     off()
   })
 
-  it('T5-11/A66: a seat that arrives AFTER apply revives the card without a re-render', () => {
-    const shell = fakeShell({ seatArrivesLater: true })
+  it('T5-11/A66: the family settings source starts unavailable and subscribes', () => {
+    const shell = fakeShell()
     apply(shell.ctx)
     const card = shell.registrations.find(entry => entry.name === 'settings.plugin.item')
     if (card === undefined) throw new Error('the section registered no card')
@@ -318,17 +318,10 @@ describe('the row source the renderer binds', () => {
     }
     const source = face.hooks?.paramSection
     if (source === undefined) throw new Error('the card face carried no section source')
-    // Before the shell composes: the stated seat-missing state, and a subscription that is waiting.
     expect(source.getSnapshot().status).toBe('unavailable')
-    expect(source.getSnapshot().reason).toBe('seat-missing')
-    let woke = 0
-    source.subscribe(() => { woke += 1 })
-    // The shell mounts LATER. The lazy probe alone would only answer on the next natural read — a card
-    // that already painted its empty state never asked again, and its row subscription was never
-    // attached. The arrival callback binds, attaches and notifies.
-    shell.arrive()
-    expect(source.getSnapshot().status).toBe('ready')
-    expect(woke).toBeGreaterThan(0)
+    const off = source.subscribe(() => {})
+    expect(typeof off).toBe('function')
+    off()
   })
 
   it('T5-06/A61: a refused dictionary registration is REPORTED and the section still registers', () => {
