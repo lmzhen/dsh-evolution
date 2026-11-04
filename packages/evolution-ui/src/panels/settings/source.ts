@@ -67,6 +67,7 @@ export function sectionSnapshotOf(snapshot: ConfigFormSnapshotLike): ParamSectio
     // G5/W7 S5: the platform's `mode` is no longer modelled — every family row writes the host
     // configuration (the card states that once, as a fixed line). An unavailable row is not-served.
     ...snapshot.status === 'unavailable' ? { reason: ((snapshot as { reason?: string }).reason ?? 'not-served') as 'not-served' } : {},
+    ...(snapshot as { stale?: boolean }).stale === true ? { stale: true } : {},
   }
 }
 
@@ -191,17 +192,17 @@ export function writeFaceFor(probe: SeatProbe, namespace: string): {
   const saveOnce = async (ops: readonly SettingsPathOpLike[]): Promise<SettingsSaveResult> => {
     const seat = form()
     if (seat === undefined) return { written: false, readback: 'failed', kind: 'transport' }
-    const before = seat.getSnapshot().revision
     let written = false
     try {
       written = await seat.mutate(ops)
     } catch (failure) {
       return { written: false, readback: 'failed', kind: 'transport', failure }
     }
-    const snapshot = seat.getSnapshot()
     if (!written) return { written: false, readback: 'failed', kind: 'conflict' }
+    try { await seat.refresh?.() } catch { /* the verdict below reads what the seat kept */ }
+    const snapshot = seat.getSnapshot()
     if (snapshot.status !== 'ready') return { written: true, readback: 'failed', kind: 'transport' }
-    return { written: true, readback: snapshot.revision !== before ? 'ok' : 'failed' }
+    return { written: true, readback: (snapshot as { stale?: boolean }).stale === true ? 'failed' : 'ok', ...(snapshot as { stale?: boolean }).stale === true ? { kind: 'transport' } : {} }
   }
   return {
     // T5-01/A56: ONE save = ONE atomic write, on BOTH faces. The Plugins page used to send one fenced

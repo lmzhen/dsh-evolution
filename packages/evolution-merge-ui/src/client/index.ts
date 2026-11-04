@@ -19,6 +19,8 @@ function MergeView(props: MergeFace & { activeView?: string }): ReactNode { retu
  * @param ctx - the client context.
  */
 export function apply(ctx: ClientContext): void {
+  const seat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
+  ctx.effect(() => () => { seat.dispose?.() }, 'evolution-merge-ui: settings seat')
   registerWorkbenchView<MergeFace>(ctx, {
     id: PANEL_ID,
     order: PANEL_ORDER,
@@ -28,7 +30,6 @@ export function apply(ctx: ClientContext): void {
     component: MergeView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {
       const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
-      const seat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
       const workspaceId = panelWorkspaceId(ctx)
       const currentSessionId = (): string | undefined => {
         const sessions = (ctx as unknown as { sessions?: { list?: { getSnapshot?: () => { byId?: Record<string, { id?: string; retainedBy?: { mainView?: number } }> } } } }).sessions

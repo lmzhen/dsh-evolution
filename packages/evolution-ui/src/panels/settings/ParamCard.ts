@@ -457,6 +457,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     open
       ? createElement('div', { className: 'evolution-param-body' },
         hintKey === undefined ? null : createElement('p', { className: 'evolution-param-note' }, t(hintKey)),
+        snapshot.stale === true ? createElement('p', { className: 'evolution-param-note', role: 'status', 'data-role': 'stale-note' }, t('readbackStale')) : null,
         disabled ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('readonly')) : null,
         fields.length === 0
           ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('empty'))

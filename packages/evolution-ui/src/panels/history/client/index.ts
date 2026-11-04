@@ -29,6 +29,7 @@ export const inject = ['slots', 'locale']
 export function apply(ctx: ClientContext): void {
   const api = createSkillHistoryApi()
   const settingsSeat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
+  ctx.effect(() => () => { settingsSeat.dispose?.() }, 'evolution-ui: settings seat')
   // U-6: unknown must never mean "auto-execute". The form starts at `ask`; the family
   // describe answers with the user layer and flips to auto only when the operator chose it.
   let approvalConfirmMode: 'auto' | 'ask' = 'ask'

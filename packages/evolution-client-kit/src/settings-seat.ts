@@ -13,6 +13,7 @@ import { ROUTES } from './generated/routes.generated.ts'
 
 interface FamilySnapshot extends ConfigFormSnapshotLike<Record<string, unknown>> {
   reason?: string
+  stale?: boolean
 }
 interface ContextLike {
   get?: (name: string) => unknown
@@ -59,62 +60,79 @@ async function write(namespace: string, ops: readonly ConfigPathOpLike[], expect
 
 function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
   let snapshot: FamilySnapshot = { ...EMPTY, reason: 'seat-missing' }
+  let lastReady: FamilySnapshot | undefined
+  let generation = 0
   const listeners = new Set<() => void>()
-  let started = false
-  let listening = false
+  let remoteOff: (() => void) | undefined
   const notify = (): void => { for (const listener of listeners) listener() }
-  const refresh = async (): Promise<void> => {
-    snapshot = await describe(namespace)
+  const absorb = (next: FamilySnapshot): void => {
+    if (next.status === 'ready') {
+      lastReady = next
+      snapshot = next
+    } else if (lastReady !== undefined) {
+      // A failed re-read must not erase the last usable values. Keep ready + mark stale;
+      // the card shows the values with a warning instead of claiming the plugin is absent.
+      snapshot = { ...lastReady, stale: true, reason: next.reason ?? 'readback-failed' }
+    } else {
+      snapshot = next
+    }
     notify()
   }
-  const start = (): void => {
-    if (started) return
-    started = true
-    if (!listening) {
-      listening = true
-      const remote = (ctx as { get?: (name: string) => unknown }).get?.('remote') as { $on?: (event: string, listener: (namespace: string) => void) => () => void } | undefined
-      remote?.$on?.('settings/document-updated', (changed) => { if (changed === namespace) void refresh() })
-    }
-    void refresh()
+  const refresh = async (): Promise<void> => {
+    const ticket = ++generation
+    const next = await describe(namespace)
+    if (ticket !== generation) return
+    absorb(next)
+  }
+  const remote = (): { $on?: (event: string, listener: (namespace: string) => void) => () => void } | undefined =>
+    (ctx as { get?: (name: string) => unknown }).get?.('remote') as { $on?: (event: string, listener: (namespace: string) => void) => () => void } | undefined
+  const stopRemote = (): void => { remoteOff?.(); remoteOff = undefined }
+  const startRemote = (): void => {
+    if (remoteOff !== undefined) return
+    remoteOff = remote()?.$on?.('settings/document-updated', (changed) => { if (changed === namespace) void refresh() })
   }
   const form: ConfigFormLike = {
     getSnapshot: () => snapshot as ConfigFormSnapshotLike,
     subscribe: (listener) => {
       listeners.add(listener)
-      start()
-      return () => { listeners.delete(listener) }
+      startRemote()
+      void refresh()
+      return () => {
+        listeners.delete(listener)
+        if (listeners.size === 0) stopRemote()
+      }
     },
     set: async (field, value) => (await form.mutate([{ op: 'set', path: [field], value }])),
     unset: async (field) => (await form.mutate([{ op: 'unset', path: [field] }])),
     mutate: async (ops, expectedRevision) => {
       const revision = expectedRevision ?? snapshot.revision
       const outcome = await write(namespace, ops, revision)
-      if (outcome.snapshot !== undefined) { snapshot = outcome.snapshot; notify() }
+      if (outcome.snapshot !== undefined) absorb(outcome.snapshot)
       else await refresh()
       return outcome.ok
     },
+    refresh,
+    dispose: () => { stopRemote(); listeners.clear() },
   }
   return form
 }
 
 /**
- * Build one cached form per family namespace over the family settings routes.
- * @param ctx - the client plugin context (remote subscription is optional).
- * @returns the seat; each namespace is served by /api/dsh-evolution/settings/*.
+ * Build one seat per client registration; every form's remote listener is released by
+ * the caller's effect. No module-level WeakMap: a replaced registration must not share
+ * a dead seat with the previous one.
  */
-const seats = new WeakMap<object, ConfigFormsSeat>()
-
 export function createSettingsSeat(ctx: ContextLike): ConfigFormsSeat {
-  const cached = seats.get(ctx as object)
-  if (cached !== undefined) return cached
   const forms = new Map<string, ConfigFormLike>()
-  const seat: ConfigFormsSeat = {
+  return {
     get<T>(namespace: string): ConfigFormLike<T> | undefined {
       let form = forms.get(namespace)
       if (form === undefined) { form = createForm(namespace, ctx); forms.set(namespace, form) }
       return form as ConfigFormLike<T>
     },
+    dispose: () => {
+      for (const form of forms.values()) form.dispose?.()
+      forms.clear()
+    },
   }
-  seats.set(ctx as object, seat)
-  return seat
 }

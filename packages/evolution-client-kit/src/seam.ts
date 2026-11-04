@@ -68,8 +68,16 @@ export interface ConfigFormLike<T = Record<string, unknown>> {
   unset(field: string): Promise<boolean>
   /** Atomic multi-field save; `expectedRevision` is the read the caller is replacing. */
   mutate(ops: readonly ConfigPathOpLike[], expectedRevision?: number): Promise<boolean>
+  /** Re-read the row (used by the card's readback verdict). */
+  refresh?(): Promise<void>
+  /** Stop the form's remote subscription; owned by the seat. */
+  dispose?(): void
 }
-export interface ConfigFormsSeat { get<T = Record<string, unknown>>(entryId: string): ConfigFormLike<T> | undefined }
+export interface ConfigFormsSeat {
+  get<T = Record<string, unknown>>(entryId: string): ConfigFormLike<T> | undefined
+  /** Release every form's remote listener; called from the client effect. */
+  dispose?(): void
+}
 export interface SettingsFace {
   merge?: ConfigFormLike
   platform?: ConfigFormLike

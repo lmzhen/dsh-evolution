@@ -43,7 +43,7 @@ describe('G4/4.1: the write face reports the host verdict', () => {
     expect(accepted).toMatchObject({ written: true, readback: 'ok' })
 
     const stale = {
-      getSnapshot: () => ({ status: 'ready', revision: 1 }),
+      getSnapshot: () => ({ status: 'ready', revision: 1, stale: true }),
       subscribe: () => () => {},
       set: async () => true,
       unset: async () => true,
