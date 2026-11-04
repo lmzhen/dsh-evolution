@@ -27,10 +27,7 @@ export interface WorkbenchFace {
 
 export type { WorkbenchView } from './WorkbenchStore.ts'
 
-/** Sidebar row injected face. */
-export interface WorkbenchNavFace {
-  readonly t: (key: string) => string
-}
+
 
 /**
  * Render the workbench page. The platform keeps it mounted; this component only
@@ -107,8 +104,5 @@ export const WORKBENCH_CSS = [
   '.evo-workbench-title{margin:0;font-size:var(--evo-type-lg);font-weight:600;line-height:var(--evo-leading-base)}',
   '.evo-workbench-body{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}',
   '.evo-workbench-body>.evolution-param-card{flex:1;min-width:0;overflow:auto}',
-  '.evo-workbench-nav{display:flex;width:100%;align-items:center;gap:var(--evo-space-8);padding:var(--evo-space-6) var(--evo-space-12);border:0;border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:var(--evo-type-sm);text-align:left;cursor:pointer}',
-  '.evo-workbench-nav:hover,.evo-workbench-nav[data-active="true"]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-  '.evo-workbench-nav:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '@media (max-width:720px){.evo-workbench-head{flex-wrap:wrap}.evo-workbench-tabs{flex-wrap:wrap}}',
 ].join('')
