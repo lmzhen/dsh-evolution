@@ -73,6 +73,13 @@ function providedServices(platformRoot) {
   }
   const clientRoot = join(platformRoot, 'packages', 'client')
   if (existsSync(clientRoot)) walk(clientRoot)
+  // `sessions` is augmented by the Session Controller's CLIENT entry, not a packages/client
+  // package; the walk above therefore reports it as unprovided.
+  const sessionClient = join(platformRoot, 'packages', 'api', 'session-controller', 'src', 'client', 'index.ts')
+  if (existsSync(sessionClient)) {
+    const text = readFileSync(sessionClient, 'utf8')
+    if (/interface Context[\s\S]*?\bsessions:\s/.test(text)) names.add('sessions')
+  }
   return names
 }
 

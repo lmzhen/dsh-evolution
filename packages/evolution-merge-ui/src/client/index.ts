@@ -8,6 +8,7 @@ import { NS, en, zh } from './messages.ts'
 import { MergePanel, type MergeFace } from './Panel.ts'
 import { MergeStore, type MergeSource } from './MergeStore.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
+import { currentSessionId } from './session.ts'
 
 export const inject = ['slots', 'sessions', 'locale']
 
@@ -31,19 +32,13 @@ export function apply(ctx: ClientContext): void {
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {
       const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
       const workspaceId = panelWorkspaceId(ctx)
-      const currentSessionId = (): string | undefined => {
-        const sessions = (ctx as unknown as { sessions?: { list?: { getSnapshot?: () => { byId?: Record<string, { id?: string; retainedBy?: { mainView?: number } }> } } } }).sessions
-        const byId = sessions?.list?.getSnapshot?.().byId
-        if (byId === undefined) return undefined
-        return Object.values(byId).find(session => (session.retainedBy?.mainView ?? 0) > 0)?.id
-      }
       return {
         store: new MergeStore(source),
         t,
         doctorCommand: '/evolution doctor',
         settings: { ...(seat.get('evolution-merge') === undefined ? {} : { merge: seat.get('evolution-merge')! }), ...(seat.get('evolution-approval') === undefined ? {} : { platform: seat.get('evolution-approval')! }) },
         decide: async (rowId: string, verb: 'approve' | 'reject') => {
-          const sessionId = currentSessionId()
+          const sessionId = currentSessionId(ctx)
           if (sessionId === undefined) return { ok: false, message: '没有当前会话；请打开会话后重试' }
           const result = await api.decide(rowId, verb, sessionId)
           if (result.ok) return result.payload
