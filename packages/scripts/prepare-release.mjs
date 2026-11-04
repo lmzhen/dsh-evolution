@@ -181,6 +181,9 @@ function rewritePackage(pkg, ourNames, sourceDir) {
   // G1-S5: the host-side support window, derived from the same platform line (peers=^floor is the
   // instance-sharing anchor; engines.dsh is the declared window for `npm`/installers).
   pkg.engines = { ...(pkg.engines ?? {}), dsh: platformLine.enginesRange }
+  if (Array.isArray(pkg.dsh?.resolverDependencies)) {
+    pkg.dsh.resolverDependencies = pkg.dsh.resolverDependencies.map(name => (scope && ourNames.has(name)) ? scopedPackageName(name) : name)
+  }
   for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
     for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
       let rewritten = name
