@@ -8,7 +8,7 @@
  * @module @deepseek-ai/dsh-evolution-skill-health/client
  */
 
-import { createElement, useEffect, useState, type ReactNode } from 'react'
+import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 // The stylesheet is scoped to this class; without it on the root element the panel renders unstyled.
 import { CSS_TAG_ID } from './styles.ts'
 import type { HealthOutcome } from './api.ts'
@@ -223,6 +223,9 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
   const [lastReadAt, setLastReadAt] = useState<number | undefined>(face.readAt)
   const [scan, setScan] = useState(face.scan)
   const [viewMode, setViewMode] = useState<'skills' | 'rules'>('skills')
+  // The parent rebuilds this face object on every render; depending on the object would
+  // re-run the effect, keep `loading` true forever and flash the loading note beside loaded rows.
+  const firstLoad = useRef(false)
   /** One read trigger for first paint and the refresh button; the latest answer wins. */
   const load = (): (() => void) => {
     const read = face.loadRows
@@ -251,7 +254,11 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
       .finally(() => { if (live) setLoading(false) })
     return () => { live = false }
   }
-  useEffect(() => load(), [face])
+  useEffect(() => {
+    if (firstLoad.current || face.loadRows === undefined) return
+    firstLoad.current = true
+    load()
+  }, [face])
   const counts = new Map(KINDS.map(kind => [kind, view.rows.filter((row: HealthRow) => row.verdict === kind).length]))
   // Four verdict cards, not one sentence: the number is the fact a reader scans for, and the tone
   // bar carries the severity. A verdict with no rows still shows its zero — silence would read as
