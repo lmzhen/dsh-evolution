@@ -122,6 +122,20 @@ function worstVerdict(face: HealthFace, skills: readonly string[]): string {
   return worst
 }
 
+/** A copy button that reports the clipboard verdict instead of swallowing it. */
+function CopyButton(props: { command: string; t: (key: string) => string; role: string; label: string }): ReactNode {
+  const [state, setState] = useState<'idle' | 'ok' | 'fail'>('idle')
+  const copy = async (): Promise<void> => {
+    try {
+      if (typeof navigator === 'undefined' || navigator.clipboard === undefined) throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(props.command)
+      setState('ok')
+    } catch { setState('fail') }
+  }
+  const text = state === 'ok' ? props.t('copy.copied') : state === 'fail' ? props.t('copy.failed') : props.label
+  return createElement('button', { type: 'button', 'data-role': props.role, 'data-copy-state': state, onClick: () => { void copy() } }, text)
+}
+
 /** H4: the evidence queue by skill, before the by-rule summary. */
 function skillQueue(face: HealthFace, t: (key: string) => string): ReactNode {
   const order = ['error', 'needs-restructure', 'warn', 'unreadable', 'healthy']
@@ -135,7 +149,7 @@ function skillQueue(face: HealthFace, t: (key: string) => string): ReactNode {
       createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + ': ' + String(row.dims?.bodyChars ?? t('dims.unknown')) + ' · ' + t('dims.support') + ': ' + String(row.dims?.supportFiles ?? t('dims.unknown'))),
       createElement('span', { 'data-role': 'skill-row-actions' },
         createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(row.name) } }, t('action.history')),
-        createElement('button', { type: 'button', 'data-role': 'action-copy', onClick: () => { if (typeof navigator !== 'undefined' && navigator.clipboard !== undefined) void navigator.clipboard.writeText('/evolution skill history ' + row.name).catch(() => {}) } }, t('action.copy')),
+        createElement(CopyButton, { command: '/evolution skill history ' + row.name, t, role: 'action-copy', label: t('action.copy') }),
       ),
     )),
   )
@@ -258,9 +272,6 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
           const command = heading === undefined || target === undefined
             ? undefined
             : '/evolution extract ' + proposal.source + ' ' + target + ' "' + heading + '" --plan'
-          const copyCommand = (): void => {
-            if (command !== undefined && typeof navigator !== 'undefined' && navigator.clipboard !== undefined) void navigator.clipboard.writeText(command).catch(() => {})
-          }
           return createElement('div', { key: proposal.id, 'data-role': 'proposal' },
             createElement('p', { 'data-role': 'proposal-summary' }, proposal.source + ' — ' + t('proposal.outcome.' + proposal.outcome) + ' · ' +
               (proposal.owner.mode === 'covered'
@@ -278,7 +289,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
               t('proposal.warnings') + ': ' + (proposal.warnings ?? []).join('；')),
             command === undefined ? null : createElement('p', { 'data-role': 'proposal-command' },
               createElement('code', {}, command),
-              createElement('button', { type: 'button', 'data-role': 'proposal-copy', onClick: copyCommand }, t('proposal.copy')),
+              createElement(CopyButton, { command, t, role: 'proposal-copy', label: t('proposal.copy') }),
             ),
           )
         }),

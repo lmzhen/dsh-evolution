@@ -348,8 +348,9 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       createElement('button', {
         className: 'evolution-param-button',
         type: 'button',
+        disabled: state.refreshing,
         onClick: () => { void load() },
-      }, t('approvalRefresh'))),
+      }, state.refreshing ? t('diagRefreshing') : t('approvalRefresh'))),
     open
       ? createElement('div', { className: 'evolution-param-body' }, body())
       : null)

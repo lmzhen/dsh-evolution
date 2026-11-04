@@ -29,13 +29,15 @@ export interface PendingState {
   readonly view: PendingView
   readonly busy: readonly string[]
   readonly notice: string | null
+  /** A background re-read is in flight; the previous rows stay on screen. */
+  readonly refreshing: boolean
   /** The row whose preview is open, or null. One at a time: a preview is a thing being read. */
   readonly open: string | null
   readonly preview: PreviewView | null
 }
 
 /** The state a card mounts in: still loading, nothing in flight, nothing said yet. */
-export const INITIAL_PENDING_STATE: PendingState = { view: { kind: 'loading' }, busy: [], notice: null, open: null, preview: null }
+export const INITIAL_PENDING_STATE: PendingState = { view: { kind: 'loading' }, busy: [], notice: null, refreshing: false, open: null, preview: null }
 
 /** Open one row's preview: the row is now the open one and its answer is on the way. */
 export function expanded(state: PendingState, id: string): PendingState {
@@ -57,7 +59,9 @@ export function previewArrived(state: PendingState, id: string, view: PreviewVie
 
 /** The first load, or a refresh after a decision: back to loading, keeping no stale rows. */
 export function loading(state: PendingState): PendingState {
-  return { ...state, view: { kind: 'loading' } }
+  // A refresh keeps the rows already read: only the FIRST read may own the loading view.
+  if (state.view.kind === 'ready' || state.view.kind === 'empty') return { ...state, refreshing: true }
+  return { ...state, view: { kind: 'loading' }, refreshing: true }
 }
 
 /**
@@ -65,12 +69,12 @@ export function loading(state: PendingState): PendingState {
  * being shown the same line a slow answer shows.
  */
 export function loaded(state: PendingState, rows: readonly PendingRow[]): PendingState {
-  return { ...state, view: rows.length === 0 ? { kind: 'empty' } : { kind: 'ready', rows } }
+  return { ...state, refreshing: false, view: rows.length === 0 ? { kind: 'empty' } : { kind: 'ready', rows } }
 }
 
 /** The list could not be read: the classified failure stays on screen next to a retry control. */
 export function failed(state: PendingState, failure: RouteFailure): PendingState {
-  return { ...state, view: { kind: 'failed', failure } }
+  return { ...state, refreshing: false, view: { kind: 'failed', failure } }
 }
 
 /** Mark one record as having an action in flight (its buttons are disabled until it ends). */

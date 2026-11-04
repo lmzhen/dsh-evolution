@@ -22,6 +22,7 @@ export type OverlayState =
 export interface StoreSnapshot {
   view: MergeViewPayload
   viewState: 'loading' | 'ready' | 'error' | 'blocked'
+  viewRefreshing?: boolean | undefined
   viewFailure?: MergeFailure | undefined
   queue: MergeQueue
   expiredOnly: boolean
@@ -101,7 +102,10 @@ export class MergeStore {
 
   async loadView(showLoading = true): Promise<void> {
     const token = ++this.viewToken
-    if (showLoading) this.set({ ...this.snapshot, viewState: 'loading', viewFailure: undefined })
+    if (showLoading) {
+      if (this.snapshot.viewState === 'ready') this.set({ ...this.snapshot, viewRefreshing: true })
+      else this.set({ ...this.snapshot, viewState: 'loading', viewFailure: undefined })
+    }
     const outcome = await this.source.view()
     if (this.disposed || token !== this.viewToken) return
     if (!outcome.ok) {
@@ -110,11 +114,11 @@ export class MergeStore {
         for (const key of this.cache.keys()) this.cache.set(key, { status: 'idle', rows: [] })
         return
       }
-      this.set({ ...this.snapshot, viewState: 'error', viewFailure: outcome.failure })
+      this.set({ ...this.snapshot, viewState: 'error', viewFailure: outcome.failure, viewRefreshing: false })
       return
     }
     const wasBlocked = this.snapshot.viewState === 'blocked'
-    this.set({ ...this.snapshot, view: outcome.payload, viewState: 'ready', viewFailure: undefined })
+    this.set({ ...this.snapshot, view: outcome.payload, viewState: 'ready', viewFailure: undefined, viewRefreshing: false })
     if (wasBlocked && this.snapshot.current.status === 'idle') void this.loadQueue(this.snapshot.queue, this.snapshot.expiredOnly)
   }
 

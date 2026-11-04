@@ -77,6 +77,8 @@ export const zh: Record<string, string> = {
   'fallbackHint': '可以改用命令：{command}',
   'action.history': '查看历史',
   'action.copy': '复制命令',
+  'copy.copied': '已复制',
+  'copy.failed': '复制失败',
   'action.extract': '提取',
   'action.extract.reason': '命令/预览面未就绪，暂不可用。',
 }
@@ -147,6 +149,8 @@ export const en: Record<string, string> = {
   'fallbackHint': 'Command fallback: {command}',
   'action.history': 'History',
   'action.copy': 'Copy command',
+  'copy.copied': 'Copied',
+  'copy.failed': 'Copy failed',
   'action.extract': 'Extract',
   'action.extract.reason': 'The command/preview surface is not ready yet.',
 }
