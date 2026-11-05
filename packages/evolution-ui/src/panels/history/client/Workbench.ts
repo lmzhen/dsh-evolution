@@ -84,7 +84,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
       view === 'history'
         ? createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision })
         : view === 'pending'
-          ? createElement(PendingCard, props.pending)
+          ? createElement(PendingCard, { ...props.pending, onHistory: () => { openHistory(undefined) } })
           : view === 'diagnostics'
             ? createElement(DiagnosticsCard, props.diagnostics)
             : null,

@@ -15,6 +15,7 @@
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { FallbackHint } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
 import { FailureBlock, failureText } from '@lmzhen/dsh-evolution-client-kit/generated/states'
+import { DecisionFrame, EmptyState } from '@lmzhen/dsh-evolution-client-kit'
 import type { ApprovalApi, PendingRow } from './api.ts'
 import type { MessageKey } from './messages.ts'
 import {
@@ -33,6 +34,8 @@ export interface PendingCardFace {
   confirmMode?: () => 'auto' | 'ask'
   /** G5/W7 S4: the command-face fallback rendered with an unreachable/unauthenticated failure. */
   fallback?: FallbackHint | undefined
+  /** Empty-state next step: open the skill history view when the workbench supplies it. */
+  onHistory?: (() => void) | undefined
 }
 
 
@@ -99,7 +102,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   const viewKind = state.view.kind
   const rowCount = state.view.kind === 'ready' ? state.view.rows.length : 0
   useEffect(() => {
-    if (viewKind === 'empty') setOpen(false)
+    if (viewKind === 'empty') setOpen(true)
     else if (viewKind === 'ready' && rowCount > 0) setOpen(true)
   }, [viewKind, rowCount])
   // The card reads the LATEST state from a holder rather than through an update function: the ambient
@@ -244,89 +247,87 @@ export function PendingCard(props: PendingCardFace): ReactNode {
     ? entry.summary
     : t(VERB_KEYS[entry.verb] ?? 'approvalVerbUpdate') + ' ' + entry.target + (entry.operationCount !== undefined && entry.operationCount > 1 ? ' ×' + String(entry.operationCount) : '')
   const row = (entry: PendingRow): ReactNode => {
-    // T4-05/A47: a running record is NOT waiting for a decision — its write effect may already have
-    // landed — so the two decisions are absent and the row says what to do instead (the CLI's own
-    // instruction). Offering "approve" here is the double-approve the CLI warns about.
-    if (entry.status === 'executing') {
-      return createElement('div', { className: 'evolution-param-field', key: entry.id },
-        createElement('div', { className: 'evolution-param-label' },
-          createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
-          createElement('span', { className: 'evolution-param-value', title: entry.summary }, summaryLine(entry))),
-        createElement('p', { className: 'evolution-param-hint' }, age(entry)),
-        createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalExecuting')),
-        entry.claimedBy === undefined ? null : createElement('p', { className: 'evolution-param-hint' }, entry.claimedBy),
-        createElement('div', { className: 'evolution-param-actions' },
-          createElement('button', {
-            className: 'evolution-param-button',
-            type: 'button',
-            disabled: state.busy.includes(entry.id),
-            onClick: () => { decide(entry.id, 'release') },
-          }, state.busy.includes(entry.id) ? t('approvalReleasing') : t('approvalRelease'))))
-    }
     const busy = state.busy.includes(entry.id)
-    // U-6: the weight of the action is part of the decision. Approve is the destructive one (it
-    // replays a staged write) and carries the family's existing primary convention; reject is an
-    // outlined alternative; preview merely reveals and stays weightless.
-    const button = (label: MessageKey, action: 'approve' | 'reject', tone: 'primary' | 'outline'): ReactNode =>
-      createElement('button', {
-        className: 'evolution-param-button',
-        type: 'button',
+    const executing = entry.status === 'executing'
+    const confirming = armed === entry.id
+    const title = summaryLine(entry)
+    const facts = [
+      { label: t('approvalFactKind'), value: t(KIND_KEYS[entry.kind]) },
+      { label: t('approvalFactAge'), value: age(entry) },
+      ...(entry.target === undefined ? [] : [{ label: t('approvalFactTarget'), value: entry.target }]),
+    ]
+    const raw = title === entry.summary ? undefined : createElement('details', { className: 'evolution-param-details' },
+      createElement('summary', null, t('approvalRawSummary')),
+      createElement('p', { className: 'evolution-param-hint' }, entry.summary))
+    const previewAction = {
+      id: 'preview-' + entry.id,
+      label: state.open === entry.id ? t('approvalPreviewClose') : t('approvalPreview'),
+      onSelect: () => { togglePreview(entry.id) },
+    }
+    const primary = executing
+      ? {
+        id: 'release-' + entry.id,
+        label: busy ? t('approvalReleasing') : t('approvalRelease'),
         disabled: busy,
-        ...(tone === 'primary' ? { 'data-primary': 'true' } : { 'data-tone': tone }),
-        onClick: () => {
-          // The gate sits on the destructive side only, and only when the registry says `ask`.
-          if (action === 'approve' && confirmMode === 'ask' && armed !== entry.id) {
-            setArmed(entry.id)
-            return
-          }
-          setArmed(null)
-          decide(entry.id, action)
-        },
-      }, busy ? t(action === 'approve' ? 'approvalApproving' : 'approvalRejecting') : t(label))
-    return createElement('div', { className: 'evolution-param-field', key: entry.id },
-      createElement('div', { className: 'evolution-param-label' },
-        createElement('span', { className: 'evolution-param-source' }, t(KIND_KEYS[entry.kind])),
-        createElement('span', { className: 'evolution-param-value', title: entry.summary }, summaryLine(entry))),
-      createElement('p', { className: 'evolution-param-hint' }, age(entry)),
-      summaryLine(entry) === entry.summary ? null : createElement('details', { className: 'evolution-param-details' },
-        createElement('summary', null, t('approvalRawSummary')),
-        createElement('p', { className: 'evolution-param-hint' }, entry.summary)),
-      armed === entry.id
-        ? createElement('p', { className: 'evolution-param-note', role: 'status' },
-          // The sentence gets its OWN element: a bare text child shares the paragraph with the two
-          // buttons, and an assertion on it then has to fight the query's own-text rule (U-6 fixture).
-          createElement('span', { className: 'evolution-param-value' }, t('approvalConfirmNamed', { n: summaryLine(entry) })),
-          createElement('button', {
-            className: 'evolution-param-button',
-            type: 'button',
-            // A marker of its own, because its label is the same word as the row's approve button:
-            // an assertion that goes by text alone would find two elements (U-6 fixture).
-            'data-confirm': 'yes',
-            'data-primary': 'true',
-            onClick: () => { setArmed(null); decide(entry.id, 'approve') },
-          }, t('approvalConfirmYes')),
-          createElement('button', {
-            className: 'evolution-param-button',
-            type: 'button',
-            'data-tone': 'ghost',
-            onClick: () => { setArmed(null) },
-          }, t('approvalConfirmNo')))
-        : null,
-      createElement('div', { className: 'evolution-param-actions' },
-        button('approvalApprove', 'approve', 'primary'),
-        button('approvalReject', 'reject', 'outline'),
-        createElement('button', {
-          className: 'evolution-param-button',
-          type: 'button',
-          'data-tone': 'ghost',
-          onClick: () => { togglePreview(entry.id) },
-        }, state.open === entry.id ? t('approvalPreviewClose') : t('approvalPreview'))),
+        onSelect: () => { decide(entry.id, 'release') },
+      }
+      : confirming
+        ? {
+          id: 'confirm-' + entry.id,
+          label: t('approvalConfirmYes'),
+          attributes: { 'data-confirm': 'yes' },
+          onSelect: () => { setArmed(null); decide(entry.id, 'approve') },
+        }
+        : {
+          id: 'approve-' + entry.id,
+          label: busy ? t('approvalApproving') : t('approvalApprove'),
+          disabled: busy,
+          onSelect: () => {
+            // The gate sits on the destructive side only, and only when the registry says ask.
+            if (confirmMode === 'ask') { setArmed(entry.id); return }
+            decide(entry.id, 'approve')
+          },
+        }
+    const secondary = executing
+      ? []
+      : confirming
+        ? [{ id: 'cancel-' + entry.id, label: t('approvalConfirmNo'), onSelect: () => { setArmed(null) } }]
+        : [
+          { id: 'reject-' + entry.id, label: busy ? t('approvalRejecting') : t('approvalReject'), disabled: busy, onSelect: () => { decide(entry.id, 'reject') } },
+          previewAction,
+        ]
+    const summary = executing ? t('approvalExecuting') : confirming ? t('approvalConfirmNamed', { n: title }) : undefined
+    return createElement('div', { className: 'evolution-approval-item', key: entry.id },
+      createElement(DecisionFrame, { className: 'evolution-approval-decision', decision: {
+        title,
+        ...(summary === undefined ? {} : { summary }),
+        facts,
+        primary,
+        ...(secondary.length === 0 ? {} : { secondary }),
+        ...(raw === undefined ? {} : { details: raw }),
+      } }),
       state.open === entry.id && state.preview !== null ? preview(state.preview) : null)
   }
 
   const body = (): ReactNode => {
     if (state.view.kind === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalLoading'))
-    if (state.view.kind === 'empty') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('approvalEmpty'))
+    if (state.view.kind === 'empty') {
+      const primary = props.onHistory === undefined ? undefined : {
+        id: 'approval-history', label: t('approvalHistory'), onSelect: props.onHistory,
+      }
+      return createElement(EmptyState, {
+        title: t('approvalEmpty'),
+        description: t('approvalEmptyDescription'),
+        tone: 'ok',
+        ...(primary === undefined ? {} : { primary }),
+        secondary: {
+          id: 'approval-refresh',
+          label: state.refreshing ? t('diagRefreshing') : t('approvalRefresh'),
+          busy: state.refreshing,
+          onSelect: () => { void load() },
+        },
+      })
+    }
     if (state.view.kind === 'failed') {
       // G5/W7 S4: the shared four-state failure block (401/403/404 sentence + command fallback when the
       // data plane is absent), then the card's own retry control.
@@ -352,13 +353,12 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       'aria-expanded': open,
     },
     createElement('span', { className: 'evolution-param-card-title' }, t('approvalTitle')),
-    state.view.kind === 'empty' ? createElement('span', { className: 'evolution-param-count', role: 'status' }, t('approvalEmpty')) : null,
     waiting === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalCount', { n: waiting })),
     running === 0 ? null : createElement('span', { className: 'evolution-param-count' }, t('approvalRunningCount', { n: running })),
     createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼')),
-    // The refresh control lives outside the disclosure: an empty/collapsed window still needs a way
-    // to pick up a write staged elsewhere without reopening the card first.
-    createElement('div', { className: 'evolution-param-actions' },
+    // Empty uses the empty-state's own secondary refresh; a populated/collapsed window keeps the
+    // header control so it can pick up a write staged elsewhere.
+    state.view.kind === 'empty' ? null : createElement('div', { className: 'evolution-param-actions' },
       createElement('button', {
         className: 'evolution-param-button',
         type: 'button',

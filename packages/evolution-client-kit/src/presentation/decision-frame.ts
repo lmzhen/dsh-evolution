@@ -15,6 +15,7 @@ function actionButton(action: PresentationAction, role: 'primary' | 'secondary')
     'data-role': role === 'primary' ? 'decision-primary' : 'decision-secondary',
     'data-action': action.id,
     'aria-busy': action.busy === true ? 'true' : undefined,
+    ...(action.attributes ?? {}),
     disabled: action.disabled === true || action.busy === true,
     title: action.title ?? action.label,
     onClick: () => { if (action.disabled !== true && action.busy !== true) void action.onSelect() },

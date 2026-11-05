@@ -12,6 +12,8 @@ export interface PresentationAction {
   readonly disabled?: boolean | undefined
   readonly busy?: boolean | undefined
   readonly title?: string | undefined
+  /** Optional data-* attributes a decision needs (for example the confirmation marker). */
+  readonly attributes?: Readonly<Record<string, string>> | undefined
 }
 
 /** One field a reader needs before deciding. */
