@@ -16,8 +16,10 @@ export interface QueueState {
   nextCursor?: string | undefined
   failure?: MergeFailure | undefined
 }
+export interface BodyTarget { readonly name: string; readonly side: 'live' | 'archive' }
 export type OverlayState =
   | { kind: 'body'; name: string; side: 'live' | 'archive'; status: 'loading' | 'ready' | 'error'; body?: MergeBody; failure?: MergeFailure }
+  | { kind: 'pair'; a: BodyTarget; b: BodyTarget; status: 'loading' | 'ready' | 'error'; aBody?: MergeBody; bBody?: MergeBody; failure?: MergeFailure }
   | { kind: 'history'; status: 'loading' | 'ready' | 'error'; items?: MergeHistoryItem[]; failure?: MergeFailure }
 export interface StoreSnapshot {
   view: MergeViewPayload
@@ -208,6 +210,26 @@ export class MergeStore {
       return
     }
     this.set({ ...this.snapshot, overlay: { kind: 'body', name, side, status: 'ready', body: outcome.payload } })
+  }
+
+  async openPair(a: BodyTarget, b: BodyTarget, rowId?: string): Promise<void> {
+    const token = ++this.overlayToken
+    this.set({ ...this.snapshot, overlay: { kind: 'pair', a, b, status: 'loading' } })
+    const [left, right] = await Promise.all([
+      this.source.body(a.name, a.side, rowId),
+      this.source.body(b.name, b.side, rowId),
+    ])
+    if (this.disposed || token !== this.overlayToken) return
+    if (!left.ok || !right.ok) {
+      const failure = !left.ok ? left.failure : !right.ok ? right.failure : undefined
+      if (failure?.kind === 'blocked') {
+        this.set({ ...this.snapshot, viewState: 'blocked', viewFailure: failure, overlay: undefined })
+        return
+      }
+      this.set({ ...this.snapshot, overlay: { kind: 'pair', a, b, status: 'error', ...(failure === undefined ? {} : { failure }) } })
+      return
+    }
+    this.set({ ...this.snapshot, overlay: { kind: 'pair', a, b, status: 'ready', aBody: left.payload, bBody: right.payload } })
   }
 
   async openHistory(): Promise<void> {

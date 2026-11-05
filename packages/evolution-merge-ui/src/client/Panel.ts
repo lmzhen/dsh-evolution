@@ -100,6 +100,29 @@ function bodyNode(overlay: Extract<OverlayState, { kind: 'body' }>, t: Translate
   )
   return Modal === undefined ? inner : createElement(Modal, { open: true, onClose, title, closeLabel: t('close'), headless: true, className: 'evo-merge-modal' }, inner)
 }
+function pairNode(overlay: Extract<OverlayState, { kind: 'pair' }>, t: Translate, onClose: () => void): ReactNode {
+  const Modal = platformModal()
+  const title = t('overlay.pair')
+  const block = (target: { name: string; side: 'live' | 'archive' }, body: typeof overlay.aBody): ReactNode => createElement('section', { 'data-role': target === overlay.a ? 'body-a' : 'body-b', 'data-side': target.side },
+    createElement('h4', { 'data-role': 'pair-name' }, target.name + ' · ' + t('body.' + target.side)),
+    body === undefined ? null : body.truncated ? createElement('p', { 'data-role': 'body-truncated' }, t('body.truncated')) : null,
+    body === undefined ? null : body.text === '' ? createElement('p', { 'data-role': 'body-empty' }, t('body.empty')) : createElement('pre', { 'data-role': 'body-text' }, body.text),
+  )
+  const inner = createElement('section', {
+    'data-role': 'overlay', 'data-overlay': 'pair', 'aria-label': title,
+    ...(Modal === undefined ? { role: 'dialog', 'aria-modal': 'true', onKeyDown: (event: KeyboardEvent<HTMLElement>) => { overlayKey(event, onClose) } } : { 'data-platform-modal': 'true' }),
+  },
+    createElement('div', { 'data-role': 'overlay-head' },
+      createElement('h3', { 'data-role': 'overlay-title' }, title),
+      createElement('button', { type: 'button', 'data-role': 'overlay-close', ...(Modal === undefined ? { autoFocus: true } : { 'data-modal-autofocus': 'true' }), onClick: onClose }, t('close')),
+    ),
+    overlay.status === 'loading' ? createElement('p', { 'data-role': 'overlay-loading' }, t('loading')) : null,
+    overlay.status === 'error' && overlay.failure !== undefined ? failureNode(t, overlay.failure, [], () => {}) : null,
+    overlay.status === 'ready' ? createElement('div', { 'data-role': 'pair-grid' }, block(overlay.a, overlay.aBody), block(overlay.b, overlay.bBody)) : null,
+  )
+  return Modal === undefined ? inner : createElement(Modal, { open: true, onClose, title, closeLabel: t('close'), headless: true, className: 'evo-merge-modal' }, inner)
+}
+
 function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Translate, onClose: () => void): ReactNode {
   const Modal = platformModal()
   const title = t('history')
@@ -135,7 +158,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | undefined>(undefined)
   const returnFocus = useRef<HTMLElement | null>(null)
   const captureFocus = (): void => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }
-  const openBody = (name: string, side: 'live' | 'archive', rowId: string | undefined): void => { captureFocus(); void store.openBody(name, side, rowId) }
+  const openBoth = (a: { name: string; side: 'live' | 'archive' }, b: { name: string; side: 'live' | 'archive' }, rowId: string | undefined): void => { captureFocus(); void store.openPair(a, b, rowId) }
   const openHistory = (): void => { captureFocus(); void store.openHistory() }
   const closeOverlay = (): void => { store.closeOverlay(); requestAnimationFrame(() => { returnFocus.current?.focus() }) }
   const workspaceId = resolveWorkspaceId(face.workspaceId)
@@ -229,7 +252,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const taskBanner = view.counts.pending > 0
     ? createElement(TaskBanner, { count: view.counts.pending, text: t('task.pending') })
     : null
-  const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => createElement(MergeRow, { row, t, copy, sort: sortHandlers, openBody, onDecide: face.decide === undefined ? undefined : decideRow, busy: deciding === row.id }))) : null
+  const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => createElement(MergeRow, { row, t, copy, sort: sortHandlers, openBoth, onDecide: face.decide === undefined ? undefined : decideRow, busy: deciding === row.id }))) : null
   const empty = uiState === 'empty' ? createElement('div', null, createElement('p', { 'data-role': 'note' }, t('empty.' + snapshot.queue)), createElement('p', { 'data-role': 'empty-scope' }, t('empty.scope'))) : null
   const staleViewFailure = snapshot.viewState === 'ready' ? snapshot.viewFailure : undefined
   const activeFailure = viewFailure !== undefined ? viewFailure : staleViewFailure !== undefined ? staleViewFailure : queue.status === 'error' ? queue.failure : undefined
@@ -281,7 +304,7 @@ export function MergePanel(face: MergeFace): ReactNode {
           ),
           createElement('button', { type: 'button', 'data-role': 'history', onClick: () => { openHistory() } }, t('history')),
           createElement('button', { type: 'button', 'data-role': 'doctor', onClick: () => { copy(doctorCommand) } }, t('doctor.open')),
-          overlay === undefined ? null : overlay.kind === 'body' ? bodyNode(overlay, t, closeOverlay) : historyNode(overlay, t, closeOverlay),
+          overlay === undefined ? null : overlay.kind === 'body' ? bodyNode(overlay, t, closeOverlay) : overlay.kind === 'pair' ? pairNode(overlay, t, closeOverlay) : historyNode(overlay, t, closeOverlay),
           createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { store.refresh() } }, t('refresh')),
           menuNode,
         ),

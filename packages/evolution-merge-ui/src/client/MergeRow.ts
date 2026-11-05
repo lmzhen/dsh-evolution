@@ -49,8 +49,8 @@ function stageNode(row: MergeRowView, t: Translate): ReactNode {
  * @param props - row, translator, copier, sort hooks, body opener and decision callback.
  * @returns the row with drag/keyboard wiring and a separate more drawer.
  */
-export function MergeRow(props: { row: MergeRowView; t: Translate; copy: (command: string) => void; sort: RowSortHandlers; openBody: (name: string, side: 'live' | 'archive', rowId: string | undefined) => void; onDecide: ((rowId: string, verb: 'approve' | 'reject') => void) | undefined; busy: boolean }): ReactNode {
-  const { row, t, copy, sort, openBody, onDecide, busy } = props
+export function MergeRow(props: { row: MergeRowView; t: Translate; copy: (command: string) => void; sort: RowSortHandlers; openBoth: (a: { name: string; side: 'live' | 'archive' }, b: { name: string; side: 'live' | 'archive' }, rowId: string | undefined) => void; onDecide: ((rowId: string, verb: 'approve' | 'reject') => void) | undefined; busy: boolean }): ReactNode {
+  const { row, t, copy, sort, openBoth, onDecide, busy } = props
   const details = [
     t('row.id') + ' ' + row.id,
     row.targetActual === undefined ? undefined : t('row.actualTarget') + ' ' + row.targetActual,
@@ -82,13 +82,9 @@ export function MergeRow(props: { row: MergeRowView; t: Translate; copy: (comman
     ...(reject.disabledReason === undefined ? {} : { attributes: { 'data-disabled-reason': reject.disabledReason } }),
     onSelect: () => { if (reject.enabled && !busy && onDecide !== undefined) onDecide(row.id, 'reject') },
   })
-  if (bodyA !== undefined) secondary.push({
-    id: 'body-a', label: 'A · ' + bodyA.name, attributes: { 'data-role': 'body-a' },
-    onSelect: () => { openBody(bodyA.name, bodyA.side, bodyA.rowId) },
-  })
-  if (bodyB !== undefined) secondary.push({
-    id: 'body-b', label: 'B · ' + bodyB.name, attributes: { 'data-role': 'body-b' },
-    onSelect: () => { openBody(bodyB.name, bodyB.side, bodyB.rowId) },
+  if (bodyA !== undefined && bodyB !== undefined) secondary.push({
+    id: 'view-both', label: t('row.viewBoth'), attributes: { 'data-role': 'view-both' },
+    onSelect: () => { openBoth({ name: bodyA.name, side: bodyA.side }, { name: bodyB.name, side: bodyB.side }, bodyA.rowId) },
   })
   for (const action of row.actions) {
     if (action.id === 'approve' || action.id === 'reject' || action.id === 'copy' || action.id === 'discard') continue
@@ -109,6 +105,7 @@ export function MergeRow(props: { row: MergeRowView; t: Translate; copy: (comman
   const decisionDetails = createElement('div', null,
     stageNode(row, t),
     summaryNode(row, t),
+    bodyA === undefined || bodyB === undefined ? null : createElement('div', { 'data-role': 'body-names' }, 'A · ' + bodyA.name + ' · B · ' + bodyB.name),
     createElement('details', { 'data-role': 'row-details' },
       createElement('summary', null, t('row.details')),
       createElement('p', null, details)),

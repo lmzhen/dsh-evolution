@@ -49,6 +49,14 @@ describe('MergeStore', () => {
     expect(store.read().current.rows).toHaveLength(1)
   })
 
+  it('loads both bodies for one view-both overlay', async () => {
+    const body = vi.fn(async (name: string): Promise<MergeOutcome<MergeBody>> => ({ ok: true, payload: { name, side: name === 'a' ? 'live' : 'archive', text: name, markdown: false, truncated: false, totalBytes: 1 } }))
+    const store = new MergeStore(source({ body }), { view: view(), rows: [row('r1')] })
+    await store.openPair({ name: 'a', side: 'live' }, { name: 'b', side: 'archive' })
+    expect(body).toHaveBeenCalledTimes(2)
+    expect(store.read().overlay).toMatchObject({ kind: 'pair', status: 'ready', a: { name: 'a' }, b: { name: 'b' } })
+  })
+
   it('a failed background view read keeps the readable view and rows', async () => {
     const read = vi.fn()
       .mockResolvedValueOnce({ ok: true, payload: view() } as MergeOutcome<MergeViewPayload>)
