@@ -5,7 +5,7 @@ import { platformModal } from './platform-modal.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from '@lmzhen/dsh-evolution-client-kit'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
-import { formatLocalDateTime, type SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
+import { formatLocalDateTime, TaskBanner, type SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
 import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, rowOrderKey, type RowOrderEdge } from './sorting.ts'
 import { MergeRunStrips } from './MergeRunStrip.ts'
 import { MergeRow, type RowSortHandlers } from './MergeRow.ts'
@@ -226,6 +226,9 @@ export function MergePanel(face: MergeFace): ReactNode {
     type: 'button', role: 'switch', 'aria-checked': snapshot.expiredOnly ? 'true' : 'false', 'data-role': 'expired-toggle', 'data-active': snapshot.expiredOnly ? 'true' : 'false', onClick: () => { store.toggleExpired() },
   }, t('tab.expired') + ' ' + String(view.expired)) : null
   const notice = decisionNotice === undefined ? null : createElement('p', { 'data-role': 'decision-notice', 'data-ok': decisionNotice.ok ? 'true' : 'false' }, decisionNotice.message)
+  const taskBanner = view.counts.pending > 0
+    ? createElement(TaskBanner, { count: view.counts.pending, text: t('task.pending') })
+    : null
   const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => createElement(MergeRow, { row, t, copy, sort: sortHandlers, openBody, onDecide: face.decide === undefined ? undefined : decideRow, busy: deciding === row.id }))) : null
   const empty = uiState === 'empty' ? createElement('div', null, createElement('p', { 'data-role': 'note' }, t('empty.' + snapshot.queue)), createElement('p', { 'data-role': 'empty-scope' }, t('empty.scope'))) : null
   const staleViewFailure = snapshot.viewState === 'ready' ? snapshot.viewFailure : undefined
@@ -253,15 +256,7 @@ export function MergePanel(face: MergeFace): ReactNode {
     blocked !== undefined
       ? failureNode(t, blocked, fallback, copy)
       : createElement('div', { 'data-role': 'content' },
-          createElement('div', { 'data-role': 'start' },
-            createElement('button', { type: 'button', 'data-role': 'start-scan', onClick: () => { copy(view.startCommands.scan) } }, t('start.scan')),
-            createElement('button', { type: 'button', 'data-role': 'start-pair', onClick: () => { copy(view.startCommands.pair) } }, t('start.pair')),
-          ),
-          view.degraded ? createElement('p', { 'data-role': 'degraded' }, t('degraded') + ' ' + view.notes.join(',')) : null,
-          createElement(MergeSettings, { view, t }),
-          createElement(MergeRunStrips, { view, t, copy }),
-          tabs,
-          expiredToggle,
+          taskBanner,
           snapshot.viewState === 'loading' || queue.status === 'loading' ? createElement('p', { 'data-role': 'note' }, t('loading')) : queue.refreshing === true ? createElement('p', { 'data-role': 'note', role: 'status' }, t('refreshing')) : null,
           activeFailure === undefined ? null : failureNode(t, activeFailure, fallback, copy),
           copyState.kind === 'idle' ? null : copyState.kind === 'copied'
@@ -273,8 +268,17 @@ export function MergePanel(face: MergeFace): ReactNode {
             ),
           notice,
           list,
+          tabs,
+          expiredToggle,
           empty,
           queue.nextCursor === undefined || uiState !== 'ready' ? null : createElement('button', { type: 'button', 'data-role': 'load-more', disabled: queue.status === 'loading', onClick: () => { store.loadMore() } }, t('loadMore')),
+          createElement(MergeSettings, { view, t }),
+          createElement(MergeRunStrips, { view, t, copy }),
+          view.degraded ? createElement('p', { 'data-role': 'degraded' }, t('degraded') + ' ' + view.notes.join(',')) : null,
+          createElement('div', { 'data-role': 'start' },
+            createElement('button', { type: 'button', 'data-role': 'start-scan', onClick: () => { copy(view.startCommands.scan) } }, t('start.scan')),
+            createElement('button', { type: 'button', 'data-role': 'start-pair', onClick: () => { copy(view.startCommands.pair) } }, t('start.pair')),
+          ),
           createElement('button', { type: 'button', 'data-role': 'history', onClick: () => { openHistory() } }, t('history')),
           createElement('button', { type: 'button', 'data-role': 'doctor', onClick: () => { copy(doctorCommand) } }, t('doctor.open')),
           overlay === undefined ? null : overlay.kind === 'body' ? bodyNode(overlay, t, closeOverlay) : historyNode(overlay, t, closeOverlay),
