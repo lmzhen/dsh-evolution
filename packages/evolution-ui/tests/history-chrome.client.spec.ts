@@ -18,6 +18,7 @@ import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
 import { note } from '../src/panels/history/client/atoms.ts'
 import { skillLine, versionRow, type Copy } from '../src/panels/history/client/chrome.ts'
 import { CSS } from '../src/panels/history/client/styles.ts'
+import { zh } from '../src/panels/history/client/messages.ts'
 import type { SkillRow, VersionRow } from '../src/panels/history/client/api.ts'
 
 /** The seat as the slot renderer hands it over: keys as words, so assertions name the exact copy. */
@@ -129,4 +130,8 @@ describe('the tool face says what it is (G3)', () => {
     // Every fact a reader compares down the column (count, version, age, delta) is a cell.
     expect(rule('.evo-hist-cell')).toContain('font-variant-numeric:tabular-nums')
   })
+})
+
+it('has a typed word for the merge action kind', () => {
+  expect(zh['action.merge']).toBe('合并')
 })
