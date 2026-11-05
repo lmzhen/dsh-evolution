@@ -89,8 +89,8 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
     expect(en['time.now']).not.toContain('{')
   })
 
-  it('names all four curation states', () => {
-    const facts = [skill(), skill({ managed: false }), skill({ protectedBy: 'guard' }), skill({ protectionUnknown: true })]
+  it('names every exception state; default family management has no state cell', () => {
+    const facts = [skill({ managed: false }), skill({ protectedBy: 'guard' }), skill({ protectionUnknown: true })]
     for (const one of facts) {
       const state = cellOf(skillRowCells(one).meta, 'state')
       const key = state !== undefined && 'copy' in state ? state.copy : ''

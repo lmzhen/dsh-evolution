@@ -1,15 +1,15 @@
 // @tier fast
-import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
+import type { ReactElement } from 'react'
 import { expect, it } from 'vitest'
 import { StateNotice } from '../src/notice.ts'
 
-it('renders tone, text and count as one semantic notice', () => {
-  const html = renderToStaticMarkup(createElement(StateNotice, { tone: 'warning', text: 'expired', count: 2 }))
-  expect(html).toContain('data-role="state-notice"')
-  expect(html).toContain('data-tone="warning"')
-  expect(html).toContain('role="status"')
-  expect(html).toContain('expired')
-  expect(html).toContain('>2<')
-  expect(renderToStaticMarkup(createElement(StateNotice, { tone: 'error', text: 'failed' }))).toContain('role="alert"')
+it('builds one semantic notice with tone, text and count', () => {
+  const warning = StateNotice({ tone: 'warning', text: 'expired', count: 2 }) as ReactElement<Record<string, unknown>>
+  expect(warning.props['data-role']).toBe('state-notice')
+  expect(warning.props['data-tone']).toBe('warning')
+  expect(warning.props.role).toBe('status')
+  const [text, count] = warning.props.children as [ReactElement<{ children: string }>, ReactElement<{ children: string }>]
+  expect(text.props.children).toBe('expired')
+  expect(count.props.children).toBe('2')
+  expect((StateNotice({ tone: 'error', text: 'failed' }) as ReactElement<Record<string, unknown>>).props.role).toBe('alert')
 })
