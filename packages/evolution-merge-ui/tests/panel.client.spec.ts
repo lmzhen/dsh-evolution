@@ -65,6 +65,8 @@ it('renders four tabs, settings, run strip, pending id/three sentences and stage
   expect(html).toContain('data-role="body-b"')
   expect(html).toContain('data-disabled-reason="unavailable"')
   expect(html).toContain('data-role="tab"')
+  expect(html).toContain('data-role="row-more"')
+  expect((html.match(/data-role="row-copy"/g) ?? []).length).toBe(2)
 })
 
 it('renders succeeded with no progress as progress unknown, never 0/N', () => {

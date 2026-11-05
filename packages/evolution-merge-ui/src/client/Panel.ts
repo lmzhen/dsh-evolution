@@ -182,11 +182,7 @@ function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => voi
         else copy(action.command)
       },
     }, decision ? t('decision.' + action.id) : t('action.' + action.id))
-    if (!decision) return [primary]
-    return [primary, createElement('button', {
-      key: action.id + '-copy', type: 'button', 'data-role': 'row-copy', 'data-action': action.id + '-copy',
-      title: action.command, disabled: busy, onClick: () => { if (!busy) copy(action.command) },
-    }, t('row.copy'))]
+    return [primary]
   })
   return createElement('div', {
     key: row.id, 'data-role': 'row', 'data-row-id': row.id, 'data-row-state': row.state, 'data-row-queue': row.queue,
@@ -230,6 +226,13 @@ function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => voi
           ]
         })(),
         actions,
+      ),
+      createElement('details', { 'data-role': 'row-more' },
+        createElement('summary', null, t('row.more')),
+        ...row.actions.map(action => createElement('button', {
+          key: 'copy-' + action.id, type: 'button', 'data-role': 'row-copy', 'data-action': action.id + '-copy',
+          title: action.command, disabled: busy, onClick: () => { if (!busy) copy(action.command) },
+        }, t('row.copy') + ' ' + t('action.' + action.id))),
       ),
     ),
   )
