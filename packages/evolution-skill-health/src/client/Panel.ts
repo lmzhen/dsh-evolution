@@ -301,7 +301,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
       createElement('button', { type: 'button', 'data-role': 'refresh', disabled: loading, onClick: () => { load() } }, t('refresh')),
     ),
     createElement('p', { 'data-role': 'hint' }, t('hint')),
-    loading || failed !== undefined || scan?.status === 'unavailable' ? null : stats,
+    failed !== undefined || scan?.status === 'unavailable' || view.loaded !== true ? null : stats,
     loading ? createElement('p', { 'data-role': 'note' }, t('loading')) : null,
     view.truncated ? createElement('p', { 'data-role': 'note' }, t('scan.truncated')) : null,
     failed === undefined ? null : createElement('div', { 'data-role': 'note' }, failureBlock(t, failed)),
