@@ -124,27 +124,25 @@ function runStrip(run: MergeRunView, t: Translate, copy: (command: string) => vo
   )
 }
 
-function ReadOnlySetting({ section, label, value, disabled, missing, note, link, t }: { section: string; label: string; value: boolean | undefined; disabled: boolean; missing: boolean; note?: string; link?: boolean; t: Translate }): ReactNode {
+function SettingChip({ section, label, value, disabled, missing, t }: { section: string; label: string; value: boolean | undefined; disabled: boolean; missing: boolean; t: Translate }): ReactNode {
   const text = missing ? t('settings.capabilityMissing') : disabled ? t('settings.capabilityDisabled') : value === true ? t('settings.on') : t('settings.off')
-  return createElement('div', { 'data-role': 'settings-section', 'data-section': section, 'data-disabled': missing || disabled ? 'true' : 'false' },
+  const state = missing ? 'missing' : disabled ? 'unavailable' : value === true ? 'on' : 'off'
+  return createElement('span', { 'data-role': 'settings-section', 'data-section': section, 'data-disabled': missing || disabled ? 'true' : 'false', 'data-state': state },
     createElement('span', { 'data-role': 'settings-label' }, label),
-    createElement('span', { 'data-role': 'settings-value', 'data-value': missing ? 'missing' : disabled ? 'unavailable' : value === true ? 'on' : 'off' }, text),
-    note === undefined ? null : createElement('span', { 'data-role': 'settings-note' }, note),
-    link === true ? createElement('span', { 'data-role': 'settings-link' }, t('settings.openPlatformPath')) : null,
+    createElement('span', { 'data-role': 'settings-value', 'data-value': state }, text),
   )
 }
 function SettingsCard({ view, t }: { view: MergeViewPayload; t: Translate }): ReactNode {
   const platform = view.approval.platformWrite
   const platformCapability = platform?.capability === true
   const platformFallback = platform?.enabled ?? false
-  const mergeFallback = view.approval.mergeApproval
   return createElement('div', { 'data-role': 'settings-card' },
     createElement('h3', { 'data-role': 'settings-title' }, t('settings.title')),
-    createElement('p', { 'data-role': 'settings-hint' }, t('settings.hint')),
     createElement('p', { 'data-role': 'settings-path' }, t('settings.openPlatformPath')),
-    createElement(ReadOnlySetting, { section: 'merge-approval', label: t('settings.mergeApproval'), value: mergeFallback, disabled: false, missing: false, t }),
-    createElement(ReadOnlySetting, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, note: t('settings.platformWriteLinkHint'), t }),
-    createElement('p', { 'data-role': 'settings-readonly' }, t('settings.readonly')),
+    createElement('div', { 'data-role': 'settings-chips' },
+      createElement(SettingChip, { section: 'merge-approval', label: t('settings.mergeApproval'), value: view.approval.mergeApproval, disabled: false, missing: false, t }),
+      createElement(SettingChip, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, t }),
+    ),
   )
 }
 interface RowSortHandlers {
