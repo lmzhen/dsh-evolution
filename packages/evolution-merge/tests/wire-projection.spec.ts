@@ -44,4 +44,5 @@ it('projects RunsView and DoctorView', () => {
 it('projects body and history envelopes', () => {
   expect(toBodyView('a', 'live', 'hello', 1)).toMatchObject({ wireVersion: 1, totalBytes: 5, truncated: false })
   expect(toHistoryView([{ name: 'a', kind: 'merged', reason: 'absorbed', lastVersion: 2, archivedAt: '2026-10-23T00:00:00.000Z' }], 1).items[0]).toMatchObject({ name: 'a', archivedAt: Date.parse('2026-10-23T00:00:00.000Z') })
+  expect(toHistoryView([{ name: 'b', kind: 'other', reason: 'archived', lastVersion: 1, archivedAt: null }], 1).items[0]?.archivedAt).toBeNull()
 })

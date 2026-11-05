@@ -37,7 +37,7 @@ export interface QueuePage { queue: MergeQueue; items: MergeRowView[]; nextCurso
 export interface MergeBody { name: string; side: 'live' | 'archive'; text: string; markdown: boolean; truncated: boolean; totalBytes: number }
 export interface MergeHistoryItem {
   name: string; kind: 'merged' | 'deleted' | 'split' | 'other'; reason: string; reasonCode?: string
-  lastVersion: number; archivedAt: string; sourceRunId?: string
+  lastVersion: number; archivedAt: string | null; sourceRunId?: string
 }
 export interface MergeStateReadiness { readonly ok?: boolean; readonly code?: string; readonly message?: string; readonly steps?: readonly string[] }
 export type MergeProblemKind = 'unauthenticated' | 'forbidden' | 'unmounted' | 'capability' | 'wire-version' | 'body-missing' | 'body-ambiguous' | 'bad-query' | 'refused' | 'server'
@@ -85,7 +85,7 @@ interface WireRow {
 }
 interface WirePage { readonly wireVersion: 1; readonly queue: MergeQueue; readonly expiredOnly: boolean; readonly counts: unknown; readonly rows: readonly WireRow[]; readonly nextCursor?: string }
 interface WireBody { readonly wireVersion: 1; readonly name: string; readonly side: 'live' | 'archive'; readonly text: string; readonly markdown: boolean; readonly truncated: boolean; readonly totalBytes: number }
-interface WireHistory { readonly wireVersion: 1; readonly items: readonly { readonly name: string; readonly kind: 'merged' | 'deleted' | 'split' | 'other'; readonly reason: string; readonly reasonCode?: string; readonly lastVersion: number; readonly archivedAt: number; readonly sourceRunId?: string }[] }
+interface WireHistory { readonly wireVersion: 1; readonly items: readonly { readonly name: string; readonly kind: 'merged' | 'deleted' | 'split' | 'other'; readonly reason: string; readonly reasonCode?: string; readonly lastVersion: number; readonly archivedAt: number | null; readonly sourceRunId?: string }[] }
 interface WireFailureBody { readonly wireVersion?: unknown; readonly code?: unknown; readonly message?: unknown; readonly readiness?: unknown }
 
 const asReadiness = (value: unknown): MergeStateReadiness => {
@@ -243,6 +243,6 @@ export async function decide(rowId: string, verb: 'approve' | 'reject', sessionI
 export async function history(): Promise<MergeOutcome<{ items: MergeHistoryItem[] }>> {
   const answer = await requestWire<WireHistory>(HOST_ROUTES.history)
   return answer.ok
-    ? { ok: true, payload: { items: answer.payload.items.map(item => ({ name: item.name, kind: item.kind, reason: item.reason, ...(item.reasonCode === undefined ? {} : { reasonCode: item.reasonCode }), lastVersion: item.lastVersion, archivedAt: new Date(item.archivedAt).toISOString(), ...(item.sourceRunId === undefined ? {} : { sourceRunId: item.sourceRunId }) })) } }
+    ? { ok: true, payload: { items: answer.payload.items.map(item => ({ name: item.name, kind: item.kind, reason: item.reason, ...(item.reasonCode === undefined ? {} : { reasonCode: item.reasonCode }), lastVersion: item.lastVersion, archivedAt: item.archivedAt === null ? null : new Date(item.archivedAt).toISOString(), ...(item.sourceRunId === undefined ? {} : { sourceRunId: item.sourceRunId }) })) } }
     : answer
 }

@@ -40,7 +40,7 @@ export interface MergeHistoryItem {
   readonly kind: 'merged' | 'deleted' | 'split' | 'other'
   readonly reason: string
   readonly lastVersion: number
-  readonly archivedAt: string
+  readonly archivedAt: string | null
   readonly sourceRunId?: string
 }
 

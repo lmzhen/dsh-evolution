@@ -312,12 +312,14 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
           for (const receipt of receipts) for (const name of receipt.sources) items.set(name, { name, kind: 'merged', reason: '已合并进「' + receipt.target + '」，最后一版保留可查。', reasonCode: 'merged', lastVersion: 1, archivedAt: receipt.at, sourceRunId: receipt.runId, runId: receipt.runId, absorbedInto: receipt.target, generation: generationOf.get(receipt.runId) ?? 1 })
           const archived = await (skills as unknown as { archivedNames?: () => Promise<string[] | null> }).archivedNames?.() ?? []
           const reasonOf = (skills as unknown as { readArchiveReason?: (name: string) => Promise<string | null> }).readArchiveReason
+          const archivedAtOf = (skills as unknown as { readArchivedAt?: (name: string) => Promise<number | null> }).readArchivedAt
           for (const name of archived) {
             if (items.has(name)) continue
             const rawReason = reasonOf === undefined ? null : await reasonOf.call(skills, name).catch(() => null)
             const lower = (rawReason ?? '').toLowerCase()
             const kind = lower.includes('split') ? 'split' as const : lower.includes('delet') || lower.includes('remove') ? 'deleted' as const : 'other' as const
-            items.set(name, { name, kind, reason: rawReason ?? '技能已归档，最后一版保留可查。', reasonCode: kind === 'other' ? 'archived' : kind, lastVersion: 1, archivedAt: Date.now() })
+            const archivedAt = archivedAtOf === undefined ? null : await archivedAtOf.call(skills, name).catch(() => null)
+            items.set(name, { name, kind, reason: rawReason ?? '技能已归档，最后一版保留可查。', reasonCode: kind === 'other' ? 'archived' : kind, lastVersion: 1, archivedAt })
           }
           const out: HistoryItem[] = []
           for (const item of items.values()) {

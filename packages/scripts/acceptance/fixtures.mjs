@@ -74,7 +74,7 @@ export async function seedManagedPair(home, a, b) {
  * Seed a legitimate v3 pending row. Fails instead of overwriting an existing
  * v4 state: callers must use a clean acceptance profile.
  */
-export async function seedPendingMerge(home, { a, b, target = a, now = new Date().toISOString() }) {
+export async function seedPendingMerge(home, { a, b, target = a, now = new Date().toISOString(), runId = 'g0-fixture-parent' }) {
   await seedManagedPair(home, a, b)
   const { key, id } = rowIdOf(a, b)
   const statePath = join(home, 'evolution', 'merge', 'merge-state.json')
@@ -100,6 +100,7 @@ export async function seedPendingMerge(home, { a, b, target = a, now = new Date(
     },
     state: 'pending',
     attempts: 0,
+    runId,
     version: 1,
     createdAt: now,
     updatedAt: now,

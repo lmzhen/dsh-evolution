@@ -10,7 +10,7 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, getRecord, loadUsage, nodeEvolutionIo, saveUsage, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 
 const body = (name: string) => `---
 name: ${name}
@@ -46,6 +46,11 @@ it('readArchived returns the archived body by original name', async () => {
   const { root, lib } = await seed()
   expect(await lib.readArchived('old-skill')).toContain('Body of old-skill.')
   expect(await lib.readArchiveReason('old-skill')).toContain('Consolidated into umbrella')
+  const usage = await loadUsage(root)
+  getRecord(usage, 'old-skill').archived_at = '2026-10-01T12:00:00.000Z'
+  await saveUsage(root, usage)
+  expect(await lib.readArchivedAt('old-skill')).toBe(Date.parse('2026-10-01T12:00:00.000Z'))
+  expect(await lib.readArchivedAt('umbrella')).toBeNull()
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 

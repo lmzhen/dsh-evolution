@@ -17,7 +17,7 @@ export interface SnapshotRow { readonly row: V4Row; readonly stage: StageEntry |
 export interface BodyRef { readonly rowId: string; readonly name: string; readonly side: 'live' | 'archive' }
 export interface SnapshotRun { readonly record: RunRecord; readonly meta: MergeRunMeta | null; readonly pairs: readonly { readonly pairKey: string; readonly runId: string; readonly result: string; readonly target?: string }[]; readonly report: MergeReport | null; readonly reportRef: string | null }
 export interface SnapshotDoctor { readonly counts: MergeCounts; readonly staging: { readonly state: 'ok' | 'absent' | 'unreadable'; readonly dirs: number; readonly oldestAgeMs?: number; readonly detail?: string }; readonly rows: readonly DoctorFact[] }
-export interface HistoryItem { readonly name: string; readonly kind: 'merged' | 'deleted' | 'split' | 'other'; readonly reason: string; readonly reasonCode?: string; readonly lastVersion: number; readonly archivedAt: number; readonly sourceRunId?: string; readonly runId?: string; readonly absorbedInto?: string
+export interface HistoryItem { readonly name: string; readonly kind: 'merged' | 'deleted' | 'split' | 'other'; readonly reason: string; readonly reasonCode?: string; readonly lastVersion: number; readonly archivedAt: number | null; readonly sourceRunId?: string; readonly runId?: string; readonly absorbedInto?: string
   readonly generation?: number }
 export interface MergeSnapshot {
   readonly wireVersion: 1

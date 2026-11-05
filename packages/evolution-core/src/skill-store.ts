@@ -58,7 +58,7 @@ import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
 import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
-import { getRecord, mutateUsage, suppressedFile, usageFile } from './usage.ts'
+import { getRecord, loadUsage, mutateUsage, suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
 
@@ -1629,6 +1629,17 @@ export class SkillLibrary {
     const name = rawName.trim()
     if (this.badName(name) !== null) return null
     return await loadVersionContent(this.root, this.io, name, v)
+  }
+
+  /** Read an archived skill's real archived_at, or null when the usage sidecar has no fact. */
+  async readArchivedAt(rawName: string): Promise<number | null> {
+    const name = rawName.trim()
+    if (this.badName(name) !== null) return null
+    const usage = await loadUsage(this.root, this.io)
+    const raw = usage.get(name)?.archived_at
+    if (raw === null || raw === undefined) return null
+    const at = Date.parse(raw)
+    return Number.isFinite(at) ? at : null
   }
 
   /** Read an archived skill's human-readable reason, exact or stamped. */

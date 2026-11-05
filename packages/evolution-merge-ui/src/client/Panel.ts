@@ -276,7 +276,7 @@ function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Tra
       ? overlay.items === undefined || overlay.items.length === 0
         ? createElement('p', { 'data-role': 'history-empty' }, t('history.empty'))
         : createElement('ul', { 'data-role': 'history-list' }, overlay.items.map(item => createElement('li', { key: item.name + ':' + item.archivedAt, 'data-role': 'history-item' },
-            item.name + ' · ' + (() => { const kind = t('history.kind.' + item.kind); const reason = reasonText(t, item.reasonCode, item.reason); return kind === reason ? kind : kind + ' · ' + reason })() + ' · v' + String(item.lastVersion) + ' · ' + t('history.archivedAt', { date: new Date(item.archivedAt).toLocaleString() }),
+            item.name + ' · ' + (() => { const kind = t('history.kind.' + item.kind); const reason = reasonText(t, item.reasonCode, item.reason); return kind === reason ? kind : kind + ' · ' + reason })() + ' · v' + String(item.lastVersion) + ' · ' + (item.archivedAt === null ? t('history.archivedAtUnknown') : t('history.archivedAt', { date: new Date(item.archivedAt).toLocaleString() })),
           )))
       : null,
   )

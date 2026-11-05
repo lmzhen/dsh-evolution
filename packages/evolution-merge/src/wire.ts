@@ -127,7 +127,7 @@ export interface BodyView {
 }
 export interface HistoryItem {
   readonly name: string; readonly kind: 'merged' | 'deleted' | 'split' | 'other'
-  readonly reason: string; readonly reasonCode?: string; readonly generation?: number; readonly lastVersion: number; readonly archivedAt: number; readonly sourceRunId?: string; readonly runId?: string; readonly absorbedInto?: string
+  readonly reason: string; readonly reasonCode?: string; readonly generation?: number; readonly lastVersion: number; readonly archivedAt: number | null; readonly sourceRunId?: string; readonly runId?: string; readonly absorbedInto?: string
 }
 export interface HistoryView { readonly wireVersion: 1; readonly readAt: number; readonly items: readonly HistoryItem[] }
 export interface DoctorFact {

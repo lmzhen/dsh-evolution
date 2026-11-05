@@ -89,6 +89,9 @@ export function toBodyView(name: string, side: 'live' | 'archive', text: string,
   return { wireVersion: 1, readAt, name, side, text, markdown: true, truncated: false, totalBytes: Buffer.byteLength(text, 'utf8') }
 }
 
-export function toHistoryView(items: readonly { name: string; kind: 'merged' | 'deleted' | 'split' | 'other'; reason: string; lastVersion: number; archivedAt: string; sourceRunId?: string }[], readAt: number): HistoryView {
-  return { wireVersion: 1, readAt, items: items.map(item => ({ name: item.name, kind: item.kind, reason: item.reason, lastVersion: item.lastVersion, archivedAt: Date.parse(item.archivedAt), ...(item.sourceRunId === undefined ? {} : { sourceRunId: item.sourceRunId }) })) }
+export function toHistoryView(items: readonly { name: string; kind: 'merged' | 'deleted' | 'split' | 'other'; reason: string; lastVersion: number; archivedAt: string | number | null; sourceRunId?: string }[], readAt: number): HistoryView {
+  return { wireVersion: 1, readAt, items: items.map(item => {
+    const parsed = item.archivedAt === null ? null : typeof item.archivedAt === 'number' ? item.archivedAt : Date.parse(item.archivedAt)
+    return { name: item.name, kind: item.kind, reason: item.reason, lastVersion: item.lastVersion, archivedAt: parsed === null || Number.isFinite(parsed) ? parsed : null, ...(item.sourceRunId === undefined ? {} : { sourceRunId: item.sourceRunId }) }
+  }) }
 }
