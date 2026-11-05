@@ -7,6 +7,7 @@ import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type 
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
 import { formatLocalDateTime, type SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
 import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, rowOrderKey, type RowOrderEdge } from './sorting.ts'
+import { summarizePair } from './merge-presentation.ts'
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
@@ -65,10 +66,16 @@ function failureNode(t: Translate, failure: MergeFailure, fallback: readonly str
 }
 function summaryNode(row: MergeRowView, t: Translate): ReactNode {
   if (row.state !== 'pending' || row.summary === undefined) return null
-  const slots: readonly [string, string | null][] = [['row.summaryA', row.summary.a], ['row.summaryB', row.summary.b], ['row.rationale', row.summary.rationale]]
+  const pair = summarizePair(row.summary.a, row.summary.b)
+  const slots: [string, string | null][] = pair.kind === 'same'
+    ? [[t('row.summaryBoth'), pair.text]]
+    : pair.kind === 'missing'
+      ? [[t('row.summaryBoth'), t('row.noSummary')]]
+      : [[t('row.summaryA'), pair.a], [t('row.summaryB'), pair.b]]
+  slots.push([t('row.rationale'), row.summary.rationale])
   return createElement('div', { 'data-role': 'pending-summary' }, slots.map(([label, value]) =>
     createElement('div', { key: label, 'data-role': 'pending-summary-slot' },
-      createElement('span', { 'data-role': 'pending-summary-label' }, t(label)),
+      createElement('span', { 'data-role': 'pending-summary-label' }, label),
       createElement('span', { 'data-role': 'pending-summary-value' }, value === null || value === '' ? t('row.noSummary') : value),
     ),
   ))
