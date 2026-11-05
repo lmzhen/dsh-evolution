@@ -267,10 +267,10 @@ function FieldBlock(props: FieldBlockProps): ReactNode {
           type: 'button',
           className: 'evolution-param-button',
           disabled: props.disabled || props.clearing,
+          'data-role': 'reset',
+          title: props.resetTo === null ? undefined : t('resetTo', { value: props.resetTo }),
           onClick: () => { props.onClear(field.id) },
         }, props.clearing ? t('resetting') : t('reset')),
-        // U-5 judge ②: name the value the button would restore — "restore default" is a decision.
-        props.resetTo === null ? null : createElement('span', { className: 'evolution-param-hint' }, t('resetTo', { value: props.resetTo })),
       )
       : null,
   )

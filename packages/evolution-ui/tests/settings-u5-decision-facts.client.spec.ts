@@ -53,7 +53,9 @@ describe('U-5/S5: where the value comes from, and where a save goes', () => {
 
   it('names the value a reset would restore (the seat base)', () => {
     const view = page({ base: { [FIELD.id]: 42 }, user: { [FIELD.id]: 7 } })
-    expect(view.container.textContent).toContain(t('resetTo', { value: 42 }))
+    const reset = view.container.querySelector('[data-role="reset"]')
+    expect(reset?.getAttribute('title')).toBe(t('resetTo', { value: 42 }))
+    expect(view.container.textContent).not.toContain(t('resetTo', { value: 42 }))
     cleanup()
   })
 })
