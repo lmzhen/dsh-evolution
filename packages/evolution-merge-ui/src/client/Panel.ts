@@ -108,6 +108,7 @@ function runStrip(run: MergeRunView, t: Translate, copy: (command: string) => vo
     run.resultRef === undefined ? null : createElement('span', { key: 'ref', 'data-role': 'run-result-ref', title: run.resultRef }, t('run.resultRef')),
   ]
   return createElement('div', { 'data-role': 'run-strip', 'data-run-role': role, 'data-run-state': run.state },
+    createElement('span', { 'data-role': 'run-identity' }, t(role === 'active' ? 'run.current' : 'run.last')),
     createElement('span', { 'data-role': 'run-state' }, t('run.state') + ' ' + t('run.' + run.state)),
     run.progress === null || run.progress === undefined
       ? run.state === 'succeeded' ? createElement('span', { 'data-role': 'run-progress', 'data-progress': 'unknown' }, t('run.progressUnknown')) : null

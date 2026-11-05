@@ -42,6 +42,8 @@ it('renders four tabs, settings, run strip, pending id/three sentences and stage
   expect(html).toContain('data-section="platform-write"')
   expect(html).toContain('data-value="off"')
   expect(html).toContain('data-role="run-strip"')
+  expect(html).toContain('data-role="run-identity"')
+  expect(html).toContain('run.last')
   expect(html).toContain('data-role="run-ended"')
   expect(html).toContain('data-role="run-failure"')
   expect(html).toContain('data-role="run-report"')

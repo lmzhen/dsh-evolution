@@ -175,6 +175,8 @@ Object.assign(zh, {
 
   'run.title': '运行',
   'run.progressUnknown': '进度未知',
+  'run.current': '当前运行',
+  'run.last': '上次完成',
   'run.id': '运行编号',
   'run.state': '状态',
   'run.stage': '阶段',
@@ -384,6 +386,8 @@ Object.assign(en, {
 
   'run.title': 'Run',
   'run.progressUnknown': 'progress unknown',
+  'run.current': 'Current run',
+  'run.last': 'Last completed',
   'run.id': 'Run ID',
   'run.state': 'State',
   'run.stage': 'Stage',
