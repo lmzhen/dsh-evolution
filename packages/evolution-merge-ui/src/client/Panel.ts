@@ -425,7 +425,11 @@ export function MergePanel(face: MergeFace): ReactNode {
           activeFailure === undefined ? null : failureNode(t, activeFailure, fallback, copy),
           copyState.kind === 'idle' ? null : copyState.kind === 'copied'
             ? createElement('p', { 'data-role': 'copied', role: 'status' }, t('copied') + ' ' + (copyState.text ?? ''))
-            : createElement('p', { 'data-role': 'copy-failed', role: 'alert' }, t('copyFailed')),
+            : createElement('div', { 'data-role': 'copy-failed', role: 'alert' },
+              createElement('p', null, t('copyFailed')),
+              copyState.text === undefined ? null : createElement('code', { 'data-role': 'copy-failed-command' }, copyState.text),
+              createElement('button', { type: 'button', 'data-role': 'copy-retry', onClick: () => { if (copyState.text !== undefined) copy(copyState.text) } }, t('copyRetry')),
+            ),
           notice,
           list,
           empty,
