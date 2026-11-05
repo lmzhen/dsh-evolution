@@ -177,9 +177,9 @@ export function notice(text: string | undefined, error: boolean): ReactNode {
 }
 
 /** The pane's heading and its one control. */
-export function panelHead(copy: Copy, onRefresh: () => void): ReactNode {
+export function panelHead(copy: Copy, onRefresh: () => void, title?: string): ReactNode {
   return createElement('div', { className: 'evo-hist-head' },
-    createElement('h2', { className: 'evo-hist-title' }, copy.t('title')),
+    createElement('h2', { className: 'evo-hist-title' }, title ?? copy.t('title')),
     button({ key: 'refresh', title: copy.t('refresh'), onClick: onRefresh, children: copy.t('refresh') }))
 }
 

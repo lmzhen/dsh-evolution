@@ -14,6 +14,7 @@ export const NS = 'evolution-skill-history'
 export const zh: Record<string, string> = {
   'entry.label': '技能历史',
   title: '技能历史',
+  bodyTitle: '正文版本',
   'workbench.history': '技能历史',
   'workbench.pending': '待批',
   'workbench.merge': '合并',
@@ -108,6 +109,7 @@ export const zh: Record<string, string> = {
 export const en: Record<string, string> = {
   'entry.label': 'Skill history',
   title: 'Skill history',
+  bodyTitle: 'Body versions',
   'workbench.history': 'Skill history',
   'workbench.pending': 'Pending',
   'workbench.merge': 'Merge',

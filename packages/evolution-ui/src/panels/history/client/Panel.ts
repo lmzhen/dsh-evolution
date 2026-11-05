@@ -279,7 +279,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
             ? emptyState(face.t('search.none'))
             : visible.map(skill => skillLine(face, skill, skill.name === selected, () => { open(skill.name) })))),
     createElement('div', { className: 'evo-hist-main' },
-      panelHead(face, refresh),
+      panelHead(face, refresh, selected ?? face.t('bodyTitle')),
       notice(noteText, noteError),
       failure === undefined ? null : createElement('div', { className: 'evo-hist-failure' }, failureBlock(face.t, failure)),
       // The explanation is for the screen that has nothing else on it (W12): a reader who can see
