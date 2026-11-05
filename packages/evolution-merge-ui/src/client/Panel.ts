@@ -5,11 +5,12 @@ import { platformModal } from './platform-modal.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from '@lmzhen/dsh-evolution-client-kit'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
-import { formatLocalDateTime, TaskBanner, type SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
+import { EmptyState, TaskBanner, type SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
 import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, rowOrderKey, type RowOrderEdge } from './sorting.ts'
 import { MergeRunStrips } from './MergeRunStrip.ts'
 import { MergeRow, type RowSortHandlers } from './MergeRow.ts'
 import { MergeSettings } from './MergeSettings.ts'
+import { HistoryItemRow } from './HistoryItemRow.ts'
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
@@ -30,12 +31,6 @@ function problemKey(problem: MergeProblem): string {
     case 'refused': return 'failureRefused'
     case 'server': return 'failureServer'
   }
-}
-function reasonText(t: Translate, reasonCode: string | undefined, fallback: string): string {
-  if (reasonCode === undefined) return fallback
-  const key = 'history.reason.' + reasonCode
-  const text = t(key)
-  return text === key ? fallback : text
 }
 function blockedReasonKey(failure: Extract<MergeFailure, { kind: 'blocked' }>): string {
   const code = failure.readiness.code ?? failure.code
@@ -138,10 +133,10 @@ function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Tra
     overlay.status === 'error' && overlay.failure !== undefined ? failureNode(t, overlay.failure, [], () => {}) : null,
     overlay.status === 'ready'
       ? overlay.items === undefined || overlay.items.length === 0
-        ? createElement('p', { 'data-role': 'history-empty' }, t('history.empty'))
-        : createElement('ul', { 'data-role': 'history-list' }, overlay.items.map(item => createElement('li', { key: item.name + ':' + item.archivedAt, 'data-role': 'history-item' },
-            item.name + ' · ' + (() => { const kind = t('history.kind.' + item.kind); const reason = reasonText(t, item.reasonCode, item.reason); return kind === reason ? kind : kind + ' · ' + reason })() + ' · v' + String(item.lastVersion) + ' · ' + (item.archivedAt === null ? t('history.archivedAtUnknown') : t('history.archivedAt', { date: formatLocalDateTime(item.archivedAt) ?? t('history.archivedAtUnknown') })),
-          )))
+        ? createElement(EmptyState, { title: t('history.empty'), variant: 'compact' })
+        : createElement('ul', { 'data-role': 'history-list' }, overlay.items.map(item => createElement(HistoryItemRow, {
+            key: item.name + ':' + String(item.archivedAt), item, t,
+          })))
       : null,
   )
   return Modal === undefined ? inner : createElement(Modal, { open: true, onClose, title, closeLabel: t('close'), headless: true, className: 'evo-merge-modal' }, inner)
@@ -298,12 +293,14 @@ export function MergePanel(face: MergeFace): ReactNode {
           createElement(MergeSettings, { view, t }),
           createElement(MergeRunStrips, { view, t, copy }),
           view.degraded ? createElement('p', { 'data-role': 'degraded' }, t('degraded') + ' ' + view.notes.join(',')) : null,
-          createElement('div', { 'data-role': 'start' },
-            createElement('button', { type: 'button', 'data-role': 'start-scan', onClick: () => { copy(view.startCommands.scan) } }, t('start.scan')),
-            createElement('button', { type: 'button', 'data-role': 'start-pair', onClick: () => { copy(view.startCommands.pair) } }, t('start.pair')),
+          createElement('div', { 'data-role': 'footer-tools' },
+            createElement('div', { 'data-role': 'start' },
+              createElement('button', { type: 'button', 'data-role': 'start-scan', onClick: () => { copy(view.startCommands.scan) } }, t('start.scan')),
+              createElement('button', { type: 'button', 'data-role': 'start-pair', onClick: () => { copy(view.startCommands.pair) } }, t('start.pair')),
+            ),
+            createElement('button', { type: 'button', 'data-role': 'history', onClick: () => { openHistory() } }, t('history')),
+            createElement('button', { type: 'button', 'data-role': 'doctor', onClick: () => { copy(doctorCommand) } }, t('doctor.open')),
           ),
-          createElement('button', { type: 'button', 'data-role': 'history', onClick: () => { openHistory() } }, t('history')),
-          createElement('button', { type: 'button', 'data-role': 'doctor', onClick: () => { copy(doctorCommand) } }, t('doctor.open')),
           overlay === undefined ? null : overlay.kind === 'body' ? bodyNode(overlay, t, closeOverlay) : overlay.kind === 'pair' ? pairNode(overlay, t, closeOverlay) : historyNode(overlay, t, closeOverlay),
           createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { store.refresh() } }, t('refresh')),
           menuNode,

@@ -24,4 +24,8 @@ it('zh and en have the same complete key set', () => {
   expect(zh['settings.mergeApproval']).toContain('技能自动合并')
   expect(zh['settings.platformWrite']).toContain('写入审批')
   expect(zh['settings.hint']).toContain('两轮合并工作流')
+  expect(zh['action.approve']).toBe('复制批准命令')
+  expect(zh['action.reject']).toBe('复制拒绝命令')
+  expect(zh['action.discard']).toBe('复制丢弃命令')
+  expect(zh['history.sourceRunId']).toBe('来源运行')
 })

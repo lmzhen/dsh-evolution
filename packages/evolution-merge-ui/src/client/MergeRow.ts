@@ -146,7 +146,7 @@ export function MergeRow(props: { row: MergeRowView; t: Translate; copy: (comman
         ...row.actions.map(action => createElement('button', {
           key: 'copy-' + action.id, type: 'button', 'data-role': 'row-copy', 'data-action': action.id + '-copy',
           title: action.command, disabled: busy, onClick: () => { if (!busy) copy(action.command) },
-        }, t('row.copy') + ' ' + t('action.' + action.id))),
+        }, t('action.' + action.id))),
       ),
     ),
   )

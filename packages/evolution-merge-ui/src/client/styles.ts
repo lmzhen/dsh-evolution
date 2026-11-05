@@ -3,7 +3,8 @@ import { TOKEN_CSS } from '@lmzhen/dsh-evolution-client-kit/tokens'
 export const CSS_TAG_ID = 'evolution-merge-panel'
 
 export const CSS = [
-  ':where(.' + CSS_TAG_ID + ') { ' + TOKEN_CSS + ' }',
+  // The platform modal portals to <body>, outside the panel that owns these vars.
+  ':where(.' + CSS_TAG_ID + ',.evo-merge-modal) { ' + TOKEN_CSS + ' }',
   '.' + CSS_TAG_ID + ' { display:flex; flex-direction:column; gap:var(--evo-space-12); padding:var(--evo-space-16); color:var(--dsw-alias-label-primary); font-size:var(--evo-type-sm); line-height:var(--evo-leading-base); }',
   '.' + CSS_TAG_ID + ' [data-role="hint"] { margin:0; color:var(--dsw-alias-label-tertiary); font-size:var(--evo-type-xs); }',
   '.' + CSS_TAG_ID + ' [data-role="stats"] { display:flex; gap:var(--evo-space-8); flex-wrap:wrap; }',
@@ -48,12 +49,19 @@ export const CSS = [
   '.' + CSS_TAG_ID + ' [data-role="fallback"] { display:flex; gap:var(--evo-space-6); flex-wrap:wrap; }',
   '.' + CSS_TAG_ID + ' [data-role="overlay"] { position:fixed; z-index:60; top:8vh; left:50%; transform:translateX(-50%); width:min(820px, calc(100vw - 64px)); max-height:78vh; overflow:auto; display:flex; flex-direction:column; gap:var(--evo-space-8); padding:var(--evo-space-12); border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); background:var(--dsw-alias-bg-layer-1); box-shadow:0 0 var(--evo-space-8) var(--dsw-alias-border-l2); }',
   '.evo-merge-modal { width:min(820px, calc(100vw - 48px)); max-width:calc(100vw - 48px); max-height:min(78vh, 720px); }',
-  '.evo-merge-modal [data-role="overlay"][data-platform-modal] { position:static; z-index:auto; top:auto; left:auto; transform:none; width:auto; box-sizing:border-box; max-height:none; overflow:auto; padding:var(--evo-space-20); border:0; border-radius:0; background:transparent; box-shadow:none; gap:var(--evo-space-8); }',
+  '.evo-merge-modal [data-role="overlay"][data-platform-modal] { position:static; z-index:auto; top:auto; left:auto; transform:none; width:auto; box-sizing:border-box; max-height:none; overflow:auto; padding:var(--evo-space-20); border:0; border-radius:0; box-shadow:none; background:var(--dsw-alias-bg-overlay); gap:var(--evo-space-8); }',
   '.evo-merge-modal [data-role="overlay-head"] { display:flex; align-items:center; justify-content:space-between; gap:var(--evo-space-8); }',
   '.evo-merge-modal [data-role="overlay-title"] { margin:0; font-size:var(--evo-type-lg); }',
   '.evo-merge-modal [data-role="body-text"] { margin:0; max-height:52vh; overflow:auto; white-space:pre-wrap; }',
-  '.evo-merge-modal [data-role="history-list"] { margin:0; padding-left:var(--evo-space-20); }',
-  '.evo-merge-modal [data-role="history-item"] { padding:var(--evo-space-4) 0; }',
+  '.evo-merge-modal [data-role="history-list"] { display:flex; flex-direction:column; gap:var(--evo-space-8); margin:0; padding:0; list-style:none; max-height:56vh; overflow:auto; }',
+  '.evo-merge-modal [data-role="history-item"] { display:flex; flex-direction:column; gap:var(--evo-space-4); padding:var(--evo-space-10) var(--evo-space-12); border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); border-radius:var(--evo-radius-control); background:var(--dsw-alias-bg-layer-2); }',
+  '.evo-merge-modal [data-role="history-item-head"] { display:flex; flex-wrap:wrap; align-items:center; gap:var(--evo-space-4) var(--evo-space-8); }',
+  '.evo-merge-modal [data-role="history-item-name"] { min-width:0; font-weight:600; overflow-wrap:anywhere; }',
+  '.evo-merge-modal [data-role="history-item-kind"] { flex:none; padding:var(--evo-space-2) var(--evo-space-6); border-radius:var(--evo-radius-pill); background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-secondary); font-size:var(--evo-type-xs); }',
+  '.evo-merge-modal [data-role="history-item-meta"] { display:flex; flex-wrap:wrap; gap:var(--evo-space-4) var(--evo-space-8); color:var(--dsw-alias-label-tertiary); font-size:var(--evo-type-xs); }',
+  '.evo-merge-modal [data-role="history-item-source"], .evo-merge-modal [data-role="history-item-reason"] { margin:0; color:var(--dsw-alias-label-secondary); overflow-wrap:anywhere; }',
+  '.evo-merge-modal [data-role="overlay-close"] { min-width:var(--evo-space-24); min-height:var(--evo-space-24); }',
+  '.' + CSS_TAG_ID + ' [data-role="footer-tools"] { display:flex; flex-wrap:wrap; align-items:center; gap:var(--evo-space-6) var(--evo-space-8); padding-top:var(--evo-space-8); border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2); }',
   '.' + CSS_TAG_ID + ' [data-role="overlay-head"] { display:flex; align-items:center; justify-content:space-between; gap:var(--evo-space-8); }',
   '.' + CSS_TAG_ID + ' [data-role="overlay-title"] { margin:0; font-size:var(--evo-type-lg); }',
   '.' + CSS_TAG_ID + ' [data-role="rows"] { display:flex; flex-direction:column; gap:var(--evo-space-6); }',

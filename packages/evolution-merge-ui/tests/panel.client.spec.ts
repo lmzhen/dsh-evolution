@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, it } from 'vitest'
 import type { MergeBody, MergeHistoryItem, MergeOutcome, MergeRowView, MergeViewPayload, QueuePage } from '../src/client/api.ts'
 import { MergePanel } from '../src/client/Panel.ts'
+import { CSS } from '../src/client/styles.ts'
 import { MergeStore, type MergeSource } from '../src/client/MergeStore.ts'
 import { en, zh } from '../src/client/messages.ts'
 
@@ -69,6 +70,8 @@ it('renders four tabs, settings, run strip, pending id/three sentences and stage
   expect(html).toContain('data-role="row-more"')
   expect((html.match(/data-role="row-more"/g) ?? []).length).toBe(2)
   expect((html.match(/data-role="row-copy"/g) ?? []).length).toBe(8)
+  expect(html).toContain('action.approve')
+  expect(html).toContain('data-role="footer-tools"')
   expect(html).not.toContain('data-action="copy"')
   expect(html).not.toContain('data-action="discard"')
 })
@@ -199,5 +202,12 @@ it('keeps body and history errors inside the overlay', async () => {
   await historyStore.openHistory()
   const historyHtml = renderToStaticMarkup(createElement(MergePanel, { store: historyStore, t: (key: string) => zh[key] ?? key }))
   expect(historyHtml).toContain('data-role="history-item"')
+  expect(historyHtml).toContain('data-role="history-item-name"')
+  expect(historyHtml).toContain('data-role="history-item-version"')
+  expect(historyHtml).toContain('v2')
   expect(historyHtml).toContain('目标已被占用')
+})
+
+it('scopes family tokens to the portal modal root', () => {
+  expect(CSS).toContain(':where(.evolution-merge-panel,.evo-merge-modal)')
 })
