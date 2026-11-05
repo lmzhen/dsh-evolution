@@ -51,12 +51,6 @@ function stageNode(row: MergeRowView, t: Translate): ReactNode {
  */
 export function MergeRow(props: { row: MergeRowView; t: Translate; copy: (command: string) => void; sort: RowSortHandlers; openBody: (name: string, side: 'live' | 'archive', rowId: string | undefined) => void; onDecide: ((rowId: string, verb: 'approve' | 'reject') => void) | undefined; busy: boolean }): ReactNode {
   const { row, t, copy, sort, openBody, onDecide, busy } = props
-  const first = [
-    row.target === undefined ? undefined : t('row.target') + ' ' + row.target,
-    row.failure === undefined ? undefined : t('row.failure') + ' ' + row.failure.code + (row.failure.retryable ? '' : ' · ' + t('row.noRetry')),
-    row.expired === undefined ? undefined : t('row.expired') + ' ' + t('expired.' + row.expired),
-    row.reasonCode === undefined && row.reason === undefined ? undefined : t('row.reason') + ' ' + reasonText(t, row.reasonCode, row.reason ?? ''),
-  ].filter((value): value is string => value !== undefined).join(' · ')
   const details = [
     t('row.id') + ' ' + row.id,
     row.targetActual === undefined ? undefined : t('row.actualTarget') + ' ' + row.targetActual,
@@ -115,7 +109,6 @@ export function MergeRow(props: { row: MergeRowView; t: Translate; copy: (comman
   const decisionDetails = createElement('div', null,
     stageNode(row, t),
     summaryNode(row, t),
-    first === '' ? null : createElement('div', { 'data-role': 'row-facts' }, first),
     createElement('details', { 'data-role': 'row-details' },
       createElement('summary', null, t('row.details')),
       createElement('p', null, details)),

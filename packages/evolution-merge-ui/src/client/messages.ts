@@ -2,7 +2,7 @@ export const NS = 'evolution-merge'
 
 export const zh: Record<string, string> = {
   'entry.label': '技能合并',
-  'title': '技能合并',
+  'title': '合并建议',
   'task.pending': '条合并建议待处理',
   'start.scan': '复制扫描命令',
   'start.pair': '复制配对命令模板',
@@ -214,7 +214,7 @@ Object.assign(zh, {
 
 export const en: Record<string, string> = {
   'entry.label': 'Skill merge',
-  'title': 'Skill merge',
+  'title': 'Merge suggestions',
   'task.pending': 'merge suggestions need attention',
   'start.scan': 'Copy scan command',
   'start.pair': 'Copy pair command template',
