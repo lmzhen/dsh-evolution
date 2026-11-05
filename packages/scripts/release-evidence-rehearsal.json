@@ -1,14 +1,14 @@
 {
-  "note": "W10/W11 rehearsal readings for v0.36.1, remeasured 2026-11-05T15:20Z on the isolated 0.2.1-rc.3 g34 profile from the 0.36.0 API surface; S4 is the family-side dispose/re-apply contract test (2/2).",
-  "familyVersion": "0.36.1",
+  "note": "W10/W11 rehearsal readings for v0.36.2, remeasured 2026-11-05T15:55Z on the isolated 0.2.1-rc.3 g34 profile; UI-only cascade fix, API readings unchanged; S4 family-side contract 2/2.",
+  "familyVersion": "0.36.2",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.36.1",
-      "startedAt": "2026-11-05T15:20:00.000Z",
+      "familyVersion": "0.36.2",
+      "startedAt": "2026-11-05T15:55:00.000Z",
       "readings": {
         "skillHistoryRows": 8,
         "skillHistoryBytes": 5205,
@@ -23,8 +23,8 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.36.1",
-      "startedAt": "2026-11-05T15:20:00.000Z",
+      "familyVersion": "0.36.2",
+      "startedAt": "2026-11-05T15:55:00.000Z",
       "readings": {
         "ownerDiagnostics": 200,
         "anonymous": 401,
@@ -37,11 +37,11 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.36.1",
-      "startedAt": "2026-11-05T15:20:00.000Z",
+      "familyVersion": "0.36.2",
+      "startedAt": "2026-11-05T15:55:00.000Z",
       "readings": {
         "semverVersion": "0.2.1-rc.3",
-        "familyVersion": "0.36.1",
+        "familyVersion": "0.36.2",
         "diagnosticsSchemaVersion": 2,
         "gridRows": 8,
         "expectedColumnMatches": true,
@@ -53,8 +53,8 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.36.1",
-      "startedAt": "2026-11-05T15:20:00.000Z",
+      "familyVersion": "0.36.2",
+      "startedAt": "2026-11-05T15:55:00.000Z",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
