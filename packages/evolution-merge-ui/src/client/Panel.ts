@@ -225,6 +225,17 @@ export function MergePanel(face: MergeFace): ReactNode {
     saveOrder(pinRow(visibleRows.map(row => row.id), menu.id, edge))
     setMenu(undefined)
   }
+  useEffect(() => {
+    if (menu === undefined || PLATFORM_MENU !== undefined) return
+    const onKey = (event: globalThis.KeyboardEvent): void => { if (event.key === 'Escape') setMenu(undefined) }
+    const onPointer = (event: globalThis.PointerEvent): void => {
+      const target = event.target
+      if (!(target instanceof Element) || target.closest('[data-role="sort-menu"]') === null) setMenu(undefined)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('pointerdown', onPointer, true)
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('pointerdown', onPointer, true) }
+  }, [menu])
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, current: (typeof QUEUES)[number]): void => {
     const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
     const isEdge = event.key === 'Home' || event.key === 'End'
@@ -254,8 +265,8 @@ export function MergePanel(face: MergeFace): ReactNode {
   const overlay = snapshot.overlay
   const menuStyle = menu === undefined ? undefined : {
     position: 'fixed', zIndex: 70, minWidth: '160px', maxWidth: 'min(320px, calc(100vw - 16px))',
-    left: String(Math.min(menu.x, Math.max(0, (globalThis.innerWidth || 1440) - 180))) + 'px',
-    top: String(Math.min(menu.y, Math.max(0, (globalThis.innerHeight || 800) - 110))) + 'px',
+    left: String(Math.min(menu.x, Math.max(0, (globalThis.innerWidth || 1440) - 320))) + 'px',
+    top: String(Math.min(menu.y, Math.max(0, (globalThis.innerHeight || 800) - 220))) + 'px',
   }
   const menuNode = menu === undefined ? null : PLATFORM_MENU === undefined
     ? createElement('div', { 'data-role': 'sort-menu', role: 'menu', 'aria-label': t('sort.menu'), style: menuStyle },
