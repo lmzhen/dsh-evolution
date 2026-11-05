@@ -93,6 +93,20 @@ describe('diagnostics card', () => {
     expect(screen.getByText('可以改用命令：/evolution doctor')).toBeTruthy()
   })
 
+  it('a failed refresh keeps the last ready view instead of replacing it with an error page', async () => {
+    const api = {
+      view: vi.fn()
+        .mockResolvedValueOnce(ok(view))
+        .mockResolvedValueOnce({ ok: false as const, failure: { kind: 'unmounted' as const, status: 404 } }),
+    }
+    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    await waitFor(() => { expect(screen.getByText('运行状态')).toBeTruthy() })
+    await act(async () => { fireEvent.click(screen.getByText('刷新')) })
+    await waitFor(() => { expect(screen.getByText('该功能没有挂载。')).toBeTruthy() })
+    expect(screen.getByText('运行状态')).toBeTruthy()
+    expect(screen.getAllByText('运行登记').length).toBeGreaterThan(0)
+  })
+
   it('reads once on mount and only again on an explicit refresh', async () => {
     const api = { view: vi.fn(async () => ok(view)) }
     renderCard({ t, api, fallback: FALLBACKS.diagnostics })

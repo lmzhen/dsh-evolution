@@ -63,6 +63,7 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => t(key as MessageKey, values)
   const [state, setState] = useState<DiagnosticsState>({ phase: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshFailure, setRefreshFailure] = useState<import('@lmzhen/dsh-evolution-client-kit/generated/route-client').RouteFailure | undefined>(undefined)
   // Collapsible like every other card in the section (same head geometry, same chevron); it starts
   // closed so a diagnostic read never dominates the section before the operator asks for it.
   const [open, setOpen] = useState(false)
@@ -72,11 +73,13 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   const read = (keepView: boolean): void => {
     const current = ticket.current + 1
     ticket.current = current
-    if (keepView) setRefreshing(true)
+    if (keepView) { setRefreshing(true); setRefreshFailure(undefined) }
     else setState({ phase: 'loading' })
     void api.view().then((answer) => {
       if (ticket.current !== current) return
-      setState(answer.ok ? { phase: 'ready', view: answer.data } : { phase: 'failed', failure: answer.failure })
+      if (answer.ok) { setState({ phase: 'ready', view: answer.data }); setRefreshFailure(undefined) }
+      else if (keepView) setRefreshFailure(answer.failure)
+      else setState({ phase: 'failed', failure: answer.failure })
     }).finally(() => { if (ticket.current === current) setRefreshing(false) })
   }
   useEffect(() => {
@@ -126,6 +129,7 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
     const view: DiagnosticsView = state.view
     return createElement('div', {},
       createElement('p', { className: 'evolution-param-note' }, t('diagSubtitle')),
+      refreshFailure === undefined ? null : FailureBlock({ failure: refreshFailure, t: translate, fallback: props.fallback }),
       createElement('div', { className: 'evolution-param-actions' },
         createElement('button', { type: 'button', className: 'evolution-param-button', onClick: refresh, disabled: refreshing, 'data-action': 'diag-refresh' }, t(refreshing ? 'diagRefreshing' : 'diagRefresh')),
       ),
