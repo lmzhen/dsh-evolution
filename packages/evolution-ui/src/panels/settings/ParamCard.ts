@@ -383,15 +383,17 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   const textOf = (field: ClientParamField): string => draft[field.id] ?? format(value[keyOf(field)])
   const dirty = fields.filter(field => draft[field.id] !== undefined && draft[field.id] !== format(value[keyOf(field)]))
   // U-4 constraint-first: an unacceptable value blocks the save instead of being staged and refused.
-  const peerTextOf = (field: ClientParamField): string | undefined => {
-    if (field.atLeast === '') return undefined
-    const related = fields.find(candidate => candidate.id === field.atLeast)
-    return related === undefined ? undefined : textOf(related)
-  }
   const invalidText = (field: ClientParamField): string | null => {
-    const reason = invalidReason(field, textOf(field), peerTextOf(field))
+    const related = field.atLeast === '' ? undefined : fields.find(candidate => candidate.id === field.atLeast)
+    const peer = related === undefined ? undefined : textOf(related)
+    const reason = invalidReason(field, textOf(field), peer)
     if (reason === null) return null
-    return reason === 'invalidAtLeast' ? t(reason, { n: peerTextOf(field) ?? '' }) : t(reason)
+    if (reason !== 'invalidAtLeast') return t(reason)
+    const relatedLabel = related === undefined
+      ? t('invalidAtLeastPeer')
+      : (labelOf(related, lang) === '' ? related.id : labelOf(related, lang))
+    const relatedUnit = related === undefined ? '' : (lang === 'en' ? (related.unitEn ?? related.unit) : related.unit)
+    return t(reason, { field: relatedLabel, n: peer ?? '', unit: relatedUnit === '' ? '' : ' ' + relatedUnit })
   }
   const blocked = fields.some(field => invalidText(field) !== null)
   const change = (id: string, next: string): void => { setDraft({ ...draft, [id]: next }) }
@@ -481,9 +483,12 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
               onClear: reset,
             }),
           ]),
-        error === '' ? null : createElement('p', { className: 'evolution-param-error', role: 'status' }, error),
-        note === '' ? null : createElement('p', { className: 'evolution-param-note', role: 'status' }, note),
         fields.length === 0 ? null : createElement('div', { className: 'evolution-param-footer' },
+          error === '' && note === '' ? null : createElement('div', { className: 'evolution-param-feedback' },
+            error === '' ? null : createElement('p', { className: 'evolution-param-error', role: 'status' }, error),
+            note === '' ? null : createElement('p', { className: 'evolution-param-note', role: 'status' }, note),
+          ),
+          createElement('div', { className: 'evolution-param-footer-actions' },
           createElement('button', {
             type: 'button',
             className: 'evolution-param-button',
@@ -497,6 +502,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
             disabled: locked || blocked || dirty.length === 0,
             onClick: save,
           }, busy ? t('saving') : t('apply')),
+          ),
         ),
       )
       : null,

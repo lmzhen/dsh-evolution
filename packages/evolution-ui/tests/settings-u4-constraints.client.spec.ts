@@ -48,6 +48,12 @@ describe('U-4: what the card accepts, and what it refuses to stage', () => {
     expect(invalidReason(field, '45', undefined)).toBe(null)
   })
 
+  it('names the related field and its unit in the cross-field refusal', () => {
+    const text = t('invalidAtLeast', { field: '多久没用算过时', n: '30', unit: ' 天' })
+    expect(text).toContain('多久没用算过时')
+    expect(text).toContain('30 天')
+  })
+
   it('names the refusal for a value outside the registry, and accepts the listed ones', () => {
     expect(invalidReason(SELECT, SELECT.values[0] ?? 'x')).toBeNull()
     expect(invalidReason(SELECT, 'legacy-mode')).toBe('invalidSelect')
