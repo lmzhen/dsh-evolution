@@ -77,6 +77,11 @@ export const CSS = [
   // A group heading is a boundary, so it takes more air above it than two rows take between them
   // (16 against the row gap of 8+8): the ink gap alone made the two look alike (W3).
   '.evo-hist-group{margin:var(--evo-space-16) 0 var(--evo-space-4);font-size:var(--evo-type-sm);font-weight:600;color:var(--dsw-alias-label-secondary)}',
+  '.evo-hist-reader{max-width:calc(var(--evo-measure-read) * 1.5);margin-top:var(--evo-space-8);padding:var(--evo-space-12);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:var(--dsw-alias-bg-layer-1)}',
+  '.evo-hist-current{padding-bottom:var(--evo-space-6)}',
+  '.evo-hist-current .evo-hist-group{margin-top:0}',
+  '.evo-hist-current .evo-hist-row{max-width:none}',
+  '.evo-hist-reader .evo-hist-group{margin-top:var(--evo-space-12)}',
   // A row is capped so its controls stay within reach of the text they act on: on a wide window the
   // tools used to sit ~700px away from the sentence they belonged to (W4). The cap is the reading
   // measure times one and a half, so it follows the scale rather than a window width.

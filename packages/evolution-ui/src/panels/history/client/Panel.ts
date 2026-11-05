@@ -12,6 +12,7 @@
 import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { emptyState, groupHeading, notice, panelHead, searchField, skillLine, versionRow, type Copy, type OpenKind } from './chrome.ts'
 import { DiffBody, PreviewBody, type BodyState, type DiffState } from './document.ts'
+import { historyViewModel } from './history-presentation.ts'
 import { SkillHistoryRefusal, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
@@ -238,6 +239,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   [skills, needle])
 
   const loaded = payload !== undefined
+  const model = payload === undefined ? undefined : historyViewModel(payload)
   /** Drop the pending confirmation: the control that opened it must not be the only way out. */
   const cancelRestore = (): void => { setPending(undefined) }
 
@@ -293,13 +295,22 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
           ? null
           // T5-09: three states, three sentences — a failed read must not render as "still reading".
           : emptyState(versionsFailed === undefined ? face.t('loading') : `${face.t('empty.versions.failed')} — ${versionsFailed}`),
-      loaded
-        ? createElement('div', null,
-          group(face.t('group.content'), payload.content, undefined),
-          group(face.t('group.support'), payload.support, face.t('group.support.note')),
-          payload.content.length === 0 && payload.support.length === 0
-            ? createElement('p', { className: 'evo-hist-hint' }, face.t('empty.versions'))
-            : null)
+      loaded && model !== undefined
+        ? createElement('div', { className: 'evo-hist-reader' },
+          model.current.length === 0 ? null : createElement('section', { key: 'current', className: 'evo-hist-current' },
+            ...groupHeading(face.t('group.current'), undefined),
+            ...model.current.map(row => versionRow({
+              copy: face, row,
+              confirming: pending === row.v,
+              open: expanded !== undefined && expanded.v === row.v ? expanded.kind : undefined,
+              expanded: expandedOf(row),
+              onRestore: () => { restore(row.v, row.unitId) },
+              onCancel: cancelRestore,
+              onToggle: (kind: OpenKind) => { toggle(row.v, kind) },
+            }))),
+          group(face.t('group.history'), model.older, undefined),
+          model.support.length === 0 ? null : group(face.t('group.support'), model.support, face.t('group.support.note')),
+          model.hasAny ? null : createElement('p', { className: 'evo-hist-hint' }, face.t('empty.versions')))
         : null))
 }
 

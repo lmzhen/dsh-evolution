@@ -48,7 +48,7 @@ const row = (v: number, undoable: boolean): VersionRow => {
   }
 }
 
-const payload = (): VersionsPayload => ({ content: [row(1, true), row(2, false)], support: [], liveHash: 'h2' })
+const payload = (): VersionsPayload => ({ content: [row(1, false), row(2, true)], support: [], liveHash: 'h1' })
 
 /** The face as the slot renderer hands it over: keys as words, so assertions name the exact copy. */
 function makeFace(overrides: Partial<PanelFace> = {}): PanelFace {
