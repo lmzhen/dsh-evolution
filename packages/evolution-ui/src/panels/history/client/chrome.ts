@@ -128,7 +128,7 @@ export function versionRow(props: VersionRowProps): ReactNode {
       key: 'undo',
       tone: confirming ? 'primary' : 'quiet',
       onClick: onRestore,
-      children: confirming ? copy.t('undo.confirm') : copy.t('undo'),
+      children: confirming ? copy.t(row.unitId === undefined ? 'undo.confirm' : 'undo.confirmUnit') : copy.t('undo'),
     }))
   }
   if (row.undoable === true || row.charsDelta !== undefined) {
