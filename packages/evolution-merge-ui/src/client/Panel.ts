@@ -5,7 +5,7 @@ import { platformModal } from './platform-modal.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeRunView, type MergeViewPayload } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
-import type { SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
+import { formatLocalDateTime, type SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
 import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, rowOrderKey, type RowOrderEdge } from './sorting.ts'
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 
@@ -276,7 +276,7 @@ function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Tra
       ? overlay.items === undefined || overlay.items.length === 0
         ? createElement('p', { 'data-role': 'history-empty' }, t('history.empty'))
         : createElement('ul', { 'data-role': 'history-list' }, overlay.items.map(item => createElement('li', { key: item.name + ':' + item.archivedAt, 'data-role': 'history-item' },
-            item.name + ' · ' + (() => { const kind = t('history.kind.' + item.kind); const reason = reasonText(t, item.reasonCode, item.reason); return kind === reason ? kind : kind + ' · ' + reason })() + ' · v' + String(item.lastVersion) + ' · ' + (item.archivedAt === null ? t('history.archivedAtUnknown') : t('history.archivedAt', { date: new Date(item.archivedAt).toLocaleString() })),
+            item.name + ' · ' + (() => { const kind = t('history.kind.' + item.kind); const reason = reasonText(t, item.reasonCode, item.reason); return kind === reason ? kind : kind + ' · ' + reason })() + ' · v' + String(item.lastVersion) + ' · ' + (item.archivedAt === null ? t('history.archivedAtUnknown') : t('history.archivedAt', { date: formatLocalDateTime(item.archivedAt) ?? t('history.archivedAtUnknown') })),
           )))
       : null,
   )

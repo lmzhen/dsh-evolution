@@ -12,6 +12,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, type ReactNode } from 'react'
+import { formatLocalDateTime } from '@lmzhen/dsh-evolution-client-kit'
 import { button, chip, note } from './atoms.ts'
 import type { RowCell, SkillRow, VersionRow } from './api.ts'
 
@@ -26,12 +27,7 @@ export type OpenKind = 'diff' | 'preview'
 
 /** The local time an ISO timestamp names, as the operator's own clock shows it. */
 export function localTime(at: string): string {
-  const parsed = Date.parse(at)
-  if (Number.isNaN(parsed)) return at
-  const date = new Date(parsed)
-  const pad = (value: number): string => String(value).padStart(2, '0')
-  return String(date.getFullYear()) + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate())
-    + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes())
+  return formatLocalDateTime(at, { seconds: false }) ?? at
 }
 
 /** The text one cell shows, resolved through the seat. */
