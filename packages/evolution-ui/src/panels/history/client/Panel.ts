@@ -286,7 +286,8 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
       })))
   }
 
-  return createElement('div', { className: 'evo-hist-root' },
+  return createElement('div', { className: 'evo-hist-frame' },
+    createElement('div', { className: 'evo-hist-root' },
     createElement('aside', { className: 'evo-hist-aside' },
       searchField(face, query, setQuery),
       createElement('div', { className: 'evo-hist-list' },
@@ -326,7 +327,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
           group(face.t('group.history'), model.older, undefined),
           model.support.length === 0 ? null : group(face.t('group.support'), model.support, face.t('group.support.note')),
           model.hasAny ? null : createElement('p', { className: 'evo-hist-hint' }, face.t('empty.versions')))
-        : null))
+        : null)))
 }
 
 /**

@@ -35,7 +35,9 @@ export const CSS = [
   // The scale, declared on the panel root so it never leaks into the host shell.
   tokenVars('.evo-hist-root'),
   // ─── the tool face: the list, its rows, and the controls that act on a version ───
-  '.evo-hist-root{display:flex;height:100%;min-height:0;min-width:0;font-size:var(--evo-type-sm);color:var(--dsw-alias-label-primary)}',
+  '.evo-hist-frame{box-sizing:border-box;display:flex;flex-direction:column;width:100%;height:100%;min-height:0;min-width:0;container-type:inline-size}',
+  '.evo-hist-frame,.evo-hist-root,.evo-hist-aside,.evo-hist-main{box-sizing:border-box}',
+  '.evo-hist-root{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;font-size:var(--evo-type-sm);color:var(--dsw-alias-label-primary)}',
   '.evo-hist-aside{display:flex;flex-direction:column;flex:0 0 var(--evo-cap-aside);width:var(--evo-cap-aside);min-height:0;border-right:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
   '.evo-hist-search{padding:var(--evo-space-12) var(--evo-space-12) var(--evo-space-4)}',
   '.evo-hist-search input{width:100%;box-sizing:border-box;padding:var(--evo-space-6) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit}',
@@ -65,7 +67,7 @@ export const CSS = [
   '.evo-hist-tone-primary{color:inherit}',
   '.evo-hist-tone-secondary{color:var(--dsw-alias-label-secondary)}',
   '.evo-hist-tone-tertiary{color:var(--dsw-alias-label-tertiary)}',
-  '.evo-hist-main{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:var(--evo-space-12) var(--evo-space-12)}',
+  '.evo-hist-main{flex:1 1 32ch;min-width:min(100%,32ch);min-height:0;overflow-y:auto;padding:var(--evo-space-12) var(--evo-space-12)}',
   '.evo-hist-head{display:flex;align-items:center;gap:var(--evo-space-10);margin:0 0 var(--evo-space-4)}',
   '.evo-hist-title{flex:1 1 auto;margin:0;font-size:var(--evo-type-lg);font-weight:600}',
   '.evo-hist-hint{margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',
@@ -85,13 +87,16 @@ export const CSS = [
   // A row is capped so its controls stay within reach of the text they act on: on a wide window the
   // tools used to sit ~700px away from the sentence they belonged to (W4). The cap is the reading
   // measure times one and a half, so it follows the scale rather than a window width.
-  '.evo-hist-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"body actions" "expanded expanded";align-items:start;gap:var(--evo-space-4) var(--evo-space-8);padding:var(--evo-space-8) 0;border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);max-width:calc(var(--evo-measure-read) * 1.5);color:var(--dsw-alias-label-primary)}',
+  '.evo-hist-row{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--evo-space-4) var(--evo-space-8);padding:var(--evo-space-8) 0;border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);max-width:calc(var(--evo-measure-read) * 1.5);color:var(--dsw-alias-label-primary)}',
   '.evo-hist-row:first-of-type{border-top:0}',
-  '.evo-hist-row-body{grid-area:body;min-width:0}',
-  '.evo-hist-row-title{display:flex;align-items:baseline;gap:var(--evo-space-8);min-width:0}',
+  '.evo-hist-row-body{flex:1 1 32ch;min-width:min(100%,32ch);max-width:100%}',
+  '.evo-hist-row-title{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--evo-space-4) var(--evo-space-8);min-width:0}',
   '.evo-hist-row-summary{margin-top:var(--evo-space-2);line-height:var(--evo-leading-base)}',
-  '.evo-hist-actions{grid-area:actions;display:flex;align-items:center;gap:var(--evo-space-6)}',
-  '.evo-hist-row-expanded{grid-area:expanded;min-width:0}',
+  '.evo-hist-row-title .evo-hist-slot-lead,.evo-hist-row-summary .evo-hist-slot-lead{min-width:0;white-space:normal;overflow-wrap:anywhere}',
+  '.evo-hist-row-title .evo-hist-slot-meta,.evo-hist-row-summary .evo-hist-slot-meta{min-width:0;white-space:normal;overflow-wrap:anywhere}',
+  '.evo-hist-row-summary .evo-hist-cell-line{flex-wrap:wrap}',
+  '.evo-hist-actions{flex:0 1 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:var(--evo-space-6);min-width:0;max-width:100%;margin-inline-start:auto}',
+  '.evo-hist-row-expanded{flex:0 0 100%;min-width:0;max-width:100%}',
   '.evo-hist-more{position:relative;display:inline-flex;align-items:center}',
   '.evo-hist-more>summary{list-style:none;cursor:pointer;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);padding:var(--evo-space-2) var(--evo-space-4)}',
   '.evo-hist-more>summary::-webkit-details-marker{display:none}',
@@ -128,6 +133,7 @@ export const CSS = [
   '.evo-doc-tag{position:absolute;left:var(--evo-space-8);top:var(--evo-space-8);color:var(--dsw-alias-label-tertiary)}',
   '.evo-doc-line-add{color:var(--evo-tone-success)}',
   '.evo-doc-line-del{color:var(--evo-tone-danger)}',
-  '@media (max-width:1100px){.evo-hist-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"body" "actions" "expanded"}.evo-hist-actions{flex-wrap:wrap;justify-content:flex-start}}',
-  '@media (max-width:900px){.evo-hist-root{flex-direction:column}.evo-hist-aside{flex:0 0 auto;width:100%;max-height:42%;border-right:0;border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}.evo-hist-row{max-width:none}}',
+  '@media (max-width:1100px){.evo-hist-actions{justify-content:flex-start;margin-inline-start:0}}',
+  '@container (max-width:760px){.evo-hist-root{flex-direction:column}.evo-hist-aside{flex:0 0 auto;width:100%;max-height:42%;border-right:0;border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}.evo-hist-main{flex:1 1 0;width:100%;min-height:0;overflow-y:auto}.evo-hist-row{max-width:none}}',
+  '@media (max-width:900px){.evo-hist-root{flex-direction:column}.evo-hist-aside{flex:0 0 auto;width:100%;max-height:42%;border-right:0;border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}.evo-hist-main{flex:1 1 0;min-height:0;overflow-y:auto}.evo-hist-row{max-width:none}}',
 ].join('\n')

@@ -114,6 +114,17 @@ describe('the tool face says what it is (G3)', () => {
     expect(rule('.evo-hist-row')).toContain('max-width:calc(var(--evo-measure-read) * 1.5)')
   })
 
+  it('wraps by content width instead of waiting for a viewport breakpoint', () => {
+    expect(rule('.evo-hist-row')).toContain('display:flex;flex-wrap:wrap')
+    expect(rule('.evo-hist-row')).not.toContain('display:grid')
+    expect(rule('.evo-hist-row-body')).toContain('flex:1 1 32ch')
+    expect(rule('.evo-hist-actions')).toContain('flex-wrap:wrap')
+    expect(rule('.evo-hist-row-expanded')).toContain('flex:0 0 100%')
+    expect(rule('.evo-hist-row-title')).toContain('flex-wrap:wrap')
+    expect(rule('.evo-hist-frame')).toContain('container-type:inline-size')
+    expect(CSS).toContain('.evo-hist-frame,.evo-hist-root,.evo-hist-aside,.evo-hist-main{box-sizing:border-box}')
+  })
+
   it('defines the focus ring once and never as a literal (W8)', () => {
     const rings = CSS.split('\n').filter(line => line.includes('outline:var(--evo-focus-ring)'))
     expect(rings.length).toBeGreaterThanOrEqual(3)
