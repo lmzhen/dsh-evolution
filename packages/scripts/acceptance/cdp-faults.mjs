@@ -70,24 +70,28 @@ export async function denyClipboard(port) {
   } finally { cdp.close() }
 }
 
-export async function failNextDescribe(port, match = 'settings/describe', timeoutMs = 120_000) {
+export async function failNextDescribe(port, match = 'settings/describe', timeoutMs = 120_000, count = 1) {
   const cdp = await connect(port)
   let timer
   try {
     await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*' + match + '*', requestStage: 'Request' }] })
-    const paused = await new Promise((resolve, reject) => {
-      timer = setTimeout(() => reject(new Error('no ' + match + ' request within ' + timeoutMs + 'ms')), timeoutMs)
-      cdp.on('Fetch.requestPaused', resolve)
-    })
-    clearTimeout(timer)
-    await cdp.send('Fetch.fulfillRequest', {
-      requestId: paused.requestId,
-      responseCode: 500,
-      responseHeaders: [{ name: 'content-type', value: 'application/json' }],
-      body: Buffer.from(JSON.stringify({ ok: false, error: { code: 'E-G0-STALE', message: 'G0 stale readback fixture' } })).toString('base64'),
-    })
+    const urls = []
+    for (let index = 0; index < count; index += 1) {
+      const paused = await new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('no ' + match + ' request within ' + timeoutMs + 'ms')), timeoutMs)
+        cdp.on('Fetch.requestPaused', resolve)
+      })
+      clearTimeout(timer)
+      urls.push(paused.request?.url)
+      await cdp.send('Fetch.fulfillRequest', {
+        requestId: paused.requestId,
+        responseCode: 500,
+        responseHeaders: [{ name: 'content-type', value: 'application/json' }],
+        body: Buffer.from(JSON.stringify({ ok: false, error: { code: 'E-G0-STALE', message: 'G0 stale readback fixture' } })).toString('base64'),
+      })
+    }
     await cdp.send('Fetch.disable')
-    return { fired: true, url: paused.request?.url }
+    return { fired: true, count: urls.length, urls }
   } finally {
     clearTimeout(timer)
     cdp.close()
@@ -101,7 +105,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
   if (mode === 'clipboard') {
     console.log(JSON.stringify(await denyClipboard(port)))
   } else if (mode === 'stale') {
-    console.log(JSON.stringify(await failNextDescribe(port, arg('match', 'settings/describe'), Number(arg('timeout', '120000')))))
+    console.log(JSON.stringify(await failNextDescribe(port, arg('match', 'settings/describe'), Number(arg('timeout', '120000')), Number(arg('count', '1')))))
   } else {
     console.error('mode must be clipboard or stale')
     process.exit(2)
