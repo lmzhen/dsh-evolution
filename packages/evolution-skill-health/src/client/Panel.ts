@@ -223,6 +223,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
   const [lastReadAt, setLastReadAt] = useState<number | undefined>(face.readAt)
   const [scan, setScan] = useState(face.scan)
   const [viewMode, setViewMode] = useState<'skills' | 'rules'>('skills')
+  const [verdictFilter, setVerdictFilter] = useState<HealthRow['verdict'] | undefined>(undefined)
   // The parent rebuilds this face object on every render; depending on the object would
   // re-run the effect, keep `loading` true forever and flash the loading note beside loaded rows.
   const firstLoad = useRef(false)
@@ -264,10 +265,16 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
   // Four verdict cards, not one sentence: the number is the fact a reader scans for, and the tone
   // bar carries the severity. A verdict with no rows still shows its zero — silence would read as
   // 'not checked' rather than 'nothing found'.
+  const shown: HealthFace = verdictFilter === undefined ? view : { ...view, rows: view.rows.filter(row => row.verdict === verdictFilter) }
   const stats = createElement('div', { 'data-role': 'stats' },
-    KINDS.map(kind => createElement('div', { key: kind, 'data-role': 'stat', 'data-tone': TONE[kind] },
-      createElement('div', { 'data-role': 'stat-value' }, String(counts.get(kind) ?? 0)),
-      createElement('div', { 'data-role': 'stat-label' }, t('verdict.' + kind)),
+    KINDS.map(kind => createElement('button', {
+      key: kind, type: 'button', 'data-role': 'stat', 'data-tone': TONE[kind],
+      'aria-pressed': verdictFilter === kind ? 'true' : 'false',
+      'aria-label': t('verdict.' + kind),
+      onClick: () => { setVerdictFilter(previous => previous === kind ? undefined : kind) },
+    },
+      createElement('span', { 'data-role': 'stat-value' }, String(counts.get(kind) ?? 0)),
+      createElement('span', { 'data-role': 'stat-label' }, t('verdict.' + kind)),
     )),
   )
   return createElement('section', { className: CSS_TAG_ID },
@@ -338,8 +345,8 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
         }, item.label)))
     })(),
     viewMode === 'skills'
-      ? createElement('div', { id: 'evo-health-skills', role: 'tabpanel' }, skillQueue(view, t))
+      ? createElement('div', { id: 'evo-health-skills', role: 'tabpanel' }, skillQueue(shown, t))
       : createElement('div', { id: 'evo-health-rules', role: 'tabpanel' },
-        createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')), ruleTable(view, t)),
+        createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')), ruleTable(shown, t)),
   )
 }

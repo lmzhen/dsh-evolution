@@ -55,8 +55,9 @@ describe('diagnostics card', () => {
     expect(screen.getByText('正在读取…')).toBeTruthy()
     await act(async () => { resolve?.(ok(view)) })
     await waitFor(() => { expect(screen.getByText('运行状态')).toBeTruthy() })
-    // The card leads with the plain-language verdict.
+    // The card leads with the plain-language verdict and the top row when collapsed.
     expect(screen.getByText('1 项需要注意')).toBeTruthy()
+    expect(document.querySelector('[data-role="diag-focus"]')?.textContent).toBe('运行登记')
     // Runtime rows: frozen status words, detail lines and a warn row's remedy.
     expect(screen.getByText('注意')).toBeTruthy()
     expect(screen.getByText('orphaned=1')).toBeTruthy()

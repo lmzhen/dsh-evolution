@@ -86,6 +86,9 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   }, [])
   const refresh = (): void => { read(true) }
   const summary = state.phase === 'ready' ? summaryOf(state.view.runtime) : undefined
+  const focusRow = summary === undefined || summary.status === 'ok' || state.phase !== 'ready'
+    ? undefined
+    : state.view.runtime.find(row => row.status === summary.status)
   const header = createElement('button', {
     type: 'button',
     className: 'evolution-param-head',
@@ -97,6 +100,7 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
     className: 'evo-diag-badge',
     'data-status': summary.status,
   }, t(SUMMARY_KEYS[summary.status], summary.count === 0 ? undefined : { n: summary.count })),
+  focusRow === undefined ? null : createElement('span', { 'data-role': 'diag-focus' }, focusRow.label),
   createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼'),
   )
   const runtime = (view: DiagnosticsView): ReactNode => view.runtime.length === 0 ? null : createElement('div', {},
