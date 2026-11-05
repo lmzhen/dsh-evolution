@@ -15,7 +15,10 @@ export interface RowSortHandlers {
 }
 
 function reasonText(t: Translate, reasonCode: string | undefined, fallback: string): string {
-  return reasonCode === undefined ? fallback : t('history.reason.' + reasonCode)
+  if (reasonCode === undefined) return fallback
+  const key = 'history.reason.' + reasonCode
+  const text = t(key)
+  return text === key ? fallback : text
 }
 
 function summaryNode(row: MergeRowView, t: Translate): ReactNode {
