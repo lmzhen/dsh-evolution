@@ -108,7 +108,10 @@ export const WORKBENCH_CSS = [
   tokenVars('.evo-workbench'),
   // Skins make the base/layer tokens translucent. The platform's overlay token stays readable over
   // a photograph; use it for the family content surface without changing the shell.
-  '.evolution-page-surface.evo-workbench{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;background:var(--dsw-alias-bg-overlay)}',
+  // Skin tokens are alpha. Repeat the same base token into the page layer (never overlay) so the
+  // surface stays readable without introducing a literal colour; higher specificity beats the
+  // platform's later .evolution-page-surface rule.
+  '.evolution-page-surface.evo-workbench{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;background-color:var(--dsw-alias-bg-base);background-image:linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base)),linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base)),linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base)),linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base)),linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base))}',
   '.evo-workbench-head{display:flex;align-items:center;justify-content:space-between;gap:var(--evo-space-16);padding:var(--evo-space-12) var(--evo-space-16);border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
   '.evo-workbench-tabs{display:flex;gap:var(--evo-space-4)}',
   '.evo-workbench-tabs button{padding:var(--evo-space-4) var(--evo-space-8);border:0;border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:var(--evo-type-sm);cursor:pointer}',

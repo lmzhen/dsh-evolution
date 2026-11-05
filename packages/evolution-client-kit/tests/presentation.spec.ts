@@ -52,6 +52,12 @@ it('exposes filter state and a single empty-state primary', () => {
   expect(roles(empty, 'empty-secondary')).toHaveLength(1)
 })
 
+it('adds compact/centered empty-state markers without changing the default', () => {
+  expect(element(EmptyState({ title: '空' })).props['data-variant']).toBeUndefined()
+  expect(element(EmptyState({ title: '空', variant: 'compact' })).props['data-variant']).toBe('compact')
+  expect(element(EmptyState({ title: '空', variant: 'centered' })).props['data-variant']).toBe('centered')
+})
+
 it('uses native details for normal items and exposes status tone', () => {
   const group = element(DisclosureGroup({ summary: '其他 6 项正常', count: 6, children: '检查项' }))
   expect(group.type).toBe('details')
