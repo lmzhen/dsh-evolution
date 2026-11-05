@@ -37,7 +37,7 @@ export const CSS = [
   '.evo-merge-modal [data-role="body-a"],.evo-merge-modal [data-role="body-b"]{min-width:0}',
   '.evo-merge-modal [data-role="body-a"] pre,.evo-merge-modal [data-role="body-b"] pre{max-height:min(52vh,560px);overflow:auto;white-space:pre-wrap}',
   '@media (max-width:900px){.evo-merge-modal [data-role="pair-grid"]{grid-template-columns:minmax(0,1fr)}}',
-  '.' + CSS_TAG_ID + ' .merge-decision [data-role="decision-primary"] { background:var(--dsw-alias-button-primary-fill); border-color:transparent; color:var(--dsw-alias-label-primary-foreground); }',
+  '.' + CSS_TAG_ID + ' .merge-decision [data-role="decision-primary"] { background:var(--dsw-alias-label-primary); border-color:transparent; color:var(--dsw-alias-label-primary-foreground); }',
   '.' + CSS_TAG_ID + ' .merge-decision [data-role="decision-primary"]:disabled, .' + CSS_TAG_ID + ' .merge-decision [data-role="decision-secondary"]:disabled, .' + CSS_TAG_ID + ' .merge-decision [data-role="view-both"]:disabled { color:var(--dsw-alias-label-dimmed); cursor:default; }',
   '.' + CSS_TAG_ID + ' .merge-decision [data-role="decision-details"] { display:flex; flex-direction:column; gap:var(--evo-space-4); }',
   '.' + CSS_TAG_ID + ' [data-role="row-actions"] { display:flex; align-items:center; justify-content:flex-end; gap:var(--evo-space-8); }',
