@@ -91,6 +91,11 @@ export const CSS = [
   '.evo-hist-row-title{display:flex;align-items:baseline;gap:var(--evo-space-8);min-width:0}',
   '.evo-hist-row-summary{margin-top:var(--evo-space-2);line-height:var(--evo-leading-base)}',
   '.evo-hist-actions{display:flex;flex:none;align-items:center;gap:var(--evo-space-6)}',
+  '.evo-hist-more{position:relative;display:inline-flex;align-items:center}',
+  '.evo-hist-more>summary{list-style:none;cursor:pointer;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);padding:var(--evo-space-2) var(--evo-space-4)}',
+  '.evo-hist-more>summary::-webkit-details-marker{display:none}',
+  '.evo-hist-more[open]>summary{color:var(--dsw-alias-label-secondary)}',
+  '.evo-hist-more>button{margin-left:var(--evo-space-2)}',
   // A chip is a STATE: it takes the neutral layer, not the interaction colour it used to borrow (W9).
   '.evo-hist-chip{flex:none;padding:var(--evo-space-2) var(--evo-space-8);border-radius:var(--evo-radius-pill);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}',
   // Two kinds of control, two shapes: one acts (bordered), one only reveals more (borderless, with a
@@ -122,5 +127,6 @@ export const CSS = [
   '.evo-doc-tag{position:absolute;left:var(--evo-space-8);top:var(--evo-space-8);color:var(--dsw-alias-label-tertiary)}',
   '.evo-doc-line-add{color:var(--evo-tone-success)}',
   '.evo-doc-line-del{color:var(--evo-tone-danger)}',
+  '@media (max-width:1100px){.evo-hist-row{flex-direction:column;align-items:stretch}.evo-hist-actions{flex-wrap:wrap;justify-content:flex-start;padding-top:var(--evo-space-4)}}',
   '@media (max-width:900px){.evo-hist-root{flex-direction:column}.evo-hist-aside{flex:0 0 auto;width:100%;max-height:42%;border-right:0;border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}.evo-hist-row{max-width:none}}',
 ].join('\n')

@@ -118,36 +118,45 @@ export interface VersionRowProps {
  */
 export function versionRow(props: VersionRowProps): ReactNode {
   const { copy, row, confirming, open, expanded, onRestore, onCancel, onToggle } = props
+  const current = row.undoable === false
   const actions: ReactNode[] = []
-  if (row.undoable === false) actions.push(chip({ key: 'current', children: copy.t('current') }))
-  if (row.undoable === true) {
-    // The confirmation is a second click on the same control, so it needs an exit of its own: without
-    // one the only way back was another row's button, which silently moved the pending write.
-    if (confirming) actions.push(button({ key: 'cancel', onClick: onCancel, children: copy.t('undo.no') }))
-    actions.push(button({
-      key: 'undo',
-      tone: confirming ? 'primary' : 'quiet',
-      onClick: onRestore,
-      children: confirming ? copy.t(row.unitId === undefined ? 'undo.confirm' : 'undo.confirmUnit') : copy.t('undo'),
-    }))
-  }
-  if (row.undoable === true || row.charsDelta !== undefined) {
-    actions.push(button({
-      key: 'diff',
-      kind: 'toggle',
-      expanded: open === 'diff',
-      onClick: () => { onToggle('diff') },
-      children: open === 'diff' ? copy.t('diff.hide') : copy.t('diff.show'),
-    }))
-  }
-  // Every version can be READ as a document, support files included: that is what the body route is for.
-  actions.push(button({
-    key: 'preview',
-    kind: 'toggle',
-    expanded: open === 'preview',
+  if (current) actions.push(chip({ key: 'current', children: copy.t('current') }))
+  if (current) actions.push(button({
+    key: 'preview', kind: 'toggle', tone: 'primary', expanded: open === 'preview',
     onClick: () => { onToggle('preview') },
     children: open === 'preview' ? copy.t('preview.hide') : copy.t('preview.show'),
   }))
+  if (current && row.charsDelta !== undefined) actions.push(button({
+    key: 'diff', kind: 'toggle', expanded: open === 'diff',
+    onClick: () => { onToggle('diff') },
+    children: open === 'diff' ? copy.t('diff.hide') : copy.t('diff.show'),
+  }))
+  if (!current) {
+    actions.push(button({
+      key: 'preview', kind: 'toggle', expanded: open === 'preview',
+      onClick: () => { onToggle('preview') },
+      children: open === 'preview' ? copy.t('preview.hide') : copy.t('preview.show'),
+    }))
+    const more: ReactNode[] = []
+    if (row.undoable === true) {
+      if (confirming) more.push(button({ key: 'cancel', onClick: onCancel, children: copy.t('undo.no') }))
+      more.push(button({
+        key: 'undo',
+        tone: confirming ? 'primary' : 'quiet',
+        onClick: onRestore,
+        children: confirming ? copy.t(row.unitId === undefined ? 'undo.confirm' : 'undo.confirmUnit') : copy.t('undo'),
+      }))
+    }
+    if (row.undoable === true || row.charsDelta !== undefined) {
+      more.push(button({
+        key: 'diff', kind: 'toggle', expanded: open === 'diff',
+        onClick: () => { onToggle('diff') },
+        children: open === 'diff' ? copy.t('diff.hide') : copy.t('diff.show'),
+      }))
+    }
+    if (more.length > 0) actions.push(createElement('details', { key: 'more', className: 'evo-hist-more' },
+      createElement('summary', null, copy.t('more')), ...more))
+  }
   return createElement('div', { key: String(row.v), className: 'evo-hist-row' },
     createElement('div', { className: 'evo-hist-row-body' },
       cellLine(row.cells.title, copy, 'evo-hist-row-title', { time: localTime(row.at) }),

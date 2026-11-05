@@ -69,7 +69,7 @@ describe('the tool face says what it is (G3)', () => {
       onRestore: () => {}, onCancel: () => {}, onToggle: () => {},
     })))
     const kinds = [...view.container.querySelectorAll('button')].map(node => node.getAttribute('data-kind'))
-    expect(kinds).toEqual(['action', 'toggle', 'toggle'])
+    expect(kinds).toEqual(['toggle', 'action', 'toggle'])
     // A toggle shows its state with a drawn glyph, and it is never the primary tone.
     const toggles = [...view.container.querySelectorAll('button[data-kind="toggle"]')]
     expect(toggles.every(node => node.querySelector('svg') !== null)).toBe(true)
