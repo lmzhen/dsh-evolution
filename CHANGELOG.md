@@ -1,4 +1,10 @@
 # Changelog
+## 0.35.0 (ui) — G4–G8 UI/UX closure
+
+> **范围**：合并页过期筛选降级、摘要归并、行复制收进“更多命令”、审批设置压缩为 chip、运行身份、MergeRow/RunStrip/Settings 组件拆分；历史三层技能行与 family 默认去重、正文按技能命名、unit 回退影响范围；健康 verdict 筛选、诊断折叠重点与刷新保留旧视图；G2 executing→release 真机闭环；768 历史上下布局。
+> **验证**：merge-ui 48/48、history 35/35、health 13/13、diagnostics 6/6；G2 release 真机（executing 仅放回待批，释放后恢复批准/拒绝/预览）；G8 1440/1024/768/深色/200% 与健康/诊断/历史 768 截图；G1 stale 连续 5 次 describe 500 真机。
+> **已知边界**：触屏未接真实触屏设备；MergeRow/MergeSettings 已拆，Panel 仍保留 tab/overlay 编排；诊断 200% 未单独截图。
+
 ## 0.34.0 (ui) — merge decisions, live config, workbench store
 
 > **范围**：合并 body 按 rowId+source+side 定位；mergeApproval/platformWrite 改为操作级 live config；新增 family-owned `merge/decision`，UI 行内批准/拒绝调用真实 Agent，复制命令降为辅助；Workbench 状态移入 registration face 持有的 store；设置 seat 去模块 WeakMap，补 generation/remote 退订/stale readback；待批 preview/action 独立 generation；排序 key 加 expiredOnly 与可见排序按钮；健康 load 单调 ticket；诊断页脚与单一设置路径。
