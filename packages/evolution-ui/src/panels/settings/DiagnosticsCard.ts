@@ -40,6 +40,24 @@ const SUMMARY_KEYS: Readonly<Record<DiagnosticRow['status'], MessageKey>> = Obje
   unknown: 'diagSummaryUnknown',
 })
 
+/** A reading split: top issue, remaining issues and the folded normal checks. */
+export interface DiagnosticsReading {
+  readonly topIssue: DiagnosticRow | undefined
+  readonly otherIssues: readonly DiagnosticRow[]
+  readonly normal: readonly DiagnosticRow[]
+}
+
+/**
+ * Split the frozen runtime rows without dropping one. The top issue follows the same fail > warn > unknown order.
+ * @param rows - runtime rows from the host view.
+ * @returns the reading shape used by the card.
+ */
+export function diagnosticsReading(rows: readonly DiagnosticRow[]): DiagnosticsReading {
+  const order: readonly DiagnosticRow['status'][] = ['fail', 'warn', 'unknown']
+  const issues = [...rows].filter(row => row.status !== 'ok').sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status))
+  return { topIssue: issues[0], otherIssues: issues.slice(1), normal: rows.filter(row => row.status === 'ok') }
+}
+
 /** The one status the card leads with: fail > warn > unknown > ok. */
 function summaryOf(rows: readonly DiagnosticRow[]): { status: DiagnosticRow['status']; count: number } {
   const count = (status: DiagnosticRow['status']): number => rows.filter(row => row.status === status).length
@@ -106,9 +124,10 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   focusRow === undefined ? null : createElement('span', { 'data-role': 'diag-focus' }, focusRow.label),
   createElement('span', { className: 'evolution-param-chevron' }, open ? '▲' : '▼'),
   )
-  const runtime = (view: DiagnosticsView): ReactNode => view.runtime.length === 0 ? null : createElement('div', {},
-    createElement('h3', { className: 'evolution-param-group' }, t('diagRuntimeTitle')),
-    createElement('div', { className: 'evo-diag-list' }, ...view.runtime.map(row => createElement('div', {
+  const runtime = (view: DiagnosticsView): ReactNode => {
+    if (view.runtime.length === 0) return null
+    const reading = diagnosticsReading(view.runtime)
+    const rowNode = (row: DiagnosticRow): ReactNode => createElement('div', {
       key: 'runtime-' + row.key,
       className: 'evo-diag-item',
       'data-kind': 'runtime',
@@ -121,8 +140,20 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
     ),
     row.detail === undefined ? null : createElement('span', { className: 'evo-diag-detail' }, row.detail),
     row.remedy === undefined ? null : createElement('span', { className: 'evo-diag-remedy' }, t('diagRemedy') + row.remedy),
-    ))),
-  )
+    )
+    return createElement('div', {},
+      createElement('h3', { className: 'evolution-param-group' }, t('diagRuntimeTitle')),
+      reading.topIssue === undefined
+        ? createElement('div', { className: 'evo-diag-complete', 'data-role': 'diag-complete' }, t('diagComplete'))
+        : createElement('div', { className: 'evo-diag-issue', 'data-role': 'diag-issue', 'data-status': reading.topIssue.status }, rowNode(reading.topIssue)),
+      reading.otherIssues.length === 0 ? null : createElement('details', { className: 'evo-diag-group', 'data-role': 'diag-other-issues' },
+        createElement('summary', null, t('diagOtherIssues', { n: reading.otherIssues.length })),
+        ...reading.otherIssues.map(rowNode)),
+      reading.normal.length === 0 ? null : createElement('details', { className: 'evo-diag-group', 'data-role': 'diag-normal' },
+        createElement('summary', null, t('diagNormal', { n: reading.normal.length })),
+        ...reading.normal.map(rowNode)),
+    )
+  }
   const body = (): ReactNode => {
     if (state.phase === 'loading') return createElement('p', { className: 'evolution-param-loading' }, t('stateLoading'))
     if (state.phase === 'failed') return FailureBlock({ failure: state.failure, t: translate, fallback: props.fallback })

@@ -13,6 +13,7 @@ import { createElement, useEffect, useRef, useState, type ReactNode } from 'reac
 import { CSS_TAG_ID } from './styles.ts'
 import type { HealthOutcome } from './api.ts'
 import { platformSegmentedTabs } from './platform-tabs.ts'
+import { healthViewModel } from './health-presentation.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
@@ -147,24 +148,30 @@ function CopyButton(props: { command: string; t: (key: string) => string; role: 
   return createElement('button', { type: 'button', 'data-role': props.role, 'data-copy-state': state, onClick: () => { void copy() } }, text)
 }
 
-/** H4: the evidence queue by skill, before the by-rule summary. */
-function skillQueue(face: HealthFace, t: (key: string) => string): ReactNode {
-  const order = ['error', 'needs-restructure', 'warn', 'unreadable', 'healthy']
-  const rows = [...face.rows].sort((a, b) => order.indexOf(a.verdict) - order.indexOf(b.verdict) || a.name.localeCompare(b.name))
+function skillRowNode(face: HealthFace, t: (key: string) => string, row: HealthRow): ReactNode {
+  return createElement('div', { key: row.name, 'data-role': 'skill-row', 'data-tone': row.verdict },
+    createElement('span', { 'data-role': 'skill-name' }, row.name),
+    createElement('span', { 'data-role': 'skill-verdict' }, t('verdict.' + row.verdict)),
+    createElement('span', { 'data-role': 'skill-findings' }, row.findings.length === 0 ? t('findings.none') : row.findings.map(finding => ruleName(t, finding.rule)).join(' / ')),
+    row.verdict === 'unreadable' ? createElement('span', { 'data-role': 'skill-unreadable-note' }, t('unreadable.note')) : null,
+    row.protection === undefined || row.protection === null ? null : createElement('span', { 'data-role': 'skill-protection' }, t('protected') + ': ' + row.protection),
+    createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + ': ' + String(row.dims?.bodyChars ?? t('dims.unknown')) + ' · ' + t('dims.support') + ': ' + String(row.dims?.supportFiles ?? t('dims.unknown'))),
+    createElement('span', { 'data-role': 'skill-row-actions' },
+      createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(row.name) } }, t('action.history')),
+      createElement(CopyButton, { command: '/evolution skill history ' + row.name, t, role: 'action-copy', label: t('action.copy') }),
+    ),
+  )
+}
+
+/** H4: issues first, normal items folded behind one native details summary. */
+function skillQueue(face: HealthFace, t: (key: string) => string, model: ReturnType<typeof healthViewModel>): ReactNode {
   return createElement('div', { 'data-role': 'skill-queue' },
     createElement('h3', { 'data-role': 'group-title' }, t('group.bySkill')),
-    ...rows.map(row => createElement('div', { key: row.name, 'data-role': 'skill-row', 'data-tone': row.verdict },
-      createElement('span', { 'data-role': 'skill-name' }, row.name),
-      createElement('span', { 'data-role': 'skill-verdict' }, t('verdict.' + row.verdict)),
-      createElement('span', { 'data-role': 'skill-findings' }, row.findings.length === 0 ? t('findings.none') : row.findings.map(finding => ruleName(t, finding.rule)).join(' / ')),
-      row.verdict === 'unreadable' ? createElement('span', { 'data-role': 'skill-unreadable-note' }, t('unreadable.note')) : null,
-      row.protection === undefined || row.protection === null ? null : createElement('span', { 'data-role': 'skill-protection' }, t('protected') + ': ' + row.protection),
-      createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + ': ' + String(row.dims?.bodyChars ?? t('dims.unknown')) + ' · ' + t('dims.support') + ': ' + String(row.dims?.supportFiles ?? t('dims.unknown'))),
-      createElement('span', { 'data-role': 'skill-row-actions' },
-        createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(row.name) } }, t('action.history')),
-        createElement(CopyButton, { command: '/evolution skill history ' + row.name, t, role: 'action-copy', label: t('action.copy') }),
-      ),
-    )),
+    model.hasIssues ? null : createElement('div', { 'data-role': 'health-complete' }, t('health.complete')),
+    ...model.issues.map(row => skillRowNode(face, t, row)),
+    model.normal.length === 0 ? null : createElement('details', { 'data-role': 'health-normal', className: 'evo-health-normal' },
+      createElement('summary', null, t('health.normal').replace('{n}', String(model.normal.length))),
+      ...model.normal.map(row => skillRowNode(face, t, row))),
   )
 }
 
@@ -345,7 +352,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
         }, item.label)))
     })(),
     viewMode === 'skills'
-      ? createElement('div', { id: 'evo-health-skills', role: 'tabpanel' }, skillQueue(shown, t))
+      ? createElement('div', { id: 'evo-health-skills', role: 'tabpanel' }, skillQueue(shown, t, healthViewModel(shown.rows)))
       : createElement('div', { id: 'evo-health-rules', role: 'tabpanel' },
         createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')), ruleTable(shown, t)),
   )
