@@ -44,6 +44,7 @@ export const CSS = [
   ':where(' + root + ' [data-role="health-normal"]) { display: flex; flex-direction: column; gap: var(--evo-space-4); padding-top: var(--evo-space-4); }',
   ':where(' + root + ' [data-role="health-normal"] > summary) { cursor: pointer; color: var(--dsw-alias-label-tertiary); font-size: var(--evo-type-xs); }',
   ':where(' + root + ' [data-role="stat"][aria-pressed="true"]) { border-color: var(--dsw-alias-brand-primary); background: var(--dsw-alias-interactive-bg-hover); }',
+  ':where(' + root + ' [data-role="stat"]:disabled) { opacity: 0.55; cursor: default; }',
   ':where(' + root + ' [data-role="stat"][data-tone="ok"]) { box-shadow: inset 2px 0 0 var(--dsw-alias-state-success-primary); }',
   ':where(' + root + ' [data-role="stat"][data-tone="warn"]) { box-shadow: inset 2px 0 0 var(--dsw-alias-state-warn-primary); }',
   ':where(' + root + ' [data-role="stat"][data-tone="error"]) { box-shadow: inset 2px 0 0 var(--dsw-alias-state-error-primary); }',

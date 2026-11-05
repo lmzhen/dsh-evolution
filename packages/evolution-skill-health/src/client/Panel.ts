@@ -278,6 +278,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
       key: kind, type: 'button', 'data-role': 'stat', 'data-tone': TONE[kind],
       'aria-pressed': verdictFilter === kind ? 'true' : 'false',
       'aria-label': t('verdict.' + kind),
+      disabled: (counts.get(kind) ?? 0) === 0,
       onClick: () => { setVerdictFilter(previous => previous === kind ? undefined : kind) },
     },
       createElement('span', { 'data-role': 'stat-value' }, String(counts.get(kind) ?? 0)),
