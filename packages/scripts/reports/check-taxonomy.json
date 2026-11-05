@@ -90,6 +90,7 @@
       "specs": [
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
+        "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
         "evolution-commands::tests/parse.spec.ts",
@@ -152,15 +153,19 @@
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
+        "evolution-skill-health::tests/health-presentation.spec.ts",
         "evolution-skill-health::tests/routes.spec.ts",
         "evolution-state-storage::tests/cap-rules.spec.ts",
         "evolution-state-storage::tests/constants.spec.ts",
         "evolution-state-storage::tests/record-contract.spec.ts",
+        "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-client-api.spec.ts",
         "evolution-ui::tests/history-markdown.client.spec.ts",
+        "evolution-ui::tests/history-presentation.spec.ts",
         "evolution-ui::tests/history-route-parity.spec.ts",
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
         "evolution-ui::tests/history-unit-undoable.spec.ts",
+        "evolution-ui::tests/settings-groups.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card.spec.ts",
         "evolution-ui::tests/settings-slot-fill.client.spec.ts",
@@ -335,6 +340,7 @@
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
+        "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
@@ -633,6 +639,7 @@
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
+        "evolution-skill-health::tests/health-presentation.spec.ts",
         "evolution-skill-health::tests/routes.spec.ts",
         "evolution-state-domain::tests/compatibility.spec.ts",
         "evolution-state-json::tests/boundary.spec.ts",
@@ -655,6 +662,7 @@
         "evolution-state-storage::tests/record-contract.spec.ts",
         "evolution-state-storage::tests/storage.spec.ts",
         "evolution-state::tests/state.spec.ts",
+        "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-apply-order.spec.ts",
         "evolution-ui::tests/history-chrome.client.spec.ts",
         "evolution-ui::tests/history-client-api.spec.ts",
@@ -662,6 +670,7 @@
         "evolution-ui::tests/history-document.client.spec.ts",
         "evolution-ui::tests/history-markdown.client.spec.ts",
         "evolution-ui::tests/history-panel.client.spec.ts",
+        "evolution-ui::tests/history-presentation.spec.ts",
         "evolution-ui::tests/history-route-parity.spec.ts",
         "evolution-ui::tests/history-routes.spec.ts",
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
@@ -669,6 +678,7 @@
         "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
+        "evolution-ui::tests/settings-groups.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
         "evolution-ui::tests/settings-pending-card.spec.ts",
@@ -954,6 +964,7 @@
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
+        "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
@@ -1252,6 +1263,7 @@
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
+        "evolution-skill-health::tests/health-presentation.spec.ts",
         "evolution-skill-health::tests/routes.spec.ts",
         "evolution-state-domain::tests/compatibility.spec.ts",
         "evolution-state-json::tests/boundary.spec.ts",
@@ -1274,6 +1286,7 @@
         "evolution-state-storage::tests/record-contract.spec.ts",
         "evolution-state-storage::tests/storage.spec.ts",
         "evolution-state::tests/state.spec.ts",
+        "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-apply-order.spec.ts",
         "evolution-ui::tests/history-chrome.client.spec.ts",
         "evolution-ui::tests/history-client-api.spec.ts",
@@ -1281,6 +1294,7 @@
         "evolution-ui::tests/history-document.client.spec.ts",
         "evolution-ui::tests/history-markdown.client.spec.ts",
         "evolution-ui::tests/history-panel.client.spec.ts",
+        "evolution-ui::tests/history-presentation.spec.ts",
         "evolution-ui::tests/history-route-parity.spec.ts",
         "evolution-ui::tests/history-routes.spec.ts",
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
@@ -1288,6 +1302,7 @@
         "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
+        "evolution-ui::tests/settings-groups.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
         "evolution-ui::tests/settings-pending-card.spec.ts",
@@ -1493,6 +1508,7 @@
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
+        "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/commands.spec.ts",
@@ -1843,6 +1859,7 @@
         "evolution-skill-discovery::tests/tool.spec.ts",
         "evolution-skill-discovery::tests/view-snapshot-store.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
+        "evolution-skill-health::tests/health-presentation.spec.ts",
         "evolution-skill-health::tests/routes.spec.ts",
         "evolution-state-domain::tests/compatibility.spec.ts",
         "evolution-state-domain::tests/domain-state.spec.ts",
@@ -1869,6 +1886,7 @@
         "evolution-state-storage::tests/storage.spec.ts",
         "evolution-state::tests/state.spec.ts",
         "evolution-threat::tests/threat-guard.spec.ts",
+        "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-apply-order.spec.ts",
         "evolution-ui::tests/history-chrome.client.spec.ts",
         "evolution-ui::tests/history-client-api.spec.ts",
@@ -1876,6 +1894,7 @@
         "evolution-ui::tests/history-document.client.spec.ts",
         "evolution-ui::tests/history-markdown.client.spec.ts",
         "evolution-ui::tests/history-panel.client.spec.ts",
+        "evolution-ui::tests/history-presentation.spec.ts",
         "evolution-ui::tests/history-route-parity.spec.ts",
         "evolution-ui::tests/history-routes.spec.ts",
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
@@ -1883,6 +1902,7 @@
         "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
+        "evolution-ui::tests/settings-groups.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
         "evolution-ui::tests/settings-pending-card.spec.ts",
@@ -2001,11 +2021,11 @@
   "counts": {
     "fast": {
       "gates": 74,
-      "specs": 79
+      "specs": 84
     },
     "pre-tag": {
       "gates": 74,
-      "specs": 363
+      "specs": 368
     },
     "ci-only": {
       "gates": 12,
@@ -2013,16 +2033,16 @@
     },
     "full(ci=off)": {
       "gates": 74,
-      "specs": 363
+      "specs": 368
     },
     "full(ci=on)": {
       "gates": 86,
-      "specs": 437
+      "specs": 442
     }
   },
   "specs": {
-    "total": 437,
-    "marked": 437,
+    "total": 442,
+    "marked": 442,
     "unmarked": 0
   }
 }
