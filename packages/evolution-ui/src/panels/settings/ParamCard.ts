@@ -255,24 +255,22 @@ function FieldBlock(props: FieldBlockProps): ReactNode {
       props.overridden
         ? createElement('span', { className: 'evolution-param-source', 'data-user': 'true' }, t('overridden'))
         : null,
+      props.overridden
+        ? createElement('button', {
+          type: 'button',
+          className: 'evolution-param-reset',
+          disabled: props.disabled || props.clearing,
+          'data-role': 'reset',
+          title: props.resetTo === null ? undefined : t('resetTo', { value: props.resetTo }),
+          onClick: () => { props.onClear(field.id) },
+        }, props.clearing ? t('resetting') : t('reset'))
+        : null,
     ),
     FieldControl(props),
     createElement('p', { className: 'evolution-param-hint' }, hintOf(field, lang) === '' ? field.doc : hintOf(field, lang)),
     props.invalid === null
       ? null
       : createElement('p', { id: controlId(field) + '-invalid', className: 'evolution-param-error', role: 'status' }, props.invalid),
-    props.overridden
-      ? createElement('div', { className: 'evolution-param-actions' },
-        createElement('button', {
-          type: 'button',
-          className: 'evolution-param-button',
-          disabled: props.disabled || props.clearing,
-          'data-role': 'reset',
-          title: props.resetTo === null ? undefined : t('resetTo', { value: props.resetTo }),
-          onClick: () => { props.onClear(field.id) },
-        }, props.clearing ? t('resetting') : t('reset')),
-      )
-      : null,
   )
 }
 

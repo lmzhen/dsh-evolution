@@ -16,6 +16,7 @@ import { createElement, type ReactNode } from 'react'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
 import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
 import { PluginParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
+import { groupParamCards } from './settings-groups.ts'
 import { PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
 import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
@@ -142,6 +143,9 @@ export function apply(ctx: ClientContext): void {
 /** One family tab: every parameter card lives inside the platform's Plugins page. */
 function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[] }): ReactNode {
   return createElement('div', { className: 'evolution-settings-tab' },
-    ...props.cards.map((face, index) => createElement(PluginParamCard, { key: face.namespace + ':' + String(index), ...face })),
+    ...groupParamCards(props.cards).flatMap(({ group, items }) => [
+      createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, message(('group.' + group) as MessageKey)),
+      ...items.map((face, index) => createElement(PluginParamCard, { key: face.namespace + ':' + String(index), ...face })),
+    ]),
   )
 }
