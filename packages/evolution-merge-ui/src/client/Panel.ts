@@ -2,7 +2,7 @@
 import { createElement, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { CSS_TAG_ID } from './styles.ts'
 import { platformModal } from './platform-modal.ts'
-import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
+import { PLATFORM_MENU, renderPlatformMenu } from '@lmzhen/dsh-evolution-client-kit'
 import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
 import { formatLocalDateTime, type SettingsFace } from '@lmzhen/dsh-evolution-client-kit'

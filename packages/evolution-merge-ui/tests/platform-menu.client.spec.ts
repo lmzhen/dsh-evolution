@@ -2,7 +2,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, it } from 'vitest'
-import { menuPrimitivesFrom, renderPlatformMenu } from '../src/client/platform-menu.ts'
+import { menuPrimitivesFrom, renderPlatformMenu } from '@lmzhen/dsh-evolution-client-kit'
 
 it('accepts only a module row with both menu components', () => {
   const Surface = (): null => null
