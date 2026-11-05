@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { WorkbenchPage } from '../src/panels/history/client/Workbench.ts'
-import { createWorkbenchStore } from '../src/panels/history/client/WorkbenchStore.ts'
+import { createWorkbenchStore, resolveDefaultView } from '../src/panels/history/client/WorkbenchStore.ts'
 import type { PanelFace } from '../src/panels/history/client/Panel.ts'
 import type { PendingCardFace } from '../src/panels/settings/PendingCard.ts'
 
@@ -37,6 +37,12 @@ const pendingFace = (): PendingCardFace => ({
 })
 
 describe('history workbench', () => {
+  it('resolves pending over merge over history and skips an unmounted merge view', () => {
+    expect(resolveDefaultView({ pending: 2, merge: 1 }, true)).toBe('pending')
+    expect(resolveDefaultView({ pending: 0, merge: 1 }, true)).toBe('merge')
+    expect(resolveDefaultView({ pending: 0, merge: 1 }, false)).toBe('history')
+  })
+
   it('moves keyboard focus only across tabs that are actually visible', async () => {
     const view = render(createElement(WorkbenchPage, {
       t: (key: string) => key,
@@ -69,6 +75,37 @@ describe('history workbench', () => {
     await waitFor(() => { expect(loadVersions.mock.calls.length).toBeGreaterThan(firstCalls) })
     await act(async () => { owner.openHistory?.('beta') })
     await waitFor(() => { expect(loadVersions).toHaveBeenCalledWith('beta') })
+    view.unmount()
+  })
+
+  it('lands on pending when a task exists and the user has not chosen a view', async () => {
+    const view = render(createElement(WorkbenchPage, {
+      t: (key: string) => key,
+      store: createWorkbenchStore(),
+      history: face(),
+      pending: pendingFace(),
+      loadTaskCounts: async () => ({ pending: 1, merge: 0 }),
+    }))
+    await waitFor(() => { expect(document.getElementById('evo-workbench-tab-pending')?.getAttribute('aria-selected')).toBe('true') })
+    expect(document.querySelector('.evo-workbench-title')?.textContent).toBe('workbench.title')
+    view.unmount()
+  })
+
+  it('does not let a late count override the user selection', async () => {
+    let resolveCounts: ((counts: { pending: number; merge: number }) => void) | undefined
+    const counts = new Promise<{ pending: number; merge: number }>((resolve) => { resolveCounts = resolve })
+    const view = render(createElement(WorkbenchPage, {
+      t: (key: string) => key,
+      store: createWorkbenchStore(),
+      history: face(),
+      pending: pendingFace(),
+      loadTaskCounts: async () => await counts,
+    }))
+    fireEvent.click(document.getElementById('evo-workbench-tab-history')!)
+    await act(async () => { resolveCounts?.({ pending: 1, merge: 0 }) })
+    await act(async () => { await counts })
+    expect(document.getElementById('evo-workbench-tab-history')?.getAttribute('aria-selected')).toBe('true')
+    expect(document.getElementById('evo-workbench-tab-pending')?.getAttribute('aria-selected')).toBe('false')
     view.unmount()
   })
 

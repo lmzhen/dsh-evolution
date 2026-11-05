@@ -5,7 +5,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
-import { createSettingsSeat, registerSidebarPanel, PAGE_SURFACE_CSS, type Translate } from '@lmzhen/dsh-evolution-client-kit'
+import { createSettingsSeat, registerSidebarPanel, PAGE_SURFACE_CSS, ROUTES, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
 import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
@@ -17,7 +17,7 @@ import type { PanelFace } from './Panel.ts'
 import { PANEL_ORDER } from './ids.ts'
 export { PANEL_ORDER }
 import { WorkbenchIcon, WorkbenchPage, WORKBENCH_CSS, WORKBENCH_ID, type WorkbenchFace } from './Workbench.ts'
-import { createWorkbenchStore } from './WorkbenchStore.ts'
+import { createWorkbenchStore, type WorkbenchTaskCounts } from './WorkbenchStore.ts'
 
 /** Required client services: the slot registry and the locale seat. */
 export const inject = ['slots', 'locale']
@@ -61,9 +61,25 @@ export function apply(ctx: ClientContext): void {
     undo: api.undo,
     markdownWords: { copy: t('markdown.copy'), copied: t('markdown.copied'), footnotes: t('markdown.footnotes') },
   })
-  const pendingFace = (): PendingCardFace => ({ t: pendingT, api: createApprovalApi((input, init) => fetch(input, init)), confirmMode, fallback: FALLBACKS.approval })
+  const approvalApi = createApprovalApi((input, init) => fetch(input, init))
+  const pendingFace = (): PendingCardFace => ({ t: pendingT, api: approvalApi, confirmMode, fallback: FALLBACKS.approval })
   const diagnosticsFace = (): DiagnosticsCardFace => ({ t: pendingT, api: createDiagnosticsApi((input, init) => fetch(input, init)), fallback: FALLBACKS.diagnostics })
 
+  const loadTaskCounts = async (): Promise<WorkbenchTaskCounts> => {
+    const pending = approvalApi.pending().then(answer => answer.ok ? answer.data.length : 0).catch(() => 0)
+    const merge = (async (): Promise<number> => {
+      try {
+        const response = await fetch(ROUTES.merge.view, { headers: { accept: 'application/json' } })
+        if (!response.ok) return 0
+        const body = await response.json() as { ok?: boolean; data?: unknown; counts?: unknown }
+        const raw = (body.ok === true ? body.data : body) as { counts?: { pending?: unknown; active?: { pending?: unknown } } } | undefined
+        const count = Number(raw?.counts?.active?.pending ?? raw?.counts?.pending ?? 0)
+        return Number.isFinite(count) && count > 0 ? count : 0
+      } catch { return 0 }
+    })()
+    const [pendingCount, mergeCount] = await Promise.all([pending, merge])
+    return { pending: pendingCount, merge: mergeCount }
+  }
   const workbenchStore = createWorkbenchStore()
   registerSidebarPanel<WorkbenchFace>(ctx, {
     id: WORKBENCH_ID,
@@ -73,7 +89,7 @@ export function apply(ctx: ClientContext): void {
     styles: { css: CSS + WORKBENCH_CSS + PAGE_SURFACE_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
     component: WorkbenchPage as unknown as (props: never) => unknown,
-    body: (t): WorkbenchFace => ({ t, store: workbenchStore, history: historyFace(t), pending: pendingFace(), diagnostics: diagnosticsFace(), hasView }),
+    body: (t): WorkbenchFace => ({ t, store: workbenchStore, history: historyFace(t), pending: pendingFace(), diagnostics: diagnosticsFace(), hasView, loadTaskCounts }),
     children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
   })
 }

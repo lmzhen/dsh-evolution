@@ -9,7 +9,7 @@ import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
 import { PendingCard, type PendingCardFace } from '../../settings/PendingCard.ts'
 import { DiagnosticsCard, type DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
-import type { WorkbenchStore, WorkbenchView } from './WorkbenchStore.ts'
+import { resolveDefaultView, type WorkbenchStore, type WorkbenchTaskCounts, type WorkbenchView } from './WorkbenchStore.ts'
 
 /** Stable page id used by the sidebar row, the page slot key, and navigation params. */
 export const WORKBENCH_ID = 'evolution.workbench'
@@ -23,6 +23,8 @@ export interface WorkbenchFace {
   readonly diagnostics: DiagnosticsCardFace
   /** Whether a feature view is actually mounted (health is disabled by default). */
   readonly hasView?: (view: 'merge' | 'health') => boolean
+  /** Read-only task counts for the first landing; absent keeps history. */
+  readonly loadTaskCounts?: (() => Promise<WorkbenchTaskCounts>) | undefined
 }
 
 export type { WorkbenchView } from './WorkbenchStore.ts'
@@ -44,8 +46,17 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   const hasMerge = props.hasView?.('merge') ?? true
   const hasHealth = props.hasView?.('health') ?? true
   useEffect(() => {
-    if ((view === 'merge' && !hasMerge) || (view === 'health' && !hasHealth)) props.store.setView('history')
+    if ((view === 'merge' && !hasMerge) || (view === 'health' && !hasHealth)) props.store.setDefaultView('history')
   }, [view, hasMerge, hasHealth, props.store])
+  useEffect(() => {
+    const load = props.loadTaskCounts
+    if (load === undefined || state.explicitView === true) return
+    let live = true
+    void load().then(counts => {
+      if (live) props.store.setDefaultView(resolveDefaultView(counts, hasMerge))
+    }).catch(() => { /* no counts means keep the stable history landing */ })
+    return () => { live = false }
+  }, [props.loadTaskCounts, state.explicitView, hasMerge, props.store])
   // Keyboard order contains only tabs that actually rendered; a hidden view has no button to land on.
   const viewOrder: readonly WorkbenchView[] = (['history', 'pending', 'merge', 'health', 'diagnostics'] as const)
     .filter(value => (value !== 'merge' || hasMerge) && (value !== 'health' || hasHealth))
@@ -60,7 +71,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   }
   return createElement('section', { className: PAGE_SURFACE_CLASS + ' evo-workbench', 'data-page': view },
     createElement('div', { className: 'evo-workbench-head' },
-      createElement('h1', { className: 'evo-workbench-title' }, props.t('entry.label')),
+      createElement('h1', { className: 'evo-workbench-title', 'data-view': view }, props.t('workbench.title')),
       createElement('div', { className: 'evo-workbench-tabs', role: 'tablist', 'aria-label': props.t('entry.label') },
         createElement('button', { id: 'evo-workbench-tab-history', type: 'button', role: 'tab', tabIndex: view === 'history' ? 0 : -1, 'aria-selected': view === 'history' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'history' ? 'true' : undefined, onClick: () => { props.store.setView('history') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'history') } }, props.t('workbench.history')),
         createElement('button', { id: 'evo-workbench-tab-pending', type: 'button', role: 'tab', tabIndex: view === 'pending' ? 0 : -1, 'aria-selected': view === 'pending' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { props.store.setView('pending') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'pending') } }, props.t('workbench.pending')),
