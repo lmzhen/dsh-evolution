@@ -19,7 +19,7 @@ const row = (): MergeRowView => ({
   id: 'mr_pending', pairKey: 'mr_pending', a: 'alpha', b: 'beta', state: 'pending', queue: 'pending', stage: null, label: 'alpha + beta',
   updatedAt: '2026-01-01T00:00:00.000Z', target: 'alpha', targetActual: 'alpha-v2', summary: { a: 'alpha summary', b: null, rationale: 'because' },
   stageView: { state: 'lost', expiresAt: 1_800_000_000_000 }, bodies: [{ name: 'alpha', side: 'live' }, { name: 'beta', side: 'archive' }],
-  actions: [{ id: 'approve', command: '/evolution merge approve mr_pending', confirm: false, enabled: true }, { id: 'reject', command: '/evolution merge reject mr_pending', confirm: true, enabled: true, disabledReason: 'unavailable' }],
+  actions: [{ id: 'approve', command: '/evolution merge approve mr_pending', confirm: false, enabled: true }, { id: 'reject', command: '/evolution merge reject mr_pending', confirm: true, enabled: true, disabledReason: 'unavailable' }, { id: 'copy', command: '/evolution merge copy mr_pending', confirm: false, enabled: true }],
   createdAt: 1, updatedAt: 2,
 })
 const source = (overrides: Partial<MergeSource> = {}): MergeSource => ({
@@ -69,7 +69,8 @@ it('renders four tabs, settings, run strip, pending id/three sentences and stage
   expect(html).toContain('data-role="tab"')
   expect(html).toContain('data-role="row-more"')
   expect((html.match(/data-role="row-more"/g) ?? []).length).toBe(2)
-  expect((html.match(/data-role="row-copy"/g) ?? []).length).toBe(4)
+  expect((html.match(/data-role="row-copy"/g) ?? []).length).toBe(6)
+  expect(html).not.toContain('data-action="copy"')
 })
 
 it('renders succeeded with no progress as progress unknown, never 0/N', () => {
