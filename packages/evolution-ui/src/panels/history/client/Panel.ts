@@ -113,6 +113,20 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   /** The sentence one failed read carries, in ONE place: every reader below reports the same way. */
   const failedMessage = (error: unknown): string => face.t('error') + ': ' + (error instanceof Error ? error.message : String(error))
 
+  /** Load one version body under the shared read ticket; used by the current default and the toggle. */
+  const loadPreview = (name: string, v: number): void => {
+    const ticket = readTicket.current + 1
+    readTicket.current = ticket
+    setBodies(current => new Map(current).set(v, { kind: 'loading', ticket }))
+    void face.loadBody(name, v).then((body) => {
+      if (readTicket.current !== ticket) { setBodies(current => dropIfTicket(current, v, ticket)); return }
+      setBodies(current => new Map(current).set(v, { kind: 'ready', body, ticket }))
+    }).catch((error: unknown) => {
+      if (readTicket.current !== ticket) { setBodies(current => dropIfTicket(current, v, ticket)); return }
+      setBodies(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error), ticket }))
+    })
+  }
+
   /** Read the skills again, keeping the sentence: a re-read is not an answer to anything. */
   const reloadSkills = (): void => {
     // `finally`, not `then`: a FAILED read is an answer too — the reader gets the empty list plus the
@@ -139,7 +153,15 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
       setBodies(new Map())
     }
     void face.loadVersions(name).then((next) => {
-      if (readTicket.current === ticket) { setPayload(next); clearReadFailure() }
+      if (readTicket.current !== ticket) return
+      setPayload(next)
+      clearReadFailure()
+      if (keepContent) return
+      const current = historyViewModel(next).current[0]
+      if (current !== undefined) {
+        setExpanded({ v: current.v, kind: 'preview' })
+        loadPreview(name, current.v)
+      }
     }).catch((error: unknown) => {
       if (readTicket.current !== ticket) return
       // T5-09: the pane needs its own answer, not only the notice.
@@ -219,14 +241,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
       })
       return
     }
-    setBodies(current => new Map(current).set(v, { kind: 'loading', ticket }))
-    void face.loadBody(name, v).then((body) => {
-      if (readTicket.current !== ticket) { setBodies(current => dropIfTicket(current, v, ticket)); return }
-      setBodies(current => new Map(current).set(v, { kind: 'ready', body, ticket }))
-    }).catch((error: unknown) => {
-      if (readTicket.current !== ticket) { setBodies(current => dropIfTicket(current, v, ticket)); return }
-      setBodies(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error), ticket }))
-    })
+    loadPreview(name, v)
   }
 
   // One read on mount; every later read is a user action. There is no store and no subscription.
