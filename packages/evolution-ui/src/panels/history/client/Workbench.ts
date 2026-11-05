@@ -114,6 +114,9 @@ export const WORKBENCH_CSS = [
   '.evo-workbench-tabs button:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evo-workbench-title{margin:0;font-size:var(--evo-type-lg);font-weight:600;line-height:var(--evo-leading-base)}',
   '.evo-workbench-body{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}',
+  '.evo-workbench-feature{display:flex;flex:1;min-width:0;min-height:0}',
+  '.evo-workbench-feature>*{flex:1;min-width:0}',
+  '.evo-workbench-feature .evolution-merge-panel,.evo-workbench-feature .evolution-skill-health-panel{flex:1 1 auto;min-width:0}',
   '.evo-workbench-body>.evolution-param-card{flex:1;min-width:0;overflow:auto}',
   '@media (max-width:720px){.evo-workbench-head{flex-wrap:wrap}.evo-workbench-tabs{flex-wrap:wrap}}',
 ].join('')
