@@ -86,7 +86,7 @@ export const CSS = [
   '.evolution-approval-decision [data-role="decision-primary"]:disabled,.evolution-approval-decision [data-role="decision-secondary"]:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}',
   '.evolution-approval-decision [data-role="decision-details"] details{margin:0}',
   '.evolution-approval-decision [data-role="decision-details"] summary{cursor:pointer;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs)}',
-  '.evolution-approval-item [data-role="empty-state"]{padding:var(--evo-space-24) var(--evo-space-16);text-align:center}',
+  '.evolution-approval-item [data-role="empty-state"]{padding:var(--evo-space-20) var(--evo-space-16);text-align:center}',
   '.evolution-approval-item [data-role="empty-title"]{margin:0 0 var(--evo-space-6);font-size:var(--evo-type-lg)}',
   '.evolution-approval-item [data-role="empty-description"]{margin:0 auto var(--evo-space-12);max-width:34em;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-sm)}',
   '.evolution-approval-item [data-role="empty-actions"]{display:flex;justify-content:center;gap:var(--evo-space-8)}',
