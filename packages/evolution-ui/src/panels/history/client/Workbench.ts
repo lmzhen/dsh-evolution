@@ -106,7 +106,9 @@ export function WorkbenchIcon(props: { size?: number; active?: boolean }): React
 /** Workbench shell and sidebar row; colours come from the platform tokens. */
 export const WORKBENCH_CSS = [
   tokenVars('.evo-workbench'),
-  '.evo-workbench{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0}',
+  // Skins make the platform's bg tokens translucent; stack the same token so the content page
+  // stays readable over a photograph without changing the shell or introducing a literal colour.
+  '.evo-workbench{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;background-color:var(--dsw-alias-bg-base);background-image:linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base)),linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base)),linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base)),linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base)),linear-gradient(var(--dsw-alias-bg-base),var(--dsw-alias-bg-base))}',
   '.evo-workbench-head{display:flex;align-items:center;justify-content:space-between;gap:var(--evo-space-16);padding:var(--evo-space-12) var(--evo-space-16);border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
   '.evo-workbench-tabs{display:flex;gap:var(--evo-space-4)}',
   '.evo-workbench-tabs button{padding:var(--evo-space-4) var(--evo-space-8);border:0;border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:var(--evo-type-sm);cursor:pointer}',
