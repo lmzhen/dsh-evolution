@@ -67,6 +67,15 @@ it('renders four tabs, settings, run strip, pending id/three sentences and stage
   expect(html).toContain('data-role="tab"')
 })
 
+it('renders succeeded with no progress as progress unknown, never 0/N', () => {
+  const base = view()
+  const noProgress = { ...base, lastRun: { ...base.lastRun!, progress: undefined } } as MergeViewPayload
+  const html = render(new MergeStore(source(), { view: noProgress, rows: [] }))
+  expect(html).toContain('data-role="run-progress"')
+  expect(html).toContain('run.progressUnknown')
+  expect(html).not.toContain('run.progress 0/')
+})
+
 it('renders four tabs, the expired toggle, and pending summary only on pending rows', () => {
   const fuse = { ...row(), id: 'mr_fuse', state: 'fuse' as const, queue: 'fuse' as const, summary: undefined, stageView: undefined }
   const html = render(new MergeStore(source(), { view: view(), rows: [row(), fuse] }))

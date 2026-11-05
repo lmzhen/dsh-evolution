@@ -172,6 +172,7 @@ Object.assign(zh, {
   'settings.readonly': '只读显示；修改请到平台设置页。',
 
   'run.title': '运行',
+  'run.progressUnknown': '进度未知',
   'run.id': '运行编号',
   'run.state': '状态',
   'run.stage': '阶段',
@@ -378,6 +379,7 @@ Object.assign(en, {
   'settings.readonly': 'Read-only here; edit in platform settings.',
 
   'run.title': 'Run',
+  'run.progressUnknown': 'progress unknown',
   'run.id': 'Run ID',
   'run.state': 'State',
   'run.stage': 'Stage',

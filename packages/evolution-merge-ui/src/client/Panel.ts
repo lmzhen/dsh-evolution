@@ -94,7 +94,7 @@ function runStrip(run: MergeRunView, t: Translate, copy: (command: string) => vo
   const internals = [
     createElement('span', { key: 'id', 'data-role': 'run-id', title: run.id }, t('run.id') + ' ' + run.id),
     run.stage === undefined ? null : createElement('span', { key: 'stage', 'data-role': 'run-stage' }, t('stage.' + run.stage)),
-    run.endedAt === undefined ? null : createElement('span', { key: 'ended', 'data-role': 'run-ended' }, t('run.endedAt') + ' ' + new Date(run.endedAt).toLocaleString()),
+    run.endedAt === undefined ? null : createElement('span', { key: 'ended', 'data-role': 'run-ended' }, t('run.endedAt') + ' ' + (formatLocalDateTime(run.endedAt) ?? '')),
     run.failure === undefined ? null : createElement('span', { key: 'failure', 'data-role': 'run-failure', title: run.failure.detail }, t('run.failure') + ' ' + run.failure.code),
     run.currentPairKey === undefined ? null : createElement('span', { key: 'pair', 'data-role': 'run-current-pair' }, t('run.currentPair') + ' ' + run.currentPairKey),
     run.parentRunId === undefined ? null : createElement('span', { key: 'parent', 'data-role': 'run-parent' }, t('run.parent') + ' ' + run.parentRunId),
@@ -102,7 +102,9 @@ function runStrip(run: MergeRunView, t: Translate, copy: (command: string) => vo
   ]
   return createElement('div', { 'data-role': 'run-strip', 'data-run-role': role, 'data-run-state': run.state },
     createElement('span', { 'data-role': 'run-state' }, t('run.state') + ' ' + t('run.' + run.state)),
-    run.progress === null || run.progress === undefined ? null : createElement('span', { 'data-role': 'run-progress' }, t('run.progress') + ' ' + String(run.progress.done) + '/' + String(run.progress.total)),
+    run.progress === null || run.progress === undefined
+      ? run.state === 'succeeded' ? createElement('span', { 'data-role': 'run-progress', 'data-progress': 'unknown' }, t('run.progressUnknown')) : null
+      : createElement('span', { 'data-role': 'run-progress' }, t('run.progress') + ' ' + String(run.progress.done) + '/' + String(run.progress.total)),
     createElement('button', { type: 'button', 'data-role': 'run-report', 'data-action': 'report', disabled: !reportEnabled, title: reportEnabled ? (report?.command ?? t('run.report')) : t('run.noReport'), onClick: () => { if (reportEnabled && report !== undefined) copy(report.command) } }, t('run.report')),
     ...run.actions.filter(action => action.id !== 'report').map(action => createElement('button', {
       key: action.id, type: 'button', 'data-role': 'run-action', 'data-action': action.id, disabled: !action.enabled,
