@@ -3,8 +3,8 @@
 /**
  * U-6 (G5.5): the weight of a dangerous action. Approve/reject/preview used to be three identical
  * buttons — same class, no tone, no primary — while the family already had the convention for the other
- * one (the save button carries `data-primary`). The judge here is assertable, not visual: the three
- * variants must differ, with the destructive side as the primary one.
+ * one (the save button carries `data-primary`). Under DecisionFrame the contract is stronger: exactly
+ * one primary, and reject/preview are secondary even though they remain visible.
  *
  * Judge ③ of the finding ("approve is disabled while the row is busy") is NOT re-pinned here:
  * `PendingCard.client.spec.ts` already drives that path through the card's real state machine (the
@@ -38,17 +38,14 @@ const api: ApprovalApi = {
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string => formatText(key, values)
 
-const variant = (node: HTMLElement): string =>
-  node.getAttribute('data-primary') === 'true' ? 'primary' : node.getAttribute('data-tone') ?? 'plain'
-
 afterEach(() => { cleanup() })
 
 describe('U-6: a dangerous action carries its weight', () => {
-  it('renders three DISTINCT variants (primary / outline / ghost)', async () => {
-    render(h(PendingCard, { t, api }))
+  it('renders one primary and two secondary decisions', async () => {
+    const view = render(h(PendingCard, { t, api }))
     await waitFor(() => { expect(screen.getByText(message('approvalApprove'))).toBeDefined() })
-    const decisions = [message('approvalApprove'), message('approvalReject'), message('approvalPreview')]
-      .map(label => screen.getByText(label))
-    expect(decisions.map(variant)).toEqual(['primary', 'outline', 'ghost'])
+    expect(view.container.querySelectorAll('[data-role="decision-primary"]').length).toBe(1)
+    expect(view.container.querySelector('[data-role="decision-primary"]')?.textContent).toBe(message('approvalApprove'))
+    expect(view.container.querySelectorAll('[data-role="decision-secondary"]').length).toBe(2)
   })
 })

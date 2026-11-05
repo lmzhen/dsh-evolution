@@ -14,12 +14,12 @@ import { en, zh } from '../src/panels/settings/messages.ts'
 const copy = [...Object.values(zh), ...Object.values(en)]
 
 describe('U-8: the family glossary', () => {
-  it('names an overridden field with the platform\'s word, in both languages', () => {
-    expect(zh.overridden).toBe('已覆盖')
-    expect(en.overridden).toBe('Overridden')
+  it('names an overridden field with one reader word, in both languages', () => {
+    expect(zh.overridden).toBe('已修改')
+    expect(en.overridden).toBe('Modified')
     // The count is the same concept — same word, not a synonym.
-    expect(zh.changed).toContain('已覆盖')
-    expect(en.changed.toLowerCase()).toContain('overridden')
+    expect(zh.changed).toContain('已修改')
+    expect(en.changed.toLowerCase()).toContain('modified')
   })
 
   it('keeps cross-face instructions out of the copy', () => {

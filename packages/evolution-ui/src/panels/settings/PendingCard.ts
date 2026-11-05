@@ -315,7 +315,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       const primary = props.onHistory === undefined ? undefined : {
         id: 'approval-history', label: t('approvalHistory'), onSelect: props.onHistory,
       }
-      return createElement(EmptyState, {
+      return createElement('div', { role: 'status' }, createElement(EmptyState, {
         title: t('approvalEmpty'),
         description: t('approvalEmptyDescription'),
         tone: 'ok',
@@ -326,7 +326,7 @@ export function PendingCard(props: PendingCardFace): ReactNode {
           busy: state.refreshing,
           onSelect: () => { void load() },
         },
-      })
+      }))
     }
     if (state.view.kind === 'failed') {
       // G5/W7 S4: the shared four-state failure block (401/403/404 sentence + command fallback when the
