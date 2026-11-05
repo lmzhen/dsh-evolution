@@ -70,6 +70,7 @@ export const CSS = [
   ':where(' + root + ' .evo-health-empty) { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: min(36vh, 280px); text-align: center; }',
   ':where(' + root + ' .evo-health-empty [data-role="empty-actions"]) { justify-content: center; }',
   ':where(' + root + ' [data-role="proposals"]) { display: flex; flex-direction: column; gap: var(--evo-space-8); }',
+  ':where(' + root + ' [data-role="proposals"] > summary) { cursor: pointer; color: var(--dsw-alias-label-secondary); font-weight: 500; }',
   ':where(' + root + ' [data-role="proposal"]) { padding: var(--evo-space-8) var(--evo-space-10); border: var(--evo-hairline-width) solid var(--dsw-alias-border-l1); border-radius: var(--evo-radius-control); }',
   ':where(' + root + ' [data-role="proposal"] p) { margin: var(--evo-space-2) 0; }',
   ':where(' + root + ' [data-role="rule-row"][data-tone="warn"]) { box-shadow: inset var(--evo-hairline-marker) 0 0 var(--dsw-alias-state-warn-primary); }',

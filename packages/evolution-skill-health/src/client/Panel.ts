@@ -313,8 +313,8 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
       ? createElement('p', { 'data-role': 'note' }, t('proposal.stale'))
       : null,
     (view.proposals ?? []).length > 0
-      ? createElement('div', { 'data-role': 'proposals' },
-        createElement('h3', { 'data-role': 'group-title' }, t('group.proposals')),
+      ? createElement('details', { 'data-role': 'proposals' },
+        createElement('summary', { 'data-role': 'group-title' }, t('group.proposals') + ' (' + String((view.proposals ?? []).length) + ')'),
         ...(view.proposals ?? []).map(proposal => {
           const heading = proposal.parts?.[0]?.heading
           const target = proposal.owner.mode === 'covered' ? proposal.owner.name : proposal.owner.neededOwner
