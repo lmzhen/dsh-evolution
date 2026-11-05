@@ -17,6 +17,7 @@ import { healthViewModel } from './health-presentation.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
+import { EmptyState } from '@lmzhen/dsh-evolution-client-kit'
 
 /** One finding, as the host reports it: `line` is null when the position cannot be named. */
 export interface HealthFinding {
@@ -148,7 +149,7 @@ function CopyButton(props: { command: string; t: (key: string) => string; role: 
   return createElement('button', { type: 'button', 'data-role': props.role, 'data-copy-state': state, onClick: () => { void copy() } }, text)
 }
 
-function skillRowNode(face: HealthFace, t: (key: string) => string, row: HealthRow): ReactNode {
+function skillRowNode(face: HealthFace, t: (key: string) => string, row: HealthRow, compact = false): ReactNode {
   return createElement('div', { key: row.name, 'data-role': 'skill-row', 'data-tone': row.verdict },
     createElement('span', { 'data-role': 'skill-name' }, row.name),
     createElement('span', { 'data-role': 'skill-verdict' }, t('verdict.' + row.verdict)),
@@ -158,7 +159,12 @@ function skillRowNode(face: HealthFace, t: (key: string) => string, row: HealthR
     createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + ': ' + String(row.dims?.bodyChars ?? t('dims.unknown')) + ' · ' + t('dims.support') + ': ' + String(row.dims?.supportFiles ?? t('dims.unknown'))),
     createElement('span', { 'data-role': 'skill-row-actions' },
       createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(row.name) } }, t('action.history')),
-      createElement(CopyButton, { command: '/evolution skill history ' + row.name, t, role: 'action-copy', label: t('action.copy') }),
+      compact
+        ? createElement('details', { 'data-role': 'skill-more' },
+          createElement('summary', null, t('action.more')),
+          createElement(CopyButton, { command: '/evolution skill history ' + row.name, t, role: 'action-copy', label: t('action.copy') }),
+        )
+        : createElement(CopyButton, { command: '/evolution skill history ' + row.name, t, role: 'action-copy', label: t('action.copy') }),
     ),
   )
 }
@@ -171,13 +177,14 @@ function skillQueue(face: HealthFace, t: (key: string) => string, model: ReturnT
     ...model.issues.map(row => skillRowNode(face, t, row)),
     model.normal.length === 0 ? null : createElement('details', { 'data-role': 'health-normal', className: 'evo-health-normal' },
       createElement('summary', null, t('health.normal').replace('{n}', String(model.normal.length))),
-      ...model.normal.map(row => skillRowNode(face, t, row))),
+      ...model.normal.map(row => skillRowNode(face, t, row, true))),
   )
 }
 
 /** The rule table: a grid so counts line up, with a tone bar per row and skill pills. */
 function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
   const rows = byRule(face.rows)
+  if (rows.length === 0) return createElement(EmptyState, { title: t('rule.empty'), className: 'evo-health-empty', variant: 'compact' })
   const cell = (role: string, children: ReactNode, key?: string): ReactNode =>
     createElement('td', key === undefined ? { 'data-role': role } : { 'data-role': role, key }, children)
   return createElement('table', { 'data-role': 'rule-table' },
@@ -287,8 +294,10 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
   )
   return createElement('section', { className: CSS_TAG_ID },
     createElement('div', { 'data-role': 'header' },
-      createElement('span', { 'data-role': 'read-at' }, lastReadAt === undefined ? t('readAt.unknown') : new Date(lastReadAt).toLocaleString()),
-      createElement('span', { 'data-role': 'scan-status' }, t('scan.' + (scan?.status ?? 'unavailable'))),
+      createElement('div', { 'data-role': 'header-meta' },
+        createElement('span', { 'data-role': 'read-at' }, lastReadAt === undefined ? t('readAt.unknown') : new Date(lastReadAt).toLocaleString()),
+        createElement('span', { 'data-role': 'scan-status' }, t('scan.' + (scan?.status ?? 'unavailable'))),
+      ),
       createElement('button', { type: 'button', 'data-role': 'refresh', disabled: loading, onClick: () => { load() } }, t('refresh')),
     ),
     createElement('p', { 'data-role': 'hint' }, t('hint')),
