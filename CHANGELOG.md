@@ -1,4 +1,9 @@
 # Changelog
+## 0.36.2 (ui) — 修复皮肤下工作台背景被平台选择器覆盖
+
+> **范围**：0.36.1 的 `.evo-workbench` 背景被平台 `.evolution-page-surface` 同权重规则覆盖；改用 `.evolution-page-surface.evo-workbench` 提高权重，使用 opaque `--dsw-alias-bg-overlay`。
+> **验证**：web 3080 主题皮肤下历史/诊断真机截图，背景 rgba(238,241,249,.92)，正文对比度恢复；history/panel 11/11；build 通过。
+
 ## 0.36.1 (ui) — 主题皮肤下的可读内容面
 
 > **范围**：平台主题/皮肤把 `--dsw-alias-bg-base` 变成半透明后，工作台正文透出背景图；用同一 token 多层叠加成近乎不透明的内容面，不改平台外壳、不引入字面色值。
