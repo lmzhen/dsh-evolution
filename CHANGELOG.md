@@ -1,4 +1,10 @@
 # Changelog
+## 0.36.0 (ui) — C 端任务界面：决定卡、异常优先、正常折叠
+
+> **范围**：工作台默认落到待处理任务并保留用户选择；历史当前正文连续阅读、旧版本轻量时间线；待批/合并统一 DecisionFrame，只有批准是视觉主动作，合并 A/B 收敛为单个“查看双方”双栏弹层；健康改为 issues 优先、正常项折叠，诊断 topIssue + 正常检查折叠；设置按写入/整理/记忆三层分组，Reset 与标签同行、已修改弱徽标；工作台 feature 面板撑满内容区，合并决定卡全宽。
+> **验证**：pending 21/21、merge 49/49、history 22/22、health 14/14、diagnostics 6/6、settings 11/11；真实 rc3 web 宿主 1440/1024/768/200% 与深色矩阵，所有页面 scrollWidth=clientWidth；设置分组/Reset、健康筛选/刷新保留选择、复制失败、合并双方弹层均有真机截图。
+> **已知边界**：触屏未接真实触屏设备；设置 768 沿用平台 Modal 外壳，不注入平台 CSS；TaskBanner 说明副行列为 P2。
+
 ## 0.35.0 (ui) — G4–G8 UI/UX closure
 
 > **范围**：合并页过期筛选降级、摘要归并、行复制收进“更多命令”、审批设置压缩为 chip、运行身份、MergeRow/RunStrip/Settings 组件拆分；历史三层技能行与 family 默认去重、正文按技能命名、unit 回退影响范围；健康 verdict 筛选、诊断折叠重点与刷新保留旧视图；G2 executing→release 真机闭环；768 历史上下布局。
