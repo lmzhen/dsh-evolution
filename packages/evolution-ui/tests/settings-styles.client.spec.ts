@@ -56,3 +56,9 @@ it('P2-29: a new owner replaces the tag so the old disposer cannot unstyle it', 
   dispose()
   expect(document.querySelectorAll('style[data-plugin-css="' + CSS_TAG_ID + '"]')).toHaveLength(0)
 })
+
+it('keeps the params footer visible and centers the pending empty state', () => {
+  expect(CSS).toContain('.evolution-param-card[data-card="params"] .evolution-param-body')
+  expect(CSS).toContain('.evolution-param-card[data-card="params"] .evolution-param-footer{position:sticky')
+  expect(CSS).toContain('.evo-pending-empty{')
+})

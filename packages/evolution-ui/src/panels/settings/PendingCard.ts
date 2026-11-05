@@ -319,6 +319,8 @@ export function PendingCard(props: PendingCardFace): ReactNode {
         title: t('approvalEmpty'),
         description: t('approvalEmptyDescription'),
         tone: 'ok',
+        variant: 'centered',
+        className: 'evo-pending-empty',
         ...(primary === undefined ? {} : { primary }),
         secondary: {
           id: 'approval-refresh',

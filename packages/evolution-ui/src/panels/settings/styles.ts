@@ -103,6 +103,11 @@ export const CSS = [
   '.evolution-param-check{width:var(--evo-space-16);height:var(--evo-space-16);margin:0;accent-color:var(--dsw-alias-brand-primary);cursor:pointer}',
   '.evolution-param-check:disabled{cursor:default;opacity:.5}',
   '.evolution-param-footer{display:flex;justify-content:flex-end;gap:var(--evo-space-8);padding:var(--evo-space-12) 0 0;border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}',
+  // The field surface scrolls; the save/discard row stays visible at its bottom edge.
+  '.evolution-param-card[data-card="params"] .evolution-param-body{display:flex;flex-direction:column;max-height:min(56vh, 520px);overflow-y:auto;padding-bottom:0}',
+  '.evolution-param-card[data-card="params"] .evolution-param-footer{position:sticky;bottom:0;z-index:1;margin-top:var(--evo-space-12);padding:var(--evo-space-12) 0;background:var(--dsw-alias-bg-layer-1)}',
+  '.evo-pending-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--evo-space-24) * 10);padding:var(--evo-space-24) var(--evo-space-16);text-align:center}',
+  '.evo-pending-empty [data-role="empty-actions"]{justify-content:center}',
   '.evolution-param-note{margin:0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   '.evolution-param-error{margin:0;color:var(--dsw-alias-state-error-primary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   // The preview a staged write shows before it runs: a facts line, then the SOURCE view. It borrows the

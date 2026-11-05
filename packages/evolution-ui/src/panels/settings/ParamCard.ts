@@ -441,7 +441,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
       }
     })()
   }
-  return createElement('section', { className: 'evolution-param-card' },
+  return createElement('section', { className: 'evolution-param-card', 'data-card': 'params' },
     createElement('button', {
       type: 'button',
       className: 'evolution-param-head',
