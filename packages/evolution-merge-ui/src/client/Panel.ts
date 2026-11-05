@@ -3,12 +3,13 @@ import { createElement, useEffect, useMemo, useRef, useState, useSyncExternalSto
 import { CSS_TAG_ID } from './styles.ts'
 import { platformModal } from './platform-modal.ts'
 import { PLATFORM_MENU, renderPlatformMenu } from './platform-menu.ts'
-import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView, type MergeViewPayload } from './api.ts'
+import { isBlocked, type MergeFailure, type MergeProblem, type MergeQueue, type MergeRowView } from './api.ts'
 import type { MergeStore, OverlayState, QueueState, StoreSnapshot } from './MergeStore.ts'
 import { formatLocalDateTime, type SettingsFace } from '@lmzhen/dsh-evolution-client-kit'
 import { createRowOrderStore, moveRow, orderRows, pinRow, resolveWorkspaceId, rowOrderKey, type RowOrderEdge } from './sorting.ts'
 import { summarizePair } from './merge-presentation.ts'
 import { MergeRunStrips } from './MergeRunStrip.ts'
+import { MergeSettings } from './MergeSettings.ts'
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
@@ -88,27 +89,6 @@ function stageNode(row: MergeRowView, t: Translate): ReactNode {
   const expiry = stage.expiresAt === undefined ? '' : ' · ' + t('row.expires') + ' ' + new Date(stage.expiresAt).toLocaleString()
   return createElement('span', { 'data-role': 'stage-badge', 'data-stage': stage.state, 'data-tone': tone }, t('stage.state.' + stage.state) + expiry)
 }
-function SettingChip({ section, label, value, disabled, missing, t }: { section: string; label: string; value: boolean | undefined; disabled: boolean; missing: boolean; t: Translate }): ReactNode {
-  const text = missing ? t('settings.capabilityMissing') : disabled ? t('settings.capabilityDisabled') : value === true ? t('settings.on') : t('settings.off')
-  const state = missing ? 'missing' : disabled ? 'unavailable' : value === true ? 'on' : 'off'
-  return createElement('span', { 'data-role': 'settings-section', 'data-section': section, 'data-disabled': missing || disabled ? 'true' : 'false', 'data-state': state },
-    createElement('span', { 'data-role': 'settings-label' }, label),
-    createElement('span', { 'data-role': 'settings-value', 'data-value': state }, text),
-  )
-}
-function SettingsCard({ view, t }: { view: MergeViewPayload; t: Translate }): ReactNode {
-  const platform = view.approval.platformWrite
-  const platformCapability = platform?.capability === true
-  const platformFallback = platform?.enabled ?? false
-  return createElement('div', { 'data-role': 'settings-card' },
-    createElement('h3', { 'data-role': 'settings-title' }, t('settings.title')),
-    createElement('p', { 'data-role': 'settings-path' }, t('settings.openPlatformPath')),
-    createElement('div', { 'data-role': 'settings-chips' },
-      createElement(SettingChip, { section: 'merge-approval', label: t('settings.mergeApproval'), value: view.approval.mergeApproval, disabled: false, missing: false, t }),
-      createElement(SettingChip, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, t }),
-    ),
-  )
-}
 interface RowSortHandlers {
   start(id: string): void
   over(event: DragEvent<HTMLDivElement>): void
@@ -116,6 +96,7 @@ interface RowSortHandlers {
   end(): void
   menu(id: string, x: number, y: number): void
 }
+
 function rowNode(row: MergeRowView, t: Translate, copy: (command: string) => void, sort: RowSortHandlers, openBody: (name: string, side: 'live' | 'archive', rowId: string | undefined) => void, onDecide: ((rowId: string, verb: 'approve' | 'reject') => void) | undefined, busy: boolean): ReactNode {
   const first = [
     row.target === undefined ? undefined : t('row.target') + ' ' + row.target,
@@ -391,7 +372,7 @@ export function MergePanel(face: MergeFace): ReactNode {
             createElement('button', { type: 'button', 'data-role': 'start-pair', onClick: () => { copy(view.startCommands.pair) } }, t('start.pair')),
           ),
           view.degraded ? createElement('p', { 'data-role': 'degraded' }, t('degraded') + ' ' + view.notes.join(',')) : null,
-          createElement(SettingsCard, { view, t }),
+          createElement(MergeSettings, { view, t }),
           createElement(MergeRunStrips, { view, t, copy }),
           tabs,
           expiredToggle,
