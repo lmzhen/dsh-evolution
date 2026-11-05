@@ -63,7 +63,7 @@ export function MergeRow(props: { row: MergeRowView; t: Translate; copy: (comman
     row.attempts === undefined ? undefined : t('row.attempts') + ' ' + String(row.attempts),
     row.confidence === undefined ? undefined : t('row.confidence') + ' ' + row.confidence.toFixed(2),
   ].filter((value): value is string => value !== undefined).join(' · ')
-  const actions = row.actions.filter(action => action.id !== 'copy').map(action => {
+  const actions = row.actions.filter(action => action.id !== 'copy' && action.id !== 'discard').map(action => {
     const decision = (action.id === 'approve' || action.id === 'reject') && onDecide !== undefined
     return createElement('button', {
       key: action.id, type: 'button', 'data-role': decision ? 'row-decision' : 'row-action', 'data-action': action.id,
