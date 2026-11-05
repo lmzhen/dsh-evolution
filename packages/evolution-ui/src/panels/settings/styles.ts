@@ -94,6 +94,7 @@ export const CSS = [
   '.evolution-approval-item [data-role="empty-secondary"]{padding:var(--evo-space-6) var(--evo-space-12);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:var(--evo-type-sm);cursor:pointer}',
   '.evo-diag-issue{padding:var(--evo-space-10) var(--evo-space-12);border:var(--evo-hairline-width) solid var(--dsw-alias-state-warn-primary);border-radius:var(--evo-radius-control);background:var(--dsw-alias-bg-layer-1)}',
   '.evo-diag-issue[data-status="fail"]{border-color:var(--dsw-alias-state-error-primary)}',
+  '.evo-diag-issue-actions{display:flex;justify-content:flex-end;margin-top:var(--evo-space-8)}',
   '.evo-diag-complete{padding:var(--evo-space-10) var(--evo-space-12);border:var(--evo-hairline-width) solid var(--dsw-alias-state-success-primary);border-radius:var(--evo-radius-control);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-state-success-primary)}',
   '.evo-diag-group{display:flex;flex-direction:column;gap:var(--evo-space-4);margin-top:var(--evo-space-8)}',
   '.evo-diag-group>summary{cursor:pointer;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs)}',

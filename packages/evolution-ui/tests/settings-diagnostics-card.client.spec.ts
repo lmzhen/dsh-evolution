@@ -62,6 +62,7 @@ describe('diagnostics card', () => {
     expect(screen.getByText('注意')).toBeTruthy()
     expect(screen.getByText('orphaned=1')).toBeTruthy()
     expect(screen.getByText('建议：/evolution runs')).toBeTruthy()
+    expect(document.querySelector('[data-action="diag-copy-remedy"]')).toBeTruthy()
     // The documentation facts (labels, values, homes) stay off the settings face.
     expect(screen.queryByText('Environment')).toBeNull()
     expect(screen.queryByText('平台兼容线')).toBeNull()

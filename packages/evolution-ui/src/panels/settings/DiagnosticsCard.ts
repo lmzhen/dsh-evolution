@@ -81,6 +81,7 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => t(key as MessageKey, values)
   const [state, setState] = useState<DiagnosticsState>({ phase: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
+  const [copyNotice, setCopyNotice] = useState('')
   const [refreshFailure, setRefreshFailure] = useState<import('@lmzhen/dsh-evolution-client-kit/generated/route-client').RouteFailure | undefined>(undefined)
   // Collapsible like every other card in the section (same head geometry, same chevron); it starts
   // closed so a diagnostic read never dominates the section before the operator asks for it.
@@ -106,6 +107,14 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
     // flicker the card (W7 §3).
   }, [])
   const refresh = (): void => { read(true) }
+  const copyRemedy = (command: string): void => {
+    setCopyNotice('')
+    if (navigator.clipboard?.writeText === undefined) { setCopyNotice(t('diagCopyFailed')); return }
+    void navigator.clipboard.writeText(command).then(
+      () => { setCopyNotice(t('diagCopied')) },
+      () => { setCopyNotice(t('diagCopyFailed')) },
+    )
+  }
   const summary = state.phase === 'ready' ? summaryOf(state.view.runtime) : undefined
   const focusRow = summary === undefined || summary.status === 'ok' || state.phase !== 'ready'
     ? undefined
@@ -145,7 +154,15 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
       createElement('h3', { className: 'evolution-param-group' }, t('diagRuntimeTitle')),
       reading.topIssue === undefined
         ? createElement('div', { className: 'evo-diag-complete', 'data-role': 'diag-complete' }, t('diagComplete'))
-        : createElement('div', { className: 'evo-diag-issue', 'data-role': 'diag-issue', 'data-status': reading.topIssue.status }, rowNode(reading.topIssue)),
+        : createElement('div', { className: 'evo-diag-issue', 'data-role': 'diag-issue', 'data-status': reading.topIssue.status },
+          rowNode(reading.topIssue),
+          createElement('div', { className: 'evo-diag-issue-actions', 'data-role': 'diag-issue-actions' },
+            reading.topIssue.remedy?.startsWith('/') === true
+              ? createElement('button', { type: 'button', className: 'evolution-param-button', 'data-action': 'diag-copy-remedy', onClick: () => { copyRemedy(reading.topIssue!.remedy!) } }, t('diagCopyRemedy'))
+              : null,
+            createElement('button', { type: 'button', className: 'evolution-param-button', 'data-action': 'diag-recheck', disabled: refreshing, onClick: refresh }, t('diagRecheck')),
+          ),
+          copyNotice === '' ? null : createElement('p', { className: 'evolution-param-note', role: 'status', 'data-role': 'diag-copy-status' }, copyNotice)),
       reading.otherIssues.length === 0 ? null : createElement('details', { className: 'evo-diag-group', 'data-role': 'diag-other-issues' },
         createElement('summary', null, t('diagOtherIssues', { n: reading.otherIssues.length })),
         ...reading.otherIssues.map(rowNode)),
