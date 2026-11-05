@@ -85,12 +85,13 @@ export const CSS = [
   // A row is capped so its controls stay within reach of the text they act on: on a wide window the
   // tools used to sit ~700px away from the sentence they belonged to (W4). The cap is the reading
   // measure times one and a half, so it follows the scale rather than a window width.
-  '.evo-hist-row{display:flex;align-items:flex-start;gap:var(--evo-space-8);padding:var(--evo-space-8) 0;border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);max-width:calc(var(--evo-measure-read) * 1.5);color:var(--dsw-alias-label-primary)}',
+  '.evo-hist-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"body actions" "expanded expanded";align-items:start;gap:var(--evo-space-4) var(--evo-space-8);padding:var(--evo-space-8) 0;border-top:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);max-width:calc(var(--evo-measure-read) * 1.5);color:var(--dsw-alias-label-primary)}',
   '.evo-hist-row:first-of-type{border-top:0}',
-  '.evo-hist-row-body{flex:1 1 auto;min-width:0}',
+  '.evo-hist-row-body{grid-area:body;min-width:0}',
   '.evo-hist-row-title{display:flex;align-items:baseline;gap:var(--evo-space-8);min-width:0}',
   '.evo-hist-row-summary{margin-top:var(--evo-space-2);line-height:var(--evo-leading-base)}',
-  '.evo-hist-actions{display:flex;flex:none;align-items:center;gap:var(--evo-space-6)}',
+  '.evo-hist-actions{grid-area:actions;display:flex;align-items:center;gap:var(--evo-space-6)}',
+  '.evo-hist-row-expanded{grid-area:expanded;min-width:0}',
   '.evo-hist-more{position:relative;display:inline-flex;align-items:center}',
   '.evo-hist-more>summary{list-style:none;cursor:pointer;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);padding:var(--evo-space-2) var(--evo-space-4)}',
   '.evo-hist-more>summary::-webkit-details-marker{display:none}',
@@ -127,6 +128,6 @@ export const CSS = [
   '.evo-doc-tag{position:absolute;left:var(--evo-space-8);top:var(--evo-space-8);color:var(--dsw-alias-label-tertiary)}',
   '.evo-doc-line-add{color:var(--evo-tone-success)}',
   '.evo-doc-line-del{color:var(--evo-tone-danger)}',
-  '@media (max-width:1100px){.evo-hist-row{flex-direction:column;align-items:stretch}.evo-hist-actions{flex-wrap:wrap;justify-content:flex-start;padding-top:var(--evo-space-4)}}',
+  '@media (max-width:1100px){.evo-hist-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"body" "actions" "expanded"}.evo-hist-actions{flex-wrap:wrap;justify-content:flex-start}}',
   '@media (max-width:900px){.evo-hist-root{flex-direction:column}.evo-hist-aside{flex:0 0 auto;width:100%;max-height:42%;border-right:0;border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}.evo-hist-row{max-width:none}}',
 ].join('\n')

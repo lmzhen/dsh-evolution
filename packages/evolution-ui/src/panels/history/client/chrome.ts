@@ -160,9 +160,9 @@ export function versionRow(props: VersionRowProps): ReactNode {
   return createElement('div', { key: String(row.v), className: 'evo-hist-row' },
     createElement('div', { className: 'evo-hist-row-body' },
       cellLine(row.cells.title, copy, 'evo-hist-row-title', { time: localTime(row.at) }),
-      row.cells.meta.length === 0 ? null : cellLine(row.cells.meta, copy, 'evo-hist-row-summary'),
-      expanded),
-    createElement('div', { className: 'evo-hist-actions' }, actions))
+      row.cells.meta.length === 0 ? null : cellLine(row.cells.meta, copy, 'evo-hist-row-summary')),
+    createElement('div', { className: 'evo-hist-actions' }, actions),
+    expanded === null || expanded === undefined ? null : createElement('div', { className: 'evo-hist-row-expanded' }, expanded))
 }
 
 /**
