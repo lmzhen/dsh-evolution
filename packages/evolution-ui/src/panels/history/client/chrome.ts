@@ -82,7 +82,14 @@ export function skillLine(copy: Copy, row: SkillRow, selected: boolean, onOpen: 
     onClick: onOpen,
   },
   cellLine(row.cells.title, copy, 'evo-hist-cell-line'),
-  cellLine(row.cells.meta, copy, 'evo-hist-cell-line evo-hist-cell-meta'))
+  (() => {
+    const description = row.cells.meta.filter(cell => cell.key === 'description')
+    const facts = row.cells.meta.filter(cell => cell.key !== 'description')
+    return [
+      description.length === 0 ? null : cellLine(description, copy, 'evo-hist-cell-line evo-hist-skill-description'),
+      facts.length === 0 ? null : cellLine(facts, copy, 'evo-hist-cell-line evo-hist-cell-meta'),
+    ]
+  })())
 }
 
 /** What one version row needs from the panel's state machine. */

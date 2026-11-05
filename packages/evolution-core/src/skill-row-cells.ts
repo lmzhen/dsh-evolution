@@ -172,8 +172,11 @@ export function skillRowCells(skill: SkillRowFacts): RowCells {
   ]
   const meta: RowCell[] = [
     { key: 'description', literal: skill.description, tone: 'tertiary', slot: 'lead', note: skill.description },
-    { key: 'state', copy: skillStateKey(skill), tone: 'tertiary', slot: 'meta' },
   ]
+  // Family management is the default; only an exception (foreign/protected/unknown) earns a state cell.
+  if (!skill.managed || skill.protectedBy !== null || skill.protectionUnknown) {
+    meta.push({ key: 'state', copy: skillStateKey(skill), tone: 'tertiary', slot: 'meta' })
+  }
   // U-5 (history half): a protected skill says WHO holds it, not only that it is held. The state cell
   // above answers 'protected or not' from the same field; this cell carries the guard's own name, a
   // verbatim fact (no dictionary key — literals are values the host owns).

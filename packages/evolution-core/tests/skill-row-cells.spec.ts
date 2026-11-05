@@ -105,12 +105,13 @@ describe('one skill row as cells (G1)', () => {
     expect(cellOf(cells.title, 'count')).toMatchObject({ copy: 'versions.count', values: { n: 4 } })
   })
 
-  it('puts the description, the state and the age on the meta line', () => {
+  it('puts the description and the age on the meta line, hiding default family management', () => {
     const cells = skillRowCells(skill())
-    expect(keys(cells.meta)).toEqual(['description', 'state', 'age'])
+    expect(keys(cells.meta)).toEqual(['description', 'age'])
     expect(cellOf(cells.meta, 'description')).toMatchObject({ literal: 'first skill', tone: 'tertiary', slot: 'lead' })
-    expect(cellOf(cells.meta, 'state')).toMatchObject({ copy: 'state.managed', slot: 'meta' })
     expect(cellOf(cells.meta, 'age')).toMatchObject({ copy: 'time.days', values: { n: 2 }, slot: 'aside' })
+    // Only an exception earns a state word; foreign is the one that must stay visible.
+    expect(keys(skillRowCells(skill({ managed: false })).meta)).toContain('state')
   })
 
   it('never lets a long description decide whether the facts survive (W1)', () => {
@@ -118,14 +119,14 @@ describe('one skill row as cells (G1)', () => {
     // The two facts a reader decides on are ASIDE: right-aligned, outside the truncating line.
     expect(slotOf(cells.title, 'count')).toBe('aside')
     expect(slotOf(cells.meta, 'age')).toBe('aside')
-    expect(slotOf(cells.meta, 'state')).toBe('meta')
+    expect(slotOf(cells.meta, 'state')).toBe('missing')
     // ...and the description reaches the renderer whole, with the full text on hover: the browser
     // ellipsis clips it at the layout's real width, which a character count cannot know.
     expect(cellOf(cells.meta, 'description')).toMatchObject({ literal: 'x'.repeat(200), note: 'x'.repeat(200) })
   })
 
   it('says nothing about an age it does not have', () => {
-    expect(keys(skillRowCells(skill({ age: null })).meta)).toEqual(['description', 'state'])
+    expect(keys(skillRowCells(skill({ age: null })).meta)).toEqual(['description'])
   })
 })
 
