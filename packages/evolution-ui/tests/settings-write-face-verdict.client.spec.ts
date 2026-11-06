@@ -52,4 +52,19 @@ describe('G4/4.1: the write face reports the host verdict', () => {
     const notReadBack = await writeFaceFor((() => ({ get: () => stale })) as unknown as Probe, 'evolution-curator').saveOnce([])
     expect(notReadBack).toMatchObject({ written: true, readback: 'failed' })
   })
+
+  it('carries the structured refusal class instead of calling every refusal a conflict', async () => {
+    const refusal = (kind: 'conflict' | 'validation' | 'transport') => ({
+      getSnapshot: () => ({ status: 'ready', revision: 1 }),
+      subscribe: () => () => {},
+      set: async () => false,
+      unset: async () => false,
+      mutate: async () => false,
+      save: async () => ({ written: false, kind }),
+    })
+    const faceOf = (kind: 'conflict' | 'validation' | 'transport') => writeFaceFor((() => ({ get: () => refusal(kind) })) as unknown as Probe, 'evolution-curator')
+    expect(await faceOf('conflict').saveOnce([])).toMatchObject({ written: false, kind: 'conflict' })
+    expect(await faceOf('validation').saveOnce([])).toMatchObject({ written: false, kind: 'validation' })
+    expect(await faceOf('transport').saveOnce([])).toMatchObject({ written: false, kind: 'transport' })
+  })
 })

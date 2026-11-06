@@ -192,13 +192,23 @@ export function writeFaceFor(probe: SeatProbe, namespace: string): {
   const saveOnce = async (ops: readonly SettingsPathOpLike[]): Promise<SettingsSaveResult> => {
     const seat = form()
     if (seat === undefined) return { written: false, readback: 'failed', kind: 'transport' }
+    // Ask the structured face first: it reports WHY a write was refused (revision CAS vs an invalid
+    // value). A face that only answers the boolean (a test double, or an older seat) keeps the old
+    // mapping, so the card still reports the refusal instead of losing it.
     let written = false
+    let kind: NonNullable<SettingsSaveResult['kind']> = 'conflict'
     try {
-      written = await seat.mutate(ops)
+      const outcome = seat.save === undefined ? undefined : await seat.save(ops)
+      if (outcome === undefined) {
+        written = await seat.mutate(ops)
+      } else {
+        written = outcome.written
+        kind = outcome.kind ?? 'conflict'
+      }
     } catch (failure) {
       return { written: false, readback: 'failed', kind: 'transport', failure }
     }
-    if (!written) return { written: false, readback: 'failed', kind: 'conflict' }
+    if (!written) return { written: false, readback: 'failed', kind }
     try { await seat.refresh?.() } catch { /* the verdict below reads what the seat kept */ }
     const snapshot = seat.getSnapshot()
     if (snapshot.status !== 'ready') return { written: true, readback: 'failed', kind: 'transport' }

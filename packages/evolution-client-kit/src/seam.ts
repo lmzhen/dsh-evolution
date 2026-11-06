@@ -61,6 +61,16 @@ export interface ConfigFormSnapshotLike<T = Record<string, unknown>> {
   writable: boolean
   revision: number | undefined
 }
+/** Why a form write was refused, as far as the host reported it. */
+export type ConfigWriteKind = 'conflict' | 'validation' | 'transport'
+
+/** One atomic write and, when it was refused, the class the host reported. */
+export interface ConfigWriteOutcome {
+  readonly written: boolean
+  /** Absent on success; when a write was refused, why (revision CAS, invalid value, transport). */
+  readonly kind?: ConfigWriteKind
+}
+
 export interface ConfigFormLike<T = Record<string, unknown>> {
   getSnapshot(): ConfigFormSnapshotLike<T>
   subscribe(listener: () => void): () => void
@@ -68,6 +78,13 @@ export interface ConfigFormLike<T = Record<string, unknown>> {
   unset(field: string): Promise<boolean>
   /** Atomic multi-field save; `expectedRevision` is the read the caller is replacing. */
   mutate(ops: readonly ConfigPathOpLike[], expectedRevision?: number): Promise<boolean>
+  /**
+   * The same atomic save with the host's refusal class. `mutate` answers only the boolean, which
+   * cannot tell "another page changed the settings" from "this value is invalid"; a card that says
+   * the wrong cause is worse than saying nothing. Optional so a test double (and the previous
+   * two-method face) still works.
+   */
+  save?(ops: readonly ConfigPathOpLike[], expectedRevision?: number): Promise<ConfigWriteOutcome>
   /** Re-read the row (used by the card's readback verdict). */
   refresh?(): Promise<void>
   /** Stop the form's remote subscription; owned by the seat. */

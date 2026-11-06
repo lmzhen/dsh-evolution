@@ -8,7 +8,7 @@
  * stay platform-owned).
  * @module @lmzhen/dsh-evolution-client-kit
  */
-import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ConfigPathOpLike } from './seam.ts'
+import type { ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ConfigPathOpLike, ConfigWriteKind } from './seam.ts'
 import { ROUTES } from './generated/routes.generated.ts'
 
 interface FamilySnapshot extends ConfigFormSnapshotLike<Record<string, unknown>> {
@@ -45,17 +45,32 @@ async function describe(namespace: string): Promise<FamilySnapshot> {
   } catch { return EMPTY }
 }
 
-async function write(namespace: string, ops: readonly ConfigPathOpLike[], expectedRevision?: number): Promise<{ ok: boolean; snapshot?: FamilySnapshot }> {
+/**
+ * Classify one refused write from the exact route's response: the route answers 409 for a revision
+ * CAS loss and 400 with an "invalid config" error for a schema refusal, so the card can name the
+ * right cause instead of calling every refusal a concurrent edit.
+ * @param response - the non-ok response.
+ * @returns the refusal class; anything the route did not name stays transport.
+ */
+async function refusalKind(response: Response): Promise<ConfigWriteKind> {
+  if (response.status === 409) return 'conflict'
+  try {
+    const body = await response.json() as { error?: unknown }
+    return typeof body.error === 'string' && body.error.startsWith('invalid config') ? 'validation' : 'transport'
+  } catch { return 'transport' }
+}
+
+async function write(namespace: string, ops: readonly ConfigPathOpLike[], expectedRevision?: number): Promise<{ ok: boolean; snapshot?: FamilySnapshot; kind?: ConfigWriteKind }> {
   try {
     const response = await fetch(SETTINGS_MUTATE, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ ns: namespace, ops, ...(expectedRevision === undefined ? {} : { expectedRevision }) }),
     })
-    if (!response.ok) return { ok: false }
+    if (!response.ok) return { ok: false, kind: await refusalKind(response) }
     const body = await response.json() as { ok?: boolean; data?: unknown }
     return { ok: body.ok === true, snapshot: snapshotFrom(body.data, namespace) }
-  } catch { return { ok: false } }
+  } catch { return { ok: false, kind: 'transport' } }
 }
 
 function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
@@ -104,6 +119,13 @@ function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
     },
     set: async (field, value) => (await form.mutate([{ op: 'set', path: [field], value }])),
     unset: async (field) => (await form.mutate([{ op: 'unset', path: [field] }])),
+    save: async (ops, expectedRevision) => {
+      const revision = expectedRevision ?? snapshot.revision
+      const outcome = await write(namespace, ops, revision)
+      if (outcome.snapshot !== undefined) absorb(outcome.snapshot)
+      else await refresh()
+      return outcome.ok ? { written: true } : { written: false, kind: outcome.kind ?? 'transport' }
+    },
     mutate: async (ops, expectedRevision) => {
       const revision = expectedRevision ?? snapshot.revision
       const outcome = await write(namespace, ops, revision)
