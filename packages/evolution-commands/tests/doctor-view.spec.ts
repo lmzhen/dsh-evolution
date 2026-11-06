@@ -4,6 +4,7 @@ import {
   DIAGNOSTICS_FACT_KEYS,
   DIAGNOSTICS_RUNTIME_KEYS,
   DIAGNOSTICS_VIEW_SCHEMA_VERSION,
+  EVOLUTION_PRESET_IDS,
   MAINTAINER_PRESET_ID,
   PLATFORM_LINE,
   REVIEWER_PRESET_ID,
@@ -67,7 +68,7 @@ describe('buildDoctorView: the frozen 7+8 shape', () => {
     expect(platform?.value).toContain(PLATFORM_LINE.version)
     expect(platform?.value).toContain(PLATFORM_LINE.floor)
     expect(view.facts.find(fact => fact.key === 'family-version')?.value).toBe('0.27.0')
-    expect(view.facts.find(fact => fact.key === 'preset-ids')?.value).toContain(REVIEWER_PRESET_ID)
+    expect(view.facts.find(fact => fact.key === 'preset-ids')?.value).toContain(String(EVOLUTION_PRESET_IDS.length) + ' 个基础预设可选')
   })
 
   it('renders a healthy host as all-ok runtime rows', () => {

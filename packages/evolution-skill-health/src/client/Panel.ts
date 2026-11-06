@@ -17,7 +17,7 @@ import { healthViewModel } from './health-presentation.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
-import { EmptyState } from '@lmzhen/dsh-evolution-client-kit'
+import { EmptyState, formatLocalClock, formatLocalDateTime, isSameLocalDay } from '@lmzhen/dsh-evolution-client-kit'
 
 /** One finding, as the host reports it: `line` is null when the position cannot be named. */
 export interface HealthFinding {
@@ -181,6 +181,15 @@ function skillQueue(face: HealthFace, t: (key: string) => string, model: ReturnT
   )
 }
 
+/** The scan clock: today reads as "今天 HH:MM"; older reads keep the full local time (title shows it). */
+function readAtNode(value: number | undefined, t: (key: string) => string): ReactNode {
+  const full = value === undefined ? null : formatLocalDateTime(value, { seconds: true })
+  if (value === undefined || full === null) return createElement('span', { 'data-role': 'read-at' }, t('readAt.unknown'))
+  const clock = formatLocalClock(value, { seconds: false })
+  const text = isSameLocalDay(value) && clock !== null ? t('readAt.today') + ' ' + clock : full
+  return createElement('span', { 'data-role': 'read-at', title: full }, text)
+}
+
 /** The count column's unit: most rules count skills; these two count timestamps/files. */
 const COUNT_UNIT: Readonly<Record<string, string>> = { 'stamp-density': 'count.unit.stamps', 'references-sprawl': 'count.unit.files' }
 
@@ -300,7 +309,7 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
   return createElement('section', { className: CSS_TAG_ID },
     createElement('div', { 'data-role': 'header' },
       createElement('div', { 'data-role': 'header-meta' },
-        createElement('span', { 'data-role': 'read-at' }, lastReadAt === undefined ? t('readAt.unknown') : new Date(lastReadAt).toLocaleString()),
+        readAtNode(lastReadAt, t),
         createElement('span', { 'data-role': 'scan-status' }, t('scan.' + (scan?.status ?? 'unavailable'))),
       ),
       createElement('button', { type: 'button', 'data-role': 'refresh', disabled: loading, onClick: () => { load() } }, t('refresh')),

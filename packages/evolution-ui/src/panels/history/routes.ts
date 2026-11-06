@@ -118,7 +118,7 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
       fetch: (request) => {
         if (request.method !== 'GET') return Promise.resolve(methodNotAllowed(['GET']))
         const name = new URL(request.url).searchParams.get('name')?.trim() ?? ''
-        if (name === '') return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '缺少 name' }))
+        if (name === '') return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '缺少技能名' }))
         return withCurator(async (curator) => {
           const versions = await curator.history(name)
           // The PANEL must not own the classification: core decides which entries hold the body
@@ -172,7 +172,7 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
         const rawV = params.get('v')?.trim() ?? ''
         const v = Number.parseInt(rawV, 10)
         if (name === '' || !/^\d+$/.test(rawV) || !Number.isInteger(v) || v < 1) {
-          return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '需要 name 与正整数 v' }))
+          return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '需要技能名和版本号' }))
         }
         return withCurator(async (curator) => {
           const groups = partitionVersions(await curator.history(name))
@@ -212,7 +212,7 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
         const rawV = params.get('v')?.trim() ?? ''
         const v = Number.parseInt(rawV, 10)
         if (name === '' || !/^\d+$/.test(rawV) || !Number.isInteger(v) || v < 1) {
-          return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '需要 name 与正整数 v' }))
+          return Promise.resolve(json(400, { ok: false, code: 'bad-request', message: '需要技能名和版本号' }))
         }
         return withCurator(async (curator) => {
           // The same read the undo path and the diff route use, so a version has ONE reader.
@@ -241,14 +241,14 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
         return (async () => {
           const payload = await readJsonObject(request)
           const name = typeof payload?.name === 'string' ? payload.name.trim() : ''
-          if (name === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 name' })
+          if (name === '') return json(400, { ok: false, code: 'bad-request', message: '缺少技能名' })
           const raw = payload?.v
           if (raw !== undefined && (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1)) {
-            return json(400, { ok: false, code: 'bad-request', message: 'v 必须是正整数' })
+            return json(400, { ok: false, code: 'bad-request', message: '版本号必须是正整数' })
           }
           const unitId = typeof payload?.unitId === 'string' ? payload.unitId.trim() : ''
           if (raw !== undefined && unitId !== '') {
-            return json(400, { ok: false, code: 'bad-request', message: 'v 与 unitId 不能同时使用' })
+            return json(400, { ok: false, code: 'bad-request', message: '版本号和写入单元不能同时指定' })
           }
           return withCurator(async (curator) => {
             const result = unitId !== ''

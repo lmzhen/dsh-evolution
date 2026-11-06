@@ -122,7 +122,7 @@ function factsOf(inputs: DoctorInputs): DocFactRow[] {
     'platform-line': inputs.platformLine.version + '（最低兼容 ' + inputs.platformLine.floor + '）',
     'family-version': inputs.familyVersion,
     'install-form': FORM_WORDS[inputs.form.id] + '（' + (inputs.form.confidence === 'declared' ? '安装内容已确认' : '按已安装内容推断') + '）',
-    'preset-ids': '审阅、维护各有一个只读模式（' + REVIEWER_PRESET_ID + ' / ' + MAINTAINER_PRESET_ID + '）；另有 ' + String(EVOLUTION_PRESET_IDS.length) + ' 个基础预设可选',
+    'preset-ids': '审阅、维护各有一个只读模式；另有 ' + String(EVOLUTION_PRESET_IDS.length) + ' 个基础预设可选',
     'readonly-contract': '只读模式下能做什么，由该模式声明的工具清单决定（审阅和维护一样）',
     'upgrade-order': '先升平台，再升家族，最后发布（详见 INSTALL 的升级说明）',
     'fallback-map': String(Object.keys(COMMAND_FALLBACKS).length) + ' 个功能页都有命令备用（见 INSTALL 的命令备用表）。',

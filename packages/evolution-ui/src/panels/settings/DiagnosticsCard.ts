@@ -16,12 +16,21 @@ import type { DiagnosticsApi, DiagnosticsState } from './diagnostics-state.ts'
 import type { FallbackHint } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
 import type { MessageKey } from './messages.ts'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
+import { formatLocalClock, formatLocalDateTime, isSameLocalDay } from '@lmzhen/dsh-evolution-client-kit'
 
 /** Injected face: the copy seat, the one host call, and this surface's command fallback. */
 export interface DiagnosticsCardFace {
   t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
   api: DiagnosticsApi
   fallback?: FallbackHint | undefined
+}
+
+/** The footer line: today reads as "今天 HH:MM"; older reads keep the full local time (title shows it). */
+function generatedAtLine(view: DiagnosticsView, t: DiagnosticsCardFace['t']): ReactNode {
+  const full = formatLocalDateTime(view.generatedAt, { seconds: true })
+  const clock = formatLocalClock(view.generatedAt, { seconds: false })
+  const at = full === null ? view.generatedAt : isSameLocalDay(view.generatedAt) && clock !== null ? t('timeToday') + ' ' + clock : full
+  return createElement('p', { className: 'evolution-param-hint', 'data-role': 'diag-footer', ...(full === null ? {} : { title: full }) }, t('diagFooter', { version: String(view.schemaVersion), at }))
 }
 
 /** Which word one status gets (the frozen W1 status set). */
@@ -184,7 +193,7 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
       runtime(view),
       view.runtime.length === 0 ? createElement('p', { className: 'evolution-param-note' }, t('diagNoRows')) : null,
       createElement('p', { className: 'evolution-param-note', 'data-role': 'diag-purpose' }, t('diagPurpose')),
-      createElement('p', { className: 'evolution-param-hint', 'data-role': 'diag-footer' }, t('diagFooter', { version: String(view.schemaVersion), at: new Date(view.generatedAt).toLocaleString() })),
+      generatedAtLine(view, t),
     )
   }
   return createElement('section', { className: 'evolution-param-card', 'data-card': 'diagnostics' }, header,
