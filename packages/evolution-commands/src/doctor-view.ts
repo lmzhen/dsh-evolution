@@ -95,7 +95,7 @@ const RUNTIME_LABELS: Readonly<Record<string, string>> = {
   'platform-services': '平台服务',
   runs: '运行记录',
   'platform-pairing': '版本兼容',
-  'install-form-detected': '安装方式',
+  'install-form-detected': '实际安装方式',
 }
 
 /**
