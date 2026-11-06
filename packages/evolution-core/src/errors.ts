@@ -142,15 +142,15 @@ export const EVOLUTION_ERRORS_EN: Readonly<Partial<Record<EvolutionErrorId, stri
   'e-322-a-parameter-would-break-a':
     'E-322: %a1% must be at least %a2%, but this write sets it to %a3%. Nothing was written.',
   'e-321-no-io-provider-is':
-    'E-321: No evolution-io provider is mounted, so the legacy settings document cannot be read. Mount the evolution-io row (evolution-host/evolution-all) and retry.',
+    'E-321: The data read/write component evolution-io is missing, so legacy settings cannot be read right now. Install or enable evolution-io and retry.',
   'e-319-skill-write-confirm-timed-out':
     'E-319: Skill "%a1%" (%a2%) was not confirmed — the confirmation prompt received no response within %a3%s, so this write was cancelled. Nobody was present to decide: set `skillWriteConfirm` to `auto` to write without prompting, keep `ask` to wait until someone responds, or increase `skillWriteConfirmTimeoutSeconds`.',
   'e-323-subagent-channel-unavailable':
-    'E-323: Subagent channel is unavailable: the subagents/agentPresets services are missing, or the spawn provider does not support the agentPreset capability. Review and maintenance are explicitly marked unavailable and never silently fall back to inject. Run /evolution doctor for causes and remediation guidance.',
+    'E-323: Review/maintenance agent is unavailable: the app is missing the subagents/agentPresets services, or the current runtime does not support read-only agents. Review and maintenance are explicitly marked unavailable and never silently fall back to running in the current session. Run /evolution doctor to inspect the cause.',
   'e-324-restricted-preset-unavailable':
-    'E-324: Restricted preset creation failed (reading the parent preset, parsing, registration, or restrictor mounting failed): %a1%. Review and maintenance channels are unavailable; run /evolution doctor to inspect the preset id, allow set, and failure reason.',
+    'E-324: Read-only mode creation failed: %a1%. Review and maintenance are temporarily unavailable; run /evolution doctor to inspect the cause.',
   'e-325-host-data-plane-unavailable':
-    'E-325: Host data plane is unavailable: the connection service is not mounted, so panel and approval routes are not registered. Use the /evolution pending, approve, and reject commands for the equivalent operations; run /evolution doctor for details.',
+    'E-325: The page cannot reach the platform connection (the connection service is missing), so panels and approvals are not registered. Use the /evolution pending, approve, and reject commands to perform the same actions; see /evolution doctor for details.',
 })
 
 /**
@@ -211,15 +211,15 @@ export const EVOLUTION_ERRORS_JA: Readonly<Partial<Record<EvolutionErrorId, stri
   'e-322-a-parameter-would-break-a':
     'E-322: %a1% は少なくとも %a2% である必要がありますが、今回の書き込みでは %a3% に設定されています。何も書き込まれませんでした。',
   'e-321-no-io-provider-is':
-    'E-321: evolution-io プロバイダがマウントされていないため、旧設定ドキュメントを読み取れません。evolution-io 行（evolution-host/evolution-all）をマウントしてから再試行してください。',
+    'E-321: データの読み書きコンポーネント evolution-io が不足しているため、現在旧設定を読み取れません。evolution-io をインストールまたは有効にしてから再試行してください。',
   'e-319-skill-write-confirm-timed-out':
     'E-319: スキル "%a1%" は%a2%されませんでした。確認プロンプトに %a3% 秒以内の応答がなかったため、この書き込みはキャンセルされました。判断する操作者が不在の場合は、`skillWriteConfirm` を `auto` に設定すると確認なしで直接書き込み、`ask` のままにすると応答があるまで待機します。または `skillWriteConfirmTimeoutSeconds` を増やしてください。',
   'e-323-subagent-channel-unavailable':
-    'E-323: サブエージェントチャネルを利用できません：subagents/agentPresets サービスが不足しているか、spawn プロバイダが agentPreset 機能に対応していません。レビューとメンテナンスは明示的に利用不可と記録され、暗黙に inject へフォールバックすることはありません。原因と対処手順を確認するには /evolution doctor を実行してください。',
+    'E-323: レビュー・メンテナンス用エージェントを利用できません：アプリに subagents/agentPresets サービスがないか、現在の実行方式が読み取り専用エージェントに対応していません。レビューとメンテナンスは明示的に利用不可と記録され、暗黙に現在のセッション内で実行へ切り替わることはありません。原因を確認するには /evolution doctor を実行してください。',
   'e-324-restricted-preset-unavailable':
-    'E-324: 制限付きプリセットの作成に失敗しました（親プリセットの読み取り、解析、登録、またはリストリクタのマウントのいずれかで失敗）：%a1%。レビューおよびメンテナンスチャネルは利用できません。/evolution doctor を実行して preset id、allow セット、失敗の原因を確認してください。',
+    'E-324: 読み取り専用モードの作成に失敗しました：%a1%。レビューとメンテナンスは現在利用できません。原因を確認するには /evolution doctor を実行してください。',
   'e-325-host-data-plane-unavailable':
-    'E-325: ホストデータプレーンを利用できません：connection サービスがマウントされていないため、パネルと承認のルートは登録されません。同等の操作には /evolution pending、approve、reject コマンドを使用してください。詳細は /evolution doctor を実行して確認してください。',
+    'E-325: ページからプラットフォーム接続を取得できないため（connection サービスが不足）、パネルと承認は登録されません。代わりに /evolution pending、approve、reject コマンドで同じ操作を行えます。詳細は /evolution doctor を参照してください。',
 })
 
 /**
