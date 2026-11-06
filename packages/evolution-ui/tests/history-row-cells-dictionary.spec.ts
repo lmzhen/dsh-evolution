@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest'
 import { ageCopyKey, skillRowCells, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
 import type { CopyCell, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core'
-import { en, fill, zh } from '../src/panels/history/client/messages.ts'
+import { en, fill, ja, zh } from '../src/panels/history/client/messages.ts'
 
 /** Every action label the library can record, plus one it never wrote (the fail-closed case). */
 const RAW_ACTIONS = [
@@ -42,13 +42,14 @@ const wordOf = (dictionary: Record<string, string>, key: string): string | undef
 const cellOf = (cells: readonly RowCell[], key: string): RowCell | undefined => cells.find(cell => cell.key === key)
 
 describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
-  it('names every action the host can report, in both languages', () => {
+  it('names every action the host can report, in all three languages', () => {
     for (const raw of RAW_ACTIONS) {
       const action = copies(...versionRowCells(version({ actionKind: versionActionKind(raw) })).title)
         .find(cell => cell.key === 'action')
       expect(action, raw).toBeDefined()
       expect(wordOf(zh, action?.copy ?? ''), raw).toBeTypeOf('string')
       expect(wordOf(en, action?.copy ?? ''), raw).toBeTypeOf('string')
+      expect(wordOf(ja, action?.copy ?? ''), raw).toBeTypeOf('string')
     }
   })
 
@@ -57,7 +58,7 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
       const cell = copies(...versionRowCells(version({ charsDelta: delta })).title)
         .find(one => one.key === 'delta')
       expect(cell, String(delta)).toBeDefined()
-      for (const dictionary of [zh, en]) {
+      for (const dictionary of [zh, en, ja]) {
         const filled = fill(wordOf(dictionary, cell?.copy ?? '') ?? '', cell?.values ?? {})
         expect(filled, String(delta)).not.toContain('{')
       }
@@ -71,6 +72,7 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
       expect(note, kind).toBeTypeOf('string')
       expect(wordOf(zh, note ?? ''), kind).toBeTypeOf('string')
       expect(wordOf(en, note ?? ''), kind).toBeTypeOf('string')
+      expect(wordOf(ja, note ?? ''), kind).toBeTypeOf('string')
     }
   })
 
@@ -82,11 +84,13 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
       for (const key of keys) {
         expect(wordOf(zh, key), key).toBeTypeOf('string')
         expect(wordOf(en, key), key).toBeTypeOf('string')
+        expect(wordOf(ja, key), key).toBeTypeOf('string')
       }
     }
     // 'now' is a sentence, not a count: nothing to interpolate, so nothing to leave behind.
     expect(zh['time.now']).not.toContain('{')
     expect(en['time.now']).not.toContain('{')
+    expect(ja['time.now']).not.toContain('{')
   })
 
   it('names every exception state; default family management has no state cell', () => {
@@ -96,6 +100,7 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
       const key = state !== undefined && 'copy' in state ? state.copy : ''
       expect(wordOf(zh, key), key).toBeTypeOf('string')
       expect(wordOf(en, key), key).toBeTypeOf('string')
+      expect(wordOf(ja, key), key).toBeTypeOf('string')
     }
   })
 
@@ -110,7 +115,7 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
     // interpolates one cannot come out with a literal brace left in it.
     expect(cells.map(cell => cell.key)).toContain('count')
     for (const cell of cells) {
-      for (const dictionary of [zh, en]) {
+      for (const dictionary of [zh, en, ja]) {
         const word = wordOf(dictionary, cell.copy)
         expect(word, cell.copy).toBeTypeOf('string')
         expect(fill(word ?? '', cell.values ?? {}), cell.copy).not.toContain('{')
@@ -118,7 +123,7 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
     }
   })
 
-  it('keeps the two dictionaries in step for every key a row can name', () => {
+  it('keeps the three dictionaries in step for every key a row can name', () => {
     const cells = copies(
       ...versionRowCells(version({ actionKind: 'delete', path: 'a.md', charsDelta: -4 })).title,
       ...versionRowCells(version({ actionKind: 'support-write' })).title,
@@ -128,6 +133,7 @@ describe('the cells a row carries resolve in the panel dictionary (G1)', () => {
     )
     for (const cell of cells) {
       expect(Object.hasOwn(zh, cell.copy), cell.copy).toBe(Object.hasOwn(en, cell.copy))
+      expect(Object.hasOwn(zh, cell.copy), cell.copy).toBe(Object.hasOwn(ja, cell.copy))
     }
   })
 })

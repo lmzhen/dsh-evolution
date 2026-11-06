@@ -27,7 +27,7 @@ export interface PanelBodyOptions {
 
 /** The locale seat: one namespace registration and a bound translator. */
 export interface LocaleSeat {
-  register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void
+  register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string>; ja: Record<string, string> }): () => void
   bind(namespace: string): (key: string) => string
 }
 

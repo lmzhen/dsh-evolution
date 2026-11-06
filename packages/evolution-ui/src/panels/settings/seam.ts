@@ -162,7 +162,7 @@ export interface RowConfigForm {
 
 /** The locale seat: register this bundle's namespace, bind a translator. */
 export interface LocaleSeat {
-  register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void
+  register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string>; ja: Record<string, string> }): () => void
   bind(namespace: string): (key: string) => string
 }
 

@@ -17,9 +17,9 @@ export interface SidebarPanelSpec<Face> {
   order: number
   /** Locale namespace owned by this panel. */
   namespace: string
-  dictionaries: { zh: Record<string, string>; en: Record<string, string> }
+  dictionaries: { zh: Record<string, string>; en: Record<string, string>; ja: Record<string, string> }
   /** Fallback dictionary when the locale seat refuses or is absent. */
-  fallback?: 'zh' | 'en'
+  fallback?: 'zh' | 'en' | 'ja'
   /** Panel stylesheet and the tag id that makes injection idempotent. */
   styles: { css: string; tagId: string }
   /** The row glyph. */

@@ -117,9 +117,122 @@ for (const half of halves) {
   }
 }
 
+// Rule C (translation readiness): every family locale namespace carries zh, en AND ja.
+// A ja table may be a `{ ...en }` placeholder (parity by construction) until a translation
+// pass replaces it with a literal; a literal must then keep the same key set as zh/en.
+const dictionaryFiles = []
+const walkDictionaries = (dir) => {
+  let entries
+  try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
+  for (const entry of entries) {
+    const path = join(dir, entry.name)
+    // Test fixtures are historical snapshots, not shipped namespaces: the parity rule
+    // governs what the bundle registers, so `tests/` stays out of this scan. Build/staging
+    // copies (lib, dist, .release-staging) are the same sources again, not new namespaces.
+    const skipped = new Set(['tests', 'lib', 'dist', 'node_modules', '.release-staging'])
+    if (entry.isDirectory()) { if (!skipped.has(entry.name)) walkDictionaries(path) }
+    // `<pkg>/src/messages.ts` is the HOST catalog (tool results / errors); the client
+    // namespaces live in a panel/client subdirectory. Different registry, different gate.
+    else if (entry.name === 'messages.ts' && entry.name && dir.split(/[\\/]/).pop() !== 'src') dictionaryFiles.push(path)
+  }
+}
+walkDictionaries(root)
+
+/** The body of the object literal opened after `marker`, braces excluded. */
+function objectBody(text, marker) {
+  const at = text.indexOf(marker)
+  if (at < 0) return null
+  const start = text.indexOf('{', at + marker.length)
+  if (start < 0) return null
+  let depth = 0
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '{') depth += 1
+    else if (char === '}') {
+      depth -= 1
+      if (depth === 0) return text.slice(start + 1, index)
+    }
+  }
+  return null
+}
+
+/** The keys declared at the object body's own two-space level. */
+function dictionaryKeys(body) {
+  const keys = new Set()
+  for (const line of body.split(NL)) {
+    const match = /^\s{2}'?([A-Za-z0-9_.-]+)'?\s*:/.exec(line)
+    if (match !== null) keys.add(match[1])
+  }
+  return keys
+}
+
+/** One dictionary's key → single-quoted value pairs (the family's flat copy tables). */
+function dictionaryEntries(body) {
+  const entries = new Map()
+  for (const line of body.split(NL)) {
+    const match = /^\s{2}'?([A-Za-z0-9_.-]+)'?\s*:\s*'((?:[^'\\]|\\.)*)'/.exec(line)
+    if (match !== null) entries.set(match[1], match[2])
+  }
+  return entries
+}
+
+/** Keys a dictionary gains through `Object.assign(<name>, { ... })` after its literal. */
+function assignedKeys(text, name) {
+  const keys = new Set()
+  const pattern = new RegExp('Object\\.assign\\(\\s*' + name + '\\s*,\\s*\\{([\\s\\S]*?)\\}\\)', 'g')
+  let match
+  while ((match = pattern.exec(text)) !== null) {
+    for (const key of dictionaryKeys(match[1])) keys.add(key)
+  }
+  return keys
+}
+
+let placeholderDictionaries = 0
+let untranslatedValues = 0
+for (const path of dictionaryFiles) {
+  const text = withoutComments(readFileSync(path, 'utf8'))
+  const zhBody = objectBody(text, 'export const zh')
+  const enBody = objectBody(text, 'export const en')
+  const jaBody = objectBody(text, 'export const ja')
+  if (zhBody === null || enBody === null) {
+    problems.push(path + ' does not export both zh and en dictionaries')
+    continue
+  }
+  if (jaBody === null) {
+    problems.push(path + ' has no ja dictionary — add one (a `{ ...en }` placeholder is accepted) so the namespace is translation-ready')
+    continue
+  }
+  const zhKeys = dictionaryKeys(zhBody)
+  const enKeys = dictionaryKeys(enBody)
+  for (const key of assignedKeys(text, 'zh')) zhKeys.add(key)
+  for (const key of assignedKeys(text, 'en')) enKeys.add(key)
+  for (const key of assignedKeys(text, 'ja')) jaKeys.add(key)
+  for (const key of zhKeys) if (!enKeys.has(key)) problems.push(path + ': en is missing key ' + JSON.stringify(key))
+  for (const key of enKeys) if (!zhKeys.has(key)) problems.push(path + ': zh is missing key ' + JSON.stringify(key))
+  if (/^\s*\.\.\.en\s*,?\s*$/m.test(jaBody)) {
+    placeholderDictionaries += 1
+    continue
+  }
+  const jaKeys = dictionaryKeys(jaBody)
+  for (const key of zhKeys) if (!jaKeys.has(key)) problems.push(path + ': ja is missing key ' + JSON.stringify(key))
+  for (const key of jaKeys) if (!zhKeys.has(key)) problems.push(path + ': ja carries key ' + JSON.stringify(key) + ' that zh does not declare')
+  // Translation progress, not a failure: a ja value still identical to its en twin (when zh differs) is untranslated.
+  const zhEntries = dictionaryEntries(zhBody)
+  const enEntries = dictionaryEntries(enBody)
+  const assignPattern = /Object\.assign\(\s*en\s*,\s*\{([\s\S]*?)\}\)/g
+  let assignMatch
+  while ((assignMatch = assignPattern.exec(text)) !== null) {
+    for (const [key, value] of dictionaryEntries(assignMatch[1])) enEntries.set(key, value)
+  }
+  const jaEntries = dictionaryEntries(jaBody)
+  for (const [key, value] of jaEntries) if (enEntries.get(key) === value && zhEntries.get(key) !== value) untranslatedValues += 1
+}
+
 if (problems.length > 0) {
   console.error('verify-client-ui-i18n: ' + problems.length + ' problem(s)')
   for (const problem of problems) console.error('  ' + problem)
   process.exit(1)
 }
-console.log('verify-client-ui-i18n: OK — ' + scanned + ' client source file(s), no undeclared copy')
+console.log('verify-client-ui-i18n: OK — ' + scanned + ' client source file(s), no undeclared copy; '
+  + dictionaryFiles.length + ' locale namespace(s) carry zh/en/ja ('
+  + placeholderDictionaries + ' ja placeholder(s), ' + untranslatedValues + ' untranslated value(s))')

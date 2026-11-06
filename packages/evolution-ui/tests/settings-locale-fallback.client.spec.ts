@@ -6,13 +6,14 @@
  * and through `message()` when it is not. An unspecified language must read Chinese.
  */
 import { describe, expect, it } from 'vitest'
-import { en, message, zh } from '../src/panels/settings/messages.ts'
+import { en, ja, message, zh } from '../src/panels/settings/messages.ts'
 
 describe('the settings card copy falls back to the platform locale', () => {
-  it('resolves an unspecified language to Chinese, and still answers English on request', () => {
+  it('resolves an unspecified language to Chinese, and still answers English and Japanese on request', () => {
     expect(message('changed')).toBe(zh.changed)
     expect(message('changed')).not.toBe(en.changed)
     expect(message('changed', 'zh')).toBe(zh.changed)
     expect(message('changed', 'en')).toBe(en.changed)
+    expect(message('changed', 'ja')).toBe(ja.changed)
   })
 })
