@@ -181,6 +181,9 @@ function skillQueue(face: HealthFace, t: (key: string) => string, model: ReturnT
   )
 }
 
+/** The count column's unit: most rules count skills; these two count timestamps/files. */
+const COUNT_UNIT: Readonly<Record<string, string>> = { 'stamp-density': 'count.unit.stamps', 'references-sprawl': 'count.unit.files' }
+
 /** The rule table: a grid so counts line up, with a tone bar per row and skill pills. */
 function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
   const rows = byRule(face.rows)
@@ -200,7 +203,9 @@ function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
     },
     cell('rule-name', ruleName(t, entry.rule)),
     cell('skills', entry.skills.map((name, i) => createElement('span', { 'data-role': 'skill-pill', key: name + ':' + String(i), title: name }, name))),
-    cell('rule-count', entry.count === 0 ? t('count.notCalibrated') : String(entry.count)),
+    cell('rule-count', entry.count === 0
+      ? createElement('span', { title: t('count.notCalibrated'), 'data-role': 'rule-count-none' }, '—')
+      : createElement('span', { 'data-role': 'rule-count-value' }, String(entry.count) + ' ' + t(COUNT_UNIT[entry.rule] ?? 'count.unit.skills'))),
     ))),
   )
 }
@@ -364,6 +369,6 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
     viewMode === 'skills'
       ? createElement('div', { id: 'evo-health-skills', role: 'tabpanel' }, skillQueue(shown, t, healthViewModel(shown.rows)))
       : createElement('div', { id: 'evo-health-rules', role: 'tabpanel' },
-        createElement('h3', { 'data-role': 'group-title' }, t('group.byRule')), ruleTable(shown, t)),
+        createElement('h3', { 'data-role': 'group-title' }, t('ruleTable.title')), ruleTable(shown, t)),
   )
 }

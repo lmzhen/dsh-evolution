@@ -32,11 +32,11 @@ const view: DiagnosticsView = {
   schemaVersion: 2,
   generatedAt: '2026-10-19T00:00:00.000Z',
   facts: [
-    { key: 'platform-line', label: '平台兼容线', value: '0.2.1-rc.3（floor 0.2.1-rc.2）', home: 'README.md（兼容线声明）' },
+    { key: 'platform-line', label: '兼容版本', value: '0.2.1-rc.3（最低兼容 0.2.1-rc.2）', home: 'README.md（兼容版本声明）' },
   ],
   runtime: [
-    { key: 'host-surface', label: 'Host 数据面', status: 'ok', detail: '已挂载 12/12；仅本机权限' },
-    { key: 'runs', label: '运行登记', status: 'warn', detail: 'orphaned=1', remedy: '/evolution runs' },
+    { key: 'host-surface', label: '数据连接', status: 'ok', detail: '已就绪 12/12；仅限本机访问（按平台设置）' },
+    { key: 'runs', label: '运行记录', status: 'warn', detail: '正在运行 2 个，遗留 1 个', remedy: '/evolution runs' },
   ],
 }
 
@@ -57,15 +57,15 @@ describe('diagnostics card', () => {
     await waitFor(() => { expect(screen.getByText('运行状态')).toBeTruthy() })
     // The card leads with the plain-language verdict and the top row when collapsed.
     expect(screen.getByText('1 项需要注意')).toBeTruthy()
-    expect(document.querySelector('[data-role="diag-focus"]')?.textContent).toBe('运行登记')
+    expect(document.querySelector('[data-role="diag-focus"]')?.textContent).toBe('运行记录')
     // Runtime rows: frozen status words, detail lines and a warn row's remedy.
     expect(screen.getByText('注意')).toBeTruthy()
-    expect(screen.getByText('orphaned=1')).toBeTruthy()
+    expect(screen.getByText('正在运行 2 个，遗留 1 个')).toBeTruthy()
     expect(screen.getByText('建议：/evolution runs')).toBeTruthy()
     expect(document.querySelector('[data-action="diag-copy-remedy"]')).toBeTruthy()
     // The documentation facts (labels, values, homes) stay off the settings face.
     expect(screen.queryByText('Environment')).toBeNull()
-    expect(screen.queryByText('平台兼容线')).toBeNull()
+    expect(screen.queryByText('兼容版本')).toBeNull()
     expect(screen.queryByText('0.2.1-rc.3（floor 0.2.1-rc.2）')).toBeNull()
     expect(screen.queryByText('README.md（兼容线声明）')).toBeNull()
     expect(screen.queryByText('Technical details')).toBeNull()
@@ -74,7 +74,7 @@ describe('diagnostics card', () => {
   it('renders an all-healthy summary when every runtime row is ok', async () => {
     const healthy: DiagnosticsView = {
       ...view,
-      runtime: [{ key: 'host-surface', label: 'Host 数据面', status: 'ok', detail: '已挂载 12/12' }],
+      runtime: [{ key: 'host-surface', label: '数据连接', status: 'ok', detail: '已就绪 12/12' }],
     }
     const api = { view: vi.fn(async () => ok(healthy)) }
     renderCard({ t, api, fallback: FALLBACKS.diagnostics })
@@ -90,7 +90,7 @@ describe('diagnostics card', () => {
   it('renders a failed read as the shared failure block with the command fallback', async () => {
     const api = { view: vi.fn(async () => ({ ok: false as const, failure: { kind: 'unmounted' as const, status: 404 } })) }
     renderCard({ t, api, fallback: FALLBACKS.diagnostics })
-    await waitFor(() => { expect(screen.getByText('该功能没有挂载。')).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByText('这个功能没有启用。')).toBeTruthy() })
     expect(screen.getByText('可以改用命令：/evolution doctor')).toBeTruthy()
   })
 
@@ -103,9 +103,9 @@ describe('diagnostics card', () => {
     renderCard({ t, api, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('运行状态')).toBeTruthy() })
     await act(async () => { fireEvent.click(screen.getByText('刷新')) })
-    await waitFor(() => { expect(screen.getByText('该功能没有挂载。')).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByText('这个功能没有启用。')).toBeTruthy() })
     expect(screen.getByText('运行状态')).toBeTruthy()
-    expect(screen.getAllByText('运行登记').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('运行记录').length).toBeGreaterThan(0)
   })
 
   it('reads once on mount and only again on an explicit refresh', async () => {

@@ -39,11 +39,11 @@ export function apply(ctx: ClientContext): void {
         settings: { ...(seat.get('evolution-merge') === undefined ? {} : { merge: seat.get('evolution-merge')! }), ...(seat.get('evolution-approval') === undefined ? {} : { platform: seat.get('evolution-approval')! }) },
         decide: async (rowId: string, verb: 'approve' | 'reject') => {
           const sessionId = currentSessionId(ctx)
-          if (sessionId === undefined) return { ok: false, message: '没有当前会话；请打开会话后重试' }
+          if (sessionId === undefined) return { ok: false, message: t('session.missing') }
           const result = await api.decide(rowId, verb, sessionId)
           if (result.ok) return result.payload
           const failure = result.failure
-          return { ok: false, message: 'message' in failure && typeof failure.message === 'string' ? failure.message : '审批请求失败' }
+          return { ok: false, message: 'message' in failure && typeof failure.message === 'string' ? failure.message : t('decide.failed') }
         },
         ...(workspaceId === undefined ? {} : { workspaceId }),
       }

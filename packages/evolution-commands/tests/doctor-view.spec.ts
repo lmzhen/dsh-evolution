@@ -114,7 +114,7 @@ describe('buildDoctorView: unreadable providers become named rows, never silence
     const view = buildDoctorView(inputs({ runs: { running: 2, orphaned: 1 } }))
     const entry = row(view, 'runs')
     expect(entry.status).toBe('warn')
-    expect(entry.detail).toContain('orphaned=1')
+    expect(entry.detail).toContain('遗留 1 个')
   })
 
   it('maps the platform pairing window to ok/warn/fail/unknown', () => {

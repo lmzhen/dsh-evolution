@@ -304,7 +304,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
       // versions does not need to be told what a version is.
       selected === undefined
         ? [
-          emptyState(face.t(skills.length === 0 ? (skillsLoaded ? 'empty.skills' : 'loading') : 'empty.pick'), 'empty'),
+          emptyState(face.t(skills.length === 0 ? (skillsLoaded ? 'empty.skills.main' : 'loading') : 'empty.pick'), 'empty'),
           createElement('p', { key: 'hint', className: 'evo-hist-hint' }, face.t('hint')),
         ]
         : loaded

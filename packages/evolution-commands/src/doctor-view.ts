@@ -78,24 +78,24 @@ const FACT_HOMES: Readonly<Record<string, string>> = {
 }
 
 const FACT_LABELS: Readonly<Record<string, string>> = {
-  'platform-line': '平台兼容线',
+  'platform-line': '兼容版本',
   'family-version': '家族版本',
-  'install-form': '安装形态',
-  'preset-ids': '受限预设',
+  'install-form': '安装方式',
+  'preset-ids': '只读模式',
   'readonly-contract': '只读说明',
   'upgrade-order': '升级顺序',
-  'fallback-map': '命令兜底',
+  'fallback-map': '命令备用',
 }
 
 const RUNTIME_LABELS: Readonly<Record<string, string>> = {
-  'subagent-channel': '子代理通道',
-  'restricted-preset': '受限预设',
-  'host-surface': '数据面连接',
+  'subagent-channel': '审阅/维护代理',
+  'restricted-preset': '只读模式',
+  'host-surface': '数据连接',
   'session-fold': '会话事件读取',
   'platform-services': '平台服务',
-  runs: '运行登记',
+  runs: '运行记录',
   'platform-pairing': '版本兼容',
-  'install-form-detected': '实际安装形态',
+  'install-form-detected': '安装方式',
 }
 
 /**
@@ -121,11 +121,11 @@ function factsOf(inputs: DoctorInputs): DocFactRow[] {
   const values: Record<string, string> = {
     'platform-line': inputs.platformLine.version + '（最低兼容 ' + inputs.platformLine.floor + '）',
     'family-version': inputs.familyVersion,
-    'install-form': FORM_WORDS[inputs.form.id] + '（' + (inputs.form.confidence === 'declared' ? '安装内容已声明' : '按已安装内容推断') + '）',
-    'preset-ids': '审阅 / 维护两个受限只读预设（' + REVIEWER_PRESET_ID + ' / ' + MAINTAINER_PRESET_ID + '）；另可选用 ' + String(EVOLUTION_PRESET_IDS.length) + ' 个基础预设',
-    'readonly-contract': '受限预设只读：可用工具由该预设声明的 allow 集合决定（审阅与维护同构）',
+    'install-form': FORM_WORDS[inputs.form.id] + '（' + (inputs.form.confidence === 'declared' ? '安装内容已确认' : '按已安装内容推断') + '）',
+    'preset-ids': '审阅、维护各有一个只读模式（' + REVIEWER_PRESET_ID + ' / ' + MAINTAINER_PRESET_ID + '）；另有 ' + String(EVOLUTION_PRESET_IDS.length) + ' 个基础预设可选',
+    'readonly-contract': '只读模式下能做什么，由该模式声明的工具清单决定（审阅和维护一样）',
     'upgrade-order': '先升平台，再升家族，最后发布（详见 INSTALL 的升级说明）',
-    'fallback-map': String(Object.keys(COMMAND_FALLBACKS).length) + ' 个功能面板各有命令兜底（详见 INSTALL 命令兜底表）',
+    'fallback-map': String(Object.keys(COMMAND_FALLBACKS).length) + ' 个功能页都有命令备用（见 INSTALL 的命令备用表）。',
   }
   const rows: DocFactRow[] = DIAGNOSTICS_FACT_KEYS.map(key => ({
     key,
@@ -141,32 +141,32 @@ function channelRow(channels: DoctorInputs['channels']): DiagnosticRow {
     (state): state is Extract<ChannelState, { kind: 'unavailable' }> => state.kind === 'unavailable',
   )
   if (unavailable.length === 0) {
-    return { key: 'subagent-channel', label: RUNTIME_LABELS['subagent-channel'] ?? '子代理通道', status: 'ok', detail: '审阅与维护两条子代理通道均可用。' }
+    return { key: 'subagent-channel', label: RUNTIME_LABELS['subagent-channel'] ?? '审阅/维护代理', status: 'ok', detail: '审阅和维护代理都可用。' }
   }
   const reasons = unavailable.map(state => state.code + ': ' + state.reason)
   return {
     key: 'subagent-channel',
-    label: RUNTIME_LABELS['subagent-channel'] ?? '子代理通道',
+    label: RUNTIME_LABELS['subagent-channel'] ?? '审阅/维护代理',
     status: 'warn',
     detail: reasons.join('；'),
-    remedy: '显式子代理运行会标记为不可用（不会静默退回 inject）；运行 /evolution doctor 查看修复指引。',
+    remedy: '审阅和维护会明确标为不可用（不会静默改在当前会话里跑）；运行 /evolution doctor 查看修复指引。',
   }
 }
 
 function presetRow(presets: DoctorInputs['presets']): DiagnosticRow {
   const entries = [presets.reviewer, presets.maintainer]
   if (entries.every(entry => entry === undefined)) {
-    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'unknown', detail: 'agentPresets 未挂载或未暴露 list()，无法探测受限 preset。', remedy: '挂载 agentPresets（随平台 Web 组合）后运行 /evolution doctor。' }
+    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '只读模式', status: 'unknown', detail: '平台没有提供预设列表，暂时无法检查只读模式。', remedy: '这是平台安装不完整；重新安装或重启程序后再检查。' }
   }
   const broken = entries.filter((entry): entry is PresetFacts => entry !== undefined && entry.broken !== undefined)
   const missing = entries.filter(entry => entry === undefined || !entry.registered)
   if (broken.length > 0) {
-    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'fail', detail: errorText('e-324-restricted-preset-unavailable', { a1: broken.map(entry => entry.broken ?? '').join('；') }), remedy: '重新加载家族插件；若仍失败，运行 /evolution doctor 查看详情。' }
+    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '只读模式', status: 'fail', detail: errorText('e-324-restricted-preset-unavailable', { a1: broken.map(entry => entry.broken ?? '').join('；') }), remedy: '重新加载家族插件；若仍失败，运行 /evolution doctor 查看详情。' }
   }
   if (missing.length > 0) {
-    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'warn', detail: '受限的只读模式尚未初始化（首次使用审阅或维护时自动创建）。', remedy: '运行一次审阅或维护，或稍后重新检查。' }
+    return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '只读模式', status: 'warn', detail: '只读的审阅/维护模式还没启用（第一次运行审阅或维护时会自动创建）。', remedy: '运行一次审阅或维护，或稍后重新检查。' }
   }
-  return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '受限 preset', status: 'ok', detail: REVIEWER_PRESET_ID + ' / ' + MAINTAINER_PRESET_ID + ' 均已注册' }
+  return { key: 'restricted-preset', label: RUNTIME_LABELS['restricted-preset'] ?? '只读模式', status: 'ok', detail: '审阅和维护的只读模式都已就绪' }
 }
 
 function hostRow(host: DoctorInputs['host'], count: DoctorInputs['hostRouteCount']): DiagnosticRow {
@@ -174,28 +174,28 @@ function hostRow(host: DoctorInputs['host'], count: DoctorInputs['hostRouteCount
     const fallback = COMMAND_FALLBACKS.approval.command.split(' … ')[0] ?? ''
     return {
       key: 'host-surface',
-      label: RUNTIME_LABELS['host-surface'] ?? 'Host 数据面',
+      label: RUNTIME_LABELS['host-surface'] ?? '数据连接',
       status: 'warn',
       detail: errorText('e-325-host-data-plane-unavailable') + '（' + (host.reason ?? 'unknown') + '）',
-      remedy: '改用命令面完成同等操作：' + fallback + ' 等；运行 /evolution doctor 查看已挂载服务。',
+      remedy: '改用命令完成同样的操作：' + fallback + ' 等；运行 /evolution doctor 查看服务状态。',
     }
   }
-  const remote = host.deploymentAllowsRemote === true ? '允许远程权限（平台准入策略原样报告）' : '仅本机权限（平台准入策略原样报告）'
-  const mounted = count === undefined ? '已挂载' : '已挂载 ' + String(count.mounted) + '/' + String(count.total)
-  return { key: 'host-surface', label: RUNTIME_LABELS['host-surface'] ?? 'Host 数据面', status: 'ok', detail: mounted + '；' + remote }
+  const remote = host.deploymentAllowsRemote === true ? '允许远程访问（按平台设置）' : '仅限本机访问（按平台设置）'
+  const mounted = count === undefined ? '已就绪' : '已就绪 ' + String(count.mounted) + '/' + String(count.total)
+  return { key: 'host-surface', label: RUNTIME_LABELS['host-surface'] ?? '数据连接', status: 'ok', detail: mounted + '；' + remote }
 }
 
 function pairingRow(inputs: DoctorInputs): DiagnosticRow {
   const status = inputs.platformPairing ?? 'unknown'
   switch (status) {
     case 'in-window':
-      return { key: 'platform-pairing', label: RUNTIME_LABELS['platform-pairing'] ?? '平台/家族配对', status: 'ok', detail: '宿主版本 ' + String(inputs.hostVersion) + ' 在兼容窗口 ' + inputs.platformLine.version + ' 内' }
+      return { key: 'platform-pairing', label: RUNTIME_LABELS['platform-pairing'] ?? '版本兼容', status: 'ok', detail: '程序版本 ' + String(inputs.hostVersion) + ' 在兼容范围内（' + inputs.platformLine.version + '）' }
     case 'host-newer':
-      return { key: 'platform-pairing', label: RUNTIME_LABELS['platform-pairing'] ?? '平台/家族配对', status: 'warn', detail: '宿主 patch 线已更新（' + String(inputs.hostVersion) + '，家族声明 ' + inputs.platformLine.version + '）。', remedy: '按升级 runbook 先升平台线再升家族。' }
+      return { key: 'platform-pairing', label: RUNTIME_LABELS['platform-pairing'] ?? '版本兼容', status: 'warn', detail: '程序已经更新（' + String(inputs.hostVersion) + '，本插件声明 ' + inputs.platformLine.version + '）。', remedy: '先升级程序，再升级本插件。' }
     case 'out-of-window':
-      return { key: 'platform-pairing', label: RUNTIME_LABELS['platform-pairing'] ?? '平台/家族配对', status: 'fail', detail: '宿主版本 ' + String(inputs.hostVersion) + ' 落在兼容窗口（floor ' + inputs.platformLine.floor + '）外。', remedy: '先升/降平台到兼容窗口，再重载家族。' }
+      return { key: 'platform-pairing', label: RUNTIME_LABELS['platform-pairing'] ?? '版本兼容', status: 'fail', detail: '程序版本 ' + String(inputs.hostVersion) + ' 低于最低兼容版本（' + inputs.platformLine.floor + '）。', remedy: '先把程序升/降到兼容版本，再重启本插件。' }
     case 'unknown':
-      return { key: 'platform-pairing', label: RUNTIME_LABELS['platform-pairing'] ?? '平台/家族配对', status: 'unknown', detail: inputs.hostVersion === undefined ? '读不到宿主版本。' : '无法判定版本窗口。', remedy: '在宿主会话里运行 /evolution doctor。' }
+      return { key: 'platform-pairing', label: RUNTIME_LABELS['platform-pairing'] ?? '版本兼容', status: 'unknown', detail: inputs.hostVersion === undefined ? '读不到程序版本。' : '无法判断版本是否兼容。', remedy: '在会话里运行 /evolution doctor。' }
   }
 }
 
@@ -207,18 +207,18 @@ function runtimeOf(inputs: DoctorInputs): DiagnosticRow[] {
     presetRow(inputs.presets),
     hostRow(inputs.host, inputs.hostRouteCount),
     fold
-      ? { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件 fold 单入口', status: 'ok', detail: '事件读取通道正常：对话内容会被读取，其余记录忽略。' }
-      : { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件 fold 单入口', status: 'fail', detail: '事件读取组件缺失，无法确认读取通道正常。', remedy: '重新安装完整功能包（evolution-all）。' },
+      ? { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件读取', status: 'ok', detail: '事件读取通道正常：对话内容会被读取，其余记录忽略。' }
+      : { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件读取', status: 'fail', detail: '事件读取组件缺失，无法确认读取通道正常。', remedy: '重新安装完整功能包（evolution-all）。' },
     missing.length === 0
-      ? { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务探测', status: 'ok', detail: '探测表中的服务均已挂载' }
-      : { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务探测', status: 'warn', detail: '缺少：' + missing.join('、'), remedy: '安装行（evolution-host/evolution-all）或检查 profile 行。' },
+      ? { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务', status: 'ok', detail: '需要的服务都已就绪' }
+      : { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务', status: 'warn', detail: '缺少：' + missing.join('、'), remedy: '安装 evolution-host 或 evolution-all，或检查配置。' },
     inputs.runs.orphaned > 0
-      ? { key: 'runs', label: RUNTIME_LABELS.runs ?? '运行登记', status: 'warn', detail: 'running=' + String(inputs.runs.running) + '，orphaned=' + String(inputs.runs.orphaned), remedy: '运行 /evolution maintain status 查看并收敛遗留运行。' }
-      : { key: 'runs', label: RUNTIME_LABELS.runs ?? '运行登记', status: 'ok', detail: 'running=' + String(inputs.runs.running) + '，orphaned=0' },
+      ? { key: 'runs', label: RUNTIME_LABELS.runs ?? '运行登记', status: 'warn', detail: '正在运行 ' + String(inputs.runs.running) + ' 个，遗留 ' + String(inputs.runs.orphaned) + ' 个', remedy: '运行 /evolution maintain status 查看并处理遗留运行。' }
+      : { key: 'runs', label: RUNTIME_LABELS.runs ?? '运行登记', status: 'ok', detail: '正在运行 ' + String(inputs.runs.running) + ' 个，没有遗留' },
     pairingRow(inputs),
     inputs.form.confidence === 'declared'
-      ? { key: 'install-form-detected', label: RUNTIME_LABELS['install-form-detected'] ?? '实际安装形态', status: 'ok', detail: FORM_WORDS[inputs.form.id] + '（已声明）' }
-      : { key: 'install-form-detected', label: RUNTIME_LABELS['install-form-detected'] ?? '实际安装形态', status: 'warn', detail: FORM_WORDS[inputs.form.id] + '（按已安装内容推断：' + inputs.form.evidence.join('、') + '）', remedy: '在 profile 里显式声明安装行，核对 INSTALL 的形态表。' },
+      ? { key: 'install-form-detected', label: RUNTIME_LABELS['install-form-detected'] ?? '实际安装形态', status: 'ok', detail: FORM_WORDS[inputs.form.id] + '（已确认）' }
+      : { key: 'install-form-detected', label: RUNTIME_LABELS['install-form-detected'] ?? '实际安装形态', status: 'warn', detail: FORM_WORDS[inputs.form.id] + '（按已安装内容推断：' + inputs.form.evidence.join('、') + '）', remedy: '在配置里明确写出安装方式，并核对 INSTALL 的安装方式表。' },
   ]
   return rows.sort((a, b) => a.key.localeCompare(b.key))
 }
@@ -239,7 +239,7 @@ export function buildDoctorView(inputs: DoctorInputs): DiagnosticsView {
 /** A safe view for a host whose inputs could not be assembled: every row names the failure. */
 export function unavailableDoctorView(now: Date, reason: string): DiagnosticsView {
   const facts: DocFactRow[] = DIAGNOSTICS_FACT_KEYS.map(key => ({ key, label: FACT_LABELS[key] ?? key, value: 'unknown', home: FACT_HOMES[key] ?? 'README.md' }))
-  const runtime: DiagnosticRow[] = DIAGNOSTICS_RUNTIME_KEYS.map(key => ({ key, label: RUNTIME_LABELS[key] ?? key, status: 'unknown', detail: '无法装配 doctor 输入：' + reason, remedy: '运行 /evolution doctor 重试；若持续失败，检查宿主日志。' }))
+  const runtime: DiagnosticRow[] = DIAGNOSTICS_RUNTIME_KEYS.map(key => ({ key, label: RUNTIME_LABELS[key] ?? key, status: 'unknown', detail: '读不到诊断所需的信息：' + reason, remedy: '运行 /evolution doctor 重试；若持续失败，检查宿主日志。' }))
   return {
     schemaVersion: DIAGNOSTICS_VIEW_SCHEMA_VERSION,
     generatedAt: now.toISOString(),
