@@ -1,21 +1,21 @@
 {
-  "note": "W10/W11 rehearsal readings for v0.36.2, remeasured 2026-11-05T15:55Z on the isolated 0.2.1-rc.3 g34 profile; UI-only cascade fix, API readings unchanged; S4 family-side contract 2/2.",
-  "familyVersion": "0.36.2",
+  "note": "W10/W11 rehearsal readings for v0.37.0, measured 2026-11-06T04:00:00.378Z on the 0.2.1-rc.3 webdev profile running the installed 0.37.0 family (3088): S1 three consecutive owner skill-history reads, S2 owner/anonymous diagnostics, S3 wire/schema facts, S4 family-side HMR contract 2/2.",
+  "familyVersion": "0.37.0",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.36.2",
-      "startedAt": "2026-11-05T15:55:00.000Z",
+      "familyVersion": "0.37.0",
+      "startedAt": "2026-11-06T04:00:00.378Z",
       "readings": {
-        "skillHistoryRows": 8,
-        "skillHistoryBytes": 5205,
+        "skillHistoryRows": 28,
+        "skillHistoryBytes": 21833,
         "ownerStatus": 200,
         "resolveBroken": false,
         "ensureIdempotent": true,
-        "note": "three consecutive owner GETs returned the same 8-row projection (5205-byte body) on the 0.36.0 g34 profile"
+        "note": "three consecutive owner GETs of /api/dsh-evolution/skill-history/skills returned the same 28-skill, 21833-byte body on the 0.37.0 webdev profile"
       }
     },
     {
@@ -23,8 +23,8 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.36.2",
-      "startedAt": "2026-11-05T15:55:00.000Z",
+      "familyVersion": "0.37.0",
+      "startedAt": "2026-11-06T04:00:00.378Z",
       "readings": {
         "ownerDiagnostics": 200,
         "anonymous": 401,
@@ -37,11 +37,11 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.36.2",
-      "startedAt": "2026-11-05T15:55:00.000Z",
+      "familyVersion": "0.37.0",
+      "startedAt": "2026-11-06T04:00:00.378Z",
       "readings": {
         "semverVersion": "0.2.1-rc.3",
-        "familyVersion": "0.36.2",
+        "familyVersion": "0.37.0",
         "diagnosticsSchemaVersion": 2,
         "gridRows": 8,
         "expectedColumnMatches": true,
@@ -53,13 +53,13 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.1-rc.3",
-      "familyVersion": "0.36.2",
-      "startedAt": "2026-11-05T15:55:00.000Z",
+      "familyVersion": "0.37.0",
+      "startedAt": "2026-11-06T04:00:00.378Z",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
         "repeatedPrepareIdempotent": true,
-        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.36.0 overlay tree; live HMR needs a dev host, family-side contract replaces it"
+        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.37.0 overlay tree; live HMR needs a dev host, family-side contract replaces it"
       }
     }
   ],
