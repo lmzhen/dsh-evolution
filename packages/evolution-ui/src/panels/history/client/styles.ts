@@ -56,6 +56,8 @@ export const CSS = [
   '.evo-hist-cell-line{display:flex;align-items:baseline;gap:var(--evo-space-6);min-width:0}',
   '.evo-hist-cell-meta{margin-top:var(--evo-space-2)}',
   '.evo-hist-skill-description{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:var(--evo-space-2);color:var(--dsw-alias-label-tertiary)}',
+  // The inner cell is nowrap for titles; on this one the 2-line clamp is the contract, so the text must wrap.
+  '.evo-hist-skill-description .evo-hist-slot-lead{white-space:normal;overflow:visible;text-overflow:clip}',
   // Tabular digits: counts, version numbers, ages and deltas are read DOWN a column, so a
   // proportional `1` next to a `4` made every number's width an accident (W10).
   '.evo-hist-cell{min-width:0;font-variant-numeric:tabular-nums}',

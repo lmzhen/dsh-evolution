@@ -93,7 +93,7 @@ export const CSS = [
   '.evolution-approval-item [data-role="empty-primary"]{padding:var(--evo-space-6) var(--evo-space-12);border:0;border-radius:var(--evo-radius-control);background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);font-size:var(--evo-type-sm);cursor:pointer}',
   '.evolution-approval-item [data-role="empty-secondary"]{padding:var(--evo-space-6) var(--evo-space-12);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:var(--evo-type-sm);cursor:pointer}',
   '.evo-pending-empty [data-role="empty-title"]{margin:0 0 var(--evo-space-6);font-size:var(--evo-type-lg)}',
-  '.evo-pending-empty [data-role="empty-description"]{margin:0 auto var(--evo-space-12);max-width:34em;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-sm)}',
+  '.evo-pending-empty [data-role="empty-description"]{margin:0 auto var(--evo-space-12);max-width:34em;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-sm);white-space:pre-line;text-wrap:pretty}',
   '.evo-pending-empty [data-role="empty-actions"]{display:flex;justify-content:center;gap:var(--evo-space-8)}',
   '.evo-pending-empty [data-role="empty-primary"]{padding:var(--evo-space-6) var(--evo-space-12);border:0;border-radius:var(--evo-radius-control);background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);font-size:var(--evo-type-sm);cursor:pointer}',
   '.evo-pending-empty [data-role="empty-secondary"]{padding:var(--evo-space-6) var(--evo-space-12);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:var(--evo-type-sm);cursor:pointer}',
@@ -114,7 +114,7 @@ export const CSS = [
   // The field surface scrolls; the save/discard row stays visible at its bottom edge.
   '.evolution-param-card[data-card="params"] .evolution-param-body{display:flex;flex-direction:column;max-height:min(56vh, 520px);overflow-y:auto;padding-bottom:0}',
   '.evolution-param-card[data-card="params"] .evolution-param-footer{position:sticky;bottom:0;z-index:1;margin-top:var(--evo-space-12);padding:var(--evo-space-12) 0;background:var(--dsw-alias-bg-layer-1)}',
-  '.evo-pending-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--evo-space-24) * 10);padding:var(--evo-space-24) var(--evo-space-16);text-align:center}',
+  '.evo-pending-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--evo-space-20) * 12);padding:var(--evo-space-20) var(--evo-space-16);text-align:center}',
   '.evolution-param-note{margin:0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   '.evolution-param-error{margin:0;color:var(--dsw-alias-state-error-primary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   // The preview a staged write shows before it runs: a facts line, then the SOURCE view. It borrows the
