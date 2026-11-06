@@ -8,6 +8,7 @@ import { aliasRegistration } from '@deepseek-ai/dsh-evolution-commands'
 import { MERGE_ALIAS_DEF, MERGE_PACKAGE_VERSION } from './command-defs.ts'
 import { handleReadOnlyMergeCommand } from './read-commands.ts'
 import { commandError, formatMergeError } from './domain/errors.ts'
+import { tr } from './messages.ts'
 
 export interface MergeCommandResult {
   readonly ok: boolean
@@ -47,7 +48,7 @@ export function createReadOnlyMergeService(io: EvolutionIoLike, home: string): M
     async execute(command) {
       const text = await handleReadOnlyMergeCommand(command, io, home)
       return text === null
-        ? { ok: false, text: formatMergeError(commandError(command.verb, 'merge-engine-required', '该命令需要合并运行时（当前只挂载了只读命令）', '安装 evolution-merge 完整行后重试；只读队列见 /evolution merge status')) }
+        ? { ok: false, text: formatMergeError(commandError(command.verb, 'merge-engine-required', tr('该命令需要合并运行时（当前只挂载了只读命令）'), tr('安装 evolution-merge 完整行后重试；只读队列见 /evolution merge status'))) }
         : { ok: true, text }
     },
   }
@@ -67,7 +68,7 @@ export async function runMergeCommand(
   try {
     return await service.execute(parsed.command, invocation?.agent === undefined ? { agentless: true } : { parent: invocation.agent })
   } catch (error) {
-    return { ok: false, text: formatMergeError(commandError('command', 'merge-command-failed', error instanceof Error ? error.message : String(error), '重试；若持续失败，运行 /evolution merge doctor 查看状态')) }
+    return { ok: false, text: formatMergeError(commandError('command', 'merge-command-failed', error instanceof Error ? error.message : String(error), tr('重试；若持续失败，运行 /evolution merge doctor 查看状态'))) }
   }
 }
 
@@ -75,7 +76,7 @@ export function createMergeCommand(service: MergeCommandService, version: string
   if (aliasRegistration(version, MERGE_ALIAS_DEF) === 'removed') return null
   return {
     name: 'merge',
-    description: (aliasRegistration(version, MERGE_ALIAS_DEF) === 'deprecated' ? '已弃用，请用 /evolution merge。' : '') + '技能自动合并：扫描、待批准、重跑、报告与 undo（兼容别名；请用 /evolution merge）',
+    description: (aliasRegistration(version, MERGE_ALIAS_DEF) === 'deprecated' ? tr('已弃用，请用 /evolution merge。') : '') + tr('技能自动合并：扫描、待批准、重跑、报告与 undo（兼容别名；请用 /evolution merge）'),
     input: { hint: mergeUsage() },
     async handler(invocation) {
       const result = await runMergeCommand(service, invocation.rawInput, invocation)

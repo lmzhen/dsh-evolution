@@ -16,6 +16,7 @@ import { readCommitReceipt } from './commit-receipt.ts'
 import { stagingRoot } from './staging.ts'
 import { readReconcileReport, type ReconcileReport } from './domain/reconcile.ts'
 import type { DoctorView } from './wire.ts'
+import { tr } from './messages.ts'
 
 export const MERGE_DOCTOR_SCHEMA_VERSION = 3
 
@@ -29,29 +30,31 @@ export interface MergeDoctorFact {
 /** Compose the one-line global-doctor fact from buildDoctorView + the last reconcile report. */
 export function mergeDoctorFact(view: DoctorView, report: ReconcileReport | null): MergeDoctorFact {
   const counts = view.counts
+  const sep = tr('；')
   const reconcileText = report === null
-    ? 'reconcile 尚未运行'
+    ? tr('reconcile 尚未运行')
     : report.state === 'blocked'
-      ? 'reconcile blocked ' + (report.code ?? 'merge-state-blocked')
-      : 'reconcile ' + String(report.actions.length) + ' 项动作'
+      ? tr('reconcile blocked {code}', { code: report.code ?? 'merge-state-blocked' })
+      : tr('reconcile {count} 项动作', { count: report.actions.length })
   const problems: string[] = []
   if (view.blocked !== undefined) problems.push('state blocked ' + view.blocked.code)
-  if (view.hostOnly !== undefined) problems.push('宿主数据面不可用 ' + view.hostOnly.code)
-  if (view.staging.state === 'unreadable') problems.push('staging 索引不可读' + (view.staging.detail === undefined ? '' : '：' + view.staging.detail))
+  if (view.hostOnly !== undefined) problems.push(tr('宿主数据面不可用 {code}', { code: view.hostOnly.code }))
+  if (view.staging.state === 'unreadable') problems.push(view.staging.detail === undefined ? tr('staging 索引不可读') : tr('staging 索引不可读：{detail}', { detail: view.staging.detail }))
   if (counts.expired > 0) problems.push('expired ' + String(counts.expired))
   const unstable = view.rows.filter(row => row.status === 'warn' || row.status === 'fail')
   if (unstable.length > 0) problems.push(unstable.map(row => row.key + '=' + row.status).join(','))
   if (report?.state === 'blocked') problems.push('reconcile blocked')
   const latest = view.latestRun
-  const latestText = latest === undefined ? '' : '；最近 run ' + latest.id + ' [' + latest.state + ']'
+  const latestText = latest === undefined ? '' : tr('；最近 run {id} [{state}]', { id: latest.id, state: latest.state })
+  const approvalText = view.approval.mergeApproval ? tr('开') : tr('关')
   const detail = 'verify ' + String(counts.active.verify) + ' / pending ' + String(counts.active.pending) + ' / fuse ' + String(counts.active.fuse) + ' / skipped ' + String(counts.active.skipped) + ' / expired ' + String(counts.expired)
-    + '；staging ' + view.staging.state + ' dirs=' + String(view.staging.dirs)
-    + '；审批 ' + (view.approval.mergeApproval ? '开' : '关') + '；' + reconcileText + latestText
-    + (problems.length === 0 ? '' : '；问题：' + problems.join('；'))
+    + tr('；staging {state} dirs={dirs}', { state: view.staging.state, dirs: view.staging.dirs })
+    + tr('；审批 {state}', { state: approvalText }) + sep + reconcileText + latestText
+    + (problems.length === 0 ? '' : tr('；问题：{problems}', { problems: problems.join(sep) }))
   const status: MergeDoctorFact['status'] = problems.length === 0
     ? 'ok'
     : view.blocked !== undefined || view.hostOnly !== undefined || report?.state === 'blocked' ? 'fail' : 'warn'
-  return problems.length === 0 ? { status, detail } : { status, detail, remedy: '运行 /evolution merge doctor 查看逐项；必要时 /evolution merge reconcile 收敛' }
+  return problems.length === 0 ? { status, detail } : { status, detail, remedy: tr('运行 /evolution merge doctor 查看逐项；必要时 /evolution merge reconcile 收敛') }
 }
 
 export interface MergeDoctorRow {
@@ -73,9 +76,9 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
   const counts = snapshot.doctor.counts.active
   rows.push({
     key: 'state',
-    label: '合并状态',
+    label: tr('合并状态'),
     status: snapshot.blocked === undefined || !hasState ? 'ok' : 'warn',
-    detail: snapshot.blocked === undefined ? 'pairs ' + String(snapshot.rows.length) + '；verify ' + String(counts.verify) + ' / pending ' + String(counts.pending) + ' / fuse ' + String(counts.fuse) + ' / skipped ' + String(counts.skipped) + ' / expired ' + String(snapshot.doctor.counts.expired) : snapshot.blocked.code + ': ' + snapshot.blocked.message,
+    detail: snapshot.blocked === undefined ? tr('pairs {pairs}；verify {verify} / pending {pending} / fuse {fuse} / skipped {skipped} / expired {expired}', { pairs: snapshot.rows.length, verify: counts.verify, pending: counts.pending, fuse: counts.fuse, skipped: counts.skipped, expired: snapshot.doctor.counts.expired }) : snapshot.blocked.code + ': ' + snapshot.blocked.message,
   })
   const recoveryRuns = new Set<string>()
   try {
@@ -100,7 +103,7 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
   rows.push({ key: 'merge-state-v3', label: 'state schema', status: snapshot.blocked === undefined ? 'ok' : 'warn', detail: snapshot.blocked === undefined ? 'schemaVersion 4' : snapshot.blocked.code })
   let quarantineCount = 0
   try { const qraw = await io.readText(join(home, 'merge', 'merge-state.quarantine.json')); if (qraw !== null) { const parsed = JSON.parse(qraw) as unknown; quarantineCount = Array.isArray(parsed) ? parsed.length : 0 } } catch { quarantineCount = -1 }
-  rows.push({ key: 'quarantine', label: 'quarantine', status: quarantineCount < 0 ? 'unknown' : quarantineCount === 0 ? 'ok' : 'warn', detail: quarantineCount < 0 ? 'quarantine 不可读' : quarantineCount + ' 行待人工检查' })
+  rows.push({ key: 'quarantine', label: 'quarantine', status: quarantineCount < 0 ? 'unknown' : quarantineCount === 0 ? 'ok' : 'warn', detail: quarantineCount < 0 ? tr('quarantine 不可读') : tr('{count} 行待人工检查', { count: quarantineCount }) })
   const holder = await readTreeLock(io, home).catch(() => null)
   rows.push({ key: 'tree-lock', label: 'tree lock', status: holder == null ? 'ok' : 'warn', detail: holder == null ? 'free' : 'holder pid=' + String(holder.pid) + ' epoch=' + String(holder.epoch) + ' token=' + holder.token.slice(0, 8) })
   const backupPath = v2BackupPath(home)
@@ -132,37 +135,37 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
   const reconcile = await readReconcileReport(io, home)
   rows.push({
     key: 'reconcile',
-    label: '状态收敛',
+    label: tr('状态收敛'),
     status: reconcile === null ? 'unknown' : reconcile.state === 'blocked' ? 'warn' : reconcile.actions.length > 0 ? 'warn' : 'ok',
     detail: reconcile === null
-      ? '尚无 reconcile 报告（启动或 /evolution merge reconcile 会生成）'
+      ? tr('尚无 reconcile 报告（启动或 /evolution merge reconcile 会生成）')
       : reconcile.state === 'blocked'
-        ? 'blocked：' + (reconcile.code ?? 'merge-state-blocked') + (reconcile.message === undefined ? '' : ' — ' + reconcile.message)
-        : String(reconcile.actions.length) + ' 项动作（' + new Date(reconcile.at).toISOString() + '）' + (reconcile.actions.length === 0 ? '' : '：' + reconcile.actions.map(action => action.rowId + '=' + action.code).join(', ')),
+        ? tr('blocked：{code}', { code: reconcile.code ?? 'merge-state-blocked' }) + (reconcile.message === undefined ? '' : ' — ' + reconcile.message)
+        : tr('{count} 项动作（{at}）', { count: reconcile.actions.length, at: new Date(reconcile.at).toISOString() }) + (reconcile.actions.length === 0 ? '' : tr('：{actions}', { actions: reconcile.actions.map(action => action.rowId + '=' + action.code).join(', ') })),
   })
-  rows.push({ key: 'consistency', label: '一致性', status: snapshot.blocked !== undefined ? 'blocked' : invalid.length === 0 ? 'ok' : 'warn', detail: snapshot.blocked !== undefined ? 'blocked: ' + snapshot.blocked.code : invalid.length === 0 ? '无非法组合' : String(invalid.length) + ' 行需人工检查: ' + invalid.map(row => row.id + '=' + row.reason).join(', ') })
+  rows.push({ key: 'consistency', label: tr('一致性'), status: snapshot.blocked !== undefined ? 'blocked' : invalid.length === 0 ? 'ok' : 'warn', detail: snapshot.blocked !== undefined ? 'blocked: ' + snapshot.blocked.code : invalid.length === 0 ? tr('无非法组合') : tr('{count} 行需人工检查: {rows}', { count: invalid.length, rows: invalid.map(row => row.id + '=' + row.reason).join(', ') }) })
   const modelRoot = configuredRoot?.trim() ?? ''
   if (modelRoot === '') {
-    rows.push({ key: 'models', label: '合并模型', status: 'warn', detail: '未配置 mergeModelsRoot；合并扫描会 fail loud' })
+    rows.push({ key: 'models', label: tr('合并模型'), status: 'warn', detail: tr('未配置 mergeModelsRoot；合并扫描会 fail loud') })
   } else {
     const int8 = join(modelRoot, 'potion-multilingual-128M-int8')
     const pca = join(modelRoot, 'potion-multilingual-128M-pca64-int8')
     const ok = await io.exists(int8) && await io.exists(pca)
-    rows.push({ key: 'models', label: '合并模型', status: ok ? 'ok' : 'warn', detail: ok ? modelRoot : '缺少 int8/pca64：' + modelRoot })
+    rows.push({ key: 'models', label: tr('合并模型'), status: ok ? 'ok' : 'warn', detail: ok ? modelRoot : tr('缺少 int8/pca64：{root}', { root: modelRoot }) })
   }
   const runsDir = join(home, 'merge', 'runs')
   const listed = await probeList(io, runsDir)
   rows.push({
     key: 'staging',
-    label: '暂存树',
+    label: tr('暂存树'),
     status: listed.kind === 'unknown' ? 'unknown' : 'ok',
     detail: listed.kind === 'unknown'
-      ? '无法列出 ' + runsDir + '：' + listed.reason
-      : listed.kind === 'absent' ? '0 个 run 目录' : String(listed.value.length) + ' 个 run 目录',
+      ? tr('无法列出 {dir}：{reason}', { dir: runsDir, reason: listed.reason })
+      : listed.kind === 'absent' ? tr('0 个 run 目录') : tr('{count} 个 run 目录', { count: listed.value.length }),
   })
   rows.push({
     key: 'staging-path',
-    label: '暂存路径',
+    label: tr('暂存路径'),
     status: 'ok',
     detail: stagingRoot(home, '<runId>'),
   })
@@ -173,15 +176,15 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
       const failed = reports.filter(report => report.ok !== true)
       rows.push({
         key: 'recovery',
-        label: '提交恢复',
+        label: tr('提交恢复'),
         status: failed.length === 0 ? 'ok' : 'warn',
         detail: failed.length === 0
-          ? String(reports.length) + ' 条恢复报告，无待处理'
-          : String(failed.length) + ' 条待处理：' + failed.map(report => (report.runId ?? '?') + '=' + (report.action ?? '?')).join(', '),
+          ? tr('{count} 条恢复报告，无待处理', { count: reports.length })
+          : tr('{count} 条待处理：{items}', { count: failed.length, items: failed.map(report => (report.runId ?? '?') + '=' + (report.action ?? '?')).join(', ') }),
       })
     }
   } catch {
-    rows.push({ key: 'recovery', label: '提交恢复', status: 'unknown', detail: '无法读取 merge/recovery.json' })
+    rows.push({ key: 'recovery', label: tr('提交恢复'), status: 'unknown', detail: tr('无法读取 merge/recovery.json') })
   }
   return rows
 }

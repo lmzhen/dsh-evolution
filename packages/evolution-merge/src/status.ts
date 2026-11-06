@@ -6,6 +6,7 @@ import type { MergeQueue, MergeRow } from './contracts.ts'
 import type { Facts, RunDetail, RunsView } from './wire.ts'
 import { queueOf, stageOf } from './contracts.ts'
 import { fitToolText } from './presentation-budget.ts'
+import { tr } from './messages.ts'
 
 export interface MergeCounts {
   readonly verify: number
@@ -81,14 +82,21 @@ export function formatQueue(rows: readonly MergeRow[], queue: MergeQueue): strin
   return fitToolText(['merge ' + queue + ': ' + String(selected.length)].concat(selected.map(row => '- ' + describe(row))).join('\n'))
 }
 
-const REASON_TEXT: Readonly<Record<string, string>> = {
-  kept: '门禁判定保留，不合并。',
-  'gate-keep': '门禁判定保留，不合并。',
-  rejected: '人工拒绝合并。',
-  'merge-over-limit': '超出合并限制，未合并。',
-  'validation-failed': '合并校验未通过，未合并。',
+function humanReason(reason: string): string {
+  switch (reason) {
+    case 'kept':
+    case 'gate-keep':
+      return tr('门禁判定保留，不合并。')
+    case 'rejected':
+      return tr('人工拒绝合并。')
+    case 'merge-over-limit':
+      return tr('超出合并限制，未合并。')
+    case 'validation-failed':
+      return tr('合并校验未通过，未合并。')
+    default:
+      return reason
+  }
 }
-function humanReason(reason: string): string { return REASON_TEXT[reason] ?? reason }
 
 /** Snapshot-compatible formatting, no legacy MergeRow. */
 export function formatSnapshotStatus(rows: readonly import('./wire.ts').RowFact[]): string {

@@ -4,6 +4,7 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import { createHash } from 'node:crypto'
+import { tr } from './messages.ts'
 import { errorText, isProcessAlive, probeText, SkillLibrary, UnitTransactions, skillLibraryUnitBackend, type EvolutionIoLike, type RunRegistry, type UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
 import { targetClaimUnitPort } from './unit-claim.ts'
 import { canRetry, pairKey, type MergeCandidate, type MergeDecision, type MergeRow } from './contracts.ts'
@@ -66,7 +67,7 @@ export function forcedDecisionFor(a: string, b: string): MergeDecision {
   const sorted = [a, b].sort()
   const raw = ('merge-' + sorted.join('-')).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
   const target = raw.length <= 64 ? raw : raw.slice(0, 55) + '-' + createHash('sha256').update(raw).digest('hex').slice(0, 8)
-  return { shouldMerge: true, mode: 'create-umbrella', target, sources: [a, b], rationale: 'forced pair merge of ' + sorted.join(' and '), confidence: 0.5, aSummary: 'A: ' + sorted[0] + ' 的现有技能面。', bSummary: 'B: ' + sorted[1] + ' 的现有技能面。' }
+  return { shouldMerge: true, mode: 'create-umbrella', target, sources: [a, b], rationale: 'forced pair merge of ' + sorted.join(' and '), confidence: 0.5, aSummary: tr('A: {name} 的现有技能面。', { name: sorted[0] ?? a }), bSummary: tr('B: {name} 的现有技能面。', { name: sorted[1] ?? b }) }
 }
 
 export interface MergeStageBindingPort {
@@ -152,13 +153,13 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
       const params = paramsOf()
       if (command.verb === 'pair') {
         const signal = new AbortController().signal
-        if (command.a === command.b) return fail('pair', 'pair-same-source', 'merge pair 需要两个不同技能源：' + command.a, '重新指定两个不同的 family-managed 技能')
+        if (command.a === command.b) return fail('pair', 'pair-same-source', tr('merge pair 需要两个不同技能源：{a}', { a: command.a }), tr('重新指定两个不同的 family-managed 技能'))
         if ([command.a, command.b].some(name => name.includes('/') || name.includes(':'))) {
-          return { ok: false, text: 'merge: 技能名不能包含 provider/name 或 provider:name 语法：' + command.a + ' / ' + command.b + ' (provider-conflict)\nusage: /evolution merge pair <a> <b>' }
+          return { ok: false, text: tr('merge: 技能名不能包含 provider/name 或 provider:name 语法：{a} / {b} (provider-conflict)\nusage: /evolution merge pair <a> <b>', { a: command.a, b: command.b }) }
         }
         // FR-RUN-03: a session-less invocation cannot host a merge child. Answer E-305 in
         // the three-line shape instead of opening a run that is guaranteed to fail.
-        if (agentless) return fail('pair', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'pair' }), '在 GUI 或 CLI 的会话里运行 /evolution merge pair ' + command.a + ' ' + command.b)
+        if (agentless) return fail('pair', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'pair' }), tr('在 GUI 或 CLI 的会话里运行 /evolution merge pair {a} {b}', { a: command.a, b: command.b }))
         const pairHost = await hostOnlyFailure('pair', deps.hostCapabilities)
         if (pairHost !== undefined) return pairHost
         // FR-EXEC-17/NFR-04: two pair runs for one pair must not race for the same row.
@@ -171,37 +172,37 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         }
         if (inFlight !== undefined && ownerActive) {
           // NFR-04: the same pair is idempotent, not an error — answer the run that already owns it.
-          return { ok: true, text: 'merge pair 已在运行：' + inFlight.runId + '；作用域：family-managed 技能对，1 对，无 per-run 上限' }
+          return { ok: true, text: tr('merge pair 已在运行：{runId}；作用域：family-managed 技能对，1 对，无 per-run 上限', { runId: inFlight.runId }) }
         }
         const cards = await deps.cards(signal)
         const cardA = cards.find(card => card.name === command.a)
         const cardB = cards.find(card => card.name === command.b)
         if (cardA === undefined || cardB === undefined || cardA.managed !== true || cardB.managed !== true) {
-          return fail('pair', 'pair-not-managed', 'merge pair 仅支持 family-managed 技能：' + command.a + ' / ' + command.b, '运行 /evolution doctor 查看 family-managed 技能范围')
+          return fail('pair', 'pair-not-managed', tr('merge pair 仅支持 family-managed 技能：{a} / {b}', { a: command.a, b: command.b }), tr('运行 /evolution doctor 查看 family-managed 技能范围'))
         }
         if (cardA.protectedBy != null || cardB.protectedBy != null
           || cardA.protectionUnknown === true || cardB.protectionUnknown === true) {
-          return fail('pair', 'pair-protected', 'merge pair 不接受受保护/保护状态未知技能：' + command.a + ' / ' + command.b, '解除保护或换一对技能后重试')
+          return fail('pair', 'pair-protected', tr('merge pair 不接受受保护/保护状态未知技能：{a} / {b}', { a: command.a, b: command.b }), tr('解除保护或换一对技能后重试'))
         }
         if ((await deps.isBlocked?.(command.a)) === true || (await deps.isBlocked?.(command.b)) === true) {
-          return fail('pair', 'pair-blocked', 'merge pair 不接受被范围门拦下的技能：' + command.a + ' / ' + command.b, '运行 /evolution scope 查看范围门，或换一对技能')
+          return fail('pair', 'pair-blocked', tr('merge pair 不接受被范围门拦下的技能：{a} / {b}', { a: command.a, b: command.b }), tr('运行 /evolution scope 查看范围门，或换一对技能'))
         }
         const pair = [{ a: command.a, b: command.b }]
         const existing = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === pairKey(command.a, command.b))
         let cleared = false
         if (existing?.state === 'skipped' || (existing?.state === 'fuse' && existing.failure?.retryable === false)) {
           const dropped = await removeRuntimeRow(deps.io, deps.home, existing.id, 'superseded')
-          if (!dropped) return fail('pair', 'row-changed', '清理可替换行时发现并发修改：' + existing.id, '运行 /evolution merge status 后重试')
+          if (!dropped) return fail('pair', 'row-changed', tr('清理可替换行时发现并发修改：{id}', { id: existing.id }), tr('运行 /evolution merge status 后重试'))
           cleared = true
         }
         if (existing?.state === 'verify' && existing.runId !== undefined && (await deps.isOwnerActive?.(existing.runId)) === true) {
-          return fail('pair', 'merge-pair-in-flight', '同一 pair 已在运行 ' + existing.runId, '等待该 run 结束，或运行 /evolution merge status ' + existing.runId, existing.runId)
+          return fail('pair', 'merge-pair-in-flight', tr('同一 pair 已在运行 {runId}', { runId: existing.runId }), tr('等待该 run 结束，或运行 /evolution merge status {runId}', { runId: existing.runId }), existing.runId)
         }
         if (existing?.state === 'pending') {
-          return fail('pair', 'pair-pending', '该 pair 已在待批准队列：' + existing.id, '先运行 /evolution merge approve/reject/discard ' + existing.id, existing.runId)
+          return fail('pair', 'pair-pending', tr('该 pair 已在待批准队列：{id}', { id: existing.id }), tr('先运行 /evolution merge approve/reject/discard {id}', { id: existing.id }), existing.runId)
         }
         if (!cleared && (existing?.state === 'approved' || existing?.state === 'fuse')) {
-          return fail('pair', 'pair-fuse', '该 pair 已在待合并队列，可复用决策重跑', '运行 /evolution merge resume --retry ' + (existing.runId ?? existing.id), existing.runId)
+          return fail('pair', 'pair-fuse', tr('该 pair 已在待合并队列，可复用决策重跑'), tr('运行 /evolution merge resume --retry {id}', { id: existing.runId ?? existing.id }), existing.runId)
         }
         const forced = command.force === true ? forcedDecisionFor(command.a, command.b) : undefined
         const approval = params.mergeApproval
@@ -226,13 +227,13 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             return forced === undefined ? ports : { ...ports, round1: () => Promise.resolve({ kind: 'merge' as const, decision: forced }) }
           },
         })
-        if (!result.ok) return failRun('pair', result.message, '修复后重新发起 pair；run 报告见 /evolution merge report', result)
-        if ('accepted' in result) return { ok: true, text: 'merge pair 已启动：' + result.runId + '；作用域：family-managed 技能对，1 对，无 per-run 上限' }
-        if (!('report' in result)) return fail('pair', 'report-missing', 'merge pair 已结束但没有写报告', '重新运行 pair，或运行 /evolution merge runs 查看运行')
-        return { ok: true, text: 'merge pair 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
+        if (!result.ok) return failRun('pair', result.message, tr('修复后重新发起 pair；run 报告见 /evolution merge report'), result)
+        if ('accepted' in result) return { ok: true, text: tr('merge pair 已启动：{runId}；作用域：family-managed 技能对，1 对，无 per-run 上限', { runId: result.runId }) }
+        if (!('report' in result)) return fail('pair', 'report-missing', tr('merge pair 已结束但没有写报告'), tr('重新运行 pair，或运行 /evolution merge runs 查看运行'))
+        return { ok: true, text: tr('merge pair 完成：merged {merged} / pending {pending} / failed {failed}', { merged: result.report.totals.merged, pending: result.report.totals.pending, failed: result.report.totals.failed }) }
       }
       if (command.verb === 'scan') {
-        if (agentless) return fail('scan', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'scan' }), '在 GUI 或 CLI 的会话里运行 /evolution merge scan')
+        if (agentless) return fail('scan', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'scan' }), tr('在 GUI 或 CLI 的会话里运行 /evolution merge scan'))
         const scanHost = await hostOnlyFailure('scan', deps.hostCapabilities)
         if (scanHost !== undefined) return scanHost
         const signal = new AbortController().signal
@@ -287,17 +288,17 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             ...stageHooks,
           }),
         })
-        if (!result.ok) return failRun('scan', result.message, '修复后重新 scan；run 报告见 /evolution merge report', result)
-        if ('accepted' in result) return { ok: true, text: 'merge scan 已启动：' + result.runId + '；作用域：family-managed 技能库，候选来源 engine screening，无 per-run 上限' }
-        if (!('report' in result)) return fail('scan', 'report-missing', 'merge scan 已结束但没有写报告', '重新运行 scan，或运行 /evolution merge runs 查看运行')
-        return { ok: true, text: 'merge scan 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
+        if (!result.ok) return failRun('scan', result.message, tr('修复后重新 scan；run 报告见 /evolution merge report'), result)
+        if ('accepted' in result) return { ok: true, text: tr('merge scan 已启动：{runId}；作用域：family-managed 技能库，候选来源 engine screening，无 per-run 上限', { runId: result.runId }) }
+        if (!('report' in result)) return fail('scan', 'report-missing', tr('merge scan 已结束但没有写报告'), tr('重新运行 scan，或运行 /evolution merge runs 查看运行'))
+        return { ok: true, text: tr('merge scan 完成：merged {merged} / pending {pending} / failed {failed}', { merged: result.report.totals.merged, pending: result.report.totals.pending, failed: result.report.totals.failed }) }
       }
       if (command.verb === 'candidates' && command.retry === true) {
-        if (command.id === undefined || command.id === '') return fail('candidates', 'candidates-id-required', 'candidates --retry 需要行 id', '运行 /evolution merge candidates 查看可重试行')
+        if (command.id === undefined || command.id === '') return fail('candidates', 'candidates-id-required', tr('candidates --retry 需要行 id'), tr('运行 /evolution merge candidates 查看可重试行'))
         const loaded = await loadMergeState(deps.io, deps.home)
         const row = loaded.state.rows.find(item => item.id === command.id)
-        if (row === undefined) return fail('candidates', 'row-not-found', '找不到候选行：' + command.id, '运行 /evolution merge candidates 查看候选')
-        if (row.state !== 'verify') return fail('candidates', 'candidates-retry-unavailable', '只有待判断行可重跑第 1 轮：' + row.state, '改用 resume --retry 或重新 pair')
+        if (row === undefined) return fail('candidates', 'row-not-found', tr('找不到候选行：{id}', { id: command.id }), tr('运行 /evolution merge candidates 查看候选'))
+        if (row.state !== 'verify') return fail('candidates', 'candidates-retry-unavailable', tr('只有待判断行可重跑第 1 轮：{state}', { state: row.state }), tr('改用 resume --retry 或重新 pair'))
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
         const pairCandidate: MergeCandidate = { a: row.a, b: row.b }
@@ -323,22 +324,22 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             ...stageHooks,
           }),
         })
-        if (!result.ok) return failRun('candidates', result.message, '修复后重试 candidates --retry', result)
-        if ('accepted' in result) return { ok: true, text: 'candidates --retry 已启动：' + result.runId + '；作用域：单条 verify 行重跑，无 per-run 上限' }
-        if (!('report' in result)) return fail('candidates', 'report-missing', 'candidates --retry 已结束但没有写报告', '运行 /evolution merge runs 查看运行')
-        return { ok: true, text: 'candidates --retry 完成：merged ' + String(result.report.totals.merged) + ' / pending ' + String(result.report.totals.pending) + ' / failed ' + String(result.report.totals.failed) }
+        if (!result.ok) return failRun('candidates', result.message, tr('修复后重试 candidates --retry'), result)
+        if ('accepted' in result) return { ok: true, text: tr('candidates --retry 已启动：{runId}；作用域：单条 verify 行重跑，无 per-run 上限', { runId: result.runId }) }
+        if (!('report' in result)) return fail('candidates', 'report-missing', tr('candidates --retry 已结束但没有写报告'), tr('运行 /evolution merge runs 查看运行'))
+        return { ok: true, text: tr('candidates --retry 完成：merged {merged} / pending {pending} / failed {failed}', { merged: result.report.totals.merged, pending: result.report.totals.pending, failed: result.report.totals.failed }) }
       }
       if (command.verb === 'reject') {
         const loaded = await loadMergeState(deps.io, deps.home)
         const row = loaded.state.rows.find(item => item.id === command.id)
-        if (row === undefined) return fail('reject', 'row-not-found', '找不到合并行 ' + command.id, '运行 /evolution merge pending 查看待处理行', command.id)
+        if (row === undefined) return fail('reject', 'row-not-found', tr('找不到合并行 {id}', { id: command.id }), tr('运行 /evolution merge pending 查看待处理行'), command.id)
         const changed = await pairLedger(deps.io, deps.home).transact(tx => {
           const current = tx.rows().find(item => item.id === row.id)
           if (current === undefined || current.state !== 'pending') return false
           return tx.transition(row.id, { type: 'skipped', reason: 'rejected', origin: 'human' }, current.version).ok
         })
-        if (!changed) return fail('reject', 'row-not-pending', '该行不是 pending，或已被并发修改：' + command.id, '运行 /evolution merge status ' + command.id + ' 后重试', row.runId)
-        return { ok: true, text: '已拒绝合并：' + command.id }
+        if (!changed) return fail('reject', 'row-not-pending', tr('该行不是 pending，或已被并发修改：{id}', { id: command.id }), tr('运行 /evolution merge status {id} 后重试', { id: command.id }), row.runId)
+        return { ok: true, text: tr('已拒绝合并：{id}', { id: command.id }) }
       }
       if (command.verb === 'reconcile') {
         const cards = await deps.cards(new AbortController().signal).catch(() => undefined)
@@ -348,15 +349,15 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const live = cards === undefined || cards.length === 0 ? undefined : liveRowFactsOf(cards)
         try {
           const report = await reconcileMergeState({ io: deps.io, home: deps.home, now: deps.now, ttlDays: params.mergeSkippedTtlDays, ...(managed === undefined ? {} : { managed }), ...(live === undefined ? {} : { live }) })
-          if (report.state === 'blocked') return fail('reconcile', report.code ?? 'merge-state-blocked', report.message ?? '合并状态不可读', '先修复合并状态，再运行 /evolution merge doctor')
+          if (report.state === 'blocked') return fail('reconcile', report.code ?? 'merge-state-blocked', report.message ?? tr('合并状态不可读'), tr('先修复合并状态，再运行 /evolution merge doctor'))
           return { ok: true, text: formatReconcileReport(report) }
         } catch (error) {
-          return fail('reconcile', 'reconcile-failed', error instanceof Error ? error.message : String(error), '运行 /evolution merge doctor 查看状态后重试')
+          return fail('reconcile', 'reconcile-failed', error instanceof Error ? error.message : String(error), tr('运行 /evolution merge doctor 查看状态后重试'))
         }
       }
       if (command.verb === 'doctor') {
         const rows = await mergeDoctor(deps.io, deps.home, params.mergeModelsRoot)
-        return { ok: true, text: rows.map(row => row.key + ' [' + row.status + '] ' + row.label + '：' + row.detail).join('\n') }
+        return { ok: true, text: rows.map(row => tr('{key} [{status}] {label}：{detail}', { key: row.key, status: row.status, label: row.label, detail: row.detail })).join('\n') }
       }
       if (command.verb === 'report' || command.verb === 'runs' || command.verb === 'cancel') {
         const registry = deps.registry as unknown as RunRegistry
@@ -368,77 +369,78 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (command.verb === 'cancel') {
           if (command.id !== undefined) {
             const cancelled = registry.cancel(command.id)
-            return cancelled ? { ok: true, text: '已请求取消 ' + command.id } : fail('cancel', 'run-not-found', '没有可取消的 run：' + command.id, '运行 /evolution merge runs 查看可取消的运行')
+            return cancelled ? { ok: true, text: tr('已请求取消 {id}', { id: command.id }) } : fail('cancel', 'run-not-found', tr('没有可取消的 run：{id}', { id: command.id }), tr('运行 /evolution merge runs 查看可取消的运行'))
           }
           const runs = registry.runs('merge')
           let count = 0
           for (const run of runs) if (registry.cancel(run.id)) count += 1
-          return { ok: true, text: '已请求取消 ' + String(count) + ' 个 merge 运行' }
+          return { ok: true, text: tr('已请求取消 {count} 个 merge 运行', { count }) }
         }
         const run = command.id === undefined ? registry.runs('merge')[0] : registry.find(command.id)
-        if (run === undefined) return fail('report', 'run-not-found', '找不到 merge run：' + (command.id ?? '(latest)'), '运行 /evolution merge runs 查看运行列表')
-        if (run.resultRef === undefined) return fail('report', 'report-missing', '该 run 还没有报告：' + run.id, '等待 run 结束，或运行 /evolution merge status ' + run.id, run.id)
+        if (run === undefined) return fail('report', 'run-not-found', tr('找不到 merge run：{id}', { id: command.id ?? '(latest)' }), tr('运行 /evolution merge runs 查看运行列表'))
+        if (run.resultRef === undefined) return fail('report', 'report-missing', tr('该 run 还没有报告：{id}', { id: run.id }), tr('等待 run 结束，或运行 /evolution merge status {runId}', { runId: run.id }), run.id)
         const report = await probeText(deps.io, run.resultRef)
-        if (report.kind === 'unknown') return fail('report', 'report-unreadable', '报告不可读：' + run.resultRef + '（' + report.reason + '）', '检查结果文件权限，或重新运行该命令', run.id)
+        if (report.kind === 'unknown') return fail('report', 'report-unreadable', tr('报告不可读：{ref}（{reason}）', { ref: run.resultRef, reason: report.reason }), tr('检查结果文件权限，或重新运行该命令'), run.id)
         return report.kind === 'absent'
-          ? fail('report', 'report-missing', '报告不存在：' + run.resultRef, '重新运行该命令生成报告', run.id)
+          ? fail('report', 'report-missing', tr('报告不存在：{ref}', { ref: run.resultRef }), tr('重新运行该命令生成报告'), run.id)
           : { ok: true, text: 'report: ' + run.resultRef + '\n' + fitToolText(report.value, 7600) }
       }
       if (command.verb === 'discard') {
         const loaded = await loadMergeState(deps.io, deps.home)
         const row = loaded.state.rows.find(item => item.id === command.id)
-        if (row === undefined) return fail('discard', 'row-not-found', '找不到合并行 ' + command.id, '运行 /evolution merge status 查看当前队列', command.id)
-        if (row.state !== 'pending' && row.state !== 'approved' && row.state !== 'fuse') return fail('discard', 'row-not-discardable', '该行状态是 ' + row.state + '，不可丢弃：' + command.id, '只有 pending/approved/fuse 行可丢弃', row.runId)
+        if (row === undefined) return fail('discard', 'row-not-found', tr('找不到合并行 {id}', { id: command.id }), tr('运行 /evolution merge status 查看当前队列'), command.id)
+        if (row.state !== 'pending' && row.state !== 'approved' && row.state !== 'fuse') return fail('discard', 'row-not-discardable', tr('该行状态是 {state}，不可丢弃：{id}', { state: row.state, id: command.id }), tr('只有 pending/approved/fuse 行可丢弃'), row.runId)
         const dropped = await removeRuntimeRow(deps.io, deps.home, row.id, 'superseded')
-        if (!dropped) return fail('discard', 'row-changed', '丢弃时发现并发修改：' + command.id, '运行 /evolution merge status ' + command.id + ' 后重试')
-        return { ok: true, text: '已丢弃合并行：' + command.id }
+        if (!dropped) return fail('discard', 'row-changed', tr('丢弃时发现并发修改：{id}', { id: command.id }), tr('运行 /evolution merge status {id} 后重试', { id: command.id }))
+        return { ok: true, text: tr('已丢弃合并行：{id}', { id: command.id }) }
       }
       if (command.verb === 'undo') {
         const receipts = (await readCommitReceipts(deps.io, deps.home)).filter(receipt => (receipt.parentRunId ?? receipt.runId) === command.run && receipt.target === command.target)
-        if (receipts.length === 0) return fail('undo', 'receipt-not-found', '该 run 没有目标回执：' + command.run + ' / ' + command.target, '只有已提交的 run 可 undo；运行 /evolution merge runs 查看')
+        if (receipts.length === 0) return fail('undo', 'receipt-not-found', tr('该 run 没有目标回执：{run} / {target}', { run: command.run, target: command.target }), tr('只有已提交的 run 可 undo；运行 /evolution merge runs 查看'))
         const undoRunId = receipts[0]!.parentRunId ?? receipts[0]!.runId
         const undoRegistry = deps.registry as unknown as RunRegistry
-        if (undoRegistry.runs('merge').some(run => run.id === undoRunId && run.supersededAt !== undefined)) return fail('undo', 'run-superseded', '该 run 已因技能树 restore 失效，不能再 undo：' + undoRunId, '运行 /evolution merge runs 查看失效标记')
+        if (undoRegistry.runs('merge').some(run => run.id === undoRunId && run.supersededAt !== undefined)) return fail('undo', 'run-superseded', tr('该 run 已因技能树 restore 失效，不能再 undo：{runId}', { runId: undoRunId }), tr('运行 /evolution merge runs 查看失效标记'))
         const unit = unitFor(deps)
         const result = await runUndoOperation({ io: deps.io, home: deps.home, runId: undoRunId, port: skillLibraryUndoPort(deps.skills), now: deps.now, target: command.target, ...(unit === undefined ? {} : { finalizeUnit: id => unit.finalize.call(unit, id) }) })
-        return result.ok ? { ok: true, text: result.message } : fail('undo', 'undo-failed', result.message, '检查回执与暂存后重试')
+        return result.ok ? { ok: true, text: result.message } : fail('undo', 'undo-failed', result.message, tr('检查回执与暂存后重试'))
       }
       if (command.verb === 'skipped' && command.restore !== undefined) {
         const loaded = await loadMergeState(deps.io, deps.home)
         const row = loaded.state.rows.find(item => item.id === command.restore)
-        if (row === undefined || row.state !== 'skipped') return fail('skipped', 'row-not-found', '找不到可恢复的 skipped 行：' + command.restore, '运行 /evolution merge skipped 查看跳过队列', command.restore)
+        if (row === undefined || row.state !== 'skipped') return fail('skipped', 'row-not-found', tr('找不到可恢复的 skipped 行：{id}', { id: command.restore }), tr('运行 /evolution merge skipped 查看跳过队列'), command.restore)
         const dropped = await removeRuntimeRow(deps.io, deps.home, row.id, 'restored')
-        if (!dropped) return fail('skipped', 'row-changed', '恢复时发现并发修改：' + row.id, '运行 /evolution merge status 后重试')
-        return { ok: true, text: '已恢复参与筛选：' + row.id }
+        if (!dropped) return fail('skipped', 'row-changed', tr('恢复时发现并发修改：{id}', { id: row.id }), tr('运行 /evolution merge status 后重试'))
+        return { ok: true, text: tr('已恢复参与筛选：{id}', { id: row.id }) }
       }
       if (command.verb === 'resume') {
         if (command.clear !== undefined) {
           const cleared = (await loadMergeState(deps.io, deps.home)).state.rows.find(item => item.id === command.clear)
-          if (cleared === undefined) return fail('resume', 'row-not-found', '找不到要清除的行：' + command.clear, '运行 /evolution merge status 查看当前队列')
+          if (cleared === undefined) return fail('resume', 'row-not-found', tr('找不到要清除的行：{id}', { id: command.clear }), tr('运行 /evolution merge status 查看当前队列'))
           const dropped = await removeRuntimeRow(deps.io, deps.home, cleared.id, 'superseded')
-          if (!dropped) return fail('resume', 'row-changed', '清除时发现并发修改：' + cleared.id, '运行 /evolution merge status 后重试')
-          return { ok: true, text: '已清除合并行：' + cleared.id }
+          if (!dropped) return fail('resume', 'row-changed', tr('清除时发现并发修改：{id}', { id: cleared.id }), tr('运行 /evolution merge status 后重试'))
+          return { ok: true, text: tr('已清除合并行：{id}', { id: cleared.id }) }
         }
         const loaded = await loadMergeState(deps.io, deps.home)
         if (command.id === undefined) {
           const resumable = loaded.state.rows.filter(item => item.state === 'fuse' || item.state === 'verify' || (command.retry === true && item.state === 'approved'))
-          return fail('resume', 'resume-id-required', 'merge resume 需要 <id>；可恢复行：' + (resumable.length === 0 ? '(none)' : resumable.map(item => item.id).join(', ')), '运行 /evolution merge resume --retry <id> 复用某一行的决策')
+          const resumableText = resumable.length === 0 ? '(none)' : resumable.map(item => item.id).join(', ')
+          return fail('resume', 'resume-id-required', tr('merge resume 需要 <id>；可恢复行：{ids}', { ids: resumableText }), tr('运行 /evolution merge resume --retry <id> 复用某一行的决策'))
         }
         const row = loaded.state.rows.find(item => item.id === command.id)
-        if (row === undefined) return fail('resume', 'row-not-found', '找不到可恢复行 ' + command.id, '运行 /evolution merge candidates 查看可恢复行')
+        if (row === undefined) return fail('resume', 'row-not-found', tr('找不到可恢复行 {id}', { id: command.id }), tr('运行 /evolution merge candidates 查看可恢复行'))
         const signal = new AbortController().signal
         const cards = await deps.cards(signal)
         if ((row.state === 'fuse' || row.state === 'approved') && row.decision !== undefined && row.decision.mode !== 'create-umbrella') {
           const targetCard = cards.find(card => card.name === row.decision?.target)
-          if (targetCard !== undefined && targetCard.managed !== true) return fail('resume', 'target-not-managed', 'target 不是 family-managed：' + row.decision.target, '重新 pair 并选一个 managed 目标', row.runId)
-          if (targetCard !== undefined && (targetCard.protectionUnknown === true || targetCard.protectedBy != null)) return fail('resume', 'target-protected', 'target 受保护：' + row.decision.target, '解除保护或改选其它目标', row.runId)
-          if (await deps.isBlocked?.(row.decision.target) === true) return fail('resume', 'target-blocked', 'target 被范围门拦下：' + row.decision.target, '运行 /evolution scope 查看范围门', row.runId)
+          if (targetCard !== undefined && targetCard.managed !== true) return fail('resume', 'target-not-managed', tr('target 不是 family-managed：{target}', { target: row.decision.target }), tr('重新 pair 并选一个 managed 目标'), row.runId)
+          if (targetCard !== undefined && (targetCard.protectionUnknown === true || targetCard.protectedBy != null)) return fail('resume', 'target-protected', tr('target 受保护：{target}', { target: row.decision.target }), tr('解除保护或改选其它目标'), row.runId)
+          if (await deps.isBlocked?.(row.decision.target) === true) return fail('resume', 'target-blocked', tr('target 被范围门拦下：{target}', { target: row.decision.target }), tr('运行 /evolution scope 查看范围门'), row.runId)
         }
         // NFR-04: a resume commits into the same target a running approve/pair may hold;
         // the target is serialised here too, not only at the commit claim.
         if ((row.state === 'fuse' || row.state === 'approved') && row.decision !== undefined) {
           const busy = busyTarget(loaded.state.rows, row.decision.target, row.id)
-          if (busy !== undefined) return fail('resume', 'merge-target-busy', '目标 ' + row.decision.target + ' 正被 ' + busy.id + ' 占用，串行等待', '等待占用行结算，或 /evolution merge discard ' + busy.id, busy.runId)
+          if (busy !== undefined) return fail('resume', 'merge-target-busy', tr('目标 {target} 正被 {id} 占用，串行等待', { target: row.decision.target, id: busy.id }), tr('等待占用行结算，或 /evolution merge discard {id}', { id: busy.id }), busy.runId)
         }
         const pair = () => Promise.resolve([{ a: row.a, b: row.b }])
         const failed = (stage: 'decide' | 'author', code: string, message: string) => Promise.resolve({
@@ -476,10 +478,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             ...stageHooks,
           }),
         })
-        if (!result.ok) return failRun('resume', result.message, '修复后重新 resume；run 报告见 /evolution merge report', result)
-        if ('accepted' in result) return { ok: true, text: 'merge resume 已启动：' + result.runId + '；作用域：单条待合并行重跑 agent2，无 per-run 上限' }
-        if (!('report' in result)) return fail('resume', 'report-missing', 'merge resume 已结束但没有写报告', '重新运行 resume，或运行 /evolution merge runs 查看运行')
-        return { ok: true, text: 'merge resume 完成：merged ' + String(result.report.totals.merged) }
+        if (!result.ok) return failRun('resume', result.message, tr('修复后重新 resume；run 报告见 /evolution merge report'), result)
+        if ('accepted' in result) return { ok: true, text: tr('merge resume 已启动：{runId}；作用域：单条待合并行重跑 agent2，无 per-run 上限', { runId: result.runId }) }
+        if (!('report' in result)) return fail('resume', 'report-missing', tr('merge resume 已结束但没有写报告'), tr('重新运行 resume，或运行 /evolution merge runs 查看运行'))
+        return { ok: true, text: tr('merge resume 完成：merged {merged}', { merged: result.report.totals.merged }) }
       }
       if (command.verb === 'approve') {
         const signal = new AbortController().signal
@@ -495,32 +497,32 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           // NFR-04: a second approve for the same target waits for the holder.
           const busy = busyTarget(rowsNow, target, candidate.id)
           if (busy !== undefined) {
-            return fail('approve', 'merge-target-busy', '目标 ' + target + ' 正被 ' + busy.id + ' 占用，串行等待', '等待占用行结算，或 /evolution merge discard ' + busy.id, busy.runId)
+            return fail('approve', 'merge-target-busy', tr('目标 {target} 正被 {id} 占用，串行等待', { target, id: busy.id }), tr('等待占用行结算，或 /evolution merge discard {id}', { id: busy.id }), busy.runId)
           }
           const targetCardNow = cards.find(card => card.name === target)
           if (targetCardNow !== undefined && (targetCardNow.protectionUnknown === true || targetCardNow.protectedBy != null)) {
-            return fail('approve', 'target-protected', '目标技能「' + target + '」在决策后变为受保护，拒绝提交', '解除保护或改选其它目标', candidate.runId)
+            return fail('approve', 'target-protected', tr('目标技能「{target}」在决策后变为受保护，拒绝提交', { target }), tr('解除保护或改选其它目标'), candidate.runId)
           }
           const missingSource = [candidate.a, candidate.b].find(name => !cards.some(card => card.name === name && card.managed === true))
           if (missingSource !== undefined) {
             const dropped = await removeRuntimeRow(deps.io, deps.home, candidate.id, 'superseded')
-            if (!dropped) return fail('approve', 'row-changed', 'source-gone，但行已被并发修改，未清理：' + candidate.id, '运行 /evolution merge status ' + candidate.id + ' 后重试')
-            return fail('approve', 'source-gone', missingSource + ' 已不在 family-managed 技能库，已从 active 队列清除', '重新 pair 该技能对；剩余行用 /evolution merge discard ' + candidate.id, candidate.runId)
+            if (!dropped) return fail('approve', 'row-changed', tr('source-gone，但行已被并发修改，未清理：{id}', { id: candidate.id }), tr('运行 /evolution merge status {id} 后重试', { id: candidate.id }))
+            return fail('approve', 'source-gone', tr('{source} 已不在 family-managed 技能库，已从 active 队列清除', { source: missingSource }), tr('重新 pair 该技能对；剩余行用 /evolution merge discard {id}', { id: candidate.id }), candidate.runId)
           }
           const sourceExpected = candidate.decision?.sourceRevisionRef ?? candidate.sourceRevisionRef
           const targetExpected = candidate.decision?.targetRevisionRef ?? candidate.targetRevisionRef
           const targetMismatch = revisionMismatch(targetExpected, targetRevisionRefOf(cards, candidate.decision.target))
           if (targetMismatch !== null) {
             await pairLedger(deps.io, deps.home).transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'target-taken' }, current.version).ok })
-            return fail('approve', 'target-taken', '目标 ' + candidate.decision.target + ' 在决策后已被占用', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
+            return fail('approve', 'target-taken', tr('目标 {target} 在决策后已被占用', { target: candidate.decision.target }), tr('重新 pair，或 /evolution merge discard {id}', { id: candidate.id }), candidate.runId)
           }
           if (candidate.decision.supportDigest !== undefined && candidate.decision.supportDigest !== supportDigestOf(cards, [candidate.decision.target, candidate.a, candidate.b])) {
             await pairLedger(deps.io, deps.home).transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'source-changed' }, current.version).ok })
-            return fail('approve', 'source-changed', '源技能内容在决策后变化，拒绝照跑', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
+            return fail('approve', 'source-changed', tr('源技能内容在决策后变化，拒绝照跑'), tr('重新 pair，或 /evolution merge discard {id}', { id: candidate.id }), candidate.runId)
           }
           if (revisionMismatch(sourceExpected, sourceRevisionRefOf(cards, candidate.a, candidate.b)) !== null) {
             await pairLedger(deps.io, deps.home).transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'source-changed' }, current.version).ok })
-            return fail('approve', 'source-changed', '源技能参考在决策后变化，拒绝照跑', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
+            return fail('approve', 'source-changed', tr('源技能参考在决策后变化，拒绝照跑'), tr('重新 pair，或 /evolution merge discard {id}', { id: candidate.id }), candidate.runId)
           }
           const currentRevision = sourceRevisionOf(cards, candidate.a, candidate.b)
           if (candidate.sourceRevision !== undefined && currentRevision !== undefined && currentRevision !== candidate.sourceRevision) {
@@ -528,8 +530,8 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
               const current = tx.rows().find(item => item.id === candidate.id)
               return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'source-changed' }, current.version).ok
             })
-            if (!recorded) return fail('approve', 'row-changed', '记录 source-changed 时发现并发修改：' + candidate.id, '运行 /evolution merge status ' + candidate.id + ' 后重试')
-            return fail('approve', 'source-changed', '源技能内容在决策后变化，拒绝照跑', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
+            if (!recorded) return fail('approve', 'row-changed', tr('记录 source-changed 时发现并发修改：{id}', { id: candidate.id }), tr('运行 /evolution merge status {id} 后重试', { id: candidate.id }))
+            return fail('approve', 'source-changed', tr('源技能内容在决策后变化，拒绝照跑'), tr('重新 pair，或 /evolution merge discard {id}', { id: candidate.id }), candidate.runId)
           }
           const currentTargetRevision = targetRevisionOf(cards, candidate.decision.target)
           if (candidate.targetRevision !== undefined && currentTargetRevision !== undefined
@@ -538,19 +540,19 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
               const current = tx.rows().find(item => item.id === candidate.id)
               return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'target-taken' }, current.version).ok
             })
-            if (!recorded) return fail('approve', 'row-changed', '记录 target-taken 时发现并发修改：' + candidate.id, '运行 /evolution merge status ' + candidate.id + ' 后重试')
-            return fail('approve', 'target-taken', '目标 ' + candidate.decision.target + ' 在决策后变化，拒绝照跑', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
+            if (!recorded) return fail('approve', 'row-changed', tr('记录 target-taken 时发现并发修改：{id}', { id: candidate.id }), tr('运行 /evolution merge status {id} 后重试', { id: candidate.id }))
+            return fail('approve', 'target-taken', tr('目标 {target} 在决策后变化，拒绝照跑', { target: candidate.decision.target }), tr('重新 pair，或 /evolution merge discard {id}', { id: candidate.id }), candidate.runId)
           }
           if (candidate.decision.mode !== 'create-umbrella') {
             const targetCard = cards.find(card => card.name === candidate.decision?.target)
             if (targetCard !== undefined && targetCard.managed !== true) {
-              return fail('approve', 'target-not-managed', 'target 不是 family-managed：' + candidate.decision.target, '重新 pair 并选一个 managed 目标', candidate.runId)
+              return fail('approve', 'target-not-managed', tr('target 不是 family-managed：{target}', { target: candidate.decision.target }), tr('重新 pair 并选一个 managed 目标'), candidate.runId)
             }
             if (targetCard !== undefined && (targetCard.protectionUnknown === true || targetCard.protectedBy != null)) {
-              return fail('approve', 'target-protected', 'target 受保护：' + candidate.decision.target, '解除保护或改选其它目标', candidate.runId)
+              return fail('approve', 'target-protected', tr('target 受保护：{target}', { target: candidate.decision.target }), tr('解除保护或改选其它目标'), candidate.runId)
             }
             if (await deps.isBlocked?.(candidate.decision.target) === true) {
-              return fail('approve', 'target-blocked', 'target 被范围门拦下：' + candidate.decision.target, '运行 /evolution scope 查看范围门', candidate.runId)
+              return fail('approve', 'target-blocked', tr('target 被范围门拦下：{target}', { target: candidate.decision.target }), tr('运行 /evolution scope 查看范围门'), candidate.runId)
             }
           }
           if (candidate.decision.mode === 'merge-into-existing' && !cards.some(card => card.name === candidate.decision?.target)) {
@@ -558,8 +560,8 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
               const current = tx.rows().find(item => item.id === candidate.id)
               return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'target-taken' }, current.version).ok
             })
-            if (!recorded) return fail('approve', 'row-changed', '记录 target-taken 时发现并发修改：' + candidate.id, '运行 /evolution merge status ' + candidate.id + ' 后重试')
-            return fail('approve', 'target-taken', '目标 ' + candidate.decision.target + ' 已不存在，行保留 pending --expired', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
+            if (!recorded) return fail('approve', 'row-changed', tr('记录 target-taken 时发现并发修改：{id}', { id: candidate.id }), tr('运行 /evolution merge status {id} 后重试', { id: candidate.id }))
+            return fail('approve', 'target-taken', tr('目标 {target} 已不存在，行保留 pending --expired', { target: candidate.decision.target }), tr('重新 pair，或 /evolution merge discard {id}', { id: candidate.id }), candidate.runId)
           }
         }
         const result = await runApproveCommand({
@@ -582,10 +584,10 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             }),
           },
         })
-        if (!result.ok) return failRun('approve', result.message, '修复后重新 approve；run 报告见 /evolution merge report', result)
-        if ('accepted' in result) return { ok: true, text: 'merge approve 已启动：' + result.runId + '；作用域：单条 pending 行批准后重跑 agent2，无 per-run 上限' }
-        if (!('report' in result)) return fail('approve', 'report-missing', 'merge approve 已结束但没有写报告', '重新运行 approve，或运行 /evolution merge runs 查看运行')
-        return { ok: true, text: 'merge approve 完成：merged ' + String(result.report.totals.merged) }
+        if (!result.ok) return failRun('approve', result.message, tr('修复后重新 approve；run 报告见 /evolution merge report'), result)
+        if ('accepted' in result) return { ok: true, text: tr('merge approve 已启动：{runId}；作用域：单条 pending 行批准后重跑 agent2，无 per-run 上限', { runId: result.runId }) }
+        if (!('report' in result)) return fail('approve', 'report-missing', tr('merge approve 已结束但没有写报告'), tr('重新运行 approve，或运行 /evolution merge runs 查看运行'))
+        return { ok: true, text: tr('merge approve 完成：merged {merged}', { merged: result.report.totals.merged }) }
       }
       const cards = command.verb === 'pending' ? await deps.cards(new AbortController().signal) : undefined
       const registry = deps.registry as unknown as RunRegistry
@@ -595,13 +597,13 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (found !== undefined && found.kind === 'merge') {
           // CLI consumer of the RunDetail envelope: current pair, per-pair outcome, stop reason.
           const snapshot = await readMergeSnapshot({ io: deps.io, home: deps.home, runs: runs !== undefined && runs.some(item => item.id === found.id) ? runs : [...(runs ?? []), found], approval: params.mergeApproval, now: deps.now })
-          if (snapshot.blocked !== undefined) return fail('status', snapshot.blocked.code, snapshot.blocked.message, '先修复合并状态（/evolution merge doctor），再查看运行')
+          if (snapshot.blocked !== undefined) return fail('status', snapshot.blocked.code, snapshot.blocked.message, tr('先修复合并状态（/evolution merge doctor），再查看运行'))
           const detail = buildRunDetail(snapshot, found.id)
-          if (detail === null) return fail('status', 'run-not-found', '找不到 merge run ' + found.id, '运行 /evolution merge runs 查看运行列表')
+          if (detail === null) return fail('status', 'run-not-found', tr('找不到 merge run {id}', { id: found.id }), tr('运行 /evolution merge runs 查看运行列表'))
           return { ok: true, text: formatRunDetail(detail) }
         }
         const row = (await loadMergeState(deps.io, deps.home)).state.rows.find(item => item.id === command.id)
-        if (row === undefined) return fail('status', 'row-not-found', '找不到合并行或 run：' + command.id, '运行 /evolution merge status 查看队列，或 /evolution merge runs 查看运行')
+        if (row === undefined) return fail('status', 'row-not-found', tr('找不到合并行或 run：{id}', { id: command.id }), tr('运行 /evolution merge status 查看队列，或 /evolution merge runs 查看运行'))
       }
       // FR-LIFE-14: CLI reads derive the same pending expiry the snapshot route does;
       // the library read stays lazy (only invoked when a pending row needs derivation).

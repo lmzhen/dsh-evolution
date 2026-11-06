@@ -21,6 +21,7 @@ import { elapsedSince, textDiffFacts } from '@deepseek-ai/dsh-evolution-core'
 import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { WritePreview } from './index.ts'
+import { tr } from './messages.ts'
 
 /** Route paths: the ONE declaration lives in core (W1) and the browser half is generated from it. */
 export const APPROVAL_ROUTES = HOST_ROUTES.approval
@@ -132,7 +133,7 @@ export function makeApprovalRoutes(approval: ApprovalFace, audit: DecisionAudit)
         const raw = params.get('status')?.trim() ?? ''
         const status = raw === '' ? 'pending' : raw
         if (!(PENDING_STATUSES as readonly string[]).includes(status)) {
-          return json(400, { ok: false, code: 'bad-request', message: 'status 必须是以下之一：' + PENDING_STATUSES.join(', ') })
+          return json(400, { ok: false, code: 'bad-request', message: tr('status 必须是以下之一：{statuses}', { statuses: PENDING_STATUSES.join(', ') }) })
         }
         try {
           const records = await approval.list(status as PendingStatus)
@@ -164,19 +165,19 @@ export function makeApprovalRoutes(approval: ApprovalFace, audit: DecisionAudit)
         if (request.method !== 'GET') return methodNotAllowed(['GET'])
         const params = new URL(request.url).searchParams
         const id = params.get('id')?.trim() ?? ''
-        if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
+        if (id === '') return json(400, { ok: false, code: 'bad-request', message: tr('缺少 id') })
         try {
           // Both statuses: a record whose replay is already running is exactly when a reader asks.
           const staged = [...await approval.list('pending'), ...await approval.list('executing')]
           const record = staged.find(candidate => candidate.id === id)
           if (record === undefined) {
-            return json(200, { ok: false, code: 'not-found', message: '没有 id 为「' + id + '」的待批准写入' })
+            return json(200, { ok: false, code: 'not-found', message: tr('没有 id 为「{id}」的待批准写入', { id }) })
           }
           const preview = approval.previewOf(record.kind)
           if (preview === undefined) {
             // Not an error: plenty of staged writes have no bytes worth showing, and the reader is owed
             // the reason rather than an empty diff.
-            return json(200, { ok: true, data: { available: false, reason: '类型 "' + record.kind + '" 的写入没有可预览内容' } })
+            return json(200, { ok: true, data: { available: false, reason: tr('类型 "{kind}" 的写入没有可预览内容', { kind: record.kind }) } })
           }
           const answer = await preview(record.args)
           if (!answer.available) return json(200, { ok: true, data: { available: false, reason: answer.reason } })
@@ -200,7 +201,7 @@ export function makeApprovalRoutes(approval: ApprovalFace, audit: DecisionAudit)
       fetch: async (request) => {
         if (request.method !== 'POST') return methodNotAllowed(['POST'])
         const id = idOf(await readJsonObject(request))
-        if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
+        if (id === '') return json(400, { ok: false, code: 'bad-request', message: tr('缺少 id') })
         return await decide(current => approval.approve(current, audit), id)
       },
     },
@@ -211,8 +212,8 @@ export function makeApprovalRoutes(approval: ApprovalFace, audit: DecisionAudit)
       fetch: async (request) => {
         if (request.method !== 'POST') return methodNotAllowed(['POST'])
         const id = idOf(await readJsonObject(request))
-        if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
-        if (approval.release === undefined) return json(200, { ok: false, code: 'approval-refused', message: '这个部署没有提供 release' })
+        if (id === '') return json(400, { ok: false, code: 'bad-request', message: tr('缺少 id') })
+        if (approval.release === undefined) return json(200, { ok: false, code: 'approval-refused', message: tr('这个部署没有提供 release') })
         return await decide(current => approval.release!(current), id)
       },
     },
@@ -223,7 +224,7 @@ export function makeApprovalRoutes(approval: ApprovalFace, audit: DecisionAudit)
       fetch: async (request) => {
         if (request.method !== 'POST') return methodNotAllowed(['POST'])
         const id = idOf(await readJsonObject(request))
-        if (id === '') return json(400, { ok: false, code: 'bad-request', message: '缺少 id' })
+        if (id === '') return json(400, { ok: false, code: 'bad-request', message: tr('缺少 id') })
         return await decide(current => approval.reject(current, audit), id)
       },
     },

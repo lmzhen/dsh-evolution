@@ -1,6 +1,7 @@
 /** Merge command adapter over the family command catalog. No parser/usage table here. */
 import { parseCommand } from '@deepseek-ai/dsh-evolution-commands'
 import { MERGE_COMMAND_DEFS } from './command-defs.ts'
+import { tr } from './messages.ts'
 
 export type MergeCliCommand =
   | { readonly verb: 'scan' }
@@ -60,12 +61,12 @@ export interface MergeLifecycleVerb {
 
 /** Machine-readable three-verb table: merge undo / skill undo / skill restore. */
 export const MERGE_LIFECYCLE_VERBS: readonly MergeLifecycleVerb[] = [
-  { verb: 'merge undo', appliesTo: '一次 merge run（按 run 反序撤销 unit）', excludes: ['skill undo', 'skill restore'] },
-  { verb: 'skill undo', appliesTo: '单个技能的一次 patch', excludes: ['merge undo'] },
-  { verb: 'skill restore', appliesTo: '从 .archive 恢复整棵技能树', excludes: ['merge undo'] },
+  { verb: 'merge undo', appliesTo: '一次 merge run（按 run 反序撤销 unit）', excludes: ['skill undo', 'skill restore'] }, // i18n-allow: usage data, translated at render time
+  { verb: 'skill undo', appliesTo: '单个技能的一次 patch', excludes: ['merge undo'] }, // i18n-allow: usage data, translated at render time
+  { verb: 'skill restore', appliesTo: '从 .archive 恢复整棵技能树', excludes: ['merge undo'] }, // i18n-allow: usage data, translated at render time
 ]
 
 export function mergeUsage(): string {
   return 'usage: ' + MERGE_COMMAND_DEFS.filter(def => def.id !== 'merge.doctor' && def.usage !== false).map(def => def.fallback).join(' | ') + '\ndefaults: mergeApproval=false, mergeSkippedTtlDays=0, mergeRunTimeoutMinutes=0, mergePairTimeoutMinutes=15, mergeModelsRoot=""'
-    + '\nlifecycle: ' + MERGE_LIFECYCLE_VERBS.map(item => item.verb + '=' + item.appliesTo + '；互斥 ' + item.excludes.join('/')).join(' | ')
+    + '\nlifecycle: ' + MERGE_LIFECYCLE_VERBS.map(item => item.verb + '=' + tr(item.appliesTo) + tr('；互斥 {excludes}', { excludes: item.excludes.join('/') })).join(' | ')
 }
