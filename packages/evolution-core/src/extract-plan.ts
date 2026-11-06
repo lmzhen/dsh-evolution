@@ -3,6 +3,7 @@ import { applyReferenceRewrite, planReferenceRewrite, planRehoming, type Referen
 import { selectSections, type SectionSelectionRequest } from './section-selection.ts'
 import { externalRefs, supportRefs } from './support-refs.ts'
 import { frontmatterBlock } from './frontmatter.ts'
+import { tr } from './messages.ts'
 
 const LF = String.fromCharCode(10)
 
@@ -295,13 +296,13 @@ export interface ExtractProjection {
 export function projectExtractBodies(plan: ExtractPlanDraft, sourceMd: string, targetMd: string): { ok: true; projection: ExtractProjection } | { ok: false; message: string } {
   const sourceBlock = frontmatterBlock(sourceMd)
   const targetBlock = frontmatterBlock(targetMd)
-  if (!sourceBlock) return { ok: false, message: 'source 没有有效 frontmatter' }
-  if (!targetBlock) return { ok: false, message: 'target 没有有效 frontmatter' }
+  if (!sourceBlock) return { ok: false, message: tr('source 没有有效 frontmatter') }
+  if (!targetBlock) return { ok: false, message: tr('target 没有有效 frontmatter') }
   const sourceHeader = sourceBlock.lines.slice(0, sourceBlock.end + 1).join(LF)
   const targetNormalized = targetMd.replace(/\r\n/g, LF)
   const targetLines = targetNormalized.split(LF)
   for (const part of plan.parts) {
-    if (targetLines.some(line => line.trim() === '## ' + part.heading)) return { ok: false, message: 'target 已有同名 heading「' + part.heading + '」。' }
+    if (targetLines.some(line => line.trim() === '## ' + part.heading)) return { ok: false, message: tr('target 已有同名 heading「{heading}」。', { heading: part.heading }) }
   }
   const additions = plan.parts.map(part => part.movedText).join(LF + LF)
   const targetRaw = targetNormalized.trimEnd() + LF + LF + additions + LF

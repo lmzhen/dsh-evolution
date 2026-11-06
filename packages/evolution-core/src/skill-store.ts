@@ -61,6 +61,7 @@ import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionConten
 import { getRecord, loadUsage, mutateUsage, suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
+import { tr } from './messages.ts'
 
 /**
  * The CLASS boundary default authority (G1/1.1, Stage 2).
@@ -76,7 +77,7 @@ const CLASS_DEFAULT_AUTHORITY: WriteAuthority = authorityFrom({ origin: 'foregro
 /** 0.3.16 (S1.13, T-6): the pointer-line prefix written into a body when a
  * section is moved to references/ — single literal, both restructure and
  * append-mode consolidation emit the same discoverability line. */
-const POINTER_LINE_PREFIX = '> 详见 references/'
+const POINTER_LINE_PREFIX = '> 详见 references/' // i18n-allow: body pointer-line data written into SKILL.md, not tool-result copy
 
 /** V3: the pure LINK LIST that travels with a pointer line. A moved section's
  * citations move one hop deeper, so without this line the body stops mentioning
@@ -84,7 +85,7 @@ const POINTER_LINE_PREFIX = '> 详见 references/'
  * unpointed — measured on the live skill, moving 验证手法 took `missing` from 0 to
  * 8 until the list was emitted. Design §2.3 explicitly allows link-list lines in
  * the body, and a list of paths carries no content claim. */
-const POINTER_REFS_PREFIX = '> 本节引用：'
+const POINTER_REFS_PREFIX = '> 本节引用：' // i18n-allow: body pointer-line data written into SKILL.md, not tool-result copy
 /** Cap keeps the line readable; an ellipsis marks a truncated list (visible, never
  * silently short). */
 const POINTER_REFS_CAP = 12
@@ -197,8 +198,8 @@ function anchorRefusal(name: string, verdict: Exclude<AnchorVerdict, 'match'>): 
     stale: true,
     anchor: verdict,
     message: verdict === 'missing'
-      ? `技能「${name}」不存在。`
-      : `技能 "${name}" 在读取之后被改动过；为避免覆盖更新的内容，本次写入被拒绝。`,
+      ? tr('技能「{name}」不存在。', { name })
+      : tr('技能 "{name}" 在读取之后被改动过；为避免覆盖更新的内容，本次写入被拒绝。', { name }),
   }
 }
 
@@ -223,8 +224,8 @@ function anchorUnverifiable(name: string, filePath: string | null): SkillActionR
     stale: true,
     anchor: 'drift',
     message: filePath === null
-      ? `无法读取技能 "${name}" 以校验暂存内容。`
-      : `无法读取技能 "${name}" 的支撑文件 "${filePath}" 以校验暂存内容。`,
+      ? tr('无法读取技能 "{name}" 以校验暂存内容。', { name })
+      : tr('无法读取技能 "{name}" 的支撑文件 "{path}" 以校验暂存内容。', { name, path: filePath }),
   }
 }
 
@@ -234,8 +235,8 @@ function anchorRefusalFile(name: string, filePath: string, verdict: Exclude<Anch
     stale: true,
     anchor: verdict,
     message: verdict === 'missing'
-      ? `文件「${filePath}」不在技能「${name}」里。`
-      : `技能 "${name}" 的支撑文件 "${filePath}" 在读取之后被改动过；为避免覆盖更新的内容，本次写入被拒绝。`,
+      ? tr('文件「{path}」不在技能「{name}」里。', { path: filePath, name })
+      : tr('技能 "{name}" 的支撑文件 "{path}" 在读取之后被改动过；为避免覆盖更新的内容，本次写入被拒绝。', { name, path: filePath }),
   }
 }
 
@@ -257,7 +258,7 @@ function unreadableTarget(label: string, error: unknown): SkillActionResult {
   const detail = code === 'EISDIR'
     ? 'the path is a DIRECTORY, not a file'
     : error instanceof Error ? error.message : String(error)
-  return { ok: false, message: `读不出「${label}」：${detail}。没有写入任何内容。` }
+  return { ok: false, message: tr('读不出「{label}」：{detail}。没有写入任何内容。', { label, detail }) }
 }
 
 export interface SkillActionResult {
@@ -574,15 +575,15 @@ export function validateRestructureTarget(filePath: string): string | null {
 
 export function validateSupportPath(filePath: string): string | null {
   const normalized = filePath.replace(/\\/g, '/')
-  if (normalized.includes('..')) return '不允许路径穿越。'
+  if (normalized.includes('..')) return tr('不允许路径穿越。')
   const parts = normalized.split('/').filter(Boolean)
   if (parts.length === 0 || !SUPPORT_DIRS.includes(parts[0] as typeof SUPPORT_DIRS[number])) {
     return `file_path must be under one of: ${SUPPORT_DIRS.join(', ')}.`
   }
-  if (parts.length < 2) return '请给出文件名，不能只给目录。'
+  if (parts.length < 2) return tr('请给出文件名，不能只给目录。')
   for (const part of parts.slice(1)) {
     if (!SUPPORT_FILE_NAME_RE.test(part)) {
-      return `不支持的文件名「${part}」：请只用小写字母、数字、点、连字符和下划线（首字符须为字母或数字）。`
+      return tr('不支持的文件名「{part}」：请只用小写字母、数字、点、连字符和下划线（首字符须为字母或数字）。', { part })
     }
     // G2 S4: the `.lock` suffix is no longer reserved. It was reserved because a user file named
     // `*.lock` was indistinguishable from the io writer lock; that protocol is retired (writes go
@@ -591,11 +592,11 @@ export function validateSupportPath(filePath: string): string | null {
     // (quarantine copy / durable-write tmp). A user support file with either
     // suffix was eligible for sweepStaleTmps deletion; reserve them too.
     if (part.toLowerCase().endsWith('.corrupt') || part.toLowerCase().endsWith('.tmp')) {
-      return `不支持的文件名「${part}」：.corrupt/.tmp 后缀由状态与 IO 协议保留。`
+      return tr('不支持的文件名「{part}」：.corrupt/.tmp 后缀由状态与 IO 协议保留。', { part })
     }
     const stem = part.split('.')[0]?.toLowerCase() ?? ''
     if (WIN32_RESERVED_DEVICE_NAMES.has(stem)) {
-      return `不支持的文件名「${part}」：这是 Windows 保留设备名。`
+      return tr('不支持的文件名「{part}」：这是 Windows 保留设备名。', { part })
     }
   }
   return null
@@ -1216,7 +1217,7 @@ export class SkillLibrary {
   private badName(name: string, opts: { allowReserved?: boolean } = {}): string | null {
     const normalized = name.trim()
     if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
-      return `技能名「${normalized}」不合法：请只用小写字母、数字和连字符（不超过 ${this.limits.maxNameLength} 个）。`
+      return tr('技能名「{name}」不合法：请只用小写字母、数字和连字符（不超过 {limit} 个）。', { name: normalized, limit: this.limits.maxNameLength })
     }
     // P2-11 (v15): win32 reserves these stems for ANY directory component —
     // the same set the support-file layer has refused since C-18 — so a skill
@@ -1699,16 +1700,16 @@ export class SkillLibrary {
     const bad = this.badName(normalized)
     if (bad) return { ok: false, message: bad }
     if (origin === 'background_review') {
-      return { ok: false, message: '只有前台（用户或主智能体）可以固定或取消固定技能。' }
+      return { ok: false, message: tr('只有前台（用户或主智能体）可以固定或取消固定技能。') }
     }
     let durabilityWarning = ''
     const dir = this.dirOf(normalized)
     const marker = markerPath(dir, 'pinned')
     const existing = await this.io.exists(marker)
-    if (pinned && existing) return { ok: true, message: `技能「${normalized}」已被固定。`, path: dir }
-    if (!pinned && !existing) return { ok: true, message: `技能「${normalized}」未被固定，无需处理。`, path: dir }
+    if (pinned && existing) return { ok: true, message: tr('技能「{name}」已被固定。', { name: normalized }), path: dir }
+    if (!pinned && !existing) return { ok: true, message: tr('技能「{name}」未被固定，无需处理。', { name: normalized }), path: dir }
     if (!await this.io.exists(join(dir, 'SKILL.md'))) {
-      return { ok: false, message: `技能「${normalized}」不存在。` }
+      return { ok: false, message: tr('技能「{name}」不存在。', { name: normalized }) }
     }
     if (pinned) {
       try {
@@ -1737,7 +1738,7 @@ export class SkillLibrary {
         // SKILL.md path) so a stale `.lock` left by a failed lock release no
         // longer defeats the removal and the rule has exactly one owner.
         await this.cleanupGhostDir(join(dir, 'SKILL.md'))
-        return { ok: false, message: `固定过程中技能「${normalized}」被并发归档；残留标记已移除：等搬运完成后重试。` }
+        return { ok: false, message: tr('固定过程中技能「{name}」被并发归档；残留标记已移除：等搬运完成后重试。', { name: normalized }) }
       }
     } else {
       await this.io.remove(marker)
@@ -1745,9 +1746,10 @@ export class SkillLibrary {
     await this.audit(normalized, pinned ? 'pin' : 'unpin', null, null, pinned ? 'pinned' : 'unpinned')
     return {
       ok: true,
-      message: `${pinned
-        ? `技能 "${normalized}" 已固定：免受删除、后台复核与生命周期影响。`
-        : `技能 "${normalized}" 已取消固定。`}${durabilityWarning === '' ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${durabilityWarning})`}`,
+      message: (pinned
+        ? tr('技能 "{name}" 已固定：免受删除、后台复核与生命周期影响。', { name: normalized })
+        : tr('技能 "{name}" 已取消固定。', { name: normalized }))
+        + (durabilityWarning === '' ? '' : tr(' （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：{warnings})', { warnings: durabilityWarning })),
       path: dir,
     }
   }
@@ -1785,7 +1787,7 @@ export class SkillLibrary {
     // platform catalog parses strict YAML, so unquoted plain scalars carrying
     // `: ` (etc.) would silently make the skill invisible to the platform.
     const norm = normalizeFrontmatter(content)
-    if (norm.issues.length > 0) return { ok: false, message: `技能「${normalized}」的 frontmatter 无法自动修复：${norm.issues[0]}：请用双引号包住取值后重试。` }
+    if (norm.issues.length > 0) return { ok: false, message: tr('技能「{name}」的 frontmatter 无法自动修复：{issue}：请用双引号包住取值后重试。', { name: normalized, issue: String(norm.issues[0]) }) }
     const finalContent = norm.changed ? norm.content : content
     if (norm.changed) {
       const revalidated = validateFrontmatter(finalContent, normalized, this.limits)
@@ -1794,7 +1796,7 @@ export class SkillLibrary {
     const threat = this.contentThreatBlock(finalContent)
     if (threat) return { ok: false, message: threat }
     const dir = this.dirOf(normalized)
-    if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `技能「${normalized}」已存在。` }
+    if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: tr('技能「{name}」已存在。', { name: normalized }) }
     // v21 (D-6): NTFS and macOS default filesystems match names case-
     // insensitively while the skill namespace is lowercase-only — a hand-
     // maintained tree carrying `My-Tool/` made create('my-tool') diverge
@@ -1815,12 +1817,12 @@ export class SkillLibrary {
       const cause = error instanceof Error ? error.message : String(error)
       return {
         ok: false,
-        message: `无法检查技能「${normalized}」是否与大小写变体冲突：列出 ${this.root} 失败（${cause}）。拒绝创建 —— 仅大小写不同的第二个目录在跨平台时无法撤销。`,
+        message: tr('无法检查技能「{name}」是否与大小写变体冲突：列出 {root} 失败（{cause}）。拒绝创建 —— 仅大小写不同的第二个目录在跨平台时无法撤销。', { name: normalized, root: this.root, cause }),
       }
     }
     for (const entry of rootEntries) {
       if (typeof entry === 'string' && entry !== normalized && entry.toLowerCase() === normalized.toLowerCase()) {
-        return { ok: false, message: `技能「${normalized}」与已存在的大小写变体目录「${entry}」冲突（技能名只允许小写）：请重命名其中一个。` }
+        return { ok: false, message: tr('技能「{name}」与已存在的大小写变体目录「{entry}」冲突（技能名只允许小写）：请重命名其中一个。', { name: normalized, entry }) }
       }
     }
     // C-15: a pre-existing directory carrying a protection marker is
@@ -1828,7 +1830,7 @@ export class SkillLibrary {
     // create() can no longer drop a SKILL.md into a bundled/hub-installed
     // (or, for the review channel, pinned) tree it does not own.
     const protection = await this.writeProtection(normalized, origin)
-    if (protection) return { ok: false, message: `技能「${normalized}」受保护（${protection}）。` }
+    if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name: normalized, protection }) }
     // F-337: hash the bytes that actually land on disk (write uses
     // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
     const onDisk = finalContent.trimEnd() + '\n'
@@ -1864,7 +1866,7 @@ export class SkillLibrary {
       ...(options.unitId === undefined ? {} : { unitId: options.unitId }),
     })
     if (!result.ok) {
-      if (result.errors.some(error => error.code === 'cas-drift' || error.message.includes('concurrent modification'))) return { ok: false, message: `技能「${normalized}」已存在。` }
+      if (result.errors.some(error => error.code === 'cas-drift' || error.message.includes('concurrent modification'))) return { ok: false, message: tr('技能「{name}」已存在。', { name: normalized }) }
       return { ok: false, message: result.errors.map(error => error.message).join('；') }
     }
     const createDurabilityWarning = result.warnings === undefined ? '' : result.warnings.join('；')
@@ -1897,7 +1899,7 @@ export class SkillLibrary {
         // unconfirmed); any other failure means the skill stays un-managed,
         // which the result text says out loud.
         if (isCommittedOnly(error)) {
-          markerWarning = `hermes-managed 标记已落盘，但其目录 fsync 失败 —— 持久性未确认：${error instanceof Error ? error.message : String(error)}`
+          markerWarning = tr('hermes-managed 标记已落盘，但其目录 fsync 失败 —— 持久性未确认：{cause}', { cause: error instanceof Error ? error.message : String(error) })
         } else {
           markerWarning = `hermes-managed marker write failed (${error instanceof Error ? error.message : String(error)}); the skill landed but is NOT lifecycle-managed — recreate or pin it manually`
         }
@@ -1908,7 +1910,7 @@ export class SkillLibrary {
         // routed through the shared `cleanupGhostDir` so a stale lock file (a
         // failed lock release) no longer defeats the empty-dir removal.
         await this.cleanupGhostDir(createPath)
-        return { ok: false, message: `创建过程中技能「${normalized}」被并发归档；残留标记已移除：等搬运完成后重试一次。` }
+        return { ok: false, message: tr('创建过程中技能「{name}」被并发归档；残留标记已移除：等搬运完成后重试一次。', { name: normalized }) }
       }
     }
     await this.audit(normalized, 'create', null, onDisk, 'created', undefined, result.unitId, options.unitHead)
@@ -1916,12 +1918,15 @@ export class SkillLibrary {
     // Both warnings ride the normal success path (audit/event included) — a
     // durability warning must never skip the accounting.
     const warnings = [
-      createDurabilityWarning !== '' ? `写入已落盘，但目录 fsync 失败 —— 持久性未确认：${createDurabilityWarning}` : '',
+      createDurabilityWarning !== '' ? tr('写入已落盘，但目录 fsync 失败 —— 持久性未确认：{cause}', { cause: createDurabilityWarning }) : '',
       markerWarning,
     ].filter(warning => warning !== '')
     return {
       ok: true,
-      message: `已创建技能「${normalized}」。${warnings.length === 0 ? '' : ` （警告：${warnings.join('；')}）`}`,
+      message: tr('已创建技能「{name}」。{warnings}', {
+        name: normalized,
+        warnings: warnings.length === 0 ? '' : tr(' （警告：{warnings}）', { warnings: warnings.join('；') }),
+      }),
       path: dir,
       ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}),
     }
@@ -1950,7 +1955,7 @@ export class SkillLibrary {
     const dir = this.dirOf(name)
     const path = join(dir, 'SKILL.md')
     const protection = await this.writeProtection(name, origin)
-    if (protection) return { ok: false, message: `技能「${name}」受保护（${protection}）。` }
+    if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name, protection }) }
     // S1.2: a lock-free read feeds only the shrink exemption below; the commit
     // still runs inside the write transaction with its own locked read.
     // N36: three-state. "Could not read" answers `null` like "no file yet", which is the CONSERVATIVE
@@ -1966,7 +1971,7 @@ export class SkillLibrary {
     }
     // 0.3.11: normalize at the write point (see create) — same reasoning.
     const norm = normalizeFrontmatter(content)
-    if (norm.issues.length > 0) return { ok: false, message: `技能「${name}」的 frontmatter 无法自动修复：${norm.issues[0]}：请用双引号包住取值后重试。` }
+    if (norm.issues.length > 0) return { ok: false, message: tr('技能「{name}」的 frontmatter 无法自动修复：{issue}：请用双引号包住取值后重试。', { name, issue: String(norm.issues[0]) }) }
     const finalContent = norm.changed ? norm.content : content
     if (norm.changed) {
       const revalidated = validateFrontmatter(finalContent, name, this.limits, currentForLimit)
@@ -1984,10 +1989,10 @@ export class SkillLibrary {
     if (verdict !== 'match') return anchorRefusal(name, verdict)
     if (current === null) {
       await this.cleanupGhostDir(path)
-      return { ok: false, message: `技能「${name}」不存在。` }
+      return { ok: false, message: tr('技能「{name}」不存在。', { name }) }
     }
     if (finalContent.trimEnd() === current.trimEnd()) {
-      return { ok: true, message: `技能「${name}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: dir }
+      return { ok: true, message: tr('技能「{name}」未变更：提供的内容与当前文件一致，未写入。', { name }), noop: true, path: dir }
     }
     const onDisk = finalContent.trimEnd() + '\n'
     const unit = new MutationUnit({
@@ -2019,12 +2024,12 @@ export class SkillLibrary {
     })
     if (!result.ok) {
       const messages = result.errors.map(error => error.message)
-      if (messages.some(message => message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
+      if (messages.some(message => message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: tr('内部错误：写事务没有调用任务；未执行任何写入') }
       return { ok: false, message: messages.join('；') }
     }
-    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
+    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : tr(' （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：{warnings})', { warnings: result.warnings.join('；') })
     const retention = contentRetentionFeedback({ name, action: 'update', before: current, after: onDisk })
-    return { ok: true, message: `技能「${name}」已更新。${warning}${retention === null ? '' : '\n' + retention}`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
+    return { ok: true, message: tr('技能「{name}」已更新。{warning}{retention}', { name, warning, retention: retention === null ? '' : '\n' + retention }), path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
@@ -2053,9 +2058,9 @@ export class SkillLibrary {
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
     const skillMd = join(dir, 'SKILL.md')
-    if (!await this.io.exists(skillMd)) return { ok: false, message: `技能「${name}」不存在。` }
+    if (!await this.io.exists(skillMd)) return { ok: false, message: tr('技能「{name}」不存在。', { name }) }
     const protection = await this.writeProtection(name, origin)
-    if (protection) return { ok: false, message: `技能「${name}」受保护（${protection}）。` }
+    if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name, protection }) }
 
     let target = skillMd
     let patchLabel = 'SKILL.md'
@@ -2067,7 +2072,7 @@ export class SkillLibrary {
     }
     const compute = (current: string | null): SingleWriteOutcome => {
       const md = current
-      if (md === null) return { result: { ok: false, message: `文件不存在：${patchLabel}` }, write: null }
+      if (md === null) return { result: { ok: false, message: tr('文件不存在：{path}', { path: patchLabel }) }, write: null }
 
       // V6-17 (0.3.37): the fuzzy scan is O(n·m) with no input bound (a
       // model-supplied 20k anchor over a 20k file measured ~6s with the event
@@ -2086,7 +2091,7 @@ export class SkillLibrary {
       const patched = fuzzyPatch(md, oldString, newString, replaceAll)
       // `null` means "no match" or (V7-11) the replaceAll loop exceeded the
       // cumulative fuzzy budget; an empty string is a legitimate replacement.
-      if (patched === null) return { result: { ok: false, message: `在「${name}/${patchLabel}」里找不到 old_string（或 replaceAll 的模糊匹配预算已用尽）。整篇重写请改用 update。` }, write: null }
+      if (patched === null) return { result: { ok: false, message: tr('在「{name}/{path}」里找不到 old_string（或 replaceAll 的模糊匹配预算已用尽）。整篇重写请改用 update。', { name, path: patchLabel }) }, write: null }
       // V27 G5.1: a first-occurrence-only patch is the silent case the tool
       // description used to omit — report how many anchors the file carries, so
       // a multi-site edit is never half-applied without the model noticing.
@@ -2097,25 +2102,25 @@ export class SkillLibrary {
       let normalizedFields: string[] | undefined
       if (target === skillMd) {
         const validation = validateFrontmatter(patched, name, this.limits, md)
-        if (validation) return { result: { ok: false, message: `补丁被拒绝：${validation}` }, write: null }
+        if (validation) return { result: { ok: false, message: tr('补丁被拒绝：{validation}', { validation }) }, write: null }
         // 0.3.11: normalize at the write point (see create) — a patch may edit
         // the frontmatter directly.
         const norm = normalizeFrontmatter(patched)
-        if (norm.issues.length > 0) return { result: { ok: false, message: `补丁被拒绝：frontmatter 无法自动修复（${norm.issues[0]}）。` }, write: null }
+        if (norm.issues.length > 0) return { result: { ok: false, message: tr('补丁被拒绝：frontmatter 无法自动修复（{issue}）。', { issue: String(norm.issues[0]) }) }, write: null }
         if (norm.changed) {
           writeContent = norm.content
           normalizedFields = norm.fields
           const revalidated = validateFrontmatter(writeContent, name, this.limits, md)
-          if (revalidated) return { result: { ok: false, message: `补丁被拒绝：${revalidated}` }, write: null }
+          if (revalidated) return { result: { ok: false, message: tr('补丁被拒绝：{validation}', { validation: revalidated }) }, write: null }
         }
       }
       if (Buffer.byteLength(writeContent, 'utf8') > this.limits.maxSkillFileBytes && target !== skillMd) {
-        return { result: { ok: false, message: `修补后的文件超过 ${this.limits.maxSkillFileBytes} 字节。` }, write: null }
+        return { result: { ok: false, message: tr('修补后的文件超过 {limit} 字节。', { limit: this.limits.maxSkillFileBytes }) }, write: null }
       }
       const overLimit = exceedsContentLimit(writeContent, this.limits.maxSkillContentChars)
       const repairing = shrinksOverLimit(writeContent, md, this.limits.maxSkillContentChars)
       if (overLimit && target === skillMd && !repairing) {
-        return { result: { ok: false, message: `修补后的内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }, write: null, hardCapHit: { bodyChars: writeContent.length, supportFiles: null } }
+        return { result: { ok: false, message: tr('修补后的内容超过 {limit} 个字符。{hint}', { limit: this.limits.maxSkillContentChars, hint: tr(CONTENT_SPLIT_HINT) }) }, write: null, hardCapHit: { bodyChars: writeContent.length, supportFiles: null } }
       }
       // V4: the same cap on a SUPPORT file. Report mode writes with an advisory;
       // enforce refuses unless the patch makes an already-over file smaller.
@@ -2124,7 +2129,7 @@ export class SkillLibrary {
         ? ` Warning: ${writeContent.length} characters is over the ${this.limits.maxSkillContentChars}-character cap upstream applies to every file; plan a split.`
         : ''
       if (supportOverCap && this.supportFileCharPolicy() === 'enforce') {
-        return { result: { ok: false, message: `修补后的文件内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }, write: null, hardCapHit: { bodyChars: writeContent.length, supportFiles: 1 } }
+        return { result: { ok: false, message: tr('修补后的文件内容超过 {limit} 个字符。{hint}', { limit: this.limits.maxSkillContentChars, hint: tr(CONTENT_SPLIT_HINT) }) }, write: null, hardCapHit: { bodyChars: writeContent.length, supportFiles: 1 } }
       }
       const threat = this.contentThreatBlock(writeContent)
       if (threat) return { result: { ok: false, message: threat }, write: null }
@@ -2137,13 +2142,13 @@ export class SkillLibrary {
       // an identical replacement, rewriting + auditing + invalidating the catalog
       // for zero change.
       if (writeContent.trimEnd() === md.trimEnd()) {
-        return { result: { ok: true, message: `技能「${name}」未变更：old_string 与替换内容相同（${patchLabel}），未写入。`, noop: true, path: dir }, write: null }
+        return { result: { ok: true, message: tr('技能「{name}」未变更：old_string 与替换内容相同（{path}），未写入。', { name, path: patchLabel }), noop: true, path: dir }, write: null }
       }
       // F-337: hash the bytes that actually land on disk (write uses
       // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
       const onDisk = writeContent.trimEnd() + '\n'
       return {
-        result: { ok: true, message: `技能「${name}」已修补（${patchLabel}）。${patchNote}${capAdvisory}`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
+        result: { ok: true, message: tr('技能「{name}」已修补（{path}）。{note}{advisory}', { name, path: patchLabel, note: patchNote, advisory: capAdvisory }), path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
         write: onDisk,
         audit: { skillName: name, action: 'patch', before: md, after: onDisk, summary: `patched ${patchLabel}` },
         event: { action: 'patch', name, skillDir: dir },
@@ -2157,7 +2162,7 @@ export class SkillLibrary {
     }
     if (current === null) {
       await this.cleanupGhostDir(target)
-      return { ok: false, message: `文件不存在：${patchLabel}` }
+      return { ok: false, message: tr('文件不存在：{path}', { path: patchLabel }) }
     }
     const outcome = compute(current)
     if (outcome.write === null) {
@@ -2192,10 +2197,10 @@ export class SkillLibrary {
     })
     if (!result.ok) {
       const messages = result.errors.map(error => error.message)
-      if (messages.some(message => message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
+      if (messages.some(message => message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: tr('内部错误：写事务没有调用任务；未执行任何写入') }
       return { ok: false, message: messages.join('；') }
     }
-    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
+    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : tr(' （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：{warnings})', { warnings: result.warnings.join('；') })
     const retention = contentRetentionFeedback({ name, action: 'patch', before: current, after: onDisk })
     return { ...outcome.result, message: `${outcome.result.message}${warning}${retention === null ? '' : '\n' + retention}` }
   }
@@ -2241,9 +2246,9 @@ export class SkillLibrary {
         const reason = error instanceof Error ? error.message : String(error)
         try {
           await this.io.remove(dest)
-          return `复制成功，但源目录删不掉（${reason}）；已回滚复制出的目录树`
+          return tr('复制成功，但源目录删不掉（{reason}）；已回滚复制出的目录树', { reason })
         } catch {
-          return `复制成功，但源目录删不掉（${reason}），且复制出的目录树也无法回滚 —— 该目录树现在同时存在于两处；请手动清理`
+          return tr('复制成功，但源目录删不掉（{reason}），且复制出的目录树也无法回滚 —— 该目录树现在同时存在于两处；请手动清理', { reason })
         }
       }
     }
@@ -2310,7 +2315,7 @@ export class SkillLibrary {
     // still archivable (protection checks and the audit do not need body
     // bytes; the audit hashes the empty before-string). Only a genuinely
     // MISSING file reads as "not found".
-    if (md === null) return { ok: false, message: `技能「${name}」不存在。` }
+    if (md === null) return { ok: false, message: tr('技能「{name}」不存在。', { name }) }
     // C-13 (v10 audit): the redundant ternary is gone — deleteProtection now
     // accepts an explicit `undefined` allowBundled, so the options object
     // passes through verbatim.
@@ -2320,7 +2325,7 @@ export class SkillLibrary {
         ok: false,
         message: protection === 'pinned'
           ? `Skill "${name}" is pinned and cannot be archived. Remove the \`.pinned\` marker in its directory, then retry.`
-          : `技能「${name}」受保护（${protection}）。`,
+          : tr('技能「{name}」受保护（{protection}）。', { name, protection }),
       }
     }
     if (options.absorbedInto) {
@@ -2328,7 +2333,7 @@ export class SkillLibrary {
       // check (it read the archived skill's own still-present file) and
       // archive X "into itself". Refuse the self-absorption up front.
       if (options.absorbedInto.trim() === name) {
-        return { ok: false, message: 'absorbed_into 不能是正在归档的技能本身（不能吸收到自己）。' }
+        return { ok: false, message: tr('absorbed_into 不能是正在归档的技能本身（不能吸收到自己）。') }
       }
       // P2-8 (v15): absorbedInto reaches dirOf below — the same guard every
       // other path-building entry applies must hold here too, or
@@ -2356,14 +2361,14 @@ export class SkillLibrary {
     // the content it points at — refuse before the rename instead.
     if (this.io.isSymlink) {
       const link = await this.io.isSymlink(dir)
-      if (link === true) return { ok: false, message: `技能「${name}」是符号链接；拒绝归档。` }
+      if (link === true) return { ok: false, message: tr('技能「{name}」是符号链接；拒绝归档。', { name }) }
     }
     // G2 S4: refuse when a support directory cannot be LISTED (fail-closed — see
     // `supportDirsUnlistable`). The writer probe that used to stand here is retired: writes are
     // versioned, so a writer that raced this move fails its own write instead of landing on a
     // moved-away path.
     if (await this.supportDirsUnlistable(dir)) {
-      return { ok: false, message: `无法检查技能「${name}」是否有写入方（有一个支撑目录列不出来）：请重试归档。` }
+      return { ok: false, message: tr('无法检查技能「{name}」是否有写入方（有一个支撑目录列不出来）：请重试归档。', { name }) }
     }
     // OPT-06 (2026-09): pin/protection RE-CHECK at the commit point. The
     // protection probe near the top runs several awaits before the move; a
@@ -2379,11 +2384,11 @@ export class SkillLibrary {
         ok: false,
         message: commitProtection === 'pinned'
           ? `Skill "${name}" is pinned and cannot be archived. Remove the \`.pinned\` marker in its directory, then retry.`
-          : `技能「${name}」受保护（${commitProtection}）。`,
+          : tr('技能「{name}」受保护（{protection}）。', { name, protection: commitProtection }),
       }
     }
     const moveFailure = await this.moveDir(dir, dest)
-    if (moveFailure !== undefined) return { ok: false, message: `技能「${name}」归档失败：${moveFailure}。` }
+    if (moveFailure !== undefined) return { ok: false, message: tr('技能「{name}」归档失败：{reason}。', { name, reason: moveFailure }) }
     const reason = options.reason ?? (options.absorbedInto ? `Consolidated into ${options.absorbedInto}` : 'Archived by self-evolution curator')
     // P2-9 (v14): the move already landed, so a failed metadata write must NOT
     // abort the archive — the caller (consolidate) would then report a rollback
@@ -2407,7 +2412,7 @@ export class SkillLibrary {
     }
     await this.audit(name, 'archive', md, null, reason, undefined, options.unitId, options.unitHead, origin)
     this.notifyMutation({ action: 'archive', name, archivedPath: dest })
-    return { ok: true, message: `技能「${name}」已归档到 .archive。`, path: dest }
+    return { ok: true, message: tr('技能「{name}」已归档到 .archive。', { name }), path: dest }
   }
 
   /**
@@ -2422,46 +2427,46 @@ export class SkillLibrary {
   async commitMerge(plan: CommitMergePlan): Promise<CommitMergeResult> {
     const target = plan.target.trim()
     const sources = [...new Set(plan.sources.map(name => name.trim()))].filter(name => name !== target)
-    if (sources.length === 0) return { ok: false, message: '合并至少需要一个互不相同的来源技能。' }
+    if (sources.length === 0) return { ok: false, message: tr('合并至少需要一个互不相同的来源技能。') }
     for (const name of [target, ...sources]) {
       const bad = this.badName(name)
       if (bad) return { ok: false, message: bad }
     }
-    if (PROTECTED_BUILTIN_SKILLS.has(target)) return { ok: false, message: `目标技能「${target}」是受保护的内置技能。` }
+    if (PROTECTED_BUILTIN_SKILLS.has(target)) return { ok: false, message: tr('目标技能「{target}」是受保护的内置技能。', { target }) }
     const protectedSource = sources.find(name => PROTECTED_BUILTIN_SKILLS.has(name))
-    if (protectedSource !== undefined) return { ok: false, message: `来源技能「${protectedSource}」是受保护的内置技能。` }
+    if (protectedSource !== undefined) return { ok: false, message: tr('来源技能「{source}」是受保护的内置技能。', { source: protectedSource }) }
     const limits = plan.limits ?? this.limits
     return await this.serial(async (): Promise<CommitMergeResult> => {
       const dir = this.dirOf(target)
       const targetPath = join(dir, 'SKILL.md')
       if (!plan.targetExists && await this.io.exists(dir)) {
-        return { ok: false, message: `目标目录「${target}」已存在但不是技能；拒绝把 SKILL.md 写进同名目录。` }
+        return { ok: false, message: tr('目标目录「{target}」已存在但不是技能；拒绝把 SKILL.md 写进同名目录。', { target }) }
       }
       const currentTarget = await this.io.readText(targetPath)
       if (plan.targetExists !== (currentTarget !== null)) {
-        return { ok: false, message: plan.targetExists ? `目标技能「${target}」不存在。` : `目标技能「${target}」已存在。` }
+        return { ok: false, message: plan.targetExists ? tr('目标技能「{target}」不存在。', { target }) : tr('目标技能「{target}」已存在。', { target }) }
       }
       if (currentTarget !== plan.expectedTargetBody) {
-        return { ok: false, message: `目标技能「${target}」在计划之后被改过；拒绝提交（未写入任何内容）。` }
+        return { ok: false, message: tr('目标技能「{target}」在计划之后被改过；拒绝提交（未写入任何内容）。', { target }) }
       }
       if (plan.targetExists && !(await this.isManaged(target))) {
-        return { ok: false, message: `目标技能「${target}」不是 family-managed；拒绝提交。` }
+        return { ok: false, message: tr('目标技能「{target}」不是 family-managed；拒绝提交。', { target }) }
       }
       if (await this.io.exists(markerPath(dir, 'pinned'))) {
-        return { ok: false, message: `目标技能「${target}」已被固定；拒绝提交。` }
+        return { ok: false, message: tr('目标技能「{target}」已被固定；拒绝提交。', { target }) }
       }
       const targetProtection = await this.writeProtection(target, plan.origin)
-      if (targetProtection) return { ok: false, message: `技能「${target}」受保护（${targetProtection}）。` }
+      if (targetProtection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name: target, protection: targetProtection }) }
       const expectedSources = new Map(plan.expectedSourceBodies.map(entry => [entry.name.trim(), entry.body]))
       const sourceBodies = new Map<string, string>()
       for (const source of sources) {
         const protection = await this.deleteProtection(source)
-        if (protection) return { ok: false, message: `技能「${source}」受保护（${protection}）。` }
+        if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name: source, protection }) }
         const body = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
-        if (body === null) return { ok: false, message: `来源技能「${source}」不存在。` }
+        if (body === null) return { ok: false, message: tr('来源技能「{source}」不存在。', { source }) }
         const expected = expectedSources.get(source)
-        if (expected === undefined) return { ok: false, message: `来源技能「${source}」缺少计划字节；拒绝提交。` }
-        if (body !== expected) return { ok: false, message: `来源技能「${source}」在计划之后被改过；拒绝提交（未写入任何内容）。` }
+        if (expected === undefined) return { ok: false, message: tr('来源技能「{source}」缺少计划字节；拒绝提交。', { source }) }
+        if (body !== expected) return { ok: false, message: tr('来源技能「{source}」在计划之后被改过；拒绝提交（未写入任何内容）。', { source }) }
         sourceBodies.set(source, body)
       }
       // Decision-time CAS (FR-EXEC-12/GAP-CAND-02): the body compare above only covers
@@ -2471,7 +2476,7 @@ export class SkillLibrary {
       if (plan.targetRevision !== undefined) {
         const liveTargetRevision = await this.revisionAnchor(target)
         if (!sameRevisionAnchor(plan.targetRevision, liveTargetRevision)) {
-          return { ok: false, code: 'target-changed', message: `目标技能「${target}」的内容在决策之后被改过；拒绝提交（未写入任何内容）。` }
+          return { ok: false, code: 'target-changed', message: tr('目标技能「{target}」的内容在决策之后被改过；拒绝提交（未写入任何内容）。', { target }) }
         }
       }
       if (plan.sourceRevisions !== undefined) {
@@ -2479,7 +2484,7 @@ export class SkillLibrary {
           if (!sources.includes(name)) continue
           const live = await this.revisionAnchor(name)
           if (!sameRevisionAnchor(expected, live)) {
-            return { ok: false, code: 'source-changed', message: `来源技能「${name}」的内容在决策之后被改过；拒绝提交（未写入任何内容）。` }
+            return { ok: false, code: 'source-changed', message: tr('来源技能「{source}」的内容在决策之后被改过；拒绝提交（未写入任何内容）。', { source: name }) }
           }
         }
       }
@@ -2490,7 +2495,7 @@ export class SkillLibrary {
           if (fingerprint !== null) fingerprints.push(fingerprint)
         }
         if (revisionSupportDigest(fingerprints) !== plan.supportDigest) {
-          return { ok: false, code: 'support-changed', message: '参与合并的技能支撑文件在决策之后被改过；拒绝提交（未写入任何内容）。' }
+          return { ok: false, code: 'support-changed', message: tr('参与合并的技能支撑文件在决策之后被改过；拒绝提交（未写入任何内容）。') }
         }
       }
       const validation = validateFrontmatter(plan.body, target, limits)
@@ -2500,9 +2505,9 @@ export class SkillLibrary {
       for (const file of plan.supportFiles) {
         const badPath = validateSupportPath(file.path)
         if (badPath) return { ok: false, message: badPath }
-        if (supportPaths.has(file.path)) return { ok: false, message: `支撑文件重复：${file.path}` }
+        if (supportPaths.has(file.path)) return { ok: false, message: tr('支撑文件重复：{path}', { path: file.path }) }
         supportPaths.add(file.path)
-        if (Buffer.byteLength(file.content, 'utf8') > limits.maxSkillFileBytes) return { ok: false, message: `支撑文件超过 ${limits.maxSkillFileBytes} 字节：${file.path}` }
+        if (Buffer.byteLength(file.content, 'utf8') > limits.maxSkillFileBytes) return { ok: false, message: tr('支撑文件超过 {limit} 字节：{path}', { limit: limits.maxSkillFileBytes, path: file.path }) }
         const threat = this.contentThreatBlock(file.content)
         if (threat) return { ok: false, message: threat }
         const previous = await this.io.readText(join(dir, ...file.path.replace(/\\/g, '/').split('/').filter(Boolean)))
@@ -2513,7 +2518,7 @@ export class SkillLibrary {
         const existing = plan.targetExists
           ? await this.io.exists(join(dir, ...ref.replace(/\\/g, '/').split('/').filter(Boolean)))
           : false
-        if (!existing) return { ok: false, message: `正文引用了未提供的支撑文件「${ref}」；拒绝提交。` }
+        if (!existing) return { ok: false, message: tr('正文引用了未提供的支撑文件「{ref}」；拒绝提交。', { ref }) }
       }
       const unitId = plan.unitId ?? ('u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36))
       const supportMoves = plan.supportFiles.map((file) => {
@@ -2548,8 +2553,8 @@ export class SkillLibrary {
       const rollbackMessage = (reason: string, stuck: readonly string[]): CommitMergeResult => ({
         ok: false,
         message: stuck.length === 0
-          ? `合并失败，已回滚：${reason}`
-          : `合并失败（${reason}）；已回滚，但以下未回滚：${stuck.join(', ')}：它们仍在 .archive 里，请用 /evolution skill restore 恢复。`,
+          ? tr('合并失败，已回滚：{reason}', { reason })
+          : tr('合并失败（{reason}）；已回滚，但以下未回滚：{stuck}：它们仍在 .archive 里，请用 /evolution skill restore 恢复。', { reason, stuck: stuck.join(', ') }),
       })
 
       const rollbackTarget = async (): Promise<string[]> => {
@@ -2585,7 +2590,7 @@ export class SkillLibrary {
       if (plan.targetExists) {
         for (const source of sources) {
           const fresh = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
-          if (fresh !== sourceBodies.get(source)) return rollbackMessage(`来源技能「${source}」在归档前被改过`, [])
+          if (fresh !== sourceBodies.get(source)) return rollbackMessage(tr('来源技能「{source}」在归档前被改过', { source }), [])
         }
         const writes: TreeChangeWrite[] = [
           { target: targetPath, content: plan.body.trimEnd() + '\n', expected: plan.expectedTargetBody },
@@ -2625,7 +2630,7 @@ export class SkillLibrary {
           if (fresh !== sourceBodies.get(source)) {
             const stuck = await rollbackSources()
             stuck.push(...await rollbackTarget())
-            return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
+            return rollbackMessage(tr('来源技能「{source}」在归档前被改过', { source }), stuck)
           }
           if (plan.assertFence !== undefined && !(await plan.assertFence())) {
             return { ok: false, message: 'tree fence lost before source archive; recovery required' }
@@ -2647,7 +2652,7 @@ export class SkillLibrary {
         await plan.onPhase?.('sources-archived')
         await this.foldArchivedUsage(sources, new Date().toISOString())
         await plan.onPhase?.('unit-written')
-        return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
+        return { ok: true, message: tr('已把 {sources} 合并进「{target}」。', { sources: sources.join(', '), target }), unitId, targetPath: dir, archived, mutations: 1 + sources.length }
       }
 
       await plan.onPhase?.('target-pending')
@@ -2672,7 +2677,7 @@ export class SkillLibrary {
           const stuck = await rollbackSources()
           const targetRollback = await this.archive(target, { reason: 'merge rolled back' }, plan.origin)
           if (!targetRollback.ok) stuck.push(target)
-          return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
+          return rollbackMessage(tr('来源技能「{source}」在归档前被改过', { source }), stuck)
         }
         if (plan.assertFence !== undefined && !(await plan.assertFence())) {
           return { ok: false, message: 'tree fence lost before source archive; recovery required' }
@@ -2723,7 +2728,7 @@ export class SkillLibrary {
       await this.foldArchivedUsage(sources, new Date().toISOString())
       await plan.onPhase?.('sources-archived')
       await plan.onPhase?.('unit-written')
-      return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
+      return { ok: true, message: tr('已把 {sources} 合并进「{target}」。', { sources: sources.join(', '), target }), unitId, targetPath: dir, archived, mutations: 1 + sources.length }
     })
   }
 
@@ -2811,7 +2816,7 @@ export class SkillLibrary {
     const targetName = target.trim()
     const normalizedSources = [...new Set(sources.map(name => name.trim()))].filter(name => name !== targetName)
     const mode = options.mode ?? 'append'
-    if (normalizedSources.length === 0) return { ok: false, message: '合并至少需要一个互不相同的来源技能。' }
+    if (normalizedSources.length === 0) return { ok: false, message: tr('合并至少需要一个互不相同的来源技能。') }
     for (const name of [targetName, ...normalizedSources]) {
       // C-16: the name guard is badName() now — consolidate gains the
       // same 64-char length ceiling and message form as every other mutator.
@@ -2820,7 +2825,7 @@ export class SkillLibrary {
     }
     const targetDir = this.dirOf(targetName)
     const targetProtection = await this.writeProtection(targetName, origin)
-    if (targetProtection) return { ok: false, message: `技能「${targetName}」受保护（${targetProtection}）。` }
+    if (targetProtection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name: targetName, protection: targetProtection }) }
     // V8-11 (0.3.46): the targetMd pre-read below MOVED into the serial queue
     // (commit section) — a concurrent patch between the old pre-read and the
     // commit used to be silently overwritten by the merged body.
@@ -2854,11 +2859,11 @@ export class SkillLibrary {
       if (mode === 'append') {
         for (const source of normalizedSources) {
           const protection = await this.deleteProtection(source)
-          if (protection) return { ok: false, message: `技能「${source}」受保护（${protection}）。` }
+          if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name: source, protection }) }
           const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
-          if (!sourceMd) return { ok: false, message: `技能「${source}」不存在。` }
+          if (!sourceMd) return { ok: false, message: tr('技能「{name}」不存在。', { name: source }) }
           const parsed = parseFrontmatter(sourceMd)
-          if (!parsed) return { ok: false, message: `技能「${source}」没有有效的 frontmatter；拒绝合并。` }
+          if (!parsed) return { ok: false, message: tr('技能「{name}」没有有效的 frontmatter；拒绝合并。', { name: source }) }
           // Package integrity (009-I): an append must never leave dangling
           // support links — refuse before ANY side effect (no archive, no write).
           const carriesSupport = await this.countSupportDirs(source) > 0
@@ -2872,7 +2877,7 @@ export class SkillLibrary {
               const reason = carriesSupport
                 ? `source "${source}" carries support files`
                 : `source "${source}" body references support files (${refs.join(', ')})`
-              return { ok: false, message: `合并被拒绝：${reason} 会被落下。请改用 mode:'reference'，或直接归档整个包。${decision.note}` }
+              return { ok: false, message: tr('合并被拒绝：{reason} 会被落下。请改用 mode:\'reference\'，或直接归档整个包。{note}', { reason, note: decision.note }) }
             }
             rehomed.push(...decision.files)
             appendedBody = decision.rewritten
@@ -2883,17 +2888,17 @@ export class SkillLibrary {
       } else {
         for (const source of normalizedSources) {
           const protection = await this.deleteProtection(source)
-          if (protection) return { ok: false, message: `技能「${source}」受保护（${protection}）。` }
+          if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name: source, protection }) }
           const sourceMd = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
-          if (!sourceMd) return { ok: false, message: `技能「${source}」不存在。` }
+          if (!sourceMd) return { ok: false, message: tr('技能「{name}」不存在。', { name: source }) }
           const parsed = parseFrontmatter(sourceMd)
-          if (!parsed) return { ok: false, message: `技能「${source}」没有有效的 frontmatter；拒绝降级。` }
+          if (!parsed) return { ok: false, message: tr('技能「{name}」没有有效的 frontmatter；拒绝降级。', { name: source }) }
           const refs = supportRefs(parsed.body)
           let demotedBody = parsed.body
           if (refs.length > 0) {
             const decision = await this.planSourceRehoming(source, targetName, parsed.body, rehomed.map(file => file.to))
             if (decision.kind === 'blocked') {
-              return { ok: false, message: `合并被拒绝：来源技能「${source}」的正文引用了会被落下的支撑文件（${refs.join(', ')}）：请改为归档整个包。${decision.note}` }
+              return { ok: false, message: tr('合并被拒绝：来源技能「{source}」的正文引用了会被落下的支撑文件（{refs}）：请改为归档整个包。{note}', { source, refs: refs.join(', '), note: decision.note }) }
             }
             rehomed.push(...decision.files)
             demotedBody = decision.rewritten
@@ -2922,7 +2927,7 @@ export class SkillLibrary {
         // tree when a restore fails). The serial read stays authoritative for
         // the merge; this probe keeps the failure path non-destructive.
         const preTargetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
-        if (!preTargetMd) return { ok: false, message: `技能「${targetName}」不存在。` }
+        if (!preTargetMd) return { ok: false, message: tr('技能「{name}」不存在。', { name: targetName }) }
         for (const source of normalizedSources) {
           // S1-E5: verify the plan-time bytes right before THIS source is
           // archived. A mismatch throws into the rollback below, so sources
@@ -2999,7 +3004,7 @@ export class SkillLibrary {
           eventAction: 'consolidate',
         })
         if (!result.ok) throw new Error(result.message)
-        return { ok: true, message: `已把 ${normalizedSources.join(', ')} 合并进「${targetName}」。`, path: targetDir }
+        return { ok: true, message: tr('已把 {sources} 合并进「{target}」。', { sources: normalizedSources.join(', '), target: targetName }), path: targetDir }
       } catch (error) {
         // Bring back every source we already archived so the merge is fully
         // undone. 0.3.16 (T-14): a failed restore used to be swallowed by
@@ -3018,9 +3023,9 @@ export class SkillLibrary {
           }
         }
         if (failedRestores.length > 0) {
-          return { ok: false, message: `合并失败（${reason}）；已回滚，但以下未回滚：${failedRestores.join(', ')}：它们仍在 .archive 里，请用 /evolution skill restore 恢复。` }
+          return { ok: false, message: tr('合并失败（{reason}）；已回滚，但以下未回滚：{stuck}：它们仍在 .archive 里，请用 /evolution skill restore 恢复。', { reason, stuck: failedRestores.join(', ') }) }
         }
-        return { ok: false, message: `合并失败，已回滚：${reason}` }
+        return { ok: false, message: tr('合并失败，已回滚：{reason}', { reason }) }
       }
     })
   }
@@ -3052,8 +3057,8 @@ export class SkillLibrary {
   private async restructureCore(name: string, moves: SkillRestructureMove[], origin: WriteOrigin): Promise<SkillActionResult> {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
-    if (moves.length === 0) return { ok: false, message: '重构至少需要一次章节搬移。' }
-    if (moves.length > MAX_RESTRUCTURE_MOVES) return { ok: false, message: `重构超过 ${MAX_RESTRUCTURE_MOVES} 次搬移。` }
+    if (moves.length === 0) return { ok: false, message: tr('重构至少需要一次章节搬移。') }
+    if (moves.length > MAX_RESTRUCTURE_MOVES) return { ok: false, message: tr('重构超过 {limit} 次搬移。', { limit: MAX_RESTRUCTURE_MOVES }) }
     for (const move of moves) {
       // V24-20a (v24): element-shape guard BEFORE the field reads — a null
       // element used to throw on `move.heading` instead of returning the
@@ -3062,10 +3067,10 @@ export class SkillLibrary {
       // model/plan payloads have historically crossed that promise (V8-09).
       const raw: unknown = move
       if (raw === null || typeof raw !== 'object') {
-        return { ok: false, message: '每次重构搬移都必须是带 heading 的对象。' }
+        return { ok: false, message: tr('每次重构搬移都必须是带 heading 的对象。') }
       }
       if (typeof move.heading !== 'string' || !move.heading.trim()) {
-        return { ok: false, message: '每次重构搬移都需要非空的 heading。' }
+        return { ok: false, message: tr('每次重构搬移都需要非空的 heading。') }
       }
       // A1-6 (v18): reuse the single validator (regex + Windows device stems)
       // so restructure cannot mint a target the support-file layer refuses.
@@ -3074,7 +3079,7 @@ export class SkillLibrary {
     }
     const dir = this.dirOf(name)
     const md = await this.io.readText(join(dir, 'SKILL.md'))
-    if (!md) return { ok: false, message: `技能「${name}」不存在。` }
+    if (!md) return { ok: false, message: tr('技能「{name}」不存在。', { name }) }
     // 0.3.16 (E-38/E-38a): the block boundary once used the loose
     // indexOf('\n---', 3) form, which matched a `----` line and leaked
     // frontmatter into the body — frontmatterBlock owns the strict line rule
@@ -3085,7 +3090,7 @@ export class SkillLibrary {
     // consume it as the separator and splice the first body line onto the
     // closing fence.
     const block = frontmatterBlock(md)
-    if (!block) return { ok: false, message: 'SKILL.md 没有有效的 frontmatter；拒绝重构。' }
+    if (!block) return { ok: false, message: tr('SKILL.md 没有有效的 frontmatter；拒绝重构。') }
     // P1-1 (v7 audit): the planner must receive the BODY ONLY — its rebuilt
     // body is spliced after the frontmatter header, so feeding it the full
     // text duplicated the frontmatter on every successful restructure (a
@@ -3094,11 +3099,11 @@ export class SkillLibrary {
     const header = block.lines.slice(0, block.end + 1).join('\n')
     const bodyRaw = md.slice(header.length)
     const plan = planRestructureSections(bodyRaw.replace(/\r\n/g, '\n'), moves)
-    if ('error' in plan) return { ok: false, message: `重构被拒绝：${plan.error}` }
+    if ('error' in plan) return { ok: false, message: tr('重构被拒绝：{reason}', { reason: plan.error }) }
     const newMd = `${header}${plan.body}`.replace(/\r\n/g, '\n')
     const finalMd = block.nl === '\r\n' ? newMd.replace(/\n/g, '\r\n') : newMd
     const newMdCheck = validateFrontmatter(finalMd, name, this.limits)
-    if (newMdCheck) return { ok: false, message: `重构被拒绝：${newMdCheck}` }
+    if (newMdCheck) return { ok: false, message: tr('重构被拒绝：{reason}', { reason: newMdCheck }) }
     // Design §2.2: the refusal is scoped to the case it exists for. A section
     // carrying citations used to be refused outright — which blocked the ONLY
     // non-destructive way to shrink a citation-dense body (measured: 10/10
@@ -3114,12 +3119,12 @@ export class SkillLibrary {
       const refs = supportRefs(section.text)
       if (refs.length === 0) continue
       if (files === null) {
-        return { ok: false, message: `重构被拒绝：章节「## ${section.heading}」引用了会留在原地的支撑文件（${refs.join(', ')}）：请拆开该章节，或连同它的文件一起搬。` }
+        return { ok: false, message: tr('重构被拒绝：章节「## {heading}」引用了会留在原地的支撑文件（{refs}）：请拆开该章节，或连同它的文件一起搬。', { heading: section.heading, refs: refs.join(', ') }) }
       }
       const report = resolveCitations({ content: section.text, file: 'SKILL.md', files })
       if (report.dangling.length > 0) {
         const missing = report.dangling.map(ref => ref.target ?? ref.raw).join(', ')
-        return { ok: false, message: `重构被拒绝：章节「## ${section.heading}」引用的支撑文件不存在（${missing}）：请修正引用，或先创建该文件。` }
+        return { ok: false, message: tr('重构被拒绝：章节「## {heading}」引用的支撑文件不存在（{missing}）：请修正引用，或先创建该文件。', { heading: section.heading, missing }) }
       }
     }
     // Aggregate by destination: two moves into one file append in move order.
@@ -3144,7 +3149,7 @@ export class SkillLibrary {
     }
     writes.push({ target: join(dir, 'SKILL.md'), content: finalMd, expected: md })
     const protection = await this.writeProtection(name, origin)
-    if (protection !== null) return { ok: false, message: `技能「${name}」受保护（${protection}）。` }
+    if (protection !== null) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name, protection }) }
     const summary = `moved ${plan.sections.length} section(s): ${[...byRel.keys()].join(', ')}`
     const ops: TreeChangeOp[] = writes.map(write => ({
       kind: 'write' as const,
@@ -3186,7 +3191,7 @@ export class SkillLibrary {
       eventAction: 'restructure',
     })
     if (!result.ok) return { ok: false, message: result.errors.map(error => error.message).join('；') }
-    return { ok: true, message: `已重构「${name}」：把 ${plan.sections.length} 个章节搬到 references/。`, path: dir }
+    return { ok: true, message: tr('已重构「{name}」：把 {count} 个章节搬到 references/。', { name, count: plan.sections.length }), path: dir }
   }
 
   /**
@@ -3206,28 +3211,28 @@ export class SkillLibrary {
    */
   async extract(plan: ExtractPlanDraft, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
     await this.ensureRecovered()
-    if (plan.outcome === 'owner-gap' || plan.owner.mode !== 'covered') return { ok: false, message: '提取被拒绝：owner-gap 不是写操作。' }
-    if (plan.support.unresolved.length > 0 || plan.support.dangling.length > 0) return { ok: false, message: '提取被拒绝：support closure 存在 unresolved/dangling。' }
-    if (plan.parts.length === 0) return { ok: false, message: '提取被拒绝：没有 part。' }
+    if (plan.outcome === 'owner-gap' || plan.owner.mode !== 'covered') return { ok: false, message: tr('提取被拒绝：owner-gap 不是写操作。') }
+    if (plan.support.unresolved.length > 0 || plan.support.dangling.length > 0) return { ok: false, message: tr('提取被拒绝：support closure 存在 unresolved/dangling。') }
+    if (plan.parts.length === 0) return { ok: false, message: tr('提取被拒绝：没有 part。') }
     const source = plan.source.trim()
     const target = plan.target.name.trim()
-    if (source === target) return { ok: false, message: '提取被拒绝：source 与 target 相同。' }
-    if (plan.target.exists !== true) return { ok: false, message: '提取被拒绝：target 不存在；owner-gap 不自动 create。' }
+    if (source === target) return { ok: false, message: tr('提取被拒绝：source 与 target 相同。') }
+    if (plan.target.exists !== true) return { ok: false, message: tr('提取被拒绝：target 不存在；owner-gap 不自动 create。') }
     const sourceDir = this.dirOf(source)
     const targetDir = this.dirOf(target)
     const sourceMd = await this.io.readText(join(sourceDir, 'SKILL.md'))
     const targetMd = await this.io.readText(join(targetDir, 'SKILL.md'))
-    if (sourceMd === null) return { ok: false, message: '技能「' + source + '」不存在。' }
-    if (targetMd === null) return { ok: false, message: '技能「' + target + '」不存在。' }
+    if (sourceMd === null) return { ok: false, message: tr('技能「{name}」不存在。', { name: source }) }
+    if (targetMd === null) return { ok: false, message: tr('技能「{name}」不存在。', { name: target }) }
     if (plan.anchors !== undefined) {
       const sourceHash = contentHash(sourceMd)
       const targetHash = contentHash(targetMd)
       if (sourceHash !== plan.anchors.sourceMdSha256 || targetHash !== plan.anchors.targetMdSha256) {
-        return { ok: false, message: '提取被拒绝：source/target 在计划之后发生了变化；请重新计划。' }
+        return { ok: false, message: tr('提取被拒绝：source/target 在计划之后发生了变化；请重新计划。') }
       }
     }
     const projected = projectExtractBodies(plan, sourceMd, targetMd)
-    if (!projected.ok) return { ok: false, message: '提取被拒绝：' + projected.message }
+    if (!projected.ok) return { ok: false, message: tr('提取被拒绝：{message}', { message: projected.message }) }
     const sourceNew = projected.projection.sourceAfter
     const targetNew = projected.projection.targetAfter
     const ops: TreeChangeOp[] = []
@@ -3235,14 +3240,14 @@ export class SkillLibrary {
       const fromPath = join(sourceDir, ...move.from.split('/'))
       const toPath = join(targetDir, ...move.to.split('/'))
       const content = await this.io.readText(fromPath)
-      if (content === null) return { ok: false, message: '提取被拒绝：support 文件不存在 ' + move.from }
+      if (content === null) return { ok: false, message: tr('提取被拒绝：support 文件不存在 {path}', { path: move.from }) }
       const previous = await this.readForCas(toPath)
       ops.push({ kind: 'write', target: toPath, content, expected: previous, skill: target })
     }
     for (const file of plan.support.external) {
-      if (file.content === undefined) return { ok: false, message: '提取被拒绝：external support 缺少已验证的内容 ' + file.from }
+      if (file.content === undefined) return { ok: false, message: tr('提取被拒绝：external support 缺少已验证的内容 {path}', { path: file.from }) }
       if (file.to.startsWith('/') || file.to.includes('..') || !/^(?:references|templates|scripts|assets)\//.test(file.to)) {
-        return { ok: false, message: '提取被拒绝：external target 不安全 ' + file.to }
+        return { ok: false, message: tr('提取被拒绝：external target 不安全 {path}', { path: file.to }) }
       }
       const toPath = join(targetDir, ...file.to.split('/'))
       const previous = await this.readForCas(toPath)
@@ -3252,16 +3257,16 @@ export class SkillLibrary {
     for (const move of plan.support.exclusive) {
       const sourcePath = join(sourceDir, ...move.from.split('/'))
       const previous = await this.readForCas(sourcePath)
-      if (previous === null) return { ok: false, message: '提取被拒绝：待删除 support 不存在 ' + move.from }
+      if (previous === null) return { ok: false, message: tr('提取被拒绝：待删除 support 不存在 {path}', { path: move.from }) }
       ops.push({ kind: 'delete', target: sourcePath, expected: previous, skill: source })
     }
     ops.push({ kind: 'write', target: join(sourceDir, 'SKILL.md'), content: sourceNew, expected: sourceMd, skill: source })
     const targetSummary = (await this.list({ withFrontmatter: true })).find(summary => summary.name === target)
-    if (targetSummary === undefined) return { ok: false, message: '提取被拒绝：target 不在技能库中。' }
-    if (!targetSummary.managed) return { ok: false, message: '提取被拒绝：target 不是家族管理的技能。' }
+    if (targetSummary === undefined) return { ok: false, message: tr('提取被拒绝：target 不在技能库中。') }
+    if (!targetSummary.managed) return { ok: false, message: tr('提取被拒绝：target 不是家族管理的技能。') }
     for (const name of [source, target]) {
       const protection = await this.writeProtection(name, origin)
-      if (protection !== null) return { ok: false, message: '技能「' + name + '」受保护（' + protection + '）。' }
+      if (protection !== null) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name, protection }) }
     }
     const summary = 'extract ' + plan.parts.map(part => part.heading).join(', ') + ' from ' + source + ' to ' + target
     const roots = [source, target]
@@ -3301,7 +3306,7 @@ export class SkillLibrary {
       auditSummary: summary,
       eventAction: 'extract',
     })
-    if (!result.ok) return { ok: false, message: '提取失败：' + result.errors.map(error => error.message).join('；') }
+    if (!result.ok) return { ok: false, message: tr('提取失败：{errors}', { errors: result.errors.map(error => error.message).join('；') }) }
     return { ok: true, message: summary + ' succeeded.', path: this.dirOf(source) }
   }
 
@@ -3311,28 +3316,28 @@ export class SkillLibrary {
     const roots: Array<{ name: string; protection: 'write' | 'delete' | 'none'; dir: string }> = []
     for (const root of declared) {
       const name = root.name.trim()
-      if (roots.some(entry => entry.name === name)) return { ok: false, message: '目录树变更声明了重复的根「' + name + '」。' }
+      if (roots.some(entry => entry.name === name)) return { ok: false, message: tr('目录树变更声明了重复的根「{name}」。', { name }) }
       const badName = this.badName(name, { allowReserved: true })
       if (badName) return { ok: false, message: badName }
       const dir = this.dirOf(name)
       const body = await this.io.readText(join(dir, 'SKILL.md'))
-      if (!body) return { ok: false, message: '技能「' + name + '」不存在。' }
+      if (!body) return { ok: false, message: tr('技能「{name}」不存在。', { name }) }
       const protection = root.protection === 'write'
         ? await this.writeProtection(name, plan.origin)
         : root.protection === 'delete'
           ? await this.deleteProtection(name)
           : null
-      if (protection) return { ok: false, message: '技能「' + name + '」受保护（' + protection + '）。' }
+      if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name, protection }) }
       roots.push({ name, protection: root.protection, dir })
     }
     if (!roots.some(root => root.name === primaryName)) {
-      return { ok: false, message: '目录树变更的 primary skill「' + primaryName + '」不在 roots 中。' }
+      return { ok: false, message: tr('目录树变更的 primary skill「{name}」不在 roots 中。', { name: primaryName }) }
     }
     const provided: TreeChangeOp[] = plan.ops ?? [
       ...plan.writes.map(write => ({ kind: 'write' as const, ...write })),
       ...(plan.deletes ?? []).map(del => ({ kind: 'delete' as const, ...del })),
     ]
-    if (provided.length === 0) return { ok: false, message: '目录树变更为空。' }
+    if (provided.length === 0) return { ok: false, message: tr('目录树变更为空。') }
     const landing: Array<{
       kind: 'write' | 'delete'
       target: string
@@ -3348,19 +3353,19 @@ export class SkillLibrary {
         const rel = relative(root.dir, op.target)
         return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
       })
-      if (owner === undefined) return { ok: false, message: '目标不属于任何声明的技能根：' + op.target }
+      if (owner === undefined) return { ok: false, message: tr('目标不属于任何声明的技能根：{path}', { path: op.target }) }
       const skill = op.skill ?? owner.name
-      if (!roots.some(root => root.name === skill)) return { ok: false, message: '目标声明的技能「' + skill + '」不在 roots 中：' + op.target }
+      if (!roots.some(root => root.name === skill)) return { ok: false, message: tr('目标声明的技能「{skill}」不在 roots 中：{path}', { skill, path: op.target }) }
       let previous: string | null
       try {
         previous = await this.io.readText(op.target)
       } catch (error) {
-        return { ok: false, message: '拒绝目录树变更：无法安全预读 ' + op.target + '（' + (error instanceof Error ? error.message : String(error)) + '）；未执行任何写入' }
+        return { ok: false, message: tr('拒绝目录树变更：无法安全预读 {path}（{cause}）；未执行任何写入', { path: op.target, cause: error instanceof Error ? error.message : String(error) }) }
       }
-      if (op.kind === 'delete' && previous === null) return { ok: false, message: '拒绝目录树变更：删除目标不存在 ' + op.target }
+      if (op.kind === 'delete' && previous === null) return { ok: false, message: tr('拒绝目录树变更：删除目标不存在 {path}', { path: op.target }) }
       if (op.kind === 'write') {
         if (Buffer.byteLength(op.content, 'utf8') > this.limits.maxSkillFileBytes) {
-          return { ok: false, message: '写入超过 ' + this.limits.maxSkillFileBytes + ' 字节：' + op.target }
+          return { ok: false, message: tr('写入超过 {limit} 字节：{path}', { limit: this.limits.maxSkillFileBytes, path: op.target }) }
         }
         const threat = this.contentThreatBlock(op.content)
         if (threat) return { ok: false, message: threat }
@@ -3410,8 +3415,8 @@ export class SkillLibrary {
         }
       }
       const reason = error instanceof Error ? error.message : String(error)
-      if (stuck.length === 0) return { ok: false, message: '目录树变更失败，已回滚：' + reason }
-      return { ok: false, message: '目录树变更失败：' + reason + '。回滚无法恢复 ' + stuck.join(', ') + '：可恢复性由当前快照决定：' + (await this.snapshotRecoveryAvailability()) + ' —— 若上面不是「最新快照」，请重新应用这次变更。' }
+      if (stuck.length === 0) return { ok: false, message: tr('目录树变更失败，已回滚：{reason}', { reason }) }
+      return { ok: false, message: tr('目录树变更失败：{reason}。回滚无法恢复 {stuck}：可恢复性由当前快照决定：{availability} —— 若上面不是「最新快照」，请重新应用这次变更。', { reason, stuck: stuck.join(', '), availability: await this.snapshotRecoveryAvailability() }) }
     }
     const unitId = plan.unitId ?? 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
     const defaultHead: UnitHead = {
@@ -3441,7 +3446,7 @@ export class SkillLibrary {
       ok: true,
       message: durabilityWarning === ''
         ? plan.eventAction + ' "' + primaryName + '" succeeded.'
-        : plan.eventAction + ' "' + primaryName + '" succeeded （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：' + durabilityWarning + ')',
+        : plan.eventAction + ' "' + primaryName + '" succeeded' + tr(' （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：{warnings})', { warnings: durabilityWarning }),
       path: primaryDir,
     }
   }
@@ -3468,8 +3473,8 @@ export class SkillLibrary {
       return {
         ok: false,
         message: hasSkillFile
-          ? `技能「${name}」已存在于当前根目录；拒绝覆盖。`
-          : `技能目录「${name}」已存在于当前根目录，但没有 SKILL.md；恢复前请先移除或修复它。`,
+          ? tr('技能「{name}」已存在于当前根目录；拒绝覆盖。', { name })
+          : tr('技能目录「{name}」已存在于当前根目录，但没有 SKILL.md；恢复前请先移除或修复它。', { name }),
       }
     }
     // OPT-08 (2026-09): case-variant collision probe, the restore-side twin of
@@ -3491,12 +3496,12 @@ export class SkillLibrary {
     if (caseVariant !== undefined) {
       return {
         ok: false,
-        message: `技能「${caseVariant}」（同名、仅大小写不同）已存在于当前根目录；把「${name}」恢复到它旁边会造成含义不清的重复：请恢复为「${caseVariant}」，或先移除该变体。`,
+        message: tr('技能「{variant}」（同名、仅大小写不同）已存在于当前根目录；把「{name}」恢复到它旁边会造成含义不清的重复：请恢复为「{variant}」，或先移除该变体。', { variant: caseVariant, name }),
       }
     }
     const archiveRoot = join(this.root, '.archive')
     let entries: string[]
-    try { entries = await this.io.list(archiveRoot) } catch { return { ok: false, message: '没有可用的技能归档。' } }
+    try { entries = await this.io.list(archiveRoot) } catch { return { ok: false, message: tr('没有可用的技能归档。') } }
     // 0.3.16 (E-3): `${name}-` also matches a SIBLING skill's archive entry
     // (restoring `foo` used to pick `foo-bar` after a lexical sort: foo got
     // foo-bar's content and foo-bar's archive vanished). The directory stamp
@@ -3529,11 +3534,11 @@ export class SkillLibrary {
       if (parsed === null) unreadable.push(candidate)
     }
     if (!chosen) {
-      if (unreadable.length === 0) return { ok: false, message: `技能「${name}」不在 .archive 里。` }
+      if (unreadable.length === 0) return { ok: false, message: tr('技能「{name}」不在 .archive 里。', { name }) }
       return {
         ok: false,
-        message: `.archive 里没有「${name}」对应的 frontmatter 名，但有 ${unreadable.length} 个名字相似的归档项：${unreadable.join(', ')}。`
-          + `这些归档项没有可读的 SKILL.md（或名字对不上），按名字恢复无法区分它们：请把目录改成技能名后再次恢复；快照这条路的当前状态是：${await this.snapshotRecoveryAvailability()}。`,
+        message: tr('.archive 里没有「{name}」对应的 frontmatter 名，但有 {count} 个名字相似的归档项：{items}。', { name, count: unreadable.length, items: unreadable.join(', ') })
+          + tr('这些归档项没有可读的 SKILL.md（或名字对不上），按名字恢复无法区分它们：请把目录改成技能名后再次恢复；快照这条路的当前状态是：{availability}。', { availability: await this.snapshotRecoveryAvailability() }),
       }
     }
     const source = join(archiveRoot, chosen)
@@ -3541,20 +3546,20 @@ export class SkillLibrary {
     // link in the active tree instead of the real content — refuse first.
     if (this.io.isSymlink) {
       const link = await this.io.isSymlink(source)
-      if (link === true) return { ok: false, message: `归档项「${chosen}」是符号链接；拒绝恢复。` }
+      if (link === true) return { ok: false, message: tr('归档项「{name}」是符号链接；拒绝恢复。', { name: chosen }) }
     }
     // P2-9 (v15): same writer-collision probe as archive — restoring ONTO a
     // skill a writer is mid-write on would drop the new bytes behind the
     // restored tree.
     if (await this.supportDirsUnlistable(dest)) {
-      return { ok: false, message: `无法检查技能「${name}」是否有写入方（有一个支撑目录列不出来）：请重试恢复。` }
+      return { ok: false, message: tr('无法检查技能「{name}」是否有写入方（有一个支撑目录列不出来）：请重试恢复。', { name }) }
     }
     const moveFailure = await this.moveDir(source, dest)
     if (moveFailure !== undefined) {
       // 0.3.16 (E-13 follow-up): the fallback failure must come back as a
       // structured result, never a rejection — consolidates call this in a
       // rollback loop and a throw there would replace the rollback report.
-      return { ok: false, message: `从 .archive 恢复「${name}」失败：${moveFailure}` }
+      return { ok: false, message: tr('从 .archive 恢复「{name}」失败：{reason}', { name, reason: moveFailure }) }
     }
     // P2 (v16): scrub lock residue that rode inside the archived entry (a
     // crashed writer, or the archive-probe TOCTOU strand) — a live-pid lock
@@ -3580,7 +3585,7 @@ export class SkillLibrary {
     }
     await this.audit(name, 'restore', null, isPresent(restoredProbe) ? restoredProbe.value : null, `restored from ${source}`, undefined, undefined, undefined, origin)
     this.notifyMutation({ action: 'restore', name, skillDir: dest })
-    return { ok: true, message: `技能「${name}」已从 .archive 恢复。`, path: dest }
+    return { ok: true, message: tr('技能「{name}」已从 .archive 恢复。', { name }), path: dest }
   }
 
   async writeSupportFile(
@@ -3604,12 +3609,12 @@ export class SkillLibrary {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
-    if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `技能「${name}」不存在。` }
+    if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: tr('技能「{name}」不存在。', { name }) }
     const protection = await this.writeProtection(name, origin)
-    if (protection) return { ok: false, message: `技能「${name}」受保护（${protection}）。` }
+    if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name, protection }) }
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
-    if (Buffer.byteLength(content, 'utf8') > this.limits.maxSkillFileBytes) return { ok: false, message: `支撑文件超过 ${this.limits.maxSkillFileBytes} 字节。` }
+    if (Buffer.byteLength(content, 'utf8') > this.limits.maxSkillFileBytes) return { ok: false, message: tr('支撑文件超过 {limit} 字节。', { limit: this.limits.maxSkillFileBytes }) }
     const threat = this.contentThreatBlock(content)
     if (threat) return { ok: false, message: threat }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
@@ -3625,10 +3630,10 @@ export class SkillLibrary {
       : ''
     if (overCap && !repairing && this.supportFileCharPolicy() === 'enforce') {
       await this.recordHardCapHit(name, content.length, 'write_file', 1)
-      return { ok: false, message: `支撑文件「${filePath}」的内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }
+      return { ok: false, message: tr('支撑文件「{path}」的内容超过 {limit} 个字符。{hint}', { path: filePath, limit: this.limits.maxSkillContentChars, hint: tr(CONTENT_SPLIT_HINT) }) }
     }
     if (current !== null && content.trimEnd() === current.trimEnd()) {
-      return { ok: true, message: `支撑文件「${filePath}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: target }
+      return { ok: true, message: tr('支撑文件「{path}」未变更：提供的内容与当前文件一致，未写入。', { path: filePath }), noop: true, path: target }
     }
     const unit = new MutationUnit({
       io: this.io,
@@ -3659,8 +3664,8 @@ export class SkillLibrary {
       eventAction: 'write_file',
     })
     if (!result.ok) return { ok: false, message: result.errors.map(error => error.message).join('；') }
-    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
-    return { ok: true, message: `支撑文件「${filePath}」已写入「${name}」。${capAdvisory}${warning}`, path: target }
+    const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : tr(' （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：{warnings})', { warnings: result.warnings.join('；') })
+    return { ok: true, message: tr('支撑文件「{path}」已写入「{name}」。{advisory}{warning}', { path: filePath, name, advisory: capAdvisory, warning }), path: target }
   }
 
   async removeSupportFile(
@@ -3683,15 +3688,15 @@ export class SkillLibrary {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
-    if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `技能「${name}」不存在。` }
+    if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: tr('技能「{name}」不存在。', { name }) }
     const protection = await this.writeProtection(name, origin)
-    if (protection) return { ok: false, message: `技能「${name}」受保护（${protection}）。` }
+    if (protection) return { ok: false, message: tr('技能「{name}」受保护（{protection}）。', { name, protection }) }
     const validation = validateSupportPath(filePath)
     if (validation) return { ok: false, message: validation }
     const target = join(dir, ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
     if (!await this.io.exists(target)) {
       if (anchor !== undefined) return anchorRefusalFile(name, filePath, 'missing')
-      return { ok: false, message: `文件「${filePath}」不在技能「${name}」里。` }
+      return { ok: false, message: tr('文件「{path}」不在技能「{name}」里。', { path: filePath, name }) }
     }
     const beforeProbe = await probeText(this.io, target)
     if (!isPresent(beforeProbe)) {
@@ -3709,14 +3714,14 @@ export class SkillLibrary {
         if (verdict === 'match' && current !== null) lockedBefore = current
         return verdict === 'match' ? null : current
       })
-      if (!ran.done) return { ok: false, message: '内部错误：删除事务没有调用任务；没有删除任何东西' }
+      if (!ran.done) return { ok: false, message: tr('内部错误：删除事务没有调用任务；没有删除任何东西') }
     } else if (verdict === 'match') {
       await this.io.remove(target)
     }
     if (verdict !== 'match') return anchorRefusalFile(name, filePath, verdict)
     await this.audit(name, 'remove_file', lockedBefore, null, `removed ${filePath}`, filePath, unitId)
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
-    return { ok: true, message: `支撑文件「${filePath}」已从「${name}」移除。`, path: target }
+    return { ok: true, message: tr('支撑文件「{path}」已从「{name}」移除。', { path: filePath, name }), path: target }
   }
 
   /**
@@ -4033,11 +4038,11 @@ export class SkillLibrary {
   private async snapshotRecoveryAvailability(): Promise<string> {
     const listed = await this.listSnapshots()
     if (isUnknown(listed)) {
-      return '快照目录读不出来（' + listed.reason + '）'
+      return tr('快照目录读不出来（{reason}）', { reason: listed.reason })
     }
     const latest = isPresent(listed) ? listed.value[0] : undefined
-    if (!latest) return '当前没有可用快照'
-    return '最新快照 ' + latest.path
+    if (!latest) return tr('当前没有可用快照')
+    return tr('最新快照 {path}', { path: latest.path })
   }
 
   private async retainSnapshots(keep: number): Promise<void> {
@@ -4075,7 +4080,7 @@ export class SkillLibrary {
         // orphan is a full tree+.archive copy. Surface it with an empty
         // createdAt — the sort treats '' as oldest, so retainSnapshots evicts
         // orphans FIRST while a genuinely recent valid snapshot stays ahead.
-        out.push({ path: join(backupRoot, name), createdAt: '', reason: '清单读不出来或缺失（孤儿快照）' })
+        out.push({ path: join(backupRoot, name), createdAt: '', reason: tr('清单读不出来或缺失（孤儿快照）') })
         continue
       }
       out.push({ path: join(backupRoot, name), createdAt: manifest.createdAt, reason: manifest.reason })
@@ -4114,10 +4119,10 @@ export class SkillLibrary {
     // N14: a failed listing is NOT "no snapshot" — say which one happened, and
     // refuse before the pre-rollback snapshot (nothing has changed yet).
     if (isUnknown(listed)) {
-      return { ok: false, message: `拒绝快照恢复：快照目录读不出来（${listed.reason}）—— 未做任何改动。` }
+      return { ok: false, message: tr('拒绝快照恢复：快照目录读不出来（{reason}）—— 未做任何改动。', { reason: listed.reason }) }
     }
     const latest = isPresent(listed) ? listed.value[0] : undefined
-    if (!latest) return { ok: false, message: '没有可用的技能快照。' }
+    if (!latest) return { ok: false, message: tr('没有可用的技能快照。') }
     // v29 SK-07: the pre-rollback snapshot is the rollback INSURANCE, not part
     // of the restore — a failure taking it (win32 AV/indexer hold on the copy,
     // ENOSPC) used to reject raw out of this method before the E-13 rollback
@@ -4128,7 +4133,7 @@ export class SkillLibrary {
       preRollbackPath = await this.snapshotAll('pre-rollback', extras)
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
-      return { ok: false, message: `在任何清理之前就拒绝了快照恢复：生成回滚前快照失败（${reason}）—— 活动目录树未改变。请解决快照写入失败后重试。` }
+      return { ok: false, message: tr('在任何清理之前就拒绝了快照恢复：生成回滚前快照失败（{reason}）—— 活动目录树未改变。请解决快照写入失败后重试。', { reason }) }
     }
     // V27 G0.4 (core-a-01): the extras read happens BEFORE the destructive
     // replace. It used to run after the commit point and outside the rollback
@@ -4149,7 +4154,7 @@ export class SkillLibrary {
       snapshotExtras = await this.readSnapshotExtras(latest.path)
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
-      return { ok: false, message: `在任何清理之前就拒绝了快照恢复：读取快照清单或附属文件失败（${reason}）—— 活动目录树未改变。请解决读取失败后重试。` }
+      return { ok: false, message: tr('在任何清理之前就拒绝了快照恢复：读取快照清单或附属文件失败（{reason}）—— 活动目录树未改变。请解决读取失败后重试。', { reason }) }
     }
     try {
       await this.restoreSnapshotIntoRoot(latest.path)
@@ -4162,7 +4167,7 @@ export class SkillLibrary {
       const reason = error instanceof Error ? error.message : String(error)
       try {
         await this.restoreSnapshotIntoRoot(preRollbackPath)
-        return { ok: false, message: `快照恢复失败（${reason}）；活动目录树已回滚到回滚前的快照。` }
+        return { ok: false, message: tr('快照恢复失败（{reason}）；活动目录树已回滚到回滚前的快照。', { reason }) }
       } catch (rollbackError) {
         const rb = rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
         // v28 G2.5 (CORE-SK-03): both failures were PRE-CLEAR refusals
@@ -4173,10 +4178,10 @@ export class SkillLibrary {
         if (isPreClearRefusal(reason) && isPreClearRefusal(rb)) {
           return {
             ok: false,
-            message: `在任何清理之前就拒绝了快照恢复； 活动目录树未改变。\n- 目标：${reason}\n- 回滚前快照：${rb}\n请解决原因（有存活的技能写入，或快照不完整）后重试 —— 无需手动抢救。`,
+            message: tr('在任何清理之前就拒绝了快照恢复； 活动目录树未改变。\n- 目标：{reason}\n- 回滚前快照：{rollback}\n请解决原因（有存活的技能写入，或快照不完整）后重试 —— 无需手动抢救。', { reason, rollback: rb }),
           }
         }
-        return { ok: false, message: `快照恢复失败（${reason}），且回滚前快照的恢复也失败（${rb}）。请手动抢救：${preRollbackPath}（回滚前）、${latest.path}（目标）。` }
+        return { ok: false, message: tr('快照恢复失败（{reason}），且回滚前快照的恢复也失败（{rollback}）。请手动抢救：{preRollback}（回滚前）、{target}（目标）。', { reason, rollback: rb, preRollback: preRollbackPath, target: latest.path }) }
       }
     }
     // Whole-tree replacement: a single synthetic event invalidates the catalog
@@ -4188,7 +4193,7 @@ export class SkillLibrary {
     // to render any more: the refusal names the skills instead.
     return {
       ok: true,
-      message: `已从 ${latest.path} 恢复技能目录树`,
+      message: tr('已从 {path} 恢复技能目录树', { path: latest.path }),
       path: latest.path,
       ...snapshotExtras.length === 0 ? {} : { extras: snapshotExtras },
     }

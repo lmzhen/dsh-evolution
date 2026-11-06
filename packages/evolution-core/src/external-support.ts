@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { basename, isAbsolute, relative, resolve } from 'node:path'
 import { externalRefs } from './support-refs.ts'
+import { tr } from './messages.ts'
 import type { ExternalSupportFile } from './extract-plan.ts'
 
 const MAX_FILE_BYTES = 1024 * 1024
@@ -57,7 +58,7 @@ export async function readExternalSupport(
   try {
     root = await realpath(allowedRoot)
   } catch {
-    return { ok: false, message: 'external support 根目录不可读：' + allowedRoot }
+    return { ok: false, message: tr('external support 根目录不可读：{path}', { path: allowedRoot }) }
   }
   const files: ExternalSupportFile[] = []
   const targets = new Set(targetFiles)
@@ -68,16 +69,16 @@ export async function readExternalSupport(
     try {
       canonical = await realpath(candidate)
     } catch {
-      return { ok: false, message: 'external support 文件不存在：' + ref }
+      return { ok: false, message: tr('external support 文件不存在：{path}', { path: ref }) }
     }
-    if (!inside(root, canonical)) return { ok: false, message: 'external support 越界：' + ref }
+    if (!inside(root, canonical)) return { ok: false, message: tr('external support 越界：{path}', { path: ref }) }
     const info = await stat(canonical)
-    if (!info.isFile()) return { ok: false, message: 'external support 不是普通文件：' + ref }
-    if (info.size > MAX_FILE_BYTES) return { ok: false, message: 'external support 超过单文件上限：' + ref }
+    if (!info.isFile()) return { ok: false, message: tr('external support 不是普通文件：{path}', { path: ref }) }
+    if (info.size > MAX_FILE_BYTES) return { ok: false, message: tr('external support 超过单文件上限：{path}', { path: ref }) }
     total += info.size
-    if (total > MAX_TOTAL_BYTES) return { ok: false, message: 'external support 超过总上限：' + ref }
+    if (total > MAX_TOTAL_BYTES) return { ok: false, message: tr('external support 超过总上限：{path}', { path: ref }) }
     const targetPath = targetPathFor(ref)
-    if (targets.has(targetPath)) return { ok: false, message: 'external support 目标冲突：' + targetPath }
+    if (targets.has(targetPath)) return { ok: false, message: tr('external support 目标冲突：{path}', { path: targetPath }) }
     targets.add(targetPath)
     const raw = await readFile(canonical, 'utf8')
     const annotated = annotate(raw, canonical)
