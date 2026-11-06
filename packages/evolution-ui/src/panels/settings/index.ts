@@ -14,11 +14,11 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactNode } from 'react'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
-import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
+import { fill, en, ja, message, NS, zh, type MessageKey } from './messages.ts'
 import { PluginParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
 import { groupParamCards } from './settings-groups.ts'
 import { PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
-import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
+import { createSettingsSeat, ensureLocaleLanguage } from '@lmzhen/dsh-evolution-client-kit'
 import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
 import { injectStyles } from './styles.ts'
 
@@ -44,6 +44,8 @@ export { PENDING_CARD_KEY }
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
+  // The 0.2.1 line's catalog ships zh/en only; offer ja before registering its dictionaries.
+  ensureLocaleLanguage(ctx, { id: 'ja', label: '日本語', fallback: 'en' })
   // The stylesheet goes in first, inside an EFFECT: cordis runs the body at apply time, so the
   // injection still precedes the first render (no unstyled flash), and the disposer it returns now
   // travels back to the fiber - the same ownership skill-history gives its own stylesheet (S5-08).
@@ -56,7 +58,7 @@ export function apply(ctx: ClientContext): void {
   let registered = false
   ctx.effect(() => {
     try {
-      const dispose = seam.locale.register(NS, { zh, en })
+      const dispose = seam.locale.register(NS, { zh, en, ja })
       registered = true
       return dispose
     } catch (error) {
@@ -91,6 +93,7 @@ export function apply(ctx: ClientContext): void {
   const language = (): ParamLanguage => {
     try {
       const active = (ctx as unknown as { locale?: { getLocale?: () => { active?: string } } }).locale?.getLocale?.().active
+      if (typeof active === 'string' && active.toLowerCase().startsWith('ja')) return 'ja'
       return active === 'en' ? 'en' : 'zh'
     } catch { return 'zh' }
   }

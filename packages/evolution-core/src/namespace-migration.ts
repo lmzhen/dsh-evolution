@@ -17,6 +17,7 @@
 import { parse as parseYaml } from 'yaml'
 import { isRecord as isSection } from './guards.ts'
 import { NAMESPACE_MIGRATIONS, PARAM_ALIASES, PARAM_EXPOSURE, resolveParamId } from './params.ts'
+import { tr } from './messages.ts'
 
 /** One value a legacy section carried, with the spelling it used. */
 export interface NamespaceMigrationValue {
@@ -105,7 +106,7 @@ export function planNamespaceMigration(documentText: string): NamespaceMigration
     for (const [key, value] of Object.entries(section)) {
       const canonical = resolveParamId(key)
       if (!allowed.has(canonical)) {
-        skipped.push({ namespace, key, reason: 'row `' + rowId + '` 没有这个参数' })
+        skipped.push({ namespace, key, reason: tr('row `{row}` 没有这个参数', { row: rowId }) })
         continue
       }
       values.push({ source: key, key: canonical, value })
@@ -217,7 +218,7 @@ export function classifyNamespaceMigration(
     const view = read(entry.rowId)
     if (view === undefined) {
       for (const value of entry.values) {
-        skipped.push({ namespace: entry.namespace, key: value.source, reason: 'row `' + entry.rowId + '` 在本组合中不提供服务' })
+        skipped.push({ namespace: entry.namespace, key: value.source, reason: tr('row `{row}` 在本组合中不提供服务', { row: entry.rowId }) })
       }
       continue
     }

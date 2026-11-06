@@ -31,6 +31,7 @@ import { join } from 'node:path'
 import { transactIo, type EvolutionIoLike } from './io.ts'
 import { isPresent, isUnknown, probeText } from './probe.ts'
 import { contentHash } from './mutations.ts'
+import { tr } from './messages.ts'
 
 /** Root-level history directory. Dot-prefixed so skill discovery skips it. */
 export const HISTORY_DIR = '.history'
@@ -560,7 +561,7 @@ export function contentRetentionFeedback(input: RetentionFeedbackInput): string 
   if (before.length < RETENTION_FEEDBACK_MIN_CHARS) return null
   if (after.length >= before.length * RETENTION_FEEDBACK_KEEP_RATIO) return null
   const kept = Math.round(after.length / before.length * 100)
-  return `新内容保留了上一版正文的 ${kept}%（${after.length}／${before.length} 字符）；被替换的版本已保留在该技能的历史里。`
+  return tr('新内容保留了上一版正文的 {kept}%（{after}／{before} 字符）；被替换的版本已保留在该技能的历史里。', { kept, after: after.length, before: before.length })
 }
 
 /**

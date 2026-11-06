@@ -91,19 +91,19 @@ export const DRIFT_SIGNALS_VERSION = '3'
 
 /** Render-time nouns for the MAINTAIN_PROMPT placeholders (single vocabulary with the facts block). */
 export const DRIFT_SIGNAL_NOUNS: Readonly<Record<string, string>> = {
-  dedup_group: '近重复组',
-  prefix_cluster: '前缀聚类',
-  stamp_density: 'stamp 密度',
-  body_size: '正文体量',
-  dup_heading: '重复标题',
-  overlong_line: '超长行',
-  pointer_missing: '缺失指针',
-  citation_resolution: '引用解析',
-  demand: '需求证据',
-  description_chars: '描述长度',
-  narrow_name: '窄名',
-  usage_observed: '使用观察',
-  quality_low: '质量分',
+  dedup_group: '近重复组', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  prefix_cluster: '前缀聚类', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  stamp_density: 'stamp 密度', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  body_size: '正文体量', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  dup_heading: '重复标题', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  overlong_line: '超长行', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  pointer_missing: '缺失指针', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  citation_resolution: '引用解析', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  demand: '需求证据', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  description_chars: '描述长度', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  narrow_name: '窄名', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  usage_observed: '使用观察', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
+  quality_low: '质量分', // i18n-allow: prompt vocabulary rendered into MAINTAIN_PROMPT (and hashed into the joint signature); not tool-result copy
 }
 
 const NARROW_NAME_PATTERNS: ReadonlyArray<{ label: string; re: RegExp }> = [

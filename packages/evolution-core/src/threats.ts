@@ -74,7 +74,7 @@ const PATTERNS: ThreatPattern[] = [
   // (`.envrc` must not trigger — `r` is a word char) and gains a second guard
   // so the DOCUMENTED template variants pass. Their next char after `.env` is
   // a `.` — which the first lookahead never excluded — so the legitimate
-  // debugging read `cat .env.example 查看变量` was hard-refused. PLAN-R2 P2-3
+  // debugging read `cat .env.example 查看变量` was hard-refused. PLAN-R2 P2-3 // i18n-allow: prose inside a comment; the comment stripper is misled by quote characters in the regex literals above
   // (2026-09-16): the suffix's old trailing `\b` only demanded a non-word
   // char, so CONTINUATIONS of the template name inherited the exemption —
   // `.env.example.local` (a real-world conventional name that may hold real

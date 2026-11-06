@@ -4,6 +4,7 @@ export { registerSidebarPanel, type SidebarPanelSpec, type Translate } from './p
 export { registerWorkbenchView } from './workbench-view.ts'
 export { createSettingsSeat } from './settings-seat.ts'
 export type { WorkbenchViewSpec } from './workbench-view.ts'
+export { ensureLocaleLanguage, type FamilyLanguage } from './language.ts'
 export { panelWorkspaceId } from './workspace.ts'
 export { AsyncResource } from './async-resource.ts'
 export { formatLocalClock, formatLocalDateTime, isSameLocalDay, type LocalDateTimeOptions } from './format.ts'

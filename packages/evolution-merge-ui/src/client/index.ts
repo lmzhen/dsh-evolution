@@ -1,10 +1,10 @@
 /** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
-import { createSettingsSeat, panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
+import { createSettingsSeat, ensureLocaleLanguage, panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
-import { NS, en, zh } from './messages.ts'
+import { NS, en, ja, zh } from './messages.ts'
 import { MergePanel, type MergeFace } from './Panel.ts'
 import { MergeStore, type MergeSource } from './MergeStore.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
@@ -20,13 +20,14 @@ function MergeView(props: MergeFace & { activeView?: string }): ReactNode { retu
  * @param ctx - the client context.
  */
 export function apply(ctx: ClientContext): void {
+  ensureLocaleLanguage(ctx, { id: 'ja', label: '日本語', fallback: 'en' })
   const seat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
   ctx.effect(() => () => { seat.dispose?.() }, 'evolution-merge-ui: settings seat')
   registerWorkbenchView<MergeFace>(ctx, {
     id: PANEL_ID,
     order: PANEL_ORDER,
     namespace: NS,
-    dictionaries: { zh, en },
+    dictionaries: { zh, en, ja },
     styles: { css: CSS, tagId: CSS_TAG_ID },
     component: MergeView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {

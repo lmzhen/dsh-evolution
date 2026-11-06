@@ -46,6 +46,7 @@ import type { StageToolContext } from './stage-tool.ts'
 import { createMergeStageTool } from './merge-tool.ts'
 import { supersedeMergeRuns } from './supersede.ts'
 import type { SkillCard } from './skill-card.ts'
+import { tr } from './messages.ts'
 
 /**
  * One library read used by both the runtime card port and the read-time convergence
@@ -157,7 +158,7 @@ export * from './runtime.ts'
 
 /** Not-yet-mounted command face: three lines so a script can read code/hint/next. */
 function formatUnreadyError(): string {
-  return formatMergeError(commandError('merge', 'merge-not-ready', 'evolutionIo 尚未挂载', '等待插件加载完成后重试；运行 /evolution doctor 查看挂载状态'))
+  return formatMergeError(commandError('merge', 'merge-not-ready', tr('evolutionIo 尚未挂载'), tr('等待插件加载完成后重试；运行 /evolution doctor 查看挂载状态')))
 }
 
 export const inject: string[] = []
@@ -177,7 +178,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     },
     /** Global-doctor consumer: merges buildDoctorView over the shared snapshot with the reconcile report. */
     async doctorFact(): Promise<MergeDoctorFact> {
-      if (doctorFact === undefined) return { status: 'unknown', detail: '合并服务尚未完成挂载', remedy: '稍后重新运行 /evolution doctor' }
+      if (doctorFact === undefined) return { status: 'unknown', detail: tr('合并服务尚未完成挂载'), remedy: tr('稍后重新运行 /evolution doctor') }
       return await doctorFact()
     },
   }
@@ -188,7 +189,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
   registerHostRoutes(ctx, audit => makeMergeRoutes({
     getSource: () => source,
     decide: async (request, _audit) => {
-      if (decide === undefined) return { ok: false, code: 'E-305', message: '合并服务尚未完成挂载' }
+      if (decide === undefined) return { ok: false, code: 'E-305', message: tr('合并服务尚未完成挂载') }
       return await decide(request)
     },
   }, audit))
@@ -309,7 +310,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
           const items = new Map<string, HistoryItem>()
           const receipts = [...await readCommitReceipts(io, home)].sort((a, b) => a.at - b.at)
           const generationOf = new Map(receipts.map((receipt, index) => [receipt.runId, index + 1]))
-          for (const receipt of receipts) for (const name of receipt.sources) items.set(name, { name, kind: 'merged', reason: '已合并进「' + receipt.target + '」，最后一版保留可查。', reasonCode: 'merged', lastVersion: 1, archivedAt: receipt.at, sourceRunId: receipt.runId, runId: receipt.runId, absorbedInto: receipt.target, generation: generationOf.get(receipt.runId) ?? 1 })
+          for (const receipt of receipts) for (const name of receipt.sources) items.set(name, { name, kind: 'merged', reason: tr('已合并进「{target}」，最后一版保留可查。', { target: receipt.target }), reasonCode: 'merged', lastVersion: 1, archivedAt: receipt.at, sourceRunId: receipt.runId, runId: receipt.runId, absorbedInto: receipt.target, generation: generationOf.get(receipt.runId) ?? 1 })
           const archived = await (skills as unknown as { archivedNames?: () => Promise<string[] | null> }).archivedNames?.() ?? []
           const reasonOf = (skills as unknown as { readArchiveReason?: (name: string) => Promise<string | null> }).readArchiveReason
           const archivedAtOf = (skills as unknown as { readArchivedAt?: (name: string) => Promise<number | null> }).readArchivedAt
@@ -319,7 +320,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
             const lower = (rawReason ?? '').toLowerCase()
             const kind = lower.includes('split') ? 'split' as const : lower.includes('delet') || lower.includes('remove') ? 'deleted' as const : 'other' as const
             const archivedAt = archivedAtOf === undefined ? null : await archivedAtOf.call(skills, name).catch(() => null)
-            items.set(name, { name, kind, reason: rawReason ?? '技能已归档，最后一版保留可查。', reasonCode: kind === 'other' ? 'archived' : kind, lastVersion: 1, archivedAt })
+            items.set(name, { name, kind, reason: rawReason ?? tr('技能已归档，最后一版保留可查。'), reasonCode: kind === 'other' ? 'archived' : kind, lastVersion: 1, archivedAt })
           }
           const out: HistoryItem[] = []
           for (const item of items.values()) {
@@ -339,7 +340,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     }
     doctorFact = async () => {
       const current = source
-      if (current?.snapshot === undefined) return { status: 'unknown', detail: '合并快照来源尚未挂载', remedy: '稍后重新运行 /evolution doctor' }
+      if (current?.snapshot === undefined) return { status: 'unknown', detail: tr('合并快照来源尚未挂载'), remedy: tr('稍后重新运行 /evolution doctor') }
       const view = buildDoctorView(await current.snapshot())
       return mergeDoctorFact(view, await readReconcileReport(io, home))
     }
@@ -372,14 +373,14 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       const state = await ready
       // These verbs answer usefully on a blocked state; reconcile reports the block without writing.
       const allowedWhenBlocked = /(?:^|\s)(doctor|status|pending|skipped|report|runs|reconcile)(?:\s|$)/.test(rawInput)
-      if (!state.ok && !allowedWhenBlocked) return { ok: false, text: formatMergeError(commandError('merge', state.code, state.message, '先修复合并状态（/evolution merge doctor），再重试')) }
+      if (!state.ok && !allowedWhenBlocked) return { ok: false, text: formatMergeError(commandError('merge', state.code, state.message, tr('先修复合并状态（/evolution merge doctor），再重试'))) }
       return runMergeCommand(runtime, rawInput, invocation)
     }
     const agents = (ctx as unknown as { get(name: string): unknown }).get('agents') as { get(id: string): unknown } | undefined
     decide = async ({ rowId, verb, sessionId }) => {
       const agent = agents?.get(sessionId)
       if (agent === undefined || agent === null) {
-        return { ok: false, code: 'E-305', message: '当前会话没有可用的 Agent；请在会话打开时操作，或复制命令到 CLI 执行' }
+        return { ok: false, code: 'E-305', message: tr('当前会话没有可用的 Agent；请在会话打开时操作，或复制命令到 CLI 执行') }
       }
       const result = await mergeService.run('/evolution merge ' + verb + ' ' + rowId, { agent })
       return { ok: result.ok, message: result.text }

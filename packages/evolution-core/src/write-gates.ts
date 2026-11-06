@@ -25,6 +25,7 @@
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, type WriteConfirm, type WriteConfirmMode } from './write-authority.ts'
 import type { ConfirmContext } from './write-authority.ts'
 import { SKILL_ACTION_REQUIRED_FIELDS, errorText, isUnreadWrite, type WriteOrigin } from './index.ts'
+import { tr } from './messages.ts'
 
 /** The point whose verdict is being taken. */
 export type WriteGatePoint = 'admission' | 'execution'
@@ -32,9 +33,6 @@ export type WriteGatePoint = 'admission' | 'execution'
 /** The confirm question's stable id — one question per write, so an answer to an earlier prompt
  * can never be read as the answer to a later one. */
 const CONFIRM_QUESTION_ID = 'evolution-skill-write'
-
-/** The cancel label every confirm question offers. */
-const CANCEL_LABEL = '取消'
 
 /** What a `timeout`-mode deadline settles with: comparable by identity against the seam's
  * boolean, so the two outcomes stay distinguishable without a mutable flag (which a linter
@@ -371,7 +369,7 @@ const HUMAN_CONFIRM: WriteGate = {
       warn('skill_manage: no confirmation channel is mounted, so the write proceeds unconfirmed.')
       return null
     }
-    const confirmLabel = action === 'create' ? '创建' : '删除'
+    const confirmLabel = action === 'create' ? tr('创建') : tr('删除')
     const seconds = timeoutSecondsOf(confirmTimeoutSeconds)
     const cancel = new AbortController()
     // The deadline is enforced HERE, not only carried by the signal: the signal lets the client
@@ -395,23 +393,23 @@ const HUMAN_CONFIRM: WriteGate = {
     // Asking for a decision by name alone is asking someone to authorize an unknown artifact.
     const context = await describeTarget?.()
     const details = [
-      context?.description === undefined || context.description === '' ? null : '功能：' + context.description,
-      context?.versions === undefined ? null : '已记录的内容版本数：' + String(context.versions),
+      context?.description === undefined || context.description === '' ? null : tr('功能：{description}', { description: context.description }),
+      context?.versions === undefined ? null : tr('已记录的内容版本数：{versions}', { versions: String(context.versions) }),
     ].filter((line): line is string => line !== null)
     const consequence = action === 'create'
-      ? `创建技能 "${view.name}"？会在家族目录树里新建一个技能目录。`
-      : `删除技能 "${view.name}"？它会被归档到 .archive 并离开目录。`
+      ? tr('创建技能 "{name}"？会在家族目录树里新建一个技能目录。', { name: view.name })
+      : tr('删除技能 "{name}"？它会被归档到 .archive 并离开目录。', { name: view.name })
     const asked = confirm({
       action,
       name: view.name,
       confirmLabel,
       question: {
         id: CONFIRM_QUESTION_ID,
-        header: '确认',
+        header: tr('确认'),
         // ONE line: the platform's question composer does not preserve newlines, so a multi-line
         // question arrives as a run-on sentence. The facts are separated instead.
         question: details.length === 0 ? consequence : consequence + ' ' + details.join(' · '),
-        options: [{ label: confirmLabel }, { label: CANCEL_LABEL }],
+        options: [{ label: confirmLabel }, { label: tr('取消') }],
       },
       ...mode === 'timeout' ? { signal: cancel.signal } : {},
     })
@@ -430,13 +428,13 @@ const HUMAN_CONFIRM: WriteGate = {
     if (outcome === CONFIRM_TIMED_OUT || cancel.signal.aborted) {
       return errorText('e-319-skill-write-confirm-timed-out', {
         a1: view.name,
-        a2: action === 'create' ? '创建' : '删除',
+        a2: action === 'create' ? tr('创建') : tr('删除'),
         a3: String(seconds),
       })
     }
     return errorText('e-317-skill-write-not-confirmed', {
       a1: view.name,
-      a2: action === 'create' ? '创建' : '删除',
+      a2: action === 'create' ? tr('创建') : tr('删除'),
     })
   },
 }

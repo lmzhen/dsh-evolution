@@ -10,9 +10,9 @@ import type { MergeCandidate, MergeDecision, MergeRow } from './contracts.ts'
 import { pairKey } from './contracts.ts'
 
 function classifyCommitFailure(message: string): string {
-  if (message.includes('目标技能') && (message.includes('被改过') || message.includes('不存在'))) return message.includes('被改过') ? 'target-changed' : 'target-taken'
-  if (message.includes('来源技能') && message.includes('被改过')) return 'source-changed'
-  if (message.includes('来源技能') && message.includes('不存在')) return 'source-gone'
+  if (message.includes('目标技能') && (message.includes('被改过') || message.includes('不存在'))) return message.includes('被改过') ? 'target-changed' : 'target-taken' // i18n-allow: parses agent-authored message text
+  if (message.includes('来源技能') && message.includes('被改过')) return 'source-changed' // i18n-allow: parses agent-authored message text
+  if (message.includes('来源技能') && message.includes('不存在')) return 'source-gone' // i18n-allow: parses agent-authored message text
   return 'authoring-failed'
 }
 import type { SkillCard } from './skill-card.ts'

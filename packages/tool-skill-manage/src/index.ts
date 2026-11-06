@@ -34,6 +34,7 @@ import type { CitationPolicy, EvolutionIoLike, LiveValue, SupportFileCharPolicy,
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from './write-gates.ts'
+import { tr } from './messages.ts'
 /**
  * F-2 (audit v46 / G7.2): the read-only action set used to be spelled out FOUR times in this file
  * (usage accounting at the patch_count bump, the cross-source directory exemption, the approval gap
@@ -216,9 +217,9 @@ async function proposeExtractWithAgent(
   library: ExtractPlanLibrary,
   source: string,
 ): Promise<{ ok: true; proposal: string } | { ok: false; message: string }> {
-  if (parent === undefined) return { ok: false, message: 'extract agent 不可用：当前调用没有 agent 上下文。' }
+  if (parent === undefined) return { ok: false, message: tr('extract agent 不可用：当前调用没有 agent 上下文。') }
   const body = await library.read(source)
-  if (body === null) return { ok: false, message: '技能「' + source + '」不存在。' }
+  if (body === null) return { ok: false, message: tr('技能「{name}」不存在。', { name: source }) }
   const summaries = await library.model.list({ withContent: true, withFrontmatter: true })
   const lookup = ownerCandidatesFromSummaries(source, summaries)
   const support = await library.listSupportFiles(source)
@@ -249,7 +250,10 @@ async function proposeExtractWithAgent(
       },
     },
   })
-  if (outcome.kind !== 'ok') return { ok: false, message: 'extract agent 不可用：' + ('reason' in outcome ? outcome.reason : outcome.kind) }
+  if (outcome.kind !== 'ok') {
+    const reason = 'reason' in outcome ? outcome.reason : outcome.kind
+    return { ok: false, message: tr('extract agent 不可用：{reason}', { reason }) }
+  }
   return { ok: true, proposal: JSON.stringify(outcome.structured) }
 }
 
@@ -269,7 +273,7 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
   const wrapped = (args ?? {}) as { operation?: SkillWriteArgs }
   const operation = wrapped.operation ?? {}
   const name = typeof operation.name === 'string' ? operation.name.trim() : ''
-  if (name === '') return { available: false, reason: '这条暂存写入没有指明技能' }
+  if (name === '') return { available: false, reason: tr('这条暂存写入没有指明技能') }
   const filePath = typeof operation.file_path === 'string' && operation.file_path !== '' ? operation.file_path : null
   const path = filePath ?? 'SKILL.md'
   // S4-01 (G0/0.7): built on the library OWN three-state read (readSkillProbe/readSupportFileProbe),
@@ -281,7 +285,7 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
     ? await library.readSkillProbe(name)
     : await library.readSupportFileProbe(name, filePath)
   if (isUnknown(probe)) {
-    return { available: false, reason: '目标当前读不到（' + probe.reason + '），无法核验暂存锚点 —— 先修好可读性再批准' }
+    return { available: false, reason: tr('目标当前读不到（{reason}），无法核验暂存锚点 —— 先修好可读性再批准', { reason: probe.reason }) }
   }
   const before: string | null = isPresent(probe) ? probe.value : null
   const staged = operation.staged_from_sha256
@@ -289,7 +293,7 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
     ? staged === 'absent' ? { absent: true } : { sha256: staged }
     : undefined
   if (anchorVerdict(anchor, before) !== 'match') {
-    return { available: false, reason: '目标在这次写入暂存之后发生了变化 —— 批准它会被拒绝' }
+    return { available: false, reason: tr('目标在这次写入暂存之后发生了变化 —— 批准它会被拒绝') }
   }
   const action = typeof operation.action === 'string' ? operation.action : ''
   /**
@@ -306,27 +310,27 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
   const bodyOnDisk = (content: string): PreviewAnswer => {
     if (filePath !== null) return { available: true, path, before, after: content.trimEnd() + '\n' }
     const norm = normalizeFrontmatter(content)
-    if (norm.issues.length > 0) return { available: false, reason: 'frontmatter 无法自动修复：' + norm.issues.join('; ') }
+    if (norm.issues.length > 0) return { available: false, reason: tr('frontmatter 无法自动修复：{issues}', { issues: norm.issues.join('; ') }) }
     return { available: true, path, before, after: (norm.changed ? norm.content : content).trimEnd() + '\n' }
   }
   if (action === 'create' || action === 'update') {
-    return typeof operation.content === 'string' ? bodyOnDisk(operation.content) : { available: false, reason: '"' + action + '" 没有携带内容' }
+    return typeof operation.content === 'string' ? bodyOnDisk(operation.content) : { available: false, reason: tr('"{action}" 没有携带内容', { action }) }
   }
   if (action === 'patch') {
-    if (before === null) return { available: false, reason: '该技能没有可修补的正文' }
+    if (before === null) return { available: false, reason: tr('该技能没有可修补的正文') }
     const patched = fuzzyPatch(before, operation.old_string ?? '', operation.new_string ?? '', operation.replace_all === true)
     return patched === null
-      ? { available: false, reason: '暂存的旧文本不在当前正文里 —— 批准它会被拒绝' }
+      ? { available: false, reason: tr('暂存的旧文本不在当前正文里 —— 批准它会被拒绝') }
       : bodyOnDisk(patched)
   }
   if (action === 'write_file') {
-    if (typeof operation.file_content !== 'string') return { available: false, reason: '"write_file" 没有携带内容' }
+    if (typeof operation.file_content !== 'string') return { available: false, reason: tr('"write_file" 没有携带内容') }
     // Support files are stored byte-verbatim (no frontmatter pass, no trailing-newline rule).
     return { available: true, path, before, after: operation.file_content }
   }
   if (action === 'remove_file') {
     return before === null
-      ? { available: false, reason: '该支撑文件不存在，无法移除' }
+      ? { available: false, reason: tr('该支撑文件不存在，无法移除') }
       : { available: true, path, before, after: null }
   }
   if (action === 'extract') {
@@ -341,7 +345,7 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
     const target = built.plan.target.name
     const sourceBefore = await library.read(source)
     const targetBefore = await library.read(target)
-    if (sourceBefore === null || targetBefore === null) return { available: false, reason: 'source/target 在预览期间不可读。' }
+    if (sourceBefore === null || targetBefore === null) return { available: false, reason: tr('source/target 在预览期间不可读。') }
     const projected = projectExtractBodies(built.plan, sourceBefore, targetBefore)
     if (!projected.ok) return { available: false, reason: projected.message }
     const files: Array<{ path: string; before: string | null; after: string | null }> = [
@@ -836,7 +840,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const action = args.action
     const name = args.name ?? ''
     if (action === 'extract' && origin === 'background_review') {
-      return { ok: false, message: '背景审查不能执行 extract：review 只提议；提取必须由显式前台工具/命令执行。', skills: [] }
+      return { ok: false, message: tr('背景审查不能执行 extract：review 只提议；提取必须由显式前台工具/命令执行。'), skills: [] }
     }
     if (action === 'review') {
       // v31 TSM-05: the tree scan fails loud on a transient read error
@@ -845,15 +849,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       try {
         return { ok: true, message: await buildSkillReviewText(), skills: [] }
       } catch (error) {
-        return { ok: false, message: `skill_manage review：技能目录树扫描失败（${error instanceof Error ? error.message : String(error)}）。`, skills: [] }
+        const reason = error instanceof Error ? error.message : String(error)
+        return { ok: false, message: tr('skill_manage review：技能目录树扫描失败（{error}）。', { error: reason }), skills: [] }
       }
     }
     if (action === 'list') {
       try {
         const list = await library.list()
-        return { ok: true, message: `已列出 ${list.length} 个技能。`, skills: list.map(s => s.name) }
+        return { ok: true, message: tr('已列出 {count} 个技能。', { count: list.length }), skills: list.map(s => s.name) }
       } catch (error) {
-        return { ok: false, message: `skill_manage list：技能目录树扫描失败（${error instanceof Error ? error.message : String(error)}）。`, skills: [] }
+        const reason = error instanceof Error ? error.message : String(error)
+        return { ok: false, message: tr('skill_manage list：技能目录树扫描失败（{error}）。', { error: reason }), skills: [] }
       }
     }
     // The write-admission sequence, EXECUTION point (design §3): the gates whose verdict can
@@ -894,7 +900,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         candidateDescription = parsed.frontmatter.description ?? ''
         feedbackLines = feedback.lines
         if (settings().descriptionStrict && feedback.over60) {
-          return { ok: false, message: `作者检查：description 为 ${feedback.descriptionChars}/60 个字符，超过严格上限；请压到 60 以内，或设置 descriptionStrict=false。`, skills: [] }
+          return { ok: false, message: tr('作者检查：description 为 {chars}/60 个字符，超过严格上限；请压到 60 以内，或设置 descriptionStrict=false。', { chars: feedback.descriptionChars }), skills: [] }
         }
       }
     }
@@ -931,7 +937,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const raw: unknown = move
         return raw === null || typeof raw !== 'object'
       })) {
-        result = { ok: false, message: 'restructure 的每一项都必须是带 heading 与 to_file 的对象。' }
+        result = { ok: false, message: tr('restructure 的每一项都必须是带 heading 与 to_file 的对象。') }
       } else {
         result = await library.restructure(name, moves.map(move => ({
           heading: typeof move.heading === 'string' ? move.heading : '',
@@ -951,10 +957,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       } else {
         proposal = JSON.stringify(proposalFromPlan(built.plan, { runId: 'tool-' + Date.now().toString(36) }))
         const ownerText = ownerDecisionText(built.plan.owner)
-        const decisionLine = `提取判定：outcome=${built.plan.outcome}；target=${built.plan.target.name}；owner=${ownerText}`
+        const decisionLine = tr('提取判定：outcome={outcome}；target={target}；owner={owner}', { outcome: built.plan.outcome, target: built.plan.target.name, owner: ownerText })
         const candidateLines = built.candidates.slice(0, 8).map(candidate => '- ' + candidate.name + '：' + candidate.description + (candidate.whenToUse === undefined ? '' : '；whenToUse: ' + candidate.whenToUse) + (candidate.headings.length === 0 ? '' : '；headings: ' + candidate.headings.join(' / ')))
         result = args.dry_run === true
-          ? { ok: true, message: '提取计划（未写入）：' + built.plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + built.plan.target.name + '\n' + decisionLine + (candidateLines.length === 0 ? '' : '\n候选 owner：\n' + candidateLines.join('\n')) }
+          ? {
+            ok: true,
+            message: tr('提取计划（未写入）：{parts} -> {target}\n{decisionLine}{candidates}', {
+              parts: built.plan.parts.map(part => '## ' + part.heading).join(', '),
+              target: built.plan.target.name,
+              decisionLine,
+              candidates: candidateLines.length === 0 ? '' : tr('\n候选 owner：\n{candidates}', { candidates: candidateLines.join('\n') }),
+            }),
+          }
           : await library.extract(built.plan, origin)
         if (result.ok && built.warnings !== undefined && built.warnings.length > 0) {
           result = { ...result, message: result.message + '\n' + built.warnings.join('\n') }
@@ -971,18 +985,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     else if (action === 'pin') result = await library.setPinned(name, true, origin)
     else if (action === 'unpin') result = await library.setPinned(name, false, origin)
-    else result = { ok: false, message: `未知动作「${action}」。` }
+    else result = { ok: false, message: tr('未知动作「{action}」。', { action: String(action) }) }
 
     // v35 C9: the library refused because the anchor did not hold — report it in
     // this channel's staged wording (which kinds of drift exist is the tool's
     // vocabulary, not the library's).
     if (result.stale === true) {
       const supportAction = action === 'write_file' || action === 'remove_file'
+      const path = args.file_path ?? ''
+      const state = result.anchor === 'missing' ? tr('已不存在') : tr('哈希不匹配')
       return {
         ok: false,
         message: supportAction
-          ? `技能「${name}」的支撑文件「${args.file_path ?? ''}」在这次写入暂存之后发生了变化（或其状态无法验证）。`
-          : `技能「${name}」在这次写入暂存之后发生了变化（内容${result.anchor === 'missing' ? '已不存在' : '哈希不匹配'}）。`,
+          ? tr('技能「{name}」的支撑文件「{path}」在这次写入暂存之后发生了变化（或其状态无法验证）。', { name, path })
+          : tr('技能「{name}」在这次写入暂存之后发生了变化（内容{state}）。', { name, state }),
         skills: [],
       }
     }
@@ -990,7 +1006,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (name !== undefined && name !== '' && (action === 'create' || action === 'update' || action === 'patch')) {
         const body = action === 'create' ? (args.content ?? null) : await library.read(name)
         if (body !== null && body.length > DEFAULT_HEALTH_THRESHOLDS.softBodyChars) {
-          feedbackLines.push(`正文 ${body.length} 字符，超过 ${DEFAULT_HEALTH_THRESHOLDS.softBodyChars} 字符软线；保持不改是合法的。`)
+          feedbackLines.push(tr('正文 {chars} 字符，超过 {soft} 字符软线；保持不改是合法的。', { chars: body.length, soft: DEFAULT_HEALTH_THRESHOLDS.softBodyChars }))
         }
       }
       // 0.3.11: the write point auto-quoted unquoted YAML-unsafe frontmatter
@@ -1353,8 +1369,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // no-base-to-string: `code` is unknown, and String(unknown) prints [object Object] for a
             // non-primitive - the refusal message would then carry a placeholder instead of the errno.
             const rawCode = (error as { code?: unknown } | undefined)?.code
-            const code = typeof rawCode === 'string' ? rawCode : 'IO 失败'
-            return { ok: false, message: '目标当前读不到（' + code + '），无法核验暂存锚点 —— 先修好可读性再批准', skills: [] }
+            const code = typeof rawCode === 'string' ? rawCode : tr('IO 失败')
+            return { ok: false, message: tr('目标当前读不到（{reason}），无法核验暂存锚点 —— 先修好可读性再批准', { reason: code }), skills: [] }
           }
           operation = { ...args, staged_from_sha256: stageCurrent === null ? 'absent' : contentHash(stageCurrent) }
         }
@@ -1369,7 +1385,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // names the third state now, so this site reads it instead of re-deriving it from a throw.
           const supportProbe = await library.readSupportFileProbe(args.name, args.file_path)
           if (isUnknown(supportProbe)) {
-            return { ok: false, message: '目标当前读不到（' + supportProbe.reason + '），无法核验暂存锚点 —— 先修好可读性再批准', skills: [] }
+            return { ok: false, message: tr('目标当前读不到（{reason}），无法核验暂存锚点 —— 先修好可读性再批准', { reason: supportProbe.reason }), skills: [] }
           }
           const stageFile: string | null = isPresent(supportProbe) ? supportProbe.value : null
           operation = { ...args, staged_from_sha256: stageFile === null ? 'absent' : contentHash(stageFile) }
@@ -1409,10 +1425,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
       if (operation.action === 'extract' && operation.dry_run === true && (operation.extract === undefined || operation.extract.length === 0)) {
         const source = typeof operation.name === 'string' ? operation.name.trim() : ''
-        if (source === '') return { ok: false, message: 'extract agent 需要 name。', skills: [] }
+        if (source === '') return { ok: false, message: tr('extract agent 需要 name。'), skills: [] }
         const proposed = await proposeExtractWithAgent(ctx, exec.agent as unknown as Agent | undefined, library, source)
         return proposed.ok
-          ? { ok: true, message: '提取提议（未写入）。', skills: [], proposal: proposed.proposal }
+          ? { ok: true, message: tr('提取提议（未写入）。'), skills: [], proposal: proposed.proposal }
           : { ok: false, message: proposed.message, skills: [] }
       }
       return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined)
@@ -1431,7 +1447,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const replayAction = operation.action
       if (!isReadOnlyAction(replayAction)) {
         return crossSourceRefusal(operation.name, 'replay').then((gate) => {
-          if (gate.refusal !== null) return { ok: false, message: `${gate.refusal}（在批准时重新检查：该写入暂存期间目录排名发生了变化）`, skills: [] }
+          if (gate.refusal !== null) return { ok: false, message: tr('{refusal}（在批准时重新检查：该写入暂存期间目录排名发生了变化）', { refusal: gate.refusal }), skills: [] }
           // The replay reuses the gate's own observation too (A20): the re-checked write pays one pass.
           return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review', gate.view ?? undefined)
         })

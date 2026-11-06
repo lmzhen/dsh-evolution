@@ -1,6 +1,6 @@
 // @tier fast
 import { expect, it } from 'vitest'
-import { en, zh } from '../src/client/messages.ts'
+import { en, ja, zh } from '../src/client/messages.ts'
 
 it('maps the command surfaces to the three queue labels', () => {
   expect(zh['tab.verify']).toBe('待判断')
@@ -8,10 +8,12 @@ it('maps the command surfaces to the three queue labels', () => {
   expect(zh['tab.pending']).toBe('待批准')
 })
 
-it('zh and en have the same complete key set', () => {
+it('zh, en and ja have the same complete key set', () => {
   const zhKeys = Object.keys(zh).sort()
   const enKeys = Object.keys(en).sort()
+  const jaKeys = Object.keys(ja).sort()
   expect(enKeys).toEqual(zhKeys)
+  expect(jaKeys).toEqual(zhKeys)
   expect(zhKeys).toEqual(expect.arrayContaining([
     'stage.screening', 'stage.settle', 'origin.system',
     'failureWireVersion', 'failureBadQuery', 'failureBodyMissing', 'failureRefused',

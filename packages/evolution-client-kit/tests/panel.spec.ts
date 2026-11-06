@@ -25,7 +25,7 @@ function fakeContext(localeRefuses = false) {
 
 const spec: SidebarPanelSpec<{ ok: boolean }> = {
   id: 'demo', order: 42, namespace: 'demo.ns',
-  dictionaries: { zh: { 'entry.label': '演示' }, en: { 'entry.label': 'Demo' } },
+  dictionaries: { zh: { 'entry.label': '演示' }, en: { 'entry.label': 'Demo' }, ja: { 'entry.label': 'デモ' } },
   styles: { css: '.x{}', tagId: 'demo-css' },
   icon: () => null,
   component: (() => null) as never,

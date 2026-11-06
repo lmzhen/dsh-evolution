@@ -17,6 +17,7 @@ import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evol
 import z from '@deepseek-ai/schemastery'
 import {
   errorText, SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveExecOrigins, newSkillLibrary, type EvolutionIoLike, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { tr } from './messages.ts'
 
 export interface GraphNode {
   id: string
@@ -205,10 +206,10 @@ export function readMemoryIndex(
 ): MemoryIndexCheck {
   const entry = entries[parsed.index]
   if (entry === undefined) {
-    return { ok: false, message: `记忆 ${parsed.source}[${parsed.index}] 不存在（共 ${entries.length} 条）。` }
+    return { ok: false, message: tr('记忆 {source}[{index}] 不存在（共 {count} 条）。', { source: parsed.source, index: parsed.index, count: entries.length }) }
   }
   if (parsed.snapshot !== undefined && memorySnapshotOf(entry) !== parsed.snapshot) {
-    return { ok: false, message: `记忆 ${parsed.source}[${parsed.index}] 在图渲染之后被改动过：请重新运行 /graph 再重试。` }
+    return { ok: false, message: tr('记忆 {source}[{index}] 在图渲染之后被改动过：请重新运行 /graph 再重试。', { source: parsed.source, index: parsed.index }) }
   }
   return { ok: true, entry }
 }
@@ -245,7 +246,7 @@ export async function resolveGraphNode(
   if (parsed.kind === 'skill') {
     const content = await repository.readSkill(parsed.name)
     return content === null
-      ? { ok: false, message: `技能「${parsed.name}」不存在。` }
+      ? { ok: false, message: tr('技能「{name}」不存在。', { name: parsed.name }) }
       : { ok: true, message: content }
   }
   const entries = await repository.readMemory(parsed.source)
@@ -254,7 +255,7 @@ export async function resolveGraphNode(
   const check = readMemoryIndex(parsed, entries)
   return check.ok
     ? { ok: true, message: check.entry ?? '' }
-    : { ok: false, message: check.message ?? `Memory ${parsed.source}[${parsed.index}] 不可用。` }
+    : { ok: false, message: check.message ?? tr('Memory {source}[{index}] 不可用。', { source: parsed.source, index: parsed.index }) }
 }
 
 interface MemoryLike {
@@ -360,7 +361,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // the skill fan-out only; nodeDetail/memory reads/usage.report stayed bare.
     const graphCommand = {
       name: 'graph',
-      description: '显示学习图，或对某个节点操作：graph [detail|edit|delete] <nodeId>',
+      description: tr('显示学习图，或对某个节点操作：graph [detail|edit|delete] <nodeId>'),
       // F-5 (0.23.0, owner decision): same as `/evolution` — record the input rather than hiding it
       // from the durable record; the platform default is what this surface now gets.
       // input declaration (same fix as /evolution, 2026-08-31): the frontend
@@ -384,7 +385,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const usageService = ctx.get('skillUsage') as { report(): Promise<ReadonlyMap<string, { use_count?: number; pinned?: boolean }>> } | undefined
         const memoryService = ctx.get('memory') as MemoryLike | undefined
         const ioService = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
-        if (!usageService || !memoryService || !ioService) return err('skill-usage、memory 或 evolution-io 服务未挂载。')
+        if (!usageService || !memoryService || !ioService) return err(tr('skill-usage、memory 或 evolution-io 服务未挂载。'))
         const usage = usageService
         const memory = memoryService
         const io = ioService
@@ -437,7 +438,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return await nodeDelete(remove[1])
         }
         const directory = await renderGraph()
-        if (input !== '') return err(`未知的 graph 子命令「${input.split(' ')[0]}」。${directory}`)
+        if (input !== '') {
+          const command = input.split(' ')[0] ?? ''
+          return err(tr('未知的 graph 子命令「{command}」。{directory}', { command, directory }))
+        }
         return ok(directory)
 
         /** S1-F3: the pre-staging existence probe shared by edit and delete.
@@ -446,10 +450,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           try {
             const body = await withSkills().read(name)
             if (body !== null) return null
-            return `实时技能库里没有技能「${name}」，即该技能不存在。（图里可能显示的是过期节点。）`
+            return tr('实时技能库里没有技能「{name}」，即该技能不存在。（图里可能显示的是过期节点。）', { name })
           } catch (error) {
             const reason = error instanceof Error ? error.message : String(error)
-            return `无法读取技能「${name}」以确认它存在（${reason}）：拒绝暂存。该技能可能仍然存在；请解决读取失败后重试。`
+            return tr('无法读取技能「{name}」以确认它存在（{reason}）：拒绝暂存。该技能可能仍然存在；请解决读取失败后重试。', { name, reason })
           }
         }
 
@@ -542,7 +546,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
         async function nodeDetail(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {
           const parsed = parseGraphNodeId(id)
-          if (parsed === null) return err(`节点 id「${id}」不合法：应为技能名或 memory:<source>:<index>。`)
+          if (parsed === null) return err(tr('节点 id「{id}」不合法：应为技能名或 memory:<source>:<index>。', { id }))
           const resolved = await resolveGraphNode(parsed, {
             readSkill: (name: string) => withSkills().read(name),
             readMemory: (target: 'memory' | 'user') => memory.read(target),
@@ -552,7 +556,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
         async function nodeEdit(id: string, content: string): Promise<{ kind: 'success' | 'error'; text: string }> {
           const parsed = parseGraphNodeId(id)
-          if (parsed === null) return err(`节点 id「${id}」不合法：应为技能名或 memory:<source>:<index>。`)
+          if (parsed === null) return err(tr('节点 id「{id}」不合法：应为技能名或 memory:<source>:<index>。', { id }))
           if (parsed.kind === 'skill') {
             // E-26: the graph edit is a content mutation and must follow the
             // same approval + telemetry path as skill_manage. Approval is a
@@ -585,7 +589,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 && sessionPolicyEdit !== 'never'
                 && (origins.approval === 'background_review' || stagesForeground)
               if (willStage && !approval.hasRunner('skill')) {
-                return err('无法暂存 graph 技能写入：没有注册技能回放运行器 —— 请挂载 tool-skill-manage 行（evolution-agent 预设），或禁用 evolution-approval。')
+                return err(tr('无法暂存 graph 技能写入：没有注册技能回放运行器 —— 请挂载 tool-skill-manage 行（evolution-agent 预设），或禁用 evolution-approval。'))
               }
               // P2-34 (v11): the graph surface is marked in the summary so the
               // audit record names where the write came from. N1 (v12): the
@@ -657,7 +661,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // between the last render and this edit cannot shift the target.
           const entries = await memory.read(parsed.source)
           const check = readMemoryIndex(parsed, entries)
-          if (!check.ok) return err(check.message ?? '记忆索引检查失败。')
+          if (!check.ok) return err(check.message ?? tr('记忆索引检查失败。'))
           // P2-6 (v15): the SAME approval seam the `memory` tool uses — the
           // skill branch above stages, and an approval-enabled deployment must
           // not have a graph path that lands the same kind of write directly.
@@ -681,7 +685,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               // not carry it (host patch: "memory seam … no model tool"), so
               // the old "evolution-host/evolution-all" wording sent host-only
               // operators looking for a row that is not there.
-              return err('无法暂存 graph 记忆写入：没有注册记忆回放运行器 —— 请挂载 tool-memory 行（evolution-all bundle，或 evolution-preset overlay；宿主 bundle 里不含它），或禁用 evolution-approval。')
+              return err(tr('无法暂存 graph 记忆写入：没有注册记忆回放运行器 —— 请挂载 tool-memory 行（evolution-all bundle，或 evolution-preset overlay；宿主 bundle 里不含它），或禁用 evolution-approval。'))
             }
             const decision = await memoryApproval.request({
               kind: 'memory',
@@ -700,7 +704,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
         async function nodeDelete(id: string): Promise<{ kind: 'success' | 'error'; text: string }> {
           const parsed = parseGraphNodeId(id)
-          if (parsed === null) return err(`节点 id「${id}」不合法：应为技能名或 memory:<source>:<index>。`)
+          if (parsed === null) return err(tr('节点 id「{id}」不合法：应为技能名或 memory:<source>:<index>。', { id }))
           if (parsed.kind === 'skill') {
             // E-26: same approval gate as edit/delete via skill_manage; the
             // archived markArchived telemetry below was already written back
@@ -719,7 +723,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 && sessionPolicy !== 'never'
                 && (origins.approval === 'background_review' || approval.stageForeground !== false)
               if (willStage && !approval.hasRunner('skill')) {
-                return err('无法暂存 graph 技能删除：没有注册技能回放运行器 —— 请挂载 tool-skill-manage 行（evolution-agent 预设），或禁用 evolution-approval。')
+                return err(tr('无法暂存 graph 技能删除：没有注册技能回放运行器 —— 请挂载 tool-skill-manage 行（evolution-agent 预设），或禁用 evolution-approval。'))
               }
               const decision = await approval.request({
                 kind: 'skill',
@@ -750,7 +754,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // E-21 memory TOCTOU guard (same as edit).
           const entries = await memory.read(parsed.source)
           const check = readMemoryIndex(parsed, entries)
-          if (!check.ok) return err(check.message ?? '记忆索引检查失败。')
+          if (!check.ok) return err(check.message ?? tr('记忆索引检查失败。'))
           // P2-6 (v15): approval seam for deletes too (see the edit branch).
           const memoryApproval = ctx.get('evolutionApproval') as ApprovalLike | undefined
           if (memoryApproval) {
@@ -764,7 +768,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             if (willStage && !memoryApproval.hasRunner('memory')) {
               // v20 (D-3): see the edit branch — the host bundle does not
               // carry the tool-memory row.
-              return err('无法暂存 graph 记忆删除：没有注册记忆回放运行器 —— 请挂载 tool-memory 行（evolution-all bundle，或 evolution-preset overlay；宿主 bundle 里不含它），或禁用 evolution-approval。')
+              return err(tr('无法暂存 graph 记忆删除：没有注册记忆回放运行器 —— 请挂载 tool-memory 行（evolution-all bundle，或 evolution-preset overlay；宿主 bundle 里不含它），或禁用 evolution-approval。'))
             }
             const decision = await memoryApproval.request({
               kind: 'memory',
@@ -782,10 +786,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
       },
       handler: (invocation: CommandInvocation): Promise<CommandResult> =>
-        graphCommand.run(invocation).catch((error: unknown): CommandResult => ({
-          kind: 'error',
-          text: `graph：命令失败：${error instanceof Error ? error.message : String(error)}\n请检查节点 id 以及 evolution 根目录下的 skills/memory 文件，然后重试。`,
-        })),
+        graphCommand.run(invocation).catch((error: unknown): CommandResult => {
+          const message = error instanceof Error ? error.message : String(error)
+          return {
+            kind: 'error',
+            text: tr('graph：命令失败：{message}\n请检查节点 id 以及 evolution 根目录下的 skills/memory 文件，然后重试。', { message }),
+          }
+        }),
     }
     commandCtx.effect(() => commands.register(graphCommand), 'evolution-learning-graph.command')
   })

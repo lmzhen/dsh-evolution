@@ -58,21 +58,49 @@ export type ParamCardProps = Omit<ParamCardFace, 'hooks'> & {
 }
 
 /** Generated-copy language. */
-export type ParamLanguage = 'zh' | 'en'
+export type ParamLanguage = 'zh' | 'en' | 'ja'
+
+/**
+ * Resolve one generated string through the locale chain ja → en → zh.
+ * @param lang - the active card language.
+ * @param ja - the Japanese twin (absent until translated).
+ * @param en - the English twin.
+ * @param zh - the registry's Chinese copy.
+ * @returns the first available twin.
+ */
+function pick(lang: ParamLanguage, ja: string | undefined, en: string | undefined, zh: string): string {
+  if (lang === 'ja') return ja ?? en ?? zh
+  if (lang === 'en') return en ?? zh
+  return zh
+}
+
+/**
+ * Resolve one generated list through the same chain; an empty list falls through.
+ * @param lang - the active card language.
+ * @param ja - the Japanese list (absent until translated).
+ * @param en - the English list.
+ * @param zh - the registry's Chinese list.
+ * @returns the first non-empty list.
+ */
+function pickList(lang: ParamLanguage, ja: readonly string[] | undefined, en: readonly string[] | undefined, zh: readonly string[]): readonly string[] {
+  if (lang === 'ja' && ja !== undefined && ja.length > 0) return ja
+  if (lang === 'en' && en !== undefined && en.length > 0) return en
+  return zh
+}
 
 /** Resolve one field's user-language label. */
 function labelOf(field: ClientParamField, lang: ParamLanguage): string {
-  return lang === 'en' ? (field.labelEn ?? field.label) : field.label
+  return pick(lang, field.labelJa, field.labelEn, field.label)
 }
 
 /** Resolve one field's user-language hint. */
 function hintOf(field: ClientParamField, lang: ParamLanguage): string {
-  return lang === 'en' ? (field.hintEn ?? field.doc) : field.hint
+  return pick(lang, field.hintJa, field.hintEn ?? field.doc, field.hint)
 }
 
 /** Resolve one field's user-language group heading. */
 function groupOf(field: ClientParamField, lang: ParamLanguage): string {
-  return lang === 'en' ? (field.groupLabelEn ?? field.group) : (field.groupLabel ?? field.group)
+  return pick(lang, field.groupLabelJa, field.groupLabelEn, field.groupLabel ?? field.group)
 }
 
 /** The op list a save hands to the seat — the seam's own shape, never a second vocabulary. */
@@ -230,7 +258,7 @@ function FieldControl(props: FieldBlockProps): ReactNode {
       // The option TEXT comes from the registry's display names; the option VALUE stays
       // the raw spelling the settings document stores (a translation here would write a
       // value the Host does not know).
-      ...field.values.map((value, index) => createElement('option', { key: value, value }, (lang === 'en' ? (field.valueLabelsEn ?? field.valueLabels) : field.valueLabels)[index] ?? value)),
+      ...field.values.map((value, index) => createElement('option', { key: value, value }, pickList(lang, field.valueLabelsJa, field.valueLabelsEn, field.valueLabels)[index] ?? value)),
     ])
   }
   return createElement('input', {
@@ -244,7 +272,7 @@ function FieldControl(props: FieldBlockProps): ReactNode {
 /** One parameter field: label, control, hint, and its reset-to-deployment action. */
 function FieldBlock(props: FieldBlockProps): ReactNode {
   const { field, t, lang } = props
-  const unitText = lang === 'en' ? (field.unitEn ?? field.unit) : field.unit
+  const unitText = pick(lang, field.unitJa, field.unitEn, field.unit)
   const unit = unitText === '' ? null : createElement('span', { className: 'evolution-param-unit' }, (lang === 'en' ? ' (' : '（') + unitText + (lang === 'en' ? ')' : '）'))
   return createElement('div', { className: 'evolution-param-field' },
     createElement('div', { className: 'evolution-param-label' },

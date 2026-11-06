@@ -10,6 +10,7 @@
 import type { CommitMergePlan, WriteOrigin, SkillLimits } from '@deepseek-ai/dsh-evolution-core'
 import { isPresent, revisionAnchorOf, revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from '@deepseek-ai/dsh-evolution-core'
 import { readStaging } from './staging.ts'
+import { tr } from './messages.ts'
 import { readStagedTree } from './staged-tree.ts'
 import { buildCommitPlan } from './commit-plan.ts'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -72,7 +73,7 @@ async function decisionRevisionFailure(
   const target = await liveRevision(port, requested, targetCurrent)
   if (!target.verified) return null
   if (options.targetRevision !== undefined && !sameAnchor(options.targetRevision, target.anchor)) {
-    return { code: 'target-changed', message: '目标技能「' + requested + '」的内容在决策之后被改过；拒绝提交（未写入任何内容）。' }
+    return { code: 'target-changed', message: tr('目标技能「{target}」的内容在决策之后被改过；拒绝提交（未写入任何内容）。', { target: requested }) }
   }
   const fingerprints: string[] = target.fingerprint === null ? [] : [target.fingerprint]
   for (const source of sources) {
@@ -83,12 +84,12 @@ async function decisionRevisionFailure(
     if (!live.verified) continue
     const expected = options.sourceRevisions?.[source.name]
     if (expected !== undefined && !sameAnchor(expected, live.anchor)) {
-      return { code: 'source-changed', message: '来源技能「' + source.name + '」的内容在决策之后被改过；拒绝提交（未写入任何内容）。' }
+      return { code: 'source-changed', message: tr('来源技能「{source}」的内容在决策之后被改过；拒绝提交（未写入任何内容）。', { source: source.name }) }
     }
     if (live.fingerprint !== null) fingerprints.push(live.fingerprint)
   }
   if (options.supportDigest !== undefined && revisionSupportDigest(fingerprints) !== options.supportDigest) {
-    return { code: 'support-changed', message: '参与合并的技能支撑文件在决策之后被改过；拒绝提交（未写入任何内容）。' }
+    return { code: 'support-changed', message: tr('参与合并的技能支撑文件在决策之后被改过；拒绝提交（未写入任何内容）。') }
   }
   return null
 }

@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-evolution-policy
  */
 
-import { asRecord } from '@deepseek-ai/dsh-evolution-core'
+import { asRecord, installHostLocale, localeFromSettings } from '@deepseek-ai/dsh-evolution-core'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
@@ -131,6 +131,10 @@ export class EvolutionPolicy extends Service {
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionPolicy')
+    // Host copy (tool results, error prose) follows the platform's durable locale
+    // preference. Installed here because this row is the control plane every family
+    // bundle mounts; without it the catalog stays on the authored `zh` text.
+    ctx.effect(() => installHostLocale(() => localeFromSettings(ctx)), 'evolution-policy: host locale')
     // DSH-native monotonic guard: policy denials run after the extensible
     // pre-execute waterfall and cannot be overridden by later listeners.
     // v28 G6.1 (UP-01): the guard function uses the upstream `ToolGuard` type

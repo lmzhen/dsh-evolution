@@ -5,13 +5,13 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
-import { createSettingsSeat, registerSidebarPanel, PAGE_SURFACE_CSS, ROUTES, type Translate } from '@lmzhen/dsh-evolution-client-kit'
+import { createSettingsSeat, ensureLocaleLanguage, registerSidebarPanel, PAGE_SURFACE_CSS, ROUTES, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
 import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
 import { fill as settingsFill, message as settingsMessage, NS as SETTINGS_NS } from '../../settings/messages.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
-import { en, NS, zh } from './messages.ts'
+import { en, ja, NS, zh } from './messages.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 import type { PanelFace } from './Panel.ts'
 import { PANEL_ORDER } from './ids.ts'
@@ -27,6 +27,7 @@ export const inject = ['slots', 'locale']
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
+  ensureLocaleLanguage(ctx, { id: 'ja', label: '日本語', fallback: 'en' })
   const api = createSkillHistoryApi()
   const settingsSeat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
   ctx.effect(() => () => { settingsSeat.dispose?.() }, 'evolution-ui: settings seat')
@@ -85,7 +86,7 @@ export function apply(ctx: ClientContext): void {
     id: WORKBENCH_ID,
     order: PANEL_ORDER,
     namespace: NS,
-    dictionaries: { zh, en },
+    dictionaries: { zh, en, ja },
     styles: { css: CSS + WORKBENCH_CSS + PAGE_SURFACE_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
     component: WorkbenchPage as unknown as (props: never) => unknown,

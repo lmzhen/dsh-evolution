@@ -1,0 +1,23 @@
+{
+  "$comment": "Packages whose tool-result and error copy must come from src/messages.ts. `allow` lists files that are NOT tool results (registry UI tail, model prompts) and may keep authored Chinese.",
+  "packages": [
+    "evolution-core",
+    "evolution-merge",
+    "evolution-approval",
+    "evolution-maintenance",
+    "evolution-curator",
+    "evolution-learning-graph",
+    "tool-memory",
+    "tool-skill-manage"
+  ],
+  "allow": {
+    "evolution-core": [
+      "errors.ts",
+      "params.ts",
+      "prompts.ts"
+    ],
+    "evolution-merge": [
+      "prompts.ts"
+    ]
+  }
+}

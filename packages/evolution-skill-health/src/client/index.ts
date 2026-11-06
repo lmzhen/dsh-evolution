@@ -4,10 +4,10 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
-import { registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
+import { ensureLocaleLanguage, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
-import { NS, en, zh } from './messages.ts'
+import { NS, en, ja, zh } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 import { requireHealthSeats } from './seats.ts'
@@ -31,12 +31,13 @@ function HealthView(props: HealthFace & { activeView?: string; openHistory?: (na
  * @param ctx - the client context; it must carry the seats above.
  */
 export function apply(ctx: ClientContext): void {
+  ensureLocaleLanguage(ctx, { id: 'ja', label: '日本語', fallback: 'en' })
   requireHealthSeats(ctx)
   registerWorkbenchView<HealthFace>(ctx, {
     id: PANEL_ID,
     order: PANEL_ORDER,
     namespace: NS,
-    dictionaries: { zh, en },
+    dictionaries: { zh, en, ja },
     styles: { css: CSS, tagId: CSS_TAG_ID },
     component: HealthView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => ({

@@ -14,6 +14,7 @@
  */
 import { BASELINE_ACTION, entryTarget, type SkillVersion } from './skill-history.ts'
 import { contentHash } from './mutations.ts'
+import { tr } from './messages.ts'
 
 export interface UnitUndoMember {
   readonly skill: string
@@ -79,7 +80,7 @@ function slotsOf(entries: readonly SkillVersion[]): { body: Slot; support: Map<s
     }
   }
   for (const [path, slot] of support) {
-    if (slot.newest === undefined) refusals.push(`${path}（单元里没有该路径的 after 条目）`)
+    if (slot.newest === undefined) refusals.push(tr('{path}（单元里没有该路径的 after 条目）', { path }))
   }
   return { body, support, refusals }
 }
@@ -92,12 +93,12 @@ export function planUnitUndoAcross(members: readonly UnitUndoMember[]): UnitUndo
   const refusals: string[] = []
   for (const member of members) {
     if (member.status === 'missing') {
-      refusals.push(`${member.skill}（成员技能不在活动树或归档里）`)
+      refusals.push(tr('{skill}（成员技能不在活动树或归档里）', { skill: member.skill }))
       continue
     }
     if (member.status === 'archived') {
       if (member.archivedPath === undefined || member.archivedPath === '') {
-        refusals.push(`${member.skill}（归档成员缺少归档路径）`)
+        refusals.push(tr('{skill}（归档成员缺少归档路径）', { skill: member.skill }))
         continue
       }
       restores.push({ skill: member.skill, archivedPath: member.archivedPath })
@@ -123,7 +124,7 @@ export function planUnitUndoAcross(members: readonly UnitUndoMember[]): UnitUndo
     }
     if (body.newest !== undefined) {
       const preUnitHash = body.baseline !== undefined ? body.baseline.hash : body.oldest?.beforeHash
-      if (preUnitHash === undefined) refusals.push(`${member.skill}：SKILL.md 缺少单元前字节`)
+      if (preUnitHash === undefined) refusals.push(tr('{skill}：SKILL.md 缺少单元前字节', { skill: member.skill }))
       else ops.push({ skill: member.skill, path: '', remove: false, preUnitHash, expectedHash: body.newest.hash })
     }
   }
