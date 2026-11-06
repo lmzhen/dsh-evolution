@@ -58,7 +58,7 @@ export const CSS = [
   ':where(' + root + ' [data-role="rule-row"]) { border-top: var(--evo-hairline-width) solid var(--dsw-alias-border-l1); }',
   ':where(' + root + ' [data-role="rule-row"] > th, ' + root + ' [data-role="rule-row"] > td) { padding: var(--evo-space-6) var(--evo-space-10); text-align: left; vertical-align: top; }',
   ':where(' + root + ' [data-role="rule-row"] > th:first-child) { width: minmax(9rem, 13rem); }',
-  ':where(' + root + ' [data-role="rule-row"] > th:last-child, ' + root + ' [data-role="rule-row"] > td:last-child) { width: 4rem; text-align: right; }',
+  ':where(' + root + ' [data-role="rule-row"] > th:last-child, ' + root + ' [data-role="rule-row"] > td:last-child) { width: 7rem; white-space: nowrap; text-align: right; }',
   ':where(' + root + ' [data-role="rule-row"][data-tone="ok"]) { box-shadow: inset var(--evo-hairline-marker) 0 0 var(--dsw-alias-state-success-primary); }',
   ':where(' + root + ' [data-role="skill-queue"]) { display: flex; flex-direction: column; gap: var(--evo-space-6); }',
   ':where(' + root + ' [data-role="skill-row"]) { display: grid; grid-template-columns: minmax(8rem, 12rem) 6rem minmax(0, 1fr) auto auto; gap: var(--evo-space-8); align-items: center; padding: var(--evo-space-6) var(--evo-space-10); border: var(--evo-hairline-width) solid var(--dsw-alias-border-l1); border-radius: var(--evo-radius-control); }',
