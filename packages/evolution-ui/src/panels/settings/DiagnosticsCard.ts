@@ -29,8 +29,11 @@ export interface DiagnosticsCardFace {
 function generatedAtLine(view: DiagnosticsView, t: DiagnosticsCardFace['t']): ReactNode {
   const full = formatLocalDateTime(view.generatedAt, { seconds: true })
   const clock = formatLocalClock(view.generatedAt, { seconds: false })
-  const at = full === null ? view.generatedAt : isSameLocalDay(view.generatedAt) && clock !== null ? t('timeToday') + ' ' + clock : full
-  return createElement('p', { className: 'evolution-param-hint', 'data-role': 'diag-footer', ...(full === null ? {} : { title: full }) }, t('diagFooter', { version: String(view.schemaVersion), at }))
+  if (full === null) return createElement('p', { className: 'evolution-param-hint', 'data-role': 'diag-footer' }, t('diagFooter', { version: String(view.schemaVersion), at: view.generatedAt }))
+  if (isSameLocalDay(view.generatedAt) && clock !== null) {
+    return createElement('p', { className: 'evolution-param-hint', 'data-role': 'diag-footer', title: full }, t('diagFooterToday', { version: String(view.schemaVersion), at: clock }))
+  }
+  return createElement('p', { className: 'evolution-param-hint', 'data-role': 'diag-footer', title: full }, t('diagFooter', { version: String(view.schemaVersion), at: full }))
 }
 
 /** Which word one status gets (the frozen W1 status set). */
