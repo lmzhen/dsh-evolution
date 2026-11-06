@@ -32,6 +32,7 @@ import { enrichmentSnapshotOptions, type Enrichment } from './enrichment.ts'
 import { renderFacts, type StoreFootprint } from './render-facts.ts'
 import { reachabilityFootprint, reclamationFootprint, type FootprintIo } from './footprint.ts'
 import { validateAndNormalizeMaintainPlan, type MaintainPlanItem, type ValidationResult } from './validate-plan.ts'
+import { tr } from './messages.ts'
 
 /**
  * W5 G3-S4: execution goes through evolution-core's Channel (the 0.2.1 startActivation contract +
@@ -142,7 +143,7 @@ function thresholdNoun(id: string): string {
   if (id === 'description_chars') return `${AUTHORING_DESCRIPTION_BAR}`
   if (id === 'body_size') return `${DEFAULT_HEALTH_THRESHOLDS.softBodyChars}`
   if (id === 'overlong_line') return `${DRIFT_MAX_LINE_CHARS}`
-  return `(阈 ${id})`
+  return tr('(阈 {id})', { id })
 }
 
 function jointSignature(template: string, signalsVersion: string): string {
@@ -218,7 +219,7 @@ function formatPlan(validated: ValidationResult, runId: string): string {
     ? []
     : ['Notes:', ...plan.notes.map(note => `- ${sanitizeField(note)}`)]
   if (plan.verdict === 'no_issues') {
-    lines.push('未检测到漂移问题，无需处理。')
+    lines.push(tr('未检测到漂移问题，无需处理。'))
     lines.push(...noteLines)
     return lines.join('\n')
   }
@@ -252,7 +253,7 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
     // the bundle digest covers the FULL template; the joint signature adds
     // the signal vocabulary + thresholds agreement.
     if (!verifyPromptBundle(PROMPT_BUNDLE)) {
-      return { ok: false, recommendationCount: 0, error: 'dsh-evolution 提示词包完整性检查失败；拒绝运行 maintain' }
+      return { ok: false, recommendationCount: 0, error: tr('dsh-evolution 提示词包完整性检查失败；拒绝运行 maintain') }
     }
     // 0.3.11: usageObserved is threaded straight into the snapshot assembly so
     // the probe (which reads it off the snapshot) and the facts block (which
@@ -279,23 +280,23 @@ export async function runMaintain(runtime: MaintainRuntime, options: MaintainOpt
       //   3. the root exists and lists nothing — genuinely empty, the only case
       //      where "nothing to do" is the truth.
       if (readFailures.length > 0) {
+        const list = readFailures.slice(0, 10).join(', ') + (readFailures.length > 10 ? ', …' : '')
         return {
           ok: false,
           recommendationCount: 0,
-          error: `维护扫描无法读取列出的 ${readFailures.length} 个技能（${readFailures.slice(0, 10).join(', ')}${readFailures.length > 10 ? ', …' : ''}），且一个技能都没读到 —— `
-            + 'the library was NOT audited; fix the unreadable skills (or their directory names) and run the scan again',
+          error: tr('维护扫描无法读取列出的 {count} 个技能（{list}），且一个技能都没读到 —— the library was NOT audited; fix the unreadable skills (or their directory names) and run the scan again', { count: readFailures.length, list }),
         }
       }
       if (runtime.rootExists && !(await runtime.rootExists())) {
+        const rootNote = runtime.skillRoot ? ` (${runtime.skillRoot})` : ''
         return {
           ok: false,
           recommendationCount: 0,
-          error: `维护扫描发现技能库为空，但配置的技能根目录不存在${runtime.skillRoot ? ` (${runtime.skillRoot})` : ''} —— `
-            + 'point the skillsRoot config at a real directory (a literal `~` is not expanded) and run the scan again',
+          error: tr('维护扫描发现技能库为空，但配置的技能根目录不存在{rootNote} —— point the skillsRoot config at a real directory (a literal `~` is not expanded) and run the scan again', { rootNote }),
         }
       }
       // Genuinely empty: no facts to review — do not spend a model call.
-      return { ok: true, recommendationCount: 0, runId: options.runId ?? randomUUID(), verdict: 'no_issues', text: '维护扫描：技能库为空，无需处理。' }
+      return { ok: true, recommendationCount: 0, runId: options.runId ?? randomUUID(), verdict: 'no_issues', text: tr('维护扫描：技能库为空，无需处理。') }
     }
     // G3/3.3: the footprint is read at THIS run's reclamation point - one line per registered store,
     // UNKNOWN when a store could not be measured. Removing this call removes every store line from the
@@ -346,7 +347,7 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // it warns and silently becomes 1ms. V27 G2.4: the message interpolates
     // MAX_TIMER_DELAY_MS, so the number has ONE definition (constants.ts).
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMER_DELAY_MS) {
-      return { ok: false, recommendationCount: 0, error: `maintain：--timeout 必须是以毫秒为单位的正整数，最大 ${MAX_TIMER_DELAY_MS}；收到 ${String(timeoutMs)}` }
+      return { ok: false, recommendationCount: 0, error: tr('maintain：--timeout 必须是以毫秒为单位的正整数，最大 {max}；收到 {received}', { max: MAX_TIMER_DELAY_MS, received: String(timeoutMs) }) }
     }
     // 0.3.11 (E-55): route off the same policy as the curator
     // (`evolutionPolicy.get().curatorModel`) instead of a hard-coded maintain
@@ -433,22 +434,23 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
     // W5 G3-S4: the channel already disposed the activation; map its outcome and return the SAME
     // operator-facing taxonomy the local result view used to produce.
     if (outcome.kind === 'unavailable') {
-      return { ok: false, recommendationCount: 0, error: `维护扫描不可用（${outcome.code}）：${outcome.reason}。请在已挂载 agentPresets/subagents 的宿主会话中重试。` }
+      return { ok: false, recommendationCount: 0, error: tr('维护扫描不可用（{code}）：{reason}。请在已挂载 agentPresets/subagents 的宿主会话中重试。', { code: outcome.code, reason: outcome.reason }) }
     }
     if (outcome.kind === 'aborted') {
       // A cancelled run settles as aborted: distinguish it from 'the model produced no plan'.
-      return { ok: false, recommendationCount: 0, error: '维护扫描已中止（取消或超时），计划尚未产出 —— 在技能多、库大的场景下，请重试或提高超时（evolution-commands maintainTimeoutMs）。' }
+      return { ok: false, recommendationCount: 0, error: tr('维护扫描已中止（取消或超时），计划尚未产出 —— 在技能多、库大的场景下，请重试或提高超时（evolution-commands maintainTimeoutMs）。') }
     }
     if (outcome.kind === 'no-structured') {
-      return { ok: false, recommendationCount: 0, error: '维护子智能体没有返回结构化计划（模型没有产出结构化计划，或运行在产出前结束）：请重试；若反复出现，请提高 --timeout 或检查模型的输出结构。' }
+      return { ok: false, recommendationCount: 0, error: tr('维护子智能体没有返回结构化计划（模型没有产出结构化计划，或运行在产出前结束）：请重试；若反复出现，请提高 --timeout 或检查模型的输出结构。') }
     }
     const raw = outcome.structured
     const validated = validateAndNormalizeMaintainPlan(raw, report, existingSignalIds(report))
     if (!validated.ok) {
+      const errors = validated.errors.slice(0, 5).join('; ')
       return {
         ok: false,
         recommendationCount: 0,
-        error: `维护计划被校验器拒绝：${validated.errors.slice(0, 5).join('; ')}`,
+        error: tr('维护计划被校验器拒绝：{errors}', { errors }),
       }
     }
     const runId = options.runId ?? randomUUID()
@@ -478,7 +480,7 @@ ${MAINTAIN_OUTPUT_INSTRUCTION}`
       ok: false,
       recommendationCount: 0,
       error: aborted
-        ? '维护扫描已中止（取消或超时），计划尚未产出 —— 在技能多、库大的场景下，请重试或提高超时（evolution-commands maintainTimeoutMs）。'
+        ? tr('维护扫描已中止（取消或超时），计划尚未产出 —— 在技能多、库大的场景下，请重试或提高超时（evolution-commands maintainTimeoutMs）。')
         : `Maintenance scan failed: ${message}`,
     }
   }

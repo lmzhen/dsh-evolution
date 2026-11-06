@@ -38,6 +38,7 @@ import {
   usageObserved,
 } from '@deepseek-ai/dsh-evolution-core'
 import { newestUnitId, planUnitUndo } from './unit-undo-plan.ts'
+import { tr } from './messages.ts'
 import { executeUnitUndo, planUnitUndoAcross, type UnitUndoMember, type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core'
 import { historyIndexFile, parseHistoryIndex, resolveUnitMembers, unitMembersAreComplete, staleRouteStubs } from '@deepseek-ai/dsh-evolution-core'
 import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
@@ -1067,7 +1068,7 @@ export class EvolutionCurator extends Service {
   private instanceHeldRefusal(operation: string): SkillActionResult {
     return {
       ok: false,
-      message: `instance-held：本 curator 行已把每 home 的占用权让给本进程的另一 curator 行。为保证持有行是唯一的控制面写入方，${operation} 与 run() 一并被拒绝（请在持有它的那一行上运行）。`,
+      message: tr('instance-held：本 curator 行已把每 home 的占用权让给本进程的另一 curator 行。为保证持有行是唯一的控制面写入方，{operation} 与 run() 一并被拒绝（请在持有它的那一行上运行）。', { operation }),
     }
   }
 
@@ -1752,7 +1753,7 @@ export class EvolutionCurator extends Service {
         }
         continue
       }
-      const archived = await this.skills.archive(name, { reason: '生命周期：已达归档阈值', allowBundled: this.pruneBuiltins })
+      const archived = await this.skills.archive(name, { reason: tr('生命周期：已达归档阈值'), allowBundled: this.pruneBuiltins })
       if (!archived.ok) {
         // A failed archive must roll back to the pre-transition state: a
         // stale->archived failure that left state='archived' would silently
@@ -1779,7 +1780,7 @@ export class EvolutionCurator extends Service {
           record.archived_at = new Date().toISOString()
           stateOwned.add(name)
         }
-        archivedSkills.push({ name, path: archived.path ?? '', reason: '生命周期：已达归档阈值' })
+        archivedSkills.push({ name, path: archived.path ?? '', reason: tr('生命周期：已达归档阈值') })
         alreadyArchived.add(name)
         if (bundledNames.has(name)) {
           suppressedNames.add(name)
@@ -1839,7 +1840,7 @@ export class EvolutionCurator extends Service {
       // SkillLibrary.archive() with a stamp suffix on collision, so the
       // nominal `.archive/<name>` used to name a directory that may not
       // exist. Omit the field and point at the event that carries the truth.
-      archivedSkills.push({ name: nomination.from, reason: `已合并进 ${nomination.into}（精确归档路径见 evolution/skill-mutated 事件里的 archivedPath）` })
+      archivedSkills.push({ name: nomination.from, reason: tr('已合并进 {into}（精确归档路径见 evolution/skill-mutated 事件里的 archivedPath）', { into: nomination.into }) })
     }
     if (suppressedChanged) {
       try {
@@ -2206,7 +2207,7 @@ export class EvolutionCurator extends Service {
     })
     const blocked = [...new Set([target, ...sources])].filter(name => gates.isBlocked(name))
     if (blocked.length > 0) {
-      return { ok: false, message: `以下技能受保护、无法合并（被排除／被引用／被抑制／受保护的内置）：${blocked.join(', ')}` }
+      return { ok: false, message: tr('以下技能受保护、无法合并（被排除／被引用／被抑制／受保护的内置）：{blocked}', { blocked: blocked.join(', ') }) }
     }
     await this.snapshotFull('pre-consolidate')
     const result = await this.skills.consolidate(target, sources)
@@ -2322,26 +2323,27 @@ export class EvolutionCurator extends Service {
   private async undoMutate(name: string, v?: number): Promise<SkillActionResult> {
     const versions = await this.skills.listVersions(name)
     if (versions.length === 0) {
-      return { ok: false, message: `技能「${name}」还没有记录内容版本 —— 没有可撤销的。` }
+      return { ok: false, message: tr('技能「{name}」还没有记录内容版本 —— 没有可撤销的。', { name }) }
     }
     const live = await this.skills.read(name)
     if (live === null) {
       return {
         ok: false,
-        message: `「${name}」不在活动目录树里 —— 撤销恢复的是存活技能的正文；若它已归档，请用 '/evolution skill restore ${name}'。`,
+        message: tr('「{name}」不在活动目录树里 —— 撤销恢复的是存活技能的正文；若它已归档，请用 \'/evolution skill restore {name}\'。', { name }),
       }
     }
     const liveHash = contentHash(live)
     const target = v ?? this.previousVersionOf(versions, liveHash)
     if (target === undefined) {
-      return { ok: false, message: `「${name}」已处于其记录的内容 —— 没有更早的版本可撤销。` }
+      return { ok: false, message: tr('「{name}」已处于其记录的内容 —— 没有更早的版本可撤销。', { name }) }
     }
     // An explicit --to can name a version the index no longer carries (retention trimmed it, or the
     // number never existed). Say THAT: the read cannot tell it apart from a lost blob, and the old
     // wording asserted the blob cause for both.
     if (!versions.some(candidate => candidate.v === target)) {
       const listed = versions.map(candidate => `v${candidate.v}`).join(', ')
-      return { ok: false, message: `技能「${name}」的版本 v${target} 不在已记录的历史里（已记录：${listed === '' ? '无' : listed}）。` }
+      const recorded = listed === '' ? tr('无') : listed
+      return { ok: false, message: tr('技能「{name}」的版本 v{version} 不在已记录的历史里（已记录：{recorded}）。', { name, version: target, recorded }) }
     }
     // One index carries two chains: the body's versions and the bytes of support files the skill
     // wrote. Naming a support version used to send those bytes at the frontmatter gate, which refused
@@ -2353,16 +2355,16 @@ export class EvolutionCurator extends Service {
       // Name the file when the index recorded it — for a legacy entry it is the only place the
       // operator can see which file those bytes came from.
       const written = entry.path === undefined
-        ? `由 ${entry.action} 写入，并且`
-        : `由 ${entry.action} 写入到 ${entry.path}，并且`
+        ? tr('由 {action} 写入，并且', { action: entry.action })
+        : tr('由 {action} 写入到 {path}，并且', { action: entry.action, path: entry.path })
       return {
         ok: false,
-        message: `技能「${name}」的版本 v${target} ${written} 存的是支撑文件的字节，而不是该技能的 SKILL.md —— 撤销只会恢复正文。 已记录的字节仍留在历史存储里；要恢复它们，请把该 blob 复制回那个文件。`,
+        message: tr('技能「{name}」的版本 v{version} {written} 存的是支撑文件的字节，而不是该技能的 SKILL.md —— 撤销只会恢复正文。 已记录的字节仍留在历史存储里；要恢复它们，请把该 blob 复制回那个文件。', { name, version: target, written }),
       }
     }
     const content = await this.skills.readVersion(name, target)
     if (content === null) {
-      return { ok: false, message: `技能「${name}」的版本 v${target} 虽在索引里，但它的存储内容读不出来 —— 拒绝瞎猜、不做写入。` }
+      return { ok: false, message: tr('技能「{name}」的版本 v{version} 虽在索引里，但它的存储内容读不出来 —— 拒绝瞎猜、不做写入。', { name, version: target }) }
     }
     // The anchor is the bytes we just read: a concurrent change between the read and the write is
     // refused by the library, which is the same protection every other staged write gets.
@@ -2373,11 +2375,11 @@ export class EvolutionCurator extends Service {
     // the live version is the ordinary way there): reporting "this undo is itself a new version" for a
     // write that never happened would be false.
     if (result.noop === true) {
-      return { ok: true, message: `「${name}」已持有 v${target} 的内容 —— 未写入任何内容，也没有记录新版本。` }
+      return { ok: true, message: tr('「{name}」已持有 v{version} 的内容 —— 未写入任何内容，也没有记录新版本。', { name, version: target }) }
     }
     return {
       ok: true,
-      message: `${result.message} （已撤销到 v${target} —— 仅内容：标记、使用计数与策展状态不变，且这次撤销本身就是一个新版本。）`,
+      message: `${result.message} ` + tr('（已撤销到 v{version} —— 仅内容：标记、使用计数与策展状态不变，且这次撤销本身就是一个新版本。）', { version: target }),
     }
   }
 
@@ -2417,7 +2419,7 @@ export class EvolutionCurator extends Service {
       await writeProposalReport(this.io, proposal)
       count += 1
     }
-    return { ok: true, count, message: count === 0 ? '没有需要 keep 提案的 body-oversize 技能。' : '已写入 ' + String(count) + ' 条 keep 提案。' }
+    return { ok: true, count, message: count === 0 ? tr('没有需要 keep 提案的 body-oversize 技能。') : tr('已写入 {count} 条 keep 提案。', { count }) }
   }
 
   async undoUnit(name: string, unitId?: string): Promise<SkillActionResult> {
@@ -2432,15 +2434,15 @@ export class EvolutionCurator extends Service {
 
   private async undoUnitMutate(name: string, unitId?: string): Promise<SkillActionResult> {
     const versions = await this.skills.listVersions(name)
-    if (versions.length === 0) return { ok: false, message: `技能「${name}」还没有记录内容版本 —— 没有可撤销的。` }
+    if (versions.length === 0) return { ok: false, message: tr('技能「{name}」还没有记录内容版本 —— 没有可撤销的。', { name }) }
     const live = await this.skills.read(name)
     if (live === null) {
-      return { ok: false, message: `「${name}」不在活动目录树里 —— 撤销恢复的是存活技能；若它已归档，请先 restore。` }
+      return { ok: false, message: tr('「{name}」不在活动目录树里 —— 撤销恢复的是存活技能；若它已归档，请先 restore。', { name }) }
     }
     const unit = unitId ?? newestUnitId(versions)
-    if (unit === undefined) return { ok: false, message: `技能「${name}」还没有记录任何单元 —— 没有可整体撤销的。` }
+    if (unit === undefined) return { ok: false, message: tr('技能「{name}」还没有记录任何单元 —— 没有可整体撤销的。', { name }) }
     const members = versions.filter(entry => entry.unitId === unit)
-    if (members.length === 0) return { ok: false, message: `单元 ${unit} 不在「${name}」已记录的历史里 —— 拒绝瞎猜、不做写入。` }
+    if (members.length === 0) return { ok: false, message: tr('单元 {unit} 不在「{name}」已记录的历史里 —— 拒绝瞎猜、不做写入。', { unit, name }) }
     // G3b/A19.2: when the unit head carries sources[], the unit may span SEVERAL skills. Resolve every
     // member from those known keys (never by scanning a directory) and refuse -- naming the objects --
     // when anything is missing or conflicting; guessing from the shards we happen to see would undo
@@ -2465,9 +2467,10 @@ export class EvolutionCurator extends Service {
         historyIndexFile, parseHistoryIndex,
       )
       if (!unitMembersAreComplete(resolved)) {
-        const missing = resolved.missing.map((m: { skill: string; reason: string }) => m.skill + (m.reason === 'index-absent' ? '（索引文件不在）' : '（索引里没有这个单元）')).join('、')
-        const conflicts = resolved.conflicts.map((c: { path: string; kind: string }) => c.path + '（' + c.kind + '）').join('、')
-        return { ok: false, message: '单元 ' + unit + ' 的成员没解析齐：' + missing + (conflicts === '' ? '' : '；冲突：' + conflicts) + ' —— 拒绝用剩余片段拼一个撤销。' }
+        const missing = resolved.missing.map((m: { skill: string; reason: string }) => m.skill + (m.reason === 'index-absent' ? tr('（索引文件不在）') : tr('（索引里没有这个单元）'))).join('、')
+        const conflicts = resolved.conflicts.map((c: { path: string; kind: string }) => c.path + tr('（{kind}）', { kind: c.kind })).join('、')
+        const conflictSuffix = conflicts === '' ? '' : tr('；冲突：{conflicts}', { conflicts })
+        return { ok: false, message: tr('单元 {unit} 的成员没解析齐：{missing}{conflictSuffix} —— 拒绝用剩余片段拼一个撤销。', { unit, missing, conflictSuffix }) }
       }
       if (resolved.members.length > 1) {
         const crossMembers: UnitUndoMember[] = []
@@ -2511,35 +2514,35 @@ export class EvolutionCurator extends Service {
     const ops: Array<{ remove: boolean; path: string; bytes: string; anchor: WriteAnchor }> = []
     for (const op of plan.ops) {
       const back = await blobOf(op.preUnitHash)
-      if (op.preUnitHash !== undefined && back === null) { refused.push(`${op.path}（before 字节读不到：blob ${op.preUnitHash}）`); continue }
+      if (op.preUnitHash !== undefined && back === null) { refused.push(tr('{path}（before 字节读不到：blob {hash}）', { path: op.path, hash: op.preUnitHash })); continue }
       const liveProbe = await probeText(this.io, join(this.skills.root, name, ...op.path.split('/')))
       if (isPresent(liveProbe) && contentHash(liveProbe.value) !== op.expectedHash) {
-        refused.push(`${op.path}（盘上字节已变，回退会覆盖别人的改动）`)
+        refused.push(tr('{path}（盘上字节已变，回退会覆盖别人的改动）', { path: op.path }))
         continue
       }
       ops.push({ remove: op.remove, path: op.path, bytes: back ?? '', anchor: { sha256: op.expectedHash } })
     }
     const bodyBytes = await blobOf(plan.bodyPreUnitHash)
-    if (plan.bodyPreUnitHash !== undefined && bodyBytes === null) refused.push('SKILL.md（正文 before 字节读不到）')
+    if (plan.bodyPreUnitHash !== undefined && bodyBytes === null) refused.push(tr('SKILL.md（正文 before 字节读不到）'))
     if (refused.length > 0) {
-      return { ok: false, message: `整单元撤销未开始（零写）—— 预检未通过：${refused.join('；')}。修好后可重试。` }
+      return { ok: false, message: tr('整单元撤销未开始（零写）—— 预检未通过：{refused}。修好后可重试。', { refused: refused.join('；') }) }
     }
     const undoUnitId = `u-undo-${Date.now().toString(36)}`
     const reverted: string[] = []
-    const done = (): string => (reverted.length === 0 ? '无' : reverted.join(', '))
+    const done = (): string => (reverted.length === 0 ? tr('无') : reverted.join(', '))
     for (const op of ops) {
       const result = op.remove
         ? await this.skills.removeSupportFile(name, op.path, 'foreground', op.anchor, undoUnitId)
         : await this.skills.writeSupportFile(name, op.path, op.bytes, 'foreground', op.anchor)
-      if (!result.ok) return { ok: false, message: `「${op.path}」：${result.message} —— 撤销未完成（已回退：${done()}）。` }
+      if (!result.ok) return { ok: false, message: tr('「{path}」：{message} —— 撤销未完成（已回退：{reverted}）。', { path: op.path, message: result.message, reverted: done() }) }
       reverted.push(op.path)
     }
     if (plan.bodyPreUnitHash !== undefined && bodyBytes !== null) {
       const result = await this.skills.update(name, bodyBytes, 'foreground', { sha256: contentHash(live) })
-      if (!result.ok) return { ok: false, message: `正文：${result.message} —— 撤销未完成（已回退：${done()}）。` }
+      if (!result.ok) return { ok: false, message: tr('正文：{message} —— 撤销未完成（已回退：{reverted}）。', { message: result.message, reverted: done() }) }
       reverted.push('SKILL.md')
     }
-    return { ok: true, message: `已按单元撤销「${name}」：${reverted.join(', ')}（撤销单元 ${undoUnitId}，被撤单元 ${unit}）。` }
+    return { ok: true, message: tr('已按单元撤销「{name}」：{reverted}（撤销单元 {undoUnitId}，被撤单元 {unit}）。', { name, reverted: reverted.join(', '), undoUnitId, unit }) }
   }
   /** The content the live bytes replaced: the CHAIN first, the recorded order as the fallback.
    *
