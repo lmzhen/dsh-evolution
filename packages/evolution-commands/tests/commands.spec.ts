@@ -1022,7 +1022,7 @@ describe('evolution-commands', () => {
     // The base table is evolution-agent/bases.json — the SAME file
     // install-layered.mjs reads. The npm path used to hardcode `standard`, so
     // the ptc variant was unreachable here; the base NAME selects the platform patch.
-    const platformFixture = '- id: tools\n  name: "@deepseek-ai/dsh-tools"\n  config:\n    mode: ptc\n'
+    const platformFixture = '- id: tool-executor-ptc\n  name: "@deepseek-ai/dsh-tool-executor-ptc"\n'
     await seedPlatformBase(profileDir, 'ptc', platformFixture)
     const patchPath = profilePatchPath(profileDir)
     ctx.provide('profileContext', profileContext('web', profileDir))
@@ -1032,7 +1032,7 @@ describe('evolution-commands', () => {
     const patch = readFileSync(patchPath, 'utf8')
     // The ptc variant is its OWN row id, composed from the ptc base patch.
     expect(patch).toContain('    - id: preset-evolution-ptc\n')
-    expect(patch).toContain('          - id: tools\n            name: "@deepseek-ai/dsh-tools"\n            config:\n              mode: ptc')
+    expect(patch).toContain('          - id: tool-executor-ptc\n            name: "@deepseek-ai/dsh-tool-executor-ptc"')
     expect(patch).not.toContain('          - id: agent-loop')
     // A3 (audit P1-3) → 0.2.x: the variant's display metadata travels as LITERALS
     // inside the row, the only place the picker reads it. The former behavior wrote
@@ -1057,7 +1057,7 @@ describe('evolution-commands', () => {
     // base is visible in the written row.
     const fixtures: Record<string, string> = {
       standard: '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n',
-      ptc: '- id: tools\n  name: "@deepseek-ai/dsh-tools"\n  config:\n    mode: ptc\n',
+      ptc: '- id: tool-executor-ptc\n  name: "@deepseek-ai/dsh-tool-executor-ptc"\n',
     }
     await seedPlatformBase(profileDir, 'standard', G3_STANDARD_FIXTURE)
     await seedPlatformBase(profileDir, 'ptc', fixtures.ptc as string)
@@ -1069,11 +1069,11 @@ describe('evolution-commands', () => {
     const patch = readFileSync(patchPath, 'utf8')
     // Each variant composes ITS OWN platform base patch, in table order.
     expect(patch).toContain('          - id: agent-loop\n            name: "@deepseek-ai/dsh-agent-loop"')
-    expect(patch).toContain('          - id: tools\n            name: "@deepseek-ai/dsh-tools"\n            config:\n              mode: ptc')
+    expect(patch).toContain('          - id: tool-executor-ptc\n            name: "@deepseek-ai/dsh-tool-executor-ptc"')
     expect(patch.indexOf('    - id: preset-evolution\n')).toBeLessThan(patch.indexOf('    - id: preset-evolution-ptc\n'))
     // The standard row must not carry the ptc base's composition.
-    expect(presetRowBlock(patch, presetRowId('evolution'))).not.toContain('mode: ptc')
-    expect(presetRowBlock(patch, presetRowId('evolution-ptc'))).toContain('mode: ptc')
+    expect(presetRowBlock(patch, presetRowId('evolution'))).not.toContain('tool-executor-ptc')
+    expect(presetRowBlock(patch, presetRowId('evolution-ptc'))).toContain('tool-executor-ptc')
 
     // Every name is resolved before anything is written: the typo aborts the
     // whole request and the two healthy rows stay exactly as they were.
