@@ -299,10 +299,10 @@ describe('agent preset bases (--base standard|ptc)', () => {
     //    NOT the source.
     expect(insertedPluginIds(patchPath(home))).toEqual([...insertedPluginIds(join(presetRoot, 'ptc.patch.yml')), ...deltaIds])
     expect(patch).not.toContain(STANDARD_FIXTURE.split('\n')[0] ?? '# runtime standard fixture')
-    expect(patch).toContain('mode: ptc')
+    expect(patch).toContain('tool-executor-ptc')
     expect(patch).toContain('preset-evolution-ptc')
     // 2. Nothing is vendored and nothing is duplicated.
-    expect(insertedPluginIds(patchPath(home)).filter(id => id === 'tool-presentation')).toHaveLength(1)
+    expect(insertedPluginIds(patchPath(home)).filter(id => id === 'tool-executor-ptc')).toHaveLength(1)
     const ptcPlugins = insertedPlugins(patchPath(home))
     expect(ptcPlugins).toHaveLength(insertedPlugins(join(presetRoot, 'ptc.patch.yml')).length + deltaIds.length)
     // 3. The variant publishes its OWN display copy — the platform localizes
@@ -334,8 +334,8 @@ describe('agent preset bases (--base standard|ptc)', () => {
     type Entry = { insert: Array<{ config: { plugins: Record<string, unknown>[] } }> }
     const standardPlugins = (entries[0] as Entry).insert[0]?.config.plugins ?? []
     const ptcPlugins = (entries[1] as Entry).insert[0]?.config.plugins ?? []
-    expect(standardPlugins.map(row => rowId(row))).not.toContain('tool-presentation')
-    expect(ptcPlugins.map(row => rowId(row))).toContain('tool-presentation')
+    expect(standardPlugins.map(row => rowId(row))).not.toContain('tool-executor-ptc')
+    expect(ptcPlugins.map(row => rowId(row))).toContain('tool-executor-ptc')
     // The selection is a SET resolved in table order, so repeats and a reversed
     // spelling produce the same run.
     const resolved = await callInstaller("return installer.resolveAgentPresetBases(['ptc', 'standard,ptc']).map(entry => entry.base)")
@@ -364,11 +364,10 @@ describe('agent preset bases (--base standard|ptc)', () => {
     for (const id of ids) expect(ids.filter(candidate => candidate === id)).toHaveLength(1)
     // Base selection proved by content: the presentation row is PTC's, and the
     // sibling standard base patch does not carry it at all.
-    expect(insertedPluginIds(platformPtc)).toContain('tool-presentation')
-    expect(insertedPluginIds(platformStandard)).not.toContain('tool-presentation')
+    expect(insertedPluginIds(platformPtc)).toContain('tool-executor-ptc')
+    expect(insertedPluginIds(platformStandard)).not.toContain('tool-executor-ptc')
     const patch = await readFile(patchPath(home), 'utf8')
-    expect(patch).toContain('tool-presentation')
-    expect(patch).toContain('mode: ptc')
+    expect(patch).toContain('tool-executor-ptc')
     expect(patch).toContain('preset-evolution-ptc')
   })
 
