@@ -81,6 +81,6 @@ export class EvolutionLlm extends Service {
   private classify(error: unknown, timeout: AbortSignal | undefined, caller: AbortSignal | undefined): EvolutionLlmError {
     if (error instanceof EvolutionLlmError) return error
     const kind: EvolutionLlmFailureKind = timeout?.aborted === true ? 'timeout' : caller?.aborted === true ? 'cancelled' : 'transport'
-    return new EvolutionLlmError(kind, 'evolutionLlm: ' + (error instanceof Error ? error.message : String(error)), error)
+    return new EvolutionLlmError(kind, error instanceof Error ? error.message : String(error), error)
   }
 }
