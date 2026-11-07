@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -37,6 +38,7 @@ async function setup() {
   const root = await mkdtemp(join(tmpdir(), 'dsh-tool-memory-boundary-'))
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(MemoryRegistry)
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)

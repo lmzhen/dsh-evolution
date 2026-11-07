@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -10,6 +11,7 @@ describe('evolution-threat', () => {
   it('V10-12 (P2-8): the deny runs on the monotonic guard channel — a short-circuiting pre-execute listener cannot bypass the scan', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(ThreatGuard)
     // A throwaway `memory`-named tool so the execution reaches the gate (an
     // unregistered name fails before policy with UNKNOWN_TOOL); the guard must
@@ -76,6 +78,7 @@ describe('evolution-threat', () => {
   it('PLAN S4.3 (2026-09-16): a skill documenting `cat .env.example` is allowed; `cat .env` still blocked (end-to-end guard channel)', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
+    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(ThreatGuard)
     // A throwaway `skill_manage` double so the write reaches the monotonic
     // guard (same shape as the V10-12 test): the deny must land before the
