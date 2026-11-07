@@ -1018,7 +1018,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // The live Session log is the only complete seed source in the current platform;
       // the query service exposes search/projections, not the full ordered event list.
       const seed = session.snapshotEvents()
-      const current = modelRoute(ctx, agent)
+      const current = modelRoute(ctx, agent, session)
       handle = await ctx.agents.create({
         sessionId: childId,
         parentAgent: agent,
