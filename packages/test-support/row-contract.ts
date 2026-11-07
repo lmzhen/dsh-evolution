@@ -12,6 +12,7 @@ function scoped(name: string): string {
 }
 
 export const HOST_ROW_IDS = [
+  'evolution-core-runtime',
   'evolution-policy',
   'evolution-io',
   'evolution-io-node',
@@ -36,6 +37,7 @@ export const HOST_ROW_IDS = [
 ] as const
 
 export const HOST_ROW_NAMES = {
+  'evolution-core-runtime': scoped('@deepseek-ai/dsh-evolution-core/runtime'),
   'evolution-policy': scoped('@deepseek-ai/dsh-evolution-policy'),
   'evolution-io': scoped('@deepseek-ai/dsh-evolution-io'),
   'evolution-io-node': scoped('@deepseek-ai/dsh-evolution-io-node'),
