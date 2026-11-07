@@ -2,7 +2,7 @@
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SubagentStopReason } from '@deepseek-ai/dsh-subagent'
-import type { ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
+import type { ObjectJsonSchema } from '../platform/index.ts'
 
 export type ChannelCode = 'E-323' | 'E-324'
 export type ChannelKind = 'reviewer' | 'maintainer'

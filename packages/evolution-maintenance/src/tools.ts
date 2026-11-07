@@ -15,7 +15,7 @@ import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 type Context = CordisContext & HostContext
 import { authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import { assertSkillsRootAliasRetired, clampedNumber, DEFAULT_PROBE_TIMEOUT_MS, MAX_TIMER_DELAY_MS, newSkillLibrary, redactSecrets, resolveRootConfig, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { computeProbe, PROBE_SIGNALS, type ProbeResult } from './probe.ts'
 import { buildEnrichment, enrichmentSnapshotOptions } from './enrichment.ts'
@@ -57,7 +57,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // `toolCtx as unknown as {...}` double-cast was a gratuitous widening —
     // the service is reachable directly via `get`, so the context object never
     // needs to be re-shaped. Mirrors evolution-policy's tool-injection cast.
-    const tools = toolCtx.get('tools') as { register(definition: unknown): () => void }
+    const tools = toolsPort(toolCtx)
+    if (tools === undefined) return
     // G4.2 (F-210): bind the register disposer to this plugin's fiber so an HMR
     // reload actually removes the tool. Mirrors evolution-policy's tools-guard
     // effect (evolution-policy/index.ts:107).

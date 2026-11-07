@@ -1,4 +1,4 @@
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
@@ -47,7 +47,7 @@ function toToolResponse(response: SkillSearchResponse): { results: Array<{ name:
  * @returns tool disposer.
  */
 export function registerSkillSearchTool(ctx: Context, provider: SkillSearchProvider | undefined): () => void {
-  const tools = ctx.get('tools') as { register: (definition: ReturnType<typeof defineTool>) => () => void } | undefined
+  const tools = toolsPort(ctx)
   if (tools === undefined) return () => {}
   return tools.register(defineTool({
     name: 'skill_search',

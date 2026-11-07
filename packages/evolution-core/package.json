@@ -30,6 +30,10 @@
       "types": "./lib/types/http-routes.d.ts",
       "default": "./lib/http-routes.js"
     },
+    "./platform": {
+      "types": "./lib/types/platform/index.d.ts",
+      "default": "./lib/platform/index.js"
+    },
     "./restrictor": {
       "types": "./lib/types/restrictor.d.ts",
       "default": "./lib/restrictor.js"

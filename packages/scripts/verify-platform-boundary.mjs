@@ -31,10 +31,11 @@ if (!writeBaseline && !check) {
 const familyRoot = resolvePlatformLineRoot(import.meta.url)
 const baselinePath = join(familyRoot, 'packages', 'scripts', 'platform-boundary-baseline.json')
 const allowed = [
-  join('evolution-core', 'src', 'platform') + sep,
-  join('evolution-client-kit', 'src') + sep,
+  join('packages', 'evolution-core', 'src', 'platform') + sep,
+  join('packages', 'evolution-client-kit', 'src') + sep,
 ]
 const skipDirs = new Set(['node_modules', 'lib', 'dist', 'vendor', '.release-staging', '.release-staging.next'])
+const familyPackage = (spec) => spec === '@deepseek-ai/dsh-memory' || spec === '@deepseek-ai/dsh-skill-usage' || spec.startsWith('@deepseek-ai/dsh-evolution-')
 
 function walk(dir, out) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -86,7 +87,7 @@ for (const file of files) {
   const rel = relative(familyRoot, file).split(sep).join('/')
   if (allowed.some((prefix) => rel.startsWith(prefix.split(sep).join('/')))) continue
   for (const spec of specifiersOf(file)) {
-    if (spec.startsWith('@deepseek-ai/dsh-')) violations.push({ file: rel, specifier: spec })
+    if (spec.startsWith('@deepseek-ai/dsh-') && !familyPackage(spec)) violations.push({ file: rel, specifier: spec })
   }
 }
 const keyOf = (v) => v.file + '::' + v.specifier

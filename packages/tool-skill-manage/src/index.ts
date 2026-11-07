@@ -23,7 +23,7 @@ import { skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@de
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, registerEvolutionTool } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-evolution-io'
@@ -1167,7 +1167,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     return [header, '', ...lines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), ...(unreadableBodies > 0 ? [unreadableLine] : []), warningLine].join('\n')
   }
 
-  ctx.tools.register(defineTool({
+  registerEvolutionTool(ctx, defineTool({
     name: 'skill_manage',
     description:
       'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit/update take full SKILL.md content (edit is an alias of update); patch applies old_string -> new_string; delete archives to .archive (absorbed_into names an umbrella skill); write_file/remove_file add or remove one support file under references/ or scripts/; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin are never allowed from a background review — foreground and delegated subagents may). '

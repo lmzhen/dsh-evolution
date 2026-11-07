@@ -10,7 +10,7 @@ import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
-import type { ToolGuard } from '@deepseek-ai/dsh-tools'
+import { toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import {
@@ -138,7 +138,8 @@ export class EvolutionPolicy extends Service {
     // hand-written structural cast — an upstream contract change now fails
     // this package's compile instead of silently detyping the denial.
     ctx.inject(['tools'], (toolCtx) => {
-      const tools = toolCtx.get('tools') as { guard(guard: ToolGuard): () => void }
+      const tools = toolsPort(toolCtx)
+      if (tools === undefined) return
       toolCtx.effect(() => tools.guard(exec => this.guardReason(exec.name, exec.arguments)), 'evolution-policy.tools-guard')
     })
     // G3.1 (0.3.23): every numeric snapshot field is clamped to at least 1.

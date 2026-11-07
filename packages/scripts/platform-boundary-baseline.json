@@ -2,120 +2,16 @@
   "version": 1,
   "violations": [
     {
-      "file": "packages/evolution-activity/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-approval/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-approval/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-approval/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state"
-    },
-    {
-      "file": "packages/evolution-approval/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state-storage"
-    },
-    {
-      "file": "packages/evolution-approval/src/routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-approval/src/routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-approval/src/routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state-storage"
-    },
-    {
-      "file": "packages/evolution-commands/src/diagnostics-route.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-commands/src/doctor-view.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-commands/src/doctor.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-commands/src/doctor.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/composition"
-    },
-    {
-      "file": "packages/evolution-commands/src/doctor.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state-storage"
-    },
-    {
       "file": "packages/evolution-commands/src/index.ts",
       "specifier": "@deepseek-ai/dsh-commands"
-    },
-    {
-      "file": "packages/evolution-commands/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-approval"
-    },
-    {
-      "file": "packages/evolution-commands/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-commands/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/composition"
-    },
-    {
-      "file": "packages/evolution-commands/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-commands/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-maintenance"
     },
     {
       "file": "packages/evolution-commands/src/index.ts",
       "specifier": "@deepseek-ai/dsh-llm"
     },
     {
-      "file": "packages/evolution-commands/src/migration.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-commands/src/params.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-commands/src/platform-view.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-commands/src/preset-source.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/composition"
-    },
-    {
-      "file": "packages/evolution-commands/src/settings-route.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-commands/src/settings-route.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-core/src/events.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-contract"
-    },
-    {
       "file": "packages/evolution-core/src/opt-in.ts",
       "specifier": "@deepseek-ai/dsh-scope"
-    },
-    {
-      "file": "packages/evolution-core/src/platform-services.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-contract"
     },
     {
       "file": "packages/evolution-core/src/scope.ts",
@@ -158,416 +54,20 @@
       "specifier": "@deepseek-ai/dsh-subagent"
     },
     {
-      "file": "packages/evolution-core/src/subagent/types.ts",
-      "specifier": "@deepseek-ai/dsh-tools"
-    },
-    {
-      "file": "packages/evolution-curator/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-curator/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-io"
-    },
-    {
-      "file": "packages/evolution-curator/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state"
-    },
-    {
       "file": "packages/evolution-curator/src/index.ts",
       "specifier": "@deepseek-ai/dsh-llm"
     },
     {
       "file": "packages/evolution-curator/src/index.ts",
       "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
-      "file": "packages/evolution-curator/src/unit-undo-plan.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-feedback/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-feedback/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-skill-usage"
-    },
-    {
-      "file": "packages/evolution-io-node/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-io-node/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-io"
-    },
-    {
-      "file": "packages/evolution-io/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
     },
     {
       "file": "packages/evolution-learning-graph/src/index.ts",
       "specifier": "@deepseek-ai/dsh-commands"
     },
     {
-      "file": "packages/evolution-learning-graph/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-approval"
-    },
-    {
-      "file": "packages/evolution-learning-graph/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/drift-scan.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/enrichment.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/footprint.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
       "file": "packages/evolution-maintenance/src/orchestrate.ts",
       "specifier": "@deepseek-ai/dsh-agent"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/orchestrate.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/probe.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/render-facts.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/tools.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/tools.ts",
-      "specifier": "@deepseek-ai/dsh-tools"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/validate-plan.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/adapters/engine-screen.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/adapters/library.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/adapters/select.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-merge-engine"
-    },
-    {
-      "file": "packages/evolution-merge/src/adapters/undo.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/approve-command.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/authoring-flow.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/command-defs.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-commands"
-    },
-    {
-      "file": "packages/evolution-merge/src/command-surface.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-commands"
-    },
-    {
-      "file": "packages/evolution-merge/src/commands.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-commands"
-    },
-    {
-      "file": "packages/evolution-merge/src/commit-assembly.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/commit-execute.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/commit-plan.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/commit-receipt.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/commit-recovery.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/doctor.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/commit-journal-store.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/evidence-hash.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/merge-limits.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/merge-snapshot.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/pair-index-store.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/pair-ledger.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/pre-1b-backup.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/read-probe.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/reconcile.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/row-run.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/run-coordinator.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/schema4.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/stage-aggregate.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/staging-index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/state-bootstrap.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/undo-journal.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/undo-receipt.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/domain/validation-plan.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/facts.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-merge/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-merge-engine"
-    },
-    {
-      "file": "packages/evolution-merge/src/merge-command.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-commands"
-    },
-    {
-      "file": "packages/evolution-merge/src/merge-command.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/merge-routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/merge-routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-merge/src/merge-tool.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/metrics.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/new-child-authoring.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/pair-command.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/pending-actions.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/read-commands.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/recovery-coordinator.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/recovery-projection.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/report.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/resume-command.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/revision.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/round2-outcome.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/rules.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/run-shell.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/runtime.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/scan-command.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/scan-ports.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/scan-run.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/stage-tool.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/staged-tree.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/staging-files.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/staging.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/state.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/supersede.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/surface/body.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/target-claim.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/undo-merge.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/undo-operation.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/unit-claim.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-merge/src/wire-projection.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-policy/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-policy/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-tools"
-    },
-    {
-      "file": "packages/evolution-replay/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-activity"
-    },
-    {
-      "file": "packages/evolution-replay/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-review/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-review/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-policy"
-    },
-    {
-      "file": "packages/evolution-review/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state"
     },
     {
       "file": "packages/evolution-review/src/index.ts",
@@ -576,18 +76,6 @@
     {
       "file": "packages/evolution-review/src/index.ts",
       "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
-      "file": "packages/evolution-review/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-tools"
-    },
-    {
-      "file": "packages/evolution-skill-catalog/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-skill-catalog/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-io"
     },
     {
       "file": "packages/evolution-skill-catalog/src/index.ts",
@@ -607,15 +95,7 @@
     },
     {
       "file": "packages/evolution-skill-discovery/src/domain-generation-llm.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/domain-generation-llm.ts",
       "specifier": "@deepseek-ai/dsh-llm"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/domain-map-store.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
     },
     {
       "file": "packages/evolution-skill-discovery/src/identity.ts",
@@ -626,20 +106,12 @@
       "specifier": "@deepseek-ai/dsh-agent"
     },
     {
-      "file": "packages/evolution-skill-discovery/src/main-entry.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
       "file": "packages/evolution-skill-discovery/src/projection-adapter.ts",
       "specifier": "@deepseek-ai/dsh-agent"
     },
     {
       "file": "packages/evolution-skill-discovery/src/projection-adapter.ts",
       "specifier": "@deepseek-ai/dsh-llm"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/projection-journal.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
     },
     {
       "file": "packages/evolution-skill-discovery/src/projection-runtime.ts",
@@ -658,112 +130,8 @@
       "specifier": "@deepseek-ai/dsh-agent"
     },
     {
-      "file": "packages/evolution-skill-discovery/src/tool.ts",
-      "specifier": "@deepseek-ai/dsh-tools"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/view-snapshot-store.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-skill-health/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-skill-health/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-skill-health/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-curator"
-    },
-    {
-      "file": "packages/evolution-skill-health/src/routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-skill-health/src/routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-state-domain/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state-storage"
-    },
-    {
       "file": "packages/evolution-state-domain/src/index.ts",
       "specifier": "@deepseek-ai/dsh-storage-domain"
-    },
-    {
-      "file": "packages/evolution-state-json/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-state-json/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-io"
-    },
-    {
-      "file": "packages/evolution-state-json/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state-storage"
-    },
-    {
-      "file": "packages/evolution-state-storage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-contract"
-    },
-    {
-      "file": "packages/evolution-state-storage/src/record-contract.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-contract"
-    },
-    {
-      "file": "packages/evolution-state/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-state-storage"
-    },
-    {
-      "file": "packages/evolution-threat/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-threat/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-tools"
-    },
-    {
-      "file": "packages/evolution-ui/src/panels/history/host.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-ui/src/panels/history/host.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-curator"
-    },
-    {
-      "file": "packages/evolution-ui/src/panels/history/routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/evolution-ui/src/panels/history/routes.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core/http-routes"
-    },
-    {
-      "file": "packages/evolution-ui/src/panels/history/unit-undoable.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/memory-files/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/memory-files/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-io"
-    },
-    {
-      "file": "packages/memory-files/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-memory"
-    },
-    {
-      "file": "packages/skill-usage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/skill-usage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-io"
     },
     {
       "file": "packages/skill-usage/src/index.ts",
@@ -771,23 +139,7 @@
     },
     {
       "file": "packages/tool-memory/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-approval"
-    },
-    {
-      "file": "packages/tool-memory/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/tool-memory/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-memory"
-    },
-    {
-      "file": "packages/tool-memory/src/index.ts",
       "specifier": "@deepseek-ai/dsh-system-prompt"
-    },
-    {
-      "file": "packages/tool-memory/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-tools"
     },
     {
       "file": "packages/tool-skill-manage/src/index.ts",
@@ -795,35 +147,11 @@
     },
     {
       "file": "packages/tool-skill-manage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-approval"
-    },
-    {
-      "file": "packages/tool-skill-manage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
-    },
-    {
-      "file": "packages/tool-skill-manage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-io"
-    },
-    {
-      "file": "packages/tool-skill-manage/src/index.ts",
       "specifier": "@deepseek-ai/dsh-skill"
     },
     {
       "file": "packages/tool-skill-manage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-skill-usage"
-    },
-    {
-      "file": "packages/tool-skill-manage/src/index.ts",
       "specifier": "@deepseek-ai/dsh-system-prompt"
-    },
-    {
-      "file": "packages/tool-skill-manage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-tools"
-    },
-    {
-      "file": "packages/tool-skill-manage/src/write-gates.ts",
-      "specifier": "@deepseek-ai/dsh-evolution-core"
     }
   ]
 }

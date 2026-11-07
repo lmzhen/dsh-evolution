@@ -6,7 +6,7 @@
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, registerEvolutionTool } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-memory'
 import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
@@ -312,7 +312,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   // S1-B3: gated on memoryDisabled — a disabled tool must not appear in the
   // catalog. (The approval runner below registers in both modes.)
   if (!memoryDisabled) {
-    ctx.tools.register(defineTool({
+    registerEvolutionTool(ctx, defineTool({
       name: 'memory',
       description: MEMORY_TOOL_DESCRIPTION,
       parameters: {

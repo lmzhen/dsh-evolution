@@ -11,7 +11,7 @@ type Context = CordisContext & HostContext
 import z from '@deepseek-ai/schemastery'
 import { DEFAULT_THREAT_MAX_SCAN_CHARS, EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { ScanOptions } from '@deepseek-ai/dsh-evolution-core'
-import type { ToolGuard } from '@deepseek-ai/dsh-tools'
+import { toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 
 export const name = 'evolution-threat'
 // T3-13 (A41): NO module-level `inject` export. The `tools` dependency is
@@ -127,7 +127,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // now fails `tsc` at the mirror instead of surfacing at runtime after an
     // upgrade. (The hand-written shape was
     // { guard(guard: (exec: { name; arguments }) => string | undefined): () => void }.)
-    const tools = toolCtx.get('tools') as { guard(guard: ToolGuard): () => void }
+    const tools = toolsPort(toolCtx)
+    if (tools === undefined) return
     toolCtx.effect(() => tools.guard((exec) => {
       const hit = scanToolArgs(exec.name, exec.arguments, maxScanChars, scanOptions)
       return hit ?? undefined
