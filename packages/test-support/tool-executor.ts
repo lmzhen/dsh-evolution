@@ -13,32 +13,37 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
   try {
     const mod = await import(/* @vite-ignore */ spec) as { NativeToolExecutor?: new (context: Context) => { execute(input: unknown): Promise<unknown> } }
     if (mod.NativeToolExecutor === undefined) return
-    // A testkit may already have registered the sole executor; setExecutor refuses
-    // a second one. Wrap that instance when present.
+    // Patch the class once: whichever executor the testkit selected shares it.
+    const proto = mod.NativeToolExecutor.prototype as unknown as {
+      __evolutionLegacyExecute?: boolean
+      execute(input: unknown): Promise<unknown>
+    }
+    if (proto.__evolutionLegacyExecute !== true) {
+      proto.__evolutionLegacyExecute = true
+      const originalExecute = proto.execute
+      proto.execute = async function (input: unknown): Promise<unknown> {
+        const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal } | null
+        if (one === null || typeof one !== 'object' || one.calls !== undefined || typeof one.name !== 'string') {
+          return originalExecute.call(this, input)
+        }
+        const block = {
+          type: 'tool-call' as const,
+          id: one.id ?? one.callId,
+          name: one.name,
+          arguments: typeof (one as { arguments?: unknown }).arguments === 'string'
+            ? (one as { arguments: string }).arguments
+            : JSON.stringify((one as { arguments?: unknown }).arguments ?? {}),
+        }
+        const batch = await originalExecute.call(this, { calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
+        return batch.results?.[0]
+      }
+    }
     const internals = tools as unknown as {
-      root?: { executor?: { execute(input: unknown): Promise<unknown> } }
-      scoped?: Map<unknown, { executor?: { execute(input: unknown): Promise<unknown> } }>
+      root?: { executor?: unknown }
+      scoped?: Map<unknown, { executor?: unknown }>
     }
     const existing = internals.root?.executor ?? internals.scoped?.values().next().value?.executor
-    const executor = existing ?? new mod.NativeToolExecutor(ctx)
-    const execute = executor.execute.bind(executor)
-    executor.execute = async (input: unknown) => {
-      const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal } | null
-      if (one === null || typeof one !== 'object' || one.calls !== undefined || typeof one.name !== 'string') {
-        return execute(input)
-      }
-      const block = {
-        type: 'tool-call' as const,
-        id: one.id ?? one.callId,
-        name: one.name,
-        arguments: typeof (one as { arguments?: unknown }).arguments === 'string'
-          ? (one as { arguments: string }).arguments
-          : JSON.stringify((one as { arguments?: unknown }).arguments ?? {}),
-      }
-      const batch = await execute({ calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
-      return batch.results?.[0]
-    }
-    if (existing === undefined) tools.setExecutor(executor)
+    if (existing === undefined) tools.setExecutor(new mod.NativeToolExecutor(ctx))
   } catch {
     // pre-0.2.2 platform: ToolsService owns execution
   }
