@@ -2,7 +2,7 @@
  * Host platform boundary for the evolution family (G1a).
  *
  * Feature packages import platform tool values/types from this subpath only;
- * architecture guard N36 keeps @deepseek-ai/dsh-* imports inside core/platform.
+ * the platform-boundary gate keeps @deepseek-ai/dsh-* imports inside core/platform.
  */
 export { defineTool } from '@deepseek-ai/dsh-tools'
 export type {
