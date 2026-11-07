@@ -4,7 +4,7 @@
  * The platform's registry reads are scope-sensitive: `skills.list(options)`
  * documents its `scope` as "the calling agent; OMITTED READS THE GLOBAL LAYER
  * ALONE", and `tools.get(name, scope?)` resolves visibility the same way
- * (packages/skill/skill/src/index.ts:113-120, packages/core/tools/src/index.ts:1194).
+ * (packages/skill/skill/src/index.ts:113-120, packages/core/tools/src/index.ts:239).
  * A preset-mounted family row therefore lives in its PRESET'S STANDING SCOPE,
  * so a scope-less read cannot see it — the asymmetry between "evolution mounted
  * onto the original preset" and "the evolution variant preset".

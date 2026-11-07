@@ -104,7 +104,7 @@ interface SessionProbeContext {
  * Does this session's scope see the family's model tools?
  *
  * The scope is the live agent's — the platform's own addressing for "what does
- * this session see" (`tools.get(name, scope)`, packages/core/tools/src/index.ts:1194).
+ * this session see" (`tools.get(name, scope)`, packages/core/tools/src/index.ts:239).
  * A session with no live agent (a finished or cold session) has no scope to ask
  * in, so it resolves to false; the consumers this gate serves only run for live
  * agents.
