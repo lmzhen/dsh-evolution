@@ -16,9 +16,11 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
     tools.setExecutor(new mod.NativeToolExecutor(ctx))
     // 0.2.2 execute() takes a batch. Family tests still exercise one call at a
     // time; accept the legacy single-call shape and return its first result.
-    const current = tools as unknown as { execute: (input: unknown, ...rest: unknown[]) => Promise<{ results?: readonly unknown[] }> }
-    const execute = current.execute.bind(current)
-    Object.defineProperty(tools, 'execute', {
+    const proto = Object.getPrototypeOf(tools) as { execute: (input: unknown, ...rest: unknown[]) => Promise<{ results?: readonly unknown[] }> }
+    if (Object.prototype.hasOwnProperty.call(proto, '__evolutionLegacyToolExecute')) return
+    const execute = proto.execute.bind(tools)
+    Object.defineProperty(proto, '__evolutionLegacyToolExecute', { value: true })
+    Object.defineProperty(proto, 'execute', {
       configurable: true,
       writable: true,
       value: async (input: unknown, ...rest: unknown[]) => {
