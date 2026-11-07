@@ -1,4 +1,3 @@
-import { emitAgentEvent } from '@deepseek-ai/dsh-agent'
 // @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -257,7 +256,7 @@ async function mountReviewFixture(options: {
   const emitInbox = (event: 'agent/inbox/inserted' | 'agent/inbox/claimed' | 'agent/inbox/discarded', payload: unknown): void => {
     const agent = (payload as { agent?: unknown }).agent
     if (agent === undefined) throw new Error('review fixture: agent missing on ' + event)
-    emitAgentEvent(ctx, agent as never, event, payload)
+    ;(ctx.emit as (name: string, data: unknown) => void)(event, { ...(payload as object), agent })
   }
   const record = (kind: 'inject' | 'followup', message: unknown, agent?: unknown): void => {
     if (options.announceInserted === true) emitInbox('agent/inbox/inserted', { message, ...(agent === undefined ? {} : { agent }) })
