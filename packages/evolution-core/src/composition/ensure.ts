@@ -2,7 +2,7 @@
 // Registration is LAZY (first run) and single-flight; the release lives on the calling fiber's
 // effect so an HMR reload cannot leave a stale preset registered.
 import type { Context } from '@deepseek-ai/cordis'
-import { presetsPort } from '../platform/index.ts'
+import { presetsPort } from '../platform/presets.ts'
 import { normalizeAllow } from './preset-ids.ts'
 import {
   composeRestrictedPresetDefinition,

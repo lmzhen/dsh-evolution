@@ -6,7 +6,8 @@
 // Function plugin (no default export): inject waits for the registry that identifies which child
 // belongs to this restricted preset; the restriction effect is owned by the child scope.
 import type { Context } from '@deepseek-ai/cordis'
-import { presetsPort, toolsPort } from './platform/index.ts'
+import { presetsPort } from './platform/presets.ts'
+import { toolsPort } from './platform/tools.ts'
 import { errorText } from './errors.ts'
 
 export const name = 'evolution-restrictor'
