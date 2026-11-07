@@ -9,6 +9,19 @@
 import type { GenerateOptions, StreamChunk, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Context } from '@deepseek-ai/cordis'
 
+export type EvolutionLlmFailureKind = 'model-unavailable' | 'no-route' | 'timeout' | 'cancelled' | 'transport'
+
+/** Typed auxiliary-LLM failure; callers may map these without parsing messages. */
+export class EvolutionLlmError extends Error {
+  readonly kind: EvolutionLlmFailureKind
+  constructor(kind: EvolutionLlmFailureKind, message: string, cause?: unknown) {
+    super(message)
+    this.name = 'EvolutionLlmError'
+    this.kind = kind
+    if (cause !== undefined) this.cause = cause
+  }
+}
+
 export type EvolutionLlmPurpose =
   | 'evolution-curator'
   | 'evolution-merge-engine'
@@ -79,7 +92,7 @@ export function llmPort(ctx: Context): LlmPort | undefined {
         yield* call.stream({ ...call.config, messages: request.messages, ...(request.signal === undefined ? {} : { signal: request.signal }) })
         return
       }
-      throw new Error('llm service has neither stream nor prepareCall')
+      throw new EvolutionLlmError('transport', 'llm service has neither stream nor prepareCall')
     },
     async completeText(request) {
       let text = ''
@@ -88,7 +101,7 @@ export function llmPort(ctx: Context): LlmPort | undefined {
         if (frame.type === 'text-delta' || frame.type === 'text') text += typeof frame.text === 'string' ? frame.text : ''
         if (frame.type === 'finish' && frame.reason?.kind === 'error') {
           const message = frame.reason.failure?.message
-          throw new Error('model call failed: ' + (typeof message === 'string' ? message : 'unknown'))
+          throw new EvolutionLlmError('transport', 'model call failed: ' + (typeof message === 'string' ? message : 'unknown'))
         }
       }
       return text
@@ -98,9 +111,20 @@ export function llmPort(ctx: Context): LlmPort | undefined {
 }
 
 /** Resolve the model route: agent-owned selection first, deployment default second. */
-export function modelRoute(ctx: Context, agent?: unknown): ModelRoute | undefined {
+export function modelRoute(ctx: Context, agent?: unknown, session?: unknown): ModelRoute | undefined {
   const owned = (agent as { model?: { current?(): ModelRoute | undefined } } | undefined)?.model?.current?.()
   if (owned !== undefined) return { provider: owned.provider, model: owned.model }
+  // 0.2.2 modelSelection is client-visible: snapshot() returns lastUsed/next.
+  if (session !== undefined) {
+    const registry = ctx.get('sessionProjections') as {
+      snapshot?(target: unknown, keys?: readonly string[]): { values?: Record<string, unknown> }
+    } | undefined
+    const value = registry?.snapshot?.(session, ['modelSelection'])?.values?.modelSelection as
+      | { lastUsed?: ModelRoute | null; next?: ModelRoute | null }
+      | undefined
+    const chosen = value?.next ?? value?.lastUsed
+    if (chosen !== undefined && chosen !== null) return { provider: chosen.provider, model: chosen.model }
+  }
   const fallback = (ctx.get('agentDefaultModel') as { currentSelection?(): ModelRoute | undefined } | undefined)?.currentSelection?.()
   return fallback === undefined ? undefined : { provider: fallback.provider, model: fallback.model }
 }

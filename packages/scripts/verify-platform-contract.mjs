@@ -663,6 +663,7 @@ const drift = []
 // anchor misses, so both tables are compared name by name and the seed's fields
 // key by key.
 const PLATFORM_PROFILE_SOURCE = 'packages/boot/app-boot/src/profile.ts'
+const PLATFORM_BUNDLES_SOURCE = 'packages/util/official-bundles/src/bundles.ts'
 const FAMILY_INSTALLER_SOURCE = 'scripts/install-layered.mjs'
 
 /**
@@ -742,13 +743,15 @@ function bundleTable(text, marker) {
 
 let seedSnapshotChecks = 0
 const platformProfilePath = join(upstream, ...PLATFORM_PROFILE_SOURCE.split('/'))
+const platformBundlesPath = join(upstream, ...PLATFORM_BUNDLES_SOURCE.split('/'))
 const familyInstallerPath = join(familyRoot, ...FAMILY_INSTALLER_SOURCE.split('/'))
-if (!existsSync(platformProfilePath) || !existsSync(familyInstallerPath)) {
-  drift.push(`the installer's profile seed snapshot cannot be compared: ${PLATFORM_PROFILE_SOURCE} or ${FAMILY_INSTALLER_SOURCE} is missing from the tree pair`)
+if (!existsSync(platformProfilePath) || !existsSync(platformBundlesPath) || !existsSync(familyInstallerPath)) {
+  drift.push(`the installer's profile seed snapshot cannot be compared: ${PLATFORM_PROFILE_SOURCE}, ${PLATFORM_BUNDLES_SOURCE} or ${FAMILY_INSTALLER_SOURCE} is missing from the tree pair`)
 } else {
   const platformProfileText = stripComments(readFileSync(platformProfilePath, 'utf8'))
+  const platformBundlesText = stripComments(readFileSync(platformBundlesPath, 'utf8'))
   const familyInstallerText = stripComments(readFileSync(familyInstallerPath, 'utf8'))
-  const platformTemplates = bundleTable(platformProfileText, 'export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = ')
+  const platformTemplates = bundleTable(platformBundlesText, 'export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = ')
   const familyTemplates = bundleTable(familyInstallerText, 'const PROFILE_SEED_TEMPLATES = ')
   if (platformTemplates === null || familyTemplates === null) {
     drift.push('the profile template table moved: PROFILE_TEMPLATES (platform) or PROFILE_SEED_TEMPLATES (installer) is no longer a literal table of `bundles` lists')
@@ -776,7 +779,7 @@ if (!existsSync(platformProfilePath) || !existsSync(familyInstallerPath)) {
     }
   }
   seedSnapshotChecks += 1
-  const platformDefault = /export const DEFAULT_PROFILE_BUNDLES[^=]*=\s*\[([^\]]*)\]/.exec(platformProfileText)
+  const platformDefault = /export const DEFAULT_PROFILE_BUNDLES[^=]*=\s*\[([^\]]*)\]/.exec(platformBundlesText)
   const familyDefault = /const DEFAULT_SEED_TEMPLATE = \{\s*bundles:\s*\[([^\]]*)\]/.exec(familyInstallerText)
   const platformDefaultBundles = platformDefault === null ? [] : [...platformDefault[1].matchAll(/'([^']+)'/g)].map(item => item[1])
   const familyDefaultBundles = familyDefault === null ? [] : [...familyDefault[1].matchAll(/'([^']+)'/g)].map(item => item[1])
