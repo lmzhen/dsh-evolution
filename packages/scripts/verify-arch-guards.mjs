@@ -89,7 +89,7 @@
  *       the calling scope: `skills.list()` documents its `scope` as the calling
  *       agent with "OMITTED READS THE GLOBAL LAYER ALONE"
  *       (skill/skill/src/index.ts:113-120) and `tools.get(name)` resolves the
- *       same way (core/tools/src/index.ts:1194 — the method never reads
+ *       same way (core/tools/src/index.ts:239 — the method never reads
  *       this.ctx). A preset-mounted family row lives in its preset's standing
  *       scope, so a scope-less read calls a healthy tree "empty"/"missing" —
  *       that is the whole asymmetry between "evolution mounted onto the

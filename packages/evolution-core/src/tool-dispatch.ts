@@ -6,9 +6,9 @@
  * mounted tool runtime's mode:
  *
  * - native mode: \`tool/call\` (with \`callId\`) settled by \`tool/result\`, the
- *   write sites being core/agent-loop/src/tool-calls.ts:264 and :282.
+ *   write sites being core/tools/src/batch.ts:247 and :256.
  * - PTC mode: \`tool/ptc-dispatch-start\` and \`tool/ptc-dispatch\` (with
- *   \`subCallId\`), the write sites being core/tools/src/ptc.ts:534 and :509.
+ *   \`subCallId\`), the write sites being core/tool-executor-ptc/src/ptc.ts:577 and :550.
  *
  * A consumer that matches a vocabulary directly therefore goes blind in the
  * other mode while still appearing to work — the defect this module exists to
@@ -443,7 +443,7 @@ export interface SupportReadHit {
 }
 
 /** Dispatch arguments: a JSON string in native mode and an already-parsed
- * object in PTC mode (core/tools/src/types.ts:11-23) — parsed defensively so no
+ * object in PTC mode (core/tool-executor-ptc/src/types.ts:11-23) — parsed defensively so no
  * consumer has to trust one modality's encoding. */
 function parsedArguments(signal: ToolDispatchSignal): Record<string, unknown> | null {
   let parsed: unknown = signal.arguments

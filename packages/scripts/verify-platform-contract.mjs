@@ -83,20 +83,6 @@ const CONTRACT_ANCHORS = [
     finding: 'P1-2',
   },
   {
-    id: 'tool-presentation-mode',
-    file: 'packages/core/tools/src/index.ts',
-    anchor: "export type ToolPresentationMode = 'native' | 'ptc'",
-    consumer: 'the `tools` row config contract the family bundles document',
-    finding: 'P2-A1',
-  },
-  {
-    id: 'tool-presentation-mode-schema',
-    file: 'packages/core/tools/src/index.ts',
-    anchor: "mode: z.union(['native', 'ptc'] as const).default('native'),",
-    consumer: 'the `tools` row config contract (default value)',
-    finding: 'P2-A1',
-  },
-  {
     id: 'command-input-images',
     file: 'packages/interaction/commands/src/types.ts',
     anchor: 'readonly attachments?: boolean',
@@ -104,24 +90,10 @@ const CONTRACT_ANCHORS = [
     finding: 'P2-A3',
   },
   {
-    id: 'code-dispatch-waterfall',
-    file: 'packages/core/tools/src/index.ts',
-    anchor: "'tools/ptc-dispatch-log'(this: Scoped<ToolRuntime>",
-    consumer: 'none — a waterfall, not the durable vocabulary; the family folds the DURABLE PTC pair (tool/ptc-dispatch-start + tool/ptc-dispatch) through evolution-core/src/tool-dispatch.ts',
-    finding: 'P2-A2',
-  },
-  {
     id: 'code-dispatch-event',
     file: 'packages/core/session/src/known-event-types.ts',
     anchor: "'tool/ptc-dispatch',",
     consumer: 'none — durable event renamed with the code→ptc rename',
-    finding: 'P2-A2',
-  },
-  {
-    id: 'code-only-section',
-    file: 'packages/core/tools/src/index.ts',
-    anchor: "name: 'tools:ptc-only',",
-    consumer: 'none — prompt section renamed with the code→ptc rename',
     finding: 'P2-A2',
   },
   {
@@ -146,20 +118,6 @@ const CONTRACT_ANCHORS = [
     anchor: 'DEPLOYMENT_PERSONA_PREFIX: 0,',
     consumer: 'none — the persona section split into prefix/suffix section orders',
     finding: 'P1-3 (order scale) / persona split',
-  },
-  {
-    id: 'dispatch-result-seam',
-    file: 'packages/core/tools/src/index.ts',
-    anchor: "'tools/result'(this: Scoped<ToolRuntime>",
-    consumer: 'none yet — the modality-free seam the rootfix P6 probe identified (2026-09-14): it fires for every execution that reaches a final result, native and PTC alike, with exec.parent set on a nested dispatch. The family still folds the durable log, so this anchor exists to make a rename visible BEFORE a consumer lands.',
-    finding: 'v41 §C (P6 probe)',
-  },
-  {
-    id: 'dispatch-result-seam-emit',
-    file: 'packages/core/tools/src/index.ts',
-    anchor: "'tools/result', exec, result,",
-    consumer: 'the seam ONE emission site (registry), recorded as the chokepoint a modality-blind consumer would hang on',
-    finding: 'v41 §C (P6 probe)',
   },
   {
     id: 'persona-order-literal',
@@ -422,34 +380,6 @@ function exportedNames(dir) {
  */
 const DISPATCH_WRITE_SITES = [
   {
-    id: 'native-call',
-    file: 'packages/core/agent-loop/src/tool-calls.ts',
-    needle: "append('tool/call'",
-    sites: 1,
-    owner: 'the agent loop is the ONLY writer of the native call vocabulary',
-  },
-  {
-    id: 'native-result',
-    file: 'packages/core/agent-loop/src/tool-calls.ts',
-    needle: "append('tool/result'",
-    sites: 1,
-    owner: 'the agent loop settles the native call it opened',
-  },
-  {
-    id: 'ptc-dispatch-start',
-    file: 'packages/core/tools/src/ptc.ts',
-    needle: "append('tool/ptc-dispatch-start'",
-    sites: 1,
-    owner: 'the PTC bridge opens one durable record per sub-dispatch',
-  },
-  {
-    id: 'ptc-dispatch-settle',
-    file: 'packages/core/tools/src/ptc.ts',
-    needle: "append('tool/ptc-dispatch'",
-    sites: 1,
-    owner: 'and settles the same record (the family folds the pair into ONE dispatch)',
-  },
-  {
     id: 'registry-writes-none',
     file: 'packages/core/tools/src/index.ts',
     needle: "append('tool/call'",
@@ -506,16 +436,6 @@ const SEMANTIC_ASSERTIONS = [
     item: 'command-goal',
     consumer: 'the goal command stays on the host plane; the family command plane owns the human command',
     finding: 'P2-D2',
-  },
-  {
-    id: 'tools-get-scope-doc',
-    file: 'packages/core/tools/src/index.ts',
-    kind: 'doc-line',
-    signature: 'get(name: string, scope?: ScopeKey)',
-    doc: '@param scope',
-    anchor: 'omitted = the global view',
-    consumer: 'evolution-core/src/scope.ts and the N16 callingScope gate: an omitted scope IS the global view',
-    finding: 'N16',
   },
   {
     id: 'session-format-version-is-4',
