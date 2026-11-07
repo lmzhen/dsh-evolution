@@ -3,10 +3,6 @@
   "violations": [
     {
       "file": "packages/evolution-commands/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-commands"
-    },
-    {
-      "file": "packages/evolution-commands/src/index.ts",
       "specifier": "@deepseek-ai/dsh-llm"
     },
     {
@@ -82,10 +78,6 @@
       "specifier": "@deepseek-ai/dsh-skill"
     },
     {
-      "file": "packages/evolution-skill-discovery/src/awareness.ts",
-      "specifier": "@deepseek-ai/dsh-system-prompt"
-    },
-    {
       "file": "packages/evolution-skill-discovery/src/catalog-codec.ts",
       "specifier": "@deepseek-ai/dsh-llm"
     },
@@ -138,20 +130,12 @@
       "specifier": "@deepseek-ai/dsh-session"
     },
     {
-      "file": "packages/tool-memory/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-system-prompt"
-    },
-    {
       "file": "packages/tool-skill-manage/src/index.ts",
       "specifier": "@deepseek-ai/dsh-agent"
     },
     {
       "file": "packages/tool-skill-manage/src/index.ts",
       "specifier": "@deepseek-ai/dsh-skill"
-    },
-    {
-      "file": "packages/tool-skill-manage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-system-prompt"
     }
   ]
 }
