@@ -143,18 +143,6 @@ runs:
         # the root script, so the overlay does the same before running them.
         pnpm run build:native-system
 
-    - name: Expose the platform tools source entry for the externalized family build
-      shell: bash
-      working-directory: upstream
-      run: |
-        # The family's core/platform re-exports defineTool; the built chunk keeps
-        # @deepseek-ai/dsh-tools as an external import. A released source checkout
-        # has no packages/core/tools/lib/index.js, so Vitest resolves the package
-        # export to a missing entry. Point it at the same source file the upstream
-        # tsconfig path facade uses.
-        mkdir -p packages/core/tools/lib
-        printf "export * from '../src/index.ts'\n" > packages/core/tools/lib/index.js
-
     - name: Build, test and lint
       shell: bash
       working-directory: upstream
