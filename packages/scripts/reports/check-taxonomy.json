@@ -810,7 +810,6 @@
         "evolution-core::tests/opt-in.spec.ts",
         "evolution-core::tests/preset-composition.spec.ts",
         "evolution-core::tests/session-projection.spec.ts",
-        "evolution-core::tests/tool-dispatch.spec.ts",
         "evolution-curator::tests/boundary.spec.ts",
         "evolution-feedback::tests/feedback.spec.ts",
         "evolution-feedback::tests/io-evidence-fs.spec.ts",
@@ -1630,7 +1629,6 @@
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
         "evolution-core::tests/threats.spec.ts",
-        "evolution-core::tests/tool-dispatch.spec.ts",
         "evolution-core::tests/tree-lock-epoch.spec.ts",
         "evolution-core::tests/tree-lock.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
@@ -2033,7 +2031,7 @@
     },
     "ci-only": {
       "gates": 12,
-      "specs": 74
+      "specs": 73
     },
     "full(ci=off)": {
       "gates": 74,
@@ -2041,12 +2039,12 @@
     },
     "full(ci=on)": {
       "gates": 86,
-      "specs": 443
+      "specs": 442
     }
   },
   "specs": {
-    "total": 443,
-    "marked": 443,
+    "total": 442,
+    "marked": 442,
     "unmarked": 0
   }
 }
