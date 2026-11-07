@@ -30,6 +30,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'evolutionMerge', feature: 'merge command delegation and the merge doctor fact', side: 'host' },
   { service: 'hmr', feature: 'the preset install read-merge-write commit (the platform HMR lock serializes it)', side: 'host' },
   { service: 'evolutionMemoryBudget', feature: 'the memory-budget divergence section of this report', side: 'host' },
+  { service: 'evolutionPlatform', feature: 'the single host edge object behind every family platform port', side: 'host' },
   { service: 'evolutionPolicy', feature: 'the policy snapshot that shadows row knobs', side: 'host' },
   { service: 'evolutionReplay', feature: '/evolution replay', side: 'host' },
   { service: 'evolutionState', feature: 'the state facade behind activity and replay', side: 'host' },

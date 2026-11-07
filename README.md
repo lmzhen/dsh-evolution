@@ -8,6 +8,10 @@ That lifecycle includes creation, discovery, use, revision after review, restruc
 
 It does not modify or train the model, and it does not provide a hosted model service. DSH's configured model performs the semantic work, while the plugin's write gates, snapshots, history and approval mechanisms constrain changes and recovery.
 
+## Platform line
+
+The family targets DeepSeek Harness `0.2.2-rc.1` only. Published packages declare the `^0.2.2-rc.0` peer range and the `>=0.2.2-rc.0 <0.2.3-0` engine range. The single host edge is the `evolutionPlatform` service; features reach it through the family's platform ports, never by importing host internals.
+
 ## What is a skill?
 
 Early language models generated text autoregressively. Questions, instructions and answers were linked statistically, so prompts that described the domain, task and constraints precisely usually improved the result. That relationship was a foundation of early prompt engineering.

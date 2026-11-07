@@ -324,10 +324,10 @@
       },
       "must": [
         {
-          "text": "**Validated platform line: DSH `0.2.1-rc.3`.**"
+          "text": "**Validated platform line: DSH `0.2.2-rc.1`.**"
         },
         {
-          "text": "`^0.2.1-rc.2`"
+          "text": "`^0.2.2-rc.0`"
         }
       ],
       "forbid": [
@@ -579,7 +579,7 @@
         "adapter": {
           "script": "lib-line.mjs",
           "sha256": "1931db3d233c642d15bb2994408e917a70819800fa876cbe03446566bf12dbcb",
-          "expectedLine": "0.2.1-rc.3",
+          "expectedLine": "0.2.2-rc.1",
           "extendsExternal": {
             "path": "D:/dsh/_tools/lib-line.mjs",
             "sha256": "1931db3d233c642d15bb2994408e917a70819800fa876cbe03446566bf12dbcb"
@@ -680,7 +680,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "475998f2561d13a9c500f74705061093c9d8fdb25a4e7f2f89bf5b9ee25c6c76",
+        "sha256": "53bce1bc090cf0d64a68ed68896aaaa1ac422aa0c45858c8830aebf70271cee3",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
