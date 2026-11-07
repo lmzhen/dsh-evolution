@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Context } from '@deepseek-ai/cordis'
-import { mountToolHost } from '../../test-support/tool-host.ts'
+import { executeOne, mountToolHost } from '../../test-support/tool-host.ts'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import EvolutionIoRegistry from '../../evolution-io/src/index.ts'
@@ -34,7 +34,7 @@ it('executes skill_search in mode:off without policy TDZ', async () => {
   const ctx = await base()
   await ctx.plugin(mainEntry, { featureEpoch: 'e', mode: 'off', searchEnabled: true })
   const agent = { id: 'search-agent', session: { id: 'search-session', header: { cwd: process.cwd() } } } as unknown as Agent
-  const result = await ctx.get('tools')!.execute({ signal: new AbortController().signal, callId: ToolCallId('mode-off-search'), name: 'skill_search', arguments: { query: 'anything' }, agent })
+  const result = await executeOne(ctx, { signal: new AbortController().signal, callId: ToolCallId('mode-off-search'), name: 'skill_search', arguments: { query: 'anything' }, agent })
   const text = JSON.stringify(result.content)
   expect(text).toContain('Found 0 skill result(s)')
   expect(text).not.toContain('degraded')
