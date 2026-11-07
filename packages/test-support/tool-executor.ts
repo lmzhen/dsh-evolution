@@ -12,7 +12,20 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
   const spec = '@deepseek-ai/dsh-tool-executor-native'
   try {
     const mod = await import(/* @vite-ignore */ spec) as { NativeToolExecutor?: new (context: Context) => unknown }
-    if (mod.NativeToolExecutor !== undefined) tools.setExecutor(new mod.NativeToolExecutor(ctx))
+    if (mod.NativeToolExecutor === undefined) return
+    tools.setExecutor(new mod.NativeToolExecutor(ctx))
+    // 0.2.2 execute() takes a batch. Family tests still exercise one call at a
+    // time; accept the legacy single-call shape and return its first result.
+    const current = tools as unknown as { execute: (input: unknown, ...rest: unknown[]) => Promise<{ results?: readonly unknown[] }> }
+    const execute = current.execute.bind(current)
+    current.execute = async (input: unknown, ...rest: unknown[]) => {
+      const one = input as { calls?: unknown; name?: unknown; signal?: AbortSignal } | null
+      if (one !== null && typeof one === 'object' && one.calls === undefined && typeof one.name === 'string') {
+        const batch = await execute({ calls: [one], signal: one.signal ?? new AbortController().signal }, ...rest)
+        return batch.results?.[0] as never
+      }
+      return execute(input, ...rest) as never
+    }
   } catch {
     // pre-0.2.2 platform: ToolsService owns execution
   }
