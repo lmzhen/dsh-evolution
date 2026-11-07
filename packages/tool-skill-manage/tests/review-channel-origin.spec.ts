@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 /**
  * S2.2 (v37 P1-2): `skill_manage` reads the family review-channel mark.
@@ -35,6 +36,7 @@ async function setup() {
   process.env.DSH_HOME = root
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
   await ctx.plugin(SkillUsageRegistry, { root })

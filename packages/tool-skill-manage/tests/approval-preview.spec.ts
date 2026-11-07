@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 /**
  * The staged skill write's PREVIEW: what the replay would store, resolved without writing.
@@ -29,6 +30,7 @@ async function setup(): Promise<{ ctx: Context; root: string; home: string | und
   process.env.DSH_HOME = root
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
   await ctx.plugin(SkillUsageRegistry, { root })

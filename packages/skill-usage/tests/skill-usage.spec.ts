@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'

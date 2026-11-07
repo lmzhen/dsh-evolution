@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { expect, it } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -17,6 +18,7 @@ async function base(): Promise<Context> {
   ctx.evolutionIo.registerProvider({ name: 'fake', readText: async () => null, writeText: async () => {}, remove: async () => {}, list: async () => [], exists: async () => false, rename: async () => {}, copy: async () => {} })
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(SkillRegistry)
   return ctx
 }

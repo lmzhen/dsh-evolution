@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -72,6 +73,7 @@ async function setup(
   process.env.DSH_HOME = root
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
   await ctx.plugin(SkillUsageRegistry, { root })

@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -10,6 +11,7 @@ it('registers skill_search with the static schema and executes provider results'
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(Object.assign((inner: Context) => {
     registerSkillSearchTool(inner, { search: async ({ query }) => ({ results: [{ name: query, description: 'found' }], truncated: false }) })
   }, { inject: ['tools'] }))
@@ -26,6 +28,7 @@ it('passes a current-view allowed set into the search provider', async () => {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(Object.assign((inner: Context) => {
     registerSkillSearchTool(inner, {
       allowedSkillKeys: () => new Set(['alpha']),

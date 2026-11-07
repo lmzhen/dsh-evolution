@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 /**
  * The family's dispatch reader: one signal per platform dispatch, in both
@@ -102,6 +103,7 @@ async function nativeLog(rawCallId: string, name: string, args: unknown, isError
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ToolRuntime)
+  await ensureNativeToolExecutor(ctx)
   ctx.tools.register(skillTool())
   const session = ctx.sessions.create(SessionId('spec-native-' + rawCallId))
   const agent = { id: SessionId('spec-native-' + rawCallId), session, ctx } as never

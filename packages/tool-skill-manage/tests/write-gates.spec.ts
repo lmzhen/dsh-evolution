@@ -1,3 +1,4 @@
+import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 /**
  * The write-admission sequence (design dsh-evolution-write-gate-design.md §3/§4.2).
@@ -63,6 +64,7 @@ async function setup(config: Record<string, unknown> = { skillWriteConfirm: 'ask
   const root = await tempHome('dsh-write-gates-')
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
+  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
   await ctx.plugin(SkillUsageRegistry, { root })
