@@ -7,7 +7,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 // platform-declaration anchor: this composition probes skills/workingDirectory/tools/evolutionIo/systemPrompt; all are declared in core PLATFORM_SERVICE_PROBES.
-import { authorityFrom, evolutionIoAdapter, evolutionRoot, installEvolutionProjections, newSkillLibrary, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, evolutionIoAdapter, evolutionRoot, newSkillLibrary, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { LlmStreamService } from './domain-generation-llm.ts'
 import { DomainGenerationCoordinator } from './domain-generation-coordinator.ts'
@@ -86,7 +86,6 @@ function searchUnavailable() {
 
 /** Apply the full production discovery composition. */
 export function apply(ctx: Context, config: Config): void {
-  installEvolutionProjections(ctx)
   if (typeof config.featureEpoch !== 'string' || config.featureEpoch.length === 0) throw new Error('evolution-skill-discovery: featureEpoch is required')
   const evolutionIo = (ctx as Context & { evolutionIo: { provider(): EvolutionIoLike } }).evolutionIo
   const io = evolutionIoAdapter(() => evolutionIo.provider())
@@ -161,10 +160,10 @@ export function apply(ctx: Context, config: Config): void {
     const scope = await readLayer(cwd, config.scopePolicyPath) ?? config.scopePolicy
     return new DomainPolicyStore({ global: globalPolicy, ...workspace === undefined ? {} : { workspace }, ...scope === undefined ? {} : { scope } })
   }
-  const projections = ctx.get('sessionProjections')
+  const projections = ctx.get('evolutionProjections') as { history(session: unknown): EvolutionProjectionHistoryState | undefined } | undefined
   const runtime = new ProjectionRuntime({
     skillIndexSource: source, map, policy, policyFor, journal, workingDirectory,
-    history: agent => projections?.stateOf(agent.session, 'evolutionProjectionHistory'),
+    history: agent => projections?.history(agent.session),
     warn: message => ctx.logger.warn(message),
     featureEpoch: config.featureEpoch, codecVersion: '1', adapterVersion: '1', projectionSchemaVersion: '1', mode,
     ...config.maxCards === undefined ? {} : { maxCards: config.maxCards },

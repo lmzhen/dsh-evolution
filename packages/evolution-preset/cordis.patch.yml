@@ -12,6 +12,10 @@
 # (P2-6): the effective one is whichever registered first unless a profile
 # overlay pins `config: { provider: ... }` on the `evolution-state` row.
 - insert:
+    # ── runtime services: one projection owner per composition ───────────────
+    - id: evolution-core-runtime
+      name: '@deepseek-ai/dsh-evolution-core/runtime'
+
     # ── control plane ───────────────────────────────────────────────────────
     - id: evolution-policy
       name: '@deepseek-ai/dsh-evolution-policy'

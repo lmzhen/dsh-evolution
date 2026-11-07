@@ -14,19 +14,7 @@
       "specifier": "@deepseek-ai/dsh-scope"
     },
     {
-      "file": "packages/evolution-core/src/session-projection.ts",
-      "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
-      "file": "packages/evolution-core/src/session-projection.ts",
-      "specifier": "@deepseek-ai/dsh-session-projection"
-    },
-    {
       "file": "packages/evolution-core/src/signals.ts",
-      "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
-      "file": "packages/evolution-core/src/skill-reads.ts",
       "specifier": "@deepseek-ai/dsh-session"
     },
     {

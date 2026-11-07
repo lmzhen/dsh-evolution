@@ -23,6 +23,10 @@
 # with the layered Evolution agent preset (the preset scope's model rows would
 # double-mount the tools). Single install only.
 - insert:
+    # ── runtime services: one projection owner per composition ───────────────
+    - id: evolution-core-runtime
+      name: '@deepseek-ai/dsh-evolution-core/runtime'
+
     # ── control plane ───────────────────────────────────────────────────────
     - id: evolution-policy
       name: '@deepseek-ai/dsh-evolution-policy'

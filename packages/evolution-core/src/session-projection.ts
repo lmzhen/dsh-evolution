@@ -4,11 +4,10 @@
  * 0.2.x deprecates the synchronous log reads (`Session.snapshotEvents` — "existing logic may
  * remain unmigrated for now, but new calls are prohibited",
  * `core/session/src/index.ts:639-658`) and drives DOMAIN-OWNED units instead: a registered unit
- * folds every committed event once, the registry owns the subscription and the per-session
- * watermark, and a reader asks for the current state
- * (`session/session-projection/src/index.ts` — `register`/`stateOf`). Each unit here carries
- * exactly what one pure family reader derives from a log, so that reader keeps its pure form and
- * gains a projection-backed one beside it.
+ * folds every committed event once, the runtime service owns the handle and the registry, and a
+ * reader asks that service for the current state. Each unit here carries exactly what one pure
+ * family reader derives from a log, so that reader keeps its pure form and gains a
+ * projection-backed one beside it.
  *
  * State stays bounded. The evidence unit keeps the SPARSE boundary seqs and answers the dense
  * question by complement: a content-seq set grows with every session event, while a turn/step
@@ -22,8 +21,7 @@
  */
 import { z } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Session } from '@deepseek-ai/dsh-session'
-import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
+import type { EvolutionProjectionDefinition, Session } from './platform/index.ts'
 import { isBookkeepingFrame, type EvidenceIndex } from './evidence.ts'
 import { dispatchPathOf, dispatchStepOf, isSkillReadToolName, skillReadNameOf } from './tool-dispatch.ts'
 import { foldTurnEvent, initialTurnFold, type TurnFoldState, type TurnSignals } from './signals.ts'
@@ -55,15 +53,6 @@ export interface EvolutionEvidenceState {
   readonly bookkeeping: readonly number[]
 }
 
-declare module '@deepseek-ai/dsh-session-projection/types' {
-  interface SessionProjectionStateMap {
-    /** The curator's idleness gate input: the newest event time of one session. */
-    evolutionActivity: EvolutionActivityState
-    /** The plan path's evidence-class input: the boundary seqs of one session. */
-    evolutionEvidence: EvolutionEvidenceState
-  }
-}
-
 // Bounds are the persisted-row validation bounds (a millisecond timestamp): the clamp guard
 // requires every `z.number()` field to carry one on the same line.
 const MAX_TIMESTAMP_MS = 8_640_000_000_000_000
@@ -76,7 +65,7 @@ const evidenceStateSchema = z.object({
 }).strict()
 
 /** The `evolutionActivity` unit (host-only: no client view is registered for it). */
-export const evolutionActivityProjection: ProjectionDefinition<'evolutionActivity'> = {
+export const evolutionActivityProjection: EvolutionProjectionDefinition<'evolutionActivity', EvolutionActivityState> = {
   key: 'evolutionActivity',
   stateVersion: 1,
   stateSchema: activityStateSchema,
@@ -90,7 +79,7 @@ export const evolutionActivityProjection: ProjectionDefinition<'evolutionActivit
 }
 
 /** The `evolutionEvidence` unit (host-only: no client view is registered for it). */
-export const evolutionEvidenceProjection: ProjectionDefinition<'evolutionEvidence'> = {
+export const evolutionEvidenceProjection: EvolutionProjectionDefinition<'evolutionEvidence', EvolutionEvidenceState> = {
   key: 'evolutionEvidence',
   stateVersion: 1,
   stateSchema: evidenceStateSchema,
@@ -177,17 +166,6 @@ export interface EvolutionProjectionHistoryState {
   readonly digests: readonly string[]
 }
 
-declare module '@deepseek-ai/dsh-session-projection/types' {
-  interface SessionProjectionStateMap {
-    /** The skill names one session read, for the read-before-write gate and the review plan path. */
-    evolutionReads: EvolutionReadsState
-    /** Catalog/projection frames and digests, newest last; bounded so the state cannot grow with the session. */
-    evolutionProjectionHistory: EvolutionProjectionHistoryState
-    /** The open turn's window signals, for the review cadence. */
-    evolutionSignals: EvolutionSignalsState
-  }
-}
-
 const projectionHistorySchema = z.object({
   catalogs: z.array(z.object({
     text: z.string(),
@@ -223,7 +201,7 @@ const signalsStateSchema = z.object({
 }).strict()
 
 /** The `evolutionProjectionHistory` unit (host-only). */
-export const evolutionProjectionHistoryProjection: ProjectionDefinition<'evolutionProjectionHistory'> = {
+export const evolutionProjectionHistoryProjection: EvolutionProjectionDefinition<'evolutionProjectionHistory', EvolutionProjectionHistoryState> = {
   key: 'evolutionProjectionHistory',
   stateVersion: 1,
   stateSchema: projectionHistorySchema,
@@ -248,7 +226,7 @@ export const evolutionProjectionHistoryProjection: ProjectionDefinition<'evoluti
 }
 
 /** The `evolutionReads` unit (host-only: no client view is registered for it). */
-export const evolutionReadsProjection: ProjectionDefinition<'evolutionReads'> = {
+export const evolutionReadsProjection: EvolutionProjectionDefinition<'evolutionReads', EvolutionReadsState> = {
   key: 'evolutionReads',
   stateVersion: 1,
   stateSchema: readsStateSchema,
@@ -299,7 +277,7 @@ export const evolutionReadsProjection: ProjectionDefinition<'evolutionReads'> = 
 }
 
 /** The `evolutionSignals` unit (host-only: no client view is registered for it). */
-export const evolutionSignalsProjection: ProjectionDefinition<'evolutionSignals'> = {
+export const evolutionSignalsProjection: EvolutionProjectionDefinition<'evolutionSignals', EvolutionSignalsState> = {
   key: 'evolutionSignals',
   stateVersion: 1,
   stateSchema: signalsStateSchema,
@@ -315,44 +293,23 @@ export const evolutionSignalsProjection: ProjectionDefinition<'evolutionSignals'
   },
 }
 
-/**
- * Register the family's units on the calling context's fiber.
- *
- * Called by the READERS (not by a plugin's mount) and idempotent by the registry's own reference
- * count: the first read of a foldable session installs the definitions, later reads count as
- * co-owners, and the keys survive until the last registrant unloads
- * (`session-projection/src/index.ts:273-292`). Registering at the read is what keeps a session
- * view the registry cannot fold (`isProjectableSession`) from ever reaching its drive — the
- * registry folds the in-memory log on first touch, so a unit that appears mid-session is still
- * correct (`:602-630`).
- *
- * Idempotent by design, so a plugin mounting later does not need its own call.
- * @param ctx - the mounting plugin's context.
- */
-export function installEvolutionProjections(ctx: Context): void {
-  const register = (registry: Context['sessionProjections']): void => {
-    registry.register(evolutionActivityProjection)
-    registry.register(evolutionEvidenceProjection)
-    registry.register(evolutionReadsProjection)
-    registry.register(evolutionProjectionHistoryProjection)
-    registry.register(evolutionSignalsProjection)
-  }
-  // Already-mounted registry first: a reader that runs in the same tick as its own mount
-  // (a unit spec, an assembly-time probe) must see its units registered, and the injected
-  // callback of a not-yet-available service is not guaranteed to have run by then.
-  // platform-declaration anchor: the platform’s `sessionProjections` service (optional; undefined ⇒ no measurement)
-  const mounted = ctx.get('sessionProjections')
-  if (mounted !== undefined) {
-    register(mounted)
-    return
-  }
-  ctx.inject(['sessionProjections'], (injected) => { register(injected.sessionProjections) })
+/** The read face the runtime service provides to the family's pure readers. */
+export interface EvolutionProjectionReader {
+  activity(session: Session): EvolutionActivityState | undefined
+  evidence(session: Session): EvolutionEvidenceState | undefined
+  reads(session: Session): EvolutionReadsState | undefined
+  history(session: Session): EvolutionProjectionHistoryState | undefined
+  signals(session: Session): EvolutionSignalsState | undefined
+}
+
+function projectionService(ctx: Context): EvolutionProjectionReader | undefined {
+  return ctx.get('evolutionProjections') as EvolutionProjectionReader | undefined
 }
 
 /**
- * Time of one session's newest event, or `undefined` when the unit is not installed.
+ * Time of one session's newest event, or undefined when the unit is not available.
  *
- * The curator's idleness gate reads this instead of folding the session log; `undefined` is a
+ * The curator's idleness gate reads this instead of folding the session log; undefined is a
  * measurement that did not happen, which the gate answers with the deployment's fail-open policy.
  * @param ctx - a context of the runtime (the service is read from the global store).
  * @param session - the session to ask about.
@@ -360,27 +317,24 @@ export function installEvolutionProjections(ctx: Context): void {
  */
 export function sessionLastEventTime(ctx: Context, session: Session): number | undefined {
   if (!isProjectableSession(session)) return undefined
-  installEvolutionProjections(ctx)
-  const state = ctx.get('sessionProjections')?.stateOf(session, 'evolutionActivity')
+  const state = projectionService(ctx)?.activity(session)
   if (state === undefined || state.lastEventTime === 0) return undefined
   return state.lastEventTime
 }
 
 /**
- * The skill names one session read through a non-failed dispatch, or `undefined` when the session
- * cannot be projected (a structural view, or a host without the registry).
+ * The skill names one session read through a non-failed dispatch, or undefined when the session
+ * cannot be projected (a structural view, or a host without the runtime service).
  *
- * `undefined` is NOT an empty set: the tool path's read-before-write gate keeps its previous
- * behavior rather than refusing every write in a composition whose session object is a bare stub
- * (`skill-reads.ts` documents that three-state posture).
+ * undefined is NOT an empty set: the tool path's read-before-write gate keeps its previous
+ * behavior rather than refusing every write in a composition whose session object is a bare stub.
  * @param ctx - a context of the runtime.
  * @param session - the session whose reads are wanted.
  * @returns the names read, or undefined when the log cannot be folded.
  */
 export function sessionReadNames(ctx: Context, session: Session): ReadonlySet<string> | undefined {
   if (!isProjectableSession(session)) return undefined
-  installEvolutionProjections(ctx)
-  const state = ctx.get('sessionProjections')?.stateOf(session, 'evolutionReads')
+  const state = projectionService(ctx)?.reads(session)
   if (state === undefined) return undefined
   const names = new Set<string>()
   for (const entry of state.reads) {
@@ -390,10 +344,10 @@ export function sessionReadNames(ctx: Context, session: Session): ReadonlySet<st
 }
 
 /**
- * The open turn's window signals, or `undefined` when the session cannot be projected.
+ * The open turn's window signals, or undefined when the session cannot be projected.
  *
- * The window is the events since the newest `turn/start`, folded by the same `foldTurnEvent`
- * `observeEvent` uses; `undefined` means the caller has no measurement (a structural view), not
+ * The window is the events since the newest turn/start, folded by the same foldTurnEvent
+ * observeEvent uses; undefined means the caller has no measurement (a structural view), not
  * that the turn was empty.
  * @param ctx - a context of the runtime.
  * @param session - the session whose open turn is being judged.
@@ -401,26 +355,24 @@ export function sessionReadNames(ctx: Context, session: Session): ReadonlySet<st
  */
 export function sessionTurnSignals(ctx: Context, session: Session): TurnSignals | undefined {
   if (!isProjectableSession(session)) return undefined
-  installEvolutionProjections(ctx)
-  const state = ctx.get('sessionProjections')?.stateOf(session, 'evolutionSignals')
+  const state = projectionService(ctx)?.signals(session)
   if (state === undefined) return undefined
   const { substantive, toolCalls, userChars, assistantChars, memorySignal, skillSignal } = state.turn
   return { substantive, toolCalls, userChars, assistantChars, memorySignal, skillSignal }
 }
 
 /**
- * The evidence index of one session, or `undefined` when the log cannot be classified.
+ * The evidence index of one session, or undefined when the log cannot be classified.
  *
- * `undefined` covers both the missing unit and a log whose frames carry no seq: the plan path's
- * `EVIDENCE_CLASS` row is report-only and must stay silent rather than report every op.
+ * undefined covers both the missing unit and a log whose frames carry no seq: the plan path's
+ * EVIDENCE_CLASS row is report-only and must stay silent rather than report every op.
  * @param ctx - a context of the runtime.
  * @param session - the session the review plan is authored against.
  * @returns an index answering "does this seq carry content?".
  */
 export function sessionEvidenceIndex(ctx: Context, session: Session): EvidenceIndex | undefined {
   if (!isProjectableSession(session)) return undefined
-  installEvolutionProjections(ctx)
-  const state = ctx.get('sessionProjections')?.stateOf(session, 'evolutionEvidence')
+  const state = projectionService(ctx)?.evidence(session)
   if (state === undefined || state.sequenced === 0) return undefined
   const { through, bookkeeping } = state
   return {

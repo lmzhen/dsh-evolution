@@ -12,6 +12,9 @@ export type {
   ToolRestriction,
 } from '@deepseek-ai/dsh-tools'
 export type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
+export type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 export type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
+export { projectionPort } from './projections.ts'
+export type { EvolutionProjectionDefinition, ProjectionHandleLike, ProjectionPort } from './projections.ts'
 export { registerEvolutionTool, toolsPort } from './tools.ts'
 export type { ToolsPort } from './tools.ts'

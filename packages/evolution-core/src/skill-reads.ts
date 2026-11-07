@@ -24,9 +24,9 @@
  * @module @deepseek-ai/dsh-evolution-core
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { Session } from '@deepseek-ai/dsh-session'
+import type { Session } from './platform/index.ts'
 import { collectReadSkillNames, collectReadSupportFiles, DEFAULT_SUPPORT_READ_TOOL_NAMES, supportFileReadFromPath } from './tool-dispatch.ts'
-import { installEvolutionProjections, isProjectableSession, sessionReadNames } from './session-projection.ts'
+import { isProjectableSession, sessionReadNames, type EvolutionReadsState } from './session-projection.ts'
 
 /**
  * The family's OWN structural view of a session log, for a caller that holds no platform `Session`
@@ -91,8 +91,8 @@ export function sessionReadSupportFiles(
 ): ReadonlyMap<string, ReadonlySet<string>> | undefined {
   if (session === undefined) return undefined
   if (isProjectableSession(session as Session)) {
-    installEvolutionProjections(ctx)
-    const state = ctx.get('sessionProjections')?.stateOf(session as Session, 'evolutionReads')
+    const projections = ctx.get('evolutionProjections') as { reads(session: Session): EvolutionReadsState | undefined } | undefined
+    const state = projections?.reads(session as Session)
     if (state !== undefined) {
       const toolNames = options.toolNames ?? DEFAULT_SUPPORT_READ_TOOL_NAMES
       const reads = new Map<string, Set<string>>()

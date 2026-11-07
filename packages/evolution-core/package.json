@@ -30,6 +30,10 @@
       "types": "./lib/types/http-routes.d.ts",
       "default": "./lib/http-routes.js"
     },
+    "./runtime": {
+      "types": "./lib/types/runtime/plugin.d.ts",
+      "default": "./lib/runtime/plugin.js"
+    },
     "./platform": {
       "types": "./lib/types/platform/index.d.ts",
       "default": "./lib/platform/index.js"

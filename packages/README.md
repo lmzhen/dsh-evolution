@@ -85,7 +85,7 @@ Build, test, gates and layout rules are in [docs/developer/development.md](../do
 
 ## Canonical facts (single source)
 
-The family uses one naming rule for the services it provides: **every key is prefixed `evolution`**. The two registered exceptions are `memory` and `skillUsage`. Service keys: `evolutionState`, `evolutionStateStorage`, `evolutionPolicy`, `evolutionIo`, `evolutionCurator`, `evolutionFeedback`, `evolutionReplay`, `evolutionApproval`, `evolutionMerge`, `evolutionMemoryBudget`.
+The family uses one naming rule for the services it provides: **every key is prefixed `evolution`**. The two registered exceptions are `memory` and `skillUsage`. Service keys: `evolutionState`, `evolutionStateStorage`, `evolutionPolicy`, `evolutionIo`, `evolutionCurator`, `evolutionFeedback`, `evolutionReplay`, `evolutionApproval`, `evolutionMerge`, `evolutionMemoryBudget`, `evolutionProjections`.
 
 **Validated platform line: DSH `0.2.1-rc.3`.** Published `@deepseek-ai/dsh-*` ranges declare `^0.2.1-rc.2`; prerelease ranges do not cross platform lines.
 

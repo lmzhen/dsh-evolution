@@ -16,7 +16,7 @@ import type { PlatformServiceProbe } from '@deepseek-ai/dsh-evolution-contract'
 
 export type { PlatformServiceProbe } from '@deepseek-ai/dsh-evolution-contract'
 
-/** The 30 probes, in service-name order (the guard checks this list against the tree). */
+/** The probes, in service-name order (the guard checks this list against the tree). */
 export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.freeze([
   { service: 'agentDefaultModel', feature: 'the model route inherited by a plugin review branch', side: 'host' },
   { service: 'agentPresets', feature: 'the preset mount that gives a plugin review branch its tools/system', side: 'host' },
@@ -39,6 +39,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'pluginManager', feature: 'the platform plugin and preset surfaces this report reads', side: 'host' },
   { service: 'profileContext', feature: 'writing the agent-preset row into a profile patch', side: 'host' },
   { service: 'sessionProjections', feature: 'the domain-owned session units', side: 'host' },
+  { service: 'evolutionProjections', feature: 'the family-owned projection runtime behind the pure readers', side: 'host' },
   { service: 'sessionQuery', feature: 'the session corpus behind /evolution sessions', side: 'host' },
   { service: 'settings', feature: 'the settings user layer and the params view', side: 'host' },
   { service: 'skillUsage', feature: 'usage counters feeding the curator and the review planner', side: 'host' },

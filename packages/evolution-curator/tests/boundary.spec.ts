@@ -7,6 +7,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 // G4: the idleness gate reads the family's session projection, so the spec mounts the registry
 // the platform's base bundle mounts (a real host always has it).
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { apply as mountRuntime } from '@deepseek-ai/dsh-evolution-core/runtime'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import EvolutionCurator from '../src/index.ts'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
@@ -39,6 +40,7 @@ async function mount(_home: string, config: SpecConfig = {}) {
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(mountRuntime)
   await ctx.plugin(NodeIo)
   await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, ...config })
   return ctx
