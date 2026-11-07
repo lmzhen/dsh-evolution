@@ -31,7 +31,8 @@ describe('parseDomainGenerationProposal', () => {
 describe('LlmDomainGenerationPort', () => {
   it('wraps transport failures as typed llm-unavailable', async () => {
     const port = new LlmDomainGenerationPort({
-      stream: async function* () { throw new Error('provider down') },
+      available: () => true,
+      text: async () => { throw new Error('provider down') },
     }, { provider: 'p', model: 'm' })
     await expect(port.generate({ skills, prompt: 'p' })).rejects.toMatchObject({ code: 'llm-unavailable' })
   })
@@ -40,9 +41,10 @@ describe('LlmDomainGenerationPort', () => {
 it('retries once with validation feedback', async () => {
   let calls = 0
   const port = new LlmDomainGenerationPort({
-    stream: async function* () {
+    available: () => true,
+    text: async () => {
       calls += 1
-      yield { type: 'text-delta', index: 0, text: calls === 1 ? 'not json' : JSON.stringify(proposal) } as never
+      return calls === 1 ? 'not json' : JSON.stringify(proposal)
     },
   }, { provider: 'p', model: 'm', attempts: 2 })
   const result = await port.generate({ skills, prompt: 'p' })
@@ -53,9 +55,10 @@ it('retries once with validation feedback', async () => {
 it('sends the live skill list to the model', async () => {
   let prompt = ''
   const port = new LlmDomainGenerationPort({
-    stream: async function* (options) {
-      prompt = options.messages.map(message => message.content.map(block => block.type === 'text' ? block.text : '').join('')).join('')
-      yield { type: 'text-delta', index: 0, text: JSON.stringify(proposal) } as never
+    available: () => true,
+    text: async (input) => {
+      prompt = input.messages.map(message => message.content.map(block => block.type === 'text' ? block.text : '').join('')).join('')
+      return JSON.stringify(proposal)
     },
   }, { provider: 'p', model: 'm', attempts: 1 })
   await port.generate({ skills, prompt: 'base' })

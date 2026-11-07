@@ -4,6 +4,7 @@
  * register units themselves.
  */
 import type { Context } from '@deepseek-ai/cordis'
+import { EvolutionLlm } from './llm.ts'
 import { EvolutionProjections } from './projections.ts'
 
 export const name = 'evolution-core-runtime'
@@ -11,4 +12,5 @@ export const name = 'evolution-core-runtime'
 /** @param ctx - the composition context that owns the runtime services. */
 export function apply(ctx: Context): void {
   ctx.plugin(EvolutionProjections)
+  ctx.plugin(EvolutionLlm)
 }

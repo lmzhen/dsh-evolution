@@ -54,6 +54,10 @@
       "specifier": "@deepseek-ai/dsh-agent"
     },
     {
+      "file": "packages/evolution-merge/src/adapters/model-runner.ts",
+      "specifier": "@deepseek-ai/dsh-llm"
+    },
+    {
       "file": "packages/evolution-review/src/index.ts",
       "specifier": "@deepseek-ai/dsh-llm"
     },

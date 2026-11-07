@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { apply as mountRuntime } from '@deepseek-ai/dsh-evolution-core/runtime'
 import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
@@ -50,6 +51,11 @@ Run the same generic workflow. Capture the standard result. Report the common ou
 /** S5.5: curator-state mock record shape and its atomic RMW task signature. */
 type StateRecord = { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }
 type StateTransactTask = (current: StateRecord | null) => StateRecord | null
+
+async function provideLlm(ctx: Context, service: unknown): Promise<void> {
+  ctx.provide('llm', service)
+  await ctx.plugin(mountRuntime)
+}
 
 describe('evolution-curator', () => {
   it('undo rolls one skill CONTENT back to a recorded version, through an anchored write', async () => {
@@ -400,7 +406,7 @@ describe('evolution-curator', () => {
     await ctx.plugin(NodeIo)
     // Capture the prompt the LLM nomination pass is shown.
     let shown = ''
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* (options: { messages?: Array<{ content?: Array<{ text: string }> }> }) {
         shown = options.messages?.[0]?.content?.[0]?.text ?? ''
         // Yield nothing → no nominations, but the capture above ran.
@@ -1445,7 +1451,7 @@ Body of ${name}.
     const ctx = new Context()
     // The provider hangs and — like the platform's own stream, which is why the
     // family passes it a signal at all — rejects when that signal aborts.
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* (options: { signal?: AbortSignal }) {
         await new Promise((_resolve, reject) => {
           options.signal?.addEventListener('abort', () => { reject(new Error('This operation was aborted')) })
@@ -1492,7 +1498,7 @@ Body of ${name}.
   it('0.18.1 (S3): a THROWING provider names itself in the report instead of reading as "nothing to nominate"', { timeout: 30_000 }, async () => {
     await tempHome('dsh-curator-llm-error-')
     const ctx = new Context()
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* () { throw new Error('provider exploded') },
     })
     await ctx.plugin(EvolutionIoRegistry)
@@ -1525,7 +1531,7 @@ Body of ${name}.
       + 'prunings: []\n'
       + '```\n'
     const ctx = new Context()
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* () {
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: yaml }
@@ -1566,7 +1572,7 @@ Body of ${name}.
       + 'prunings: []\n'
       + '```\n'
     const ctx = new Context()
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* () {
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: yaml }
@@ -1612,7 +1618,7 @@ Body of ${name}.
     const seen: string[] = []
     const emptyYaml = '## Structured summary (required)\n```yaml\nconsolidations: []\nprunings: []\n```\n'
     const ctx = new Context()
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* (options: { messages: Array<{ content: Array<{ text: string }> }> }) {
         seen.push(options.messages[0]?.content[0]?.text ?? '')
         yield { type: 'block-start', index: 0, blockType: 'text' }
@@ -1649,7 +1655,7 @@ Body of ${name}.
     await tempHome('dsh-curator-m3-')
     const pruneYaml = '```yaml\nconsolidations: []\nprunings:\n  - name: dup-a\n    reason: duplicate\n```\n'
     const ctx = new Context()
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* () {
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: pruneYaml }
@@ -1681,7 +1687,7 @@ Body of ${name}.
     let captured = ''
     const emptyYaml = '```yaml\nconsolidations: []\nprunings: []\n```\n'
     const ctx = new Context()
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* (options: { messages: unknown[] }) {
         const message = options.messages[0] as { content: Array<{ text?: string }> } | undefined
         captured = message?.content[0]?.text ?? ''
@@ -1707,7 +1713,7 @@ Body of ${name}.
     await tempHome('dsh-curator-m1-')
     const yaml = '```yaml\nconsolidations:\n  - from: plain-skill\n    into: umbrella-skill\n    reason: absorb\nprunings: []\n```\n'
     const ctx = new Context()
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* () {
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: yaml }
@@ -1930,7 +1936,7 @@ Body of ${name}.
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    ctx.provide('llm', {
+    await provideLlm(ctx, {
       stream: async function* () { throw new Error('llm provider down') },
     })
     ctx.provide('evolutionPolicy', { get: () => ({ curatorModel: 'model-x' }) })
@@ -2145,7 +2151,7 @@ it('P1-10 (v38): an unvalidated usage-sidecar key reaches no path, no suppressio
   let captured = ''
   const emptyYaml = '## Structured summary (required)\n' + '```yaml\nconsolidations: []\nprunings: []\n```\n'
   const ctx = new Context()
-  ctx.provide('llm', {
+  await provideLlm(ctx, {
     stream: async function* (options: { messages: Array<{ content: Array<{ text?: string }> }> }) {
       captured = options.messages[0]?.content[0]?.text ?? ''
       yield { type: 'block-start', index: 0, blockType: 'text' }
@@ -2212,7 +2218,7 @@ it('P2-17 (v38): a FAILED archive does not read as "already archived" for its me
     '```',
   ].join('\n')
   const ctx = new Context()
-  ctx.provide('llm', {
+  await provideLlm(ctx, {
     stream: async function* () {
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text: yaml }
@@ -2278,7 +2284,7 @@ it('P2-18 (v38): the executed consolidation carries its mode into the run report
     '```',
   ].join('\n')
   const ctx = new Context()
-  ctx.provide('llm', {
+  await provideLlm(ctx, {
     stream: async function* () {
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text: yaml }

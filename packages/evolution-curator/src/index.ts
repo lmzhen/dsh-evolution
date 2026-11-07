@@ -10,7 +10,7 @@ import { authorityFrom, withTreeWrite, type SnapshotView } from '@deepseek-ai/ds
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
-import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
@@ -50,6 +50,18 @@ import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
 import type { Session } from '@deepseek-ai/dsh-session'
 
+
+/** The runtime service surface the curator's advisory pass consumes. */
+interface CuratorLlm {
+  available(): boolean
+  text(input: {
+    readonly purpose: 'evolution-curator'
+    readonly route: { readonly provider: string; readonly model: string }
+    readonly messages: ReturnType<typeof createUserMessage>[]
+    readonly maxTokens: number
+    readonly signal?: AbortSignal | undefined
+  }): Promise<string>
+}
 
 /** Quality-warned skills may turn stale after this many idle days (package-private tunable, P2-8). */
 
@@ -757,13 +769,13 @@ export class EvolutionCurator extends Service {
     // `tsc` at the mirror instead of breaking at runtime after an upgrade.
     // The hand-written shape was: { stream(options: { provider; model;
     // messages: unknown[]; maxTokens }) }.
-    const llm = this.ctx.get('llm')
+    const llm = this.ctx.get('evolutionLlm') as CuratorLlm | undefined
     // S1-C3: an absent llm service is an observability event, not a silent
     // empty set — the E-52 discipline ("a silent catch once hid a whole-channel
     // failure behind an empty nomination set") applies equally to the channel
     // that was never mounted. `llmReviewEnabled: true` in the run report would
     // otherwise describe a channel that never fired a single pass.
-    if (!llm) {
+    if (llm === undefined || !llm.available()) {
       if (!this.llmAbsentWarned) {
         this.llmAbsentWarned = true
         this.ctx.logger.warn('evolution-curator: llmReview is enabled but no llm service is mounted — the LLM nomination channel NEVER runs (every pass degrades to deterministic-only). Mount an llm provider or set llmReview:false.')
@@ -803,15 +815,13 @@ export class EvolutionCurator extends Service {
     // accessor (:476/:524).
     const llmSignal = AbortSignal.timeout(settings.curatorReviewTimeoutMs)
     try {
-      const assembler = new BlockAssembler()
-      for await (const chunk of llm.stream({
-        provider: this.curatorProvider,
-        model,
+      const text = await llm.text({
+        purpose: 'evolution-curator',
+        route: { provider: this.curatorProvider, model },
         messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'evolution-curator', form: 'notice', summary: 'curator review' } })],
         maxTokens: settings.curatorReviewMaxTokens,
         signal: llmSignal,
-      })) assembler.push(chunk)
-      const text = assembler.blocks().filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text').map(block => block.text).join('\n')
+      })
       const parsed = parseCuratorNominations(text)
       return {
         prunings: parsed.prunings.filter(name => candidates.includes(name)),

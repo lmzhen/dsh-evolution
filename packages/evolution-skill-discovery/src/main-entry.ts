@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 // platform-declaration anchor: this composition probes skills/workingDirectory/tools/evolutionIo/systemPrompt; all are declared in core PLATFORM_SERVICE_PROBES.
 import { authorityFrom, evolutionIoAdapter, evolutionRoot, newSkillLibrary, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
-import type { LlmStreamService } from './domain-generation-llm.ts'
+import type { LlmTextService } from './domain-generation-llm.ts'
 import { DomainGenerationCoordinator } from './domain-generation-coordinator.ts'
 import { DomainPolicyStore } from './domain-policy-store.ts'
 import type { DomainPolicyLayer } from './domain-policy.ts'
@@ -100,7 +100,7 @@ export function apply(ctx: Context, config: Config): void {
   if (mode !== 'off') {
     generation = resolveGenerationPort({
       mode,
-      ...ctx.get('llm') === undefined ? {} : { llm: ctx.get('llm') as LlmStreamService },
+      ...ctx.get('evolutionLlm') === undefined ? {} : { llm: ctx.get('evolutionLlm') as LlmTextService },
       provider: config.generationProvider ?? 'deepseek-official',
       model: config.generationModel ?? 'deepseek-flash',
       ...config.generationTimeoutMs === undefined ? {} : { timeoutMs: config.generationTimeoutMs },

@@ -1,5 +1,5 @@
 import type { DomainGenerationPort } from './domain-generation-service.ts'
-import { DomainGenerationError, LlmDomainGenerationPort, type LlmStreamService } from './domain-generation-llm.ts'
+import { DomainGenerationError, LlmDomainGenerationPort, type LlmTextService } from './domain-generation-llm.ts'
 import { bootstrapFactsFromRows } from './generation-input.ts'
 import type { GenerationRequest } from './domain-generation-coordinator.ts'
 import type { SkillIndexRow } from './identity.ts'
@@ -7,7 +7,7 @@ import type { SkillIndexRow } from './identity.ts'
 /** Inputs for the production generation port composition. */
 export interface GenerationCompositionInput {
   readonly mode: 'off' | 'on'
-  readonly llm?: LlmStreamService | undefined
+  readonly llm?: LlmTextService | undefined
   readonly provider: string
   readonly model: string
   readonly maxTokens?: number | undefined

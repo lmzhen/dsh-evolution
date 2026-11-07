@@ -5,22 +5,23 @@ import { createEngineRunner } from '../src/index.ts'
 it('collects platform text chunks and passes provider/model', async () => {
   const calls: Record<string, unknown>[] = []
   const runner = createEngineRunner({
-    async *stream(options) {
-      calls.push(options)
-      yield { type: 'text-delta', text: '{"verdict":' }
-      yield { type: 'text-delta', text: '-1}' }
+    available: () => true,
+    async text(input) {
+      calls.push(input)
+      return '{"verdict":-1}'
     },
   }, () => ({ provider: 'deepseek', model: 'deepseek-flash' }))
   expect(await runner('prompt')).toBe('{"verdict":-1}')
-  expect(calls[0]).toMatchObject({ provider: 'deepseek', model: 'deepseek-flash', temperature: 0 })
+  expect(calls[0]).toMatchObject({ route: { provider: 'deepseek', model: 'deepseek-flash' }, temperature: 0 })
 })
 
 it('P2-19: forwards the run signal and cfg timeout to the provider', async () => {
   const calls: Record<string, unknown>[] = []
   const runner = createEngineRunner({
-    async *stream(options) {
-      calls.push(options)
-      yield { type: 'text-delta', text: 'ok' }
+    available: () => true,
+    async text(input) {
+      calls.push(input)
+      return 'ok'
     },
   }, () => ({ provider: 'deepseek', model: 'deepseek-flash' }))
   const controller = new AbortController()

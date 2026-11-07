@@ -1,5 +1,5 @@
-import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed, UserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
 import { validateDomainGeneration, type DomainGenerationProposal, type GeneratedDomain, type GenerationSkillFact } from './domain-generation.ts'
 import { DOMAIN_GENERATION_PROMPT_VERSION } from './domain-generation-prompt.ts'
@@ -25,17 +25,16 @@ export class DomainGenerationError extends Error {
   }
 }
 
-type LlmChunk = Parameters<BlockAssembler['push']>[0]
-
-/** Minimal platform LLM service used by the generation port. */
-export interface LlmStreamService {
-  stream(options: {
-    readonly provider: string
-    readonly model: string
-    readonly messages: readonly UserMessage[]
+/** Minimal family LLM service used by the generation port. */
+export interface LlmTextService {
+  available(): boolean
+  text(input: {
+    readonly purpose: 'evolution-skill-discovery'
+    readonly route: { readonly provider: string; readonly model: string }
+    readonly messages: ReturnType<typeof createUserMessage>[]
     readonly maxTokens: number
     readonly signal?: AbortSignal | undefined
-  }): AsyncIterable<LlmChunk>
+  }): Promise<string>
 }
 
 /** @returns parsed proposal with the caller's skill set; throws on malformed/empty output. */
@@ -53,10 +52,10 @@ export function parseDomainGenerationProposal(text: string, skills: readonly Gen
 
 /** Production LLM adapter; validates before returning, never writes the map. */
 export class LlmDomainGenerationPort implements DomainGenerationPort {
-  private readonly llm: LlmStreamService
+  private readonly llm: LlmTextService
   private readonly options: { readonly provider: string; readonly model: string; readonly maxTokens: number; readonly timeoutMs: number; readonly attempts: number }
 
-  constructor(llm: LlmStreamService, options: { readonly provider: string; readonly model: string; readonly maxTokens?: number | undefined; readonly timeoutMs?: number | undefined; readonly attempts?: number | undefined }) {
+  constructor(llm: LlmTextService, options: { readonly provider: string; readonly model: string; readonly maxTokens?: number | undefined; readonly timeoutMs?: number | undefined; readonly attempts?: number | undefined }) {
     this.llm = llm
     this.options = { provider: options.provider, model: options.model, maxTokens: options.maxTokens ?? 4096, timeoutMs: options.timeoutMs ?? 120_000, attempts: options.attempts ?? 3 }
   }
@@ -76,15 +75,13 @@ export class LlmDomainGenerationPort implements DomainGenerationPort {
     for (let attempt = 1; attempt <= this.options.attempts; attempt += 1) {
       try {
         const prompt = feedback === '' ? basePrompt : basePrompt + '\nPrevious output was rejected: ' + feedback + '\nReturn only the structured result with 8-12 domains.'
-        const assembler = new BlockAssembler()
-        for await (const chunk of this.llm.stream({
-          provider: this.options.provider,
-          model: this.options.model,
+        const text = await this.llm.text({
+          purpose: 'evolution-skill-discovery',
+          route: { provider: this.options.provider, model: this.options.model },
           messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'evolution-skill-generation', form: 'notice', summary: 'initial domain generation' } })],
           maxTokens: this.options.maxTokens,
           signal,
-        })) assembler.push(chunk)
-        const text = assembler.blocks().filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text').map(block => block.text).join('\n')
+        })
         return parseDomainGenerationProposal(text, input.skills)
       } catch (error) {
         if (!(error instanceof DomainGenerationError) || (error.code !== 'invalid-output' && error.code !== 'invalid-proposal')) {

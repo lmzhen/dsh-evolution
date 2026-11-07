@@ -1,8 +1,9 @@
 /**
- * DeepSeek judge runner over the platform llm service. The engine calls
- * runner(prompt, cfg) and expects raw model text; the platform owns provider
- * selection, usage accounting and transport.
+ * DeepSeek judge runner over the family LLM runtime. The engine calls
+ * runner(prompt, cfg) and expects raw model text; the runtime owns provider
+ * selection, purpose, transport and timeout.
  */
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { normalizeProviderKey } from '../domain/provider-key.ts'
 
 export interface ModelRoute {
@@ -10,55 +11,31 @@ export interface ModelRoute {
   readonly model: string
 }
 
-export interface LlmChunkLike {
-  readonly type: string
-  readonly text?: string
-  readonly reason?: { readonly kind?: string; readonly failure?: { readonly message?: string } }
+/** The runtime service surface the merge engine consumes. */
+export interface EvolutionLlmLike {
+  available(): boolean
+  text(input: {
+    readonly purpose: 'evolution-merge-engine'
+    readonly route: ModelRoute
+    readonly messages: ReturnType<typeof createUserMessage>[]
+    readonly temperature: number
+    readonly signal?: AbortSignal | undefined
+    readonly timeoutMs?: number | undefined
+  }): Promise<string>
 }
 
-export interface LlmServiceLike {
-  stream?(options: Record<string, unknown>): AsyncIterable<LlmChunkLike>
-  prepareCall?(
-    config: Record<string, unknown>,
-    signal?: AbortSignal,
-  ): Promise<{
-    readonly config: Record<string, unknown>
-    stream(input: Record<string, unknown>): AsyncIterable<LlmChunkLike>
-  }>
-}
-
-function append(chunk: LlmChunkLike, text: string): string {
-  if (chunk.type === 'text-delta' || chunk.type === 'text') return text + (chunk.text ?? '')
-  if (chunk.type === 'finish' && chunk.reason?.kind === 'error') {
-    throw new Error('model call failed: ' + (chunk.reason.failure?.message ?? 'unknown'))
-  }
-  return text
-}
-
-export function createEngineRunner(llm: LlmServiceLike, route: () => ModelRoute): (prompt: string, cfg?: Record<string, unknown>, signal?: AbortSignal | undefined) => Promise<string> {
+export function createEngineRunner(llm: EvolutionLlmLike, route: () => ModelRoute): (prompt: string, cfg?: Record<string, unknown>, signal?: AbortSignal | undefined) => Promise<string> {
   return async (prompt: string, cfg?: Record<string, unknown>, runSignal?: AbortSignal | undefined): Promise<string> => {
+    if (!llm.available()) throw new Error('llm service unavailable: evolutionLlm is degraded')
     const selection = route()
     const timeout = Number(cfg?.timeoutMs)
-    const timeoutSignal = Number.isFinite(timeout) && timeout > 0 ? AbortSignal.timeout(timeout) : undefined
-    const signal = runSignal === undefined ? timeoutSignal : timeoutSignal === undefined ? runSignal : (typeof AbortSignal.any === 'function' ? AbortSignal.any([runSignal, timeoutSignal]) : runSignal)
-    let text = ''
-    if (llm.stream !== undefined) {
-      for await (const chunk of llm.stream({
-        provider: normalizeProviderKey(selection.provider),
-        model: selection.model,
-        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
-        temperature: 0,
-        ...(signal === undefined ? {} : { signal }),
-      })) text = append(chunk, text)
-      return text
-    }
-    if (llm.prepareCall === undefined) throw new Error('llm service has neither stream nor prepareCall')
-    const call = await llm.prepareCall({ provider: normalizeProviderKey(selection.provider), model: selection.model, temperature: 0 }, signal)
-    for await (const chunk of call.stream({
-      ...call.config,
-      messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
-      ...(signal === undefined ? {} : { signal }),
-    })) text = append(chunk, text)
-    return text
+    return await llm.text({
+      purpose: 'evolution-merge-engine',
+      route: { provider: normalizeProviderKey(selection.provider), model: selection.model },
+      messages: [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'user' } })],
+      temperature: 0,
+      ...(runSignal === undefined ? {} : { signal: runSignal }),
+      ...(Number.isFinite(timeout) && timeout > 0 ? { timeoutMs: timeout } : {}),
+    })
   }
 }

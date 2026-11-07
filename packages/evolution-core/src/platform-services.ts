@@ -40,6 +40,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'profileContext', feature: 'writing the agent-preset row into a profile patch', side: 'host' },
   { service: 'sessionProjections', feature: 'the domain-owned session units', side: 'host' },
   { service: 'evolutionProjections', feature: 'the family-owned projection runtime behind the pure readers', side: 'host' },
+  { service: 'evolutionLlm', feature: 'the family LLM runtime for auxiliary model calls', side: 'host' },
   { service: 'sessionQuery', feature: 'the session corpus behind /evolution sessions', side: 'host' },
   { service: 'settings', feature: 'the settings user layer and the params view', side: 'host' },
   { service: 'skillUsage', feature: 'usage counters feeding the curator and the review planner', side: 'host' },

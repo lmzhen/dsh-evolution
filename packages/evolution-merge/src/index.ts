@@ -7,7 +7,7 @@ type Context = Omit<CordisContext, 'logger'> & HostContext
 import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
-import { createEngineRunner, type LlmServiceLike } from './adapters/model-runner.ts'
+import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
 import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
@@ -268,7 +268,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const stage = new StageToolRegistry()
     const engineInput = resolveEngineInput({ modelsRoot: startupParams.mergeModelsRoot })
     const engineConfig = engineConfigFromRoot(engineInput.modelsRoot)
-    const llm = (ctx as unknown as { get(name: string): unknown }).get('llm') as LlmServiceLike | undefined
+    const llm = (ctx as unknown as { get(name: string): unknown }).get('evolutionLlm') as EvolutionLlmLike | undefined
     const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
     const runner = llm === undefined || defaultModel === undefined
       ? undefined

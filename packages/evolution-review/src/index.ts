@@ -29,6 +29,7 @@ import type { LiveValue } from '@deepseek-ai/dsh-evolution-core'
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
 import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
+import { modelRoute } from '@deepseek-ai/dsh-evolution-core/platform'
 
 import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
@@ -1017,7 +1018,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // The live Session log is the only complete seed source in the current platform;
       // the query service exposes search/projections, not the full ordered event list.
       const seed = session.snapshotEvents()
-      const current = (ctx.get('agentDefaultModel') as { currentSelection?: () => { provider: string; model: string } } | undefined)?.currentSelection?.()
+      const current = modelRoute(ctx, agent)
       handle = await ctx.agents.create({
         sessionId: childId,
         parentAgent: agent,
