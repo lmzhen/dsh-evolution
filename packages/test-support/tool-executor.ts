@@ -18,14 +18,19 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
     // time; accept the legacy single-call shape and return its first result.
     const current = tools as unknown as { execute: (input: unknown, ...rest: unknown[]) => Promise<{ results?: readonly unknown[] }> }
     const execute = current.execute.bind(current)
-    current.execute = async (input: unknown, ...rest: unknown[]) => {
-      const one = input as { calls?: unknown; name?: unknown; signal?: AbortSignal } | null
-      if (one !== null && typeof one === 'object' && one.calls === undefined && typeof one.name === 'string') {
-        const batch = await execute({ calls: [one], signal: one.signal ?? new AbortController().signal }, ...rest)
-        return batch.results?.[0] as never
-      }
-      return execute(input, ...rest) as never
-    }
+    Object.defineProperty(tools, 'execute', {
+      configurable: true,
+      writable: true,
+      value: async (input: unknown, ...rest: unknown[]) => {
+        const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal } | null
+        if (one !== null && typeof one === 'object' && one.calls === undefined && typeof one.name === 'string') {
+          const block = { ...one, id: one.id ?? one.callId }
+          const batch = await execute({ calls: [block], signal: one.signal ?? new AbortController().signal }, ...rest)
+          return batch.results?.[0] as never
+        }
+        return execute(input, ...rest) as never
+      },
+    })
   } catch {
     // pre-0.2.2 platform: ToolsService owns execution
   }
