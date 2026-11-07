@@ -42,8 +42,26 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
       root?: { executor?: unknown }
       scoped?: Map<unknown, { executor?: unknown }>
     }
-    const existing = internals.root?.executor ?? internals.scoped?.values().next().value?.executor
-    if (existing === undefined) tools.setExecutor(new mod.NativeToolExecutor(ctx))
+    const existing = internals.root?.executor as { execute(input: unknown): Promise<unknown> } | undefined
+    if (existing !== undefined) {
+      const original = existing.execute.bind(existing)
+      existing.execute = async (input: unknown) => {
+        const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal } | null
+        if (one === null || typeof one !== 'object' || one.calls !== undefined || typeof one.name !== 'string') return original(input)
+        const block = {
+          type: 'tool-call' as const,
+          id: one.id ?? one.callId,
+          name: one.name,
+          arguments: typeof (one as { arguments?: unknown }).arguments === 'string'
+            ? (one as { arguments: string }).arguments
+            : JSON.stringify((one as { arguments?: unknown }).arguments ?? {}),
+        }
+        const batch = await original({ calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
+        return batch.results?.[0]
+      }
+    } else {
+      tools.setExecutor(new mod.NativeToolExecutor(ctx))
+    }
   } catch {
     // pre-0.2.2 platform: ToolsService owns execution
   }
