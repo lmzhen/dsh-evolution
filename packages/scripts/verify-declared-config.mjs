@@ -96,7 +96,7 @@ const UPSTREAM_PLANES = {
   base: {
     // 0.2.1-rc.2 re-record (`--upstream` recompute): `hmr` stays mounted ENABLED; the base plane
     // disables `tool-plugin-manager` ONLY — `skill-badge` and `tool-ralph` are mounted enabled again.
-    disabled: ['tool-plugin-manager'],
+    disabled: ['tool-plugin-manager', 'fs-observation-policy', 'tool-executor-ptc'],
     mounted: ['session-query-sqlite', 'tool-skill'],
     source: 'packages/bundle/base/cordis.patch.yml (session-query-sqlite and tool-skill mounted; tool-plugin-manager disabled:true)',
   },
@@ -119,7 +119,6 @@ const UPSTREAM_PLANES = {
       'command-compact',
       'tool-result-pruner',
       'tool-subagent-control',
-      'tool-subagent-list-agents',
       'tool-subagent',
       'tool-subagent-fork',
       'workflow-ptc',
