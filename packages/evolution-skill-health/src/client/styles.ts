@@ -30,6 +30,8 @@ import { TOKEN_CSS } from '@lmzhen/dsh-evolution-client-kit/tokens'
 /** Tag id for the injected <style>, so a hot reload replaces rather than stacks it. */
 export const CSS_TAG_ID = 'dsh-evolution-skill-health'
 
+import { RESPONSIVE_TABLE_CSS } from '@lmzhen/dsh-evolution-client-kit'
+
 const root = '.' + CSS_TAG_ID
 
 /** The panel stylesheet text. */
@@ -85,4 +87,5 @@ export const CSS = [
   ':where(' + root + ' [data-role="skills"]) { display: flex; flex-wrap: wrap; gap: var(--evo-space-4); }',
   ':where(' + root + ' [data-role="skill-pill"]) { padding: 0 var(--evo-space-6); border: var(--evo-hairline-width) solid var(--dsw-alias-border-l1); border-radius: var(--evo-radius-pill); color: var(--dsw-alias-label-secondary); white-space: normal; overflow-wrap: anywhere; }',
   ':where(' + root + ' [data-role="note"]) { margin: 0; color: var(--dsw-alias-label-secondary); }',
+  RESPONSIVE_TABLE_CSS,
 ].join(String.fromCharCode(10))

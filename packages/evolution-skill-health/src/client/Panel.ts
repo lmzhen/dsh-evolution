@@ -199,7 +199,7 @@ function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
   if (rows.length === 0) return createElement(EmptyState, { title: t('rule.empty'), className: 'evo-health-empty', variant: 'compact' })
   const cell = (role: string, children: ReactNode, key?: string): ReactNode =>
     createElement('td', key === undefined ? { 'data-role': role } : { 'data-role': role, key }, children)
-  return createElement('table', { 'data-role': 'rule-table' },
+  const table = createElement('table', { 'data-role': 'rule-table' },
     createElement('thead', null, createElement('tr', { 'data-role': 'rule-head' },
       createElement('th', { scope: 'col', 'data-role': 'rule-name' }, t('col.rule')),
       createElement('th', { scope: 'col', 'data-role': 'skills' }, t('col.skills')),
@@ -217,6 +217,7 @@ function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
       : createElement('span', { 'data-role': 'rule-count-value' }, String(entry.count) + ' ' + t(COUNT_UNIT[entry.rule] ?? 'count.unit.skills'))),
     ))),
   )
+  return createElement('div', { 'data-evo-table-wrap': '' }, table)
 }
 
 /**

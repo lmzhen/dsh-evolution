@@ -10,7 +10,7 @@ import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, en, zh } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
-import { requireHealthSeats } from './seats.ts'
+import { requireClientSeats } from '@lmzhen/dsh-evolution-client-kit'
 
 /** Required client services: the slot registry, locale seat and page navigation. */
 export const inject = ['slots', 'locale']
@@ -31,7 +31,7 @@ function HealthView(props: HealthFace & { activeView?: string; openHistory?: (na
  * @param ctx - the client context; it must carry the seats above.
  */
 export function apply(ctx: ClientContext): void {
-  requireHealthSeats(ctx)
+  requireClientSeats(ctx, 'skill-health')
   registerWorkbenchView<HealthFace>(ctx, {
     id: PANEL_ID,
     order: PANEL_ORDER,

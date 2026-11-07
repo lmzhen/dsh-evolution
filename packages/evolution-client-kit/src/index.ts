@@ -1,6 +1,6 @@
 /** Shared browser seams and panel lifecycle for the evolution family. */
 export type { ClientSeam, ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ConfigPathOpLike, ConfigWriteKind, ConfigWriteOutcome, LocaleSeat, PanelBodyOptions, PanelRowOptions, SettingsFace, SlotsSeat } from './seam.ts'
-export { registerSidebarPanel, type SidebarPanelSpec, type Translate } from './panel.ts'
+export { registerSidebarPanel, requireClientSeats, type SidebarPanelSpec, type Translate } from './panel.ts'
 export { registerWorkbenchView } from './workbench-view.ts'
 export { createSettingsSeat } from './settings-seat.ts'
 export type { WorkbenchViewSpec } from './workbench-view.ts'
@@ -12,6 +12,7 @@ export { DecisionFrame, type DecisionFrameProps } from './presentation/decision-
 export { TaskBanner, type TaskBannerProps } from './presentation/task-banner.ts'
 export { StatusChip, FilterChip, type StatusChipProps, type FilterChipProps } from './presentation/chips.ts'
 export { EmptyState, type EmptyStateProps } from './presentation/empty-state.ts'
+export { RESPONSIVE_TABLE_CSS } from './presentation/table.ts'
 export { DisclosureGroup, type DisclosureGroupProps } from './presentation/disclosure-group.ts'
 export { TimeText, type TimeTextProps } from './presentation/time-text.ts'
 export { ActionMenu, PLATFORM_MENU, renderPlatformMenu, menuPrimitivesFrom, type ActionMenuProps, type RowMenuAction, type MenuPrimitives, type MenuSurfaceComponent, type MenuItemButtonComponent } from './presentation/action-menu.ts'

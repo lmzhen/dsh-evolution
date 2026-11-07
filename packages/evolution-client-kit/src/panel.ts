@@ -34,6 +34,15 @@ export interface SidebarPanelSpec<Face> {
   store?: unknown
 }
 
+/** Fail loud when a client bundle is mounted without the shell seats it consumes. */
+export function requireClientSeats(ctx: unknown, owner: string): ClientSeam {
+  const candidate = ctx as Partial<ClientSeam>
+  if (candidate.slots === undefined || candidate.locale === undefined) {
+    throw new Error(owner + ': the client slots/locale seats are not mounted')
+  }
+  return candidate as ClientSeam
+}
+
 function interpolate(text: string, values?: Readonly<Record<string, string | number>>): string {
   if (values === undefined) return text
   return text.replace(/\{(\w+)\}/g, (_match, key: string) => String(values[key] ?? ''))
