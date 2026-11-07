@@ -9,10 +9,6 @@
 # the bundle carries exactly ONE read-only model-visible tool, the
 # `maintenance_probe` row below (its only model-facing surface).
 - insert:
-    # ── runtime services: one projection owner per composition ───────────────
-    - id: evolution-core-runtime
-      name: '@deepseek-ai/dsh-evolution-core/runtime'
-
     # ── control plane ───────────────────────────────────────────────────────
     - id: evolution-policy
       name: '@deepseek-ai/dsh-evolution-policy'

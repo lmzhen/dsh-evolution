@@ -51,10 +51,6 @@
 # after the v0.1.0-rc.18 release tag (see docs/codebase-audit-rc16.md); this
 # composition uses the smaller native packages instead.
 
-# ── runtime services: one projection owner per composition ───────────────
-- id: evolution-core-runtime
-  name: '@deepseek-ai/dsh-evolution-core/runtime'
-
 # ── control plane (immutable policy, deterministic plan validation) ────────
 - id: evolution-policy
   name: '@deepseek-ai/dsh-evolution-policy'
