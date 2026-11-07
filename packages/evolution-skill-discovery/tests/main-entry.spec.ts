@@ -1,11 +1,9 @@
-import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { expect, it } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Context } from '@deepseek-ai/cordis'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { mountToolHost } from '../../test-support/tool-host.ts'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import EvolutionIoRegistry from '../../evolution-io/src/index.ts'
@@ -18,7 +16,6 @@ async function base(): Promise<Context> {
   ctx.evolutionIo.registerProvider({ name: 'fake', readText: async () => null, writeText: async () => {}, remove: async () => {}, list: async () => [], exists: async () => false, rename: async () => {}, copy: async () => {} })
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(SkillRegistry)
   return ctx
 }

@@ -1,6 +1,5 @@
 import { executeOne } from '../../test-support/tool-executor.ts'
 import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
-import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -329,7 +328,6 @@ describe('skill-usage', () => {
     await ctx.plugin(SkillUsageRegistry, { root, eventsHome: root })
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(PtcToolExecutor)
-    await ensureNativeToolExecutor(ctx)
     ctx.tools.register(PtcSkillTool)
     await ctx.skillUsage.ensureRecordCreated('ptc-read', false)
     const session = ctx.sessions.create(SessionId('usage-ptc'))

@@ -1,5 +1,4 @@
 import { executeOne } from '../../test-support/tool-executor.ts'
-import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -41,7 +40,6 @@ async function setup() {
   try {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     // Explicit root keeps the usage sidecar local to this fixture instead of
@@ -73,7 +71,6 @@ describe('tool-skill-manage', () => {
 
   it('registers the skill_manage tool', async () => {    const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-')) })
@@ -84,7 +81,6 @@ describe('tool-skill-manage', () => {
   it('mounts the Hermes SKILLS_GUIDANCE system-prompt section (alignment)', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-guidance-')) })
@@ -115,7 +111,6 @@ describe('tool-skill-manage', () => {
   it('B4: the guidance carries the policy protected list, and reads it at every assembly', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-guard-')) })
@@ -333,7 +328,6 @@ describe('tool-skill-manage', () => {
     const root = await tempHome('dsh-skill-strict-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
@@ -464,7 +458,6 @@ describe('tool-skill-manage', () => {
     const root = await tempHome('dsh-skill-strict-edit-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
@@ -487,7 +480,6 @@ describe('tool-skill-manage', () => {
     const root = await tempHome('dsh-skill-restructure-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
@@ -535,7 +527,6 @@ Use it.
     const root = await tempHome('dsh-skill-extract-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
@@ -674,7 +665,6 @@ Existing.
     const root = await tempHome('dsh-skill-manage-nan-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
@@ -758,7 +748,6 @@ Existing.
   it('V10-03 (P2-18): mounting with threatExemptLabels constructs the library and registers the tool', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-exempt-')) })

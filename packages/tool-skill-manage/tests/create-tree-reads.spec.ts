@@ -1,4 +1,3 @@
-import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 // @vitest-environment node
 /**
@@ -35,7 +34,6 @@ it('T2-05/A20: one create reads each existing SKILL.md once (no second whole-tre
   let skillMdReads = 0
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  await ensureNativeToolExecutor(ctx)
   await ctx.plugin(SkillRegistry)
   await ctx.plugin(EvolutionIoRegistry)
   ctx.evolutionIo.registerProvider({

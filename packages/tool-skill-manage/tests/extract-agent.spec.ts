@@ -1,5 +1,4 @@
 import { executeOne } from '../../test-support/tool-executor.ts'
-import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -37,7 +36,6 @@ describe('extract agent proposal mode', () => {
     const root = await tempHome('dsh-extract-agent-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    await ensureNativeToolExecutor(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
