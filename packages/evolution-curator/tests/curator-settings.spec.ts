@@ -158,14 +158,15 @@ describe('curator parameter surface (G1: row config, precedence and the cross-fi
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     const captured: Array<{ maxTokens?: number | undefined }> = []
-    ;(ctx.provide as unknown as (name: string, value: unknown) => void).call(ctx, 'llm', {
-      // A provider that only settles when the curator's own signal aborts: the pass
-      // can end ONLY through the timeout under test.
-      stream: async function* (options: { maxTokens?: number; signal?: AbortSignal }) {
+    ;(ctx.provide as unknown as (name: string, value: unknown) => void).call(ctx, 'evolutionLlm', {
+      available: () => true,
+      // The curator timeout is the only way this call settles.
+      async text(options: { maxTokens?: number; signal?: AbortSignal }) {
         captured.push(options)
         await new Promise((_resolve, reject) => {
           options.signal?.addEventListener('abort', () => { reject(new Error('aborted by the curator timeout')) })
         })
+        return ''
       },
     })
     const curator = new EvolutionCurator(ctx, {
