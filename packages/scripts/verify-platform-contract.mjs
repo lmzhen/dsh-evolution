@@ -573,7 +573,11 @@ function walkCitationSurface(dir, visit) {
       walkCitationSurface(path, visit)
       continue
     }
-    if (!entry.isFile() && !entry.isSymbolicLink()) continue
+    if (entry.isSymbolicLink()) {
+      try {
+        if (statSync(path).isDirectory()) { walkCitationSurface(path, visit); continue }
+      } catch { continue }
+    } else if (!entry.isFile()) continue
     const text = readFileSync(path, 'utf8')
     if (text.includes('\u0000')) continue
     visit(path, text)
