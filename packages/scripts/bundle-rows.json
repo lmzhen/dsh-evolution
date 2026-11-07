@@ -426,6 +426,14 @@
   },
   "groups": [
     {
+      "id": "evolution-core-runtime",
+      "banners": {
+        "all": "    # ── runtime services: one projection owner per composition ───────────────",
+        "host": "    # ── runtime services: one projection owner per composition ───────────────",
+        "preset": "    # ── runtime services: one projection owner per composition ───────────────"
+      }
+    },
+    {
       "id": "evolution-policy",
       "banners": {
         "all": "    # ── control plane ───────────────────────────────────────────────────────",
@@ -515,6 +523,28 @@
     }
   ],
   "rows": [
+    {
+      "id": "evolution-core-runtime",
+      "group": "evolution-core-runtime",
+      "forms": [
+        "all",
+        "host",
+        "preset",
+        "standalone"
+      ],
+      "lead": [],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-core/runtime'"
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-core/runtime'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
+    },
     {
       "id": "evolution-policy",
       "group": "evolution-policy",
