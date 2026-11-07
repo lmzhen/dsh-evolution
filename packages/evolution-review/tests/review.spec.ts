@@ -256,8 +256,8 @@ async function mountReviewFixture(options: {
   const emitInbox = (event: 'agent/inbox/inserted' | 'agent/inbox/claimed' | 'agent/inbox/discarded', payload: unknown): void => {
     ;(ctx.emit as (name: string, data: unknown) => void)(event, payload)
   }
-  const record = (kind: 'inject' | 'followup', message: unknown): void => {
-    if (options.announceInserted === true) emitInbox('agent/inbox/inserted', { message })
+  const record = (kind: 'inject' | 'followup', message: unknown, agent?: unknown): void => {
+    if (options.announceInserted === true) emitInbox('agent/inbox/inserted', { message, ...(agent === undefined ? {} : { agent }) })
     if (kind === 'followup' && options.onFollowup) options.onFollowup(message)
     else options.onInject?.(message)
   }
@@ -270,7 +270,7 @@ async function mountReviewFixture(options: {
     readonly session = session
     inject(message: unknown): void { this.forward('inject', message) }
     followup(message: unknown): void { this.forward('followup', message) }
-    forward(kind: 'inject' | 'followup', message: unknown): void { record(kind, message) }
+    forward(kind: 'inject' | 'followup', message: unknown): void { record(kind, message, this) }
   })() as unknown as Agent
   const agent = options.classAgent === true
     ? makeClassAgent()
