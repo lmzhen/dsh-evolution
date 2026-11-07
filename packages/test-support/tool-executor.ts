@@ -35,7 +35,7 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
             : JSON.stringify((one as { arguments?: unknown }).arguments ?? {}),
         }
         const batch = await originalExecute.call(this, { calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
-        return batch.results?.[0]
+        return (batch.results?.[0] as { result?: unknown } | undefined)?.result
       }
     }
     const internals = tools as unknown as {
@@ -57,7 +57,7 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
             : JSON.stringify((one as { arguments?: unknown }).arguments ?? {}),
         }
         const batch = await original({ calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
-        return batch.results?.[0]
+        return (batch.results?.[0] as { result?: unknown } | undefined)?.result
       }
     } else {
       tools.setExecutor(new mod.NativeToolExecutor(ctx))
