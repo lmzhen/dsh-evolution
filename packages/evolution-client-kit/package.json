@@ -1,7 +1,7 @@
 {
   "name": "@lmzhen/dsh-evolution-client-kit",
   "description": "Shared browser seams and lifecycle for the evolution family sidebar panels",
-  "version": "0.37.1",
+  "version": "0.38.0",
   "private": false,
   "publishConfig": {
     "access": "public"

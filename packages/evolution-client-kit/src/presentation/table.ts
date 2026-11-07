@@ -8,7 +8,7 @@
  */
 export const RESPONSIVE_TABLE_CSS = [
   '[data-evo-table-wrap]{container-type:inline-size;}',
-  '@container (max-width: 560px) {',
+  '@container (max-width: 700px) {',
   '  [data-evo-table-wrap] table{display:block;width:100%;table-layout:auto;border:0;}',
   '  [data-evo-table-wrap] thead{display:none;}',
   '  [data-evo-table-wrap] tbody{display:flex;flex-direction:column;gap:var(--evo-space-4);}',
