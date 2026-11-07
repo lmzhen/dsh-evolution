@@ -27,7 +27,14 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
       if (one === null || typeof one !== 'object' || one.calls !== undefined || typeof one.name !== 'string') {
         return execute(input)
       }
-      const block = { ...one, id: one.id ?? one.callId }
+      const block = {
+        type: 'tool-call' as const,
+        id: one.id ?? one.callId,
+        name: one.name,
+        arguments: typeof (one as { arguments?: unknown }).arguments === 'string'
+          ? (one as { arguments: string }).arguments
+          : JSON.stringify((one as { arguments?: unknown }).arguments ?? {}),
+      }
       const batch = await execute({ calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
       return batch.results?.[0]
     }
