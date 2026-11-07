@@ -35,10 +35,10 @@ const run = promisify(execFile)
 const script = fileURLToPath(new URL('../../scripts/verify-release-evidence.mjs', import.meta.url))
 const assembleScript = fileURLToPath(new URL('../../scripts/assemble-release-evidence.mjs', import.meta.url))
 const FAMILY_VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version
-const PLATFORM_LINE = { version: '0.2.1-rc.3', floor: '0.2.1-rc.2', peersRange: '^0.2.1-rc.2', enginesRange: '>=0.2.1-rc.2 <0.2.2-0', upstreamRef: 'dsh-v0.2.1-rc.3' }
+const PLATFORM_LINE = { version: '0.2.2-rc.1', floor: '0.2.2-rc.0', peersRange: '^0.2.2-rc.0', enginesRange: '>=0.2.2-rc.0 <0.2.3-0', upstreamRef: 'dsh-v0.2.2-rc.1' }
 
 function spike(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.1-rc.3', familyVersion: FAMILY_VERSION, startedAt: new Date(Date.now() - 3_600_000).toISOString(), readings: { route: 200 }, ...overrides }
+  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.2-rc.1', familyVersion: FAMILY_VERSION, startedAt: new Date(Date.now() - 3_600_000).toISOString(), readings: { route: 200 }, ...overrides }
 }
 
 function staging(): Record<string, unknown> {
@@ -47,7 +47,7 @@ function staging(): Record<string, unknown> {
     platformLine: PLATFORM_LINE,
     semverVersion: '7.8.5',
     ciFace: null,
-    manifests: { count: 32, enginesRange: PLATFORM_LINE.enginesRange, peerRange: PLATFORM_LINE.peersRange },
+    manifests: { count: 36, enginesRange: PLATFORM_LINE.enginesRange, peerRange: PLATFORM_LINE.peersRange },
     gates: [],
     frozenLines: ['0.2.0'],
     generatedAt: new Date().toISOString(),
