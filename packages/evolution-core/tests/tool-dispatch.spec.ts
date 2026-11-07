@@ -15,7 +15,8 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import { TOOL_RUNTIME_SCHEDULER, ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
+import { ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
+import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 // 0.2.1: an agent-owned run_code resolves its working directory through the `workingDirectory`
 // service before it may dispatch; the platform testkit owns the canonical fixture.
@@ -84,15 +85,15 @@ async function ptcLog(): Promise<LoggedEvent[]> {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ProbePtcRuntime)
-  await ctx.plugin(ToolRuntime, { mode: 'ptc' })
+  await ctx.plugin(ToolRuntime)
+  await ctx.plugin(PtcToolExecutor)
   ctx.tools.register(skillTool())
   const session = ctx.sessions.create(SessionId('spec-ptc'))
   const agent = { id: SessionId('spec-ptc'), session, ctx } as never
   await ctx.tools.execute({
-    callId: 'c1', name: 'run_code',
-    arguments: { code: 'await tools.skill({name:"demo-skill"})', description: 'read two skills' },
+    calls: [{ type: 'tool-call', id: 'c1', name: 'run_code', arguments: JSON.stringify({ code: 'await tools.skill({name:"demo-skill"})', description: 'read two skills' }) }],
     agent, signal: new AbortController().signal,
-  } as never)
+  })
   return asLog(session.snapshotEvents())
 }
 
@@ -107,28 +108,16 @@ async function nativeLog(rawCallId: string, name: string, args: unknown, isError
   ctx.tools.register(skillTool())
   const session = ctx.sessions.create(SessionId('spec-native-' + rawCallId))
   const agent = { id: SessionId('spec-native-' + rawCallId), session, ctx } as never
-  const prepared = await ctx.tools[TOOL_RUNTIME_SCHEDULER].prepare({
-    callId, name, arguments: args, agent, signal: new AbortController().signal,
-  })
-  const exec = (prepared as unknown as { exec: never }).exec
-  // The payloads are the agent loop's own shapes, cast once at the append site:
-  // the spec deliberately writes them as plain objects.
+  // The payloads are the agent loop's own shapes; the normalizer is the subject.
   const callSeq = session.append(NATIVE_CALL_EVENT, {
     turn: 1, step: 0, callId, name, arguments: JSON.stringify(args),
   }).seq
-  const dispatched = await ctx.tools[TOOL_RUNTIME_SCHEDULER].dispatch(exec)
-  const result = dispatched.kind === 'post-result'
-    ? await ctx.tools[TOOL_RUNTIME_SCHEDULER].finalize(exec, dispatched.result)
-    : ctx.tools[TOOL_RUNTIME_SCHEDULER].finish(exec, dispatched.result)
-  const typed = result as unknown as { content: object[]; isError: boolean }
-  // The block list mirrors the platform's own `createToolResultMessage` output;
-  // the spec builds it by hand, so it is cast once at the append site.
   session.append(NATIVE_RESULT_EVENT, {
     turn: 1, step: 0,
     message: {
       role: 'user',
       source: { kind: 'tool', callId },
-      content: typed.content.map(block => ({ ...block, type: 'tool-result', toolCallId: callId, isError: isError || typed.isError })),
+      content: [{ type: 'tool-result', toolCallId: callId, isError, content: [{ type: 'text', text: 'demo skill body' }] }],
     },
   } as never, { surfaceOp: 'append', sourceEventSeqs: [callSeq] })
   return asLog(session.snapshotEvents())
