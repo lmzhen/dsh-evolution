@@ -22,7 +22,7 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
       proto.__evolutionLegacyExecute = true
       const originalExecute = proto.execute
       proto.execute = async function (input: unknown): Promise<unknown> {
-        const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal } | null
+        const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal; agent?: unknown } | null
         if (one === null || typeof one !== 'object' || one.calls !== undefined || typeof one.name !== 'string') {
           return originalExecute.call(this, input)
         }
@@ -34,7 +34,7 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
             ? (one as { arguments: string }).arguments
             : JSON.stringify((one as { arguments?: unknown }).arguments ?? {}),
         }
-        const batch = await originalExecute.call(this, { calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
+        const batch = await originalExecute.call(this, { calls: [block], signal: one.signal ?? new AbortController().signal, ...(one.agent === undefined ? {} : { agent: one.agent }) }) as { results?: readonly unknown[] }
         return (batch.results?.[0] as { result?: unknown } | undefined)?.result
       }
     }
@@ -46,7 +46,7 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
     if (existing !== undefined) {
       const original = existing.execute.bind(existing)
       existing.execute = async (input: unknown) => {
-        const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal } | null
+        const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal; agent?: unknown } | null
         if (one === null || typeof one !== 'object' || one.calls !== undefined || typeof one.name !== 'string') return original(input)
         const block = {
           type: 'tool-call' as const,
@@ -56,7 +56,7 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
             ? (one as { arguments: string }).arguments
             : JSON.stringify((one as { arguments?: unknown }).arguments ?? {}),
         }
-        const batch = await original({ calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
+        const batch = await original({ calls: [block], signal: one.signal ?? new AbortController().signal, ...(one.agent === undefined ? {} : { agent: one.agent }) }) as { results?: readonly unknown[] }
         return (batch.results?.[0] as { result?: unknown } | undefined)?.result
       }
     } else {
