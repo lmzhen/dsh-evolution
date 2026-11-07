@@ -2,10 +2,10 @@
 // Registration is LAZY (first run) and single-flight; the release lives on the calling fiber's
 // effect so an HMR reload cannot leave a stale preset registered.
 import type { Context } from '@deepseek-ai/cordis'
+import { presetsPort } from '../platform/index.ts'
 import { normalizeAllow } from './preset-ids.ts'
 import {
   composeRestrictedPresetDefinition,
-  type PresetRegistryLike,
   type RestrictedPresetRequest,
   type RestrictedPresetState,
 } from './restricted-preset.ts'
@@ -28,19 +28,10 @@ function slotFor(ctx: Context, kind: RestrictedPresetRequest['kind']): Restricte
   return slot
 }
 
-function registryOf(ctx: Context): PresetRegistryLike | undefined {
-  const candidate = (ctx as unknown as { get(name: string): unknown }).get('agentPresets') as Partial<PresetRegistryLike> | undefined
-  if (candidate === undefined) return undefined
-  if (typeof candidate.readDocument !== 'function' || typeof candidate.register !== 'function') return undefined
-  return candidate as PresetRegistryLike
-}
-
 function installReleaseEffect(ctx: Context, slot: RestrictedSlot): void {
   if (slot.effectInstalled === true) return
-  const effect = (ctx as unknown as { effect?: (run: () => () => void, label?: string) => unknown }).effect
-  if (effect === undefined) return
   slot.effectInstalled = true
-  effect.call(ctx, () => () => { void releaseRestrictedPreset(ctx, undefined, slot) }, 'evolution-restricted-preset')
+  ctx.effect(() => () => { void releaseRestrictedPreset(ctx, undefined, slot) }, 'evolution-restricted-preset')
 }
 
 async function releaseRestrictedPreset(ctx: Context, kind: RestrictedPresetRequest['kind'] | undefined, explicitSlot?: RestrictedSlot): Promise<void> {
@@ -67,7 +58,7 @@ export async function ensureRestrictedPreset(ctx: Context, req: EnsureRestricted
       slot.state = { kind: 'failed', code: 'E-324', reason: 'allow set is empty' }
       return slot.state
     }
-    const registry = registryOf(ctx)
+    const registry = presetsPort(ctx)
     if (registry === undefined) {
       slot.state = { kind: 'failed', code: 'E-324', reason: 'agentPresets service unavailable or incomplete' }
       return slot.state

@@ -3,20 +3,10 @@
  * this module owns the argument schema and the JSON result. All policy remains in applyStageTool.
  */
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { defineTool } from '@deepseek-ai/dsh-evolution-core/platform'
 import { applyStageTool, type StageToolContext, type StageToolOp, type StageToolResult } from './stage-tool.ts'
 
 export const MERGE_STAGE_TOOL_NAME = 'merge_stage'
-
-export interface ToolDefinitionLike {
-  readonly name: string
-  readonly description: string
-  readonly parameters: Record<string, unknown>
-  readonly output: {
-    readonly schema: Record<string, unknown>
-    readonly render: (args: unknown, value: string) => readonly { readonly type: 'text'; readonly text: string }[]
-  }
-  readonly execute: (args: Record<string, unknown>, exec: unknown) => Promise<string>
-}
 
 function shapeError(message: string): StageToolResult {
   return { ok: false, code: 'bad-path', message }
@@ -52,23 +42,18 @@ export function createMergeStageTool(
   home: string,
   context: (exec: unknown) => StageToolContext | undefined,
   diagnose?: (exec: unknown) => unknown,
-): ToolDefinitionLike {
-  return {
+): ReturnType<typeof defineTool> {
+  return defineTool({
     name: MERGE_STAGE_TOOL_NAME,
     description: 'Read source copies and write the merged skill into the staging tree. list/read use area=sources|merged plus source (for sources); write/copy paths are relative to merged/<target> (for example path=SKILL.md, from=SKILL.md, to=references/x.md). Write/copy are only allowed in the author phase.',
     parameters: {
-      type: 'object',
-      properties: {
-        op: { type: 'string', enum: ['list', 'read', 'write', 'copy'] },
-        area: { type: 'string', enum: ['sources', 'merged'] },
-        path: { type: 'string' },
-        source: { type: 'string' },
-        content: { type: 'string' },
-        from: { type: 'string' },
-        to: { type: 'string' },
-      },
-      required: ['op'],
-      additionalProperties: false,
+      op: { type: 'string', required: true, enum: ['list', 'read', 'write', 'copy'] },
+      area: { type: 'string', enum: ['sources', 'merged'] },
+      path: { type: 'string' },
+      source: { type: 'string' },
+      content: { type: 'string' },
+      from: { type: 'string' },
+      to: { type: 'string' },
     },
     output: {
       schema: { type: 'string' },
@@ -81,5 +66,5 @@ export function createMergeStageTool(
       if (ctx === undefined) return JSON.stringify({ ok: false, code: 'not-merge-child', message: 'merge_stage is only available to an active merge child', ...(diagnose === undefined ? {} : { diagnostic: diagnose(exec) }) })
       return JSON.stringify(await applyStageTool(io, home, ctx, op))
     },
-  }
+  })
 }

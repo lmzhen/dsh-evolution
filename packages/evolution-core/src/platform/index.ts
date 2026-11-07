@@ -15,6 +15,8 @@ export type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands
 export type { StreamChunk } from '@deepseek-ai/dsh-llm'
 export type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 export type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
+export { presetsPort } from './presets.ts'
+export type { PresetDefinitionLike, PresetDocument, PresetsPort } from './presets.ts'
 export { projectionPort } from './projections.ts'
 export type { EvolutionProjectionDefinition, ProjectionHandleLike, ProjectionPort } from './projections.ts'
 export { llmPort, modelRoute } from './llm.ts'

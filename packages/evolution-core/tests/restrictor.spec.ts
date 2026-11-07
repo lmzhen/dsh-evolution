@@ -14,13 +14,14 @@ function harness(composedOf: (ctx: ChildCtx) => string | undefined = () => 'evol
   let listener: ((payload: { agent?: { ctx: ChildCtx } }) => void) | undefined
   const presets = { composedPreset: (ctx: ChildCtx) => composedOf(ctx) }
   const ctx = {
-    agentPresets: presets,
+    get(name: string) { return name === 'agentPresets' ? presets : undefined },
     on(_event: 'agent/created', registered: (payload: { agent?: { ctx: ChildCtx } }) => void) {
       listener = registered
       return () => {}
     },
   }
   const child = (): ChildCtx => ({
+    get(name: string) { return name === 'tools' ? this.tools : undefined },
     tools: {
       restrict(filter: Record<string, unknown>) {
         calls.push(filter)
@@ -93,11 +94,11 @@ describe('evolution restrictor (G2-S3, W4 R: child-scope)', () => {
   it('fails loud with E-324 on an empty filter, a missing presetId, or a scope without on()', () => {
     expect(() => { apply(harness().ctx as never, { allow: [], presetId: 'evolution-reviewer-readonly' }) }).toThrow(/E-324/)
     expect(() => { apply(harness().ctx as never, { allow: ['skill'] }) }).toThrow(/presetId/)
-    expect(() => { apply({ agentPresets: {} } as never, { allow: ['skill'], presetId: 'x' }) }).toThrow(/E-324/)
+    expect(() => { apply({ get: () => undefined } as never, { allow: ['skill'], presetId: 'x' }) }).toThrow(/E-324/)
     const h = harness()
     apply(h.ctx as never, { allow: ['skill'], presetId: 'evolution-reviewer-readonly' })
     ;(h as unknown as { own: ChildCtx }).own = h.child()
-    const brokenChild = { tools: undefined } as unknown as ChildCtx
+    const brokenChild = { tools: undefined, get: () => undefined } as unknown as ChildCtx
     expect(() => { h.emit(brokenChild) }).toThrow(/E-324/)
   })
 })

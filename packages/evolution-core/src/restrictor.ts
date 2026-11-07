@@ -6,6 +6,7 @@
 // Function plugin (no default export): inject waits for the registry that identifies which child
 // belongs to this restricted preset; the restriction effect is owned by the child scope.
 import type { Context } from '@deepseek-ai/cordis'
+import { presetsPort, toolsPort } from './platform/index.ts'
 import { errorText } from './errors.ts'
 
 export const name = 'evolution-restrictor'
@@ -23,20 +24,12 @@ interface ToolRestrictionLike {
   readonly deny?: readonly string[]
 }
 
-interface ToolsServiceLike {
-  restrict(filter: ToolRestrictionLike): () => void
-}
-
 interface ScopedAgentLike {
   readonly ctx: Context
 }
 
 interface AgentCreatedPayload {
   readonly agent?: ScopedAgentLike
-}
-
-interface PresetRegistryLike {
-  composedPreset(ctx: Context): string | undefined
 }
 
 function normalize(names: readonly string[] | undefined): readonly string[] {
@@ -59,8 +52,8 @@ export function apply(ctx: Context, config: Config = {}): void {
   if (presetId === undefined) throw failure('requires the restricted presetId in its row config')
   const on = (ctx as unknown as { on?: (event: 'agent/created', listener: (payload: AgentCreatedPayload) => void) => unknown }).on
   if (typeof on !== 'function') throw failure('requires a context that owns on()')
-  const presets = (ctx as unknown as { agentPresets?: PresetRegistryLike }).agentPresets
-  if (presets === undefined || typeof presets.composedPreset !== 'function') {
+  const presets = presetsPort(ctx)
+  if (presets === undefined) {
     throw failure('requires the agentPresets service (inject: agentPresets)')
   }
   // The listener lives in the preset MOUNT scope: scope routing delivers every descendant
@@ -70,12 +63,8 @@ export function apply(ctx: Context, config: Config = {}): void {
     const agent = payload.agent
     if (agent === undefined) return
     if (presets.composedPreset(agent.ctx) !== presetId) return
-    const tools = (agent.ctx as unknown as { tools?: ToolsServiceLike }).tools
-    if (tools === undefined || typeof tools.restrict !== 'function') {
-      throw failure('child scope exposes no tools.restrict()')
-    }
-    const effect = (agent.ctx as unknown as { effect?: (run: () => () => void, label?: string) => unknown }).effect
-    if (effect === undefined) throw failure('child scope owns no effect() to release the restriction')
-    effect.call(agent.ctx, () => tools.restrict(filter), 'evolution-restrictor:child')
+    const tools = toolsPort(agent.ctx)
+    if (tools === undefined) throw failure('child scope exposes no tools.restrict()')
+    agent.ctx.effect(() => tools.restrict(filter), 'evolution-restrictor:child')
   })
 }

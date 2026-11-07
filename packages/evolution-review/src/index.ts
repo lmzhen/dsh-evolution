@@ -29,7 +29,7 @@ import type { LiveValue } from '@deepseek-ai/dsh-evolution-core'
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
 import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
-import { modelRoute } from '@deepseek-ai/dsh-evolution-core/platform'
+import { modelRoute, presetsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 
 import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
@@ -1007,7 +1007,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }, config.reviewTimeoutMs)
     let handle: Awaited<ReturnType<typeof ctx.agents.create>> | undefined
     try {
-      const presets = ctx.get('agentPresets') as { resolve(id?: string): Promise<{ id: string }>; mount(target: Context, id?: string): Promise<unknown> } | undefined
+      const presets = presetsPort(ctx)
       let agentPreset: string | undefined
       let setup: ((target: Context, child: import('@deepseek-ai/dsh-agent').Agent) => Promise<void>) | undefined
       if (presets !== undefined) {
