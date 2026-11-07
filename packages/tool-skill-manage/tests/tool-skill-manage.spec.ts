@@ -1,3 +1,4 @@
+import { executeOne } from '../../test-support/tool-executor.ts'
 import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
@@ -99,7 +100,7 @@ describe('tool-skill-manage', () => {
     const { ctx } = await setup()
     try {
       ;(ctx.skillUsage as unknown as { ensureRecordCreated: () => Promise<void> }).ensureRecordCreated = async () => { throw new Error('usage down') }
-      const result = await ctx.tools.execute({
+      const result = await executeOne(ctx, {
         callId: ToolCallId('p2-28'), name: 'skill_manage',
         arguments: { action: 'create', name: 'p2-28-skill', content: SKILL.replace('boundary-skill', 'p2-28-skill') },
         agent: fakeAgent(undefined), signal: new AbortController().signal,
@@ -159,7 +160,7 @@ describe('tool-skill-manage', () => {
 
   it('reports the authoring check on create and refuses under descriptionStrict (P0)', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (args: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`authoring-${Math.random()}`),
       name: 'skill_manage',
       arguments: args,
@@ -191,7 +192,7 @@ describe('tool-skill-manage', () => {
     expect(tool?.description ?? '').toContain('replace_all')
     expect(tool?.description ?? '').toContain('file_path')
     expect(tool?.description ?? '').toContain('extract')
-    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (args: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`g51-${Math.random()}`),
       name: 'skill_manage',
       arguments: args,
@@ -220,7 +221,7 @@ describe('tool-skill-manage', () => {
 
   it('v20 (D-1): a non-string scalar arg is refused structurally, not as a bare TypeError', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (args: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`scalar-guard-${Math.random()}`),
       name: 'skill_manage',
       arguments: args,
@@ -312,7 +313,7 @@ describe('tool-skill-manage', () => {
 
   it('reports the write-point frontmatter auto-quote on create (0.3.11)', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (args: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`norm-${Math.random()}`),
       name: 'skill_manage',
       arguments: args,
@@ -338,7 +339,7 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(SkillUsageRegistry, { root })
     await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
     const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
-    const result = await ctx.tools.execute({
+    const result = await executeOne(ctx, {
       callId: ToolCallId(`strict-${Math.random()}`),
       name: 'skill_manage',
       arguments: { action: 'create', name: 'strict-skill', content: SKILL.replace('boundary-skill', 'strict-skill').replace('lifecycle boundary test', over) },
@@ -353,7 +354,7 @@ describe('tool-skill-manage', () => {
 
   it('marks review-created skills for curator lifecycle management, but not foreground writes', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = async (origin: string | undefined, name: string) => ctx.tools.execute({
+    const execute = async (origin: string | undefined, name: string) => executeOne(ctx, {
       callId: ToolCallId(`create-${origin ?? 'foreground'}-${name}`),
       name: 'skill_manage',
       arguments: { action: 'create', name, content: SKILL.replace('boundary-skill', name) },
@@ -377,7 +378,7 @@ describe('tool-skill-manage', () => {
     const { ctx, root, previousHome } = await setup()
     let mutationEvents = 0
     ctx.on('evolution/skill-mutated', () => { mutationEvents += 1 })
-    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`review-skip-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
@@ -419,7 +420,7 @@ describe('tool-skill-manage', () => {
 
   it('review text aggregates quality-warned skills into one guidance line', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`quality-warn-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
@@ -440,7 +441,7 @@ describe('tool-skill-manage', () => {
 
   it('review text marks protection with [pinned] (N-1)', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`pin-mark-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
@@ -470,7 +471,7 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
     const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
     // edit routes to the same full-content update as update — the gate must not be bypassable.
-    const result = await ctx.tools.execute({
+    const result = await executeOne(ctx, {
       callId: ToolCallId(`edit-strict-${Math.random()}`),
       name: 'skill_manage',
       arguments: { action: 'edit', name: 'edit-strict', content: SKILL.replace('boundary-skill', 'edit-strict').replace('lifecycle boundary test', over) },
@@ -506,7 +507,7 @@ description: restructure fixture.
 
 Use it.
 `
-    const created = await ctx.tools.execute({
+    const created = await executeOne(ctx, {
       callId: ToolCallId(`restructure-create-${Math.random()}`),
       name: 'skill_manage',
       arguments: { action: 'create', name: 'fat-body', content: body },
@@ -514,7 +515,7 @@ Use it.
       signal: new AbortController().signal,
     })
     expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(true)
-    const moved = await ctx.tools.execute({
+    const moved = await executeOne(ctx, {
       callId: ToolCallId(`restructure-move-${Math.random()}`),
       name: 'skill_manage',
       arguments: { action: 'restructure', name: 'fat-body', restructure: [{ heading: 'Details log', to_file: 'references/log.md' }] },
@@ -565,7 +566,7 @@ description: owner fixture.
 
 Existing.
 `
-    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`extract-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
@@ -602,7 +603,7 @@ Existing.
 
   it('S1: a >20k write gets one neutral size fact, a 19k write does not', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId('s1-' + Math.random()),
       name: 'skill_manage',
       arguments: arguments_,
@@ -637,7 +638,7 @@ Existing.
 
   it('V4-27: a no-op update/patch (byte-equivalent, noop:true) is not counted as a modification', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`noop-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
@@ -687,7 +688,7 @@ Existing.
       maxSkillFileBytes: NaN,
     })
     const longName = 'n'.repeat(65)
-    const created = await ctx.tools.execute({
+    const created = await executeOne(ctx, {
       callId: ToolCallId(`nan-${Math.random()}`),
       name: 'skill_manage',
       arguments: { action: 'create', name: longName, content: SKILL.replace('boundary-skill', longName) },
@@ -700,7 +701,7 @@ Existing.
 
   it('V6-15: a byte-equivalent write_file is a no-op — no patch_count bump (0.3.36)', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`wf-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
@@ -725,7 +726,7 @@ Existing.
 
   it('V8-09: a non-array restructure argument is a structured refusal, not a TypeError (0.3.47)', async () => {
     const { ctx, root, previousHome } = await setup()
-    const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId(`v809-${Math.random()}`),
       name: 'skill_manage',
       arguments: arguments_,
@@ -856,7 +857,7 @@ it('OPT-01: an update/write_file lands through the REAL runtime with the approva
     saveReviewState: async () => {},
   })
   await ctx.plugin(EvolutionApproval, { enabled: false })
-  const execute = (arguments_: Record<string, unknown>) => ctx.tools.execute({
+  const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
     callId: ToolCallId(`opt01-${Math.random()}`),
     name: 'skill_manage',
     arguments: arguments_,
@@ -893,7 +894,7 @@ it('P1-13: a staged update of a missing skill is refused when the skill appears 
   })
   await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
   const session = { id: 'p113', header: { origin: undefined }, readEvents: () => [] }
-  const staged = await ctx.tools.execute({
+  const staged = await executeOne(ctx, {
     callId: ToolCallId(`p113-${Math.random()}`),
     name: 'skill_manage',
     arguments: { action: 'update', name: 'late-skill', content: SKILL.replace('boundary-skill', 'late-skill') },
@@ -941,7 +942,7 @@ it('P1-13: approving the staged update is refused once the skill exists', async 
   // Same staging route as the sibling test (the TOOL), so the anchor under test is the
   // one the product writes, not a hand-built payload.
   const session = { id: 'p113b', header: { origin: undefined }, readEvents: () => [] }
-  const toolStaged = await ctx.tools.execute({
+  const toolStaged = await executeOne(ctx, {
     callId: ToolCallId(`p113b-${Math.random()}`),
     name: 'skill_manage',
     arguments: { action: 'update', name: 'no-anchor-skill', content: SKILL.replace('boundary-skill', 'no-anchor-skill') },
@@ -1025,7 +1026,7 @@ it('v32 TEST-05: the tool channel refuses autonomous (subagent-origin) writes on
     get: () => ({ protectedSkillNames: ['guarded-skill'] }),
   })
   const subagent = fakeAgent('subagent')
-  const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+  const execute = (args: Record<string, unknown>) => executeOne(ctx, {
     callId: ToolCallId(`tsm05-${Math.random()}`),
     name: 'skill_manage',
     arguments: args,
@@ -1073,7 +1074,7 @@ it('P2-7: a patch missing new_string is refused before the approval seam — app
     return realRequest(input)
   }
   const session = { id: 'p27', header: { origin: undefined }, readEvents: () => [] }
-  const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+  const execute = (args: Record<string, unknown>) => executeOne(ctx, {
     callId: ToolCallId(`p27-${Math.random()}`),
     name: 'skill_manage',
     arguments: args,
@@ -1125,7 +1126,7 @@ it('P2-5: skills whose body cannot be read are excluded from review dedup groupi
     await mkdir(join(root, 'skills', name), { recursive: true })
     await writeFile(join(root, 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: unreadable body probe.\n---\n\nBody.\n`)
   }
-  const review = await ctx.tools.execute({
+  const review = await executeOne(ctx, {
     callId: ToolCallId(`p25-${Math.random()}`),
     name: 'skill_manage',
     arguments: { action: 'review' },
@@ -1157,7 +1158,7 @@ it('P2-5: skills whose body cannot be read are excluded from review dedup groupi
 // projections are observed side by side, not asserted from a comment.
 it('C: create reports a near-duplicate hint, writes anyway, and cannot see bodies', async () => {
   const { ctx, root, previousHome } = await setup()
-  const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+  const execute = (args: Record<string, unknown>) => executeOne(ctx, {
     callId: ToolCallId(`dup-hint-${Math.random()}`),
     name: 'skill_manage',
     arguments: args,

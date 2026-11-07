@@ -1,3 +1,4 @@
+import { executeOne } from '../../test-support/tool-executor.ts'
 import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 /**
@@ -41,7 +42,7 @@ async function setup() {
   await ctx.plugin(NodeIo)
   await ctx.plugin(SkillUsageRegistry, { root })
   await ctx.plugin(ToolSkillManage)
-  const run = (sessionId: string, args: Record<string, unknown>) => ctx.tools.execute({
+  const run = (sessionId: string, args: Record<string, unknown>) => executeOne(ctx, {
     callId: ToolCallId(`s22-${sessionId}-${Math.random()}`),
     name: 'skill_manage',
     arguments: args,

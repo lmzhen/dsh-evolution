@@ -1,3 +1,4 @@
+import { executeOne } from '../../test-support/tool-executor.ts'
 import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
@@ -51,7 +52,7 @@ async function setup() {
 describe('tool-memory execution boundaries', () => {
   it('accepts a normal write through the native tool pipeline', async () => {
     const { ctx, root } = await setup()
-    const result = await ctx.tools.execute({
+    const result = await executeOne(ctx, {
       callId: ToolCallId('normal'),
       name: 'memory',
       arguments: { target: 'memory', action: 'add', facts: 'boundary normal' },
@@ -65,7 +66,7 @@ describe('tool-memory execution boundaries', () => {
 
   it('policy guard denies model-shaped control-plane fields before execution', async () => {
     const { ctx, root } = await setup()
-    const result = await ctx.tools.execute({
+    const result = await executeOne(ctx, {
       callId: ToolCallId('policy'),
       name: 'memory',
       arguments: { target: 'memory', action: 'add', facts: 'boundary policy', policy: 'override' },
@@ -100,7 +101,7 @@ describe('tool-memory execution boundaries', () => {
     // execute-level shape check in src stays as defense-in-depth for
     // schema-less callers. Pin the observable pipeline behavior: a proper
     // array-shape error, no silent single-op write.
-    const result = await ctx.tools.execute({
+    const result = await executeOne(ctx, {
       callId: ToolCallId('shape'),
       name: 'memory',
       arguments: { target: 'memory', action: 'add', facts: 'ghost write', operations: { action: 'add' } },

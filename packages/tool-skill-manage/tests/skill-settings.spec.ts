@@ -1,3 +1,4 @@
+import { executeOne } from '../../test-support/tool-executor.ts'
 import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
@@ -80,7 +81,7 @@ async function setup(
   provideSettings(ctx, user)
   if (policy !== undefined) ctx.provide('evolutionPolicy', { get: () => policy })
   ToolSkillManage.apply(ctx, config)
-  const execute = async (args: Record<string, unknown>): Promise<{ value?: ToolValue }> => await ctx.tools.execute({
+  const execute = async (args: Record<string, unknown>): Promise<{ value?: ToolValue }> => await executeOne(ctx, {
     callId: ToolCallId(`settings-${Math.random()}`),
     name: 'skill_manage',
     arguments: args,

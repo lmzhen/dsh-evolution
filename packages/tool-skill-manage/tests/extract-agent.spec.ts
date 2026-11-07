@@ -1,3 +1,4 @@
+import { executeOne } from '../../test-support/tool-executor.ts'
 import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
@@ -43,7 +44,7 @@ describe('extract agent proposal mode', () => {
     await ctx.plugin(ToolSkillManage)
     const source = '---\nname: agent-source\ndescription: agent source.\n---\n\nIntro.\n\n## Details\n\nReusable.\n'
     const target = '---\nname: agent-target\ndescription: agent target.\n---\n\nTarget.\n'
-    const execute = (args: Record<string, unknown>) => ctx.tools.execute({
+    const execute = (args: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId('agent-' + Math.random()),
       name: 'skill_manage',
       arguments: args,

@@ -1,3 +1,4 @@
+import { executeOne } from '../../test-support/tool-executor.ts'
 import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
 import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
@@ -333,7 +334,7 @@ describe('skill-usage', () => {
     await ctx.skillUsage.ensureRecordCreated('ptc-read', false)
     const session = ctx.sessions.create(SessionId('usage-ptc'))
     const agent = { id: SessionId('usage-ptc'), session, ctx } as never
-    await ctx.tools.execute({
+    await executeOne(ctx, {
       callId: 'c1', name: 'run_code',
       arguments: { code: 'await tools.skill({name:"ptc-read"})', description: 'read one skill' },
       agent, signal: new AbortController().signal,

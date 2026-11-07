@@ -1,3 +1,4 @@
+import { executeOne } from '../../test-support/tool-executor.ts'
 import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 /**
@@ -90,7 +91,7 @@ async function ptcLog(): Promise<LoggedEvent[]> {
   ctx.tools.register(skillTool())
   const session = ctx.sessions.create(SessionId('spec-ptc'))
   const agent = { id: SessionId('spec-ptc'), session, ctx } as never
-  await ctx.tools.execute({
+  await executeOne(ctx, {
     calls: [{ type: 'tool-call', id: 'c1', name: 'run_code', arguments: JSON.stringify({ code: 'await tools.skill({name:"demo-skill"})', description: 'read two skills' }) }],
     agent, signal: new AbortController().signal,
   })

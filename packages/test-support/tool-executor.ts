@@ -66,3 +66,27 @@ export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
     // pre-0.2.2 platform: ToolsService owns execution
   }
 }
+
+
+/** Call one tool through the 0.2.2 batch seam and return its inner result. */
+export async function executeOne(ctx: Context, input: {
+  readonly callId?: unknown
+  readonly name: string
+  readonly arguments?: unknown
+  readonly agent?: unknown
+  readonly signal?: AbortSignal
+}): Promise<any> {
+  const tools = ctx.get('tools') as { execute(input: unknown): Promise<{ results?: readonly { result?: unknown }[] }> } | undefined
+  if (tools === undefined) throw new Error('executeOne: tools service is not mounted')
+  const batch = await tools.execute({
+    calls: [{
+      type: 'tool-call',
+      id: input.callId ?? 'probe-' + Math.random().toString(36).slice(2),
+      name: input.name,
+      arguments: typeof input.arguments === 'string' ? input.arguments : JSON.stringify(input.arguments ?? {}),
+    }],
+    signal: input.signal ?? new AbortController().signal,
+    ...(input.agent === undefined ? {} : { agent: input.agent }),
+  })
+  return batch.results?.[0]?.result
+}

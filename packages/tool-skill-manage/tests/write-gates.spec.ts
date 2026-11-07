@@ -1,3 +1,4 @@
+import { executeOne } from '../../test-support/tool-executor.ts'
 import { ensureNativeToolExecutor } from '../../test-support/tool-executor.ts'
 // @tier ci-only
 /**
@@ -73,7 +74,7 @@ async function setup(config: Record<string, unknown> = { skillWriteConfirm: 'ask
 }
 
 function callTool(ctx: Context, args: Record<string, unknown>, session: unknown) {
-  return ctx.tools.execute({
+  return executeOne(ctx, {
     callId: ToolCallId(`wg-${Math.random()}`),
     name: 'skill_manage',
     arguments: args,
