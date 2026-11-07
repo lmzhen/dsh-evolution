@@ -1,38 +1,30 @@
 import type { Context } from '@deepseek-ai/cordis'
 
 /**
- * 0.2.2 split tool execution out of ToolsService. Family tests that mount
- * ToolRuntime directly (or a testkit from a line before the split) need the
- * native executor; older lines have no such package and keep their built-in
- * executor.
+ * 0.2.2 split tool execution out of ToolsService and made execute() take a
+ * batch. Family tests mount ToolRuntime directly and still call one tool at a
+ * time; install the native executor, then normalize that test-only shape at
+ * the executor boundary.
  */
 export async function ensureNativeToolExecutor(ctx: Context): Promise<void> {
   const tools = ctx.get('tools') as { setExecutor?: (executor: unknown) => void } | undefined
   if (tools?.setExecutor === undefined) return
   const spec = '@deepseek-ai/dsh-tool-executor-native'
   try {
-    const mod = await import(/* @vite-ignore */ spec) as { NativeToolExecutor?: new (context: Context) => unknown }
+    const mod = await import(/* @vite-ignore */ spec) as { NativeToolExecutor?: new (context: Context) => { execute(input: unknown): Promise<unknown> } }
     if (mod.NativeToolExecutor === undefined) return
-    tools.setExecutor(new mod.NativeToolExecutor(ctx))
-    // 0.2.2 execute() takes a batch. Family tests still exercise one call at a
-    // time; accept the legacy single-call shape and return its first result.
-    const proto = Object.getPrototypeOf(tools) as { execute: (input: unknown, ...rest: unknown[]) => Promise<{ results?: readonly unknown[] }> }
-    if (Object.prototype.hasOwnProperty.call(proto, '__evolutionLegacyToolExecute')) return
-    const execute = proto.execute.bind(tools)
-    Object.defineProperty(proto, '__evolutionLegacyToolExecute', { value: true })
-    Object.defineProperty(proto, 'execute', {
-      configurable: true,
-      writable: true,
-      value: async (input: unknown, ...rest: unknown[]) => {
-        const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal } | null
-        if (one !== null && typeof one === 'object' && one.calls === undefined && typeof one.name === 'string') {
-          const block = { ...one, id: one.id ?? one.callId }
-          const batch = await execute({ calls: [block], signal: one.signal ?? new AbortController().signal }, ...rest)
-          return batch.results?.[0] as never
-        }
-        return execute(input, ...rest) as never
-      },
-    })
+    const executor = new mod.NativeToolExecutor(ctx)
+    const execute = executor.execute.bind(executor)
+    executor.execute = async (input: unknown) => {
+      const one = input as { calls?: unknown; name?: unknown; callId?: unknown; id?: unknown; signal?: AbortSignal } | null
+      if (one === null || typeof one !== 'object' || one.calls !== undefined || typeof one.name !== 'string') {
+        return execute(input)
+      }
+      const block = { ...one, id: one.id ?? one.callId }
+      const batch = await execute({ calls: [block], signal: one.signal ?? new AbortController().signal }) as { results?: readonly unknown[] }
+      return batch.results?.[0]
+    }
+    tools.setExecutor(executor)
   } catch {
     // pre-0.2.2 platform: ToolsService owns execution
   }
