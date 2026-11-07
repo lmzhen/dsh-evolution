@@ -11,7 +11,7 @@
  */
 
 import type { ReactNode } from 'react'
-import type { ConfigFormLike as KitConfigFormLike, ConfigFormSnapshotLike as KitConfigFormSnapshotLike, ConfigPathOpLike } from '@lmzhen/dsh-evolution-client-kit'
+import type { ConfigFormLike as KitConfigFormLike, ConfigFormSnapshotLike as KitConfigFormSnapshotLike, ConfigFormsSeat as KitConfigFormsSeat, ConfigPathOpLike, LocaleSeat as KitLocaleSeat } from '@lmzhen/dsh-evolution-client-kit'
 
 /** Our card slot, hosted by the section this bundle registers. */
 export const CARD_SLOT = 'evolution.namespace.card'
@@ -86,10 +86,7 @@ export type ConfigFormLike<T = Record<string, unknown>> = KitConfigFormLike<T>
  * family without the settings surface, and a REQUIRED inject for a missing service
  * leaves the whole browser half pending forever (no error, no UI).
  */
-export interface ConfigFormsSeat {
-  /** One Host plugin entry id to its form. */
-  get<T>(entryId: string): ConfigFormLike<T> | undefined
-}
+export type ConfigFormsSeat = KitConfigFormsSeat
 
 /** Registration options the keyed card slot under our own section takes. */
 export interface SlotRegisterOptions {
@@ -160,11 +157,8 @@ export interface RowConfigForm {
   readonly mutate: (ops: readonly SettingsPathOpLike[], revision?: number) => Promise<boolean>
 }
 
-/** The locale seat: register this bundle's namespace, bind a translator. */
-export interface LocaleSeat {
-  register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void
-  bind(namespace: string): (key: string) => string
-}
+/** The locale seat; client-kit owns the shape. */
+export type LocaleSeat = KitLocaleSeat
 
 /** The slice of the client context this plugin consumes. */
 export interface ClientSeam {
