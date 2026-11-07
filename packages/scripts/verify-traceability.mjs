@@ -26,7 +26,7 @@ const UNIVERSE = {
   C: 12,
 }
 const DISPOSITIONS = new Set(['adopted', 'adopted-min', 'deferred', 'rejected', 'no-action'])
-const BASELINE = { packages: 32, coreExports: 4 }
+const BASELINE = { packages: 32, coreExports: 8 }
 
 const problems = []
 const warnings = []

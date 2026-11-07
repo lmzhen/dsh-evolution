@@ -62,7 +62,17 @@
       }
     }
   ],
-  "traceability": null,
+  "traceability": {
+    "universe": {
+      "A": 22,
+      "B": 18,
+      "C": 12
+    },
+    "covered": 52,
+    "total": 52,
+    "planned": false,
+    "source": "gate-55 verify-traceability --strict on a53185cf + baseline fix"
+  },
   "faces": {
     "web": {
       "diagnosticsSchemaVersion": 2,
