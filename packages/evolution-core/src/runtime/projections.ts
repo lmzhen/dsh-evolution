@@ -40,21 +40,24 @@ export class EvolutionProjections extends Service {
   }
 
   protected async [Service.init](): Promise<void> {
-    const port = projectionPort(this.ctx)
+    const platform = this.ctx.get('evolutionPlatform') as { ports?: { projections?: import('../platform/projections.ts').ProjectionPort } } | undefined
+    const port = platform?.ports?.projections ?? projectionPort(this.ctx)
     if (port === undefined) {
       this.markDegraded('sessionProjections service unavailable')
       return
     }
+    const partial: Partial<Handles> = {}
     try {
-      const [activity, evidence, reads, history, signals] = await Promise.all([
-        port.register(evolutionActivityProjection),
-        port.register(evolutionEvidenceProjection),
-        port.register(evolutionReadsProjection),
-        port.register(evolutionProjectionHistoryProjection),
-        port.register(evolutionSignalsProjection),
-      ])
-      this.handles = { activity, evidence, reads, history, signals }
+      partial.activity = await port.register(evolutionActivityProjection)
+      partial.evidence = await port.register(evolutionEvidenceProjection)
+      partial.reads = await port.register(evolutionReadsProjection)
+      partial.history = await port.register(evolutionProjectionHistoryProjection)
+      partial.signals = await port.register(evolutionSignalsProjection)
+      this.handles = partial as Handles
     } catch (error) {
+      for (const handle of Object.values(partial).reverse()) {
+        try { await handle.dispose() } catch { /* best-effort rollback; keep the original failure */ }
+      }
       this.markDegraded('projection registration failed: ' + (error instanceof Error ? error.message : String(error)))
     }
   }

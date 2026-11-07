@@ -29,7 +29,8 @@ export class EvolutionLlm extends Service {
   }
 
   protected [Service.init](): void {
-    this.port = llmPort(this.ctx)
+    const platform = this.ctx.get('evolutionPlatform') as { ports?: { llm?: import('../platform/llm.ts').LlmPort } } | undefined
+    this.port = platform?.ports?.llm ?? llmPort(this.ctx)
     if (this.port === undefined) this.ctx.logger.warn('evolution-core-runtime: llm service unavailable; model calls fail with llm-unavailable')
   }
 
