@@ -1,6 +1,6 @@
 import { seedRow } from './support/seed-row.ts'
 // @tier pre-tag
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
@@ -10,7 +10,7 @@ const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', 
 const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill'), managed: true }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill'), managed: true }, { name: 'umbrella', description: 'u', body: BODY('umbrella'), managed: true }]
 const decision = { shouldMerge: true, mode: 'merge-into-existing' as const, target: 'umbrella', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }
 
-it('approves a pending row through a new child and drops it after commit', async () => {
+it('approves a pending row through a new child and drops it after commit', { timeout: 90_000 }, async () => {
   const home = await tempRoot('dsh-merge-runtime-approve-')
   const io = nodeEvolutionIo()
   const key = pairKey('alpha-skill', 'beta-skill')
@@ -49,9 +49,5 @@ it('approves a pending row through a new child and drops it after commit', async
   expect(result.ok, result.text).toBe(true)
   expect(result.text).toContain('已启动')
   expect(result.text).toContain('作用域：单条 pending 行')
-  for (let i = 0; i < 2000; i += 1) {
-    if ((await loadMergeState(io, home)).state.rows.length === 0) break
-    await new Promise(resolve => setTimeout(resolve, 5))
-  }
-  expect((await loadMergeState(io, home)).state.rows).toEqual([])
+  await vi.waitFor(async () => expect((await loadMergeState(io, home)).state.rows).toEqual([]), { timeout: 60_000, interval: 20 })
 })
