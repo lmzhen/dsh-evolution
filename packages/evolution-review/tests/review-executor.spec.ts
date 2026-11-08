@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, Message, StreamChunk, ToolCallBlock } from '@deepseek-ai/dsh-llm'
