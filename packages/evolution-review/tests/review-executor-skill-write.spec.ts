@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { Message, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
@@ -16,6 +16,7 @@ import * as ToolSkillManage from '../../tool-skill-manage/src/index.ts'
 import { clearReviewChannel, withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 import { runReview } from '../src/review-executor.ts'
 import type { ReviewLlmPort, ReviewParent, ReviewToolPort } from '../src/review-executor.ts'
+import { executeTool } from './support/execute-tool.ts'
 
 const parentId = SessionId('aux-skill-parent')
 let root = ''
@@ -69,7 +70,6 @@ describe('real skill_manage write', () => {
       await ctx.plugin(ToolSkillManage)
       const p = parent()
       const toolAgent = { session: { id: parentId, header: {} } } as unknown as Agent
-      const toolService = ctx.get('tools') as { execute(input: unknown): Promise<{ content?: ContentBlock[]; isError?: boolean }> }
       const script = [toolChunks, textChunks]
       const llm: ReviewLlmPort = {
         stream() {
@@ -82,14 +82,8 @@ describe('real skill_manage write', () => {
         async execute(input) {
           const results = []
           for (const toolCall of input.calls) {
-            const result = await toolService.execute({
-              callId: toolCall.id,
-              name: toolCall.name,
-              arguments: JSON.parse(toolCall.arguments),
-              agent: toolAgent,
-              signal: input.signal,
-            })
-            results.push({ callId: toolCall.id, result: { content: (result?.content ?? []) as ContentBlock[], isError: result?.isError === true } })
+            const result = await executeTool(ctx, toolAgent, toolCall.id, toolCall.name, toolCall.arguments, input.signal)
+            results.push({ callId: toolCall.id, result })
           }
           return { results }
         },
@@ -109,15 +103,9 @@ describe('real skill_manage write', () => {
       expect(await readFile(join(dir, 'SKILL.md'), 'utf8')).toContain('Body.')
       expect(await readFile(join(dir, '.hermes-managed'), 'utf8').then(() => true)).toBe(true)
       expect((await ctx.skillUsage.report()).get('aux-skill')?.created_by).toBe('agent')
-      const pinResult = await toolService.execute({ callId: ToolCallId('pin'), name: 'skill_manage', arguments: { action: 'pin', name: 'aux-skill' }, agent: toolAgent, signal: new AbortController().signal })
+      const pinResult = await executeTool(ctx, toolAgent, ToolCallId('pin'), 'skill_manage', JSON.stringify({ action: 'pin', name: 'aux-skill' }), new AbortController().signal)
       expect((pinResult as { value?: { ok?: boolean } }).value?.ok).toBe(true)
-      const update = await withReviewContext({ reviewId: 'ctx-review', runId: 'ctx-run' }, () => toolService.execute({
-        callId: ToolCallId('update'),
-        name: 'skill_manage',
-        arguments: { action: 'update', name: 'aux-skill', content: '---\nname: aux-skill\ndescription: changed.\n---\nChanged.\n' },
-        agent: toolAgent,
-        signal: new AbortController().signal,
-      }))
+      const update = await withReviewContext({ reviewId: 'ctx-review', runId: 'ctx-run' }, () => executeTool(ctx, toolAgent, ToolCallId('update'), 'skill_manage', JSON.stringify({ action: 'update', name: 'aux-skill', content: '---\nname: aux-skill\ndescription: changed.\n---\nChanged.\n' }), new AbortController().signal))
       expect((update as { value?: { ok?: boolean; message?: string } }).value?.ok).toBe(false)
       expect((update as { value?: { message?: string } }).value?.message).toContain('受保护（pinned）')
       expect(await readFile(join(dir, 'SKILL.md'), 'utf8')).toContain('Body.')

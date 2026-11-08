@@ -9,6 +9,7 @@ import { clearReviewChannel, markReviewChannel } from '@deepseek-ai/dsh-evolutio
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import { runReview } from '../src/review-executor.ts'
 import type { ReviewLlmPort, ReviewToolPort } from '../src/review-executor.ts'
+import { executeTool } from './support/execute-tool.ts'
 
 const parents = new Set<SessionId>()
 
@@ -60,7 +61,7 @@ describe('review executor over a real ToolsService', () => {
         execute: async input => {
           const results = []
           for (const call of input.calls) {
-            const result = await ctx.tools.execute({ callId: call.id, name: call.name, arguments: JSON.parse(call.arguments), agent: parent, signal: input.signal })
+            const result = await executeTool(ctx, parent, call.id, call.name, call.arguments, input.signal)
             results.push({ callId: call.id, result })
           }
           return { results }
