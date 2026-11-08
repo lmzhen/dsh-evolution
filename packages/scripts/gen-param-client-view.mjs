@@ -84,7 +84,7 @@ const GROUP_LABELS = {
 const VALUE_LABELS_EN = {
   approvalConfirm: ['Execute directly', 'Ask first'],
   skillReviewTrigger: ['By interval', 'On completion', 'Both'],
-  reviewMode: ['In this session', 'Background branch'],
+  reviewMode: ['Plugin auxiliary', 'In this session (debug)'],
   citationPolicy: ['Verify first', 'Refuse'],
   supportFileCharPolicy: ['Warn only', 'Refuse write'],
   skillWriteConfirm: ['Write directly', 'Wait for answer', 'Cancel on timeout'],

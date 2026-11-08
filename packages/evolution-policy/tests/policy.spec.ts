@@ -18,10 +18,10 @@ describe('evolution-policy', () => {
     expect((ctx.evolutionPolicy as unknown as Record<string, unknown>).isProtectedPath).toBeUndefined()
   })
 
-  it('0.3.74: the snapshot default reviewMode is inject (mirrors the review plugin default)', async () => {
+  it('0.3.74: the snapshot default reviewMode is aux (mirrors the review plugin default)', async () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionPolicy)
-    expect(ctx.evolutionPolicy.get().reviewMode).toBe('inject')
+    expect(ctx.evolutionPolicy.get().reviewMode).toBe('aux')
   })
 
   it('refuses governance keys inside memory operations[] too (E-28, 0.3.17)', async () => {
@@ -169,6 +169,7 @@ describe('evolution-policy', () => {
     // degrading, so the historical "warn once at apply" contract was replaced
     // by the stronger fail-loud one.
     await expect(ctx.plugin(EvolutionPolicy, { reviewMode: 'orchestrate' as never })).rejects.toThrow(/reviewMode/)
+    await expect(ctx.plugin(EvolutionPolicy, { reviewMode: 'branch' as never })).rejects.toThrow(/reviewMode/)
   })
 
   it('F-14 (v18): configured protectedSkillNames extend the frozen safety list', async () => {

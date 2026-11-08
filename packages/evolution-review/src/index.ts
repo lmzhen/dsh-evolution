@@ -7,7 +7,9 @@ import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, ContextFormed, GenerateOptions, StreamChunk, ToolCallBlock, ToolCallId } from '@deepseek-ai/dsh-llm'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { runReview } from './review-executor.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
@@ -19,7 +21,7 @@ declare module '@deepseek-ai/dsh-llm' {
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-evolution-core/platform'
-import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, MEMORY_REVIEW_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
@@ -29,7 +31,6 @@ import type { LiveValue } from '@deepseek-ai/dsh-evolution-core'
 // per-dispatch dedup and the skill-read tool names. This file matches on
 // `ToolDispatchSignal` fields instead of on an event type.
 import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, sessionTurnSignals } from '@deepseek-ai/dsh-evolution-core'
-import { modelRoute, presetsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 
 import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
@@ -88,14 +89,11 @@ export function noticeAllowed(reviewPrompt: boolean, notice: boolean): boolean {
 
 export interface Config {
   reviewEnabled?: Volatile<boolean>
-  /** How the flush delivers the review. `'inject'` (default) runs it in the
-   * parent agent on the parent's model and cached prefix. `'branch'` is a
-   * TEMPORARY platform-gap path, not a durable product feature: the platform
-   * cannot currently provide a review child that is simultaneously
-   * durable-log-governable, parent-prefix-cache-reusing, and free of workspace
-   * pollution. Choose branch only when that trade-off is acceptable; see the
-   * README "Branch review is a temporary platform-gap path". */
-  reviewMode?: Volatile<'inject' | 'branch'>
+  /** How the flush delivers the review. `'aux'` (default) is the plugin-owned
+   * manual loop: parent prefix, no child Session, no parent append.
+   * `'inject'` remains a debugging/compatibility mode that runs the review as
+   * an ordinary parent turn and therefore appends prompt/tool events. */
+  reviewMode?: Volatile<'inject' | 'aux'>
   /** Review cadence in TOOL CALLS — the CANONICAL registry id (G1, signals.ts:
    * a turn advances by its tool-call count, minimum 1, or by 1 when the turn
    * itself carried the memory signal). Shadowed by the policy snapshot in every
@@ -159,7 +157,7 @@ export const Config = z.object({
   // 0.3.74: default is 'inject' — see the Config JSDoc. 'subagent' stays a
   // first-class opt-in for deployments that want the parent context kept clean
   // or a dedicated review model.
-  reviewMode: z.union([z.const('inject'), z.const('branch')]).default('inject').volatile(),
+  reviewMode: z.union([z.const('inject'), z.const('aux')]).default('aux').volatile(),
   // G1: the canonical registry ids, merged into the row Config. No .default(): a
   // schema default would fill the canonical key and make the deprecated alias
   // below unreachable through the alias fallback (resolveReviewRowSettings resolves
@@ -291,7 +289,7 @@ export interface ReviewSettings {
   /** Master switch for the review plugin. */
   reviewEnabled: boolean
   /** Run the review in the parent session (inject) or on a subagent. */
-  reviewMode: 'inject' | 'branch'
+  reviewMode: 'inject' | 'aux'
   /** Deliver the deferred review as a waking follow-up message. */
   reviewWakeInject: boolean
   /** Deliver result notices (not review prompts). */
@@ -316,7 +314,7 @@ export function resolveReviewRowSettings(rawConfig: Config, warn: (message: stri
     skillReviewTrigger: unwrapLive(rawConfig.skillReviewTrigger) ?? DEFAULT_SKILL_REVIEW_TRIGGER,
     skillReviewCompletionMinToolCalls: clampOnce(warned, warn, 'skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
     reviewEnabled: liveBool(rawConfig.reviewEnabled, true),
-    reviewMode: unwrapLive(rawConfig.reviewMode) ?? 'inject',
+    reviewMode: unwrapLive(rawConfig.reviewMode) ?? 'aux',
     reviewWakeInject: liveBool(rawConfig.reviewWakeInject, true),
     reviewNotice: liveBool(rawConfig.reviewNotice, true),
   }
@@ -411,10 +409,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // interleave window: the loser records a failed op and the snapshot stays
   // the rollback path. Accepted + documented (plan v20 C-3①); the same
   // statement lives on evolution-curator's acquireMutex.
-  /** Branch mode runs at most one branch per parent session; a second trigger only sets rerun. */
-  const branchRunning = sessionState.add('branchRunning', new Map<SessionId, { rerun?: ReviewKind }>())
-  /** Child Sessions this plugin owns; their turn/end must not start another review. */
-  const branchSessions = sessionState.add('branchSessions', new Set<SessionId>())
+  /** Aux mode runs at most one plugin-side review per parent session; a second trigger only sets rerun. */
+  const auxRunning = sessionState.add('auxRunning', new Map<SessionId, { rerun?: ReviewKind }>())
   const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
   /**
@@ -440,7 +436,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // precedence itself is core's `pickWithPolicy` (ONE rule for both readers of the policy row).
     const pick = (key: 'reviewSkillInterval' | 'reviewMemoryInterval'): number =>
       pickWithPolicy(userSet, row, snapshot, key)
-    const mode = (): 'inject' | 'branch' => {
+    const mode = (): 'inject' | 'aux' => {
       if (userSet.has('reviewMode')) return row.reviewMode
       return snapshot?.reviewMode ?? row.reviewMode
     }
@@ -465,7 +461,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const schemaDefaults = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: Config } } })['~standard'].validate({}).value
   /** The value the schema fills in when nobody sets the key — for a volatile field the
    * reference is always present, so this is what "the row set nothing" resolves to. */
-  const SHADOW_DEFAULTS = { reviewMode: 'inject', reviewMemoryInterval: DEFAULT_REVIEW_MEMORY_INTERVAL, reviewSkillInterval: DEFAULT_REVIEW_SKILL_INTERVAL } as const
+  const SHADOW_DEFAULTS = { reviewMode: 'aux', reviewMemoryInterval: DEFAULT_REVIEW_MEMORY_INTERVAL, reviewSkillInterval: DEFAULT_REVIEW_SKILL_INTERVAL } as const
   const rowSupplied = (id: keyof typeof SHADOW_DEFAULTS, alias?: 'memoryInterval' | 'skillInterval'): boolean => {
     // The key is a union of differently-typed volatile fields, so the read is asked as unknown:
     // unwrapLive cannot unify a union of payload types, and this site only compares against defaults.
@@ -497,7 +493,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // session and emits no `evolution/plan-applied` — an empty ledger is a
   // property of the composition, so it is disclosed once at load, not per review.
   if (params().reviewMode === 'inject') {
-    ctx.logger.warn('dsh-evolution-review: reviewMode "inject" (default) runs the review in the parent session and emits NO evolution/plan-applied ledger entry — evolution-activity and evolution-replay stay empty in this mode (see the evolution-review README, "Known Limitations and Deferred Work"). Set reviewMode: "branch" on the evolution-policy row to keep the audited plan path; branch review is a temporary platform-gap path (see the README known limitations).')
+    ctx.logger.warn('dsh-evolution-review: reviewMode "inject" (debug-only) runs the review in the parent session and emits NO evolution/plan-applied ledger entry — evolution-activity and evolution-replay stay empty in this mode (see the evolution-review README, "Known Limitations and Deferred Work"). Set reviewMode: "branch" on the evolution-policy row to keep the audited plan path; branch review is a temporary platform-gap path (see the README known limitations).')
   }
 
   // V24-04 (v24): per-session mutex over the persisted review-state RMW.
@@ -660,7 +656,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function runOnTurnEnd(session: Session, event: SessionEvent<'turn/end'>): Promise<void> {
     if (!params().reviewEnabled) return
     if (session.header.origin === 'subagent') return
-    if (branchSessions.has(session.id)) return
     if ((session.header as { visibility?: 'background' }).visibility === 'background') return
     const agent = ctx.agents.get(session.id)
     if (!agent) return
@@ -761,10 +756,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // Explicit 'inject' deployments also execute at the end (the user
         // decision: BOTH modes complete after the task — the old immediate
         // 'inject' contract is superseded, 0.3.39).
-        if (params().reviewMode === 'branch' && await tryBranchReview(session, agent, pendingKind, signal as { toolCalls: number; userChars: number; assistantChars: number }, 'cadence')) {
+        if (params().reviewMode === 'aux') {
+          if (!tryAuxReview(session, agent, pendingKind, signal, 'cadence')) {
+            pendingCadenceReviews.set(session.id, pendingKind)
+          }
           return
         }
-        if (params().reviewMode === 'inject' || params().reviewMode === 'branch') {
+        if (params().reviewMode === 'inject') {
           // 0.3.73: a refused delivery restores the latch and returns BEFORE the
           // reset below, so the segment's review retries instead of vanishing.
           if (!deliverMessage(agent, reviewPrompt(pendingKind), cadenceSummary(pendingKind), true)) {
@@ -827,7 +825,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (completionInjected.has(session.id)) return
     if (!shouldCompletionReview(event.data.reason, cumulative, params().skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
-    if (params().reviewMode === 'branch' && await tryBranchReview(session, agent, 'skill', signal as { toolCalls: number; userChars: number; assistantChars: number }, 'completion')) {
+    if (params().reviewMode === 'aux') {
+      if (!tryAuxReview(session, agent, 'skill', signal, 'completion')) {
+        completionInjected.delete(session.id)
+      }
       return
     }
     // V4-21 (F-334 residual ②) / 0.3.73: the flag is set BEFORE the delivery, so a
@@ -989,105 +990,111 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     'Do not create skills here; return a short summary of what was saved.\nIf nothing is worth saving, say "Nothing to save." and stop.',
   )
 
-  async function tryBranchReview(session: Session, agent: import('@deepseek-ai/dsh-agent').Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
-    const state = branchRunning.get(session.id)
-    if (state !== undefined) { state.rerun = kind; return true }
-    const branchState: { rerun?: ReviewKind } = {}
-    branchRunning.set(session.id, branchState)
-    const childId = SessionId('session-' + randomUUID())
+  /** Tools the plugin-side review may call; every name must already be in the parent request head. */
+  /**
+   * Run one plugin-side review over the parent prefix. No child Agent/Session is
+   * created; the parent Agent is used only for tool scope/approval, with no log.
+   */
+  function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): boolean {
+    const running = auxRunning.get(session.id)
+    if (running !== undefined) { running.rerun = kind; return true }
+    const header = session.requestHeader()
+    if (header === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — parent has no request header'); return false }
+    const llm = ctx.get('llm') as { stream(options: GenerateOptions): AsyncIterable<StreamChunk> } | undefined
+    const tools = ctx.get('tools') as {
+      execute(input: { calls: readonly ToolCallBlock[]; signal: AbortSignal; agent?: Agent }): Promise<{
+        results: readonly { callId: ToolCallId; result: { content: ContentBlock[]; isError: boolean } }[]
+      }>
+    } | undefined
+    if (llm === undefined || tools === undefined) {
+      ctx.logger.warn('dsh-evolution-review: aux review skipped — llm/tools service is not mounted')
+      return false
+    }
+    const state: { rerun?: ReviewKind } = {}
+    auxRunning.set(session.id, state)
+    const reviewId = 'aux-' + randomUUID()
     const startedAt = Date.now()
     const controller = new AbortController()
     let timedOut = false
-    const timeoutDone = Promise.withResolvers<void>()
-    const timer = setTimeout(() => {
-      timedOut = true
-      controller.abort()
-      timeoutDone.resolve()
-      handle?.agent.cancel({ kind: 'hook', reason: 'evolution-review-timeout' })
-    }, config.reviewTimeoutMs)
-    let handle: Awaited<ReturnType<typeof ctx.agents.create>> | undefined
-    try {
-      const presets = presetsPort(ctx)
-      let agentPreset: string | undefined
-      let setup: ((target: Context, child: import('@deepseek-ai/dsh-agent').Agent) => Promise<void>) | undefined
-      if (presets !== undefined) {
-        const resolved = await presets.resolve(session.header.agentPreset)
-        agentPreset = resolved.id
-        setup = async (target, _child) => { await presets.mount(target, resolved.id) }
-      }
-      // The live Session log is the only complete seed source in the current platform;
-      // the query service exposes search/projections, not the full ordered event list.
-      const seed = session.snapshotEvents()
-      const current = modelRoute(ctx, agent, session)
-      handle = await ctx.agents.create({
-        sessionId: childId,
-        parentAgent: agent,
-        seed,
-        // The session API changed the branded log-offset type across platform lines; the value is
-        // still the inherited event count, so keep the payload numeric and erase the old brand.
-        inheritedEventCount: seed.length as unknown as never,
-        meta: { parentSession: session.id, isSeeded: true, ...(agentPreset === undefined ? {} : { agentPreset }) },
-        ...(current === undefined ? {} : { agentOptions: { provider: current.provider, model: current.model } }),
-        ...(setup === undefined ? {} : { setup }),
-      })
-    } catch (error) {
-      clearTimeout(timer)
-      branchRunning.delete(session.id)
-      ctx.logger.warn('dsh-evolution-review: branch Session did not start: ' + (error instanceof Error ? error.message : String(error)))
-      return false
-    }
-    branchSessions.add(childId)
-    const collected = { finalText: '', actions: [] as { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'error' }[], usage: undefined as { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined, error: undefined as string | undefined }
-    const onEvent = (owner: { id: SessionId }, event: SessionEvent): void => {
-      if (owner.id !== childId) return
-      if (event.type === 'assistant/message') {
-        const text = event.data.message.content.filter(block => block.type === 'text').map(block => block.text).join('')
-        if (text !== '') collected.finalText = text
-        if (event.data.usage !== undefined) collected.usage = { inputTokens: event.data.usage.inputTokens ?? 0, outputTokens: event.data.usage.outputTokens ?? 0, cacheReadTokens: event.data.usage.cacheReadTokens ?? 0, cacheWriteTokens: event.data.usage.cacheWriteTokens ?? 0 }
-      }
-    }
-    const offEvent = ctx.on('session/event', onEvent)
-    emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'branch' })
+    const timer = setTimeout(() => { timedOut = true; controller.abort() }, config.reviewTimeoutMs)
+    const AUX_TOOL_ALLOW = new Set(['skill_manage', 'memory', 'skill', 'skill_search', 'read', 'glob', 'grep'])
+    const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
+    emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
+      let finalText = ''
+      let status: 'completed' | 'failed' | 'timeout' | 'aborted' = 'failed'
+      let actions: readonly { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'error' }[] = []
+      let usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined
+      let error: string | undefined
       try {
         const prompt = kind === 'memory' ? BRANCH_MEMORY_PROMPT : COMPLETION_SKILL_REVIEW_PROMPT
-        handle.agent.followup(createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'user' } }))
-        const idle = handle.agent.whenIdle().catch(error => {
-          if (collected.error === undefined) collected.error = error instanceof Error ? error.message : String(error)
-        })
-        await Promise.race([idle, timeoutDone.promise])
-        if (timedOut) handle.agent.cancel({ kind: 'hook', reason: 'evolution-review-timeout' })
-        offEvent()
-        if (collected.finalText.trim() !== '') deliverMessage(agent, collected.finalText, 'branch review result', false)
-        try {
-          ctx.emit('evolution/review-completed', { version: 1, reviewId: childId, sessionId: session.id, branchSessionId: childId, kind, status: collected.error !== undefined ? 'failed' : timedOut ? 'timeout' : controller.signal.aborted ? 'aborted' : 'completed', trigger: { reason, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars }, finalText: collected.finalText, actions: collected.actions, ...(collected.usage === undefined ? {} : { usage: collected.usage }), startedAt, finishedAt: Date.now(), ...(collected.error === undefined ? {} : { error: collected.error }) })
-        } catch (emitError) { ctx.logger.warn('dsh-evolution-review: review-completed emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError))) }
-        try {
-          const ok = (action: typeof collected.actions[number]): boolean => action.status === 'ok'
-          ctx.emit('evolution/plan-applied', {
-            sessionId: String(session.id),
-            planId: String(childId),
-            memoryApplied: collected.actions.filter(action => action.type === 'memory' && ok(action)).length,
-            skillApplied: collected.actions.filter(action => action.type === 'skill' && ok(action)).length,
-            rejectedOps: collected.actions.filter(action => !ok(action)).length,
-            ...(collected.error === undefined ? {} : { executionError: collected.error }),
-          })
-        } catch (emitError) { ctx.logger.warn('dsh-evolution-review: plan-applied emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError))) }
-      } catch (error) {
-        offEvent()
-        collected.error = error instanceof Error ? error.message : String(error)
-        ctx.logger.warn('dsh-evolution-review: branch review failed: ' + collected.error)
+        const result = await withReviewContext({ reviewId, runId: reviewId }, () => runReview({
+          parent: agent,
+          llm: { stream: options => llm.stream(options) },
+          tools: { execute: input => tools.execute({ calls: input.calls, signal: input.signal, agent }) },
+          instruction: prompt,
+          toolAllow,
+          signal: controller.signal,
+          markReview: () => {},
+          clearReview: () => {},
+        }))
+        finalText = result.finalText
+        actions = result.actions
+        if (result.usage !== undefined) {
+          usage = {
+            inputTokens: result.usage.inputTokens ?? 0,
+            outputTokens: result.usage.outputTokens ?? 0,
+            cacheReadTokens: result.usage.cacheReadTokens ?? 0,
+            cacheWriteTokens: 0,
+          }
+        }
+        status = 'completed'
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : String(caught)
+        status = timedOut ? 'timeout' : controller.signal.aborted ? 'aborted' : 'failed'
+        ctx.logger.warn('dsh-evolution-review: aux review failed: ' + error)
       } finally {
         clearTimeout(timer)
-        branchSessions.delete(childId)
-        await handle.dispose().catch(() => {})
-        const rerun = branchState.rerun
-        branchRunning.delete(session.id)
-        if (rerun !== undefined) void tryBranchReview(session, agent, rerun, signal, reason)
+        const finishedAt = Date.now()
+        try {
+          ctx.emit('evolution/review-completed', {
+            version: 1,
+            reviewId,
+            sessionId: String(session.id),
+            kind,
+            status,
+            trigger: { reason, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars },
+            finalText,
+            actions,
+            ...(usage === undefined ? {} : { usage }),
+            startedAt,
+            finishedAt,
+            model: { provider: header.config.provider, model: header.config.model },
+            ...(error === undefined ? {} : { error }),
+          })
+        } catch (emitError) {
+          ctx.logger.warn('dsh-evolution-review: aux review-completed emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
+        }
+        try {
+          const ok = (action: typeof actions[number]): boolean => action.status === 'ok'
+          ctx.emit('evolution/plan-applied', {
+            sessionId: String(session.id),
+            planId: reviewId,
+            memoryApplied: actions.filter(action => action.type === 'memory' && ok(action)).length,
+            skillApplied: actions.filter(action => action.type === 'skill' && ok(action)).length,
+            rejectedOps: actions.filter(action => !ok(action)).length,
+            ...(error === undefined ? {} : { executionError: error }),
+          })
+        } catch (emitError) {
+          ctx.logger.warn('dsh-evolution-review: aux plan-applied emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
+        }
+        auxRunning.delete(session.id)
+        if (state.rerun !== undefined) void tryAuxReview(session, agent, state.rerun, signal, reason)
       }
     })()
     return true
   }
+
 
   ctx.effect(() => () => {
     // T3-09/A37: unload cancels this fiber's long work FIRST — the subagent leg sees an aborted

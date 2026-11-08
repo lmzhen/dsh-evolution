@@ -25,8 +25,8 @@ it('every per-session collection in the plugin source is registered', () => {
   // skipNextCadenceFire 与 lastTurnStart 两个集合删掉——抑制改由「取走它的回合」识别，不必再
   // 按投递顺序记账。G4 删掉 turnStarts（回合窗口改由家族会话投影 `evolutionSignals` 按
   // `turn/start` 自行重置，那张表原本只是替它记住起点 seq），同时新增 dispatchDigest
-  // （审查摘要的工具证据＝有界的 dispatch 帧尾巴，取代每次复查重读整份日志）。所以现在是八个。
-  expect(registered).toHaveLength(10)
+  // （审查摘要的工具证据＝有界的 dispatch 帧尾巴，取代每次复查重读整份日志）。删掉 branchRunning/branchSessions 后现在是九个。
+  expect(registered).toHaveLength(9)
 })
 
 it('the dispose hook delegates to the registry instead of hand-listing clears', () => {

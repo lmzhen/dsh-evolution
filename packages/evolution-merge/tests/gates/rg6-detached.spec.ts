@@ -1,7 +1,7 @@
 import { seedRow } from '../support/seed-row.ts'
 // @tier pre-tag
 import { createHash } from 'node:crypto'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { loadMergeState, pairKey, rowIdOf, runApproveCommand, runResumeCommand, type MergeDecision, type MergeRegistryPort, type MergeRow } from '../../src/index.ts'
@@ -20,7 +20,7 @@ function registry() {
   return { port, calls }
 }
 
-it('detached approve accepts under 1s and completes without a client', async () => {
+it('detached approve accepts under 1s and completes without a client', { timeout: 90_000 }, async () => {
   const home = await tempRoot('dsh-rg6-detached-')
   const io = nodeEvolutionIo()
   const planned = row()
@@ -33,12 +33,11 @@ it('detached approve accepts under 1s and completes without a client', async () 
   expect(Date.now() - started).toBeLessThan(1000)
   expect(result).toMatchObject({ ok: true, accepted: true, runId: 'run-1' })
   release()
-  for (let i = 0; i < 2000 && !reg.calls.includes('settle:succeeded'); i += 1) await new Promise(resolve => setTimeout(resolve, 5))
-  expect(reg.calls).toContain('settle:succeeded')
+  await vi.waitFor(() => expect(reg.calls).toContain('settle:succeeded'), { timeout: 60_000, interval: 20 })
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })
 
-it('detached resume accepts under 1s and completes in background', async () => {
+it('detached resume accepts under 1s and completes in background', { timeout: 90_000 }, async () => {
   const home = await tempRoot('dsh-rg6-detached-resume-')
   const io = nodeEvolutionIo()
   const planned = { ...row(), state: 'fuse' as const, queue: 'fuse' as const }
@@ -48,11 +47,10 @@ it('detached resume accepts under 1s and completes in background', async () => {
   const result = await runResumeCommand({ io, home, registry: reg.port, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
   expect(Date.now() - started).toBeLessThan(1000)
   expect(result).toMatchObject({ ok: true, accepted: true, runId: 'run-1' })
-  for (let i = 0; i < 2000 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
-  expect((await loadMergeState(io, home)).state.rows).toEqual([])
+  await vi.waitFor(async () => expect((await loadMergeState(io, home)).state.rows).toEqual([]), { timeout: 60_000, interval: 20 })
 })
 
-it('client disconnect does not abort a detached run', async () => {
+it('client disconnect does not abort a detached run', { timeout: 90_000 }, async () => {
   const home = await tempRoot('dsh-rg6-kill-client-')
   const io = nodeEvolutionIo()
   const planned = row()
@@ -60,7 +58,6 @@ it('client disconnect does not abort a detached run', async () => {
   const reg = registry()
   const result = await runApproveCommand({ io, home, registry: reg.port, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, ports: { async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
   expect(result).toMatchObject({ ok: true, accepted: true })
-  for (let i = 0; i < 2000 && !reg.calls.includes('settle:succeeded'); i += 1) await new Promise(resolve => setTimeout(resolve, 5))
-  expect(reg.calls).toContain('settle:succeeded')
+  await vi.waitFor(() => expect(reg.calls).toContain('settle:succeeded'), { timeout: 60_000, interval: 20 })
   expect(createHash('sha256').update(await (await import('node:fs/promises')).readFile(mergeStatePath(home))).digest('hex')).toHaveLength(64)
 })

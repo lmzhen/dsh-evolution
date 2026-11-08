@@ -1,4 +1,10 @@
 # Changelog
+## 0.39.0 (review) — 纯插件辅助审查；删除持久 branch
+
+> **范围**：review 默认改为纯插件 `aux`：复用父 requestHeader/deriveMessages/toolHistory，用父 Agent 执行 allowlist 工具且不传 log，不创建 child Session、不 append 父 Session；新增 ReviewExecutionContext 让 review 写入保持 `background_review`；activity 的 review 记录收敛为有界 ReviewRun（finalText preview + finalTextChars）；删除 `reviewMode: branch` 配置、child 创建、branch 事件生产与 branch UI；旧 branch 记录仅保留 `branchSessionId` 只读。真实运行修复：review LLM 不传父 sessionId（避免 provider 追加 delivery-accepted）、aux finalText 不回写父会话、允许 read/glob/grep 及错误结果恢复。
+> **验证**：review 18 tests、policy 11 tests、review-context 2 tests（31）通过；review tsc 与 family build-lib 通过。隔离 lab 真实 review cacheReadTokens=17152；npm web 3080 standard preset 真实 review cacheReadTokens=38912，2 个 skill_search ok，父 Session 1 turn、无 child、无 review turn；UI 参数卡显示「插件内辅助」，无 branch 选项；lab timeout 状态为 timeout 且父 Session 不变。
+> **迁移/边界**：旧 profile 的 `reviewMode: branch` 必须改为 `aux`，否则 closed union 会在加载时 fail-loud；旧 branch 记录只读。PTC 会话父 header 只暴露 `run_code`，aux 为保护 no-append 拒绝该工具，PTC review 会降级/空结果——用 standard preset 做语义验收，不要把 PTC 空结果当成功。真实 inject/aux A/B 语义对比仍 DEFERRED。
+
 ## 0.38.0 (platform) — 平台线 0.2.2-rc.1 与运行时收口
 
 > **范围**：平台线从 0.2.1-rc.3 抬到 0.2.2-rc.1；投影/LLM/工具/预设边界迁入 core/platform 与 runtime 服务；G5 响应式表格与 client seat 收敛。目标宿主候选验收完成；0.38.0 发布。

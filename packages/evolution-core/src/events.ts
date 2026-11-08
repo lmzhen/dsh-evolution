@@ -34,7 +34,7 @@ export interface EvolutionReviewScheduledEvent {
    * `'subagent'` (spawned review run), `'inject'` (prompt injected into the
    * parent — direct, fallback, or deferred-drain), `'completion'`
    * (completion-trigger prompt, direct or deferred-drain). */
-  channel?: 'subagent' | 'inject' | 'completion' | 'branch' | undefined
+  channel?: 'subagent' | 'inject' | 'completion' | 'aux' | undefined
 }
 
 /** One normalized skill/memory action performed by a review branch. */

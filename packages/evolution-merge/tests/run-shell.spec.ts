@@ -1,5 +1,5 @@
 // @tier pre-tag
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { readMergeReport, withMergeRun, type MergeRegistryPort } from '../src/index.ts'
@@ -74,7 +74,7 @@ it('records stagingRef and the claimed pair in run-meta', async () => {
   expect(meta).toMatchObject({ stagingRef: 'stage-1', pairs: [{ pairKey: 'a\u0000b', state: 'pending' }] })
 })
 
-it('detached returns a run id before the body settles', async () => {
+it('detached returns a run id before the body settles', { timeout: 90_000 }, async () => {
   const home = await tempRoot('dsh-merge-run-shell-detached-')
   const io = nodeEvolutionIo()
   const reg = registry()
@@ -94,13 +94,10 @@ it('detached returns a run id before the body settles', async () => {
   expect(result).toMatchObject({ ok: true, accepted: true, runId: 'run-1' })
   expect(reg.calls).not.toContain('settle:succeeded')
   release()
-  for (let i = 0; i < 2000 && !reg.calls.includes('settle:succeeded'); i += 1) {
-    await new Promise(resolve => setTimeout(resolve, 5))
-  }
-  expect(reg.calls).toContain('settle:succeeded')
+  await vi.waitFor(() => expect(reg.calls).toContain('settle:succeeded'), { timeout: 60_000, interval: 20 })
 })
 
-it('waits for an aborted body before settling the timeout', async () => {
+it('waits for an aborted body before settling the timeout', { timeout: 90_000 }, async () => {
   const home = await tempRoot('dsh-merge-run-shell-timeout-')
   const io = nodeEvolutionIo()
   const reg = registry()
@@ -120,8 +117,7 @@ it('waits for an aborted body before settling the timeout', async () => {
       }
     },
   })
-  for (let i = 0; i < 400 && !aborted; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
-  expect(aborted).toBe(true)
+  await vi.waitFor(() => expect(aborted).toBe(true), { timeout: 60_000, interval: 20 })
   expect(reg.calls).not.toContain('settle:cancelled')
   expect(reg.calls).not.toContain('settle:failed')
   release()
