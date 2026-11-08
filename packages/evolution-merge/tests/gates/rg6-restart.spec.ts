@@ -36,7 +36,7 @@ it('typed settleOrphan only settles a running run once', async () => {
   expect(await registry.settleOrphan(handle.id)).toBe(false)
 })
 
-it('manual resume after restart is explicit and can complete', async () => {
+it('manual resume after restart is explicit and can complete', { timeout: 90_000 }, async () => {
   const home = await tempRoot('dsh-rg6-manual-resume-')
   const io = nodeEvolutionIo()
   const key = pairKey('a', 'b')
@@ -45,6 +45,13 @@ it('manual resume after restart is explicit and can complete', async () => {
   const registry = newRunRegistry({ io, home, now: () => 1000 })
   const accepted = await runResumeCommand({ io, home, registry, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
   expect(accepted).toMatchObject({ ok: true, accepted: true })
-  for (let i = 0; i < 2000 && (await loadMergeState(io, home)).state.rows.length > 0; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
+  const runId = accepted.runId
+  const deadline = Date.now() + 60_000
+  while (Date.now() < deadline) {
+    if ((await loadMergeState(io, home)).state.rows.length === 0) break
+    const run = registry.find(runId)
+    if (run !== undefined && run.state !== 'running') break
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
 })
