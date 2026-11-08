@@ -14,17 +14,23 @@ Subagent-origin, background-visibility, and review-child sessions are excluded. 
 
 | Mode | Behavior | Recorded history |
 |---|---|---|
-| `inject` (default) | Sends the review prompt into the parent session. `reviewWakeInject=true` uses a waking follow-up when available. | Emits `review-scheduled`; does **not** emit `plan-applied`, so plan-based activity/replay stays empty. |
-| `branch` | Creates a child agent with a seed from the live session log and delivers the result to the parent. | Emits `review-completed` and `plan-applied`, including failure/timeout status when known. |
+| `aux` (default) | Runs a plugin-owned manual loop over the parent request prefix: parent Agent, no child Session, no parent append, allowlisted parent-visible tools executed without a log; a disallowed call returns a tool error instead of aborting the review. | Emits `review-scheduled` and `review-completed`; the completion event is folded into the bounded activity review list (preview + actions + usage). |
+| `inject` (debug) | Sends the review prompt into the parent session as an ordinary turn. `reviewWakeInject=true` uses a waking follow-up when available. | Emits `review-scheduled`; does **not** emit `plan-applied`, so plan-based activity/replay stays empty. |
 
-Branch mode requires `agents`. It is a temporary platform-gap path with trade-offs among durable-log governance, parent prefix-cache reuse, and workspace pollution; it is not the default product path.
-
-`reviewNotice=true` allows result notices. It does not suppress an inject-mode review prompt, because that prompt is the review itself.
+`reviewNotice=true` allows result notices for the inject path. Aux results are audit-only: `finalText` lands in the bounded activity review record and never becomes a parent message or a new parent turn.
 
 ## Events and limits
 
-The package emits `evolution/review-scheduled`, `evolution/review-completed` (branch), `evolution/review-error`, and branch-mode `evolution/plan-applied`. `reviewTimeoutMs` bounds the branch run. Review cadence state is persisted when `evolution-state` is available; without it, cadence can reset between turns.
+The package emits `evolution/review-scheduled`, `evolution/review-completed`, `evolution/review-error`, and an aux `evolution/plan-applied` ledger entry. `reviewTimeoutMs` bounds the aux loop. Review cadence state is persisted when `evolution-state` is available; without it, cadence can reset between turns.
 
 **Unimplemented metadata:** `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth`, and `reviewToolAllow` may still appear in generated parameter/bundle metadata, but this plugin does not read them. Do not rely on them for provider selection, context limits, delegation depth, or tool restrictions. `reviewTimeoutMs` is implemented.
 
 `memoryInterval` and `skillInterval` remain readable deprecated aliases of `reviewMemoryInterval` and `reviewSkillInterval`; writes to the old names are refused (G0/S0.3).
+
+
+## Known limitations and migration
+
+Step-by-step upgrade instructions: [docs/UPGRADE-0.39.md](../../docs/UPGRADE-0.39.md).
+
+- **PTC sessions:** their parent request header exposes only `run_code`. Aux review deliberately rejects `run_code` to keep the parent log append-free, so a PTC review cannot inspect the skill library and may return an empty/degraded result. Use a standard Agent preset for semantic review; do not report a PTC empty review as success.
+- **0.39 migration:** `branch` was removed from the closed `reviewMode` union. An existing `reviewMode: branch` profile patch now fails validation and deactivates the policy row; rewrite it to `aux` before restarting. Old branch activity records remain readable through `branchSessionId`; no new branch run is produced.

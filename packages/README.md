@@ -26,7 +26,7 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 | `evolution-approval` | Staged writes, 4 routes, TTL, release, preview, cross-package `effectiveSessionPolicy` |
 | `evolution-merge` | Merge service, 16 verbs, `merge_stage`, 4 read-only routes, recovery/reconcile |
 | `evolution-merge-engine` | Pure library: screening, report map, vendored pipeline; no plugin surface |
-| `evolution-review` | Review cadence, delivery, notice state machine, branch mode |
+| `evolution-review` | Review cadence, aux delivery, notice state machine |
 | `evolution-maintenance` | `maintenance_probe` tool + maintain scan/facts/validation |
 | `evolution-curator` | Lifecycle curation, restore/history/undo, health view, reports |
 | `evolution-learning-graph` | `/graph` view/detail/edit/delete over skills + memory |

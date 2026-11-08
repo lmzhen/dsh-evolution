@@ -38,6 +38,7 @@ import { authorityFrom, type WriteAuthority } from './write-authority.ts'
 import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
+import { currentReviewContext } from './review-context.ts'
 import { isCommittedWarning, nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
 import { appendEvolutionEvent, eventsFile } from './evolution-events.ts'
 import { isAbsent, isPresent, isUnknown, probeAbsent, probeList, probeMtime, probePresent, probeReason, probeText, probeUnknown, type Probe } from './probe.ts'
@@ -491,6 +492,7 @@ export interface EvolutionExecOriginView {
 export function resolveExecOrigins(
   exec: EvolutionExecOriginView | undefined,
 ): { approval: 'foreground' | 'background_review'; library: WriteOrigin } {
+  if (currentReviewContext() !== undefined) return { approval: 'background_review', library: 'background_review' }
   const session = exec?.agent?.session
   return resolveOrigins(
     session?.header?.origin,

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-merge-engine",
   "description": "Vendored skill-merge Node pipeline engine (byte-identical upstream) for DSH evolution-merge",
-  "version": "0.38.0",
+  "version": "0.39.0",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

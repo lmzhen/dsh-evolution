@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike, type EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, activityFile, apply, applyActivityEvent, loadActivity, parseActivityContent, serializeActivity, type EvolutionActivityRecord } from '../src/index.ts'
+import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, REVIEW_TEXT_PREVIEW_CHARS, activityFile, apply, applyActivityEvent, applyReviewActivityEvent, loadActivity, parseActivityContent, serializeActivity, type EvolutionActivityRecord } from '../src/index.ts'
 import { tempHome } from '../../test-support/temp-home.ts'
 
 function payload(overrides: Partial<EvolutionPlanAppliedEvent> = {}): EvolutionPlanAppliedEvent {
@@ -84,6 +84,42 @@ function serialize(items: EvolutionActivityRecord[]): string {
     // Cap drops the OLDEST records, keeping the recent window.
     items = applyActivityEvent(items, payload({ planId: 'plan-3' }), 2, 300)
     expect(items.map(item => item.planId)).toEqual(['plan-2', 'plan-3'])
+  })
+
+  it('bounds the review preview while preserving the full text length', () => {
+    const text = 'x'.repeat(REVIEW_TEXT_PREVIEW_CHARS + 500)
+    const [record] = applyReviewActivityEvent([], {
+      version: 1,
+      reviewId: 'review-bounded',
+      sessionId: 'session-a',
+      kind: 'memory',
+      status: 'completed',
+      trigger: { reason: 'cadence', toolCalls: 0, userChars: 10, assistantChars: 10 },
+      finalText: text,
+      actions: [],
+      startedAt: 1,
+      finishedAt: 2,
+    }, 200, 3)
+    expect(record?.finalText).toHaveLength(REVIEW_TEXT_PREVIEW_CHARS)
+    expect(record?.finalTextChars).toBe(text.length)
+  })
+
+
+  it('keeps the legacy branchSessionId read path without producing it', () => {
+    const [record] = applyReviewActivityEvent([], {
+      version: 1,
+      reviewId: 'legacy-review',
+      sessionId: 'session-a',
+      branchSessionId: 'session-old',
+      kind: 'skill',
+      status: 'completed',
+      trigger: { reason: 'branch', toolCalls: 1, userChars: 1, assistantChars: 1 },
+      finalText: 'done',
+      actions: [],
+      startedAt: 1,
+      finishedAt: 2,
+    }, 200, 3)
+    expect(record?.branchSessionId).toBe('session-old')
   })
 
   it('persists every emitted plan-applied payload across driver restarts (A1 replacement read path)', { timeout: 20_000 }, async () => {

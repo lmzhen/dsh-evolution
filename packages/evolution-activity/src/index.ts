@@ -56,6 +56,8 @@ export interface EvolutionReviewActivityRecord {
   status: EvolutionReviewCompletedEvent['status']
   trigger: EvolutionReviewCompletedEvent['trigger']
   finalText: string
+  /** Full final-text length before the review preview was bounded. */
+  finalTextChars?: number | undefined
   actions: EvolutionReviewCompletedEvent['actions']
   usage?: EvolutionReviewCompletedEvent['usage']
   startedAt: number
@@ -72,6 +74,9 @@ export const ACTIVITY_FILE_VERSION = 2
 /** Default bound on the retained sidecar (S6.4: also the fallback for a
  * non-finite `maxItems`). */
 export const DEFAULT_MAX_ITEMS = 200
+
+/** Bound on the retained final review text; the full length stays in finalTextChars. */
+export const REVIEW_TEXT_PREVIEW_CHARS = 2000
 
 export function activityFile(root: string): string {
   return join(root, 'activity.json')
@@ -133,7 +138,8 @@ export function applyReviewActivityEvent(
     kind: event.kind,
     status: event.status,
     trigger: event.trigger,
-    finalText: event.finalText,
+    finalText: event.finalText.length <= REVIEW_TEXT_PREVIEW_CHARS ? event.finalText : event.finalText.slice(0, REVIEW_TEXT_PREVIEW_CHARS),
+    finalTextChars: event.finalText.length,
     actions: event.actions,
     ...event.usage === undefined ? {} : { usage: event.usage },
     startedAt: event.startedAt,

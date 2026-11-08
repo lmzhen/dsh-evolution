@@ -15,7 +15,7 @@ The root entry is a library, not a user-facing command. The package also exposes
 | `evolution/skill-mutated` | emit (one-way) | Invalidate catalog state after a skill-tree write. |
 | `evolution/skills-refresh` | emit (one-way) | Explicitly refresh the catalog after `/evolution skills refresh`. |
 | `evolution/review-scheduled` | emit (one-way) | A review was scheduled. |
-| `evolution/review-completed` | emit (one-way) | A branch review completed, including failure/timeout status when known. |
+| `evolution/review-completed` | emit (one-way) | An auxiliary review completed, including failure/timeout status when known. |
 | `evolution/review-error` | emit (one-way) | The review pipeline failed. |
 | `evolution/plan-applied` | emit (one-way) | A reviewed plan produced an execution result. |
 | `evolution/memory-applied` | emit (one-way) | A memory write succeeded through the registry sink. |

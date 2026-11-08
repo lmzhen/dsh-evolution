@@ -5,7 +5,7 @@ Internal plugin that persists evolution process events into `$DSH_HOME/evolution
 ## What it records
 
 - `evolution/plan-applied`: accepted, rejected, skipped, and failed operation counts for a reviewed plan.
-- `evolution/review-completed`: the review status, trigger, text, actions, timing, and model usage when supplied.
+- `evolution/review-completed`: the review status, trigger, bounded text preview, actions, timing, and model usage when supplied. `finalText` is capped at 2000 characters and `finalTextChars` keeps the full length; prompts and tool results are not persisted.
 
 The versioned sidecar contains separate `items` and `reviews` arrays. `maxItems` bounds each array and defaults to 200; values below 1 are rejected by the loader.
 
