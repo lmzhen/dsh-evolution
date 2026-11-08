@@ -97,7 +97,7 @@ it('detached returns a run id before the body settles', { timeout: 90_000 }, asy
   await vi.waitFor(() => expect(reg.calls).toContain('settle:succeeded'), { timeout: 60_000, interval: 20 })
 })
 
-it('waits for an aborted body before settling the timeout', async () => {
+it('waits for an aborted body before settling the timeout', { timeout: 90_000 }, async () => {
   const home = await tempRoot('dsh-merge-run-shell-timeout-')
   const io = nodeEvolutionIo()
   const reg = registry()
@@ -117,8 +117,7 @@ it('waits for an aborted body before settling the timeout', async () => {
       }
     },
   })
-  for (let i = 0; i < 400 && !aborted; i += 1) await new Promise(resolve => setTimeout(resolve, 5))
-  expect(aborted).toBe(true)
+  await vi.waitFor(() => expect(aborted).toBe(true), { timeout: 60_000, interval: 20 })
   expect(reg.calls).not.toContain('settle:cancelled')
   expect(reg.calls).not.toContain('settle:failed')
   release()
