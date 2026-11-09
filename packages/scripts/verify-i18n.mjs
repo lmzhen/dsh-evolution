@@ -48,10 +48,15 @@ for (const [id, rows] of Object.entries(param.values)) for (const [value, row] o
   checkRow('field.' + id + '.value.' + value, row, true); paramLeaves++
 }
 
+const host = JSON.parse(await readFile(join(CATALOG, 'host.errors.json'), 'utf8'))
+let hostKeys = 0
+for (const [id, row] of Object.entries(host.messages ?? {})) { checkRow('host.error.' + id, row, true); hostKeys++ }
+
 const run = (script) => {
   const result = spawnSync(process.execPath, [join(ROOT, 'packages/scripts', script), '--strict', '--check'], { encoding: 'utf8' })
   if (result.status !== 0) throw new Error(script + ' failed: ' + String(result.stderr) + String(result.stdout))
 }
 run('gen-i18n.mjs')
 run('gen-param-i18n.mjs')
-console.log('verify-i18n: OK — 4 namespace(s), ' + String(uiKeys) + ' UI key(s), ' + String(paramLeaves) + ' parameter leaf/leaves, 8 locales')
+run('gen-host-errors.mjs')
+console.log('verify-i18n: OK — 4 namespace(s), ' + String(uiKeys) + ' UI key(s), ' + String(paramLeaves) + ' parameter leaf/leaves, ' + String(hostKeys) + ' host error(s), 8 locales')
