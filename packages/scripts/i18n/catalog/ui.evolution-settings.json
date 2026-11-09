@@ -5,617 +5,740 @@
     "aboutPurpose": {
       "zh": "自进化设置与技能历史",
       "en": "Self-evolution settings and skill history",
-      "ja": "自己進化の設定とスキル履歴"
+      "ja": "自己進化の設定とスキル履歴",
+      "es": "Ajustes de evolución e historial de skills"
     },
     "apply": {
       "zh": "保存",
       "en": "Save",
-      "ja": "保存"
+      "ja": "保存",
+      "es": "Guardar"
     },
     "approvalAgeDays": {
       "zh": "{n} 天前",
       "en": "{n} d ago",
-      "ja": "{n} 日前"
+      "ja": "{n} 日前",
+      "es": "hace {n} d"
     },
     "approvalAgeHours": {
       "zh": "{n} 小时前",
       "en": "{n} h ago",
-      "ja": "{n} 時間前"
+      "ja": "{n} 時間前",
+      "es": "hace {n} h"
     },
     "approvalAgeMinutes": {
       "zh": "{n} 分钟前",
       "en": "{n} min ago",
-      "ja": "{n} 分前"
+      "ja": "{n} 分前",
+      "es": "hace {n} min"
     },
     "approvalAgeMonths": {
       "zh": "{n} 个月前",
       "en": "{n} mo ago",
-      "ja": "{n} か月前"
+      "ja": "{n} か月前",
+      "es": "hace {n} meses"
     },
     "approvalAgeNow": {
       "zh": "刚刚",
       "en": "just now",
-      "ja": "たった今"
+      "ja": "たった今",
+      "es": "ahora mismo"
     },
     "approvalApprove": {
       "zh": "批准",
       "en": "Approve",
-      "ja": "承認"
+      "ja": "承認",
+      "es": "Aprobar"
     },
     "approvalApproving": {
       "zh": "批准中…",
       "en": "approving…",
-      "ja": "承認中…"
+      "ja": "承認中…",
+      "es": "Aprobando…"
     },
     "approvalCardHint": {
       "zh": "技能在使用中生成或修改内容时，先放进待批清单，由你确认。",
       "en": "When a skill is created or changed while in use, the write waits in the pending list for your decision.",
-      "ja": "使用中にスキルが作成・変更されたときは、まず承認待ち一覧に入り、あなたの確認を待ちます。"
+      "ja": "使用中にスキルが作成・変更されたときは、まず承認待ち一覧に入り、あなたの確認を待ちます。",
+      "es": "Cuando un skill crea o modifica contenido durante el uso, la escritura queda en la lista de pendientes hasta que la confirmes."
     },
     "approvalConfirmNamed": {
       "zh": "即将批准：{n}",
       "en": "About to approve: {n}",
-      "ja": "承認の確認：{n}"
+      "ja": "承認の確認：{n}",
+      "es": "A punto de aprobar: {n}"
     },
     "approvalConfirmNo": {
       "zh": "取消",
       "en": "Cancel",
-      "ja": "キャンセル"
+      "ja": "キャンセル",
+      "es": "Cancelar"
     },
     "approvalConfirmYes": {
       "zh": "确认批准",
       "en": "Approve",
-      "ja": "承認を確定"
+      "ja": "承認を確定",
+      "es": "Confirmar aprobación"
     },
     "approvalCount": {
       "zh": "{n} 项待批",
       "en": "{n} waiting",
-      "ja": "{n} 件の承認待ち"
+      "ja": "{n} 件の承認待ち",
+      "es": "{n} pendientes"
     },
     "approvalDiffAdded": {
       "zh": "{n} 行新增",
       "en": "{n} lines added",
-      "ja": "{n} 行追加"
+      "ja": "{n} 行追加",
+      "es": "{n} líneas añadidas"
     },
     "approvalDiffCut": {
       "zh": "改动区域已截断",
       "en": "the changed region is truncated",
-      "ja": "変更箇所が長いため省略されました"
+      "ja": "変更箇所が長いため省略されました",
+      "es": "la zona modificada está truncada"
     },
     "approvalDiffRemoved": {
       "zh": "{n} 行删除",
       "en": "{n} lines removed",
-      "ja": "{n} 行削除"
+      "ja": "{n} 行削除",
+      "es": "{n} líneas eliminadas"
     },
     "approvalEmpty": {
       "zh": "没有待处理的写入",
       "en": "Nothing is waiting",
-      "ja": "承認待ちの書き込みはありません"
+      "ja": "承認待ちの書き込みはありません",
+      "es": "No hay escrituras pendientes"
     },
     "approvalEmptyDescription": {
       "zh": "当前没有需要你确认的技能变更。\n有新的写入时，会在这里显示来源、内容和影响范围。",
       "en": "There are no skill changes to confirm.\nNew writes will show their source, content and impact here.",
-      "ja": "現在、確認が必要なスキルの変更はありません。\n新しい書き込みがあると、ここに発生元・内容・影響範囲が表示されます。"
+      "ja": "現在、確認が必要なスキルの変更はありません。\n新しい書き込みがあると、ここに発生元・内容・影響範囲が表示されます。",
+      "es": "No hay cambios de skills que confirmar.\nCuando haya nuevas escrituras, aquí verás su origen, contenido y alcance."
     },
     "approvalExecuting": {
       "zh": "正在执行：改动可能已经生效，别重复批准。先确认结果，再用「放回待批」释放占用；释放不会停止或撤销正在进行的写入。",
       "en": "Running: the change may already have taken effect; do not approve it again. Check the result first, then use \"Back to pending\" to free it; that does not stop or undo the write in progress.",
-      "ja": "実行中：変更がすでに反映されている可能性があるため、重複して承認しないでください。先に結果を確認してから「承認待ちに戻す」で占有を解除してください。解除しても進行中の書き込みは停止・取り消しされません。"
+      "ja": "実行中：変更がすでに反映されている可能性があるため、重複して承認しないでください。先に結果を確認してから「承認待ちに戻す」で占有を解除してください。解除しても進行中の書き込みは停止・取り消しされません。",
+      "es": "En curso: el cambio puede estar ya aplicado; no lo apruebes otra vez. Comprueba el resultado y luego usa «Volver a pendientes» para liberarlo; liberar no detiene ni deshace la escritura en curso."
     },
     "approvalFactAge": {
       "zh": "时间",
       "en": "Time",
-      "ja": "日時"
+      "ja": "日時",
+      "es": "Hora"
     },
     "approvalFactKind": {
       "zh": "类型",
       "en": "Kind",
-      "ja": "種別"
+      "ja": "種別",
+      "es": "Tipo"
     },
     "approvalFactTarget": {
       "zh": "对象",
       "en": "Target",
-      "ja": "対象"
+      "ja": "対象",
+      "es": "Destino"
     },
     "approvalFailed": {
       "zh": "待批项读取失败",
       "en": "the pending window could not be read",
-      "ja": "承認待ち項目の読み取りに失敗しました"
+      "ja": "承認待ち項目の読み取りに失敗しました",
+      "es": "no se pudo leer la lista de pendientes"
     },
     "approvalHistory": {
       "zh": "查看技能历史",
       "en": "View skill history",
-      "ja": "スキル履歴を表示"
+      "ja": "スキル履歴を表示",
+      "es": "Ver historial de skills"
     },
     "approvalKindCapability": {
       "zh": "能力",
       "en": "capability",
-      "ja": "機能"
+      "ja": "機能",
+      "es": "capacidad"
     },
     "approvalKindMemory": {
       "zh": "记忆",
       "en": "memory",
-      "ja": "メモリ"
+      "ja": "メモリ",
+      "es": "memoria"
     },
     "approvalKindSkill": {
       "zh": "技能",
       "en": "skill",
-      "ja": "スキル"
+      "ja": "スキル",
+      "es": "skill"
     },
     "approvalLoading": {
       "zh": "正在读取待批项…",
       "en": "reading the pending window…",
-      "ja": "承認待ち項目を読み取り中…"
+      "ja": "承認待ち項目を読み取り中…",
+      "es": "leyendo la lista de pendientes…"
     },
     "approvalPreview": {
       "zh": "预览",
       "en": "Preview",
-      "ja": "プレビュー"
+      "ja": "プレビュー",
+      "es": "Vista previa"
     },
     "approvalPreviewClose": {
       "zh": "收起",
       "en": "Hide",
-      "ja": "閉じる"
+      "ja": "閉じる",
+      "es": "Ocultar"
     },
     "approvalPreviewNone": {
       "zh": "暂时看不了预览：",
       "en": "Preview is not available right now:",
-      "ja": "現在プレビューを表示できません："
+      "ja": "現在プレビューを表示できません：",
+      "es": "La vista previa no está disponible ahora:"
     },
     "approvalPreviewPath": {
       "zh": "文件：{path}",
       "en": "File: {path}",
-      "ja": "ファイル：{path}"
+      "ja": "ファイル：{path}",
+      "es": "Archivo: {path}"
     },
     "approvalPreviewReading": {
       "zh": "正在读取预览…",
       "en": "reading the preview…",
-      "ja": "プレビューを読み取り中…"
+      "ja": "プレビューを読み取り中…",
+      "es": "leyendo la vista previa…"
     },
     "approvalRawSummary": {
       "zh": "原始摘要",
       "en": "Raw summary",
-      "ja": "元の要約"
+      "ja": "元の要約",
+      "es": "Resumen original"
     },
     "approvalRefresh": {
       "zh": "刷新",
       "en": "Refresh",
-      "ja": "更新"
+      "ja": "更新",
+      "es": "Actualizar"
     },
     "approvalReject": {
       "zh": "拒绝",
       "en": "Reject",
-      "ja": "却下"
+      "ja": "却下",
+      "es": "Rechazar"
     },
     "approvalRejecting": {
       "zh": "拒绝中…",
       "en": "rejecting…",
-      "ja": "却下中…"
+      "ja": "却下中…",
+      "es": "Rechazando…"
     },
     "approvalRelease": {
       "zh": "放回待批",
       "en": "Release",
-      "ja": "承認待ちに戻す"
+      "ja": "承認待ちに戻す",
+      "es": "Volver a pendientes"
     },
     "approvalReleasing": {
       "zh": "释放中…",
       "en": "releasing…",
-      "ja": "解除中…"
+      "ja": "解除中…",
+      "es": "Liberando…"
     },
     "approvalRetry": {
       "zh": "重试",
       "en": "Retry",
-      "ja": "再試行"
+      "ja": "再試行",
+      "es": "Reintentar"
     },
     "approvalRunningCount": {
       "zh": "{n} 项执行中",
       "en": "{n} running",
-      "ja": "{n} 件を実行中"
+      "ja": "{n} 件を実行中",
+      "es": "{n} en curso"
     },
     "approvalTitle": {
       "zh": "待批写入",
       "en": "Writes awaiting approval",
-      "ja": "承認待ちの書き込み"
+      "ja": "承認待ちの書き込み",
+      "es": "Escrituras pendientes de aprobación"
     },
     "approvalVerbAdd": {
       "zh": "新增",
       "en": "add",
-      "ja": "追加"
+      "ja": "追加",
+      "es": "añadir"
     },
     "approvalVerbArchive": {
       "zh": "归档",
       "en": "archive",
-      "ja": "アーカイブ"
+      "ja": "アーカイブ",
+      "es": "archivar"
     },
     "approvalVerbCreate": {
       "zh": "创建",
       "en": "create",
-      "ja": "作成"
+      "ja": "作成",
+      "es": "crear"
     },
     "approvalVerbDelete": {
       "zh": "删除",
       "en": "delete",
-      "ja": "削除"
+      "ja": "削除",
+      "es": "eliminar"
     },
     "approvalVerbMerge": {
       "zh": "合并",
       "en": "merge",
-      "ja": "マージ"
+      "ja": "マージ",
+      "es": "merge"
     },
     "approvalVerbRemove": {
       "zh": "移除",
       "en": "remove",
-      "ja": "除去"
+      "ja": "除去",
+      "es": "quitar"
     },
     "approvalVerbRestore": {
       "zh": "恢复",
       "en": "restore",
-      "ja": "復元"
+      "ja": "復元",
+      "es": "restaurar"
     },
     "approvalVerbUpdate": {
       "zh": "更新",
       "en": "update",
-      "ja": "更新"
+      "ja": "更新",
+      "es": "actualizar"
     },
     "cardApproval": {
       "zh": "写入审批",
       "en": "Write approval",
-      "ja": "書き込み承認"
+      "ja": "書き込み承認",
+      "es": "Aprobación de escrituras"
     },
     "cardCommands": {
       "zh": "维护扫描",
       "en": "Maintenance scans",
-      "ja": "メンテナンススキャン"
+      "ja": "メンテナンススキャン",
+      "es": "Escaneos de mantenimiento"
     },
     "cardCurator": {
       "zh": "技能整理",
       "en": "Skill tidy-up",
-      "ja": "スキル整理"
+      "ja": "スキル整理",
+      "es": "Curación de skills"
     },
     "cardMemory": {
       "zh": "长期记忆",
       "en": "Long-term memory",
-      "ja": "長期メモリ"
+      "ja": "長期メモリ",
+      "es": "Memoria a largo plazo"
     },
     "cardMerge": {
       "zh": "技能自动合并",
       "en": "Skill auto-merge",
-      "ja": "スキル自動マージ"
+      "ja": "スキル自動マージ",
+      "es": "Merge automático de skills"
     },
     "cardReview": {
       "zh": "会话回顾",
       "en": "Session review",
-      "ja": "セッション振り返り"
+      "ja": "セッション振り返り",
+      "es": "Revisión de sesiones"
     },
     "cardSkills": {
       "zh": "技能写入规则",
       "en": "Skill write rules",
-      "ja": "スキル書き込みルール"
+      "ja": "スキル書き込みルール",
+      "es": "Reglas de escritura de skills"
     },
     "cardToolMemory": {
       "zh": "记忆写入",
       "en": "Writing memory",
-      "ja": "メモリ書き込み"
+      "ja": "メモリ書き込み",
+      "es": "Escritura de memoria"
     },
     "changed": {
       "zh": "{n} 项已修改",
       "en": "{n} modified",
-      "ja": "{n} 件変更済み"
+      "ja": "{n} 件変更済み",
+      "es": "{n} modificados"
     },
     "deployment": {
       "zh": "默认",
       "en": "default",
-      "ja": "デフォルト"
+      "ja": "デフォルト",
+      "es": "predeterminado"
     },
     "diagComplete": {
       "zh": "没有需要处理的异常",
       "en": "Nothing needs attention",
-      "ja": "対処が必要な異常はありません"
+      "ja": "対処が必要な異常はありません",
+      "es": "Nada requiere atención"
     },
     "diagCopied": {
       "zh": "修复命令已复制",
       "en": "Fix command copied",
-      "ja": "修復コマンドをコピーしました"
+      "ja": "修復コマンドをコピーしました",
+      "es": "Comando de reparación copiado"
     },
     "diagCopyFailed": {
       "zh": "复制失败；请手动执行上方命令",
       "en": "Copy failed; run the command above manually",
-      "ja": "コピーに失敗しました。上のコマンドを手動で実行してください"
+      "ja": "コピーに失敗しました。上のコマンドを手動で実行してください",
+      "es": "No se pudo copiar; ejecuta el comando de arriba a mano"
     },
     "diagCopyRemedy": {
       "zh": "复制修复命令",
       "en": "Copy fix command",
-      "ja": "修復コマンドをコピー"
+      "ja": "修復コマンドをコピー",
+      "es": "Copiar comando de reparación"
     },
     "diagFooter": {
       "zh": "诊断数据 v{version} · 生成于 {at}",
       "en": "Diagnostics data v{version} · generated {at}",
-      "ja": "診断データ v{version} · 生成日時 {at}"
+      "ja": "診断データ v{version} · 生成日時 {at}",
+      "es": "Datos de diagnóstico v{version} · generados el {at}"
     },
     "diagFooterToday": {
       "zh": "诊断数据 v{version} · 今天 {at} 生成",
       "en": "Diagnostics data v{version} · generated today at {at}",
-      "ja": "診断データ v{version} · 今日 {at} に生成"
+      "ja": "診断データ v{version} · 今日 {at} に生成",
+      "es": "Datos de diagnóstico v{version} · generados hoy a las {at}"
     },
     "diagNoRows": {
       "zh": "没有可显示的运行状态",
       "en": "no runtime status to show",
-      "ja": "表示できる実行状態がありません"
+      "ja": "表示できる実行状態がありません",
+      "es": "no hay estado de ejecución que mostrar"
     },
     "diagNormal": {
       "zh": "其他 {n} 项正常",
       "en": "Other {n} normal checks",
-      "ja": "ほか {n} 件は正常"
+      "ja": "ほか {n} 件は正常",
+      "es": "Otros {n} en orden"
     },
     "diagOtherIssues": {
       "zh": "其他 {n} 项异常",
       "en": "Other {n} issues",
-      "ja": "ほか {n} 件の異常"
+      "ja": "ほか {n} 件の異常",
+      "es": "Otros {n} con problemas"
     },
     "diagPurpose": {
       "zh": "用途：检查插件、平台服务和数据连接是否正常；这里不会修改任何东西。",
       "en": "What it checks: plugins, platform services and data connections. Nothing is changed here.",
-      "ja": "用途：プラグイン、プラットフォームサービス、データ接続が正常かを確認します。ここでは何も変更しません。"
+      "ja": "用途：プラグイン、プラットフォームサービス、データ接続が正常かを確認します。ここでは何も変更しません。",
+      "es": "Para qué sirve: comprueba plugins, servicios de la plataforma y conexiones de datos. Aquí no se modifica nada."
     },
     "diagRecheck": {
       "zh": "重新检查",
       "en": "Recheck",
-      "ja": "再チェック"
+      "ja": "再チェック",
+      "es": "Revisar de nuevo"
     },
     "diagRefresh": {
       "zh": "刷新",
       "en": "Refresh",
-      "ja": "更新"
+      "ja": "更新",
+      "es": "Actualizar"
     },
     "diagRefreshing": {
       "zh": "刷新中…",
       "en": "refreshing…",
-      "ja": "更新中…"
+      "ja": "更新中…",
+      "es": "Actualizando…"
     },
     "diagRemedy": {
       "zh": "建议：",
       "en": "Suggested: ",
-      "ja": "対処案："
+      "ja": "対処案：",
+      "es": "Sugerencia: "
     },
     "diagRuntimeTitle": {
       "zh": "运行状态",
       "en": "Runtime status",
-      "ja": "実行状態"
+      "ja": "実行状態",
+      "es": "Estado de ejecución"
     },
     "diagStatusFail": {
       "zh": "异常",
       "en": "failing",
-      "ja": "異常"
+      "ja": "異常",
+      "es": "con error"
     },
     "diagStatusOk": {
       "zh": "正常",
       "en": "healthy",
-      "ja": "正常"
+      "ja": "正常",
+      "es": "correcto"
     },
     "diagStatusUnknown": {
       "zh": "未知",
       "en": "unknown",
-      "ja": "不明"
+      "ja": "不明",
+      "es": "desconocido"
     },
     "diagStatusWarn": {
       "zh": "注意",
       "en": "needs attention",
-      "ja": "注意"
+      "ja": "注意",
+      "es": "requiere atención"
     },
     "diagSubtitle": {
       "zh": "运行状态的只读自查；不会改动任何东西。",
       "en": "A read-only check of the runtime state; nothing here changes anything.",
-      "ja": "実行状態の読み取り専用チェックです。状態の変更は一切行いません。"
+      "ja": "実行状態の読み取り専用チェックです。状態の変更は一切行いません。",
+      "es": "Autodiagnóstico de solo lectura del estado; no cambia nada."
     },
     "diagSummaryFail": {
       "zh": "{n} 项异常",
       "en": "{n} failing",
-      "ja": "{n} 件の異常"
+      "ja": "{n} 件の異常",
+      "es": "{n} con error"
     },
     "diagSummaryOk": {
       "zh": "运行正常",
       "en": "All healthy",
-      "ja": "すべて正常"
+      "ja": "すべて正常",
+      "es": "Todo en orden"
     },
     "diagSummaryUnknown": {
       "zh": "{n} 项待确认",
       "en": "{n} unconfirmed",
-      "ja": "{n} 件が未確認"
+      "ja": "{n} 件が未確認",
+      "es": "{n} sin confirmar"
     },
     "diagSummaryWarn": {
       "zh": "{n} 项需要注意",
       "en": "{n} need attention",
-      "ja": "{n} 件に注意が必要"
+      "ja": "{n} 件に注意が必要",
+      "es": "{n} requieren atención"
     },
     "diagTitle": {
       "zh": "诊断",
       "en": "Diagnostics",
-      "ja": "診断"
+      "ja": "診断",
+      "es": "Diagnóstico"
     },
     "discard": {
       "zh": "放弃修改",
       "en": "Discard",
-      "ja": "変更を破棄"
+      "ja": "変更を破棄",
+      "es": "Descartar cambios"
     },
     "empty": {
       "zh": "这里没有可改项",
       "en": "nothing to change here",
-      "ja": "変更できる項目はありません"
+      "ja": "変更できる項目はありません",
+      "es": "no hay nada que cambiar aquí"
     },
     "failureForbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
       "en": "The platform refused this request (this account has no permission).",
-      "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。"
+      "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。",
+      "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso)."
     },
     "failureServer": {
       "zh": "读取失败，可以手动重试。",
       "en": "The read failed; you can retry manually.",
-      "ja": "読み取りに失敗しました。手動で再試行できます。"
+      "ja": "読み取りに失敗しました。手動で再試行できます。",
+      "es": "La lectura falló; puedes reintentar a mano."
     },
     "failureUnauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
       "en": "Sign-in is required: reopen this page and sign in, then retry.",
-      "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。"
+      "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。",
+      "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta."
     },
     "failureUnmounted": {
       "zh": "这个功能没有启用。",
       "en": "This feature is not enabled.",
-      "ja": "この機能は有効になっていません。"
+      "ja": "この機能は有効になっていません。",
+      "es": "Esta función no está activada."
     },
     "fallbackHint": {
       "zh": "可以改用命令：{command}",
       "en": "Command fallback: {command}",
-      "ja": "代替コマンド：{command}"
+      "ja": "代替コマンド：{command}",
+      "es": "Alternativa por comando: {command}"
     },
     "group.memory": {
       "zh": "记忆与回顾",
       "en": "Memory and review",
-      "ja": "メモリと振り返り"
+      "ja": "メモリと振り返り",
+      "es": "Memoria y revisión"
     },
     "group.organize": {
       "zh": "自动整理",
       "en": "Automatic tidy-up",
-      "ja": "自動整理"
+      "ja": "自動整理",
+      "es": "Orden automático"
     },
     "group.write": {
       "zh": "写入与审批",
       "en": "Writes and approval",
-      "ja": "書き込みと承認"
+      "ja": "書き込みと承認",
+      "es": "Escrituras y aprobación"
     },
     "invalidAtLeast": {
       "zh": "不能小于「{field}」的 {n}{unit}",
       "en": "must not be below {field}: {n}{unit}",
-      "ja": "「{field}」の {n}{unit} 以上にしてください"
+      "ja": "「{field}」の {n}{unit} 以上にしてください",
+      "es": "no puede ser inferior a {n}{unit} de «{field}»"
     },
     "invalidAtLeastPeer": {
       "zh": "同组设置",
       "en": "the related setting",
-      "ja": "同じグループの設定"
+      "ja": "同じグループの設定",
+      "es": "el ajuste relacionado"
     },
     "invalidNumber": {
       "zh": "需要一个数字",
       "en": "Needs a number",
-      "ja": "数値を入力してください"
+      "ja": "数値を入力してください",
+      "es": "Necesita un número"
     },
     "invalidSelect": {
       "zh": "不在允许的取值里",
       "en": "Not one of the allowed values",
-      "ja": "許可された値ではありません"
+      "ja": "許可された値ではありません",
+      "es": "No es uno de los valores permitidos"
     },
     "loading": {
       "zh": "正在读取设置…",
       "en": "reading settings…",
-      "ja": "設定を読み取り中…"
+      "ja": "設定を読み取り中…",
+      "es": "leyendo los ajustes…"
     },
     "mergeCardHint": {
       "zh": "两个技能被判重复后，第一轮结束先停下，等你批准再合并。",
       "en": "When two skills look duplicated, the first round stops and waits for your approval before merging.",
-      "ja": "2つのスキルが重複と判定されたときは、第1段階の終了後にいったん停止し、承認を待ってからマージします。"
+      "ja": "2つのスキルが重複と判定されたときは、第1段階の終了後にいったん停止し、承認を待ってからマージします。",
+      "es": "Cuando dos skills parecen duplicados, la primera ronda se detiene y espera tu aprobación antes de hacer el merge."
     },
     "overridden": {
       "zh": "已修改",
       "en": "Modified",
-      "ja": "変更済み"
+      "ja": "変更済み",
+      "es": "Modificado"
     },
     "projectionFailed": {
       "zh": "这一块读设置时出错，已记入日志；其它参数不受影响",
       "en": "reading this row failed and the error is in the log; the other parameters are unaffected",
-      "ja": "この項目の設定読み取りでエラーが発生し、ログに記録されました。他のパラメータには影響ありません"
+      "ja": "この項目の設定読み取りでエラーが発生し、ログに記録されました。他のパラメータには影響ありません",
+      "es": "no se pudo leer este bloque y el error quedó en el log; los demás parámetros no se ven afectados"
     },
     "readbackStale": {
       "zh": "显示的是最后一次成功读取的值；当前回读失败，刷新后可能变化。",
       "en": "Showing the last successfully read values; the current re-read failed and may change after refresh.",
-      "ja": "最後に正常に読み取れた値を表示しています。今回の再読み取りに失敗したため、更新後に値が変わる可能性があります。"
+      "ja": "最後に正常に読み取れた値を表示しています。今回の再読み取りに失敗したため、更新後に値が変わる可能性があります。",
+      "es": "Se muestran los últimos valores leídos con éxito; la relectura actual falló y pueden cambiar al actualizar."
     },
     "readonly": {
       "zh": "本次会话不允许写入设置（临时运行模式）",
       "en": "settings cannot be written in this session (temporary mode)",
-      "ja": "このセッションでは設定を書き込めません（一時実行モード）"
+      "ja": "このセッションでは設定を書き込めません（一時実行モード）",
+      "es": "en esta sesión no se pueden escribir ajustes (modo temporal)"
     },
     "refused": {
       "zh": "这个值没有被接受（页面上保持原样）。想知道原因：在对话里问它。",
       "en": "This value was not accepted (the page keeps what you see). To find out why, ask in the conversation.",
-      "ja": "この値は受理されませんでした（画面の表示はそのままです）。理由を確認するには、会話内で尋ねてください。"
+      "ja": "この値は受理されませんでした（画面の表示はそのままです）。理由を確認するには、会話内で尋ねてください。",
+      "es": "Este valor no se aceptó (la página mantiene lo que ves). Para saber por qué, pregúntalo en la conversación."
     },
     "reset": {
       "zh": "恢复默认",
       "en": "Restore default",
-      "ja": "デフォルトに戻す"
+      "ja": "デフォルトに戻す",
+      "es": "Restaurar predeterminado"
     },
     "resetDone": {
       "zh": "已恢复默认值。",
       "en": "Default restored.",
-      "ja": "デフォルトに戻しました。"
+      "ja": "デフォルトに戻しました。",
+      "es": "Predeterminado restaurado."
     },
     "resetRefused": {
       "zh": "恢复默认没有生效（这一行还是你的值）。想知道原因：在对话里问它。",
       "en": "Restoring the default did not take effect (the row still holds your value). To find out why, ask in the conversation.",
-      "ja": "デフォルトへの復元は反映されませんでした（この行は設定値のままです）。理由を確認するには、会話内で尋ねてください。"
+      "ja": "デフォルトへの復元は反映されませんでした（この行は設定値のままです）。理由を確認するには、会話内で尋ねてください。",
+      "es": "Restaurar el predeterminado no surtió efecto (la fila sigue con tu valor). Para saber por qué, pregúntalo en la conversación."
     },
     "resetTo": {
       "zh": "恢复为 {value}",
       "en": "Restore to {value}",
-      "ja": "{value} に戻す"
+      "ja": "{value} に戻す",
+      "es": "Restaurar a {value}"
     },
     "resetting": {
       "zh": "恢复中…",
       "en": "Restoring…",
-      "ja": "復元中…"
+      "ja": "復元中…",
+      "es": "Restaurando…"
     },
     "saveConflict": {
       "zh": "这个值没有被接受：设置已被其他页面修改。请重读后再保存。",
       "en": "The value was not accepted: settings changed in another page. Re-read before saving again.",
-      "ja": "この値は受理されませんでした。別のページで設定が変更されています。再読み取りしてから保存してください。"
+      "ja": "この値は受理されませんでした。別のページで設定が変更されています。再読み取りしてから保存してください。",
+      "es": "El valor no se aceptó: los ajustes cambiaron en otra página. Vuelve a leerlos antes de guardar."
     },
     "saveReadbackFailed": {
       "zh": "写入已被接受，但回读失败；点刷新重读后再确认。",
       "en": "The write was accepted, but reading it back failed; refresh and confirm.",
-      "ja": "書き込みは受理されましたが、再読み取りに失敗しました。「更新」を押して再読み取りしてから確認してください。"
+      "ja": "書き込みは受理されましたが、再読み取りに失敗しました。「更新」を押して再読み取りしてから確認してください。",
+      "es": "La escritura se aceptó, pero la relectura falló; actualiza y compruébalo."
     },
     "saved": {
       "zh": "已保存。",
       "en": "Saved.",
-      "ja": "保存しました。"
+      "ja": "保存しました。",
+      "es": "Guardado."
     },
     "saving": {
       "zh": "保存中…",
       "en": "Saving…",
-      "ja": "保存中…"
+      "ja": "保存中…",
+      "es": "Guardando…"
     },
     "seatMissing": {
       "zh": "这个界面没有提供设置服务，参数只能看不能改",
       "en": "this shell serves no settings surface, so the parameters cannot be edited here",
-      "ja": "この画面には設定サービスがないため、パラメータは閲覧のみで変更できません"
+      "ja": "この画面には設定サービスがないため、パラメータは閲覧のみで変更できません",
+      "es": "esta interfaz no ofrece servicio de ajustes, así que los parámetros solo se pueden ver"
     },
     "stateLoading": {
       "zh": "正在读取…",
       "en": "reading…",
-      "ja": "読み取り中…"
+      "ja": "読み取り中…",
+      "es": "leyendo…"
     },
     "subtitle": {
       "zh": "待你决定的写入在最上面；下面按功能列出你能改的参数，没有列出的由安装时的配置决定。",
       "en": "Writes waiting for your decision come first; the changeable parameters are listed by feature below, and anything not listed comes from the deployment configuration.",
-      "ja": "承認待ちの書き込みが一番上に表示され、その下に変更可能なパラメータが機能ごとに並びます。一覧にない項目はインストール時の設定で決まります。"
+      "ja": "承認待ちの書き込みが一番上に表示され、その下に変更可能なパラメータが機能ごとに並びます。一覧にない項目はインストール時の設定で決まります。",
+      "es": "Las escrituras que esperan tu decisión aparecen arriba; debajo van los parámetros que puedes cambiar, agrupados por función. Lo que no aparece lo define la configuración de la instalación."
     },
     "timeToday": {
       "zh": "今天",
       "en": "Today",
-      "ja": "今日"
+      "ja": "今日",
+      "es": "Hoy"
     },
     "title": {
       "zh": "自进化",
       "en": "Self-evolution",
-      "ja": "自己進化"
+      "ja": "自己進化",
+      "es": "Evolución"
     },
     "unavailable": {
       "zh": "这个功能没有启动（对应的插件没有安装）",
       "en": "this feature is not running (its plugin is not installed)",
-      "ja": "この機能は起動していません（対応するプラグインが未インストールです）"
+      "ja": "この機能は起動していません（対応するプラグインが未インストールです）",
+      "es": "esta función no está en marcha (su plugin no está instalado)"
     },
     "writeTargetHost": {
       "zh": "保存位置：插件配置（对所有会话生效）",
       "en": "Saved to: plugin config (applies to all sessions)",
-      "ja": "保存先：プラグイン設定（すべてのセッションに反映）"
+      "ja": "保存先：プラグイン設定（すべてのセッションに反映）",
+      "es": "Se guarda en: configuración del plugin (afecta a todas las sesiones)"
     }
   }
 }
