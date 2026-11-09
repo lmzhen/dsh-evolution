@@ -94,7 +94,6 @@ export function apply(ctx: ClientContext): void {
       return (['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt'] as const).includes(active as SupportedLocale) ? active as SupportedLocale : 'en'
     } catch { return 'en' }
   }
-  const paramLanguage = (): ParamLanguage => language() === 'zh' ? 'zh' : 'en'
   // G2: the client settings seat, probed LAZILY (see `inject`). Without a seat every card
   // renders the stated empty state and the Plugins page says the same — never a blank card
   // and never a thrown render. The probe must not be captured here: this row may activate
@@ -122,7 +121,7 @@ export function apply(ctx: ClientContext): void {
       namespace: section.namespace,
       fields: section.fields,
       t,
-      lang: paramLanguage,
+      lang: language,
       mutateOnce,
       saveOnce,
       clear,

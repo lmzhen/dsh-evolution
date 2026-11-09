@@ -2024,7 +2024,7 @@ export const DICTIONARIES = {
       "group.memory": "Memory and review",
       "group.organize": "Automatic curation",
       "group.write": "Writes and approval",
-      "invalidAtLeast": "Minimum is {n} {unit}, set by {field}",
+      "invalidAtLeast": "Minimum is {n}{unit}, set by {field}",
       "invalidAtLeastPeer": "another setting in this group",
       "invalidNumber": "Enter a number",
       "invalidSelect": "Not one of the allowed values",

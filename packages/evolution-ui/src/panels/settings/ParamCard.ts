@@ -16,6 +16,8 @@
 import { createElement, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
+import { PARAM_FIELDS, PARAM_GROUPS, PARAM_UNITS, PARAM_VALUES } from './generated-param-i18n.ts'
+import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
 /**
  * One staged write awaiting the Host's answer. The verdict is the Host's own boolean (the settings
  * scope performs a recovery read before it resolves), so this record carries only what the effect
@@ -60,21 +62,37 @@ export type ParamCardProps = Omit<ParamCardFace, 'hooks'> & {
 }
 
 /** Generated-copy language. */
-export type ParamLanguage = 'zh' | 'en'
+export type ParamLanguage = SupportedLocale
+
+type CopyRow = Readonly<Record<string, string>>
+
+function fieldCopy(field: ClientParamField): { label?: CopyRow; hint?: CopyRow } | undefined {
+  return (PARAM_FIELDS as Readonly<Record<string, { label: CopyRow; hint: CopyRow }>>)[field.id]
+}
+
+/** Resolve one localized enum value; an unknown value keeps its raw text. */
+function valueOf(field: ClientParamField, value: string, lang: ParamLanguage): string {
+  return (PARAM_VALUES as Readonly<Record<string, Readonly<Record<string, CopyRow>>>>)[field.id]?.[value]?.[lang] ?? value
+}
+
+/** Localized unit from the generated catalog, with the raw unit as the final fallback. */
+function unitOf(field: ClientParamField, lang: ParamLanguage): string {
+  return (PARAM_UNITS as Readonly<Record<string, CopyRow>>)[field.unit]?.[lang] ?? (lang === 'zh' ? field.unit : field.unitEn)
+}
 
 /** Resolve one field's user-language label. */
 function labelOf(field: ClientParamField, lang: ParamLanguage): string {
-  return lang === 'en' ? (field.labelEn ?? field.label) : field.label
+  return fieldCopy(field)?.label?.[lang] ?? (lang === 'zh' ? field.label : (field.labelEn ?? field.label))
 }
 
 /** Resolve one field's user-language hint. */
 function hintOf(field: ClientParamField, lang: ParamLanguage): string {
-  return lang === 'en' ? (field.hintEn ?? field.doc) : field.hint
+  return fieldCopy(field)?.hint?.[lang] ?? (lang === 'zh' ? field.hint : (field.hintEn ?? field.doc))
 }
 
 /** Resolve one field's user-language group heading. */
 function groupOf(field: ClientParamField, lang: ParamLanguage): string {
-  return lang === 'en' ? (field.groupLabelEn ?? field.group) : (field.groupLabel ?? field.group)
+  return (PARAM_GROUPS as Readonly<Record<string, CopyRow>>)[field.group]?.[lang] ?? (lang === 'zh' ? (field.groupLabel ?? field.group) : (field.groupLabelEn ?? field.group))
 }
 
 /** The op list a save hands to the seat — the seam's own shape, never a second vocabulary. */
@@ -232,7 +250,7 @@ function FieldControl(props: FieldBlockProps): ReactNode {
       // The option TEXT comes from the registry's display names; the option VALUE stays
       // the raw spelling the settings document stores (a translation here would write a
       // value the Host does not know).
-      ...field.values.map((value, index) => createElement('option', { key: value, value }, (lang === 'en' ? (field.valueLabelsEn ?? field.valueLabels) : field.valueLabels)[index] ?? value)),
+      ...field.values.map(value => createElement('option', { key: value, value }, valueOf(field, value, lang))),
     ])
   }
   return createElement('input', {
@@ -246,8 +264,8 @@ function FieldControl(props: FieldBlockProps): ReactNode {
 /** One parameter field: label, control, hint, and its reset-to-deployment action. */
 function FieldBlock(props: FieldBlockProps): ReactNode {
   const { field, t, lang } = props
-  const unitText = lang === 'en' ? (field.unitEn ?? field.unit) : field.unit
-  const unit = unitText === '' ? null : createElement('span', { className: 'evolution-param-unit' }, (lang === 'en' ? ' (' : '（') + unitText + (lang === 'en' ? ')' : '）'))
+  const unitText = unitOf(field, lang)
+  const unit = unitText === '' ? null : createElement('span', { className: 'evolution-param-unit' }, (lang === 'zh' ? '（' : ' (') + unitText + (lang === 'zh' ? '）' : ')'))
   return createElement('div', { className: 'evolution-param-field' },
     createElement('div', { className: 'evolution-param-label' },
       createElement('label', { htmlFor: controlId(field) }, labelOf(field, lang) === '' ? field.id : labelOf(field, lang)),
@@ -399,7 +417,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     const relatedLabel = related === undefined
       ? t('invalidAtLeastPeer')
       : (labelOf(related, lang) === '' ? related.id : labelOf(related, lang))
-    const relatedUnit = related === undefined ? '' : (lang === 'en' ? (related.unitEn ?? related.unit) : related.unit)
+    const relatedUnit = related === undefined ? '' : unitOf(related, lang)
     return t(reason, { field: relatedLabel, n: peer ?? '', unit: relatedUnit === '' ? '' : ' ' + relatedUnit })
   }
   const blocked = fields.some(field => invalidText(field) !== null)

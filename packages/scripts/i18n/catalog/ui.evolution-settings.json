@@ -964,7 +964,7 @@
     },
     "invalidAtLeast": {
       "zh": "不能小于「{field}」的 {n}{unit}",
-      "en": "Minimum is {n} {unit}, set by {field}",
+      "en": "Minimum is {n}{unit}, set by {field}",
       "ja": "「{field}」の {n}{unit} 以上にしてください",
       "es": "no puede ser inferior a {n}{unit} de «{field}»",
       "fr": "ne doit pas être inférieur à {field} : {n}{unit}",
