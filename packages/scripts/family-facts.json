@@ -680,7 +680,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "3e42719c9ef5643486de3a0e3b757645fd836e28f7bfc198504fe237370f649b",
+        "sha256": "ac0d5f05df0ebe99cd5d83f4c5528e963743d044b97ef5d98bb344be6554055e",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1098,6 +1098,11 @@
             "criterion": "unknown"
           },
           {
+            "id": "gate-82",
+            "tier": "fast",
+            "criterion": "verify-i18n"
+          },
+          {
             "id": "ci-only-01",
             "tier": "ci-only",
             "criterion": "audit-release-tarballs",
@@ -1243,7 +1248,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 104,
+            "rowsWithoutIt": 105,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
