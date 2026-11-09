@@ -11,7 +11,7 @@ import {
   BlockAssembler,
   createToolResultMessage,
   createUserMessage,
-} from '@deepseek-ai/dsh-llm'
+} from '@deepseek-ai/dsh-evolution-core/platform'
 import type {
   ContentBlock,
   ContextFormed,
@@ -23,8 +23,8 @@ import type {
   ToolCallId,
   ToolHistory,
   ToolSchema,
-} from '@deepseek-ai/dsh-llm'
-import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-session'
+} from '@deepseek-ai/dsh-evolution-core/platform'
+import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-core/platform'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {

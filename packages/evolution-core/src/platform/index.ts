@@ -12,8 +12,22 @@ export type {
   ToolRestriction,
 } from '@deepseek-ai/dsh-tools'
 export type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
-export type { StreamChunk } from '@deepseek-ai/dsh-llm'
-export type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+export { BlockAssembler, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+export type {
+  ContentBlock,
+  ContextFormed,
+  GenerateOptions,
+  Message,
+  RequestMessage,
+  StreamChunk,
+  ToolCallBlock,
+  ToolCallId,
+  ToolHistory,
+  ToolSchema,
+} from '@deepseek-ai/dsh-llm'
+export { SessionId } from '@deepseek-ai/dsh-session'
+export type { EpochHeader, Session, SessionEvent } from '@deepseek-ai/dsh-session'
+export type { Agent } from '@deepseek-ai/dsh-agent'
 export type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 export { presetsPort } from './presets.ts'
 export type { PresetDefinitionLike, PresetDocument, PresetsPort } from './presets.ts'

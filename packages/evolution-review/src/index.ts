@@ -6,9 +6,8 @@
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, ContextFormed, GenerateOptions, StreamChunk, ToolCallBlock, ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Agent, ContentBlock, ContextFormed, GenerateOptions, StreamChunk, ToolCallBlock, ToolCallId } from '@deepseek-ai/dsh-evolution-core/platform'
 import { runReview } from './review-executor.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
@@ -18,9 +17,8 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-review': { kind: 'evolution-review' } & ContextFormed
   }
 }
-import { SessionId } from '@deepseek-ai/dsh-session'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-evolution-core/platform'
+import { SessionId } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-evolution-core/platform'
 import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'

@@ -58,14 +58,6 @@
       "specifier": "@deepseek-ai/dsh-llm"
     },
     {
-      "file": "packages/evolution-review/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-llm"
-    },
-    {
-      "file": "packages/evolution-review/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
       "file": "packages/evolution-skill-catalog/src/index.ts",
       "specifier": "@deepseek-ai/dsh-skill"
     },
