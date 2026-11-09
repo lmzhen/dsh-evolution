@@ -22,3 +22,14 @@ it('writes and reads a journal under a safe run path', async () => {
   expect(await readUnitJournal(io, home, journal.unitId)).toEqual(journal)
   expect(unitJournalPath(home, journal.unitId).split(/[\\/]/).pop()).not.toContain(':')
 })
+
+it('write refuses a backwards/terminal phase once a journal exists, and accepts the same phase', async () => {
+  const home = await tempRoot('dsh-unit-journal-transition-')
+  const io = nodeEvolutionIo()
+  const base: UnitJournal = { schemaVersion: 1, unitId: 'run-2:abc', runId: 'run-2', planDigest: 'd2', target: 'alpha', sources: [], phase: 'target-written', storageKey: 'k2', snapshotSha256: 'a'.repeat(64), updatedAt: 1 }
+  await writeUnitJournal(io, home, base)
+  await expect(writeUnitJournal(io, home, { ...base, phase: 'prepared' })).rejects.toThrow(/nonmonotonic|terminal/)
+  await expect(writeUnitJournal(io, home, { ...base, phase: 'target-written' })).resolves.toBeTruthy()
+  await writeUnitJournal(io, home, { ...base, phase: 'committed' })
+  await expect(writeUnitJournal(io, home, { ...base, phase: 'target-written' })).rejects.toThrow(/terminal/)
+})
