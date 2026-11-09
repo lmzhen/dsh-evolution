@@ -134,7 +134,8 @@ export class LeaseStore {
     await transact(this.io, path, (raw) => {
       const current = parseLease(raw)
       if (current === undefined || current.state !== 'active' || current.id !== token.id || current.epoch !== token.epoch) return raw
-      next = { ...current, heartbeatAt: this.now(), expiresAt: this.now() + ttlMs }
+      const now = this.now()
+      next = { ...current, heartbeatAt: now, expiresAt: now + ttlMs }
       return JSON.stringify(next)
     })
     return next
