@@ -3,13 +3,15 @@
  * registered through the platform's locale seat.
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client/messages
  */
-import { dictionariesFor, type SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
+import { dictionaries as generatedDictionaries } from '@lmzhen/dsh-evolution-client-kit/generated/i18n/evolution-skill-history'
+import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
 
 /** Locale namespace this panel registers. */
+export const dictionaries = generatedDictionaries
+
 export const NS = 'evolution-skill-history'
 
 /** Every supported dictionary for this namespace. */
-export const dictionaries = dictionariesFor(NS)
 export const zh = dictionaries.zh
 export const en = dictionaries.en
 export const ja = dictionaries.ja

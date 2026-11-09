@@ -47,6 +47,10 @@
     "./generated/i18n": {
       "types": "./lib/types/generated/i18n.generated.d.ts",
       "default": "./lib/generated/i18n.generated.js"
+    },
+    "./generated/i18n/*": {
+      "types": "./lib/types/generated/i18n/*.d.ts",
+      "default": "./lib/generated/i18n/*.js"
     }
   },
   "files": [

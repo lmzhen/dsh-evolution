@@ -6,13 +6,15 @@
  * locale registration.
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/messages
  */
-import { dictionariesFor, type SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
+import { dictionaries as generatedDictionaries } from '@lmzhen/dsh-evolution-client-kit/generated/i18n/evolution-settings'
+import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
 
 /** Locale namespace this bundle registers. */
+export const dictionaries = generatedDictionaries
+
 export const NS = 'evolution-settings'
 
 /** Every supported dictionary for this namespace. */
-export const dictionaries = dictionariesFor(NS)
 
 /** Chinese copy. */
 export const zh = dictionaries.zh
