@@ -3,7 +3,8 @@
  * rule gate, then commit through the injected CommitPort. The channel adapter and the
  * author tool live outside; this is the seam they share.
  */
-import type { EvolutionIoLike, UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitTransaction } from './unit-protocol.ts'
 import { createStaging, setStagingTarget } from './staging.ts'
 import { readStagedTree } from './staged-tree.ts'
 import { validateStagedTree, hasBlockingFinding, type RuleFinding } from './rules.ts'

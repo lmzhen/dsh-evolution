@@ -2,7 +2,8 @@
  * Round2 with a NEW child (approval after the pending window). The child gets the round2
  * prompt and writes the staging tree; the plugin then runs the same gate/commit path.
  */
-import type { EvolutionIoLike, UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitTransaction } from './unit-protocol.ts'
 import type { MergeDecision, MergeRow } from './contracts.ts'
 import type { SkillCard } from './skill-card.ts'
 import type { ConversationChannelLike } from './channel-port.ts'

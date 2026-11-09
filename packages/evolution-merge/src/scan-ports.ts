@@ -5,7 +5,8 @@
  * Approval on: round1 disposes the child immediately; the row waits in pending and the later
  * approve run must open a new child (not handled by this factory).
  */
-import type { EvolutionIoLike, UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitTransaction } from './unit-protocol.ts'
 import type { MergeCandidate, MergeDecision, MergeRow } from './contracts.ts'
 import { pairKey } from './contracts.ts'
 

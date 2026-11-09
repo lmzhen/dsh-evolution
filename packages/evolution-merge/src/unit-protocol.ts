@@ -1,8 +1,8 @@
 /** G2 opaque UnitTransaction. Core owns prepare/commit/verify/rollback lifecycle. */
 import { createHash } from "node:crypto";
-import type { EvolutionIoLike } from "./io.ts";
-import { acquireTreeWriteLock, type TreeLock } from "./tree-lock.ts";
-import type { HomeFence, HomeFenceLease } from './home-fence.ts';
+import type { EvolutionIoLike, SkillLimits } from '@deepseek-ai/dsh-evolution-core';
+import { acquireTreeWriteLock, type TreeLock } from '@deepseek-ai/dsh-evolution-core';
+import type { HomeFence, HomeFenceLease } from '@deepseek-ai/dsh-evolution-core';
 import {
   readUnitEvidence,
   readUnitReceipt,
@@ -14,8 +14,8 @@ import {
   writeUnitSnapshot,
   type UnitEvidenceRecord,
   type UnitSnapshot,
-} from "./unit-storage.ts";
-import { readUnitJournal, writeUnitJournal, type UnitJournal, type UnitJournalCheckpoint, type UnitJournalPhase } from "./unit-journal.ts";
+} from '@deepseek-ai/dsh-evolution-core';
+import { readUnitJournal, writeUnitJournal, type UnitJournal, type UnitJournalCheckpoint, type UnitJournalPhase } from '@deepseek-ai/dsh-evolution-core';
 
 export interface UnitSupportFile {
   readonly path: string;
@@ -35,7 +35,7 @@ export interface UnitPlan {
   readonly expectedSourceBodies: readonly { name: string; body: string }[];
   readonly origin: "foreground" | "subagent" | "background_review";
   readonly summary: string;
-  readonly skillLimits?: import("./limits.ts").SkillLimits;
+  readonly skillLimits?: SkillLimits;
   readonly limitsDigest?: string;
   readonly validationPlan?: { readonly planVersion: 1; readonly stageDigest: string; readonly revision: string };
   readonly targetRevision?: { readonly kind: 'absent' } | { readonly kind: 'present'; readonly sha256: string };
@@ -73,8 +73,7 @@ export interface UnitBackend {
   restoreSource(name: string, body: string): Promise<void>;
   restoreSupportFile?(name: string, path: string, content: string | null): Promise<void>;
 }
-export type { UnitClaim, UnitClaimPort } from './unit-claim.ts'
-import type { UnitClaim, UnitClaimPort } from './unit-claim.ts'
+import type { UnitClaim, UnitClaimPort } from '@deepseek-ai/dsh-evolution-core'
 export interface UnitTransactionOptions {
   readonly io: EvolutionIoLike;
   readonly home: string;
@@ -86,7 +85,7 @@ export interface UnitTransactionOptions {
   readonly onPhase?: (phase: UnitJournalPhase) => void | Promise<void>;
   /** Gate instrumentation: tree fence then target claim. */
   readonly onLock?: (lock: "tree" | "claim") => void;
-  /** One home fence owned by authority; when set, UnitTransactions must not acquire tree-lock itself. */
+  /** One home fence owned by authority; when set, MergeUnitTransactions must not acquire tree-lock itself. */
   readonly fence?: HomeFence;
   /** Optional run liveness gate: false means the run is terminal and must not commit. */
   readonly isActive?: (runId: string) => boolean | Promise<boolean>;
@@ -149,7 +148,7 @@ export function unitEvidenceDigest(evidence: UnitEvidenceRecord): string {
   return createHash("sha256").update(canonicalJson({ ...evidence, at: 0, mutations: 0 })).digest("hex")
 }
 
-export class UnitTransactions implements UnitTransaction {
+export class MergeUnitTransactions implements UnitTransaction {
   private readonly prepared = new Map<string, { plan: UnitPlan; digest: string; at: number; snapshotSha256: string }>();
   private readonly commits = new Map<string, Promise<{ ok: true; evidence: UnitEvidenceRecord } | UnitFailure>>();
   private readonly now: () => number;

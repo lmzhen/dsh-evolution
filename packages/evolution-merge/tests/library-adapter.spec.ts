@@ -2,7 +2,9 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, SkillLibrary, skillLibraryUnitBackend, UnitTransactions } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { MergeUnitTransactions } from '../src/unit-protocol.ts'
+import { skillLibraryUnitBackend } from '../src/skill-library-unit-backend.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { commitStagedRun, createStaging, readCommitReceipt, skillLibraryPort, writeStagedFile } from '../src/index.ts'
 
@@ -25,7 +27,7 @@ it('commits through SkillLibrary and archives the source', async () => {
     now: () => 1000,
   })).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('target'))).ok).toBe(true)
-  const unit = new UnitTransactions({ io, home, backend: skillLibraryUnitBackend(lib), claim: { async acquire() { return { async release() {} } } } })
+  const unit = new MergeUnitTransactions({ io, home, backend: skillLibraryUnitBackend(lib), claim: { async acquire() { return { async release() {} } } } })
   const result = await commitStagedRun(io, home, 'run-1', skillLibraryPort(lib), {
     origin: 'foreground',
     summary: 'adapter merge',

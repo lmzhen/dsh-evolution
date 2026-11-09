@@ -17,15 +17,15 @@ async function waitFor(path: string, timeoutMs: number): Promise<string> {
 
 it('persists target-pending when the commit process is force-killed', async () => {
   const home = await tempRoot('dsh-unit-crash-')
-  const core = new URL('../src/unit-transaction.ts', import.meta.url).href
+  const core = new URL('../../evolution-merge/src/unit-protocol.ts', import.meta.url).href
   const ioUrl = new URL('../src/io.ts', import.meta.url).href
   const scriptPath = join(home, 'crash.mts')
   const pidPath = join(home, 'child.pid')
   await writeFile(scriptPath, `
 import { writeFile } from 'node:fs/promises'
-import { UnitTransactions } from ${JSON.stringify(core)}
+import { MergeUnitTransactions } from ${JSON.stringify(core)}
 import { nodeEvolutionIo } from ${JSON.stringify(ioUrl)}
-const tx = new UnitTransactions({
+const tx = new MergeUnitTransactions({
   io: nodeEvolutionIo(), home: ${JSON.stringify(home)},
   backend: { async readSkill() { return 'old' }, async readSupportFile() { return null }, async commit() { await writeFile(${JSON.stringify(pidPath)}, String(process.pid)); await new Promise(() => { setInterval(() => {}, 1000) }) }, async restoreTarget() {}, async restoreSource() {} },
   claim: { async acquire() { return { async release() {} } } }, now: () => 1,

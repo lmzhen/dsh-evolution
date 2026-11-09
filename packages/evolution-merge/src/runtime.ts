@@ -4,7 +4,10 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import { createHash } from 'node:crypto'
-import { errorText, isProcessAlive, probeText, SkillLibrary, UnitTransactions, skillLibraryUnitBackend, type EvolutionIoLike, type RunRegistry, type UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
+import { errorText, isProcessAlive, probeText, SkillLibrary, type EvolutionIoLike, type RunRegistry } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitTransaction } from './unit-protocol.ts'
+import { MergeUnitTransactions } from './unit-protocol.ts'
+import { skillLibraryUnitBackend } from './skill-library-unit-backend.ts'
 import { targetClaimUnitPort } from './unit-claim.ts'
 import { canRetry, pairKey, type MergeCandidate, type MergeDecision, type MergeRow } from './contracts.ts'
 import { skippedPairKeys } from './skipped.ts'
@@ -126,7 +129,7 @@ async function removeRuntimeRow(io: EvolutionIoLike, home: string, id: string, e
 export function unitFor(deps: MergeRuntimeDeps): UnitTransaction | undefined {
   if (deps.unit !== undefined) return deps.unit
   if (!(deps.skills instanceof SkillLibrary)) return undefined
-  return new UnitTransactions({ io: deps.io, home: deps.home, backend: skillLibraryUnitBackend(deps.skills), claim: targetClaimUnitPort(deps.io, deps.home, deps.now), now: deps.now })
+  return new MergeUnitTransactions({ io: deps.io, home: deps.home, backend: skillLibraryUnitBackend(deps.skills), claim: targetClaimUnitPort(deps.io, deps.home, deps.now), now: deps.now })
 }
 
 export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService {

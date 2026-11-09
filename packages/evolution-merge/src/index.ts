@@ -18,7 +18,8 @@ import { readV4Readiness } from './domain/schema4.ts'
 import { readMergeSnapshot } from './domain/merge-snapshot.ts'
 import type { HistoryItem } from './domain/merge-snapshot.ts'
 import { readCommitReceipts } from './commit-receipt.ts'
-import { UnitTransactions, skillLibraryUnitBackend } from '@deepseek-ai/dsh-evolution-core'
+import { MergeUnitTransactions } from './unit-protocol.ts'
+import { skillLibraryUnitBackend } from './skill-library-unit-backend.ts'
 import { targetClaimUnitPort } from './unit-claim.ts'
 import { resolveLimitsSnapshot } from './domain/merge-limits.ts'
 import { resolveEngineInput } from './domain/engine-input.ts'
@@ -232,7 +233,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     })
     void ready.then(value => {
       if (!value.ok) { ctx.logger.warn('merge state is not ready: ' + value.code + ': ' + value.message); return }
-      const unit = new UnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now(), isActive: async runId => await runs.hasOwner(runId), ...(mutationAuthority?.homeFence === undefined ? {} : { fence: mutationAuthority.homeFence }) })
+      const unit = new MergeUnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now(), isActive: async runId => await runs.hasOwner(runId), ...(mutationAuthority?.homeFence === undefined ? {} : { fence: mutationAuthority.homeFence }) })
       const cards = async () => await readSkillCards(skills)
       void (async () => {
         // NFR-05: load the shared run index BEFORE recovery. Recovery settles through the

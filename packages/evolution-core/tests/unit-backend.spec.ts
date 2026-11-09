@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { DEFAULT_SKILL_LIMITS, SkillLibrary, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { skillLibraryUnitBackend } from '../src/unit-backend.ts'
-import { UnitTransactions, type UnitPlan } from '../src/unit-transaction.ts'
+import { skillLibraryUnitBackend } from '../../evolution-merge/src/skill-library-unit-backend.ts'
+import { MergeUnitTransactions, type UnitPlan } from '../../evolution-merge/src/unit-protocol.ts'
 
 it('commits through the real SkillLibrary adapter', async () => {
   const root = await tempRoot('dsh-unit-backend-')
@@ -15,7 +15,7 @@ it('commits through the real SkillLibrary adapter', async () => {
   }
   await writeFile(join(root, 'alpha', '.hermes-managed'), '')
   const skills = new SkillLibrary(root, nodeEvolutionIo(), DEFAULT_SKILL_LIMITS)
-  const tx = new UnitTransactions({ io: nodeEvolutionIo(), home: root, backend: skillLibraryUnitBackend(skills), claim: { async acquire() { return { async release() {} } } } })
+  const tx = new MergeUnitTransactions({ io: nodeEvolutionIo(), home: root, backend: skillLibraryUnitBackend(skills), claim: { async acquire() { return { async release() {} } } } })
   const plan: UnitPlan = { runId: 'run-1', pairKey: 'alpha|beta', target: 'alpha', targetExists: true, sources: ['beta'], body: ['---', 'name: alpha', 'description: merged', '---', '', '# alpha', ''].join('\n'), supportFiles: [], expectedTargetBody: await skills.read('alpha'), expectedSourceBodies: [{ name: 'beta', body: await skills.read('beta') ?? '' }], origin: 'foreground', summary: 'merge' }
   const prepared = await tx.prepare(plan)
   expect(prepared.ok).toBe(true)

@@ -9,7 +9,8 @@ import { writeCommitReceipt, type CommitReceipt } from './commit-receipt.ts'
 import { pairKey } from './contracts.ts'
 import { writeJournal } from './domain/commit-journal-store.ts'
 import { evidenceSha256 as digestEvidence } from './domain/evidence-hash.ts'
-import type { UnitTransaction, UnitPlan } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitTransaction } from './unit-protocol.ts'
+import type { UnitPlan } from './unit-protocol.ts'
 
 export interface CommitPort extends CommitAssemblyPort {
   /** Transitional G2: when set, commit-execute prefers this over commitMerge. */

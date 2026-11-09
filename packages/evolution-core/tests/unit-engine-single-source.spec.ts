@@ -1,0 +1,27 @@
+// @tier pre-tag
+import { expect, it } from 'vitest'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const root = fileURLToPath(new URL('../..', import.meta.url))
+
+it('keeps the generic unit engine in core and the merge protocol in merge', () => {
+  const hits: string[] = []
+  const visit = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'lib' || entry.name === 'dist' || entry.name.startsWith('.')) continue
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) { visit(full); continue }
+      if (!entry.name.endsWith('.ts')) continue
+      const text = readFileSync(full, 'utf8')
+      const rel = relative(root, full).split('\\').join('/')
+      if (/export class (MutationUnit|MergeUnitTransactions)\b/.test(text)) hits.push(rel)
+    }
+  }
+  visit(root)
+  expect(hits).toEqual([
+    'evolution-core/src/mutation-unit.ts',
+    'evolution-merge/src/unit-protocol.ts',
+  ])
+})
