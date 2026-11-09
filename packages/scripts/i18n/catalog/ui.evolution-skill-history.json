@@ -9,7 +9,8 @@
       "es": "archivado",
       "fr": "archivé",
       "de": "archiviert",
-      "pt": "arquivamento"
+      "pt": "arquivamento",
+      "ru": "заархивировано"
     },
     "action.archive.note": {
       "zh": "这一版存的是被归档的正文",
@@ -18,7 +19,8 @@
       "es": "esta versión guarda el cuerpo archivado",
       "fr": "cette version contient le texte archivé",
       "de": "Diese Version enthält den archivierten Text",
-      "pt": "esta versão guarda o corpo arquivado"
+      "pt": "esta versão guarda o corpo arquivado",
+      "ru": "в этой версии сохранён заархивированный текст"
     },
     "action.baseline": {
       "zh": "初始快照",
@@ -27,7 +29,8 @@
       "es": "instantánea inicial",
       "fr": "instantané initial",
       "de": "Ausgangssnapshot",
-      "pt": "snapshot inicial"
+      "pt": "snapshot inicial",
+      "ru": "первый снимок"
     },
     "action.consolidate": {
       "zh": "合并",
@@ -36,7 +39,8 @@
       "es": "mergeado",
       "fr": "fusionné",
       "de": "gemergt",
-      "pt": "consolidação"
+      "pt": "consolidação",
+      "ru": "объединено"
     },
     "action.create": {
       "zh": "新建",
@@ -45,7 +49,8 @@
       "es": "creado",
       "fr": "créé",
       "de": "erstellt",
-      "pt": "criação"
+      "pt": "criação",
+      "ru": "создано"
     },
     "action.delete": {
       "zh": "删除",
@@ -54,7 +59,8 @@
       "es": "eliminado",
       "fr": "supprimé",
       "de": "gelöscht",
-      "pt": "exclusão"
+      "pt": "exclusão",
+      "ru": "удалено"
     },
     "action.delete.note": {
       "zh": "这一版存的是被删掉的正文",
@@ -63,7 +69,8 @@
       "es": "esta versión guarda el cuerpo eliminado",
       "fr": "cette version contient le texte supprimé",
       "de": "Diese Version enthält den entfernten Text",
-      "pt": "esta versão guarda o corpo removido"
+      "pt": "esta versão guarda o corpo removido",
+      "ru": "в этой версии сохранён удалённый текст"
     },
     "action.extract": {
       "zh": "跨技能提取",
@@ -72,7 +79,8 @@
       "es": "extraído entre skills",
       "fr": "extrait entre skills",
       "de": "über Skills hinweg extrahiert",
-      "pt": "extração entre skills"
+      "pt": "extração entre skills",
+      "ru": "перенос между навыками"
     },
     "action.merge": {
       "zh": "合并",
@@ -81,7 +89,8 @@
       "es": "mergeado",
       "fr": "fusionné",
       "de": "gemergt",
-      "pt": "merge"
+      "pt": "merge",
+      "ru": "объединено"
     },
     "action.other": {
       "zh": "其他写入",
@@ -90,7 +99,8 @@
       "es": "otra escritura",
       "fr": "autre écriture",
       "de": "anderer Schreibvorgang",
-      "pt": "outra escrita"
+      "pt": "outra escrita",
+      "ru": "другая запись"
     },
     "action.patch": {
       "zh": "定点修改",
@@ -99,7 +109,8 @@
       "es": "edición puntual",
       "fr": "modification ciblée",
       "de": "gezielte Änderung",
-      "pt": "edição pontual"
+      "pt": "edição pontual",
+      "ru": "точечная правка"
     },
     "action.restore": {
       "zh": "回退",
@@ -108,7 +119,8 @@
       "es": "restaurado",
       "fr": "restauré",
       "de": "wiederhergestellt",
-      "pt": "restauração"
+      "pt": "restauração",
+      "ru": "откат"
     },
     "action.restructure": {
       "zh": "结构调整",
@@ -117,7 +129,8 @@
       "es": "reestructurado",
       "fr": "restructuré",
       "de": "umstrukturiert",
-      "pt": "reestruturação"
+      "pt": "reestruturação",
+      "ru": "перестройка структуры"
     },
     "action.support-remove": {
       "zh": "删除附带文件",
@@ -126,7 +139,8 @@
       "es": "archivo adjunto eliminado",
       "fr": "fichier joint supprimé",
       "de": "Begleitdatei entfernt",
-      "pt": "arquivo de apoio removido"
+      "pt": "arquivo de apoio removido",
+      "ru": "удалён вспомогательный файл"
     },
     "action.support-write": {
       "zh": "写入附带文件",
@@ -135,7 +149,8 @@
       "es": "archivo adjunto escrito",
       "fr": "fichier joint écrit",
       "de": "Begleitdatei geschrieben",
-      "pt": "arquivo de apoio gravado"
+      "pt": "arquivo de apoio gravado",
+      "ru": "записан вспомогательный файл"
     },
     "action.update": {
       "zh": "整篇更新",
@@ -144,7 +159,8 @@
       "es": "actualización completa",
       "fr": "mise à jour du texte entier",
       "de": "Voll-Update",
-      "pt": "atualização do corpo inteiro"
+      "pt": "atualização do corpo inteiro",
+      "ru": "полное обновление"
     },
     "bodyTitle": {
       "zh": "正文版本",
@@ -153,7 +169,8 @@
       "es": "Versiones del cuerpo",
       "fr": "Versions du texte",
       "de": "Textversionen",
-      "pt": "Versões do corpo"
+      "pt": "Versões do corpo",
+      "ru": "Версии текста"
     },
     "current": {
       "zh": "当前",
@@ -162,7 +179,8 @@
       "es": "Actual",
       "fr": "Actuelle",
       "de": "Aktuell",
-      "pt": "Atual"
+      "pt": "Atual",
+      "ru": "Текущая"
     },
     "diff.added": {
       "zh": "新增 {n} 行",
@@ -171,7 +189,8 @@
       "es": "{n} líneas añadidas",
       "fr": "{n} lignes ajoutées",
       "de": "{n} Zeilen hinzugefügt",
-      "pt": "{n} linhas adicionadas"
+      "pt": "{n} linhas adicionadas",
+      "ru": "Строк добавлено: {n}"
     },
     "diff.against": {
       "zh": "与 v{n} 比较",
@@ -180,7 +199,8 @@
       "es": "comparado con v{n}",
       "fr": "comparé à v{n}",
       "de": "Vergleich mit v{n}",
-      "pt": "comparado com v{n}"
+      "pt": "comparado com v{n}",
+      "ru": "сравнение с v{n}"
     },
     "diff.first": {
       "zh": "这是第一版，整篇都是新增",
@@ -189,7 +209,8 @@
       "es": "primera versión: todo es nuevo",
       "fr": "première version : tout est nouveau",
       "de": "Erste Version: alles ist neu",
-      "pt": "primeira versão: tudo é novo"
+      "pt": "primeira versão: tudo é novo",
+      "ru": "первая версия: всё содержимое новое"
     },
     "diff.hide": {
       "zh": "收起差异",
@@ -198,7 +219,8 @@
       "es": "Ocultar diferencias",
       "fr": "Masquer le diff",
       "de": "Diff ausblenden",
-      "pt": "Ocultar diferenças"
+      "pt": "Ocultar diferenças",
+      "ru": "Скрыть изменения"
     },
     "diff.loading": {
       "zh": "读取差异…",
@@ -207,7 +229,8 @@
       "es": "Cargando las diferencias…",
       "fr": "Chargement du diff…",
       "de": "Diff wird gelesen…",
-      "pt": "carregando as diferenças…"
+      "pt": "carregando as diferenças…",
+      "ru": "Читаем изменения…"
     },
     "diff.removed": {
       "zh": "删除 {n} 行",
@@ -216,7 +239,8 @@
       "es": "{n} líneas eliminadas",
       "fr": "{n} lignes supprimées",
       "de": "{n} Zeilen entfernt",
-      "pt": "{n} linhas removidas"
+      "pt": "{n} linhas removidas",
+      "ru": "Строк удалено: {n}"
     },
     "diff.rendered": {
       "zh": "排版",
@@ -225,7 +249,8 @@
       "es": "Con formato",
       "fr": "Rendu",
       "de": "Gerendert",
-      "pt": "Formatado"
+      "pt": "Formatado",
+      "ru": "Вид"
     },
     "diff.show": {
       "zh": "差异",
@@ -234,7 +259,8 @@
       "es": "Diferencias",
       "fr": "Diff",
       "de": "Diff",
-      "pt": "Diferenças"
+      "pt": "Diferenças",
+      "ru": "Изменения"
     },
     "diff.source": {
       "zh": "原文",
@@ -243,7 +269,8 @@
       "es": "Markdown",
       "fr": "Markdown",
       "de": "Markdown",
-      "pt": "Markdown"
+      "pt": "Markdown",
+      "ru": "Исходник"
     },
     "diff.truncated": {
       "zh": "差异过长，只显示前一部分",
@@ -252,7 +279,8 @@
       "es": "el cambio es largo; solo se muestra el principio",
       "fr": "le diff est long ; seul son début est affiché",
       "de": "Die Änderung ist lang; nur der Anfang wird gezeigt",
-      "pt": "as diferenças são longas; só o início é mostrado"
+      "pt": "as diferenças são longas; só o início é mostrado",
+      "ru": "изменения длинные, показано только начало"
     },
     "empty.pick": {
       "zh": "从左栏选一个技能，看它记录过的版本。",
@@ -261,7 +289,8 @@
       "es": "Elige un skill a la izquierda para ver las versiones que registró.",
       "fr": "Choisissez un skill à gauche pour voir les versions enregistrées.",
       "de": "Wähle links einen Skill, um seine aufgezeichneten Versionen zu sehen.",
-      "pt": "Escolha uma skill à esquerda para ver as versões registradas."
+      "pt": "Escolha uma skill à esquerda para ver as versões registradas.",
+      "ru": "Выберите навык слева — увидите его записанные версии."
     },
     "empty.skills": {
       "zh": "还没有技能留下过内容版本。",
@@ -270,7 +299,8 @@
       "es": "Ningún skill ha registrado todavía una versión de contenido.",
       "fr": "Aucun skill n’a encore enregistré de version de contenu.",
       "de": "Noch kein Skill hat eine Textversion aufgezeichnet.",
-      "pt": "Nenhuma skill registrou uma versão de conteúdo ainda."
+      "pt": "Nenhuma skill registrou uma versão de conteúdo ainda.",
+      "ru": "Пока ни один навык не сохранил версию содержимого."
     },
     "empty.skills.main": {
       "zh": "技能第一次被写入后，这里会显示它的内容版本。",
@@ -279,7 +309,8 @@
       "es": "Cuando un skill se escriba por primera vez, aquí verás sus versiones de contenido.",
       "fr": "Après la première écriture d’un skill, ses versions de contenu apparaissent ici.",
       "de": "Sobald ein Skill zum ersten Mal geschrieben wird, erscheinen hier seine Textversionen.",
-      "pt": "Depois que uma skill é gravada pela primeira vez, as versões de conteúdo aparecem aqui."
+      "pt": "Depois que uma skill é gravada pela primeira vez, as versões de conteúdo aparecem aqui.",
+      "ru": "После первой записи навыка здесь появятся его версии содержимого."
     },
     "empty.versions": {
       "zh": "这个技能还没有记录版本。",
@@ -288,7 +319,8 @@
       "es": "Este skill no tiene versiones registradas.",
       "fr": "Ce skill n’a aucune version enregistrée.",
       "de": "Für diesen Skill sind keine Versionen aufgezeichnet.",
-      "pt": "Esta skill não tem versões registradas."
+      "pt": "Esta skill não tem versões registradas.",
+      "ru": "У этого навыка пока нет записанных версий."
     },
     "empty.versions.failed": {
       "zh": "版本读取失败——这个技能有没有版本，现在判断不了；点「刷新」重试。",
@@ -297,7 +329,8 @@
       "es": "No se pudieron leer las versiones: ahora mismo no se puede saber si este skill tiene versiones; pulsa «Actualizar» para reintentar.",
       "fr": "La lecture des versions a échoué : impossible de savoir si ce skill a des versions ; cliquez sur « Actualiser » pour réessayer.",
       "de": "Versionen konnten nicht gelesen werden – ob dieser Skill Versionen hat, lässt sich gerade nicht sagen. „Aktualisieren“ versucht es erneut.",
-      "pt": "A leitura das versões falhou — não é possível dizer agora se esta skill tem versões; clique em Atualizar para tentar novamente."
+      "pt": "A leitura das versões falhou — não é possível dizer agora se esta skill tem versões; clique em Atualizar para tentar novamente.",
+      "ru": "Не удалось прочитать версии — есть ли они у этого навыка, сейчас не определить; нажмите «Обновить» и повторите."
     },
     "entry.label": {
       "zh": "技能自动进化",
@@ -306,7 +339,8 @@
       "es": "Evolución automática de skills",
       "fr": "Auto-évolution des skills",
       "de": "Skill-Evolution",
-      "pt": "Evolução automática de skills"
+      "pt": "Evolução automática de skills",
+      "ru": "Автоэволюция навыков"
     },
     "error": {
       "zh": "读取失败",
@@ -315,7 +349,8 @@
       "es": "No se pudo cargar",
       "fr": "Chargement impossible",
       "de": "Laden fehlgeschlagen",
-      "pt": "Não foi possível carregar"
+      "pt": "Não foi possível carregar",
+      "ru": "Не удалось прочитать"
     },
     "error.hint": {
       "zh": "面板连不上后台服务：通常是插件和程序版本不匹配。重启 DeepSeek Harness 再试；还不行就在对话里说明。",
@@ -324,7 +359,8 @@
       "es": "El panel no llega al servicio en segundo plano: normalmente el plugin y la app tienen versiones distintas. Reinicia DeepSeek Harness y vuelve a intentarlo; si sigue fallando, dilo en la conversación.",
       "fr": "Le panneau n’arrive pas à joindre le service en arrière-plan : en général, le plugin et l’application ne sont pas sur la même version. Redémarrez DeepSeek Harness et réessayez ; si ça persiste, signalez-le dans la conversation.",
       "de": "Das Panel erreicht den Hintergrunddienst nicht: meist passen Plugin- und App-Version nicht zusammen. DeepSeek Harness neu starten und erneut versuchen; wenn es dann noch scheitert, im Chat melden.",
-      "pt": "O painel não alcança o serviço em segundo plano: geralmente plugin e aplicativo estão em versões diferentes. Reinicie o DeepSeek Harness e tente novamente; se continuar falhando, diga isso na conversa."
+      "pt": "O painel não alcança o serviço em segundo plano: geralmente plugin e aplicativo estão em versões diferentes. Reinicie o DeepSeek Harness e tente novamente; se continuar falhando, diga isso na conversa.",
+      "ru": "Панель не может связаться с фоновой службой: обычно у плагина и приложения разные версии. Перезапустите DeepSeek Harness и попробуйте снова; если не помогло, напишите об этом в диалоге."
     },
     "failure.forbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
@@ -333,7 +369,8 @@
       "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso).",
       "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission).",
       "de": "Die Plattform hat die Anfrage abgelehnt (dieses Konto hat keine Berechtigung).",
-      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão)."
+      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão).",
+      "ru": "Платформа отклонила запрос (у текущей учётной записи нет прав)."
     },
     "failure.server": {
       "zh": "读取失败，可以重试。",
@@ -342,7 +379,8 @@
       "es": "La lectura falló; puedes reintentar.",
       "fr": "La lecture a échoué ; vous pouvez réessayer.",
       "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
-      "pt": "Falha na leitura; você pode tentar novamente."
+      "pt": "Falha na leitura; você pode tentar novamente.",
+      "ru": "Не удалось прочитать; можно повторить."
     },
     "failure.unauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
@@ -351,7 +389,8 @@
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
       "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
       "de": "Anmeldung nötig: Seite neu öffnen, anmelden und erneut versuchen.",
-      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente."
+      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente.",
+      "ru": "Нужен вход: откройте страницу заново, войдите и повторите."
     },
     "failure.unmounted": {
       "zh": "这个功能没有启用。",
@@ -360,7 +399,8 @@
       "es": "Esta función no está activada.",
       "fr": "Cette fonction n’est pas activée.",
       "de": "Diese Funktion ist nicht aktiviert.",
-      "pt": "Este recurso não está ativado."
+      "pt": "Este recurso não está ativado.",
+      "ru": "Эта функция не включена."
     },
     "failureForbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
@@ -369,7 +409,8 @@
       "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso).",
       "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission).",
       "de": "Die Plattform hat die Anfrage abgelehnt (dieses Konto hat keine Berechtigung).",
-      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão)."
+      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão).",
+      "ru": "Платформа отклонила запрос (у текущей учётной записи нет прав)."
     },
     "failureServer": {
       "zh": "读取失败，可以重试。",
@@ -378,7 +419,8 @@
       "es": "La lectura falló; puedes reintentar.",
       "fr": "La lecture a échoué ; vous pouvez réessayer.",
       "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
-      "pt": "Falha na leitura; você pode tentar novamente."
+      "pt": "Falha na leitura; você pode tentar novamente.",
+      "ru": "Не удалось прочитать; можно повторить."
     },
     "failureUnauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
@@ -387,7 +429,8 @@
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
       "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
       "de": "Anmeldung nötig: Seite neu öffnen, anmelden und erneut versuchen.",
-      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente."
+      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente.",
+      "ru": "Нужен вход: откройте страницу заново, войдите и повторите."
     },
     "failureUnmounted": {
       "zh": "这个功能没有启用。",
@@ -396,7 +439,8 @@
       "es": "Esta función no está activada.",
       "fr": "Cette fonction n’est pas activée.",
       "de": "Diese Funktion ist nicht aktiviert.",
-      "pt": "Este recurso não está ativado."
+      "pt": "Este recurso não está ativado.",
+      "ru": "Эта функция не включена."
     },
     "fallback.hint": {
       "zh": "可以改用命令：{command}",
@@ -405,7 +449,8 @@
       "es": "Alternativa por comando: {command}",
       "fr": "Commande de repli : {command}",
       "de": "Alternativ per Befehl: {command}",
-      "pt": "Alternativa por comando: {command}"
+      "pt": "Alternativa por comando: {command}",
+      "ru": "Запасной вариант — команда: {command}"
     },
     "fallbackHint": {
       "zh": "可以改用命令：{command}",
@@ -414,7 +459,8 @@
       "es": "Alternativa por comando: {command}",
       "fr": "Commande de repli : {command}",
       "de": "Alternativ per Befehl: {command}",
-      "pt": "Alternativa por comando: {command}"
+      "pt": "Alternativa por comando: {command}",
+      "ru": "Запасной вариант — команда: {command}"
     },
     "group.content": {
       "zh": "正文版本",
@@ -423,7 +469,8 @@
       "es": "Versiones del cuerpo",
       "fr": "Versions du texte",
       "de": "Textversionen",
-      "pt": "Versões do corpo"
+      "pt": "Versões do corpo",
+      "ru": "Версии текста"
     },
     "group.current": {
       "zh": "当前版本",
@@ -432,7 +479,8 @@
       "es": "Versión actual",
       "fr": "Version actuelle",
       "de": "Aktuelle Version",
-      "pt": "Versão atual"
+      "pt": "Versão atual",
+      "ru": "Текущая версия"
     },
     "group.history": {
       "zh": "历史版本",
@@ -441,7 +489,8 @@
       "es": "Historial",
       "fr": "Historique",
       "de": "Frühere Versionen",
-      "pt": "Versões anteriores"
+      "pt": "Versões anteriores",
+      "ru": "История"
     },
     "group.support": {
       "zh": "文件版本（不可回退）",
@@ -450,7 +499,8 @@
       "es": "Versiones de archivos (no restaurables)",
       "fr": "Versions des fichiers (non restaurables)",
       "de": "Dateiversionen (nicht wiederherstellbar)",
-      "pt": "Versões de arquivos de apoio (sem restauração)"
+      "pt": "Versões de arquivos de apoio (sem restauração)",
+      "ru": "Версии файлов (без отката)"
     },
     "group.support.note": {
       "zh": "附带文件的版本会和正文一起记录；回退正文时不会恢复附带文件。",
@@ -459,7 +509,8 @@
       "es": "Las versiones de los archivos adjuntos se registran junto al cuerpo; restaurar el cuerpo no las restaura.",
       "fr": "Les versions des fichiers joints sont enregistrées avec le texte ; restaurer le texte ne restaure pas les fichiers joints.",
       "de": "Versionen von Begleitdateien werden zusammen mit dem Text aufgezeichnet; beim Wiederherstellen des Texts werden sie nicht zurückgesetzt.",
-      "pt": "As versões dos arquivos de apoio são registradas junto com o corpo; restaurar o corpo não restaura esses arquivos."
+      "pt": "As versões dos arquivos de apoio são registradas junto com o corpo; restaurar o corpo não restaura esses arquivos.",
+      "ru": "Версии вспомогательных файлов записываются вместе с текстом; откат текста их не восстанавливает."
     },
     "hint": {
       "zh": "每次写入技能都会留下一个内容版本。回退只改正文；技能标记、使用次数和整理状态不变。内容相同的版本会同时标为「当前」。",
@@ -468,7 +519,8 @@
       "es": "Cada escritura de un skill deja una versión de contenido. Restaurar solo cambia el cuerpo; los marcadores del skill, los recuentos de uso y el estado de curación no varían. Las versiones con el mismo contenido se marcan todas como «Actual».",
       "fr": "Chaque écriture d’un skill laisse une version de contenu. La restauration ne modifie que le texte ; les marqueurs du skill, les compteurs d’usage et l’état de curation restent inchangés. Les versions au contenu identique sont toutes marquées « Actuelle ».",
       "de": "Jeder Schreibvorgang an einem Skill hinterlässt eine Textversion. Wiederherstellen ändert nur den Text; Skill-Markierungen, Nutzungszahlen und Curation-Status bleiben unverändert. Versionen mit gleichem Inhalt werden alle als „Aktuell“ markiert.",
-      "pt": "Cada escrita de uma skill deixa uma versão de conteúdo. Restaurar muda só o corpo; marcadores da skill, contagem de uso e estado de organização continuam iguais. Versões com o mesmo conteúdo são todas marcadas como \"Atual\"."
+      "pt": "Cada escrita de uma skill deixa uma versão de conteúdo. Restaurar muda só o corpo; marcadores da skill, contagem de uso e estado de organização continuam iguais. Versões com o mesmo conteúdo são todas marcadas como \"Atual\".",
+      "ru": "Каждая запись навыка оставляет версию содержимого. Откат меняет только текст; метки навыка, число использований и состояние упорядочивания остаются прежними. Версии с одинаковым содержимым все помечаются как «Текущая»."
     },
     "loading": {
       "zh": "读取中…",
@@ -477,7 +529,8 @@
       "es": "Cargando…",
       "fr": "Chargement…",
       "de": "Wird gelesen…",
-      "pt": "carregando…"
+      "pt": "carregando…",
+      "ru": "Читаем…"
     },
     "markdown.copied": {
       "zh": "已复制",
@@ -486,7 +539,8 @@
       "es": "Copiado",
       "fr": "Copié",
       "de": "Kopiert",
-      "pt": "Copiado"
+      "pt": "Copiado",
+      "ru": "Скопировано"
     },
     "markdown.copy": {
       "zh": "复制",
@@ -495,7 +549,8 @@
       "es": "Copiar",
       "fr": "Copier",
       "de": "Kopieren",
-      "pt": "Copiar"
+      "pt": "Copiar",
+      "ru": "Копировать"
     },
     "markdown.footnotes": {
       "zh": "脚注",
@@ -504,7 +559,8 @@
       "es": "Notas al pie",
       "fr": "Notes de bas de page",
       "de": "Fußnoten",
-      "pt": "Notas de rodapé"
+      "pt": "Notas de rodapé",
+      "ru": "Сноски"
     },
     "more": {
       "zh": "更多",
@@ -513,7 +569,8 @@
       "es": "Más",
       "fr": "Plus",
       "de": "Mehr",
-      "pt": "Mais"
+      "pt": "Mais",
+      "ru": "Ещё"
     },
     "path.unrecorded": {
       "zh": "（路径未记录）",
@@ -522,7 +579,8 @@
       "es": "(ruta no registrada)",
       "fr": "(chemin non enregistré)",
       "de": "(Pfad nicht aufgezeichnet)",
-      "pt": "(caminho não registrado)"
+      "pt": "(caminho não registrado)",
+      "ru": "(путь не записан)"
     },
     "preview.hide": {
       "zh": "收起正文",
@@ -531,7 +589,8 @@
       "es": "Ocultar cuerpo",
       "fr": "Masquer le texte",
       "de": "Text ausblenden",
-      "pt": "Ocultar corpo"
+      "pt": "Ocultar corpo",
+      "ru": "Скрыть текст"
     },
     "preview.loading": {
       "zh": "读取预览…",
@@ -540,7 +599,8 @@
       "es": "Cargando la vista previa…",
       "fr": "Chargement de l’aperçu…",
       "de": "Vorschau wird gelesen…",
-      "pt": "carregando a prévia…"
+      "pt": "carregando a prévia…",
+      "ru": "Загружаем предпросмотр…"
     },
     "preview.show": {
       "zh": "查看正文",
@@ -549,7 +609,8 @@
       "es": "Ver cuerpo",
       "fr": "Voir le texte",
       "de": "Text ansehen",
-      "pt": "Ver corpo"
+      "pt": "Ver corpo",
+      "ru": "Показать текст"
     },
     "preview.truncated": {
       "zh": "正文过长：只显示前 {shown} 个字符（共 {total} 个）",
@@ -558,7 +619,8 @@
       "es": "el cuerpo es largo: se muestran los primeros {shown} de {total} caracteres",
       "fr": "texte trop long : seuls les {shown} premiers caractères sur {total} sont affichés",
       "de": "Text zu lang: die ersten {shown} von {total} Zeichen werden angezeigt",
-      "pt": "o corpo é longo: mostrando os primeiros {shown} de {total} caracteres"
+      "pt": "o corpo é longo: mostrando os primeiros {shown} de {total} caracteres",
+      "ru": "Текст длинный: показаны первые {shown} из {total} символов"
     },
     "refresh": {
       "zh": "刷新",
@@ -567,7 +629,8 @@
       "es": "Actualizar",
       "fr": "Actualiser",
       "de": "Aktualisieren",
-      "pt": "Atualizar"
+      "pt": "Atualizar",
+      "ru": "Обновить"
     },
     "row.delta.down": {
       "zh": "（-{n} 字符）",
@@ -576,7 +639,8 @@
       "es": "(-{n} caracteres)",
       "fr": "(-{n} caractères)",
       "de": "(-{n} Zeichen)",
-      "pt": "(-{n} caracteres)"
+      "pt": "(-{n} caracteres)",
+      "ru": "(-{n} симв.)"
     },
     "row.delta.up": {
       "zh": "（+{n} 字符）",
@@ -585,7 +649,8 @@
       "es": "(+{n} caracteres)",
       "fr": "(+{n} caractères)",
       "de": "(+{n} Zeichen)",
-      "pt": "(+{n} caracteres)"
+      "pt": "(+{n} caracteres)",
+      "ru": "(+{n} симв.)"
     },
     "row.first": {
       "zh": "初始版本",
@@ -594,7 +659,8 @@
       "es": "Primera versión",
       "fr": "Version initiale",
       "de": "Erste Version",
-      "pt": "Primeira versão"
+      "pt": "Primeira versão",
+      "ru": "Первая версия"
     },
     "row.summary.missing": {
       "zh": "（未生成摘要）",
@@ -603,7 +669,8 @@
       "es": "(sin resumen)",
       "fr": "(aucun résumé généré)",
       "de": "(keine Zusammenfassung erzeugt)",
-      "pt": "(nenhum resumo gerado)"
+      "pt": "(nenhum resumo gerado)",
+      "ru": "(сводка не создана)"
     },
     "row.version": {
       "zh": "v{n}",
@@ -612,7 +679,8 @@
       "es": "v{n}",
       "fr": "v{n}",
       "de": "v{n}",
-      "pt": "v{n}"
+      "pt": "v{n}",
+      "ru": "v{n}"
     },
     "search": {
       "zh": "按名字或描述筛选",
@@ -621,7 +689,8 @@
       "es": "Filtrar por nombre o descripción",
       "fr": "Filtrer par nom ou description",
       "de": "Nach Name oder Beschreibung filtern",
-      "pt": "Filtrar por nome ou descrição"
+      "pt": "Filtrar por nome ou descrição",
+      "ru": "Фильтр по имени или описанию"
     },
     "search.none": {
       "zh": "没有匹配的技能。",
@@ -630,7 +699,8 @@
       "es": "Ningún skill coincide.",
       "fr": "Aucun skill ne correspond.",
       "de": "Kein Skill passt.",
-      "pt": "Nenhuma skill corresponde."
+      "pt": "Nenhuma skill corresponde.",
+      "ru": "Нет подходящих навыков."
     },
     "state.foreign": {
       "zh": "不受本插件管理",
@@ -639,7 +709,8 @@
       "es": "no lo gestiona este plugin",
       "fr": "Non géré par ce plugin",
       "de": "Nicht von diesem Plugin verwaltet",
-      "pt": "Fora do gerenciamento deste plugin"
+      "pt": "Fora do gerenciamento deste plugin",
+      "ru": "Не управляется этим плагином"
     },
     "state.managed": {
       "zh": "由本插件管理",
@@ -648,7 +719,8 @@
       "es": "gestionado por este plugin",
       "fr": "Géré par ce plugin",
       "de": "Von diesem Plugin verwaltet",
-      "pt": "Gerenciada por este plugin"
+      "pt": "Gerenciada por este plugin",
+      "ru": "Управляется этим плагином"
     },
     "state.protected": {
       "zh": "受保护",
@@ -657,7 +729,8 @@
       "es": "protegido",
       "fr": "protégé",
       "de": "geschützt",
-      "pt": "protegida"
+      "pt": "protegida",
+      "ru": "защищён"
     },
     "state.unknown": {
       "zh": "标记为无法读取",
@@ -666,7 +739,8 @@
       "es": "marcado como ilegible",
       "fr": "Marqué illisible",
       "de": "Als nicht lesbar markiert",
-      "pt": "Marcada como ilegível"
+      "pt": "Marcada como ilegível",
+      "ru": "помечен как нечитаемый"
     },
     "time.days": {
       "zh": "{n} 天前",
@@ -675,7 +749,8 @@
       "es": "hace {n} días",
       "fr": "il y a {n} jours",
       "de": "vor {n} Tagen",
-      "pt": "{n} dias atrás"
+      "pt": "{n} dias atrás",
+      "ru": "{n} дн. назад"
     },
     "time.days.one": {
       "zh": "1 天前",
@@ -684,7 +759,8 @@
       "es": "hace 1 día",
       "fr": "il y a 1 jour",
       "de": "vor 1 Tag",
-      "pt": "1 dia atrás"
+      "pt": "1 dia atrás",
+      "ru": "1 день назад"
     },
     "time.hours": {
       "zh": "{n} 小时前",
@@ -693,7 +769,8 @@
       "es": "hace {n} horas",
       "fr": "il y a {n} heures",
       "de": "vor {n} Stunden",
-      "pt": "{n} horas atrás"
+      "pt": "{n} horas atrás",
+      "ru": "{n} ч назад"
     },
     "time.hours.one": {
       "zh": "1 小时前",
@@ -702,7 +779,8 @@
       "es": "hace 1 hora",
       "fr": "il y a 1 heure",
       "de": "vor 1 Stunde",
-      "pt": "1 hora atrás"
+      "pt": "1 hora atrás",
+      "ru": "1 час назад"
     },
     "time.minutes": {
       "zh": "{n} 分钟前",
@@ -711,7 +789,8 @@
       "es": "hace {n} minutos",
       "fr": "il y a {n} minutes",
       "de": "vor {n} Minuten",
-      "pt": "{n} minutos atrás"
+      "pt": "{n} minutos atrás",
+      "ru": "{n} мин назад"
     },
     "time.minutes.one": {
       "zh": "1 分钟前",
@@ -720,7 +799,8 @@
       "es": "hace 1 minuto",
       "fr": "il y a 1 minute",
       "de": "vor 1 Minute",
-      "pt": "1 minuto atrás"
+      "pt": "1 minuto atrás",
+      "ru": "1 минуту назад"
     },
     "time.months": {
       "zh": "{n} 个月前",
@@ -729,7 +809,8 @@
       "es": "hace {n} meses",
       "fr": "il y a {n} mois",
       "de": "vor {n} Monaten",
-      "pt": "{n} meses atrás"
+      "pt": "{n} meses atrás",
+      "ru": "{n} мес. назад"
     },
     "time.months.one": {
       "zh": "1 个月前",
@@ -738,7 +819,8 @@
       "es": "hace 1 mes",
       "fr": "il y a 1 mois",
       "de": "vor 1 Monat",
-      "pt": "1 mês atrás"
+      "pt": "1 mês atrás",
+      "ru": "1 месяц назад"
     },
     "time.now": {
       "zh": "刚刚",
@@ -747,7 +829,8 @@
       "es": "ahora mismo",
       "fr": "à l’instant",
       "de": "gerade eben",
-      "pt": "agora mesmo"
+      "pt": "agora mesmo",
+      "ru": "только что"
     },
     "time.years": {
       "zh": "{n} 年前",
@@ -756,7 +839,8 @@
       "es": "hace {n} años",
       "fr": "il y a {n} ans",
       "de": "vor {n} Jahren",
-      "pt": "{n} anos atrás"
+      "pt": "{n} anos atrás",
+      "ru": "{n} г. назад"
     },
     "time.years.one": {
       "zh": "1 年前",
@@ -765,7 +849,8 @@
       "es": "hace 1 año",
       "fr": "il y a 1 an",
       "de": "vor 1 Jahr",
-      "pt": "1 ano atrás"
+      "pt": "1 ano atrás",
+      "ru": "1 год назад"
     },
     "title": {
       "zh": "技能自动进化",
@@ -774,7 +859,8 @@
       "es": "Evolución automática de skills",
       "fr": "Auto-évolution des skills",
       "de": "Skill-Evolution",
-      "pt": "Evolução automática de skills"
+      "pt": "Evolução automática de skills",
+      "ru": "Автоэволюция навыков"
     },
     "undo": {
       "zh": "回退到此版",
@@ -783,7 +869,8 @@
       "es": "Restaurar esta versión",
       "fr": "Restaurer cette version",
       "de": "Diese Version wiederherstellen",
-      "pt": "Restaurar esta versão"
+      "pt": "Restaurar esta versão",
+      "ru": "Вернуть эту версию"
     },
     "undo.confirm": {
       "zh": "确认回退（会写入一版，可再回退）",
@@ -792,7 +879,8 @@
       "es": "Confirmar restauración (se escribe una versión; puedes volver a restaurar)",
       "fr": "Confirmer la restauration (écrit une nouvelle version, restaurable ensuite)",
       "de": "Wiederherstellen bestätigen (schreibt eine neue Version; lässt sich erneut zurückrollen)",
-      "pt": "Confirmar restauração (grava uma nova versão; pode ser desfeita)"
+      "pt": "Confirmar restauração (grava uma nova versão; pode ser desfeita)",
+      "ru": "Подтвердить откат (запишется новая версия, откат можно повторить)"
     },
     "undo.confirmUnit": {
       "zh": "确认把这次涉及的多个技能一起回退（会写入新版本，之后仍可回退）",
@@ -801,7 +889,8 @@
       "es": "Confirmar la restauración conjunta de los skills implicados (se escriben versiones nuevas; después aún puedes restaurar)",
       "fr": "Restaurer ensemble tous les skills concernés par cette écriture (une nouvelle version est écrite, restaurable plus tard)",
       "de": "Alle Skills dieses Writes gemeinsam wiederherstellen? Es wird eine neue Version geschrieben, die sich später erneut zurückrollen lässt.",
-      "pt": "Restaurar juntas todas as skills desta escrita? Uma nova versão é gravada e pode ser restaurada depois."
+      "pt": "Restaurar juntas todas as skills desta escrita? Uma nova versão é gravada e pode ser restaurada depois.",
+      "ru": "Откатить все навыки этой записи вместе (запишется новая версия, её тоже можно будет откатить)"
     },
     "undo.no": {
       "zh": "取消",
@@ -810,7 +899,8 @@
       "es": "Cancelar",
       "fr": "Annuler",
       "de": "Abbrechen",
-      "pt": "Cancelar"
+      "pt": "Cancelar",
+      "ru": "Отмена"
     },
     "versions.count": {
       "zh": "{n} 个版本",
@@ -819,7 +909,8 @@
       "es": "{n} versiones",
       "fr": "{n} versions",
       "de": "{n} Versionen",
-      "pt": "{n} versões"
+      "pt": "{n} versões",
+      "ru": "Версий: {n}"
     },
     "workbench.diagnostics": {
       "zh": "诊断",
@@ -828,7 +919,8 @@
       "es": "Diagnóstico",
       "fr": "Diagnostic",
       "de": "Diagnose",
-      "pt": "Diagnóstico"
+      "pt": "Diagnóstico",
+      "ru": "Диагностика"
     },
     "workbench.health": {
       "zh": "健康",
@@ -837,7 +929,8 @@
       "es": "Salud",
       "fr": "Santé",
       "de": "Health",
-      "pt": "Saúde"
+      "pt": "Saúde",
+      "ru": "Здоровье"
     },
     "workbench.history": {
       "zh": "技能历史",
@@ -846,7 +939,8 @@
       "es": "Historial de skills",
       "fr": "Historique des skills",
       "de": "Skill-Historie",
-      "pt": "Histórico de skills"
+      "pt": "Histórico de skills",
+      "ru": "История навыков"
     },
     "workbench.merge": {
       "zh": "合并",
@@ -855,7 +949,8 @@
       "es": "Merge",
       "fr": "Fusion",
       "de": "Merge",
-      "pt": "Merge"
+      "pt": "Merge",
+      "ru": "Объединение"
     },
     "workbench.pending": {
       "zh": "待批",
@@ -864,7 +959,8 @@
       "es": "Pendientes",
       "fr": "En attente",
       "de": "Offen",
-      "pt": "Pendentes"
+      "pt": "Pendentes",
+      "ru": "На одобрении"
     },
     "workbench.title": {
       "zh": "自进化",
@@ -873,7 +969,8 @@
       "es": "Evolución",
       "fr": "Auto-évolution",
       "de": "Selbstevolution",
-      "pt": "Autoevolução"
+      "pt": "Autoevolução",
+      "ru": "Самоэволюция"
     }
   }
 }

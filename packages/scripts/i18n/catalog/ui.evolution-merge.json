@@ -9,7 +9,8 @@
       "es": "Copiar el comando de aprobación",
       "fr": "Copier la commande d’approbation",
       "de": "Freigabe-Befehl kopieren",
-      "pt": "Copiar comando de aprovação"
+      "pt": "Copiar comando de aprovação",
+      "ru": "Скопировать команду одобрения"
     },
     "action.cancel": {
       "zh": "复制取消命令",
@@ -18,7 +19,8 @@
       "es": "Copiar el comando de cancelación",
       "fr": "Copier la commande d’annulation",
       "de": "Abbruch-Befehl kopieren",
-      "pt": "Copiar comando de cancelamento"
+      "pt": "Copiar comando de cancelamento",
+      "ru": "Скопировать команду отмены"
     },
     "action.confirm": {
       "zh": "确认复制",
@@ -27,7 +29,8 @@
       "es": "Confirmar copia",
       "fr": "Confirmer la copie",
       "de": "Bestätigung kopieren",
-      "pt": "Copiar confirmação"
+      "pt": "Copiar confirmação",
+      "ru": "Подтвердите копирование:"
     },
     "action.discard": {
       "zh": "复制丢弃命令",
@@ -36,7 +39,8 @@
       "es": "Copiar el comando de descarte",
       "fr": "Copier la commande de rejet",
       "de": "Verwerfen-Befehl kopieren",
-      "pt": "Copiar comando de descarte"
+      "pt": "Copiar comando de descarte",
+      "ru": "Скопировать команду отбрасывания"
     },
     "action.pair": {
       "zh": "复制配对",
@@ -45,7 +49,8 @@
       "es": "Copiar el comando de emparejamiento",
       "fr": "Copier la paire",
       "de": "Paarung kopieren",
-      "pt": "Copiar par"
+      "pt": "Copiar par",
+      "ru": "Скопировать пару"
     },
     "action.reject": {
       "zh": "复制拒绝命令",
@@ -54,7 +59,8 @@
       "es": "Copiar el comando de rechazo",
       "fr": "Copier la commande de refus",
       "de": "Ablehnungs-Befehl kopieren",
-      "pt": "Copiar comando de rejeição"
+      "pt": "Copiar comando de rejeição",
+      "ru": "Скопировать команду отклонения"
     },
     "action.report": {
       "zh": "复制报告命令",
@@ -63,7 +69,8 @@
       "es": "Copiar el comando de informe",
       "fr": "Copier la commande de rapport",
       "de": "Report-Befehl kopieren",
-      "pt": "Copiar comando de relatório"
+      "pt": "Copiar comando de relatório",
+      "ru": "Скопировать команду отчёта"
     },
     "action.restore": {
       "zh": "复制恢复命令",
@@ -72,7 +79,8 @@
       "es": "Copiar el comando de restauración",
       "fr": "Copier la commande de restauration",
       "de": "Wiederherstellen-Befehl kopieren",
-      "pt": "Copiar comando de restauração"
+      "pt": "Copiar comando de restauração",
+      "ru": "Скопировать команду восстановления"
     },
     "action.retry-candidates": {
       "zh": "复制重试命令",
@@ -81,7 +89,8 @@
       "es": "Copiar el comando de reintento",
       "fr": "Copier la commande de nouvelle tentative",
       "de": "Wiederholen-Befehl kopieren",
-      "pt": "Copiar comando de nova tentativa"
+      "pt": "Copiar comando de nova tentativa",
+      "ru": "Скопировать команду повтора"
     },
     "action.retry-resume": {
       "zh": "复制继续运行命令",
@@ -90,7 +99,8 @@
       "es": "Copiar el comando para reanudar",
       "fr": "Copier la commande de reprise",
       "de": "Fortsetzen-Befehl kopieren",
-      "pt": "Copiar comando de retomada"
+      "pt": "Copiar comando de retomada",
+      "ru": "Скопировать команду продолжения"
     },
     "action.status": {
       "zh": "复制状态命令",
@@ -99,7 +109,8 @@
       "es": "Copiar el comando de estado",
       "fr": "Copier la commande d’état",
       "de": "Status-Befehl kopieren",
-      "pt": "Copiar comando de status"
+      "pt": "Copiar comando de status",
+      "ru": "Скопировать команду состояния"
     },
     "action.unavailable": {
       "zh": "不可用",
@@ -108,7 +119,8 @@
       "es": "No disponible",
       "fr": "Indisponible",
       "de": "Nicht verfügbar",
-      "pt": "Indisponível"
+      "pt": "Indisponível",
+      "ru": "Недоступно"
     },
     "approval.off": {
       "zh": "审批关：合并自动执行。",
@@ -117,7 +129,8 @@
       "es": "Aprobación desactivada: el merge se ejecuta solo.",
       "fr": "Approbation désactivée : les fusions s’exécutent automatiquement.",
       "de": "Freigabe aus: Merges laufen automatisch.",
-      "pt": "Aprovação desativada: o merge é executado automaticamente."
+      "pt": "Aprovação desativada: o merge é executado automaticamente.",
+      "ru": "Одобрение выключено: объединения выполняются сами."
     },
     "approval.on": {
       "zh": "审批开：合并前需人工批准。",
@@ -126,7 +139,8 @@
       "es": "Aprobación activada: el merge necesita aprobación manual.",
       "fr": "Approbation activée : les fusions attendent une approbation humaine.",
       "de": "Freigabe an: Merges warten auf eine Person.",
-      "pt": "Aprovação ativada: o merge aguarda uma pessoa."
+      "pt": "Aprovação ativada: o merge aguarda uma pessoa.",
+      "ru": "Одобрение включено: перед объединением нужно одобрение человека."
     },
     "blocked.detail": {
       "zh": "查看原始信息",
@@ -135,7 +149,8 @@
       "es": "Ver el mensaje original",
       "fr": "Afficher le message d’origine",
       "de": "Host-Meldung anzeigen",
-      "pt": "Ver mensagem original"
+      "pt": "Ver mensagem original",
+      "ru": "Показать сообщение хоста"
     },
     "blocked.doctor": {
       "zh": "复制诊断命令",
@@ -144,7 +159,8 @@
       "es": "Copiar el comando de diagnóstico",
       "fr": "Copier la commande de diagnostic",
       "de": "Diagnose-Befehl kopieren",
-      "pt": "Copiar comando de diagnóstico"
+      "pt": "Copiar comando de diagnóstico",
+      "ru": "Скопировать команду диагностики"
     },
     "blocked.hint": {
       "zh": "修好合并数据后再刷新；面板不会自动退回旧数据。",
@@ -153,7 +169,8 @@
       "es": "Arregla los datos del merge y luego actualiza; el panel no vuelve por su cuenta a datos antiguos.",
       "fr": "Réparez les données de fusion puis actualisez ; le panneau ne revient pas tout seul aux anciennes données.",
       "de": "Merge-Daten reparieren und dann aktualisieren; das Panel fällt nicht von selbst auf ältere Daten zurück.",
-      "pt": "Corrija os dados de merge e atualize; o painel não volta sozinho para dados antigos."
+      "pt": "Corrija os dados de merge e atualize; o painel não volta sozinho para dados antigos.",
+      "ru": "Исправьте данные объединения и обновите; сама панель к старым данным не вернётся."
     },
     "blocked.reason.forward-only": {
       "zh": "合并状态版本过新，当前面板暂不支持。",
@@ -162,7 +179,8 @@
       "es": "El estado del merge es más nuevo de lo que admite este panel.",
       "fr": "L’état de fusion a été écrit par une version plus récente ; ce panneau ne peut pas le lire.",
       "de": "Der Merge-Status stammt aus einer neueren Version; dieses Panel kann ihn nicht lesen.",
-      "pt": "O estado de merge foi gravado por uma versão mais nova; este painel não consegue lê-lo."
+      "pt": "O estado de merge foi gravado por uma versão mais nova; este painel não consegue lê-lo.",
+      "ru": "Состояние объединения записано более новой версией; эта панель его не читает."
     },
     "blocked.reason.migration-blocked": {
       "zh": "合并数据需要升级，面板已暂停读取。",
@@ -171,7 +189,8 @@
       "es": "Los datos del merge necesitan una actualización; el panel ha dejado de leerlos.",
       "fr": "Les données de fusion doivent être migrées ; la lecture est en pause.",
       "de": "Die Merge-Daten brauchen ein Upgrade; das Lesen ist pausiert.",
-      "pt": "Os dados de merge precisam de atualização; a leitura está pausada."
+      "pt": "Os dados de merge precisam de atualização; a leitura está pausada.",
+      "ru": "Данные объединения нужно обновить; чтение приостановлено."
     },
     "blocked.reason.needs-repair": {
       "zh": "合并状态需要修复，面板已暂停读取。",
@@ -180,7 +199,8 @@
       "es": "El estado del merge necesita reparación; el panel ha dejado de leerlo.",
       "fr": "L’état de fusion doit être réparé ; le panneau est en pause.",
       "de": "Der Merge-Status muss repariert werden; das Lesen ist pausiert.",
-      "pt": "O estado de merge precisa de reparo; a leitura está pausada."
+      "pt": "O estado de merge precisa de reparo; a leitura está pausada.",
+      "ru": "Состояние объединения требует исправления; чтение приостановлено."
     },
     "blocked.reason.unknown": {
       "zh": "合并状态未就绪，面板已暂停读取。",
@@ -189,7 +209,8 @@
       "es": "El estado del merge no está listo; el panel ha dejado de leerlo.",
       "fr": "L’état de fusion n’est pas prêt ; le panneau est en pause.",
       "de": "Der Merge-Status ist nicht bereit; das Lesen ist pausiert.",
-      "pt": "O estado de merge não está pronto; a leitura está pausada."
+      "pt": "O estado de merge não está pronto; a leitura está pausada.",
+      "ru": "Состояние объединения не готово; чтение приостановлено."
     },
     "blocked.title": {
       "zh": "合并状态未就绪",
@@ -198,7 +219,8 @@
       "es": "El estado del merge no está listo",
       "fr": "État de fusion bloqué",
       "de": "Merge-Status blockiert",
-      "pt": "Estado de merge bloqueado"
+      "pt": "Estado de merge bloqueado",
+      "ru": "Состояние объединения не готово"
     },
     "body.archive": {
       "zh": "归档版本",
@@ -207,7 +229,8 @@
       "es": "Versión archivada",
       "fr": "Version archivée",
       "de": "Archiv",
-      "pt": "Versão arquivada"
+      "pt": "Versão arquivada",
+      "ru": "Архивная версия"
     },
     "body.empty": {
       "zh": "正文为空。",
@@ -216,7 +239,8 @@
       "es": "El cuerpo está vacío.",
       "fr": "Le texte est vide.",
       "de": "Der Text ist leer.",
-      "pt": "O corpo está vazio."
+      "pt": "O corpo está vazio.",
+      "ru": "Текст пуст."
     },
     "body.live": {
       "zh": "当前版本",
@@ -225,7 +249,8 @@
       "es": "Versión actual",
       "fr": "Version actuelle",
       "de": "Aktuell",
-      "pt": "Versão atual"
+      "pt": "Versão atual",
+      "ru": "Текущая версия"
     },
     "body.missing": {
       "zh": "正文不存在或不可读。",
@@ -234,7 +259,8 @@
       "es": "El cuerpo no existe o no se puede leer.",
       "fr": "Texte absent ou illisible.",
       "de": "Text fehlt oder ist nicht lesbar.",
-      "pt": "O corpo não existe ou não pode ser lido."
+      "pt": "O corpo não existe ou não pode ser lido.",
+      "ru": "Текста нет или он не читается."
     },
     "body.totalBytes": {
       "zh": "总字节",
@@ -243,7 +269,8 @@
       "es": "Bytes totales",
       "fr": "Octets au total",
       "de": "Bytes gesamt",
-      "pt": "Total de bytes"
+      "pt": "Total de bytes",
+      "ru": "Всего байт"
     },
     "body.truncated": {
       "zh": "正文过长，已截断。",
@@ -252,7 +279,8 @@
       "es": "El cuerpo es largo y se ha truncado.",
       "fr": "Texte trop long, tronqué.",
       "de": "Der Text ist zu lang und wurde gekürzt.",
-      "pt": "O corpo é longo e foi truncado."
+      "pt": "O corpo é longo e foi truncado.",
+      "ru": "Текст слишком длинный, обрезан."
     },
     "close": {
       "zh": "关闭",
@@ -261,7 +289,8 @@
       "es": "Cerrar",
       "fr": "Fermer",
       "de": "Schließen",
-      "pt": "Fechar"
+      "pt": "Fechar",
+      "ru": "Закрыть"
     },
     "copied": {
       "zh": "已复制：",
@@ -270,7 +299,8 @@
       "es": "Copiado: ",
       "fr": "Copié :",
       "de": "Kopiert: ",
-      "pt": "Copiado:"
+      "pt": "Copiado:",
+      "ru": "Скопировано: "
     },
     "copyFailed": {
       "zh": "复制失败：浏览器没有接受剪贴板写入。",
@@ -279,7 +309,8 @@
       "es": "No se pudo copiar: el navegador no aceptó la escritura en el portapapeles.",
       "fr": "Copie impossible : le navigateur n’a pas accepté l’écriture dans le presse-papiers.",
       "de": "Kopieren fehlgeschlagen: Der Browser hat das Schreiben in die Zwischenablage nicht angenommen.",
-      "pt": "Falha ao copiar: o navegador não aceitou a gravação na área de transferência."
+      "pt": "Falha ao copiar: o navegador não aceitou a gravação na área de transferência.",
+      "ru": "Не удалось скопировать: браузер отклонил запись в буфер обмена."
     },
     "copyRetry": {
       "zh": "重试复制",
@@ -288,7 +319,8 @@
       "es": "Reintentar copia",
       "fr": "Réessayer la copie",
       "de": "Kopieren erneut versuchen",
-      "pt": "Tentar copiar novamente"
+      "pt": "Tentar copiar novamente",
+      "ru": "Повторить копирование"
     },
     "decide.failed": {
       "zh": "审批请求失败",
@@ -297,7 +329,8 @@
       "es": "La solicitud de aprobación falló",
       "fr": "La demande d’approbation a échoué",
       "de": "Freigabe-Anfrage fehlgeschlagen",
-      "pt": "A solicitação de aprovação falhou"
+      "pt": "A solicitação de aprovação falhou",
+      "ru": "Запрос одобрения не выполнен"
     },
     "decision.approve": {
       "zh": "批准",
@@ -306,7 +339,8 @@
       "es": "Aprobar",
       "fr": "Approuver",
       "de": "Freigeben",
-      "pt": "Aprovar"
+      "pt": "Aprovar",
+      "ru": "Одобрить"
     },
     "decision.reject": {
       "zh": "拒绝",
@@ -315,7 +349,8 @@
       "es": "Rechazar",
       "fr": "Rejeter",
       "de": "Ablehnen",
-      "pt": "Rejeitar"
+      "pt": "Rejeitar",
+      "ru": "Отклонить"
     },
     "degraded": {
       "zh": "读取结果不完整：",
@@ -324,7 +359,8 @@
       "es": "Resultado de lectura incompleto: ",
       "fr": "Lecture incomplète :",
       "de": "Unvollständiges Lesen: ",
-      "pt": "Leitura incompleta:"
+      "pt": "Leitura incompleta:",
+      "ru": "Данные прочитаны не полностью: "
     },
     "disabled.expired": {
       "zh": "已过期，不可用",
@@ -333,7 +369,8 @@
       "es": "Caducado, no disponible",
       "fr": "expiré",
       "de": "abgelaufen",
-      "pt": "expirado"
+      "pt": "expirado",
+      "ru": "истекло"
     },
     "disabled.invalid": {
       "zh": "状态不允许",
@@ -342,7 +379,8 @@
       "es": "El estado no lo permite",
       "fr": "état invalide",
       "de": "im aktuellen Zustand nicht möglich",
-      "pt": "estado inválido"
+      "pt": "estado inválido",
+      "ru": "недопустимое состояние"
     },
     "disabled.not-retryable": {
       "zh": "不可重试",
@@ -351,7 +389,8 @@
       "es": "No se puede reintentar",
       "fr": "non réessayable",
       "de": "nicht wiederholbar",
-      "pt": "não repetível"
+      "pt": "não repetível",
+      "ru": "повтор невозможен"
     },
     "disabled.owned": {
       "zh": "已有运行",
@@ -360,7 +399,8 @@
       "es": "Ya hay una ejecución",
       "fr": "déjà en cours",
       "de": "läuft bereits",
-      "pt": "já em execução"
+      "pt": "já em execução",
+      "ru": "уже выполняется"
     },
     "disabled.source-gone": {
       "zh": "源已缺失",
@@ -369,7 +409,8 @@
       "es": "Falta el origen",
       "fr": "source absente",
       "de": "Quelle fehlt",
-      "pt": "origem ausente"
+      "pt": "origem ausente",
+      "ru": "исходный навык пропал"
     },
     "disabled.unavailable": {
       "zh": "暂不可用",
@@ -378,7 +419,8 @@
       "es": "No disponible por ahora",
       "fr": "indisponible",
       "de": "nicht verfügbar",
-      "pt": "indisponível"
+      "pt": "indisponível",
+      "ru": "пока недоступно"
     },
     "doctor.open": {
       "zh": "复制诊断命令",
@@ -387,7 +429,8 @@
       "es": "Copiar el comando de diagnóstico",
       "fr": "Copier la commande de diagnostic",
       "de": "Diagnose-Befehl kopieren",
-      "pt": "Copiar comando de diagnóstico"
+      "pt": "Copiar comando de diagnóstico",
+      "ru": "Скопировать команду диагностики"
     },
     "empty.fuse": {
       "zh": "没有待合并的对。",
@@ -396,7 +439,8 @@
       "es": "No hay pares listos para merge.",
       "fr": "Aucune paire prête à fusionner.",
       "de": "Keine Paare bereit zum Merge.",
-      "pt": "Nenhum par pronto para merge."
+      "pt": "Nenhum par pronto para merge.",
+      "ru": "Нет пар, готовых к объединению."
     },
     "empty.pending": {
       "zh": "没有待批准的合并。",
@@ -405,7 +449,8 @@
       "es": "No hay merges pendientes de aprobación.",
       "fr": "Aucune fusion en attente d’approbation.",
       "de": "Keine Merges warten auf Freigabe.",
-      "pt": "Nenhum merge aguardando aprovação."
+      "pt": "Nenhum merge aguardando aprovação.",
+      "ru": "Нет объединений, ожидающих одобрения."
     },
     "empty.scope": {
       "zh": "这里只处理两轮合并；单纯追加内容属于技能管理，不会进入合并队列。",
@@ -414,7 +459,8 @@
       "es": "Aquí solo se tratan merges de dos rondas; añadir contenido suelto es gestión de skills y no entra en la cola de merge.",
       "fr": "Seules les fusions en deux tours sont traitées ici ; un simple ajout de contenu relève de la gestion des skills et n’entre jamais dans cette file.",
       "de": "Hier laufen nur Zwei-Runden-Merges; reines Anhängen gehört zur Skill-Verwaltung und landet nie in dieser Warteschlange.",
-      "pt": "Aqui só são tratados merges de duas rodadas; acréscimos simples pertencem ao gerenciamento de skills e não entram nesta fila."
+      "pt": "Aqui só são tratados merges de duas rodadas; acréscimos simples pertencem ao gerenciamento de skills e não entram nesta fila.",
+      "ru": "Здесь обрабатываются только двухраундовые объединения; обычное дополнение содержимого относится к управлению навыками и в очередь не попадает."
     },
     "empty.skipped": {
       "zh": "没有标记为无需合并的对。",
@@ -423,7 +469,8 @@
       "es": "No hay pares marcados como innecesarios de merge.",
       "fr": "Aucune paire marquée comme sans fusion nécessaire.",
       "de": "Keine Paare als nicht mergebedürftig markiert.",
-      "pt": "Nenhum par marcado como sem necessidade de merge."
+      "pt": "Nenhum par marcado como sem necessidade de merge.",
+      "ru": "Нет пар, помеченных как не требующие объединения."
     },
     "empty.verify": {
       "zh": "没有待判断的对。",
@@ -432,7 +479,8 @@
       "es": "No hay pares pendientes de juicio.",
       "fr": "Aucune paire à juger.",
       "de": "Keine Paare zu beurteilen.",
-      "pt": "Nenhum par para julgar."
+      "pt": "Nenhum par para julgar.",
+      "ru": "Нет пар, ожидающих решения."
     },
     "entry.label": {
       "zh": "技能合并",
@@ -441,7 +489,8 @@
       "es": "Merge de skills",
       "fr": "Fusion des skills",
       "de": "Skill-Merge",
-      "pt": "Merge de skills"
+      "pt": "Merge de skills",
+      "ru": "Объединение навыков"
     },
     "error.raw": {
       "zh": "原始信息",
@@ -450,7 +499,8 @@
       "es": "Mensaje original",
       "fr": "Message brut",
       "de": "Roh-Meldung",
-      "pt": "Mensagem original"
+      "pt": "Mensagem original",
+      "ru": "Исходное сообщение"
     },
     "error.retry": {
       "zh": "重试",
@@ -459,7 +509,8 @@
       "es": "Reintentar",
       "fr": "Réessayer",
       "de": "Erneut versuchen",
-      "pt": "Tentar novamente"
+      "pt": "Tentar novamente",
+      "ru": "Повторить"
     },
     "error.title": {
       "zh": "读取失败",
@@ -468,7 +519,8 @@
       "es": "No se pudo leer",
       "fr": "Échec de lecture",
       "de": "Lesen fehlgeschlagen",
-      "pt": "Falha na leitura"
+      "pt": "Falha na leitura",
+      "ru": "Не удалось прочитать"
     },
     "expired.skipped-ttl": {
       "zh": "跳过已到期",
@@ -477,7 +529,8 @@
       "es": "Se omitió por caducidad",
       "fr": "ignoré : expiré",
       "de": "abgelaufen übersprungen",
-      "pt": "ignorado por expiração"
+      "pt": "ignorado por expiração",
+      "ru": "пропущено: истёк срок"
     },
     "expired.source-changed": {
       "zh": "源已变更",
@@ -486,7 +539,8 @@
       "es": "El origen cambió",
       "fr": "source modifiée",
       "de": "Quelle geändert",
-      "pt": "origem alterada"
+      "pt": "origem alterada",
+      "ru": "исходный навык изменился"
     },
     "expired.source-gone": {
       "zh": "源已缺失",
@@ -495,7 +549,8 @@
       "es": "Falta el origen",
       "fr": "source absente",
       "de": "Quelle fehlt",
-      "pt": "origem ausente"
+      "pt": "origem ausente",
+      "ru": "исходный навык пропал"
     },
     "expired.target-taken": {
       "zh": "目标已被占用",
@@ -504,7 +559,8 @@
       "es": "El destino ya está ocupado",
       "fr": "cible déjà prise",
       "de": "Ziel belegt",
-      "pt": "destino já ocupado"
+      "pt": "destino já ocupado",
+      "ru": "цель занята"
     },
     "failed": {
       "zh": "读取失败，保留上次结果。",
@@ -513,7 +569,8 @@
       "es": "La lectura falló; se mantiene el último resultado.",
       "fr": "Lecture échouée ; dernier résultat conservé.",
       "de": "Lesen fehlgeschlagen; das letzte Ergebnis bleibt stehen.",
-      "pt": "Falha na leitura; mantendo o último resultado."
+      "pt": "Falha na leitura; mantendo o último resultado.",
+      "ru": "Не удалось прочитать; показан прошлый результат."
     },
     "failureBadQuery": {
       "zh": "请求已失效，请刷新后重试。",
@@ -522,7 +579,8 @@
       "es": "La solicitud ya no vale; actualiza y reintenta.",
       "fr": "Cette requête n’est plus valide ; actualisez puis réessayez.",
       "de": "Die Anfrage ist veraltet; aktualisiere und versuche es erneut.",
-      "pt": "Esta solicitação expirou; atualize e tente novamente."
+      "pt": "Esta solicitação expirou; atualize e tente novamente.",
+      "ru": "Запрос устарел; обновите и повторите."
     },
     "failureBodyAmbiguous": {
       "zh": "同名技能匹配到多行，无法确定读取哪一个；请用唯一名称或从具体行打开。",
@@ -531,7 +589,8 @@
       "es": "Varias filas coinciden con ese nombre de skill y no se puede saber cuál leer; usa un nombre único o ábrelo desde la fila concreta.",
       "fr": "Ce nom de skill correspond à plusieurs lignes : impossible de savoir laquelle lire. Utilisez un nom unique ou ouvrez-le depuis une ligne précise.",
       "de": "Der Skill-Name passt auf mehrere Zeilen, der Text ist nicht eindeutig. Nutze einen eindeutigen Namen oder öffne den Text aus der passenden Zeile.",
-      "pt": "O nome da skill corresponde a várias linhas, então o corpo é ambíguo. Use um nome único ou abra a partir de uma linha específica."
+      "pt": "O nome da skill corresponde a várias linhas, então o corpo é ambíguo. Use um nome único ou abra a partir de uma linha específica.",
+      "ru": "Имя навыка совпадает с несколькими строками, непонятно, какую читать. Укажите уникальное имя или откройте навык из нужной строки."
     },
     "failureBodyMissing": {
       "zh": "正文不存在或不可读。",
@@ -540,7 +599,8 @@
       "es": "El cuerpo no existe o no se puede leer.",
       "fr": "Texte absent ou illisible.",
       "de": "Text fehlt oder ist nicht lesbar.",
-      "pt": "O corpo não existe ou não pode ser lido."
+      "pt": "O corpo não existe ou não pode ser lido.",
+      "ru": "Текста нет или он не читается."
     },
     "failureCapability": {
       "zh": "子代理通道不可用",
@@ -549,7 +609,8 @@
       "es": "El canal de subagentes no está disponible",
       "fr": "Canal de sous-agent indisponible",
       "de": "Subagent-Kanal nicht verfügbar",
-      "pt": "Canal de subagente indisponível"
+      "pt": "Canal de subagente indisponível",
+      "ru": "Канал субагентов недоступен"
     },
     "failureCapabilityHint": {
       "zh": "先运行全局诊断，或复制下方命令继续处理。没有面板的安装方式（preset / host-only）仍可用这些命令。",
@@ -558,7 +619,8 @@
       "es": "Ejecuta antes el diagnóstico global o copia el comando de abajo para seguir. Las instalaciones sin panel (preset / host-only) también pueden usar estos comandos.",
       "fr": "Lancez d’abord le diagnostic global, ou copiez une commande ci-dessous pour continuer. Les installations sans panneau (preset / host-only) peuvent aussi utiliser ces commandes.",
       "de": "Zuerst die globale Diagnose ausführen oder einen Befehl unten kopieren. Installationen ohne Panel (preset / host-only) können diese Befehle ebenfalls nutzen.",
-      "pt": "Execute o diagnóstico global primeiro ou copie um comando abaixo. Instalações sem o painel (preset / host-only) ainda podem usar esses comandos."
+      "pt": "Execute o diagnóstico global primeiro ou copie um comando abaixo. Instalações sem o painel (preset / host-only) ainda podem usar esses comandos.",
+      "ru": "Сначала запустите общую диагностику или скопируйте команду ниже. Установки без панели (preset / host-only) тоже могут пользоваться этими командами."
     },
     "failureDetails": {
       "zh": "查看详情",
@@ -567,7 +629,8 @@
       "es": "Ver detalles",
       "fr": "Afficher les détails",
       "de": "Details anzeigen",
-      "pt": "Ver detalhes"
+      "pt": "Ver detalhes",
+      "ru": "Показать подробности"
     },
     "failureFallback": {
       "zh": "可复制命令见下方",
@@ -576,7 +639,8 @@
       "es": "Abajo tienes comandos que puedes copiar",
       "fr": "Commandes à copier ci-dessous",
       "de": "Befehl unten kopieren",
-      "pt": "Copie um comando abaixo"
+      "pt": "Copie um comando abaixo",
+      "ru": "Команду можно скопировать ниже"
     },
     "failureForbidden": {
       "zh": "无权访问",
@@ -585,7 +649,8 @@
       "es": "Sin acceso",
       "fr": "Accès refusé",
       "de": "Kein Zugriff",
-      "pt": "Sem acesso"
+      "pt": "Sem acesso",
+      "ru": "Нет доступа"
     },
     "failureRefused": {
       "zh": "宿主拒绝了这次读取。",
@@ -594,7 +659,8 @@
       "es": "El host rechazó esta lectura.",
       "fr": "L’hôte a refusé cette lecture.",
       "de": "Der Host hat dieses Lesen abgelehnt.",
-      "pt": "O host recusou esta leitura."
+      "pt": "O host recusou esta leitura.",
+      "ru": "Хост отклонил это чтение."
     },
     "failureServer": {
       "zh": "读取失败",
@@ -603,7 +669,8 @@
       "es": "La lectura falló",
       "fr": "Échec de lecture",
       "de": "Lesen fehlgeschlagen",
-      "pt": "Falha na leitura"
+      "pt": "Falha na leitura",
+      "ru": "Не удалось прочитать"
     },
     "failureUnauthorized": {
       "zh": "未登录",
@@ -612,7 +679,8 @@
       "es": "Sesión no iniciada",
       "fr": "Non connecté",
       "de": "Nicht angemeldet",
-      "pt": "Não autenticado"
+      "pt": "Não autenticado",
+      "ru": "Вход не выполнен"
     },
     "failureUnmounted": {
       "zh": "功能未启用",
@@ -621,7 +689,8 @@
       "es": "Función no activada",
       "fr": "Fonction non activée",
       "de": "Funktion nicht aktiviert",
-      "pt": "Recurso não ativado"
+      "pt": "Recurso não ativado",
+      "ru": "Функция не включена"
     },
     "failureWireVersion": {
       "zh": "宿主返回了不兼容的数据版本，请升级页面。",
@@ -630,7 +699,8 @@
       "es": "El host devolvió una versión de datos incompatible; actualiza la página.",
       "fr": "L’hôte a renvoyé une version de données incompatible ; rechargez la page.",
       "de": "Der Host hat eine inkompatible Datenversion geliefert; lade die Seite neu.",
-      "pt": "O host retornou uma versão de dados incompatível; recarregue a página."
+      "pt": "O host retornou uma versão de dados incompatível; recarregue a página.",
+      "ru": "Хост вернул несовместимую версию данных. Перезагрузите страницу."
     },
     "fallbackHint": {
       "zh": "可复制命令见下方",
@@ -639,7 +709,8 @@
       "es": "Abajo tienes comandos que puedes copiar",
       "fr": "Copiez la commande ci-dessous",
       "de": "Befehl unten kopieren",
-      "pt": "Copie o comando abaixo"
+      "pt": "Copie o comando abaixo",
+      "ru": "Команду можно скопировать ниже"
     },
     "hint": {
       "zh": "先处理需要判断的合并，其他信息按需展开。",
@@ -648,7 +719,8 @@
       "es": "Empieza por los merges que hay que juzgar; el resto de la información se despliega cuando haga falta.",
       "fr": "Traitez d’abord les fusions qui demandent une décision ; le reste s’ouvre au besoin.",
       "de": "Erst die Merges erledigen, die eine Entscheidung brauchen; alles andere bleibt eingeklappt.",
-      "pt": "Resolva primeiro os merges que precisam de decisão; o resto fica recolhido."
+      "pt": "Resolva primeiro os merges que precisam de decisão; o resto fica recolhido.",
+      "ru": "Сначала разберите объединения, ждущие решения; остальное раскрывается по мере нужды."
     },
     "history": {
       "zh": "历史",
@@ -657,7 +729,8 @@
       "es": "Historial",
       "fr": "Historique",
       "de": "Verlauf",
-      "pt": "Histórico"
+      "pt": "Histórico",
+      "ru": "История"
     },
     "history.archivedAt": {
       "zh": "归档于 {date}",
@@ -666,7 +739,8 @@
       "es": "Archivado el {date}",
       "fr": "Archivé le {date}",
       "de": "Archiviert am {date}",
-      "pt": "Arquivado em {date}"
+      "pt": "Arquivado em {date}",
+      "ru": "Зархивировано {date}"
     },
     "history.archivedAtUnknown": {
       "zh": "归档时间未知",
@@ -675,7 +749,8 @@
       "es": "Fecha de archivo desconocida",
       "fr": "Date d’archivage inconnue",
       "de": "Archivzeit unbekannt",
-      "pt": "Data de arquivamento desconhecida"
+      "pt": "Data de arquivamento desconhecida",
+      "ru": "Время архивации неизвестно"
     },
     "history.empty": {
       "zh": "没有历史。",
@@ -684,7 +759,8 @@
       "es": "Sin historial.",
       "fr": "Aucun historique.",
       "de": "Kein Verlauf.",
-      "pt": "Sem histórico."
+      "pt": "Sem histórico.",
+      "ru": "Истории нет."
     },
     "history.kind.deleted": {
       "zh": "已删除",
@@ -693,7 +769,8 @@
       "es": "Eliminado",
       "fr": "Supprimé",
       "de": "Gelöscht",
-      "pt": "Excluído"
+      "pt": "Excluído",
+      "ru": "Удалено"
     },
     "history.kind.merged": {
       "zh": "已合并",
@@ -702,7 +779,8 @@
       "es": "Mergeado",
       "fr": "Fusionné",
       "de": "Gemergt",
-      "pt": "Com merge"
+      "pt": "Com merge",
+      "ru": "Объединено"
     },
     "history.kind.other": {
       "zh": "其他",
@@ -711,7 +789,8 @@
       "es": "Otro",
       "fr": "Autre",
       "de": "Sonstiges",
-      "pt": "Outro"
+      "pt": "Outro",
+      "ru": "Другое"
     },
     "history.kind.split": {
       "zh": "已拆分",
@@ -720,7 +799,8 @@
       "es": "Dividido",
       "fr": "Scindé",
       "de": "Geteilt",
-      "pt": "Separado"
+      "pt": "Separado",
+      "ru": "Разделено"
     },
     "history.lastVersion": {
       "zh": "最后版本",
@@ -729,7 +809,8 @@
       "es": "Última versión",
       "fr": "Dernière version",
       "de": "Letzte Version",
-      "pt": "Última versão"
+      "pt": "Última versão",
+      "ru": "Последняя версия"
     },
     "history.reason.archived": {
       "zh": "已归档",
@@ -738,7 +819,8 @@
       "es": "Archivado",
       "fr": "archivé",
       "de": "archiviert",
-      "pt": "arquivado"
+      "pt": "arquivado",
+      "ru": "заархивировано"
     },
     "history.reason.kept": {
       "zh": "无需合并",
@@ -747,7 +829,8 @@
       "es": "No hacía falta merge",
       "fr": "sans fusion nécessaire",
       "de": "kein Merge nötig",
-      "pt": "sem necessidade de merge"
+      "pt": "sem necessidade de merge",
+      "ru": "объединение не требуется"
     },
     "history.reason.merge-over-limit": {
       "zh": "融合后超出字数上限",
@@ -756,7 +839,8 @@
       "es": "Tras el merge superaba el límite de caracteres",
       "fr": "le skill fusionné dépasse la limite de caractères",
       "de": "gemergter Skill überschreitet das Zeichenlimit",
-      "pt": "o merge passa do limite de caracteres"
+      "pt": "o merge passa do limite de caracteres",
+      "ru": "после объединения навык превышает лимит символов"
     },
     "history.reason.merged": {
       "zh": "已合并",
@@ -765,7 +849,8 @@
       "es": "Se hizo el merge",
       "fr": "fusionné",
       "de": "gemergt",
-      "pt": "merge feito"
+      "pt": "merge feito",
+      "ru": "объединено"
     },
     "history.reason.rejected": {
       "zh": "人工拒绝合并",
@@ -774,7 +859,8 @@
       "es": "Merge rechazado a mano",
       "fr": "fusion rejetée par l’utilisateur",
       "de": "vom Nutzer abgelehnt",
-      "pt": "merge rejeitado pelo usuário"
+      "pt": "merge rejeitado pelo usuário",
+      "ru": "объединение отклонено пользователем"
     },
     "history.reason.skipped-ttl": {
       "zh": "跳过已到期",
@@ -783,7 +869,8 @@
       "es": "Se omitió por caducidad",
       "fr": "ignoré : expiré",
       "de": "abgelaufen übersprungen",
-      "pt": "ignorado por expiração"
+      "pt": "ignorado por expiração",
+      "ru": "пропущено: истёк срок"
     },
     "history.reason.source-changed": {
       "zh": "源已变更",
@@ -792,7 +879,8 @@
       "es": "El origen cambió",
       "fr": "source modifiée",
       "de": "Quelle geändert",
-      "pt": "origem alterada"
+      "pt": "origem alterada",
+      "ru": "исходный навык изменился"
     },
     "history.reason.source-gone": {
       "zh": "源已缺失",
@@ -801,7 +889,8 @@
       "es": "Falta el origen",
       "fr": "source absente",
       "de": "Quelle fehlt",
-      "pt": "origem ausente"
+      "pt": "origem ausente",
+      "ru": "исходный навык пропал"
     },
     "history.reason.target-taken": {
       "zh": "目标已被占用",
@@ -810,7 +899,8 @@
       "es": "El destino ya está ocupado",
       "fr": "cible déjà prise",
       "de": "Ziel belegt",
-      "pt": "destino já ocupado"
+      "pt": "destino já ocupado",
+      "ru": "цель занята"
     },
     "history.reason.unknown": {
       "zh": "原因未提供",
@@ -819,7 +909,8 @@
       "es": "Sin motivo indicado",
       "fr": "raison non fournie",
       "de": "kein Grund angegeben",
-      "pt": "motivo não informado"
+      "pt": "motivo não informado",
+      "ru": "причина не указана"
     },
     "history.reason.validation-failed": {
       "zh": "检查失败",
@@ -828,7 +919,8 @@
       "es": "Falló la comprobación",
       "fr": "vérification échouée",
       "de": "Prüfung fehlgeschlagen",
-      "pt": "validação falhou"
+      "pt": "validação falhou",
+      "ru": "проверка не пройдена"
     },
     "history.sourceRunId": {
       "zh": "来源运行",
@@ -837,7 +929,8 @@
       "es": "Ejecución de origen",
       "fr": "Exécution d’origine",
       "de": "Ursprungslauf",
-      "pt": "Execução de origem"
+      "pt": "Execução de origem",
+      "ru": "Исходный запуск"
     },
     "loadMore": {
       "zh": "加载更多",
@@ -846,7 +939,8 @@
       "es": "Cargar más",
       "fr": "Charger plus",
       "de": "Mehr laden",
-      "pt": "Carregar mais"
+      "pt": "Carregar mais",
+      "ru": "Показать ещё"
     },
     "loading": {
       "zh": "正在读取…",
@@ -855,7 +949,8 @@
       "es": "Cargando…",
       "fr": "Chargement…",
       "de": "Wird gelesen…",
-      "pt": "carregando…"
+      "pt": "carregando…",
+      "ru": "Читаем…"
     },
     "origin.agent": {
       "zh": "自动",
@@ -864,7 +959,8 @@
       "es": "auto",
       "fr": "auto",
       "de": "auto",
-      "pt": "automático"
+      "pt": "automático",
+      "ru": "авто"
     },
     "origin.human": {
       "zh": "人工",
@@ -873,7 +969,8 @@
       "es": "humano",
       "fr": "humain",
       "de": "manuell",
-      "pt": "humano"
+      "pt": "humano",
+      "ru": "вручную"
     },
     "origin.system": {
       "zh": "系统",
@@ -882,7 +979,8 @@
       "es": "sistema",
       "fr": "système",
       "de": "System",
-      "pt": "sistema"
+      "pt": "sistema",
+      "ru": "система"
     },
     "overlay.body": {
       "zh": "正文",
@@ -891,7 +989,8 @@
       "es": "Cuerpo",
       "fr": "Texte",
       "de": "Text",
-      "pt": "Corpo"
+      "pt": "Corpo",
+      "ru": "Текст"
     },
     "overlay.pair": {
       "zh": "查看双方",
@@ -900,7 +999,8 @@
       "es": "Ver ambos",
       "fr": "Voir les deux",
       "de": "Beide ansehen",
-      "pt": "Ver os dois"
+      "pt": "Ver os dois",
+      "ru": "Показать оба"
     },
     "pin": {
       "zh": "置顶",
@@ -909,7 +1009,8 @@
       "es": "Fijar arriba",
       "fr": "Épingler",
       "de": "Anheften",
-      "pt": "Fixar no topo"
+      "pt": "Fixar no topo",
+      "ru": "Закрепить"
     },
     "refresh": {
       "zh": "刷新",
@@ -918,7 +1019,8 @@
       "es": "Actualizar",
       "fr": "Actualiser",
       "de": "Aktualisieren",
-      "pt": "Atualizar"
+      "pt": "Atualizar",
+      "ru": "Обновить"
     },
     "refreshing": {
       "zh": "刷新中，下面仍是上次结果…",
@@ -927,7 +1029,8 @@
       "es": "Actualizando; abajo siguen los resultados anteriores…",
       "fr": "Actualisation ; les lignes ci-dessous sont le résultat précédent…",
       "de": "Wird aktualisiert; unten stehen noch die vorherigen Ergebnisse…",
-      "pt": "Atualizando; as linhas abaixo são o resultado anterior…"
+      "pt": "Atualizando; as linhas abaixo são o resultado anterior…",
+      "ru": "Обновляем; ниже пока прошлый результат…"
     },
     "row.actions": {
       "zh": "操作",
@@ -936,7 +1039,8 @@
       "es": "Acciones",
       "fr": "Actions",
       "de": "Aktionen",
-      "pt": "Ações"
+      "pt": "Ações",
+      "ru": "Действия"
     },
     "row.actualTarget": {
       "zh": "实际目标",
@@ -945,7 +1049,8 @@
       "es": "Destino real",
       "fr": "Cible réelle",
       "de": "Tatsächliches Ziel",
-      "pt": "Destino real"
+      "pt": "Destino real",
+      "ru": "Фактическая цель"
     },
     "row.attempts": {
       "zh": "尝试",
@@ -954,7 +1059,8 @@
       "es": "Intentos",
       "fr": "Tentatives",
       "de": "Versuche",
-      "pt": "Tentativas"
+      "pt": "Tentativas",
+      "ru": "Попытки"
     },
     "row.bodies": {
       "zh": "正文",
@@ -963,7 +1069,8 @@
       "es": "Cuerpos",
       "fr": "Textes",
       "de": "Texte",
-      "pt": "Corpos"
+      "pt": "Corpos",
+      "ru": "Тексты"
     },
     "row.confidence": {
       "zh": "置信度",
@@ -972,7 +1079,8 @@
       "es": "Confianza",
       "fr": "Confiance",
       "de": "Konfidenz",
-      "pt": "Confiança"
+      "pt": "Confiança",
+      "ru": "Уверенность"
     },
     "row.copy": {
       "zh": "复制命令",
@@ -981,7 +1089,8 @@
       "es": "Copiar comando",
       "fr": "Copier la commande",
       "de": "Befehl kopieren",
-      "pt": "Copiar comando"
+      "pt": "Copiar comando",
+      "ru": "Скопировать команду"
     },
     "row.details": {
       "zh": "详情",
@@ -990,7 +1099,8 @@
       "es": "Detalles",
       "fr": "Détails",
       "de": "Details",
-      "pt": "Detalhes"
+      "pt": "Detalhes",
+      "ru": "Подробности"
     },
     "row.expired": {
       "zh": "已过期",
@@ -999,7 +1109,8 @@
       "es": "Caducado",
       "fr": "Expiré",
       "de": "Abgelaufen",
-      "pt": "Expirado"
+      "pt": "Expirado",
+      "ru": "Истекло"
     },
     "row.expires": {
       "zh": "暂存到期",
@@ -1008,7 +1119,8 @@
       "es": "Caducidad del staging",
       "fr": "Expiration du staging",
       "de": "Staging läuft ab",
-      "pt": "Expiração do staging"
+      "pt": "Expiração do staging",
+      "ru": "Истекает"
     },
     "row.failure": {
       "zh": "失败",
@@ -1017,7 +1129,8 @@
       "es": "Fallo",
       "fr": "Échec",
       "de": "Fehler",
-      "pt": "Falha"
+      "pt": "Falha",
+      "ru": "Сбой"
     },
     "row.fullId": {
       "zh": "完整编号",
@@ -1026,7 +1139,8 @@
       "es": "ID completo",
       "fr": "ID complet",
       "de": "Vollständige ID",
-      "pt": "ID completo"
+      "pt": "ID completo",
+      "ru": "Полный ID"
     },
     "row.id": {
       "zh": "编号",
@@ -1035,7 +1149,8 @@
       "es": "ID",
       "fr": "ID",
       "de": "ID",
-      "pt": "ID"
+      "pt": "ID",
+      "ru": "ID"
     },
     "row.more": {
       "zh": "更多命令",
@@ -1044,7 +1159,8 @@
       "es": "Más comandos",
       "fr": "Plus de commandes",
       "de": "Weitere Befehle",
-      "pt": "Mais comandos"
+      "pt": "Mais comandos",
+      "ru": "Другие команды"
     },
     "row.noRetry": {
       "zh": "不可重试",
@@ -1053,7 +1169,8 @@
       "es": "no reintentable",
       "fr": "non réessayable",
       "de": "nicht wiederholbar",
-      "pt": "não repetível"
+      "pt": "não repetível",
+      "ru": "Повтор невозможен"
     },
     "row.noSummary": {
       "zh": "无摘要",
@@ -1062,7 +1179,8 @@
       "es": "Sin resumen",
       "fr": "Sans résumé",
       "de": "Keine Zusammenfassung",
-      "pt": "Sem resumo"
+      "pt": "Sem resumo",
+      "ru": "Без сводки"
     },
     "row.notProvided": {
       "zh": "未提供",
@@ -1071,7 +1189,8 @@
       "es": "sin indicar",
       "fr": "non fourni",
       "de": "nicht angegeben",
-      "pt": "não informado"
+      "pt": "não informado",
+      "ru": "не указано"
     },
     "row.origin": {
       "zh": "来源",
@@ -1080,7 +1199,8 @@
       "es": "Origen",
       "fr": "Origine",
       "de": "Ursprung",
-      "pt": "Origem"
+      "pt": "Origem",
+      "ru": "Источник:"
     },
     "row.rationale": {
       "zh": "理由",
@@ -1089,7 +1209,8 @@
       "es": "Razón",
       "fr": "Justification",
       "de": "Begründung",
-      "pt": "Justificativa"
+      "pt": "Justificativa",
+      "ru": "Обоснование"
     },
     "row.reason": {
       "zh": "原因",
@@ -1098,7 +1219,8 @@
       "es": "Motivo",
       "fr": "Raison",
       "de": "Grund",
-      "pt": "Motivo"
+      "pt": "Motivo",
+      "ru": "Причина"
     },
     "row.requestedTarget": {
       "zh": "请求目标",
@@ -1107,7 +1229,8 @@
       "es": "Destino solicitado",
       "fr": "Cible demandée",
       "de": "Angefragtes Ziel",
-      "pt": "Destino solicitado"
+      "pt": "Destino solicitado",
+      "ru": "Запрошенная цель"
     },
     "row.skipKind": {
       "zh": "跳过类型",
@@ -1116,7 +1239,8 @@
       "es": "Tipo de omisión",
       "fr": "Motif de saut",
       "de": "Skip-Art",
-      "pt": "Tipo de descarte"
+      "pt": "Tipo de descarte",
+      "ru": "Тип пропуска"
     },
     "row.stage": {
       "zh": "合并暂存",
@@ -1125,7 +1249,8 @@
       "es": "Staging del merge",
       "fr": "Staging de fusion",
       "de": "Merge-Staging",
-      "pt": "Staging do merge"
+      "pt": "Staging do merge",
+      "ru": "Черновик объединения"
     },
     "row.staging": {
       "zh": "暂存",
@@ -1134,7 +1259,8 @@
       "es": "Staging",
       "fr": "Staging",
       "de": "Staging",
-      "pt": "Staging"
+      "pt": "Staging",
+      "ru": "Черновик"
     },
     "row.summaryA": {
       "zh": "摘要 A",
@@ -1143,7 +1269,8 @@
       "es": "Resumen A",
       "fr": "Résumé A",
       "de": "Zusammenfassung A",
-      "pt": "Resumo A"
+      "pt": "Resumo A",
+      "ru": "Сводка A"
     },
     "row.summaryB": {
       "zh": "摘要 B",
@@ -1152,7 +1279,8 @@
       "es": "Resumen B",
       "fr": "Résumé B",
       "de": "Zusammenfassung B",
-      "pt": "Resumo B"
+      "pt": "Resumo B",
+      "ru": "Сводка B"
     },
     "row.summaryBoth": {
       "zh": "双方摘要",
@@ -1161,7 +1289,8 @@
       "es": "Resumen común",
       "fr": "Résumé commun",
       "de": "Gemeinsame Zusammenfassung",
-      "pt": "Resumo em comum"
+      "pt": "Resumo em comum",
+      "ru": "Общая сводка"
     },
     "row.target": {
       "zh": "目标",
@@ -1170,7 +1299,8 @@
       "es": "Destino",
       "fr": "Cible",
       "de": "Ziel",
-      "pt": "Destino"
+      "pt": "Destino",
+      "ru": "Цель"
     },
     "row.targetCreated": {
       "zh": "新建",
@@ -1179,7 +1309,8 @@
       "es": "creado",
       "fr": "créée",
       "de": "neu erstellt",
-      "pt": "criado"
+      "pt": "criado",
+      "ru": "создана"
     },
     "row.verify": {
       "zh": "判定状态",
@@ -1188,7 +1319,8 @@
       "es": "Estado de verificación",
       "fr": "État de vérification",
       "de": "Prüfstatus",
-      "pt": "Estado da avaliação"
+      "pt": "Estado da avaliação",
+      "ru": "Проверка:"
     },
     "row.viewBoth": {
       "zh": "查看双方",
@@ -1197,7 +1329,8 @@
       "es": "Ver ambos",
       "fr": "Voir les deux",
       "de": "Beide ansehen",
-      "pt": "Ver os dois"
+      "pt": "Ver os dois",
+      "ru": "Показать оба"
     },
     "run.actions": {
       "zh": "运行操作",
@@ -1206,7 +1339,8 @@
       "es": "Acciones de la ejecución",
       "fr": "Actions de l’exécution",
       "de": "Run-Aktionen",
-      "pt": "Ações da execução"
+      "pt": "Ações da execução",
+      "ru": "Действия запуска"
     },
     "run.awaiting": {
       "zh": "等待审批",
@@ -1215,7 +1349,8 @@
       "es": "Esperando aprobación",
       "fr": "En attente d’approbation",
       "de": "Wartet auf Freigabe",
-      "pt": "Aguardando aprovação"
+      "pt": "Aguardando aprovação",
+      "ru": "ждёт одобрения"
     },
     "run.awaiting-approval": {
       "zh": "等待审批",
@@ -1224,7 +1359,8 @@
       "es": "Esperando aprobación",
       "fr": "En attente d’approbation",
       "de": "Wartet auf Freigabe",
-      "pt": "Aguardando aprovação"
+      "pt": "Aguardando aprovação",
+      "ru": "ждёт одобрения"
     },
     "run.cancelled": {
       "zh": "已取消",
@@ -1233,7 +1369,8 @@
       "es": "Cancelada",
       "fr": "Annulé",
       "de": "Abgebrochen",
-      "pt": "Cancelada"
+      "pt": "Cancelada",
+      "ru": "отменён"
     },
     "run.current": {
       "zh": "当前运行",
@@ -1242,7 +1379,8 @@
       "es": "Ejecución actual",
       "fr": "Exécution en cours",
       "de": "Aktueller Run",
-      "pt": "Execução atual"
+      "pt": "Execução atual",
+      "ru": "Текущий запуск"
     },
     "run.currentPair": {
       "zh": "当前对",
@@ -1251,7 +1389,8 @@
       "es": "Par actual",
       "fr": "Paire en cours",
       "de": "Aktuelles Paar",
-      "pt": "Par atual"
+      "pt": "Par atual",
+      "ru": "Текущая пара"
     },
     "run.details": {
       "zh": "运行详情",
@@ -1260,7 +1399,8 @@
       "es": "Detalles de la ejecución",
       "fr": "Détails de l’exécution",
       "de": "Run-Details",
-      "pt": "Detalhes da execução"
+      "pt": "Detalhes da execução",
+      "ru": "Детали запуска"
     },
     "run.ended": {
       "zh": "已结束",
@@ -1269,7 +1409,8 @@
       "es": "Terminada",
       "fr": "Terminé",
       "de": "Beendet",
-      "pt": "Encerrada"
+      "pt": "Encerrada",
+      "ru": "завершён"
     },
     "run.endedAt": {
       "zh": "结束时间",
@@ -1278,7 +1419,8 @@
       "es": "Terminó el",
       "fr": "Fin",
       "de": "Beendet am",
-      "pt": "Encerrada em"
+      "pt": "Encerrada em",
+      "ru": "Завершён в"
     },
     "run.failed": {
       "zh": "失败",
@@ -1287,7 +1429,8 @@
       "es": "Fallida",
       "fr": "Échoué",
       "de": "Fehlgeschlagen",
-      "pt": "Falhou"
+      "pt": "Falhou",
+      "ru": "сбой"
     },
     "run.failure": {
       "zh": "失败",
@@ -1296,7 +1439,8 @@
       "es": "Fallo",
       "fr": "Échec",
       "de": "Fehler",
-      "pt": "Falha"
+      "pt": "Falha",
+      "ru": "Сбой"
     },
     "run.id": {
       "zh": "运行编号",
@@ -1305,7 +1449,8 @@
       "es": "ID de ejecución",
       "fr": "ID d’exécution",
       "de": "Run-ID",
-      "pt": "ID da execução"
+      "pt": "ID da execução",
+      "ru": "ID запуска"
     },
     "run.interrupted": {
       "zh": "已中断",
@@ -1314,7 +1459,8 @@
       "es": "Interrumpida",
       "fr": "Interrompu",
       "de": "Unterbrochen",
-      "pt": "Interrompida"
+      "pt": "Interrompida",
+      "ru": "прерван"
     },
     "run.last": {
       "zh": "上次完成",
@@ -1323,7 +1469,8 @@
       "es": "Última completada",
       "fr": "Dernière exécution terminée",
       "de": "Zuletzt abgeschlossen",
-      "pt": "Última concluída"
+      "pt": "Última concluída",
+      "ru": "Последний завершённый"
     },
     "run.noReport": {
       "zh": "暂无报告",
@@ -1332,7 +1479,8 @@
       "es": "Sin informe todavía",
       "fr": "Pas encore de rapport",
       "de": "Noch kein Report",
-      "pt": "Sem relatório ainda"
+      "pt": "Sem relatório ainda",
+      "ru": "Отчёта пока нет"
     },
     "run.orphan": {
       "zh": "孤立",
@@ -1341,7 +1489,8 @@
       "es": "Huérfana",
       "fr": "Orphelin",
       "de": "Verwaist",
-      "pt": "Órfã"
+      "pt": "Órfã",
+      "ru": "без родителя"
     },
     "run.parent": {
       "zh": "父运行",
@@ -1350,7 +1499,8 @@
       "es": "Ejecución padre",
       "fr": "Exécution parente",
       "de": "Übergeordneter Run",
-      "pt": "Execução pai"
+      "pt": "Execução pai",
+      "ru": "Родительский запуск"
     },
     "run.progress": {
       "zh": "进度",
@@ -1359,7 +1509,8 @@
       "es": "Progreso",
       "fr": "Progression",
       "de": "Fortschritt",
-      "pt": "Progresso"
+      "pt": "Progresso",
+      "ru": "Прогресс"
     },
     "run.progressUnknown": {
       "zh": "进度未知",
@@ -1368,7 +1519,8 @@
       "es": "progreso desconocido",
       "fr": "progression inconnue",
       "de": "Fortschritt unbekannt",
-      "pt": "progresso desconhecido"
+      "pt": "progresso desconhecido",
+      "ru": "прогресс неизвестен"
     },
     "run.report": {
       "zh": "报告",
@@ -1377,7 +1529,8 @@
       "es": "Informe",
       "fr": "Rapport",
       "de": "Report",
-      "pt": "Relatório"
+      "pt": "Relatório",
+      "ru": "Отчёт"
     },
     "run.resultRef": {
       "zh": "报告位置",
@@ -1386,7 +1539,8 @@
       "es": "Ubicación del informe",
       "fr": "Emplacement du rapport",
       "de": "Report-Ablage",
-      "pt": "Local do relatório"
+      "pt": "Local do relatório",
+      "ru": "Место отчёта"
     },
     "run.running": {
       "zh": "运行中",
@@ -1395,7 +1549,8 @@
       "es": "En ejecución",
       "fr": "En cours",
       "de": "Läuft",
-      "pt": "Em execução"
+      "pt": "Em execução",
+      "ru": "идёт"
     },
     "run.stage": {
       "zh": "阶段",
@@ -1404,7 +1559,8 @@
       "es": "Fase",
       "fr": "Étape",
       "de": "Phase",
-      "pt": "Etapa"
+      "pt": "Etapa",
+      "ru": "Этап"
     },
     "run.state": {
       "zh": "状态",
@@ -1413,7 +1569,8 @@
       "es": "Estado",
       "fr": "État",
       "de": "Status",
-      "pt": "Estado"
+      "pt": "Estado",
+      "ru": "Состояние:"
     },
     "run.succeeded": {
       "zh": "成功",
@@ -1422,7 +1579,8 @@
       "es": "Completada",
       "fr": "Réussi",
       "de": "Erfolgreich",
-      "pt": "Concluída"
+      "pt": "Concluída",
+      "ru": "успешно"
     },
     "run.superseded": {
       "zh": "已失效",
@@ -1431,7 +1589,8 @@
       "es": "Sustituida",
       "fr": "Remplacé",
       "de": "Abgelöst",
-      "pt": "Substituída"
+      "pt": "Substituída",
+      "ru": "заменён"
     },
     "run.title": {
       "zh": "运行",
@@ -1440,7 +1599,8 @@
       "es": "Ejecución",
       "fr": "Exécution",
       "de": "Run",
-      "pt": "Execução"
+      "pt": "Execução",
+      "ru": "Запуск"
     },
     "run.undone": {
       "zh": "已撤销",
@@ -1449,7 +1609,8 @@
       "es": "Deshecha",
       "fr": "Révoqué",
       "de": "Rückgängig gemacht",
-      "pt": "Desfeita"
+      "pt": "Desfeita",
+      "ru": "откатан"
     },
     "session.missing": {
       "zh": "没有当前会话；请打开会话后重试",
@@ -1458,7 +1619,8 @@
       "es": "No hay sesión actual; abre una sesión y reintenta",
       "fr": "Aucune session active ; ouvrez une session puis réessayez",
       "de": "Keine aktuelle Sitzung; öffne eine Sitzung und versuche es erneut",
-      "pt": "Nenhuma sessão atual; abra uma sessão e tente novamente"
+      "pt": "Nenhuma sessão atual; abra uma sessão e tente novamente",
+      "ru": "Нет текущей сессии; откройте сессию и повторите"
     },
     "settings.capabilityDisabled": {
       "zh": "当前部署不可用",
@@ -1467,7 +1629,8 @@
       "es": "No disponible en esta instalación",
       "fr": "Indisponible dans ce déploiement",
       "de": "In diesem Deployment nicht verfügbar",
-      "pt": "Indisponível nesta instalação"
+      "pt": "Indisponível nesta instalação",
+      "ru": "Недоступно в этом развёртывании"
     },
     "settings.capabilityMissing": {
       "zh": "宿主未提供该能力",
@@ -1476,7 +1639,8 @@
       "es": "El host no ofrece esta capacidad",
       "fr": "L’hôte ne fournit pas cette capacité",
       "de": "Der Host stellt diese Fähigkeit nicht bereit",
-      "pt": "O host não oferece este recurso"
+      "pt": "O host não oferece este recurso",
+      "ru": "Хост не предоставляет эту возможность"
     },
     "settings.hint": {
       "zh": "写入审批 = 使用中生成/修改；技能自动合并 = 两轮合并工作流。两段独立，不从另一项推导。",
@@ -1485,7 +1649,8 @@
       "es": "Aprobación de escrituras = crear o modificar durante el uso; merge automático de skills = flujo de merge en dos rondas. Son independientes: una no se deduce de la otra.",
       "fr": "Approbation des écritures = création/modification en cours d’usage ; fusion automatique = workflow de fusion en deux tours. Les deux sont indépendants.",
       "de": "Schreibfreigabe = Erzeugen und Ändern während der Nutzung; automatisches Skill-Merge = der Zwei-Runden-Ablauf. Beides ist unabhängig, eines folgt nicht aus dem anderen.",
-      "pt": "Aprovação de escrita = criar ou alterar durante o uso; merge automático de skills = o fluxo de merge em duas rodadas. Os dois são independentes."
+      "pt": "Aprovação de escrita = criar ou alterar durante o uso; merge automático de skills = o fluxo de merge em duas rodadas. Os dois são independentes.",
+      "ru": "Одобрение записей = создание и изменение во время работы; автообъединение = двухраундовый процесс. Настройки независимы друг от друга."
     },
     "settings.live": {
       "zh": "可直接在此保存；platformWrite 能力来自宿主。",
@@ -1494,7 +1659,8 @@
       "es": "Se guarda aquí mismo; la capacidad platformWrite la aporta el host.",
       "fr": "Enregistrez directement ici ; la capacité platformWrite vient de l’hôte.",
       "de": "Hier direkt speicherbar; die platformWrite-Fähigkeit kommt vom Host.",
-      "pt": "Salve diretamente aqui; a capacidade platformWrite vem do host."
+      "pt": "Salve diretamente aqui; a capacidade platformWrite vem do host.",
+      "ru": "Можно сохранить прямо здесь; возможность platformWrite даёт хост."
     },
     "settings.mergeApproval": {
       "zh": "技能自动合并（合并审批）",
@@ -1503,7 +1669,8 @@
       "es": "Merge automático de skills (aprobación del merge)",
       "fr": "Fusion automatique (approbation des fusions)",
       "de": "Automatisches Skill-Merge (Freigabe)",
-      "pt": "Merge automático de skills (aprovação de merge)"
+      "pt": "Merge automático de skills (aprovação de merge)",
+      "ru": "Автообъединение (одобрение объединений)"
     },
     "settings.off": {
       "zh": "关",
@@ -1512,7 +1679,8 @@
       "es": "Desactivado",
       "fr": "Désactivé",
       "de": "Aus",
-      "pt": "Desativado"
+      "pt": "Desativado",
+      "ru": "Выкл"
     },
     "settings.on": {
       "zh": "开",
@@ -1521,7 +1689,8 @@
       "es": "Activado",
       "fr": "Activé",
       "de": "An",
-      "pt": "Ativado"
+      "pt": "Ativado",
+      "ru": "Вкл"
     },
     "settings.openPlatform": {
       "zh": "打开平台设置",
@@ -1530,7 +1699,8 @@
       "es": "Abrir ajustes de la plataforma",
       "fr": "Ouvrir les paramètres de la plateforme",
       "de": "Plattform-Einstellungen öffnen",
-      "pt": "Abrir configurações da plataforma"
+      "pt": "Abrir configurações da plataforma",
+      "ru": "Открыть настройки платформы"
     },
     "settings.openPlatformPath": {
       "zh": "设置 → 自进化 → 技能自动合并",
@@ -1539,7 +1709,8 @@
       "es": "Ajustes → Evolución → Merge automático de skills",
       "fr": "Paramètres → Auto-évolution → Fusion automatique des skills",
       "de": "Einstellungen → Selbstevolution → Skill-Auto-Merge",
-      "pt": "Configurações → Autoevolução → Merge automático de skills"
+      "pt": "Configurações → Autoevolução → Merge automático de skills",
+      "ru": "Настройки → Самоэволюция → Автообъединение навыков"
     },
     "settings.platformWrite": {
       "zh": "写入审批（平台写入）",
@@ -1548,7 +1719,8 @@
       "es": "Aprobación de escrituras (escritura de plataforma)",
       "fr": "Approbation des écritures (écriture plateforme)",
       "de": "Schreibfreigabe (Plattform)",
-      "pt": "Aprovação de escrita (escrita da plataforma)"
+      "pt": "Aprovação de escrita (escrita da plataforma)",
+      "ru": "Одобрение записей (настройка платформы)"
     },
     "settings.platformWriteLinkHint": {
       "zh": "此开关属于平台设置，这里只读；请到平台设置修改。",
@@ -1557,7 +1729,8 @@
       "es": "Este interruptor pertenece a los ajustes de la plataforma; aquí solo se muestra. Cámbialo en los ajustes de la plataforma.",
       "fr": "Ce commutateur relève des paramètres de la plateforme : lecture seule ici. Modifiez-le dans les paramètres de la plateforme.",
       "de": "Dieser Schalter gehört zu den Plattform-Einstellungen und ist hier nur lesbar; ändere ihn dort.",
-      "pt": "Este interruptor pertence às configurações da plataforma e aqui é somente leitura; altere nas configurações da plataforma."
+      "pt": "Este interruptor pertence às configurações da plataforma e aqui é somente leitura; altere nas configurações da plataforma.",
+      "ru": "Этот переключатель относится к настройкам платформы; здесь только чтение. Меняйте его в настройках платформы."
     },
     "settings.readonly": {
       "zh": "只读显示；修改请到平台设置页。",
@@ -1566,7 +1739,8 @@
       "es": "Solo lectura aquí; cámbialo en la página de ajustes de la plataforma.",
       "fr": "Lecture seule ici ; modifiez dans les paramètres de la plateforme.",
       "de": "Hier nur lesbar; Änderungen in den Plattform-Einstellungen.",
-      "pt": "Somente leitura aqui; altere na página de configurações da plataforma."
+      "pt": "Somente leitura aqui; altere na página de configurações da plataforma.",
+      "ru": "Только чтение; менять — на странице настроек платформы."
     },
     "settings.saveFailed": {
       "zh": "保存失败",
@@ -1575,7 +1749,8 @@
       "es": "No se pudo guardar",
       "fr": "Échec de l’enregistrement",
       "de": "Speichern fehlgeschlagen",
-      "pt": "Falha ao salvar"
+      "pt": "Falha ao salvar",
+      "ru": "Не удалось сохранить"
     },
     "settings.saved": {
       "zh": "已保存",
@@ -1584,7 +1759,8 @@
       "es": "Guardado",
       "fr": "Enregistré",
       "de": "Gespeichert",
-      "pt": "Salvo"
+      "pt": "Salvo",
+      "ru": "Сохранено"
     },
     "settings.title": {
       "zh": "审批设置",
@@ -1593,7 +1769,8 @@
       "es": "Aprobaciones",
       "fr": "Approbations",
       "de": "Freigabeeinstellungen",
-      "pt": "Aprovações"
+      "pt": "Aprovações",
+      "ru": "Настройки одобрения"
     },
     "skipKind.agent-keep": {
       "zh": "自动保留",
@@ -1602,7 +1779,8 @@
       "es": "conservación automática",
       "fr": "conservation auto",
       "de": "automatisch behalten",
-      "pt": "mantido automaticamente"
+      "pt": "mantido automaticamente",
+      "ru": "оставлено агентом"
     },
     "skipKind.forced": {
       "zh": "强制",
@@ -1611,7 +1789,8 @@
       "es": "forzado",
       "fr": "forcé",
       "de": "erzwungen",
-      "pt": "forçado"
+      "pt": "forçado",
+      "ru": "принудительно"
     },
     "skipKind.human-reject": {
       "zh": "人工拒绝",
@@ -1620,7 +1799,8 @@
       "es": "rechazo humano",
       "fr": "rejet humain",
       "de": "manuell abgelehnt",
-      "pt": "rejeição humana"
+      "pt": "rejeição humana",
+      "ru": "отклонено человеком"
     },
     "skipKind.over-limit": {
       "zh": "超限",
@@ -1629,7 +1809,8 @@
       "es": "por encima del límite",
       "fr": "hors limite",
       "de": "über dem Limit",
-      "pt": "acima do limite"
+      "pt": "acima do limite",
+      "ru": "сверх лимита"
     },
     "sort.cancel": {
       "zh": "取消",
@@ -1638,7 +1819,8 @@
       "es": "Cancelar",
       "fr": "Annuler",
       "de": "Abbrechen",
-      "pt": "Cancelar"
+      "pt": "Cancelar",
+      "ru": "Отмена"
     },
     "sort.drag": {
       "zh": "拖动排序",
@@ -1647,7 +1829,8 @@
       "es": "Arrastra para reordenar",
       "fr": "Glisser pour réordonner",
       "de": "Zum Sortieren ziehen",
-      "pt": "Arraste para reordenar"
+      "pt": "Arraste para reordenar",
+      "ru": "Перетащите, чтобы изменить порядок"
     },
     "sort.menu": {
       "zh": "行排序",
@@ -1656,7 +1839,8 @@
       "es": "Orden de las filas",
       "fr": "Ordre des lignes",
       "de": "Zeilenreihenfolge",
-      "pt": "Ordem das linhas"
+      "pt": "Ordem das linhas",
+      "ru": "Порядок строк"
     },
     "sort.pinBottom": {
       "zh": "置底",
@@ -1665,7 +1849,8 @@
       "es": "Fijar abajo",
       "fr": "Épingler en bas",
       "de": "Unten anheften",
-      "pt": "Fixar no fim"
+      "pt": "Fixar no fim",
+      "ru": "Закрепить снизу"
     },
     "sort.pinTop": {
       "zh": "置顶",
@@ -1674,7 +1859,8 @@
       "es": "Fijar arriba",
       "fr": "Épingler en haut",
       "de": "Oben anheften",
-      "pt": "Fixar no topo"
+      "pt": "Fixar no topo",
+      "ru": "Закрепить сверху"
     },
     "sort.score": {
       "zh": "按分数",
@@ -1683,7 +1869,8 @@
       "es": "Puntuación",
       "fr": "Score",
       "de": "Score",
-      "pt": "Pontuação"
+      "pt": "Pontuação",
+      "ru": "По оценке"
     },
     "sort.updatedAt": {
       "zh": "按更新时间",
@@ -1692,7 +1879,8 @@
       "es": "Última actualización",
       "fr": "Dernière mise à jour",
       "de": "Zuletzt aktualisiert",
-      "pt": "Última atualização"
+      "pt": "Última atualização",
+      "ru": "По времени изменения"
     },
     "stage.author": {
       "zh": "合并",
@@ -1701,7 +1889,8 @@
       "es": "Redacción",
       "fr": "Rédaction",
       "de": "Mergen",
-      "pt": "Merge"
+      "pt": "Merge",
+      "ru": "Объединение"
     },
     "stage.commit": {
       "zh": "提交",
@@ -1710,7 +1899,8 @@
       "es": "Confirmar",
       "fr": "Commit",
       "de": "Commit",
-      "pt": "Commit"
+      "pt": "Commit",
+      "ru": "Фиксация"
     },
     "stage.decide": {
       "zh": "判定",
@@ -1719,7 +1909,8 @@
       "es": "Decidir",
       "fr": "Décision",
       "de": "Entscheiden",
-      "pt": "Decidir"
+      "pt": "Decidir",
+      "ru": "Решение"
     },
     "stage.screening": {
       "zh": "筛选",
@@ -1728,7 +1919,8 @@
       "es": "Filtrar",
       "fr": "Tri",
       "de": "Sichten",
-      "pt": "Triagem"
+      "pt": "Triagem",
+      "ru": "Отбор"
     },
     "stage.settle": {
       "zh": "结算",
@@ -1737,7 +1929,8 @@
       "es": "Cierre",
       "fr": "Clôture",
       "de": "Abschließen",
-      "pt": "Consolidação"
+      "pt": "Consolidação",
+      "ru": "Завершение"
     },
     "stage.state.absent": {
       "zh": "无暂存",
@@ -1746,7 +1939,8 @@
       "es": "Sin staging",
       "fr": "Sans staging",
       "de": "Kein Staging",
-      "pt": "sem staging"
+      "pt": "sem staging",
+      "ru": "Без черновика"
     },
     "stage.state.expired": {
       "zh": "已过期",
@@ -1755,7 +1949,8 @@
       "es": "Caducado",
       "fr": "Expiré",
       "de": "Abgelaufen",
-      "pt": "Expirado"
+      "pt": "Expirado",
+      "ru": "Черновик просрочен"
     },
     "stage.state.lost": {
       "zh": "暂存丢失",
@@ -1764,7 +1959,8 @@
       "es": "Staging perdido",
       "fr": "Staging perdu",
       "de": "Staging verloren",
-      "pt": "staging perdido"
+      "pt": "staging perdido",
+      "ru": "Черновик потерян"
     },
     "stage.state.present": {
       "zh": "已暂存",
@@ -1773,7 +1969,8 @@
       "es": "En staging",
       "fr": "En staging",
       "de": "Im Staging",
-      "pt": "em staging"
+      "pt": "em staging",
+      "ru": "Черновик готов"
     },
     "stage.state.reserved": {
       "zh": "已预留",
@@ -1782,7 +1979,8 @@
       "es": "Reservado",
       "fr": "Réservé",
       "de": "Reserviert",
-      "pt": "reservado"
+      "pt": "reservado",
+      "ru": "Черновик зарезервирован"
     },
     "stage.validate": {
       "zh": "检查",
@@ -1791,7 +1989,8 @@
       "es": "Comprobar",
       "fr": "Vérification",
       "de": "Prüfen",
-      "pt": "Validar"
+      "pt": "Validar",
+      "ru": "Проверка"
     },
     "staging.cleared-source-gone": {
       "zh": "已清理（源已缺失）",
@@ -1800,7 +1999,8 @@
       "es": "Limpiado (origen ausente)",
       "fr": "nettoyé (source absente)",
       "de": "entfernt (Quelle fehlt)",
-      "pt": "limpo (origem ausente)"
+      "pt": "limpo (origem ausente)",
+      "ru": "очищен (исходный навык пропал)"
     },
     "staging.cleared-source-ok": {
       "zh": "已清理（源完好）",
@@ -1809,7 +2009,8 @@
       "es": "Limpiado (origen correcto)",
       "fr": "nettoyé (source intacte)",
       "de": "entfernt (Quelle intakt)",
-      "pt": "limpo (origem intacta)"
+      "pt": "limpo (origem intacta)",
+      "ru": "очищен (исходный навык на месте)"
     },
     "staging.kept": {
       "zh": "保留",
@@ -1818,7 +2019,8 @@
       "es": "Conservado",
       "fr": "conservé",
       "de": "behalten",
-      "pt": "mantido"
+      "pt": "mantido",
+      "ru": "оставлен"
     },
     "staging.none": {
       "zh": "无",
@@ -1827,7 +2029,8 @@
       "es": "Ninguno",
       "fr": "aucun",
       "de": "keins",
-      "pt": "nenhum"
+      "pt": "nenhum",
+      "ru": "нет"
     },
     "start.pair": {
       "zh": "复制配对命令",
@@ -1836,7 +2039,8 @@
       "es": "Copiar el comando de emparejamiento",
       "fr": "Copier la commande de paire",
       "de": "Paar-Befehl kopieren",
-      "pt": "Copiar o comando do par"
+      "pt": "Copiar o comando do par",
+      "ru": "Скопировать команду пары"
     },
     "start.scan": {
       "zh": "复制查找重复技能的命令",
@@ -1845,7 +2049,8 @@
       "es": "Copiar el comando para buscar skills duplicados",
       "fr": "Copier la commande de recherche de skills en double",
       "de": "Befehl zum Suchen doppelter Skills kopieren",
-      "pt": "Copiar o comando de busca de skills duplicadas"
+      "pt": "Copiar o comando de busca de skills duplicadas",
+      "ru": "Скопировать команду поиска дублей навыков"
     },
     "state.approved": {
       "zh": "已批准",
@@ -1854,7 +2059,8 @@
       "es": "Aprobado",
       "fr": "Approuvé",
       "de": "Freigegeben",
-      "pt": "Aprovado"
+      "pt": "Aprovado",
+      "ru": "Одобрено"
     },
     "state.fuse": {
       "zh": "待合并",
@@ -1863,7 +2069,8 @@
       "es": "Listo para merge",
       "fr": "Prêt à fusionner",
       "de": "Bereit zum Merge",
-      "pt": "Pronto para merge"
+      "pt": "Pronto para merge",
+      "ru": "Готово к объединению"
     },
     "state.pending": {
       "zh": "待批准",
@@ -1872,7 +2079,8 @@
       "es": "Pendiente de aprobación",
       "fr": "En attente d’approbation",
       "de": "Wartet auf Freigabe",
-      "pt": "Aguardando aprovação"
+      "pt": "Aguardando aprovação",
+      "ru": "Ожидает одобрения"
     },
     "state.skipped": {
       "zh": "已跳过",
@@ -1881,7 +2089,8 @@
       "es": "Omitido",
       "fr": "Ignoré",
       "de": "Übersprungen",
-      "pt": "Ignorado"
+      "pt": "Ignorado",
+      "ru": "Пропущено"
     },
     "state.verify": {
       "zh": "待判定",
@@ -1890,7 +2099,8 @@
       "es": "Sin verificar",
       "fr": "Non vérifié",
       "de": "Ungeprüft",
-      "pt": "Não verificado"
+      "pt": "Não verificado",
+      "ru": "Ждёт решения"
     },
     "tab.expired": {
       "zh": "已过期",
@@ -1899,7 +2109,8 @@
       "es": "Caducados",
       "fr": "Expirés",
       "de": "Abgelaufen",
-      "pt": "Expirados"
+      "pt": "Expirados",
+      "ru": "Истекшие"
     },
     "tab.fuse": {
       "zh": "待合并",
@@ -1908,7 +2119,8 @@
       "es": "Listos para merge",
       "fr": "Prêts à fusionner",
       "de": "Bereit zum Merge",
-      "pt": "Prontos para merge"
+      "pt": "Prontos para merge",
+      "ru": "К объединению"
     },
     "tab.pending": {
       "zh": "待批准",
@@ -1917,7 +2129,8 @@
       "es": "Pendientes",
       "fr": "En attente",
       "de": "Wartet auf Freigabe",
-      "pt": "Aguardando aprovação"
+      "pt": "Aguardando aprovação",
+      "ru": "На одобрении"
     },
     "tab.skipped": {
       "zh": "无需合并",
@@ -1926,7 +2139,8 @@
       "es": "Omitidos",
       "fr": "Sans fusion",
       "de": "Übersprungen",
-      "pt": "Sem merge"
+      "pt": "Sem merge",
+      "ru": "Без объединения"
     },
     "tab.verify": {
       "zh": "待判断",
@@ -1935,7 +2149,8 @@
       "es": "Por juzgar",
       "fr": "À juger",
       "de": "Zu prüfen",
-      "pt": "A avaliar"
+      "pt": "A avaliar",
+      "ru": "На решение"
     },
     "task.pending": {
       "zh": "条合并建议待处理",
@@ -1944,7 +2159,8 @@
       "es": "sugerencias de merge por atender",
       "fr": "suggestions de fusion à traiter",
       "de": "Merge-Vorschläge warten auf Bearbeitung",
-      "pt": "sugestões de merge precisam de atenção"
+      "pt": "sugestões de merge precisam de atenção",
+      "ru": "предложений по объединению ждут решения"
     },
     "title": {
       "zh": "合并建议",
@@ -1953,7 +2169,8 @@
       "es": "Sugerencias de merge",
       "fr": "Suggestions de fusion",
       "de": "Merge-Vorschläge",
-      "pt": "Sugestões de merge"
+      "pt": "Sugestões de merge",
+      "ru": "Предложения по объединению"
     },
     "unpin": {
       "zh": "取消置顶",
@@ -1962,7 +2179,8 @@
       "es": "Quitar de fijados",
       "fr": "Désépingler",
       "de": "Lösen",
-      "pt": "Desafixar"
+      "pt": "Desafixar",
+      "ru": "Открепить"
     },
     "verify.cancelled": {
       "zh": "已取消",
@@ -1971,7 +2189,8 @@
       "es": "cancelada",
       "fr": "annulé",
       "de": "Abgebrochen",
-      "pt": "cancelada"
+      "pt": "cancelada",
+      "ru": "отменена"
     },
     "verify.failed": {
       "zh": "失败",
@@ -1980,7 +2199,8 @@
       "es": "fallida",
       "fr": "échec",
       "de": "Fehlgeschlagen",
-      "pt": "falhou"
+      "pt": "falhou",
+      "ru": "не прошла"
     },
     "verify.queued": {
       "zh": "排队",
@@ -1989,7 +2209,8 @@
       "es": "en cola",
       "fr": "en file",
       "de": "In Warteschlange",
-      "pt": "na fila"
+      "pt": "na fila",
+      "ru": "в очереди"
     },
     "verify.running": {
       "zh": "进行中",
@@ -1998,7 +2219,8 @@
       "es": "en curso",
       "fr": "en cours",
       "de": "Läuft",
-      "pt": "em execução"
+      "pt": "em execução",
+      "ru": "выполняется"
     }
   }
 }

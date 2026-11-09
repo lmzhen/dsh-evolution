@@ -9,7 +9,8 @@
       "es": "Copiar comando",
       "fr": "Copier la commande",
       "de": "Befehl kopieren",
-      "pt": "Copiar comando"
+      "pt": "Copiar comando",
+      "ru": "Скопировать команду"
     },
     "action.extract": {
       "zh": "提取",
@@ -18,7 +19,8 @@
       "es": "Extraer",
       "fr": "Extraire",
       "de": "Extrahieren",
-      "pt": "Extrair"
+      "pt": "Extrair",
+      "ru": "Извлечь"
     },
     "action.extract.reason": {
       "zh": "命令/预览面未就绪，暂不可用。",
@@ -27,7 +29,8 @@
       "es": "La superficie de comandos y vista previa aún no está lista.",
       "fr": "La commande et l’aperçu ne sont pas encore prêts ; action indisponible.",
       "de": "Die Befehls- und Vorschau-Oberfläche ist noch nicht bereit.",
-      "pt": "A área de comando e prévia ainda não está pronta; indisponível por enquanto."
+      "pt": "A área de comando e prévia ainda não está pronta; indisponível por enquanto.",
+      "ru": "Команды и предпросмотр ещё не готовы; пока недоступно."
     },
     "action.history": {
       "zh": "查看历史",
@@ -36,7 +39,8 @@
       "es": "Historial",
       "fr": "Historique",
       "de": "Verlauf ansehen",
-      "pt": "Histórico"
+      "pt": "Histórico",
+      "ru": "История"
     },
     "action.more": {
       "zh": "更多",
@@ -45,7 +49,8 @@
       "es": "Más",
       "fr": "Plus",
       "de": "Mehr",
-      "pt": "Mais"
+      "pt": "Mais",
+      "ru": "Ещё"
     },
     "col.count": {
       "zh": "数量",
@@ -54,7 +59,8 @@
       "es": "Cantidad",
       "fr": "Nombre",
       "de": "Anzahl",
-      "pt": "Quantidade"
+      "pt": "Quantidade",
+      "ru": "Количество"
     },
     "col.findings": {
       "zh": "证据",
@@ -63,7 +69,8 @@
       "es": "Evidencia",
       "fr": "Preuves",
       "de": "Belege",
-      "pt": "Evidência"
+      "pt": "Evidência",
+      "ru": "Свидетельства"
     },
     "col.rule": {
       "zh": "规则",
@@ -72,7 +79,8 @@
       "es": "Regla",
       "fr": "Règle",
       "de": "Regel",
-      "pt": "Regra"
+      "pt": "Regra",
+      "ru": "Правило"
     },
     "col.skill": {
       "zh": "技能",
@@ -81,7 +89,8 @@
       "es": "Skill",
       "fr": "Skill",
       "de": "Skill",
-      "pt": "Skill"
+      "pt": "Skill",
+      "ru": "Навык"
     },
     "col.skills": {
       "zh": "涉及技能",
@@ -90,7 +99,8 @@
       "es": "Skills",
       "fr": "Skills concernés",
       "de": "Betroffene Skills",
-      "pt": "Skills"
+      "pt": "Skills",
+      "ru": "Навыки"
     },
     "copy.copied": {
       "zh": "已复制",
@@ -99,7 +109,8 @@
       "es": "Copiado",
       "fr": "Copié",
       "de": "Kopiert",
-      "pt": "Copiado"
+      "pt": "Copiado",
+      "ru": "Скопировано"
     },
     "copy.failed": {
       "zh": "复制失败",
@@ -108,7 +119,8 @@
       "es": "No se pudo copiar",
       "fr": "Copie impossible",
       "de": "Kopieren fehlgeschlagen",
-      "pt": "Falha ao copiar"
+      "pt": "Falha ao copiar",
+      "ru": "Не удалось скопировать"
     },
     "count.notCalibrated": {
       "zh": "暂无标准",
@@ -117,7 +129,8 @@
       "es": "Sin estándar todavía",
       "fr": "Pas encore de standard",
       "de": "Noch kein Maßstab",
-      "pt": "Sem padrão definido"
+      "pt": "Sem padrão definido",
+      "ru": "Нет эталона"
     },
     "count.unit.files": {
       "zh": "个文件",
@@ -126,7 +139,8 @@
       "es": "archivos",
       "fr": "fichiers",
       "de": "Dateien",
-      "pt": "arquivos"
+      "pt": "arquivos",
+      "ru": "файлов"
     },
     "count.unit.skills": {
       "zh": "个技能",
@@ -135,7 +149,8 @@
       "es": "skills",
       "fr": "skills",
       "de": "Skills",
-      "pt": "skills"
+      "pt": "skills",
+      "ru": "навыков"
     },
     "count.unit.stamps": {
       "zh": "处时间戳",
@@ -144,7 +159,8 @@
       "es": "marcas de tiempo",
       "fr": "horodatages",
       "de": "Zeitstempel",
-      "pt": "timestamps"
+      "pt": "timestamps",
+      "ru": "отметок времени"
     },
     "counts": {
       "zh": "{ok} 正常 · {warn} 警告 · {error} 错误 · {unreadable} 无法读取",
@@ -153,7 +169,8 @@
       "es": "{ok} correctos · {warn} avisos · {error} errores · {unreadable} ilegibles",
       "fr": "{ok} ok · {warn} avertissement · {error} erreur · {unreadable} illisible",
       "de": "{ok} OK · {warn} Warnung · {error} Fehler · {unreadable} nicht lesbar",
-      "pt": "{ok} ok · {warn} aviso · {error} erro · {unreadable} ilegível"
+      "pt": "{ok} ok · {warn} aviso · {error} erro · {unreadable} ilegível",
+      "ru": "{ok} в норме · {warn} с предупреждениями · {error} с ошибками · {unreadable} нечитаемых"
     },
     "dims.body": {
       "zh": "正文",
@@ -162,7 +179,8 @@
       "es": "Cuerpo",
       "fr": "Texte",
       "de": "Text",
-      "pt": "Corpo"
+      "pt": "Corpo",
+      "ru": "Текст"
     },
     "dims.support": {
       "zh": "附带文件",
@@ -171,7 +189,8 @@
       "es": "Archivos adjuntos",
       "fr": "Fichiers joints",
       "de": "Begleitdateien",
-      "pt": "Arquivos de apoio"
+      "pt": "Arquivos de apoio",
+      "ru": "Вспомогательные файлы"
     },
     "dims.unknown": {
       "zh": "未知",
@@ -180,7 +199,8 @@
       "es": "desconocido",
       "fr": "inconnu",
       "de": "unbekannt",
-      "pt": "desconhecido"
+      "pt": "desconhecido",
+      "ru": "неизвестно"
     },
     "empty": {
       "zh": "没有可报告的结论。",
@@ -189,7 +209,8 @@
       "es": "Nada que informar.",
       "fr": "Aucun résultat à signaler.",
       "de": "Nichts zu berichten.",
-      "pt": "Nada a relatar."
+      "pt": "Nada a relatar.",
+      "ru": "Сообщать нечего."
     },
     "empty.noneReported": {
       "zh": "这次没有发现异常——但这不代表每个技能都能读取。",
@@ -198,7 +219,8 @@
       "es": "Esta vez no se marcó nada, pero eso no significa que todos los skills se pudieran leer.",
       "fr": "Rien n’a été signalé cette fois — cela ne veut pas dire que chaque skill a pu être lu.",
       "de": "Diesmal wurde nichts Auffälliges gefunden – das heißt aber nicht, dass jeder Skill lesbar war.",
-      "pt": "Nada foi sinalizado desta vez — mas isso não significa que todas as skills puderam ser lidas."
+      "pt": "Nada foi sinalizado desta vez — mas isso não significa que todas as skills puderam ser lidas.",
+      "ru": "На этот раз проблем не найдено — но это не значит, что каждый навык удалось прочитать."
     },
     "entry.label": {
       "zh": "技能健康",
@@ -207,7 +229,8 @@
       "es": "Salud de skills",
       "fr": "Santé des skills",
       "de": "Skill-Health",
-      "pt": "Saúde das skills"
+      "pt": "Saúde das skills",
+      "ru": "Здоровье навыков"
     },
     "failure.forbidden": {
       "zh": "平台拒绝了这个请求（身份不是 owner）。",
@@ -216,7 +239,8 @@
       "es": "La plataforma rechazó esta solicitud (la identidad no es la propietaria).",
       "fr": "La plateforme a refusé cette requête (votre identité n’est pas owner).",
       "de": "Die Plattform hat die Anfrage abgelehnt (die Identität ist nicht owner).",
-      "pt": "A plataforma recusou esta solicitação (a identidade não é o owner)."
+      "pt": "A plataforma recusou esta solicitação (a identidade não é o owner).",
+      "ru": "Платформа отклонила запрос (эта учётная запись не является владельцем)."
     },
     "failure.server": {
       "zh": "读取失败，可以重试。",
@@ -225,7 +249,8 @@
       "es": "La lectura falló; puedes reintentar.",
       "fr": "La lecture a échoué ; vous pouvez réessayer.",
       "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
-      "pt": "Falha na leitura; você pode tentar novamente."
+      "pt": "Falha na leitura; você pode tentar novamente.",
+      "ru": "Не удалось прочитать; можно повторить."
     },
     "failure.unauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
@@ -234,7 +259,8 @@
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
       "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
       "de": "Anmeldung nötig: Seite neu öffnen, anmelden und erneut versuchen.",
-      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente."
+      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente.",
+      "ru": "Нужен вход: откройте страницу заново, войдите и повторите."
     },
     "failure.unmounted": {
       "zh": "该功能没有挂载。",
@@ -243,7 +269,8 @@
       "es": "Esta función no está montada.",
       "fr": "Cette fonction n’est pas montée.",
       "de": "Diese Funktion ist nicht eingebunden.",
-      "pt": "Este recurso não está montado."
+      "pt": "Este recurso não está montado.",
+      "ru": "Эта функция не подключена."
     },
     "failureForbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
@@ -252,7 +279,8 @@
       "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso).",
       "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission).",
       "de": "Die Plattform hat die Anfrage abgelehnt (dieses Konto hat keine Berechtigung).",
-      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão)."
+      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão).",
+      "ru": "Платформа отклонила запрос (у текущей учётной записи нет прав)."
     },
     "failureServer": {
       "zh": "读取失败，可以重试。",
@@ -261,7 +289,8 @@
       "es": "La lectura falló; puedes reintentar.",
       "fr": "La lecture a échoué ; vous pouvez réessayer.",
       "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
-      "pt": "Falha na leitura; você pode tentar novamente."
+      "pt": "Falha na leitura; você pode tentar novamente.",
+      "ru": "Не удалось прочитать; можно повторить."
     },
     "failureUnauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
@@ -270,7 +299,8 @@
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
       "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
       "de": "Anmeldung nötig: Seite neu öffnen, anmelden und erneut versuchen.",
-      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente."
+      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente.",
+      "ru": "Нужен вход: откройте страницу заново, войдите и повторите."
     },
     "failureUnmounted": {
       "zh": "这个功能没有启用。",
@@ -279,7 +309,8 @@
       "es": "Esta función no está activada.",
       "fr": "Cette fonction n’est pas activée.",
       "de": "Diese Funktion ist nicht aktiviert.",
-      "pt": "Este recurso não está ativado."
+      "pt": "Este recurso não está ativado.",
+      "ru": "Эта функция не включена."
     },
     "fallback.hint": {
       "zh": "可以改用命令：{command}",
@@ -288,7 +319,8 @@
       "es": "Alternativa por comando: {command}",
       "fr": "Commande de repli : {command}",
       "de": "Alternativ per Befehl: {command}",
-      "pt": "Alternativa por comando: {command}"
+      "pt": "Alternativa por comando: {command}",
+      "ru": "Запасной вариант — команда: {command}"
     },
     "fallbackHint": {
       "zh": "可以改用命令：{command}",
@@ -297,7 +329,8 @@
       "es": "Alternativa por comando: {command}",
       "fr": "Commande de repli : {command}",
       "de": "Alternativ per Befehl: {command}",
-      "pt": "Alternativa por comando: {command}"
+      "pt": "Alternativa por comando: {command}",
+      "ru": "Запасной вариант — команда: {command}"
     },
     "findings.none": {
       "zh": "无规则命中",
@@ -306,7 +339,8 @@
       "es": "Ninguna regla coincide",
       "fr": "Aucune règle déclenchée",
       "de": "Keine Regel greift",
-      "pt": "Nenhuma regra acionada"
+      "pt": "Nenhuma regra acionada",
+      "ru": "Правила не сработали"
     },
     "group.byRule": {
       "zh": "按规则",
@@ -315,7 +349,8 @@
       "es": "Por regla",
       "fr": "Par règle",
       "de": "Nach Regel",
-      "pt": "Por regra"
+      "pt": "Por regra",
+      "ru": "По правилам"
     },
     "group.bySkill": {
       "zh": "按技能",
@@ -324,7 +359,8 @@
       "es": "Por skill",
       "fr": "Par skill",
       "de": "Nach Skill",
-      "pt": "Por skill"
+      "pt": "Por skill",
+      "ru": "По навыкам"
     },
     "group.proposals": {
       "zh": "改进建议",
@@ -333,7 +369,8 @@
       "es": "Sugerencias de mejora",
       "fr": "Suggestions",
       "de": "Vorschläge",
-      "pt": "Sugestões"
+      "pt": "Sugestões",
+      "ru": "Предложения"
     },
     "health.complete": {
       "zh": "没有需要处理的问题",
@@ -342,7 +379,8 @@
       "es": "Nada requiere atención",
       "fr": "Rien à traiter",
       "de": "Keine offenen Punkte",
-      "pt": "Nada precisa de atenção"
+      "pt": "Nada precisa de atenção",
+      "ru": "Ничего не требует внимания"
     },
     "health.normal": {
       "zh": "{n} 项正常，展开查看",
@@ -351,7 +389,8 @@
       "es": "{n} en orden; despliega para ver",
       "fr": "{n} éléments normaux — développez pour voir",
       "de": "{n} normal – zum Ansehen aufklappen",
-      "pt": "{n} itens normais — expanda para ver"
+      "pt": "{n} itens normais — expanda para ver",
+      "ru": "{n} в норме — разверните, чтобы увидеть"
     },
     "hint": {
       "zh": "这里按规则汇总技能检查结果。还没定统一标准的规则只报规则名、不报数字；读不到内容的技能单独标为「无法读取」，不算正常。",
@@ -360,7 +399,8 @@
       "es": "Aquí se resumen los resultados de la revisión de skills por regla. Una regla sin estándar fijo solo muestra su nombre, sin cifra; los skills cuyo contenido no se puede leer se marcan aparte como «Ilegible» y nunca cuentan como correctos.",
       "fr": "Les résultats de vérification des skills sont regroupés par règle. Une règle sans standard fixé n’affiche que son nom, sans chiffre ; les skills dont le contenu est illisible sont marqués « Illisible » et ne comptent jamais comme normaux.",
       "de": "Hier sind die Skill-Prüfungen nach Regel zusammengefasst. Regeln ohne festen Maßstab zeigen nur ihren Namen, keine Zahl; Skills, deren Inhalt nicht lesbar ist, sind separat als „Nicht lesbar“ markiert und gelten nie als in Ordnung.",
-      "pt": "Aqui os resultados das verificações de skills aparecem agrupados por regra. Uma regra sem padrão definido mostra só o nome, sem número; skills que não puderam ser lidas ficam marcadas como \"Ilegível\" e nunca contam como boas."
+      "pt": "Aqui os resultados das verificações de skills aparecem agrupados por regra. Uma regra sem padrão definido mostra só o nome, sem número; skills que não puderam ser lidas ficam marcadas como \"Ilegível\" e nunca contam como boas.",
+      "ru": "Здесь собраны результаты проверки навыков по правилам. Если для правила ещё нет общего эталона, показывается только его название, без цифр; навыки, содержимое которых не читается, помечаются отдельно как «Нечитаемый» и не считаются нормой."
     },
     "line": {
       "zh": "位置：{path}",
@@ -369,7 +409,8 @@
       "es": "línea: {path}",
       "fr": "ligne : {path}",
       "de": "Zeile: {path}",
-      "pt": "local: {path}"
+      "pt": "local: {path}",
+      "ru": "Позиция: {path}"
     },
     "line.unknown": {
       "zh": "位置：未知",
@@ -378,7 +419,8 @@
       "es": "línea: DESCONOCIDA",
       "fr": "ligne : inconnue",
       "de": "Zeile: unbekannt",
-      "pt": "local: desconhecido"
+      "pt": "local: desconhecido",
+      "ru": "Позиция: неизвестно"
     },
     "loading": {
       "zh": "读取中…",
@@ -387,7 +429,8 @@
       "es": "Cargando…",
       "fr": "Chargement…",
       "de": "Wird gelesen…",
-      "pt": "carregando…"
+      "pt": "carregando…",
+      "ru": "Читаем…"
     },
     "loading.failed": {
       "zh": "读取失败——现在判断不了；点「刷新」重试。",
@@ -396,7 +439,8 @@
       "es": "La lectura falló: ahora mismo no se puede juzgar; pulsa «Actualizar» para reintentar.",
       "fr": "Lecture échouée : impossible de juger pour l’instant ; cliquez sur « Actualiser » pour réessayer.",
       "de": "Lesen fehlgeschlagen – eine Aussage ist gerade nicht möglich; „Aktualisieren“ versucht es erneut.",
-      "pt": "A leitura falhou — não é possível avaliar agora; clique em Atualizar para tentar novamente."
+      "pt": "A leitura falhou — não é possível avaliar agora; clique em Atualizar para tentar novamente.",
+      "ru": "Не удалось прочитать — сейчас судить нельзя; нажмите «Обновить» и повторите."
     },
     "proposal.copy": {
       "zh": "复制命令",
@@ -405,7 +449,8 @@
       "es": "Copiar comando",
       "fr": "Copier la commande",
       "de": "Befehl kopieren",
-      "pt": "Copiar comando"
+      "pt": "Copiar comando",
+      "ru": "Скопировать команду"
     },
     "proposal.kept": {
       "zh": "保留正文",
@@ -414,7 +459,8 @@
       "es": "cuerpo conservado",
       "fr": "texte conservé",
       "de": "behaltener Text",
-      "pt": "corpo mantido"
+      "pt": "corpo mantido",
+      "ru": "оставленный текст"
     },
     "proposal.outcome.extract": {
       "zh": "提取",
@@ -423,7 +469,8 @@
       "es": "extraer",
       "fr": "extraction",
       "de": "extrahieren",
-      "pt": "extrair"
+      "pt": "extrair",
+      "ru": "извлечение"
     },
     "proposal.outcome.keep": {
       "zh": "保持",
@@ -432,7 +479,8 @@
       "es": "conservar",
       "fr": "conservation",
       "de": "behalten",
-      "pt": "manter"
+      "pt": "manter",
+      "ru": "оставить"
     },
     "proposal.outcome.mixed": {
       "zh": "混合",
@@ -441,7 +489,8 @@
       "es": "mixto",
       "fr": "mixte",
       "de": "gemischt",
-      "pt": "misto"
+      "pt": "misto",
+      "ru": "смешанное"
     },
     "proposal.outcome.owner-gap": {
       "zh": "缺少归属技能",
@@ -450,7 +499,8 @@
       "es": "sin skill de destino",
       "fr": "skill d’accueil manquant",
       "de": "owner-gap",
-      "pt": "sem skill de destino"
+      "pt": "sem skill de destino",
+      "ru": "нет принимающего навыка"
     },
     "proposal.owner": {
       "zh": "放到哪个技能",
@@ -459,7 +509,8 @@
       "es": "A qué skill",
       "fr": "Skill d’accueil",
       "de": "Welcher Skill",
-      "pt": "Para qual skill"
+      "pt": "Para qual skill",
+      "ru": "В какой навык"
     },
     "proposal.owner.covered": {
       "zh": "已有可承接的技能",
@@ -468,7 +519,8 @@
       "es": "Hay un skill que puede recibirlo",
       "fr": "Un skill peut l’accueillir",
       "de": "Ein Skill kann es übernehmen",
-      "pt": "Há uma skill para receber"
+      "pt": "Há uma skill para receber",
+      "ru": "Есть навык, который примет"
     },
     "proposal.owner.owner-gap": {
       "zh": "还没有可承接的技能",
@@ -477,7 +529,8 @@
       "es": "Aún no hay ningún skill que pueda recibirlo",
       "fr": "Aucun skill pour l’accueillir",
       "de": "Noch kein Skill kann es übernehmen",
-      "pt": "Ainda não há skill para receber"
+      "pt": "Ainda não há skill para receber",
+      "ru": "Пока нет навыка, который примет"
     },
     "proposal.provenance": {
       "zh": "生成来源",
@@ -486,7 +539,8 @@
       "es": "Procedencia",
       "fr": "Provenance",
       "de": "Herkunft",
-      "pt": "Origem"
+      "pt": "Origem",
+      "ru": "Источник"
     },
     "proposal.reusable": {
       "zh": "可提取",
@@ -495,7 +549,8 @@
       "es": "reutilizable",
       "fr": "réutilisable",
       "de": "wiederverwendbar",
-      "pt": "reutilizável"
+      "pt": "reutilizável",
+      "ru": "можно извлечь"
     },
     "proposal.stale": {
       "zh": "改进建议的数据已过期；这不等于没有可整理内容，请刷新后重试。",
@@ -504,7 +559,8 @@
       "es": "Los datos de las sugerencias están desactualizados; actualiza y reintenta. Eso no significa que no haya nada que curar.",
       "fr": "Les suggestions sont périmées ; cela ne veut pas dire qu’il n’y a rien à ranger. Actualisez puis réessayez.",
       "de": "Die Vorschlagsdaten sind veraltet; aktualisiere und versuche es erneut. Das heißt nicht, dass es nichts zu curaten gibt.",
-      "pt": "As sugestões estão desatualizadas; atualize e tente novamente. Isso não significa que não haja nada para organizar."
+      "pt": "As sugestões estão desatualizadas; atualize e tente novamente. Isso não significa que não haja nada para organizar.",
+      "ru": "Данные предложений устарели; это не значит, что упорядочивать нечего — обновите и повторите."
     },
     "proposal.status.dismissed": {
       "zh": "状态：已忽略",
@@ -513,7 +569,8 @@
       "es": "estado: descartada",
       "fr": "statut : ignorée",
       "de": "Status: verworfen",
-      "pt": "status: dispensada"
+      "pt": "status: dispensada",
+      "ru": "Статус: отклонено"
     },
     "proposal.status.previewed": {
       "zh": "状态：已预览",
@@ -522,7 +579,8 @@
       "es": "estado: previsualizada",
       "fr": "statut : prévisualisée",
       "de": "Status: in Vorschau",
-      "pt": "status: visualizada"
+      "pt": "status: visualizada",
+      "ru": "Статус: просмотрено"
     },
     "proposal.status.proposed": {
       "zh": "状态：提议",
@@ -531,7 +589,8 @@
       "es": "estado: propuesta",
       "fr": "statut : proposée",
       "de": "Status: vorgeschlagen",
-      "pt": "status: proposta"
+      "pt": "status: proposta",
+      "ru": "Статус: предложено"
     },
     "proposal.status.stale": {
       "zh": "状态：已过期",
@@ -540,7 +599,8 @@
       "es": "estado: caducada",
       "fr": "statut : périmée",
       "de": "Status: veraltet",
-      "pt": "status: desatualizada"
+      "pt": "status: desatualizada",
+      "ru": "Статус: устарело"
     },
     "proposal.unavailable": {
       "zh": "暂时拿不到改进建议；这不等于没有可整理的内容。",
@@ -549,7 +609,8 @@
       "es": "Las sugerencias no están disponibles ahora; eso no significa que no haya nada que curar.",
       "fr": "Suggestions indisponibles pour l’instant ; cela ne veut pas dire qu’il n’y a rien à ranger.",
       "de": "Vorschläge sind gerade nicht abrufbar; das heißt nicht, dass es nichts zu curaten gibt.",
-      "pt": "As sugestões estão indisponíveis no momento; isso não significa que não haja nada para organizar."
+      "pt": "As sugestões estão indisponíveis no momento; isso não significa que não haja nada para organizar.",
+      "ru": "Предложения сейчас недоступны; это не значит, что упорядочивать нечего."
     },
     "proposal.warnings": {
       "zh": "警告",
@@ -558,7 +619,8 @@
       "es": "avisos",
       "fr": "avertissements",
       "de": "Warnungen",
-      "pt": "avisos"
+      "pt": "avisos",
+      "ru": "предупреждения"
     },
     "protected": {
       "zh": "这个技能受保护，不能直接改。",
@@ -567,7 +629,8 @@
       "es": "Este skill está protegido; no se puede cambiar directamente.",
       "fr": "Ce skill est protégé : modification directe impossible.",
       "de": "Dieser Skill ist geschützt und lässt sich nicht direkt ändern.",
-      "pt": "Esta skill é protegida e não pode ser alterada diretamente."
+      "pt": "Esta skill é protegida e não pode ser alterada diretamente.",
+      "ru": "Навык защищён, напрямую его не изменить."
     },
     "read.failed": {
       "zh": "这次没读到数据（下面一行是原始信息）：",
@@ -576,7 +639,8 @@
       "es": "Esta lectura no devolvió datos (abajo está el mensaje original):",
       "fr": "Cette lecture a échoué (le message brut est ci-dessous) :",
       "de": "Dieses Lesen hat keine Daten geliefert (die Zeile darunter ist die Roh-Meldung):",
-      "pt": "Esta leitura falhou (a mensagem original está logo abaixo):"
+      "pt": "Esta leitura falhou (a mensagem original está logo abaixo):",
+      "ru": "Данные прочитать не удалось (ниже исходное сообщение):"
     },
     "readAt.today": {
       "zh": "今天",
@@ -585,7 +649,8 @@
       "es": "Hoy",
       "fr": "Aujourd’hui",
       "de": "Heute",
-      "pt": "Hoje"
+      "pt": "Hoje",
+      "ru": "Сегодня"
     },
     "readAt.unknown": {
       "zh": "扫描时间未知",
@@ -594,7 +659,8 @@
       "es": "Fecha del escaneo desconocida",
       "fr": "Heure du scan inconnue",
       "de": "Scan-Zeit unbekannt",
-      "pt": "Horário da varredura desconhecido"
+      "pt": "Horário da varredura desconhecido",
+      "ru": "Время сканирования неизвестно"
     },
     "refresh": {
       "zh": "刷新",
@@ -603,7 +669,8 @@
       "es": "Actualizar",
       "fr": "Actualiser",
       "de": "Aktualisieren",
-      "pt": "Atualizar"
+      "pt": "Atualizar",
+      "ru": "Обновить"
     },
     "rule.body-oversize": {
       "zh": "正文偏长（超过参考长度）",
@@ -612,7 +679,8 @@
       "es": "Cuerpo largo (por encima de la longitud de referencia)",
       "fr": "Texte long (au-delà de la longueur de référence)",
       "de": "Text lang (über der Richtlänge)",
-      "pt": "Corpo longo (acima do tamanho de referência)"
+      "pt": "Corpo longo (acima do tamanho de referência)",
+      "ru": "Текст длинноват (длиннее эталона)"
     },
     "rule.body-oversize-2x": {
       "zh": "正文特别长（超过参考长度 2 倍）",
@@ -621,7 +689,8 @@
       "es": "Cuerpo muy largo (más del doble de la longitud de referencia)",
       "fr": "Texte très long (plus de 2× la longueur de référence)",
       "de": "Text sehr lang (über dem Doppelten der Richtlänge)",
-      "pt": "Corpo muito longo (acima de 2× o tamanho de referência)"
+      "pt": "Corpo muito longo (acima de 2× o tamanho de referência)",
+      "ru": "Текст очень длинный (вдвое длиннее эталона)"
     },
     "rule.body-without-support": {
       "zh": "正文长但没有附带文件",
@@ -630,7 +699,8 @@
       "es": "Cuerpo largo sin archivos adjuntos",
       "fr": "Texte long sans fichier joint",
       "de": "langer Text ohne Begleitdateien",
-      "pt": "Corpo longo sem arquivos de apoio"
+      "pt": "Corpo longo sem arquivos de apoio",
+      "ru": "Длинный текст без вспомогательных файлов"
     },
     "rule.empty": {
       "zh": "没有命中规则，当前全部正常",
@@ -639,7 +709,8 @@
       "es": "Ninguna regla coincide; ahora todo está en orden",
       "fr": "Aucune règle déclenchée, tout est normal",
       "de": "Keine Regel greift; derzeit alles in Ordnung",
-      "pt": "Nenhuma regra acionada; tudo saudável agora"
+      "pt": "Nenhuma regra acionada; tudo saudável agora",
+      "ru": "Ни одно правило не сработало, сейчас всё в норме"
     },
     "rule.references-sprawl": {
       "zh": "附带文件过多",
@@ -648,7 +719,8 @@
       "es": "Demasiados archivos adjuntos",
       "fr": "Trop de fichiers joints",
       "de": "zu viele Begleitdateien",
-      "pt": "Arquivos de apoio demais"
+      "pt": "Arquivos de apoio demais",
+      "ru": "Слишком много вспомогательных файлов"
     },
     "rule.scope-overloaded": {
       "zh": "内容范围过杂",
@@ -657,7 +729,8 @@
       "es": "Abarca demasiado",
       "fr": "Périmètre trop large",
       "de": "Thema zu breit",
-      "pt": "Abrange demais"
+      "pt": "Abrange demais",
+      "ru": "Слишком широкий охват"
     },
     "rule.stamp-density": {
       "zh": "正文像日志（时间戳多）",
@@ -666,7 +739,8 @@
       "es": "El cuerpo parece un registro (muchas marcas de tiempo)",
       "fr": "Texte en forme de journal (beaucoup d’horodatages)",
       "de": "Text liest sich wie ein Log (viele Zeitstempel)",
-      "pt": "O corpo parece um log (muitos timestamps)"
+      "pt": "O corpo parece um log (muitos timestamps)",
+      "ru": "Текст похож на журнал (много отметок времени)"
     },
     "rule.unreadable-skill": {
       "zh": "无法读取",
@@ -675,7 +749,8 @@
       "es": "Ilegible",
       "fr": "Illisible",
       "de": "nicht lesbar",
-      "pt": "Ilegível"
+      "pt": "Ilegível",
+      "ru": "Нечитаемый"
     },
     "rule.write-ghost": {
       "zh": "只写不读",
@@ -684,7 +759,8 @@
       "es": "Escrito, nunca leído",
       "fr": "Écrit, jamais lu",
       "de": "geschrieben, nie gelesen",
-      "pt": "Gravada, nunca lida"
+      "pt": "Gravada, nunca lida",
+      "ru": "Записан, но не читался"
     },
     "ruleTable.title": {
       "zh": "规则分布",
@@ -693,7 +769,8 @@
       "es": "Desglose por regla",
       "fr": "Répartition par règle",
       "de": "Regelverteilung",
-      "pt": "Distribuição por regra"
+      "pt": "Distribuição por regra",
+      "ru": "Распределение по правилам"
     },
     "scan.complete": {
       "zh": "扫描完成",
@@ -702,7 +779,8 @@
       "es": "Escaneo completado",
       "fr": "Scan terminé",
       "de": "Scan abgeschlossen",
-      "pt": "Varredura concluída"
+      "pt": "Varredura concluída",
+      "ru": "Сканирование завершено"
     },
     "scan.truncated": {
       "zh": "本次扫描不完整，数量可能偏少；请刷新后重试。",
@@ -711,7 +789,8 @@
       "es": "Este escaneo está incompleto y las cifras pueden quedarse cortas; actualiza y reintenta.",
       "fr": "Ce scan est incomplet : les comptes peuvent être sous-estimés. Actualisez puis réessayez.",
       "de": "Dieser Scan ist unvollständig; die Zahlen können zu niedrig sein. Mit „Aktualisieren“ erneut versuchen.",
-      "pt": "A varredura está incompleta; as contagens podem estar baixas. Clique em Atualizar para tentar novamente."
+      "pt": "A varredura está incompleta; as contagens podem estar baixas. Clique em Atualizar para tentar novamente.",
+      "ru": "Сканирование неполное, счётчики могут быть занижены; обновите и повторите."
     },
     "scan.unavailable": {
       "zh": "扫描不可用",
@@ -720,7 +799,8 @@
       "es": "Escaneo no disponible",
       "fr": "Scan indisponible",
       "de": "Scan nicht verfügbar",
-      "pt": "Varredura indisponível"
+      "pt": "Varredura indisponível",
+      "ru": "Сканирование недоступно"
     },
     "title": {
       "zh": "技能健康",
@@ -729,7 +809,8 @@
       "es": "Salud de skills",
       "fr": "Santé des skills",
       "de": "Skill-Health",
-      "pt": "Saúde das skills"
+      "pt": "Saúde das skills",
+      "ru": "Здоровье навыков"
     },
     "unreadable.note": {
       "zh": "读不到内容，因此无法判断（不是「通过」）。",
@@ -738,7 +819,8 @@
       "es": "No se pudo leer el contenido, así que no se puede juzgar (no es un aprobado).",
       "fr": "Contenu illisible, donc impossible de juger (ce n’est pas un « conforme »).",
       "de": "Der Inhalt war nicht lesbar, deshalb lässt sich nichts sagen (es ist kein „Bestanden“).",
-      "pt": "O conteúdo não pôde ser lido, então não é possível avaliar (não significa que está tudo bem)."
+      "pt": "O conteúdo não pôde ser lido, então não é possível avaliar (não significa que está tudo bem).",
+      "ru": "Содержимое не читается, поэтому судить нельзя (это не «Норма»)."
     },
     "verdict.error": {
       "zh": "错误",
@@ -747,7 +829,8 @@
       "es": "Error",
       "fr": "Erreur",
       "de": "Fehler",
-      "pt": "Erro"
+      "pt": "Erro",
+      "ru": "Ошибка"
     },
     "verdict.healthy": {
       "zh": "正常",
@@ -756,7 +839,8 @@
       "es": "Correcto",
       "fr": "OK",
       "de": "OK",
-      "pt": "OK"
+      "pt": "OK",
+      "ru": "Норма"
     },
     "verdict.needs-restructure": {
       "zh": "需要调整结构",
@@ -765,7 +849,8 @@
       "es": "Necesita reestructuración",
       "fr": "Restructuration nécessaire",
       "de": "Umstrukturierung nötig",
-      "pt": "Precisa reestruturar"
+      "pt": "Precisa reestruturar",
+      "ru": "Нужна перестройка"
     },
     "verdict.unreadable": {
       "zh": "无法读取",
@@ -774,7 +859,8 @@
       "es": "Ilegible",
       "fr": "Illisible",
       "de": "Nicht lesbar",
-      "pt": "Ilegível"
+      "pt": "Ilegível",
+      "ru": "Нечитаемый"
     },
     "verdict.warn": {
       "zh": "警告",
@@ -783,7 +869,8 @@
       "es": "Aviso",
       "fr": "Avertissement",
       "de": "Warnung",
-      "pt": "Aviso"
+      "pt": "Aviso",
+      "ru": "Предупреждение"
     }
   }
 }
