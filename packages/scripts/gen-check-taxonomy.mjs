@@ -66,6 +66,23 @@ const visit = (dir) => {
   }
 }
 visit(TREE)
+// Independent flat census: an explicit stack and a separate filter, so a bug in
+// `visit` cannot be green simply because `--check` uses the same walk.
+const census = []
+const stack = [TREE]
+while (stack.length > 0) {
+  const dir = stack.pop()
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === 'lib' || entry.name === 'dist' || entry.name.startsWith('.')) continue
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) { stack.push(full); continue }
+    if (entry.name.endsWith('.spec.ts') && relative(TREE, full).split(/[\\/]/).includes('tests')) census.push(full)
+  }
+}
+if (census.length !== specFiles.length) {
+  console.error('gen-check-taxonomy: census mismatch - visit=' + specFiles.length + ', flat=' + census.length)
+  process.exit(1)
+}
 const specMembers = { }
 for (const tier of tiers) specMembers[tier] = []
 const observations = []
