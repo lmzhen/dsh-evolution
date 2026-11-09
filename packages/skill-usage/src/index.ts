@@ -3,12 +3,13 @@
  * @module @deepseek-ai/dsh-skill-usage
  */
 
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import type { } from '@deepseek-ai/dsh-evolution-io'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 
-import { evolutionIoAdapter, evolutionRoot, makeSerialQueue, resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, evolutionRoot, makeSerialQueue } from '@deepseek-ai/dsh-evolution-core'
+import { resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core/skills'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_SUPPORT_READ_TOOL_NAMES, ToolDispatchNormalizer, classifySessionEvent, isReviewChannelSession, sessionAudited, skillReadNameOf, supportFileReadOf } from '@deepseek-ai/dsh-evolution-core'
 import { bumpPatch, bumpSupportRead, bumpUse, bumpView, getRecord, loadUsage, markAgentCreated, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'

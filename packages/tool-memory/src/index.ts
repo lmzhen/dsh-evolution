@@ -8,7 +8,8 @@ import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evol
 import z from '@deepseek-ai/schemastery'
 import { defineTool, registerEvolutionTool, type PromptContext, type PromptSection } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-memory'
-import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText } from '@deepseek-ai/dsh-evolution-core'
+import { resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core/skills'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'

@@ -37,7 +37,7 @@ import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, 
 // tool path and this plan path — design dsh-evolution-write-gate-design.md §4.2); the READER is
 // core's reader (the `evolutionReads` projection for a real Session, the structural accessor for a
 // bare stub view). Re-exported so this package's published surface keeps naming the rule.
-export { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core'
+export { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
 import { SessionScopedState } from './session-state.ts'
 
