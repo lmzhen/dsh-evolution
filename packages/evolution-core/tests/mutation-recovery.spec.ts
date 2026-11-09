@@ -43,7 +43,7 @@ it('update records a unit that undo restores', async () => {
     const unitId = versions.map(version => (version as { unitId?: string }).unitId).filter((id): id is string => id !== undefined && id !== '').at(-1)
     expect(unitId).toBeDefined()
     if (unitId === undefined) return
-    const unit = new MutationUnit({
+    const unit = new MutationUnit({ nested: true,
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
@@ -71,7 +71,7 @@ it('patch records a unit that undo restores', async () => {
     const unitId = versions.map(version => (version as { unitId?: string }).unitId).filter((id): id is string => id !== undefined && id !== '').at(-1)
     expect(unitId).toBeDefined()
     if (unitId === undefined) return
-    const unit = new MutationUnit({
+    const unit = new MutationUnit({ nested: true,
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
@@ -98,7 +98,7 @@ it('create undo removes the body and the managed marker', async () => {
     const unitId = versions.map(version => (version as { unitId?: string }).unitId).filter((id): id is string => id !== undefined && id !== '').at(-1)
     expect(unitId).toBeDefined()
     if (unitId === undefined) return
-    const unit = new MutationUnit({
+    const unit = new MutationUnit({ nested: true,
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),

@@ -209,6 +209,8 @@ export interface MutationUnitOptions {
   limits: MutationLimits
   serial?: <T>(task: () => Promise<T>) => Promise<T>
   lock?: MutationLockPort
+  /** Explicit escape for a caller that already holds the home fence (nested merge/skill write). */
+  nested?: boolean
   journal?: MutationJournalPort
   snapshots?: MutationSnapshotPort
   /** Optional merge target claim, acquired after the fence and released in finally. */
@@ -268,6 +270,9 @@ export class MutationUnit {
     this.io = options.io
     this.limits = options.limits
     this.serial = options.serial ?? identitySerial
+    if (options.lock === undefined && options.nested !== true) {
+      throw new Error('mutation-unit: a lock (or an explicit nested:true under an outer fence) is required')
+    }
     this.lock = options.lock ?? noLock
     this.journal = options.journal
     this.snapshots = options.snapshots

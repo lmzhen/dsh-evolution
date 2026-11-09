@@ -1848,7 +1848,7 @@ export class SkillLibrary {
     const unit = new MutationUnit({
       io: this.io,
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
-      lock: { acquire: async () => ({ release: async () => {} }) },
+      nested: true,
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       transactGuard: false,

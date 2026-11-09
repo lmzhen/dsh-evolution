@@ -25,7 +25,7 @@ describe('MutationUnit context provenance', () => {
     const io = new MemoryIo()
     io.files.set('skill/SKILL.md', 'old')
     const snapshots = new Snapshots()
-    const unit = new MutationUnit({
+    const unit = new MutationUnit({ nested: true,
       io,
       limits: { maxSkillFileBytes: 1000, maxSkillContentChars: 1000 },
       snapshots,

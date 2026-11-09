@@ -41,7 +41,7 @@ const io = { ...base, async transact(path, task) {
   if (path.replaceAll('\\\\', '/').endsWith('target/SKILL.md')) { await writeFile(${JSON.stringify(pidPath)}, String(process.pid)); await new Promise(() => { setInterval(() => {}, 1000) }) }
   return base.transact(path, task)
 } }
-const unit = new MutationUnit({ io, limits: { maxSkillFileBytes: 100000, maxSkillContentChars: 100000 }, snapshots: unitSnapshotPort(io, home), journal: unitJournalPort(io, home), now: () => 1 })
+const unit = new MutationUnit({ nested: true, io, limits: { maxSkillFileBytes: 100000, maxSkillContentChars: 100000 }, snapshots: unitSnapshotPort(io, home), journal: unitJournalPort(io, home), now: () => 1 })
 const result = await unit.apply({ name: 'source', roots: [{ name: 'source', protection: 'write' }], rootDirs: { source: ${JSON.stringify(skills)} }, ops: [
   { kind: 'write', target: ${JSON.stringify(source)}, content: 'new-source' },
   { kind: 'write', target: ${JSON.stringify(target)}, content: 'new-target' },
@@ -54,7 +54,7 @@ if (!result.ok) process.exit(2)
   await new Promise<void>(resolve => child.once('exit', () => { resolve() }))
 
   const io = nodeEvolutionIo()
-  const recovery = new MutationUnit({ io, limits: { maxSkillFileBytes: 100000, maxSkillContentChars: 100000 }, snapshots: unitSnapshotPort(io, home), journal: unitJournalPort(io, home) })
+  const recovery = new MutationUnit({ nested: true, io, limits: { maxSkillFileBytes: 100000, maxSkillContentChars: 100000 }, snapshots: unitSnapshotPort(io, home), journal: unitJournalPort(io, home) })
   const results = await recovery.recoverPrepared()
   expect(results.some(result => result.ok)).toBe(true)
   expect(await readFile(source, 'utf8')).toBe('old-source')

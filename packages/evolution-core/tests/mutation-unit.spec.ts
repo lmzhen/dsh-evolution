@@ -39,7 +39,7 @@ function request(overrides: Partial<MutationRequest> = {}): MutationRequest {
 }
 
 function unit(io: MemoryIo, overrides: { lock?: MutationLockPort; journal?: { write(record: MutationJournalRecord): Promise<void> }; snapshots?: MutationSnapshotPort; hooks?: MutationUnitHooks; context?: { owner: 'foreground' | 'background_review'; runId: string; leaseId: string } } = {}) {
-  return new MutationUnit({ io, limits: LIMITS, ...overrides })
+  return new MutationUnit({ io, limits: LIMITS, ...(overrides.lock === undefined ? { nested: true } : {}), ...overrides })
 }
 
 class MemorySnapshots implements MutationSnapshotPort {
@@ -57,6 +57,10 @@ class CommittedWarningIo extends MemoryIo {
 }
 
 describe('MutationUnit executor', () => {
+  it('refuses construction without a lock or an explicit nested mark', () => {
+    expect(() => new MutationUnit({ io: new MemoryIo(), limits: LIMITS })).toThrow(/lock.*nested/i)
+  })
+
   it('writes the plan and journals committed', async () => {
     const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
     const events: string[] = []
@@ -86,7 +90,7 @@ describe('MutationUnit executor', () => {
     const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
     let acquired = 0
     let released = 0
-    const unitWithClaim = new MutationUnit({ io, limits: LIMITS, claimRunId: 'run-1', claim: { async acquire(target, runId) { acquired += 1; expect(target).toBe('source'); expect(runId).toBe('run-1'); return { async release() { released += 1 } } } } })
+    const unitWithClaim = new MutationUnit({ io, limits: LIMITS, nested: true, claimRunId: 'run-1', claim: { async acquire(target, runId) { acquired += 1; expect(target).toBe('source'); expect(runId).toBe('run-1'); return { async release() { released += 1 } } } } })
     const result = await unitWithClaim.apply(request())
     expect(result.ok).toBe(true)
     expect(acquired).toBe(1)
@@ -95,7 +99,7 @@ describe('MutationUnit executor', () => {
 
   it('refuses the write when the target claim cannot be acquired', async () => {
     const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
-    const unitWithClaim = new MutationUnit({ io, limits: LIMITS, claimRunId: 'run-1', claim: { async acquire() { throw new Error('claim busy') } } })
+    const unitWithClaim = new MutationUnit({ io, limits: LIMITS, nested: true, claimRunId: 'run-1', claim: { async acquire() { throw new Error('claim busy') } } })
     const result = await unitWithClaim.apply(request())
     expect(result.ok).toBe(false)
     expect(result.errors[0]?.code).toBe('claim-failed')
@@ -128,7 +132,7 @@ describe('MutationUnit executor', () => {
       if (next === null) memory.files.delete(path)
       else memory.files.set(path, next)
     }) as never
-    const result = await new MutationUnit({ io, limits: LIMITS, transact }).apply(request())
+    const result = await new MutationUnit({ io, limits: LIMITS, nested: true, transact }).apply(request())
     expect(result.ok).toBe(false)
     expect(io.files.get('source/SKILL.md')).toBe('CONCURRENT')
   })
