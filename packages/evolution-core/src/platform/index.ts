@@ -13,6 +13,8 @@ export type {
 } from '@deepseek-ai/dsh-tools'
 export type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 export { scopeOf } from '@deepseek-ai/dsh-scope'
+export { defineDomain, domainTable, DomainError } from '@deepseek-ai/dsh-storage-domain'
+export type { Domain } from '@deepseek-ai/dsh-storage-domain'
 export { BlockAssembler, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 export type {
   ContentBlock,

@@ -10,10 +10,6 @@
       "specifier": "@deepseek-ai/dsh-skill"
     },
     {
-      "file": "packages/evolution-state-domain/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-storage-domain"
-    },
-    {
       "file": "packages/evolution-skill-discovery/src/identity.ts",
       "specifier": "@deepseek-ai/dsh-skill"
     },
