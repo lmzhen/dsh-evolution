@@ -988,6 +988,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * Run one plugin-side review over the parent prefix. No child Agent/Session is
    * created; the parent Agent is used only for tool scope/approval, with no log.
    */
+  let inFlightControllers = new Set<AbortController>()
+
   async function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
     const running = auxRunning.get(session.id)
     if (running !== undefined) { running.rerun = kind; return true }
@@ -1016,6 +1018,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const reviewId = 'aux-' + randomUUID()
     const startedAt = Date.now()
     const controller = new AbortController()
+    inFlightControllers.add(controller)
     let timedOut = false
     const timer = setTimeout(() => { timedOut = true; controller.abort() }, config.reviewTimeoutMs)
     let leaseRenewTimer: ReturnType<typeof setInterval> | undefined
@@ -1055,7 +1058,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             cacheWriteTokens: 0,
           }
         }
-        status = 'completed'
+        status = toolAllow.size === 0
+          ? 'failed'
+          : 'completed'
+        if (toolAllow.size === 0) error = 'aux review has no allowed tools for this parent (PTC-only header); refusing to report completed'
       } catch (caught) {
         error = caught instanceof Error ? caught.message : String(caught)
         status = timedOut ? 'timeout' : controller.signal.aborted ? 'aborted' : 'failed'
@@ -1097,6 +1103,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ctx.logger.warn('dsh-evolution-review: aux plan-applied emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
         }
         auxRunning.delete(session.id)
+        inFlightControllers.delete(controller)
         if (leaseToken !== undefined && authority?.lease !== undefined) await authority.lease.release(leaseToken).catch(() => {})
         if (state.rerun !== undefined) void tryAuxReview(session, agent, state.rerun, signal, reason)
       }
@@ -1116,6 +1123,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // tests/session-state-ownership.spec.ts fails when a new per-session map
     // skips the registry. reviewStateLocks chains self-remove when drained;
     // this clear only covers locks still pending at unload.
+    for (const controller of inFlightControllers) controller.abort()
+    inFlightControllers = new Set<AbortController>()
     sessionState.dispose()
   }, 'dsh-evolution-review.cleanup')
 }
