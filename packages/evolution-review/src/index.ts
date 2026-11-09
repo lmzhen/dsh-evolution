@@ -1003,7 +1003,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       ctx.logger.warn('dsh-evolution-review: aux review skipped — llm/tools service is not mounted')
       return false
     }
-    const authority = ctx.get('evolutionMutationAuthority') as { lease?: { acquire(owner: 'background_review', runId: string, ttlMs?: number): Promise<{ ok: true; token: { id: string; owner: string; runId: string; epoch: number } } | { ok: false; reason: string }>; release(token: { id: string; owner: string; runId: string; epoch: number }): Promise<void> } } | undefined
+    const authority = ctx.get('evolutionMutationAuthority') as { lease?: { acquire(owner: 'background_review', runId: string, ttlMs?: number): Promise<{ ok: true; token: { id: string; owner: string; runId: string; epoch: number } } | { ok: false; reason: string }>; release(token: { id: string; owner: string; runId: string; epoch: number }): Promise<void>; renew(token: { id: string; owner: string; runId: string; epoch: number }): Promise<unknown | null> } } | undefined
     let leaseToken: { id: string; owner: string; runId: string; epoch: number } | undefined
     if (authority?.lease !== undefined) {
       const lease = await authority.lease.acquire('background_review', 'review:' + session.id, Math.max(config.reviewTimeoutMs + 30_000, 60_000)).catch(() => undefined)
@@ -1018,6 +1018,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const controller = new AbortController()
     let timedOut = false
     const timer = setTimeout(() => { timedOut = true; controller.abort() }, config.reviewTimeoutMs)
+    let leaseRenewTimer: ReturnType<typeof setInterval> | undefined
+    if (leaseToken !== undefined && authority?.lease !== undefined) {
+      leaseRenewTimer = setInterval(() => {
+        void authority.lease!.renew(leaseToken!).then(record => { if (record === null) controller.abort() }).catch(() => { controller.abort() })
+      }, Math.max(5_000, Math.min(30_000, Math.floor(config.reviewTimeoutMs / 2))))
+    }
     const AUX_TOOL_ALLOW = new Set(['skill_manage', 'memory', 'skill', 'skill_search', 'read', 'glob', 'grep'])
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
@@ -1056,6 +1062,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         ctx.logger.warn('dsh-evolution-review: aux review failed: ' + error)
       } finally {
         clearTimeout(timer)
+        if (leaseRenewTimer !== undefined) clearInterval(leaseRenewTimer)
         const finishedAt = Date.now()
         try {
           ctx.emit('evolution/review-completed', {
