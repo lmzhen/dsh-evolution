@@ -4,7 +4,8 @@
   "spikes": [
     {
       "spike": "S1",
-      "verdict": "pass",
+      "verdict": "blocked",
+      "failure": "not measured on 0.41.x; the rehearsal PASS claim is withdrawn",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
       "familyVersion": "0.40.0",
@@ -19,7 +20,8 @@
     },
     {
       "spike": "S2",
-      "verdict": "pass",
+      "verdict": "blocked",
+      "failure": "not measured on 0.41.x; the rehearsal PASS claim is withdrawn",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
       "familyVersion": "0.0.0-main",
@@ -33,7 +35,8 @@
     },
     {
       "spike": "S3",
-      "verdict": "pass",
+      "verdict": "blocked",
+      "failure": "not measured on 0.41.x; the rehearsal PASS claim is withdrawn",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
       "familyVersion": "0.0.0-main",
@@ -49,7 +52,8 @@
     },
     {
       "spike": "S4",
-      "verdict": "pass",
+      "verdict": "blocked",
+      "failure": "not measured on 0.41.x; the rehearsal PASS claim is withdrawn",
       "face": "headless",
       "hostVersion": "0.2.2-rc.1",
       "familyVersion": "0.40.0",
