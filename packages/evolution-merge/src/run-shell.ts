@@ -64,6 +64,8 @@ export interface WithMergeRunOptions {
   readonly parentRunId?: string
   readonly detached?: boolean
   readonly timeoutMinutes?: number
+  /** Observability for a detached finish failure; defaults to console.warn. */
+  readonly warn?: (message: string) => void
   readonly body: (ctx: MergeRunBodyContext) => Promise<MergeRunReportDraft>
 }
 
@@ -235,7 +237,10 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     return { ok: false, runId: handle.id, message: 'merge ' + report.stopReason, reportPath }
   }
   if (options.detached === true) {
-    void finish().catch(() => {})
+    void finish().catch((error: unknown) => {
+      const warn = options.warn ?? ((message: string) => { console.warn(message) })
+      warn('evolution-merge: detached run ' + handle.id + ' finish failed: ' + (error instanceof Error ? error.message : String(error)))
+    })
     return { ok: true, accepted: true, runId: handle.id }
   }
   return await finish()
