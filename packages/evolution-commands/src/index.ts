@@ -249,12 +249,14 @@ async function writeMaintainReport(
   record: MaintainReportRecord,
   warn: (message: string) => void,
   evolutionHomePath: string,
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined,
 ): Promise<string | undefined> {
   // The home is bound when the RUN starts (passed in, not read here): a run belongs to
   // the home it was started in, and a later home change must not misfile its report.
   const dir = join(evolutionHomePath, 'reports')
   const path = join(dir, `maintain-${record.runId}.json`)
   let written = true
+  const body = async (): Promise<void> => {
   try {
     await io.writeText(path, JSON.stringify(record, null, 2))
     await io.writeText(join(dir, `maintain-${record.runId}.md`), record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text)
@@ -275,6 +277,9 @@ async function writeMaintainReport(
     // The lock target itself is never written — the task exists to hold the lock.
     return null
   })
+  }
+  if (fence !== undefined) await fence.run(body)
+  else await body()
   return written ? path : undefined
 }
 
@@ -1059,7 +1064,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 startedAt: handle.startedAt,
                 endedAt,
                 text: outcome.text ?? '',
-              }, (message) => { ctx.logger.warn(message) }, runHome)
+              }, (message) => { ctx.logger.warn(message) }, runHome, (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence)
               // W5 G3-S4: a settle that names a resultRef must be readable NOW — otherwise the
               // terminal record points at a file a reader/replay cannot open (write/io race).
               if (resultRef !== undefined) {
