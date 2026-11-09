@@ -164,7 +164,7 @@ describe('the evolution settings section', () => {
     const section = registrations.find(row => row.name === 'settings.section')
     expect(section).toBeDefined()
     render(h(section?.component, {}))
-    expect(document.body.textContent).toContain('这个界面没有提供设置服务')
+    expect(document.body.textContent).toContain('seatMissing')
     cleanup()
   })
 })
