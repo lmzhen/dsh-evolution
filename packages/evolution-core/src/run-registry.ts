@@ -43,6 +43,8 @@ import { join } from 'node:path'
 import { clampedNumber } from './numeric.ts'
 import { isProcessAlive, transactIo } from './io.ts'
 import type { EvolutionIoLike } from './io.ts'
+import type { RunOutcome } from '@deepseek-ai/dsh-evolution-contract'
+export type { RunOutcome } from '@deepseek-ai/dsh-evolution-contract'
 
 /** The kinds of long-running work the registry tracks. */
 export type RunKind = 'maintain' | 'merge'
@@ -115,14 +117,6 @@ export interface RunHandle {
   readonly pairs?: readonly unknown[] | undefined
 }
 
-/** How a run ended, as reported by its owner. */
-export interface RunOutcome {
-  state: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
-  resultRef?: string | undefined
-  failure?: string | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan' | undefined
-}
 
 /** The registry surface the commands row drives. */
 export interface RunRegistry {
