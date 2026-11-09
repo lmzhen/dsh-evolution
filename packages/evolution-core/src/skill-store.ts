@@ -59,7 +59,7 @@ import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
-import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
+import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type HistoryFence, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { getRecord, loadUsage, mutateUsage, suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
@@ -791,6 +791,7 @@ export class SkillLibrary {
   private readonly authority: WriteAuthority
   /** When supplied by the family MutationAuthority, replaces the per-directory file lock. */
   private readonly mutationLock: MutationLockPort | undefined
+  private readonly fence: HistoryFence | undefined
   /** skill-history.ts: the content history is best-effort, so a failure must not be SILENT —
    * but it is a deployment condition, not a per-write event, so it warns once per instance. */
   private historyWarned = false
@@ -804,6 +805,7 @@ export class SkillLibrary {
     threatExemptLabels?: readonly string[],
     authority: WriteAuthority = CLASS_DEFAULT_AUTHORITY,
     mutationLock?: MutationLockPort,
+    fence?: HistoryFence,
   ) {
     this.root = root
     this.io = io
@@ -812,6 +814,7 @@ export class SkillLibrary {
     this.threatExemptLabels = threatExemptLabels ?? []
     this.authority = authority
     this.mutationLock = mutationLock
+    this.fence = fence
     // V4-20: bind the IO backend's own transact by default. Explicit injection
     // stays first; a backend WITHOUT transact keeps the old plain read→write
     // (the in-process serial chain is the second layer). The wrapper adapts the
@@ -1555,7 +1558,7 @@ export class SkillLibrary {
         ...unitId === undefined ? {} : { unitId },
         ...unitHead === undefined ? {} : { unitHead },
       }
-      versions = await recordVersions(this.root, this.io, input, keep)
+      versions = await recordVersions(this.root, this.io, input, keep, this.fence)
     } catch (error) {
       if (!this.historyWarned) {
         this.historyWarned = true
@@ -4393,6 +4396,7 @@ export interface NewSkillLibraryOptions {
   authority: WriteAuthority
   /** Optional family authority lock; absent falls back to per-directory file lock. */
   mutationLock?: MutationLockPort
+  fence?: HistoryFence
 }
 
 export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
@@ -4408,6 +4412,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     [...(threatExemptLabels ?? [])],
     authority,
     options.mutationLock ?? mutationLockFrom(ctx),
+    options.fence ?? (ctx?.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence,
   )
 }
 

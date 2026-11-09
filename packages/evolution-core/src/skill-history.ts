@@ -617,11 +617,16 @@ export async function loadVersionContent(root: string, io: EvolutionIoLike, name
  * @param keep - how many versions to retain per skill.
  * @returns the version numbers, or null when there was no content to record.
  */
+export interface HistoryFence {
+  run<T>(body: () => Promise<T>): Promise<T>
+}
+
 export async function recordVersions(
   root: string,
   io: EvolutionIoLike,
   input: VersionRecordInput,
   keep: number,
+  fence?: HistoryFence,
 ): Promise<RecordedVersions | null> {
   if (input.before === null && input.after === null) return null
   for (const side of [input.before, input.after]) {
@@ -670,7 +675,8 @@ export async function recordVersions(
   }
   const recorded: RecordedVersions = {}
   let raceRefused: boolean = false
-  await transactIo(io, file, (current) => {
+  const write = async (): Promise<void> => {
+    await transactIo(io, file, (current) => {
     const state = readHistoryIndex(current)
     // The old comment here claimed the probe's copy covered a race. It only did when the probe had
     // ALREADY seen the bytes as unreadable; a file that turned unreadable in between had no copy, and
@@ -685,8 +691,11 @@ export async function recordVersions(
     const { versions, recorded: numbers } = nextHistoryIndex(state.kind === 'ok' ? state.versions : [], input, keep)
     recorded.beforeVersion = numbers.beforeVersion
     recorded.afterVersion = numbers.afterVersion
-    return JSON.stringify({ version: HISTORY_INDEX_VERSION, versions }, null, 2)
-  })
+      return JSON.stringify({ version: HISTORY_INDEX_VERSION, versions }, null, 2)
+    })
+  }
+  if (fence !== undefined) await fence.run(write)
+  else await write()
   // v46 lint: `raceRefused` is set inside the transact task (the analyzer sees only the literal
   // initializer), and the refusal is the S3.1 case this branch exists for.
   // oxlint-disable-next-line typescript/no-unnecessary-condition -- set inside the transact task
