@@ -1,12 +1,10 @@
 // @tier fast
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { nodeEvolutionIo } from '../src/io.ts'
-import { LeaseStore } from '../src/lease-store.ts'
-import { MutationAuthority, MutationAuthorityError } from '../src/mutation-authority.ts'
-import type { MutationSnapshot, MutationSnapshotPort } from '../src/mutation-unit.ts'
+import { MutationAuthority } from '../src/mutation-authority.ts'
 
 const roots: string[] = []
 async function root(): Promise<string> {
@@ -16,77 +14,32 @@ async function root(): Promise<string> {
 }
 afterEach(async () => { while (roots.length > 0) await rm(roots.pop()!, { recursive: true, force: true }) })
 
-class Snapshots implements MutationSnapshotPort {
-  readonly items = new Map<string, MutationSnapshot>()
-  async write(snapshot: MutationSnapshot): Promise<void> { this.items.set(snapshot.unitId, snapshot) }
-  async read(unitId: string): Promise<MutationSnapshot | null> { return this.items.get(unitId) ?? null }
-  async listPrepared(): Promise<MutationSnapshot[]> { return [...this.items.values()].filter(item => item.state === 'prepared') }
-}
-
-const limits = { maxSkillFileBytes: 10000, maxSkillContentChars: 10000 }
-
 describe('MutationAuthority', () => {
-  it('requires an active lease before apply and stamps the snapshot', async () => {
+  it('mutationLock is the one home fence and serializes its holders', async () => {
     const home = await root()
-    const io = nodeEvolutionIo()
-    const leases = new LeaseStore({ io, home })
-    const authority = new MutationAuthority({ io, home, leases })
-    const target = join(home, 'skill', 'SKILL.md')
-    const snapshots = new Snapshots()
-    const request = {
-      name: 'skill',
-      roots: [{ name: 'skill', protection: 'write' as const }],
-      rootDirs: { skill: join(home, 'skill') },
-      ops: [{ kind: 'write' as const, target, content: 'hello', expected: null, skill: 'skill' }],
-      origin: 'foreground',
-      auditAction: 'write',
-      auditSummary: 'test',
-      eventAction: 'write',
-    }
-    const acquired = await leases.acquire('foreground', 'run-1')
-    expect(acquired.ok).toBe(true)
-    if (!acquired.ok) return
-    const result = await authority.apply(request, { owner: 'foreground', runId: 'run-1', lease: acquired.token }, { limits, snapshots })
-    expect(result.ok).toBe(true)
-    expect(await readFile(target, 'utf8')).toBe('hello')
-    expect([...snapshots.items.values()][0]).toMatchObject({ owner: 'foreground', runId: 'run-1', leaseId: acquired.lease.id, state: 'committed' })
-    await leases.release(acquired.token)
-    await expect(authority.apply(request, { owner: 'foreground', runId: 'run-1', lease: acquired.token }, { limits, snapshots })).rejects.toBeInstanceOf(MutationAuthorityError)
+    const authority = new MutationAuthority({ io: nodeEvolutionIo(), home, waitMs: 0 })
+    const first = await authority.mutationLock.acquire()
+    const secondPromise = authority.mutationLock.acquire()
+    const outcome = await Promise.race([
+      secondPromise.then(() => 'acquired'),
+      new Promise<string>(resolve => setTimeout(() => resolve('waiting'), 50)),
+    ])
+    expect(outcome).toBe('waiting')
+    await first.release()
+    const second = await secondPromise
+    await second.release()
   })
 
-  it('runs a single-file transact under the fence and lease', async () => {
+  it('keeps the per-run lease independent from the write fence', async () => {
     const home = await root()
-    const io = nodeEvolutionIo()
-    const leases = new LeaseStore({ io, home })
-    const authority = new MutationAuthority({ io, home, leases })
-    const path = join(home, 'state.json')
-    await writeFile(path, 'before')
-    const acquired = await leases.acquire('foreground', 'run-2')
+    const authority = new MutationAuthority({ io: nodeEvolutionIo(), home, waitMs: 1000 })
+    const acquired = await authority.lease.acquire('foreground', 'run-1')
     expect(acquired.ok).toBe(true)
     if (!acquired.ok) return
-    await authority.transact(path, current => current === 'before' ? 'after' : current, { owner: 'foreground', runId: 'run-2', lease: acquired.token })
-    expect(await readFile(path, 'utf8')).toBe('after')
-    await leases.release(acquired.token)
-  })
-
-  it('blocks recovery while the run lease is active, then recovers after release', async () => {
-    const home = await root()
-    const io = nodeEvolutionIo()
-    const leases = new LeaseStore({ io, home })
-    const authority = new MutationAuthority({ io, home, leases })
-    const target = join(home, 'skill', 'SKILL.md')
-    await io.writeText(target, 'new')
-    const snapshots = new Snapshots()
-    snapshots.items.set('u-1', { unitId: 'u-1', state: 'prepared', ops: [{ target, before: 'old', after: 'new', skill: 'skill' }], createdAt: 1, owner: 'foreground', runId: 'run-3', leaseId: 'lease-3' })
-    const acquired = await leases.acquire('foreground', 'run-3')
-    expect(acquired.ok).toBe(true)
-    if (!acquired.ok) return
-    const blocked = await authority.recover({ snapshots, limits })
-    expect(blocked.blocked).toHaveLength(1)
-    expect(await readFile(target, 'utf8')).toBe('new')
-    await leases.release(acquired.token)
-    const recovered = await authority.recover({ snapshots, limits })
-    expect(recovered.recovered[0]?.ok).toBe(true)
-    expect(await readFile(target, 'utf8')).toBe('old')
+    await expect(authority.lease.acquire('foreground', 'run-1')).resolves.toMatchObject({ ok: false })
+    await authority.lease.release(acquired.token)
+    const again = await authority.lease.acquire('foreground', 'run-1')
+    expect(again.ok).toBe(true)
+    if (again.ok) await authority.lease.release(again.token)
   })
 })
