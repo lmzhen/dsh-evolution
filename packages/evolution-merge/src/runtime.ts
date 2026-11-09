@@ -58,8 +58,12 @@ interface BusyTarget { readonly id: string; readonly runId?: string }
  * approved/fuse BEFORE their run starts, so this row IS the in-flight claim a second
  * same-target run would collide with (the pair itself is guarded by run-meta).
  */
-function busyTarget(rows: readonly MergeRow[], target: string, excludeRowId: string): BusyTarget | undefined {
-  const row = rows.find(item => item.id !== excludeRowId && (item.state === 'approved' || item.state === 'fuse') && item.decision?.target === target)
+export function busyTarget(rows: readonly MergeRow[], target: string, excludeRowId: string): BusyTarget | undefined {
+  const row = rows.find(item => item.id !== excludeRowId
+    && (item.state === 'approved' || item.state === 'fuse')
+    && item.decision?.target === target
+    // P1-4: a non-retryable failure is auditable but must not hold the target forever.
+    && !(item.failure !== undefined && item.failure.retryable !== true))
   return row === undefined ? undefined : { id: row.id, ...(row.runId === undefined ? {} : { runId: row.runId }) }
 }
 export function forcedDecisionFor(a: string, b: string): MergeDecision {
