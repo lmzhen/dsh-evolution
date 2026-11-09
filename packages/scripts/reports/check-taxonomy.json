@@ -83,6 +83,7 @@
         "gate-79",
         "gate-80",
         "gate-81",
+        "gate-82",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -95,6 +96,8 @@
         "evolution-client-kit::tests/settings-seat.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
+        "evolution-commands::tests/help-locale.spec.ts",
+        "evolution-commands::tests/host-locale.spec.ts",
         "evolution-commands::tests/parse.spec.ts",
         "evolution-core::tests/citations.spec.ts",
         "evolution-core::tests/content-hash.spec.ts",
@@ -258,6 +261,7 @@
         "gate-79",
         "gate-80",
         "gate-81",
+        "gate-82",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -340,6 +344,7 @@
         "gate-79",
         "gate-80",
         "gate-81",
+        "gate-82",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -360,6 +365,8 @@
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
         "evolution-commands::tests/doctor-view.spec.ts",
+        "evolution-commands::tests/help-locale.spec.ts",
+        "evolution-commands::tests/host-locale.spec.ts",
         "evolution-commands::tests/maintain-handoff.spec.ts",
         "evolution-commands::tests/migration.spec.ts",
         "evolution-commands::tests/params-view.spec.ts",
@@ -799,6 +806,7 @@
         "gate-79",
         "gate-80",
         "gate-81",
+        "gate-82",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -975,6 +983,7 @@
         "gate-79",
         "gate-80",
         "gate-81",
+        "gate-82",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -995,6 +1004,8 @@
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
         "evolution-commands::tests/doctor-view.spec.ts",
+        "evolution-commands::tests/help-locale.spec.ts",
+        "evolution-commands::tests/host-locale.spec.ts",
         "evolution-commands::tests/maintain-handoff.spec.ts",
         "evolution-commands::tests/migration.spec.ts",
         "evolution-commands::tests/params-view.spec.ts",
@@ -1434,6 +1445,7 @@
         "gate-79",
         "gate-80",
         "gate-81",
+        "gate-82",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -1528,6 +1540,7 @@
         "gate-79",
         "gate-80",
         "gate-81",
+        "gate-82",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed",
@@ -1555,6 +1568,8 @@
         "evolution-commands::tests/doctor-merge.spec.ts",
         "evolution-commands::tests/doctor-view.spec.ts",
         "evolution-commands::tests/doctor.spec.ts",
+        "evolution-commands::tests/help-locale.spec.ts",
+        "evolution-commands::tests/host-locale.spec.ts",
         "evolution-commands::tests/maintain-handoff.spec.ts",
         "evolution-commands::tests/migration.spec.ts",
         "evolution-commands::tests/params-view.spec.ts",
@@ -2060,6 +2075,7 @@
         "gate-79",
         "gate-80",
         "gate-81",
+        "gate-82",
         "graph-edges-live",
         "health-admission",
         "line-identity-bed"
@@ -2068,29 +2084,29 @@
   },
   "counts": {
     "fast": {
-      "gates": 74,
-      "specs": 97
+      "gates": 75,
+      "specs": 99
     },
     "pre-tag": {
-      "gates": 74,
-      "specs": 381
+      "gates": 75,
+      "specs": 383
     },
     "ci-only": {
       "gates": 12,
       "specs": 72
     },
     "full(ci=off)": {
-      "gates": 74,
-      "specs": 381
+      "gates": 75,
+      "specs": 383
     },
     "full(ci=on)": {
-      "gates": 86,
-      "specs": 453
+      "gates": 87,
+      "specs": 455
     }
   },
   "specs": {
-    "total": 453,
-    "marked": 453,
+    "total": 455,
+    "marked": 455,
     "unmarked": 0
   }
 }
