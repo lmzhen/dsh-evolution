@@ -86,6 +86,23 @@ describe('staged-window expiry (T4-09/A51)', () => {
     expect(rows.map(row => row.id)).toContain(id)
   })
 
+  it('releases the claim when an expiry reject throws — the record returns to pending', async () => {
+    const { ctx } = await mountApproval(1000)
+    const id = await stage(ctx, new Date(Date.now() - 60_000).toISOString())
+    const provider = ctx.evolutionStateStorage.provider('json') as unknown as { tryResolvePending: (...args: unknown[]) => Promise<unknown> }
+    const original = provider.tryResolvePending.bind(provider)
+    provider.tryResolvePending = async () => { throw new Error('injected reject failure') }
+    try {
+      await expect(ctx.evolutionApproval.expireStale()).resolves.toEqual([])
+    } finally {
+      provider.tryResolvePending = original
+    }
+    const pending = await ctx.evolutionState.listPending('pending')
+    expect(pending.some(item => item.id === id)).toBe(true)
+    const executing = await ctx.evolutionState.listPending('executing')
+    expect(executing.some(item => item.id === id)).toBe(false)
+  })
+
   it('an unparseable createdAt is not stale evidence — the record stays for the operator', async () => {
     const { ctx } = await mountApproval(1000)
     const id = await stage(ctx, 'not-a-date')
