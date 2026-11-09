@@ -247,3 +247,19 @@ it('classifies a claim-acquire failure as unit-claim-failed', async () => {
   const committed = await tx.commit(prepared.prepared)
   expect(committed).toMatchObject({ ok: false, code: 'unit-claim-failed' })
 })
+
+it('releases the fence even when claim release throws', async () => {
+  const home = await tempRoot('dsh-unit-tx-claim-release-')
+  const io = nodeEvolutionIo()
+  const tree = new Map<string, string>([['alpha', 'old'], ['beta', 'beta']])
+  const fence = new HomeFence({ io, home, waitMs: 0 })
+  const tx = new UnitTransactions({ io, home, backend: backend(tree), fence, now: () => 1, claim: { async acquire() { return { async release() { throw new Error('claim release failed') } } } } })
+  const prepared = await tx.prepare(plan())
+  if (!prepared.ok) throw new Error(prepared.message)
+  await expect(tx.commit(prepared.prepared)).rejects.toThrow('claim release failed')
+  const acquired = await Promise.race([
+    fence.acquire().then(lease => lease.release().then(() => 'free')),
+    new Promise<string>(resolve => setTimeout(() => resolve('wedged'), 300)),
+  ])
+  expect(acquired).toBe('free')
+})

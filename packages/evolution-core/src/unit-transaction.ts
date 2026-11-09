@@ -406,9 +406,10 @@ export class UnitTransactions implements UnitTransaction {
         message,
       };
     } finally {
-      await claim?.release();
-      if (fenceLease !== undefined) await fenceLease.release();
-      else await lock?.release();
+      try { await claim?.release() } finally {
+        if (fenceLease !== undefined) await fenceLease.release();
+        else await lock?.release();
+      }
     }
   }
 
@@ -618,9 +619,10 @@ export class UnitTransactions implements UnitTransaction {
       };
       return { ok: true as const, evidence: evidenceRecord };
     } finally {
-      await claim?.release();
-      if (fenceLease !== undefined) await fenceLease.release();
-      else await lock?.release();
+      try { await claim?.release() } finally {
+        if (fenceLease !== undefined) await fenceLease.release();
+        else await lock?.release();
+      }
     }
   }
 
