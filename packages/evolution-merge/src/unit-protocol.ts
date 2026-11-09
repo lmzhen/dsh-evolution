@@ -131,6 +131,9 @@ function canonicalJson(value: unknown): string {
   const object = value as Record<string, unknown>
   return '{' + Object.keys(object).sort().map(key => JSON.stringify(key) + ':' + canonicalJson(object[key])).join(',') + '}'
 }
+function sameTarget(a: string | null | undefined, b: string | null | undefined): boolean {
+  return (a ?? '').trimEnd() === (b ?? '').trimEnd()
+}
 function digest(plan: UnitPlan): string {
   return createHash("sha256").update(canonicalJson(plan)).digest("hex")
 }
@@ -463,7 +466,7 @@ export class MergeUnitTransactions implements UnitTransaction {
         message: "source checkpoint missing: " + missing.map((item) => item.name).join(","),
       };
     const liveTarget = await this.options.backend.readSkill(snapshot.target);
-    if (liveTarget === null || liveTarget !== (snapshot.targetAfter ?? null))
+    if (liveTarget === null || !sameTarget(liveTarget, snapshot.targetAfter))
       return { ok: false as const, code: "unit-rollback-blocked" as const, message: "target live hash does not match the prepared target; manual recovery required" };
     const liveSources = await Promise.all(snapshot.sourceBefore.map(async source => ({ name: source.name, body: await this.options.backend.readSkill(source.name) })));
     const liveSource = liveSources.find(source => source.body !== null);
@@ -536,7 +539,7 @@ export class MergeUnitTransactions implements UnitTransaction {
         message: "source checkpoint missing: " + missing.map((item) => item.name).join(","),
       };
     const targetAfter = await this.options.backend.readSkill(snapshot.target);
-    if (targetAfter === null || targetAfter !== (snapshot.targetAfter ?? null))
+    if (targetAfter === null || !sameTarget(targetAfter, snapshot.targetAfter))
       return { ok: false as const, code: "unit-rollback-blocked" as const, message: "target missing or drifted; manual recovery required" };
     const liveSources = await Promise.all(snapshot.sourceBefore.map(async source => ({ name: source.name, body: await this.options.backend.readSkill(source.name) })));
     const liveSource = liveSources.find(source => source.body !== null);
@@ -599,7 +602,7 @@ export class MergeUnitTransactions implements UnitTransaction {
       claim = await this.options.claim.acquire(snapshot.target, snapshot.runId);
       this.options.onLock?.("claim");
       const currentTarget = await this.options.backend.readSkill(snapshot.target);
-      if (currentTarget !== snapshot.targetBefore && currentTarget !== (snapshot.targetAfter ?? null))
+      if (currentTarget !== snapshot.targetBefore && !sameTarget(currentTarget, snapshot.targetAfter))
         return {
           ok: false as const,
           code: "unit-rollback-blocked" as const,
