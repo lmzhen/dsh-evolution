@@ -73,12 +73,12 @@ export function apply(ctx: ClientContext): void {
   // the meaningful guard is whether the REGISTRATION above succeeded.
   let bound: ((key: string) => string) | null = null
   const translate = (key: MessageKey): string => {
-    if (!registered) return message(key)
+    if (!registered) return message(key, language())
     if (bound === null) {
       try {
         bound = seam.locale.bind(NS)
       } catch {
-        return message(key)
+        return message(key, language())
       }
     }
     return bound(key)
@@ -90,7 +90,7 @@ export function apply(ctx: ClientContext): void {
   const language = (): ParamLanguage => {
     try {
       const active = (ctx as unknown as { locale?: { getLocale?: () => { active?: string } } }).locale?.getLocale?.().active
-      return active === 'en' ? 'en' : 'zh'
+      return active === 'zh' ? 'zh' : 'en'
     } catch { return 'zh' }
   }
   // G2: the client settings seat, probed LAZILY (see `inject`). Without a seat every card
@@ -149,7 +149,7 @@ export function apply(ctx: ClientContext): void {
 function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[] }): ReactNode {
   return createElement('div', { className: 'evolution-settings-tab' },
     ...groupParamCards(props.cards).flatMap(({ group, items }) => [
-      createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, message(('group.' + group) as MessageKey)),
+      createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, t(('group.' + group) as MessageKey)),
       ...items.map((face, index) => createElement(PluginParamCard, { key: face.namespace + ':' + String(index), ...face })),
     ]),
   )

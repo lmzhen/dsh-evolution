@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-evolution-client-kit
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { FALLBACK_LOCALE } from './panel.ts'
 import type { ReactNode } from 'react'
 
 /** One feature view contribution. */
@@ -59,7 +60,7 @@ export function registerWorkbenchView<Face>(ctx: ClientContext, spec: WorkbenchV
     }
   }, spec.namespace + ': locale')
   ctx.effect(() => injectStyles(typeof document === 'undefined' ? undefined : document, spec.styles.css, spec.styles.tagId), spec.namespace + ': styles')
-  const fallback = spec.dictionaries.zh
+  const fallback = spec.dictionaries[FALLBACK_LOCALE]
   const lookup = (key: string): string => {
     const own = fallback[key] ?? key
     if (!registered) return own

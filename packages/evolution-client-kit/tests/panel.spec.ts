@@ -48,7 +48,7 @@ describe('client kit panel lifecycle', () => {
     expect(() => registerSidebarPanel(f.ctx as never, spec)).not.toThrow()
     for (const dispose of f.injector!()) void dispose
     const row = f.rows[0] as { label: () => string }
-    expect(row.label()).toBe('演示')
+    expect(row.label()).toBe('Demo')
   })
 
   it('reads a workspace id from either service shape and falls back to local scope', () => {

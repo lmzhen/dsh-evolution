@@ -293,7 +293,7 @@ export type MessageKey = keyof typeof zh
  * @param language - which dictionary to read; defaults to zh, matching the platform FALLBACK_LOCALE.
  * @returns the copy this bundle carries.
  */
-export function message(key: MessageKey, language: 'zh' | 'en' = 'zh'): string {
+export function message(key: MessageKey, language: 'zh' | 'en' = 'en'): string {
   return language === 'zh' ? zh[key] : en[key]
 }
 
