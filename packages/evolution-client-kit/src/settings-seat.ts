@@ -17,6 +17,7 @@ interface FamilySnapshot extends ConfigFormSnapshotLike<Record<string, unknown>>
 }
 interface ContextLike {
   get?: (name: string) => unknown
+  inject?: (deps: string[], callback: () => void) => void
   remote?: { $on?: (event: string, listener: (namespace: string) => void) => () => void }
 }
 
@@ -94,6 +95,7 @@ function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
     notify()
   }
   const refresh = async (): Promise<void> => {
+    startRemote()
     const ticket = ++generation
     const next = await describe(namespace)
     if (ticket !== generation) return
@@ -140,13 +142,17 @@ function createForm(namespace: string, ctx: ContextLike): ConfigFormLike {
 }
 
 /**
- * Build one seat per client registration; every form's remote listener is released by
- * the caller's effect. No module-level WeakMap: a replaced registration must not share
- * a dead seat with the previous one.
+ * Build/return the ONE seat for one ClientContext. All panels share the same form,
+ * snapshot and revision; dispose removes the seat so a replacement context starts clean.
  */
+const seats = new WeakMap<object, ConfigFormsSeat>()
+
 export function createSettingsSeat(ctx: ContextLike): ConfigFormsSeat {
+  const key = ctx as object
+  const existing = seats.get(key)
+  if (existing !== undefined) return existing
   const forms = new Map<string, ConfigFormLike>()
-  return {
+  const seat: ConfigFormsSeat = {
     get<T>(namespace: string): ConfigFormLike<T> | undefined {
       let form = forms.get(namespace)
       if (form === undefined) { form = createForm(namespace, ctx); forms.set(namespace, form) }
@@ -155,6 +161,10 @@ export function createSettingsSeat(ctx: ContextLike): ConfigFormsSeat {
     dispose: () => {
       for (const form of forms.values()) form.dispose?.()
       forms.clear()
+      seats.delete(key)
     },
   }
+  seats.set(key, seat)
+  ctx.inject?.(['remote'], () => { for (const form of forms.values()) void form.refresh?.() })
+  return seat
 }
