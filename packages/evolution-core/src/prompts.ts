@@ -49,7 +49,7 @@ const SKILL_REVIEW_BODY = `Review the conversation above and update the skill li
 
 Update only when the session contains a durable lesson that changes how this class of task should be done. A precise no-op is a valid outcome.
 
-Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail. Do not create one narrow skill per incident. A new skill is class-level when it can serve at least two different future events; if it only serves this incident, fold it into an existing owner or a support file. Keep the body compact; put new session-specific detail in references/.
+Target: a class-level skill with a compact SKILL.md. Keep the body compact.
 
 A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Support files: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators. When you add a support file, add the SKILL.md line that points to it; a file no pointer reaches is invisible next session.
 
@@ -62,11 +62,11 @@ Any one of these warrants a decision; it does not by itself require a write.
 
 Read before writing. Update only skills whose body you have read in this review pass. Before creating a new class-level skill, search the existing library with the available skill tools; the create exception only waives reading a target body, not that search.
 
-Choose the nearest owner that can carry the lesson:
-1. the loaded skill, if it is the class-level owner;
-2. an existing umbrella, when the loaded skill is narrow;
-3. a support file under that umbrella;
-4. a new class-level skill only when no existing skill can carry the lesson.
+Update when an existing class-level owner shares the lesson's trigger and audience.
+
+Create a new class-level skill when the lesson has a distinct trigger or audience and would make that owner heterogeneous. A class-level skill can serve at least two different future events; if the lesson serves only this incident, fold it into an existing owner or a support file.
+
+When only session-specific detail changes, add a support file under the owner.
 
 Name a new skill for its class, not for a PR number, error string, feature codename, or session artifact.
 
