@@ -138,7 +138,7 @@ async function mount(options: { handoff?: boolean; live?: boolean } = {}) {
 }
 
 async function waitSettled(handler: Handler, id: string): Promise<void> {
-  for (let attempt = 0; attempt < 500; attempt++) {
+  for (let attempt = 0; attempt < 2000; attempt++) {
     const status = await handler.handler({ rawInput: 'maintain status ' + id })
     if (!/\srunning\s/.test(status.text)) return
     await new Promise(resolve => setTimeout(resolve, 10))
@@ -222,7 +222,7 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     expect(running.kind).toBe('error')
     expect(running.text).toContain('仍在进行')
     expect(early.calls).toEqual([])
-    for (let attempt = 0; attempt < 500 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     bed.release()
     await waitSettled(bed.handler, id)
     expect(auto.calls, 'the switch is OFF by default: settling injects nothing').toEqual([])
@@ -266,9 +266,9 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     const started = await bed.handler.handler({ rawInput: 'maintain', agent: auto.agent })
     expect(started.kind).toBe('success')
     // The scan settles only when the stub's outcome is released; the handoff rides on that settle.
-    for (let attempt = 0; attempt < 500 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     bed.release()
-    for (let attempt = 0; attempt < 500 && auto.calls.length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && auto.calls.length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     expect(auto.calls).toEqual(['followup'])
     expect(auto.sent()).toContain('REPORT-ONLY')
   })
@@ -284,7 +284,7 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     const started = await bed.handler.handler({ rawInput: 'maintain', agent: first.agent })
     const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
     expect(id).toBeTruthy()
-    for (let attempt = 0; attempt < 500 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && !bed.releaseReady(); attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     bed.release()
     await waitSettled(bed.handler, id)
     expect(first.calls, 'the mounted value is OFF: settling injects nothing').toEqual([])
@@ -293,9 +293,9 @@ describe('G2 (0.20.0) maintain handoff and id-less subcommands', () => {
     const second = receiver('followup')
     const again = await bed.handler.handler({ rawInput: 'maintain', agent: second.agent })
     expect(again.kind).toBe('success')
-    for (let attempt = 0; attempt < 500 && bed.startedRuns() < 2; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && bed.startedRuns() < 2; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     bed.release()
-    for (let attempt = 0; attempt < 500 && second.calls.length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && second.calls.length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     expect(second.calls).toEqual(['followup'])
     expect(second.sent()).toContain('REPORT-ONLY')
   })

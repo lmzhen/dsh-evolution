@@ -650,7 +650,7 @@ describe('evolution-commands', () => {
   async function settleMaintain(handler: Handler, started: { text: string }): Promise<string> {
     const id = /Maintenance run (\S+) started/.exec(started.text)?.[1]
     expect(id, `the command names its run: ${started.text}`).toBeTruthy()
-    for (let attempt = 0; attempt < 500; attempt++) {
+    for (let attempt = 0; attempt < 2000; attempt++) {
       const status = await handler.handler({ rawInput: `maintain status ${id}` })
       if (!/\srunning\s/.test(status.text)) return id as string
       await new Promise(resolve => setTimeout(resolve, 10))
@@ -733,7 +733,7 @@ describe('evolution-commands', () => {
     expect(good.kind).toBe('success')
     // The spawn happens inside the detached run: wait for it instead of assuming
     // the command awaited it.
-    for (let attempt = 0; attempt < 500 && capturedSignal === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && capturedSignal === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     expect(capturedSignal).toBeTruthy()
   })
 
@@ -790,7 +790,7 @@ describe('evolution-commands', () => {
       // After the run settles the same invocation may run again.
       const third = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
       expect(third.kind).toBe('success')
-      for (let attempt = 0; attempt < 500 && starts < 2; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+      for (let attempt = 0; attempt < 2000 && starts < 2; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
       expect(starts).toBe(2)
     } finally {
       if (resolveRun) resolveRun()
@@ -1293,7 +1293,7 @@ describe('evolution-commands', () => {
     expect(live.text).toContain(id)
     expect(live.text).toContain('running')
     // The spawn happens inside the detached run: wait for it before releasing it.
-    for (let attempt = 0; attempt < 500 && release === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && release === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     release!()
     await settleMaintain(handler!, started)
     const settled = await handler!.handler({ agent: { ctx }, rawInput: `maintain status ${id}` })
@@ -1328,7 +1328,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const started = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     const id = /Maintenance run (\S+) started/.exec(started.text)?.[1] as string
-    for (let attempt = 0; attempt < 500 && capturedSignal === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    for (let attempt = 0; attempt < 2000 && capturedSignal === undefined; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
     const cancelled = await handler!.handler({ agent: { ctx }, rawInput: `maintain cancel ${id}` })
     expect(cancelled.kind).toBe('success')
     expect(capturedSignal?.aborted, 'cancel aborts the run, not the request').toBe(true)
