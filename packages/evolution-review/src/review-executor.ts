@@ -65,6 +65,10 @@ export interface ReviewLlmPort {
   stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 }
 
+export class ReviewPartialFailure extends Error {
+  constructor(message: string, readonly actions: readonly ReviewAction[] = []) { super(message); this.name = 'ReviewPartialFailure' }
+}
+
 export interface ReviewAction {
   readonly type: 'tool' | 'skill' | 'memory'
   readonly action: string
@@ -216,12 +220,12 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         }))
       }
       toolCalls += calls.length
-      if (parent.session.seq !== beforeSeq) throw new Error('review tool mutated the parent Session')
+      if (parent.session.seq !== beforeSeq) throw new ReviewPartialFailure('review tool mutated the parent Session', actions)
     }
   } finally {
     clearReview()
   }
-  if (parent.session.seq !== beforeSeq) throw new Error('review mutated the parent Session')
+  if (parent.session.seq !== beforeSeq) throw new ReviewPartialFailure('review mutated the parent Session', actions)
   return {
     finalText,
     actions,

@@ -8,7 +8,7 @@ import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Agent, ContentBlock, ContextFormed, GenerateOptions, StreamChunk, ToolCallBlock, ToolCallId } from '@deepseek-ai/dsh-evolution-core/platform'
-import { runReview } from './review-executor.ts'
+import { ReviewPartialFailure, runReview } from './review-executor.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
@@ -1064,6 +1064,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (toolAllow.size === 0) error = 'aux review has no allowed tools for this parent (PTC-only header); refusing to report completed'
       } catch (caught) {
         error = caught instanceof Error ? caught.message : String(caught)
+        if (caught instanceof ReviewPartialFailure && caught.actions.length > 0) actions = caught.actions
         status = timedOut ? 'timeout' : controller.signal.aborted ? 'aborted' : 'failed'
         ctx.logger.warn('dsh-evolution-review: aux review failed: ' + error)
       } finally {
