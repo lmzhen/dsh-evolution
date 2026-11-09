@@ -203,7 +203,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         const loaded = await loadMergeState(io, home)
         return { ok: true as const, schema: 3 as const, migrated: false, state: { schemaVersion: 3 as const, rows: loaded.state.rows.map(legacyToV3).filter((row): row is NonNullable<typeof row> => row !== null) }, quarantine: [], report: null }
       }
-      const state = await ensureMergeStateReady(io, home)
+      const state = await ensureMergeStateReady(io, home, (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence)
       if (!state.ok) return v4.code === 'merge-state-forward-only' || v4.code === 'merge-state-needs-repair' ? { ok: false as const, code: v4.code, message: v4.message } : state
       const normalized = await normalizePairLedger(io, home)
       return normalized.ok ? state : { ok: false as const, code: 'merge-state-needs-repair' as const, message: normalized.message ?? 'v4 normalize failed' }
