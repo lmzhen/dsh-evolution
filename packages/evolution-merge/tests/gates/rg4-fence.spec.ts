@@ -2,7 +2,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { acquireTreeWriteLock, DEFAULT_SKILL_LIMITS, nodeEvolutionIo, readUnitEvidence, SkillLibrary, skillLibraryUnitBackend, treeLockFile, UnitTransactions, type UnitBackend, type UnitPlan } from '@deepseek-ai/dsh-evolution-core'
+import { acquireTreeWriteLock, DEFAULT_SKILL_LIMITS, nodeEvolutionIo, readUnitEvidence, SkillLibrary, treeLockFile } from '@deepseek-ai/dsh-evolution-core'
+import { skillLibraryUnitBackend, UnitTransactions, type UnitBackend, type UnitPlan } from '../support/unit.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { mergeDoctor } from '../../src/doctor.ts'
 

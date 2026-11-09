@@ -126,7 +126,7 @@ export function unitJournalPort(io: EvolutionIoLike, home: string): MutationJour
     async write(record: MutationJournalRecord): Promise<void> {
       const journal: UnitJournal = {
         schemaVersion: 1,
-        unitId: record.unitId,
+        unitId: record.journalId ?? record.unitId,
         runId: record.runId ?? record.unitId,
         planDigest: contentHash(JSON.stringify(record)),
         target: record.target ?? record.changed[0] ?? '',

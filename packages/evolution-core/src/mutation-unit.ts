@@ -139,6 +139,8 @@ export function validateMutationRequest(
 
 export interface MutationJournalRecord {
   unitId: string
+  /** Unique journal key for this nested unit; unitId may be shared by a merge's sub-writes. */
+  journalId?: string
   /** Run that owns this unit; absent for a foreground tree-change without a run. */
   runId?: string
   phase: 'prepared' | 'unit-written' | 'committed' | 'failed' | 'undone'
@@ -265,6 +267,7 @@ export class MutationUnit {
   private readonly kernel: WriteKernel
   private readonly transactGuard: boolean
   private readonly now: () => number
+  private readonly journalId: string
 
   constructor(options: MutationUnitOptions) {
     this.io = options.io
@@ -283,6 +286,7 @@ export class MutationUnit {
     this.validateWrite = options.validateWrite
     this.transactGuard = options.transactGuard !== false
     this.now = options.now ?? Date.now
+    this.journalId = 'j-' + String(this.now()) + '-' + Math.random().toString(36).slice(2)
     const transact = options.transact
     this.kernel = new WriteKernel({ io: this.io, ...(transact === undefined ? {} : { transact }), now: this.now })
   }
@@ -355,7 +359,7 @@ export class MutationUnit {
         })
         const cleanup = request.cleanupPaths === undefined ? {} : { cleanup: request.cleanupPaths }
         if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'prepared', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
-        await bestEffort(async () => this.journal?.write({ unitId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'prepared', changed: [], target: validation.roots.find(root => root.name === primary)?.name ?? primary, roots: validation.roots.map(root => root.name) }))
+        await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'prepared', changed: [], target: validation.roots.find(root => root.name === primary)?.name ?? primary, roots: validation.roots.map(root => root.name) }))
         for (const op of validation.ops) {
           const snapshot = snapshots.find(entry => entry.target === op.target)
           if (snapshot === undefined) throw new Error('snapshot missing for ' + op.target)
@@ -369,11 +373,11 @@ export class MutationUnit {
             warnings.push(error instanceof Error ? error.message : String(error))
           }
         }
-        await bestEffort(async () => this.journal?.write({ unitId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'unit-written', changed, target: primary, roots: validation.roots.map(root => root.name) }))
+        await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'unit-written', changed, target: primary, roots: validation.roots.map(root => root.name) }))
         // P2-1: the committed snapshot is the recovery authority. Write it BEFORE the journal's
         // committed phase so a crash in this window recovers as committed, never rolled back.
         if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
-        await bestEffort(async () => this.journal?.write({ unitId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
+        await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
         try {
           await this.hooks?.committed?.({ unitId, changed, ops: eventOps, roots: validation.roots.map(root => root.name) })
         } catch {
@@ -389,7 +393,7 @@ export class MutationUnit {
           rollbackFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
         }
         const detail = rollbackFailure === '' ? message : message + '; rollback failed: ' + rollbackFailure
-        await this.journal?.write({ unitId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'failed', changed, error: detail })
+        await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'failed', changed, error: detail })
         try {
           await this.hooks?.rolledBack?.({
             unitId,
@@ -456,7 +460,7 @@ export class MutationUnit {
         }
         for (const path of snapshot.cleanup ?? []) await this.io.remove(path).catch(() => {})
         await this.snapshots?.write({ ...snapshot, state: 'undone' })
-        await this.journal?.write({ unitId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'undone', changed: reverted, ...(snapshot.ops[0]?.target === undefined ? {} : { target: snapshot.ops[0].target }), roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
+        await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'undone', changed: reverted, ...(snapshot.ops[0]?.target === undefined ? {} : { target: snapshot.ops[0].target }), roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
         try {
           await this.hooks?.undone?.({ unitId, changed: reverted, ops: snapshot.ops, roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
         } catch {
@@ -509,7 +513,7 @@ export class MutationUnit {
           undone.push(op.target)
         }
         for (const path of snapshot.cleanup ?? []) await this.io.remove(path).catch(() => {})
-        await this.journal?.write({ unitId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'undone', changed: undone, ...(snapshot.ops[0]?.target === undefined ? {} : { target: snapshot.ops[0].target }), roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
+        await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'undone', changed: undone, ...(snapshot.ops[0]?.target === undefined ? {} : { target: snapshot.ops[0].target }), roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
         await this.snapshots?.write({ ...snapshot, state: 'undone' })
         try {
           await this.hooks?.undone?.({ unitId, changed: undone, ops: snapshot.ops, roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })

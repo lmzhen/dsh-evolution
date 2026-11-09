@@ -2,7 +2,8 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, type UnitEvidenceRecord, type UnitJournal, type UnitTransaction } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, type UnitEvidenceRecord, type UnitJournal } from '@deepseek-ai/dsh-evolution-core'
+import { type UnitTransaction } from '../support/unit.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { recoverCommitUnits } from '../../src/recovery-coordinator.ts'
 

@@ -3,7 +3,8 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, UnitTransactions, type UnitBackend } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { MergeUnitTransactions, type UnitBackend } from '../support/unit.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { spawnTsx } from '../../../test-support/tsx-launcher.ts'
 
@@ -19,16 +20,16 @@ async function waitFor(path: string, timeoutMs: number): Promise<string> {
 
 async function crashAt(point: (typeof POINTS)[number]): Promise<void> {
     const home = await tempRoot('dsh-rg3-crash-')
-    const core = new URL('../../../evolution-core/src/unit-transaction.ts', import.meta.url).href
+    const core = new URL('../../src/unit-protocol.ts', import.meta.url).href
     const ioUrl = new URL('../../../evolution-core/src/io.ts', import.meta.url).href
     const scriptPath = join(home, 'crash.mts')
     const pidPath = join(home, 'child.pid')
     await writeFile(scriptPath, `
 import { mkdir, writeFile, rm } from 'node:fs/promises'
-import { UnitTransactions } from ${JSON.stringify(core)}
+import { MergeUnitTransactions } from ${JSON.stringify(core)}
 import { nodeEvolutionIo } from ${JSON.stringify(ioUrl)}
 const tree = ${JSON.stringify(home)} + '/tree'
-const tx = new UnitTransactions({
+const tx = new MergeUnitTransactions({
   io: nodeEvolutionIo(), home: ${JSON.stringify(home)},
   backend: { async readSkill(n) { return n === 'alpha' ? 'old' : 'beta' }, async readSupportFile() { return null }, async commit(_p, onPhase) { await onPhase?.('target-pending'); await mkdir(tree, { recursive: true }); await writeFile(tree + '/alpha', 'new'); await onPhase?.('target-applied'); await onPhase?.('target-written'); await onPhase?.('source-archiving', { source: 'beta' }); await rm(tree + '/beta', { force: true }); await onPhase?.('sources-archived'); await onPhase?.('unit-written'); return { ok: true, message: 'merged', archived: ['beta'], mutations: 1 } }, async restoreTarget() {}, async restoreSource() {} },
   claim: { async acquire() { return { async release() {} } } }, now: () => 1,
@@ -71,7 +72,7 @@ await tx.commit(p.prepared)
       async restoreTarget(name, body) { await mkdir(join(home, 'tree'), { recursive: true }); if (body === null) await rm(join(home, 'tree', name), { force: true }); else await writeFile(join(home, 'tree', name), body) },
       async restoreSource(name, body) { await mkdir(join(home, 'tree'), { recursive: true }); await writeFile(join(home, 'tree', name), body) },
     }
-    const tx = new UnitTransactions({ io: nodeEvolutionIo(), home, backend: treeBackend, claim: { async acquire() { return { async release() {} } } }, now: () => 2 })
+    const tx = new MergeUnitTransactions({ io: nodeEvolutionIo(), home, backend: treeBackend, claim: { async acquire() { return { async release() {} } } }, now: () => 2 })
     if (point === 'unit-written') {
       const refused = await tx.rollback({ unitId: journal.unitId, reason: 'crash' })
       expect(refused.ok).toBe(false)

@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo, readUnitJournal, SkillLibrary, skillLibraryUnitBackend, UnitTransactions, writeUnitJournal, type UnitBackend, type UnitPlan } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo, readUnitJournal, SkillLibrary, writeUnitJournal } from '@deepseek-ai/dsh-evolution-core'
+import { skillLibraryUnitBackend, UnitTransactions, type UnitBackend, type UnitPlan } from '../support/unit.ts'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tempRoot } from '../../../test-support/temp-home.ts'

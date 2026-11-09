@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, UnitTransactions, type UnitBackend, type UnitPlan } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { UnitTransactions, type UnitBackend, type UnitPlan } from '../support/unit.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
 it('acquires target claim only at commit, after the tree fence', async () => {
