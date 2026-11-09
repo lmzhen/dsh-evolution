@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { contentHash, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 import { undoMergeReceipt, type CommitReceipt, type MergeUndoPort } from '../src/index.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'

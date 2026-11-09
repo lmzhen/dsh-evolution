@@ -1,7 +1,7 @@
 // @tier fast
 /** G3a 纯函数夹具：单元撤销的决策必须按 (baseline, 最老 after, 最新 after) 三元组走。 */
 import { expect, it } from 'vitest'
-import { BASELINE_ACTION, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+import { BASELINE_ACTION, type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 import { newestUnitId, planUnitUndo } from '../src/unit-undo-plan.ts'
 
 const entry = (over: Partial<SkillVersion>): SkillVersion => ({ v: 1, at: 't', action: 'restructure', hash: 'h', chars: 1, ...over })

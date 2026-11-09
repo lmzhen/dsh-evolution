@@ -7,7 +7,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { DEFAULT_SKILL_LIMITS, lintBody, nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { lintBody, SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const mk = async () => await mkdtemp(join(tmpdir(), 'dsh-receipt-health-'))
 const body = (name: string, text: string) => ['---', 'name: ' + name, 'description: ' + name + ' body', '---', '', text, ''].join(String.fromCharCode(10))

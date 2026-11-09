@@ -10,7 +10,7 @@
  *     real outcome, so `removed` / `written` were reported while nothing landed.
  */
 import { expect, it, vi } from 'vitest'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { fakeIo } from '../../test-support/fake-io.ts'
 

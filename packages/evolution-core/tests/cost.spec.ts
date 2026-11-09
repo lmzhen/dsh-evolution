@@ -1,6 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { AUTHORING_SPLIT_LINE_CHARS, UPSTREAM_LIMIT_CHARS_PER_TOKEN, bodyCost, tokenLineFor, COST_ASCII_TOKEN_HIGH, COST_ASCII_TOKEN_LOW, COST_CJK_TOKEN_HIGH, COST_CJK_TOKEN_LOW, DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core'
+import { AUTHORING_SPLIT_LINE_CHARS, UPSTREAM_LIMIT_CHARS_PER_TOKEN, bodyCost, tokenLineFor, COST_ASCII_TOKEN_HIGH, COST_ASCII_TOKEN_LOW, COST_CJK_TOKEN_HIGH, COST_CJK_TOKEN_LOW } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core/skills'
 
 // Every expectation is stated on the ON-DISK form: the accounting basis appends
 // one trailing newline, the same measure `maxSkillContentChars` bounds.

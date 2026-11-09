@@ -1,6 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { currentReviewContext, resolveExecOrigins, withReviewContext } from '../src/index.ts'
+import { currentReviewContext, withReviewContext } from '../src/index.ts'
+import { resolveExecOrigins } from '../src/skills.ts'
 
 const exec = {
   agent: { session: { id: 'plain-session', header: {} } },

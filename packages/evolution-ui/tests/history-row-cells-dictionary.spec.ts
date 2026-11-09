@@ -9,8 +9,9 @@
  * dictionaries, and every `{slot}` a template interpolates gets a value from the cell that named it.
  */
 import { describe, expect, it } from 'vitest'
-import { ageCopyKey, skillRowCells, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
-import type { CopyCell, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core'
+import { ageCopyKey, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
+import type { CopyCell } from '@deepseek-ai/dsh-evolution-core'
+import { skillRowCells, versionActionKind, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core/skills'
 import { en, fill, zh } from '../src/panels/history/client/messages.ts'
 
 /** Every action label the library can record, plus one it never wrote (the fail-closed case). */

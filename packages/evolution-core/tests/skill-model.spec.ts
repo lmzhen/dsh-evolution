@@ -1,6 +1,7 @@
 // @tier fast
 import { describe, expect, it, vi } from 'vitest'
-import { contentHash, SkillModel, type SkillModelProvider, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { SkillModel, type SkillModelProvider, type SkillSummary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const alpha: SkillSummary = {
   name: 'alpha',

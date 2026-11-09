@@ -1,7 +1,8 @@
 // @tier fast
 import { basename, dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { fileMutationLock, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { fileMutationLock } from '@deepseek-ai/dsh-evolution-core/write'
 
 class MemoryIo implements EvolutionIoLike {
   readonly files = new Map<string, string>()

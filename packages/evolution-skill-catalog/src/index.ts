@@ -22,7 +22,9 @@ import type {
   SkillProviderObservation,
 } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-evolution-core'
-import { evolutionIoAdapter, isAbsent, isUnknown, parseFrontmatter, newSkillLibrary, probeList, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, isAbsent, isUnknown, probeList, SKILL_NAME_RE } from '@deepseek-ai/dsh-evolution-core'
+import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
+import { newSkillLibrary, type SkillSummary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { join } from 'node:path'
 
 export const name = 'evolution-skill-catalog'

@@ -10,7 +10,7 @@
  * timer, so a self-deadlock fails the assertion instead of hanging the suite.
  */
 import { expect, it } from 'vitest'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const skillOf = (name: string) =>

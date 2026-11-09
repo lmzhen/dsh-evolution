@@ -7,7 +7,8 @@
  *
  * Entries without a unit id keep the per-entry answer (they are their own singleton unit).
  */
-import { isLandmark, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
+import { isLandmark } from '@deepseek-ai/dsh-evolution-core/write'
 
 /** @param members - every entry that shares the unit (content and support chains together).
  * @param liveHash - hash of the live body, or null when the skill is not readable.

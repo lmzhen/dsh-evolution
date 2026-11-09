@@ -4,7 +4,8 @@
  * The slot rules live in core (`planUnitUndoAcross`); this adapter keeps the curator’s
  * single-skill call shape and splits the body op out of the support ops.
  */
-import { planUnitUndoAcross, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
+import { planUnitUndoAcross } from '@deepseek-ai/dsh-evolution-core/write'
 
 /** One support path’s action inside a unit undo. */
 export interface UnitUndoOp {

@@ -4,15 +4,9 @@
  * block = commit must not proceed; warn = report only. The path and reference checks reuse
  * the skill-store's own `validateSupportPath` / `supportRefs`, so there is one whitelist.
  */
-import {
-  DEFAULT_SKILL_LIMITS,
-  parseFrontmatter,
-  scanContentThreats,
-  supportRefs,
-  validateFrontmatter,
-  validateSupportPath,
-  type SkillLimits,
-} from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, scanContentThreats, supportRefs, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
+import { parseFrontmatter, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
+import { validateSupportPath } from '@deepseek-ai/dsh-evolution-core/skills'
 
 export interface StagedTree {
   readonly target: string

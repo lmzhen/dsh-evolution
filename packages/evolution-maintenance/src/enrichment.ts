@@ -12,16 +12,9 @@ import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
 import type { SnapshotOptions } from './drift-scan.ts'
-import {
-  frontmatterCatalogInvalid,
-  idleDays,
-  isPresent,
-  parseFrontmatter,
-  usageObserved,
-  type SkillLibrary,
-  type SkillLiveness,
-  type UsageMap,
-} from '@deepseek-ai/dsh-evolution-core'
+import { frontmatterCatalogInvalid, idleDays, isPresent, usageObserved, type SkillLiveness, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import type { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
+import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 export interface Enrichment {
   descriptions: ReadonlyMap<string, string>

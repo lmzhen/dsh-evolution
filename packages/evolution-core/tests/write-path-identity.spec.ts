@@ -11,7 +11,8 @@
  * the mutation event (skill-store.ts:892), not the file, so that comparison would pass whatever the code
  * did - the second half below (the emitted origins must differ) is what keeps the first half meaningful. */
 import { expect, it } from 'vitest'
-import { SkillLibrary, authorityFrom } from '../src/index.ts'
+import { authorityFrom } from '../src/index.ts'
+import { SkillLibrary } from '../src/skills.ts'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 /** One template; only the name line differs, because the validator insists it matches the skill. */

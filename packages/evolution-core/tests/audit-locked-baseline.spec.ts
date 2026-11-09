@@ -11,7 +11,8 @@
 import { expect, it } from 'vitest'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { SkillLibrary, contentHash, nodeEvolutionIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, nodeEvolutionIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const SKILL_MD = `---

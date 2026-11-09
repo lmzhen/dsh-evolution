@@ -3,7 +3,9 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { DEFAULT_SKILL_LIMITS, MutationUnit, SkillLibrary, fileMutationLock, nodeEvolutionIo, unitJournalPort, unitSnapshotPort } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
+import { MutationUnit, fileMutationLock, unitJournalPort, unitSnapshotPort } from '@deepseek-ai/dsh-evolution-core/write'
 
 it('recovers a prepared tree-change snapshot before the first write', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dsh-evo-recover-'))

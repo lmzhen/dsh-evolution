@@ -2,7 +2,7 @@
 // E2 (FR-EXEC-12 / GAP-CAND-02): commitMerge re-checks the decision-time anchors against
 // the LIVE tree (body + support) and refuses with a typed code before writing anything.
 import { expect, it } from 'vitest'
-import { SkillLibrary, revisionSupportDigest } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, revisionSupportDigest } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const BODY = (name: string): string => '---\nname: ' + name + '\ndescription: A merge revision fixture.\n---\n\n# ' + name + '\n'

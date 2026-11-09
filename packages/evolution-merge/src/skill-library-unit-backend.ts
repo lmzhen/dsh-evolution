@@ -1,5 +1,5 @@
 /** G2 adapter: core UnitBackend over the existing SkillLibrary. */
-import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { UnitBackend, UnitCommitResult, UnitPlan } from './unit-protocol.ts'
 
 export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {

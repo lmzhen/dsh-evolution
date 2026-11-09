@@ -1,6 +1,6 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { validateMutationRequest, type MutationRequest } from '@deepseek-ai/dsh-evolution-core'
+import { validateMutationRequest, type MutationRequest } from '@deepseek-ai/dsh-evolution-core/write'
 
 const LIMITS = { maxSkillFileBytes: 10, maxSkillContentChars: 10 }
 

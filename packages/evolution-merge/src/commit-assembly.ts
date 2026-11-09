@@ -7,12 +7,16 @@
  * port is called, so a source/target change is refused with a typed cause rather than a
  * generic commit message.
  */
-import type { CommitMergePlan, WriteOrigin, SkillLimits } from '@deepseek-ai/dsh-evolution-core'
-import { isPresent, revisionAnchorOf, revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillLimits } from '@deepseek-ai/dsh-evolution-core'
+import type { WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
+import { isPresent } from '@deepseek-ai/dsh-evolution-core'
+import type { CommitMergePlan } from '@deepseek-ai/dsh-evolution-core/skills'
+import { type RevisionFile } from '@deepseek-ai/dsh-evolution-core/skills'
 import { readStaging } from './staging.ts'
 import { readStagedTree } from './staged-tree.ts'
 import { buildCommitPlan } from './commit-plan.ts'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { revisionAnchorOf, revisionFingerprint, revisionSupportDigest, type RevisionAnchor } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { RevisionRef } from './contracts.ts'
 
 export interface CommitAssemblyPort {

@@ -7,7 +7,8 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 // platform-declaration anchor: this composition probes skills/workingDirectory/tools/evolutionIo/systemPrompt; all are declared in core PLATFORM_SERVICE_PROBES.
-import { authorityFrom, evolutionIoAdapter, evolutionRoot, newSkillLibrary, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, evolutionIoAdapter, evolutionRoot, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
+import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
 import type { LlmTextService } from './domain-generation-llm.ts'
 import { DomainGenerationCoordinator } from './domain-generation-coordinator.ts'

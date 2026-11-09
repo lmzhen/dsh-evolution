@@ -42,6 +42,14 @@
       "types": "./lib/types/restrictor.d.ts",
       "default": "./lib/restrictor.js"
     },
+    "./write": {
+      "types": "./lib/types/write.d.ts",
+      "default": "./lib/write.js"
+    },
+    "./skills": {
+      "types": "./lib/types/skills.d.ts",
+      "default": "./lib/skills.js"
+    },
     "./package.json": "./package.json",
     "./row-overrides.json": "./row-overrides.json",
     "./persisted-write-inventory.json": "./persisted-write-inventory.json"

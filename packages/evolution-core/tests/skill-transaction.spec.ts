@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { SkillLibrary, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 /**

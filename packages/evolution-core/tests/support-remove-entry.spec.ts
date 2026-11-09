@@ -14,8 +14,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  DEFAULT_SKILL_LIMITS, loadVersions, newSkillLibrary, nodeEvolutionIo, versionActionKind, versionTarget,
-} from '../src/index.ts'
+  DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '../src/index.ts'
+import { loadVersions, newSkillLibrary, versionActionKind, versionTarget } from '../src/skills.ts'
 
 const SUPPORT = 'a support file\n'
 const BODY = '---\nname: probe-skill\ndescription: probe\n---\nBody.\n'

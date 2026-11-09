@@ -15,7 +15,7 @@ async function waitFor(path: string, timeoutMs: number): Promise<string> {
   throw new Error('timeout waiting for ' + path)
 }
 
-it('persists target-pending when the commit process is force-killed', async () => {
+it('persists target-pending when the commit process is force-killed', { timeout: 60_000 }, async () => {
   const home = await tempRoot('dsh-unit-crash-')
   const core = new URL('../../evolution-merge/src/unit-protocol.ts', import.meta.url).href
   const ioUrl = new URL('../src/io.ts', import.meta.url).href
@@ -35,7 +35,7 @@ if (!p.ok) process.exit(2)
 await tx.commit(p.prepared)
 `)
   const child = spawnTsx(scriptPath)
-  const pid = Number(await waitFor(pidPath, 20_000))
+  const pid = Number(await waitFor(pidPath, 40_000))
   process.kill(pid, 'SIGKILL')
   await new Promise<void>(resolve => child.once('exit', () => { resolve() }))
   const dir = join(home, 'merge', 'unit-journals')

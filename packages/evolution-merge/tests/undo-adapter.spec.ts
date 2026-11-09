@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { contentHash, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { skillLibraryUndoPort } from '../src/index.ts'
 
 it('indexes version bodies by content hash for undo preflight', async () => {

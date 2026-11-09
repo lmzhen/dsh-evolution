@@ -10,7 +10,8 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SKILL_LIMITS, getRecord, loadUsage, nodeEvolutionIo, saveUsage, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, getRecord, loadUsage, nodeEvolutionIo, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const body = (name: string) => `---
 name: ${name}

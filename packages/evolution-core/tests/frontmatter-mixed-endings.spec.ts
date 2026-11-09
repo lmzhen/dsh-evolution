@@ -11,7 +11,9 @@
  * keep working, and the CRLF detection (unsafe-value scan) must not go blind.
  */
 import { describe, expect, it } from 'vitest'
-import { frontmatterCatalogInvalid, parseFrontmatter, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { frontmatterCatalogInvalid } from '@deepseek-ai/dsh-evolution-core/skills'
+import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 const LF = '---\nname: mixed-skill\ndescription: Mixed endings.\n---\n\n# Body\n\nKeep me.\n'

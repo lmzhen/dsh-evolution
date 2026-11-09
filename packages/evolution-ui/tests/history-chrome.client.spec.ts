@@ -14,7 +14,7 @@
 import { describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
-import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
+import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
 import { note } from '../src/panels/history/client/atoms.ts'
 import { skillLine, versionRow, type Copy } from '../src/panels/history/client/chrome.ts'
 import { CSS } from '../src/panels/history/client/styles.ts'

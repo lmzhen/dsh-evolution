@@ -13,8 +13,9 @@
  * of a number and its unit. `row-cells-dictionary.spec.ts` proves the two sides agree.
  */
 import { describe, expect, it } from 'vitest'
-import { ageCopyKey, skillRowCells, skillStateKey, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
-import type { CopyCell, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core'
+import { ageCopyKey, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
+import type { CopyCell } from '@deepseek-ai/dsh-evolution-core'
+import { skillRowCells, skillStateKey, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const version = (over: Partial<VersionRowFacts> = {}): VersionRowFacts => ({
   v: 3, actionKind: 'update', age: { unit: 'hours', n: 5 }, ...over,

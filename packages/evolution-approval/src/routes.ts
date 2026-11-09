@@ -17,7 +17,7 @@
 
 import { PENDING_STATUSES } from '@deepseek-ai/dsh-evolution-state-storage'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
-import { elapsedSince, textDiffFacts } from '@deepseek-ai/dsh-evolution-core'
+import { elapsedSince, textDiffFacts } from '@deepseek-ai/dsh-evolution-core/skills'
 import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { WritePreview } from './index.ts'

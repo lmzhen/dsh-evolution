@@ -1,6 +1,8 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { BASELINE_ACTION, planUnitUndoAcross, type SkillVersion } from '../src/index.ts'
+import { BASELINE_ACTION } from '../src/skills.ts'
+import { type SkillVersion } from '../src/skills.ts'
+import { planUnitUndoAcross } from '../src/write.ts'
 
 let seq = 0
 function version(unitId: string, action: string, hash: string, beforeHash?: string, path?: string): SkillVersion {

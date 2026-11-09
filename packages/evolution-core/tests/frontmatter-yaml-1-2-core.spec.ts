@@ -11,7 +11,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import { parse as platformParse } from 'yaml'
-import { frontmatterCatalogInvalid, normalizeFrontmatter, parseFrontmatter, SkillLibrary, validateFrontmatter, yamlPlainScalarNeedsQuotes } from '@deepseek-ai/dsh-evolution-core'
+import { frontmatterCatalogInvalid, normalizeFrontmatter, parseFrontmatter, validateFrontmatter, yamlPlainScalarNeedsQuotes } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 /** The platform's reading of one frontmatter field. */

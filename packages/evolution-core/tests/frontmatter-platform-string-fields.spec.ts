@@ -15,7 +15,9 @@ import { describe, expect, it } from 'vitest'
 // S2.1 (PLAN 2026-09-16): the platform oracle is the `yaml` package (the
 // dependency skill-filesystem parses with, YAML 1.2 core schema).
 import { parse as loadStrictYaml } from 'yaml'
-import { frontmatterCatalogInvalid, parseFrontmatter, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { frontmatterCatalogInvalid } from '@deepseek-ai/dsh-evolution-core/skills'
+import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 /** The frontmatter block as the platform's parser extracts it. */

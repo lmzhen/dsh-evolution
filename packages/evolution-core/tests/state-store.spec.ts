@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { evolutionHome, evolutionRoot, memoryRoot, skillsRoot } from '../src/index.ts'
+import { evolutionHome, evolutionRoot, memoryRoot } from '../src/index.ts'
+import { skillsRoot } from '../src/skills.ts'
 
 describe('evolutionRoot / evolutionHome (0.3.22 G3.2, F-207)', () => {
   it('falls back to ~/.dsh when DSH_HOME is empty — never a CWD-relative path', () => {

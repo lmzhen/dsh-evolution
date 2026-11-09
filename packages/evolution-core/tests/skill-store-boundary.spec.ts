@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { describe, expect, it } from 'vitest'
-import { SkillLibrary, loadMutations } from '@deepseek-ai/dsh-evolution-core'
+import { loadMutations } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { fakeIo } from '../../test-support/fake-io.ts'
 import { deadLockBody } from '../../test-support/lock-fixtures.ts'

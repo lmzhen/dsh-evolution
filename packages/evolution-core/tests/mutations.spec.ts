@@ -2,7 +2,8 @@
 import { expect, it } from 'vitest'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { contentHash, SkillLibrary, loadMutations, loadSuppressedNames, mutationsFile, nodeEvolutionIo, recordMutation } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, loadMutations, loadSuppressedNames, mutationsFile, nodeEvolutionIo, recordMutation } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const USABLE = (name: string) => `---

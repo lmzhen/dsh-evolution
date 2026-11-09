@@ -4,7 +4,7 @@ import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { CommitJournal } from './domain/commit-journal.ts'
 import { writeJournal } from './domain/commit-journal-store.ts'
 import { readCommitReceipt } from './commit-receipt.ts'
-import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
+import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core/write'
 
 export interface CommitRecoveryReport {
   readonly runId: string

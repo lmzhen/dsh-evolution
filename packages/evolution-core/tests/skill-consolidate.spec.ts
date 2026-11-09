@@ -3,7 +3,8 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SKILL_LIMITS, isPresent, nodeEvolutionIo, resolveCitations, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, isPresent, nodeEvolutionIo, resolveCitations } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const body = (name: string) => `---
 name: ${name}

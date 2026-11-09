@@ -2,7 +2,8 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
-import { loadUsage, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { loadUsage } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const BODY = (name: string, extra = '') => `---

@@ -3,8 +3,8 @@
  * sources; this module resolves versions, plans the cross-skill undo and runs the shared
  * executor. No command/routing logic here.
  */
-import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core'
-import { executeUnitUndo, planUnitUndoAcross, type UnitUndoExecution, type UnitUndoMember, type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
+import { executeUnitUndo, planUnitUndoAcross, type UnitUndoExecution, type UnitUndoMember, type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core/write'
 import type { CommitReceipt } from './commit-receipt.ts'
 
 export interface MergeUndoPort extends UnitUndoSink {

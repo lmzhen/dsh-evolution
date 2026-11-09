@@ -1,0 +1,10 @@
+/** Skill-domain surface. Consumers import it from the documented subpath. */
+export * from './skill-lint.ts'
+export * from './skill-health.ts'
+export * from './skill-reads.ts'
+export * from './skill-row-cells.ts'
+export * from './skill-history.ts'
+export * from './skill-store.ts'
+export * from './skill-model.ts'
+export * from './skill-revision.ts'
+export * from './frontmatter.ts'

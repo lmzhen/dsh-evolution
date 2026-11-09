@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { evaluateThreat, MemoryStore, scanContentThreats, scanMemoryThreats, scanThreats, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { evaluateThreat, MemoryStore, scanContentThreats, scanMemoryThreats, scanThreats } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 it('threat scan blocks injection and exfiltration patterns', () => {

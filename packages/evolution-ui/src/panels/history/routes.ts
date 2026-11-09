@@ -14,7 +14,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { undoableFor, unitUndoableFlags } from './unit-undoable.ts'
-import { contentHash, displayBodyOf, elapsedSince, errorText, latestVersionAt, partitionVersions, skillRowCells, textDiffFacts, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, displayBodyOf, errorText } from '@deepseek-ai/dsh-evolution-core'
+import { elapsedSince, latestVersionAt, partitionVersions, skillRowCells, textDiffFacts, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
 import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 

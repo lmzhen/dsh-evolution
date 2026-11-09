@@ -13,7 +13,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core'
+import { skillRowCells, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
 import { SkillHistoryPanel, type PanelFace } from '../src/panels/history/client/Panel.ts'
 import { zh } from '../src/panels/history/client/messages.ts'
 import type { SkillRow, VersionRow, VersionsPayload } from '../src/panels/history/client/api.ts'

@@ -1,8 +1,10 @@
 /** Batch 2c unit-journal recovery coordinator. UnitTransaction remains the only skill writer. */
 import { join } from 'node:path'
-import type { EvolutionIoLike, UnitJournal } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitJournal } from '@deepseek-ai/dsh-evolution-core/write'
 import type { UnitTransaction } from './unit-protocol.ts'
-import { probeList, readUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
+import { probeList } from '@deepseek-ai/dsh-evolution-core'
+import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core/write'
 import { evidenceSha256 } from './domain/evidence-hash.ts'
 import { projectRecoveredUnit } from './recovery-projection.ts'
 import { readCommitReceipts } from './commit-receipt.ts'

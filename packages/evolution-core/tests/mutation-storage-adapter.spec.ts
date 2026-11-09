@@ -1,7 +1,8 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
 import { sep } from 'node:path'
-import { pruneTreeChangeUnits, readUnitJournal, readUnitSnapshot, unitJournalPort, unitSnapshotPort, type EvolutionIoLike, type MutationJournalRecord, type MutationSnapshot } from '@deepseek-ai/dsh-evolution-core'
+import { type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { pruneTreeChangeUnits, readUnitJournal, readUnitSnapshot, unitJournalPort, unitSnapshotPort, type MutationJournalRecord, type MutationSnapshot } from '@deepseek-ai/dsh-evolution-core/write'
 
 class MemoryIo implements EvolutionIoLike {
   readonly files = new Map<string, string>()

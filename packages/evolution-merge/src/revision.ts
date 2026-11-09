@@ -1,4 +1,5 @@
-import { contentHash, revisionFingerprint, revisionSupportDigest } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { revisionFingerprint, revisionSupportDigest } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillCard } from './skill-card.ts'
 import type { RevisionRef } from './contracts.ts'
 

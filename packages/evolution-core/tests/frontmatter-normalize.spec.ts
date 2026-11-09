@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 // S2.1 (PLAN 2026-09-16): the oracle is the `yaml` package — the dependency
 // the platform's skill-filesystem catalog actually parses with (YAML 1.2 core).
 import { parse as loadStrictYaml } from 'yaml'
-import { frontmatterCatalogInvalid, normalizeFrontmatter, parseFrontmatter, relatedSkillNames, yamlPlainScalarNeedsQuotes } from '../src/index.ts'
+import { frontmatterCatalogInvalid } from '../src/frontmatter.ts'
+import { normalizeFrontmatter, parseFrontmatter, relatedSkillNames, yamlPlainScalarNeedsQuotes } from '../src/skills.ts'
 
 describe('yamlPlainScalarNeedsQuotes (0.3.11)', () => {
   it('flags the plain-scalar hazards the strict YAML catalog rejects', () => {

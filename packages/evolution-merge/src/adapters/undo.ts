@@ -3,7 +3,9 @@
  * version, so the first readBlob call indexes all version bodies once; an undo is rare enough
  * that this is preferable to adding a second hash index.
  */
-import { contentHash, type SkillLibrary, type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
+import { type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core/write'
 import type { MergeUndoPort } from '../undo-merge.ts'
 
 export function skillLibraryUndoPort(skills: SkillLibrary): MergeUndoPort {

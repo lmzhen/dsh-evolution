@@ -1,5 +1,6 @@
 /** Batch 2b undo operation: per-pair preflight, journal, restore, receipt and settlement. */
-import type { EvolutionIoLike, UnitEvidenceRecord } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitEvidenceRecord } from '@deepseek-ai/dsh-evolution-core/write'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
 import type { CommitReceipt } from './commit-receipt.ts'
 import { readCommitReceipts } from './commit-receipt.ts'
@@ -8,7 +9,7 @@ import { writeUndoJournal, type UndoPairState } from './domain/undo-journal.ts'
 import { readUndoReceipt, writeUndoReceipt } from './domain/undo-receipt.ts'
 import { recordPair } from './domain/pair-index-store.ts'
 import { readRunMeta, writeRunMeta } from './domain/run-coordinator.ts'
-import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
+import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core/write'
 import { evidenceSha256 as unitEvidenceDigest } from './domain/evidence-hash.ts'
 
 export type UndoErrorCode = 'undo-unavailable-legacy-receipt' | 'undo-evidence-expired' | 'undo-evidence-hash-mismatch' | 'undo-target-drift' | 'undo-source-drift' | 'undo-partial-state' | 'undo-unit-not-committed'

@@ -1,7 +1,8 @@
 // @tier pre-tag
 
 import { expect, it } from 'vitest'
-import { DEFAULT_SKILL_LIMITS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { skillLibraryUnitBackend, UnitTransactions, type UnitBackend, type UnitPlan } from '../support/unit.ts'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'

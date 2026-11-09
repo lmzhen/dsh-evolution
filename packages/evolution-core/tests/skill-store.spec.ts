@@ -3,7 +3,10 @@ import { expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
-import { authoringFeedback, contentHash, frontmatterCatalogInvalid, parseFrontmatter, resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SKILL_NAME_RE, SkillLibrary, skillsRoot, loadSuppressedNames, loadUsage, nodeEvolutionIo, relatedSkillNames, saveSuppressedNames, saveUsage, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, SKILL_NAME_RE, loadSuppressedNames, loadUsage, nodeEvolutionIo, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
+import { authoringFeedback } from '@deepseek-ai/dsh-evolution-core/skills'
+import { frontmatterCatalogInvalid, parseFrontmatter, relatedSkillNames, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
+import { resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SkillLibrary, skillsRoot } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 /**

@@ -7,7 +7,8 @@
  * instead of becoming unmaintainable.
  */
 import { expect, it } from 'vitest'
-import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_LIMITS, MAX_SKILL_CONTENT_CHARS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_LIMITS, MAX_SKILL_CONTENT_CHARS } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 const BODY = '---\nname: cap-skill\ndescription: D.\n---\n\nBody.\n'

@@ -22,13 +22,8 @@
 
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import {
-  DRIFT_SIGNAL_NOUNS,
-  DRIFT_SIGNALS_VERSION,
-  HEALTH_STAMP_RE,
-  MAINTAIN_PROMPT,
-  computeDriftSignals,
-} from '@deepseek-ai/dsh-evolution-core'
+import { DRIFT_SIGNAL_NOUNS, DRIFT_SIGNALS_VERSION, MAINTAIN_PROMPT, computeDriftSignals } from '@deepseek-ai/dsh-evolution-core'
+import { HEALTH_STAMP_RE } from '@deepseek-ai/dsh-evolution-core/skills'
 import { PROBE_SIGNALS, computeProbe, renderMaintainTemplate as render, snapshotFromLibrary, validateAndNormalizeMaintainPlan } from '../src/index.ts'
 
 function templateSignalRefs(): Set<string> {

@@ -10,7 +10,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { loadMutations, nodeEvolutionIo, recordMutation, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { loadMutations, nodeEvolutionIo, recordMutation } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const stamp = String.fromCharCode(10)
 const bodyWithExtra = ['---', 'name: r-skill', 'description: r-skill body', '---', '', '## Extra', 'extra content', ''].join(stamp)

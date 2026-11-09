@@ -467,6 +467,7 @@ runs:
         node packages/evolution/scripts/verify-verdict-records.mjs packages/evolution
         node packages/evolution/scripts/verify-check-registry.mjs packages/evolution --strict
         node packages/evolution/scripts/verify-test-lines.mjs packages/evolution --strict
+        node packages/evolution/scripts/verify-core-surface.mjs packages/evolution
 
     - name: "Packed install: full import against the npm platform"
       shell: bash

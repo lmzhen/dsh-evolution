@@ -1,7 +1,8 @@
 // @tier pre-tag
 import { unlink } from 'node:fs/promises'
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, readUnitJournal, unitEvidencePath, writeUnitJournal, writeUnitReceipt } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { readUnitJournal, unitEvidencePath, writeUnitJournal, writeUnitReceipt } from '@deepseek-ai/dsh-evolution-core/write'
 import { UnitTransactions, type UnitBackend, type UnitPlan } from '../support/unit.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { recoverCommitJournals } from '../../src/commit-recovery.ts'

@@ -1,6 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { findOwnerCandidate, ownerCandidatesFromSummaries, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
+import { findOwnerCandidate, ownerCandidatesFromSummaries } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillSummary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 function summary(name: string, extra: Partial<SkillSummary> = {}): SkillSummary {
   return {

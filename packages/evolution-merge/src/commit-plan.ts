@@ -5,7 +5,8 @@
  * This module only turns those bytes into a CommitMergePlan; it never reads the live tree and
  * never decides whether a merge is allowed (validateStagedTree does that).
  */
-import type { CommitMergePlan, WriteOrigin, SkillLimits } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillLimits } from '@deepseek-ai/dsh-evolution-core'
+import type { CommitMergePlan, WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { RevisionRef } from './contracts.ts'
 
 const MAX_SKILL_NAME_LENGTH = 64

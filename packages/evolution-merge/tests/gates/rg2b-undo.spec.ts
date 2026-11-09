@@ -1,7 +1,9 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { contentHash, nodeEvolutionIo, type SkillVersion, type UnitEvidenceRecord } from '@deepseek-ai/dsh-evolution-core'
-import { writeUnitEvidence } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
+import { type UnitEvidenceRecord } from '@deepseek-ai/dsh-evolution-core/write'
+import { writeUnitEvidence } from '@deepseek-ai/dsh-evolution-core/write'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { writeCommitReceipt, readCommitReceipt } from '../../src/commit-receipt.ts'
 import { runUndoOperation } from '../../src/undo-operation.ts'

@@ -1,7 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
-import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { createMergeRuntime, loadMergeState, pairKey, rowIdOf, stageKeyOf, writeStagedFile, type MergeRuntimeDeps, type MergeRow, type SkillCard } from '../../src/index.ts'
 import { seedRow } from '../support/seed-row.ts'

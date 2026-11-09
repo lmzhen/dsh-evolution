@@ -10,7 +10,8 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, WriteKernel, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { WriteKernel } from '@deepseek-ai/dsh-evolution-core/write'
 import {
   assertCloneable,
   canClaimPending,

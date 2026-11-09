@@ -6,27 +6,11 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import {
-  AUTHORING_DESCRIPTION_BAR,
-  computeDriftSignals,
-  DRIFT_MAX_LINE_CHARS,
-  DRIFT_SIGNAL_NOUNS,
-  DRIFT_SIGNALS_VERSION,
-  DEFAULT_CURATOR_MODEL,
-  DEFAULT_HEALTH_THRESHOLDS,
-  LOW_QUALITY_THRESHOLD,
-  MAINTAIN_OUTPUT_INSTRUCTION,
-  MAINTAIN_PROMPT,
-  MAX_TIMER_DELAY_MS,
-  MIN_STAMP_BODY_CHARS,
-  PROMPT_BUNDLE,
-  PROMPT_BUNDLE_ID,
-  verifyPromptBundle,
-  type DriftReport,
-  type DriftSkillSnapshot,
-} from '@deepseek-ai/dsh-evolution-core'
+import { AUTHORING_DESCRIPTION_BAR, computeDriftSignals, DRIFT_MAX_LINE_CHARS, DRIFT_SIGNAL_NOUNS, DRIFT_SIGNALS_VERSION, DEFAULT_CURATOR_MODEL, LOW_QUALITY_THRESHOLD, MAINTAIN_OUTPUT_INSTRUCTION, MAINTAIN_PROMPT, MAX_TIMER_DELAY_MS, PROMPT_BUNDLE, PROMPT_BUNDLE_ID, verifyPromptBundle, type DriftReport, type DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
+import { MIN_STAMP_BODY_CHARS } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { SubagentChannel } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core/skills'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
 import { enrichmentSnapshotOptions, type Enrichment } from './enrichment.ts'
 import { renderFacts, type StoreFootprint } from './render-facts.ts'

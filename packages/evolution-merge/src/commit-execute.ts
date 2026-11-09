@@ -3,7 +3,8 @@
  * receipt. A failed commit returns without a receipt; a landed commit with a failed receipt
  * stays successful and carries a warning.
  */
-import type { CommitMergePlan, CommitMergeResult, EvolutionIoLike, SkillLimits } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike, SkillLimits } from '@deepseek-ai/dsh-evolution-core'
+import type { CommitMergePlan, CommitMergeResult } from '@deepseek-ai/dsh-evolution-core/skills'
 import { assembleStagedCommit, type CommitAssemblyPort } from './commit-assembly.ts'
 import { writeCommitReceipt, type CommitReceipt } from './commit-receipt.ts'
 import { pairKey } from './contracts.ts'
@@ -84,7 +85,7 @@ export async function commitStagedRun(
     if (!committed.ok) { try { await writeJournal(io, home, { ...journal, phase: 'failed', updatedAt: new Date(options.now()).toISOString() }) } catch {} ; return { ok: false, message: committed.message, plan: assembled.plan, ...(committed.code === 'target-changed' || committed.code === 'source-changed' || committed.code === 'support-changed' ? { code: committed.code } : {}) } }
     const unitId = committed.evidence.unitId
     if (committed.evidence.unitId !== prepared.prepared.unitId && !prepared.prepared.unitId.startsWith('legacy:')) return { ok: false, message: 'unit evidence does not match prepared unitId', plan: assembled.plan }
-    const finalize = (transaction as { finalize?: (unitId: string) => Promise<{ ok: true; evidence: import('@deepseek-ai/dsh-evolution-core').UnitEvidenceRecord } | { ok: false; message: string }> }).finalize
+    const finalize = (transaction as { finalize?: (unitId: string) => Promise<{ ok: true; evidence: import('@deepseek-ai/dsh-evolution-core/write').UnitEvidenceRecord } | { ok: false; message: string }> }).finalize
     if (finalize !== undefined) {
       const finalized = await finalize.call(transaction, unitId)
       // The tree is already committed. Finalize is post-commit bookkeeping; failing it must

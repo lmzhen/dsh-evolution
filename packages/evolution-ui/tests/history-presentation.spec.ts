@@ -1,6 +1,6 @@
 // @tier fast
 import { expect, it } from 'vitest'
-import { versionRowCells } from '@deepseek-ai/dsh-evolution-core'
+import { versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
 import { historyViewModel } from '../src/panels/history/client/history-presentation.ts'
 import type { VersionRow } from '../src/panels/history/client/api.ts'
 

@@ -2,15 +2,9 @@
 import { describe, expect, it } from 'vitest'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import {
-  latestActivityAt,
-  nodeEvolutionIo,
-  observeEvent,
-  scanThreats,
-  SkillLibrary,
-  yamlPlainScalarNeedsQuotes,
-  type TurnSignals,
-} from '@deepseek-ai/dsh-evolution-core'
+import { latestActivityAt, nodeEvolutionIo, observeEvent, scanThreats, type TurnSignals } from '@deepseek-ai/dsh-evolution-core'
+import { yamlPlainScalarNeedsQuotes } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('0.3.16 S1.9 batch (E-42..E-50)', () => {

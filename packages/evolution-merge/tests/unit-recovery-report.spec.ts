@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, writeUnitJournal } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { writeUnitJournal } from '@deepseek-ai/dsh-evolution-core/write'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { recoverCommitJournals } from '../src/commit-recovery.ts'
 

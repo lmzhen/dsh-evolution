@@ -3,7 +3,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { SkillLibrary, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 it('records one mechanical hard-cap event on a rejected create', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dsh-hard-cap-'))

@@ -28,9 +28,10 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
   }
 }
-import {
-  appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
+import { partitionVersions } from '@deepseek-ai/dsh-evolution-core/skills'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
@@ -45,6 +46,7 @@ import { isParseFailure, parseSubcommand, subcommandOf } from './parse.ts'
 // G7-3: the atomic writer moved to the core io seam (one implementation); re-exported so this
 // module public surface -- Commands.atomicWriteFiles, which the F-211 spec drives -- is unchanged.
 import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
+import { assertSkillsRootAliasRetired, elapsedSince, resolveRootConfig, newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 export { atomicWriteFiles }
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'

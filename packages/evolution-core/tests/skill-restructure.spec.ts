@@ -3,7 +3,9 @@ import { expect, it } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SKILL_LIMITS, isPresent, missingSupportPointers, parseFrontmatter, SkillLibrary, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, isPresent, missingSupportPointers } from '@deepseek-ai/dsh-evolution-core'
+import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillLibrary, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const BODY = `---

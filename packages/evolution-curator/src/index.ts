@@ -21,32 +21,39 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import z from '@deepseek-ai/schemastery'
-import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, markerEntryName, relatedSkillNames, SKILL_NAME_RE, newSkillLibrary, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SkillLibrary, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
+import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
+import type { relatedSkillNames } from '@deepseek-ai/dsh-evolution-core/skills'
+import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /** Shape of one history index file (only the field this reading needs). */
 type RawIndex = { versions?: unknown[] }
 import { eventsFile, EXTRACT_PROMPT_HASH, readEvolutionEvents, writeProposalReport, type ProposalView } from '@deepseek-ai/dsh-evolution-core'
+import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
+import { markerEntryName } from '@deepseek-ai/dsh-evolution-core/skills'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 // G2.4/C3: the review ceiling has ONE home (core's DEFAULT_REVIEW_TIMEOUT_MS) — this package used to
 // declare its own 120_000 beside it, which the bounds gate reports as a second home of the same number.
-import {
-  DEFAULT_CURATOR_MODEL,
-  DEFAULT_REVIEW_TIMEOUT_MS as DEFAULT_CURATOR_REVIEW_TIMEOUT_MS,
-  lintSkill,
-  MAX_TIMER_DELAY_MS,
-  usageObserved,
-} from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CURATOR_MODEL, DEFAULT_REVIEW_TIMEOUT_MS as DEFAULT_CURATOR_REVIEW_TIMEOUT_MS, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
+import { lintSkill } from '@deepseek-ai/dsh-evolution-core/skills'
 import { newestUnitId, planUnitUndo } from './unit-undo-plan.ts'
-import { executeUnitUndo, planUnitUndoAcross, type UnitUndoMember, type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core'
-import { historyIndexFile, parseHistoryIndex, resolveUnitMembers, unitMembersAreComplete, staleRouteStubs } from '@deepseek-ai/dsh-evolution-core'
-import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, parseFrontmatter, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView, type SkillActionResult, type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
-import { INSTANCE_KEYS, acquireTreeWriteLock, blobPath, claimInstance, contentHash, entryTarget, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
-import type { SkillVersion, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
+import { executeUnitUndo, planUnitUndoAcross, type UnitUndoMember, type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core/write'
+import { historyIndexFile, parseHistoryIndex } from '@deepseek-ai/dsh-evolution-core/skills'
+import { resolveUnitMembers, unitMembersAreComplete, staleRouteStubs } from '@deepseek-ai/dsh-evolution-core/write'
+import { computeDedupGroups, buildCuratorRunReport, computeLifecycleTransitions, computePrefixClusters, computeQualityScores, computeScopeView, parseCuratorNominations, renderCuratorReportMarkdown, type CuratorConsolidation, type CuratorNominations, type CuratorRunReport, type ScopeView } from '@deepseek-ai/dsh-evolution-core'
+import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
+import { type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core/skills'
+import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
+import { type SkillActionResult } from '@deepseek-ai/dsh-evolution-core/skills'
+import { DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core/skills'
+import { INSTANCE_KEYS, acquireTreeWriteLock, claimInstance, contentHash, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { entryTarget } from '@deepseek-ai/dsh-evolution-core/skills'
+import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+import { WriteAnchor } from '@deepseek-ai/dsh-evolution-core/skills'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { blobPath } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
 import type { Session } from '@deepseek-ai/dsh-evolution-core/platform'
 

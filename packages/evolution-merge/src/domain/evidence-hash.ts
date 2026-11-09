@@ -1,6 +1,6 @@
 /** Canonical evidence JSON hash shared with core unit receipts. */
 import { createHash } from 'node:crypto'
-import type { UnitEvidenceRecord } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitEvidenceRecord } from '@deepseek-ai/dsh-evolution-core/write'
 function canonical(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']'

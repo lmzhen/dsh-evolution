@@ -11,12 +11,14 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { isPresent, isUnknown, authorityFrom, runWriteGates, skillWriteGateContext, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
+import { isPresent, isUnknown, authorityFrom, runWriteGates, skillWriteGateContext } from '@deepseek-ai/dsh-evolution-core'
+import { type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import {
-  errorText, SKILL_NAME_RE, contentHash, evolutionIoAdapter, relatedSkillNames, resolveExecOrigins, newSkillLibrary, type EvolutionIoLike, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { errorText, SKILL_NAME_RE, contentHash, evolutionIoAdapter, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { relatedSkillNames } from '@deepseek-ai/dsh-evolution-core/skills'
+import { resolveExecOrigins, newSkillLibrary, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 export interface GraphNode {
   id: string

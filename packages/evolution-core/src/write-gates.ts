@@ -24,7 +24,10 @@
  */
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, type WriteConfirm, type WriteConfirmMode } from './write-authority.ts'
 import type { ConfirmContext } from './write-authority.ts'
-import { SKILL_ACTION_REQUIRED_FIELDS, errorText, isUnreadWrite, type WriteOrigin } from './index.ts'
+import { SKILL_ACTION_REQUIRED_FIELDS } from './constants.ts'
+import { errorText } from './errors.ts'
+import { isUnreadWrite } from './skill-reads.ts'
+import type { WriteOrigin } from './skill-store.ts'
 
 /** The point whose verdict is being taken. */
 export type WriteGatePoint = 'admission' | 'execution'

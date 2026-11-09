@@ -14,8 +14,8 @@ import {
   writeUnitSnapshot,
   type UnitEvidenceRecord,
   type UnitSnapshot,
-} from '@deepseek-ai/dsh-evolution-core';
-import { readUnitJournal, writeUnitJournal, type UnitJournal, type UnitJournalCheckpoint, type UnitJournalPhase } from '@deepseek-ai/dsh-evolution-core';
+} from '@deepseek-ai/dsh-evolution-core/write';
+import { readUnitJournal, writeUnitJournal, type UnitJournal, type UnitJournalCheckpoint, type UnitJournalPhase } from '@deepseek-ai/dsh-evolution-core/write';
 
 export interface UnitSupportFile {
   readonly path: string;
@@ -74,7 +74,7 @@ export interface UnitBackend {
   restoreSource(name: string, body: string): Promise<void>;
   restoreSupportFile?(name: string, path: string, content: string | null): Promise<void>;
 }
-import type { UnitClaim, UnitClaimPort } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitClaim, UnitClaimPort } from '@deepseek-ai/dsh-evolution-core/write'
 export interface UnitTransactionOptions {
   readonly io: EvolutionIoLike;
   readonly home: string;

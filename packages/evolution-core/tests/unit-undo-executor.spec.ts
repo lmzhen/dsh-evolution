@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { contentHash, executeUnitUndo, type UnitUndoSink, type UnitUndoPlan } from '../src/index.ts'
+import { contentHash } from '../src/index.ts'
+import { executeUnitUndo, type UnitUndoSink, type UnitUndoPlan } from '../src/write.ts'
 
 interface State {
   skills: Map<string, string>

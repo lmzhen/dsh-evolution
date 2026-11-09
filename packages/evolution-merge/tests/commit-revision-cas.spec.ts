@@ -3,7 +3,8 @@
 // travel producer -> assembly -> store, and a changed live tree is refused with a typed
 // cause; validation findings land in skipped, manifest files[] is checked on both paths.
 import { expect, it } from 'vitest'
-import { contentHash, nodeEvolutionIo, revisionFingerprint, revisionSupportDigest, type CommitMergePlan, type RevisionFile } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { revisionFingerprint, revisionSupportDigest, type CommitMergePlan, type RevisionFile } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { makeV4Home, v3Row } from './support/schema4-home.ts'
 import {

@@ -1,7 +1,7 @@
 // @tier pre-tag
 import { unlink } from 'node:fs/promises'
 import { expect, it } from 'vitest'
-import { unitEvidencePath } from '@deepseek-ai/dsh-evolution-core'
+import { unitEvidencePath } from '@deepseek-ai/dsh-evolution-core/write'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { MergeUnitTransactions, unitEvidenceDigest, type UnitBackend, type UnitPlan } from '../../evolution-merge/src/unit-protocol.ts'

@@ -3,7 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const stamp = String.fromCharCode(10)
 const bodyWithExtra = ['---', 'name: q-skill', 'description: q-skill body', '---', '', '## Extra', 'extra content', ''].join(stamp)

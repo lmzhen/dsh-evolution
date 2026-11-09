@@ -9,7 +9,8 @@
  * `skill_manage` with no way back.
  */
 import { expect, it } from 'vitest'
-import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_LIMITS, SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_LIMITS } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 const LIMIT = 300

@@ -7,18 +7,8 @@
  * probe result can never disagree with the facts block. No IO, no writes.
  */
 
-import {
-  computeDedupGroups,
-  computePrefixClusters,
-  duplicateHeadings,
-  HEALTH_STAMP_RE,
-  MIN_STAMP_BODY_CHARS,
-  missingSupportPointers,
-  narrowNameMatches,
-  overlongLines,
-  retirementReport,
-  type DriftSkillSnapshot,
-} from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, computePrefixClusters, duplicateHeadings, missingSupportPointers, narrowNameMatches, overlongLines, retirementReport, type DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
+import { HEALTH_STAMP_RE, MIN_STAMP_BODY_CHARS } from '@deepseek-ai/dsh-evolution-core/skills'
 
 export const PROBE_SIGNALS: ReadonlyArray<string> = [
   'dedup_group',

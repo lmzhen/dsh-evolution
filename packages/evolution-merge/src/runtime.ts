@@ -4,7 +4,8 @@
  * out of apply() and makes the mutating verbs testable with fakes.
  */
 import { createHash } from 'node:crypto'
-import { errorText, isProcessAlive, probeText, SkillLibrary, type EvolutionIoLike, type RunRegistry } from '@deepseek-ai/dsh-evolution-core'
+import { errorText, isProcessAlive, probeText, type EvolutionIoLike, type RunRegistry } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { UnitTransaction } from './unit-protocol.ts'
 import { MergeUnitTransactions } from './unit-protocol.ts'
 import { skillLibraryUnitBackend } from './skill-library-unit-backend.ts'

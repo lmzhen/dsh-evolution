@@ -1,5 +1,6 @@
 /** Post-recovery projection: evidence -> report -> row remove -> stage drop -> settle/meta. */
-import type { EvolutionIoLike, UnitEvidenceRecord } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { UnitEvidenceRecord } from '@deepseek-ai/dsh-evolution-core/write'
 import { readCommitReceipts, writeCommitReceipt } from './commit-receipt.ts'
 import { mergeReportPath, readMergeReport, writeMergeReport } from './report.ts'
 import { pairLedger, readPairLedgerV4 } from './domain/pair-ledger.ts'

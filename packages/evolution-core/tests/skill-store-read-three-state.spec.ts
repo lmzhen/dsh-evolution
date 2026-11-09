@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { describe, expect, it } from 'vitest'
-import { SkillLibrary, isUnknown, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { isUnknown, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { fakeIo } from '../../test-support/fake-io.ts'

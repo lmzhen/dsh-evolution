@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, HEALTH_STAMP_RE } from '@deepseek-ai/dsh-evolution-core'
+import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, HEALTH_STAMP_RE } from '@deepseek-ai/dsh-evolution-core/skills'
 
 it('a small dense body with support files is healthy', () => {
   const assessment = assessStructureHealth({

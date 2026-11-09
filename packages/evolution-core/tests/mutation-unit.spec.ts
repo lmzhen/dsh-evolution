@@ -1,6 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { MutationUnit, type MutationRequest, type MutationLockPort, type MutationJournalRecord, type EvolutionIoLike, type MutationSnapshotPort, type MutationUnitHooks } from '@deepseek-ai/dsh-evolution-core'
+import { type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { MutationUnit, type MutationRequest, type MutationLockPort, type MutationJournalRecord, type MutationSnapshotPort, type MutationUnitHooks } from '@deepseek-ai/dsh-evolution-core/write'
 
 class MemoryIo implements EvolutionIoLike {
   readonly files = new Map<string, string>()
