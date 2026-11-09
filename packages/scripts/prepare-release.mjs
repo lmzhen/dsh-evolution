@@ -605,6 +605,8 @@ const publishGroups = [
   // 0.23.0: the byte-seat implementation (G2 S4). It implements the `evolution-io` seat, so it
   // rides that group; the table must cover every staged tarball (P2-39 above).
   ['evolution-io', 'evolution-state-storage'],
+  // G2: the mutation authority implements the io peer; publish after io.
+  ['evolution-authority'],
   ['evolution-io-node', 'evolution-state-domain', 'evolution-state-json'],
   ['evolution-state'],
   ['memory', 'memory-files', 'skill-usage'],
