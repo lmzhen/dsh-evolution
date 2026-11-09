@@ -125,27 +125,14 @@ export interface UnitTransaction {
   cancel(unitId: string, reason: string): Promise<{ ok: boolean; phase: UnitJournalPhase | "none" }>;
 }
 
-function canonical(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
-  const object = value as Record<string, unknown>;
-  return (
-    "{" +
-    Object.keys(object)
-      .sort()
-      .map((key) => JSON.stringify(key) + ":" + canonical(object[key]))
-      .join(",") +
-    "}"
-  );
-}
-function digest(plan: UnitPlan): string {
-  return createHash("sha256").update(canonical(plan)).digest("hex");
-}
 function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']'
   const object = value as Record<string, unknown>
   return '{' + Object.keys(object).sort().map(key => JSON.stringify(key) + ':' + canonicalJson(object[key])).join(',') + '}'
+}
+function digest(plan: UnitPlan): string {
+  return createHash("sha256").update(canonicalJson(plan)).digest("hex")
 }
 export function unitEvidenceDigest(evidence: UnitEvidenceRecord): string {
   return createHash("sha256").update(canonicalJson({ ...evidence, at: 0, mutations: 0 })).digest("hex")
