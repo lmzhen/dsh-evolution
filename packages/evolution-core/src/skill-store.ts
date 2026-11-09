@@ -865,24 +865,14 @@ export class SkillLibrary {
   }
 
   private async withMutationLock<T>(task: () => Promise<T>): Promise<T> {
-    let lease: import('./mutation-unit.ts').MutationLockLease | undefined
-    try {
-      lease = await this.lockPort().acquire()
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      if (message.startsWith('mutation-lock-busy')) throw error
-      // Coordination failure: the per-file transact/serial path remains the
-      // fallback; a lock sidecar must not change the mutation's business result.
-      return await task()
-    }
+    // Fail closed: a missing authority/lock is an assembly error, not a reason to run
+    // the write outside the fence. The old catch-and-fallback inverted this guard: the
+    // "refusing an unfenced production write" error itself took the fallback path.
+    const lease = await this.lockPort().acquire()
     try {
       return await task()
     } finally {
-      try {
-        await lease.release()
-      } catch {
-        // A failed lock cleanup is a coordination degradation, not a write failure.
-      }
+      await lease.release()
     }
   }
 

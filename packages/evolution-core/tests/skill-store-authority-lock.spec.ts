@@ -17,3 +17,12 @@ it('newSkillLibrary auto-detects evolutionMutationAuthority from ctx', async () 
   expect(created.ok).toBe(true)
   expect(acquired).toBeGreaterThan(0)
 })
+
+it('fails closed when the authority lock cannot be acquired', async () => {
+  const root = await tempRoot('dsh-skill-authority-fail-closed-')
+  const lock = { async acquire() { throw new Error('skill-store: no authority mutationLock was supplied; refusing an unfenced production write') } }
+  const ctx = { emit() {}, get(name: string) { return name === 'evolutionMutationAuthority' ? { mutationLock: lock } : undefined } }
+  const lib = newSkillLibrary({ config: { root }, io: nodeEvolutionIo(), ctx, authority: authorityFrom({ origin: 'foreground' }) })
+  await expect(lib.create('must-not-write', skill('must-not-write'), 'foreground')).rejects.toThrow('refusing an unfenced production write')
+  expect(await nodeEvolutionIo().exists(root + '/must-not-write/SKILL.md')).toBe(false)
+})
