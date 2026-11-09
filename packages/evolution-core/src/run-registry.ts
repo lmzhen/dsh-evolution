@@ -187,6 +187,8 @@ export interface RunRegistryOptions {
   home: string
   /** Warn channel for a failed index write (the run itself is unaffected). */
   warn?: (message: string) => void
+  /** Optional family fence; when set, every index RMW runs inside it. */
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   /** Clock seam for tests. */
   now?: () => number
   /** Retained records (N3-clamped). */
@@ -272,6 +274,11 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
   const maxRecords = clampedNumber(options.maxRecords ?? DEFAULT_RUN_RECORDS, DEFAULT_RUN_RECORDS, { min: 1 })
   const warn = options.warn ?? (() => {})
   const path = runsFile(options.home)
+  const writeIndex = async (task: (current: string | null) => string | null | Promise<string | null>): Promise<void> => {
+    const run = async (): Promise<void> => { await transactIo(options.io, path, task) }
+    if (options.fence !== undefined) await options.fence.run(run)
+    else await run()
+  }
 
   /** Rows THIS process started: its memory is the only truth for them. */
   const owned = new Map<string, RunRecord>()
@@ -343,7 +350,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       // single write a non-owner may make is the orphan verdict for a row whose owner is
       // gone. The row read inside this transaction IS the compare-and-swap: if its owner
       // settled it in between, it no longer reads as `running` and is left alone.
-      await transactIo(options.io, path, (current) => {
+      await writeIndex((current) => {
         const onDisk = parseIndex(current)
         const merged = new Map<string, RunRecord>()
         for (const row of onDisk.records) merged.set(row.id, row)
@@ -503,7 +510,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
 
     async supersedeKind(kind) {
       let marked = 0
-      await transactIo(options.io, path, (current) => {
+      await writeIndex((current) => {
         const onDisk = parseIndex(current)
         const merged = new Map<string, RunRecord>()
         for (const row of onDisk.records) merged.set(row.id, row)
@@ -541,7 +548,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         return owned.get(id)?.state === outcome.state
       }
       let changed = false
-      await transactIo(options.io, path, (current) => {
+      await writeIndex((current) => {
         const onDisk = parseIndex(current)
         const row = onDisk.records.find(item => item.id === id)
         if (row === undefined) return current

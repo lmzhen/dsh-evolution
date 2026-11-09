@@ -336,6 +336,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       io: ioRegistry.provider(),
       home: evolutionHome(),
       warn: (message) => { ctx.logger.warn(message) },
+      ...((ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence === undefined ? {} : { fence: (ctx.get('evolutionMutationAuthority') as { readonly homeFence: { run<T>(body: () => Promise<T>): Promise<T> } }).homeFence }),
     })
     runs = registry
     void registry.load().then((loaded) => {

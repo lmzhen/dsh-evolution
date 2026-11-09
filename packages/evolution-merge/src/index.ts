@@ -208,7 +208,8 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       const normalized = await normalizePairLedger(io, home)
       return normalized.ok ? state : { ok: false as const, code: 'merge-state-needs-repair' as const, message: normalized.message ?? 'v4 normalize failed' }
     })().catch(error => ({ ok: false as const, code: 'merge-state-migration-blocked' as const, message: error instanceof Error ? error.message : String(error) }))
-    const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) } })
+    const homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
+    const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) }, ...(homeFence === undefined ? {} : { fence: homeFence }) })
     ctx.effect(() => {
       const host = ctx as unknown as { on(name: string, listener: (event: { action?: string }) => void): () => void }
       if (typeof host.on !== 'function') return () => {}
