@@ -128,6 +128,15 @@
       "note": "The skill tree itself. G1: ordinary byte writers take the root mutation lock (fileMutationLock) and still run their per-file read-modify-write through `transact`; the root lock is what keeps extract/restructure/update/patch/create from interleaving. Destructive movers refuse only when a support directory cannot be listed (fail-closed)."
     },
     {
+      "id": "activity-log-fenced",
+      "path": "<evolutionHome>/activity.json",
+      "writer": "evolution-activity/src/index.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, path, task)",
+      "state": [],
+      "note": "The same activity sidecar through the authority-fence wrapper; the helper is the one transactIo call site."
+    },
+    {
       "id": "activity-log",
       "path": "<evolutionHome>/activity.json",
       "writer": "evolution-activity/src/index.ts",

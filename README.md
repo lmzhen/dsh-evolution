@@ -10,7 +10,7 @@ It does not modify or train the model, and it does not provide a hosted model se
 
 ## Platform line
 
-The family targets DeepSeek Harness `0.2.2-rc.1` only. Published packages declare the `^0.2.2-rc.0` peer range and the `>=0.2.2-rc.0 <0.2.3-0` engine range. The single host edge is the `evolutionPlatform` service; features reach it through the family's platform ports, never by importing host internals.
+The family targets DeepSeek Harness `0.2.2-rc.1` only. Published packages declare the `^0.2.2-rc.0` peer range and the `>=0.2.2-rc.0 <0.2.3-0` engine range. The single host edge is the `evolutionPlatform` service; features reach it through the family's platform ports, never by importing host internals. The family's own write authority is `evolutionMutationAuthority`: one lease/fence service above the IO seam, shared by merge, review, curator and the knowledge stores.
 
 ## What is a skill?
 
