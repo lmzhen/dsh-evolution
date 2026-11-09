@@ -3,8 +3,8 @@
   "edits": [
     {
       "file": "packages/evolution-core/src/http-routes.ts",
-      "find": "for (const dispose of disposers) {\n          try { void dispose() } catch { /* a failed disposer must not mask the others */ }",
-      "replace": "for (const dispose of disposers.slice(0, 0)) {\n          try { void dispose() } catch { /* a failed disposer must not mask the others */ }"
+      "find": "return () => {\n          for (const dispose of disposers) {",
+      "replace": "return () => {\n          for (const dispose of disposers.slice(0, 0)) {"
     }
   ],
   "expect": "red",
