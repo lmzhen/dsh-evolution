@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-09T17:06:38.610Z",
+  "generatedAt": "2026-11-09T17:11:42.423Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -89,8 +89,8 @@
     },
     {
       "probe": "decl-client-seats",
-      "signature": "ee5dbb7420b243744a762151c0794df2c43dfc8f31553dc7c42d64c74d2f18df",
-      "provenAt": "2026-11-02T23:45:36.401Z",
+      "signature": "eedd09fd2b4b92cc3bc4f7f739286dd797806b7a4c42edd10bf0c28b0c2cb129",
+      "provenAt": "2026-11-09T17:09:35.442Z",
       "tree": "overlay"
     },
     {
@@ -114,19 +114,19 @@
     {
       "probe": "decl-dependency-closure",
       "signature": "2be1ef612050cba67d79784d01b6ee4bce4c8255e80bfdb1b5743776928da698",
-      "provenAt": "2026-11-02T23:45:36.403Z",
+      "provenAt": "2026-11-09T17:11:00.460Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-doc-facts",
       "signature": "b6efb36cf98e74ba17375617b720212e02d17aca7f7d4f699da49f3aeeb9be50",
-      "provenAt": "2026-11-02T23:45:36.408Z",
+      "provenAt": "2026-11-09T17:11:42.415Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-platform-contract",
-      "signature": "60e84ee7b5810eebfe93690c3f97934a040a7e8c43ed7876484d6c649b5f666f",
-      "provenAt": "2026-11-02T23:45:36.404Z",
+      "signature": "6685428699e7219ad862c1eb27fce28fa1687add67c1ca696f0c7ac3def4231a",
+      "provenAt": "2026-11-09T17:10:17.422Z",
       "tree": "overlay"
     },
     {
