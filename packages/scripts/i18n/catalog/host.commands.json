@@ -580,6 +580,86 @@
       "de": " (Sitzung {session})",
       "ru": " (сеанс {session})",
       "pt": " (sessão {session})"
+    },
+    "command.curator.skipped": {
+      "zh": "策展轮已跳过（{reason}）：未执行策展过程。\nrunId={runId}",
+      "en": "Curation round skipped ({reason}): no curation pass ran.\nrunId={runId}",
+      "ja": "キュレーションをスキップしました（{reason}）：処理は実行されていません。\nrunId={runId}",
+      "es": "Ronda de curación omitida ({reason}): no se ejecutó ningún pase.\nrunId={runId}",
+      "fr": "Tour de curation ignoré ({reason}) : aucune passe n’a été exécutée.\nrunId={runId}",
+      "de": "Kurationslauf übersprungen ({reason}): Es wurde kein Durchlauf ausgeführt.\nrunId={runId}",
+      "ru": "Цикл упорядочивания пропущен ({reason}): проход не выполнялся.\nrunId={runId}",
+      "pt": "Rodada de curadoria ignorada ({reason}): nenhuma passagem foi executada.\nrunId={runId}"
+    },
+    "command.curator.done": {
+      "zh": "策展轮完成：{stale} 项过期，{archived} 项已归档，{errors} 项失败。\nrunId={runId}{snapshot}",
+      "en": "Curation round complete: {stale} stale, {archived} archived, {errors} failed.\nrunId={runId}{snapshot}",
+      "ja": "キュレーション完了：期限切れ {stale} 件、アーカイブ {archived} 件、失敗 {errors} 件。\nrunId={runId}{snapshot}",
+      "es": "Ronda de curación completada: {stale} obsoletas, {archived} archivadas, {errors} fallidas.\nrunId={runId}{snapshot}",
+      "fr": "Tour de curation terminé : {stale} obsolètes, {archived} archivées, {errors} en échec.\nrunId={runId}{snapshot}",
+      "de": "Kurationslauf abgeschlossen: {stale} veraltet, {archived} archiviert, {errors} fehlgeschlagen.\nrunId={runId}{snapshot}",
+      "ru": "Цикл упорядочивания завершён: устарело {stale}, в архив {archived}, ошибок {errors}.\nrunId={runId}{snapshot}",
+      "pt": "Rodada de curadoria concluída: {stale} obsoletas, {archived} arquivadas, {errors} falharam.\nrunId={runId}{snapshot}"
+    },
+    "command.curator.paused": {
+      "zh": "策展自动轮已暂停。手动 /evolution curator run 不受影响；用 /evolution curator resume 恢复。",
+      "en": "Automatic curation is paused. Manual /evolution curator run still works; use /evolution curator resume to restart.",
+      "ja": "自動キュレーションを一時停止しました。手動の /evolution curator run は引き続き使えます。再開するには /evolution curator resume を実行してください。",
+      "es": "La curación automática está en pausa. La ejecución manual /evolution curator run sigue funcionando; usa /evolution curator resume para reanudarla.",
+      "fr": "La curation automatique est en pause. /evolution curator run manuel fonctionne toujours ; utilisez /evolution curator resume pour la relancer.",
+      "de": "Die automatische Kuration ist pausiert. Der manuelle /evolution curator run funktioniert weiterhin; mit /evolution curator resume wieder starten.",
+      "ru": "Автоматическое упорядочивание приостановлено. Ручной /evolution curator run продолжает работать; для возобновления используйте /evolution curator resume.",
+      "pt": "A curadoria automática está pausada. O /evolution curator run manual continua funcionando; use /evolution curator resume para retomar."
+    },
+    "command.curator.resumed": {
+      "zh": "策展自动轮已恢复。下一次定时轮要等一个间隔（首轮延后语义）。",
+      "en": "Automatic curation resumed. The next scheduled round waits one interval (first round delayed).",
+      "ja": "自動キュレーションを再開しました。次の定時実行は 1 インターバル後です（初回は遅延）。",
+      "es": "Curación automática reanudada. La siguiente ronda programada espera un intervalo (primera ronda diferida).",
+      "fr": "Curation automatique relancée. Le prochain tour attend un intervalle (premier tour différé).",
+      "de": "Automatische Kuration fortgesetzt. Der nächste planmäßige Lauf wartet ein Intervall (erster Lauf verzögert).",
+      "ru": "Автоматическое упорядочивание возобновлено. Следующий плановый цикл ждёт один интервал (первый цикл отложен).",
+      "pt": "Curadoria automática retomada. A próxima rodada agendada aguarda um intervalo (primeira rodada adiada)."
+    },
+    "command.curator.notPersisted": {
+      "zh": "\n注意：没有挂载 evolution 状态服务 —— 该设置不会被持久化，也不会在此进程之后保留。",
+      "en": "\nNote: the evolution state service is not mounted — this setting is not persisted and will not survive this process.",
+      "ja": "\n注意：evolution 状態サービスが未マウントです。この設定は永続化されず、このプロセスの終了後も残りません。",
+      "es": "\nNota: el servicio de estado de evolution no está montado; este ajuste no se guardará y no sobrevivirá a este proceso.",
+      "fr": "\nRemarque : le service d’état evolution n’est pas monté — ce réglage n’est pas persistant et ne survivra pas à ce processus.",
+      "de": "\nHinweis: Der evolution-Statusdienst ist nicht eingebunden – diese Einstellung wird nicht gespeichert und überlebt diesen Prozess nicht.",
+      "ru": "\nПримечание: служба состояния evolution не подключена — настройка не сохранится и не переживёт этот процесс.",
+      "pt": "\nNota: o serviço de estado do evolution não está montado — esta configuração não será persistida e não sobreviverá a este processo."
+    },
+    "command.curator.noState": {
+      "zh": "还没有策展状态：首个自动轮次要等间隔到达后才会执行。",
+      "en": "No curation state yet: the first automatic round runs after one interval.",
+      "ja": "キュレーション状態はまだありません。最初の自動実行は 1 インターバル後に走ります。",
+      "es": "Aún no hay estado de curación: la primera ronda automática se ejecuta tras un intervalo.",
+      "fr": "Aucun état de curation pour l’instant : le premier tour automatique s’exécute après un intervalle.",
+      "de": "Noch kein Kurationsstatus: Der erste automatische Lauf startet nach einem Intervall.",
+      "ru": "Состояния упорядочивания пока нет: первый автоматический цикл запустится через интервал.",
+      "pt": "Ainda não há estado de curadoria: a primeira rodada automática ocorre após um intervalo."
+    },
+    "command.curator.noReport": {
+      "zh": "暂无策展报告。",
+      "en": "No curation report yet.",
+      "ja": "キュレーションレポートはまだありません。",
+      "es": "Aún no hay informe de curación.",
+      "fr": "Aucun rapport de curation pour l’instant.",
+      "de": "Noch kein Kurationsbericht.",
+      "ru": "Отчёта об упорядочивании пока нет.",
+      "pt": "Ainda não há relatório de curadoria."
+    },
+    "command.curator.reportReadFailed": {
+      "zh": "报告文件读不出来。",
+      "en": "The report file could not be read.",
+      "ja": "レポートファイルを読み込めませんでした。",
+      "es": "No se pudo leer el archivo del informe.",
+      "fr": "Le fichier du rapport n’a pas pu être lu.",
+      "de": "Die Berichtsdatei konnte nicht gelesen werden.",
+      "ru": "Не удалось прочитать файл отчёта.",
+      "pt": "Não foi possível ler o arquivo do relatório."
     }
   }
 }

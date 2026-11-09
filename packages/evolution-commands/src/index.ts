@@ -537,9 +537,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // D-12 (v18): a reentrant run that was skipped must not be reported
           // as a completed 0/0/0 pass.
           if (result.skipped !== undefined) {
-            return ok(`策展轮已跳过（${result.skipped}）：未执行策展过程。\nrunId=${result.report.runId}`)
+            return ok(hostCommandText(hostLocale, 'command.curator.skipped', { reason: result.skipped, runId: result.report.runId }))
           }
-          return ok(`策展轮完成：${result.stale.length} 项过期，${result.archived.length} 项已归档，${result.errors.length} 项失败。\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}`)
+          return ok(hostCommandText(hostLocale, 'command.curator.done', { stale: result.stale.length, archived: result.archived.length, errors: result.errors.length, runId: result.report.runId, snapshot: result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : '' }))
         }
         if (input === 'curator pause' || input === 'curator resume') {
           const curator = ctx.get('evolutionCurator') as { setPaused(paused: boolean): Promise<void> } | undefined
@@ -551,16 +551,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // travel through the return). Surface it on the command result so
           // the operator can tell a persisted pause from an ephemeral one.
           const stateMounted = ctx.get('evolutionState') !== undefined
-          const notPersisted = stateMounted ? '' : '\n注意：没有挂载 evolution 状态服务 —— 该设置不会被持久化，也不会在此进程之后保留。'
+          const notPersisted = stateMounted ? '' : hostCommandText(hostLocale, 'command.curator.notPersisted')
           return ok((paused
-            ? '策展自动轮已暂停。手动 /evolution curator run 不受影响；用 /evolution curator resume 恢复。'
-            : '策展自动轮已恢复。下一次定时轮要等一个间隔（首轮延后语义）。') + notPersisted)
+            ? hostCommandText(hostLocale, 'command.curator.paused')
+            : hostCommandText(hostLocale, 'command.curator.resumed')) + notPersisted)
         }
         if (input === 'curator status') {
           const curator = ctx.get('evolutionCurator') as { status(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null> } | undefined
           if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const state = await curator.status()
-          if (!state) return ok('还没有策展状态：首个自动轮次要等间隔到达后才会执行。')
+          if (!state) return ok(hostCommandText(hostLocale, 'command.curator.noState'))
           // A corrupt state record must not crash the command surface with a
           // RangeError from `Invalid Date`.toISOString().
           const lastRun = typeof state.lastRunAt === 'number' && Number.isFinite(state.lastRunAt) && state.lastRunAt > 0
@@ -610,7 +610,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }>; aborted?: string; unattributed?: string[] } | null> } | undefined
           if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const report: unknown = await curator.latestReport()
-          if (!report) return ok('暂无策展报告。')
+          if (!report) return ok(hostCommandText(hostLocale, 'command.curator.noReport'))
           // V6-41 (0.3.36): the report file is out-of-band editable — a damaged
           // shape must render "report unreadable" instead of an uncaught
           // TypeError (the `curator status` command already has this posture).
@@ -619,7 +619,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             || typeof (report as { startedAt?: unknown }).startedAt !== 'string'
             || !Array.isArray((report as { archived?: unknown }).archived)
             || !Array.isArray((report as { failed?: unknown }).failed)) {
-            return err('报告文件读不出来。')
+            return err(hostCommandText(hostLocale, 'command.curator.reportReadFailed'))
           }
           const reportAny = report as {
             runId: string
