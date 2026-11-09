@@ -11,6 +11,7 @@ it('journals monotonic phases and rejects terminal/backwards transitions', () =>
   expect(() => { assertUnitJournalTransition('source-archiving', 'sources-archived') }).not.toThrow()
   expect(() =>{  assertUnitJournalTransition('sources-archived', 'committed'); }).not.toThrow()
   expect(() =>{  assertUnitJournalTransition('committed', 'prepared'); }).toThrow()
+  expect(() =>{  assertUnitJournalTransition('committed', 'failed'); }).toThrow(/terminal/)
   expect(() =>{  assertUnitJournalTransition('target-written', 'prepared'); }).toThrow()
 })
 
@@ -32,4 +33,13 @@ it('write refuses a backwards/terminal phase once a journal exists, and accepts 
   await expect(writeUnitJournal(io, home, { ...base, phase: 'target-written' })).resolves.toBeTruthy()
   await writeUnitJournal(io, home, { ...base, phase: 'committed' })
   await expect(writeUnitJournal(io, home, { ...base, phase: 'target-written' })).rejects.toThrow(/terminal/)
+})
+
+it('keeps unitId stable while the nested journal key is separate', async () => {
+  const home = await tempRoot('dsh-unit-journal-nested-')
+  const io = nodeEvolutionIo()
+  const journal: UnitJournal = { schemaVersion: 1, unitId: 'run-3:abc', journalId: 'j-nested', runId: 'run-3', planDigest: 'd3', target: 'alpha', sources: [], phase: 'prepared', storageKey: 'k3', snapshotSha256: 'b'.repeat(64), updatedAt: 1 }
+  await writeUnitJournal(io, home, journal)
+  expect(await readUnitJournal(io, home, 'j-nested')).toEqual(journal)
+  expect(unitJournalPath(home, 'run-3:abc')).not.toBe(unitJournalPath(home, 'j-nested'))
 })

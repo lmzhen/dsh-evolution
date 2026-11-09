@@ -264,3 +264,22 @@ it('releases the fence even when claim release throws', async () => {
   ])
   expect(acquired).toBe('free')
 })
+
+it('acquires the writer serial before the tree fence', async () => {
+  const home = await tempRoot('dsh-unit-serial-order-')
+  const io = nodeEvolutionIo()
+  const tree = new Map<string, string>()
+  const order: string[] = []
+  const tx = new MergeUnitTransactions({
+    io, home, backend: backend(tree),
+    claim: { async acquire() { return { async release() {} } } },
+    now: () => 1,
+    serial: async task => { order.push('serial'); return await task() },
+    onLock: lock => order.push('lock:' + lock),
+  })
+  const prepared = await tx.prepare(plan())
+  if (!prepared.ok) throw new Error(prepared.message)
+  await tx.commit(prepared.prepared)
+  expect(order[0]).toBe('serial')
+  expect(order[1]).toBe('lock:tree')
+})

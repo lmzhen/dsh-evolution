@@ -2426,7 +2426,10 @@ export class SkillLibrary {
    * Every failure rolls back what already landed; a rollback failure names the
    * unrestored skills instead of claiming success.
    */
-  async commitMerge(plan: CommitMergePlan): Promise<CommitMergeResult> {
+  /** Expose the store's writer queue so a caller can acquire it BEFORE the home fence. */
+  async runSerial<T>(task: () => Promise<T>): Promise<T> { return await this.serial(task) }
+
+  async commitMerge(plan: CommitMergePlan, options?: { readonly serialized?: boolean }): Promise<CommitMergeResult> {
     const target = plan.target.trim()
     const sources = [...new Set(plan.sources.map(name => name.trim()))].filter(name => name !== target)
     if (sources.length === 0) return { ok: false, message: '合并至少需要一个互不相同的来源技能。' }
@@ -2438,7 +2441,7 @@ export class SkillLibrary {
     const protectedSource = sources.find(name => PROTECTED_BUILTIN_SKILLS.has(name))
     if (protectedSource !== undefined) return { ok: false, message: `来源技能「${protectedSource}」是受保护的内置技能。` }
     const limits = plan.limits ?? this.limits
-    return await this.serial(async (): Promise<CommitMergeResult> => {
+    const run = async (): Promise<CommitMergeResult> => {
       const dir = this.dirOf(target)
       const targetPath = join(dir, 'SKILL.md')
       if (!plan.targetExists && await this.io.exists(dir)) {
@@ -2731,7 +2734,8 @@ export class SkillLibrary {
       await plan.onPhase?.('sources-archived')
       await plan.onPhase?.('unit-written')
       return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
-    })
+    }
+    return options?.serialized === true ? await run() : await this.serial(run)
   }
 
   /**

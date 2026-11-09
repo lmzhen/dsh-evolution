@@ -129,7 +129,7 @@ async function removeRuntimeRow(io: EvolutionIoLike, home: string, id: string, e
 export function unitFor(deps: MergeRuntimeDeps): UnitTransaction | undefined {
   if (deps.unit !== undefined) return deps.unit
   if (!(deps.skills instanceof SkillLibrary)) return undefined
-  return new MergeUnitTransactions({ io: deps.io, home: deps.home, backend: skillLibraryUnitBackend(deps.skills), claim: targetClaimUnitPort(deps.io, deps.home, deps.now), now: deps.now })
+  return new MergeUnitTransactions({ io: deps.io, home: deps.home, backend: skillLibraryUnitBackend(deps.skills), claim: targetClaimUnitPort(deps.io, deps.home, deps.now), now: deps.now, serial: async task => await deps.skills.runSerial(task) })
 }
 
 export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService {

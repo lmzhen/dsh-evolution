@@ -68,6 +68,7 @@ export interface UnitBackend {
     ) => void | Promise<void>,
     signal?: AbortSignal,
     assertFence?: () => Promise<boolean>,
+    options?: { readonly serialized?: boolean },
   ): Promise<UnitCommitResult>;
   restoreTarget(name: string, body: string | null): Promise<void>;
   restoreSource(name: string, body: string): Promise<void>;
@@ -87,6 +88,8 @@ export interface UnitTransactionOptions {
   readonly onLock?: (lock: "tree" | "claim") => void;
   /** One home fence owned by authority; when set, MergeUnitTransactions must not acquire tree-lock itself. */
   readonly fence?: HomeFence;
+  /** Writer queue acquired BEFORE the fence, so merge and ordinary store writes share one lock order. */
+  readonly serial?: <T>(task: () => Promise<T>) => Promise<T>;
   /** Optional run liveness gate: false means the run is terminal and must not commit. */
   readonly isActive?: (runId: string) => boolean | Promise<boolean>;
 }
@@ -238,7 +241,8 @@ export class MergeUnitTransactions implements UnitTransaction {
   ): Promise<{ ok: true; evidence: UnitEvidenceRecord } | UnitFailure> {
     const running = this.commits.get(prepared.unitId);
     if (running !== undefined) return await running;
-    const task = this.commitOnce(prepared, options);
+    const run = (): Promise<{ ok: true; evidence: UnitEvidenceRecord } | UnitFailure> => this.commitOnce(prepared, options);
+    const task = this.options.serial === undefined ? run() : this.options.serial(run);
     this.commits.set(prepared.unitId, task);
     try {
       return await task;
@@ -308,6 +312,13 @@ export class MergeUnitTransactions implements UnitTransaction {
       stage = 'claim'
       claim = await this.options.claim.acquire(stored.plan.target, stored.plan.runId);
       this.options.onLock?.("claim");
+      // Re-read under the fence: another instance may have committed while we queued.
+      const committedWhileWaiting = await readUnitEvidence(this.options.io, this.options.home, prepared.unitId);
+      if (committedWhileWaiting !== null) {
+        return committedWhileWaiting.planDigest === prepared.planDigest
+          ? { ok: true as const, evidence: committedWhileWaiting }
+          : { ok: false as const, code: "unit-conflict" as const, message: "unit already committed with a different digest" };
+      }
       stage = 'commit'
       await writeUnitJournal(this.options.io, this.options.home, { ...journalBase, phase: "target-pending" });
       const result = await this.options.backend.commit(
@@ -350,6 +361,7 @@ export class MergeUnitTransactions implements UnitTransaction {
         },
         options?.signal,
         async () => lock !== undefined && (await lock.assertHeld()),
+        this.options.serial === undefined ? undefined : { serialized: true },
       );
       if (!result.ok) {
         await writePhase("failed");
@@ -470,9 +482,18 @@ export class MergeUnitTransactions implements UnitTransaction {
     const liveSource = liveSources.find(source => source.body !== null);
     if (liveSource !== undefined)
       return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source is still live: " + liveSource.name };
-    const liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
-    if (liveSupport.some(file => file.content !== (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null)))
-      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file live hash does not match the prepared support; manual recovery required" };
+    let liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
+    const supportMatches = () => liveSupport.every(file => file.content === (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null));
+    if (!supportMatches()) {
+      // Crash after the sources are archived but before the support files land: finish the
+      // idempotent support write from the prepared snapshot, then re-check.
+      if (!["support-pending", "sources-archived", "unit-written"].includes(journal.phase) || this.options.backend.restoreSupportFile === undefined)
+        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file live hash does not match the prepared support; manual recovery required" };
+      for (const file of snapshot.supportAfter) await this.options.backend.restoreSupportFile(snapshot.target, file.path, file.content);
+      liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
+      if (!supportMatches())
+        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file could not be completed from the prepared snapshot" };
+    }
     const evidence: UnitEvidenceRecord = {
       schemaVersion: 1,
       unitId,
@@ -654,6 +675,7 @@ export class MergeUnitTransactions implements UnitTransaction {
       journal.phase === "target-pending" ||
       journal.phase === "target-written" ||
       journal.phase === "source-archiving" ||
+      journal.phase === "support-pending" ||
       journal.phase === "sources-archived"
     ) {
       const rolled = await this.rollback({ unitId, reason });

@@ -9,7 +9,7 @@ export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
       const probe = (skills as unknown as { readSupportFile?: (name: string, path: string) => Promise<string | null> }).readSupportFile
       return typeof probe === 'function' ? await probe.call(skills, name, path) : null
     },
-    async commit(plan: UnitPlan, onPhase, signal, assertFence): Promise<UnitCommitResult> {
+    async commit(plan: UnitPlan, onPhase, signal, assertFence, options): Promise<UnitCommitResult> {
       const result = await skills.commitMerge({
         ...(plan.runId === undefined ? {} : { runId: plan.runId }),
         ...(plan.unitId === undefined ? {} : { unitId: plan.unitId }),
@@ -29,7 +29,7 @@ export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
         ...(onPhase === undefined ? {} : { onPhase }),
         ...(signal === undefined ? {} : { signal }),
         ...(assertFence === undefined ? {} : { assertFence }),
-      })
+      }, { ...(options?.serialized === undefined ? {} : { serialized: options.serialized }) })
       return { ok: result.ok, message: result.message, ...(result.code === undefined ? {} : { code: result.code }), ...(result.archived === undefined ? {} : { archived: result.archived }), ...(result.mutations === undefined ? {} : { mutations: result.mutations }) }
     },
     async restoreTarget(name, body) {

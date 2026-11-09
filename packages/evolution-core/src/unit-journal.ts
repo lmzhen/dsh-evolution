@@ -30,6 +30,8 @@ export interface UnitJournalCheckpoint {
 export interface UnitJournal {
   readonly schemaVersion: typeof UNIT_JOURNAL_SCHEMA_VERSION
   readonly unitId: string
+  /** Nested journal key; unitId stays the user-visible identity. */
+  readonly journalId?: string
   readonly runId: string
   readonly planDigest: string
   readonly target: string
@@ -55,14 +57,17 @@ export function unitJournalPhaseRank(phase: UnitJournalPhase): number {
 
 export function assertUnitJournalTransition(from: UnitJournalPhase, to: UnitJournalPhase): void {
   if (from === to) return
+  // A committed unit is final: a late failure must never rewrite its journal.
+  if (from === 'committed') throw new Error('unit-journal-terminal:' + from)
   if (to === 'failed' || to === 'rolled-back') return
-  if (from === 'failed' || from === 'rolled-back' || from === 'committed') throw new Error('unit-journal-terminal:' + from)
+  if (from === 'failed' || from === 'rolled-back') throw new Error('unit-journal-terminal:' + from)
   if (unitJournalPhaseRank(to) <= unitJournalPhaseRank(from)) throw new Error('unit-journal-nonmonotonic:' + from + '->' + to)
 }
 
 export async function writeUnitJournal(io: EvolutionIoLike, home: string, journal: UnitJournal, scope: UnitJournalScope = 'merge'): Promise<string> {
-  const path = unitJournalPath(home, journal.unitId, scope)
-  const existing = await readUnitJournal(io, home, journal.unitId, scope)
+  const key = journal.journalId ?? journal.unitId
+  const path = unitJournalPath(home, key, scope)
+  const existing = await readUnitJournal(io, home, key, scope)
   if (existing !== null) assertUnitJournalTransition(existing.phase, journal.phase)
   const content = JSON.stringify(journal, null, 2) + '\n'
   if (io.transact !== undefined) await io.transact(path, () => content)

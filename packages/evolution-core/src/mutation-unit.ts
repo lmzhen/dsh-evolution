@@ -171,6 +171,7 @@ export interface MutationSnapshotOp {
 
 export interface MutationSnapshot {
   unitId: string
+  journalId?: string
   state: 'prepared' | 'committed' | 'undone'
   ops: readonly MutationSnapshotOp[]
   cleanup?: readonly string[]
@@ -358,7 +359,7 @@ export class MutationUnit {
           }
         })
         const cleanup = request.cleanupPaths === undefined ? {} : { cleanup: request.cleanupPaths }
-        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'prepared', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
+        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, journalId: this.journalId, state: 'prepared', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
         await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'prepared', changed: [], target: validation.roots.find(root => root.name === primary)?.name ?? primary, roots: validation.roots.map(root => root.name) }))
         for (const op of validation.ops) {
           const snapshot = snapshots.find(entry => entry.target === op.target)
@@ -376,7 +377,7 @@ export class MutationUnit {
         await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'unit-written', changed, target: primary, roots: validation.roots.map(root => root.name) }))
         // P2-1: the committed snapshot is the recovery authority. Write it BEFORE the journal's
         // committed phase so a crash in this window recovers as committed, never rolled back.
-        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
+        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, journalId: this.journalId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
         await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
         try {
           await this.hooks?.committed?.({ unitId, changed, ops: eventOps, roots: validation.roots.map(root => root.name) })

@@ -8,6 +8,7 @@ export const UNIT_STORAGE_SCHEMA_VERSION = 1
 export interface UnitSnapshot {
   readonly schemaVersion: typeof UNIT_STORAGE_SCHEMA_VERSION
   readonly unitId: string
+  readonly journalId?: string
   readonly planDigest: string
   readonly runId: string
   readonly target: string

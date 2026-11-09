@@ -17,6 +17,7 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
       const body: UnitSnapshot = {
         schemaVersion: 1,
         unitId: snapshot.unitId,
+        ...(snapshot.journalId === undefined ? {} : { journalId: snapshot.journalId }),
         planDigest: contentHash(JSON.stringify(snapshot.ops)),
         runId: snapshot.runId ?? snapshot.unitId,
         target: first?.target ?? '',
@@ -87,13 +88,13 @@ export async function pruneTreeChangeUnits(io: EvolutionIoLike, home: string, ke
   if (!Number.isInteger(keep) || keep < 1) return 0
   const dir = unitSnapshotsDir(home, 'skill')
   const names = await io.list(dir)
-  const terminal: Array<{ name: string; unitId: string; createdAt: number }> = []
+  const terminal: Array<{ name: string; unitId: string; journalId?: string; createdAt: number }> = []
   for (const name of names) {
     if (!name.endsWith('.json')) continue
     try {
       const snapshot = JSON.parse(await io.readText(join(dir, name)) ?? '') as UnitSnapshot
       if (snapshot.kind !== 'tree-change' || snapshot.mutationState === 'prepared') continue
-      terminal.push({ name, unitId: snapshot.unitId, createdAt: snapshot.createdAt })
+      terminal.push({ name, unitId: snapshot.unitId, ...(snapshot.journalId === undefined ? {} : { journalId: snapshot.journalId }), createdAt: snapshot.createdAt })
     } catch {
       // unreadable files are left for the explicit recovery/audit path
     }
