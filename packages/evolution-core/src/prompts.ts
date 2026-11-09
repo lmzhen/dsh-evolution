@@ -46,7 +46,7 @@ Update only when the session contains a durable lesson that changes how this cla
 
 Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail.
 
-A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Support files: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators. When you add a support file, add the SKILL.md line that points to it; a file no pointer reaches is invisible next session.
+A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Support files: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators. When you add a support file, add the SKILL.md line that points to it; a file no pointer reaches is invisible next session. A skill must use only tools, commands, and paths available in this session. If one is unavailable, replace it only with a verified local equivalent; otherwise leave it unchanged and report the limitation. Do not invent command names.
 
 Signals include:
 - The user corrected style, tone, format, verbosity, workflow, or approach.
@@ -83,10 +83,6 @@ After the memory pass, continue to the Skills pass. If nothing is worth saving, 
 ## Skills
 ${SKILL_REVIEW_BODY}`
 
-const BACKGROUND_REVIEW_TAIL = `
-
-This is a background review. Do not address the user or write a user-facing reply; return what changed and a short audit summary.`
-
 export const INJECT_MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
 ${MEMORY_REVIEW_BODY}
 
@@ -105,15 +101,6 @@ export const INJECT_COMPLETION_SKILL_REVIEW_PROMPT = `[Auto-review — Skills ·
 ${SKILL_REVIEW_BODY}
 
 If nothing durable exists, say "Nothing to save." and stop.`
-
-export const AUX_MEMORY_REVIEW_PROMPT = `[Auto-review — Memory · background]
-${MEMORY_REVIEW_BODY}${BACKGROUND_REVIEW_TAIL}
-
-If nothing is worth saving, say "Nothing to save."`
-
-export const AUX_COMBINED_REVIEW_PROMPT = `${COMBINED_REVIEW_BODY}${BACKGROUND_REVIEW_TAIL}
-
-If nothing durable exists in either pass, say "Nothing to save."`
 
 // Inject aliases kept for the foreground delivery path and existing imports.
 export const MEMORY_REVIEW_PROMPT = INJECT_MEMORY_REVIEW_PROMPT
@@ -287,7 +274,7 @@ export const SKILLS_GUIDANCE = `Skills guidance:
 export type ReviewSurface = 'inject' | 'aux'
 
 export function reviewPrompt(kind: 'memory' | 'skill' | 'combined', surface: ReviewSurface = 'inject'): string {
-  if (surface === 'aux') return kind === 'memory' ? AUX_MEMORY_REVIEW_PROMPT : AUX_COMBINED_REVIEW_PROMPT
+  if (surface === 'aux') return kind === 'memory' ? INJECT_MEMORY_REVIEW_PROMPT : INJECT_COMBINED_REVIEW_PROMPT
   if (kind === 'memory') return INJECT_MEMORY_REVIEW_PROMPT
   if (kind === 'skill') return INJECT_SKILL_REVIEW_PROMPT
   return INJECT_COMBINED_REVIEW_PROMPT
@@ -329,8 +316,6 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
   // (the intended fail-closed signal), and PROMPT_BUNDLE_VERSION moves 21 -> 22 with it.
   curatorDryRun: CURATOR_DRY_RUN_BANNER,
   completion: INJECT_COMPLETION_SKILL_REVIEW_PROMPT,
-  auxMemory: AUX_MEMORY_REVIEW_PROMPT,
-  auxCombined: AUX_COMBINED_REVIEW_PROMPT,
   maintain: MAINTAIN_PROMPT,
   // F-16: new entry — the maintain subagent's output instruction
   // (see MAINTAIN_OUTPUT_INSTRUCTION). Digest changes with this entry.
