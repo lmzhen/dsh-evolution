@@ -18,7 +18,7 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
         schemaVersion: 1,
         unitId: snapshot.unitId,
         planDigest: contentHash(JSON.stringify(snapshot.ops)),
-        runId: snapshot.unitId,
+        runId: snapshot.runId ?? snapshot.unitId,
         target: first?.target ?? '',
         targetExists: true,
         targetBefore: first?.before ?? null,
@@ -26,7 +26,8 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
         supportBefore: [],
         supportAfter: [],
         sourceBefore: [],
-        origin: 'foreground',
+        origin: snapshot.owner ?? 'foreground',
+        ...(snapshot.leaseId === undefined ? {} : { leaseId: snapshot.leaseId }),
         summary: 'tree-change ' + snapshot.unitId,
         createdAt: snapshot.createdAt,
         kind: 'tree-change',
@@ -50,6 +51,9 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
         ops: snapshot.ops,
         ...(snapshot.cleanup === undefined ? {} : { cleanup: snapshot.cleanup }),
         createdAt: snapshot.createdAt,
+        ...(snapshot.origin === 'foreground' || snapshot.origin === 'background_review' ? { owner: snapshot.origin } : {}),
+        runId: snapshot.runId,
+        ...(snapshot.leaseId === undefined ? {} : { leaseId: snapshot.leaseId }),
       }
     },
     async listPrepared(): Promise<MutationSnapshot[]> {
@@ -70,7 +74,7 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
           if (snapshot.kind !== 'tree-change' || snapshot.mutationState !== 'prepared' || snapshot.ops === undefined) continue
           if (seen.has(snapshot.unitId)) continue
           seen.add(snapshot.unitId)
-          out.push({ unitId: snapshot.unitId, state: 'prepared', ops: snapshot.ops, ...(snapshot.cleanup === undefined ? {} : { cleanup: snapshot.cleanup }), createdAt: snapshot.createdAt })
+          out.push({ unitId: snapshot.unitId, state: 'prepared', ops: snapshot.ops, ...(snapshot.cleanup === undefined ? {} : { cleanup: snapshot.cleanup }), createdAt: snapshot.createdAt, ...(snapshot.origin === 'foreground' || snapshot.origin === 'background_review' ? { owner: snapshot.origin } : {}), runId: snapshot.runId, ...(snapshot.leaseId === undefined ? {} : { leaseId: snapshot.leaseId }) })
         }
       }
       return out
