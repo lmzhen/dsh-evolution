@@ -252,6 +252,23 @@ async function proposeExtractWithAgent(
   return { ok: true, proposal: JSON.stringify(outcome.structured) }
 }
 
+/** Render agent/structured proposals as outcome lines instead of opaque JSON. */
+function formatProposal(raw: string): string {
+  try {
+    const value = JSON.parse(raw) as { outcome?: unknown; target?: unknown; neededOwner?: unknown; reason?: unknown; parts?: unknown }
+    const parts = Array.isArray(value.parts)
+      ? value.parts.map(part => part !== null && typeof part === 'object' && 'heading' in part ? String((part as { heading: unknown }).heading) : '').filter(Boolean)
+      : []
+    return [
+      'outcome: ' + String(value.outcome ?? 'unknown'),
+      'target: ' + String(value.target ?? '—'),
+      'neededOwner: ' + String(value.neededOwner ?? '—'),
+      'parts: ' + (parts.length === 0 ? '—' : parts.join(', ')),
+      ...(typeof value.reason === 'string' && value.reason !== '' ? ['reason: ' + value.reason] : []),
+    ].join('\n')
+  } catch { return raw }
+}
+
 /**
  * What the staged skill write WOULD store, resolved WITHOUT writing.
  *
@@ -1209,7 +1226,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           proposal: { type: 'string' },
         },
       },
-      render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` + (value.proposal === undefined ? '' : '\n\n' + value.proposal) }],
+      render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` + (value.proposal === undefined ? '' : '\n\n' + formatProposal(value.proposal)) }],
     },
     isConcurrencySafe: () => false,
     // F-06: `session` is optional in the exec contract too — the
