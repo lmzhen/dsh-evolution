@@ -9,6 +9,9 @@
  * home instead of restating the table (doc-facts rule N19).
  * Keep `usage` in the exact shape a user can type after `/evolution`.
  */
+import { HOST_COMMANDS } from './generated/host-commands.ts'
+import type { HostLocale } from './generated/host-errors.ts'
+
 export interface CommandEntry {
   /** The subcommand as typed after `/evolution`. Variants use `|` (curator run|pause). */
   usage: string
@@ -91,11 +94,11 @@ export function renderHint(): string {
 }
 
 /** The bare `/evolution` help body (one line per subcommand). */
-export function renderHelpText(): string {
+export function renderHelpText(locale: HostLocale = 'zh'): string {
   // First line first: the platform's command row collapses to the output's FIRST LINE, and a list
   // whose first line is a subcommand reads like that subcommand was what ran.
   return [`/evolution subcommands (${COMMAND_ENTRIES.length}):`, '', ...COMMAND_ENTRIES
-    .map(entry => `  ${entry.usage.padEnd(44)} ${entry.summary}`)]
+    .map(entry => `  ${entry.usage.padEnd(44)} ${(HOST_COMMANDS as Record<string, Partial<Record<HostLocale, string>>>)['summary.' + entryName(entry)]?.[locale] ?? entry.summary}`)]
     .join('\n')
 }
 

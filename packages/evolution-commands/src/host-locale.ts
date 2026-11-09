@@ -2,6 +2,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import { HOST_ERRORS, HOST_LOCALES, type HostErrorId, type HostLocale } from './generated/host-errors.ts'
+import { HOST_COMMANDS, type HostCommandKey } from './generated/host-commands.ts'
 
 /**
  * Resolve the host human-output locale.
@@ -19,6 +20,16 @@ export function resolveHostLocale(ctx: Pick<Context, 'get'>): HostLocale {
   } catch {
     return 'zh'
   }
+}
+
+/**
+ * Render one human-facing command-help line in the resolved host locale.
+ * @param locale - resolved host locale.
+ * @param key - stable command-help key.
+ * @returns localized help text.
+ */
+export function hostCommandText(locale: HostLocale, key: HostCommandKey): string {
+  return HOST_COMMANDS[key][locale] ?? HOST_COMMANDS[key].zh
 }
 
 /**

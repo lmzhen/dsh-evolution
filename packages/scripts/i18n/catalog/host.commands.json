@@ -1,0 +1,101 @@
+{
+  "surface": "host-human",
+  "messages": {
+    "summary.merge": {
+      "zh": "技能自动合并（扫描/待批准/重跑/报告/撤销）"
+    },
+    "summary.pending": {
+      "zh": "列出暂存的写入（--detail 显示参数）"
+    },
+    "summary.approve": {
+      "zh": "执行一条已批准的写入"
+    },
+    "summary.reject": {
+      "zh": "丢弃一条暂存写入，不执行"
+    },
+    "summary.release": {
+      "zh": "把卡在执行中的写入放回待批窗口（先确认效果再批准或驳回）"
+    },
+    "summary.doctor": {
+      "zh": "只读自检：安装形态、冲突、环境、服务（--json 供脚本用）"
+    },
+    "summary.curator": {
+      "zh": "立即运行一次自动整理，或暂停／恢复／查看状态"
+    },
+    "summary.mutations": {
+      "zh": "列出技能改动记录"
+    },
+    "summary.restore": {
+      "zh": "从最近的快照恢复技能"
+    },
+    "summary.skill restore": {
+      "zh": "按名字恢复一个已归档的技能"
+    },
+    "summary.skill history": {
+      "zh": "列出某个技能的内容版本（含时间、动作、字符数、哈希前缀）"
+    },
+    "summary.skill undo": {
+      "zh": "把某个技能的内容回退到某一版（默认上一版；只动内容，撤销本身也记为一版）"
+    },
+    "summary.skill pin": {
+      "zh": "钉住一个技能：免于删除、后台审查与生命周期整理（立即生效、随时可解钉；与 skill_manage 的 pin 动作同一语义，不走审批）"
+    },
+    "summary.skill unpin": {
+      "zh": "解钉一个技能：撤销上面的冻结（立即生效、不走审批）"
+    },
+    "summary.propose": {
+      "zh": "为 body-oversize 技能写 keep 提议（不自动拆分；同一 reports store）"
+    },
+    "summary.skills health": {
+      "zh": "技能库结构体检"
+    },
+    "summary.skills refresh": {
+      "zh": "丢弃目录缓存并重新读取技能树"
+    },
+    "summary.learn": {
+      "zh": "向本会话发一条学习请求"
+    },
+    "summary.maintain": {
+      "zh": "起一次维护扫描并立即回 run id（后台跑；--facts 为 0 token 预览）"
+    },
+    "summary.maintain status": {
+      "zh": "看维护扫描：在飞的那次（含已跑多久）或某个 run 的终态"
+    },
+    "summary.maintain report": {
+      "zh": "读某个 run 的结果正文（省略 id 取本 home 最新一条；没有结果就明说，不装成空结果）"
+    },
+    "summary.maintain handoff": {
+      "zh": "把某次维护报告交给模型：注入指针与汇报协议，模型只汇报、等你确认后再动手"
+    },
+    "summary.maintain cancel": {
+      "zh": "停掉在飞的那次维护扫描（省略 id 仅当最新一条是本进程在跑的那次）"
+    },
+    "summary.migrate": {
+      "zh": "把旧设置文档里家族的旧分区迁进现在的行（幂等；已迁移过就报「已一致」）"
+    },
+    "summary.policy set": {
+      "zh": "通过设置服务写入一个你可改的参数 （仅 E3；E1/E2 仍留在 cordis.yml）"
+    },
+    "summary.params": {
+      "zh": "列出全部参数：分组、档位、生效时机、来源与当前值（--json 便于脚本处理）"
+    },
+    "summary.preset install": {
+      "zh": "把自进化 Agent 预设**行**写进当前 profile 的 patch 层（`profiles/<p>/cordis.patch.yml`；bases 来自 agent 包的 bases.json）"
+    },
+    "summary.restructure": {
+      "zh": "把技能正文的一节移到 references 文件"
+    },
+    "summary.extract": {
+      "zh": "预览把源技能的可复用部分提取到已有类级 owner；默认 plan，--apply 才写（多根一次事务）"
+    },
+    "summary.replay": {
+      "zh": "比较不同会话与重启之间的计划结果（从活动记录回填）"
+    },
+    "help.header": {
+      "zh": "自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。"
+    },
+    "help.unknown": {
+      "zh": "不是本构建能应答的子命令（已知子命令但缺参数也会落到这里）。"
+    }
+  }
+}

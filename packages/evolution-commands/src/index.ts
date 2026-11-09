@@ -35,7 +35,7 @@ import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
-import { hostErrorText, resolveHostLocale } from './host-locale.ts'
+import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
 import { PROFILE_PATCH_FILENAME, baseRefusalReason, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
 // G3: the write-path exclusion asks the ONE owner of <home>/profiles about THIS plane only.
 import { installExclusionTarget } from './profiles.ts'
@@ -409,7 +409,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const input = rawInputTrimmed.replace(/\s+/g, ' ')
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
-        const hostError = (id: EvolutionErrorId, args: Record<string, string | number> = {}): string => hostErrorText(resolveHostLocale(ctx), id, args)
+        const hostLocale = resolveHostLocale(ctx)
+        const hostError = (id: EvolutionErrorId, args: Record<string, string | number> = {}): string => hostErrorText(hostLocale, id, args)
         // G5.3: merge owns its parser and semantics; this surface only owns the
         // /evolution namespace. Forward the RAW input so merge flags survive.
         if (input === 'merge' || input.startsWith('merge ')) {
@@ -1806,9 +1807,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // same silent-success shape `/evolution maintain --bogus` already refuses. Only the bare
         // command (and an explicit `help`) answer with the list, and they still answer success.
         if (input === '' || input === 'help') {
-          return ok(`自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。\n${renderHelpText()}`)
+          return ok(hostCommandText(hostLocale, 'help.header') + '\n' + renderHelpText(hostLocale))
         }
-        return err(`/evolution ${input} 不是本构建能应答的子命令（已知子命令但缺参数也会落到这里）。\n${renderHint()}`)
+        return err('/evolution ' + input + ' ' + hostCommandText(hostLocale, 'help.unknown') + '\n' + renderHint())
       },
     }
     /** The registered definition: declared members only (A46). */
