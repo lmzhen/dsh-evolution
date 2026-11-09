@@ -1,4 +1,8 @@
 # Changelog
+## 0.40.1 (architecture) — 合并 main 的 0.39.2 提示词/审查修复
+
+> **范围**：0.40.0 从发布分支构建，未包含 main 上 0.39.2 的 review prompt 分离与 memory review 收口；本版把 main 合入发布分支后重发，保持同一套 mutation authority/lease/CAS/UI 改动。
+> **验证**：merge 后重新构建与 tag CI；0.40.0 已发布但内容不完整，已 deprecate。
 ## 0.40.0 (architecture) — 单一变更权威、运行租约与交付身份
 
 > **范围**：新增 `evolution-authority`，把 mutation lease、HomeFence 与 write lock 收敛为一个 `evolutionMutationAuthority` 服务；merge/approval/review/knowledge stores 统一接入，run-meta 增加 revision CAS，target claim 加 30 分钟 TTL，row attach 用 LeaseStore 串行化并拒绝第二 live run；review 增加 per-session lease、dispose abort、staged/partial action 记账与 PTC 空工具拒绝；客户端 settings seat 改为每 ClientContext 共享，remote 晚到可唤醒，locale fallback 对齐平台 en，MergeStore 单实例并保持挂载；新增 authority 的 npm 0.0.0 占位与 Trusted Publisher，bundle roster/publishGroups/traceability/taxonomy 同源。

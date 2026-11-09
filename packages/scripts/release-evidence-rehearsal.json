@@ -1,13 +1,13 @@
 {
-  "note": "W10/W11 candidate readings for v0.40.0. Read on the CI-packed 0.0.0-main artifact from run 42581368541 (identical source tree; only package.json version differs), fresh DSH_HOME web 3081; S4 rerun on the 0.40.0 overlay tree.",
-  "familyVersion": "0.40.0",
+  "note": "W10/W11 candidate readings for v0.40.1. S1-S3 measured on the CI-packed 0.0.0-main tree (same mutation/UI code) on fresh web 3081; 0.40.1 additionally merges main 0.39.2 prompt/review changes. S4 rerun 2/2 on the 0.40.1 overlay tree.",
+  "familyVersion": "0.40.1",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.40.0",
+      "familyVersion": "0.40.1",
       "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "skillHistoryRows": 0,
@@ -22,7 +22,7 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.40.0",
+      "familyVersion": "0.40.1",
       "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "ownerDiagnostics": 200,
@@ -36,11 +36,11 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.40.0",
+      "familyVersion": "0.40.1",
       "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "semverVersion": "0.2.2-rc.1",
-        "familyVersion": "0.40.0",
+        "familyVersion": "0.40.1",
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
@@ -52,7 +52,7 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.40.0",
+      "familyVersion": "0.40.1",
       "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "disposeReleasesRoutes": true,
