@@ -1598,7 +1598,7 @@ export class SkillLibrary {
         summary: summary + healthNote + danglingNote,
         at,
         ...origin === undefined ? {} : { origin },
-      })
+      }, undefined, this.fence)
     } catch {
       // Auditing is best-effort; a transient disk failure must not surface
       // after the mutation already landed.
