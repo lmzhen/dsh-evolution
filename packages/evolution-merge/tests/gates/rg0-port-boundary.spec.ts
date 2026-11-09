@@ -21,6 +21,11 @@ it('RG0 adapters may use only their declared raw methods', () => {
       expect(source, file).not.toContain('skills.removeSupportFile(')
       continue
     }
+    if (normalized === 'skill-library-unit-backend.ts') {
+      expect(source, file).toContain('skills.commitMerge')
+      expect(source, file).not.toContain('applyTreeChange(')
+      continue
+    }
     if (normalized === 'adapters/undo.ts') {
       expect(source, file).toContain('skills.archive(')
       expect(source, file).toContain('restoreFromArchive(')
@@ -42,7 +47,7 @@ it('RG0 adapters may use only their declared raw methods', () => {
 })
 
 it('RG0 core UnitBackend is the only commitMerge adapter', () => {
-  const source = readFileSync(root + '/../evolution-core/src/unit-backend.ts', 'utf8')
+  const source = readFileSync(root + '/src/skill-library-unit-backend.ts', 'utf8')
   expect(source).toContain('skills.commitMerge')
 })
 
