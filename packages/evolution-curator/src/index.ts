@@ -48,7 +48,7 @@ import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBund
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
-import type { Session } from '@deepseek-ai/dsh-session'
+import type { Session } from '@deepseek-ai/dsh-evolution-core/platform'
 
 
 /** The runtime service surface the curator's advisory pass consumes. */

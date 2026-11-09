@@ -14,40 +14,8 @@
       "specifier": "@deepseek-ai/dsh-scope"
     },
     {
-      "file": "packages/evolution-core/src/signals.ts",
-      "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
-      "file": "packages/evolution-core/src/subagent/channel.ts",
-      "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
-      "file": "packages/evolution-core/src/subagent/channel.ts",
-      "specifier": "@deepseek-ai/dsh-subagent"
-    },
-    {
-      "file": "packages/evolution-core/src/subagent/types.ts",
-      "specifier": "@deepseek-ai/dsh-agent"
-    },
-    {
-      "file": "packages/evolution-core/src/subagent/types.ts",
-      "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
-      "file": "packages/evolution-core/src/subagent/types.ts",
-      "specifier": "@deepseek-ai/dsh-subagent"
-    },
-    {
       "file": "packages/evolution-curator/src/index.ts",
       "specifier": "@deepseek-ai/dsh-llm"
-    },
-    {
-      "file": "packages/evolution-curator/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-session"
-    },
-    {
-      "file": "packages/evolution-maintenance/src/orchestrate.ts",
-      "specifier": "@deepseek-ai/dsh-agent"
     },
     {
       "file": "packages/evolution-merge/src/adapters/model-runner.ts",
@@ -70,48 +38,20 @@
       "specifier": "@deepseek-ai/dsh-llm"
     },
     {
-      "file": "packages/evolution-skill-discovery/src/identity.ts",
-      "specifier": "@deepseek-ai/dsh-skill"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/main-entry.ts",
-      "specifier": "@deepseek-ai/dsh-agent"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/projection-adapter.ts",
-      "specifier": "@deepseek-ai/dsh-agent"
-    },
-    {
       "file": "packages/evolution-skill-discovery/src/projection-adapter.ts",
       "specifier": "@deepseek-ai/dsh-llm"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/projection-runtime.ts",
-      "specifier": "@deepseek-ai/dsh-agent"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/projection-runtime.ts",
-      "specifier": "@deepseek-ai/dsh-llm"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/skill-index.ts",
-      "specifier": "@deepseek-ai/dsh-skill"
-    },
-    {
-      "file": "packages/evolution-skill-discovery/src/tool.ts",
-      "specifier": "@deepseek-ai/dsh-agent"
     },
     {
       "file": "packages/evolution-state-domain/src/index.ts",
       "specifier": "@deepseek-ai/dsh-storage-domain"
     },
     {
-      "file": "packages/skill-usage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-session"
+      "file": "packages/evolution-skill-discovery/src/identity.ts",
+      "specifier": "@deepseek-ai/dsh-skill"
     },
     {
-      "file": "packages/tool-skill-manage/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-agent"
+      "file": "packages/evolution-skill-discovery/src/skill-index.ts",
+      "specifier": "@deepseek-ai/dsh-skill"
     },
     {
       "file": "packages/tool-skill-manage/src/index.ts",

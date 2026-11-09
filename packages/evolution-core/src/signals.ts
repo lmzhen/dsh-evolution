@@ -6,7 +6,7 @@
  * accumulated until a configured interval fires.
  */
 
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from './platform/index.ts'
 import { dispatchStepOf, isSkillToolName } from './tool-dispatch.ts'
 
 export type ReviewKind = 'memory' | 'skill' | 'combined'

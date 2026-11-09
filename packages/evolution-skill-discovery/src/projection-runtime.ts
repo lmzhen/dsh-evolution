@@ -1,5 +1,5 @@
-import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { UserMessage } from '@deepseek-ai/dsh-llm'
+import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { UserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { DomainMapSnapshot, DomainMapStore } from './domain-map.ts'
 import { buildDomainProjection } from './domain-projection.ts'
 import type { DomainPolicyStore } from './domain-policy-store.ts'

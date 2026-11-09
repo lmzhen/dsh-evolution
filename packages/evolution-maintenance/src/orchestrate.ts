@@ -25,7 +25,7 @@ import {
   type DriftReport,
   type DriftSkillSnapshot,
 } from '@deepseek-ai/dsh-evolution-core'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { SubagentChannel } from '@deepseek-ai/dsh-evolution-core'
 import { snapshotFromLibrary, type SkillLibraryLike } from './drift-scan.ts'
 import { enrichmentSnapshotOptions, type Enrichment } from './enrichment.ts'

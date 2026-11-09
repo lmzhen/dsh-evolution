@@ -1,7 +1,7 @@
 // Subagent channel contract types (frozen in W1; implementation in channel.ts/readiness.ts).
-import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
-import type { SessionId } from '@deepseek-ai/dsh-session'
-import type { SubagentStopReason } from '@deepseek-ai/dsh-subagent'
+import type { Agent, AgentOptions } from '../platform/index.ts'
+import type { SessionId } from '../platform/index.ts'
+import type { SubagentStopReason } from '../platform/index.ts'
 import type { ObjectJsonSchema } from '../platform/index.ts'
 
 export type ChannelCode = 'E-323' | 'E-324'

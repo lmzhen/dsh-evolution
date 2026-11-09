@@ -1,4 +1,4 @@
-import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
+import type { PreStepDecision } from '@deepseek-ai/dsh-evolution-core/platform'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { ProjectionResult } from './projection.ts'
