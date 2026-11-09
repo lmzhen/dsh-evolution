@@ -1,4 +1,5 @@
 import { acquireTreeWriteLock, type TreeLock, type TreeLockOptions } from './tree-lock.ts'
+import { assertHomeOwner } from './home-owner.ts'
 
 export interface HomeFenceOptions extends TreeLockOptions {}
 
@@ -39,6 +40,7 @@ export class HomeFence {
       if (!acquired.ok) {
         throw new HomeFenceError(acquired.reason, acquired.message ?? 'home fence is ' + acquired.reason)
       }
+      try { await assertHomeOwner(this.options.io, this.options.home) } catch (error) { await acquired.lock.release(); throw error }
       return {
         lock: acquired.lock,
         release: async () => {
