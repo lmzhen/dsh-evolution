@@ -74,6 +74,14 @@ describe('MutationUnit executor', () => {
     expect([...snapshots.items.values()][0]).toMatchObject({ owner: 'background_review', runId: 'review-1', leaseId: 'lease-1', state: 'committed' })
   })
 
+  it('stamps the run id onto journal records when a context is present', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    const records: MutationJournalRecord[] = []
+    await unit(io, { journal: { async write(record) { records.push(record) } }, context: { owner: 'background_review', runId: 'review-2', leaseId: 'lease-2' } }).apply(request())
+    expect(records[0]?.runId).toBe('review-2')
+    expect(records.every(record => record.runId === 'review-2')).toBe(true)
+  })
+
   it('acquires and releases an optional target claim around the write', async () => {
     const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
     let acquired = 0

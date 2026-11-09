@@ -127,7 +127,7 @@ export function unitJournalPort(io: EvolutionIoLike, home: string): MutationJour
       const journal: UnitJournal = {
         schemaVersion: 1,
         unitId: record.unitId,
-        runId: record.unitId,
+        runId: record.runId ?? record.unitId,
         planDigest: contentHash(JSON.stringify(record)),
         target: record.target ?? record.changed[0] ?? '',
         sources: record.roots ?? [],
