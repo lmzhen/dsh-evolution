@@ -54,7 +54,18 @@ export interface RunCoordinator {
 export function runMetaPath(home: string, runId: string): string { return join(home, 'merge', 'run-meta', encodeURIComponent(runId) + '.json') }
 export async function writeRunMeta(io: EvolutionIoLike, home: string, meta: MergeRunMeta, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<void> {
   const write = async (): Promise<void> => {
-    await transactIo(io, runMetaPath(home, meta.runId), () => JSON.stringify(meta, null, 2) + '\n')
+    await transactIo(io, runMetaPath(home, meta.runId), current => {
+      let next = meta
+      if (current !== null) {
+        try {
+          const prev = JSON.parse(current) as Partial<MergeRunMeta>
+          if (prev.degraded === true) next = { ...next, degraded: true }
+          const terminal = prev.phase === 'settled' || prev.phase === 'cancelled' || prev.phase === 'undone'
+          if (terminal && next.phase !== prev.phase) next = { ...next, phase: prev.phase, ...(prev.stopReason === undefined ? {} : { stopReason: prev.stopReason }) }
+        } catch { /* unreadable old meta is replaced by the caller's record */ }
+      }
+      return JSON.stringify(next, null, 2) + '\n'
+    })
   }
   if (fence !== undefined) await fence.run(write)
   else await write()
