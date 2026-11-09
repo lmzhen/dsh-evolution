@@ -1648,11 +1648,11 @@
       "kind": "beh",
       "owner": "platform-backend-01",
       "files": [
-        "packages/evolution-review/tests/review.spec.ts"
+        "packages/evolution-review/tests/review-mode-default.spec.ts"
       ],
       "mutation": "packages/evolution-review/tests/review-inject.mutation.json",
       "evidence": "A",
-      "note": "reviewMode default inject; the parent delivers against its own warm prefix"
+      "note": "reviewMode defaults to aux (plugin-owned loop); inject is the explicit compatibility mode"
     },
     {
       "id": "beh-restrictor-allowset",
