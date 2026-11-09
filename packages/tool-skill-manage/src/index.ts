@@ -28,7 +28,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
-import { buildExtractPlanFromLibrary, ownerDecisionText, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, writeProposalReport, type ExtractPlanLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, ownerDecisionText, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, readProposalReport, writeProposalReport, type ExtractPlanLibrary, type ExtractPartRequest } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, EvolutionIoLike, LiveValue, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -956,12 +956,35 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
     }
     else if (action === 'extract') {
-      const built = await buildExtractPlanFromLibrary(library, {
-        source: typeof args.name === 'string' ? args.name : '',
-        items: Array.isArray(args.extract) ? args.extract : [],
-        ...(args.outcome === undefined ? {} : { outcome: args.outcome }),
-        ...(args.owner_covers === undefined ? {} : { ownerCovers: args.owner_covers }),
-      })
+      let source = typeof args.name === 'string' ? args.name : ''
+      let items: ExtractPartRequest[] = Array.isArray(args.extract) ? args.extract as ExtractPartRequest[] : []
+      let outcome = args.outcome
+      let ownerCovers = args.owner_covers
+      if (args.proposal_id !== undefined && args.proposal_id !== '') {
+        const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+        const io = registry?.provider()
+        if (io === undefined) { result = { ok: false, message: 'proposal_id 需要 evolutionIo 提供者。' }; }
+        else {
+          const proposal = await readProposalReport(io, args.proposal_id)
+          if (proposal === null) result = { ok: false, message: '找不到 extract proposal：' + args.proposal_id }
+          else if (proposal.outcome === 'keep') result = { ok: false, message: '该 proposal 的结论是 keep，没有可应用提取。' }
+          else if (proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) result = { ok: false, message: '该 proposal 未覆盖 owner（owner-gap），不能应用。' }
+          else {
+            source = proposal.source
+            outcome = proposal.outcome
+            ownerCovers = undefined
+            items = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: proposal.owner.name! }))
+          }
+        }
+      }
+      const built = result === undefined
+        ? await buildExtractPlanFromLibrary(library, {
+          source,
+          items,
+          ...(outcome === undefined ? {} : { outcome }),
+          ...(ownerCovers === undefined ? {} : { ownerCovers }),
+        })
+        : { ok: false as const, message: result.message }
       if (!built.ok) {
         result = { ok: false, message: built.message }
       } else {
@@ -1213,6 +1236,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       outcome: { type: 'string', enum: ['extract', 'mixed'] },
       owner_covers: { type: 'boolean' },
       dry_run: { type: 'boolean' },
+      proposal_id: { type: 'string' },
     },
     output: {
       schema: {
