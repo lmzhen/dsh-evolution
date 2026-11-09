@@ -14,6 +14,7 @@ function checkRow(where, row, requireAll) {
   const en = row.en
   if (typeof en !== 'string' || en.length === 0) throw new Error(where + ': en is required')
   const slots = [...en.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join('|')
+  const percentSlots = [...en.matchAll(/%a(\d+)%/g)].map(m => m[1]).sort().join('|')
   for (const locale of LOCALES) {
     const text = row[locale]
     if (typeof text !== 'string' || text.length === 0) {
@@ -22,6 +23,8 @@ function checkRow(where, row, requireAll) {
     }
     const own = [...text.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join('|')
     if (own !== slots) throw new Error(where + ': ' + locale + ' placeholder mismatch')
+    const ownPercent = [...text.matchAll(/%a(\d+)%/g)].map(m => m[1]).sort().join('|')
+    if (ownPercent !== percentSlots) throw new Error(where + ': ' + locale + ' %aN% placeholder mismatch')
   }
 }
 
