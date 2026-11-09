@@ -1,4 +1,9 @@
 # Changelog
+## 0.39.1 (ui) — 自进化设置升为一级入口；技能历史更名
+
+> **范围**：设置里的自进化从「内置插件 → 自进化」标签页移到左侧一级「自进化」，与皮肤/图片取用等并列；侧栏「技能历史」更名为「技能自动进化」，页内右上小标签仍为「技能历史」；合并页的跳转文案同步改路径。
+> **验证**：settings-section 客户端规格 11/11；3080 真机确认左栏一级入口、页内「技能历史」标签和参数卡片渲染；release tag CI 负责构建/安装/发布。
+
 ## 0.39.0 (review) — 纯插件辅助审查；删除持久 branch
 
 > **范围**：review 默认改为纯插件 `aux`：复用父 requestHeader/deriveMessages/toolHistory，用父 Agent 执行 allowlist 工具且不传 log，不创建 child Session、不 append 父 Session；新增 ReviewExecutionContext 让 review 写入保持 `background_review`；activity 的 review 记录收敛为有界 ReviewRun（finalText preview + finalTextChars）；删除 `reviewMode: branch` 配置、child 创建、branch 事件生产与 branch UI；旧 branch 记录仅保留 `branchSessionId` 只读。真实运行修复：review LLM 不传父 sessionId（避免 provider 追加 delivery-accepted）、aux finalText 不回写父会话、允许 read/glob/grep 及错误结果恢复。
