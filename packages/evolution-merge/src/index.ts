@@ -237,7 +237,11 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         // committed unit can turn an orphan-stamped run back into succeeded.
         const loaded = await runs.load()
         if (!loaded.ok) ctx.logger.warn('merge run index: ' + (loaded.note ?? 'unreadable'))
-        const reports = await recoverCommitUnits({ io, home, unit, now: () => Date.now(), isActive: () => false, runs })
+        const activeRuns = new Set<string>()
+        for (const record of runs.runs().filter(record => record.state === 'running')) {
+          if (await runs.hasOwner(record.id)) activeRuns.add(record.id)
+        }
+        const reports = await recoverCommitUnits({ io, home, unit, now: () => Date.now(), isActive: (runId) => activeRuns.has(runId), runs })
         if (reports.length > 0) ctx.logger.info('merge unit recovery: ' + reports.map(report => report.runId + '/' + report.unitId + '=' + report.action).join(', '))
         const v4 = await readV4Readiness(io, home)
         if (v4.ok) {
