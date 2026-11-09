@@ -21,6 +21,14 @@ describe('evolution-state-json', () => {
     expect(await provider.listPending('executing')).toHaveLength(1)
   })
 
+  it('provides the family mutation authority service', async () => {
+    const home = await tempRoot('dsh-state-json-authority-')
+    const ctx = await mountStateStack(home)
+    expect(ctx.evolutionMutationAuthority).toBeDefined()
+    await ctx.evolutionMutationAuthority.transactSystem(join(home, 'authority-probe.json'), () => 'ok')
+    expect(await ctx.evolutionIo.provider('node').readText(join(home, 'authority-probe.json'))).toBe('ok')
+  })
+
   it('V24-08: the review-state session cap evicts least-recently-active rows and strips the internal stamp on read', async () => {
     const home = await tempRoot('dsh-state-json-cap-')
     const ctx = await mountStateStack(home)
