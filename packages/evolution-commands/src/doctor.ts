@@ -8,6 +8,8 @@
  * services are actually mounted in this runtime. Always ends with suggested
  * actions so any finding carries its next step.
  */
+import { hostCommandText } from './host-locale.ts'
+import type { HostLocale } from './generated/host-errors.ts'
 import { readFileSync } from 'node:fs'
 import { scopedPackageName, asRecord } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
@@ -1073,7 +1075,7 @@ function legacyLine(row: LegacyMigrationRow): string {
  * @param report - the assembled report (view + legacy findings).
  * @returns the text face.
  */
-export function renderDoctorText(report: DoctorReport): string {
+export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'): string {
   const extras: string[] = []
   // G5: the RUNNING profile's own bundle list, from the platform. `unknown` is a verdict, not
   // an empty list: a trimmed base without `pluginManager` must not read as "no bundles".
@@ -1087,7 +1089,7 @@ export function renderDoctorText(report: DoctorReport): string {
   // mounted service. The view's platform-services row only names MISSING probed services, not this
   // family-specific inference, so the line stays here.
   extras.push(`services: review=${report.services.review} (${report.serviceSource === 'platform' ? 'the live row, this runtime' : 'inferred from bundles, all profiles'}) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`)
-  const mergeStatus = report.merge.status === 'ok' ? '正常' : report.merge.status === 'warn' ? '注意' : report.merge.status === 'fail' ? '异常' : '未知'
+  const mergeStatus = hostCommandText(locale, ('doctor.status.' + report.merge.status) as 'doctor.status.ok')
   extras.push('merge: [' + mergeStatus + '] ' + report.merge.detail + (report.merge.remedy === undefined ? '' : '；下一步：' + report.merge.remedy))
   if (report.merge.status !== 'ok' && report.merge.remedy !== undefined) extras.push('  → ' + report.merge.remedy)
   // O-2 (S3.4/A99): one line, only when a capability the family uses is missing. Each entry names
@@ -1118,7 +1120,7 @@ export function renderDoctorText(report: DoctorReport): string {
   if (report.paramIssues.length > 0) extras.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
   if (report.queryIssues.length > 0) extras.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) extras.push('next steps:', ...report.actions.map(line => `  → ${line}`))
-  return renderDiagnosticsText(report.view).trimEnd() + '\n\n补充检查（view 未覆盖的运行时事实）：\n' + extras.join('\n')
+  return renderDiagnosticsText(report.view, locale).trimEnd() + '\n\n补充检查（view 未覆盖的运行时事实）：\n' + extras.join('\n')
 }
 /**
  * G6/W8 tail: render the frozen DiagnosticsView as the doctor's diagnostics section.
@@ -1129,14 +1131,14 @@ export function renderDoctorText(report: DoctorReport): string {
  * @param view - the assembled view.
  * @returns the section text (ends with a newline).
  */
-export function renderDiagnosticsText(view: DiagnosticsView): string {
+export function renderDiagnosticsText(view: DiagnosticsView, locale: HostLocale = 'zh'): string {
   const lines: string[] = []
   lines.push('诊断（schema v' + String(view.schemaVersion) + '，生成于 ' + view.generatedAt + '）：')
   lines.push('  事实：')
   for (const fact of view.facts) lines.push('  - ' + fact.label + '：' + fact.value + '（出处：' + fact.home + '）')
   lines.push('  运行时：')
   for (const row of view.runtime) {
-    const status = row.status === 'ok' ? '正常' : row.status === 'warn' ? '注意' : row.status === 'fail' ? '异常' : '未知'
+    const status = hostCommandText(locale, ('doctor.status.' + row.status) as 'doctor.status.ok')
     const detail = row.detail === undefined ? '' : '：' + row.detail
     const remedy = row.remedy === undefined ? '' : '；下一步：' + row.remedy
     lines.push('  - [' + status + '] ' + row.label + detail + remedy)

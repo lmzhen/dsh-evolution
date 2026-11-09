@@ -320,6 +320,46 @@
       "de": "ist kein Unterbefehl, den dieser Build beantworten kann (ein bekannter Unterbefehl mit fehlenden Argumenten landet ebenfalls hier).",
       "ru": "не является подкомандой, которую эта сборка может обработать (известная подкоманда без аргументов тоже попадает сюда).",
       "pt": "não é um subcomando que esta compilação consegue atender (um subcomando conhecido sem argumentos também cai aqui)."
+    },
+    "doctor.status.ok": {
+      "zh": "正常",
+      "en": "OK",
+      "ja": "正常",
+      "es": "correcto",
+      "fr": "sain",
+      "de": "OK",
+      "ru": "в норме",
+      "pt": "saudável"
+    },
+    "doctor.status.warn": {
+      "zh": "注意",
+      "en": "Warning",
+      "ja": "注意",
+      "es": "requiere atención",
+      "fr": "à surveiller",
+      "de": "Achtung",
+      "ru": "требует внимания",
+      "pt": "atenção"
+    },
+    "doctor.status.fail": {
+      "zh": "异常",
+      "en": "Error",
+      "ja": "異常",
+      "es": "con error",
+      "fr": "en échec",
+      "de": "Fehler",
+      "ru": "сбой",
+      "pt": "falha"
+    },
+    "doctor.status.unknown": {
+      "zh": "未知",
+      "en": "Unknown",
+      "ja": "不明",
+      "es": "desconocido",
+      "fr": "inconnu",
+      "de": "Unbekannt",
+      "ru": "неизвестно",
+      "pt": "desconhecido"
     }
   }
 }

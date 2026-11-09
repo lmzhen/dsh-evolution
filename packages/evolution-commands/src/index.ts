@@ -1799,7 +1799,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // the diagnostics route/client card consume.
           if (input === 'doctor --json') return ok(JSON.stringify(report.view, null, 2))
           // G6/W8 tail: the text face ends with the SAME 7+8 view the diagnostics route answers.
-          return ok(renderDoctorText(report))
+          return ok(renderDoctorText(report, hostLocale))
         }
         // T4-03 (P2): an UNMATCHED subcommand is an error. The old fallback answered
         // `kind: 'success'` with the full help text, so `/evolution approve` (no id),
