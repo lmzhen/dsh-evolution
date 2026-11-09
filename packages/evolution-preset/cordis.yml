@@ -60,6 +60,8 @@
   name: '@deepseek-ai/dsh-evolution-io'
 - id: evolution-io-node
   name: '@deepseek-ai/dsh-evolution-io-node'
+- id: evolution-authority
+  name: '@deepseek-ai/dsh-evolution-authority'
 
 # ── durable state: DSH storage-domain KV is the primary provider ────────────
 - id: storage
