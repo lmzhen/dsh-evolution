@@ -359,7 +359,8 @@ export async function jsonTransact<T>(
     memory: QuarantineMemory
   },
 ): Promise<void> {
-  await new WriteKernel({ io: io() }).run({ path: join(root, file) }, async current => {
+  const write = async (): Promise<void> => {
+    await new WriteKernel({ io: io() }).run({ path: join(root, file) }, async current => {
     let parsed: T | null = null
     if (current !== null) {
       try {
@@ -443,8 +444,12 @@ export async function jsonTransact<T>(
         throw writeGateError(`evolution state file "${file}" write-back carries ${failing.length} record(s) that fail the field gate (${failing.map(([id]) => id).join(', ')}); not written.`)
       }
     }
-    return next === null ? null : JSON.stringify(next, null, 2)
-  })
+      return next === null ? null : JSON.stringify(next, null, 2)
+    })
+  }
+  const authority = ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
+  if (authority?.homeFence !== undefined) await authority.homeFence.run(async () => { await write() })
+  else await write()
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {

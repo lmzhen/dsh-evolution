@@ -21,6 +21,21 @@ describe('evolution-state-json', () => {
     expect(await provider.listPending('executing')).toHaveLength(1)
   })
 
+  it('runs state writes under the authority home fence when mounted', async () => {
+    const home = await tempRoot('dsh-state-json-fence-')
+    const ctx = await mountStateStack(home)
+    let entered = 0
+    let released = 0
+    ctx.provide('evolutionMutationAuthority', {
+      homeFence: {
+        async run(body: () => Promise<unknown>) { entered += 1; try { return await body() } finally { released += 1 } },
+      },
+    })
+    await ctx.evolutionStateStorage.provider('json').saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 })
+    expect(entered).toBeGreaterThan(0)
+    expect(released).toBe(entered)
+  })
+
   it('V24-08: the review-state session cap evicts least-recently-active rows and strips the internal stamp on read', async () => {
     const home = await tempRoot('dsh-state-json-cap-')
     const ctx = await mountStateStack(home)
