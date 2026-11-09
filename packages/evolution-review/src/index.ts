@@ -755,7 +755,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // decision: BOTH modes complete after the task — the old immediate
         // 'inject' contract is superseded, 0.3.39).
         if (params().reviewMode === 'aux') {
-          if (!tryAuxReview(session, agent, pendingKind, signal, 'cadence')) {
+          if (!(await tryAuxReview(session, agent, pendingKind, signal, 'cadence'))) {
             pendingCadenceReviews.set(session.id, pendingKind)
           }
           return
@@ -824,7 +824,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (!shouldCompletionReview(event.data.reason, cumulative, params().skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
     if (params().reviewMode === 'aux') {
-      if (!tryAuxReview(session, agent, 'skill', signal, 'completion')) {
+      if (!(await tryAuxReview(session, agent, 'skill', signal, 'completion'))) {
         completionInjected.delete(session.id)
       }
       return
@@ -988,7 +988,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * Run one plugin-side review over the parent prefix. No child Agent/Session is
    * created; the parent Agent is used only for tool scope/approval, with no log.
    */
-  function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): boolean {
+  async function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
     const running = auxRunning.get(session.id)
     if (running !== undefined) { running.rerun = kind; return true }
     const header = session.requestHeader()
@@ -1002,6 +1002,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (llm === undefined || tools === undefined) {
       ctx.logger.warn('dsh-evolution-review: aux review skipped — llm/tools service is not mounted')
       return false
+    }
+    const authority = ctx.get('evolutionMutationAuthority') as { lease?: { acquire(owner: 'background_review', runId: string, ttlMs?: number): Promise<{ ok: true; token: { id: string; owner: string; runId: string; epoch: number } } | { ok: false; reason: string }>; release(token: { id: string; owner: string; runId: string; epoch: number }): Promise<void> } } | undefined
+    let leaseToken: { id: string; owner: string; runId: string; epoch: number } | undefined
+    if (authority?.lease !== undefined) {
+      const lease = await authority.lease.acquire('background_review', 'review:' + session.id, Math.max(config.reviewTimeoutMs + 30_000, 60_000)).catch(() => undefined)
+      if (lease === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — lease acquire failed'); return false }
+      if (!lease.ok) { ctx.logger.warn('dsh-evolution-review: aux review already leased (' + lease.reason + ')'); return false }
+      leaseToken = lease.token
     }
     const state: { rerun?: ReviewKind } = {}
     auxRunning.set(session.id, state)
@@ -1082,6 +1090,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ctx.logger.warn('dsh-evolution-review: aux plan-applied emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
         }
         auxRunning.delete(session.id)
+        if (leaseToken !== undefined && authority?.lease !== undefined) await authority.lease.release(leaseToken).catch(() => {})
         if (state.rerun !== undefined) void tryAuxReview(session, agent, state.rerun, signal, reason)
       }
     })()
