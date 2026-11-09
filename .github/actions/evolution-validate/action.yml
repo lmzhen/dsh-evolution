@@ -418,7 +418,8 @@ runs:
         node packages/evolution/scripts/verify-traceability.mjs packages/evolution --strict
         # F0/A3: requirement definitions, evidence and generated views share ONE registry.
         # Non-strict here (the 251-ID evidence upgrade is tracked by the optimization goal);
-        # the release gate switches this to --strict only after every in-scope item is satisfied.
+        # REPORT-ONLY (DEFERRED): 9 V2-* requirements are still unverified and 1 is partial;
+        # the release gate must not claim a strict requirements pass until those close.
         node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check
         node packages/evolution/scripts/verify-requirements.mjs packages/evolution
         node packages/evolution/scripts/requirements.selftest.mjs
