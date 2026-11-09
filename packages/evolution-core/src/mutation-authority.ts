@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { MutationOwner } from '@deepseek-ai/dsh-evolution-contract'
 import { HomeFence, HomeFenceError } from './home-fence.ts'
 import { LeaseStore, type LeaseToken } from './lease-store.ts'
@@ -115,6 +116,18 @@ export class MutationAuthority {
         throw new MutationAuthorityError(error.reason === 'busy' ? 'fence-busy' : 'fence-io', error.message)
       }
       throw error
+    }
+  }
+
+  /** Control-plane single-file write: short-lived system lease + HomeFence, no unit snapshot. */
+  async transactSystem(path: string, task: (current: string | null) => Promise<string | null> | string | null): Promise<void> {
+    const runId = 'system-' + randomUUID()
+    const acquired = await this.leases.acquire('foreground', runId, 15_000)
+    if (!acquired.ok) throw new MutationAuthorityError('lease-missing', 'could not acquire system lease for ' + path)
+    try {
+      await this.transact(path, task, { owner: 'foreground', runId, lease: acquired.token })
+    } finally {
+      await this.leases.release(acquired.token)
     }
   }
 
