@@ -88,14 +88,6 @@ export interface RunRecord {
   supersededAt?: number | undefined
   /** The run this run was spawned from (approve/resume after an earlier command). */
   parentRunId?: string | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan' | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  stagingRef?: string | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  pairKey?: string | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  pairs?: readonly unknown[] | undefined
 }
 
 /** What a started run gets: its id and the signal its work must honour. */
@@ -107,14 +99,6 @@ export interface RunHandle {
   readonly startedAt: number
   readonly command?: RunCommand | undefined
   readonly parentRunId?: string | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  readonly mergeStatus?: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting-approval' | 'undone' | 'superseded' | 'interrupted' | 'orphan' | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  readonly stagingRef?: string | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  readonly pairKey?: string | undefined
-  /** @deprecated Legacy merge projection; read-only compatibility, never written. */
-  readonly pairs?: readonly unknown[] | undefined
 }
 
 

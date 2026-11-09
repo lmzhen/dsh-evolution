@@ -392,3 +392,19 @@ describe('core run registry (S2)', () => {
     expect(persisted.runs.find(row => row.id === 'settled-row')?.state).toBe('succeeded')
   })
 })
+
+it('loads a legacy index carrying removed merge projection fields', async () => {
+  const dir = await home()
+  const io = nodeEvolutionIo()
+  const registry = newRunRegistry({ io, home: dir })
+  await registry.load()
+  const merge = await registry.begin('merge', { command: 'pair' })
+  await registry.settle(merge.id, { state: 'succeeded' })
+  const path = runsFile(dir)
+  const raw = JSON.parse(await readFile(path, 'utf8')) as { schemaVersion: number; runs: Array<Record<string, unknown>> }
+  raw.runs = raw.runs.map(row => row.id === merge.id ? { ...row, mergeStatus: 'succeeded', pairKey: 'alpha|beta', pairs: [] } : row)
+  await writeFile(path, JSON.stringify(raw), 'utf8')
+  const reloaded = newRunRegistry({ io, home: dir })
+  await reloaded.load()
+  expect(reloaded.find(merge.id)).toMatchObject({ id: merge.id, kind: 'merge', state: 'succeeded' })
+})
