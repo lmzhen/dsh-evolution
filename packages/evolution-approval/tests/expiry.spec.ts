@@ -86,6 +86,24 @@ describe('staged-window expiry (T4-09/A51)', () => {
     expect(rows.map(row => row.id)).toContain(id)
   })
 
+  it('uses evolutionMutationAuthority lease around an expiry claim', async () => {
+    const { ctx } = await mountApproval(1000)
+    const released: string[] = []
+    const fake = {
+      lease: {
+        async acquire() {
+          return { ok: true, lease: { id: 'l1', owner: 'foreground', runId: 'approval:x', pid: 1, epoch: 1, issuedAt: 1, expiresAt: 1e12, heartbeatAt: 1, state: 'active' }, token: { id: 'l1', owner: 'foreground', runId: 'approval:x', epoch: 1 } }
+        },
+        async release(token: { id: string }) { released.push(token.id) },
+      },
+    }
+    ctx.provide('evolutionMutationAuthority', fake)
+    const id = await stage(ctx, new Date(Date.now() - 60_000).toISOString())
+    await ctx.evolutionApproval.expireStale()
+    expect(released).toEqual(['l1'])
+    expect((await ctx.evolutionState.listPending('rejected')).some(item => item.id === id)).toBe(true)
+  })
+
   it('releases the claim when an expiry reject throws — the record returns to pending', async () => {
     const { ctx } = await mountApproval(1000)
     const id = await stage(ctx, new Date(Date.now() - 60_000).toISOString())

@@ -64,6 +64,9 @@ export class MutationAuthority {
   private readonly leases: LeaseStore
   private readonly fence: HomeFence
 
+  /** Lease primitives for domain run/claim owners. */
+  get lease(): LeaseStore { return this.leases }
+
   constructor(options: MutationAuthorityOptions) {
     this.io = options.io
     this.leases = options.leases ?? new LeaseStore({ io: options.io, home: options.home, ...(options.now === undefined ? {} : { now: options.now }) })
