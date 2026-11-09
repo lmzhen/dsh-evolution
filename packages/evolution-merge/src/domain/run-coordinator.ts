@@ -52,8 +52,12 @@ export interface RunCoordinator {
 }
 
 export function runMetaPath(home: string, runId: string): string { return join(home, 'merge', 'run-meta', encodeURIComponent(runId) + '.json') }
-export async function writeRunMeta(io: EvolutionIoLike, home: string, meta: MergeRunMeta): Promise<void> {
-  await transactIo(io, runMetaPath(home, meta.runId), () => JSON.stringify(meta, null, 2) + '\n')
+export async function writeRunMeta(io: EvolutionIoLike, home: string, meta: MergeRunMeta, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<void> {
+  const write = async (): Promise<void> => {
+    await transactIo(io, runMetaPath(home, meta.runId), () => JSON.stringify(meta, null, 2) + '\n')
+  }
+  if (fence !== undefined) await fence.run(write)
+  else await write()
 }
 export async function readRunMeta(io: EvolutionIoLike, home: string, runId: string): Promise<MergeRunMeta | null> {
   const raw = await readTextOrNull(io, runMetaPath(home, runId))
