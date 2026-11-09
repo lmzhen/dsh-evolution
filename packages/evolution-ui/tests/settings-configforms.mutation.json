@@ -3,8 +3,8 @@
   "edits": [
     {
       "file": "packages/evolution-ui/src/panels/settings/index.ts",
-      "find": "const probe: SeatProbe = (): ConfigFormsSeat | undefined => ctx.get('configForms') as ConfigFormsSeat | undefined",
-      "replace": "const probe: SeatProbe = (): ConfigFormsSeat | undefined => undefined"
+      "find": "const probe: SeatProbe = () => seat",
+      "replace": "const probe: SeatProbe = () => undefined"
     }
   ],
   "expect": "red",

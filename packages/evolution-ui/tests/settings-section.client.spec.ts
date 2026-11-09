@@ -13,11 +13,22 @@
  * resolves) and out of `tsconfig.host.json`, which includes the family's plain `tests` TypeScript files but
  * client-suffixed specs.
  */
-import { describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { apply, SECTION_ID } from '../src/panels/settings/index.ts'
 import { createSourceCache, PROJECTION_FAILED, SEAT_MISSING, type SeatProbe } from '../src/panels/settings/source.ts'
+
+const NAMESPACES = ['evolution-memory', 'evolution-review', 'memory-files', 'tool-memory', 'evolution-curator', 'tool-skill-manage', 'evolution-approval', 'evolution-commands', 'evolution-merge']
+
+function mockDescribe(): void {
+  vi.stubGlobal('fetch', async () => ({
+    ok: true,
+    json: async () => ({ ok: true, data: { namespaces: NAMESPACES.map(ns => ({ ns, status: 'ready', value: {}, user: {}, writable: true, revision: 1, base: undefined })) } }),
+  }))
+}
+
+afterEach(() => { vi.unstubAllGlobals() })
 
 /**
  * `createElement` narrowed for the renderer: this package carries its own minimal ambient React surface, so
@@ -137,15 +148,17 @@ function fakeShell(options: { seat?: boolean; refuseLocale?: boolean; seatArrive
 }
 
 describe('the evolution settings section', () => {
-  it('registers one top-level settings.section + icon and renders the generated cards in it', () => {
+  it('registers one top-level settings.section + icon and renders the generated cards in it', async () => {
     const { ctx, registrations } = fakeShell()
     apply(ctx)
     const sections = registrations.filter(row => row.name === 'settings.section')
     expect(sections).toHaveLength(1)
     expect(sections[0]?.id).toBe(SECTION_ID)
     expect(registrations.filter(row => row.name === 'settings.section.icon')).toHaveLength(1)
-    render(h(sections[0]?.component, {}))
+    mockDescribe()
+    await act(async () => { render(h(sections[0]?.component, {})); await new Promise(resolve => setTimeout(resolve, 0)) })
     expect(document.body.textContent).toBeTruthy()
+    expect(document.body.textContent).not.toContain('seatMissing')
     cleanup()
   })
 
