@@ -24,4 +24,7 @@ it('keeps the generic unit engine in core and the merge protocol in merge', () =
     'evolution-core/src/mutation-unit.ts',
     'evolution-merge/src/unit-protocol.ts',
   ])
+  const commitExecute = readFileSync(join(root, 'evolution-merge/src/commit-execute.ts'), 'utf8')
+  expect(commitExecute).toContain('options.unit ?? port.unit')
+  expect(commitExecute).not.toContain('legacyUnitAdapter')
 })
