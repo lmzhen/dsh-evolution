@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 25
+export const PROMPT_BUNDLE_VERSION = 26
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -39,11 +39,6 @@ Focus on:
 2. Has the user expressed expectations about how you should behave, their work style, or ways you want them to operate?
 
 If something stands out, save it using the memory tool.`
-
-export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
-${MEMORY_REVIEW_BODY}
-
-If nothing is worth saving, say "Nothing to save." and stop.`
 
 const SKILL_REVIEW_BODY = `Review the conversation above and update the skill library.
 
@@ -78,11 +73,6 @@ A one-off environment failure, transient error, or "tool X is broken" claim is n
 
 Write skills only through skill_manage. If its guard refuses a write, report the refusal and do not work around it. Respect protected skills (bundled, hub-installed, pinned) and their guards. If a lesson can only live in a protected skill, report it and leave that lesson unapplied; continue with any other lessons. Do not create a near-duplicate to hold it.`
 
-export const SKILL_REVIEW_PROMPT = `[Auto-review — Skills]
-${SKILL_REVIEW_BODY}
-
-If nothing durable exists, say "Nothing to save." and stop.`
-
 const COMBINED_REVIEW_BODY = `[Auto-review]
 Apply both review passes below.
 
@@ -93,9 +83,43 @@ After the memory pass, continue to the Skills pass. If nothing is worth saving, 
 ## Skills
 ${SKILL_REVIEW_BODY}`
 
-export const COMBINED_REVIEW_PROMPT = `${COMBINED_REVIEW_BODY}
+const BACKGROUND_REVIEW_TAIL = `
+
+This is a background review. Do not address the user or write a user-facing reply; return what changed and a short audit summary.`
+
+export const INJECT_MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
+${MEMORY_REVIEW_BODY}
+
+If nothing is worth saving, say "Nothing to save." and stop.`
+
+export const INJECT_SKILL_REVIEW_PROMPT = `[Auto-review — Skills]
+${SKILL_REVIEW_BODY}
+
+If nothing durable exists, say "Nothing to save." and stop.`
+
+export const INJECT_COMBINED_REVIEW_PROMPT = `${COMBINED_REVIEW_BODY}
 
 If nothing durable exists in either pass, say "Nothing to save." and stop.`
+
+export const INJECT_COMPLETION_SKILL_REVIEW_PROMPT = `[Auto-review — Skills · task complete]
+${SKILL_REVIEW_BODY}
+
+If nothing durable exists, say "Nothing to save." and stop.`
+
+export const AUX_MEMORY_REVIEW_PROMPT = `[Auto-review — Memory · background]
+${MEMORY_REVIEW_BODY}${BACKGROUND_REVIEW_TAIL}
+
+If nothing is worth saving, say "Nothing to save."`
+
+export const AUX_COMBINED_REVIEW_PROMPT = `${COMBINED_REVIEW_BODY}${BACKGROUND_REVIEW_TAIL}
+
+If nothing durable exists in either pass, say "Nothing to save."`
+
+// Inject aliases kept for the foreground delivery path and existing imports.
+export const MEMORY_REVIEW_PROMPT = INJECT_MEMORY_REVIEW_PROMPT
+export const SKILL_REVIEW_PROMPT = INJECT_SKILL_REVIEW_PROMPT
+export const COMBINED_REVIEW_PROMPT = INJECT_COMBINED_REVIEW_PROMPT
+export const COMPLETION_SKILL_REVIEW_PROMPT = INJECT_COMPLETION_SKILL_REVIEW_PROMPT
 
 export const CURATOR_PROMPT = `You are the skill curator. Maintain a healthy, class-level skill library, not a flat pile of narrow one-session skills.
 
@@ -161,11 +185,6 @@ This is a PREVIEW pass. Follow every instruction above EXCEPT:
 Your output IS the deliverable: produce the exact same human-readable summary and YAML block you would on a live run, describing the actions you WOULD take. A reviewer will decide whether to approve a live run.
 
 If you accidentally take a mutating action, say so explicitly in the summary.`
-
-export const COMPLETION_SKILL_REVIEW_PROMPT = `[Auto-review — Skills · task complete]
-${SKILL_REVIEW_BODY}
-
-If nothing durable exists, say "Nothing to save." and stop.`
 
 export const MAINTAIN_PROMPT = `<<<MAINTAIN_PROMPT v={bundle_version} sig={joint_signature}>>>
 
@@ -265,10 +284,13 @@ export const SKILLS_GUIDANCE = `Skills guidance:
 • After a complex task (5+ tool calls), a tricky fix, or a non-trivial workflow, decide whether an existing owner should be updated or a new class-level skill is needed; search the library before creating.
 • When using a skill and finding it outdated, incomplete, or wrong, patch it immediately with skill_manage (action='patch') — don't wait to be asked. Skills that aren't maintained become liabilities.`
 
-export function reviewPrompt(kind: 'memory' | 'skill' | 'combined'): string {
-  if (kind === 'memory') return MEMORY_REVIEW_PROMPT
-  if (kind === 'skill') return SKILL_REVIEW_PROMPT
-  return COMBINED_REVIEW_PROMPT
+export type ReviewSurface = 'inject' | 'aux'
+
+export function reviewPrompt(kind: 'memory' | 'skill' | 'combined', surface: ReviewSurface = 'inject'): string {
+  if (surface === 'aux') return kind === 'memory' ? AUX_MEMORY_REVIEW_PROMPT : AUX_COMBINED_REVIEW_PROMPT
+  if (kind === 'memory') return INJECT_MEMORY_REVIEW_PROMPT
+  if (kind === 'skill') return INJECT_SKILL_REVIEW_PROMPT
+  return INJECT_COMBINED_REVIEW_PROMPT
 }
 
 export interface PromptBundle {
@@ -297,16 +319,18 @@ function createPromptBundle(prompts: Record<string, string>): PromptBundle {
 }
 
 export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
-  memory: MEMORY_REVIEW_PROMPT,
-  skill: SKILL_REVIEW_PROMPT,
-  combined: COMBINED_REVIEW_PROMPT,
+  memory: INJECT_MEMORY_REVIEW_PROMPT,
+  skill: INJECT_SKILL_REVIEW_PROMPT,
+  combined: INJECT_COMBINED_REVIEW_PROMPT,
   curator: CURATOR_PROMPT,
   // v46 S1.12b (finding T3-07): the curator's dry-run banner rides the bundle too. It is prepended
   // to the curator prompt at run time and used to live outside the digest, so a drifted banner was
   // model-visible text the integrity check could not see. The bundle digest changes with this entry
   // (the intended fail-closed signal), and PROMPT_BUNDLE_VERSION moves 21 -> 22 with it.
   curatorDryRun: CURATOR_DRY_RUN_BANNER,
-  completion: COMPLETION_SKILL_REVIEW_PROMPT,
+  completion: INJECT_COMPLETION_SKILL_REVIEW_PROMPT,
+  auxMemory: AUX_MEMORY_REVIEW_PROMPT,
+  auxCombined: AUX_COMBINED_REVIEW_PROMPT,
   maintain: MAINTAIN_PROMPT,
   // F-16: new entry — the maintain subagent's output instruction
   // (see MAINTAIN_OUTPUT_INSTRUCTION). Digest changes with this entry.
