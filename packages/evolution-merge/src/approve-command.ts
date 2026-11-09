@@ -23,6 +23,7 @@ export interface ApprovePorts {
 
 export interface RunApproveCommandOptions {
   readonly io: EvolutionIoLike
+  readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
   readonly home: string
   readonly registry: MergeRegistryPort
   readonly ports: ApprovePorts
@@ -66,6 +67,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
     io: options.io,
     home: options.home,
     registry: options.registry,
+    ...(options.fence === undefined ? {} : { fence: options.fence }),
     command: 'approve',
     approval: { platformWrite: options.platformWrite, mergeApproval: true },
     pairKey: row.pairKey,

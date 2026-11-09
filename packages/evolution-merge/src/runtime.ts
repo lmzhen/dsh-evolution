@@ -106,6 +106,8 @@ export interface MergeRuntimeDeps {
   readonly stage?: MergeStageBindingPort
   /** G2 transitional: when set, authoring commits through core UnitTransaction. */
   readonly unit?: UnitTransaction
+  /** Authority home fence for metadata writes. */
+  readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
 }
 
 async function removeRuntimeRow(io: EvolutionIoLike, home: string, id: string, event: 'superseded' | 'restored' | 'committed', unitId?: string): Promise<boolean> {
@@ -137,6 +139,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
     platformWrite: platformWriteOf(), now: deps.now,
     ...(deps.model === undefined ? {} : { model: deps.model }),
     ...(deps.isOwnerActive === undefined ? {} : { isOwnerActive: deps.isOwnerActive }),
+    ...(deps.fence === undefined ? {} : { fence: deps.fence }),
     ...(timeout === undefined ? {} : { timeoutMinutes: timeout }),
   })
   const stage = deps.stage

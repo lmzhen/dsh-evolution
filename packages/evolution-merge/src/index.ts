@@ -354,6 +354,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     if (commands === undefined) return
     const runtime = createMergeRuntime({
       io, home, registry: runs, skills, now: () => Date.now(), getParams, getPlatformWrite,
+      ...(mutationAuthority?.homeFence === undefined ? {} : { fence: mutationAuthority.homeFence }),
       ...(defaultModel === undefined ? {} : { model: defaultModel.currentSelection().model }),
       channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: startupParams.mergeRunTimeoutMinutes,
       hostCapabilities,

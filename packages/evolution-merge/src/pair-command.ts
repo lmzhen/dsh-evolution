@@ -8,6 +8,7 @@ import type { MergeRegistryPort, WithMergeRunResult } from './run-shell.ts'
 
 export interface RunPairCommandOptions {
   readonly io: EvolutionIoLike
+  readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
   readonly home: string
   readonly registry: MergeRegistryPort
   readonly ports: ScanPorts
@@ -24,6 +25,7 @@ export async function runPairCommand(options: RunPairCommandOptions): Promise<Wi
     io: options.io,
     home: options.home,
     registry: options.registry,
+    ...(options.fence === undefined ? {} : { fence: options.fence }),
     approval: options.approval,
     platformWrite: options.platformWrite,
     now: options.now,
