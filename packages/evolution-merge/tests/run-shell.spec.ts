@@ -142,6 +142,19 @@ it('waits for an aborted body before settling the timeout', { timeout: 90_000 },
   if (probe.kind === 'present') expect(probe.value.stopReason).toBe('timeout')
 })
 
+it('settles the run when body ignores abort past the drain budget', async () => {
+  const home = await tempRoot('dsh-merge-run-shell-drain-')
+  const io = nodeEvolutionIo()
+  const reg = registry()
+  const result = await withMergeRun({
+    io, home, registry: reg, command: 'scan', approval: { platformWrite: true, mergeApproval: false },
+    now: () => 200, timeoutMinutes: 0.0001, drainMs: 5, total: 1,
+    async body() { await new Promise<void>(() => {}) },
+  })
+  expect(result.ok).toBe(false)
+  expect(reg.calls).toContain('settle:failed')
+})
+
 it('still writes a failed report when the body throws', async () => {
   const home = await tempRoot('dsh-merge-run-shell-fail-')
   const io = nodeEvolutionIo()

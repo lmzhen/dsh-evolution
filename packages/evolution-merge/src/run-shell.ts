@@ -64,6 +64,8 @@ export interface WithMergeRunOptions {
   readonly parentRunId?: string
   readonly detached?: boolean
   readonly timeoutMinutes?: number
+  /** Drain budget after abort; tests may shrink it. Defaults to 30s. */
+  readonly drainMs?: number
   /** Observability for a detached finish failure; defaults to console.warn. */
   readonly warn?: (message: string) => void
   readonly body: (ctx: MergeRunBodyContext) => Promise<MergeRunReportDraft>
@@ -161,7 +163,7 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
           let drainTimer: ReturnType<typeof setTimeout> | undefined
           const drained = await Promise.race([
             bodyOutcome,
-            new Promise<{ kind: 'drain-timeout' }>(resolve => { drainTimer = setTimeout(() => resolve({ kind: 'drain-timeout' }), DETACHED_DRAIN_MS) }),
+            new Promise<{ kind: 'drain-timeout' }>(resolve => { drainTimer = setTimeout(() => resolve({ kind: 'drain-timeout' }), options.drainMs ?? DETACHED_DRAIN_MS) }),
           ])
           if (drainTimer !== undefined) clearTimeout(drainTimer)
           if (drained.kind === 'drain-timeout') {
