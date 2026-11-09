@@ -1106,11 +1106,11 @@ export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'
   for (const row of report.presetFreshness) {
     if (row.status === 'absent') continue
     const verdict = row.status === 'fresh'
-      ? 'fresh — a fresh generation matches this file byte-for-byte'
+      ? hostCommandText(locale, 'doctor.presetFresh')
       : row.status === 'differs'
-        ? 'DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate'
-        : `unknown — a fresh generation could not be recomputed (${row.detail ?? 'reason not recorded'})`
-    extras.push(`preset:   ${row.base} → ${row.destination}  ${verdict}`)
+        ? hostCommandText(locale, 'doctor.presetDiffers')
+        : hostCommandText(locale, 'doctor.presetUnknown', { detail: row.detail ?? 'reason not recorded' })
+    extras.push(hostCommandText(locale, 'doctor.presetLine', { base: row.base, destination: row.destination, verdict }))
   }
   if (report.presetIssues.length > 0) extras.push('agent presets:', ...report.presetIssues.map(line => `  ! ${line}`))
   if (report.foreignProfiles.length > 0) extras.push('profiles-foreign: ' + report.foreignProfiles.join(', ') + ' — not part of this plane: /evolution preset install ignores them, while the bundles (all profiles) line above counts them')

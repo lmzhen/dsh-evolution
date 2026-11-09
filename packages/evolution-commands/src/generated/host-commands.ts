@@ -442,6 +442,46 @@ export const HOST_COMMANDS = {
       "de": "; nächster Schritt: ",
       "ru": "; следующий шаг: ",
       "pt": "; próximo passo: "
+    },
+    "doctor.presetLine": {
+      "zh": "preset:   {base} → {destination}  {verdict}",
+      "en": "preset:   {base} → {destination}  {verdict}",
+      "ja": "preset:   {base} → {destination}  {verdict}",
+      "es": "preset:   {base} → {destination}  {verdict}",
+      "fr": "preset:   {base} → {destination}  {verdict}",
+      "de": "preset:   {base} → {destination}  {verdict}",
+      "ru": "preset:   {base} → {destination}  {verdict}",
+      "pt": "preset:   {base} → {destination}  {verdict}"
+    },
+    "doctor.presetFresh": {
+      "zh": "最新 — 新生成的版本与此文件逐字节一致",
+      "en": "fresh — a fresh generation matches this file byte-for-byte",
+      "ja": "最新 — 新しく生成した内容がこのファイルとバイト単位で一致します",
+      "es": "actualizado — una generación nueva coincide byte por byte con este archivo",
+      "fr": "à jour — une nouvelle génération correspond octet pour octet à ce fichier",
+      "de": "aktuell — eine neue Erzeugung stimmt bytegenau mit dieser Datei überein",
+      "ru": "актуально — новая генерация совпадает с файлом побайтно",
+      "pt": "atualizado — uma nova geração corresponde byte a byte a este arquivo"
+    },
+    "doctor.presetDiffers": {
+      "zh": "与最新生成不同 — 这是安装时快照；重新运行安装器（/evolution preset install）以重新生成",
+      "en": "DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate",
+      "ja": "最新の生成結果と異なります — インストール時のスナップショットです。インストーラー（/evolution preset install）を再実行して再生成してください",
+      "es": "DIFIERE de una generación nueva — es una instantánea del momento de instalar; vuelve a ejecutar el instalador (/evolution preset install) para regenerarla",
+      "fr": "DIFFÈRE d’une nouvelle génération — c’est un instantané de l’installation ; relancez l’installateur (/evolution preset install) pour la régénérer",
+      "de": "WEICHT von einer neuen Erzeugung ab — es ist ein Installations-Snapshot; Installer erneut ausführen (/evolution preset install), um ihn neu zu erzeugen",
+      "ru": "ОТЛИЧАЕТСЯ от новой генерации — это снимок на момент установки; запустите установщик повторно (/evolution preset install)",
+      "pt": "DIFERE de uma nova geração — é um instantâneo do momento da instalação; execute o instalador novamente (/evolution preset install)"
+    },
+    "doctor.presetUnknown": {
+      "zh": "未知 — 无法重新生成（{detail}）",
+      "en": "unknown — a fresh generation could not be recomputed ({detail})",
+      "ja": "不明 — 新しい生成を再計算できませんでした（{detail}）",
+      "es": "desconocido — no se pudo recalcular una generación nueva ({detail})",
+      "fr": "inconnu — une nouvelle génération n’a pas pu être recalculée ({detail})",
+      "de": "unbekannt — eine neue Erzeugung konnte nicht berechnet werden ({detail})",
+      "ru": "неизвестно — не удалось пересчитать новую генерацию ({detail})",
+      "pt": "desconhecido — não foi possível recalcular uma nova geração ({detail})"
     }
   } as const
 

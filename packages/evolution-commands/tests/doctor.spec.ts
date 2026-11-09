@@ -664,7 +664,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(row?.destination).toBe(patchPath)
       expect(row?.status).toBe('fresh')
       expect(report.actions.some(action => action.includes(patchPath))).toBe(false)
-      expect(renderDoctorText(report)).toContain(`${patchPath}  fresh`)
+      expect(renderDoctorText(report, 'en')).toContain(`${patchPath}  fresh`)
 
       // One hand-edited line is the whole failure: the row still mounts, but it
       // no longer describes a generation this platform can produce.
@@ -674,7 +674,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(stale.presetFreshness.find(entry => entry.base === 'standard')?.status).toBe('differs')
       expect(stale.actions.some(action => action.includes(patchPath))).toBe(true)
       // The line a user reads: pinned verbatim, destination included.
-      expect(renderDoctorText(stale)).toContain(`preset:   standard → ${patchPath}  DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
+      expect(renderDoctorText(stale, 'en')).toContain(`preset:   standard → ${patchPath}  DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
       // READ-ONLY: reporting an install-time snapshot never rewrites it.
       expect(readFileSync(patchPath, 'utf8')).toBe(edited)
     } finally {
@@ -713,7 +713,7 @@ describe('doctor (WB2, 0.3.55)', () => {
         expect(unmountedRow?.status).toBe('unknown')
         expect(unmountedRow?.detail).toContain('standard.patch.yml does not exist')
         expect(unmounted.actions.some(action => action.includes(patchPath))).toBe(false)
-        expect(renderDoctorText(unmounted)).toContain('could not be recomputed')
+        expect(renderDoctorText(unmounted, 'en')).toContain('could not be recomputed')
       } finally {
         if (previousRoot === undefined) delete process.env.DSH_AGENT_PRESET_ROOT
         else process.env.DSH_AGENT_PRESET_ROOT = previousRoot
