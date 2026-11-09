@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-09T16:53:01.831Z",
+  "generatedAt": "2026-11-09T16:55:54.605Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
-      "signature": "ebdab16fc40892bbd00242f75a038e2b86a7ed5e0cdd6b8c28d599e0485f34fa",
-      "provenAt": "2026-11-02T23:45:36.405Z",
+      "signature": "d96268d3d1eb0d162318665bf2b724ed2622e025ed7881878914e51c4bccbf91",
+      "provenAt": "2026-11-09T16:55:43.639Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-doctor-view",
-      "signature": "af213e0681c590aa60c8394bf2125f95121744595e8d60f695e2ab6208a419ce",
-      "provenAt": "2026-11-02T23:45:36.400Z",
+      "signature": "b8da74799d22634fcd9568e190261a9d314fb014c899cc2e10eb200b017fa8f3",
+      "provenAt": "2026-11-09T16:55:13.597Z",
       "tree": "overlay"
     },
     {
@@ -48,13 +48,13 @@
     {
       "probe": "beh-restricted-preset-lifecycle",
       "signature": "cf426ca0de03351e6616fabf76e8717fbb5dd85483074d1b28ef3ea46496a1f4",
-      "provenAt": "2026-11-02T23:45:36.392Z",
+      "provenAt": "2026-11-09T16:54:35.163Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-restrictor-allowset",
-      "signature": "a2ed3c78a8e43812049c59d6198d8ce0634ea0c6b4e562ba7b815bec9e3ded80",
-      "provenAt": "2026-11-02T23:45:36.396Z",
+      "signature": "6c22bcc47f11cd4b525af43ed3c2c780047a0ff20e848736fe85e159f3057fd8",
+      "provenAt": "2026-11-09T16:54:50.192Z",
       "tree": "overlay"
     },
     {
@@ -66,25 +66,25 @@
     {
       "probe": "beh-review-notice",
       "signature": "6f8f4b47ef01cba88349d983392a863be9ebc6d468a351543b4a4ed278f4fabb",
-      "provenAt": "2026-11-02T23:45:36.402Z",
+      "provenAt": "2026-11-09T16:55:32.066Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-run-registry",
-      "signature": "9688831492d160967fe8b59b200312d4f7041e52ffeeb3392f2461c59b8f3f1a",
-      "provenAt": "2026-11-02T23:45:36.399Z",
+      "signature": "43634e78b4b56003a894104847e66b01cf80866a40bee6d3567e809f1aae0670",
+      "provenAt": "2026-11-09T16:55:02.378Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-session-fold",
       "signature": "56373de66f248b0abe7a5305ae84ce2c89abfa728fa919eb1b0f2db7eec615b3",
-      "provenAt": "2026-11-02T23:45:36.394Z",
+      "provenAt": "2026-11-09T16:54:42.519Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-subagent-channel-outcomes",
       "signature": "18ef8d0a24953a7237fabc931c1b36e8da7cd9bb30f2e63c4fbe56a091797454",
-      "provenAt": "2026-11-02T23:45:36.392Z",
+      "provenAt": "2026-11-09T16:54:27.407Z",
       "tree": "overlay"
     },
     {
@@ -96,7 +96,7 @@
     {
       "probe": "decl-composer-single-source",
       "signature": "ecdb2584868f7b8e52f48392922fa78732ab65b0b20792811f74a15f42442e3a",
-      "provenAt": "2026-11-02T23:45:36.391Z",
+      "provenAt": "2026-11-09T16:54:19.750Z",
       "tree": "overlay"
     },
     {
@@ -107,8 +107,8 @@
     },
     {
       "probe": "decl-contracts-surface",
-      "signature": "a2e2dcb024cb8db55b04194c428befbd972bc8bb56d4251796823be0883cd1ba",
-      "provenAt": "2026-11-02T23:45:36.390Z",
+      "signature": "77bad1938abc5cb42562f6fa57615b33e1adb7833edb617a8153bed57e7bda40",
+      "provenAt": "2026-11-09T16:54:17.738Z",
       "tree": "overlay"
     },
     {
@@ -137,14 +137,14 @@
     },
     {
       "probe": "decl-platform-ranges",
-      "signature": "d1f64dfecd5f56f614cbd0c2c1a615d212ce15a61f091cab573e5c209faa410b",
-      "provenAt": "2026-11-02T23:45:36.407Z",
+      "signature": "3770818e4b0b4d3365e18543e4160967aff209a2da5637b9e99501cae0da8fc8",
+      "provenAt": "2026-11-09T16:55:54.597Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-platform-view",
       "signature": "1775b1c264d159b68734a2545b52627c4508d6775142e0a547bbdb61f5629070",
-      "provenAt": "2026-11-02T23:45:36.400Z",
+      "provenAt": "2026-11-09T16:55:24.733Z",
       "tree": "overlay"
     }
   ]
