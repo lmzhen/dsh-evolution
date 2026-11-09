@@ -76,7 +76,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
   if (selected.state === 'approved' && options.ports.stage !== undefined) {
     const staged = await options.ports.stage(selected, decision)
     if (!staged.ok) return failure('resume', 'stage-failed', staged.message, '检查暂存目录后重试；不影响已记录的决策', selected.runId)
-    const fused = await pairLedger(options.io, options.home).transact(tx => {
+    const fused = await pairLedger(options.io, options.home, options.fence).transact(tx => {
       const current = tx.rows().find(item => item.id === selected.id)
       if (current === undefined) return null
       const moved = tx.transition(selected.id, { type: 'staged', stagingRef: staged.entry.ref, stagingExpiresAt: staged.entry.expiresAt }, current.version)

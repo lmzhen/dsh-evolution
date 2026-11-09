@@ -53,7 +53,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
   if (options.ports.stage !== undefined) {
     const staged = await options.ports.stage(row, decision)
     if (!staged.ok) return failure('approve', 'stage-failed', staged.message, '检查暂存目录后重试；不影响已记录的决策', row.runId)
-    const fused = await pairLedger(options.io, options.home).transact(tx => {
+    const fused = await pairLedger(options.io, options.home, options.fence).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       if (current === undefined) return null
       const moved = tx.transition(row.id, { type: 'staged', stagingRef: staged.entry.ref, stagingExpiresAt: staged.entry.expiresAt }, current.version)
