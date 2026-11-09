@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-09T17:41:19.287Z",
+  "generatedAt": "2026-11-09T20:09:52.487Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
-      "signature": "d96268d3d1eb0d162318665bf2b724ed2622e025ed7881878914e51c4bccbf91",
-      "provenAt": "2026-11-09T17:02:02.212Z",
+      "signature": "a651f6dafbc9185e72e0ce3eec7cd9bf1d1d270b61348332109c60da6847b847",
+      "provenAt": "2026-11-09T20:09:52.471Z",
       "tree": "overlay"
     },
     {
@@ -59,8 +59,8 @@
     },
     {
       "probe": "beh-review-inject-fallback",
-      "signature": "ec162e33c16f99148d1873f9556832130afb1b34ae93c88352d234e26e1a46c5",
-      "provenAt": "2026-11-09T17:15:06.498Z",
+      "signature": "b4de93019be476d01274cc166c93caa63783afd819b4c73ad5968180aa081c15",
+      "provenAt": "2026-11-09T20:09:37.444Z",
       "tree": "overlay"
     },
     {
