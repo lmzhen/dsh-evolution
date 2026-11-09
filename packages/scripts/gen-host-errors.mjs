@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path'
 const SCRIPTS = import.meta.dirname
 const EVOLUTION_ROOT = resolve(SCRIPTS, '..')
 const SOURCE = resolve(SCRIPTS, 'i18n/catalog/host.errors.json')
-const TARGET = resolve(EVOLUTION_ROOT, 'evolution-commands/src/generated/host-errors.ts')
+const TARGET = resolve(EVOLUTION_ROOT, 'evolution-core/src/generated/errors.localized.ts')
 const LOCALES = ['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt']
 const CHECK = process.argv.includes('--check')
 const STRICT = process.argv.includes('--strict')
@@ -20,8 +20,9 @@ for (const [id, row] of Object.entries(messages)) {
   if (typeof row.en !== 'string' || row.en.length === 0) throw new Error(id + ': en required')
   const out = {}
   for (const locale of LOCALES) {
-    if (typeof row[locale] === 'string' && row[locale].length > 0) out[locale] = row[locale]
-    else { out[locale] = row.en; missing.push(id + ':' + locale) }
+    const text = typeof row[locale] === 'string' && row[locale].length > 0 ? row[locale] : row.en
+    out[locale] = text.replace(/^E-\d{3}:\s*/, '')
+    if (typeof row[locale] !== 'string' || row[locale].length === 0) missing.push(id + ':' + locale)
   }
   rows[id] = out
 }

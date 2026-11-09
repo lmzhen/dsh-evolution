@@ -9,7 +9,7 @@
  * actions so any finding carries its next step.
  */
 import { hostCommandText } from './host-locale.ts'
-import type { HostLocale } from './generated/host-errors.ts'
+import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
 import { readFileSync } from 'node:fs'
 import { scopedPackageName, asRecord } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'

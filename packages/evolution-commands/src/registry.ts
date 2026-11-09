@@ -10,7 +10,7 @@
  * Keep `usage` in the exact shape a user can type after `/evolution`.
  */
 import { HOST_COMMANDS } from './generated/host-commands.ts'
-import type { HostLocale } from './generated/host-errors.ts'
+import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
 
 export interface CommandEntry {
   /** The subcommand as typed after `/evolution`. Variants use `|` (curator run|pause). */

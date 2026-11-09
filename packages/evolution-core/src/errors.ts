@@ -11,6 +11,10 @@
  * `errorText` from the values the call site used to interpolate inline.
  * @module @deepseek-ai/dsh-evolution-core
  */
+import { HOST_ERRORS, type HostLocale } from './generated/errors.localized.ts'
+export { HOST_LOCALES } from './generated/errors.localized.ts'
+export type { HostLocale } from './generated/errors.localized.ts'
+
 export const EVOLUTION_ERRORS = Object.freeze({
   'e-305-this-invocation-carries-no':
     'E-305: 本次调用没有携带 agent —— `%a1%` 需要由会话支撑的调用（请在 GUI 或 CLI 的会话里运行）。',
@@ -91,4 +95,20 @@ export type EvolutionErrorId = keyof typeof EVOLUTION_ERRORS
  */
 export function errorText(id: EvolutionErrorId, args: Record<string, string | number> = {}): string {
   return EVOLUTION_ERRORS[id].replace(/%a(\d+)%/g, (_match, n: string) => String(args['a' + n] ?? ''))
+}
+
+/**
+ * Render the same error id in a requested host-human locale.
+ * Model-visible callers keep using {@link errorText}, which stays canonical.
+ * @param locale - locale selected for human output.
+ * @param id - stable error-table key.
+ * @param args - values for %aN% slots.
+ * @returns localized human error text.
+ */
+export function errorTextIn(locale: HostLocale, id: EvolutionErrorId, args: Record<string, string | number> = {}): string {
+  const row = HOST_ERRORS[id]
+  const canonical = EVOLUTION_ERRORS[id]
+  const prefix = /^E-\d{3}:\s*/.exec(canonical)?.[0] ?? ''
+  const template = row[locale] ?? row.en
+  return prefix + template.replace(/%a(\d+)%/g, (_match, n: string) => String(args['a' + n] ?? ''))
 }

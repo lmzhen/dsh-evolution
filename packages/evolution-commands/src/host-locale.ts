@@ -1,7 +1,6 @@
 /** Host human-output locale: one resolver, output boundaries only. */
 import type { Context } from '@deepseek-ai/cordis'
-import type { SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
-import { HOST_ERRORS, HOST_LOCALES, type HostErrorId, type HostLocale } from './generated/host-errors.ts'
+import { errorTextIn, HOST_LOCALES, type EvolutionErrorId, type HostLocale, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import { HOST_COMMANDS, type HostCommandKey } from './generated/host-commands.ts'
 
 /**
@@ -12,6 +11,7 @@ import { HOST_COMMANDS, type HostCommandKey } from './generated/host-commands.ts
  */
 export function resolveHostLocale(ctx: Pick<Context, 'get'>): HostLocale {
   try {
+    // platform-declaration anchor: settings is a declared optional platform service; this probe only reads the locale row.
     const settings = ctx.get('settings') as SettingsProviderLike | undefined
     const value = settings?.describe?.({ redactSecrets: false })?.find(entry => entry.ns === 'locale')?.value
     const preference = typeof value === 'object' && value !== null ? (value as { preference?: unknown }).preference : undefined
@@ -40,8 +40,6 @@ export function hostCommandText(locale: HostLocale, key: HostCommandKey, values:
  * @param args - values for %aN% slots.
  * @returns localized human error text.
  */
-export function hostErrorText(locale: HostLocale, id: HostErrorId, args: Record<string, string | number> = {}): string {
-  const row = HOST_ERRORS[id]
-  const template = row[locale] ?? row.en
-  return template.replace(/%a(\d+)%/g, (_match, n: string) => String(args['a' + n] ?? ''))
+export function hostErrorText(locale: HostLocale, id: EvolutionErrorId, args: Record<string, string | number> = {}): string {
+  return errorTextIn(locale, id, args)
 }
