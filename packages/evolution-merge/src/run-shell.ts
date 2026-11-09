@@ -164,9 +164,14 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
             new Promise<{ kind: 'drain-timeout' }>(resolve => { drainTimer = setTimeout(() => resolve({ kind: 'drain-timeout' }), DETACHED_DRAIN_MS) }),
           ])
           if (drainTimer !== undefined) clearTimeout(drainTimer)
-          outcome = drained.kind === 'drain-timeout'
-            ? { kind: 'error', error: new Error('timeout: body did not stop within 30s drain window') }
-            : drained
+          if (drained.kind === 'drain-timeout') {
+            // P1-2: the body ignored abort. Close the run now so its stage/registry
+            // writes stop; the report below records the timeout.
+            await options.registry.settle(handle.id, { state: 'failed', failure: 'timeout: body did not stop within 30s drain window' }).catch(error => {
+              (options.warn ?? ((message: string) => { console.warn(message) }))('evolution-merge: drain-timeout settle failed for ' + handle.id + ': ' + (error instanceof Error ? error.message : String(error)))
+            })
+            outcome = { kind: 'error', error: new Error('timeout: body did not stop within 30s drain window') }
+          } else outcome = drained
         }
       }
       draft = outcome.kind === 'draft'
