@@ -1,13 +1,13 @@
 {
-  "note": "W10/W11 candidate readings for v0.41.0; S1-S4 readings inherited from the 0.40.1 build because the 0.41.0 delta is i18n-only (same mutation/UI/route code), and CI compat-check + desktop install are green on 0.41.0. S1-S3 measured on the CI-packed 0.0.0-main tree (same mutation/UI code) on fresh web 3081; 0.41.0 additionally merges main 0.39.2 prompt/review changes. S4 rerun 2/2 on the 0.41.0 overlay tree.",
-  "familyVersion": "0.41.0",
+  "note": "Historical W10/W11 rehearsal for 0.40.1. S1 was measured on the 0.40.0 candidate host; S2/S3 on the CI-packed 0.0.0-main tree; S4 on the 0.40.0 overlay. No S1-S4 reading was taken on 0.41.0; this file is a rehearsal and must not be used as release evidence.",
+  "familyVersion": "0.40.1",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.41.0",
+      "familyVersion": "0.40.0",
       "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "skillHistoryRows": 0,
@@ -22,7 +22,7 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.41.0",
+      "familyVersion": "0.0.0-main",
       "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "ownerDiagnostics": 200,
@@ -36,11 +36,11 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.41.0",
+      "familyVersion": "0.0.0-main",
       "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "semverVersion": "0.2.2-rc.1",
-        "familyVersion": "0.41.0",
+        "familyVersion": "0.0.0-main",
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
@@ -52,7 +52,7 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.41.0",
+      "familyVersion": "0.40.0",
       "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "disposeReleasesRoutes": true,
@@ -79,5 +79,7 @@
       "facts": 7,
       "runtime": 8
     }
-  }
+  },
+  "evidenceStatus": "rehearsal",
+  "inheritedFrom": "0.40.1"
 }

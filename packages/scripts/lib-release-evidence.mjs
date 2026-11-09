@@ -115,6 +115,7 @@ export function validateReleaseEvidence(evidence, options = {}) {
   if (!nonEmptyString(evidence.familyVersion)) problems.push('familyVersion is required')
   if (nonEmptyString(options.expectedFamilyVersion) && evidence.familyVersion !== options.expectedFamilyVersion) problems.push('release: familyVersion ' + String(evidence.familyVersion) + ' does not match the current tree ' + options.expectedFamilyVersion)
   if (release && (!nonEmptyString(evidence.generatedAt) || Number.isNaN(Date.parse(evidence.generatedAt)))) problems.push('release: generatedAt must be an ISO 8601 timestamp')
+  if (release && evidence.evidenceStatus !== 'measured') problems.push('release: evidenceStatus must be measured (a rehearsal/inherited label is not release evidence)')
   if (release && (typeof evidence.commit !== 'string' || !GIT_SHA.test(evidence.commit))) problems.push('release: commit must be the git sha the evidence was measured on')
   if (release && (typeof evidence.tag !== 'string' || !evidence.tag.startsWith('v'))) problems.push('release: tag must start with v')
   if (release && nonEmptyString(options.expectedCommit) && evidence.commit !== options.expectedCommit) problems.push('release: commit ' + String(evidence.commit) + ' does not match the current checkout ' + options.expectedCommit)

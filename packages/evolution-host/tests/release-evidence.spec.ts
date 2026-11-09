@@ -51,6 +51,7 @@ function staging(): Record<string, unknown> {
     gates: [],
     frozenLines: ['0.2.0'],
     generatedAt: new Date().toISOString(),
+    evidenceStatus: 'measured',
   })
 }
 
@@ -84,7 +85,7 @@ async function runGuard(doc: unknown): Promise<{ code: number; stdout: string; s
   const file = join(dir, 'release-evidence.json')
   await writeFile(file, JSON.stringify(doc), 'utf8')
   try {
-    return await run(process.execPath, [script, file, '--release'], { encoding: 'utf8' })
+    return await run(process.execPath, [script, file, '--release', '--version', FAMILY_VERSION], { encoding: 'utf8' })
       .then(out => ({ code: 0, stdout: out.stdout, stderr: out.stderr }))
       .catch((error: unknown) => { const failure = execFailure(error); return { code: failure.code ?? 1, stdout: failure.stdout ?? '', stderr: failure.stderr ?? '' } })
   } finally { await rm(dir, { recursive: true, force: true }) }
@@ -113,6 +114,7 @@ describe('release-evidence schema v2', () => {
       ['unevaluated pass', (doc) => { delete (doc.gates as Array<Record<string, unknown>>)[0]!.criterionEvaluated }],
       ['short traceability', (doc) => { (doc.traceability as Record<string, unknown>).covered = 51 }],
       ['wrong universe', (doc) => { (doc.traceability as Record<string, unknown>).universe = { A: 22, B: 18, C: 11 } }],
+      ['rehearsal status', (doc) => { doc.evidenceStatus = 'rehearsal' }],
     ]
     for (const [label, mutate] of cases) {
       const doc = releasable()
@@ -167,6 +169,23 @@ describe('release-evidence schema v2', () => {
     const missing = await run(process.execPath, [script, join(tmpdir(), 'does-not-exist-release-evidence.json')], { encoding: 'utf8' })
       .then(() => ({ code: 0 })).catch((error: unknown) => ({ code: execFailure(error).code ?? 1 }))
     expect(missing.code).toBe(2)
+  })
+
+  it('refuses a rehearsal whose spikes were not measured on the release version', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assemble-inherited-'))
+    const evidencePath = join(dir, 'release-evidence.json')
+    await writeFile(evidencePath, JSON.stringify(staging()), 'utf8')
+    try {
+      const result = await run(process.execPath, [assembleScript, evidencePath,
+        '--rehearsal', fileURLToPath(new URL('../../scripts/release-evidence-rehearsal.json', import.meta.url)),
+        '--ci-face', 'release.yml@refs/tags/v' + FAMILY_VERSION, '--os', 'linux',
+        '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION,
+        '--version', FAMILY_VERSION, '--release'], { encoding: 'utf8' })
+        .then(out => ({ code: 0, stderr: out.stderr }))
+        .catch((error: unknown) => { const failure = execFailure(error); return { code: failure.code ?? 1, stderr: failure.stderr ?? '' } })
+      expect(result.code).toBe(1)
+      expect(result.stderr).toContain('was measured on')
+    } finally { await rm(dir, { recursive: true, force: true }) }
   })
 })
 

@@ -206,7 +206,7 @@ jobs:
             --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json \
             --gates-report ci-gates.json \
             --ci-face "$GITHUB_WORKFLOW_REF" --os "$RUNNER_OS" \
-            --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --release
+            --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --version "${RELEASE_VERSION#v}" --release
 
       - name: Check the release evidence before publishing
         shell: bash
@@ -215,7 +215,7 @@ jobs:
           # S1-S4 must be PASS (blocked is an environment gap, never a pass). A failure here stops
           # the publish before npm receives a byte.
           node packages/evolution/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json --release \
-            --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME"
+            --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --version "${RELEASE_VERSION#v}"
 
       - name: Audit the artifacts about to be published
         shell: bash
