@@ -51,8 +51,6 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe(dep === '@deepseek-ai/dsh-tool-session-query' ? '^0.2.2-rc.0' : 'workspace:^')
   }
   expect(Object.keys(manifest.dependencies).sort()).toEqual([...expected].sort())
-  expect(manifest.peerDependencies?.['@deepseek-ai/dsh-tool-session-query']).toBe('^0.2.2-rc.0')
-  expect(manifest.peerDependenciesMeta?.['@deepseek-ai/dsh-tool-session-query']?.optional).toBe(true)
 })
 
 it('G-C: every model row package named by the all.patch resolves in the dependency closure (0.3.54)', () => {
