@@ -1423,7 +1423,7 @@ describe('evolution-commands', () => {
     for (const rawInput of ['', 'help']) {
       const bare = await captured!.handler({ rawInput })
       expect(bare.kind, rawInput).toBe('success')
-      expect(bare.text, rawInput).toContain('subcommands (')
+      expect(bare.text, rawInput).toContain('子命令（')
     }
     // A known subcommand without its argument, a bare unknown word, and a flag-only form: all
     // three used to return the help text with kind 'success', so a command that did nothing read
