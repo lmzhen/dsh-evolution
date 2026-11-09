@@ -13,6 +13,7 @@
  */
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -109,8 +110,14 @@ try {
       failures.push(item.name + ': export target is absent from the tarball: ' + entry)
       continue
     }
-    // CI checks the packed asset graph; importing needs a built platform tree.
-    // The full import path is exercised where that tree exists (local/real host).
+    // Always parse the packed entry: CI skips the import because it needs a
+    // built platform tree, but a syntactically broken tarball must still fail.
+    const parsed = spawnSync(process.execPath, ['--check', entryPath], { encoding: 'utf8' })
+    if (parsed.status !== 0) {
+      failures.push(item.name + ': entry syntax check failed: ' + String(parsed.stderr).trim().split(String.fromCharCode(10))[0])
+      continue
+    }
+    // The full import path is exercised where a built platform tree exists.
     if (!assetsOnly) {
       try {
         await import(pathToFileURL(entryPath).href)
@@ -126,7 +133,7 @@ try {
     for (const failure of failures) console.error('  - ' + failure)
     process.exit(1)
   }
-  console.log('smoke-packed-install: OK - ' + unpacked.length + ' tarball(s) unpacked; ' + (assetsOnly ? 'asset targets present (imports skipped)' : 'every "." export imports') + '; every bundle patch is present')
+  console.log('smoke-packed-install: OK - ' + unpacked.length + ' tarball(s) unpacked; ' + (assetsOnly ? 'asset targets and syntax present (imports skipped)' : 'every "." export imports') + '; every bundle patch is present')
 } finally {
   await rm(root, { recursive: true, force: true })
 }
