@@ -49,7 +49,7 @@ const SKILL_REVIEW_BODY = `Review the conversation above and update the skill li
 
 Update only when the session contains a durable lesson that changes how this class of task should be done. A precise no-op is a valid outcome.
 
-Target: a class-level skill with a compact SKILL.md. Keep the body compact.
+Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail.
 
 A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Support files: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators. When you add a support file, add the SKILL.md line that points to it; a file no pointer reaches is invisible next session.
 
@@ -60,11 +60,11 @@ Signals include:
 
 Any one of these warrants a decision; it does not by itself require a write.
 
-Read before writing. Update only skills whose body you have read in this review pass. Before creating a new class-level skill, search the existing library with the available skill tools; the create exception only waives reading a target body, not that search.
+Read before writing. Update only skills whose body you have read in this review pass. A new skill has no body to read; before choosing, search the existing library with the available skill tools.
 
 Update when an existing class-level owner shares the lesson's trigger and audience.
 
-Create a new class-level skill when the lesson has a distinct trigger or audience and would make that owner heterogeneous. A class-level skill can serve at least two different future events; if the lesson serves only this incident, fold it into an existing owner or a support file.
+Create a new class-level skill when the lesson has a distinct trigger or audience and would make that owner heterogeneous. A class-level skill can serve at least two different future events; if the lesson serves only this incident, fold it into an existing owner's body or support file.
 
 When only session-specific detail changes, add a support file under the owner.
 

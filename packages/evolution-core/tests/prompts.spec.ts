@@ -28,7 +28,7 @@ it('skill review prompt keeps neutral decision structure and pass wording', () =
   expect(SKILL_REVIEW_PROMPT).toContain('this review pass')
   expect(SKILL_REVIEW_PROMPT).not.toContain('background review pass')
   expect(SKILL_REVIEW_PROMPT).toContain('Update only skills whose body you have read')
-  expect(SKILL_REVIEW_PROMPT).toContain('the create exception only waives reading a target body')
+  expect(SKILL_REVIEW_PROMPT).toContain('A new skill has no body to read')
   expect(SKILL_REVIEW_PROMPT).toContain('A one-off environment failure')
   expect(SKILL_REVIEW_PROMPT).toContain('Capture only a reproducible setup or repair procedure')
   expect(SKILL_REVIEW_PROMPT).toContain('A user correction about how a class of task should be done')
@@ -135,7 +135,7 @@ it('reviewPrompt maps each kind to the agent prompt', () => {
 
 it('skill review keeps read-before-write and the create exemption neutral', () => {
   expect(SKILL_REVIEW_PROMPT).toContain('Update only skills whose body you have read in this review pass')
-  expect(SKILL_REVIEW_PROMPT).toContain('the create exception only waives reading a target body')
+  expect(SKILL_REVIEW_PROMPT).toContain('A new skill has no body to read')
   expect(COMBINED_REVIEW_PROMPT).toContain('Update only skills whose body you have read in this review pass')
 })
 
