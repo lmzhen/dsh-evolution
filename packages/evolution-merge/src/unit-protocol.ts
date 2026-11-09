@@ -545,9 +545,18 @@ export class MergeUnitTransactions implements UnitTransaction {
     const liveSource = liveSources.find(source => source.body !== null);
     if (liveSource !== undefined)
       return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source is still live: " + liveSource.name };
-    const liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
-    if (liveSupport.some(file => file.content !== (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null)))
-      return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file live hash does not match the prepared support; manual recovery required" };
+    let liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
+    const supportMatches = () => liveSupport.every(file => file.content === (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null));
+    if (!supportMatches()) {
+      // Crash after the sources are archived but before the support files land: finish the
+      // idempotent support write from the prepared snapshot, then re-check.
+      if (!["support-pending", "sources-archived", "unit-written"].includes(journal.phase) || this.options.backend.restoreSupportFile === undefined)
+        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file live hash does not match the prepared support; manual recovery required" };
+      for (const file of snapshot.supportAfter) await this.options.backend.restoreSupportFile(snapshot.target, file.path, file.content);
+      liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
+      if (!supportMatches())
+        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file could not be completed from the prepared snapshot" };
+    }
     const evidence: UnitEvidenceRecord = {
       schemaVersion: 1,
       unitId,

@@ -6,7 +6,7 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { MergeUnitTransactions, unitEvidenceDigest, type UnitBackend, type UnitPlan } from '../../evolution-merge/src/unit-protocol.ts'
 import { readUnitJournal, writeUnitJournal } from '../src/unit-journal.ts'
-import { readUnitReceipt } from '../src/unit-storage.ts'
+import { readUnitReceipt, writeUnitSnapshot } from '../src/unit-storage.ts'
 import { HomeFence } from '../src/home-fence.ts'
 
 function backend(tree: Map<string, string>): UnitBackend {
@@ -282,4 +282,37 @@ it('acquires the writer serial before the tree fence', async () => {
   await tx.commit(prepared.prepared)
   expect(order[0]).toBe('serial')
   expect(order[1]).toBe('lock:tree')
+})
+
+it('roll-forward completes support files from the prepared snapshot', async () => {
+  const home = await tempRoot('dsh-unit-support-forward-')
+  const io = nodeEvolutionIo()
+  const tree = new Map<string, string>([['umbrella', '# u\n']])
+  const support = new Map<string, string>()
+  const unitId = 'run-support:abc'
+  const snapshot = {
+    schemaVersion: 1 as const, unitId, planDigest: 'd', runId: 'run-support', target: 'umbrella', targetExists: false,
+    targetBefore: null, targetAfter: '# u\n', supportBefore: [], supportAfter: [{ path: 'references/a.md', content: 'A' }],
+    sourceBefore: [], origin: 'foreground' as const, summary: 'support', createdAt: 1,
+  }
+  await writeUnitSnapshot(io, home, snapshot)
+  await writeUnitJournal(io, home, {
+    schemaVersion: 1, unitId, runId: 'run-support', planDigest: 'd', target: 'umbrella', sources: [], phase: 'support-pending',
+    storageKey: 'k', snapshotSha256: 'a'.repeat(64), updatedAt: 1,
+  })
+  const tx = new MergeUnitTransactions({
+    io, home,
+    backend: {
+      async readSkill(name) { return tree.get(name) ?? null },
+      async readSupportFile(_name, path) { return support.get(path) ?? null },
+      async commit() { throw new Error('must not commit during recovery') },
+      async restoreTarget(name, body) { if (body === null) tree.delete(name); else tree.set(name, body) },
+      async restoreSource(name, body) { tree.set(name, body) },
+      async restoreSupportFile(_name, path, content) { if (content === null) support.delete(path); else support.set(path, content) },
+    },
+    claim: { async acquire() { return { async release() {} } } }, now: () => 2,
+  })
+  const result = await tx.rollForward(unitId)
+  expect(result.ok).toBe(true)
+  expect(support.get('references/a.md')).toBe('A')
 })
