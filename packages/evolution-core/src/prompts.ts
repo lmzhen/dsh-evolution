@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 24
+export const PROMPT_BUNDLE_VERSION = 25
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -36,56 +36,64 @@ const MEMORY_REVIEW_BODY = `Review the conversation above and consider saving to
 
 Focus on:
 1. Has the user revealed things about themselves — persona, desires, preferences, personal details, or expectations about how you should behave?
-2. Has the user expressed expectations about how you should behave, their work style, or ways they want you to operate?
+2. Has the user expressed expectations about how you should behave, their work style, or ways you want them to operate?
 
-If something stands out, save it using the memory tool.
-If nothing is worth saving, just say "Nothing to save." and stop.`
+If something stands out, save it using the memory tool.`
 
 export const MEMORY_REVIEW_PROMPT = `[Auto-review — Memory]
-${MEMORY_REVIEW_BODY}`
+${MEMORY_REVIEW_BODY}
+
+If nothing is worth saving, say "Nothing to save." and stop.`
 
 const SKILL_REVIEW_BODY = `Review the conversation above and update the skill library.
 
 Update only when the session contains a durable lesson that changes how this class of task should be done. A precise no-op is a valid outcome.
 
-Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail. Do not create one narrow skill per incident. If a loaded skill has become bloated, move its session-specific sections to references/.
+Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail. Do not create one narrow skill per incident. When you update a loaded skill whose body has become bloated, move its session-specific sections to references/.
 
-A skill body contains reusable decisions: when to use it, what to do, and how to verify. Dates, versions, narratives, and one-off evidence belong in references/. Brief support-file roles: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators.
+A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Brief support-file roles: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators.
 
 Signals:
 - The user corrected style, tone, format, verbosity, workflow, or approach.
-- A non-trivial technique, fix, or debugging path emerged.
+- A reusable technique, repair procedure, or debugging path emerged that will recur.
 - A loaded skill proved wrong, incomplete, or outdated.
 
 Read before writing. Update only skills you loaded or read in this review pass; creating a new class-level skill is the exception.
 
-Choose the narrowest target that fits:
-1. the loaded skill;
-2. an existing umbrella;
+Choose the smallest target that can carry the lesson:
+1. the loaded skill, if it is the class-level owner;
+2. an existing umbrella, when the loaded skill is narrow;
 3. a support file under that umbrella;
 4. a new class-level skill only when no existing skill can carry the lesson.
 
 Name a new skill for its class, not for a PR number, error string, feature codename, or session artifact.
 
-User preferences belong in the skill that governs the task, not only in memory. When the user complains about how a task was done, put the correction in that skill.
+A user correction about how a class of task should be done belongs in the skill that governs that task.
 
-Note overlapping skills for the curator; do not expand the library just to record one incident.
+Do not expand the library just to record one incident.
 
-Do not turn environment failures, transient errors, or "tool X is broken" into skills. Capture a reproducible setup fix instead.
+A one-off environment failure, transient error, or "tool X is broken" claim is not a lesson. Capture a reproducible setup or repair procedure only when it will recur; otherwise no-op.
 
-Respect protected skills (bundled, hub-installed, pinned) and their guards. If nothing durable exists, say "Nothing to save." and stop.`
+Respect protected skills (bundled, hub-installed, pinned) and their guards.`
 
 export const SKILL_REVIEW_PROMPT = `[Auto-review — Skills]
-${SKILL_REVIEW_BODY}`
+${SKILL_REVIEW_BODY}
 
-export const COMBINED_REVIEW_PROMPT = `[Auto-review]
+If nothing durable exists, say "Nothing to save." and stop.`
+
+const COMBINED_REVIEW_BODY = `[Auto-review]
 Apply both review passes below.
 
 ## Memory
 ${MEMORY_REVIEW_BODY}
+If nothing is worth saving, say "Nothing to save (memory)." and continue to the Skills pass.
 
 ## Skills
 ${SKILL_REVIEW_BODY}`
+
+export const COMBINED_REVIEW_PROMPT = `${COMBINED_REVIEW_BODY}
+
+If nothing durable exists in either pass, say "Nothing to save." and stop.`
 
 export const CURATOR_PROMPT = `You are the skill curator. Maintain a healthy, class-level skill library, not a flat pile of narrow one-session skills.
 
@@ -255,13 +263,14 @@ export const SKILLS_GUIDANCE = `Skills guidance:
 
 const PLAN_CHANNEL_NOTE = `
 
-CHANNEL (subagent): this review channel mounts only the read-only \`skill\` tool — you have NO \`skill_manage\`, NO \`memory\`. Your deliverable is the structured JSON plan below (outputSchema). Describe the patches/creates you RECOMMEND in the plan; never narrate actions you took.`
+CHANNEL (subagent): this review channel mounts only the read-only \`skill\` tool — you have NO \`skill_manage\`, NO \`memory\`. Your deliverable is the structured JSON plan below (outputSchema). Describe the patches/creates you RECOMMEND in the plan; never narrate actions you took. When there is nothing durable to change, return the plan with an empty items list; do not answer with prose.`
 
 /** Subagent-channel variant: same review policy, channel-limited deliverable (M-2). */
-export const SKILL_REVIEW_PLAN_PROMPT = `${SKILL_REVIEW_PROMPT}${PLAN_CHANNEL_NOTE}`
+export const SKILL_REVIEW_PLAN_PROMPT = `[Auto-review — Skills]
+${SKILL_REVIEW_BODY}${PLAN_CHANNEL_NOTE}`
 
 /** Subagent-channel variant of the combined review (M-2). */
-export const COMBINED_REVIEW_PLAN_PROMPT = `${COMBINED_REVIEW_PROMPT}${PLAN_CHANNEL_NOTE}`
+export const COMBINED_REVIEW_PLAN_PROMPT = `${COMBINED_REVIEW_BODY}${PLAN_CHANNEL_NOTE}`
 
 export function reviewPrompt(kind: 'memory' | 'skill' | 'combined', channel: 'agent' | 'plan' = 'agent'): string {
   // 0.3.16 (E-48): kind==='memory' + channel==='plan' used to fall through to
