@@ -38,7 +38,7 @@ const FAMILY_VERSION = (JSON.parse(readFileSync(new URL('../package.json', impor
 const PLATFORM_LINE = { version: '0.2.2-rc.1', floor: '0.2.2-rc.0', peersRange: '^0.2.2-rc.0', enginesRange: '>=0.2.2-rc.0 <0.2.3-0', upstreamRef: 'dsh-v0.2.2-rc.1' }
 
 function spike(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.2-rc.1', familyVersion: FAMILY_VERSION, startedAt: new Date(Date.now() - 3_600_000).toISOString(), readings: { route: 200 }, ...overrides }
+  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.2-rc.1', familyVersion: FAMILY_VERSION, startedAt: new Date(Date.now() - 3_600_000).toISOString(), readings: { route: 200 }, artifactSha256: 'b'.repeat(64), commit: 'a'.repeat(40), inputsSha256: 'c'.repeat(64), ...overrides }
 }
 
 function staging(): Record<string, unknown> {
@@ -152,6 +152,9 @@ describe('release-evidence schema v2', () => {
 
   it('one spike record: a blocked/failed verdict must name what stopped it', () => {
     expect(validateSpikeEvidence(spike('S1'))).toEqual([])
+    expect(validateSpikeEvidence(spike('S1', { artifactSha256: undefined }))).not.toEqual([])
+    expect(validateSpikeEvidence(spike('S1', { commit: undefined }))).not.toEqual([])
+    expect(validateSpikeEvidence(spike('S1', { inputsSha256: undefined }))).not.toEqual([])
     expect(validateSpikeEvidence(spike('S1', { verdict: 'blocked' }))).not.toEqual([])
     expect(validateSpikeEvidence(spike('S1', { verdict: 'fail', failure: 'HTTP 404' }))).toEqual([])
     expect(validateSpikeEvidence(spike('S9'))).not.toEqual([])
