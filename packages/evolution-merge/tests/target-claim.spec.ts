@@ -17,3 +17,14 @@ it('one approve writer per target at a time', async () => {
   assert.notEqual(again, null)
   await again?.release()
 })
+
+it('expires a stale target claim after its TTL', async () => {
+  const home = await tempRoot('dsh-merge-target-claim-ttl-')
+  const io = nodeEvolutionIo()
+  const first = await acquireTargetClaim(io, home, 'alpha', 1)
+  assert.notEqual(first, null)
+  const later = await acquireTargetClaim(io, home, 'alpha', 1 + 31 * 60_000)
+  assert.notEqual(later, null)
+  await first?.release()
+  await later?.release()
+})

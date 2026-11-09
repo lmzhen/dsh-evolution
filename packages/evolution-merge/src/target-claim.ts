@@ -6,6 +6,7 @@ import { contentHash, isProcessAlive, type EvolutionIoLike } from '@deepseek-ai/
 import { acquireClaim, releaseClaim, type Claim } from './domain/claim.ts'
 
 const PROCESS_STARTED_AT = Date.now() - process.uptime() * 1000
+const TARGET_CLAIM_TTL_MS = 30 * 60_000
 
 function claimPath(home: string, target: string): string {
   return join(home, 'merge', 'claims', contentHash(target) + '.json')
@@ -26,12 +27,16 @@ async function withGuard<T>(path: string, fn: () => Promise<T>): Promise<T> {
   const guard = path + '.guard'
   await mkdir(dirname(path), { recursive: true })
   for (let attempt = 0; attempt < 500; attempt += 1) {
+    let handle: Awaited<ReturnType<typeof open>> | undefined
     try {
-      const handle = await open(guard, 'wx')
+      handle = await open(guard, 'wx')
       await handle.writeFile(String(process.pid))
       await handle.close()
+      handle = undefined
       try { return await fn() } finally { await unlink(guard).catch(() => {}) }
     } catch (error) {
+      await handle?.close().catch(() => {})
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') await unlink(guard).catch(() => {})
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
       const pid = Number(await readFile(guard, 'utf8').catch(() => ''))
       if (Number.isFinite(pid) && pid > 0 && !isProcessAlive(pid)) await unlink(guard).catch(() => {})
@@ -76,7 +81,7 @@ export async function acquireTargetClaim(io: EvolutionIoLike, home: string, targ
     const reused = current !== undefined && current.pid === process.pid && current.startedAt !== undefined && Math.abs(current.startedAt - PROCESS_STARTED_AT) > 1_000
     const abandoned = reused || (current !== undefined && current.expiresAt > now
       && current.pid !== undefined && current.pid !== process.pid && !isProcessAlive(current.pid))
-    const claim = acquireClaim(abandoned ? undefined : current, now, Number.MAX_SAFE_INTEGER, token, process.pid, PROCESS_STARTED_AT)
+    const claim = acquireClaim(abandoned ? undefined : current, now, TARGET_CLAIM_TTL_MS, token, process.pid, PROCESS_STARTED_AT)
     if (claim === undefined) return raw
     granted = claim
     return JSON.stringify(claim) + '\n'
