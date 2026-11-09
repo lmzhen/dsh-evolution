@@ -1090,7 +1090,7 @@ export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'
   // family-specific inference, so the line stays here.
   extras.push(`services: review=${report.services.review} (${report.serviceSource === 'platform' ? 'the live row, this runtime' : 'inferred from bundles, all profiles'}) curator=${report.services.curator} approval=${report.services.approval} skillUsage=${report.services.skillUsage} io=${report.services.io}`)
   const mergeStatus = hostCommandText(locale, ('doctor.status.' + report.merge.status) as 'doctor.status.ok')
-  extras.push('merge: [' + mergeStatus + '] ' + report.merge.detail + (report.merge.remedy === undefined ? '' : '；下一步：' + report.merge.remedy))
+  extras.push('merge: [' + mergeStatus + '] ' + report.merge.detail + (report.merge.remedy === undefined ? '' : hostCommandText(locale, 'doctor.nextStep') + report.merge.remedy))
   if (report.merge.status !== 'ok' && report.merge.remedy !== undefined) extras.push('  → ' + report.merge.remedy)
   // O-2 (S3.4/A99): one line, only when a capability the family uses is missing. Each entry names
   // the feature that goes quiet, because "service X is absent" alone does not tell a reader what
@@ -1140,7 +1140,7 @@ export function renderDiagnosticsText(view: DiagnosticsView, locale: HostLocale 
   for (const row of view.runtime) {
     const status = hostCommandText(locale, ('doctor.status.' + row.status) as 'doctor.status.ok')
     const detail = row.detail === undefined ? '' : '：' + row.detail
-    const remedy = row.remedy === undefined ? '' : '；下一步：' + row.remedy
+    const remedy = row.remedy === undefined ? '' : hostCommandText(locale, 'doctor.nextStep') + row.remedy
     lines.push('  - [' + status + '] ' + row.label + detail + remedy)
   }
   return lines.join('\n') + '\n'

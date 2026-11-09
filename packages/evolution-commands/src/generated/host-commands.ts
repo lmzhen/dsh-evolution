@@ -432,6 +432,16 @@ export const HOST_COMMANDS = {
       "de": " (Quelle: {home})",
       "ru": " (источник: {home})",
       "pt": " (origem: {home})"
+    },
+    "doctor.nextStep": {
+      "zh": "；下一步：",
+      "en": "; next step: ",
+      "ja": "。次の手順：",
+      "es": "; siguiente paso: ",
+      "fr": " ; étape suivante : ",
+      "de": "; nächster Schritt: ",
+      "ru": "; следующий шаг: ",
+      "pt": "; próximo passo: "
     }
   } as const
 
