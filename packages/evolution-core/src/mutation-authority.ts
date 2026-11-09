@@ -60,6 +60,12 @@ const identitySerial = async <T>(task: () => Promise<T>): Promise<T> => await ta
  * multi-file unit or single-file transaction. Domain code never takes a second
  * lock; MutationUnit remains the only multi-file transaction engine.
  */
+export function mutationLockFrom(ctx: { get?(name: string): unknown } | undefined): MutationLockPort | undefined {
+  if (ctx?.get === undefined) return undefined
+  const authority = ctx.get('evolutionMutationAuthority') as { readonly mutationLock?: MutationLockPort } | undefined
+  return authority?.mutationLock
+}
+
 export class MutationAuthority {
   private readonly io: EvolutionIoLike
   private readonly leases: LeaseStore

@@ -9,7 +9,7 @@
 // by `vendor/hmr/src/index.ts`. The probes are capability checks — absence degrades a feature and
 // `/evolution doctor` reports it.
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
-import { createSubagentChannel, scopedPackageName, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
+import { createSubagentChannel, scopedPackageName, authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
@@ -869,7 +869,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // disagree with the scan it previews.
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：维护事实不可用。')
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider() })
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider(), mutationLock: mutationLockFrom(ctx) })
           const enrichment = await buildEnrichment(ctx, library)
           const readFailures: string[] = []
           const snapshots = await snapshotFromLibrary(library, {
@@ -1002,7 +1002,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // could never fire first).
           void (async (): Promise<void> => {
             try {
-              const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider() })
+              const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider(), mutationLock: mutationLockFrom(ctx) })
               const enrichment = await buildEnrichment(ctx, library)
               const outcome = await runMaintain(
                 {

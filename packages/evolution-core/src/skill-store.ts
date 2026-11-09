@@ -52,6 +52,7 @@ import { makeSerialQueue } from './serial.ts'
 import { supportRefs } from './support-refs.ts'
 import { selectSections } from './section-selection.ts'
 import { MutationUnit, fileMutationLock, type MutationLockPort, type MutationResult, type MutationUnitHooks } from './mutation-unit.ts'
+import { mutationLockFrom } from './mutation-authority.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
 import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
@@ -4365,6 +4366,7 @@ export class SkillLibrary {
  * `emit`, so core states the contract without importing the platform type. */
 export interface SkillMutationSink {
   emit: (type: 'evolution/skill-mutated', event: EvolutionSkillMutatedEvent) => unknown
+  get?(name: string): unknown
 }
 
 /** V41 P2-26 (0.3.75): the ONE SkillLibrary construction point.
@@ -4391,7 +4393,7 @@ export interface NewSkillLibraryOptions {
 }
 
 export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
-  const { config, io, limits, ctx, transact, threatExemptLabels, authority, mutationLock } = options
+  const { config, io, limits, ctx, transact, threatExemptLabels, authority } = options
   return new SkillLibrary(
     resolveSkillsRoot(config ?? {}),
     io,
@@ -4402,7 +4404,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     // not alias a config object the caller still owns.
     [...(threatExemptLabels ?? [])],
     authority,
-    mutationLock,
+    options.mutationLock ?? mutationLockFrom(ctx),
   )
 }
 

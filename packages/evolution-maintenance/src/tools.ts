@@ -13,7 +13,7 @@ import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
-import { authorityFrom } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import { defineTool, toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import { assertSkillsRootAliasRetired, clampedNumber, DEFAULT_PROBE_TIMEOUT_MS, MAX_TIMER_DELAY_MS, newSkillLibrary, redactSecrets, resolveRootConfig, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -94,7 +94,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const target = args.target
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return { signal, detail: ['evolution-io registry not mounted'], ...(target ? { target } : {}) }
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rootConfig, io: ioRegistry.provider() })
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rootConfig, io: ioRegistry.provider(), mutationLock: mutationLockFrom(ctx) })
           // 0.3.9: build snapshots through the SAME enrichment the scan uses
           // (descriptions/supportFiles/quality) — previously the probe fed
           // body-only snapshots and answered "description=missing" while the
