@@ -1,6 +1,6 @@
 import type { PreStepDecision } from '@deepseek-ai/dsh-evolution-core/platform'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed, UserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { ContextFormed, UserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { ProjectionResult } from './projection.ts'
 import { captureCatalog, renderCatalog, renderCatalogUpdate, restoreCatalog, type CatalogCapture } from './catalog-codec.ts'
 declare module '@deepseek-ai/dsh-llm' {

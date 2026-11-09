@@ -12,6 +12,7 @@ export type {
   ToolRestriction,
 } from '@deepseek-ai/dsh-tools'
 export type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
+export { scopeOf } from '@deepseek-ai/dsh-scope'
 export { BlockAssembler, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 export type {
   ContentBlock,

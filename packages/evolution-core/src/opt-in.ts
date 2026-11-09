@@ -38,7 +38,7 @@
  * @module
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { scopeOf } from '@deepseek-ai/dsh-scope'
+import { scopeOf } from './platform/index.ts'
 import type { OpaqueScopeKey } from './scope.ts'
 
 /**

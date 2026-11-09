@@ -18,8 +18,8 @@ import { makeSettingsRoutes } from './settings-route.ts'
 import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { ContextFormed } from '@deepseek-ai/dsh-evolution-core/platform'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).

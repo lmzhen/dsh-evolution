@@ -10,8 +10,8 @@ import { authorityFrom, withTreeWrite, type SnapshotView } from '@deepseek-ai/ds
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { ContextFormed } from '@deepseek-ai/dsh-evolution-core/platform'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).

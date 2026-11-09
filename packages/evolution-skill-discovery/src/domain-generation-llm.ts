@@ -1,5 +1,5 @@
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { ContextFormed } from '@deepseek-ai/dsh-evolution-core/platform'
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
 import { validateDomainGeneration, type DomainGenerationProposal, type GeneratedDomain, type GenerationSkillFact } from './domain-generation.ts'
 import { DOMAIN_GENERATION_PROMPT_VERSION } from './domain-generation-prompt.ts'
