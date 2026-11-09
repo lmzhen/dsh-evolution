@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-02T23:45:36.415Z",
+  "generatedAt": "2026-11-09T16:53:01.831Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -23,8 +23,8 @@
     },
     {
       "probe": "beh-host-route-registration",
-      "signature": "08d6f717aa246bcc4105e48ace1ff52c83d8c4ae08985634a1a66672f419ee08",
-      "provenAt": "2026-11-02T23:45:36.393Z",
+      "signature": "a9eac01af4427feabf9bf8672f1b0b09a369824fefb16bf085e3dfb80bbc3ab7",
+      "provenAt": "2026-11-09T16:53:01.824Z",
       "tree": "overlay"
     },
     {
@@ -131,8 +131,8 @@
     },
     {
       "probe": "decl-platform-line-grid",
-      "signature": "e10c7977b28a79d4f22d1423c7d97e2d7ba810f508c8781c410095835643efbc",
-      "provenAt": "2026-11-02T23:45:36.389Z",
+      "signature": "30ee6e73fbcd5b9cb69bb8965702e952d42470999df3519210c73438dec6dd0a",
+      "provenAt": "2026-11-09T16:52:54.366Z",
       "tree": "overlay"
     },
     {

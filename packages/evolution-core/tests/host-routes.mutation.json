@@ -3,7 +3,7 @@
   "edits": [
     {
       "file": "packages/evolution-core/src/http-routes.ts",
-      "find": "deploymentAllowsRemote: connection.allowsRemoteAuthorities === true,",
+      "find": "deploymentAllowsRemote: connection?.allowsRemoteAuthorities === true,",
       "replace": "deploymentAllowsRemote: false,"
     }
   ],
