@@ -1,3 +1,4 @@
+// @tier fast
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'

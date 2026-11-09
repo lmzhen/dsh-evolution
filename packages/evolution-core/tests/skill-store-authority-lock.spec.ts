@@ -1,3 +1,4 @@
+// @tier fast
 import { expect, it } from 'vitest'
 import { newSkillLibrary } from '../src/skill-store.ts'
 import { nodeEvolutionIo } from '../src/io.ts'

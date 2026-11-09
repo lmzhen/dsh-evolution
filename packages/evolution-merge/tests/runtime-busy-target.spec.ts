@@ -1,3 +1,4 @@
+// @tier fast
 import { expect, it } from 'vitest'
 import type { MergeRow } from '../src/contracts.ts'
 import { busyTarget } from '../src/runtime.ts'
