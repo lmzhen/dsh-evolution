@@ -90,15 +90,21 @@ function validateWrite(next: DomainMapWrite): void {
  * JSON-backed DomainMap owner. One file, schemaVersion, CAS mapVersion, and a
  * best-effort .bak for rollback; no evolution-state tables or graph DB.
  */
+export interface DiscoveryFence {
+  run<T>(body: () => Promise<T>): Promise<T>
+}
+
 export class DomainMapFileStore implements DomainMapStore {
   private queue: Promise<unknown> = Promise.resolve()
   private readonly io: EvolutionIoLike
   private readonly path: string
   private readonly now: () => number
-  constructor(io: EvolutionIoLike, path: string, now: () => number = Date.now) {
+  private readonly fence: DiscoveryFence | undefined
+  constructor(io: EvolutionIoLike, path: string, now: () => number = Date.now, fence?: DiscoveryFence) {
     this.io = io
     this.path = path
     this.now = now
+    this.fence = fence
   }
 
   private get backupPath(): string { return this.path + '.bak' }
@@ -138,7 +144,14 @@ export class DomainMapFileStore implements DomainMapStore {
         await this.io.writeText(this.path, await this.commitNow(current, expectedMapVersion, next))
       }
     }
-    const pending = this.queue.then(run, run)
+    const fenced = async (): Promise<void> => {
+      if (this.fence !== undefined) {
+        await this.fence.run(run)
+      } else {
+        await run()
+      }
+    }
+    const pending = this.queue.then(fenced, fenced)
     this.queue = pending.catch(() => {})
     await pending
     return this.read()
@@ -148,7 +161,9 @@ export class DomainMapFileStore implements DomainMapStore {
     const backup = await this.io.readText(this.backupPath)
     if (backup === null) throw new DomainMapCorruptError('domain map backup is missing')
     const snapshot = this.parse(backup)
-    await this.io.writeText(this.path, backup)
+    const write = async (): Promise<void> => { await this.io.writeText(this.path, backup) }
+    if (this.fence !== undefined) await this.fence.run(write)
+    else await write()
     return snapshot
   }
 }

@@ -139,10 +139,11 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('evolution/skill-mutated', () => { searchCache.clear() })
   if (mode === 'off') return
 
-  const map = new DomainMapFileStore(io, config.domainMapPath ?? join(root, 'evolution', 'domain-map.json'))
+  const fence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
+  const map = new DomainMapFileStore(io, config.domainMapPath ?? join(root, 'evolution', 'domain-map.json'), undefined, fence)
   const descriptionStaleAfterHours = config.descriptionStaleAfterHours ?? 24 * 7
-  const journal = new ProjectionJournal(io, config.projectionJournalPath ?? join(root, 'evolution', 'projection-journal.json'))
-  const snapshots = new ViewSnapshotStore(io, config.viewSnapshotPath ?? join(root, 'evolution', 'view-snapshots.json'))
+  const journal = new ProjectionJournal(io, config.projectionJournalPath ?? join(root, 'evolution', 'projection-journal.json'), { ...(fence === undefined ? {} : { fence }) })
+  const snapshots = new ViewSnapshotStore(io, config.viewSnapshotPath ?? join(root, 'evolution', 'view-snapshots.json'), fence)
   const globalPolicy: DomainPolicyLayer = { mode, pinDomains: config.pinDomains, disableDomains: config.disableDomains }
   const policy = new DomainPolicyStore({ global: globalPolicy, ...config.workspacePolicy === undefined ? {} : { workspace: config.workspacePolicy }, ...config.scopePolicy === undefined ? {} : { scope: config.scopePolicy } })
   const readLayer = async (cwd: string, path: string | undefined): Promise<DomainPolicyLayer | undefined> => {

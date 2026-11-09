@@ -1,4 +1,5 @@
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { DiscoveryFence } from './domain-map-store.ts'
 import { makeSerialQueue } from '@deepseek-ai/dsh-evolution-core'
 import type { CatalogCapture } from './catalog-codec.ts'
 
@@ -28,13 +29,21 @@ export class ProjectionJournal {
   private readonly io: EvolutionIoLike
   private readonly path: string
   private readonly maxRecords: number
+  private readonly fence: DiscoveryFence | undefined
   private cache: JournalFile | undefined
   private readonly serial = makeSerialQueue()
 
-  constructor(io: EvolutionIoLike, path: string, options: { readonly maxRecords?: number | undefined } = {}) {
+  constructor(io: EvolutionIoLike, path: string, options: { readonly maxRecords?: number | undefined; readonly fence?: DiscoveryFence | undefined } = {}) {
     this.io = io
     this.path = path
     this.maxRecords = options.maxRecords ?? 512
+    this.fence = options.fence
+  }
+
+  private async persist(): Promise<void> {
+    const write = async (): Promise<void> => { await this.io.writeText(this.path, JSON.stringify(this.cache)) }
+    if (this.fence !== undefined) await this.fence.run(write)
+    else await write()
   }
 
   private async read(): Promise<JournalFile> {
@@ -57,7 +66,7 @@ export class ProjectionJournal {
       const records = { ...current.records, [keyOf(record)]: record }
       const ordered = Object.entries(records).sort((left, right) => right[1].createdAt - left[1].createdAt).slice(0, this.maxRecords)
       this.cache = { schemaVersion: 1, records: Object.fromEntries(ordered) }
-      await this.io.writeText(this.path, JSON.stringify(this.cache))
+      await this.persist()
     })
   }
 
@@ -83,7 +92,7 @@ export class ProjectionJournal {
       const records = { ...current.records }
       delete records[keyOf({ sessionId, viewKey, projectionDigest, codecVersion })]
       this.cache = { schemaVersion: 1, records }
-      await this.io.writeText(this.path, JSON.stringify(this.cache))
+      await this.persist()
     })
   }
 
@@ -94,7 +103,7 @@ export class ProjectionJournal {
       const records = Object.fromEntries(Object.entries(current.records).filter(([, record]) =>
         record.sessionId !== sessionId || record.viewKey !== viewKey))
       this.cache = { schemaVersion: 1, records }
-      await this.io.writeText(this.path, JSON.stringify(this.cache))
+      await this.persist()
     })
   }
 }
