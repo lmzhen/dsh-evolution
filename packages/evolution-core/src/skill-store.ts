@@ -884,7 +884,10 @@ export class SkillLibrary {
   }
 
   private lockPort(): MutationLockPort {
-    return this.mutationLock ?? fileMutationLock(this.io, this.root)
+    if (this.mutationLock !== undefined) return this.mutationLock
+    // Fail loud outside tests: production skill writes must use the family authority fence.
+    if (process.env['VITEST'] === 'true' || process.env['NODE_ENV'] === 'test') return fileMutationLock(this.io, this.root)
+    throw new Error('skill-store: no authority mutationLock was supplied; refusing an unfenced production write')
   }
 
   private recovery: Promise<void> | undefined
