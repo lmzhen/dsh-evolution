@@ -30,7 +30,7 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 import {
   errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
-import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
@@ -1456,25 +1456,43 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input.startsWith('extract ')) {
           const extractParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(extractParsed) || extractParsed.name !== 'extract') {
-            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--owner-covers]')
+            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--owner-covers] 或 --proposal <id>')
           }
           const source = extractParsed.positionals[0] ?? ''
-          const target = extractParsed.positionals[1] ?? ''
-          const heading = extractParsed.positionals[2] ?? ''
-          if (source === '' || target === '' || heading === '') {
-            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
+          const proposalFlag = extractParsed.flags.get('proposal')
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
+          let target = extractParsed.positionals[1] ?? ''
+          let heading = extractParsed.positionals[2] ?? ''
+          let start: string | undefined
+          let end: string | undefined
+          let extractItems: Array<{ heading: string; start?: string; end?: string; to_skill: string }> = []
+          let proposalOutcome: 'extract' | 'mixed' | undefined
+          if (typeof proposalFlag === 'string') {
+            if (source === '') return err('用法：/evolution extract <source> --proposal <id>')
+            const proposal = await readProposalReport(ioRegistry.provider(), proposalFlag)
+            if (proposal === null) return err('找不到 extract proposal：' + proposalFlag)
+            if (proposal.outcome === 'keep') return err('该 proposal 的结论是 keep，没有可应用提取。')
+            if (proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) return err('该 proposal 未覆盖 owner（owner-gap），不能应用。')
+            target = proposal.owner.name
+            heading = proposal.parts[0]?.heading ?? ''
+            proposalOutcome = proposal.outcome
+            extractItems = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: target }))
+          } else {
+            if (source === '' || target === '' || heading === '') {
+              return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
+            }
+            const startFlag = extractParsed.flags.get('start')
+            const endFlag = extractParsed.flags.get('end')
+            start = typeof startFlag === 'string' ? startFlag : undefined
+            end = typeof endFlag === 'string' ? endFlag : undefined
+            extractItems = [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }]
           }
-          const startFlag = extractParsed.flags.get('start')
-          const endFlag = extractParsed.flags.get('end')
           const ownerCovers = extractParsed.flags.has('owner-covers')
           const outcomeFlag = extractParsed.flags.get('outcome')
           if (outcomeFlag !== undefined && outcomeFlag !== 'extract' && outcomeFlag !== 'mixed') {
             return err('--outcome 只能是 extract 或 mixed。')
           }
-          const start = typeof startFlag === 'string' ? startFlag : undefined
-          const end = typeof endFlag === 'string' ? endFlag : undefined
-          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
           const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
             config: { root: skillsRootValue },
             io: ioRegistry.provider(),
@@ -1487,8 +1505,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           })
           const built = await buildExtractPlanFromLibrary(library, {
             source,
-            items: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }],
-            ...(outcomeFlag === undefined ? {} : { outcome: outcomeFlag }),
+            items: extractItems,
+            ...(outcomeFlag === undefined ? (proposalOutcome === undefined ? {} : { outcome: proposalOutcome }) : { outcome: outcomeFlag }),
             ...(ownerCovers ? { ownerCovers: true } : {}),
           })
           if (!built.ok) return err(built.message)
@@ -1496,10 +1514,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const warnings = built.warnings === undefined || built.warnings.length === 0 ? '' : '\n' + built.warnings.join('\n')
           if (!extractParsed.flags.has('apply')) {
             const proposal = proposalFromPlan(plan, { runId: 'cli-' + Date.now().toString(36) })
-            const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-            const io = registry?.provider()
-            if (io !== undefined) await writeProposalReport(io, proposal).catch(() => { /* best-effort proposal report */ })
-            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=' + ownerDecisionText(plan.owner) + warnings)
+            const proposalPath = await writeProposalReport(ioRegistry.provider(), proposal).catch(() => { /* best-effort proposal report */ })
+            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=' + ownerDecisionText(plan.owner) + warnings + '\nproposal_id: ' + proposal.id + (proposalPath === undefined ? '' : '（已写入 reports）'))
           }
           if (approval) {
             const session = invocationAgent?.session
@@ -1514,7 +1530,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const decision = await approval.request({
               kind: 'skill',
               summary: '/evolution extract ' + source + ' -> ' + target + ' ' + heading,
-              args: { operation: { action: 'extract', name: source, extract: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }] }, origin: 'foreground', libraryOrigin: 'foreground' },
+              args: { operation: { action: 'extract', name: source, extract: extractItems }, origin: 'foreground', libraryOrigin: 'foreground' },
               origin: 'foreground',
               ...session !== undefined ? { sessionId: session.id, session } : {},
               ...sessionPolicy !== undefined ? { sessionPolicy } : {},
