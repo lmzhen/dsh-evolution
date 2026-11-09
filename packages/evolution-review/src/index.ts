@@ -1033,7 +1033,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     void (async () => {
       let finalText = ''
       let status: 'completed' | 'failed' | 'timeout' | 'aborted' = 'failed'
-      let actions: readonly { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'error' }[] = []
+      let actions: readonly { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'staged' | 'error' }[] = []
       let usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined
       let error: string | undefined
       try {
@@ -1096,7 +1096,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             planId: reviewId,
             memoryApplied: actions.filter(action => action.type === 'memory' && ok(action)).length,
             skillApplied: actions.filter(action => action.type === 'skill' && ok(action)).length,
-            rejectedOps: actions.filter(action => !ok(action)).length,
+            rejectedOps: actions.filter(action => action.status === 'error').length,
+            stagedOps: actions.filter(action => action.status === 'staged').length,
             ...(error === undefined ? {} : { executionError: error }),
           })
         } catch (emitError) {

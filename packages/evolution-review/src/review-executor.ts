@@ -69,7 +69,7 @@ export interface ReviewAction {
   readonly type: 'tool' | 'skill' | 'memory'
   readonly action: string
   readonly target: string
-  readonly status: 'ok' | 'error'
+  readonly status: 'ok' | 'staged' | 'error'
 }
 
 export interface ReviewUsage {
@@ -207,7 +207,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
           type: actionType(call.name),
           action: call.name,
           target: toolTarget(call.name, call.arguments),
-          status: item.result.isError ? 'error' : 'ok',
+          status: item.result.isError ? 'error' : item.result.content.some(block => block.type === 'text' && /staged id:|已暂存|pending_id/.test(block.text)) ? 'staged' : 'ok',
         })
         messages.push(createToolResultMessage({
           callId: item.callId,

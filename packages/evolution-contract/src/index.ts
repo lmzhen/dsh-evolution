@@ -104,6 +104,7 @@ export interface EvolutionPlanAppliedEvent {
   memoryApplied: number
   skillApplied: number
   rejectedOps: number
+  stagedOps?: number | undefined
   executionFailures?: number | undefined
   skippedUnread?: number | undefined
   executionError?: string | undefined
