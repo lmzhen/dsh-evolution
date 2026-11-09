@@ -18,6 +18,8 @@ export interface UnitSnapshot {
   readonly supportAfter: readonly { path: string; content: string }[]
   readonly sourceBefore: readonly { name: string; body: string }[]
   readonly origin: string
+  /** Optional lease identity for tree-change snapshots; legacy units omit it. */
+  readonly leaseId?: string
   readonly summary: string
   /** Tree-change units reuse this store; merge snapshots leave these absent. */
   readonly kind?: 'merge' | 'tree-change'

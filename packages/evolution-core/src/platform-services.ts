@@ -28,6 +28,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'evolutionCurator', feature: '/evolution curator subcommands, skill undo and history', side: 'host' },
   { service: 'evolutionIo', feature: 'every durable read and write (the IO seam)', side: 'host' },
   { service: 'evolutionMerge', feature: 'merge command delegation and the merge doctor fact', side: 'host' },
+  { service: 'evolutionMutationAuthority', feature: 'the family-wide mutation lease, fence and lock authority', side: 'host' },
   { service: 'hmr', feature: 'the preset install read-merge-write commit (the platform HMR lock serializes it)', side: 'host' },
   { service: 'evolutionMemoryBudget', feature: 'the memory-budget divergence section of this report', side: 'host' },
   { service: 'evolutionPlatform', feature: 'the single host edge object behind every family platform port', side: 'host' },

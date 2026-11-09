@@ -1,6 +1,6 @@
 import { readTextOrNull, listOrEmpty } from './read-probe.ts'
 /** 1b-1 shadow staging adoption. Production staging is still owned by the old staged writers. */
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { readPairLedger } from './pair-ledger.ts'
 import { readStagingIndex, writeStagingIndex, type StagingEntry } from './staging-index.ts'
@@ -221,11 +221,23 @@ export async function reserveStage(io: EvolutionIoLike, home: string, entry: Sta
 export async function presentStage(io: EvolutionIoLike, home: string, entry: StageEntry): Promise<void> {
   await writeStageIndex(io, home, { rowId: entry.rowId, pairKey: entry.pairKey, ref: entry.ref, expiresAt: entry.expiresAt, ...(entry.runId === undefined ? {} : { runId: entry.runId }), createdAt: entry.createdAt, state: 'present' })
 }
+function safeRunTree(home: string, ref: string): string | null {
+  const name = ref.trim()
+  if (name === '' || name.includes('\\') || isAbsolute(name)) return null
+  const parts = name.split('/')
+  if (parts.some(part => part === '' || part === '.' || part === '..')) return null
+  return join(home, 'merge', 'runs', ...parts)
+}
+
 export async function dropStage(io: EvolutionIoLike, home: string, rowId: string, ref?: string, onError?: (path: string, error: unknown) => void): Promise<void> {
   const index = join(home, 'merge', 'staging-index', encodeURIComponent(rowId) + '.json')
   await io.remove(index).catch(error => onError?.(index, error))
   if (ref !== undefined && ref !== '') {
-    const tree = join(home, 'merge', 'runs', ref)
+    const tree = safeRunTree(home, ref)
+    if (tree === null) {
+      onError?.(join(home, 'merge', 'runs'), new Error('invalid staging ref: ' + JSON.stringify(ref)))
+      return
+    }
     await io.remove(tree).catch(error => onError?.(tree, error))
   }
 }
@@ -274,7 +286,9 @@ export async function cleanupStage(io: EvolutionIoLike, home: string, now: numbe
   for (const run of runNames.slice(0, limit)) {
     const prefix = run + '/'
     if ([...refs].some(ref => ref === run || ref.startsWith(prefix))) continue
-    await io.remove(join(runRoot, run)).catch(error => fail(join(runRoot, run), error))
+    const tree = safeRunTree(home, run)
+    if (tree === null) { fail(join(runRoot, run), new Error('invalid run dir name: ' + JSON.stringify(run))); continue }
+    await io.remove(tree).catch(error => fail(tree, error))
     orphans.push(run)
   }
   return { removed, expired, kept, orphans, failures }

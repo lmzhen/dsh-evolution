@@ -165,11 +165,12 @@ export async function readStateReadiness(io: EvolutionIoLike, home: string): Pro
 export const ensureV3Ready = ensureMergeStateReady
 
 /** One readiness/migration gate; used by startup and every write entry. */
-export async function ensureMergeStateReady(io: EvolutionIoLike, home: string): Promise<StateReadiness> {
+export async function ensureMergeStateReady(io: EvolutionIoLike, home: string, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<StateReadiness> {
   let outcome: StateReadiness | undefined
   let migrated = false
   try {
-    await transactIo(io, mergeStatePath(home), async (current) => {
+    const run = async (): Promise<void> => {
+      await transactIo(io, mergeStatePath(home), async (current) => {
       if (current === null) {
         outcome = { ok: true, schema: 3, migrated: false, state: { schemaVersion: 3, rows: [] }, quarantine: [], report: await readReport(io, home) }
         return null
@@ -225,7 +226,10 @@ export async function ensureMergeStateReady(io: EvolutionIoLike, home: string): 
       migrated = true
       outcome = { ok: true, schema: 3, migrated: true, state: mapped.state, quarantine: mapped.quarantine, report: prepared }
       return targetText
-    })
+      })
+    }
+    if (fence !== undefined) await fence.run(run)
+    else await run()
   } catch (error) {
     return blocked('merge-state-migration-blocked', 'state migration failed: ' + (error instanceof Error ? error.message : String(error)))
   }

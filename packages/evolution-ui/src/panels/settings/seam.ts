@@ -51,7 +51,7 @@ export interface ParamSectionSnapshot {
    * all, or the seat is there and serves no such row. The two read differently to the
    * operator (one is the UI's own gap, the other is a row that is not composed).
    */
-  reason?: 'seat-missing' | 'not-served' | 'projection-failed' | 'readback-failed'
+  reason?: 'seat-missing' | 'not-served' | 'projection-failed' | 'readback-failed' | 'transport'
   /** Last-known values are still shown; the row could not be re-read. */
   stale?: boolean
 }

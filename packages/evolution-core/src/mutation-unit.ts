@@ -2,6 +2,7 @@ import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isCommittedWarning, isProcessAlive, type transactIo } from './io.ts'
 import { WriteKernel } from './write-kernel.ts'
+import type { MutationOwner } from '@deepseek-ai/dsh-evolution-contract'
 
 export interface MutationRoot {
   name: string
@@ -169,6 +170,16 @@ export interface MutationSnapshot {
   ops: readonly MutationSnapshotOp[]
   cleanup?: readonly string[]
   createdAt: number
+  owner?: MutationOwner
+  runId?: string
+  leaseId?: string
+}
+
+/** Identity attached to one MutationUnit's snapshot/journal writes. */
+export interface MutationUnitContext {
+  readonly owner: MutationOwner
+  readonly runId: string
+  readonly leaseId: string
 }
 
 export interface MutationSnapshotPort {
@@ -198,6 +209,7 @@ export interface MutationUnitOptions {
   journal?: MutationJournalPort
   snapshots?: MutationSnapshotPort
   hooks?: MutationUnitHooks
+  context?: MutationUnitContext
   validateWrite?: (op: TreeChangeOp) => string | null
   transact?: typeof transactIo
   /** @deprecated the kernel always re-checks the baseline; kept for source compatibility. */
@@ -238,6 +250,7 @@ export class MutationUnit {
   private readonly journal: MutationJournalPort | undefined
   private readonly snapshots: MutationSnapshotPort | undefined
   private readonly hooks: MutationUnitHooks | undefined
+  private readonly context: MutationUnitContext | undefined
   private readonly validateWrite: ((op: TreeChangeOp) => string | null) | undefined
   private readonly kernel: WriteKernel
   private readonly transactGuard: boolean
@@ -251,6 +264,7 @@ export class MutationUnit {
     this.journal = options.journal
     this.snapshots = options.snapshots
     this.hooks = options.hooks
+    this.context = options.context
     this.validateWrite = options.validateWrite
     this.transactGuard = options.transactGuard !== false
     this.now = options.now ?? Date.now
@@ -316,7 +330,7 @@ export class MutationUnit {
           }
         })
         const cleanup = request.cleanupPaths === undefined ? {} : { cleanup: request.cleanupPaths }
-        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'prepared', ops: eventOps, ...cleanup, createdAt: this.now() }))
+        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'prepared', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
         await bestEffort(async () => this.journal?.write({ unitId, phase: 'prepared', changed: [], target: validation.roots.find(root => root.name === primary)?.name ?? primary, roots: validation.roots.map(root => root.name) }))
         for (const op of validation.ops) {
           const snapshot = snapshots.find(entry => entry.target === op.target)
@@ -334,7 +348,7 @@ export class MutationUnit {
         await bestEffort(async () => this.journal?.write({ unitId, phase: 'unit-written', changed, target: primary, roots: validation.roots.map(root => root.name) }))
         // P2-1: the committed snapshot is the recovery authority. Write it BEFORE the journal's
         // committed phase so a crash in this window recovers as committed, never rolled back.
-        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now() }))
+        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
         await bestEffort(async () => this.journal?.write({ unitId, phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
         try {
           await this.hooks?.committed?.({ unitId, changed, ops: eventOps, roots: validation.roots.map(root => root.name) })
@@ -430,6 +444,10 @@ export class MutationUnit {
         await lease.release()
       }
     })
+  }
+
+  private contextFields(): Pick<MutationSnapshot, 'owner' | 'runId' | 'leaseId'> {
+    return this.context === undefined ? {} : { owner: this.context.owner, runId: this.context.runId, leaseId: this.context.leaseId }
   }
 
   async undo(unitId: string): Promise<MutationResult> {

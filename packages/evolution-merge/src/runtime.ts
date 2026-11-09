@@ -58,8 +58,12 @@ interface BusyTarget { readonly id: string; readonly runId?: string }
  * approved/fuse BEFORE their run starts, so this row IS the in-flight claim a second
  * same-target run would collide with (the pair itself is guarded by run-meta).
  */
-function busyTarget(rows: readonly MergeRow[], target: string, excludeRowId: string): BusyTarget | undefined {
-  const row = rows.find(item => item.id !== excludeRowId && (item.state === 'approved' || item.state === 'fuse') && item.decision?.target === target)
+export function busyTarget(rows: readonly MergeRow[], target: string, excludeRowId: string): BusyTarget | undefined {
+  const row = rows.find(item => item.id !== excludeRowId
+    && (item.state === 'approved' || item.state === 'fuse')
+    && item.decision?.target === target
+    // P1-4: a non-retryable failure is auditable but must not hold the target forever.
+    && !(item.failure !== undefined && item.failure.retryable !== true))
   return row === undefined ? undefined : { id: row.id, ...(row.runId === undefined ? {} : { runId: row.runId }) }
 }
 export function forcedDecisionFor(a: string, b: string): MergeDecision {
@@ -106,10 +110,12 @@ export interface MergeRuntimeDeps {
   readonly stage?: MergeStageBindingPort
   /** G2 transitional: when set, authoring commits through core UnitTransaction. */
   readonly unit?: UnitTransaction
+  /** Authority home fence for metadata writes. */
+  readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
 }
 
-async function removeRuntimeRow(io: EvolutionIoLike, home: string, id: string, event: 'superseded' | 'restored' | 'committed', unitId?: string): Promise<boolean> {
-  return await pairLedger(io, home).transact(tx => {
+async function removeRuntimeRow(io: EvolutionIoLike, home: string, id: string, event: 'superseded' | 'restored' | 'committed', unitId?: string, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<boolean> {
+  return await pairLedger(io, home, fence).transact(tx => {
     const current = tx.rows().find(item => item.id === id)
     if (current === undefined) return false
     const unit = event === 'committed' ? { unitId: unitId ?? 'unknown', evidenceSha256: 'legacy' } : undefined
@@ -124,6 +130,7 @@ export function unitFor(deps: MergeRuntimeDeps): UnitTransaction | undefined {
 }
 
 export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService {
+  const ledger = () => pairLedger(deps.io, deps.home, deps.fence)
   const readOnly = createReadOnlyMergeService(deps.io, deps.home)
   const timeout = deps.timeoutMinutes > 0 ? deps.timeoutMinutes : undefined
   const paramsOf = (): MergeParams => {
@@ -137,6 +144,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
     platformWrite: platformWriteOf(), now: deps.now,
     ...(deps.model === undefined ? {} : { model: deps.model }),
     ...(deps.isOwnerActive === undefined ? {} : { isOwnerActive: deps.isOwnerActive }),
+    ...(deps.fence === undefined ? {} : { fence: deps.fence }),
     ...(timeout === undefined ? {} : { timeoutMinutes: timeout }),
   })
   const stage = deps.stage
@@ -190,7 +198,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const existing = (await loadMergeState(deps.io, deps.home)).state.rows.find(row => row.pairKey === pairKey(command.a, command.b))
         let cleared = false
         if (existing?.state === 'skipped' || (existing?.state === 'fuse' && existing.failure?.retryable === false)) {
-          const dropped = await removeRuntimeRow(deps.io, deps.home, existing.id, 'superseded')
+          const dropped = await removeRuntimeRow(deps.io, deps.home, existing.id, 'superseded', undefined, deps.fence)
           if (!dropped) return fail('pair', 'row-changed', '清理可替换行时发现并发修改：' + existing.id, '运行 /evolution merge status 后重试')
           cleared = true
         }
@@ -332,7 +340,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const loaded = await loadMergeState(deps.io, deps.home)
         const row = loaded.state.rows.find(item => item.id === command.id)
         if (row === undefined) return fail('reject', 'row-not-found', '找不到合并行 ' + command.id, '运行 /evolution merge pending 查看待处理行', command.id)
-        const changed = await pairLedger(deps.io, deps.home).transact(tx => {
+        const changed = await ledger().transact(tx => {
           const current = tx.rows().find(item => item.id === row.id)
           if (current === undefined || current.state !== 'pending') return false
           return tx.transition(row.id, { type: 'skipped', reason: 'rejected', origin: 'human' }, current.version).ok
@@ -389,7 +397,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const row = loaded.state.rows.find(item => item.id === command.id)
         if (row === undefined) return fail('discard', 'row-not-found', '找不到合并行 ' + command.id, '运行 /evolution merge status 查看当前队列', command.id)
         if (row.state !== 'pending' && row.state !== 'approved' && row.state !== 'fuse') return fail('discard', 'row-not-discardable', '该行状态是 ' + row.state + '，不可丢弃：' + command.id, '只有 pending/approved/fuse 行可丢弃', row.runId)
-        const dropped = await removeRuntimeRow(deps.io, deps.home, row.id, 'superseded')
+        const dropped = await removeRuntimeRow(deps.io, deps.home, row.id, 'superseded', undefined, deps.fence)
         if (!dropped) return fail('discard', 'row-changed', '丢弃时发现并发修改：' + command.id, '运行 /evolution merge status ' + command.id + ' 后重试')
         return { ok: true, text: '已丢弃合并行：' + command.id }
       }
@@ -400,14 +408,14 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const undoRegistry = deps.registry as unknown as RunRegistry
         if (undoRegistry.runs('merge').some(run => run.id === undoRunId && run.supersededAt !== undefined)) return fail('undo', 'run-superseded', '该 run 已因技能树 restore 失效，不能再 undo：' + undoRunId, '运行 /evolution merge runs 查看失效标记')
         const unit = unitFor(deps)
-        const result = await runUndoOperation({ io: deps.io, home: deps.home, runId: undoRunId, port: skillLibraryUndoPort(deps.skills), now: deps.now, target: command.target, ...(unit === undefined ? {} : { finalizeUnit: id => unit.finalize.call(unit, id) }) })
+        const result = await runUndoOperation({ io: deps.io, home: deps.home, runId: undoRunId, port: skillLibraryUndoPort(deps.skills), now: deps.now, target: command.target, ...(deps.fence === undefined ? {} : { fence: deps.fence }), ...(unit === undefined ? {} : { finalizeUnit: id => unit.finalize.call(unit, id) }) })
         return result.ok ? { ok: true, text: result.message } : fail('undo', 'undo-failed', result.message, '检查回执与暂存后重试')
       }
       if (command.verb === 'skipped' && command.restore !== undefined) {
         const loaded = await loadMergeState(deps.io, deps.home)
         const row = loaded.state.rows.find(item => item.id === command.restore)
         if (row === undefined || row.state !== 'skipped') return fail('skipped', 'row-not-found', '找不到可恢复的 skipped 行：' + command.restore, '运行 /evolution merge skipped 查看跳过队列', command.restore)
-        const dropped = await removeRuntimeRow(deps.io, deps.home, row.id, 'restored')
+        const dropped = await removeRuntimeRow(deps.io, deps.home, row.id, 'restored', undefined, deps.fence)
         if (!dropped) return fail('skipped', 'row-changed', '恢复时发现并发修改：' + row.id, '运行 /evolution merge status 后重试')
         return { ok: true, text: '已恢复参与筛选：' + row.id }
       }
@@ -415,7 +423,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (command.clear !== undefined) {
           const cleared = (await loadMergeState(deps.io, deps.home)).state.rows.find(item => item.id === command.clear)
           if (cleared === undefined) return fail('resume', 'row-not-found', '找不到要清除的行：' + command.clear, '运行 /evolution merge status 查看当前队列')
-          const dropped = await removeRuntimeRow(deps.io, deps.home, cleared.id, 'superseded')
+          const dropped = await removeRuntimeRow(deps.io, deps.home, cleared.id, 'superseded', undefined, deps.fence)
           if (!dropped) return fail('resume', 'row-changed', '清除时发现并发修改：' + cleared.id, '运行 /evolution merge status 后重试')
           return { ok: true, text: '已清除合并行：' + cleared.id }
         }
@@ -503,7 +511,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           }
           const missingSource = [candidate.a, candidate.b].find(name => !cards.some(card => card.name === name && card.managed === true))
           if (missingSource !== undefined) {
-            const dropped = await removeRuntimeRow(deps.io, deps.home, candidate.id, 'superseded')
+            const dropped = await removeRuntimeRow(deps.io, deps.home, candidate.id, 'superseded', undefined, deps.fence)
             if (!dropped) return fail('approve', 'row-changed', 'source-gone，但行已被并发修改，未清理：' + candidate.id, '运行 /evolution merge status ' + candidate.id + ' 后重试')
             return fail('approve', 'source-gone', missingSource + ' 已不在 family-managed 技能库，已从 active 队列清除', '重新 pair 该技能对；剩余行用 /evolution merge discard ' + candidate.id, candidate.runId)
           }
@@ -511,20 +519,20 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           const targetExpected = candidate.decision?.targetRevisionRef ?? candidate.targetRevisionRef
           const targetMismatch = revisionMismatch(targetExpected, targetRevisionRefOf(cards, candidate.decision.target))
           if (targetMismatch !== null) {
-            await pairLedger(deps.io, deps.home).transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'target-taken' }, current.version).ok })
+            await ledger().transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'target-taken' }, current.version).ok })
             return fail('approve', 'target-taken', '目标 ' + candidate.decision.target + ' 在决策后已被占用', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
           }
           if (candidate.decision.supportDigest !== undefined && candidate.decision.supportDigest !== supportDigestOf(cards, [candidate.decision.target, candidate.a, candidate.b])) {
-            await pairLedger(deps.io, deps.home).transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'source-changed' }, current.version).ok })
+            await ledger().transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'source-changed' }, current.version).ok })
             return fail('approve', 'source-changed', '源技能内容在决策后变化，拒绝照跑', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
           }
           if (revisionMismatch(sourceExpected, sourceRevisionRefOf(cards, candidate.a, candidate.b)) !== null) {
-            await pairLedger(deps.io, deps.home).transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'source-changed' }, current.version).ok })
+            await ledger().transact(tx => { const current = tx.rows().find(item => item.id === candidate.id); return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'source-changed' }, current.version).ok })
             return fail('approve', 'source-changed', '源技能参考在决策后变化，拒绝照跑', '重新 pair，或 /evolution merge discard ' + candidate.id, candidate.runId)
           }
           const currentRevision = sourceRevisionOf(cards, candidate.a, candidate.b)
           if (candidate.sourceRevision !== undefined && currentRevision !== undefined && currentRevision !== candidate.sourceRevision) {
-            const recorded = await pairLedger(deps.io, deps.home).transact(tx => {
+            const recorded = await ledger().transact(tx => {
               const current = tx.rows().find(item => item.id === candidate.id)
               return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'source-changed' }, current.version).ok
             })
@@ -534,7 +542,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           const currentTargetRevision = targetRevisionOf(cards, candidate.decision.target)
           if (candidate.targetRevision !== undefined && currentTargetRevision !== undefined
             && currentTargetRevision !== candidate.targetRevision) {
-            const recorded = await pairLedger(deps.io, deps.home).transact(tx => {
+            const recorded = await ledger().transact(tx => {
               const current = tx.rows().find(item => item.id === candidate.id)
               return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'target-taken' }, current.version).ok
             })
@@ -554,7 +562,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
             }
           }
           if (candidate.decision.mode === 'merge-into-existing' && !cards.some(card => card.name === candidate.decision?.target)) {
-            const recorded = await pairLedger(deps.io, deps.home).transact(tx => {
+            const recorded = await ledger().transact(tx => {
               const current = tx.rows().find(item => item.id === candidate.id)
               return current === undefined ? false : tx.transition(candidate.id, { type: 'expired', kind: 'target-taken' }, current.version).ok
             })

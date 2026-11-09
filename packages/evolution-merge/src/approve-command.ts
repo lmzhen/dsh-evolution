@@ -23,6 +23,7 @@ export interface ApprovePorts {
 
 export interface RunApproveCommandOptions {
   readonly io: EvolutionIoLike
+  readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
   readonly home: string
   readonly registry: MergeRegistryPort
   readonly ports: ApprovePorts
@@ -34,6 +35,7 @@ export interface RunApproveCommandOptions {
   readonly now: () => number
   /** The invocation carried no agent at all (E-305), as opposed to an agent with no parent run. */
   readonly agentless?: boolean
+  readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
 }
 
 export async function runApproveCommand(options: RunApproveCommandOptions): Promise<WithMergeRunResult> {
@@ -44,7 +46,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
   if (options.agentless === true) return failure('approve', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'approve' }), '在 GUI 或 CLI 的会话里运行 /evolution merge approve ' + before.id)
   const parentRunId = options.parentRunId ?? before.runId
   if (parentRunId === undefined) return failure('approve', 'merge-parent-required', '缺 parent run id（E-305 提示：该行可能由无会话调用创建，或父 run 已丢失）', '在 agent 会话中执行 /evolution merge approve ' + before.id, before.runId)
-  const taken = await approvePending(options.io, options.home, options.now, options.rowId)
+  const taken = await approvePending(options.io, options.home, options.now, options.rowId, options.fence)
   if (!taken.ok) return failure('approve', 'approve-' + taken.reason, taken.message, '重试；若行状态已变化，运行 /evolution merge status ' + options.rowId, before.runId)
   let row = taken.row
   const decision = row.decision
@@ -52,7 +54,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
   if (options.ports.stage !== undefined) {
     const staged = await options.ports.stage(row, decision)
     if (!staged.ok) return failure('approve', 'stage-failed', staged.message, '检查暂存目录后重试；不影响已记录的决策', row.runId)
-    const fused = await pairLedger(options.io, options.home).transact(tx => {
+    const fused = await pairLedger(options.io, options.home, options.fence).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       if (current === undefined) return null
       const moved = tx.transition(row.id, { type: 'staged', stagingRef: staged.entry.ref, stagingExpiresAt: staged.entry.expiresAt }, current.version)
@@ -66,6 +68,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
     io: options.io,
     home: options.home,
     registry: options.registry,
+    ...(options.fence === undefined ? {} : { fence: options.fence }),
     command: 'approve',
     approval: { platformWrite: options.platformWrite, mergeApproval: true },
     pairKey: row.pairKey,
@@ -74,7 +77,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
     now: options.now,
     ...(options.detached === true ? { detached: true } : {}),
     async body(ctx) {
-      await attachRunToRow(options.io, options.home, row.id, ctx.runId)
+      await attachRunToRow(options.io, options.home, row.id, ctx.runId, options.isOwnerActive, options.fence)
       const stage = (name: RunStage) => ctx.stage(name, { done: 0, total: 1 })
       await stage('author')
       let outcome: ScanRound2Outcome
@@ -84,7 +87,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
         outcome = { kind: 'failed', failure: { stage: 'author', code: 'merge-failed', message: error instanceof Error ? error.message : String(error), retryable: true, retryFrom: 'agent2' } }
       }
       const base = { scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 1, skipped: 0 } }, notes: [] as string[] }
-      const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome, true)
+      const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome, true, options.fence)
       return {
         ...base,
         stopReason: record.merged ? 'completed' as const : 'failed' as const,

@@ -7,8 +7,11 @@ import { ProjectionJournal, type ProjectionJournalRecord } from '../src/projecti
 class Io implements EvolutionIoLike {
   files = new Map<string, string>()
   reads = 0
+  mtimes = new Map<string, number>()
+  private clock = 0
   async readText(path: string): Promise<string | null> { this.reads += 1; return this.files.get(path) ?? null }
-  async writeText(path: string, content: string): Promise<void> { this.files.set(path, content) }
+  async mtime(path: string): Promise<number | null> { return this.mtimes.get(path) ?? null }
+  async writeText(path: string, content: string): Promise<void> { this.files.set(path, content); this.mtimes.set(path, ++this.clock) }
   async remove(path: string): Promise<void> { this.files.delete(path) }
   async list(): Promise<string[]> { return [...this.files.keys()] }
   async exists(path: string): Promise<boolean> { return this.files.has(path) }
@@ -30,6 +33,24 @@ it('reads the journal file once and keeps concurrent writes', async () => {
   expect(await journal.latest('s', 'v2', '1')).toMatchObject({ viewKey: 'v2' })
   expect(await journal.latest('s', 'v1', '1')).toMatchObject({ viewKey: 'v1' })
   expect(io.reads).toBe(1)
+})
+
+it('does not publish a cache entry when the write fails', async () => {
+  const io = new Io()
+  const journal = new ProjectionJournal(io, 'journal.json')
+  const original = io.writeText.bind(io)
+  io.writeText = async () => { throw new Error('disk full') }
+  await expect(journal.put(record('s', 'v1', 1))).rejects.toThrow('disk full')
+  io.writeText = original
+  expect(await journal.get('s', 'v1', 'd', '1')).toBeUndefined()
+})
+
+it('invalidates the cache when an external writer changes the file mtime', async () => {
+  const io = new Io()
+  const journal = new ProjectionJournal(io, 'journal.json')
+  await journal.put(record('s', 'v1', 1))
+  await io.writeText('journal.json', JSON.stringify({ schemaVersion: 1, records: { ['s|v2|d|1']: record('s', 'v2', 2) } }))
+  expect(await journal.get('s', 'v2', 'd', '1')).toMatchObject({ viewKey: 'v2' })
 })
 
 it('remove deletes only the exact record', async () => {

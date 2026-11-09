@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-host",
   "description": "Self-evolution automation bundle — infrastructure only, plus the read-only maintenance_probe diagnostic; the shrink-path install",
-  "version": "0.39.2",
+  "version": "0.40.1",
   "publishConfig": {
     "access": "public"
   },
@@ -30,6 +30,7 @@
     "@deepseek-ai/dsh-evolution-policy": "workspace:^",
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
+    "@deepseek-ai/dsh-evolution-authority": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-json": "workspace:^",

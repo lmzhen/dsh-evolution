@@ -6,6 +6,23 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { cleanupStage } from '../src/domain/stage-aggregate.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
+it('P0-3: refuses a traversal staging ref and keeps the outside tree', async () => {
+  const home = await tempRoot('dsh-stage-cleanup-traversal-')
+  try {
+    const io = nodeEvolutionIo()
+    const indexRoot = join(home, 'merge', 'staging-index')
+    await mkdir(indexRoot, { recursive: true })
+    await mkdir(join(home, 'outside'), { recursive: true })
+    await writeFile(join(home, 'outside', 'marker.txt'), 'keep')
+    await writeFile(join(indexRoot, 'row-evil.json'), JSON.stringify({ rowId: 'row-evil', pairKey: 'p', ref: '../../outside', expiresAt: 1, createdAt: 1, state: 'present' }))
+    const result = await cleanupStage(io, home, 2, new Map([['row-evil', { state: 'skipped' }]]), 100)
+    expect(result.failures.some(failure => failure.message.includes('invalid staging ref'))).toBe(true)
+    expect(await io.exists(join(home, 'outside', 'marker.txt'))).toBe(true)
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
 it('P1-7: collects refs from every index before deleting run trees', async () => {
   const home = await tempRoot('dsh-stage-cleanup-101-')
   try {

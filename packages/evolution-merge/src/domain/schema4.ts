@@ -72,9 +72,10 @@ export interface V4RowTx {
 }
 
 /** Atomic readiness + V4 row write under one state-file lock. No production caller in 1b-2a. */
-export async function transactMergeState<T>(io: EvolutionIoLike, home: string, fn: (tx: V4RowTx) => T | Promise<T>): Promise<T> {
+export async function transactMergeState<T>(io: EvolutionIoLike, home: string, fn: (tx: V4RowTx) => T | Promise<T>, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<T> {
   let result: T | undefined
-  await transactIo(io, schema4StatePath(home), async current => {
+  const run = async (): Promise<void> => {
+    await transactIo(io, schema4StatePath(home), async current => {
     if (current === null) throw new V4BlockedError(blocked('merge-state-v4-required', 'schema4 state is missing'))
     let value: unknown
     try { value = JSON.parse(current) } catch { throw new V4BlockedError(blocked('merge-state-needs-repair', 'merge state is not JSON')) }
@@ -102,6 +103,9 @@ export async function transactMergeState<T>(io: EvolutionIoLike, home: string, f
     result = await fn(tx)
     return JSON.stringify({ ...parsed.body, schemaVersion: 4, rows }, null, 2) + '\n'
   })
+  }
+  if (fence !== undefined) await fence.run(run)
+  else await run()
   if (result === undefined) throw new V4BlockedError(blocked('merge-state-needs-repair', 'v4 transaction did not produce a result'))
   return result
 }

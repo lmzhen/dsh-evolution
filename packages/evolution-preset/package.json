@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-preset",
   "description": "Compatibility one-click bundle (legacy; new installs should use evolution-all)",
-  "version": "0.39.2",
+  "version": "0.40.1",
   "publishConfig": {
     "access": "public"
   },
@@ -32,6 +32,7 @@
   "dependencies": {
     "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
+    "@deepseek-ai/dsh-evolution-authority": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-domain": "workspace:^",
@@ -55,13 +56,13 @@
     "@deepseek-ai/dsh-evolution-replay": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^"
+    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
+    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-storage": "^0.2.2-rc.0",
     "@deepseek-ai/dsh-storage-json": "^0.2.2-rc.0",
-    "@deepseek-ai/dsh-storage-domain": "^0.2.2-rc.0",
-    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0"
+    "@deepseek-ai/dsh-storage-domain": "^0.2.2-rc.0"
   },
   "exports": {
     ".": {
@@ -72,10 +73,5 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
-  "types": "lib/types/index.d.ts",
-  "peerDependenciesMeta": {
-    "@deepseek-ai/dsh-tool-session-query": {
-      "optional": true
-    }
-  }
+  "types": "lib/types/index.d.ts"
 }

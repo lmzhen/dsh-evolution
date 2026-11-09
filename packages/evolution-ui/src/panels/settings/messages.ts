@@ -293,7 +293,7 @@ export type MessageKey = keyof typeof zh
  * @param language - which dictionary to read; defaults to zh, matching the platform FALLBACK_LOCALE.
  * @returns the copy this bundle carries.
  */
-export function message(key: MessageKey, language: 'zh' | 'en' = 'zh'): string {
+export function message(key: MessageKey, language: 'zh' | 'en' = 'en'): string {
   return language === 'zh' ? zh[key] : en[key]
 }
 
@@ -320,7 +320,7 @@ export function fill(template: string, values: Readonly<Record<string, string | 
  * @param values - substitutions, or undefined for the plain copy.
  * @returns the copy a reader sees.
  */
-export function formatText(key: MessageKey, values?: Readonly<Record<string, string | number>>): string {
-  const text = message(key)
+export function formatText(key: MessageKey, values?: Readonly<Record<string, string | number>>, language: 'zh' | 'en' = 'en'): string {
+  const text = message(key, language)
   return values === undefined ? text : fill(text, values)
 }

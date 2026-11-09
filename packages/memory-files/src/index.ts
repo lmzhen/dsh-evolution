@@ -182,6 +182,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // The IO provider is resolved lazily so `memory-files` does not depend on
   // row order: the first write happens only after the preset has fully mounted.
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+  const authority = (ctx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
   // In-process write serialization: applyBatch is read-modify-write, so two
   // concurrent callers (multi-session host) can otherwise compute on the same
   // old entries and the last rename wins, silently dropping the other's ops.
@@ -228,6 +229,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       ...rawConfig.threatExemptLabels !== undefined ? { threatExemptLabels: rawConfig.threatExemptLabels } : {},
       ...resolvedRoot !== '' ? { root: resolvedRoot } : {},
       io,
+      ...(authority?.homeFence === undefined ? {} : { fence: authority.homeFence }),
     })
     storeKey = key
     return store

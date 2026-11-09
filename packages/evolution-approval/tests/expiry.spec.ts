@@ -86,6 +86,59 @@ describe('staged-window expiry (T4-09/A51)', () => {
     expect(rows.map(row => row.id)).toContain(id)
   })
 
+  it('uses evolutionMutationAuthority lease around approve', async () => {
+    const { ctx } = await mountApproval(0)
+    const released: string[] = []
+    const fake = {
+      lease: {
+        async acquire() {
+          return { ok: true, lease: { id: 'l2', owner: 'foreground', runId: 'approval:y', pid: 1, epoch: 1, issuedAt: 1, expiresAt: 1e12, heartbeatAt: 1, state: 'active' }, token: { id: 'l2', owner: 'foreground', runId: 'approval:y', epoch: 1 } }
+        },
+        async release(token: { id: string }) { released.push(token.id) },
+      },
+    }
+    ctx.provide('evolutionMutationAuthority', fake)
+    const id = await stage(ctx)
+    const outcome = await ctx.evolutionApproval.approve(id)
+    expect(outcome.ok).toBe(true)
+    expect(released).toEqual(['l2'])
+  })
+
+  it('uses evolutionMutationAuthority lease around an expiry claim', async () => {
+    const { ctx } = await mountApproval(1000)
+    const released: string[] = []
+    const fake = {
+      lease: {
+        async acquire() {
+          return { ok: true, lease: { id: 'l1', owner: 'foreground', runId: 'approval:x', pid: 1, epoch: 1, issuedAt: 1, expiresAt: 1e12, heartbeatAt: 1, state: 'active' }, token: { id: 'l1', owner: 'foreground', runId: 'approval:x', epoch: 1 } }
+        },
+        async release(token: { id: string }) { released.push(token.id) },
+      },
+    }
+    ctx.provide('evolutionMutationAuthority', fake)
+    const id = await stage(ctx, new Date(Date.now() - 60_000).toISOString())
+    await ctx.evolutionApproval.expireStale()
+    expect(released).toEqual(['l1'])
+    expect((await ctx.evolutionState.listPending('rejected')).some(item => item.id === id)).toBe(true)
+  })
+
+  it('releases the claim when an expiry reject throws — the record returns to pending', async () => {
+    const { ctx } = await mountApproval(1000)
+    const id = await stage(ctx, new Date(Date.now() - 60_000).toISOString())
+    const provider = ctx.evolutionStateStorage.provider('json') as unknown as { tryResolvePending: (...args: unknown[]) => Promise<unknown> }
+    const original = provider.tryResolvePending.bind(provider)
+    provider.tryResolvePending = async () => { throw new Error('injected reject failure') }
+    try {
+      await expect(ctx.evolutionApproval.expireStale()).resolves.toEqual([])
+    } finally {
+      provider.tryResolvePending = original
+    }
+    const pending = await ctx.evolutionState.listPending('pending')
+    expect(pending.some(item => item.id === id)).toBe(true)
+    const executing = await ctx.evolutionState.listPending('executing')
+    expect(executing.some(item => item.id === id)).toBe(false)
+  })
+
   it('an unparseable createdAt is not stale evidence — the record stays for the operator', async () => {
     const { ctx } = await mountApproval(1000)
     const id = await stage(ctx, 'not-a-date')

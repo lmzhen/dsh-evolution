@@ -25,6 +25,8 @@
       name: '@deepseek-ai/dsh-evolution-io'
     - id: evolution-io-node
       name: '@deepseek-ai/dsh-evolution-io-node'
+    - id: evolution-authority
+      name: '@deepseek-ai/dsh-evolution-authority'
 
     # ── durable state: provider registry (json active; domain opt-in) ───────
     - id: evolution-state-storage

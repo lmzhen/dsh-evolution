@@ -17,7 +17,7 @@
  * @module @deepseek-ai/dsh-evolution-approval
  */
 
-import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
+import { registerOwnerSettings, type MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
@@ -300,6 +300,19 @@ export class EvolutionApproval extends Service {
     return this.ctx.evolutionState
   }
 
+  /** Serialize one approval's claim with the family run lease when the authority service is mounted. */
+  private async withApprovalLease<T>(id: string, task: () => Promise<T>): Promise<T | undefined> {
+    const authority = this.ctx.get('evolutionMutationAuthority') as MutationAuthority | undefined
+    if (authority === undefined) return await task()
+    const acquired = await authority.lease.acquire('foreground', 'approval:' + id)
+    if (!acquired.ok) return undefined
+    try {
+      return await task()
+    } finally {
+      await authority.lease.release(acquired.token)
+    }
+  }
+
   /** Fail-closed capability adapters need to distinguish "allowed" from "enabled". */
   /** Host write capability exposed to settings/Facts; mirrors the live enabled switch. */
   get platformWrite(): boolean {
@@ -456,11 +469,23 @@ export class EvolutionApproval extends Service {
       // An unparseable timestamp is NOT stale evidence: the record stays for the operator (the same
       // posture the ordering helper takes — a missing timestamp must not decide anything).
       if (!Number.isFinite(stagedAt) || stagedAt > cutoff) continue
-      const claimId = this.newClaimId()
-      const claimed = await this.state().claimPending(record.id, claimId)
-      if (!claimed) continue
-      const resolution = await this.state().tryResolvePending(record.id, 'rejected', claimId)
-      if (resolution.applied) expired.push(record.id)
+      await this.withApprovalLease(record.id, async () => {
+        const claimId = this.newClaimId()
+        const claimed = await this.state().claimPending(record.id, claimId)
+        if (!claimed) return
+        let applied = false
+        try {
+          const resolution = await this.state().tryResolvePending(record.id, 'rejected', claimId)
+          applied = resolution.applied
+          if (applied) expired.push(record.id)
+        } catch (error) {
+          this.ctx.logger.warn(error)
+        } finally {
+          if (!applied) {
+            await this.state().releasePendingClaim(record.id, claimId).catch((error: unknown) => { this.ctx.logger.warn(error) })
+          }
+        }
+      })
     }
     if (expired.length > 0) {
       this.ctx.logger.warn(`evolution-approval: ${expired.length} staged write(s) passed pendingTtlMs=${ttl} and were closed as rejected WITHOUT executing: ${expired.join(', ')} — stage them again if they are still wanted`)
@@ -479,7 +504,8 @@ export class EvolutionApproval extends Service {
     // P2-22: the TTL is a gate on EVERY decision, not only on list(). A caller
     // holding an id must not execute a record the window already closed.
     await this.expireStale()
-    return await this.dedupe(`approve:${id}`, () => this.doApprove(id, audit))
+    const result = await this.withApprovalLease(id, () => this.dedupe(`approve:${id}`, () => this.doApprove(id, audit)))
+    return result ?? { ok: false, message: '待批准写入「' + id + '」正在被另一个批准/过期进程处理：lease 被占用。' }
   }
 
   /** S2-P2-22 (0.3.80): return an ORPHANED executing record to the pending
@@ -557,7 +583,7 @@ export class EvolutionApproval extends Service {
   }
 
   async reject(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }> {
-    return await this.dedupe(`reject:${id}`, async () => {
+    const result = await this.withApprovalLease(id, () => this.dedupe(`reject:${id}`, async () => {
       // Reject claims the record like approve does, so a pending write resolves
       // on a single gate (F-204). The executing-rescue branch below does NOT
       // hold a claim: an 'executing' record may be an approve runner still in
@@ -602,7 +628,8 @@ export class EvolutionApproval extends Service {
       }
       await this.recordDecision(resolution.record, audit)
       return { ok: true, message: `已拒绝 ${resolution.record.kind} 写入「${id}」。` }
-    })
+    }))
+    return result ?? { ok: false, message: '待批准写入「' + id + '」正在被另一个批准/过期进程处理：lease 被占用。' }
   }
 
   /**

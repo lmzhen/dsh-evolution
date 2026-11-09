@@ -116,8 +116,8 @@ describe('history client bundle: what it contributes, and what it takes back', (
     expect(seams.pages).toHaveLength(1)
     expect(document.querySelectorAll('style[data-plugin-css]')).toHaveLength(1)
     expect(seams.warnings.some(line => line.includes(NS) && line.includes('falls back to the bundle'))).toBe(true)
-    expect(seams.rows[0]?.label?.()).toBe(zh['entry.label'])
-    expect(seams.rows[0]?.label?.()).not.toBe(en['entry.label'])
+    expect(seams.rows[0]?.label?.()).toBe(en['entry.label'])
+    expect(seams.rows[0]?.label?.()).not.toBe(zh['entry.label'])
   })
 
   it('leaves nothing behind when the bundle is disposed', () => {

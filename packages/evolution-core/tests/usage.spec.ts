@@ -22,6 +22,16 @@ describe('support-file demand (design §5.5)', () => {
   })
 })
 
+it('runs usage mutation under a supplied fence', async () => {
+  const root = await tempRoot('dsh-usage-fence-')
+  let entered = 0
+  await mutateUsage(root, nodeEvolutionIo(), map => { map.set('a', { ...emptyRecord(), use_count: 1 }) }, {
+    fence: { async run(body) { entered += 1; return await body() } },
+  })
+  expect(entered).toBe(1)
+  expect((await loadUsage(root)).get('a')?.use_count).toBe(1)
+})
+
 describe('usage sidecar field normalization (P2-3)', () => {
   it('A2-4 (v18): the lifecycle fold is compare-and-set on the run-start state', () => {
     const make = (state: 'active' | 'stale' | 'archived') => ({ ...emptyRecord(), state, archived_at: state === 'archived' ? '2026-01-01T00:00:00.000Z' : null })

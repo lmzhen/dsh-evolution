@@ -323,6 +323,7 @@ export class EvolutionCurator extends Service {
     return gates.isBlocked(name)
   }
   private readonly io: EvolutionIoLike
+  private readonly homeFence: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   private readonly enabled: boolean
   /** This row's live config (G1 §8.3): its volatile fields are resolved at USE time. */
   private readonly config: Config
@@ -395,6 +396,7 @@ export class EvolutionCurator extends Service {
     // G2 S3: prefer the platform backend when the deployment mounts it (this covers the reads AND the
     // CAS-backed RMW transact); fall back to the default backend otherwise — contract C2 degradation.
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+    this.homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
     // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
     // honour the same deployment-selected stages as every other writer.
     this.skills = newSkillLibrary({ authority: authorityFrom({ origin: 'background_review' }),
@@ -1033,6 +1035,7 @@ export class EvolutionCurator extends Service {
 
   /** Cross-process tree lock shared with merge runs; curator mutations take it only around apply. */
   private async withMergeTreeLock<T>(body: () => Promise<T>): Promise<T> {
+    if (this.homeFence !== undefined) return await this.homeFence.run(body)
     const acquired = await acquireTreeWriteLock({ io: this.io, home: evolutionHome() })
     if (!acquired.ok) {
       throw new Error('evolution-curator: merge tree lock unavailable (' + acquired.reason + ')' + (acquired.holder === undefined ? '' : '; holder pid ' + String(acquired.holder.pid)))
@@ -1292,7 +1295,7 @@ export class EvolutionCurator extends Service {
             for (const [name, record] of usage) {
               if (!map.has(name)) map.set(name, { ...record })
             }
-          })
+          }, { ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
         } catch (error) {
           this.ctx.logger.warn(`evolution-curator: failed to persist the seeded usage baseline on a session-blocked run (${error instanceof Error ? error.message : String(error)})`)
         }
@@ -1321,7 +1324,7 @@ export class EvolutionCurator extends Service {
             for (const [name, record] of usage) {
               if (!map.has(name)) map.set(name, { ...record })
             }
-          })
+          }, { ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
         } catch (error) {
           this.ctx.logger.warn(`evolution-curator: failed to persist the seeded usage baseline on a session-blocked run (${error instanceof Error ? error.message : String(error)})`)
         }
@@ -1878,6 +1881,7 @@ export class EvolutionCurator extends Service {
       }, {
         // P2-9 (v19): a quarantined sidecar keeps folding but must be visible.
         onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) },
+        ...(this.homeFence === undefined ? {} : { fence: this.homeFence }),
       })
       if (skipped.length > 0) {
         this.ctx.logger.warn(`evolution-curator: lifecycle fold skipped ${skipped.length} name(s) whose on-disk state moved during the run (a concurrent curator/tool won): ${skipped.join(', ')}`)
@@ -1951,12 +1955,16 @@ export class EvolutionCurator extends Service {
    * each report name is unique per runId.
    */
   private async retainReports(keep = 20, errorKeep = 10): Promise<void> {
-    await transactIo(this.io, reportsSweepLockTarget(), async () => {
-      await this.sweepReports(keep, errorKeep)
-      // The lock target itself is never written — the task exists to hold the
-      // lock across the sweep, and `null` leaves the target absent.
-      return null
-    })
+    const sweep = async (): Promise<void> => {
+      await transactIo(this.io, reportsSweepLockTarget(), async () => {
+        await this.sweepReports(keep, errorKeep)
+        // The lock target itself is never written — the task exists to hold the
+        // lock across the sweep, and `null` leaves the target absent.
+        return null
+      })
+    }
+    if (this.homeFence !== undefined) await this.homeFence.run(sweep)
+    else await sweep()
   }
 
   /** The sweep `retainReports` holds the per-home lock for. A caller MUST hold
@@ -2235,7 +2243,7 @@ export class EvolutionCurator extends Service {
             record.archived_at = new Date().toISOString()
           }
         }
-      }, { onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) } })
+      }, { onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) }, ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
     } catch (error) {
       this.ctx.logger.warn(`evolution-curator: failed to persist consolidate usage state: ${error instanceof Error ? error.message : String(error)}`)
     }

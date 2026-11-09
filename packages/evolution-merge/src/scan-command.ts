@@ -8,6 +8,7 @@ import { withMergeRun, type MergeRegistryPort, type WithMergeRunResult } from '.
 
 export interface RunScanCommandOptions {
   readonly io: EvolutionIoLike
+  readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
   readonly home: string
   readonly registry: MergeRegistryPort
   readonly ports?: ScanPorts
@@ -29,6 +30,7 @@ export async function runScanCommand(options: RunScanCommandOptions): Promise<Wi
     io: options.io,
     home: options.home,
     registry: options.registry,
+    ...(options.fence === undefined ? {} : { fence: options.fence }),
     command: 'scan',
     approval: { platformWrite: options.platformWrite, mergeApproval: options.approval },
     now: options.now,

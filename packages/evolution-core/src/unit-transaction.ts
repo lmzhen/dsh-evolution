@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import type { EvolutionIoLike } from "./io.ts";
 import { acquireTreeWriteLock, type TreeLock } from "./tree-lock.ts";
+import type { HomeFence, HomeFenceLease } from './home-fence.ts';
 import {
   readUnitEvidence,
   readUnitReceipt,
@@ -89,6 +90,10 @@ export interface UnitTransactionOptions {
   readonly onPhase?: (phase: UnitJournalPhase) => void | Promise<void>;
   /** Gate instrumentation: tree fence then target claim. */
   readonly onLock?: (lock: "tree" | "claim") => void;
+  /** One home fence owned by authority; when set, UnitTransactions must not acquire tree-lock itself. */
+  readonly fence?: HomeFence;
+  /** Optional run liveness gate: false means the run is terminal and must not commit. */
+  readonly isActive?: (runId: string) => boolean | Promise<boolean>;
 }
 export type UnitErrorCode =
   | "unit-plan-missing"
@@ -98,6 +103,7 @@ export type UnitErrorCode =
   | "unit-commit-failed"
   | "unit-claim-failed"
   | "unit-fence-failed"
+  | "unit-run-inactive"
   | "unit-rollback-blocked"
   | "target-changed"
   | "source-changed"
@@ -264,6 +270,9 @@ export class UnitTransactions implements UnitTransaction {
       };
     if (options?.signal?.aborted === true)
       return { ok: false as const, code: "unit-commit-failed" as const, message: "cancelled before commit" };
+    if (this.options.isActive !== undefined && !(await this.options.isActive(stored.plan.runId))) {
+      return { ok: false as const, code: "unit-run-inactive" as const, message: "run is no longer active; refusing to commit" };
+    }
     const journalBase = {
       schemaVersion: 1 as const,
       unitId: prepared.unitId,
@@ -276,6 +285,7 @@ export class UnitTransactions implements UnitTransaction {
       updatedAt: this.now(),
     };
     let lock: TreeLock | undefined;
+    let fenceLease: HomeFenceLease | undefined;
     let claim: UnitClaim | undefined;
     const checkpoints: UnitJournalCheckpoint[] = [];
     const writePhase = async (phase: UnitJournalPhase, checkpointsNext: UnitJournal["checkpoints"] = checkpoints) => {
@@ -288,11 +298,17 @@ export class UnitTransactions implements UnitTransaction {
       await this.options.onPhase?.(phase);
     };
     try {
-      const acquired = await acquireTreeWriteLock({ io: this.options.io, home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
-      if (!acquired.ok) return { ok: false as const, code: "unit-fence-failed" as const, message: acquired.message ?? acquired.reason };
-      lock = acquired.lock;
+      if (this.options.fence !== undefined) {
+        fenceLease = await this.options.fence.acquire();
+        lock = fenceLease.lock;
+        this.options.onLock?.("tree");
+      } else {
+        const acquired = await acquireTreeWriteLock({ io: this.options.io, home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
+        if (!acquired.ok) return { ok: false as const, code: "unit-fence-failed" as const, message: acquired.message ?? acquired.reason };
+        lock = acquired.lock;
+        this.options.onLock?.("tree");
+      }
       if (!(await lock.assertHeld())) return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost" };
-      this.options.onLock?.("tree");
       claim = await this.options.claim.acquire(stored.plan.target, stored.plan.runId);
       this.options.onLock?.("claim");
       await writeUnitJournal(this.options.io, this.options.home, { ...journalBase, phase: "target-pending" });
@@ -386,7 +402,8 @@ export class UnitTransactions implements UnitTransaction {
       };
     } finally {
       await claim?.release();
-      await lock?.release();
+      if (fenceLease !== undefined) await fenceLease.release();
+      else await lock?.release();
     }
   }
 

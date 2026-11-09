@@ -43,6 +43,19 @@ it('writes the report before settling a successful run', async () => {
   expect((reg as unknown as { settled: { resultRef?: string; mergeStatus?: string } }).settled.resultRef).toContain('merge-run-1.json')
 })
 
+it('settles the run when staging fails after begin', async () => {
+  const home = await tempRoot('dsh-merge-run-shell-stage-fail-')
+  const io = nodeEvolutionIo()
+  const reg = registry()
+  reg.stage = async () => { throw new Error('stage failed') }
+  await expect(withMergeRun({
+    io, home, registry: reg, command: 'scan', approval: { platformWrite: true, mergeApproval: false },
+    now: () => 200,
+    async body() { throw new Error('body must not run') },
+  })).rejects.toThrow('stage failed')
+  expect(reg.calls).toContain('settle:failed')
+})
+
 it('preserves pair natural lengths in the report', async () => {
   const home = await tempRoot('dsh-merge-run-shell-lengths-')
   const io = nodeEvolutionIo()
@@ -127,6 +140,19 @@ it('waits for an aborted body before settling the timeout', { timeout: 90_000 },
   const probe = await readMergeReport(io, home, 'run-1')
   expect(probe.kind).toBe('present')
   if (probe.kind === 'present') expect(probe.value.stopReason).toBe('timeout')
+})
+
+it('settles the run when body ignores abort past the drain budget', async () => {
+  const home = await tempRoot('dsh-merge-run-shell-drain-')
+  const io = nodeEvolutionIo()
+  const reg = registry()
+  const result = await withMergeRun({
+    io, home, registry: reg, command: 'scan', approval: { platformWrite: true, mergeApproval: false },
+    now: () => 200, timeoutMinutes: 0.0001, drainMs: 5, total: 1,
+    async body() { await new Promise<void>(() => {}) },
+  })
+  expect(result.ok).toBe(false)
+  expect(reg.calls).toContain('settle:failed')
 })
 
 it('still writes a failed report when the body throws', async () => {

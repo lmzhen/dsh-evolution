@@ -38,7 +38,7 @@ function request(overrides: Partial<MutationRequest> = {}): MutationRequest {
   }
 }
 
-function unit(io: MemoryIo, overrides: { lock?: MutationLockPort; journal?: { write(record: MutationJournalRecord): Promise<void> }; snapshots?: MutationSnapshotPort; hooks?: MutationUnitHooks } = {}) {
+function unit(io: MemoryIo, overrides: { lock?: MutationLockPort; journal?: { write(record: MutationJournalRecord): Promise<void> }; snapshots?: MutationSnapshotPort; hooks?: MutationUnitHooks; context?: { owner: 'foreground' | 'background_review'; runId: string; leaseId: string } } = {}) {
   return new MutationUnit({ io, limits: LIMITS, ...overrides })
 }
 
@@ -64,6 +64,14 @@ describe('MutationUnit executor', () => {
     expect(result.ok).toBe(true)
     expect(io.files.get('source/SKILL.md')).toBe('new')
     expect(events).toEqual(['prepared', 'unit-written', 'committed'])
+  })
+
+  it('stamps the mutation context on snapshots', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    const snapshots = new MemorySnapshots()
+    const result = await unit(io, { snapshots, context: { owner: 'background_review', runId: 'review-1', leaseId: 'lease-1' } }).apply(request())
+    expect(result.ok).toBe(true)
+    expect([...snapshots.items.values()][0]).toMatchObject({ owner: 'background_review', runId: 'review-1', leaseId: 'lease-1', state: 'committed' })
   })
 
   it('keeps a committed-only write as success with a warning', async () => {

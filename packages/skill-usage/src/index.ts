@@ -73,6 +73,7 @@ export class SkillUsageRegistry extends Service {
   readonly root: string
   private readonly eventsHome: string
   private readonly io: EvolutionIoLike
+  private readonly homeFence: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   private readonly supportReadToolNames: readonly string[]
   /** Process-local RMW queue (v34 B14 / v35 R6: the same factory the other sidecars use). */
   private readonly serial = makeSerialQueue()
@@ -94,6 +95,7 @@ export class SkillUsageRegistry extends Service {
     // value is truthy and used to become a CWD-relative path.
     this.eventsHome = config.eventsHome?.trim() || evolutionRoot()
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+    this.homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
     // A2 observation: `session/event` DISPATCH records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This
     // makes the sidecar's view counters live; names without a usage record are
@@ -266,6 +268,7 @@ export class SkillUsageRegistry extends Service {
       }, {
         // P2-9 (v19): a quarantined sidecar keeps working but must be visible.
         onQuarantine: (message) => { this.ctx.logger.warn(`skill-usage: ${message}`) },
+        ...(this.homeFence === undefined ? {} : { fence: this.homeFence }),
       })
       return outcome as T
     })

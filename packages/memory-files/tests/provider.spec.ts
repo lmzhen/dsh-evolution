@@ -23,6 +23,25 @@ describe('memory-files', () => {
     expect(await ctx.memory.read('memory')).toContain('user prefers terse')
   })
 
+  it('runs memory writes under the authority home fence when mounted', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemoryRegistry)
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    let entered = 0
+    let released = 0
+    ctx.provide('evolutionMutationAuthority', {
+      homeFence: {
+        async run(body: () => Promise<unknown>) { entered += 1; try { return await body() } finally { released += 1 } },
+      },
+    })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-fence-') })
+    const result = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'fenced fact' }])
+    expect(result.ok).toBe(true)
+    expect(entered).toBeGreaterThan(0)
+    expect(released).toBe(entered)
+  })
+
   it('T3-06/A34: the provider normalization takes the first NON-BLANK payload field', async () => {
     // The provider's own normalization is the site a caller mounting ctx.memory
     // directly (no family tool, no review) goes through.

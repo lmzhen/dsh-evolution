@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-agent-preset",
   "description": "Agent preset exposing memory and skill evolution tools to a session",
-  "version": "0.39.2",
+  "version": "0.40.1",
   "publishConfig": {
     "access": "public"
   },
@@ -24,7 +24,8 @@
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^"
+    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
+    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0"
   },
   "exports": {
     ".": {
@@ -42,13 +43,5 @@
       "@deepseek-ai/dsh-evolution-core",
       "@deepseek-ai/dsh-evolution-skill-discovery"
     ]
-  },
-  "peerDependencies": {
-    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0"
-  },
-  "peerDependenciesMeta": {
-    "@deepseek-ai/dsh-tool-session-query": {
-      "optional": true
-    }
   }
 }

@@ -10,6 +10,8 @@ import type { ClientSeam } from './seam.ts'
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
 
 /** The feature-specific part of one sidebar panel. */
+export const FALLBACK_LOCALE = 'en' as const
+
 export interface SidebarPanelSpec<Face> {
   /** The row id; the keyed main body uses the same value. */
   id: string
@@ -81,7 +83,7 @@ export function registerSidebarPanel<Face>(ctx: ClientContext, spec: SidebarPane
   }, spec.namespace + ': locale')
   ctx.effect(() => injectStyles(typeof document === 'undefined' ? undefined : document, spec.styles.css, spec.styles.tagId), spec.namespace + ': styles')
 
-  const fallback = spec.dictionaries[spec.fallback ?? 'zh']
+  const fallback = spec.dictionaries[spec.fallback ?? FALLBACK_LOCALE]
   const lookup = (key: string): string => {
     const own = fallback[key] ?? key
     if (!registered) return own

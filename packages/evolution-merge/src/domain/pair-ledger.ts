@@ -52,7 +52,7 @@ export async function readPairLedger(io: EvolutionIoLike, home: string): Promise
 }
 
 /** 1b-2a write skeleton. Production stays on the v3 gate until 1b-2b. */
-export function pairLedger(io: EvolutionIoLike, home: string): PairLedger {
+export function pairLedger(io: EvolutionIoLike, home: string, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): PairLedger {
   return {
     read: () => readPairLedger(io, home),
     transact: async fn => {
@@ -61,7 +61,7 @@ export function pairLedger(io: EvolutionIoLike, home: string): PairLedger {
         const normalized = await normalizePairLedger(io, home)
         if (!normalized.ok) throw new Error(normalized.message ?? 'normalize failed')
       }
-      return await transactMergeState(io, home, fn)
+      return await transactMergeState(io, home, fn, fence)
     },
     normalize: () => normalizePairLedger(io, home),
   }

@@ -130,14 +130,14 @@ it('reclaims a claim whose holder pid is dead', async () => {
   await reclaimed?.release()
 })
 
-it('claim has no time-based lease; only release or dead pid frees it', async () => {
+it('claim carries a 30-minute TTL and a stale claim is taken over', async () => {
   const home = await tempRoot('dsh-merge-detached-lease-')
   const io = nodeEvolutionIo()
   const held = await acquireTargetClaim(io, home, 'a', 0)
   expect(held).not.toBeNull()
-  expect(await acquireTargetClaim(io, home, 'a', 46 * 60_000)).toBeNull()
+  expect(await acquireTargetClaim(io, home, 'a', 29 * 60_000)).toBeNull()
+  expect(await acquireTargetClaim(io, home, 'a', 31 * 60_000)).not.toBeNull()
   await held?.release()
-  expect(await acquireTargetClaim(io, home, 'a', 47 * 60_000)).not.toBeNull()
 })
 
 it('non-detached invalid row returns before registry.begin', async () => {

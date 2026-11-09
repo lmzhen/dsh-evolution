@@ -1,6 +1,6 @@
 /** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { ReactNode } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { createSettingsSeat, panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
@@ -13,7 +13,9 @@ import { currentSessionId } from './session.ts'
 export const inject = ['slots', 'sessions', 'locale']
 
 /** The view component receives the workbench's activeView marker alongside its face. */
-function MergeView(props: MergeFace & { activeView?: string }): ReactNode { return props.activeView === 'merge' ? MergePanel(props) : null }
+function MergeView(props: MergeFace & { activeView?: string }): ReactNode {
+  return createElement('div', { hidden: props.activeView !== 'merge' }, MergePanel(props))
+}
 
 /**
  * Register the merge view on the workbench page.
@@ -21,7 +23,9 @@ function MergeView(props: MergeFace & { activeView?: string }): ReactNode { retu
  */
 export function apply(ctx: ClientContext): void {
   const seat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
-  ctx.effect(() => () => { seat.dispose?.() }, 'evolution-merge-ui: settings seat')
+  const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
+  const store = new MergeStore(source)
+  ctx.effect(() => () => { store.dispose(); seat.dispose?.() }, 'evolution-merge-ui: settings seat + store')
   registerWorkbenchView<MergeFace>(ctx, {
     id: PANEL_ID,
     order: PANEL_ORDER,
@@ -30,10 +34,9 @@ export function apply(ctx: ClientContext): void {
     styles: { css: CSS, tagId: CSS_TAG_ID },
     component: MergeView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {
-      const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
       const workspaceId = panelWorkspaceId(ctx)
       return {
-        store: new MergeStore(source),
+        store,
         t,
         doctorCommand: '/evolution doctor',
         settings: { ...(seat.get('evolution-merge') === undefined ? {} : { merge: seat.get('evolution-merge')! }), ...(seat.get('evolution-approval') === undefined ? {} : { platform: seat.get('evolution-approval')! }) },

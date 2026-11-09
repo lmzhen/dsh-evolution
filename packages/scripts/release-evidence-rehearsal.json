@@ -1,20 +1,20 @@
 {
-  "note": "W10/W11 candidate readings for v0.39.2. S1-S3 surfaces are unchanged from the v0.38.0 lab readings; S4 was last rerun on the 0.39.0 overlay; v0.39.2 changes review prompts and the settings/history client surface only.",
-  "familyVersion": "0.39.2",
+  "note": "W10/W11 candidate readings for v0.40.1. S1-S3 measured on the CI-packed 0.0.0-main tree (same mutation/UI code) on fresh web 3081; 0.40.1 additionally merges main 0.39.2 prompt/review changes. S4 rerun 2/2 on the 0.40.1 overlay tree.",
+  "familyVersion": "0.40.1",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.39.2",
-      "startedAt": "2026-11-07T21:32:00.000Z",
+      "familyVersion": "0.40.1",
+      "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
-        "skillHistoryRows": 12,
-        "skillHistoryBytes": 7724,
+        "skillHistoryRows": 0,
+        "skillHistoryBytes": 21,
         "ownerStatus": 200,
         "threeReadsStable": true,
-        "note": "three consecutive owner GETs of /api/dsh-evolution/skill-history/skills returned the same 12-row, 7724-byte JSON body on the candidate lab host"
+        "note": "three consecutive owner GETs of /api/dsh-evolution/skill-history/skills returned the same 0-row, 21-byte JSON body on the fresh 0.40.0 candidate host"
       }
     },
     {
@@ -22,8 +22,8 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.39.2",
-      "startedAt": "2026-11-07T21:32:00.000Z",
+      "familyVersion": "0.40.1",
+      "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "ownerDiagnostics": 200,
         "anonymous": 401,
@@ -36,11 +36,11 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.39.2",
-      "startedAt": "2026-11-07T21:32:00.000Z",
+      "familyVersion": "0.40.1",
+      "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "semverVersion": "0.2.2-rc.1",
-        "familyVersion": "0.39.2",
+        "familyVersion": "0.40.1",
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
@@ -52,13 +52,13 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.39.2",
-      "startedAt": "2026-11-08T18:20:00.000Z",
+      "familyVersion": "0.40.1",
+      "startedAt": "2026-11-09T08:58:00.000Z",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
         "repeatedPrepareIdempotent": true,
-        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.39.2 overlay tree (2026-11-08T18:20Z)"
+        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.40.0 overlay tree (2026-11-09T16:57+08:00)"
       }
     }
   ],

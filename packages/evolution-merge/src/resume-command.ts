@@ -17,6 +17,7 @@ import { failure } from './domain/errors.ts'
 
 export interface RunResumeCommandOptions {
   readonly io: EvolutionIoLike
+  readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
   readonly home: string
   readonly registry: MergeRegistryPort
   readonly ports: ScanPorts
@@ -47,7 +48,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       return failure('resume', 'run-owns-row', '该 verify 行仍由运行中的 run 持有：' + row.runId, '等待该 run 结束，或运行 /evolution merge cancel ' + row.runId, row.runId)
     }
     return await runScanCommand({
-      io: options.io, home: options.home, registry: options.registry,
+      io: options.io, home: options.home, registry: options.registry, ...(options.fence === undefined ? {} : { fence: options.fence }),
       approval: options.approval, platformWrite: options.platformWrite, now: options.now,
       ...(options.detached === true ? { detached: true } : {}),
       ...(options.makePorts === undefined
@@ -75,7 +76,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
   if (selected.state === 'approved' && options.ports.stage !== undefined) {
     const staged = await options.ports.stage(selected, decision)
     if (!staged.ok) return failure('resume', 'stage-failed', staged.message, '检查暂存目录后重试；不影响已记录的决策', selected.runId)
-    const fused = await pairLedger(options.io, options.home).transact(tx => {
+    const fused = await pairLedger(options.io, options.home, options.fence).transact(tx => {
       const current = tx.rows().find(item => item.id === selected.id)
       if (current === undefined) return null
       const moved = tx.transition(selected.id, { type: 'staged', stagingRef: staged.entry.ref, stagingExpiresAt: staged.entry.expiresAt }, current.version)
@@ -92,7 +93,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
     parentRunId, now: options.now,
     ...(options.detached === true ? { detached: true } : {}),
     async body(ctx) {
-      await attachRunToRow(options.io, options.home, row.id, ctx.runId)
+      await attachRunToRow(options.io, options.home, row.id, ctx.runId, options.isOwnerActive, options.fence)
       await ctx.stage('author', { done: 0, total: 1 })
       let outcome
       try {
@@ -102,7 +103,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       } catch (error) {
         outcome = { kind: 'failed' as const, failure: { stage: 'author' as const, code: 'merge-failed', message: error instanceof Error ? error.message : String(error), retryable: true, retryFrom: 'agent2' as const } }
       }
-      const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome, true)
+      const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome, true, options.fence)
       return {
         stopReason: record.merged ? 'completed' as const : 'failed' as const,
         scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 1, skipped: 0 } },

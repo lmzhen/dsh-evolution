@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.pkg.json",
+  "references": [
+    {
+      "path": "../evolution-core"
+    },
+    {
+      "path": "../evolution-io"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    }
+  ]
+}

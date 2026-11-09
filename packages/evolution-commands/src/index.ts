@@ -9,7 +9,7 @@
 // by `vendor/hmr/src/index.ts`. The probes are capability checks — absence degrades a feature and
 // `/evolution doctor` reports it.
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
-import { createSubagentChannel, scopedPackageName, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
+import { createSubagentChannel, scopedPackageName, authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
@@ -30,7 +30,7 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 import {
   errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
-import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
@@ -249,12 +249,14 @@ async function writeMaintainReport(
   record: MaintainReportRecord,
   warn: (message: string) => void,
   evolutionHomePath: string,
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined,
 ): Promise<string | undefined> {
   // The home is bound when the RUN starts (passed in, not read here): a run belongs to
   // the home it was started in, and a later home change must not misfile its report.
   const dir = join(evolutionHomePath, 'reports')
   const path = join(dir, `maintain-${record.runId}.json`)
   let written = true
+  const body = async (): Promise<void> => {
   try {
     await io.writeText(path, JSON.stringify(record, null, 2))
     await io.writeText(join(dir, `maintain-${record.runId}.md`), record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text)
@@ -275,6 +277,9 @@ async function writeMaintainReport(
     // The lock target itself is never written — the task exists to hold the lock.
     return null
   })
+  }
+  if (fence !== undefined) await fence.run(body)
+  else await body()
   return written ? path : undefined
 }
 
@@ -331,6 +336,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       io: ioRegistry.provider(),
       home: evolutionHome(),
       warn: (message) => { ctx.logger.warn(message) },
+      ...((ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence === undefined ? {} : { fence: (ctx.get('evolutionMutationAuthority') as { readonly homeFence: { run<T>(body: () => Promise<T>): Promise<T> } }).homeFence }),
     })
     runs = registry
     void registry.load().then((loaded) => {
@@ -869,7 +875,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // disagree with the scan it previews.
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：维护事实不可用。')
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider() })
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider(), ...(mutationLockFrom(ctx) === undefined ? {} : { mutationLock: mutationLockFrom(ctx)! }) })
           const enrichment = await buildEnrichment(ctx, library)
           const readFailures: string[] = []
           const snapshots = await snapshotFromLibrary(library, {
@@ -1002,7 +1008,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // could never fire first).
           void (async (): Promise<void> => {
             try {
-              const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider() })
+              const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider(), ...(mutationLockFrom(ctx) === undefined ? {} : { mutationLock: mutationLockFrom(ctx)! }) })
               const enrichment = await buildEnrichment(ctx, library)
               const outcome = await runMaintain(
                 {
@@ -1059,7 +1065,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 startedAt: handle.startedAt,
                 endedAt,
                 text: outcome.text ?? '',
-              }, (message) => { ctx.logger.warn(message) }, runHome)
+              }, (message) => { ctx.logger.warn(message) }, runHome, (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence)
               // W5 G3-S4: a settle that names a resultRef must be readable NOW — otherwise the
               // terminal record points at a file a reader/replay cannot open (write/io race).
               if (resultRef !== undefined) {
@@ -1451,25 +1457,43 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input.startsWith('extract ')) {
           const extractParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(extractParsed) || extractParsed.name !== 'extract') {
-            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--owner-covers]')
+            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--owner-covers] 或 --proposal <id>')
           }
           const source = extractParsed.positionals[0] ?? ''
-          const target = extractParsed.positionals[1] ?? ''
-          const heading = extractParsed.positionals[2] ?? ''
-          if (source === '' || target === '' || heading === '') {
-            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
+          const proposalFlag = extractParsed.flags.get('proposal')
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
+          let target = extractParsed.positionals[1] ?? ''
+          let heading = extractParsed.positionals[2] ?? ''
+          let start: string | undefined
+          let end: string | undefined
+          let extractItems: Array<{ heading: string; start?: string; end?: string; to_skill: string }> = []
+          let proposalOutcome: 'extract' | 'mixed' | undefined
+          if (typeof proposalFlag === 'string') {
+            if (source === '') return err('用法：/evolution extract <source> --proposal <id>')
+            const proposal = await readProposalReport(ioRegistry.provider(), proposalFlag)
+            if (proposal === null) return err('找不到 extract proposal：' + proposalFlag)
+            if (proposal.outcome === 'keep') return err('该 proposal 的结论是 keep，没有可应用提取。')
+            if (proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) return err('该 proposal 未覆盖 owner（owner-gap），不能应用。')
+            target = proposal.owner.name
+            heading = proposal.parts[0]?.heading ?? ''
+            proposalOutcome = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : undefined
+            extractItems = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: target }))
+          } else {
+            if (source === '' || target === '' || heading === '') {
+              return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
+            }
+            const startFlag = extractParsed.flags.get('start')
+            const endFlag = extractParsed.flags.get('end')
+            start = typeof startFlag === 'string' ? startFlag : undefined
+            end = typeof endFlag === 'string' ? endFlag : undefined
+            extractItems = [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }]
           }
-          const startFlag = extractParsed.flags.get('start')
-          const endFlag = extractParsed.flags.get('end')
           const ownerCovers = extractParsed.flags.has('owner-covers')
           const outcomeFlag = extractParsed.flags.get('outcome')
           if (outcomeFlag !== undefined && outcomeFlag !== 'extract' && outcomeFlag !== 'mixed') {
             return err('--outcome 只能是 extract 或 mixed。')
           }
-          const start = typeof startFlag === 'string' ? startFlag : undefined
-          const end = typeof endFlag === 'string' ? endFlag : undefined
-          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
           const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
             config: { root: skillsRootValue },
             io: ioRegistry.provider(),
@@ -1482,8 +1506,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           })
           const built = await buildExtractPlanFromLibrary(library, {
             source,
-            items: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }],
-            ...(outcomeFlag === undefined ? {} : { outcome: outcomeFlag }),
+            items: extractItems,
+            ...(outcomeFlag === undefined ? (proposalOutcome === undefined ? {} : { outcome: proposalOutcome }) : { outcome: outcomeFlag }),
             ...(ownerCovers ? { ownerCovers: true } : {}),
           })
           if (!built.ok) return err(built.message)
@@ -1491,10 +1515,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const warnings = built.warnings === undefined || built.warnings.length === 0 ? '' : '\n' + built.warnings.join('\n')
           if (!extractParsed.flags.has('apply')) {
             const proposal = proposalFromPlan(plan, { runId: 'cli-' + Date.now().toString(36) })
-            const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-            const io = registry?.provider()
-            if (io !== undefined) await writeProposalReport(io, proposal).catch(() => { /* best-effort proposal report */ })
-            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=' + ownerDecisionText(plan.owner) + warnings)
+            const proposalPath = await writeProposalReport(ioRegistry.provider(), proposal).catch(() => { /* best-effort proposal report */ })
+            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=' + ownerDecisionText(plan.owner) + warnings + '\nproposal_id: ' + proposal.id + (proposalPath === undefined ? '' : '（已写入 reports）'))
           }
           if (approval) {
             const session = invocationAgent?.session
@@ -1509,7 +1531,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const decision = await approval.request({
               kind: 'skill',
               summary: '/evolution extract ' + source + ' -> ' + target + ' ' + heading,
-              args: { operation: { action: 'extract', name: source, extract: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }] }, origin: 'foreground', libraryOrigin: 'foreground' },
+              args: { operation: { action: 'extract', name: source, extract: extractItems }, origin: 'foreground', libraryOrigin: 'foreground' },
               origin: 'foreground',
               ...session !== undefined ? { sessionId: session.id, session } : {},
               ...sessionPolicy !== undefined ? { sessionPolicy } : {},

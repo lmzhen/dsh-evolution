@@ -120,7 +120,9 @@ export class EvolutionFeedback {
    * keeping an optimistic value that never landed. */
   onRollback?: (target: string, kind: 'skill' | 'session') => void
 
-  constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}) {
+  private readonly fence: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
+
+  constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}, fence?: { run<T>(body: () => Promise<T>): Promise<T> }) {
     // rc.68 + K-6: BOTH paths derive from the constructor surface only —
     // record() takes no backend io, so path and io backend can never disagree.
     // They derive unconditionally so a late `attachIo` (S6.4) does not need to
@@ -129,6 +131,7 @@ export class EvolutionFeedback {
     this.eventsPath = eventsFile(home)
     this.io = io
     this.warn = warn
+    this.fence = fence
   }
 
   /** Bind the evolution IO backend after construction (S6.4 deferred binding). */
@@ -204,7 +207,7 @@ export class EvolutionFeedback {
         const aggregate = parseAggregate(rawCache, this.warn)
         if (aggregate) {
           try {
-            await migrateFeedbackEvents(io, eventsPath, aggregate, this.warn)
+            await migrateFeedbackEvents(io, eventsPath, aggregate, this.warn, this.fence)
           } catch {
             // Best-effort: a failed migration means the log stays absent and
             // history starts empty — the old aggregate is not re-booted.
@@ -353,7 +356,7 @@ export class EvolutionFeedback {
     // linger in memory (it would silently diverge and be dropped next boot).
     void this.mutate(async () => {
       try {
-        const seq = await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note })
+        const seq = await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note }, undefined, this.fence)
         // A successfully persisted note becomes the durable truth for a later
         // failed append's rollback (V4-41).
         if (note !== undefined) {
@@ -580,6 +583,7 @@ export async function migrateFeedbackEvents(
   eventsPath: string,
   aggregate: FeedbackState,
   warn: (message: string) => void = () => {},
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> },
 ): Promise<void> {
   const expected = synthesizeFeedbackEvents(aggregate)
   // v35 R5: this is the event log's SECOND writer, and it used to serialize the
@@ -593,7 +597,8 @@ export async function migrateFeedbackEvents(
     warn(`evolution-feedback: migration refused ${refused.length} synthesized event(s) that the event log's payload gate rejects (types: ${[...new Set(refused.map(event => event.type))].join(', ')}) — history starts empty instead of writing an unreadable log`)
     return
   }
-  await transactIo(io, eventsPath, (current) => {
+  const write = async (): Promise<void> => {
+    await transactIo(io, eventsPath, (current) => {
     // P1-8 (v37): the gate reads the content INSIDE the transact — a lockless
     // read outside it can report a just-committed log as missing, and the
     // migration must never translate that read into a write.
@@ -608,8 +613,11 @@ export async function migrateFeedbackEvents(
     if (containsLegacyMultiset(existing, expected)) return Promise.resolve(current)
     const maxSeq = existing.reduce((max, event) => Math.max(max, event.seq), 0)
     const merged = [...existing, ...expected.map((event, index) => ({ ...event, seq: maxSeq + index + 1 }))]
-    return Promise.resolve(JSON.stringify({ version: EVENT_LOG_VERSION, events: merged }, null, 2))
-  })
+      return Promise.resolve(JSON.stringify({ version: EVENT_LOG_VERSION, events: merged }, null, 2))
+    })
+  }
+  if (fence !== undefined) await fence.run(write)
+  else await write()
 }
 
 /** Parse a legacy aggregate (v1) or a v2 cache into a plain aggregate state.
@@ -861,6 +869,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     (message) => {
       ctx.logger.warn(message)
     },
+    (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence,
   )
   // Make the service available first; restoration settles in the background.
   ctx.provide('evolutionFeedback', feedback)

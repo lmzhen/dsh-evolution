@@ -1,4 +1,5 @@
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { DiscoveryFence } from './domain-map-store.ts'
 
 /** Frozen view identity captured when a session is created. */
 export interface ViewSnapshot {
@@ -19,8 +20,14 @@ export class ViewSnapshotStore {
   private readonly io: EvolutionIoLike
   private readonly path: string
   private serial: Promise<void> = Promise.resolve()
+  private readonly fence: DiscoveryFence | undefined
 
-  constructor(io: EvolutionIoLike, path: string) { this.io = io; this.path = path }
+  constructor(io: EvolutionIoLike, path: string, fence?: DiscoveryFence) { this.io = io; this.path = path; this.fence = fence }
+
+  private async fenced<T>(task: () => Promise<T>): Promise<T> {
+    if (this.fence !== undefined) return await this.fence.run(task)
+    return await task()
+  }
 
   private async read(): Promise<SnapshotFile> {
     return this.decode(await this.io.readText(this.path))
@@ -35,14 +42,14 @@ export class ViewSnapshotStore {
       return JSON.stringify({ schemaVersion: 1, sessions })
     }
     if (this.io.transact !== undefined) {
-      await this.io.transact(this.path, current => apply(current))
+      await this.fenced(async () => { await this.io.transact!(this.path, current => apply(current)) })
       return
     }
-    const task = async (): Promise<void> => {
+    const task = async (): Promise<void> => await this.fenced(async () => {
       const current = await this.io.readText(this.path)
       const next = apply(current)
       if (next !== null && next !== current) await this.io.writeText(this.path, next)
-    }
+    })
     this.serial = this.serial.then(task, task)
     await this.serial
   }

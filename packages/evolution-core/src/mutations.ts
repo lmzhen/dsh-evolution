@@ -81,11 +81,13 @@ export async function recordMutation(
   io: EvolutionIoLike,
   record: MutationRecord,
   cap = DEFAULT_MUTATION_CAP,
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> },
 ): Promise<void> {
   // The read-append-write runs as one atomic transact (rc.50 P2-2): a second
   // process sharing DSH_HOME can no longer interleave its append between our
   // read and write and lose an audit record.
-  await transactIo(io, mutationsFile(root), (current) => {
+  const write = async (): Promise<void> => {
+    await transactIo(io, mutationsFile(root), (current) => {
     // P3 (v3 audit): never overwrite a malformed audit file with a re-serialized empty.
     // P3 (v15): parse exactly ONCE — the malformed guard and the record
     // extraction used to JSON.parse the same bytes twice inside one transact
@@ -117,6 +119,9 @@ export async function recordMutation(
     const existing = recordsFromParsed(parsed)
     existing.push(record)
     const trimmed = existing.length > cap ? existing.slice(existing.length - cap) : existing
-    return JSON.stringify({ version: MUTATIONS_FILE_VERSION, records: trimmed }, null, 2)
-  })
+      return JSON.stringify({ version: MUTATIONS_FILE_VERSION, records: trimmed }, null, 2)
+    })
+  }
+  if (fence !== undefined) await fence.run(write)
+  else await write()
 }

@@ -14,7 +14,7 @@ import type {
 import type { MergeReport, MergeReportPair, MergeRunCommand } from './contracts.ts'
 import { writeMergeReport } from './report.ts'
 import type { MergeError } from './domain/errors.ts'
-import { writeRunMeta } from './domain/run-coordinator.ts'
+import { readRunMeta, writeRunMeta } from './domain/run-coordinator.ts'
 
 /** Bounded wait for a detached body before the run is reported as timed out. */
 const DETACHED_DRAIN_MS = 30_000
@@ -64,6 +64,12 @@ export interface WithMergeRunOptions {
   readonly parentRunId?: string
   readonly detached?: boolean
   readonly timeoutMinutes?: number
+  /** Drain budget after abort; tests may shrink it. Defaults to 30s. */
+  readonly drainMs?: number
+  /** Observability for a detached finish failure; defaults to console.warn. */
+  readonly warn?: (message: string) => void
+  /** Optional authority fence for run metadata writes. */
+  readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
   readonly body: (ctx: MergeRunBodyContext) => Promise<MergeRunReportDraft>
 }
 
@@ -93,9 +99,11 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }),
   })
   const startedAt = handle.startedAt
+  const writeMeta = async (meta: Parameters<typeof writeRunMeta>[2]): Promise<void> => { await writeRunMeta(options.io, options.home, meta, options.fence) }
   const stage = (name: RunStage, progress?: { done: number; total: number }) => options.registry.stage(handle.id, name, progress)
-  await stage('screening', options.total === undefined ? undefined : { done: 0, total: options.total })
-  await writeRunMeta(options.io, options.home, {
+  try {
+    await stage('screening', options.total === undefined ? undefined : { done: 0, total: options.total })
+    await writeMeta({
     version: 1, runId: handle.id, pid: process.pid,
     ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }),
     ...(options.pairKey === undefined ? {} : { pairKey: options.pairKey }),
@@ -103,11 +111,19 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     ...(options.pairKey === undefined ? {} : { pairs: [{ pairKey: options.pairKey, state: 'pending' as const }] }),
     pairCount: options.pairCount ?? (options.pairKey === undefined ? 0 : 1),
     phase: 'running', approval: options.approval.mergeApproval ? 'pending' : 'approved',
-    createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString(),
-  })
+      createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString(),
+    })
+  } catch (error) {
+    // P1-1: begin() succeeded, so a staging/meta failure must still settle the run.
+    await options.registry.settle(handle.id, {
+      state: 'failed',
+      failure: 'merge run failed before body: ' + (error instanceof Error ? error.message : String(error)),
+    }).catch(() => {})
+    throw error
+  }
   const writeFailureMeta = async (stopReason: 'failed'): Promise<void> => {
     try {
-      await writeRunMeta(options.io, options.home, {
+      await writeMeta({
         version: 1, runId: handle.id, pid: process.pid,
         ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }),
         ...(options.pairKey === undefined ? {} : { pairKey: options.pairKey }),
@@ -150,12 +166,17 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
           let drainTimer: ReturnType<typeof setTimeout> | undefined
           const drained = await Promise.race([
             bodyOutcome,
-            new Promise<{ kind: 'drain-timeout' }>(resolve => { drainTimer = setTimeout(() => resolve({ kind: 'drain-timeout' }), DETACHED_DRAIN_MS) }),
+            new Promise<{ kind: 'drain-timeout' }>(resolve => { drainTimer = setTimeout(() => resolve({ kind: 'drain-timeout' }), options.drainMs ?? DETACHED_DRAIN_MS) }),
           ])
           if (drainTimer !== undefined) clearTimeout(drainTimer)
-          outcome = drained.kind === 'drain-timeout'
-            ? { kind: 'error', error: new Error('timeout: body did not stop within 30s drain window') }
-            : drained
+          if (drained.kind === 'drain-timeout') {
+            // P1-2: the body ignored abort. Close the run now so its stage/registry
+            // writes stop; the report below records the timeout.
+            await options.registry.settle(handle.id, { state: 'failed', failure: 'timeout: body did not stop within 30s drain window' }).catch(error => {
+              (options.warn ?? ((message: string) => { console.warn(message) }))('evolution-merge: drain-timeout settle failed for ' + handle.id + ': ' + (error instanceof Error ? error.message : String(error)))
+            })
+            outcome = { kind: 'error', error: new Error('timeout: body did not stop within 30s drain window') }
+          } else outcome = drained
         }
       }
       draft = outcome.kind === 'draft'
@@ -221,12 +242,16 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     const finalPairs = draft.pairs.length > 0
       ? draft.pairs.map(pair => ({ pairKey: pair.pairKey, state: pair.outcome === 'merged' ? 'fused' as const : pair.outcome === 'pending' ? 'pending' as const : 'skipped' as const }))
       : options.pairKey === undefined ? [] : [{ pairKey: options.pairKey, state: 'pending' as const }]
-    await writeRunMeta(options.io, options.home, { version: 1, runId: handle.id, pid: process.pid, ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }), ...(options.pairKey === undefined ? {} : { pairKey: options.pairKey }), ...(options.stagingRef === undefined ? {} : { stagingRef: options.stagingRef }), ...(finalPairs.length === 0 ? {} : { pairs: finalPairs }), pairCount: options.pairCount ?? (options.pairKey === undefined ? 0 : 1), phase: awaiting ? 'awaiting-approval' : 'settled', approval: awaiting ? 'pending' : 'approved', stopReason: report.stopReason, reportRef: reportPath, createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString() })
+    const currentMeta = await readRunMeta(options.io, options.home, handle.id)
+    await writeMeta({ version: 1, runId: handle.id, pid: process.pid, ...(currentMeta?.revision === undefined ? {} : { revision: currentMeta.revision }), ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }), ...(options.pairKey === undefined ? {} : { pairKey: options.pairKey }), ...(options.stagingRef === undefined ? {} : { stagingRef: options.stagingRef }), ...(finalPairs.length === 0 ? {} : { pairs: finalPairs }), pairCount: options.pairCount ?? (options.pairKey === undefined ? 0 : 1), phase: awaiting ? 'awaiting-approval' : 'settled', approval: awaiting ? 'pending' : 'approved', stopReason: report.stopReason, reportRef: reportPath, createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString() })
     if (report.stopReason === 'completed') return { ok: true, runId: handle.id, reportPath, report }
     return { ok: false, runId: handle.id, message: 'merge ' + report.stopReason, reportPath }
   }
   if (options.detached === true) {
-    void finish().catch(() => {})
+    void finish().catch((error: unknown) => {
+      const warn = options.warn ?? ((message: string) => { console.warn(message) })
+      warn('evolution-merge: detached run ' + handle.id + ' finish failed: ' + (error instanceof Error ? error.message : String(error)))
+    })
     return { ok: true, accepted: true, runId: handle.id }
   }
   return await finish()

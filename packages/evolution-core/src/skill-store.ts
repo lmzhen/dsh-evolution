@@ -51,14 +51,15 @@ import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPa
 import { makeSerialQueue } from './serial.ts'
 import { supportRefs } from './support-refs.ts'
 import { selectSections } from './section-selection.ts'
-import { MutationUnit, fileMutationLock, type MutationResult, type MutationUnitHooks } from './mutation-unit.ts'
+import { MutationUnit, fileMutationLock, type MutationLockPort, type MutationResult, type MutationUnitHooks } from './mutation-unit.ts'
+import { mutationLockFrom } from './mutation-authority.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
 import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
-import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type RecordedVersions, type SkillVersion } from './skill-history.ts'
+import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type HistoryFence, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { getRecord, loadUsage, mutateUsage, suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
@@ -788,6 +789,9 @@ export class SkillLibrary {
   /** G1/1.1: default authority; a call may override (origin is per-invocation). */
   /** G1/1.1/Stage 2: the ONE default every mutator reads. Per-call overrides still win. */
   private readonly authority: WriteAuthority
+  /** When supplied by the family MutationAuthority, replaces the per-directory file lock. */
+  private readonly mutationLock: MutationLockPort | undefined
+  private readonly fence: HistoryFence | undefined
   /** skill-history.ts: the content history is best-effort, so a failure must not be SILENT —
    * but it is a deployment condition, not a per-write event, so it warns once per instance. */
   private historyWarned = false
@@ -800,6 +804,8 @@ export class SkillLibrary {
     transact?: typeof transactIo,
     threatExemptLabels?: readonly string[],
     authority: WriteAuthority = CLASS_DEFAULT_AUTHORITY,
+    mutationLock?: MutationLockPort,
+    fence?: HistoryFence,
   ) {
     this.root = root
     this.io = io
@@ -807,6 +813,8 @@ export class SkillLibrary {
     this.onMutation = onMutation
     this.threatExemptLabels = threatExemptLabels ?? []
     this.authority = authority
+    this.mutationLock = mutationLock
+    this.fence = fence
     // V4-20: bind the IO backend's own transact by default. Explicit injection
     // stays first; a backend WITHOUT transact keeps the old plain read→write
     // (the in-process serial chain is the second layer). The wrapper adapts the
@@ -859,7 +867,7 @@ export class SkillLibrary {
   private async withMutationLock<T>(task: () => Promise<T>): Promise<T> {
     let lease: import('./mutation-unit.ts').MutationLockLease | undefined
     try {
-      lease = await fileMutationLock(this.io, this.root).acquire()
+      lease = await this.lockPort().acquire()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       if (message.startsWith('mutation-lock-busy')) throw error
@@ -876,6 +884,13 @@ export class SkillLibrary {
         // A failed lock cleanup is a coordination degradation, not a write failure.
       }
     }
+  }
+
+  private lockPort(): MutationLockPort {
+    if (this.mutationLock !== undefined) return this.mutationLock
+    // Fail loud outside tests: production skill writes must use the family authority fence.
+    if (process.env['VITEST'] === 'true' || process.env['NODE_ENV'] === 'test') return fileMutationLock(this.io, this.root)
+    throw new Error('skill-store: no authority mutationLock was supplied; refusing an unfenced production write')
   }
 
   private recovery: Promise<void> | undefined
@@ -900,7 +915,7 @@ export class SkillLibrary {
       io: this.io,
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, home),
       snapshots: unitSnapshotPort(this.io, home),
     })
@@ -1498,7 +1513,7 @@ export class SkillLibrary {
         supportFiles,
         restructureRounds: 0,
         source,
-      })
+      }, undefined, this.fence)
     } catch (error) {
       console.warn('skill-store: hard-cap event not recorded for "' + name + '": ' + (error instanceof Error ? error.message : String(error)))
     }
@@ -1543,7 +1558,7 @@ export class SkillLibrary {
         ...unitId === undefined ? {} : { unitId },
         ...unitHead === undefined ? {} : { unitHead },
       }
-      versions = await recordVersions(this.root, this.io, input, keep)
+      versions = await recordVersions(this.root, this.io, input, keep, this.fence)
     } catch (error) {
       if (!this.historyWarned) {
         this.historyWarned = true
@@ -1583,7 +1598,7 @@ export class SkillLibrary {
         summary: summary + healthNote + danglingNote,
         at,
         ...origin === undefined ? {} : { origin },
-      })
+      }, undefined, this.fence)
     } catch {
       // Auditing is best-effort; a transient disk failure must not surface
       // after the mutation already landed.
@@ -1995,7 +2010,7 @@ export class SkillLibrary {
     const unit = new MutationUnit({
       io: this.io,
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
@@ -2170,7 +2185,7 @@ export class SkillLibrary {
     const unit = new MutationUnit({
       io: this.io,
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
@@ -3171,7 +3186,7 @@ export class SkillLibrary {
       io: this.io,
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, home),
       snapshots: unitSnapshotPort(this.io, home),
       hooks,
@@ -3287,7 +3302,7 @@ export class SkillLibrary {
       io: this.io,
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, home),
       snapshots: unitSnapshotPort(this.io, home),
       hooks,
@@ -3636,7 +3651,7 @@ export class SkillLibrary {
       io: this.io,
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       serial: this.serial,
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
@@ -4357,6 +4372,7 @@ export class SkillLibrary {
  * `emit`, so core states the contract without importing the platform type. */
 export interface SkillMutationSink {
   emit: (type: 'evolution/skill-mutated', event: EvolutionSkillMutatedEvent) => unknown
+  get?(name: string): unknown
 }
 
 /** V41 P2-26 (0.3.75): the ONE SkillLibrary construction point.
@@ -4378,6 +4394,9 @@ export interface NewSkillLibraryOptions {
   threatExemptLabels?: readonly string[] | undefined
   /** G1/1.1: WHO writes through this library. Required: no call site can omit it. */
   authority: WriteAuthority
+  /** Optional family authority lock; absent falls back to per-directory file lock. */
+  mutationLock?: MutationLockPort
+  fence?: HistoryFence
 }
 
 export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
@@ -4392,6 +4411,8 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     // not alias a config object the caller still owns.
     [...(threatExemptLabels ?? [])],
     authority,
+    options.mutationLock ?? mutationLockFrom(ctx),
+    options.fence ?? (ctx?.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence,
   )
 }
 

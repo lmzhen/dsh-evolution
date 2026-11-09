@@ -359,7 +359,8 @@ export async function jsonTransact<T>(
     memory: QuarantineMemory
   },
 ): Promise<void> {
-  await new WriteKernel({ io: io() }).run({ path: join(root, file) }, async current => {
+  const write = async (): Promise<void> => {
+    await new WriteKernel({ io: io() }).run({ path: join(root, file) }, async current => {
     let parsed: T | null = null
     if (current !== null) {
       try {
@@ -443,8 +444,12 @@ export async function jsonTransact<T>(
         throw writeGateError(`evolution state file "${file}" write-back carries ${failing.length} record(s) that fail the field gate (${failing.map(([id]) => id).join(', ')}); not written.`)
       }
     }
-    return next === null ? null : JSON.stringify(next, null, 2)
-  })
+      return next === null ? null : JSON.stringify(next, null, 2)
+    })
+  }
+  const authority = ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
+  if (authority?.homeFence !== undefined) await authority.homeFence.run(async () => { await write() })
+  else await write()
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
@@ -878,6 +883,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * caller must compensate (merge them back) before the legacy merge can
    * revive a ghost twin. A dedupe no-op counts as success — the records are
    * already in the archive. */
+  const homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
+
   async function appendArchive(records: PendingRecord[]): Promise<boolean> {
     // v46 S1.12b (finding 1-9): `landed` used to start `true` and only flip in the catch paths, so a
     // backend that never invokes the archive task reported a successful archive with nothing on
@@ -886,7 +893,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const guard = transactTaskGuard(`pending archive (${PENDING_ARCHIVE_FILE})`)
     let landed = true
     try {
-      await transactIo(io(), pathOf(PENDING_ARCHIVE_FILE), guard.wrap(async (current) => {
+      const writeArchive = async (): Promise<void> => {
+        await transactIo(io(), pathOf(PENDING_ARCHIVE_FILE), guard.wrap(async (current) => {
         // P2-25 (v11): the archive arrives from disk — keep the type honest as
         // (PendingRecord | null)[] so the non-object guard below is meaningful
         // (a null entry used to TypeError inside pendingArchiveKey).
@@ -977,6 +985,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // V7-08 (0.3.44) + V11-B2: plain appends add ids—re-read covers them.
         return JSON.stringify(next)
       }))
+      }
+      if (homeFence !== undefined) await homeFence.run(writeArchive)
+      else await writeArchive()
       // v46 S1.12b: never resurrect a false set inside the task (the rescue-skip path) — the probe
       // can only lower the verdict.
       if (!guard.invoked()) landed = false

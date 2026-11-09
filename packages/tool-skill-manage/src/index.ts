@@ -28,7 +28,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-evolution-io'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_HEALTH_THRESHOLDS, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, newSkillLibrary, probePresent, probeUnknown, type Probe, resolveExecOrigins, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, computeDedupGroups, nearDuplicateSummaries, parseFrontmatter, type SkillLimits, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
-import { buildExtractPlanFromLibrary, ownerDecisionText, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, writeProposalReport, type ExtractPlanLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, ownerDecisionText, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, readProposalReport, writeProposalReport, type ExtractPlanLibrary, type ExtractPartRequest } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, EvolutionIoLike, LiveValue, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-skill-usage'
@@ -252,6 +252,23 @@ async function proposeExtractWithAgent(
   return { ok: true, proposal: JSON.stringify(outcome.structured) }
 }
 
+/** Render agent/structured proposals as outcome lines instead of opaque JSON. */
+function formatProposal(raw: string): string {
+  try {
+    const value = JSON.parse(raw) as { outcome?: unknown; target?: unknown; neededOwner?: unknown; reason?: unknown; parts?: unknown }
+    const parts = Array.isArray(value.parts)
+      ? value.parts.map(part => part !== null && typeof part === 'object' && 'heading' in part ? String((part as { heading: unknown }).heading) : '').filter(Boolean)
+      : []
+    return [
+      'outcome: ' + String(value.outcome ?? 'unknown'),
+      'target: ' + String(value.target ?? '—'),
+      'neededOwner: ' + String(value.neededOwner ?? '—'),
+      'parts: ' + (parts.length === 0 ? '—' : parts.join(', ')),
+      ...(typeof value.reason === 'string' && value.reason !== '' ? ['reason: ' + value.reason] : []),
+    ].join('\n')
+  } catch { return raw }
+}
+
 /**
  * What the staged skill write WOULD store, resolved WITHOUT writing.
  *
@@ -378,6 +395,8 @@ interface SkillWriteArgs {
   owner_covers?: boolean
   /** extract plan only; no write. */
   dry_run?: boolean
+  /** Apply a persisted extract proposal by id. */
+  proposal_id?: string
   /** v23 (AP-3): stage-time content hash of the target skill, attached to
    * update/edit stagings so the replay can refuse a stale full-content
    * overwrite (memory carries old_text for the same purpose). Absent on
@@ -939,12 +958,35 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
     }
     else if (action === 'extract') {
-      const built = await buildExtractPlanFromLibrary(library, {
-        source: typeof args.name === 'string' ? args.name : '',
-        items: Array.isArray(args.extract) ? args.extract : [],
-        ...(args.outcome === undefined ? {} : { outcome: args.outcome }),
-        ...(args.owner_covers === undefined ? {} : { ownerCovers: args.owner_covers }),
-      })
+      let source = typeof args.name === 'string' ? args.name : ''
+      let items: ExtractPartRequest[] = Array.isArray(args.extract) ? args.extract as ExtractPartRequest[] : []
+      let outcome = args.outcome
+      let ownerCovers = args.owner_covers
+      if (args.proposal_id !== undefined && args.proposal_id !== '') {
+        const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+        const io = registry?.provider()
+        if (io === undefined) { result = { ok: false, message: 'proposal_id 需要 evolutionIo 提供者。' }; }
+        else {
+          const proposal = await readProposalReport(io, args.proposal_id)
+          if (proposal === null) result = { ok: false, message: '找不到 extract proposal：' + args.proposal_id }
+          else if (proposal.outcome === 'keep') result = { ok: false, message: '该 proposal 的结论是 keep，没有可应用提取。' }
+          else if (proposal.outcome === 'owner-gap' || proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) result = { ok: false, message: '该 proposal 未覆盖 owner（owner-gap），不能应用。' }
+          else {
+            source = proposal.source
+            outcome = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : undefined
+            ownerCovers = undefined
+            items = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: proposal.owner.name! }))
+          }
+        }
+      }
+      const built = result === undefined
+        ? await buildExtractPlanFromLibrary(library, {
+          source,
+          items,
+          ...(outcome === undefined ? {} : { outcome }),
+          ...(ownerCovers === undefined ? {} : { ownerCovers }),
+        })
+        : { ok: false as const, message: result.message }
       if (!built.ok) {
         result = { ok: false, message: built.message }
       } else {
@@ -1179,7 +1221,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
       + 'restructure moves entire body sections (by their exact "## heading" line, via restructure: [{heading, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change. '
-      + 'extract moves a reusable part (exact heading, optional start/end sub-block) into an existing class-level owner: extract: [{heading, start?, end?, to_skill}]. One target per call; owner-gap is reported, never auto-created.'
+      + 'extract moves a reusable part (exact heading, optional start/end sub-block) into an existing class-level owner: extract: [{heading, start?, end?, to_skill}]. One target per call; an empty extract list returns the child-agent proposal (outcome/target/neededOwner/parts) without writing; supply extract items to apply, and use owner_covers only as an explicit override; owner-gap is reported, never auto-created.'
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
       action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract', 'pin', 'unpin'] },
@@ -1196,6 +1238,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       outcome: { type: 'string', enum: ['extract', 'mixed'] },
       owner_covers: { type: 'boolean' },
       dry_run: { type: 'boolean' },
+      proposal_id: { type: 'string' },
     },
     output: {
       schema: {
@@ -1209,7 +1252,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           proposal: { type: 'string' },
         },
       },
-      render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` }],
+      render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` + (value.proposal === undefined ? '' : '\n\n' + formatProposal(value.proposal)) }],
     },
     isConcurrencySafe: () => false,
     // F-06: `session` is optional in the exec contract too — the
@@ -1406,12 +1449,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
         }
       }
-      if (operation.action === 'extract' && operation.dry_run === true && (operation.extract === undefined || operation.extract.length === 0)) {
+      if (operation.action === 'extract' && (operation.extract === undefined || operation.extract.length === 0)) {
         const source = typeof operation.name === 'string' ? operation.name.trim() : ''
         if (source === '') return { ok: false, message: 'extract agent 需要 name。', skills: [] }
         const proposed = await proposeExtractWithAgent(ctx, exec.agent as unknown as Agent | undefined, library, source)
         return proposed.ok
-          ? { ok: true, message: '提取提议（未写入）。', skills: [], proposal: proposed.proposal }
+          ? { ok: true, message: '提取提议（未写入；确认后按 extract items 提交）。', skills: [], proposal: proposed.proposal }
           : { ok: false, message: proposed.message, skills: [] }
       }
       return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined)

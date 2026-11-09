@@ -11,7 +11,7 @@ import {
   BlockAssembler,
   createToolResultMessage,
   createUserMessage,
-} from '@deepseek-ai/dsh-llm'
+} from '@deepseek-ai/dsh-evolution-core/platform'
 import type {
   ContentBlock,
   ContextFormed,
@@ -23,8 +23,8 @@ import type {
   ToolCallId,
   ToolHistory,
   ToolSchema,
-} from '@deepseek-ai/dsh-llm'
-import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-session'
+} from '@deepseek-ai/dsh-evolution-core/platform'
+import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-core/platform'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -65,11 +65,26 @@ export interface ReviewLlmPort {
   stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 }
 
+export class ReviewModelError extends Error {
+  constructor(message: string, readonly code: 'timeout' | 'cancelled' | 'transport') { super(message); this.name = 'ReviewModelError' }
+}
+
+async function* streamReviewModel(llm: ReviewLlmPort, options: GenerateOptions, signal: AbortSignal): AsyncIterable<StreamChunk> {
+  try { yield* llm.stream(options) } catch (error) {
+    const code = signal.aborted ? 'cancelled' : (error as { name?: unknown }).name === 'TimeoutError' ? 'timeout' : 'transport'
+    throw new ReviewModelError(error instanceof Error ? error.message : String(error), code)
+  }
+}
+
+export class ReviewPartialFailure extends Error {
+  constructor(message: string, readonly actions: readonly ReviewAction[] = []) { super(message); this.name = 'ReviewPartialFailure' }
+}
+
 export interface ReviewAction {
   readonly type: 'tool' | 'skill' | 'memory'
   readonly action: string
   readonly target: string
-  readonly status: 'ok' | 'error'
+  readonly status: 'ok' | 'staged' | 'error'
 }
 
 export interface ReviewUsage {
@@ -152,7 +167,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
     for (let round = 0; round < maxRounds; round += 1) {
       signal.throwIfAborted()
       const assembler = new BlockAssembler()
-      const stream = llm.stream({
+      const stream = streamReviewModel(llm, {
         provider: header.config.provider,
         model: header.config.model,
         ...(header.config.reasoningEffort === undefined ? {} : { reasoningEffort: header.config.reasoningEffort }),
@@ -162,7 +177,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         ...(header.tools === undefined ? {} : { tools: [...header.tools] as ToolSchema[] }),
         ...(toolHistory === undefined ? {} : { toolHistory }),
         signal,
-      })
+      }, signal)
       requests += 1
       for await (const chunk of stream) {
         assembler.push(chunk)
@@ -207,7 +222,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
           type: actionType(call.name),
           action: call.name,
           target: toolTarget(call.name, call.arguments),
-          status: item.result.isError ? 'error' : 'ok',
+          status: item.result.isError ? 'error' : item.result.content.some(block => block.type === 'text' && /staged id:|已暂存|pending_id/.test(block.text)) ? 'staged' : 'ok',
         })
         messages.push(createToolResultMessage({
           callId: item.callId,
@@ -216,12 +231,12 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         }))
       }
       toolCalls += calls.length
-      if (parent.session.seq !== beforeSeq) throw new Error('review tool mutated the parent Session')
+      if (parent.session.seq !== beforeSeq) throw new ReviewPartialFailure('review tool mutated the parent Session', actions)
     }
   } finally {
     clearReview()
   }
-  if (parent.session.seq !== beforeSeq) throw new Error('review mutated the parent Session')
+  if (parent.session.seq !== beforeSeq) throw new ReviewPartialFailure('review mutated the parent Session', actions)
   return {
     finalText,
     actions,

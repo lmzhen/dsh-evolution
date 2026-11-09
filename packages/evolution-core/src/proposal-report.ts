@@ -41,6 +41,15 @@ function isProposal(value: unknown): value is ProposalView {
  * @param limit - newest rows to return.
  * @returns valid proposals, newest filename first.
  */
+export async function readProposalReport(io: EvolutionIoLike, id: string, dir = proposalReportDir()): Promise<ProposalView | null> {
+  const raw = await probeText(io, join(dir, proposalReportName({ id } as ProposalView)))
+  if (!isPresent(raw)) return null
+  try {
+    const parsed: unknown = JSON.parse(raw.value)
+    return isProposal(parsed) ? parsed : null
+  } catch { return null }
+}
+
 export async function readProposalReports(io: EvolutionIoLike, dir = proposalReportDir(), limit = 10): Promise<ProposalView[]> {
   const listed = await probeList(io, dir)
   if (isUnknown(listed) || !isPresent(listed)) return []

@@ -44,3 +44,15 @@ describe('settings seat refusal kind', () => {
     expect(await saveOf(200, { ok: true, data: { namespaces: [] } })).toEqual({ written: true })
   })
 })
+
+describe('settings seat sharing', () => {
+  it('returns one seat and one form per client context', () => {
+    const ctx = {}
+    const first = createSettingsSeat(ctx)
+    const second = createSettingsSeat(ctx)
+    expect(second).toBe(first)
+    expect(second.get('evolution-curator')).toBe(first.get('evolution-curator'))
+    first.dispose()
+    expect(createSettingsSeat(ctx)).not.toBe(first)
+  })
+})

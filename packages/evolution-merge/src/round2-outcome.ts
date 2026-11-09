@@ -24,6 +24,7 @@ export async function recordRound2Outcome(
   row: MergeRow,
   outcome: ScanRound2Outcome,
   deferProjection = false,
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> },
 ): Promise<Round2Record> {
   void now
   const reportExtra: Partial<MergeReportPair> = {
@@ -35,7 +36,7 @@ export async function recordRound2Outcome(
     const unitRef = { unitId: outcome.unitId ?? 'unknown', evidenceSha256: outcome.evidenceSha256 ?? 'unknown' }
     const target = outcome.target?.actual ?? outcome.target?.requested ?? row.decision?.target
     const finalize = async (): Promise<void> => {
-      const removed = await pairLedger(io, home).transact(tx => {
+      const removed = await pairLedger(io, home, fence).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
         return current === undefined ? { ok: false as const, code: 'row-not-found' as const, message: 'row not found' } : tx.remove(row.id, 'committed', unitRef, current.version)
       })
@@ -70,7 +71,7 @@ export async function recordRound2Outcome(
   const failure: MergeFailure = outcome.failure ?? { stage: 'author', code: 'merge-failed', message: 'round2 failed', retryable: true, retryFrom: 'agent2' }
   if (failure.code === 'merge-over-limit' || failure.code === 'limit') {
     const reason = 'merge-over-limit'
-    const skipped = await pairLedger(io, home).transact(tx => {
+    const skipped = await pairLedger(io, home, fence).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       return current === undefined ? false : tx.transition(row.id, { type: 'skipped', reason, origin: 'system', skipSource: 'system' }, current.version).ok
     })
@@ -80,7 +81,7 @@ export async function recordRound2Outcome(
   const cas = casExpiredHook(failure.code)
   if (cas !== null) {
     const terminalFailure = { ...failure, code: cas.reason, retryable: false, retryFrom: 'none' as const }
-    await pairLedger(io, home).transact(tx => {
+    await pairLedger(io, home, fence).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       if (current === undefined) return false
       const moved = tx.transition(row.id, { type: 'failed', failure: terminalFailure }, current.version)
@@ -92,7 +93,7 @@ export async function recordRound2Outcome(
   if (failure.code === 'commit-failed' || failure.code === 'validation-failed') {
     // FR-EXEC-11/14: report-only failure. The pair leaves the active queue (so a later scan
     // can evaluate it again); it is NOT written to skipped.
-    const dropped = await pairLedger(io, home).transact(tx => {
+    const dropped = await pairLedger(io, home, fence).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       return current === undefined ? false : tx.remove(row.id, 'superseded', undefined, current.version).ok
     })
@@ -102,14 +103,14 @@ export async function recordRound2Outcome(
     }
   }
   if (failure.code === 'source-gone') {
-    const dropped = await pairLedger(io, home).transact(tx => {
+    const dropped = await pairLedger(io, home, fence).transact(tx => {
       const current = tx.rows().find(item => item.id === row.id)
       return current === undefined ? false : tx.remove(row.id, 'superseded', undefined, current.version).ok
     })
     if (dropped) await dropStage(io, home, row.id, row.stagingRef)
     return { merged: false, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, outcome: 'failed', archived: [], failure } }
   }
-  const projected = await pairLedger(io, home).transact(tx => {
+  const projected = await pairLedger(io, home, fence).transact(tx => {
     const current = tx.rows().find(item => item.id === row.id)
     if (current === undefined) return null
     const moved = tx.transition(row.id, { type: 'failed', failure }, current.version)

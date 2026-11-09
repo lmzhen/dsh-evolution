@@ -18,7 +18,7 @@ import { DiagnosticsCard } from '../src/panels/settings/DiagnosticsCard.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { formatText } from '../src/panels/settings/messages.ts'
 
-const t = (key: string, values?: Readonly<Record<string, string | number>>): string => formatText(key as never, values)
+const t = (key: string, values?: Readonly<Record<string, string | number>>): string => formatText(key as never, values, 'zh')
 
 /** The card starts collapsed; open it before asserting its body. */
 const renderCard = (props: Parameters<typeof DiagnosticsCard>[0]): ReturnType<typeof render> => {

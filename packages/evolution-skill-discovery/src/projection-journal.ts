@@ -1,4 +1,5 @@
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import type { DiscoveryFence } from './domain-map-store.ts'
 import { makeSerialQueue } from '@deepseek-ai/dsh-evolution-core'
 import type { CatalogCapture } from './catalog-codec.ts'
 
@@ -28,25 +29,48 @@ export class ProjectionJournal {
   private readonly io: EvolutionIoLike
   private readonly path: string
   private readonly maxRecords: number
+  private readonly fence: DiscoveryFence | undefined
   private cache: JournalFile | undefined
+  private cacheMtime: number | null | undefined
   private readonly serial = makeSerialQueue()
 
-  constructor(io: EvolutionIoLike, path: string, options: { readonly maxRecords?: number | undefined } = {}) {
+  constructor(io: EvolutionIoLike, path: string, options: { readonly maxRecords?: number | undefined; readonly fence?: DiscoveryFence | undefined } = {}) {
     this.io = io
     this.path = path
     this.maxRecords = options.maxRecords ?? 512
+    this.fence = options.fence
+  }
+
+  private async persist(next: JournalFile): Promise<void> {
+    const write = async (): Promise<void> => { await this.io.writeText(this.path, JSON.stringify(next)) }
+    if (this.fence !== undefined) await this.fence.run(write)
+    else await write()
+    // Publish only after the bytes landed: a failed write must not leave a
+    // cache entry claiming a record that is not durable.
+    this.cache = next
+    this.cacheMtime = this.io.mtime === undefined ? null : await this.io.mtime(this.path)
   }
 
   private async read(): Promise<JournalFile> {
-    if (this.cache !== undefined) return this.cache
+    if (this.cache !== undefined) {
+      // Optional invalidation: a backend with mtime lets an external writer's
+      // change beat the cache. Backends without mtime keep the one-read cache
+      // (the projection-journal spec's contract).
+      if (this.io.mtime !== undefined && this.cacheMtime !== undefined) {
+        const stamp = await this.io.mtime(this.path)
+        if (stamp !== null && this.cacheMtime !== null && stamp !== this.cacheMtime) this.cache = undefined
+      }
+      if (this.cache !== undefined) return this.cache
+    }
     const content = await this.io.readText(this.path)
-    if (content === null) { this.cache = { schemaVersion: 1, records: {} }; return this.cache }
+    if (content === null) { this.cache = { schemaVersion: 1, records: {} }; this.cacheMtime = this.io.mtime === undefined ? null : await this.io.mtime(this.path); return this.cache }
     try {
       const parsed = JSON.parse(content) as { schemaVersion?: unknown; records?: unknown }
       this.cache = parsed.schemaVersion === 1 && typeof parsed.records === 'object' && parsed.records !== null
         ? { schemaVersion: 1, records: parsed.records as JournalFile['records'] }
         : { schemaVersion: 1, records: {} }
     } catch { this.cache = { schemaVersion: 1, records: {} } }
+    this.cacheMtime = this.io.mtime === undefined ? null : await this.io.mtime(this.path)
     return this.cache
   }
 
@@ -56,8 +80,7 @@ export class ProjectionJournal {
       const current = await this.read()
       const records = { ...current.records, [keyOf(record)]: record }
       const ordered = Object.entries(records).sort((left, right) => right[1].createdAt - left[1].createdAt).slice(0, this.maxRecords)
-      this.cache = { schemaVersion: 1, records: Object.fromEntries(ordered) }
-      await this.io.writeText(this.path, JSON.stringify(this.cache))
+      await this.persist({ schemaVersion: 1, records: Object.fromEntries(ordered) })
     })
   }
 
@@ -82,8 +105,7 @@ export class ProjectionJournal {
       const current = await this.read()
       const records = { ...current.records }
       delete records[keyOf({ sessionId, viewKey, projectionDigest, codecVersion })]
-      this.cache = { schemaVersion: 1, records }
-      await this.io.writeText(this.path, JSON.stringify(this.cache))
+      await this.persist({ schemaVersion: 1, records })
     })
   }
 
@@ -93,8 +115,7 @@ export class ProjectionJournal {
       const current = await this.read()
       const records = Object.fromEntries(Object.entries(current.records).filter(([, record]) =>
         record.sessionId !== sessionId || record.viewKey !== viewKey))
-      this.cache = { schemaVersion: 1, records }
-      await this.io.writeText(this.path, JSON.stringify(this.cache))
+      await this.persist({ schemaVersion: 1, records })
     })
   }
 }

@@ -42,7 +42,7 @@ export interface EvolutionReviewAction {
   readonly type: 'skill' | 'memory' | 'tool'
   readonly action: string
   readonly target: string
-  readonly status: 'ok' | 'error'
+  readonly status: 'ok' | 'staged' | 'error'
   readonly revision?: string | undefined
   readonly summary?: string | undefined
 }

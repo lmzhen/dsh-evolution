@@ -6,10 +6,9 @@
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, ContextFormed, GenerateOptions, StreamChunk, ToolCallBlock, ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import { runReview } from './review-executor.ts'
+import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Agent, ContentBlock, ContextFormed, GenerateOptions, StreamChunk, ToolCallBlock, ToolCallId } from '@deepseek-ai/dsh-evolution-core/platform'
+import { ReviewPartialFailure, runReview } from './review-executor.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
@@ -18,9 +17,8 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-review': { kind: 'evolution-review' } & ContextFormed
   }
 }
-import { SessionId } from '@deepseek-ai/dsh-session'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-evolution-core/platform'
+import { SessionId } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-evolution-core/platform'
 import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
@@ -757,7 +755,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // decision: BOTH modes complete after the task — the old immediate
         // 'inject' contract is superseded, 0.3.39).
         if (params().reviewMode === 'aux') {
-          if (!tryAuxReview(session, agent, pendingKind, signal, 'cadence')) {
+          if (!(await tryAuxReview(session, agent, pendingKind, signal, 'cadence'))) {
             pendingCadenceReviews.set(session.id, pendingKind)
           }
           return
@@ -826,7 +824,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (!shouldCompletionReview(event.data.reason, cumulative, params().skillReviewCompletionMinToolCalls)) return
     completionInjected.add(session.id)
     if (params().reviewMode === 'aux') {
-      if (!tryAuxReview(session, agent, 'skill', signal, 'completion')) {
+      if (!(await tryAuxReview(session, agent, 'skill', signal, 'completion'))) {
         completionInjected.delete(session.id)
       }
       return
@@ -990,7 +988,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * Run one plugin-side review over the parent prefix. No child Agent/Session is
    * created; the parent Agent is used only for tool scope/approval, with no log.
    */
-  function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): boolean {
+  let inFlightControllers = new Set<AbortController>()
+
+  async function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
     const running = auxRunning.get(session.id)
     if (running !== undefined) { running.rerun = kind; return true }
     const header = session.requestHeader()
@@ -1005,20 +1005,35 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       ctx.logger.warn('dsh-evolution-review: aux review skipped — llm/tools service is not mounted')
       return false
     }
+    const authority = ctx.get('evolutionMutationAuthority') as { lease?: { acquire(owner: 'background_review', runId: string, ttlMs?: number): Promise<{ ok: true; token: { id: string; owner: string; runId: string; epoch: number } } | { ok: false; reason: string }>; release(token: { id: string; owner: string; runId: string; epoch: number }): Promise<void>; renew(token: { id: string; owner: string; runId: string; epoch: number }): Promise<unknown | null> } } | undefined
+    let leaseToken: { id: string; owner: string; runId: string; epoch: number } | undefined
+    if (authority?.lease !== undefined) {
+      const lease = await authority.lease.acquire('background_review', 'review:' + session.id, Math.max(config.reviewTimeoutMs + 30_000, 60_000)).catch(() => undefined)
+      if (lease === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — lease acquire failed'); return false }
+      if (!lease.ok) { ctx.logger.warn('dsh-evolution-review: aux review already leased (' + lease.reason + ')'); return false }
+      leaseToken = lease.token
+    }
     const state: { rerun?: ReviewKind } = {}
     auxRunning.set(session.id, state)
     const reviewId = 'aux-' + randomUUID()
     const startedAt = Date.now()
     const controller = new AbortController()
+    inFlightControllers.add(controller)
     let timedOut = false
     const timer = setTimeout(() => { timedOut = true; controller.abort() }, config.reviewTimeoutMs)
+    let leaseRenewTimer: ReturnType<typeof setInterval> | undefined
+    if (leaseToken !== undefined && authority?.lease !== undefined) {
+      leaseRenewTimer = setInterval(() => {
+        void authority.lease!.renew(leaseToken!).then(record => { if (record === null) controller.abort() }).catch(() => { controller.abort() })
+      }, Math.max(5_000, Math.min(30_000, Math.floor(config.reviewTimeoutMs / 2))))
+    }
     const AUX_TOOL_ALLOW = new Set(['skill_manage', 'memory', 'skill', 'skill_search', 'read', 'glob', 'grep'])
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
       let status: 'completed' | 'failed' | 'timeout' | 'aborted' = 'failed'
-      let actions: readonly { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'error' }[] = []
+      let actions: readonly { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'staged' | 'error' }[] = []
       let usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined
       let error: string | undefined
       try {
@@ -1043,13 +1058,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             cacheWriteTokens: 0,
           }
         }
-        status = 'completed'
+        status = toolAllow.size === 0
+          ? 'failed'
+          : 'completed'
+        if (toolAllow.size === 0) error = 'aux review has no allowed tools for this parent (PTC-only header); refusing to report completed'
       } catch (caught) {
         error = caught instanceof Error ? caught.message : String(caught)
+        if (caught instanceof ReviewPartialFailure && caught.actions.length > 0) actions = caught.actions
         status = timedOut ? 'timeout' : controller.signal.aborted ? 'aborted' : 'failed'
         ctx.logger.warn('dsh-evolution-review: aux review failed: ' + error)
       } finally {
         clearTimeout(timer)
+        if (leaseRenewTimer !== undefined) clearInterval(leaseRenewTimer)
         const finishedAt = Date.now()
         try {
           ctx.emit('evolution/review-completed', {
@@ -1077,13 +1097,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             planId: reviewId,
             memoryApplied: actions.filter(action => action.type === 'memory' && ok(action)).length,
             skillApplied: actions.filter(action => action.type === 'skill' && ok(action)).length,
-            rejectedOps: actions.filter(action => !ok(action)).length,
+            rejectedOps: actions.filter(action => action.status === 'error').length,
+            stagedOps: actions.filter(action => action.status === 'staged').length,
             ...(error === undefined ? {} : { executionError: error }),
           })
         } catch (emitError) {
           ctx.logger.warn('dsh-evolution-review: aux plan-applied emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
         }
         auxRunning.delete(session.id)
+        inFlightControllers.delete(controller)
+        if (leaseToken !== undefined && authority?.lease !== undefined) await authority.lease.release(leaseToken).catch(() => {})
         if (state.rerun !== undefined) void tryAuxReview(session, agent, state.rerun, signal, reason)
       }
     })()
@@ -1102,6 +1125,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // tests/session-state-ownership.spec.ts fails when a new per-session map
     // skips the registry. reviewStateLocks chains self-remove when drained;
     // this clear only covers locks still pending at unload.
+    for (const controller of inFlightControllers) controller.abort()
+    inFlightControllers = new Set<AbortController>()
     sessionState.dispose()
   }, 'dsh-evolution-review.cleanup')
 }

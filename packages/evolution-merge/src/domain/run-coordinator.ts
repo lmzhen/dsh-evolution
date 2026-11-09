@@ -24,6 +24,8 @@ export interface MergeRunMeta {
   readonly undonePairs?: readonly string[]
   readonly undoneAt?: string
   readonly degraded?: boolean
+  /** Monotone run-meta revision; callers pass the current value for CAS. */
+  readonly revision?: number
   readonly createdAt: string
   readonly updatedAt: string
 }
@@ -52,8 +54,34 @@ export interface RunCoordinator {
 }
 
 export function runMetaPath(home: string, runId: string): string { return join(home, 'merge', 'run-meta', encodeURIComponent(runId) + '.json') }
-export async function writeRunMeta(io: EvolutionIoLike, home: string, meta: MergeRunMeta): Promise<void> {
-  await transactIo(io, runMetaPath(home, meta.runId), () => JSON.stringify(meta, null, 2) + '\n')
+export async function writeRunMeta(io: EvolutionIoLike, home: string, meta: MergeRunMeta, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<void> {
+  if (meta.revision !== undefined) {
+    const current = await readRunMeta(io, home, meta.runId)
+    const currentRevision = current?.revision ?? 0
+    if (currentRevision !== meta.revision) throw new Error('run-meta revision conflict: expected ' + String(meta.revision) + ', found ' + String(currentRevision))
+  }
+  const write = async (): Promise<void> => {
+    await transactIo(io, runMetaPath(home, meta.runId), current => {
+      let next = meta
+      let previousRevision = 0
+      if (current !== null) {
+        try {
+          const prev = JSON.parse(current) as Partial<MergeRunMeta>
+          previousRevision = typeof prev.revision === 'number' ? prev.revision : 0
+          if (meta.revision !== undefined && meta.revision !== previousRevision) throw new Error('run-meta revision conflict: expected ' + String(meta.revision) + ', found ' + String(previousRevision))
+          if (prev.degraded === true) next = { ...next, degraded: true }
+          const terminal = prev.phase === 'settled' || prev.phase === 'cancelled' || prev.phase === 'undone'
+          // Undo is the one allowed transition out of a settled record; every other
+          // terminal phase is immutable (a late body write must not reopen a run).
+          const undoFromSettled = prev.phase === 'settled' && next.phase === 'undone'
+          if (terminal && next.phase !== prev.phase && !undoFromSettled) next = { ...next, phase: prev.phase, ...(prev.stopReason === undefined ? {} : { stopReason: prev.stopReason }) }
+        } catch { /* unreadable old meta is replaced by the caller's record */ }
+      }
+      return JSON.stringify({ ...next, revision: previousRevision + 1 }, null, 2) + '\n'
+    })
+  }
+  if (fence !== undefined) await fence.run(write)
+  else await write()
 }
 export async function readRunMeta(io: EvolutionIoLike, home: string, runId: string): Promise<MergeRunMeta | null> {
   const raw = await readTextOrNull(io, runMetaPath(home, runId))

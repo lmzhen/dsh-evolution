@@ -8,7 +8,7 @@ import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
-import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type SkillLibrary, type HomeFence, type MutationLockPort } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
@@ -203,12 +203,13 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         const loaded = await loadMergeState(io, home)
         return { ok: true as const, schema: 3 as const, migrated: false, state: { schemaVersion: 3 as const, rows: loaded.state.rows.map(legacyToV3).filter((row): row is NonNullable<typeof row> => row !== null) }, quarantine: [], report: null }
       }
-      const state = await ensureMergeStateReady(io, home)
+      const state = await ensureMergeStateReady(io, home, (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence)
       if (!state.ok) return v4.code === 'merge-state-forward-only' || v4.code === 'merge-state-needs-repair' ? { ok: false as const, code: v4.code, message: v4.message } : state
       const normalized = await normalizePairLedger(io, home)
       return normalized.ok ? state : { ok: false as const, code: 'merge-state-needs-repair' as const, message: normalized.message ?? 'v4 normalize failed' }
     })().catch(error => ({ ok: false as const, code: 'merge-state-migration-blocked' as const, message: error instanceof Error ? error.message : String(error) }))
-    const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) } })
+    const homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
+    const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) }, ...(homeFence === undefined ? {} : { fence: homeFence }) })
     ctx.effect(() => {
       const host = ctx as unknown as { on(name: string, listener: (event: { action?: string }) => void): () => void }
       if (typeof host.on !== 'function') return () => {}
@@ -223,13 +224,15 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       return typeof hostApproval?.platformWrite === 'boolean' ? hostApproval.platformWrite : (resolveMergeParams(rawConfig).platformWrite ?? false)
     }
     const getParams = () => ({ ...resolveMergeParams(rawConfig), limitsSnapshot, platformWrite: getPlatformWrite() })
+    const mutationAuthority = (ctx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: HomeFence; readonly mutationLock?: MutationLockPort } | undefined
     const skills = newSkillLibrary({
       io, ctx, authority: authorityFrom({ origin: 'subagent' }),
       limits: limitsSnapshot.skillLimits,
+      ...(mutationAuthority?.mutationLock === undefined ? {} : { mutationLock: mutationAuthority.mutationLock }),
     })
     void ready.then(value => {
       if (!value.ok) { ctx.logger.warn('merge state is not ready: ' + value.code + ': ' + value.message); return }
-      const unit = new UnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now() })
+      const unit = new UnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now(), isActive: async runId => await runs.hasOwner(runId), ...(mutationAuthority?.homeFence === undefined ? {} : { fence: mutationAuthority.homeFence }) })
       const cards = async () => await readSkillCards(skills)
       void (async () => {
         // NFR-05: load the shared run index BEFORE recovery. Recovery settles through the
@@ -237,7 +240,11 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         // committed unit can turn an orphan-stamped run back into succeeded.
         const loaded = await runs.load()
         if (!loaded.ok) ctx.logger.warn('merge run index: ' + (loaded.note ?? 'unreadable'))
-        const reports = await recoverCommitUnits({ io, home, unit, now: () => Date.now(), isActive: () => false, runs })
+        const activeRuns = new Set<string>()
+        for (const record of runs.runs().filter(record => record.state === 'running')) {
+          if (await runs.hasOwner(record.id)) activeRuns.add(record.id)
+        }
+        const reports = await recoverCommitUnits({ io, home, unit, now: () => Date.now(), isActive: (runId) => activeRuns.has(runId), runs })
         if (reports.length > 0) ctx.logger.info('merge unit recovery: ' + reports.map(report => report.runId + '/' + report.unitId + '=' + report.action).join(', '))
         const v4 = await readV4Readiness(io, home)
         if (v4.ok) {
@@ -347,6 +354,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     if (commands === undefined) return
     const runtime = createMergeRuntime({
       io, home, registry: runs, skills, now: () => Date.now(), getParams, getPlatformWrite,
+      ...(mutationAuthority?.homeFence === undefined ? {} : { fence: mutationAuthority.homeFence }),
       ...(defaultModel === undefined ? {} : { model: defaultModel.currentSelection().model }),
       channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: startupParams.mergeRunTimeoutMinutes,
       hostCapabilities,

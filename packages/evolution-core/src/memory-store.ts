@@ -104,6 +104,10 @@ function hasEntryDelimiter(content: string): boolean {
   return content.includes(ENTRY_DELIMITER) || content.endsWith('\n§')
 }
 
+export interface MemoryFence {
+  run<T>(body: () => Promise<T>): Promise<T>
+}
+
 export interface MemoryStoreOptions {
   memoryCharLimit?: number
   userCharLimit?: number
@@ -111,6 +115,8 @@ export interface MemoryStoreOptions {
   root?: string
   maxConsolidationFailures?: number
   io?: EvolutionIoLike
+  /** Optional shared family fence; all single-file RMWs run inside it. */
+  fence?: MemoryFence
   /** V10-03 (P2-18): deployment-declared benign pattern labels (ScanOptions.
    * excludeLabels) applied to every threat check of this store (writes and
    * the renderContext filter). Default empty — the strict ANY-hit-blocks
@@ -127,6 +133,7 @@ export class MemoryStore {
   readonly root: string
   private readonly maxFailures: number
   private readonly io: EvolutionIoLike
+  private readonly fence: MemoryFence | undefined
   /** V10-03 (P2-18): see MemoryStoreOptions.threatExemptLabels. */
   private readonly threatExemptLabels: readonly string[]
   /** V6-16 (0.3.37): same-process RMW serialization (the SkillLibrary queue) —
@@ -140,6 +147,7 @@ export class MemoryStore {
 
   constructor(options: MemoryStoreOptions = {}) {
     this.io = options.io ?? nodeEvolutionIo()
+    this.fence = options.fence
     this.memoryLimit = options.memoryCharLimit ?? DEFAULT_MEMORY_CHAR_LIMIT
     this.userLimit = options.userCharLimit ?? DEFAULT_USER_CHAR_LIMIT
     this.addDatePrefix = options.addDatePrefix ?? false
@@ -332,7 +340,8 @@ export class MemoryStore {
       }
     }
     let outcome: MemoryApplyResult | undefined
-    await transactIo(this.io, fileFor(this.root, target), async (current) => {
+    const run = async (): Promise<void> => {
+      await transactIo(this.io, fileFor(this.root, target), async (current) => {
       const step = await core(current ?? '')
       outcome = step.result
       // M-4 (v3 audit): a failure on a MISSING file must keep it missing —
@@ -340,6 +349,9 @@ export class MemoryStore {
       // here: the file does not exist, so the remove is a no-op.
       return step.write ?? (current ?? null)
     })
+    }
+    if (this.fence !== undefined) await this.fence.run(run)
+    else await run()
     // C-01: a transact backend that violates the contract (never invokes the
     // task) leaves `outcome` undefined — the old `undefined as
     // MemoryApplyResult` cast handed callers an object whose `.ok` dereference
