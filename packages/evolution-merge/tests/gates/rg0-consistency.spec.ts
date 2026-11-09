@@ -64,8 +64,9 @@ it('RG0 recovery never writes skill bytes', () => {
   expect(source).not.toContain('restoreFromArchive')
 })
 
-it('RG0 commit goes through the CommitPort only', () => {
+it('RG0 commit goes through one UnitTransaction only', () => {
   const source = readFileSync(root + '/src/commit-execute.ts', 'utf8')
-  expect(source).toContain('port.commitMerge')
+  expect(source).toContain('options.unit ?? port.unit')
+  expect(source).not.toContain('legacyUnitAdapter')
   expect(source).not.toContain('applyTreeChange')
 })

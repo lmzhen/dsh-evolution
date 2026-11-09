@@ -3,16 +3,18 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { createChannelScanPorts, pairKey, runScan, stageKeyOf, writeStagedFile, type CommitPort, type ConversationChannelLike, type SkillCard } from '../src/index.ts'
+import { legacyUnit } from './support/legacy-unit.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill') }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill') }, { name: 'umbrella', description: 'u', body: BODY('umbrella'), managed: true }]
 const decision = { should_merge: true, mode: 'merge-into-existing', target: 'umbrella', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' }
 
 function commitPort(): CommitPort {
-  return {
+  const base: CommitPort = {
     async readSkill(name) { return cards.find(card => card.name === name)?.body ?? null },
     async commitMerge(plan) { return { ok: true, message: 'merged', unitId: 'u-1', archived: plan.sources, mutations: 3 } },
   }
+  return { ...base, unit: legacyUnit(base) }
 }
 
 it('runs scan through channel authoring and commit', async () => {

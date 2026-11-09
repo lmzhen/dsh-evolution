@@ -36,7 +36,7 @@ it('RG0 writer map allows only the declared row/commit writers', () => {
   const legacyWriters = files.filter(file => /\b(upsertRow|dropRow|moveRow|mutateMergeState)\b/.test(readFileSync(root + '/src/' + file, 'utf8')))
   expect(legacyWriters).toEqual(['state.ts'])
   const commitWriters = files.filter(file => readFileSync(root + '/src/' + file, 'utf8').includes('port.commitMerge'))
-  expect(commitWriters).toEqual(['commit-execute.ts'])
+  expect(commitWriters).toEqual([])
 })
 
 it('RG0 twelve owner current paths exist', () => {

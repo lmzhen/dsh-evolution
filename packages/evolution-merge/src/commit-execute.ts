@@ -70,7 +70,7 @@ export async function commitStagedRun(
   let result: CommitMergeResult
   let evidenceSha256: string | undefined
   let warning: string | undefined
-  const transaction = options.unit ?? port.unit ?? legacyUnitAdapter(port, assembled.plan, options, runId)
+  const transaction = options.unit ?? port.unit
   if (transaction === undefined) return { ok: false, message: 'commit port missing: UnitTransaction or commitMerge required', plan: assembled.plan }
   {
     const first = assembled.plan.sources[0] ?? assembled.plan.target
@@ -127,24 +127,3 @@ export async function commitStagedRun(
   }
 }
 
-function legacyUnitAdapter(port: CommitPort, plan: CommitMergePlan, options: CommitStagedOptions, runId: string): UnitTransaction | undefined {
-  if (port.commitMerge === undefined) return undefined
-  let evidence: import('@deepseek-ai/dsh-evolution-core').UnitEvidenceRecord | undefined
-  const unitId = 'legacy:' + plan.target + ':' + String(options.now())
-  return {
-    async prepare() { return { ok: true as const, prepared: { unitId, planDigest: unitId } } },
-    async commit() {
-      if (port.commitMerge === undefined) return { ok: false as const, code: 'unit-commit-failed' as const, message: 'commitMerge missing' }
-      const result = await port.commitMerge(plan)
-      if (!result.ok) return { ok: false as const, code: result.code ?? 'unit-commit-failed' as const, message: result.message }
-      const actualUnitId = result.unitId ?? unitId
-      evidence = { schemaVersion: 1, unitId: actualUnitId, runId, planDigest: actualUnitId, state: 'complete', target: { before: plan.expectedTargetBody, after: plan.body, supportDigest: '', created: !plan.targetExists }, sources: plan.expectedSourceBodies.map(source => ({ name: source.name, before: source.body, after: null, archived: (result.archived ?? []).includes(source.name), absorbedInto: plan.target })), mutations: result.mutations ?? 0, at: options.now() }
-      return { ok: true as const, evidence }
-    },
-    async verify() { return evidence ?? null },
-    async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'legacy commit cannot roll back' } },
-    async finalize() { return evidence === undefined ? { ok: false as const, code: 'unit-plan-missing' as const, message: 'legacy unit has no evidence' } : { ok: true as const, evidence } },
-    async rollForward() { return evidence === undefined ? { ok: false as const, code: 'unit-plan-missing' as const, message: 'legacy unit has no evidence' } : { ok: true as const, evidence } },
-    async cancel() { return { ok: false, phase: 'none' as const } },
-  }
-}

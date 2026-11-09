@@ -12,6 +12,11 @@ import {
 } from '../src/index.ts'
 import { withDecisionRevisions } from '../src/revision.ts'
 import { readPairLedgerV4 } from '../src/domain/pair-ledger.ts'
+import { legacyUnit } from './support/legacy-unit.ts'
+
+function commitWithLegacy(io: any, home: string, runId: string, port: any, options: any) {
+  return commitStagedRun(io, home, runId, port.unit === undefined ? { ...port, unit: legacyUnit(port) } : port, options)
+}
 
 const BODY = (name: string): string => ['---', 'name: ' + name, 'description: A merge fixture skill.', '---', '', '# ' + name, '', 'Body of ' + name + '.', ''].join('\n')
 
@@ -32,7 +37,7 @@ const decision = withDecisionRevisions(baseDecision, cards, 'alpha-skill', 'beta
 
 function livePort(options: { readonly mutate?: 'source-support' | 'target-support' } = {}): CommitPort & { plans: CommitMergePlan[] } {
   const plans: CommitMergePlan[] = []
-  return {
+  const base = {
     plans,
     async readSkill(name) { return cards.find(card => card.name === name)?.body ?? null },
     async readSupportFiles(name) {
@@ -43,6 +48,7 @@ function livePort(options: { readonly mutate?: 'source-support' | 'target-suppor
     },
     async commitMerge(plan) { plans.push(plan); return { ok: true, message: 'merged', unitId: 'u-1', archived: plan.sources, mutations: 3 } },
   }
+  return { ...base, unit: legacyUnit(base) }
 }
 
 async function staged(runId: string): Promise<{ home: string; io: ReturnType<typeof nodeEvolutionIo> }> {
@@ -67,7 +73,7 @@ const refs = {
 it('the commit plan carries the decision-time anchors, not a fresh cards hash', async () => {
   const { home, io } = await staged('run-1')
   const port = livePort()
-  const result = await commitStagedRun(io, home, 'run-1', port, { origin: 'foreground', summary: 'merge', now: () => 2, ...refs })
+  const result = await commitWithLegacy(io, home, 'run-1', port, { origin: 'foreground', summary: 'merge', now: () => 2, ...refs })
   expect(result.ok).toBe(true)
   expect(port.plans).toHaveLength(1)
   expect(port.plans[0]?.targetRevision).toEqual(decision.targetRevisionRef)
@@ -78,7 +84,7 @@ it('the commit plan carries the decision-time anchors, not a fresh cards hash', 
 it('assembly refuses a target whose support files changed with a typed cause', async () => {
   const { home, io } = await staged('run-2')
   const port = livePort({ mutate: 'target-support' })
-  const result = await commitStagedRun(io, home, 'run-2', port, { origin: 'foreground', summary: 'merge', now: () => 2, ...refs })
+  const result = await commitWithLegacy(io, home, 'run-2', port, { origin: 'foreground', summary: 'merge', now: () => 2, ...refs })
   expect(result).toMatchObject({ ok: false, code: 'target-changed' })
   expect(port.plans).toHaveLength(0)
 })
@@ -86,7 +92,7 @@ it('assembly refuses a target whose support files changed with a typed cause', a
 it('assembly refuses a source whose support files changed with a typed cause', async () => {
   const { home, io } = await staged('run-3')
   const port = livePort({ mutate: 'source-support' })
-  const result = await commitStagedRun(io, home, 'run-3', port, { origin: 'foreground', summary: 'merge', now: () => 2, ...refs })
+  const result = await commitWithLegacy(io, home, 'run-3', port, { origin: 'foreground', summary: 'merge', now: () => 2, ...refs })
   expect(result).toMatchObject({ ok: false, code: 'source-changed' })
   expect(port.plans).toHaveLength(0)
 })
@@ -94,7 +100,7 @@ it('assembly refuses a source whose support files changed with a typed cause', a
 it('assembly refuses a support digest mismatch even when every body is unchanged', async () => {
   const { home, io } = await staged('run-4')
   const port = livePort()
-  const result = await commitStagedRun(io, home, 'run-4', port, { origin: 'foreground', summary: 'merge', now: () => 2, targetRevision: refs.targetRevision, sourceRevisions: refs.sourceRevisions, supportDigest: revisionSupportDigest([]) })
+  const result = await commitWithLegacy(io, home, 'run-4', port, { origin: 'foreground', summary: 'merge', now: () => 2, targetRevision: refs.targetRevision, sourceRevisions: refs.sourceRevisions, supportDigest: revisionSupportDigest([]) })
   expect(result).toMatchObject({ ok: false, code: 'support-changed' })
   expect(port.plans).toHaveLength(0)
 })

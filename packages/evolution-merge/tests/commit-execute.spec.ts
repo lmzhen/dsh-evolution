@@ -4,6 +4,11 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { commitReceiptPath, commitStagedRun, createStaging, readCommitReceipt, writeStagedFile } from '../src/index.ts'
 import { readJournal } from '../src/domain/commit-journal-store.ts'
+import { legacyUnit } from './support/legacy-unit.ts'
+
+function commitWithLegacy(io: any, home: string, runId: string, port: any, options: any) {
+  return commitStagedRun(io, home, runId, port.unit === undefined ? { ...port, unit: legacyUnit(port) } : port, options)
+}
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 
@@ -22,7 +27,7 @@ it('commits a staged tree and writes a receipt', async () => {
   const io = nodeEvolutionIo()
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
-  const result = await commitStagedRun(io, home, 'run-1', {
+  const result = await commitWithLegacy(io, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge(plan) {
       expect(plan.target).toBe('umbrella')
@@ -50,7 +55,7 @@ it('commits through the UnitTransaction branch without calling commitMerge', asy
     async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
     async cancel() { return { ok: false, phase: 'none' as const } },
   }
-  const result = await commitStagedRun(io, home, 'run-1', {
+  const result = await commitWithLegacy(io, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('old path must not run') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000, unit: unit as never })
@@ -72,7 +77,7 @@ it('P1-6: prepares the unit under the canonical parent run id, not the stage key
     async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
     async cancel() { return { ok: false, phase: 'none' as const } },
   }
-  const result = await commitStagedRun(io, home, 'run-1/pairs/abc', {
+  const result = await commitWithLegacy(io, home, 'run-1/pairs/abc', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('old path must not run') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000, parentRunId: 'run-parent', unit: unit as never })
@@ -95,7 +100,7 @@ it('passes the abort signal to the unit and keeps a landed commit when finalize 
     async cancel() { return { ok: false, phase: 'none' as const } },
     async finalize() { return { ok: false as const, code: 'unit-plan-missing' as const, message: 'finalize unavailable' } },
   }
-  const result = await commitStagedRun(io, home, 'run-1', {
+  const result = await commitWithLegacy(io, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('old path must not run') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000, unit: unit as never, signal: controller.signal })
@@ -118,7 +123,7 @@ it('commit survives a failing journal write', async () => {
       await io.writeText(path, content)
     },
   }
-  const result = await commitStagedRun(flaky, home, 'run-1', {
+  const result = await commitWithLegacy(flaky, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { return { ok: true, message: 'merged', unitId: 'u-1', archived: ['a', 'b'], mutations: 3 } },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000 })
@@ -131,7 +136,7 @@ it('does not write a receipt when commit fails', async () => {
   const io = nodeEvolutionIo()
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
-  const result = await commitStagedRun(io, home, 'run-1', {
+  const result = await commitWithLegacy(io, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { return { ok: false, message: 'commit refused' } },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000 })
@@ -145,7 +150,7 @@ it('keeps the journal prepared when commitMerge throws', async () => {
   const io = nodeEvolutionIo()
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
-  await expect(commitStagedRun(io, home, 'run-1', {
+  await expect(commitWithLegacy(io, home, 'run-1', {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('commit unknown') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000 })).rejects.toThrow('commit unknown')
