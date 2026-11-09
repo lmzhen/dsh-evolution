@@ -94,8 +94,9 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
   })
   const startedAt = handle.startedAt
   const stage = (name: RunStage, progress?: { done: number; total: number }) => options.registry.stage(handle.id, name, progress)
-  await stage('screening', options.total === undefined ? undefined : { done: 0, total: options.total })
-  await writeRunMeta(options.io, options.home, {
+  try {
+    await stage('screening', options.total === undefined ? undefined : { done: 0, total: options.total })
+    await writeRunMeta(options.io, options.home, {
     version: 1, runId: handle.id, pid: process.pid,
     ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }),
     ...(options.pairKey === undefined ? {} : { pairKey: options.pairKey }),
@@ -103,8 +104,16 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     ...(options.pairKey === undefined ? {} : { pairs: [{ pairKey: options.pairKey, state: 'pending' as const }] }),
     pairCount: options.pairCount ?? (options.pairKey === undefined ? 0 : 1),
     phase: 'running', approval: options.approval.mergeApproval ? 'pending' : 'approved',
-    createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString(),
-  })
+      createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString(),
+    })
+  } catch (error) {
+    // P1-1: begin() succeeded, so a staging/meta failure must still settle the run.
+    await options.registry.settle(handle.id, {
+      state: 'failed',
+      failure: 'merge run failed before body: ' + (error instanceof Error ? error.message : String(error)),
+    }).catch(() => {})
+    throw error
+  }
   const writeFailureMeta = async (stopReason: 'failed'): Promise<void> => {
     try {
       await writeRunMeta(options.io, options.home, {

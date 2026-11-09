@@ -43,6 +43,19 @@ it('writes the report before settling a successful run', async () => {
   expect((reg as unknown as { settled: { resultRef?: string; mergeStatus?: string } }).settled.resultRef).toContain('merge-run-1.json')
 })
 
+it('settles the run when staging fails after begin', async () => {
+  const home = await tempRoot('dsh-merge-run-shell-stage-fail-')
+  const io = nodeEvolutionIo()
+  const reg = registry()
+  reg.stage = async () => { throw new Error('stage failed') }
+  await expect(withMergeRun({
+    io, home, registry: reg, command: 'scan', approval: { platformWrite: true, mergeApproval: false },
+    now: () => 200,
+    async body() { throw new Error('body must not run') },
+  })).rejects.toThrow('stage failed')
+  expect(reg.calls).toContain('settle:failed')
+})
+
 it('preserves pair natural lengths in the report', async () => {
   const home = await tempRoot('dsh-merge-run-shell-lengths-')
   const io = nodeEvolutionIo()
