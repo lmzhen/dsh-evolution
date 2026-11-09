@@ -99,11 +99,12 @@ it('replays the same digest idempotently and rejects a different one', async () 
   expect(conflict.code).toBe('unit-conflict')
 })
 
-it('finalizes missing evidence from snapshot + committed journal', async () => {
+it('finalizes missing evidence from snapshot + committed journal under a supplied fence', async () => {
   const home = await tempRoot('dsh-unit-tx-finalize-')
   const io = nodeEvolutionIo()
   const tree = new Map<string, string>([['alpha', 'old'], ['beta', 'beta']])
-  const tx = new UnitTransactions({ io, home, backend: backend(tree), claim: { async acquire() { return { async release() {} } } }, now: () => 1 })
+  const fence = new HomeFence({ io, home, waitMs: 1000 })
+  const tx = new UnitTransactions({ io, home, backend: backend(tree), claim: { async acquire() { return { async release() {} } } }, now: () => 1, fence })
   const prepared = await tx.prepare(plan())
   if (!prepared.ok) throw new Error(prepared.message)
   const committed = await tx.commit(prepared.prepared)
