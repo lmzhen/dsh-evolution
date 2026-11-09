@@ -14,7 +14,7 @@ import type {
 import type { MergeReport, MergeReportPair, MergeRunCommand } from './contracts.ts'
 import { writeMergeReport } from './report.ts'
 import type { MergeError } from './domain/errors.ts'
-import { writeRunMeta } from './domain/run-coordinator.ts'
+import { readRunMeta, writeRunMeta } from './domain/run-coordinator.ts'
 
 /** Bounded wait for a detached body before the run is reported as timed out. */
 const DETACHED_DRAIN_MS = 30_000
@@ -242,7 +242,8 @@ export async function withMergeRun(options: WithMergeRunOptions): Promise<WithMe
     const finalPairs = draft.pairs.length > 0
       ? draft.pairs.map(pair => ({ pairKey: pair.pairKey, state: pair.outcome === 'merged' ? 'fused' as const : pair.outcome === 'pending' ? 'pending' as const : 'skipped' as const }))
       : options.pairKey === undefined ? [] : [{ pairKey: options.pairKey, state: 'pending' as const }]
-    await writeMeta({ version: 1, runId: handle.id, pid: process.pid, ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }), ...(options.pairKey === undefined ? {} : { pairKey: options.pairKey }), ...(options.stagingRef === undefined ? {} : { stagingRef: options.stagingRef }), ...(finalPairs.length === 0 ? {} : { pairs: finalPairs }), pairCount: options.pairCount ?? (options.pairKey === undefined ? 0 : 1), phase: awaiting ? 'awaiting-approval' : 'settled', approval: awaiting ? 'pending' : 'approved', stopReason: report.stopReason, reportRef: reportPath, createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString() })
+    const currentMeta = await readRunMeta(options.io, options.home, handle.id)
+    await writeMeta({ version: 1, runId: handle.id, pid: process.pid, ...(currentMeta?.revision === undefined ? {} : { revision: currentMeta.revision }), ...(options.parentRunId === undefined ? {} : { parentRunId: options.parentRunId }), ...(options.pairKey === undefined ? {} : { pairKey: options.pairKey }), ...(options.stagingRef === undefined ? {} : { stagingRef: options.stagingRef }), ...(finalPairs.length === 0 ? {} : { pairs: finalPairs }), pairCount: options.pairCount ?? (options.pairKey === undefined ? 0 : 1), phase: awaiting ? 'awaiting-approval' : 'settled', approval: awaiting ? 'pending' : 'approved', stopReason: report.stopReason, reportRef: reportPath, createdAt: new Date(startedAt).toISOString(), updatedAt: new Date(options.now()).toISOString() })
     if (report.stopReason === 'completed') return { ok: true, runId: handle.id, reportPath, report }
     return { ok: false, runId: handle.id, message: 'merge ' + report.stopReason, reportPath }
   }

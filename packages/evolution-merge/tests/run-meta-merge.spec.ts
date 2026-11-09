@@ -17,3 +17,13 @@ it('preserves degraded and terminal phase across overlapping run-meta writes', a
   const meta = await readRunMeta(io, home, 'run-1')
   expect(meta).toMatchObject({ phase: 'settled', degraded: true, stopReason: 'completed' })
 })
+
+it('rejects a stale run-meta revision', async () => {
+  const home = await tempRoot('dsh-run-meta-cas-')
+  const io = nodeEvolutionIo()
+  await writeRunMeta(io, home, base('running'))
+  const first = await readRunMeta(io, home, 'run-1')
+  if (first?.revision === undefined) throw new Error('missing revision')
+  await writeRunMeta(io, home, { ...base('settled'), revision: first.revision })
+  await expect(writeRunMeta(io, home, { ...base('cancelled'), revision: first.revision })).rejects.toThrow('revision conflict')
+})
