@@ -47,7 +47,6 @@
     "@deepseek-ai/dsh-evolution-io": "workspace:^"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-llm": "workspace:^",
     "minisearch": "^7.2.0"
   }
 }
