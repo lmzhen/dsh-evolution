@@ -1681,7 +1681,7 @@
       "kind": "beh",
       "owner": "platform-backend-01",
       "files": [
-        "packages/tool-memory/tests/memory-interpolation.spec.ts"
+        "packages/tool-memory/tests/memory-interpolation-contract.spec.ts"
       ],
       "mutation": "packages/tool-memory/tests/memory-interpolation.mutation.json",
       "evidence": "A",
