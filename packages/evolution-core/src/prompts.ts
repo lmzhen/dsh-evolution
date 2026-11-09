@@ -27,18 +27,19 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 26
+export const PROMPT_BUNDLE_VERSION = 27
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
 
-const MEMORY_REVIEW_BODY = `Review the conversation above and consider saving to memory if appropriate.
+const MEMORY_REVIEW_BODY = `Focus on durable facts that change future collaboration:
 
-Focus on:
-1. Has the user revealed things about themselves — persona, desires, preferences, personal details, or expectations about how you should behave?
-2. Has the user expressed expectations about how you should behave, their work style, or ways you want them to operate?
+1. The user: role, context, stable preferences, constraints, and facts they would want remembered.
+2. The work: how deliverables should be judged across future tasks — quality bar, format, sources/tools, and collaboration conventions.
 
-If something stands out, save it using the memory tool.`
+Do not store task progress or reusable procedures; procedures belong in skills.
+Prefer merging or replacing an existing entry over adding a near-duplicate.
+Keep the entry compact.`
 
 const SKILL_REVIEW_BODY = `Review the conversation above and update the skill library.
 

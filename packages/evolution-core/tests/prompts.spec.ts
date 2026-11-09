@@ -33,7 +33,8 @@ it('skill review prompt keeps neutral decision structure and pass wording', () =
   expect(SKILL_REVIEW_PROMPT).toContain('Capture only a reproducible setup or repair procedure')
   expect(SKILL_REVIEW_PROMPT).toContain('A user correction about how a class of task should be done')
   expect(SKILL_REVIEW_PROMPT).toContain('Nothing to save.')
-  expect(MEMORY_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
+  expect(MEMORY_REVIEW_PROMPT).toContain('durable facts that change future collaboration')
+  expect(MEMORY_REVIEW_PROMPT).toContain('Prefer merging or replacing')
 })
 
 it('authoring standards put routing metadata in frontmatter', () => {
@@ -42,7 +43,7 @@ it('authoring standards put routing metadata in frontmatter', () => {
 
 it('combined review prompt mirrors the same neutral decision structure', () => {
   expect(COMBINED_REVIEW_PROMPT).toContain('## Memory')
-  expect(COMBINED_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
+  expect(COMBINED_REVIEW_PROMPT).toContain('durable facts that change future collaboration')
   expect(COMBINED_REVIEW_PROMPT).toContain('## Skills')
   expect(COMBINED_REVIEW_PROMPT).toContain('A precise no-op is a valid outcome')
   expect(COMBINED_REVIEW_PROMPT).toContain('A user correction about how a class of task should be done')
@@ -81,7 +82,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
   // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
   // bundle identity moves with it (v18 pinned the step-7 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(26)
+  expect(PROMPT_BUNDLE_VERSION).toBe(27)
   // v46 S1.12b (finding T3-07): the dry-run banner is model-visible curator text, so it rides
   // the bundle and the digest covers it.
   expect(PROMPT_BUNDLE.prompts['curatorDryRun']).toBe(CURATOR_DRY_RUN_BANNER)
