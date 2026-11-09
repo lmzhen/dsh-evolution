@@ -223,3 +223,27 @@ it('rolls back an uncommitted target from the snapshot', async () => {
   expect(rolled.ok).toBe(true)
   expect(tree.get('alpha')).toBe('old')
 })
+
+it('rolls back under a supplied HomeFence without taking tree-lock itself', async () => {
+  const home = await tempRoot('dsh-unit-tx-rollback-fence-')
+  const io = nodeEvolutionIo()
+  const tree = new Map<string, string>([['alpha', 'old'], ['beta', 'beta']])
+  const fence = new HomeFence({ io, home, waitMs: 1000 })
+  const tx = new UnitTransactions({ io, home, backend: backend(tree), claim: { async acquire() { return { async release() {} } } }, now: () => 1, fence })
+  const prepared = await tx.prepare(plan())
+  if (!prepared.ok) throw new Error(prepared.message)
+  const rolled = await tx.rollback({ unitId: prepared.prepared.unitId, reason: 'test' })
+  expect(rolled.ok).toBe(true)
+  expect(tree.get('alpha')).toBe('old')
+})
+
+it('classifies a claim-acquire failure as unit-claim-failed', async () => {
+  const home = await tempRoot('dsh-unit-tx-claim-failed-')
+  const io = nodeEvolutionIo()
+  const tree = new Map<string, string>([['alpha', 'old'], ['beta', 'beta']])
+  const tx = new UnitTransactions({ io, home, backend: backend(tree), claim: { async acquire() { throw new Error('claim busy') } }, now: () => 1 })
+  const prepared = await tx.prepare(plan())
+  if (!prepared.ok) throw new Error(prepared.message)
+  const committed = await tx.commit(prepared.prepared)
+  expect(committed).toMatchObject({ ok: false, code: 'unit-claim-failed' })
+})

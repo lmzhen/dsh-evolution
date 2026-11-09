@@ -283,6 +283,7 @@ export class UnitTransactions implements UnitTransaction {
     let lock: TreeLock | undefined;
     let fenceLease: HomeFenceLease | undefined;
     let claim: UnitClaim | undefined;
+    let stage: 'fence' | 'claim' | 'commit' = 'fence'
     const checkpoints: UnitJournalCheckpoint[] = [];
     const writePhase = async (phase: UnitJournalPhase, checkpointsNext: UnitJournal["checkpoints"] = checkpoints) => {
       if (lock !== undefined && !(await lock.assertHeld())) throw new Error("unit-fence-lost");
@@ -305,8 +306,10 @@ export class UnitTransactions implements UnitTransaction {
         this.options.onLock?.("tree");
       }
       if (!(await lock.assertHeld())) return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost" };
+      stage = 'claim'
       claim = await this.options.claim.acquire(stored.plan.target, stored.plan.runId);
       this.options.onLock?.("claim");
+      stage = 'commit'
       await writeUnitJournal(this.options.io, this.options.home, { ...journalBase, phase: "target-pending" });
       const result = await this.options.backend.commit(
         { ...stored.plan, unitId: prepared.unitId },
@@ -393,7 +396,13 @@ export class UnitTransactions implements UnitTransaction {
       const message = error instanceof Error ? error.message : String(error);
       return {
         ok: false as const,
-        code: message === "unit-fence-lost" ? ("unit-fence-failed" as const) : ("unit-claim-failed" as const),
+        code: message === "unit-fence-lost"
+          ? ("unit-fence-failed" as const)
+          : stage === "claim"
+            ? ("unit-claim-failed" as const)
+            : stage === "fence"
+              ? ("unit-fence-failed" as const)
+              : ("unit-commit-failed" as const),
         message,
       };
     } finally {
@@ -546,13 +555,21 @@ export class UnitTransactions implements UnitTransaction {
     const snapshot = await readUnitSnapshot(this.options.io, this.options.home, ref.unitId);
     if (snapshot === null) return { ok: false as const, code: "unit-rollback-blocked" as const, message: "snapshot missing" };
     const journal = await readUnitJournal(this.options.io, this.options.home, ref.unitId);
-    const acquired = await acquireTreeWriteLock({ io: this.options.io, home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
-    if (!acquired.ok) return { ok: false as const, code: "unit-fence-failed" as const, message: acquired.message ?? acquired.reason };
+    let fenceLease: HomeFenceLease | undefined
+    let lock: TreeLock | undefined
     let claim: UnitClaim | undefined;
     try {
-      if (!(await acquired.lock.assertHeld()))
-        return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost" };
+      if (this.options.fence !== undefined) {
+        fenceLease = await this.options.fence.acquire()
+        lock = fenceLease.lock
+      } else {
+        const acquired = await acquireTreeWriteLock({ io: this.options.io, home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
+        if (!acquired.ok) return { ok: false as const, code: "unit-fence-failed" as const, message: acquired.message ?? acquired.reason };
+        lock = acquired.lock
+      }
       this.options.onLock?.("tree");
+      if (!(await lock.assertHeld()))
+        return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost" };
       claim = await this.options.claim.acquire(snapshot.target, snapshot.runId);
       this.options.onLock?.("claim");
       const currentTarget = await this.options.backend.readSkill(snapshot.target);
@@ -567,16 +584,16 @@ export class UnitTransactions implements UnitTransaction {
         if (current !== null && current !== source.body)
           return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source drifted since snapshot: " + source.name };
       }
-      if (!(await acquired.lock.assertHeld()))
+      if (!(await lock.assertHeld()))
         return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before target restore" };
       await this.options.backend.restoreTarget(snapshot.target, snapshot.targetBefore);
       for (const file of snapshot.supportBefore) {
-        if (!(await acquired.lock.assertHeld()))
+        if (!(await lock.assertHeld()))
           return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before support restore" };
         await this.options.backend.restoreSupportFile?.(snapshot.target, file.path, file.content);
       }
       for (const source of snapshot.sourceBefore) {
-        if (!(await acquired.lock.assertHeld()))
+        if (!(await lock.assertHeld()))
           return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before source restore" };
         await this.options.backend.restoreSource(source.name, source.body);
       }
@@ -602,7 +619,8 @@ export class UnitTransactions implements UnitTransaction {
       return { ok: true as const, evidence: evidenceRecord };
     } finally {
       await claim?.release();
-      await acquired.lock.release();
+      if (fenceLease !== undefined) await fenceLease.release();
+      else await lock?.release();
     }
   }
 
