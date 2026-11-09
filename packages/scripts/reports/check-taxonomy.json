@@ -487,6 +487,7 @@
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
         "evolution-core::tests/unit-crash-final.spec.ts",
+        "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
@@ -1201,6 +1202,7 @@
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
         "evolution-core::tests/unit-crash-final.spec.ts",
+        "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
@@ -1845,6 +1847,7 @@
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
         "evolution-core::tests/unit-crash-final.spec.ts",
+        "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
@@ -2315,7 +2318,7 @@
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 458
+      "specs": 459
     },
     "ci-only": {
       "gates": 12,
@@ -2323,16 +2326,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 458
+      "specs": 459
     },
     "full(ci=on)": {
       "gates": 87,
-      "specs": 530
+      "specs": 531
     }
   },
   "specs": {
-    "total": 530,
-    "marked": 530,
+    "total": 531,
+    "marked": 531,
     "unmarked": 0
   }
 }
