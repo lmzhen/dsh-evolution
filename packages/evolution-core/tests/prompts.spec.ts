@@ -27,10 +27,10 @@ it('skill review prompt keeps neutral decision structure and pass wording', () =
   expect(SKILL_REVIEW_PROMPT).toContain('references/')
   expect(SKILL_REVIEW_PROMPT).toContain('this review pass')
   expect(SKILL_REVIEW_PROMPT).not.toContain('background review pass')
-  expect(SKILL_REVIEW_PROMPT).toContain('Update only skills you loaded or read')
-  expect(SKILL_REVIEW_PROMPT).toContain('creating a new class-level skill is the exception')
+  expect(SKILL_REVIEW_PROMPT).toContain('Update only skills whose body you have read')
+  expect(SKILL_REVIEW_PROMPT).toContain('the create exception only waives reading a target body')
   expect(SKILL_REVIEW_PROMPT).toContain('A one-off environment failure')
-  expect(SKILL_REVIEW_PROMPT).toContain('Capture a reproducible setup or repair procedure')
+  expect(SKILL_REVIEW_PROMPT).toContain('Capture only a reproducible setup or repair procedure')
   expect(SKILL_REVIEW_PROMPT).toContain('A user correction about how a class of task should be done')
   expect(SKILL_REVIEW_PROMPT).toContain('Nothing to save.')
   expect(MEMORY_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
@@ -55,7 +55,11 @@ it('keeps no-op delivery out of the shared decision body', () => {
   expect(COMBINED_REVIEW_PROMPT).toContain('continue to the Skills pass')
   expect(COMBINED_REVIEW_PROMPT).toContain('If nothing durable exists in either pass')
   expect(SKILL_REVIEW_PROMPT).toContain('add the SKILL.md line that points to it')
-  expect(SKILL_REVIEW_PROMPT).toContain('If only a protected skill can carry the lesson')
+  expect(SKILL_REVIEW_PROMPT).toContain('If a lesson can only live in a protected skill')
+  expect(SKILL_REVIEW_PROMPT).toContain('Write skills only through skill_manage')
+  expect(SKILL_REVIEW_PROMPT).toContain('search the existing library')
+  expect(SKILL_REVIEW_PROMPT).toContain('at least two different future events')
+  expect(SKILL_REVIEW_PROMPT).toContain('Any one of these warrants a decision')
 })
 
 it('curator prompt keeps package integrity and the consolidated/pruned block contract', () => {
@@ -130,9 +134,9 @@ it('reviewPrompt maps each kind to the agent prompt', () => {
 })
 
 it('skill review keeps read-before-write and the create exemption neutral', () => {
-  expect(SKILL_REVIEW_PROMPT).toContain('Update only skills you loaded or read in this review pass')
-  expect(SKILL_REVIEW_PROMPT).toContain('creating a new class-level skill is the exception')
-  expect(COMBINED_REVIEW_PROMPT).toContain('Update only skills you loaded or read in this review pass')
+  expect(SKILL_REVIEW_PROMPT).toContain('Update only skills whose body you have read in this review pass')
+  expect(SKILL_REVIEW_PROMPT).toContain('the create exception only waives reading a target body')
+  expect(COMBINED_REVIEW_PROMPT).toContain('Update only skills whose body you have read in this review pass')
 })
 
 it('authoring standards carry the colon-quote and privacy motive guarantees', () => {

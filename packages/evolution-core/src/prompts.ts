@@ -49,16 +49,18 @@ const SKILL_REVIEW_BODY = `Review the conversation above and update the skill li
 
 Update only when the session contains a durable lesson that changes how this class of task should be done. A precise no-op is a valid outcome.
 
-Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail. Do not create one narrow skill per incident. Keep the body compact; put new session-specific detail in references/.
+Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail. Do not create one narrow skill per incident. A new skill is class-level when it can serve at least two different future events; if it only serves this incident, fold it into an existing owner or a support file. Keep the body compact; put new session-specific detail in references/.
 
 A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Support files: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators. When you add a support file, add the SKILL.md line that points to it; a file no pointer reaches is invisible next session.
 
-Signals:
+Signals include:
 - The user corrected style, tone, format, verbosity, workflow, or approach.
-- A reusable technique, repair procedure, or debugging path emerged that will recur.
+- A reusable technique, durable interface or environment fact, repair procedure, or debugging path emerged that will recur.
 - A loaded skill proved wrong, incomplete, or outdated.
 
-Read before writing. If you loaded a skill earlier and cannot recall its body, read it again before patching. Update only skills you loaded or read in this review pass; creating a new class-level skill is the exception.
+Any one of these warrants a decision; it does not by itself require a write.
+
+Read before writing. Update only skills whose body you have read in this review pass. Before creating a new class-level skill, search the existing library with the available skill tools; the create exception only waives reading a target body, not that search.
 
 Choose the nearest owner that can carry the lesson:
 1. the loaded skill, if it is the class-level owner;
@@ -72,9 +74,9 @@ A user correction about how a class of task should be done belongs in the skill 
 
 Leave consolidation to the curator; focus this pass on the smallest edit that carries the session's lesson.
 
-A one-off environment failure, transient error, or "tool X is broken" claim is not a lesson. Capture a reproducible setup or repair procedure only when it will recur; otherwise no-op.
+A one-off environment failure, transient error, or "tool X is broken" claim is not a lesson. Capture only a reproducible setup or repair procedure that will recur.
 
-Respect protected skills (bundled, hub-installed, pinned) and their guards. If only a protected skill can carry the lesson, stop and say so; do not create a near-duplicate to hold it.`
+Write skills only through skill_manage. If its guard refuses a write, report the refusal and do not work around it. Respect protected skills (bundled, hub-installed, pinned) and their guards. If a lesson can only live in a protected skill, report it and leave that lesson unapplied; continue with any other lessons. Do not create a near-duplicate to hold it.`
 
 export const SKILL_REVIEW_PROMPT = `[Auto-review — Skills]
 ${SKILL_REVIEW_BODY}
@@ -86,7 +88,7 @@ Apply both review passes below.
 
 ## Memory
 ${MEMORY_REVIEW_BODY}
-If nothing is worth saving, say "Nothing to save (memory)." and continue to the Skills pass.
+After the memory pass, continue to the Skills pass. If nothing is worth saving, say "Nothing to save (memory)."
 
 ## Skills
 ${SKILL_REVIEW_BODY}`
@@ -260,7 +262,7 @@ export const MAINTAIN_OUTPUT_INSTRUCTION = '按模板契约输出 JSON 维护计
  * model to save/repair skills on its own initiative.
  */
 export const SKILLS_GUIDANCE = `Skills guidance:
-• After completing a complex task (5+ tool calls), fixing a tricky error, or discovering a non-trivial workflow, save the approach as a skill with skill_manage so you can reuse it next time.
+• After a complex task (5+ tool calls), a tricky fix, or a non-trivial workflow, decide whether an existing owner should be updated or a new class-level skill is needed; search the library before creating.
 • When using a skill and finding it outdated, incomplete, or wrong, patch it immediately with skill_manage (action='patch') — don't wait to be asked. Skills that aren't maintained become liabilities.`
 
 export function reviewPrompt(kind: 'memory' | 'skill' | 'combined'): string {
