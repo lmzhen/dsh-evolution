@@ -67,6 +67,9 @@ export class MutationAuthority {
   /** Lease primitives for domain run/claim owners. */
   get lease(): LeaseStore { return this.leases }
 
+  /** The one home fence domain unit engines must reuse instead of taking tree-lock themselves. */
+  get homeFence(): HomeFence { return this.fence }
+
   constructor(options: MutationAuthorityOptions) {
     this.io = options.io
     this.leases = options.leases ?? new LeaseStore({ io: options.io, home: options.home, ...(options.now === undefined ? {} : { now: options.now }) })

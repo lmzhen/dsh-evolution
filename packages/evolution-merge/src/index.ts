@@ -8,7 +8,7 @@ import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
-import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, newSkillLibrary, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type SkillLibrary, type HomeFence } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
@@ -229,7 +229,8 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     })
     void ready.then(value => {
       if (!value.ok) { ctx.logger.warn('merge state is not ready: ' + value.code + ': ' + value.message); return }
-      const unit = new UnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now() })
+      const mutationAuthority = (ctx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: HomeFence } | undefined
+      const unit = new UnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now(), ...(mutationAuthority?.homeFence === undefined ? {} : { fence: mutationAuthority.homeFence }) })
       const cards = async () => await readSkillCards(skills)
       void (async () => {
         // NFR-05: load the shared run index BEFORE recovery. Recovery settles through the

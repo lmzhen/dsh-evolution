@@ -2,6 +2,11 @@ import { acquireTreeWriteLock, type TreeLock, type TreeLockOptions } from './tre
 
 export interface HomeFenceOptions extends TreeLockOptions {}
 
+export interface HomeFenceLease {
+  readonly lock: TreeLock
+  release(): Promise<void>
+}
+
 export class HomeFenceError extends Error {
   readonly reason: 'busy' | 'io'
   constructor(reason: 'busy' | 'io', message: string) {
@@ -24,7 +29,7 @@ export class HomeFence {
     this.options = options
   }
 
-  async run<T>(body: (lock: TreeLock) => Promise<T>): Promise<T> {
+  async acquire(): Promise<HomeFenceLease> {
     const previous = this.tail
     let releaseQueue: () => void = () => {}
     this.tail = new Promise<void>(resolve => { releaseQueue = resolve })
@@ -34,13 +39,25 @@ export class HomeFence {
       if (!acquired.ok) {
         throw new HomeFenceError(acquired.reason, acquired.message ?? 'home fence is ' + acquired.reason)
       }
-      try {
-        return await body(acquired.lock)
-      } finally {
-        await acquired.lock.release()
+      return {
+        lock: acquired.lock,
+        release: async () => {
+          await acquired.lock.release()
+          releaseQueue()
+        },
       }
-    } finally {
+    } catch (error) {
       releaseQueue()
+      throw error
+    }
+  }
+
+  async run<T>(body: (lock: TreeLock) => Promise<T>): Promise<T> {
+    const lease = await this.acquire()
+    try {
+      return await body(lease.lock)
+    } finally {
+      await lease.release()
     }
   }
 }

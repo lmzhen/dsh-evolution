@@ -7,6 +7,7 @@ import { tempRoot } from '../../test-support/temp-home.ts'
 import { UnitTransactions, unitEvidenceDigest, type UnitBackend, type UnitPlan } from '../src/unit-transaction.ts'
 import { readUnitJournal, writeUnitJournal } from '../src/unit-journal.ts'
 import { readUnitReceipt } from '../src/unit-storage.ts'
+import { HomeFence } from '../src/home-fence.ts'
 
 function backend(tree: Map<string, string>): UnitBackend {
   return {
@@ -31,6 +32,19 @@ it('accepts a caller-provided unitId and keeps it through commit', async () => {
   if (!prepared.ok) return
   const committed = await tx.commit(prepared.prepared)
   expect(committed).toMatchObject({ ok: true, evidence: { unitId: 'caller-unit' } })
+})
+
+it('commits under a supplied HomeFence without taking tree-lock itself', async () => {
+  const home = await tempRoot('dsh-unit-tx-fence-')
+  const io = nodeEvolutionIo()
+  const tree = new Map<string, string>([['alpha', 'old'], ['beta', 'beta']])
+  const fence = new HomeFence({ io, home, waitMs: 1000 })
+  const tx = new UnitTransactions({ io, home, backend: backend(tree), claim: { async acquire() { return { async release() {} } } }, now: () => 1, fence })
+  const prepared = await tx.prepare(plan())
+  if (!prepared.ok) throw new Error(prepared.message)
+  const committed = await tx.commit(prepared.prepared)
+  expect(committed.ok).toBe(true)
+  expect(tree.get('alpha')).toBe('new')
 })
 
 it('prepares, commits and returns stored evidence', async () => {
