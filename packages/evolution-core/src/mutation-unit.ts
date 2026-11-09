@@ -309,7 +309,7 @@ export class MutationUnit {
       try {
         lease = await this.lock.acquire()
       } catch (error) {
-        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'lock-failed', message: error instanceof Error ? error.message : String(error) }] }
+        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'unit-fence-failed', message: error instanceof Error ? error.message : String(error) }] }
       }
       let claim: { release(): Promise<void> } | undefined
       if (this.claim !== undefined) {
@@ -438,7 +438,7 @@ export class MutationUnit {
       try {
         lease = await this.lock.acquire()
       } catch (error) {
-        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'lock-failed', message: error instanceof Error ? error.message : String(error) }] }
+        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'unit-fence-failed', message: error instanceof Error ? error.message : String(error) }] }
       }
       const reverted: string[] = []
       try {

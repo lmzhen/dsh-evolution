@@ -271,7 +271,7 @@ describe('MutationUnit executor', () => {
     const lock: MutationLockPort = { async acquire() { throw new Error('busy') } }
     const result = await unit(io, { lock }).apply(request())
     expect(result.ok).toBe(false)
-    expect(result.errors[0]?.code).toBe('lock-failed')
+    expect(result.errors[0]?.code).toBe('unit-fence-failed')
   })
 
   it('releases the lock after success and failure', async () => {
