@@ -1,4 +1,9 @@
 # Changelog
+## 0.39.2 (prompt) — 前后台 review 提示词分离；memory review 收口
+
+> **范围**：inject 使用前台 kind-specific 提示词；aux 的 skill/combined 走 combined 提示词并包含 memory，修复后台缺 memory 的问题；删除无生产消费者的 plan 提示词/branch；共享 decision body，通道终止语外置；memory prompt 改为 durable facts + user/work 双轴 + merge/replace；创建/补旧改为对称判据并保留 support pointer、protected、skill_manage、search-before-create 边界；prompt bundle 升到 v27。
+> **验证**：prompts.spec.ts + s1-9-batch.spec.ts 19/19 通过；inject/aux 映射与 completion no-op 由契约测试覆盖；tag CI 负责构建、桌面安装和 npm 发布。
+
 ## 0.39.1 (ui) — 自进化设置升为一级入口；技能历史更名
 
 > **范围**：设置里的自进化从「内置插件 → 自进化」标签页移到左侧一级「自进化」，与皮肤/图片取用等并列；侧栏「技能历史」更名为「技能自动进化」，页内右上小标签仍为「技能历史」；合并页的跳转文案同步改路径。
