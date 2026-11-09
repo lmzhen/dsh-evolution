@@ -13,8 +13,9 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactNode } from 'react'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
-import { fill, en, message, NS, zh, type MessageKey } from './messages.ts'
-import { PluginParamCard, type ParamCardFace, type ParamLanguage } from './ParamCard.ts'
+import { dictionaries, fill, message, NS, type MessageKey } from './messages.ts'
+import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
+import { PluginParamCard, type ParamCardFace } from './ParamCard.ts'
 import { groupParamCards } from './settings-groups.ts'
 import { PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
 import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
@@ -55,7 +56,7 @@ export function apply(ctx: ClientContext): void {
   let registered = false
   ctx.effect(() => {
     try {
-      const dispose = seam.locale.register(NS, { zh, en })
+      const dispose = seam.locale.register(NS, dictionaries)
       registered = true
       return dispose
     } catch (error) {
@@ -87,11 +88,11 @@ export function apply(ctx: ClientContext): void {
   // sites used to write `t('changed').replace('{n}', …)` seven times.
   const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string =>
     values === undefined ? translate(key) : fill(translate(key), values)
-  const language = (): ParamLanguage => {
+  const language = (): SupportedLocale => {
     try {
       const active = (ctx as unknown as { locale?: { getLocale?: () => { active?: string } } }).locale?.getLocale?.().active
-      return active === 'zh' ? 'zh' : 'en'
-    } catch { return 'zh' }
+      return (['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt'] as const).includes(active as SupportedLocale) ? active as SupportedLocale : 'en'
+    } catch { return 'en' }
   }
   // G2: the client settings seat, probed LAZILY (see `inject`). Without a seat every card
   // renders the stated empty state and the Plugins page says the same — never a blank card

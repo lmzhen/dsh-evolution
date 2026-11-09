@@ -1,7 +1,7 @@
 {
   "name": "@lmzhen/dsh-evolution-client-kit",
   "description": "Shared browser seams and lifecycle for the evolution family sidebar panels",
-  "version": "0.40.1",
+  "version": "0.41.0",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -43,7 +43,27 @@
       "types": "./lib/types/tokens.d.ts",
       "default": "./lib/tokens.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./generated/i18n": {
+      "types": "./lib/types/generated/i18n.generated.d.ts",
+      "default": "./lib/generated/i18n.generated.js"
+    },
+    "./generated/i18n/evolution-settings": {
+      "types": "./lib/types/generated/i18n/evolution-settings.d.ts",
+      "default": "./lib/generated/i18n/evolution-settings.js"
+    },
+    "./generated/i18n/evolution-skill-history": {
+      "types": "./lib/types/generated/i18n/evolution-skill-history.d.ts",
+      "default": "./lib/generated/i18n/evolution-skill-history.js"
+    },
+    "./generated/i18n/evolution-merge": {
+      "types": "./lib/types/generated/i18n/evolution-merge.d.ts",
+      "default": "./lib/generated/i18n/evolution-merge.js"
+    },
+    "./generated/i18n/evolution-skill-health": {
+      "types": "./lib/types/generated/i18n/evolution-skill-health.d.ts",
+      "default": "./lib/generated/i18n/evolution-skill-health.js"
+    }
   },
   "files": [
     "lib/**/*.js",

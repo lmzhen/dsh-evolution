@@ -29,12 +29,13 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import {
-  errorText, appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion } from '@deepseek-ai/dsh-evolution-core'
+  appendEvolutionEvent, assertSkillsRootAliasRetired, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, elapsedSince, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, resolveRootConfig, newSkillLibrary, partitionVersions, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type SkillVersion, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
 import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
+import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
 import { PROFILE_PATCH_FILENAME, baseRefusalReason, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
 // G3: the write-path exclusion asks the ONE owner of <home>/profiles about THIS plane only.
 import { installExclusionTarget } from './profiles.ts'
@@ -408,6 +409,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const input = rawInputTrimmed.replace(/\s+/g, ' ')
         const ok = (text: string) => ({ kind: 'success' as const, text })
         const err = (text: string) => ({ kind: 'error' as const, text })
+        const hostLocale = resolveHostLocale(ctx)
+        const hostError = (id: EvolutionErrorId, args: Record<string, string | number> = {}): string => hostErrorText(hostLocale, id, args)
         // G5.3: merge owns its parser and semantics; this surface only owns the
         // /evolution namespace. Forward the RAW input so merge flags survive.
         if (input === 'merge' || input.startsWith('merge ')) {
@@ -425,7 +428,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           | (CommandInvocation['agent'] & { followup?: unknown; inject?: unknown })
           | undefined
         const agentMissing = (need: string): CommandResult | undefined => invocationAgent === undefined
-          ? err(errorText('e-305-this-invocation-carries-no', { a1: need }))
+          ? err(hostError('e-305-this-invocation-carries-no', { a1: need }))
           : undefined
         // v43 audit (P1-2): consolidate, the whole-tree `restore` and `skill
         // restore <name>` are destructive and had NO approval seam, while their
@@ -441,7 +444,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const sessionPolicy = effectiveSessionPolicy(ctx, session)
           const wouldStage = approval.isEnabled !== false && sessionPolicy !== 'never' && approval.stageForeground !== false
           if (!wouldStage) return undefined
-          return err(errorText('e-306-this-deployment-stages-foreground', { a1: what }))
+          return err(hostError('e-306-this-deployment-stages-foreground', { a1: what }))
         }
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         // G7.4/C7: the ONE parser answers the shape.
@@ -460,7 +463,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // used to render as the success line below, so a degraded assembly
           // read "service unavailable" as "nothing in flight". Match the
           // E-301 posture of approve/reject instead.
-          if (!approval) return err(errorText('e-301-approval-service-not-mounted'))
+          if (!approval) return err(hostError('e-301-approval-service-not-mounted'))
           const listed = [...await approval.list('pending'), ...await approval.list('executing')]
           const pending = [...new Map(listed.map(row => [row.id, row])).values()]
           // T4-09/A51: say which of the three human-confirmation states is in force. Reading through
@@ -468,9 +471,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // by the time these rows print — the note tells the operator that happened / can happen.
           const ttlMs = typeof approval.ttlMs === 'number' && Number.isFinite(approval.ttlMs) ? approval.ttlMs : 0
           const ttlNote = ttlMs > 0
-            ? `\n（暂存写入 ${ttlMs} 毫秒后过期：过期即关闭为 REJECTED，且永不执行。若仍需要，请重新暂存。）`
-            : '\n(staged writes never expire — the window waits for a decision; set the evolution-approval row pendingTtlMs to bound it)'
-          if (pending.length === 0) return ok('没有待批准的自进化写入。' + ttlNote)
+            ? hostCommandText(hostLocale, 'command.pending.ttl', { ttl: ttlMs })
+            : hostCommandText(hostLocale, 'command.pending.neverExpires')
+          if (pending.length === 0) return ok(hostCommandText(hostLocale, 'command.pending.empty') + ttlNote)
           // F-328: `--detail` renders each record's staged args so an operator
           // reviews what approve will actually replay (the summary alone is a
           // 120-char label). The default (collapsed) view is unchanged.
@@ -485,30 +488,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const attribution = (p: { createdAt: string; origin?: string | undefined; sessionId?: string | undefined }): string => {
             const age = elapsedSince(p.createdAt, nowMs)
             const unit = age.n === 1 ? age.unit.replace(/s$/u, '') : age.unit
-            const when = age.unit === 'now' ? 'just now' : `${age.n} ${unit} ago`
-            const who = p.origin === undefined ? '' : `  from ${p.origin}`
-            const session = p.sessionId === undefined ? '' : ` (session ${p.sessionId.slice(0, 8)})`
+            const when = age.unit === 'now' ? hostCommandText(hostLocale, 'command.pending.justNow') : hostCommandText(hostLocale, 'command.pending.ago', { n: age.n, unit })
+            const who = p.origin === undefined ? '' : hostCommandText(hostLocale, 'command.pending.from', { origin: p.origin })
+            const session = p.sessionId === undefined ? '' : hostCommandText(hostLocale, 'command.pending.session', { session: p.sessionId.slice(0, 8) })
             return `  ·  ${when}${who}${session}`
           }
           const body = pending.map((p) => {
-            if (!detailed) return `${p.id}  ${p.kind}  ${p.status === 'executing' ? 'EXECUTING ' : ''}${p.summary}${attribution(p)}`
-            const status = p.status === 'executing' ? 'EXECUTING' : p.status
+            if (!detailed) return `${p.id}  ${p.kind}  ${p.status === 'executing' ? hostCommandText(hostLocale, 'command.pending.executing') + ' ' : ''}${p.summary}${attribution(p)}`
+            const status = p.status === 'executing' ? hostCommandText(hostLocale, 'command.pending.executing') : p.status
             const line = `${p.id}  ${p.kind}  ${status}  ${p.summary}${attribution(p)}`
-            return p.args === undefined ? line : `${line}\n  staged args: ${safeStagedArgs(p.args)}`
+            return p.args === undefined ? line : `${line}\n` + hostCommandText(hostLocale, 'command.pending.stagedArgs', { args: safeStagedArgs(p.args) })
           }).join('\n')
           const hint = pending.some(p => p.status === 'executing')
-            ? '\n(EXECUTING: a previous approve may have crashed after running; verify the write manually, then reject — approve will not re-run it)'
+            ? hostCommandText(hostLocale, 'command.pending.executingHint')
             : ''
           return ok(body + hint + ttlNote)
         }
         if (input.startsWith('approve ')) {
           const id = input.slice(8).trim()
-          const result = approval ? await approval.approve(id) : { ok: false, message: errorText('e-301-approval-service-not-mounted-2') }
+          const result = approval ? await approval.approve(id) : { ok: false, message: hostError('e-301-approval-service-not-mounted-2') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('reject ')) {
           const id = input.slice(7).trim()
-          const result = approval ? await approval.reject(id) : { ok: false, message: errorText('e-301-approval-service-not-mounted-2') }
+          const result = approval ? await approval.reject(id) : { ok: false, message: hostError('e-301-approval-service-not-mounted-2') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('release ')) {
@@ -522,25 +525,25 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // verified, so that release is a destructive operator action whose
           // message states the replay risk.
           const id = input.slice(8).trim()
-          if (!approval) return err(errorText('e-301-approval-service-not-mounted-2'))
-          if (!approval.release) return err(errorText('e-304-the-mounted-approval-service'))
+          if (!approval) return err(hostError('e-301-approval-service-not-mounted-2'))
+          if (!approval.release) return err(hostError('e-304-the-mounted-approval-service'))
           const result = await approval.release(id)
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'curator run') {
           const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; skipped?: string; report: { runId: string; snapshotPath?: string } }> } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const result = await curator.run({ ignoreGates: true })
           // D-12 (v18): a reentrant run that was skipped must not be reported
           // as a completed 0/0/0 pass.
           if (result.skipped !== undefined) {
-            return ok(`策展轮已跳过（${result.skipped}）：未执行策展过程。\nrunId=${result.report.runId}`)
+            return ok(hostCommandText(hostLocale, 'command.curator.skipped', { reason: result.skipped, runId: result.report.runId }))
           }
-          return ok(`策展轮完成：${result.stale.length} 项过期，${result.archived.length} 项已归档，${result.errors.length} 项失败。\nrunId=${result.report.runId}${result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : ''}`)
+          return ok(hostCommandText(hostLocale, 'command.curator.done', { stale: result.stale.length, archived: result.archived.length, errors: result.errors.length, runId: result.report.runId, snapshot: result.report.snapshotPath ? `\nsnapshot=${result.report.snapshotPath}` : '' }))
         }
         if (input === 'curator pause' || input === 'curator resume') {
           const curator = ctx.get('evolutionCurator') as { setPaused(paused: boolean): Promise<void> } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const paused = input === 'curator pause'
           await curator.setPaused(paused)
           // H-07 completion: in a state-less composition the curator warns and
@@ -548,16 +551,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // travel through the return). Surface it on the command result so
           // the operator can tell a persisted pause from an ephemeral one.
           const stateMounted = ctx.get('evolutionState') !== undefined
-          const notPersisted = stateMounted ? '' : '\n注意：没有挂载 evolution 状态服务 —— 该设置不会被持久化，也不会在此进程之后保留。'
+          const notPersisted = stateMounted ? '' : hostCommandText(hostLocale, 'command.curator.notPersisted')
           return ok((paused
-            ? '策展自动轮已暂停。手动 /evolution curator run 不受影响；用 /evolution curator resume 恢复。'
-            : '策展自动轮已恢复。下一次定时轮要等一个间隔（首轮延后语义）。') + notPersisted)
+            ? hostCommandText(hostLocale, 'command.curator.paused')
+            : hostCommandText(hostLocale, 'command.curator.resumed')) + notPersisted)
         }
         if (input === 'curator status') {
           const curator = ctx.get('evolutionCurator') as { status(): Promise<{ lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null> } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const state = await curator.status()
-          if (!state) return ok('还没有策展状态：首个自动轮次要等间隔到达后才会执行。')
+          if (!state) return ok(hostCommandText(hostLocale, 'command.curator.noState'))
           // A corrupt state record must not crash the command surface with a
           // RangeError from `Invalid Date`.toISOString().
           const lastRun = typeof state.lastRunAt === 'number' && Number.isFinite(state.lastRunAt) && state.lastRunAt > 0
@@ -572,7 +575,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'mutations') {
           const curator = ctx.get('evolutionCurator') as { skills: { listMutations(): Promise<Array<{ at: string; skillName: string; action: string; summary: string }>> } } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const records: unknown = await curator.skills.listMutations()
           // V6-41 (0.3.36): the mutations file is out-of-band editable — a
           // damaged record must not crash the command with a TypeError (the
@@ -591,7 +594,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator scope') {
           const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; qualityWarned: string[]; exempted: string[]; protected: string[] }> } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const view = await curator.scopeView()
           const line = (label: string, names: string[]): string => `${label}: ${names.length}${names.length === 0 ? '' : `\n  ${names.join(', ')}`}`
           return ok([
@@ -605,9 +608,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'curator report') {
           const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }>; aborted?: string; unattributed?: string[] } | null> } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const report: unknown = await curator.latestReport()
-          if (!report) return ok('暂无策展报告。')
+          if (!report) return ok(hostCommandText(hostLocale, 'command.curator.noReport'))
           // V6-41 (0.3.36): the report file is out-of-band editable — a damaged
           // shape must render "report unreadable" instead of an uncaught
           // TypeError (the `curator status` command already has this posture).
@@ -616,7 +619,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             || typeof (report as { startedAt?: unknown }).startedAt !== 'string'
             || !Array.isArray((report as { archived?: unknown }).archived)
             || !Array.isArray((report as { failed?: unknown }).failed)) {
-            return err('报告文件读不出来。')
+            return err(hostCommandText(hostLocale, 'command.curator.reportReadFailed'))
           }
           const reportAny = report as {
             runId: string
@@ -665,7 +668,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const restoreRefusal = unreplayableWriteRefusal('restore')
           if (restoreRefusal) return restoreRefusal
           const curator = ctx.get('evolutionCurator') as { restoreSnapshot(): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.restoreSnapshot() : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
+          const result = curator ? await curator.restoreSnapshot() : { ok: false, message: hostError('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input === 'consolidate' || input.startsWith('consolidate ')) {
@@ -678,7 +681,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const skillRestoreRefusal = unreplayableWriteRefusal('skill restore')
           if (skillRestoreRefusal) return skillRestoreRefusal
           const curator = ctx.get('evolutionCurator') as { restore(name: string): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.restore(name) : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
+          const result = curator ? await curator.restore(name) : { ok: false, message: hostError('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('skill history ')) {
@@ -687,7 +690,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const curator = ctx.get('evolutionCurator') as {
             history(name: string): Promise<SkillVersion[]>
           } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const versions = await curator.history(name)
           if (versions.length === 0) return ok(`技能 "${name}" 还没有内容版本：下一次经 skill_manage 写入后才会出现。`)
           // Content order, not append order: two writers of one skill can interleave their index
@@ -722,7 +725,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ? unitId !== undefined
               ? await curator.undoUnit(name, unitId)
               : target === undefined ? await curator.undo(name) : await curator.undo(name, target)
-            : { ok: false, message: errorText('e-302-curator-service-not-mounted') }
+            : { ok: false, message: hostError('e-302-curator-service-not-mounted') }
           return result.ok ? ok(result.message) : err(result.message)
         }
         // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
@@ -753,7 +756,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'propose') {
           const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const result = await curator.proposeKeeps()
           return result.ok ? ok(result.message) : err(result.message)
         }
@@ -766,7 +769,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             }>>
             usageObserved(): Promise<boolean>
           } | undefined
-          if (!curator) return err(errorText('e-302-curator-service-not-mounted'))
+          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
           const [rows, observed] = await Promise.all([curator.healthView(), curator.usageObserved()])
           // C observation window: before ANY observed read exists, view_count
           // zero is not evidence — say so instead of silently showing a clean
@@ -843,7 +846,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           } else if (typeof agent.inject === 'function') {
             (agent as unknown as { inject: (message: unknown) => void }).inject(message)
           } else {
-            return err(errorText('e-305-the-invocation-agent-exposes', { a1: 'this learn request' }))
+            return err(hostError('e-305-the-invocation-agent-exposes', { a1: 'this learn request' }))
           }
           // rc.68: the learn action joins the event timeline (the loop
           // substrate). Soft probe: without the io registry the log is
@@ -1296,7 +1299,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // N13b: deliverHandoff calls the waking primitive ON the receiver; a host that
           // exposes neither primitive is a documented E-305, never a silent no-op.
           const woke = deliverHandoff(invocationAgent as { followup?: unknown; inject?: unknown }, message)
-          if (woke === undefined) return err(errorText('e-305-the-invocation-agent-exposes', { a1: 'this maintenance handoff' }))
+          if (woke === undefined) return err(hostError('e-305-the-invocation-agent-exposes', { a1: 'this maintenance handoff' }))
           return ok(woke
             ? `已把运行 ${record.id} 交给模型 —— 报告：${reportDigestPath(record)}。它会读取该文件并执行其中的行动项。`
             : `已把运行 ${record.id} 交给模型并排队 —— 本宿主没有唤醒通道，因此会在你下一条消息时被读取。`)
@@ -1524,7 +1527,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const stagesForeground = approval.isEnabled !== false
               && sessionPolicy !== 'never'
               && approval.stageForeground !== false
-            if (stagesForeground && session === undefined) return err(errorText('e-306-this-deployment-stages-foreground-2'))
+            if (stagesForeground && session === undefined) return err(hostError('e-306-this-deployment-stages-foreground-2'))
             if (stagesForeground && !approval.hasRunner('skill')) {
               return err('无法暂存提取：没有注册技能回放运行器：请挂载 tool-skill-manage 行，或禁用 evolution-approval。')
             }
@@ -1596,7 +1599,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             // helper. Same structured refusal here; with a session present the
             // behavior is unchanged.
             if (stagesForeground && session === undefined) {
-              return err(errorText('e-306-this-deployment-stages-foreground-2'))
+              return err(hostError('e-306-this-deployment-stages-foreground-2'))
             }
             const willStage = stagesForeground
             if (willStage && !approval.hasRunner('skill')) {
@@ -1646,7 +1649,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input === 'replay') {
           const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
-          if (!replay) return err(errorText('e-303-replay-service-not-mounted'))
+          if (!replay) return err(hostError('e-303-replay-service-not-mounted'))
           return ok(replay.compare().report)
         }
         // G7.4/C7: the ONE parser answers the shape (flag order and `=` tolerated, F-4).
@@ -1672,7 +1675,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             } catch (error) {
               // Unreadable is NOT "no overrides" (the S3.x posture): refuse instead
               // of rendering every row as if the user had set nothing.
-              return err(errorText('e-307-the-settings-service-could', { a1: error instanceof Error ? error.message : String(error) }))
+              return err(hostError('e-307-the-settings-service-could', { a1: error instanceof Error ? error.message : String(error) }))
             }
           }
           const rows = paramSurfaceRows(sections, PARAM_EXPOSURE)
@@ -1681,7 +1684,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const group = typeof groupFlag === 'string' ? groupFlag : undefined
           const selected = group === undefined ? rows : rows.filter(row => row.group === group)
           if (group !== undefined && selected.length === 0) {
-            return err(errorText('e-308-unknown-parameter-group-group', { a1: group, a2: paramGroups(PARAM_EXPOSURE).join(', ') }))
+            return err(hostError('e-308-unknown-parameter-group-group', { a1: group, a2: paramGroups(PARAM_EXPOSURE).join(', ') }))
           }
           if (paramsParsed.flags.get('json') === true) return ok(renderParamJson(selected))
           return ok(renderParamRows(selected, { providerMounted: provider !== undefined }))
@@ -1698,7 +1701,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // be a second write path to the same fact (design §8.3).
           const provider = ctx.get('settings') as SettingsProviderLike | undefined
           if (provider?.update === undefined || provider.describe === undefined) {
-            return err(errorText('e-311-no-settings-service-is'))
+            return err(hostError('e-311-no-settings-service-is'))
           }
           const rawId = policyParsed.positionals[1] ?? ''
           const rawValue = policyParsed.positionals[2] ?? ''
@@ -1706,29 +1709,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           try {
             id = canonicalWriteId(rawId)
           } catch (error) {
-            return err(errorText('e-312-error-instanceof-Error-error', { a1: error instanceof Error ? error.message : String(error) }))
+            return err(hostError('e-312-error-instanceof-Error-error', { a1: error instanceof Error ? error.message : String(error) }))
           }
           const entry = PARAM_EXPOSURE.find(candidate => candidate.id === id)
           if (entry === undefined) {
-            return err(errorText('e-313-unknown-parameter-id-evolution', { a1: id }))
+            return err(hostError('e-313-unknown-parameter-id-evolution', { a1: id }))
           }
           if (entry.tier !== 'E3') {
-            return err(errorText('e-314-id-is-a-deployment', { a1: id, a2: entry.tier, a3: entry.owner }))
+            return err(hostError('e-314-id-is-a-deployment', { a1: id, a2: entry.tier, a3: entry.owner }))
           }
           // The platform keys the section by the Loader entry id (the row id), never by the
           // legacy namespace the 0.1.x seam registered: see core's `paramSettingsId`.
           const namespace = paramSettingsId(entry.owner)
           if (namespace === undefined) {
-            return err(errorText('e-315-id-has-no-user', { a1: id, a2: entry.owner }))
+            return err(hostError('e-315-id-has-no-user', { a1: id, a2: entry.owner }))
           }
           let descriptor: { ns: string; value?: unknown; user?: Record<string, unknown>; revision?: number } | undefined
           try {
             descriptor = provider.describe({ redactSecrets: false }).find(candidate => candidate.ns === namespace)
           } catch (error) {
-            return err(errorText('e-307-the-settings-service-could-2', { a1: error instanceof Error ? error.message : String(error) }))
+            return err(hostError('e-307-the-settings-service-could-2', { a1: error instanceof Error ? error.message : String(error) }))
           }
           if (descriptor === undefined) {
-            return err(errorText('e-316-namespace-namespace-is-not', { a1: namespace, a2: entry.owner }))
+            return err(hostError('e-316-namespace-namespace-is-not', { a1: namespace, a2: entry.owner }))
           }
           const current = descriptor.value
           const resolved = typeof current === 'object' && current !== null ? current as Record<string, unknown> : undefined
@@ -1738,7 +1741,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const expectedRaw = typeof expectFlag === 'string' ? expectFlag : undefined
           const expected = expectedRaw === undefined ? descriptor.revision : Number(expectedRaw)
           if (expectedRaw !== undefined && descriptor.revision !== undefined && Number(expectedRaw) !== descriptor.revision) {
-            return err(errorText('e-309-revision-conflict-you-sent', { a1: expectedRaw, a2: descriptor.revision }))
+            return err(hostError('e-309-revision-conflict-you-sent', { a1: expectedRaw, a2: descriptor.revision }))
           }
           const value = parseParamValue(rawValue)
           // G5.12/U-4: the cross-field constraint is declared ONCE in the registry (core's params.ts,
@@ -1750,7 +1753,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const sibling = resolved?.[floorId]
             const floor = typeof sibling === 'number' ? sibling : Number.NaN
             if (Number.isFinite(floor) && value < floor) {
-              return err(errorText('e-322-a-parameter-would-break-a', { a1: id, a2: String(floor), a3: String(value) }))
+              return err(hostError('e-322-a-parameter-would-break-a', { a1: id, a2: String(floor), a3: String(value) }))
             }
           }
           try {
@@ -1759,9 +1762,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const code = (error as { code?: unknown } | null)?.code
             const message = error instanceof Error ? error.message : String(error)
             if (code === 'SETTINGS_CONFLICT') {
-              return err(errorText('e-309-revision-conflict-message-Re', { a1: message }))
+              return err(hostError('e-309-revision-conflict-message-Re', { a1: message }))
             }
-            return err(errorText('e-310-the-settings-service-refused', { a1: message }))
+            return err(hostError('e-310-the-settings-service-refused', { a1: message }))
           }
           return ok(renderPolicySet({
             id, namespace, applies: entry.applies,
@@ -1776,9 +1779,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // values write nothing), so this is safe to run as often as the operator likes.
           const attempt = await migrateFromContext(ctx)
           if (!attempt.ok) {
-            if (attempt.problem === 'settings') return err(errorText('e-311-no-settings-service-is'))
-            if (attempt.problem === 'home') return err(errorText('e-320-the-profile-home-is-not'))
-            return err(errorText('e-321-no-io-provider-is'))
+            if (attempt.problem === 'settings') return err(hostError('e-311-no-settings-service-is'))
+            if (attempt.problem === 'home') return err(hostError('e-320-the-profile-home-is-not'))
+            return err(hostError('e-321-no-io-provider-is'))
           }
           return ok(renderNamespaceMigration(attempt.outcome))
         }
@@ -1796,7 +1799,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // the diagnostics route/client card consume.
           if (input === 'doctor --json') return ok(JSON.stringify(report.view, null, 2))
           // G6/W8 tail: the text face ends with the SAME 7+8 view the diagnostics route answers.
-          return ok(renderDoctorText(report))
+          return ok(renderDoctorText(report, hostLocale))
         }
         // T4-03 (P2): an UNMATCHED subcommand is an error. The old fallback answered
         // `kind: 'success'` with the full help text, so `/evolution approve` (no id),
@@ -1804,9 +1807,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // same silent-success shape `/evolution maintain --bogus` already refuses. Only the bare
         // command (and an explicit `help`) answer with the list, and they still answer success.
         if (input === '' || input === 'help') {
-          return ok(`自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。\n${renderHelpText()}`)
+          return ok(hostCommandText(hostLocale, 'help.header') + '\n' + renderHelpText(hostLocale))
         }
-        return err(`/evolution ${input} 不是本构建能应答的子命令（已知子命令但缺参数也会落到这里）。\n${renderHint()}`)
+        return err('/evolution ' + input + ' ' + hostCommandText(hostLocale, 'help.unknown') + '\n' + renderHint())
       },
     }
     /** The registered definition: declared members only (A46). */

@@ -1423,7 +1423,7 @@ describe('evolution-commands', () => {
     for (const rawInput of ['', 'help']) {
       const bare = await captured!.handler({ rawInput })
       expect(bare.kind, rawInput).toBe('success')
-      expect(bare.text, rawInput).toContain('subcommands (')
+      expect(bare.text, rawInput).toContain('子命令（')
     }
     // A known subcommand without its argument, a bare unknown word, and a flag-only form: all
     // three used to return the help text with kind 'success', so a command that did nothing read
@@ -1551,7 +1551,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands)
     const detail = await captured!.handler({ agent: { ctx } as never, rawInput: 'pending --detail' })
     expect(detail.text).toContain('c3  skill  pending  fn args')
-    expect(detail.text).toContain('staged args: (unserializable)')
+    expect(detail.text).toContain('暂存参数：(unserializable)')
   })
 
   it('S2-P2-22: /evolution release routes to the approval service (happy path, and E-304 on an older service)', async () => {
@@ -1710,15 +1710,15 @@ describe('evolution-commands', () => {
     const detail = await captured!.handler({ agent: { ctx } as never, rawInput: 'pending --detail' })
     expect(detail.kind).toBe('success')
     expect(detail.text).toContain('a1  skill  pending  create demo')
-    expect(detail.text).toContain('b2  memory  EXECUTING  remember')
-    expect(detail.text).toContain('staged args:')
+    expect(detail.text).toContain('b2  memory  执行中  remember')
+    expect(detail.text).toContain('暂存参数：')
     const argsJson = JSON.stringify(pendingRecord.args)
     // The staged args are rendered (truncated to 500 chars), so the operator
     // can see what approve will actually replay rather than "blind-approving".
     // 0.13.0: the row carries its attribution (age, origin) between the summary and the args, so the
     // assertion is anchored on the summary and the staged-args line rather than on a fixed newline.
-    expect(detail.text).toMatch(/a1 {2}skill {2}pending {2}create demo {2}· {2}[^\n]+\n {2}staged args: /)
-    expect(detail.text).toContain(`  staged args: ${argsJson.slice(0, 500)}…(truncated ${argsJson.length - 500} chars)`)
+    expect(detail.text).toMatch(/a1 {2}skill {2}pending {2}create demo {2}· {2}[^\n]+\n {2}暂存参数：/) 
+    expect(detail.text).toContain(`  暂存参数：${argsJson.slice(0, 500)}…(truncated ${argsJson.length - 500} chars)`) 
     // The truncation is explicitly marked — an oversized payload never reads as
     // a complete-but-cut JSON, even when the cut lands mid-escape (V4-19).
     expect(detail.text).toMatch(/\(truncated \d+ chars\)/)
@@ -1729,8 +1729,8 @@ describe('evolution-commands', () => {
     const bare = await captured!.handler({ agent: { ctx } as never, rawInput: 'pending' })
     expect(bare.kind).toBe('success')
     expect(bare.text).toContain('a1  skill  create demo')
-    expect(bare.text).toContain('b2  memory  EXECUTING remember')
-    expect(bare.text).not.toContain('staged args:')
+    expect(bare.text).toContain('b2  memory  执行中 remember')
+    expect(bare.text).not.toContain('暂存参数：')
   })
 
   it('V6-41: a damaged mutations/report shape renders unreadable instead of a TypeError (0.3.36)', async () => {

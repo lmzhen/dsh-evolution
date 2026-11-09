@@ -16,10 +16,10 @@ const copy = [...Object.values(zh), ...Object.values(en)]
 describe('U-8: the family glossary', () => {
   it('names an overridden field with one reader word, in both languages', () => {
     expect(zh.overridden).toBe('已修改')
-    expect(en.overridden).toBe('Modified')
+    expect(en.overridden).toBe('Changed')
     // The count is the same concept — same word, not a synonym.
     expect(zh.changed).toContain('已修改')
-    expect(en.changed.toLowerCase()).toContain('modified')
+    expect(en.changed.toLowerCase()).toContain('changed')
   })
 
   it('keeps cross-face instructions out of the copy', () => {

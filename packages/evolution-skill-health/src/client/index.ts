@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import { registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
-import { NS, en, zh } from './messages.ts'
+import { NS, dictionaries } from './messages.ts'
 import { SkillHealthPanel, type HealthFace } from './Panel.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 import { requireClientSeats } from '@lmzhen/dsh-evolution-client-kit'
@@ -36,7 +36,7 @@ export function apply(ctx: ClientContext): void {
     id: PANEL_ID,
     order: PANEL_ORDER,
     namespace: NS,
-    dictionaries: { zh, en },
+    dictionaries,
     styles: { css: CSS, tagId: CSS_TAG_ID },
     component: HealthView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => ({

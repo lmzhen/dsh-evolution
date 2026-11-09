@@ -1,4 +1,7 @@
 # Changelog
+## 0.41.0 (i18n) — 八语言客户端与宿主人类文案；单源字典拆分
+> **范围**：客户端四块界面、参数卡片、宿主错误、帮助、doctor 与 pending/curator 固定结果模板接入 zh/en/ja/es/fr/de/ru/pt；模型可见文案不随 UI locale 变化，模型生成的 merge/review/maintain 正文不翻译。catalog 单一源生成客户端字典与宿主表；客户端字典拆成每 namespace 一个模块，避免每个面板打包全部语言。修复复核 P1：panel locale fallback 类型、错误文案单一 owner（core errorTextIn）、settings probe 声明锚点、gate 计数同步。
+> **验证**：verify-i18n（529 UI key、113 参数 leaf、31 host error、67 command-help key、8 locale）、verify-arch-guards --strict、verify-gate-manifest 通过；client-kit/commands/UI/merge-ui/skill-health tsc 0；真实 web 3082 八语言入口验收；客户端构建产物 evolution-ui 255 kB、merge-ui 102 kB、skill-health 49 kB。
 ## 0.40.1 (architecture) — 合并 main 的 0.39.2 提示词/审查修复
 
 > **范围**：0.40.0 从发布分支构建，未包含 main 上 0.39.2 的 review prompt 分离与 memory review 收口；本版把 main 合入发布分支后重发，保持同一套 mutation authority/lease/CAS/UI 改动。
