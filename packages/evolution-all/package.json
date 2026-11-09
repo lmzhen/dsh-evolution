@@ -37,6 +37,7 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-evolution-host": "workspace:^",
+    "@deepseek-ai/dsh-evolution-authority": "workspace:^",
     "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
