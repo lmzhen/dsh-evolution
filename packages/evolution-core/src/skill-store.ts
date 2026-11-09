@@ -3379,52 +3379,32 @@ export class SkillLibrary {
       const rel = relative(owner.dir, op.target).split(String.fromCharCode(92)).join('/')
       landing.push({ kind: op.kind, target: op.target, content: op.kind === 'write' ? op.content : null, previous, expected: op.expected, skill, dir: owner.dir, rel })
     }
-    const written: Array<{ target: string; previous: string | null }> = []
-    let durabilityWarning = ''
-    try {
-      for (const entry of landing) {
-        try {
-          if (this.transact) {
-            const baseline = entry.expected === undefined ? entry.previous : entry.expected
-            const drift = { seen: false }
-            const ran = { done: false }
-            await this.transact(this.io, entry.target, (current) => {
-              drift.seen = false
-              ran.done = true
-              if (current !== baseline) {
-                drift.seen = true
-                return current
-              }
-              return entry.kind === 'delete' ? null : entry.content
-            })
-            if (!ran.done) throw new Error('internal error: the write transaction for ' + entry.target + ' did not invoke the task; nothing was written')
-            if (drift.seen) throw new Error('concurrent modification detected: ' + entry.target + ' changed after the plan was computed (a concurrent writer won the race); no further writes were performed')
-          } else if (entry.kind === 'delete') {
-            await this.io.remove(entry.target)
-          } else {
-            await this.io.writeText(entry.target, entry.content ?? '')
-          }
-        } catch (error) {
-          if (!isCommittedOnly(error)) throw error
-          durabilityWarning = error instanceof Error ? error.message : String(error)
-        }
-        written.push({ target: entry.target, previous: entry.previous })
-      }
-    } catch (error) {
-      const stuck: string[] = []
-      for (const entry of written.reverse()) {
-        try {
-          if (entry.previous === null) await this.io.remove(entry.target)
-          else await this.io.writeText(entry.target, entry.previous)
-        } catch {
-          stuck.push(entry.target)
-        }
-      }
-      const reason = error instanceof Error ? error.message : String(error)
-      if (stuck.length === 0) return { ok: false, message: '目录树变更失败，已回滚：' + reason }
-      return { ok: false, message: '目录树变更失败：' + reason + '。回滚无法恢复 ' + stuck.join(', ') + '：可恢复性由当前快照决定：' + (await this.snapshotRecoveryAvailability()) + ' —— 若上面不是「最新快照」，请重新应用这次变更。' }
-    }
     const unitId = plan.unitId ?? 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
+    const unit = new MutationUnit({
+      io: this.io,
+      limits: this.limits,
+      lock: this.lockPort(),
+      journal: unitJournalPort(this.io, dirname(this.root)),
+      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
+      ...(this.transact === undefined ? {} : { transact: this.transact }),
+      now: () => Date.now(),
+    })
+    const applied = await unit.apply({
+      name: primaryName,
+      roots: roots.map(root => ({ name: root.name, protection: root.protection })),
+      ops: landing.map(entry => entry.kind === 'delete'
+        ? { kind: 'delete' as const, target: entry.target, ...(entry.expected === undefined ? {} : { expected: entry.expected }) }
+        : { kind: 'write' as const, target: entry.target, content: entry.content ?? '', ...(entry.expected === undefined ? {} : { expected: entry.expected }) }),
+      rootDirs: Object.fromEntries(roots.map(root => [root.name, root.dir])),
+      origin: plan.origin,
+      auditAction: plan.auditAction,
+      auditSummary: plan.auditSummary,
+      eventAction: plan.eventAction,
+      unitId,
+    })
+    if (!applied.ok) {
+      return { ok: false, message: '目录树变更失败：' + applied.errors.map(error => error.message).join('; ') }
+    }
     const defaultHead: UnitHead = {
       moves: landing
         .filter(entry => basename(entry.target) !== 'SKILL.md')
@@ -3448,11 +3428,12 @@ export class SkillLibrary {
       if (dir !== undefined) this.notifyMutation({ action: plan.eventAction, name: skill, skillDir: dir })
     }
     const primaryDir = roots.find(root => root.name === primaryName)?.dir ?? roots[0]?.dir ?? ''
+    const warnings = applied.warnings ?? []
     return {
       ok: true,
-      message: durabilityWarning === ''
+      message: warnings.length === 0
         ? plan.eventAction + ' "' + primaryName + '" succeeded.'
-        : plan.eventAction + ' "' + primaryName + '" succeeded （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：' + durabilityWarning + ')',
+        : plan.eventAction + ' "' + primaryName + '" succeeded （警告：' + warnings.join('; ') + ')',
       path: primaryDir,
     }
   }
