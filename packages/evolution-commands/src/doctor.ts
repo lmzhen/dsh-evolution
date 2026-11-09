@@ -1098,8 +1098,8 @@ export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'
   if (report.capabilityAbsence.length > 0) extras.push(`capability absence (${report.capabilityAbsence.length}): ${report.capabilityAbsence.map(entry => `${entry.service} — ${entry.feature}`).join('; ')}`)
   extras.push(scopedProbeLine(report.scopedProbe))
   extras.push(legacyLine(report.legacy))
-  extras.push(`pending: ${report.pendingCount === null ? 'unknown' : report.pendingCount}`)
-  extras.push(`executing: ${report.executingCount === null ? 'unknown' : report.executingCount}`)
+  extras.push(hostCommandText(locale, 'doctor.pending') + String(report.pendingCount === null ? 'unknown' : report.pendingCount))
+  extras.push(hostCommandText(locale, 'doctor.executing') + String(report.executingCount === null ? 'unknown' : report.executingCount))
   // G3-② (B2): one line per variant that EXISTS. `absent` rows are omitted — every base this
   // deployment does not install would otherwise claim a line about a variant nobody chose; the
   // report data keeps them for programmatic readers.
@@ -1120,7 +1120,7 @@ export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'
   if (report.paramIssues.length > 0) extras.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
   if (report.queryIssues.length > 0) extras.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) extras.push('next steps:', ...report.actions.map(line => `  → ${line}`))
-  return renderDiagnosticsText(report.view, locale).trimEnd() + '\n\n补充检查（view 未覆盖的运行时事实）：\n' + extras.join('\n')
+  return renderDiagnosticsText(report.view, locale).trimEnd() + '\n\n' + hostCommandText(locale, 'doctor.supplement') + '\n' + extras.join('\n')
 }
 /**
  * G6/W8 tail: render the frozen DiagnosticsView as the doctor's diagnostics section.
@@ -1133,10 +1133,10 @@ export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'
  */
 export function renderDiagnosticsText(view: DiagnosticsView, locale: HostLocale = 'zh'): string {
   const lines: string[] = []
-  lines.push('诊断（schema v' + String(view.schemaVersion) + '，生成于 ' + view.generatedAt + '）：')
-  lines.push('  事实：')
-  for (const fact of view.facts) lines.push('  - ' + fact.label + '：' + fact.value + '（出处：' + fact.home + '）')
-  lines.push('  运行时：')
+  lines.push(hostCommandText(locale, 'doctor.diagnosticsHeader', { version: view.schemaVersion, at: view.generatedAt }))
+  lines.push(hostCommandText(locale, 'doctor.facts'))
+  for (const fact of view.facts) lines.push('  - ' + fact.label + '：' + fact.value + hostCommandText(locale, 'doctor.source', { home: fact.home }))
+  lines.push(hostCommandText(locale, 'doctor.runtime'))
   for (const row of view.runtime) {
     const status = hostCommandText(locale, ('doctor.status.' + row.status) as 'doctor.status.ok')
     const detail = row.detail === undefined ? '' : '：' + row.detail

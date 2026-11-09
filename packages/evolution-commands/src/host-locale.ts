@@ -28,8 +28,9 @@ export function resolveHostLocale(ctx: Pick<Context, 'get'>): HostLocale {
  * @param key - stable command-help key.
  * @returns localized help text.
  */
-export function hostCommandText(locale: HostLocale, key: HostCommandKey): string {
-  return HOST_COMMANDS[key][locale] ?? HOST_COMMANDS[key].zh
+export function hostCommandText(locale: HostLocale, key: HostCommandKey, values: Readonly<Record<string, string | number>> = {}): string {
+  const template = HOST_COMMANDS[key][locale] ?? HOST_COMMANDS[key].zh
+  return template.replace(/\{(\w+)\}/g, (match, slot: string) => values[slot] === undefined ? match : String(values[slot]))
 }
 
 /**

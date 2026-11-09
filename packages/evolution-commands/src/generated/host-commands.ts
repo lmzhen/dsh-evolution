@@ -362,6 +362,76 @@ export const HOST_COMMANDS = {
       "de": "Unbekannt",
       "ru": "неизвестно",
       "pt": "desconhecido"
+    },
+    "doctor.pending": {
+      "zh": "待批：",
+      "en": "Pending: ",
+      "ja": "承認待ち：",
+      "es": "Pendientes: ",
+      "fr": "En attente : ",
+      "de": "Ausstehend: ",
+      "ru": "Ожидают: ",
+      "pt": "Pendentes: "
+    },
+    "doctor.executing": {
+      "zh": "执行中：",
+      "en": "Running: ",
+      "ja": "実行中：",
+      "es": "En ejecución: ",
+      "fr": "En cours : ",
+      "de": "Laufend: ",
+      "ru": "Выполняется: ",
+      "pt": "Em execução: "
+    },
+    "doctor.supplement": {
+      "zh": "补充检查（view 未覆盖的运行时事实）：",
+      "en": "Supplemental checks (runtime facts the view does not cover):",
+      "ja": "補足チェック（ビューが扱わない実行時情報）：",
+      "es": "Comprobaciones adicionales (datos de ejecución que la vista no cubre):",
+      "fr": "Vérifications complémentaires (faits d’exécution non couverts par la vue) :",
+      "de": "Ergänzende Prüfungen (Laufzeitfakten, die die Ansicht nicht abdeckt):",
+      "ru": "Дополнительные проверки (факты выполнения, не охваченные представлением):",
+      "pt": "Verificações complementares (fatos de execução não cobertos pela visualização):"
+    },
+    "doctor.diagnosticsHeader": {
+      "zh": "诊断（schema v{version}，生成于 {at}）：",
+      "en": "Diagnostics (schema v{version}, generated {at}):",
+      "ja": "診断（schema v{version}、{at} 生成）：",
+      "es": "Diagnóstico (schema v{version}, generado el {at}):",
+      "fr": "Diagnostic (schéma v{version}, généré le {at}) :",
+      "de": "Diagnose (Schema v{version}, erzeugt am {at}):",
+      "ru": "Диагностика (схема v{version}, создано {at}):",
+      "pt": "Diagnóstico (schema v{version}, gerado em {at}):"
+    },
+    "doctor.facts": {
+      "zh": "  事实：",
+      "en": "  Facts:",
+      "ja": "  事実：",
+      "es": "  Datos:",
+      "fr": "  Faits :",
+      "de": "  Fakten:",
+      "ru": "  Факты:",
+      "pt": "  Fatos:"
+    },
+    "doctor.runtime": {
+      "zh": "  运行时：",
+      "en": "  Runtime:",
+      "ja": "  実行時：",
+      "es": "  Ejecución:",
+      "fr": "  Exécution :",
+      "de": "  Laufzeit:",
+      "ru": "  Выполнение:",
+      "pt": "  Execução:"
+    },
+    "doctor.source": {
+      "zh": "（出处：{home}）",
+      "en": " (source: {home})",
+      "ja": "（出典：{home}）",
+      "es": " (origen: {home})",
+      "fr": " (source : {home})",
+      "de": " (Quelle: {home})",
+      "ru": " (источник: {home})",
+      "pt": " (origem: {home})"
     }
   } as const
 
