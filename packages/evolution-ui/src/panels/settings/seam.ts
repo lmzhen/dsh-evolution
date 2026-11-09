@@ -10,24 +10,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 
-import type { ReactNode } from 'react'
 import type { ConfigFormLike as KitConfigFormLike, ConfigFormSnapshotLike as KitConfigFormSnapshotLike, ConfigFormsSeat as KitConfigFormsSeat, ConfigPathOpLike, LocaleSeat as KitLocaleSeat } from '@lmzhen/dsh-evolution-client-kit'
-
-/** Our card slot, hosted by the section this bundle registers. */
-export const CARD_SLOT = 'evolution.namespace.card'
-
-/**
- * The pending-window card's slot key.
- *
- * The section pairs cards by key and the parameter cards use their settings namespace; this card has no
- * namespace (its data comes from the host's approval routes), so it carries a key of its own. The constant
- * lives HERE and not in `index.ts` because the SECTION has to name it too, and `index.ts` already imports
- * the section — one definition in the module both sides already share is what keeps that pair acyclic.
- */
-export const PENDING_CARD_KEY = 'approval-pending'
-
-/** The diagnostics card's slot key: read-only, no settings namespace (its data comes from HOST_ROUTES.diagnostics). */
-export const DIAGNOSTICS_CARD_KEY = 'diagnostics'
 
 /** Structured result of one settings write, separating acceptance from readback. */
 export interface SettingsSaveResult {
@@ -88,14 +71,6 @@ export type ConfigFormLike<T = Record<string, unknown>> = KitConfigFormLike<T>
  */
 export type ConfigFormsSeat = KitConfigFormsSeat
 
-/** Registration options the keyed card slot under our own section takes. */
-export interface SlotRegisterOptions {
-  name: typeof CARD_SLOT
-  /** The settings row this card edits — the slot's key. */
-  key: string
-  inject: () => unknown
-}
-
 /** Nav glyph for a `settings.section` registration. */
 export interface SectionIconRegisterOptions {
   name: 'settings.section.icon'
@@ -118,16 +93,6 @@ export interface SectionRegisterOptions {
   locale: string
   /** Child slots this section hosts, declared for the shell's renderer. */
   children?: Record<string, { kind: 'keyed' | 'list' | 'single'; scope: 'root' }>
-}
-
-/**
- * The face the shell hands a section component: a translator bound to our locale
- * namespace and the renderer for the child slots we declared.
- */
-export interface SectionFace {
-  t: (key: string) => string
-  /** Render one child slot; `filter` selects keyed entries (e.g. `{ entryKey }`). */
-  renderSlot: (name: string, props?: Record<string, unknown>, filter?: Record<string, unknown>) => ReactNode
 }
 
 /**
@@ -155,7 +120,7 @@ export interface ClientSeam {
   slots: {
     inject(name: string, callback: () => Generator<unknown, void, unknown>): unknown
     register(
-      options: SlotRegisterOptions | SectionRegisterOptions | SectionIconRegisterOptions,
+      options: SectionRegisterOptions | SectionIconRegisterOptions,
       component: (props: never) => unknown,
     ): () => void
   }

@@ -17,7 +17,8 @@ import { dictionaries, fill, message, NS, type MessageKey } from './messages.ts'
 import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
 import { PluginParamCard, type ParamCardFace } from './ParamCard.ts'
 import { groupParamCards } from './settings-groups.ts'
-import { PENDING_CARD_KEY, type ClientSeam, type ParamSectionSource } from './seam.ts'
+import { type ClientSeam, type ParamSectionSource } from './seam.ts'
+import { FAMILY_VERSION } from './generated-about.ts'
 import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
 import { injectStyles } from './styles.ts'
@@ -37,7 +38,6 @@ export const SECTION_ID = 'evolution'
 export const SECTION_ORDER = 25
 
 /** The pending-window card's key, re-exported from `seam.ts` (the section names it as well). */
-export { PENDING_CARD_KEY }
 
 /**
  * Register the locale namespace, the section, its cards, and the per-row configuration entries.
@@ -148,8 +148,11 @@ export function apply(ctx: ClientContext): void {
 }
 
 /** One family settings page: every parameter card lives inside it. */
-function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[]; readonly t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string }): ReactNode {
+export function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[]; readonly t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string }): ReactNode {
   return createElement('div', { className: 'evolution-settings-tab' },
+    createElement('h2', { className: 'evolution-params-title' }, props.t('title')),
+    createElement('p', { className: 'evolution-params-subtitle' }, props.t('subtitle')),
+    createElement('p', { className: 'evolution-params-about' }, FAMILY_VERSION + ' · ' + props.t('aboutPurpose')),
     ...groupParamCards(props.cards).flatMap(({ group, items }) => [
       createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, props.t(('group.' + group) as MessageKey)),
       ...items.map((face, index) => createElement(PluginParamCard, { key: face.namespace + ':' + String(index), ...face })),

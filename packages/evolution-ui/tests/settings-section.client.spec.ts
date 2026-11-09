@@ -17,7 +17,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { apply, SECTION_ID } from '../src/panels/settings/index.ts'
-import { CARD_SLOT, DIAGNOSTICS_CARD_KEY } from '../src/panels/settings/seam.ts'
 import { createSourceCache, PROJECTION_FAILED, SEAT_MISSING, type SeatProbe } from '../src/panels/settings/source.ts'
 
 /**

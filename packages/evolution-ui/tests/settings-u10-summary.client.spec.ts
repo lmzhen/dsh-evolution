@@ -17,22 +17,17 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { createElement } from 'react'
 import { FAMILY_VERSION } from '../src/panels/settings/generated-about.ts'
 import { message } from '../src/panels/settings/messages.ts'
-import { SettingsSection } from '../src/panels/settings/SettingsSection.ts'
+import { EvolutionSettingsTab } from '../src/panels/settings/index.ts'
 
 /** `createElement` narrowed for the renderer (the package carries its own minimal ambient React surface). */
 const h = createElement as unknown as (type: unknown, props: unknown) => Parameters<typeof render>[0]
 
-/** The section's inject face, reduced to what the component reads. */
-const face = {
-  t: (key: string): string => message(key as never),
-  renderSlot: (): null => null,
-}
 
 afterEach(() => { cleanup() })
 
 describe('the section decision line (U-10)', () => {
   it('renders the generated version together with the generated purpose', () => {
-    render(h(SettingsSection, face))
+    render(h(EvolutionSettingsTab, { cards: [], t: (key: string): string => message(key as never) }))
     const about = screen.getByText(new RegExp(FAMILY_VERSION.split('.').join('\\.')))
     expect(about.textContent).toContain(FAMILY_VERSION)
     expect(about.textContent).toContain(message('aboutPurpose'))
