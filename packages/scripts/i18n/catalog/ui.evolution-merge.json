@@ -148,7 +148,7 @@
     },
     "blocked.hint": {
       "zh": "修好合并数据后再刷新；面板不会自动退回旧数据。",
-      "en": "Fix the merge data and refresh; the panel will not fall back to older data by itself.",
+      "en": "Fix the merge data, then refresh; the panel won’t fall back to older data on its own.",
       "ja": "マージデータを修復してから更新してください。パネルが自動で古いデータに戻ることはありません。",
       "es": "Arregla los datos del merge y luego actualiza; el panel no vuelve por su cuenta a datos antiguos.",
       "fr": "Réparez les données de fusion puis actualisez ; le panneau ne revient pas tout seul aux anciennes données.",
@@ -1840,7 +1840,7 @@
     },
     "start.scan": {
       "zh": "复制查找重复技能的命令",
-      "en": "Copy the find-duplicate-skills command",
+      "en": "Copy the command to find duplicate skills",
       "ja": "重複スキル検索コマンドをコピー",
       "es": "Copiar el comando para buscar skills duplicados",
       "fr": "Copier la commande de recherche de skills en double",
@@ -1930,7 +1930,7 @@
     },
     "tab.verify": {
       "zh": "待判断",
-      "en": "To judge",
+      "en": "Needs review",
       "ja": "判定待ち",
       "es": "Por juzgar",
       "fr": "À juger",

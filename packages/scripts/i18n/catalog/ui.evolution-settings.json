@@ -85,7 +85,7 @@
     },
     "approvalCardHint": {
       "zh": "技能在使用中生成或修改内容时，先放进待批清单，由你确认。",
-      "en": "When a skill is created or changed while in use, the write waits in the pending list for your decision.",
+      "en": "When a skill creates or changes content during a run, the write goes to the pending list first and waits for your decision.",
       "ja": "使用中にスキルが作成・変更されたときは、まず承認待ち一覧に入り、あなたの確認を待ちます。",
       "es": "Cuando un skill crea o modifica contenido durante el uso, la escritura queda en la lista de pendientes hasta que la confirmes.",
       "fr": "Quand un skill est créé ou modifié en cours d’usage, l’écriture attend dans la liste des approbations que vous tranchiez.",
@@ -949,7 +949,7 @@
     },
     "readonly": {
       "zh": "本次会话不允许写入设置（临时运行模式）",
-      "en": "settings cannot be written in this session (temporary mode)",
+      "en": "Settings can’t be changed in this session (temporary mode).",
       "ja": "このセッションでは設定を書き込めません（一時実行モード）",
       "es": "en esta sesión no se pueden escribir ajustes (modo temporal)",
       "fr": "les paramètres ne peuvent pas être écrits dans cette session (mode temporaire)",
@@ -1012,7 +1012,7 @@
     },
     "saveConflict": {
       "zh": "这个值没有被接受：设置已被其他页面修改。请重读后再保存。",
-      "en": "The value was not accepted: settings changed in another page. Re-read before saving again.",
+      "en": "The value was not accepted: settings changed on another page. Re-read before saving again.",
       "ja": "この値は受理されませんでした。別のページで設定が変更されています。再読み取りしてから保存してください。",
       "es": "El valor no se aceptó: los ajustes cambiaron en otra página. Vuelve a leerlos antes de guardar.",
       "fr": "La valeur n’a pas été acceptée : les paramètres ont été modifiés depuis une autre page. Relisez avant d’enregistrer.",
