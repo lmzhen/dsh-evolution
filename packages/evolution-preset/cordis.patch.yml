@@ -120,28 +120,6 @@
     - id: evolution-merge
       name: '@deepseek-ai/dsh-evolution-merge'
 
-# ── cross-session recall: enable the native session-query index ─────────────
-# Mirrors evolution-host: this is an OVERRIDE of the base `session-query-sqlite`
-# row (never an insert) so it sits OUTSIDE the `- insert:` block. Parameterized
-# via dsh `!!js` runtime env evaluation; profile overlays may still override.
-# WHOLE-CONFIG REPLACEMENT (v33 G2.3): an override's `config` replaces the base
-# entry's config as a whole, so every platform key NOT set below falls back to
-# that row's schema default. Platform keys for this row
-# (0.2.0-rc.2 `session-query-sqlite` Config): path, openAt, journalMode,
-# defaultLimit, maxLimit, snippetChars, readWindowMax, persistedReadConcurrency,
-# preparedSessionCacheSize.
-# verify-declared-config.mjs --upstream recomputes this list from the platform
-# source and fails when the row gains a key this comment does not name.
-- id: session-query-sqlite
-  config:
-    # P2-12 (V10-15): trim-then-fallback — an empty DSH_EVOLUTION_SESSION_
-    # QUERY_PATH used to resolve the SQLite index into the process CWD (see
-    # the host patch for the full note; keep the two expressions identical).
-    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH || '').trim() || dshHomePath('evolution', 'session-query.db')
-    # P2-13 (V10-15): whitelist normalization instead of feeding any raw value
-    # to the platform z.union schema (see the host patch for the full note).
-    openAt: !!js "['startup', 'first-search', 'never'].includes(process.env.DSH_EVOLUTION_SESSION_QUERY) ? process.env.DSH_EVOLUTION_SESSION_QUERY : 'startup'"
-
 # ── Hermes 60-char catalog cap: same root-level override the host carries ────
 # Upstream tool-skill exposes `catalogDescriptionMaxLength` (the 500 constant is
 # only the schema default); the Hermes authoring standard is 60.

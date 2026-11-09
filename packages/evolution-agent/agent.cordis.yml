@@ -16,8 +16,9 @@
 #
 # This delta deliberately keeps the MINIMAL model-facing set and does NOT
 # duplicate host-bundle rows: `evolution-maintenance/tools` (maintenance_probe)
-# and the `session-query-sqlite` index override are evolution-host-owned, so
-# repeating them here would mount the row twice in a layered install. The
+# is evolution-host-owned, so repeating it here would mount the row twice in a
+# layered install. The platform owns the session-query index policy; the family
+# does not override it. The
 # `tool-skill` 60-char catalog cap is likewise NOT carried as a delta row: the
 # session-visible `tool-skill` instance is the standard composition's own row,
 # so a delta copy would collide with it (N-5) and a profile-root patch cannot
@@ -34,8 +35,9 @@
 
 # Cross-session recall. The memory guidance tells the model to use
 # `session_search` instead of saving task progress, so the tool must be
-# mounted for that guidance to be actionable. The backing index is enabled
-# by evolution-host's `session-query-sqlite` row (see its openAt/path config).
+# mounted for that guidance to be actionable. The backing index follows the
+# platform policy (opt-in); enable it in a profile patch if content search is
+# wanted.
 - id: tool-session-query
   name: '@deepseek-ai/dsh-tool-session-query'
 

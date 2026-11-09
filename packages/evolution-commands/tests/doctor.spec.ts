@@ -326,21 +326,7 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
-  it('T-WB2: an invalid DSH_EVOLUTION_SESSION_QUERY surfaces as an env issue with a fix', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'doctor-env-'))
-    const previous = process.env.DSH_EVOLUTION_SESSION_QUERY
-    process.env.DSH_EVOLUTION_SESSION_QUERY = '1'
-    try {
-      const report = await diagnose(stub, { home })
-      expect(report.envIssues.join('\n')).toContain('not one of startup|first-search|never')
-      expect(report.actions.join('\n')).toContain('DSH_EVOLUTION_*')
-    } finally {
-      if (previous === undefined) delete process.env.DSH_EVOLUTION_SESSION_QUERY
-      else process.env.DSH_EVOLUTION_SESSION_QUERY = previous
-      await rm(home, { recursive: true, force: true })
-    }
-  })
-
+  // T-WB2 removed: the family no longer owns DSH_EVOLUTION_SESSION_QUERY.
   it('reports the legacy settings document, and what is still unmigrated (G3)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-legacy-'))
     try {

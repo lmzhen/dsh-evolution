@@ -26,16 +26,16 @@
 #     patch overlay on a host that already provides them).
 #   - `tool-session-query` is carried by the agent/one-click delta (the layered
 #     flow gets it from the Evolution agent preset), so it is not repeated
-#     here; a fully self-sufficient manual compose should add it (plus the
-#     host's `session-query-sqlite` index override) for cross-session recall.
+#     here; a fully self-sufficient manual compose should add it for
+#     cross-session recall. The backing index stays platform opt-in.
 #   - `evolution-maintenance-tools` is listed by the overlay form and the host
 #     bundle but deliberately NOT by this STANDALONE file (H-01) — a standalone
 #     compose that wants maintenance_probe / `/evolution maintain` must add the
 #     row (`name: '@deepseek-ai/dsh-evolution-maintenance/tools'`) itself. The
 #     package.json dependency on `dsh-evolution-maintenance` exists so that
-#     added row resolves without also editing dependencies. The standalone file
-#     likewise carries no `session-query-sqlite` override; the overlay form
-#     carries it (overriding the platform row the DSH profile already has).
+#     added row resolves without also editing dependencies. Neither the
+#     standalone file nor the overlay carries a `session-query-sqlite` override;
+#     the platform owns that policy.
 #   - the `tool-skill` 60-char catalog cap override is carried by the one-click
 #     patch (V10-14) and by the host bundle as the identical root-level row;
 #     this STANDALONE file does not list it — a manual compose wanting the cap

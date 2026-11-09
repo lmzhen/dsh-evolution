@@ -266,7 +266,6 @@ export interface DoctorReport {
    * list is what makes that difference visible instead of mysterious. */
   foreignProfiles: string[]
   conflicts: string[]
-  envIssues: string[]
   /** S4/P-1+P-2 (platform gap, family mitigation): the session-query corpus
    * listing failed — reported verbatim, with the isolation recipe. Empty when the
    * service is absent or answering. */
@@ -361,17 +360,6 @@ export function collectEvolutionBundles(home: string, onReadError?: (error: unkn
     }
   }
   return bundles
-}
-
-const SESSION_QUERY_MODES = new Set(['startup', 'first-search', 'never'])
-
-function envIssues(): string[] {
-  const issues: string[] = []
-  const query = process.env.DSH_EVOLUTION_SESSION_QUERY
-  if (query && !SESSION_QUERY_MODES.has(query)) {
-    issues.push(`DSH_EVOLUTION_SESSION_QUERY="${query}" is not one of startup|first-search|never — the patch normalizes it to 'startup' silently; set it to a listed mode.`)
-  }
-  return issues
 }
 
 /** G3-② (B2): the family delta container. An optionalDependency of this
@@ -814,8 +802,6 @@ export async function diagnose(
   else if (installForm === 'none') actions.push('Install the default full bundle: dsh plugin --profile web add @lmzhen/dsh-evolution-all')
   else if (installForm === 'preset-only') actions.push(`The Evolution preset row is installed but no profile mounts an evolution bundle — re-add @lmzhen/dsh-evolution-host for the layered layout (do NOT add all on top of the preset: that double-mounts the model rows), or drop the row (${layeredArtifactLabel}) from the profile patch if the layered layout is no longer wanted.`)
   else if (installForm === 'layered') actions.push('Variant form (session opt-in): model tools follow the Evolution preset, and a session on a platform original preset carries no family rows; add @lmzhen/dsh-evolution-all instead if every session should have them.')
-  const env = envIssues()
-  if (env.length > 0) actions.push('Fix the DSH_EVOLUTION_* variable listed above.')
   // O-2 (S3.4/A99): absent capabilities get their own next step BESIDE the ladder (the ladder
   // answers "which install form do I have"; this answers "what can I not use"). The finding and its
   // step ship together, like every other row of this report.
@@ -882,7 +868,7 @@ export async function diagnose(
     .filter(({ profile, dir }) => mounted === undefined || (profile !== mounted.profile && dir !== mounted.dir))
     .map(({ profile }) => profile)
   return {
-    installForm, deploymentForm, bundles, foreignProfiles, conflicts, envIssues: env, budgetIssues,
+    installForm, deploymentForm, bundles, foreignProfiles, conflicts, budgetIssues,
     paramIssues, queryIssues, services, capabilityAbsence,
     pendingCount, executingCount, presetFreshness, scopedProbe, legacy,
     runtimeBundles: runtimeBundles ?? null,
@@ -1115,7 +1101,6 @@ export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'
   if (report.presetIssues.length > 0) extras.push('agent presets:', ...report.presetIssues.map(line => `  ! ${line}`))
   if (report.foreignProfiles.length > 0) extras.push('profiles-foreign: ' + report.foreignProfiles.join(', ') + ' — not part of this plane: /evolution preset install ignores them, while the bundles (all profiles) line above counts them')
   if (report.conflicts.length > 0) extras.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
-  if (report.envIssues.length > 0) extras.push('env:', ...report.envIssues.map(line => `  ! ${line}`))
   if (report.budgetIssues.length > 0) extras.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
   if (report.paramIssues.length > 0) extras.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
   if (report.queryIssues.length > 0) extras.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
