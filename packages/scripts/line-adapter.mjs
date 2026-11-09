@@ -173,6 +173,9 @@ export function resolveEntries(env = process.env) {
     add('@lmzhen/dsh-evolution-client-kit/generated/routes', 'kit-subpath', join(kitSrc, 'generated/routes.generated.ts'), 'overlay src subpath')
     add('@lmzhen/dsh-evolution-client-kit/generated/states', 'kit-subpath', join(kitSrc, 'generated/states.generated.ts'), 'overlay src subpath')
     add('@lmzhen/dsh-evolution-client-kit/tokens', 'kit-subpath', join(kitSrc, 'tokens.ts'), 'overlay src subpath')
+    for (const ns of ['evolution-settings', 'evolution-skill-history', 'evolution-merge', 'evolution-skill-health']) {
+      add('@lmzhen/dsh-evolution-client-kit/generated/i18n/' + ns, 'kit-subpath', join(kitSrc, 'generated/i18n', ns + '.ts'), 'overlay src subpath')
+    }
   }
   // 2. the family's own packages, from the dev overlay SOURCE (the tree the tests exercise).
   if (existsSync(p.evo)) {
