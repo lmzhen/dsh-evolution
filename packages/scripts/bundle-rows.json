@@ -320,7 +320,8 @@
           ],
           "rows": [
             "evolution-io",
-            "evolution-io-node"
+            "evolution-io-node",
+            "evolution-authority"
           ]
         },
         {
@@ -605,6 +606,28 @@
       "bodies": {
         "standalone": [
           "  name: '@deepseek-ai/dsh-evolution-io-node'"
+        ]
+      },
+      "leads": {
+        "standalone": []
+      }
+    },
+    {
+      "id": "evolution-authority",
+      "group": "evolution-io",
+      "forms": [
+        "all",
+        "host",
+        "preset",
+        "standalone"
+      ],
+      "lead": [],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-authority'"
+      ],
+      "bodies": {
+        "standalone": [
+          "  name: '@deepseek-ai/dsh-evolution-authority'"
         ]
       },
       "leads": {
