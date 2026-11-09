@@ -29,9 +29,9 @@ it('skill review prompt keeps neutral decision structure and pass wording', () =
   expect(SKILL_REVIEW_PROMPT).not.toContain('background review pass')
   expect(SKILL_REVIEW_PROMPT).toContain('Update only skills you loaded or read')
   expect(SKILL_REVIEW_PROMPT).toContain('creating a new class-level skill is the exception')
-  expect(SKILL_REVIEW_PROMPT).toContain('Do not turn environment failures')
-  expect(SKILL_REVIEW_PROMPT).toContain('Capture a reproducible setup fix')
-  expect(SKILL_REVIEW_PROMPT).toContain('User preferences belong')
+  expect(SKILL_REVIEW_PROMPT).toContain('A one-off environment failure')
+  expect(SKILL_REVIEW_PROMPT).toContain('Capture a reproducible setup or repair procedure')
+  expect(SKILL_REVIEW_PROMPT).toContain('A user correction about how a class of task should be done')
   expect(SKILL_REVIEW_PROMPT).toContain('Nothing to save.')
   expect(MEMORY_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
 })
@@ -45,7 +45,16 @@ it('combined review prompt mirrors the same neutral decision structure', () => {
   expect(COMBINED_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
   expect(COMBINED_REVIEW_PROMPT).toContain('## Skills')
   expect(COMBINED_REVIEW_PROMPT).toContain('A precise no-op is a valid outcome')
-  expect(COMBINED_REVIEW_PROMPT).toContain('User preferences belong')
+  expect(COMBINED_REVIEW_PROMPT).toContain('A user correction about how a class of task should be done')
+})
+
+it('keeps no-op delivery out of the shared decision body', () => {
+  expect(SKILL_REVIEW_PROMPT).toContain('If nothing durable exists, say "Nothing to save." and stop.')
+  expect(SKILL_REVIEW_PLAN_PROMPT).not.toContain('Nothing to save.')
+  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('return the plan with an empty items list')
+  expect(COMBINED_REVIEW_PROMPT).toContain('Nothing to save (memory)')
+  expect(COMBINED_REVIEW_PROMPT).toContain('continue to the Skills pass')
+  expect(COMBINED_REVIEW_PROMPT).toContain('If nothing durable exists in either pass')
 })
 
 it('curator prompt keeps package integrity and the consolidated/pruned block contract', () => {
@@ -67,7 +76,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
   // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
   // bundle identity moves with it (v18 pinned the step-7 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(24)
+  expect(PROMPT_BUNDLE_VERSION).toBe(25)
   // v46 S1.12b (finding T3-07): the dry-run banner is model-visible curator text, so it rides
   // the bundle and the digest covers it.
   expect(PROMPT_BUNDLE.prompts['curatorDryRun']).toBe(CURATOR_DRY_RUN_BANNER)
