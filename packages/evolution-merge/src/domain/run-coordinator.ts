@@ -71,7 +71,10 @@ export async function writeRunMeta(io: EvolutionIoLike, home: string, meta: Merg
           if (meta.revision !== undefined && meta.revision !== previousRevision) throw new Error('run-meta revision conflict: expected ' + String(meta.revision) + ', found ' + String(previousRevision))
           if (prev.degraded === true) next = { ...next, degraded: true }
           const terminal = prev.phase === 'settled' || prev.phase === 'cancelled' || prev.phase === 'undone'
-          if (terminal && next.phase !== prev.phase) next = { ...next, phase: prev.phase, ...(prev.stopReason === undefined ? {} : { stopReason: prev.stopReason }) }
+          // Undo is the one allowed transition out of a settled record; every other
+          // terminal phase is immutable (a late body write must not reopen a run).
+          const undoFromSettled = prev.phase === 'settled' && next.phase === 'undone'
+          if (terminal && next.phase !== prev.phase && !undoFromSettled) next = { ...next, phase: prev.phase, ...(prev.stopReason === undefined ? {} : { stopReason: prev.stopReason }) }
         } catch { /* unreadable old meta is replaced by the caller's record */ }
       }
       return JSON.stringify({ ...next, revision: previousRevision + 1 }, null, 2) + '\n'

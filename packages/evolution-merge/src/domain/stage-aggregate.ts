@@ -1,6 +1,6 @@
 import { readTextOrNull, listOrEmpty } from './read-probe.ts'
 /** 1b-1 shadow staging adoption. Production staging is still owned by the old staged writers. */
-import { basename, isAbsolute, join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { readPairLedger } from './pair-ledger.ts'
 import { readStagingIndex, writeStagingIndex, type StagingEntry } from './staging-index.ts'
@@ -223,8 +223,10 @@ export async function presentStage(io: EvolutionIoLike, home: string, entry: Sta
 }
 function safeRunTree(home: string, ref: string): string | null {
   const name = ref.trim()
-  if (name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\') || isAbsolute(name) || basename(name) !== name) return null
-  return join(home, 'merge', 'runs', name)
+  if (name === '' || name.includes('\\') || isAbsolute(name)) return null
+  const parts = name.split('/')
+  if (parts.some(part => part === '' || part === '.' || part === '..')) return null
+  return join(home, 'merge', 'runs', ...parts)
 }
 
 export async function dropStage(io: EvolutionIoLike, home: string, rowId: string, ref?: string, onError?: (path: string, error: unknown) => void): Promise<void> {

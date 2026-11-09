@@ -20,6 +20,8 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
   expect(manifest.name).toBe('@deepseek-ai/dsh-evolution-all')
   const expected = [
     '@deepseek-ai/dsh-evolution-host',
+    // G2: the mutation authority is part of the default composition.
+    '@deepseek-ai/dsh-evolution-authority',
     // 0.28.0: the merge host row and its browser half.
     '@deepseek-ai/dsh-evolution-merge',
     '@deepseek-ai/dsh-evolution-merge-ui',
@@ -41,6 +43,8 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     // G2-S6: resolver dependency — the generated restricted preset mounts the core restrictor
     // subpath at runtime, so the bundle must ship core even though no source file imports it.
     '@deepseek-ai/dsh-evolution-core',
+    // G0: the default bundle mounts the session-query row, so it must be a dependency.
+    '@deepseek-ai/dsh-tool-session-query',
   ]
   for (const dep of expected) {
     expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe('workspace:^')

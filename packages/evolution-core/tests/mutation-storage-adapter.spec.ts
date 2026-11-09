@@ -20,6 +20,8 @@ class MemoryIo implements EvolutionIoLike {
 const HOME = 'D:/home'
 const SNAP: MutationSnapshot = {
   unitId: 'u-1',
+  owner: 'foreground',
+  runId: 'u-1',
   state: 'committed',
   createdAt: 1,
   ops: [

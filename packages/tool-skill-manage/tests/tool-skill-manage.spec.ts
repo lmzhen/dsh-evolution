@@ -183,7 +183,7 @@ describe('tool-skill-manage', () => {
     // by 1151: the expression interpolates more than one constant, which is
     // exactly why this pin has to be runtime-captured.) De-duplication must
     // lower this number and say so; growth must be a deliberate edit here.
-    expect((tool?.description ?? '').length).toBe(5090)
+    expect((tool?.description ?? '').length).toBe(5279)
     expect(tool?.description ?? '').toContain('replace_all')
     expect(tool?.description ?? '').toContain('file_path')
     expect(tool?.description ?? '').toContain('extract')
