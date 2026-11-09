@@ -30,5 +30,8 @@ export default defineConfig(() => ({
   target: 'es2024',
   fixedExtension: false,
   dts: false,
+  // Platform packages are peers at runtime. Bundling their source pulled
+  // decorator syntax into lib/ (Node cannot parse @Remote property decorators).
+  external: [/^@deepseek-ai\/(?!dsh-evolution-)/],
   clean: false,
 }))
