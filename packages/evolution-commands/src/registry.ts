@@ -11,6 +11,7 @@
  */
 import { HOST_COMMANDS } from './generated/host-commands.ts'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
+import { hostCommandText } from './host-locale.ts'
 
 export interface CommandEntry {
   /** The subcommand as typed after `/evolution`. Variants use `|` (curator run|pause). */
@@ -97,7 +98,7 @@ export function renderHint(): string {
 export function renderHelpText(locale: HostLocale = 'zh'): string {
   // First line first: the platform's command row collapses to the output's FIRST LINE, and a list
   // whose first line is a subcommand reads like that subcommand was what ran.
-  return [`/evolution subcommands (${COMMAND_ENTRIES.length}):`, '', ...COMMAND_ENTRIES
+  return [hostCommandText(locale, 'help.subcommands', { count: COMMAND_ENTRIES.length }), '', ...COMMAND_ENTRIES
     .map(entry => `  ${entry.usage.padEnd(44)} ${(HOST_COMMANDS as Record<string, Partial<Record<HostLocale, string>>>)['summary.' + entryName(entry)]?.[locale] ?? entry.summary}`)]
     .join('\n')
 }

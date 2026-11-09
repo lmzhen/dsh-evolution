@@ -662,6 +662,16 @@ export const HOST_COMMANDS = {
       "de": "Die Berichtsdatei konnte nicht gelesen werden.",
       "ru": "Не удалось прочитать файл отчёта.",
       "pt": "Não foi possível ler o arquivo do relatório."
+    },
+    "help.subcommands": {
+      "zh": "/evolution 子命令（{count}）：",
+      "en": "/evolution subcommands ({count}):",
+      "ja": "/evolution サブコマンド（{count}）:",
+      "es": "/evolution subcomandos ({count}):",
+      "fr": "/evolution sous-commandes ({count}) :",
+      "de": "/evolution Unterbefehle ({count}):",
+      "ru": "/evolution подкоманды ({count}):",
+      "pt": "/evolution subcomandos ({count}):"
     }
   } as const
 

@@ -3634,7 +3634,7 @@ export const DICTIONARIES = {
       "action.support-remove": "Support file removed",
       "action.support-write": "Support file written",
       "action.update": "Full rewrite",
-      "bodyTitle": "Body version",
+      "bodyTitle": "Body versions",
       "current": "Current",
       "diff.added": "{n} lines added",
       "diff.against": "Compared to v{n}",
