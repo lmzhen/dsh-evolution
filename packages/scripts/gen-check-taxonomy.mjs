@@ -62,7 +62,7 @@ const visit = (dir) => {
     if (entry.name === 'node_modules' || entry.name === 'lib' || entry.name === 'dist' || entry.name.startsWith('.')) continue
     const full = join(dir, entry.name)
     if (entry.isDirectory()) { visit(full); continue }
-    if (entry.name.endsWith('.spec.ts') && dir.endsWith('tests')) specFiles.push(full)
+    if (entry.name.endsWith('.spec.ts') && relative(TREE, full).split(/[\\/]/).includes('tests')) specFiles.push(full)
   }
 }
 visit(TREE)

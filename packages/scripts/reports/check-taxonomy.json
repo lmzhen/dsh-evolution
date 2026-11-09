@@ -149,6 +149,7 @@
         "evolution-merge-ui::tests/api.client.spec.ts",
         "evolution-merge-ui::tests/copy-failure.client.spec.ts",
         "evolution-merge-ui::tests/focus.client.spec.ts",
+        "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/merge-presentation.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
@@ -543,6 +544,7 @@
         "evolution-merge-ui::tests/api.client.spec.ts",
         "evolution-merge-ui::tests/copy-failure.client.spec.ts",
         "evolution-merge-ui::tests/focus.client.spec.ts",
+        "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/merge-presentation.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
@@ -662,12 +664,13 @@
         "evolution-merge::tests/wire.spec.ts",
         "evolution-policy::tests/policy.spec.ts",
         "evolution-policy::tests/protected-skills.spec.ts",
-        "evolution-preset::tests/environment-fallbacks.spec.ts",
+        "evolution-preset::tests/session-query-policy.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
+        "evolution-review::tests/review-mode-default.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
@@ -1182,6 +1185,7 @@
         "evolution-merge-ui::tests/api.client.spec.ts",
         "evolution-merge-ui::tests/copy-failure.client.spec.ts",
         "evolution-merge-ui::tests/focus.client.spec.ts",
+        "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/merge-presentation.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
@@ -1301,12 +1305,13 @@
         "evolution-merge::tests/wire.spec.ts",
         "evolution-policy::tests/policy.spec.ts",
         "evolution-policy::tests/protected-skills.spec.ts",
-        "evolution-preset::tests/environment-fallbacks.spec.ts",
+        "evolution-preset::tests/session-query-policy.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
+        "evolution-review::tests/review-mode-default.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
@@ -1763,6 +1768,7 @@
         "evolution-merge-ui::tests/api.client.spec.ts",
         "evolution-merge-ui::tests/copy-failure.client.spec.ts",
         "evolution-merge-ui::tests/focus.client.spec.ts",
+        "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/merge-presentation.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
@@ -1882,13 +1888,14 @@
         "evolution-merge::tests/wire.spec.ts",
         "evolution-policy::tests/policy.spec.ts",
         "evolution-policy::tests/protected-skills.spec.ts",
-        "evolution-preset::tests/environment-fallbacks.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
+        "evolution-preset::tests/session-query-policy.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
+        "evolution-review::tests/review-mode-default.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
         "evolution-review::tests/review.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
@@ -2085,11 +2092,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 99
+      "specs": 100
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 383
+      "specs": 385
     },
     "ci-only": {
       "gates": 12,
@@ -2097,16 +2104,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 383
+      "specs": 385
     },
     "full(ci=on)": {
       "gates": 87,
-      "specs": 455
+      "specs": 457
     }
   },
   "specs": {
-    "total": 455,
-    "marked": 455,
+    "total": 457,
+    "marked": 457,
     "unmarked": 0
   }
 }
