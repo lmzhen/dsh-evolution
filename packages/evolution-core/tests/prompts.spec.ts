@@ -42,6 +42,7 @@ it('authoring standards put routing metadata in frontmatter', () => {
 
 it('combined review prompt mirrors the same neutral decision structure', () => {
   expect(COMBINED_REVIEW_PROMPT).toContain('## Memory')
+  expect(COMBINED_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
   expect(COMBINED_REVIEW_PROMPT).toContain('## Skills')
   expect(COMBINED_REVIEW_PROMPT).toContain('A precise no-op is a valid outcome')
   expect(COMBINED_REVIEW_PROMPT).toContain('User preferences belong')
