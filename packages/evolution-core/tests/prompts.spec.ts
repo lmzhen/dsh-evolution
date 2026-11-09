@@ -1,6 +1,6 @@
 // @tier fast
 import { expect, it } from 'vitest'
-import { COMBINED_REVIEW_PROMPT, COMBINED_REVIEW_PLAN_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PLAN_PROMPT, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { COMBINED_REVIEW_PROMPT, COMBINED_REVIEW_PLAN_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PLAN_PROMPT, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 
 it('verifyPromptBundle accepts the canonical bundle', () => {
   expect(verifyPromptBundle(PROMPT_BUNDLE)).toBe(true)
@@ -50,11 +50,14 @@ it('combined review prompt mirrors the same neutral decision structure', () => {
 
 it('keeps no-op delivery out of the shared decision body', () => {
   expect(SKILL_REVIEW_PROMPT).toContain('If nothing durable exists, say "Nothing to save." and stop.')
+  expect(COMPLETION_SKILL_REVIEW_PROMPT).toContain('If nothing durable exists, say "Nothing to save." and stop.')
   expect(SKILL_REVIEW_PLAN_PROMPT).not.toContain('Nothing to save.')
   expect(SKILL_REVIEW_PLAN_PROMPT).toContain('return the plan with an empty items list')
   expect(COMBINED_REVIEW_PROMPT).toContain('Nothing to save (memory)')
   expect(COMBINED_REVIEW_PROMPT).toContain('continue to the Skills pass')
   expect(COMBINED_REVIEW_PROMPT).toContain('If nothing durable exists in either pass')
+  expect(SKILL_REVIEW_PROMPT).toContain('add the SKILL.md line that points to it')
+  expect(SKILL_REVIEW_PROMPT).toContain('If only a protected skill can carry the lesson')
 })
 
 it('curator prompt keeps package integrity and the consolidated/pruned block contract', () => {
