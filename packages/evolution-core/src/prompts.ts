@@ -49,18 +49,18 @@ const SKILL_REVIEW_BODY = `Review the conversation above and update the skill li
 
 Update only when the session contains a durable lesson that changes how this class of task should be done. A precise no-op is a valid outcome.
 
-Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail. Do not create one narrow skill per incident. When you update a loaded skill whose body has become bloated, move its session-specific sections to references/.
+Target: a class-level skill with a compact SKILL.md and a references/ directory for session-specific detail. Do not create one narrow skill per incident. Keep the body compact; put new session-specific detail in references/.
 
-A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Brief support-file roles: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators.
+A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Support files: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators. When you add a support file, add the SKILL.md line that points to it; a file no pointer reaches is invisible next session.
 
 Signals:
 - The user corrected style, tone, format, verbosity, workflow, or approach.
 - A reusable technique, repair procedure, or debugging path emerged that will recur.
 - A loaded skill proved wrong, incomplete, or outdated.
 
-Read before writing. Update only skills you loaded or read in this review pass; creating a new class-level skill is the exception.
+Read before writing. If you loaded a skill earlier and cannot recall its body, read it again before patching. Update only skills you loaded or read in this review pass; creating a new class-level skill is the exception.
 
-Choose the smallest target that can carry the lesson:
+Choose the nearest owner that can carry the lesson:
 1. the loaded skill, if it is the class-level owner;
 2. an existing umbrella, when the loaded skill is narrow;
 3. a support file under that umbrella;
@@ -70,11 +70,11 @@ Name a new skill for its class, not for a PR number, error string, feature coden
 
 A user correction about how a class of task should be done belongs in the skill that governs that task.
 
-Do not expand the library just to record one incident.
+Leave consolidation to the curator; focus this pass on the smallest edit that carries the session's lesson.
 
 A one-off environment failure, transient error, or "tool X is broken" claim is not a lesson. Capture a reproducible setup or repair procedure only when it will recur; otherwise no-op.
 
-Respect protected skills (bundled, hub-installed, pinned) and their guards.`
+Respect protected skills (bundled, hub-installed, pinned) and their guards. If only a protected skill can carry the lesson, stop and say so; do not create a near-duplicate to hold it.`
 
 export const SKILL_REVIEW_PROMPT = `[Auto-review — Skills]
 ${SKILL_REVIEW_BODY}
@@ -161,7 +161,9 @@ Your output IS the deliverable: produce the exact same human-readable summary an
 If you accidentally take a mutating action, say so explicitly in the summary.`
 
 export const COMPLETION_SKILL_REVIEW_PROMPT = `[Auto-review — Skills · task complete]
-${SKILL_REVIEW_BODY}`
+${SKILL_REVIEW_BODY}
+
+If nothing durable exists, say "Nothing to save." and stop.`
 
 export const MAINTAIN_PROMPT = `<<<MAINTAIN_PROMPT v={bundle_version} sig={joint_signature}>>>
 
