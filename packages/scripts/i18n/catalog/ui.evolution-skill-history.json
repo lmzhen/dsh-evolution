@@ -7,679 +7,873 @@
       "en": "archived",
       "ja": "アーカイブ",
       "es": "archivado",
-      "fr": "archivé"
+      "fr": "archivé",
+      "de": "archiviert",
+      "pt": "arquivamento"
     },
     "action.archive.note": {
       "zh": "这一版存的是被归档的正文",
       "en": "this version holds the archived body",
       "ja": "このバージョンにはアーカイブされた本文が保存されています",
       "es": "esta versión guarda el cuerpo archivado",
-      "fr": "cette version contient le texte archivé"
+      "fr": "cette version contient le texte archivé",
+      "de": "Diese Version enthält den archivierten Text",
+      "pt": "esta versão guarda o corpo arquivado"
     },
     "action.baseline": {
       "zh": "初始快照",
       "en": "initial snapshot",
       "ja": "初期スナップショット",
       "es": "instantánea inicial",
-      "fr": "instantané initial"
+      "fr": "instantané initial",
+      "de": "Ausgangssnapshot",
+      "pt": "snapshot inicial"
     },
     "action.consolidate": {
       "zh": "合并",
       "en": "merged",
       "ja": "マージ",
       "es": "mergeado",
-      "fr": "fusionné"
+      "fr": "fusionné",
+      "de": "gemergt",
+      "pt": "consolidação"
     },
     "action.create": {
       "zh": "新建",
       "en": "created",
       "ja": "新規作成",
       "es": "creado",
-      "fr": "créé"
+      "fr": "créé",
+      "de": "erstellt",
+      "pt": "criação"
     },
     "action.delete": {
       "zh": "删除",
       "en": "deleted",
       "ja": "削除",
       "es": "eliminado",
-      "fr": "supprimé"
+      "fr": "supprimé",
+      "de": "gelöscht",
+      "pt": "exclusão"
     },
     "action.delete.note": {
       "zh": "这一版存的是被删掉的正文",
       "en": "this version holds the removed body",
       "ja": "このバージョンには削除された本文が保存されています",
       "es": "esta versión guarda el cuerpo eliminado",
-      "fr": "cette version contient le texte supprimé"
+      "fr": "cette version contient le texte supprimé",
+      "de": "Diese Version enthält den entfernten Text",
+      "pt": "esta versão guarda o corpo removido"
     },
     "action.extract": {
       "zh": "跨技能提取",
       "en": "extracted across skills",
       "ja": "スキル間抽出",
       "es": "extraído entre skills",
-      "fr": "extrait entre skills"
+      "fr": "extrait entre skills",
+      "de": "über Skills hinweg extrahiert",
+      "pt": "extração entre skills"
     },
     "action.merge": {
       "zh": "合并",
       "en": "merged",
       "ja": "マージ",
       "es": "mergeado",
-      "fr": "fusionné"
+      "fr": "fusionné",
+      "de": "gemergt",
+      "pt": "merge"
     },
     "action.other": {
       "zh": "其他写入",
       "en": "other write",
       "ja": "その他の書き込み",
       "es": "otra escritura",
-      "fr": "autre écriture"
+      "fr": "autre écriture",
+      "de": "anderer Schreibvorgang",
+      "pt": "outra escrita"
     },
     "action.patch": {
       "zh": "定点修改",
       "en": "targeted edit",
       "ja": "部分修正",
       "es": "edición puntual",
-      "fr": "modification ciblée"
+      "fr": "modification ciblée",
+      "de": "gezielte Änderung",
+      "pt": "edição pontual"
     },
     "action.restore": {
       "zh": "回退",
       "en": "restored",
       "ja": "復元",
       "es": "restaurado",
-      "fr": "restauré"
+      "fr": "restauré",
+      "de": "wiederhergestellt",
+      "pt": "restauração"
     },
     "action.restructure": {
       "zh": "结构调整",
       "en": "restructured",
       "ja": "構成整理",
       "es": "reestructurado",
-      "fr": "restructuré"
+      "fr": "restructuré",
+      "de": "umstrukturiert",
+      "pt": "reestruturação"
     },
     "action.support-remove": {
       "zh": "删除附带文件",
       "en": "support file removed",
       "ja": "補助ファイルの削除",
       "es": "archivo adjunto eliminado",
-      "fr": "fichier joint supprimé"
+      "fr": "fichier joint supprimé",
+      "de": "Begleitdatei entfernt",
+      "pt": "arquivo de apoio removido"
     },
     "action.support-write": {
       "zh": "写入附带文件",
       "en": "support file written",
       "ja": "補助ファイルの書き込み",
       "es": "archivo adjunto escrito",
-      "fr": "fichier joint écrit"
+      "fr": "fichier joint écrit",
+      "de": "Begleitdatei geschrieben",
+      "pt": "arquivo de apoio gravado"
     },
     "action.update": {
       "zh": "整篇更新",
       "en": "whole-body update",
       "ja": "全文更新",
       "es": "actualización completa",
-      "fr": "mise à jour du texte entier"
+      "fr": "mise à jour du texte entier",
+      "de": "Voll-Update",
+      "pt": "atualização do corpo inteiro"
     },
     "bodyTitle": {
       "zh": "正文版本",
       "en": "Body versions",
       "ja": "本文のバージョン",
       "es": "Versiones del cuerpo",
-      "fr": "Versions du texte"
+      "fr": "Versions du texte",
+      "de": "Textversionen",
+      "pt": "Versões do corpo"
     },
     "current": {
       "zh": "当前",
       "en": "Current",
       "ja": "現在",
       "es": "Actual",
-      "fr": "Actuelle"
+      "fr": "Actuelle",
+      "de": "Aktuell",
+      "pt": "Atual"
     },
     "diff.added": {
       "zh": "新增 {n} 行",
       "en": "{n} lines added",
       "ja": "{n} 行追加",
       "es": "{n} líneas añadidas",
-      "fr": "{n} lignes ajoutées"
+      "fr": "{n} lignes ajoutées",
+      "de": "{n} Zeilen hinzugefügt",
+      "pt": "{n} linhas adicionadas"
     },
     "diff.against": {
       "zh": "与 v{n} 比较",
       "en": "compared with v{n}",
       "ja": "v{n} との比較",
       "es": "comparado con v{n}",
-      "fr": "comparé à v{n}"
+      "fr": "comparé à v{n}",
+      "de": "Vergleich mit v{n}",
+      "pt": "comparado com v{n}"
     },
     "diff.first": {
       "zh": "这是第一版，整篇都是新增",
       "en": "first version: everything is new",
       "ja": "初期バージョンのため、全文が新規追加です",
       "es": "primera versión: todo es nuevo",
-      "fr": "première version : tout est nouveau"
+      "fr": "première version : tout est nouveau",
+      "de": "Erste Version: alles ist neu",
+      "pt": "primeira versão: tudo é novo"
     },
     "diff.hide": {
       "zh": "收起差异",
       "en": "Hide diff",
       "ja": "差分を閉じる",
       "es": "Ocultar diferencias",
-      "fr": "Masquer le diff"
+      "fr": "Masquer le diff",
+      "de": "Diff ausblenden",
+      "pt": "Ocultar diferenças"
     },
     "diff.loading": {
       "zh": "读取差异…",
       "en": "Loading the diff…",
       "ja": "差分を読み取り中…",
       "es": "Cargando las diferencias…",
-      "fr": "Chargement du diff…"
+      "fr": "Chargement du diff…",
+      "de": "Diff wird gelesen…",
+      "pt": "carregando as diferenças…"
     },
     "diff.removed": {
       "zh": "删除 {n} 行",
       "en": "{n} lines removed",
       "ja": "{n} 行削除",
       "es": "{n} líneas eliminadas",
-      "fr": "{n} lignes supprimées"
+      "fr": "{n} lignes supprimées",
+      "de": "{n} Zeilen entfernt",
+      "pt": "{n} linhas removidas"
     },
     "diff.rendered": {
       "zh": "排版",
       "en": "Rendered",
       "ja": "整形表示",
       "es": "Con formato",
-      "fr": "Rendu"
+      "fr": "Rendu",
+      "de": "Gerendert",
+      "pt": "Formatado"
     },
     "diff.show": {
       "zh": "差异",
       "en": "Diff",
       "ja": "差分",
       "es": "Diferencias",
-      "fr": "Diff"
+      "fr": "Diff",
+      "de": "Diff",
+      "pt": "Diferenças"
     },
     "diff.source": {
       "zh": "原文",
       "en": "Markdown",
       "ja": "原文",
       "es": "Markdown",
-      "fr": "Markdown"
+      "fr": "Markdown",
+      "de": "Markdown",
+      "pt": "Markdown"
     },
     "diff.truncated": {
       "zh": "差异过长，只显示前一部分",
       "en": "the change is long; only its beginning is shown",
       "ja": "差分が長いため、先頭の一部のみ表示しています",
       "es": "el cambio es largo; solo se muestra el principio",
-      "fr": "le diff est long ; seul son début est affiché"
+      "fr": "le diff est long ; seul son début est affiché",
+      "de": "Die Änderung ist lang; nur der Anfang wird gezeigt",
+      "pt": "as diferenças são longas; só o início é mostrado"
     },
     "empty.pick": {
       "zh": "从左栏选一个技能，看它记录过的版本。",
       "en": "Pick a skill on the left to see the versions it recorded.",
       "ja": "左の欄からスキルを選ぶと、記録されたバージョンが表示されます。",
       "es": "Elige un skill a la izquierda para ver las versiones que registró.",
-      "fr": "Choisissez un skill à gauche pour voir les versions enregistrées."
+      "fr": "Choisissez un skill à gauche pour voir les versions enregistrées.",
+      "de": "Wähle links einen Skill, um seine aufgezeichneten Versionen zu sehen.",
+      "pt": "Escolha uma skill à esquerda para ver as versões registradas."
     },
     "empty.skills": {
       "zh": "还没有技能留下过内容版本。",
       "en": "No skill has recorded a content version yet.",
       "ja": "内容のバージョンが記録されたスキルはまだありません。",
       "es": "Ningún skill ha registrado todavía una versión de contenido.",
-      "fr": "Aucun skill n’a encore enregistré de version de contenu."
+      "fr": "Aucun skill n’a encore enregistré de version de contenu.",
+      "de": "Noch kein Skill hat eine Textversion aufgezeichnet.",
+      "pt": "Nenhuma skill registrou uma versão de conteúdo ainda."
     },
     "empty.skills.main": {
       "zh": "技能第一次被写入后，这里会显示它的内容版本。",
       "en": "After a skill is written for the first time, its content versions appear here.",
       "ja": "スキルが初めて書き込まれると、ここに内容のバージョンが表示されます。",
       "es": "Cuando un skill se escriba por primera vez, aquí verás sus versiones de contenido.",
-      "fr": "Après la première écriture d’un skill, ses versions de contenu apparaissent ici."
+      "fr": "Après la première écriture d’un skill, ses versions de contenu apparaissent ici.",
+      "de": "Sobald ein Skill zum ersten Mal geschrieben wird, erscheinen hier seine Textversionen.",
+      "pt": "Depois que uma skill é gravada pela primeira vez, as versões de conteúdo aparecem aqui."
     },
     "empty.versions": {
       "zh": "这个技能还没有记录版本。",
       "en": "This skill has no recorded versions.",
       "ja": "このスキルには記録されたバージョンがありません。",
       "es": "Este skill no tiene versiones registradas.",
-      "fr": "Ce skill n’a aucune version enregistrée."
+      "fr": "Ce skill n’a aucune version enregistrée.",
+      "de": "Für diesen Skill sind keine Versionen aufgezeichnet.",
+      "pt": "Esta skill não tem versões registradas."
     },
     "empty.versions.failed": {
       "zh": "版本读取失败——这个技能有没有版本，现在判断不了；点「刷新」重试。",
       "en": "The version read FAILED - whether this skill has versions is unknown right now; use Refresh to retry.",
       "ja": "バージョンの読み取りに失敗しました。このスキルにバージョンがあるか今は判断できません。「更新」を押して再試行してください。",
       "es": "No se pudieron leer las versiones: ahora mismo no se puede saber si este skill tiene versiones; pulsa «Actualizar» para reintentar.",
-      "fr": "La lecture des versions a échoué : impossible de savoir si ce skill a des versions ; cliquez sur « Actualiser » pour réessayer."
+      "fr": "La lecture des versions a échoué : impossible de savoir si ce skill a des versions ; cliquez sur « Actualiser » pour réessayer.",
+      "de": "Versionen konnten nicht gelesen werden – ob dieser Skill Versionen hat, lässt sich gerade nicht sagen. „Aktualisieren“ versucht es erneut.",
+      "pt": "A leitura das versões falhou — não é possível dizer agora se esta skill tem versões; clique em Atualizar para tentar novamente."
     },
     "entry.label": {
       "zh": "技能自动进化",
       "en": "Skill auto-evolution",
       "ja": "スキル履歴",
       "es": "Evolución automática de skills",
-      "fr": "Auto-évolution des skills"
+      "fr": "Auto-évolution des skills",
+      "de": "Skill-Evolution",
+      "pt": "Evolução automática de skills"
     },
     "error": {
       "zh": "读取失败",
       "en": "Could not load",
       "ja": "読み取りに失敗しました",
       "es": "No se pudo cargar",
-      "fr": "Chargement impossible"
+      "fr": "Chargement impossible",
+      "de": "Laden fehlgeschlagen",
+      "pt": "Não foi possível carregar"
     },
     "error.hint": {
       "zh": "面板连不上后台服务：通常是插件和程序版本不匹配。重启 DeepSeek Harness 再试；还不行就在对话里说明。",
       "en": "The panel cannot reach the background service: usually the plugin and the app are on different versions. Restart DeepSeek Harness and try again; if it still fails, say so in the conversation.",
       "ja": "パネルからバックグラウンドサービスに接続できません。通常はプラグインとアプリのバージョン不一致が原因です。DeepSeek Harness を再起動して再試行してください。解消しない場合は会話内で伝えてください。",
       "es": "El panel no llega al servicio en segundo plano: normalmente el plugin y la app tienen versiones distintas. Reinicia DeepSeek Harness y vuelve a intentarlo; si sigue fallando, dilo en la conversación.",
-      "fr": "Le panneau n’arrive pas à joindre le service en arrière-plan : en général, le plugin et l’application ne sont pas sur la même version. Redémarrez DeepSeek Harness et réessayez ; si ça persiste, signalez-le dans la conversation."
+      "fr": "Le panneau n’arrive pas à joindre le service en arrière-plan : en général, le plugin et l’application ne sont pas sur la même version. Redémarrez DeepSeek Harness et réessayez ; si ça persiste, signalez-le dans la conversation.",
+      "de": "Das Panel erreicht den Hintergrunddienst nicht: meist passen Plugin- und App-Version nicht zusammen. DeepSeek Harness neu starten und erneut versuchen; wenn es dann noch scheitert, im Chat melden.",
+      "pt": "O painel não alcança o serviço em segundo plano: geralmente plugin e aplicativo estão em versões diferentes. Reinicie o DeepSeek Harness e tente novamente; se continuar falhando, diga isso na conversa."
     },
     "failure.forbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
       "en": "The platform refused this request (this account has no permission).",
       "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。",
       "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso).",
-      "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission)."
+      "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission).",
+      "de": "Die Plattform hat die Anfrage abgelehnt (dieses Konto hat keine Berechtigung).",
+      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão)."
     },
     "failure.server": {
       "zh": "读取失败，可以重试。",
       "en": "The read failed; you can retry.",
       "ja": "読み取りに失敗しました。再試行できます。",
       "es": "La lectura falló; puedes reintentar.",
-      "fr": "La lecture a échoué ; vous pouvez réessayer."
+      "fr": "La lecture a échoué ; vous pouvez réessayer.",
+      "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
+      "pt": "Falha na leitura; você pode tentar novamente."
     },
     "failure.unauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
       "en": "Sign-in is required: reopen this page and sign in, then retry.",
       "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。",
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
-      "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez."
+      "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
+      "de": "Anmeldung nötig: Seite neu öffnen, anmelden und erneut versuchen.",
+      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente."
     },
     "failure.unmounted": {
       "zh": "这个功能没有启用。",
       "en": "This feature is not enabled.",
       "ja": "この機能は有効になっていません。",
       "es": "Esta función no está activada.",
-      "fr": "Cette fonction n’est pas activée."
+      "fr": "Cette fonction n’est pas activée.",
+      "de": "Diese Funktion ist nicht aktiviert.",
+      "pt": "Este recurso não está ativado."
     },
     "failureForbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
       "en": "The platform refused this request (this account has no permission).",
       "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。",
       "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso).",
-      "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission)."
+      "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission).",
+      "de": "Die Plattform hat die Anfrage abgelehnt (dieses Konto hat keine Berechtigung).",
+      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão)."
     },
     "failureServer": {
       "zh": "读取失败，可以重试。",
       "en": "The read failed; you can retry.",
       "ja": "読み取りに失敗しました。再試行できます。",
       "es": "La lectura falló; puedes reintentar.",
-      "fr": "La lecture a échoué ; vous pouvez réessayer."
+      "fr": "La lecture a échoué ; vous pouvez réessayer.",
+      "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
+      "pt": "Falha na leitura; você pode tentar novamente."
     },
     "failureUnauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
       "en": "Sign-in is required: reopen this page and sign in, then retry.",
       "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。",
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
-      "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez."
+      "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
+      "de": "Anmeldung nötig: Seite neu öffnen, anmelden und erneut versuchen.",
+      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente."
     },
     "failureUnmounted": {
       "zh": "这个功能没有启用。",
       "en": "This feature is not enabled.",
       "ja": "この機能は有効になっていません。",
       "es": "Esta función no está activada.",
-      "fr": "Cette fonction n’est pas activée."
+      "fr": "Cette fonction n’est pas activée.",
+      "de": "Diese Funktion ist nicht aktiviert.",
+      "pt": "Este recurso não está ativado."
     },
     "fallback.hint": {
       "zh": "可以改用命令：{command}",
       "en": "Command fallback: {command}",
       "ja": "代替コマンド：{command}",
       "es": "Alternativa por comando: {command}",
-      "fr": "Commande de repli : {command}"
+      "fr": "Commande de repli : {command}",
+      "de": "Alternativ per Befehl: {command}",
+      "pt": "Alternativa por comando: {command}"
     },
     "fallbackHint": {
       "zh": "可以改用命令：{command}",
       "en": "Command fallback: {command}",
       "ja": "代替コマンド：{command}",
       "es": "Alternativa por comando: {command}",
-      "fr": "Commande de repli : {command}"
+      "fr": "Commande de repli : {command}",
+      "de": "Alternativ per Befehl: {command}",
+      "pt": "Alternativa por comando: {command}"
     },
     "group.content": {
       "zh": "正文版本",
       "en": "Body versions",
       "ja": "本文のバージョン",
       "es": "Versiones del cuerpo",
-      "fr": "Versions du texte"
+      "fr": "Versions du texte",
+      "de": "Textversionen",
+      "pt": "Versões do corpo"
     },
     "group.current": {
       "zh": "当前版本",
       "en": "Current version",
       "ja": "現在のバージョン",
       "es": "Versión actual",
-      "fr": "Version actuelle"
+      "fr": "Version actuelle",
+      "de": "Aktuelle Version",
+      "pt": "Versão atual"
     },
     "group.history": {
       "zh": "历史版本",
       "en": "History",
       "ja": "過去のバージョン",
       "es": "Historial",
-      "fr": "Historique"
+      "fr": "Historique",
+      "de": "Frühere Versionen",
+      "pt": "Versões anteriores"
     },
     "group.support": {
       "zh": "文件版本（不可回退）",
       "en": "File versions (not restorable)",
       "ja": "補助ファイルのバージョン（復元不可）",
       "es": "Versiones de archivos (no restaurables)",
-      "fr": "Versions des fichiers (non restaurables)"
+      "fr": "Versions des fichiers (non restaurables)",
+      "de": "Dateiversionen (nicht wiederherstellbar)",
+      "pt": "Versões de arquivos de apoio (sem restauração)"
     },
     "group.support.note": {
       "zh": "附带文件的版本会和正文一起记录；回退正文时不会恢复附带文件。",
       "en": "Attached-file versions are recorded with the body; restoring the body does not restore them.",
       "ja": "補助ファイルのバージョンは本文と一緒に記録されます。本文を復元しても補助ファイルは元に戻りません。",
       "es": "Las versiones de los archivos adjuntos se registran junto al cuerpo; restaurar el cuerpo no las restaura.",
-      "fr": "Les versions des fichiers joints sont enregistrées avec le texte ; restaurer le texte ne restaure pas les fichiers joints."
+      "fr": "Les versions des fichiers joints sont enregistrées avec le texte ; restaurer le texte ne restaure pas les fichiers joints.",
+      "de": "Versionen von Begleitdateien werden zusammen mit dem Text aufgezeichnet; beim Wiederherstellen des Texts werden sie nicht zurückgesetzt.",
+      "pt": "As versões dos arquivos de apoio são registradas junto com o corpo; restaurar o corpo não restaura esses arquivos."
     },
     "hint": {
       "zh": "每次写入技能都会留下一个内容版本。回退只改正文；技能标记、使用次数和整理状态不变。内容相同的版本会同时标为「当前」。",
       "en": "Every time a skill is written, a content version is kept. Restoring changes only the body; skill markers, usage counts and tidy-up state stay the same. Versions with identical content are all marked \"Current\".",
       "ja": "スキルが書き込まれるたびに内容のバージョンが残ります。復元で変わるのは本文のみで、スキルのマーカーや使用回数、整理状態は変わりません。同じ内容のバージョンにはすべて「現在」と表示されます。",
       "es": "Cada escritura de un skill deja una versión de contenido. Restaurar solo cambia el cuerpo; los marcadores del skill, los recuentos de uso y el estado de curación no varían. Las versiones con el mismo contenido se marcan todas como «Actual».",
-      "fr": "Chaque écriture d’un skill laisse une version de contenu. La restauration ne modifie que le texte ; les marqueurs du skill, les compteurs d’usage et l’état de curation restent inchangés. Les versions au contenu identique sont toutes marquées « Actuelle »."
+      "fr": "Chaque écriture d’un skill laisse une version de contenu. La restauration ne modifie que le texte ; les marqueurs du skill, les compteurs d’usage et l’état de curation restent inchangés. Les versions au contenu identique sont toutes marquées « Actuelle ».",
+      "de": "Jeder Schreibvorgang an einem Skill hinterlässt eine Textversion. Wiederherstellen ändert nur den Text; Skill-Markierungen, Nutzungszahlen und Curation-Status bleiben unverändert. Versionen mit gleichem Inhalt werden alle als „Aktuell“ markiert.",
+      "pt": "Cada escrita de uma skill deixa uma versão de conteúdo. Restaurar muda só o corpo; marcadores da skill, contagem de uso e estado de organização continuam iguais. Versões com o mesmo conteúdo são todas marcadas como \"Atual\"."
     },
     "loading": {
       "zh": "读取中…",
       "en": "Loading…",
       "ja": "読み取り中…",
       "es": "Cargando…",
-      "fr": "Chargement…"
+      "fr": "Chargement…",
+      "de": "Wird gelesen…",
+      "pt": "carregando…"
     },
     "markdown.copied": {
       "zh": "已复制",
       "en": "Copied",
       "ja": "コピーしました",
       "es": "Copiado",
-      "fr": "Copié"
+      "fr": "Copié",
+      "de": "Kopiert",
+      "pt": "Copiado"
     },
     "markdown.copy": {
       "zh": "复制",
       "en": "Copy",
       "ja": "コピー",
       "es": "Copiar",
-      "fr": "Copier"
+      "fr": "Copier",
+      "de": "Kopieren",
+      "pt": "Copiar"
     },
     "markdown.footnotes": {
       "zh": "脚注",
       "en": "Footnotes",
       "ja": "脚注",
       "es": "Notas al pie",
-      "fr": "Notes de bas de page"
+      "fr": "Notes de bas de page",
+      "de": "Fußnoten",
+      "pt": "Notas de rodapé"
     },
     "more": {
       "zh": "更多",
       "en": "More",
       "ja": "その他",
       "es": "Más",
-      "fr": "Plus"
+      "fr": "Plus",
+      "de": "Mehr",
+      "pt": "Mais"
     },
     "path.unrecorded": {
       "zh": "（路径未记录）",
       "en": "(path not recorded)",
       "ja": "（パス未記録）",
       "es": "(ruta no registrada)",
-      "fr": "(chemin non enregistré)"
+      "fr": "(chemin non enregistré)",
+      "de": "(Pfad nicht aufgezeichnet)",
+      "pt": "(caminho não registrado)"
     },
     "preview.hide": {
       "zh": "收起正文",
       "en": "Hide body",
       "ja": "本文を閉じる",
       "es": "Ocultar cuerpo",
-      "fr": "Masquer le texte"
+      "fr": "Masquer le texte",
+      "de": "Text ausblenden",
+      "pt": "Ocultar corpo"
     },
     "preview.loading": {
       "zh": "读取预览…",
       "en": "Loading the preview…",
       "ja": "プレビューを読み取り中…",
       "es": "Cargando la vista previa…",
-      "fr": "Chargement de l’aperçu…"
+      "fr": "Chargement de l’aperçu…",
+      "de": "Vorschau wird gelesen…",
+      "pt": "carregando a prévia…"
     },
     "preview.show": {
       "zh": "查看正文",
       "en": "View body",
       "ja": "本文を表示",
       "es": "Ver cuerpo",
-      "fr": "Voir le texte"
+      "fr": "Voir le texte",
+      "de": "Text ansehen",
+      "pt": "Ver corpo"
     },
     "preview.truncated": {
       "zh": "正文过长：只显示前 {shown} 个字符（共 {total} 个）",
       "en": "the body is long: showing the first {shown} of {total} characters",
       "ja": "本文が長いため、全 {total} 文字のうち先頭の {shown} 文字のみ表示しています",
       "es": "el cuerpo es largo: se muestran los primeros {shown} de {total} caracteres",
-      "fr": "texte trop long : seuls les {shown} premiers caractères sur {total} sont affichés"
+      "fr": "texte trop long : seuls les {shown} premiers caractères sur {total} sont affichés",
+      "de": "Text zu lang: die ersten {shown} von {total} Zeichen werden angezeigt",
+      "pt": "o corpo é longo: mostrando os primeiros {shown} de {total} caracteres"
     },
     "refresh": {
       "zh": "刷新",
       "en": "Refresh",
       "ja": "更新",
       "es": "Actualizar",
-      "fr": "Actualiser"
+      "fr": "Actualiser",
+      "de": "Aktualisieren",
+      "pt": "Atualizar"
     },
     "row.delta.down": {
       "zh": "（-{n} 字符）",
       "en": "(-{n} chars)",
       "ja": "（-{n} 文字）",
       "es": "(-{n} caracteres)",
-      "fr": "(-{n} caractères)"
+      "fr": "(-{n} caractères)",
+      "de": "(-{n} Zeichen)",
+      "pt": "(-{n} caracteres)"
     },
     "row.delta.up": {
       "zh": "（+{n} 字符）",
       "en": "(+{n} chars)",
       "ja": "（+{n} 文字）",
       "es": "(+{n} caracteres)",
-      "fr": "(+{n} caractères)"
+      "fr": "(+{n} caractères)",
+      "de": "(+{n} Zeichen)",
+      "pt": "(+{n} caracteres)"
     },
     "row.first": {
       "zh": "初始版本",
       "en": "First version",
       "ja": "初期バージョン",
       "es": "Primera versión",
-      "fr": "Version initiale"
+      "fr": "Version initiale",
+      "de": "Erste Version",
+      "pt": "Primeira versão"
     },
     "row.summary.missing": {
       "zh": "（未生成摘要）",
       "en": "(no summary generated)",
       "ja": "（要約未生成）",
       "es": "(sin resumen)",
-      "fr": "(aucun résumé généré)"
+      "fr": "(aucun résumé généré)",
+      "de": "(keine Zusammenfassung erzeugt)",
+      "pt": "(nenhum resumo gerado)"
     },
     "row.version": {
       "zh": "v{n}",
       "en": "v{n}",
       "ja": "v{n}",
       "es": "v{n}",
-      "fr": "v{n}"
+      "fr": "v{n}",
+      "de": "v{n}",
+      "pt": "v{n}"
     },
     "search": {
       "zh": "按名字或描述筛选",
       "en": "Filter by name or description",
       "ja": "名前または説明で絞り込む",
       "es": "Filtrar por nombre o descripción",
-      "fr": "Filtrer par nom ou description"
+      "fr": "Filtrer par nom ou description",
+      "de": "Nach Name oder Beschreibung filtern",
+      "pt": "Filtrar por nome ou descrição"
     },
     "search.none": {
       "zh": "没有匹配的技能。",
       "en": "No skill matches.",
       "ja": "一致するスキルがありません。",
       "es": "Ningún skill coincide.",
-      "fr": "Aucun skill ne correspond."
+      "fr": "Aucun skill ne correspond.",
+      "de": "Kein Skill passt.",
+      "pt": "Nenhuma skill corresponde."
     },
     "state.foreign": {
       "zh": "不受本插件管理",
       "en": "Not managed by this plugin",
       "ja": "このプラグインの管理対象外",
       "es": "no lo gestiona este plugin",
-      "fr": "Non géré par ce plugin"
+      "fr": "Non géré par ce plugin",
+      "de": "Nicht von diesem Plugin verwaltet",
+      "pt": "Fora do gerenciamento deste plugin"
     },
     "state.managed": {
       "zh": "由本插件管理",
       "en": "Managed by this plugin",
       "ja": "このプラグインで管理",
       "es": "gestionado por este plugin",
-      "fr": "Géré par ce plugin"
+      "fr": "Géré par ce plugin",
+      "de": "Von diesem Plugin verwaltet",
+      "pt": "Gerenciada por este plugin"
     },
     "state.protected": {
       "zh": "受保护",
       "en": "protected",
       "ja": "保護済み",
       "es": "protegido",
-      "fr": "protégé"
+      "fr": "protégé",
+      "de": "geschützt",
+      "pt": "protegida"
     },
     "state.unknown": {
       "zh": "标记为无法读取",
       "en": "Marked as unreadable",
       "ja": "読み取り不可として記録",
       "es": "marcado como ilegible",
-      "fr": "Marqué illisible"
+      "fr": "Marqué illisible",
+      "de": "Als nicht lesbar markiert",
+      "pt": "Marcada como ilegível"
     },
     "time.days": {
       "zh": "{n} 天前",
       "en": "{n} days ago",
       "ja": "{n} 日前",
       "es": "hace {n} días",
-      "fr": "il y a {n} jours"
+      "fr": "il y a {n} jours",
+      "de": "vor {n} Tagen",
+      "pt": "{n} dias atrás"
     },
     "time.days.one": {
       "zh": "1 天前",
       "en": "1 day ago",
       "ja": "1 日前",
       "es": "hace 1 día",
-      "fr": "il y a 1 jour"
+      "fr": "il y a 1 jour",
+      "de": "vor 1 Tag",
+      "pt": "1 dia atrás"
     },
     "time.hours": {
       "zh": "{n} 小时前",
       "en": "{n} hours ago",
       "ja": "{n} 時間前",
       "es": "hace {n} horas",
-      "fr": "il y a {n} heures"
+      "fr": "il y a {n} heures",
+      "de": "vor {n} Stunden",
+      "pt": "{n} horas atrás"
     },
     "time.hours.one": {
       "zh": "1 小时前",
       "en": "1 hour ago",
       "ja": "1 時間前",
       "es": "hace 1 hora",
-      "fr": "il y a 1 heure"
+      "fr": "il y a 1 heure",
+      "de": "vor 1 Stunde",
+      "pt": "1 hora atrás"
     },
     "time.minutes": {
       "zh": "{n} 分钟前",
       "en": "{n} minutes ago",
       "ja": "{n} 分前",
       "es": "hace {n} minutos",
-      "fr": "il y a {n} minutes"
+      "fr": "il y a {n} minutes",
+      "de": "vor {n} Minuten",
+      "pt": "{n} minutos atrás"
     },
     "time.minutes.one": {
       "zh": "1 分钟前",
       "en": "1 minute ago",
       "ja": "1 分前",
       "es": "hace 1 minuto",
-      "fr": "il y a 1 minute"
+      "fr": "il y a 1 minute",
+      "de": "vor 1 Minute",
+      "pt": "1 minuto atrás"
     },
     "time.months": {
       "zh": "{n} 个月前",
       "en": "{n} months ago",
       "ja": "{n} か月前",
       "es": "hace {n} meses",
-      "fr": "il y a {n} mois"
+      "fr": "il y a {n} mois",
+      "de": "vor {n} Monaten",
+      "pt": "{n} meses atrás"
     },
     "time.months.one": {
       "zh": "1 个月前",
       "en": "1 month ago",
       "ja": "1 か月前",
       "es": "hace 1 mes",
-      "fr": "il y a 1 mois"
+      "fr": "il y a 1 mois",
+      "de": "vor 1 Monat",
+      "pt": "1 mês atrás"
     },
     "time.now": {
       "zh": "刚刚",
       "en": "just now",
       "ja": "たった今",
       "es": "ahora mismo",
-      "fr": "à l’instant"
+      "fr": "à l’instant",
+      "de": "gerade eben",
+      "pt": "agora mesmo"
     },
     "time.years": {
       "zh": "{n} 年前",
       "en": "{n} years ago",
       "ja": "{n} 年前",
       "es": "hace {n} años",
-      "fr": "il y a {n} ans"
+      "fr": "il y a {n} ans",
+      "de": "vor {n} Jahren",
+      "pt": "{n} anos atrás"
     },
     "time.years.one": {
       "zh": "1 年前",
       "en": "1 year ago",
       "ja": "1 年前",
       "es": "hace 1 año",
-      "fr": "il y a 1 an"
+      "fr": "il y a 1 an",
+      "de": "vor 1 Jahr",
+      "pt": "1 ano atrás"
     },
     "title": {
       "zh": "技能自动进化",
       "en": "Skill auto-evolution",
       "ja": "スキル履歴",
       "es": "Evolución automática de skills",
-      "fr": "Auto-évolution des skills"
+      "fr": "Auto-évolution des skills",
+      "de": "Skill-Evolution",
+      "pt": "Evolução automática de skills"
     },
     "undo": {
       "zh": "回退到此版",
       "en": "Restore this version",
       "ja": "このバージョンに戻す",
       "es": "Restaurar esta versión",
-      "fr": "Restaurer cette version"
+      "fr": "Restaurer cette version",
+      "de": "Diese Version wiederherstellen",
+      "pt": "Restaurar esta versão"
     },
     "undo.confirm": {
       "zh": "确认回退（会写入一版，可再回退）",
       "en": "Confirm restore (writes a new version; can be undone)",
       "ja": "復元を確定（新しいバージョンとして書き込まれ、再度戻すこともできます）",
       "es": "Confirmar restauración (se escribe una versión; puedes volver a restaurar)",
-      "fr": "Confirmer la restauration (écrit une nouvelle version, restaurable ensuite)"
+      "fr": "Confirmer la restauration (écrit une nouvelle version, restaurable ensuite)",
+      "de": "Wiederherstellen bestätigen (schreibt eine neue Version; lässt sich erneut zurückrollen)",
+      "pt": "Confirmar restauração (grava uma nova versão; pode ser desfeita)"
     },
     "undo.confirmUnit": {
       "zh": "确认把这次涉及的多个技能一起回退（会写入新版本，之后仍可回退）",
       "en": "Restore all skills involved in this write together? A new version is written and can be restored again later.",
       "ja": "今回の変更に関わる複数のスキルをまとめて復元しますか？（新しいバージョンとして書き込まれ、あとから再度戻すこともできます）",
       "es": "Confirmar la restauración conjunta de los skills implicados (se escriben versiones nuevas; después aún puedes restaurar)",
-      "fr": "Restaurer ensemble tous les skills concernés par cette écriture (une nouvelle version est écrite, restaurable plus tard)"
+      "fr": "Restaurer ensemble tous les skills concernés par cette écriture (une nouvelle version est écrite, restaurable plus tard)",
+      "de": "Alle Skills dieses Writes gemeinsam wiederherstellen? Es wird eine neue Version geschrieben, die sich später erneut zurückrollen lässt.",
+      "pt": "Restaurar juntas todas as skills desta escrita? Uma nova versão é gravada e pode ser restaurada depois."
     },
     "undo.no": {
       "zh": "取消",
       "en": "Cancel",
       "ja": "キャンセル",
       "es": "Cancelar",
-      "fr": "Annuler"
+      "fr": "Annuler",
+      "de": "Abbrechen",
+      "pt": "Cancelar"
     },
     "versions.count": {
       "zh": "{n} 个版本",
       "en": "{n} versions",
       "ja": "{n} 個のバージョン",
       "es": "{n} versiones",
-      "fr": "{n} versions"
+      "fr": "{n} versions",
+      "de": "{n} Versionen",
+      "pt": "{n} versões"
     },
     "workbench.diagnostics": {
       "zh": "诊断",
       "en": "Diagnostics",
       "ja": "診断",
       "es": "Diagnóstico",
-      "fr": "Diagnostic"
+      "fr": "Diagnostic",
+      "de": "Diagnose",
+      "pt": "Diagnóstico"
     },
     "workbench.health": {
       "zh": "健康",
       "en": "Health",
       "ja": "健全性",
       "es": "Salud",
-      "fr": "Santé"
+      "fr": "Santé",
+      "de": "Health",
+      "pt": "Saúde"
     },
     "workbench.history": {
       "zh": "技能历史",
       "en": "Skill history",
       "ja": "スキル履歴",
       "es": "Historial de skills",
-      "fr": "Historique des skills"
+      "fr": "Historique des skills",
+      "de": "Skill-Historie",
+      "pt": "Histórico de skills"
     },
     "workbench.merge": {
       "zh": "合并",
       "en": "Merge",
       "ja": "マージ",
       "es": "Merge",
-      "fr": "Fusion"
+      "fr": "Fusion",
+      "de": "Merge",
+      "pt": "Merge"
     },
     "workbench.pending": {
       "zh": "待批",
       "en": "Pending",
       "ja": "承認待ち",
       "es": "Pendientes",
-      "fr": "En attente"
+      "fr": "En attente",
+      "de": "Offen",
+      "pt": "Pendentes"
     },
     "workbench.title": {
       "zh": "自进化",
       "en": "Self-evolution",
       "ja": "自己進化",
       "es": "Evolución",
-      "fr": "Auto-évolution"
+      "fr": "Auto-évolution",
+      "de": "Selbstevolution",
+      "pt": "Autoevolução"
     }
   }
 }
