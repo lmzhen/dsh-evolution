@@ -471,9 +471,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // by the time these rows print — the note tells the operator that happened / can happen.
           const ttlMs = typeof approval.ttlMs === 'number' && Number.isFinite(approval.ttlMs) ? approval.ttlMs : 0
           const ttlNote = ttlMs > 0
-            ? `\n（暂存写入 ${ttlMs} 毫秒后过期：过期即关闭为 REJECTED，且永不执行。若仍需要，请重新暂存。）`
-            : '\n(staged writes never expire — the window waits for a decision; set the evolution-approval row pendingTtlMs to bound it)'
-          if (pending.length === 0) return ok('没有待批准的自进化写入。' + ttlNote)
+            ? hostCommandText(hostLocale, 'command.pending.ttl', { ttl: ttlMs })
+            : hostCommandText(hostLocale, 'command.pending.neverExpires')
+          if (pending.length === 0) return ok(hostCommandText(hostLocale, 'command.pending.empty') + ttlNote)
           // F-328: `--detail` renders each record's staged args so an operator
           // reviews what approve will actually replay (the summary alone is a
           // 120-char label). The default (collapsed) view is unchanged.
@@ -488,19 +488,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const attribution = (p: { createdAt: string; origin?: string | undefined; sessionId?: string | undefined }): string => {
             const age = elapsedSince(p.createdAt, nowMs)
             const unit = age.n === 1 ? age.unit.replace(/s$/u, '') : age.unit
-            const when = age.unit === 'now' ? 'just now' : `${age.n} ${unit} ago`
-            const who = p.origin === undefined ? '' : `  from ${p.origin}`
-            const session = p.sessionId === undefined ? '' : ` (session ${p.sessionId.slice(0, 8)})`
+            const when = age.unit === 'now' ? hostCommandText(hostLocale, 'command.pending.justNow') : hostCommandText(hostLocale, 'command.pending.ago', { n: age.n, unit })
+            const who = p.origin === undefined ? '' : hostCommandText(hostLocale, 'command.pending.from', { origin: p.origin })
+            const session = p.sessionId === undefined ? '' : hostCommandText(hostLocale, 'command.pending.session', { session: p.sessionId.slice(0, 8) })
             return `  ·  ${when}${who}${session}`
           }
           const body = pending.map((p) => {
-            if (!detailed) return `${p.id}  ${p.kind}  ${p.status === 'executing' ? 'EXECUTING ' : ''}${p.summary}${attribution(p)}`
-            const status = p.status === 'executing' ? 'EXECUTING' : p.status
+            if (!detailed) return `${p.id}  ${p.kind}  ${p.status === 'executing' ? hostCommandText(hostLocale, 'command.pending.executing') + ' ' : ''}${p.summary}${attribution(p)}`
+            const status = p.status === 'executing' ? hostCommandText(hostLocale, 'command.pending.executing') : p.status
             const line = `${p.id}  ${p.kind}  ${status}  ${p.summary}${attribution(p)}`
-            return p.args === undefined ? line : `${line}\n  staged args: ${safeStagedArgs(p.args)}`
+            return p.args === undefined ? line : `${line}\n` + hostCommandText(hostLocale, 'command.pending.stagedArgs', { args: safeStagedArgs(p.args) })
           }).join('\n')
           const hint = pending.some(p => p.status === 'executing')
-            ? '\n(EXECUTING: a previous approve may have crashed after running; verify the write manually, then reject — approve will not re-run it)'
+            ? hostCommandText(hostLocale, 'command.pending.executingHint')
             : ''
           return ok(body + hint + ttlNote)
         }
