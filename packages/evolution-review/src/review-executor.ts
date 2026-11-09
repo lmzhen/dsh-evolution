@@ -65,6 +65,17 @@ export interface ReviewLlmPort {
   stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 }
 
+export class ReviewModelError extends Error {
+  constructor(message: string, readonly code: 'timeout' | 'cancelled' | 'transport') { super(message); this.name = 'ReviewModelError' }
+}
+
+async function* streamReviewModel(llm: ReviewLlmPort, options: GenerateOptions, signal: AbortSignal): AsyncIterable<StreamChunk> {
+  try { yield* llm.stream(options) } catch (error) {
+    const code = signal.aborted ? 'cancelled' : (error as { name?: unknown }).name === 'TimeoutError' ? 'timeout' : 'transport'
+    throw new ReviewModelError(error instanceof Error ? error.message : String(error), code)
+  }
+}
+
 export class ReviewPartialFailure extends Error {
   constructor(message: string, readonly actions: readonly ReviewAction[] = []) { super(message); this.name = 'ReviewPartialFailure' }
 }
@@ -156,7 +167,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
     for (let round = 0; round < maxRounds; round += 1) {
       signal.throwIfAborted()
       const assembler = new BlockAssembler()
-      const stream = llm.stream({
+      const stream = streamReviewModel(llm, {
         provider: header.config.provider,
         model: header.config.model,
         ...(header.config.reasoningEffort === undefined ? {} : { reasoningEffort: header.config.reasoningEffort }),
@@ -166,7 +177,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         ...(header.tools === undefined ? {} : { tools: [...header.tools] as ToolSchema[] }),
         ...(toolHistory === undefined ? {} : { toolHistory }),
         signal,
-      })
+      }, signal)
       requests += 1
       for await (const chunk of stream) {
         assembler.push(chunk)
