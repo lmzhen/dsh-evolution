@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-evolution-io'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, MutationAuthority, WriteKernel, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, isAbsent, isPresent, isUnknown, makeSerialQueue, probeText, transactIo, transactTaskGuard, WriteKernel, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
   assertCloneable,
   canClaimPending,
@@ -45,12 +45,6 @@ import { basename, dirname, isAbsolute, join } from 'node:path'
 
 export const name = 'evolution-state-json'
 export const inject = ['evolutionStateStorage', 'evolutionIo']
-
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    evolutionMutationAuthority: MutationAuthority
-  }
-}
 
 export interface Config {
   root?: string
@@ -466,8 +460,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // G2 S3 migration: prefer the platform backend when the deployment mounts one (this consumer is
   // write-heavy, so the CAS-backed transact matters here), else the default backend.
   const io = () => ctx.evolutionIo.provider()
-  const authority = new MutationAuthority({ io: io(), home: root })
-  ctx.provide('evolutionMutationAuthority', authority)
   const pathOf = (file: string) => join(root, file)
   // N12/O-6 (S4.4): this PROVIDER INSTANCE owns the quarantine bookkeeping (warn-once sets and the
   // last `.corrupt` rewrite key). It used to be module scope, which the file itself documented as
