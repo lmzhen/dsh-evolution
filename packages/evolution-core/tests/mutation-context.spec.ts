@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { MutationUnit, type EvolutionIoLike, type MutationSnapshotPort } from '../src/mutation-unit.ts'
 
