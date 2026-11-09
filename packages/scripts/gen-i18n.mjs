@@ -10,9 +10,10 @@
 import { readFile, writeFile, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
-const ROOT = resolve(import.meta.dirname, '..', '..')
-const CATALOG = join(ROOT, 'packages/scripts/i18n/catalog')
-const TARGET = join(ROOT, 'packages/evolution-client-kit/src/generated/i18n.generated.ts')
+const SCRIPTS = import.meta.dirname
+const EVOLUTION_ROOT = resolve(SCRIPTS, '..')
+const CATALOG = join(SCRIPTS, 'i18n/catalog')
+const TARGET = join(EVOLUTION_ROOT, 'evolution-client-kit/src/generated/i18n.generated.ts')
 export const SUPPORTED_LOCALES = ['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt']
 
 const args = new Set(process.argv.slice(2))

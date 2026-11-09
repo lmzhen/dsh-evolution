@@ -27,7 +27,7 @@ The canonical fact table is `packages/scripts/family-facts.json`. If you move a 
 - Run a single spec by file; an entire directory can exceed the default timeout for reasons unrelated to the change.
 - A green process is not a pass by itself: the declared criterion must be evaluated. An unevaluated criterion is not a pass.
 
-## The gate: all 81 steps
+## The gate: all 82 steps
 
 The local profile runs the family gate runner (see [docs/developer/development.md](docs/developer/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from `packages/scripts/gate-manifest.json`; do not hand-edit it. If a row moves tier or command, change the manifest, regenerate, and update this appendix.
 
@@ -114,6 +114,7 @@ The local profile runs the family gate runner (see [docs/developer/development.m
 | 79 | node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict | mirror |
 | 80 | node packages/evolution/scripts/verify-graph-edges.mjs --report | overlay |
 | 81 | node packages/scripts/verify-health-admission.mjs | mirror |
+| 82 | `node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、529 个 key、113 个参数文案、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿） | mirror |
 
 ## Pull request checklist
 

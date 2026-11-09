@@ -1172,6 +1172,20 @@
       "argvProblem": "no-command-in-cell"
     },
     {
+      "id": "gate-82",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、529 个 key、113 个参数文案、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-i18n.mjs"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ]
+    },
+    {
       "id": "ci-only-01",
       "kind": "script",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",

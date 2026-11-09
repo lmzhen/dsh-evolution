@@ -373,6 +373,8 @@ runs:
         # U-8/G5.9: the client halves' visible copy must come from a dictionary (no undeclared
         # literal child, no cross-face instruction in a string).
         node packages/evolution/scripts/verify-client-ui-i18n.mjs packages/evolution
+        # B6: one catalog source for every supported locale, including generated host/parameter tables.
+        node packages/evolution/scripts/verify-i18n.mjs
         # G4.3/C5: the error-code table and README must be the same set, and the stated range must match.
         node packages/evolution/scripts/verify-error-codes.mjs packages/evolution
         # G4.1/C5: the package map must name exactly what the tree publishes.

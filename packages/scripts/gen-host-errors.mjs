@@ -3,9 +3,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
-const ROOT = resolve(import.meta.dirname, '..', '..')
-const SOURCE = resolve(ROOT, 'packages/scripts/i18n/catalog/host.errors.json')
-const TARGET = resolve(ROOT, 'packages/evolution-commands/src/generated/host-errors.ts')
+const SCRIPTS = import.meta.dirname
+const EVOLUTION_ROOT = resolve(SCRIPTS, '..')
+const SOURCE = resolve(SCRIPTS, 'i18n/catalog/host.errors.json')
+const TARGET = resolve(EVOLUTION_ROOT, 'evolution-commands/src/generated/host-errors.ts')
 const LOCALES = ['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt']
 const CHECK = process.argv.includes('--check')
 const STRICT = process.argv.includes('--strict')

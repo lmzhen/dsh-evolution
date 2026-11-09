@@ -436,6 +436,9 @@
     "gate-81": {
       "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
       "owner": "ci"
+    },
+    "gate-82": {
+      "noDrillReason": "catalog-level drill is manual (delete a key or change a placeholder); no mutation-ledger entry is registered yet"
     }
   }
 }

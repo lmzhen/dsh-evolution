@@ -4,8 +4,9 @@ import { readFile, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-const ROOT = resolve(import.meta.dirname, '..', '..')
-const CATALOG = join(ROOT, 'packages/scripts/i18n/catalog')
+const SCRIPTS = import.meta.dirname
+const EVOLUTION_ROOT = resolve(SCRIPTS, '..')
+const CATALOG = join(SCRIPTS, 'i18n/catalog')
 const LOCALES = ['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt']
 
 function checkRow(where, row, requireAll) {
@@ -53,7 +54,7 @@ let hostKeys = 0
 for (const [id, row] of Object.entries(host.messages ?? {})) { checkRow('host.error.' + id, row, true); hostKeys++ }
 
 const run = (script) => {
-  const result = spawnSync(process.execPath, [join(ROOT, 'packages/scripts', script), '--strict', '--check'], { encoding: 'utf8' })
+  const result = spawnSync(process.execPath, [join(SCRIPTS, script), '--strict', '--check'], { encoding: 'utf8' })
   if (result.status !== 0) throw new Error(script + ' failed: ' + String(result.stderr) + String(result.stdout))
 }
 run('gen-i18n.mjs')

@@ -3,9 +3,10 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-const ROOT = resolve(import.meta.dirname, '..', '..')
-const SOURCE = resolve(ROOT, 'packages/scripts/i18n/catalog/param-copy.json')
-const TARGET = resolve(ROOT, 'packages/evolution-ui/src/panels/settings/generated-param-i18n.ts')
+const SCRIPTS = import.meta.dirname
+const EVOLUTION_ROOT = resolve(SCRIPTS, '..')
+const SOURCE = resolve(SCRIPTS, 'i18n/catalog/param-copy.json')
+const TARGET = resolve(EVOLUTION_ROOT, 'evolution-ui/src/panels/settings/generated-param-i18n.ts')
 const LOCALES = ['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt']
 const CHECK = process.argv.includes('--check')
 const STRICT = process.argv.includes('--strict')
