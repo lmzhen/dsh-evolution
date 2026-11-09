@@ -34,7 +34,7 @@
     },
     "approvalAgeHours": {
       "zh": "{n} 小时前",
-      "en": "{n} h ago",
+      "en": "{n} hr ago",
       "ja": "{n} 時間前",
       "es": "hace {n} h",
       "fr": "il y a {n} h",
@@ -64,7 +64,7 @@
     },
     "approvalAgeNow": {
       "zh": "刚刚",
-      "en": "just now",
+      "en": "Just now",
       "ja": "たった今",
       "es": "ahora mismo",
       "fr": "à l’instant",
@@ -84,7 +84,7 @@
     },
     "approvalApproving": {
       "zh": "批准中…",
-      "en": "approving…",
+      "en": "Approving…",
       "ja": "承認中…",
       "es": "Aprobando…",
       "fr": "Approbation…",
@@ -94,7 +94,7 @@
     },
     "approvalCardHint": {
       "zh": "技能在使用中生成或修改内容时，先放进待批清单，由你确认。",
-      "en": "When a skill creates or changes content during a run, the write goes to the pending list first and waits for your decision.",
+      "en": "When a skill generates or changes content while in use, it goes to the pending list for you to confirm.",
       "ja": "使用中にスキルが作成・変更されたときは、まず承認待ち一覧に入り、あなたの確認を待ちます。",
       "es": "Cuando un skill crea o modifica contenido durante el uso, la escritura queda en la lista de pendientes hasta que la confirmes.",
       "fr": "Quand un skill est créé ou modifié en cours d’usage, l’écriture attend dans la liste des approbations que vous tranchiez.",
@@ -134,7 +134,7 @@
     },
     "approvalCount": {
       "zh": "{n} 项待批",
-      "en": "{n} waiting",
+      "en": "{n} pending",
       "ja": "{n} 件の承認待ち",
       "es": "{n} pendientes",
       "fr": "{n} en attente d’approbation",
@@ -154,7 +154,7 @@
     },
     "approvalDiffCut": {
       "zh": "改动区域已截断",
-      "en": "the changed region is truncated",
+      "en": "Diff truncated",
       "ja": "変更箇所が長いため省略されました",
       "es": "la zona modificada está truncada",
       "fr": "la zone modifiée est tronquée",
@@ -174,7 +174,7 @@
     },
     "approvalEmpty": {
       "zh": "没有待处理的写入",
-      "en": "Nothing is waiting",
+      "en": "No writes pending",
       "ja": "承認待ちの書き込みはありません",
       "es": "No hay escrituras pendientes",
       "fr": "Aucune écriture en attente",
@@ -184,7 +184,7 @@
     },
     "approvalEmptyDescription": {
       "zh": "当前没有需要你确认的技能变更。\n有新的写入时，会在这里显示来源、内容和影响范围。",
-      "en": "There are no skill changes to confirm.\nNew writes will show their source, content and impact here.",
+      "en": "Nothing needs your confirmation right now.\nNew writes appear here with their source, content, and scope.",
       "ja": "現在、確認が必要なスキルの変更はありません。\n新しい書き込みがあると、ここに発生元・内容・影響範囲が表示されます。",
       "es": "No hay cambios de skills que confirmar.\nCuando haya nuevas escrituras, aquí verás su origen, contenido y alcance.",
       "fr": "Aucune modification de skill à confirmer pour l’instant.\nLes nouvelles écritures afficheront ici leur source, leur contenu et leur portée.",
@@ -194,7 +194,7 @@
     },
     "approvalExecuting": {
       "zh": "正在执行：改动可能已经生效，别重复批准。先确认结果，再用「放回待批」释放占用；释放不会停止或撤销正在进行的写入。",
-      "en": "Running: the change may already have taken effect; do not approve it again. Check the result first, then use \"Back to pending\" to free it; that does not stop or undo the write in progress.",
+      "en": "Running: the change may already be live, so don't approve it again. Check the result first, then free it up with Return to pending; releasing won't stop or undo a write in progress.",
       "ja": "実行中：変更がすでに反映されている可能性があるため、重複して承認しないでください。先に結果を確認してから「承認待ちに戻す」で占有を解除してください。解除しても進行中の書き込みは停止・取り消しされません。",
       "es": "En curso: el cambio puede estar ya aplicado; no lo apruebes otra vez. Comprueba el resultado y luego usa «Volver a pendientes» para liberarlo; liberar no detiene ni deshace la escritura en curso.",
       "fr": "En cours : la modification est peut-être déjà effective, ne l’approuvez pas deux fois. Vérifiez d’abord le résultat, puis utilisez « Renvoyer en attente » pour libérer ; cela n’arrête ni n’annule l’écriture en cours.",
@@ -214,7 +214,7 @@
     },
     "approvalFactKind": {
       "zh": "类型",
-      "en": "Kind",
+      "en": "Type",
       "ja": "種別",
       "es": "Tipo",
       "fr": "Type",
@@ -234,7 +234,7 @@
     },
     "approvalFailed": {
       "zh": "待批项读取失败",
-      "en": "the pending window could not be read",
+      "en": "Couldn't load pending items",
       "ja": "承認待ち項目の読み取りに失敗しました",
       "es": "no se pudo leer la lista de pendientes",
       "fr": "Lecture des éléments en attente impossible",
@@ -254,7 +254,7 @@
     },
     "approvalKindCapability": {
       "zh": "能力",
-      "en": "capability",
+      "en": "Capability",
       "ja": "機能",
       "es": "capacidad",
       "fr": "capacité",
@@ -264,7 +264,7 @@
     },
     "approvalKindMemory": {
       "zh": "记忆",
-      "en": "memory",
+      "en": "Memory",
       "ja": "メモリ",
       "es": "memoria",
       "fr": "mémoire",
@@ -274,7 +274,7 @@
     },
     "approvalKindSkill": {
       "zh": "技能",
-      "en": "skill",
+      "en": "Skill",
       "ja": "スキル",
       "es": "skill",
       "fr": "skill",
@@ -284,7 +284,7 @@
     },
     "approvalLoading": {
       "zh": "正在读取待批项…",
-      "en": "reading the pending window…",
+      "en": "Loading pending items…",
       "ja": "承認待ち項目を読み取り中…",
       "es": "leyendo la lista de pendientes…",
       "fr": "Lecture des éléments en attente…",
@@ -314,7 +314,7 @@
     },
     "approvalPreviewNone": {
       "zh": "暂时看不了预览：",
-      "en": "Preview is not available right now:",
+      "en": "Can't preview this right now:",
       "ja": "現在プレビューを表示できません：",
       "es": "La vista previa no está disponible ahora:",
       "fr": "Aperçu indisponible pour l’instant :",
@@ -334,7 +334,7 @@
     },
     "approvalPreviewReading": {
       "zh": "正在读取预览…",
-      "en": "reading the preview…",
+      "en": "Loading preview…",
       "ja": "プレビューを読み取り中…",
       "es": "leyendo la vista previa…",
       "fr": "Lecture de l’aperçu…",
@@ -374,7 +374,7 @@
     },
     "approvalRejecting": {
       "zh": "拒绝中…",
-      "en": "rejecting…",
+      "en": "Rejecting…",
       "ja": "却下中…",
       "es": "Rechazando…",
       "fr": "Rejet…",
@@ -384,7 +384,7 @@
     },
     "approvalRelease": {
       "zh": "放回待批",
-      "en": "Release",
+      "en": "Return to pending",
       "ja": "承認待ちに戻す",
       "es": "Volver a pendientes",
       "fr": "Renvoyer en attente",
@@ -394,7 +394,7 @@
     },
     "approvalReleasing": {
       "zh": "释放中…",
-      "en": "releasing…",
+      "en": "Releasing…",
       "ja": "解除中…",
       "es": "Liberando…",
       "fr": "Libération…",
@@ -424,7 +424,7 @@
     },
     "approvalTitle": {
       "zh": "待批写入",
-      "en": "Writes awaiting approval",
+      "en": "Pending writes",
       "ja": "承認待ちの書き込み",
       "es": "Escrituras pendientes de aprobación",
       "fr": "Écritures en attente d’approbation",
@@ -434,7 +434,7 @@
     },
     "approvalVerbAdd": {
       "zh": "新增",
-      "en": "add",
+      "en": "Add",
       "ja": "追加",
       "es": "añadir",
       "fr": "ajouter",
@@ -444,7 +444,7 @@
     },
     "approvalVerbArchive": {
       "zh": "归档",
-      "en": "archive",
+      "en": "Archive",
       "ja": "アーカイブ",
       "es": "archivar",
       "fr": "archiver",
@@ -454,7 +454,7 @@
     },
     "approvalVerbCreate": {
       "zh": "创建",
-      "en": "create",
+      "en": "Create",
       "ja": "作成",
       "es": "crear",
       "fr": "créer",
@@ -464,7 +464,7 @@
     },
     "approvalVerbDelete": {
       "zh": "删除",
-      "en": "delete",
+      "en": "Delete",
       "ja": "削除",
       "es": "eliminar",
       "fr": "supprimer",
@@ -474,7 +474,7 @@
     },
     "approvalVerbMerge": {
       "zh": "合并",
-      "en": "merge",
+      "en": "Merge",
       "ja": "マージ",
       "es": "merge",
       "fr": "fusionner",
@@ -484,7 +484,7 @@
     },
     "approvalVerbRemove": {
       "zh": "移除",
-      "en": "remove",
+      "en": "Remove",
       "ja": "除去",
       "es": "quitar",
       "fr": "retirer",
@@ -494,7 +494,7 @@
     },
     "approvalVerbRestore": {
       "zh": "恢复",
-      "en": "restore",
+      "en": "Restore",
       "ja": "復元",
       "es": "restaurar",
       "fr": "restaurer",
@@ -504,7 +504,7 @@
     },
     "approvalVerbUpdate": {
       "zh": "更新",
-      "en": "update",
+      "en": "Update",
       "ja": "更新",
       "es": "actualizar",
       "fr": "mettre à jour",
@@ -524,7 +524,7 @@
     },
     "cardCommands": {
       "zh": "维护扫描",
-      "en": "Maintenance scans",
+      "en": "Maintenance scan",
       "ja": "メンテナンススキャン",
       "es": "Escaneos de mantenimiento",
       "fr": "Scans de maintenance",
@@ -534,7 +534,7 @@
     },
     "cardCurator": {
       "zh": "技能整理",
-      "en": "Skill tidy-up",
+      "en": "Skill curation",
       "ja": "スキル整理",
       "es": "Curación de skills",
       "fr": "Curation des skills",
@@ -584,7 +584,7 @@
     },
     "cardToolMemory": {
       "zh": "记忆写入",
-      "en": "Writing memory",
+      "en": "Memory writes",
       "ja": "メモリ書き込み",
       "es": "Escritura de memoria",
       "fr": "Écriture en mémoire",
@@ -594,7 +594,7 @@
     },
     "changed": {
       "zh": "{n} 项已修改",
-      "en": "{n} modified",
+      "en": "{n} changed",
       "ja": "{n} 件変更済み",
       "es": "{n} modificados",
       "fr": "{n} modifiés",
@@ -604,7 +604,7 @@
     },
     "deployment": {
       "zh": "默认",
-      "en": "default",
+      "en": "Default",
       "ja": "デフォルト",
       "es": "predeterminado",
       "fr": "par défaut",
@@ -634,7 +634,7 @@
     },
     "diagCopyFailed": {
       "zh": "复制失败；请手动执行上方命令",
-      "en": "Copy failed; run the command above manually",
+      "en": "Copy failed; run the command above yourself",
       "ja": "コピーに失敗しました。上のコマンドを手動で実行してください",
       "es": "No se pudo copiar; ejecuta el comando de arriba a mano",
       "fr": "Copie impossible ; exécutez la commande ci-dessus manuellement",
@@ -654,7 +654,7 @@
     },
     "diagFooter": {
       "zh": "诊断数据 v{version} · 生成于 {at}",
-      "en": "Diagnostics data v{version} · generated {at}",
+      "en": "Diagnostics v{version} · generated {at}",
       "ja": "診断データ v{version} · 生成日時 {at}",
       "es": "Datos de diagnóstico v{version} · generados el {at}",
       "fr": "Données de diagnostic v{version} · générées le {at}",
@@ -664,7 +664,7 @@
     },
     "diagFooterToday": {
       "zh": "诊断数据 v{version} · 今天 {at} 生成",
-      "en": "Diagnostics data v{version} · generated today at {at}",
+      "en": "Diagnostics v{version} · generated today at {at}",
       "ja": "診断データ v{version} · 今日 {at} に生成",
       "es": "Datos de diagnóstico v{version} · generados hoy a las {at}",
       "fr": "Données de diagnostic v{version} · générées aujourd’hui à {at}",
@@ -674,7 +674,7 @@
     },
     "diagNoRows": {
       "zh": "没有可显示的运行状态",
-      "en": "no runtime status to show",
+      "en": "No runtime status to show",
       "ja": "表示できる実行状態がありません",
       "es": "no hay estado de ejecución que mostrar",
       "fr": "Aucun état d’exécution à afficher",
@@ -684,7 +684,7 @@
     },
     "diagNormal": {
       "zh": "其他 {n} 项正常",
-      "en": "Other {n} normal checks",
+      "en": "{n} more OK",
       "ja": "ほか {n} 件は正常",
       "es": "Otros {n} en orden",
       "fr": "Autres {n} vérifications normales",
@@ -694,7 +694,7 @@
     },
     "diagOtherIssues": {
       "zh": "其他 {n} 项异常",
-      "en": "Other {n} issues",
+      "en": "{n} more failing",
       "ja": "ほか {n} 件の異常",
       "es": "Otros {n} con problemas",
       "fr": "Autres {n} anomalies",
@@ -704,7 +704,7 @@
     },
     "diagPurpose": {
       "zh": "用途：检查插件、平台服务和数据连接是否正常；这里不会修改任何东西。",
-      "en": "What it checks: plugins, platform services and data connections. Nothing is changed here.",
+      "en": "What this checks: plugins, platform services, and data connections. It changes nothing here.",
       "ja": "用途：プラグイン、プラットフォームサービス、データ接続が正常かを確認します。ここでは何も変更しません。",
       "es": "Para qué sirve: comprueba plugins, servicios de la plataforma y conexiones de datos. Aquí no se modifica nada.",
       "fr": "Rôle : vérifier les plugins, les services de la plateforme et les connexions aux données. Rien n’est modifié ici.",
@@ -714,7 +714,7 @@
     },
     "diagRecheck": {
       "zh": "重新检查",
-      "en": "Recheck",
+      "en": "Check again",
       "ja": "再チェック",
       "es": "Revisar de nuevo",
       "fr": "Revérifier",
@@ -734,7 +734,7 @@
     },
     "diagRefreshing": {
       "zh": "刷新中…",
-      "en": "refreshing…",
+      "en": "Refreshing…",
       "ja": "更新中…",
       "es": "Actualizando…",
       "fr": "Actualisation…",
@@ -744,7 +744,7 @@
     },
     "diagRemedy": {
       "zh": "建议：",
-      "en": "Suggested: ",
+      "en": "Suggested fix:",
       "ja": "対処案：",
       "es": "Sugerencia: ",
       "fr": "Suggestion :",
@@ -764,7 +764,7 @@
     },
     "diagStatusFail": {
       "zh": "异常",
-      "en": "failing",
+      "en": "Error",
       "ja": "異常",
       "es": "con error",
       "fr": "en échec",
@@ -774,7 +774,7 @@
     },
     "diagStatusOk": {
       "zh": "正常",
-      "en": "healthy",
+      "en": "OK",
       "ja": "正常",
       "es": "correcto",
       "fr": "sain",
@@ -784,7 +784,7 @@
     },
     "diagStatusUnknown": {
       "zh": "未知",
-      "en": "unknown",
+      "en": "Unknown",
       "ja": "不明",
       "es": "desconocido",
       "fr": "inconnu",
@@ -794,7 +794,7 @@
     },
     "diagStatusWarn": {
       "zh": "注意",
-      "en": "needs attention",
+      "en": "Warning",
       "ja": "注意",
       "es": "requiere atención",
       "fr": "à surveiller",
@@ -804,7 +804,7 @@
     },
     "diagSubtitle": {
       "zh": "运行状态的只读自查；不会改动任何东西。",
-      "en": "A read-only check of the runtime state; nothing here changes anything.",
+      "en": "A read-only self-check of runtime status; nothing is changed.",
       "ja": "実行状態の読み取り専用チェックです。状態の変更は一切行いません。",
       "es": "Autodiagnóstico de solo lectura del estado; no cambia nada.",
       "fr": "Contrôle en lecture seule de l’état d’exécution ; rien n’est modifié.",
@@ -814,7 +814,7 @@
     },
     "diagSummaryFail": {
       "zh": "{n} 项异常",
-      "en": "{n} failing",
+      "en": "{n} failed",
       "ja": "{n} 件の異常",
       "es": "{n} con error",
       "fr": "{n} en échec",
@@ -824,7 +824,7 @@
     },
     "diagSummaryOk": {
       "zh": "运行正常",
-      "en": "All healthy",
+      "en": "Running normally",
       "ja": "すべて正常",
       "es": "Todo en orden",
       "fr": "Tout fonctionne",
@@ -834,7 +834,7 @@
     },
     "diagSummaryUnknown": {
       "zh": "{n} 项待确认",
-      "en": "{n} unconfirmed",
+      "en": "{n} to confirm",
       "ja": "{n} 件が未確認",
       "es": "{n} sin confirmar",
       "fr": "{n} à confirmer",
@@ -844,7 +844,7 @@
     },
     "diagSummaryWarn": {
       "zh": "{n} 项需要注意",
-      "en": "{n} need attention",
+      "en": "{n} to review",
       "ja": "{n} 件に注意が必要",
       "es": "{n} requieren atención",
       "fr": "{n} à surveiller",
@@ -864,7 +864,7 @@
     },
     "discard": {
       "zh": "放弃修改",
-      "en": "Discard",
+      "en": "Discard changes",
       "ja": "変更を破棄",
       "es": "Descartar cambios",
       "fr": "Abandonner",
@@ -874,7 +874,7 @@
     },
     "empty": {
       "zh": "这里没有可改项",
-      "en": "nothing to change here",
+      "en": "Nothing to change here",
       "ja": "変更できる項目はありません",
       "es": "no hay nada que cambiar aquí",
       "fr": "Rien à modifier ici",
@@ -884,7 +884,7 @@
     },
     "failureForbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
-      "en": "The platform refused this request (this account has no permission).",
+      "en": "The platform rejected this request (your current identity lacks permission).",
       "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。",
       "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso).",
       "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission).",
@@ -894,7 +894,7 @@
     },
     "failureServer": {
       "zh": "读取失败，可以手动重试。",
-      "en": "The read failed; you can retry manually.",
+      "en": "Load failed. You can retry.",
       "ja": "読み取りに失敗しました。手動で再試行できます。",
       "es": "La lectura falló; puedes reintentar a mano.",
       "fr": "La lecture a échoué ; vous pouvez réessayer manuellement.",
@@ -904,7 +904,7 @@
     },
     "failureUnauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
-      "en": "Sign-in is required: reopen this page and sign in, then retry.",
+      "en": "Sign-in required: reopen this page, sign in, then try again.",
       "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。",
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
       "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
@@ -914,7 +914,7 @@
     },
     "failureUnmounted": {
       "zh": "这个功能没有启用。",
-      "en": "This feature is not enabled.",
+      "en": "This feature isn't enabled.",
       "ja": "この機能は有効になっていません。",
       "es": "Esta función no está activada.",
       "fr": "Cette fonction n’est pas activée.",
@@ -924,7 +924,7 @@
     },
     "fallbackHint": {
       "zh": "可以改用命令：{command}",
-      "en": "Command fallback: {command}",
+      "en": "Or run this command: {command}",
       "ja": "代替コマンド：{command}",
       "es": "Alternativa por comando: {command}",
       "fr": "Commande de repli : {command}",
@@ -944,7 +944,7 @@
     },
     "group.organize": {
       "zh": "自动整理",
-      "en": "Automatic tidy-up",
+      "en": "Automatic curation",
       "ja": "自動整理",
       "es": "Orden automático",
       "fr": "Rangement automatique",
@@ -964,7 +964,7 @@
     },
     "invalidAtLeast": {
       "zh": "不能小于「{field}」的 {n}{unit}",
-      "en": "must not be below {field}: {n}{unit}",
+      "en": "Minimum is {n} {unit}, set by {field}",
       "ja": "「{field}」の {n}{unit} 以上にしてください",
       "es": "no puede ser inferior a {n}{unit} de «{field}»",
       "fr": "ne doit pas être inférieur à {field} : {n}{unit}",
@@ -974,7 +974,7 @@
     },
     "invalidAtLeastPeer": {
       "zh": "同组设置",
-      "en": "the related setting",
+      "en": "another setting in this group",
       "ja": "同じグループの設定",
       "es": "el ajuste relacionado",
       "fr": "le réglage associé",
@@ -984,7 +984,7 @@
     },
     "invalidNumber": {
       "zh": "需要一个数字",
-      "en": "Needs a number",
+      "en": "Enter a number",
       "ja": "数値を入力してください",
       "es": "Necesita un número",
       "fr": "Nombre requis",
@@ -1004,7 +1004,7 @@
     },
     "loading": {
       "zh": "正在读取设置…",
-      "en": "reading settings…",
+      "en": "Loading settings…",
       "ja": "設定を読み取り中…",
       "es": "leyendo los ajustes…",
       "fr": "Lecture des paramètres…",
@@ -1014,7 +1014,7 @@
     },
     "mergeCardHint": {
       "zh": "两个技能被判重复后，第一轮结束先停下，等你批准再合并。",
-      "en": "When two skills look duplicated, the first round stops and waits for your approval before merging.",
+      "en": "When two skills are judged duplicates, the first round stops and waits for your approval before merging.",
       "ja": "2つのスキルが重複と判定されたときは、第1段階の終了後にいったん停止し、承認を待ってからマージします。",
       "es": "Cuando dos skills parecen duplicados, la primera ronda se detiene y espera tu aprobación antes de hacer el merge.",
       "fr": "Quand deux skills sont jugés redondants, le premier tour s’arrête et attend votre approbation avant la fusion.",
@@ -1024,7 +1024,7 @@
     },
     "overridden": {
       "zh": "已修改",
-      "en": "Modified",
+      "en": "Changed",
       "ja": "変更済み",
       "es": "Modificado",
       "fr": "Modifié",
@@ -1034,7 +1034,7 @@
     },
     "projectionFailed": {
       "zh": "这一块读设置时出错，已记入日志；其它参数不受影响",
-      "en": "reading this row failed and the error is in the log; the other parameters are unaffected",
+      "en": "Something went wrong reading this section's settings; it's been logged. Other settings are unaffected",
       "ja": "この項目の設定読み取りでエラーが発生し、ログに記録されました。他のパラメータには影響ありません",
       "es": "no se pudo leer este bloque y el error quedó en el log; los demás parámetros no se ven afectados",
       "fr": "la lecture de cette ligne a échoué et l’erreur est dans le journal ; les autres paramètres ne sont pas affectés",
@@ -1044,7 +1044,7 @@
     },
     "readbackStale": {
       "zh": "显示的是最后一次成功读取的值；当前回读失败，刷新后可能变化。",
-      "en": "Showing the last successfully read values; the current re-read failed and may change after refresh.",
+      "en": "Showing the last value that read back successfully; the current read-back failed, so it may change after a refresh.",
       "ja": "最後に正常に読み取れた値を表示しています。今回の再読み取りに失敗したため、更新後に値が変わる可能性があります。",
       "es": "Se muestran los últimos valores leídos con éxito; la relectura actual falló y pueden cambiar al actualizar.",
       "fr": "Affichage des dernières valeurs lues avec succès ; la relecture actuelle a échoué et elles peuvent changer après actualisation.",
@@ -1054,7 +1054,7 @@
     },
     "readonly": {
       "zh": "本次会话不允许写入设置（临时运行模式）",
-      "en": "Settings can’t be changed in this session (temporary mode).",
+      "en": "Settings can't be written in this session (temporary run mode)",
       "ja": "このセッションでは設定を書き込めません（一時実行モード）",
       "es": "en esta sesión no se pueden escribir ajustes (modo temporal)",
       "fr": "les paramètres ne peuvent pas être écrits dans cette session (mode temporaire)",
@@ -1064,7 +1064,7 @@
     },
     "refused": {
       "zh": "这个值没有被接受（页面上保持原样）。想知道原因：在对话里问它。",
-      "en": "This value was not accepted (the page keeps what you see). To find out why, ask in the conversation.",
+      "en": "This value wasn't accepted (the page keeps the old one). Want the reason? Ask in chat.",
       "ja": "この値は受理されませんでした（画面の表示はそのままです）。理由を確認するには、会話内で尋ねてください。",
       "es": "Este valor no se aceptó (la página mantiene lo que ves). Para saber por qué, pregúntalo en la conversación.",
       "fr": "Cette valeur n’a pas été acceptée (la page garde l’affichage actuel). Pour en connaître la raison, demandez dans la conversation.",
@@ -1074,7 +1074,7 @@
     },
     "reset": {
       "zh": "恢复默认",
-      "en": "Restore default",
+      "en": "Reset to default",
       "ja": "デフォルトに戻す",
       "es": "Restaurar predeterminado",
       "fr": "Rétablir la valeur par défaut",
@@ -1094,7 +1094,7 @@
     },
     "resetRefused": {
       "zh": "恢复默认没有生效（这一行还是你的值）。想知道原因：在对话里问它。",
-      "en": "Restoring the default did not take effect (the row still holds your value). To find out why, ask in the conversation.",
+      "en": "Reset didn't take effect (this row still holds your value). Want the reason? Ask in chat.",
       "ja": "デフォルトへの復元は反映されませんでした（この行は設定値のままです）。理由を確認するには、会話内で尋ねてください。",
       "es": "Restaurar el predeterminado no surtió efecto (la fila sigue con tu valor). Para saber por qué, pregúntalo en la conversación.",
       "fr": "Le rétablissement par défaut n’a pas pris effet (la ligne garde votre valeur). Pour en connaître la raison, demandez dans la conversation.",
@@ -1104,7 +1104,7 @@
     },
     "resetTo": {
       "zh": "恢复为 {value}",
-      "en": "Restore to {value}",
+      "en": "Reset to {value}",
       "ja": "{value} に戻す",
       "es": "Restaurar a {value}",
       "fr": "Rétablir {value}",
@@ -1114,7 +1114,7 @@
     },
     "resetting": {
       "zh": "恢复中…",
-      "en": "Restoring…",
+      "en": "Resetting…",
       "ja": "復元中…",
       "es": "Restaurando…",
       "fr": "Rétablissement…",
@@ -1124,7 +1124,7 @@
     },
     "saveConflict": {
       "zh": "这个值没有被接受：设置已被其他页面修改。请重读后再保存。",
-      "en": "The value was not accepted: settings changed on another page. Re-read before saving again.",
+      "en": "This value wasn't accepted: another page changed the settings. Reload, then save again.",
       "ja": "この値は受理されませんでした。別のページで設定が変更されています。再読み取りしてから保存してください。",
       "es": "El valor no se aceptó: los ajustes cambiaron en otra página. Vuelve a leerlos antes de guardar.",
       "fr": "La valeur n’a pas été acceptée : les paramètres ont été modifiés depuis une autre page. Relisez avant d’enregistrer.",
@@ -1134,7 +1134,7 @@
     },
     "saveReadbackFailed": {
       "zh": "写入已被接受，但回读失败；点刷新重读后再确认。",
-      "en": "The write was accepted, but reading it back failed; refresh and confirm.",
+      "en": "The write went through, but reading it back failed. Hit Refresh and read it again.",
       "ja": "書き込みは受理されましたが、再読み取りに失敗しました。「更新」を押して再読み取りしてから確認してください。",
       "es": "La escritura se aceptó, pero la relectura falló; actualiza y compruébalo.",
       "fr": "L’écriture a été acceptée, mais la relecture a échoué ; actualisez puis vérifiez.",
@@ -1164,7 +1164,7 @@
     },
     "seatMissing": {
       "zh": "这个界面没有提供设置服务，参数只能看不能改",
-      "en": "this shell serves no settings surface, so the parameters cannot be edited here",
+      "en": "This surface doesn't provide the settings service, so settings are read-only here",
       "ja": "この画面には設定サービスがないため、パラメータは閲覧のみで変更できません",
       "es": "esta interfaz no ofrece servicio de ajustes, así que los parámetros solo se pueden ver",
       "fr": "cette interface n’expose pas de service de paramètres : les paramètres sont consultables seulement",
@@ -1174,7 +1174,7 @@
     },
     "stateLoading": {
       "zh": "正在读取…",
-      "en": "reading…",
+      "en": "Loading…",
       "ja": "読み取り中…",
       "es": "leyendo…",
       "fr": "Lecture…",
@@ -1184,7 +1184,7 @@
     },
     "subtitle": {
       "zh": "待你决定的写入在最上面；下面按功能列出你能改的参数，没有列出的由安装时的配置决定。",
-      "en": "Writes waiting for your decision come first; the changeable parameters are listed by feature below, and anything not listed comes from the deployment configuration.",
+      "en": "Writes waiting on you come first; below, settings are grouped by feature. Anything not listed is fixed by your install configuration.",
       "ja": "承認待ちの書き込みが一番上に表示され、その下に変更可能なパラメータが機能ごとに並びます。一覧にない項目はインストール時の設定で決まります。",
       "es": "Las escrituras que esperan tu decisión aparecen arriba; debajo van los parámetros que puedes cambiar, agrupados por función. Lo que no aparece lo define la configuración de la instalación.",
       "fr": "Les écritures qui attendent votre décision viennent en premier ; en dessous, les paramètres modifiables classés par fonction. Ceux qui ne sont pas listés dépendent de la configuration d’installation.",
@@ -1214,7 +1214,7 @@
     },
     "unavailable": {
       "zh": "这个功能没有启动（对应的插件没有安装）",
-      "en": "this feature is not running (its plugin is not installed)",
+      "en": "This feature isn't running (its plugin isn't installed)",
       "ja": "この機能は起動していません（対応するプラグインが未インストールです）",
       "es": "esta función no está en marcha (su plugin no está instalado)",
       "fr": "cette fonction n’est pas démarrée (son plugin n’est pas installé)",

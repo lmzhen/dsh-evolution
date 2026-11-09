@@ -24,7 +24,7 @@
     },
     "action.confirm": {
       "zh": "确认复制",
-      "en": "Copy confirmation",
+      "en": "Confirm copy",
       "ja": "コピーを確定",
       "es": "Confirmar copia",
       "fr": "Confirmer la copie",
@@ -44,7 +44,7 @@
     },
     "action.pair": {
       "zh": "复制配对",
-      "en": "Copy pair",
+      "en": "Copy pairing command",
       "ja": "ペア指定をコピー",
       "es": "Copiar el comando de emparejamiento",
       "fr": "Copier la paire",
@@ -134,7 +134,7 @@
     },
     "approval.on": {
       "zh": "审批开：合并前需人工批准。",
-      "en": "Approval on: merges wait for a human.",
+      "en": "Approval on: merges need human approval first.",
       "ja": "承認オン：マージ前に人の承認が必要です。",
       "es": "Aprobación activada: el merge necesita aprobación manual.",
       "fr": "Approbation activée : les fusions attendent une approbation humaine.",
@@ -144,7 +144,7 @@
     },
     "blocked.detail": {
       "zh": "查看原始信息",
-      "en": "Show host message",
+      "en": "View raw details",
       "ja": "元のメッセージを表示",
       "es": "Ver el mensaje original",
       "fr": "Afficher le message d’origine",
@@ -164,7 +164,7 @@
     },
     "blocked.hint": {
       "zh": "修好合并数据后再刷新；面板不会自动退回旧数据。",
-      "en": "Fix the merge data, then refresh; the panel won’t fall back to older data on its own.",
+      "en": "Fix the merge data, then refresh; the panel won't fall back to older data on its own.",
       "ja": "マージデータを修復してから更新してください。パネルが自動で古いデータに戻ることはありません。",
       "es": "Arregla los datos del merge y luego actualiza; el panel no vuelve por su cuenta a datos antiguos.",
       "fr": "Réparez les données de fusion puis actualisez ; le panneau ne revient pas tout seul aux anciennes données.",
@@ -174,7 +174,7 @@
     },
     "blocked.reason.forward-only": {
       "zh": "合并状态版本过新，当前面板暂不支持。",
-      "en": "Merge state was written by a newer version; this panel cannot read it.",
+      "en": "The merge state was written by a newer version; this panel doesn't support it yet.",
       "ja": "マージ状態のバージョンが新しすぎるため、このパネルでは読み取れません。",
       "es": "El estado del merge es más nuevo de lo que admite este panel.",
       "fr": "L’état de fusion a été écrit par une version plus récente ; ce panneau ne peut pas le lire.",
@@ -184,7 +184,7 @@
     },
     "blocked.reason.migration-blocked": {
       "zh": "合并数据需要升级，面板已暂停读取。",
-      "en": "The merge data needs an upgrade; reading is paused.",
+      "en": "The merge data needs an upgrade, so the panel has stopped reading it.",
       "ja": "マージデータのアップグレードが必要なため、読み取りを一時停止しています。",
       "es": "Los datos del merge necesitan una actualización; el panel ha dejado de leerlos.",
       "fr": "Les données de fusion doivent être migrées ; la lecture est en pause.",
@@ -194,7 +194,7 @@
     },
     "blocked.reason.needs-repair": {
       "zh": "合并状态需要修复，面板已暂停读取。",
-      "en": "Merge state needs repair; the panel is paused.",
+      "en": "The merge state needs repair, so the panel has stopped reading it.",
       "ja": "マージ状態の修復が必要なため、パネルの読み取りを一時停止しています。",
       "es": "El estado del merge necesita reparación; el panel ha dejado de leerlo.",
       "fr": "L’état de fusion doit être réparé ; le panneau est en pause.",
@@ -204,7 +204,7 @@
     },
     "blocked.reason.unknown": {
       "zh": "合并状态未就绪，面板已暂停读取。",
-      "en": "Merge state is not ready; the panel is paused.",
+      "en": "The merge state isn't ready, so the panel has stopped reading it.",
       "ja": "マージ状態が未準備のため、パネルの読み取りを一時停止しています。",
       "es": "El estado del merge no está listo; el panel ha dejado de leerlo.",
       "fr": "L’état de fusion n’est pas prêt ; le panneau est en pause.",
@@ -214,7 +214,7 @@
     },
     "blocked.title": {
       "zh": "合并状态未就绪",
-      "en": "Merge state blocked",
+      "en": "Merge state isn't ready",
       "ja": "マージ状態が未準備です",
       "es": "El estado del merge no está listo",
       "fr": "État de fusion bloqué",
@@ -224,7 +224,7 @@
     },
     "body.archive": {
       "zh": "归档版本",
-      "en": "Archive",
+      "en": "Archived version",
       "ja": "アーカイブ版",
       "es": "Versión archivada",
       "fr": "Version archivée",
@@ -234,7 +234,7 @@
     },
     "body.empty": {
       "zh": "正文为空。",
-      "en": "Body is empty.",
+      "en": "The body is empty.",
       "ja": "本文が空です。",
       "es": "El cuerpo está vacío.",
       "fr": "Le texte est vide.",
@@ -244,7 +244,7 @@
     },
     "body.live": {
       "zh": "当前版本",
-      "en": "Live",
+      "en": "Current version",
       "ja": "現在のバージョン",
       "es": "Versión actual",
       "fr": "Version actuelle",
@@ -254,7 +254,7 @@
     },
     "body.missing": {
       "zh": "正文不存在或不可读。",
-      "en": "Body missing or unreadable.",
+      "en": "The body is missing or unreadable.",
       "ja": "本文が存在しないか、読み取れません。",
       "es": "El cuerpo no existe o no se puede leer.",
       "fr": "Texte absent ou illisible.",
@@ -274,7 +274,7 @@
     },
     "body.truncated": {
       "zh": "正文过长，已截断。",
-      "en": "Body is truncated.",
+      "en": "The body is too long and was truncated.",
       "ja": "本文が長いため省略されています。",
       "es": "El cuerpo es largo y se ha truncado.",
       "fr": "Texte trop long, tronqué.",
@@ -304,7 +304,7 @@
     },
     "copyFailed": {
       "zh": "复制失败：浏览器没有接受剪贴板写入。",
-      "en": "Copy failed: the browser did not accept the clipboard write.",
+      "en": "Copy failed: the browser didn't accept the clipboard write.",
       "ja": "コピーに失敗しました。ブラウザがクリップボードへの書き込みを受け付けませんでした。",
       "es": "No se pudo copiar: el navegador no aceptó la escritura en el portapapeles.",
       "fr": "Copie impossible : le navigateur n’a pas accepté l’écriture dans le presse-papiers.",
@@ -314,7 +314,7 @@
     },
     "copyRetry": {
       "zh": "重试复制",
-      "en": "Retry copy",
+      "en": "Try copying again",
       "ja": "コピーを再試行",
       "es": "Reintentar copia",
       "fr": "Réessayer la copie",
@@ -354,7 +354,7 @@
     },
     "degraded": {
       "zh": "读取结果不完整：",
-      "en": "Incomplete read:",
+      "en": "Incomplete results:",
       "ja": "読み取り結果が不完全です：",
       "es": "Resultado de lectura incompleto: ",
       "fr": "Lecture incomplète :",
@@ -364,7 +364,7 @@
     },
     "disabled.expired": {
       "zh": "已过期，不可用",
-      "en": "expired",
+      "en": "Expired, unavailable",
       "ja": "期限切れのため利用不可",
       "es": "Caducado, no disponible",
       "fr": "expiré",
@@ -374,7 +374,7 @@
     },
     "disabled.invalid": {
       "zh": "状态不允许",
-      "en": "invalid state",
+      "en": "Not allowed in this state",
       "ja": "現在の状態では操作不可",
       "es": "El estado no lo permite",
       "fr": "état invalide",
@@ -384,7 +384,7 @@
     },
     "disabled.not-retryable": {
       "zh": "不可重试",
-      "en": "not retryable",
+      "en": "Can't be retried",
       "ja": "再試行不可",
       "es": "No se puede reintentar",
       "fr": "non réessayable",
@@ -394,7 +394,7 @@
     },
     "disabled.owned": {
       "zh": "已有运行",
-      "en": "already running",
+      "en": "A run already owns it",
       "ja": "すでに実行中",
       "es": "Ya hay una ejecución",
       "fr": "déjà en cours",
@@ -404,7 +404,7 @@
     },
     "disabled.source-gone": {
       "zh": "源已缺失",
-      "en": "source gone",
+      "en": "Source is gone",
       "ja": "元スキルが欠落",
       "es": "Falta el origen",
       "fr": "source absente",
@@ -414,7 +414,7 @@
     },
     "disabled.unavailable": {
       "zh": "暂不可用",
-      "en": "unavailable",
+      "en": "Not available yet",
       "ja": "現在利用不可",
       "es": "No disponible por ahora",
       "fr": "indisponible",
@@ -434,7 +434,7 @@
     },
     "empty.fuse": {
       "zh": "没有待合并的对。",
-      "en": "No pairs ready to merge.",
+      "en": "No pairs to merge.",
       "ja": "マージ待ちのペアはありません。",
       "es": "No hay pares listos para merge.",
       "fr": "Aucune paire prête à fusionner.",
@@ -444,7 +444,7 @@
     },
     "empty.pending": {
       "zh": "没有待批准的合并。",
-      "en": "No pending merges.",
+      "en": "No merges awaiting approval.",
       "ja": "承認待ちのマージはありません。",
       "es": "No hay merges pendientes de aprobación.",
       "fr": "Aucune fusion en attente d’approbation.",
@@ -454,7 +454,7 @@
     },
     "empty.scope": {
       "zh": "这里只处理两轮合并；单纯追加内容属于技能管理，不会进入合并队列。",
-      "en": "Only two-round merges are handled here; plain appends belong to skill management and never enter this queue.",
+      "en": "This view only handles two-round merges. Plain additions are skill management and never enter the merge queue.",
       "ja": "ここでは2段階のマージのみを扱います。単純な内容の追記はスキル管理の対象であり、マージキューには入りません。",
       "es": "Aquí solo se tratan merges de dos rondas; añadir contenido suelto es gestión de skills y no entra en la cola de merge.",
       "fr": "Seules les fusions en deux tours sont traitées ici ; un simple ajout de contenu relève de la gestion des skills et n’entre jamais dans cette file.",
@@ -464,7 +464,7 @@
     },
     "empty.skipped": {
       "zh": "没有标记为无需合并的对。",
-      "en": "No pairs marked as not worth merging.",
+      "en": "No pairs are marked as not needing a merge.",
       "ja": "マージ不要と判定されたペアはありません。",
       "es": "No hay pares marcados como innecesarios de merge.",
       "fr": "Aucune paire marquée comme sans fusion nécessaire.",
@@ -474,7 +474,7 @@
     },
     "empty.verify": {
       "zh": "没有待判断的对。",
-      "en": "No pairs to judge.",
+      "en": "No pairs waiting for a verdict.",
       "ja": "判定待ちのペアはありません。",
       "es": "No hay pares pendientes de juicio.",
       "fr": "Aucune paire à juger.",
@@ -494,7 +494,7 @@
     },
     "error.raw": {
       "zh": "原始信息",
-      "en": "Raw message",
+      "en": "Raw details",
       "ja": "元のメッセージ",
       "es": "Mensaje original",
       "fr": "Message brut",
@@ -514,7 +514,7 @@
     },
     "error.title": {
       "zh": "读取失败",
-      "en": "Read failed",
+      "en": "Couldn't load",
       "ja": "読み取りに失敗しました",
       "es": "No se pudo leer",
       "fr": "Échec de lecture",
@@ -524,7 +524,7 @@
     },
     "expired.skipped-ttl": {
       "zh": "跳过已到期",
-      "en": "skip expired",
+      "en": "Skipped as expired",
       "ja": "スキップ期限切れ",
       "es": "Se omitió por caducidad",
       "fr": "ignoré : expiré",
@@ -534,7 +534,7 @@
     },
     "expired.source-changed": {
       "zh": "源已变更",
-      "en": "source changed",
+      "en": "Source changed",
       "ja": "元スキルが変更済み",
       "es": "El origen cambió",
       "fr": "source modifiée",
@@ -544,7 +544,7 @@
     },
     "expired.source-gone": {
       "zh": "源已缺失",
-      "en": "source gone",
+      "en": "Source is gone",
       "ja": "元スキルが欠落",
       "es": "Falta el origen",
       "fr": "source absente",
@@ -554,7 +554,7 @@
     },
     "expired.target-taken": {
       "zh": "目标已被占用",
-      "en": "target taken",
+      "en": "Target is taken",
       "ja": "ターゲットが使用中",
       "es": "El destino ya está ocupado",
       "fr": "cible déjà prise",
@@ -564,7 +564,7 @@
     },
     "failed": {
       "zh": "读取失败，保留上次结果。",
-      "en": "Read failed; keeping the last result.",
+      "en": "Load failed; showing the last result.",
       "ja": "読み取りに失敗したため、前回の結果を表示しています。",
       "es": "La lectura falló; se mantiene el último resultado.",
       "fr": "Lecture échouée ; dernier résultat conservé.",
@@ -574,7 +574,7 @@
     },
     "failureBadQuery": {
       "zh": "请求已失效，请刷新后重试。",
-      "en": "This request is stale; refresh and retry.",
+      "en": "This request is out of date; refresh and try again.",
       "ja": "このリクエストは古くなっています。更新して再試行してください。",
       "es": "La solicitud ya no vale; actualiza y reintenta.",
       "fr": "Cette requête n’est plus valide ; actualisez puis réessayez.",
@@ -584,7 +584,7 @@
     },
     "failureBodyAmbiguous": {
       "zh": "同名技能匹配到多行，无法确定读取哪一个；请用唯一名称或从具体行打开。",
-      "en": "The skill name matches multiple rows, so the body is ambiguous. Use a unique name or open it from a specific row.",
+      "en": "More than one row matches that skill name, so it's unclear which one to read. Use a unique name or open it from its row.",
       "ja": "同名のスキルが複数の行に一致したため、どれを読み取るか特定できません。一意の名前を指定するか、該当する行から開いてください。",
       "es": "Varias filas coinciden con ese nombre de skill y no se puede saber cuál leer; usa un nombre único o ábrelo desde la fila concreta.",
       "fr": "Ce nom de skill correspond à plusieurs lignes : impossible de savoir laquelle lire. Utilisez un nom unique ou ouvrez-le depuis une ligne précise.",
@@ -594,7 +594,7 @@
     },
     "failureBodyMissing": {
       "zh": "正文不存在或不可读。",
-      "en": "Body missing or unreadable.",
+      "en": "The body is missing or unreadable.",
       "ja": "本文が存在しないか、読み取れません。",
       "es": "El cuerpo no existe o no se puede leer.",
       "fr": "Texte absent ou illisible.",
@@ -604,7 +604,7 @@
     },
     "failureCapability": {
       "zh": "子代理通道不可用",
-      "en": "Subagent channel unavailable",
+      "en": "The subagent channel isn't available",
       "ja": "サブエージェントのチャネルを利用できません",
       "es": "El canal de subagentes no está disponible",
       "fr": "Canal de sous-agent indisponible",
@@ -614,7 +614,7 @@
     },
     "failureCapabilityHint": {
       "zh": "先运行全局诊断，或复制下方命令继续处理。没有面板的安装方式（preset / host-only）仍可用这些命令。",
-      "en": "Run the global diagnostics first, or copy a command below. Installs without the panel (preset / host-only) can still use these commands.",
+      "en": "Run the global diagnostics first, or copy a command below to keep going. Installs without a panel (preset / host-only) can still use these commands.",
       "ja": "先に全体診断を実行するか、下のコマンドをコピーして処理を続けてください。パネルのない構成（preset / host-only）でも、これらのコマンドは利用できます。",
       "es": "Ejecuta antes el diagnóstico global o copia el comando de abajo para seguir. Las instalaciones sin panel (preset / host-only) también pueden usar estos comandos.",
       "fr": "Lancez d’abord le diagnostic global, ou copiez une commande ci-dessous pour continuer. Les installations sans panneau (preset / host-only) peuvent aussi utiliser ces commandes.",
@@ -624,7 +624,7 @@
     },
     "failureDetails": {
       "zh": "查看详情",
-      "en": "Show details",
+      "en": "See details",
       "ja": "詳細を表示",
       "es": "Ver detalles",
       "fr": "Afficher les détails",
@@ -634,7 +634,7 @@
     },
     "failureFallback": {
       "zh": "可复制命令见下方",
-      "en": "Copy a command below",
+      "en": "Copyable commands are below",
       "ja": "下のコマンドをコピーして実行できます",
       "es": "Abajo tienes comandos que puedes copiar",
       "fr": "Commandes à copier ci-dessous",
@@ -644,7 +644,7 @@
     },
     "failureForbidden": {
       "zh": "无权访问",
-      "en": "Forbidden",
+      "en": "No access",
       "ja": "アクセス権がありません",
       "es": "Sin acceso",
       "fr": "Accès refusé",
@@ -664,7 +664,7 @@
     },
     "failureServer": {
       "zh": "读取失败",
-      "en": "Read failed",
+      "en": "Couldn't load",
       "ja": "読み取りに失敗しました",
       "es": "La lectura falló",
       "fr": "Échec de lecture",
@@ -684,7 +684,7 @@
     },
     "failureUnmounted": {
       "zh": "功能未启用",
-      "en": "Feature not enabled",
+      "en": "Feature isn't enabled",
       "ja": "機能が有効になっていません",
       "es": "Función no activada",
       "fr": "Fonction non activée",
@@ -694,7 +694,7 @@
     },
     "failureWireVersion": {
       "zh": "宿主返回了不兼容的数据版本，请升级页面。",
-      "en": "The host returned an incompatible data version; reload the page.",
+      "en": "The host returned an incompatible data version; update the page.",
       "ja": "ホストから互換性のないデータバージョンが返されました。ページを再読み込みしてください。",
       "es": "El host devolvió una versión de datos incompatible; actualiza la página.",
       "fr": "L’hôte a renvoyé une version de données incompatible ; rechargez la page.",
@@ -704,7 +704,7 @@
     },
     "fallbackHint": {
       "zh": "可复制命令见下方",
-      "en": "Copy the command below",
+      "en": "Copyable commands are below",
       "ja": "下のコマンドをコピーして実行できます",
       "es": "Abajo tienes comandos que puedes copiar",
       "fr": "Copiez la commande ci-dessous",
@@ -714,7 +714,7 @@
     },
     "hint": {
       "zh": "先处理需要判断的合并，其他信息按需展开。",
-      "en": "Resolve the merges that need a decision first; everything else stays folded.",
+      "en": "Handle merges that need a verdict first; expand the rest as needed.",
       "ja": "判断が必要なマージを先に処理します。その他の情報は必要に応じて展開できます。",
       "es": "Empieza por los merges que hay que juzgar; el resto de la información se despliega cuando haga falta.",
       "fr": "Traitez d’abord les fusions qui demandent une décision ; le reste s’ouvre au besoin.",
@@ -814,7 +814,7 @@
     },
     "history.reason.archived": {
       "zh": "已归档",
-      "en": "archived",
+      "en": "Archived",
       "ja": "アーカイブ済み",
       "es": "Archivado",
       "fr": "archivé",
@@ -824,7 +824,7 @@
     },
     "history.reason.kept": {
       "zh": "无需合并",
-      "en": "no merge needed",
+      "en": "No merge needed",
       "ja": "マージ不要",
       "es": "No hacía falta merge",
       "fr": "sans fusion nécessaire",
@@ -834,7 +834,7 @@
     },
     "history.reason.merge-over-limit": {
       "zh": "融合后超出字数上限",
-      "en": "merged skill exceeds the character limit",
+      "en": "Merged text would be over the length cap",
       "ja": "マージ後の文字数が上限を超過",
       "es": "Tras el merge superaba el límite de caracteres",
       "fr": "le skill fusionné dépasse la limite de caractères",
@@ -844,7 +844,7 @@
     },
     "history.reason.merged": {
       "zh": "已合并",
-      "en": "merged",
+      "en": "Merged",
       "ja": "マージ済み",
       "es": "Se hizo el merge",
       "fr": "fusionné",
@@ -854,7 +854,7 @@
     },
     "history.reason.rejected": {
       "zh": "人工拒绝合并",
-      "en": "rejected by user",
+      "en": "Rejected by a person",
       "ja": "手動でマージを却下",
       "es": "Merge rechazado a mano",
       "fr": "fusion rejetée par l’utilisateur",
@@ -864,7 +864,7 @@
     },
     "history.reason.skipped-ttl": {
       "zh": "跳过已到期",
-      "en": "skip expired",
+      "en": "Skipped as expired",
       "ja": "スキップ期限切れ",
       "es": "Se omitió por caducidad",
       "fr": "ignoré : expiré",
@@ -874,7 +874,7 @@
     },
     "history.reason.source-changed": {
       "zh": "源已变更",
-      "en": "source changed",
+      "en": "Source changed",
       "ja": "元スキルが変更済み",
       "es": "El origen cambió",
       "fr": "source modifiée",
@@ -884,7 +884,7 @@
     },
     "history.reason.source-gone": {
       "zh": "源已缺失",
-      "en": "source gone",
+      "en": "Source is gone",
       "ja": "元スキルが欠落",
       "es": "Falta el origen",
       "fr": "source absente",
@@ -894,7 +894,7 @@
     },
     "history.reason.target-taken": {
       "zh": "目标已被占用",
-      "en": "target taken",
+      "en": "Target is taken",
       "ja": "ターゲットが使用中",
       "es": "El destino ya está ocupado",
       "fr": "cible déjà prise",
@@ -904,7 +904,7 @@
     },
     "history.reason.unknown": {
       "zh": "原因未提供",
-      "en": "reason not provided",
+      "en": "No reason given",
       "ja": "理由の記録なし",
       "es": "Sin motivo indicado",
       "fr": "raison non fournie",
@@ -914,7 +914,7 @@
     },
     "history.reason.validation-failed": {
       "zh": "检查失败",
-      "en": "validation failed",
+      "en": "Validation failed",
       "ja": "検証に失敗",
       "es": "Falló la comprobación",
       "fr": "vérification échouée",
@@ -954,7 +954,7 @@
     },
     "origin.agent": {
       "zh": "自动",
-      "en": "auto",
+      "en": "Automatic",
       "ja": "自動",
       "es": "auto",
       "fr": "auto",
@@ -964,7 +964,7 @@
     },
     "origin.human": {
       "zh": "人工",
-      "en": "human",
+      "en": "Human",
       "ja": "手動",
       "es": "humano",
       "fr": "humain",
@@ -1004,7 +1004,7 @@
     },
     "pin": {
       "zh": "置顶",
-      "en": "Pin",
+      "en": "Pin to top",
       "ja": "上部に固定",
       "es": "Fijar arriba",
       "fr": "Épingler",
@@ -1024,7 +1024,7 @@
     },
     "refreshing": {
       "zh": "刷新中，下面仍是上次结果…",
-      "en": "Refreshing; the rows below are the previous result…",
+      "en": "Refreshing; the results below are still from last time…",
       "ja": "更新中です。下には前回の結果を表示しています…",
       "es": "Actualizando; abajo siguen los resultados anteriores…",
       "fr": "Actualisation ; les lignes ci-dessous sont le résultat précédent…",
@@ -1124,7 +1124,7 @@
     },
     "row.failure": {
       "zh": "失败",
-      "en": "Failure",
+      "en": "Failed",
       "ja": "失敗",
       "es": "Fallo",
       "fr": "Échec",
@@ -1164,7 +1164,7 @@
     },
     "row.noRetry": {
       "zh": "不可重试",
-      "en": "not retryable",
+      "en": "Can't retry",
       "ja": "再試行不可",
       "es": "no reintentable",
       "fr": "non réessayable",
@@ -1184,7 +1184,7 @@
     },
     "row.notProvided": {
       "zh": "未提供",
-      "en": "not provided",
+      "en": "Not provided",
       "ja": "未指定",
       "es": "sin indicar",
       "fr": "non fourni",
@@ -1234,7 +1234,7 @@
     },
     "row.skipKind": {
       "zh": "跳过类型",
-      "en": "Skip kind",
+      "en": "Skip type",
       "ja": "スキップ種別",
       "es": "Tipo de omisión",
       "fr": "Motif de saut",
@@ -1284,7 +1284,7 @@
     },
     "row.summaryBoth": {
       "zh": "双方摘要",
-      "en": "Shared summary",
+      "en": "Both summaries",
       "ja": "共通の要約",
       "es": "Resumen común",
       "fr": "Résumé commun",
@@ -1304,7 +1304,7 @@
     },
     "row.targetCreated": {
       "zh": "新建",
-      "en": "created",
+      "en": "Created",
       "ja": "新規作成",
       "es": "creado",
       "fr": "créée",
@@ -1314,7 +1314,7 @@
     },
     "row.verify": {
       "zh": "判定状态",
-      "en": "Verify state",
+      "en": "Verdict",
       "ja": "判定状態",
       "es": "Estado de verificación",
       "fr": "État de vérification",
@@ -1434,7 +1434,7 @@
     },
     "run.failure": {
       "zh": "失败",
-      "en": "Failure",
+      "en": "Failed",
       "ja": "失敗",
       "es": "Fallo",
       "fr": "Échec",
@@ -1464,7 +1464,7 @@
     },
     "run.last": {
       "zh": "上次完成",
-      "en": "Last completed",
+      "en": "Last finished",
       "ja": "直前の完了分",
       "es": "Última completada",
       "fr": "Dernière exécution terminée",
@@ -1484,7 +1484,7 @@
     },
     "run.orphan": {
       "zh": "孤立",
-      "en": "Orphan",
+      "en": "Orphaned",
       "ja": "孤立",
       "es": "Huérfana",
       "fr": "Orphelin",
@@ -1514,7 +1514,7 @@
     },
     "run.progressUnknown": {
       "zh": "进度未知",
-      "en": "progress unknown",
+      "en": "Progress unknown",
       "ja": "進捗不明",
       "es": "progreso desconocido",
       "fr": "progression inconnue",
@@ -1634,7 +1634,7 @@
     },
     "settings.capabilityMissing": {
       "zh": "宿主未提供该能力",
-      "en": "Host did not provide this capability",
+      "en": "The host doesn't provide this capability",
       "ja": "ホストがこの機能を提供していません",
       "es": "El host no ofrece esta capacidad",
       "fr": "L’hôte ne fournit pas cette capacité",
@@ -1644,7 +1644,7 @@
     },
     "settings.hint": {
       "zh": "写入审批 = 使用中生成/修改；技能自动合并 = 两轮合并工作流。两段独立，不从另一项推导。",
-      "en": "Write approval = create/modify during use; auto-merge = the two-round merge workflow. The two are independent.",
+      "en": "Write approval covers content generated or changed while a skill is in use; skill auto-merge is the two-round merge workflow. The two are independent; one never follows from the other.",
       "ja": "書き込み承認＝使用中の生成・変更、スキル自動マージ＝2段階のマージワークフロー。この2つは独立しており、一方からもう一方は決まりません。",
       "es": "Aprobación de escrituras = crear o modificar durante el uso; merge automático de skills = flujo de merge en dos rondas. Son independientes: una no se deduce de la otra.",
       "fr": "Approbation des écritures = création/modification en cours d’usage ; fusion automatique = workflow de fusion en deux tours. Les deux sont indépendants.",
@@ -1654,7 +1654,7 @@
     },
     "settings.live": {
       "zh": "可直接在此保存；platformWrite 能力来自宿主。",
-      "en": "Save directly here; platformWrite capability comes from the host.",
+      "en": "Saved directly here; the platformWrite capability comes from the host.",
       "ja": "ここで直接保存できます。platformWrite の機能はホストから提供されます。",
       "es": "Se guarda aquí mismo; la capacidad platformWrite la aporta el host.",
       "fr": "Enregistrez directement ici ; la capacité platformWrite vient de l’hôte.",
@@ -1664,7 +1664,7 @@
     },
     "settings.mergeApproval": {
       "zh": "技能自动合并（合并审批）",
-      "en": "Auto-merge (merge approval)",
+      "en": "Skill auto-merge (merge approval)",
       "ja": "スキル自動マージ（マージ承認）",
       "es": "Merge automático de skills (aprobación del merge)",
       "fr": "Fusion automatique (approbation des fusions)",
@@ -1704,7 +1704,7 @@
     },
     "settings.openPlatformPath": {
       "zh": "设置 → 自进化 → 技能自动合并",
-      "en": "Settings → Evolution → Skill auto-merge",
+      "en": "Settings → Self-evolution → Skill auto-merge",
       "ja": "設定 → 内蔵プラグイン → 自己進化 → スキル自動マージ",
       "es": "Ajustes → Evolución → Merge automático de skills",
       "fr": "Paramètres → Auto-évolution → Fusion automatique des skills",
@@ -1714,7 +1714,7 @@
     },
     "settings.platformWrite": {
       "zh": "写入审批（平台写入）",
-      "en": "Write approval (platform write)",
+      "en": "Write approval (platform writes)",
       "ja": "書き込み承認（プラットフォーム書き込み）",
       "es": "Aprobación de escrituras (escritura de plataforma)",
       "fr": "Approbation des écritures (écriture plateforme)",
@@ -1724,7 +1724,7 @@
     },
     "settings.platformWriteLinkHint": {
       "zh": "此开关属于平台设置，这里只读；请到平台设置修改。",
-      "en": "This switch belongs to platform settings; this card is read-only. Change it in platform settings.",
+      "en": "This switch belongs to platform settings and is read-only here; change it there.",
       "ja": "このスイッチはプラットフォーム設定に属するため、ここでは読み取り専用です。プラットフォーム設定で変更してください。",
       "es": "Este interruptor pertenece a los ajustes de la plataforma; aquí solo se muestra. Cámbialo en los ajustes de la plataforma.",
       "fr": "Ce commutateur relève des paramètres de la plateforme : lecture seule ici. Modifiez-le dans les paramètres de la plateforme.",
@@ -1734,7 +1734,7 @@
     },
     "settings.readonly": {
       "zh": "只读显示；修改请到平台设置页。",
-      "en": "Read-only here; edit in platform settings.",
+      "en": "Read-only here; change it on the platform settings page.",
       "ja": "ここでは読み取り専用です。変更はプラットフォームの設定画面で行ってください。",
       "es": "Solo lectura aquí; cámbialo en la página de ajustes de la plataforma.",
       "fr": "Lecture seule ici ; modifiez dans les paramètres de la plateforme.",
@@ -1764,7 +1764,7 @@
     },
     "settings.title": {
       "zh": "审批设置",
-      "en": "Approvals",
+      "en": "Approval settings",
       "ja": "承認設定",
       "es": "Aprobaciones",
       "fr": "Approbations",
@@ -1774,7 +1774,7 @@
     },
     "skipKind.agent-keep": {
       "zh": "自动保留",
-      "en": "agent keep",
+      "en": "Kept automatically",
       "ja": "自動保持",
       "es": "conservación automática",
       "fr": "conservation auto",
@@ -1784,7 +1784,7 @@
     },
     "skipKind.forced": {
       "zh": "强制",
-      "en": "forced",
+      "en": "Forced",
       "ja": "強制",
       "es": "forzado",
       "fr": "forcé",
@@ -1794,7 +1794,7 @@
     },
     "skipKind.human-reject": {
       "zh": "人工拒绝",
-      "en": "human reject",
+      "en": "Rejected by a person",
       "ja": "手動却下",
       "es": "rechazo humano",
       "fr": "rejet humain",
@@ -1804,7 +1804,7 @@
     },
     "skipKind.over-limit": {
       "zh": "超限",
-      "en": "over limit",
+      "en": "Over the limit",
       "ja": "上限超過",
       "es": "por encima del límite",
       "fr": "hors limite",
@@ -1834,7 +1834,7 @@
     },
     "sort.menu": {
       "zh": "行排序",
-      "en": "Row order",
+      "en": "Sort rows",
       "ja": "行の並び順",
       "es": "Orden de las filas",
       "fr": "Ordre des lignes",
@@ -1864,7 +1864,7 @@
     },
     "sort.score": {
       "zh": "按分数",
-      "en": "Score",
+      "en": "By score",
       "ja": "スコア順",
       "es": "Puntuación",
       "fr": "Score",
@@ -1874,7 +1874,7 @@
     },
     "sort.updatedAt": {
       "zh": "按更新时间",
-      "en": "Last updated",
+      "en": "By last updated",
       "ja": "更新日時順",
       "es": "Última actualización",
       "fr": "Dernière mise à jour",
@@ -1884,7 +1884,7 @@
     },
     "stage.author": {
       "zh": "合并",
-      "en": "Author",
+      "en": "Merge",
       "ja": "マージ",
       "es": "Redacción",
       "fr": "Rédaction",
@@ -1904,7 +1904,7 @@
     },
     "stage.decide": {
       "zh": "判定",
-      "en": "Decide",
+      "en": "Decision",
       "ja": "判定",
       "es": "Decidir",
       "fr": "Décision",
@@ -1914,7 +1914,7 @@
     },
     "stage.screening": {
       "zh": "筛选",
-      "en": "Screen",
+      "en": "Screening",
       "ja": "選別",
       "es": "Filtrar",
       "fr": "Tri",
@@ -1934,7 +1934,7 @@
     },
     "stage.state.absent": {
       "zh": "无暂存",
-      "en": "Not staged",
+      "en": "No staging",
       "ja": "ステージングなし",
       "es": "Sin staging",
       "fr": "Sans staging",
@@ -1994,7 +1994,7 @@
     },
     "staging.cleared-source-gone": {
       "zh": "已清理（源已缺失）",
-      "en": "cleared (source gone)",
+      "en": "Cleared (source is gone)",
       "ja": "消去済み（元スキル欠落）",
       "es": "Limpiado (origen ausente)",
       "fr": "nettoyé (source absente)",
@@ -2004,7 +2004,7 @@
     },
     "staging.cleared-source-ok": {
       "zh": "已清理（源完好）",
-      "en": "cleared (source ok)",
+      "en": "Cleared (source intact)",
       "ja": "消去済み（元スキル正常）",
       "es": "Limpiado (origen correcto)",
       "fr": "nettoyé (source intacte)",
@@ -2014,7 +2014,7 @@
     },
     "staging.kept": {
       "zh": "保留",
-      "en": "kept",
+      "en": "Kept",
       "ja": "保持",
       "es": "Conservado",
       "fr": "conservé",
@@ -2024,7 +2024,7 @@
     },
     "staging.none": {
       "zh": "无",
-      "en": "none",
+      "en": "None",
       "ja": "なし",
       "es": "Ninguno",
       "fr": "aucun",
@@ -2034,7 +2034,7 @@
     },
     "start.pair": {
       "zh": "复制配对命令",
-      "en": "Copy the pair command",
+      "en": "Copy pairing command",
       "ja": "ペア指定コマンドをコピー",
       "es": "Copiar el comando de emparejamiento",
       "fr": "Copier la commande de paire",
@@ -2044,7 +2044,7 @@
     },
     "start.scan": {
       "zh": "复制查找重复技能的命令",
-      "en": "Copy the command to find duplicate skills",
+      "en": "Copy find-duplicates command",
       "ja": "重複スキル検索コマンドをコピー",
       "es": "Copiar el comando para buscar skills duplicados",
       "fr": "Copier la commande de recherche de skills en double",
@@ -2064,7 +2064,7 @@
     },
     "state.fuse": {
       "zh": "待合并",
-      "en": "Ready to merge",
+      "en": "To merge",
       "ja": "マージ待ち",
       "es": "Listo para merge",
       "fr": "Prêt à fusionner",
@@ -2094,7 +2094,7 @@
     },
     "state.verify": {
       "zh": "待判定",
-      "en": "Unverified",
+      "en": "Awaiting verdict",
       "ja": "判定待ち",
       "es": "Sin verificar",
       "fr": "Non vérifié",
@@ -2114,7 +2114,7 @@
     },
     "tab.fuse": {
       "zh": "待合并",
-      "en": "Ready to merge",
+      "en": "To merge",
       "ja": "マージ待ち",
       "es": "Listos para merge",
       "fr": "Prêts à fusionner",
@@ -2134,7 +2134,7 @@
     },
     "tab.skipped": {
       "zh": "无需合并",
-      "en": "Skipped",
+      "en": "No merge needed",
       "ja": "マージ不要",
       "es": "Omitidos",
       "fr": "Sans fusion",
@@ -2144,7 +2144,7 @@
     },
     "tab.verify": {
       "zh": "待判断",
-      "en": "Needs review",
+      "en": "Awaiting verdict",
       "ja": "判定待ち",
       "es": "Por juzgar",
       "fr": "À juger",
@@ -2154,7 +2154,7 @@
     },
     "task.pending": {
       "zh": "条合并建议待处理",
-      "en": "merge suggestions need attention",
+      "en": "merge suggestions pending",
       "ja": "件のマージ提案が未処理です",
       "es": "sugerencias de merge por atender",
       "fr": "suggestions de fusion à traiter",
@@ -2184,7 +2184,7 @@
     },
     "verify.cancelled": {
       "zh": "已取消",
-      "en": "cancelled",
+      "en": "Cancelled",
       "ja": "キャンセル済み",
       "es": "cancelada",
       "fr": "annulé",
@@ -2194,7 +2194,7 @@
     },
     "verify.failed": {
       "zh": "失败",
-      "en": "failed",
+      "en": "Failed",
       "ja": "失敗",
       "es": "fallida",
       "fr": "échec",
@@ -2204,7 +2204,7 @@
     },
     "verify.queued": {
       "zh": "排队",
-      "en": "queued",
+      "en": "Queued",
       "ja": "待機中",
       "es": "en cola",
       "fr": "en file",
@@ -2214,7 +2214,7 @@
     },
     "verify.running": {
       "zh": "进行中",
-      "en": "running",
+      "en": "Running",
       "ja": "実行中",
       "es": "en curso",
       "fr": "en cours",

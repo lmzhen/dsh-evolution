@@ -24,7 +24,7 @@
     },
     "action.extract.reason": {
       "zh": "命令/预览面未就绪，暂不可用。",
-      "en": "The command/preview surface is not ready yet.",
+      "en": "The command and preview surfaces aren't ready, so this isn't available yet.",
       "ja": "コマンドまたはプレビュー画面が未準備のため、現在利用できません。",
       "es": "La superficie de comandos y vista previa aún no está lista.",
       "fr": "La commande et l’aperçu ne sont pas encore prêts ; action indisponible.",
@@ -34,7 +34,7 @@
     },
     "action.history": {
       "zh": "查看历史",
-      "en": "History",
+      "en": "View history",
       "ja": "履歴を表示",
       "es": "Historial",
       "fr": "Historique",
@@ -54,7 +54,7 @@
     },
     "col.count": {
       "zh": "数量",
-      "en": "Amount",
+      "en": "Count",
       "ja": "件数",
       "es": "Cantidad",
       "fr": "Nombre",
@@ -164,7 +164,7 @@
     },
     "counts": {
       "zh": "{ok} 正常 · {warn} 警告 · {error} 错误 · {unreadable} 无法读取",
-      "en": "{ok} ok · {warn} warn · {error} error · {unreadable} unreadable",
+      "en": "Healthy {ok} · Warning {warn} · Error {error} · Unreadable {unreadable}",
       "ja": "{ok} 正常 · {warn} 警告 · {error} エラー · {unreadable} 読み取り不可",
       "es": "{ok} correctos · {warn} avisos · {error} errores · {unreadable} ilegibles",
       "fr": "{ok} ok · {warn} avertissement · {error} erreur · {unreadable} illisible",
@@ -184,7 +184,7 @@
     },
     "dims.support": {
       "zh": "附带文件",
-      "en": "Attached files",
+      "en": "Support files",
       "ja": "補助ファイル",
       "es": "Archivos adjuntos",
       "fr": "Fichiers joints",
@@ -194,7 +194,7 @@
     },
     "dims.unknown": {
       "zh": "未知",
-      "en": "unknown",
+      "en": "Unknown",
       "ja": "不明",
       "es": "desconocido",
       "fr": "inconnu",
@@ -214,7 +214,7 @@
     },
     "empty.noneReported": {
       "zh": "这次没有发现异常——但这不代表每个技能都能读取。",
-      "en": "Nothing was flagged this time — but this does not mean every skill could be read.",
+      "en": "No problems found this time—but that doesn't mean every skill could be read.",
       "ja": "今回は問題が見つかりませんでした。ただし、すべてのスキルが読み取れるとは限りません。",
       "es": "Esta vez no se marcó nada, pero eso no significa que todos los skills se pudieran leer.",
       "fr": "Rien n’a été signalé cette fois — cela ne veut pas dire que chaque skill a pu être lu.",
@@ -234,7 +234,7 @@
     },
     "failure.forbidden": {
       "zh": "平台拒绝了这个请求（身份不是 owner）。",
-      "en": "The platform refused this request (not the owner principal).",
+      "en": "The platform rejected this request (this identity isn't the owner).",
       "ja": "プラットフォームがこのリクエストを拒否しました（owner 権限がありません）。",
       "es": "La plataforma rechazó esta solicitud (la identidad no es la propietaria).",
       "fr": "La plateforme a refusé cette requête (votre identité n’est pas owner).",
@@ -244,7 +244,7 @@
     },
     "failure.server": {
       "zh": "读取失败，可以重试。",
-      "en": "The read failed; you can retry.",
+      "en": "Load failed. You can retry.",
       "ja": "読み取りに失敗しました。再試行できます。",
       "es": "La lectura falló; puedes reintentar.",
       "fr": "La lecture a échoué ; vous pouvez réessayer.",
@@ -254,7 +254,7 @@
     },
     "failure.unauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
-      "en": "Sign-in is required: reopen this page and sign in, then retry.",
+      "en": "Sign-in required: reopen this page, sign in, then try again.",
       "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。",
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
       "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
@@ -264,7 +264,7 @@
     },
     "failure.unmounted": {
       "zh": "该功能没有挂载。",
-      "en": "This feature is not mounted.",
+      "en": "This feature isn't mounted.",
       "ja": "この機能はマウントされていません。",
       "es": "Esta función no está montada.",
       "fr": "Cette fonction n’est pas montée.",
@@ -274,7 +274,7 @@
     },
     "failureForbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
-      "en": "The platform refused this request (this account has no permission).",
+      "en": "The platform rejected this request (your current identity lacks permission).",
       "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。",
       "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso).",
       "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission).",
@@ -284,7 +284,7 @@
     },
     "failureServer": {
       "zh": "读取失败，可以重试。",
-      "en": "The read failed; you can retry.",
+      "en": "Load failed. You can retry.",
       "ja": "読み取りに失敗しました。再試行できます。",
       "es": "La lectura falló; puedes reintentar.",
       "fr": "La lecture a échoué ; vous pouvez réessayer.",
@@ -294,7 +294,7 @@
     },
     "failureUnauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
-      "en": "Sign-in is required: reopen this page and sign in, then retry.",
+      "en": "Sign-in required: reopen this page, sign in, then try again.",
       "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。",
       "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
       "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
@@ -304,7 +304,7 @@
     },
     "failureUnmounted": {
       "zh": "这个功能没有启用。",
-      "en": "This feature is not enabled.",
+      "en": "This feature isn't enabled.",
       "ja": "この機能は有効になっていません。",
       "es": "Esta función no está activada.",
       "fr": "Cette fonction n’est pas activée.",
@@ -314,7 +314,7 @@
     },
     "fallback.hint": {
       "zh": "可以改用命令：{command}",
-      "en": "Command fallback: {command}",
+      "en": "Or run this command: {command}",
       "ja": "代替コマンド：{command}",
       "es": "Alternativa por comando: {command}",
       "fr": "Commande de repli : {command}",
@@ -324,7 +324,7 @@
     },
     "fallbackHint": {
       "zh": "可以改用命令：{command}",
-      "en": "Command fallback: {command}",
+      "en": "Or run this command: {command}",
       "ja": "代替コマンド：{command}",
       "es": "Alternativa por comando: {command}",
       "fr": "Commande de repli : {command}",
@@ -334,7 +334,7 @@
     },
     "findings.none": {
       "zh": "无规则命中",
-      "en": "No rule hit",
+      "en": "No rule matched",
       "ja": "該当ルールなし",
       "es": "Ninguna regla coincide",
       "fr": "Aucune règle déclenchée",
@@ -364,7 +364,7 @@
     },
     "group.proposals": {
       "zh": "改进建议",
-      "en": "Suggestions",
+      "en": "Improvement suggestions",
       "ja": "改善案",
       "es": "Sugerencias de mejora",
       "fr": "Suggestions",
@@ -384,7 +384,7 @@
     },
     "health.normal": {
       "zh": "{n} 项正常，展开查看",
-      "en": "{n} normal items — expand to view",
+      "en": "{n} healthy, expand to view",
       "ja": "{n} 件は正常（展開して表示）",
       "es": "{n} en orden; despliega para ver",
       "fr": "{n} éléments normaux — développez pour voir",
@@ -394,7 +394,7 @@
     },
     "hint": {
       "zh": "这里按规则汇总技能检查结果。还没定统一标准的规则只报规则名、不报数字；读不到内容的技能单独标为「无法读取」，不算正常。",
-      "en": "Here are the skill health results, grouped by rule. A rule without a fixed standard shows only its name, no number; skills that cannot be read are marked \"Unreadable\" and never counted as fine.",
+      "en": "Skill check results are grouped by rule. Rules without a set standard report only the rule name, no numbers; skills whose content can't be read are marked unreadable and don't count as healthy.",
       "ja": "スキルのチェック結果をルール別に集計しています。まだ統一された基準がないルールは名前のみを表示し、数値は出しません。内容を読み取れないスキルは「読み取り不可」として別に表示し、正常とは扱いません。",
       "es": "Aquí se resumen los resultados de la revisión de skills por regla. Una regla sin estándar fijo solo muestra su nombre, sin cifra; los skills cuyo contenido no se puede leer se marcan aparte como «Ilegible» y nunca cuentan como correctos.",
       "fr": "Les résultats de vérification des skills sont regroupés par règle. Une règle sans standard fixé n’affiche que son nom, sans chiffre ; les skills dont le contenu est illisible sont marqués « Illisible » et ne comptent jamais comme normaux.",
@@ -404,7 +404,7 @@
     },
     "line": {
       "zh": "位置：{path}",
-      "en": "line: {path}",
+      "en": "Location: {path}",
       "ja": "位置：{path}",
       "es": "línea: {path}",
       "fr": "ligne : {path}",
@@ -414,7 +414,7 @@
     },
     "line.unknown": {
       "zh": "位置：未知",
-      "en": "line: UNKNOWN",
+      "en": "Location: unknown",
       "ja": "位置：不明",
       "es": "línea: DESCONOCIDA",
       "fr": "ligne : inconnue",
@@ -434,7 +434,7 @@
     },
     "loading.failed": {
       "zh": "读取失败——现在判断不了；点「刷新」重试。",
-      "en": "Reading failed — this cannot be judged right now; press Refresh to retry.",
+      "en": "Couldn't load, so there's no verdict right now. Hit Refresh to retry.",
       "ja": "読み取りに失敗したため、今は判断できません。「更新」を押して再試行してください。",
       "es": "La lectura falló: ahora mismo no se puede juzgar; pulsa «Actualizar» para reintentar.",
       "fr": "Lecture échouée : impossible de juger pour l’instant ; cliquez sur « Actualiser » pour réessayer.",
@@ -454,7 +454,7 @@
     },
     "proposal.kept": {
       "zh": "保留正文",
-      "en": "kept body",
+      "en": "Body kept",
       "ja": "残す本文",
       "es": "cuerpo conservado",
       "fr": "texte conservé",
@@ -464,7 +464,7 @@
     },
     "proposal.outcome.extract": {
       "zh": "提取",
-      "en": "extract",
+      "en": "Extract",
       "ja": "抽出",
       "es": "extraer",
       "fr": "extraction",
@@ -474,7 +474,7 @@
     },
     "proposal.outcome.keep": {
       "zh": "保持",
-      "en": "keep",
+      "en": "Keep",
       "ja": "維持",
       "es": "conservar",
       "fr": "conservation",
@@ -484,7 +484,7 @@
     },
     "proposal.outcome.mixed": {
       "zh": "混合",
-      "en": "mixed",
+      "en": "Mixed",
       "ja": "混在",
       "es": "mixto",
       "fr": "mixte",
@@ -494,7 +494,7 @@
     },
     "proposal.outcome.owner-gap": {
       "zh": "缺少归属技能",
-      "en": "owner-gap",
+      "en": "No owner skill",
       "ja": "帰属先スキルなし",
       "es": "sin skill de destino",
       "fr": "skill d’accueil manquant",
@@ -504,7 +504,7 @@
     },
     "proposal.owner": {
       "zh": "放到哪个技能",
-      "en": "Which skill",
+      "en": "Goes to",
       "ja": "移し先のスキル",
       "es": "A qué skill",
       "fr": "Skill d’accueil",
@@ -514,7 +514,7 @@
     },
     "proposal.owner.covered": {
       "zh": "已有可承接的技能",
-      "en": "Has a skill to take it",
+      "en": "An existing skill can take it",
       "ja": "引き継ぎ先のスキルあり",
       "es": "Hay un skill que puede recibirlo",
       "fr": "Un skill peut l’accueillir",
@@ -524,7 +524,7 @@
     },
     "proposal.owner.owner-gap": {
       "zh": "还没有可承接的技能",
-      "en": "No skill to take it yet",
+      "en": "No skill can take it yet",
       "ja": "引き継ぎ先のスキルがまだありません",
       "es": "Aún no hay ningún skill que pueda recibirlo",
       "fr": "Aucun skill pour l’accueillir",
@@ -534,7 +534,7 @@
     },
     "proposal.provenance": {
       "zh": "生成来源",
-      "en": "Provenance",
+      "en": "Generated by",
       "ja": "生成元",
       "es": "Procedencia",
       "fr": "Provenance",
@@ -544,7 +544,7 @@
     },
     "proposal.reusable": {
       "zh": "可提取",
-      "en": "reusable",
+      "en": "Extractable",
       "ja": "抽出可能",
       "es": "reutilizable",
       "fr": "réutilisable",
@@ -554,7 +554,7 @@
     },
     "proposal.stale": {
       "zh": "改进建议的数据已过期；这不等于没有可整理内容，请刷新后重试。",
-      "en": "The suggestions are out of date; refresh and try again. This does not mean there is nothing to tidy up.",
+      "en": "The suggestions data is out of date; that doesn't mean there's nothing to curate. Refresh and try again.",
       "ja": "改善案のデータが古くなっています。「整理する内容がない」という意味ではありません。更新して再試行してください。",
       "es": "Los datos de las sugerencias están desactualizados; actualiza y reintenta. Eso no significa que no haya nada que curar.",
       "fr": "Les suggestions sont périmées ; cela ne veut pas dire qu’il n’y a rien à ranger. Actualisez puis réessayez.",
@@ -564,7 +564,7 @@
     },
     "proposal.status.dismissed": {
       "zh": "状态：已忽略",
-      "en": "status: dismissed",
+      "en": "Status: dismissed",
       "ja": "状態：却下済み",
       "es": "estado: descartada",
       "fr": "statut : ignorée",
@@ -574,7 +574,7 @@
     },
     "proposal.status.previewed": {
       "zh": "状态：已预览",
-      "en": "status: previewed",
+      "en": "Status: previewed",
       "ja": "状態：プレビュー済み",
       "es": "estado: previsualizada",
       "fr": "statut : prévisualisée",
@@ -584,7 +584,7 @@
     },
     "proposal.status.proposed": {
       "zh": "状态：提议",
-      "en": "status: proposed",
+      "en": "Status: proposed",
       "ja": "状態：提案中",
       "es": "estado: propuesta",
       "fr": "statut : proposée",
@@ -594,7 +594,7 @@
     },
     "proposal.status.stale": {
       "zh": "状态：已过期",
-      "en": "status: stale",
+      "en": "Status: out of date",
       "ja": "状態：期限切れ",
       "es": "estado: caducada",
       "fr": "statut : périmée",
@@ -604,7 +604,7 @@
     },
     "proposal.unavailable": {
       "zh": "暂时拿不到改进建议；这不等于没有可整理的内容。",
-      "en": "Suggestions are unavailable right now; this does not mean there is nothing to tidy up.",
+      "en": "Suggestions aren't available right now; that doesn't mean there's nothing to curate.",
       "ja": "現在、改善案を取得できません。「整理する内容がない」という意味ではありません。",
       "es": "Las sugerencias no están disponibles ahora; eso no significa que no haya nada que curar.",
       "fr": "Suggestions indisponibles pour l’instant ; cela ne veut pas dire qu’il n’y a rien à ranger.",
@@ -614,7 +614,7 @@
     },
     "proposal.warnings": {
       "zh": "警告",
-      "en": "warnings",
+      "en": "Warnings",
       "ja": "警告",
       "es": "avisos",
       "fr": "avertissements",
@@ -624,7 +624,7 @@
     },
     "protected": {
       "zh": "这个技能受保护，不能直接改。",
-      "en": "This skill is protected; it cannot be changed directly.",
+      "en": "This skill is protected and can't be changed directly.",
       "ja": "このスキルは保護されているため、直接変更できません。",
       "es": "Este skill está protegido; no se puede cambiar directamente.",
       "fr": "Ce skill est protégé : modification directe impossible.",
@@ -634,7 +634,7 @@
     },
     "read.failed": {
       "zh": "这次没读到数据（下面一行是原始信息）：",
-      "en": "This read failed (raw message below):",
+      "en": "No data this time (the raw message is on the line below):",
       "ja": "今回の読み取りに失敗しました（下の行は元のメッセージです）：",
       "es": "Esta lectura no devolvió datos (abajo está el mensaje original):",
       "fr": "Cette lecture a échoué (le message brut est ci-dessous) :",
@@ -694,7 +694,7 @@
     },
     "rule.body-without-support": {
       "zh": "正文长但没有附带文件",
-      "en": "Long body with no attached files",
+      "en": "Long body with no support files",
       "ja": "本文が長く補助ファイルがない",
       "es": "Cuerpo largo sin archivos adjuntos",
       "fr": "Texte long sans fichier joint",
@@ -704,7 +704,7 @@
     },
     "rule.empty": {
       "zh": "没有命中规则，当前全部正常",
-      "en": "No rule matched; everything is healthy",
+      "en": "No rules matched; everything is healthy",
       "ja": "該当するルールはなく、現在すべて正常です",
       "es": "Ninguna regla coincide; ahora todo está en orden",
       "fr": "Aucune règle déclenchée, tout est normal",
@@ -714,7 +714,7 @@
     },
     "rule.references-sprawl": {
       "zh": "附带文件过多",
-      "en": "Too many attached files",
+      "en": "Too many support files",
       "ja": "補助ファイルが多すぎる",
       "es": "Demasiados archivos adjuntos",
       "fr": "Trop de fichiers joints",
@@ -724,7 +724,7 @@
     },
     "rule.scope-overloaded": {
       "zh": "内容范围过杂",
-      "en": "Covers too much",
+      "en": "Scope is too broad",
       "ja": "扱う範囲が広すぎる",
       "es": "Abarca demasiado",
       "fr": "Périmètre trop large",
@@ -734,7 +734,7 @@
     },
     "rule.stamp-density": {
       "zh": "正文像日志（时间戳多）",
-      "en": "Body reads like a log (many timestamps)",
+      "en": "Body reads like a log (too many timestamps)",
       "ja": "本文がログ状（タイムスタンプが多い）",
       "es": "El cuerpo parece un registro (muchas marcas de tiempo)",
       "fr": "Texte en forme de journal (beaucoup d’horodatages)",
@@ -754,7 +754,7 @@
     },
     "rule.write-ghost": {
       "zh": "只写不读",
-      "en": "Written, never read",
+      "en": "Written but never read",
       "ja": "書き込みのみで未参照",
       "es": "Escrito, nunca leído",
       "fr": "Écrit, jamais lu",
@@ -784,7 +784,7 @@
     },
     "scan.truncated": {
       "zh": "本次扫描不完整，数量可能偏少；请刷新后重试。",
-      "en": "This scan is incomplete; the counts may be low. Press Refresh to retry.",
+      "en": "This scan was incomplete, so counts may be low. Refresh and try again.",
       "ja": "今回のスキャンは未完了のため、件数が少なく表示されている可能性があります。「更新」を押して再試行してください。",
       "es": "Este escaneo está incompleto y las cifras pueden quedarse cortas; actualiza y reintenta.",
       "fr": "Ce scan est incomplet : les comptes peuvent être sous-estimés. Actualisez puis réessayez.",
@@ -814,7 +814,7 @@
     },
     "unreadable.note": {
       "zh": "读不到内容，因此无法判断（不是「通过」）。",
-      "en": "The content could not be read, so this cannot be judged (it is not a pass).",
+      "en": "The content couldn't be read, so there's no verdict (this isn't a pass).",
       "ja": "内容を読み取れないため判断できません（「問題なし」ではありません）。",
       "es": "No se pudo leer el contenido, así que no se puede juzgar (no es un aprobado).",
       "fr": "Contenu illisible, donc impossible de juger (ce n’est pas un « conforme »).",
@@ -834,7 +834,7 @@
     },
     "verdict.healthy": {
       "zh": "正常",
-      "en": "OK",
+      "en": "Healthy",
       "ja": "正常",
       "es": "Correcto",
       "fr": "OK",
@@ -864,7 +864,7 @@
     },
     "verdict.warn": {
       "zh": "警告",
-      "en": "Warn",
+      "en": "Warning",
       "ja": "警告",
       "es": "Aviso",
       "fr": "Avertissement",
