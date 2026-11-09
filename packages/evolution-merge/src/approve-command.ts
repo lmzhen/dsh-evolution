@@ -35,6 +35,7 @@ export interface RunApproveCommandOptions {
   readonly now: () => number
   /** The invocation carried no agent at all (E-305), as opposed to an agent with no parent run. */
   readonly agentless?: boolean
+  readonly isOwnerActive?: (runId: string) => boolean | Promise<boolean>
 }
 
 export async function runApproveCommand(options: RunApproveCommandOptions): Promise<WithMergeRunResult> {
@@ -76,7 +77,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
     now: options.now,
     ...(options.detached === true ? { detached: true } : {}),
     async body(ctx) {
-      await attachRunToRow(options.io, options.home, row.id, ctx.runId)
+      await attachRunToRow(options.io, options.home, row.id, ctx.runId, options.isOwnerActive, options.fence)
       const stage = (name: RunStage) => ctx.stage(name, { done: 0, total: 1 })
       await stage('author')
       let outcome: ScanRound2Outcome

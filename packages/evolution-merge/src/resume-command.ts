@@ -93,7 +93,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
     parentRunId, now: options.now,
     ...(options.detached === true ? { detached: true } : {}),
     async body(ctx) {
-      await attachRunToRow(options.io, options.home, row.id, ctx.runId)
+      await attachRunToRow(options.io, options.home, row.id, ctx.runId, options.isOwnerActive, options.fence)
       await ctx.stage('author', { done: 0, total: 1 })
       let outcome
       try {
