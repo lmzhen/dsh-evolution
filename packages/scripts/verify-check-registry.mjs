@@ -185,5 +185,8 @@ if (json) {
 // The six axes stay report-only until M5 flips --strict into the gate table.
 const closureBroken = axes.some((axis) => axis.axis === 'closure' && axis.state !== 'pass')
 if (closureBroken) process.exit(1)
-if (strict && violations.length > 0) process.exit(1)
+const axisFailure = axes.some((axis) => axis.state === 'fail')
+const axisCannotDecide = axes.some((axis) => axis.state === 'cannot-decide')
+if (strict && (violations.length > 0 || axisFailure)) process.exit(1)
+if (strict && axisCannotDecide) process.exit(2)
 process.exit(0)
