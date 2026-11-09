@@ -15,9 +15,9 @@ Subagent-origin, background-visibility, and review-child sessions are excluded. 
 | Mode | Behavior | Recorded history |
 |---|---|---|
 | `aux` (default) | Runs a plugin-owned manual loop over the parent request prefix: parent Agent, no child Session, no parent append, allowlisted parent-visible tools executed without a log; a disallowed call returns a tool error instead of aborting the review. | Emits `review-scheduled` and `review-completed`; the completion event is folded into the bounded activity review list (preview + actions + usage). |
-| `inject` (debug) | Sends the review prompt into the parent session as an ordinary turn. `reviewWakeInject=true` uses a waking follow-up when available. | Emits `review-scheduled`; does **not** emit `plan-applied`, so plan-based activity/replay stays empty. |
+| `inject` (debug) | Sends the kind-specific foreground review prompt into the parent session as an ordinary turn. `reviewWakeInject=true` uses a waking follow-up when available. | Emits `review-scheduled`; does **not** emit `plan-applied`, so plan-based activity/replay stays empty. |
 
-`reviewNotice=true` allows result notices for the inject path. Aux results are audit-only: `finalText` lands in the bounded activity review record and never becomes a parent message or a new parent turn.
+`reviewNotice=true` allows result notices for the inject path. Aux results are audit-only: `finalText` lands in the bounded activity review record and never becomes a parent message or a new parent turn. The aux path uses background-specific prompts; a skill or combined aux pass includes the memory review, so a background review cannot silently drop memory.
 
 ## Events and limits
 

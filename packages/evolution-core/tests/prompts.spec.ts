@@ -1,6 +1,6 @@
 // @tier fast
 import { expect, it } from 'vitest'
-import { COMBINED_REVIEW_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { AUX_COMBINED_REVIEW_PROMPT, AUX_MEMORY_REVIEW_PROMPT, COMBINED_REVIEW_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 
 it('verifyPromptBundle accepts the canonical bundle', () => {
   expect(verifyPromptBundle(PROMPT_BUNDLE)).toBe(true)
@@ -81,7 +81,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
   // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
   // bundle identity moves with it (v18 pinned the step-7 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(25)
+  expect(PROMPT_BUNDLE_VERSION).toBe(26)
   // v46 S1.12b (finding T3-07): the dry-run banner is model-visible curator text, so it rides
   // the bundle and the digest covers it.
   expect(PROMPT_BUNDLE.prompts['curatorDryRun']).toBe(CURATOR_DRY_RUN_BANNER)
@@ -127,10 +127,17 @@ it('maintain persona v14 carries the guidance clauses pinned by the prompt loops
   expect(MAINTAIN_PROMPT).not.toContain('（中文）')
 })
 
-it('reviewPrompt maps each kind to the agent prompt', () => {
+it('reviewPrompt separates inject and background prompts', () => {
   expect(reviewPrompt('memory')).toBe(MEMORY_REVIEW_PROMPT)
   expect(reviewPrompt('skill')).toBe(SKILL_REVIEW_PROMPT)
   expect(reviewPrompt('combined')).toBe(COMBINED_REVIEW_PROMPT)
+  expect(reviewPrompt('memory', 'aux')).toBe(AUX_MEMORY_REVIEW_PROMPT)
+  expect(reviewPrompt('skill', 'aux')).toBe(AUX_COMBINED_REVIEW_PROMPT)
+  expect(reviewPrompt('combined', 'aux')).toBe(AUX_COMBINED_REVIEW_PROMPT)
+  expect(AUX_COMBINED_REVIEW_PROMPT).toContain('## Memory')
+  expect(AUX_COMBINED_REVIEW_PROMPT).toContain('background review')
+  expect(PROMPT_BUNDLE.prompts['auxMemory']).toBe(AUX_MEMORY_REVIEW_PROMPT)
+  expect(PROMPT_BUNDLE.prompts['auxCombined']).toBe(AUX_COMBINED_REVIEW_PROMPT)
 })
 
 it('skill review keeps read-before-write and the create exemption neutral', () => {

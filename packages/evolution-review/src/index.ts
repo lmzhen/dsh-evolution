@@ -24,7 +24,7 @@ import type {} from '@deepseek-ai/dsh-evolution-core/platform'
 import { advanceReview, assertSkillsRootAliasRetired, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
-import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, MEMORY_REVIEW_PROMPT, SKILL_REVIEW_PROMPT, COMBINED_REVIEW_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
+import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, INJECT_COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import type { LiveValue } from '@deepseek-ai/dsh-evolution-core'
 // v37 P7a: the platform dispatch vocabulary is read in ONE place —
 // evolution-core's tool-dispatch module, which owns the event types, the
@@ -835,7 +835,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // refused delivery must roll it back — otherwise this session's one
     // completion review is permanently lost in-process (the flag is in-memory
     // state, not durable).
-    if (!deliverMessage(agent, COMPLETION_SKILL_REVIEW_PROMPT, 'completion review', true)) {
+    if (!deliverMessage(agent, INJECT_COMPLETION_SKILL_REVIEW_PROMPT, 'completion review', true)) {
       completionInjected.delete(session.id)
       return
     }
@@ -1022,11 +1022,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       let usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined
       let error: string | undefined
       try {
-        const prompt = kind === 'memory'
-          ? MEMORY_REVIEW_PROMPT
-          : kind === 'combined'
-            ? COMBINED_REVIEW_PROMPT
-            : reason === 'completion' ? COMPLETION_SKILL_REVIEW_PROMPT : SKILL_REVIEW_PROMPT
+        const prompt = reviewPrompt(kind, 'aux')
         const result = await withReviewContext({ reviewId, runId: reviewId }, () => runReview({
           parent: agent,
           llm: { stream: options => llm.stream(options) },
