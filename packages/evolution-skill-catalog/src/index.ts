@@ -20,7 +20,7 @@ import type {
   SkillProvider,
   SkillProviderControl,
   SkillProviderObservation,
-} from '@deepseek-ai/dsh-skill'
+} from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-evolution-core'
 import { evolutionIoAdapter, isAbsent, isUnknown, parseFrontmatter, newSkillLibrary, probeList, SKILL_NAME_RE, type SkillSummary } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'

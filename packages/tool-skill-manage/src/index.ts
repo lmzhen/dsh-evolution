@@ -30,7 +30,7 @@ import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAU
 import { anchorVerdict, fuzzyPatch, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core'
 import { buildExtractPlanFromLibrary, ownerDecisionText, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, readProposalReport, writeProposalReport, type ExtractPlanLibrary, type ExtractPartRequest } from '@deepseek-ai/dsh-evolution-core'
 import type { CitationPolicy, EvolutionIoLike, LiveValue, SupportFileCharPolicy, WriteAnchor } from '@deepseek-ai/dsh-evolution-core'
-import type { SkillSummary } from '@deepseek-ai/dsh-skill'
+import type { SkillSummary } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-skill-usage'
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from './write-gates.ts'
 /**

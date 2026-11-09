@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
-import type { SkillSummary } from '@deepseek-ai/dsh-skill'
+import type { SkillSummary } from '@deepseek-ai/dsh-evolution-core/platform'
 
 /** Stable identity for one winning skill: provider + source + name, JSON-encoded. */
 export type SkillKey = string

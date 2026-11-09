@@ -1,6 +1,6 @@
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { UserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
-import { escapeText } from '@deepseek-ai/dsh-skill'
+import { escapeText } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { CatalogEntry } from './projection.ts'
 
 interface CatalogSource {
