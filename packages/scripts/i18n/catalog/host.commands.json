@@ -2,100 +2,324 @@
   "surface": "host-human",
   "messages": {
     "summary.merge": {
-      "zh": "技能自动合并（扫描/待批准/重跑/报告/撤销）"
+      "zh": "技能自动合并（扫描/待批准/重跑/报告/撤销）",
+      "en": "Skill auto-merge (scan / pending approval / rerun / report / undo)",
+      "ja": "スキルの自動マージ（スキャン／承認待ち／再実行／レポート／取り消し）",
+      "es": "Merge automático de skills (escaneo / aprobación pendiente / nueva ejecución / informe / deshacer)",
+      "fr": "Fusion automatique des skills (scan / en attente d’approbation / relance / rapport / annulation)",
+      "de": "Skill-Auto-Merge (Scan / offene Freigaben / erneuter Lauf / Bericht / Rücknahme)",
+      "ru": "Автообъединение навыков (сканирование / ожидание одобрения / повторный запуск / отчёт / отмена)",
+      "pt": "Merge automático de skills (varredura / aguardando aprovação / reexecução / relatório / desfazer)"
     },
     "summary.pending": {
-      "zh": "列出暂存的写入（--detail 显示参数）"
+      "zh": "列出暂存的写入（--detail 显示参数）",
+      "en": "List pending writes (--detail shows arguments)",
+      "ja": "承認待ちの書き込みを一覧表示（--detail で引数を表示）",
+      "es": "Listar las escrituras pendientes (--detail muestra los argumentos)",
+      "fr": "Lister les écritures en attente (--detail affiche les arguments)",
+      "de": "Ausstehende Schreibvorgänge auflisten (--detail zeigt die Argumente)",
+      "ru": "Показать ожидающие записи (--detail показывает аргументы)",
+      "pt": "Listar as escritas pendentes (--detail mostra os argumentos)"
     },
     "summary.approve": {
-      "zh": "执行一条已批准的写入"
+      "zh": "执行一条已批准的写入",
+      "en": "Run an approved write",
+      "ja": "承認済みの書き込みを実行",
+      "es": "Ejecutar una escritura aprobada",
+      "fr": "Exécuter une écriture approuvée",
+      "de": "Einen freigegebenen Schreibvorgang ausführen",
+      "ru": "Выполнить одобренную запись",
+      "pt": "Executar uma escrita aprovada"
     },
     "summary.reject": {
-      "zh": "丢弃一条暂存写入，不执行"
+      "zh": "丢弃一条暂存写入，不执行",
+      "en": "Discard a pending write without running it",
+      "ja": "承認待ちの書き込みを破棄（実行しない）",
+      "es": "Descartar una escritura pendiente sin ejecutarla",
+      "fr": "Écarter une écriture en attente sans l’exécuter",
+      "de": "Einen ausstehenden Schreibvorgang verwerfen, ohne ihn auszuführen",
+      "ru": "Отбросить ожидающую запись, не выполняя её",
+      "pt": "Descartar uma escrita pendente sem executá-la"
     },
     "summary.release": {
-      "zh": "把卡在执行中的写入放回待批窗口（先确认效果再批准或驳回）"
+      "zh": "把卡在执行中的写入放回待批窗口（先确认效果再批准或驳回）",
+      "en": "Return a write stuck mid-execution to the pending list (check the result first, then approve or reject)",
+      "ja": "実行中に詰まった書き込みを承認待ちに戻す（結果を確認してから承認または却下）",
+      "es": "Devolver a pendientes una escritura atascada en ejecución (comprobar el resultado antes de aprobar o rechazar)",
+      "fr": "Renvoyer en attente une écriture bloquée en cours d’exécution (vérifier le résultat avant d’approuver ou de rejeter)",
+      "de": "Einen in der Ausführung hängenden Schreibvorgang zurück in die Freigabeliste stellen (erst das Ergebnis prüfen, dann freigeben oder ablehnen)",
+      "ru": "Вернуть в список на одобрение запись, застрявшую при выполнении (сначала проверить результат, затем одобрить или отклонить)",
+      "pt": "Devolver para pendentes uma escrita travada em execução (conferir o resultado antes de aprovar ou rejeitar)"
     },
     "summary.doctor": {
-      "zh": "只读自检：安装形态、冲突、环境、服务（--json 供脚本用）"
+      "zh": "只读自检：安装形态、冲突、环境、服务（--json 供脚本用）",
+      "en": "Read-only self-check: installation type, conflicts, environment, services (--json for scripts)",
+      "ja": "読み取り専用の自己診断：インストール形態、競合、環境、サービス（--json はスクリプト向け）",
+      "es": "Autodiagnóstico de solo lectura: tipo de instalación, conflictos, entorno y servicios (--json para scripts)",
+      "fr": "Autodiagnostic en lecture seule : type d’installation, conflits, environnement et services (--json pour les scripts)",
+      "de": "Schreibgeschützter Selbsttest: Installationstyp, Konflikte, Umgebung, Dienste (--json für Skripte)",
+      "ru": "Самопроверка только для чтения: тип установки, конфликты, окружение, службы (--json для скриптов)",
+      "pt": "Autodiagnóstico somente leitura: tipo de instalação, conflitos, ambiente e serviços (--json para scripts)"
     },
     "summary.curator": {
-      "zh": "立即运行一次自动整理，或暂停／恢复／查看状态"
+      "zh": "立即运行一次自动整理，或暂停／恢复／查看状态",
+      "en": "Run automatic skill curation once now, or pause, resume, or check status",
+      "ja": "スキルの自動整理を今すぐ1回実行、または一時停止／再開／状態確認",
+      "es": "Ejecutar una pasada de curación automática de skills ahora, o pausarla, reanudarla o consultar su estado",
+      "fr": "Lancer une passe de curation automatique des skills maintenant, ou la mettre en pause, la reprendre ou consulter son état",
+      "de": "Automatische Skill-Pflege jetzt einmal ausführen; alternativ pausieren, fortsetzen oder Status prüfen",
+      "ru": "Запустить проход автоматического упорядочивания навыков сейчас или приостановить, возобновить либо проверить состояние",
+      "pt": "Executar uma passagem de curadoria automática de skills agora, ou pausar, retomar ou consultar o estado"
     },
     "summary.mutations": {
-      "zh": "列出技能改动记录"
+      "zh": "列出技能改动记录",
+      "en": "List skill change records",
+      "ja": "スキルの変更記録を一覧表示",
+      "es": "Listar el historial de cambios de skills",
+      "fr": "Lister l’historique des modifications de skills",
+      "de": "Skill-Änderungen auflisten",
+      "ru": "Показать историю изменений навыков",
+      "pt": "Listar o histórico de mudanças em skills"
     },
     "summary.restore": {
-      "zh": "从最近的快照恢复技能"
+      "zh": "从最近的快照恢复技能",
+      "en": "Restore skills from the latest snapshot",
+      "ja": "最新のスナップショットからスキルを復元",
+      "es": "Restaurar los skills desde la instantánea más reciente",
+      "fr": "Restaurer les skills depuis l’instantané le plus récent",
+      "de": "Skills aus dem neuesten Snapshot wiederherstellen",
+      "ru": "Восстановить навыки из последнего снимка",
+      "pt": "Restaurar as skills a partir do snapshot mais recente"
     },
     "summary.skill restore": {
-      "zh": "按名字恢复一个已归档的技能"
+      "zh": "按名字恢复一个已归档的技能",
+      "en": "Restore an archived skill by name",
+      "ja": "アーカイブ済みのスキルを名前で復元",
+      "es": "Restaurar por nombre un skill archivado",
+      "fr": "Restaurer un skill archivé par son nom",
+      "de": "Einen archivierten Skill anhand des Namens wiederherstellen",
+      "ru": "Восстановить архивный навык по имени",
+      "pt": "Restaurar uma skill arquivada pelo nome"
     },
     "summary.skill history": {
-      "zh": "列出某个技能的内容版本（含时间、动作、字符数、哈希前缀）"
+      "zh": "列出某个技能的内容版本（含时间、动作、字符数、哈希前缀）",
+      "en": "List a skill's content versions (time, action, character count, hash prefix)",
+      "ja": "スキルの内容のバージョンを一覧表示（時刻、操作、文字数、ハッシュ接頭辞）",
+      "es": "Listar las versiones del contenido de un skill (fecha y hora, acción, número de caracteres y prefijo del hash)",
+      "fr": "Lister les versions du contenu d’un skill (date, action, nombre de caractères, préfixe de hash)",
+      "de": "Inhaltsversionen eines Skills auflisten (Zeitpunkt, Aktion, Zeichenzahl, Hash-Präfix)",
+      "ru": "Показать версии содержимого навыка (время, действие, число символов, префикс хеша)",
+      "pt": "Listar as versões do conteúdo de uma skill (horário, ação, contagem de caracteres, prefixo do hash)"
     },
     "summary.skill undo": {
-      "zh": "把某个技能的内容回退到某一版（默认上一版；只动内容，撤销本身也记为一版）"
+      "zh": "把某个技能的内容回退到某一版（默认上一版；只动内容，撤销本身也记为一版）",
+      "en": "Revert a skill's content to a version (the previous one by default; only the content changes, and the revert itself counts as a version)",
+      "ja": "スキルの内容を指定バージョンに戻す（既定は直前の版。変わるのは内容のみで、戻す操作自体も1バージョンとして記録）",
+      "es": "Restaurar el contenido de un skill a una versión (la anterior por defecto; solo cambia el contenido y la restauración cuenta como una versión más)",
+      "fr": "Restaurer le contenu d’un skill à une version (la précédente par défaut ; seul le contenu change, et la restauration compte elle-même comme une version)",
+      "de": "Den Inhalt eines Skills auf eine Version zurücksetzen (standardmäßig die vorherige; nur der Inhalt ändert sich, und das Zurücksetzen zählt selbst als Version)",
+      "ru": "Вернуть содержимое навыка к версии (по умолчанию к предыдущей; меняется только содержимое, а сам откат считается ещё одной версией)",
+      "pt": "Reverter o conteúdo de uma skill para uma versão (a anterior por padrão; só o conteúdo muda, e a própria reversão conta como versão)"
     },
     "summary.skill pin": {
-      "zh": "钉住一个技能：免于删除、后台审查与生命周期整理（立即生效、随时可解钉；与 skill_manage 的 pin 动作同一语义，不走审批）"
+      "zh": "钉住一个技能：免于删除、后台审查与生命周期整理（立即生效、随时可解钉；与 skill_manage 的 pin 动作同一语义，不走审批）",
+      "en": "Pin a skill: exempt from deletion, background review, and lifecycle curation (takes effect immediately and can be unpinned anytime; same semantics as skill_manage's pin action, no approval needed)",
+      "ja": "スキルをピン留め：削除・バックグラウンドレビュー・ライフサイクル整理の対象外にする（即時反映、ピン留めはいつでも解除可。skill_manage の pin と同じ意味で、承認は不要）",
+      "es": "Fijar un skill: queda exento de borrado, revisión en segundo plano y curación del ciclo de vida (surte efecto al instante y se puede desfijar cuando quieras; misma semántica que la acción pin de skill_manage, sin aprobación)",
+      "fr": "Épingler un skill : il échappe à la suppression, à la revue en arrière-plan et à la curation du cycle de vie (effet immédiat, désépinglage possible à tout moment ; même sémantique que l’action pin de skill_manage, sans approbation)",
+      "de": "Einen Skill anheften: ausgenommen von Löschung, Hintergrund-Review und Lebenszyklus-Pflege (sofort wirksam, jederzeit lösbar; dieselbe Semantik wie die pin-Aktion von skill_manage, keine Freigabe nötig)",
+      "ru": "Закрепить навык: на него не распространяются удаление, фоновый обзор и упорядочивание жизненного цикла (действует сразу, открепить можно в любой момент; та же семантика, что у действия pin в skill_manage, без одобрения)",
+      "pt": "Fixar uma skill: isenta de exclusão, revisão em segundo plano e curadoria do ciclo de vida (efeito imediato, pode ser desafixada a qualquer momento; mesma semântica da ação pin do skill_manage, sem aprovação)"
     },
     "summary.skill unpin": {
-      "zh": "解钉一个技能：撤销上面的冻结（立即生效、不走审批）"
+      "zh": "解钉一个技能：撤销上面的冻结（立即生效、不走审批）",
+      "en": "Unpin a skill: lift the freeze (takes effect immediately, no approval needed)",
+      "ja": "スキルのピン留めを解除：凍結を解除する（即時反映、承認不要）",
+      "es": "Desfijar un skill: levanta el bloqueo (surte efecto al instante, sin aprobación)",
+      "fr": "Désépingler un skill : lève le gel (effet immédiat, sans approbation)",
+      "de": "Einen Skill lösen: hebt die Sperre auf (sofort wirksam, keine Freigabe nötig)",
+      "ru": "Открепить навык: снять заморозку (действует сразу, без одобрения)",
+      "pt": "Desafixar uma skill: remove o congelamento (efeito imediato, sem aprovação)"
     },
     "summary.propose": {
-      "zh": "为 body-oversize 技能写 keep 提议（不自动拆分；同一 reports store）"
+      "zh": "为 body-oversize 技能写 keep 提议（不自动拆分；同一 reports store）",
+      "en": "Write a keep proposal for body-oversize skills (no automatic split; the same reports store)",
+      "ja": "body-oversize のスキルに keep の提案を書き出す（自動分割なし。reports store は共通）",
+      "es": "Escribir una propuesta keep para los skills body-oversize (sin división automática; el mismo reports store)",
+      "fr": "Écrire une proposition keep pour les skills body-oversize (pas de découpage automatique ; le même reports store)",
+      "de": "Einen keep-Vorschlag für body-oversize-Skills schreiben (keine automatische Aufteilung; derselbe reports store)",
+      "ru": "Записать предложение keep для навыков body-oversize (без автоматического разделения; тот же reports store)",
+      "pt": "Gravar uma proposta keep para skills body-oversize (sem divisão automática; o mesmo reports store)"
     },
     "summary.skills health": {
-      "zh": "技能库结构体检"
+      "zh": "技能库结构体检",
+      "en": "Structural health check of the skill library",
+      "ja": "スキルライブラリの構造チェック",
+      "es": "Revisión estructural de la biblioteca de skills",
+      "fr": "Contrôle structurel de la bibliothèque de skills",
+      "de": "Strukturprüfung der Skill-Bibliothek",
+      "ru": "Проверка структуры библиотеки навыков",
+      "pt": "Verificação estrutural da biblioteca de skills"
     },
     "summary.skills refresh": {
-      "zh": "丢弃目录缓存并重新读取技能树"
+      "zh": "丢弃目录缓存并重新读取技能树",
+      "en": "Drop the catalog cache and reread the skill tree",
+      "ja": "カタログキャッシュを破棄してスキルツリーを読み直す",
+      "es": "Descartar la caché del catálogo y releer el árbol de skills",
+      "fr": "Vider le cache du catalogue et relire l’arborescence des skills",
+      "de": "Den Katalog-Cache verwerfen und den Skill-Baum neu einlesen",
+      "ru": "Сбросить кеш каталога и перечитать дерево навыков",
+      "pt": "Descartar o cache do catálogo e reler a árvore de skills"
     },
     "summary.learn": {
-      "zh": "向本会话发一条学习请求"
+      "zh": "向本会话发一条学习请求",
+      "en": "Send a learning request to this session",
+      "ja": "このセッションに学習リクエストを送る",
+      "es": "Enviar una solicitud de aprendizaje a esta sesión",
+      "fr": "Envoyer une demande d’apprentissage à cette session",
+      "de": "Eine Lernanfrage an diese Sitzung senden",
+      "ru": "Отправить запрос на обучение в эту сессию",
+      "pt": "Enviar uma solicitação de aprendizado para esta sessão"
     },
     "summary.maintain": {
-      "zh": "起一次维护扫描并立即回 run id（后台跑；--facts 为 0 token 预览）"
+      "zh": "起一次维护扫描并立即回 run id（后台跑；--facts 为 0 token 预览）",
+      "en": "Start a maintenance scan and return the run id immediately (runs in the background; --facts is a 0-token preview)",
+      "ja": "メンテナンススキャンを開始し、実行 ID をすぐ返す（バックグラウンド実行。--facts は0トークンのプレビュー）",
+      "es": "Iniciar un escaneo de mantenimiento y devolver el ID de ejecución al momento (corre en segundo plano; --facts es una vista previa de 0 tokens)",
+      "fr": "Lancer un scan de maintenance et renvoyer aussitôt l’ID d’exécution (s’exécute en arrière-plan ; --facts est un aperçu à 0 token)",
+      "de": "Einen Wartungsscan starten und sofort die Run-ID zurückgeben (läuft im Hintergrund; --facts ist eine Vorschau mit 0 Token)",
+      "ru": "Запустить служебное сканирование и сразу вернуть ID запуска (работает в фоне; --facts — предпросмотр без токенов)",
+      "pt": "Iniciar uma varredura de manutenção e devolver o ID da execução na hora (roda em segundo plano; --facts é uma prévia com 0 token)"
     },
     "summary.maintain status": {
-      "zh": "看维护扫描：在飞的那次（含已跑多久）或某个 run 的终态"
+      "zh": "看维护扫描：在飞的那次（含已跑多久）或某个 run 的终态",
+      "en": "Show maintenance scans: the in-flight run (and how long it has been running) or a run's final state",
+      "ja": "メンテナンススキャンを表示：実行中の回（経過時間を含む）または実行の終了状態",
+      "es": "Ver los escaneos de mantenimiento: el que está en curso (y cuánto lleva) o el estado final de una ejecución",
+      "fr": "Voir les scans de maintenance : celui en cours (et sa durée) ou l’état final d’une exécution",
+      "de": "Wartungsscans anzeigen: den laufenden (inklusive Laufzeit) oder den Endzustand eines Runs",
+      "ru": "Показать служебные сканирования: текущее (и сколько уже идёт) или конечное состояние запуска",
+      "pt": "Ver as varreduras de manutenção: a que está em andamento (e há quanto tempo) ou o estado final de uma execução"
     },
     "summary.maintain report": {
-      "zh": "读某个 run 的结果正文（省略 id 取本 home 最新一条；没有结果就明说，不装成空结果）"
+      "zh": "读某个 run 的结果正文（省略 id 取本 home 最新一条；没有结果就明说，不装成空结果）",
+      "en": "Read a run's result body (omit the id for the latest one in this home; say so when there's no result instead of faking an empty one)",
+      "ja": "実行の結果本文を読む（id を省略するとこの home の最新。結果がなければ空の結果を装わず、そのまま伝える）",
+      "es": "Leer el texto del resultado de una ejecución (omite el id para la más reciente de este home; si no hay resultado, dilo sin fingir un resultado vacío)",
+      "fr": "Lire le texte du résultat d’une exécution (sans ID, la plus récente de ce home ; s’il n’y a pas de résultat, le dire au lieu de faire passer un résultat vide)",
+      "de": "Den Ergebnistext eines Runs lesen (ohne ID den neuesten in diesem Home; gibt es kein Ergebnis, das sagen statt ein leeres vorzutäuschen)",
+      "ru": "Прочитать текст результата запуска (без id — последнее в этом home; если результата нет, сказать прямо, а не изображать пустой результат)",
+      "pt": "Ler o texto do resultado de uma execução (omita o id para a mais recente deste home; se não houver resultado, dizer isso sem fingir um resultado vazio)"
     },
     "summary.maintain handoff": {
-      "zh": "把某次维护报告交给模型：注入指针与汇报协议，模型只汇报、等你确认后再动手"
+      "zh": "把某次维护报告交给模型：注入指针与汇报协议，模型只汇报、等你确认后再动手",
+      "en": "Hand a maintenance report to the model: inject a pointer and a reporting protocol; the model only reports and waits for your confirmation before acting",
+      "ja": "メンテナンスレポートをモデルに渡す：ポインタと報告プロトコルを注入し、モデルは報告のみ行い、あなたの確認を待ってから動く",
+      "es": "Pasar un informe de mantenimiento al modelo: inyecta un puntero y un protocolo de informe; el modelo solo informa y espera tu confirmación antes de actuar",
+      "fr": "Transmettre un rapport de maintenance au modèle : injecter un pointeur et un protocole de compte rendu ; le modèle se contente de rapporter et attend votre feu vert avant d’agir",
+      "de": "Einen Wartungsbericht an das Modell übergeben: einen Verweis und ein Berichtsprotokoll injizieren; das Modell berichtet nur und wartet auf deine Freigabe, bevor es etwas tut",
+      "ru": "Передать отчёт служебного сканирования модели: внедрить ссылку и протокол отчёта; модель только докладывает и ждёт вашего подтверждения, прежде чем действовать",
+      "pt": "Passar um relatório de manutenção ao modelo: injeta uma referência e um protocolo de relato; o modelo só relata e espera sua confirmação antes de agir"
     },
     "summary.maintain cancel": {
-      "zh": "停掉在飞的那次维护扫描（省略 id 仅当最新一条是本进程在跑的那次）"
+      "zh": "停掉在飞的那次维护扫描（省略 id 仅当最新一条是本进程在跑的那次）",
+      "en": "Stop the in-flight maintenance scan (omit the id only when the latest run is the one this process is running)",
+      "ja": "実行中のメンテナンススキャンを停止（id を省略できるのは、最新がこのプロセスで実行中の回のときだけ）",
+      "es": "Detener el escaneo de mantenimiento en curso (omite el id solo si la última ejecución es la que corre en este proceso)",
+      "fr": "Arrêter le scan de maintenance en cours (n’omettre l’ID que si la dernière exécution est celle lancée par ce processus)",
+      "de": "Den laufenden Wartungsscan stoppen (die ID nur weglassen, wenn der neueste Run der ist, den dieser Prozess gerade ausführt)",
+      "ru": "Остановить текущее служебное сканирование (id можно опустить, только если последнее — запуск, идущий в этом процессе)",
+      "pt": "Parar a varredura de manutenção em andamento (omita o id só se a última execução for a que roda neste processo)"
     },
     "summary.migrate": {
-      "zh": "把旧设置文档里家族的旧分区迁进现在的行（幂等；已迁移过就报「已一致」）"
+      "zh": "把旧设置文档里家族的旧分区迁进现在的行（幂等；已迁移过就报「已一致」）",
+      "en": "Move the family's old namespaces from the legacy settings document into the current rows (idempotent; reports “already consistent” when already migrated)",
+      "ja": "旧設定ドキュメントにあるファミリーの旧名前空間を現在の行へ移す（冪等。移行済みなら「整合済み」と報告）",
+      "es": "Mover los espacios de nombres antiguos de la familia del documento de ajustes heredado a las filas actuales (idempotente; si ya se migró, informa de que «ya está alineado»)",
+      "fr": "Déplacer les anciens espaces de noms de la famille du document de paramètres hérité vers les lignes actuelles (idempotent ; signale « déjà aligné » si la migration a déjà eu lieu)",
+      "de": "Die alten Namespaces der Familie aus dem alten Einstellungsdokument in die aktuellen Zeilen übernehmen (idempotent; meldet „bereits konsistent“, wenn schon migriert)",
+      "ru": "Перенести старые пространства имён семейства из старого документа настроек в текущие строки (идемпотентно; если уже перенесено, сообщает «уже совпадает»)",
+      "pt": "Mover os namespaces antigos da família do documento de configurações legado para as linhas atuais (idempotente; se já migrado, informa “já consistente”)"
     },
     "summary.policy set": {
-      "zh": "通过设置服务写入一个你可改的参数 （仅 E3；E1/E2 仍留在 cordis.yml）"
+      "zh": "通过设置服务写入一个你可改的参数 （仅 E3；E1/E2 仍留在 cordis.yml）",
+      "en": "Write a parameter you can change through the settings service (E3 only; E1/E2 stay in cordis.yml)",
+      "ja": "設定サービス経由で変更できるパラメータを書き込む（E3 のみ。E1/E2 は cordis.yml のまま）",
+      "es": "Escribir un parámetro que puedes cambiar mediante el servicio de ajustes (solo E3; E1/E2 siguen en cordis.yml)",
+      "fr": "Écrire un paramètre que vous pouvez modifier via le service de paramètres (E3 uniquement ; E1/E2 restent dans cordis.yml)",
+      "de": "Einen von dir änderbaren Parameter über den Einstellungsdienst schreiben (nur E3; E1/E2 bleiben in cordis.yml)",
+      "ru": "Записать изменяемый вами параметр через службу настроек (только E3; E1/E2 остаются в cordis.yml)",
+      "pt": "Gravar um parâmetro que você pode alterar pelo serviço de configurações (somente E3; E1/E2 ficam em cordis.yml)"
     },
     "summary.params": {
-      "zh": "列出全部参数：分组、档位、生效时机、来源与当前值（--json 便于脚本处理）"
+      "zh": "列出全部参数：分组、档位、生效时机、来源与当前值（--json 便于脚本处理）",
+      "en": "List all parameters: group, tier, when they take effect, source, and current value (--json for scripts)",
+      "ja": "全パラメータを一覧表示：グループ、ティア、反映タイミング、取得元、現在値（--json はスクリプト向け）",
+      "es": "Listar todos los parámetros: grupo, nivel, cuándo aplican, origen y valor actual (--json para scripts)",
+      "fr": "Lister tous les paramètres : groupe, palier, moment d’application, source et valeur actuelle (--json pour les scripts)",
+      "de": "Alle Parameter auflisten: Gruppe, Stufe, wann sie greifen, Quelle und aktueller Wert (--json für Skripte)",
+      "ru": "Показать все параметры: группа, уровень, когда вступают в силу, источник и текущее значение (--json для скриптов)",
+      "pt": "Listar todos os parâmetros: grupo, nível, quando entram em vigor, origem e valor atual (--json para scripts)"
     },
     "summary.preset install": {
-      "zh": "把自进化 Agent 预设**行**写进当前 profile 的 patch 层（`profiles/<p>/cordis.patch.yml`；bases 来自 agent 包的 bases.json）"
+      "zh": "把自进化 Agent 预设**行**写进当前 profile 的 patch 层（`profiles/<p>/cordis.patch.yml`；bases 来自 agent 包的 bases.json）",
+      "en": "Write the self-evolution Agent preset **row** into the current profile's patch layer (`profiles/<p>/cordis.patch.yml`; bases come from the agent package's bases.json)",
+      "ja": "自己進化 Agent プリセットの**行**を現在のプロファイルのパッチ層に書き込む（`profiles/<p>/cordis.patch.yml`。bases は agent パッケージの bases.json から）",
+      "es": "Escribir la **fila** del preset Agent de autoevolución en la capa de parches del perfil actual (`profiles/<p>/cordis.patch.yml`; las bases vienen del bases.json del paquete agent)",
+      "fr": "Écrire la **ligne** du preset Agent de l’auto-évolution dans la couche de patchs du profil actuel (`profiles/<p>/cordis.patch.yml` ; les bases viennent du bases.json du paquet agent)",
+      "de": "Die **Zeile** des Selbstevolution-Agent-Presets in die Patch-Ebene des aktuellen Profils schreiben (`profiles/<p>/cordis.patch.yml`; die Bases stammen aus der bases.json des agent-Pakets)",
+      "ru": "Записать **строку** пресета Agent самоэволюции в слой патчей текущего профиля (`profiles/<p>/cordis.patch.yml`; bases берутся из bases.json пакета agent)",
+      "pt": "Gravar a **linha** do preset Agent de autoevolução na camada de patches do perfil atual (`profiles/<p>/cordis.patch.yml`; as bases vêm do bases.json do pacote agent)"
     },
     "summary.restructure": {
-      "zh": "把技能正文的一节移到 references 文件"
+      "zh": "把技能正文的一节移到 references 文件",
+      "en": "Move one section of a skill body into a references file",
+      "ja": "スキル本文の1セクションを references ファイルへ移す",
+      "es": "Mover una sección del cuerpo de un skill a un archivo de references",
+      "fr": "Déplacer une section du corps d’un skill vers un fichier references",
+      "de": "Einen Abschnitt des Skill-Textes in eine references-Datei verschieben",
+      "ru": "Перенести один раздел текста навыка в файл references",
+      "pt": "Mover uma seção do corpo de uma skill para um arquivo references"
     },
     "summary.extract": {
-      "zh": "预览把源技能的可复用部分提取到已有类级 owner；默认 plan，--apply 才写（多根一次事务）"
+      "zh": "预览把源技能的可复用部分提取到已有类级 owner；默认 plan，--apply 才写（多根一次事务）",
+      "en": "Preview extracting a source skill's reusable part into an existing class-level owner; by default it produces a plan, and only --apply writes (multiple roots in one transaction)",
+      "ja": "元スキルの再利用できる部分を既存のクラス担当スキルへ抽出するプレビュー（既定は plan のみ、--apply で書き込み。複数ルートを1トランザクション）",
+      "es": "Previsualizar la extracción de la parte reutilizable de un skill de origen a un skill existente que ya cubre esa clase; por defecto solo genera un plan y solo --apply escribe (varias raíces en una transacción)",
+      "fr": "Prévisualiser l’extraction de la partie réutilisable d’un skill d’origine vers un skill existant qui couvre déjà la classe ; par défaut, elle produit un plan et seul --apply écrit (plusieurs racines en une transaction)",
+      "de": "In der Vorschau zeigen, wie der wiederverwendbare Teil eines Quell-Skills in einen vorhandenen Skill, der die Klasse abdeckt, extrahiert wird; standardmäßig entsteht nur ein Plan, und erst --apply schreibt (mehrere Roots in einer Transaktion)",
+      "ru": "Показать предпросмотр извлечения переиспользуемой части исходного навыка в существующий навык, покрывающий этот класс; по умолчанию только план, запись — с --apply (несколько корней в одной транзакции)",
+      "pt": "Pré-visualizar a extração da parte reutilizável de uma skill de origem para uma skill existente que já cobre a classe; por padrão gera só o plano e --apply é que grava (várias raízes em uma transação)"
     },
     "summary.replay": {
-      "zh": "比较不同会话与重启之间的计划结果（从活动记录回填）"
+      "zh": "比较不同会话与重启之间的计划结果（从活动记录回填）",
+      "en": "Compare plan results across sessions and restarts (backfilled from the activity log)",
+      "ja": "セッションや再起動をまたいで計画結果を比較（活動ログから補完）",
+      "es": "Comparar los resultados de los planes entre sesiones y reinicios (rellenados desde el registro de actividad)",
+      "fr": "Comparer les résultats des plans entre sessions et redémarrages (complétés depuis le journal d’activité)",
+      "de": "Plan-Ergebnisse über Sitzungen und Neustarts hinweg vergleichen (aus dem Aktivitätsprotokoll nachgetragen)",
+      "ru": "Сравнить результаты планов между сессиями и перезапусками (дополняются из журнала активности)",
+      "pt": "Comparar os resultados dos planos entre sessões e reinícios (preenchidos a partir do registro de atividade)"
     },
     "help.header": {
-      "zh": "自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。"
+      "zh": "自进化：记忆、技能、会话回顾、技能整理——状态、待批准写入与维护。",
+      "en": "Self-evolution: memory, skills, session review, skill curation — status, pending writes, and maintenance.",
+      "ja": "自己進化：記憶、スキル、セッションのレビュー、スキル整理 — 状態、承認待ちの書き込み、メンテナンス。",
+      "es": "Evolución: memoria, skills, revisión de sesiones y curación de skills — estado, escrituras pendientes y mantenimiento.",
+      "fr": "Auto-évolution : mémoire, skills, revue de session, curation des skills — état, écritures en attente et maintenance.",
+      "de": "Selbstevolution: Gedächtnis, Skills, Session-Review und Skill-Pflege — Status, ausstehende Schreibvorgänge und Wartung.",
+      "ru": "Самоэволюция: память, навыки, обзор сессий, упорядочивание навыков — состояние, ожидающие записи и обслуживание.",
+      "pt": "Autoevolução: memória, skills, revisão de sessões e curadoria de skills — estado, escritas pendentes e manutenção."
     },
     "help.unknown": {
-      "zh": "不是本构建能应答的子命令（已知子命令但缺参数也会落到这里）。"
+      "zh": "不是本构建能应答的子命令（已知子命令但缺参数也会落到这里）。",
+      "en": "is not a subcommand this build can answer (a known subcommand with missing arguments lands here too).",
+      "ja": "は本ビルドで応答できるサブコマンドではありません（既知のサブコマンドでも引数が足りない場合はここに表示されます）。",
+      "es": "no es un subcomando que esta compilación pueda atender (un subcomando conocido sin argumentos también acaba aquí).",
+      "fr": "n’est pas une sous-commande que ce build peut traiter (une sous-commande connue avec des arguments manquants finit aussi ici).",
+      "de": "ist kein Unterbefehl, den dieser Build beantworten kann (ein bekannter Unterbefehl mit fehlenden Argumenten landet ebenfalls hier).",
+      "ru": "не является подкомандой, которую эта сборка может обработать (известная подкоманда без аргументов тоже попадает сюда).",
+      "pt": "não é um subcomando que esta compilação consegue atender (um subcomando conhecido sem argumentos também cai aqui)."
     }
   }
 }

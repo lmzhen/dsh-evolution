@@ -1,6 +1,6 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { hostErrorText, resolveHostLocale } from '../src/host-locale.ts'
+import { hostCommandText, hostErrorText, resolveHostLocale } from '../src/host-locale.ts'
 
 function ctxFor(preference: unknown): never {
   return {
@@ -19,6 +19,11 @@ describe('host human locale', () => {
   it('keeps Chinese without a preference and falls back to English for an unknown one', () => {
     expect(resolveHostLocale(ctxFor(undefined))).toBe('zh')
     expect(resolveHostLocale(ctxFor('it'))).toBe('en')
+  })
+
+  it('renders localized command help', () => {
+    expect(hostCommandText('ja', 'summary.pending')).toContain('承認待ち')
+    expect(hostCommandText('ja', 'summary.pending')).toContain('--detail')
   })
 
   it('renders the localized error with stable code and slots', () => {

@@ -52,6 +52,9 @@ for (const [id, rows] of Object.entries(param.values)) for (const [value, row] o
 const host = JSON.parse(await readFile(join(CATALOG, 'host.errors.json'), 'utf8'))
 let hostKeys = 0
 for (const [id, row] of Object.entries(host.messages ?? {})) { checkRow('host.error.' + id, row, true); hostKeys++ }
+const commandHelp = JSON.parse(await readFile(join(CATALOG, 'host.commands.json'), 'utf8'))
+let commandKeys = 0
+for (const [id, row] of Object.entries(commandHelp.messages ?? {})) { checkRow('host.command.' + id, row, true); commandKeys++ }
 
 const run = (script) => {
   const result = spawnSync(process.execPath, [join(SCRIPTS, script), '--strict', '--check'], { encoding: 'utf8' })
@@ -60,4 +63,5 @@ const run = (script) => {
 run('gen-i18n.mjs')
 run('gen-param-i18n.mjs')
 run('gen-host-errors.mjs')
-console.log('verify-i18n: OK — 4 namespace(s), ' + String(uiKeys) + ' UI key(s), ' + String(paramLeaves) + ' parameter leaf/leaves, ' + String(hostKeys) + ' host error(s), 8 locales')
+run('gen-host-commands.mjs')
+console.log('verify-i18n: OK — 4 namespace(s), ' + String(uiKeys) + ' UI key(s), ' + String(paramLeaves) + ' parameter leaf/leaves, ' + String(hostKeys) + ' host error(s), ' + String(commandKeys) + ' command-help key(s), 8 locales')
