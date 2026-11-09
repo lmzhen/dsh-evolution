@@ -174,6 +174,8 @@ export async function loadUsage(root: string, io: EvolutionIoLike = nodeEvolutio
  * single-process serialize chain as the second layer.
  */
 export interface UsageMutateOptions {
+  /** Optional family fence; all usage RMW runs inside it. */
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   /** P2-9 (v19): called when malformed entries had to be quarantined before the
    * task could run. The guard preserves bytes AND keeps the facility working;
    * this callback is how that stays observable. */
@@ -186,7 +188,8 @@ export async function mutateUsage(
   task: (map: UsageMap) => void | Promise<void>,
   options: UsageMutateOptions = {},
 ): Promise<void> {
-  await transactIo(io, usageFile(root), async (current) => {
+  const run = async (): Promise<void> => {
+    await transactIo(io, usageFile(root), async (current) => {
     // P3 (v3 audit): a malformed sidecar is never overwritten by the RMW —
     // JSON.parse swallow→empty then persist would destroy recoverable telemetry.
     // P3 (v17): the same preserve applies to "valid JSON, wrong top-level
@@ -261,8 +264,11 @@ export async function mutateUsage(
     if (shapePreserved) return current
     const map = parseUsage(recovered ?? current)
     await task(map)
-    return JSON.stringify(Object.fromEntries(map.entries()), null, 2)
-  })
+      return JSON.stringify(Object.fromEntries(map.entries()), null, 2)
+    })
+  }
+  if (options.fence !== undefined) await options.fence.run(run)
+  else await run()
 }
 
 /** Curator-owned usage fields (rc.67 K-2): the curator writes ONLY this set —

@@ -1295,7 +1295,7 @@ export class EvolutionCurator extends Service {
             for (const [name, record] of usage) {
               if (!map.has(name)) map.set(name, { ...record })
             }
-          })
+          }, { ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
         } catch (error) {
           this.ctx.logger.warn(`evolution-curator: failed to persist the seeded usage baseline on a session-blocked run (${error instanceof Error ? error.message : String(error)})`)
         }
@@ -1324,7 +1324,7 @@ export class EvolutionCurator extends Service {
             for (const [name, record] of usage) {
               if (!map.has(name)) map.set(name, { ...record })
             }
-          })
+          }, { ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
         } catch (error) {
           this.ctx.logger.warn(`evolution-curator: failed to persist the seeded usage baseline on a session-blocked run (${error instanceof Error ? error.message : String(error)})`)
         }
@@ -1881,6 +1881,7 @@ export class EvolutionCurator extends Service {
       }, {
         // P2-9 (v19): a quarantined sidecar keeps folding but must be visible.
         onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) },
+        ...(this.homeFence === undefined ? {} : { fence: this.homeFence }),
       })
       if (skipped.length > 0) {
         this.ctx.logger.warn(`evolution-curator: lifecycle fold skipped ${skipped.length} name(s) whose on-disk state moved during the run (a concurrent curator/tool won): ${skipped.join(', ')}`)
@@ -2238,7 +2239,7 @@ export class EvolutionCurator extends Service {
             record.archived_at = new Date().toISOString()
           }
         }
-      }, { onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) } })
+      }, { onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) }, ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
     } catch (error) {
       this.ctx.logger.warn(`evolution-curator: failed to persist consolidate usage state: ${error instanceof Error ? error.message : String(error)}`)
     }
