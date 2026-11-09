@@ -17,7 +17,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { apply, SECTION_ID } from '../src/panels/settings/index.ts'
-import { CLIENT_PARAM_SECTIONS } from '../src/panels/settings/generated-params.ts'
 import { CARD_SLOT, DIAGNOSTICS_CARD_KEY } from '../src/panels/settings/seam.ts'
 import { createSourceCache, PROJECTION_FAILED, SEAT_MISSING, type SeatProbe } from '../src/panels/settings/source.ts'
 
@@ -138,38 +137,34 @@ function fakeShell(options: { seat?: boolean; refuseLocale?: boolean; seatArrive
   }
 }
 
-describe('the evolution settings tab', () => {
-  it('registers one settings.plugins.tab and renders every generated card inside it', () => {
+describe('the evolution settings section', () => {
+  it('registers one top-level settings.section + icon and renders the generated cards in it', () => {
     const { ctx, registrations } = fakeShell()
     apply(ctx)
-    const tabs = registrations.filter(row => row.name === 'settings.plugins.tab')
-    expect(tabs).toHaveLength(1)
-    expect(tabs[0]?.id).toBe(SECTION_ID)
-    const face = tabs[0]?.inject() as { cards: Array<{ namespace: string }> }
-    expect(face.cards.map(card => card.namespace)).toEqual(CLIENT_PARAM_SECTIONS.map(section => section.namespace))
-    render(h(tabs[0]?.component, face))
+    const sections = registrations.filter(row => row.name === 'settings.section')
+    expect(sections).toHaveLength(1)
+    expect(sections[0]?.id).toBe(SECTION_ID)
+    expect(registrations.filter(row => row.name === 'settings.section.icon')).toHaveLength(1)
+    render(h(sections[0]?.component, {}))
     expect(document.body.textContent).toBeTruthy()
     cleanup()
   })
 
-  it('does not register the retired settings.section or settings.plugin.item seats', () => {
+  it('does not register the retired plugins tab or per-row plugin item seats', () => {
     const { ctx, registrations } = fakeShell()
     apply(ctx)
-    expect(registrations.some(row => row.name === 'settings.section')).toBe(false)
+    expect(registrations.some(row => row.name === 'settings.plugins.tab')).toBe(false)
     expect(registrations.some(row => row.name === 'settings.plugin.item')).toBe(false)
-    expect(registrations.filter(row => row.name === 'settings.plugins.tab')).toHaveLength(1)
+    expect(registrations.filter(row => row.name === 'settings.section')).toHaveLength(1)
   })
 
-  it('applies on a shell without a settings seat; the tab still carries cards and the card says read-only', () => {
+  it('applies on a shell without a settings seat; the section still renders and the card says read-only', () => {
     const { ctx, registrations } = fakeShell({ seat: false })
     apply(ctx)
-    const tab = registrations.find(row => row.name === 'settings.plugins.tab')
-    expect(tab).toBeDefined()
-    const face = tab?.inject() as { cards: Array<Record<string, unknown>> }
-    expect(face.cards).toHaveLength(CLIENT_PARAM_SECTIONS.length)
-    const card = face.cards.find(entry => entry['namespace'] === 'memory-files')
-    expect(card).toBeDefined()
-    render(h(tab?.component, { cards: [card] }))
+    const section = registrations.find(row => row.name === 'settings.section')
+    expect(section).toBeDefined()
+    render(h(section?.component, {}))
+    expect(document.body.textContent).toContain('这个界面没有提供设置服务')
     cleanup()
   })
 })
@@ -286,20 +281,14 @@ describe('the row source the renderer binds', () => {
     off()
   })
 
-  it('T5-11/A66: the family settings source starts unavailable and subscribes', () => {
+  it('T5-11/A66: the section renders the cards on every apply', () => {
     const shell = fakeShell()
     apply(shell.ctx)
-    const tab = shell.registrations.find(entry => entry.name === 'settings.plugins.tab')
-    if (tab === undefined) throw new Error('the tab was not registered')
-    const face = tab.inject() as {
-      cards?: Array<{ namespace: string; hooks?: { paramSection?: { getSnapshot: () => { status: string; reason?: string }; subscribe: (listener: () => void) => () => void } } }>
-    }
-    const source = face.cards?.find(card => card.namespace === 'memory-files')?.hooks?.paramSection
-    if (source === undefined) throw new Error('the card face carried no section source')
-    expect(source.getSnapshot().status).toBe('unavailable')
-    const off = source.subscribe(() => {})
-    expect(typeof off).toBe('function')
-    off()
+    const section = shell.registrations.find(entry => entry.name === 'settings.section')
+    if (section === undefined) throw new Error('the section was not registered')
+    render(h(section.component, {}))
+    expect(document.body.textContent).toBeTruthy()
+    cleanup()
   })
 
   it('T5-06/A61: a refused dictionary registration is REPORTED and the section still registers', () => {
@@ -308,6 +297,6 @@ describe('the row source the renderer binds', () => {
     // report — a silent fallback leaves the reader wondering why the cards speak the bundle language.
     apply(shell.ctx)
     expect(shell.warnings.some(line => line.includes('evolution-settings') && line.includes('fall back'))).toBe(true)
-    expect(shell.registrations.some(entry => entry.name === 'settings.plugins.tab')).toBe(true)
+    expect(shell.registrations.some(entry => entry.name === 'settings.section')).toBe(true)
   })
 })

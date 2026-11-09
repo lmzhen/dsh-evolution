@@ -437,14 +437,14 @@ Object.assign(zh, {
   'settings.saved': '已保存',
   'settings.saveFailed': '保存失败',
   'settings.openPlatform': '打开平台设置',
-  'settings.openPlatformPath': '设置 → 内置插件 → 自进化 → 技能自动合并',
+  'settings.openPlatformPath': '设置 → 自进化 → 技能自动合并',
   'settings.live': '可直接在此保存；platformWrite 能力来自宿主。',
 })
 Object.assign(en, {
   'settings.saved': 'Saved',
   'settings.saveFailed': 'Save failed',
   'settings.openPlatform': 'Open platform settings',
-  'settings.openPlatformPath': 'Settings → Built-in plugins → Evolution → Skill auto-merge',
+  'settings.openPlatformPath': 'Settings → Evolution → Skill auto-merge',
   'settings.live': 'Save directly here; platformWrite capability comes from the host.',
 })
 Object.assign(zh, {

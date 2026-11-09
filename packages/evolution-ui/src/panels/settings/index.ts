@@ -1,7 +1,6 @@
 /**
- * Browser half: parameter cards register on the platform's Plugins surface
- * (`settings.plugin.item`); the family-owned `settings.section` is now only the
- * diagnostics card. Pending decisions live in `evolution.workbench`.
+ * Browser half: the family owns one top-level `settings.section`; every parameter
+ * card lives in that page. Pending decisions live in `evolution.workbench`.
  *
  * The join key is the row's ENTRY ID — the platform derives a settings namespace from
  * the Loader entry id, and that id is the registry's owner name — so the card, the
@@ -128,24 +127,41 @@ export function apply(ctx: ClientContext): void {
       hooks: { paramSection: source },
     }
   })
-  seam.slots.inject('settings.plugins.tab', function* () {
+  const section = (): ReactNode => createElement(EvolutionSettingsTab, { cards })
+  seam.slots.inject('settings.section', function* () {
     yield seam.slots.register({
-      name: 'settings.plugins.tab',
+      name: 'settings.section',
       id: SECTION_ID,
       order: SECTION_ORDER,
       label: () => t('title'),
       locale: NS,
-      inject: () => ({ cards }),
-    }, EvolutionSettingsTab as unknown as (props: never) => unknown)
+    }, section as unknown as (props: never) => unknown)
+    yield seam.slots.register({
+      name: 'settings.section.icon',
+      id: SECTION_ID,
+      order: SECTION_ORDER,
+      label: () => t('title'),
+    }, EvolutionSettingsIcon as unknown as (props: never) => unknown)
   })
 }
 
-/** One family tab: every parameter card lives inside the platform's Plugins page. */
+/** One family settings page: every parameter card lives inside it. */
 function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[] }): ReactNode {
   return createElement('div', { className: 'evolution-settings-tab' },
     ...groupParamCards(props.cards).flatMap(({ group, items }) => [
       createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, message(('group.' + group) as MessageKey)),
       ...items.map((face, index) => createElement(PluginParamCard, { key: face.namespace + ':' + String(index), ...face })),
     ]),
+  )
+}
+
+/** Nav glyph for the family settings section. */
+function EvolutionSettingsIcon(props: { readonly size?: number; readonly active?: boolean }): ReactNode {
+  const size = props.size ?? 16
+  return createElement('svg', {
+    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', 'aria-hidden': true,
+  },
+  createElement('path', { d: 'M12 3v4m0 10v4M3 12h4m10 0h4M5.6 5.6l2.8 2.8m7.2 7.2 2.8 2.8m0-12.8-2.8 2.8M8.4 15.6l-2.8 2.8' }),
   )
 }

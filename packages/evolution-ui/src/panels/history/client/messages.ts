@@ -12,8 +12,8 @@ export const NS = 'evolution-skill-history'
 
 /** Chinese dictionary. */
 export const zh: Record<string, string> = {
-  'entry.label': '技能历史',
-  title: '技能历史',
+  'entry.label': '技能自动进化',
+  title: '技能自动进化',
   bodyTitle: '正文版本',
   'workbench.title': '自进化',
   'workbench.history': '技能历史',
@@ -113,8 +113,8 @@ export const zh: Record<string, string> = {
 
 /** English dictionary: the same keys, or the panel falls back to the key itself. */
 export const en: Record<string, string> = {
-  'entry.label': 'Skill history',
-  title: 'Skill history',
+  'entry.label': 'Skill auto-evolution',
+  title: 'Skill auto-evolution',
   bodyTitle: 'Body versions',
   'workbench.title': 'Self-evolution',
   'workbench.history': 'Skill history',
