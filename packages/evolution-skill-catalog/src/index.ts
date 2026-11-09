@@ -99,7 +99,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // G2 S1 (contract C2): this consumer only reads, so it prefers the platform backend when the
   // deployment mounts the node backend (evolution-io-node) and otherwise falls back to the registry default.
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-  const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rawConfig, io, mutationLock: mutationLockFrom(ctx) })
+  const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rawConfig, io, ...(mutationLockFrom(ctx) === undefined ? {} : { mutationLock: mutationLockFrom(ctx)! }) })
   const included = new Set(rawConfig.includeSkillNames ?? [])
   const excluded = new Set(rawConfig.excludeSkillNames ?? [])
   const visible = (name: string) => (included.size === 0 || included.has(name)) && !excluded.has(name)

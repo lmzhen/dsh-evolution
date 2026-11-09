@@ -44,6 +44,8 @@ export interface ParamCardFace {
   /** Structured write result; when present the card distinguishes acceptance from readback. */
   saveOnce?: (ops: readonly SettingsParamOp[]) => Promise<SettingsSaveResult>
   clear: (field: string) => Promise<boolean>
+  /** Retry the section read after a transport failure. */
+  retry?: (() => void) | undefined
   hooks: { paramSection: ParamSectionSource }
 }
 
@@ -365,7 +367,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     if (snapshot.reason === 'transport') {
       return createElement('div', { className: 'evolution-param-note', role: 'status' },
         createElement('p', null, t('unavailable')),
-        createElement('button', { type: 'button', onClick: () => props.hooks.paramSection.revive() }, t('approvalRetry')))
+        createElement('button', { type: 'button', onClick: () => { (props as unknown as { retry?: () => void }).retry?.() } }, t('approvalRetry')))
     }
     const key: MessageKey = snapshot.reason === 'seat-missing'
       ? 'seatMissing'

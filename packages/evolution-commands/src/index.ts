@@ -875,7 +875,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // disagree with the scan it previews.
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：维护事实不可用。')
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider(), mutationLock: mutationLockFrom(ctx) })
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider(), ...(mutationLockFrom(ctx) === undefined ? {} : { mutationLock: mutationLockFrom(ctx)! }) })
           const enrichment = await buildEnrichment(ctx, library)
           const readFailures: string[] = []
           const snapshots = await snapshotFromLibrary(library, {
@@ -1008,7 +1008,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // could never fire first).
           void (async (): Promise<void> => {
             try {
-              const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider(), mutationLock: mutationLockFrom(ctx) })
+              const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root: skillsRootValue }, io: ioRegistry.provider(), ...(mutationLockFrom(ctx) === undefined ? {} : { mutationLock: mutationLockFrom(ctx)! }) })
               const enrichment = await buildEnrichment(ctx, library)
               const outcome = await runMaintain(
                 {
@@ -1477,7 +1477,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             if (proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) return err('该 proposal 未覆盖 owner（owner-gap），不能应用。')
             target = proposal.owner.name
             heading = proposal.parts[0]?.heading ?? ''
-            proposalOutcome = proposal.outcome
+            proposalOutcome = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : undefined
             extractItems = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: target }))
           } else {
             if (source === '' || target === '' || heading === '') {

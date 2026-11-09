@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import type { MutationOwner } from '@deepseek-ai/dsh-evolution-contract'
 import { HomeFence, HomeFenceError } from './home-fence.ts'
 import { LeaseStore, type LeaseToken } from './lease-store.ts'
@@ -7,7 +6,6 @@ import {
   MutationUnit,
   type MutationLockPort,
   type MutationLimits,
-  type MutationLockPort,
   type MutationResult,
   type MutationSnapshotPort,
   type MutationUnitContext,

@@ -124,10 +124,11 @@ export function apply(ctx: ClientContext): void {
       mutateOnce,
       saveOnce,
       clear,
+      retry: () => source.revive(),
       hooks: { paramSection: source },
     }
   })
-  const section = (): ReactNode => createElement(EvolutionSettingsTab, { cards })
+  const section = (): ReactNode => createElement(EvolutionSettingsTab, { cards, t })
   seam.slots.inject('settings.section', function* () {
     yield seam.slots.register({
       name: 'settings.section',
@@ -146,10 +147,10 @@ export function apply(ctx: ClientContext): void {
 }
 
 /** One family settings page: every parameter card lives inside it. */
-function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[] }): ReactNode {
+function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[]; readonly t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string }): ReactNode {
   return createElement('div', { className: 'evolution-settings-tab' },
     ...groupParamCards(props.cards).flatMap(({ group, items }) => [
-      createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, t(('group.' + group) as MessageKey)),
+      createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, props.t(('group.' + group) as MessageKey)),
       ...items.map((face, index) => createElement(PluginParamCard, { key: face.namespace + ':' + String(index), ...face })),
     ]),
   )

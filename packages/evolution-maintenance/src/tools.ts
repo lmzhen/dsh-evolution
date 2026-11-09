@@ -94,7 +94,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const target = args.target
           const ioRegistry = ctx.get('evolutionIo') as { provider(): EvolutionIoLike } | undefined
           if (!ioRegistry) return { signal, detail: ['evolution-io registry not mounted'], ...(target ? { target } : {}) }
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rootConfig, io: ioRegistry.provider(), mutationLock: mutationLockFrom(ctx) })
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rootConfig, io: ioRegistry.provider(), ...(mutationLockFrom(ctx) === undefined ? {} : { mutationLock: mutationLockFrom(ctx)! }) })
           // 0.3.9: build snapshots through the SAME enrichment the scan uses
           // (descriptions/supportFiles/quality) — previously the probe fed
           // body-only snapshots and answered "description=missing" while the

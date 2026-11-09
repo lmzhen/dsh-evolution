@@ -395,6 +395,8 @@ interface SkillWriteArgs {
   owner_covers?: boolean
   /** extract plan only; no write. */
   dry_run?: boolean
+  /** Apply a persisted extract proposal by id. */
+  proposal_id?: string
   /** v23 (AP-3): stage-time content hash of the target skill, attached to
    * update/edit stagings so the replay can refuse a stale full-content
    * overwrite (memory carries old_text for the same purpose). Absent on
@@ -968,10 +970,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const proposal = await readProposalReport(io, args.proposal_id)
           if (proposal === null) result = { ok: false, message: '找不到 extract proposal：' + args.proposal_id }
           else if (proposal.outcome === 'keep') result = { ok: false, message: '该 proposal 的结论是 keep，没有可应用提取。' }
-          else if (proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) result = { ok: false, message: '该 proposal 未覆盖 owner（owner-gap），不能应用。' }
+          else if (proposal.outcome === 'owner-gap' || proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) result = { ok: false, message: '该 proposal 未覆盖 owner（owner-gap），不能应用。' }
           else {
             source = proposal.source
-            outcome = proposal.outcome
+            outcome = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : undefined
             ownerCovers = undefined
             items = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: proposal.owner.name! }))
           }
