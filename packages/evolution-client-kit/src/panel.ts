@@ -4,7 +4,7 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
-import type { ClientSeam } from './seam.ts'
+import type { ClientSeam, LocaleDictionaries } from './seam.ts'
 import type { SupportedLocale } from './generated/i18n.generated.ts'
 
 /** Dictionary lookup used by the panel body and row label. */
@@ -20,7 +20,7 @@ export interface SidebarPanelSpec<Face> {
   order: number
   /** Locale namespace owned by this panel. */
   namespace: string
-  dictionaries: Record<SupportedLocale, Record<string, string>>
+  dictionaries: LocaleDictionaries
   /** Fallback dictionary when the locale seat refuses or is absent. */
   fallback?: SupportedLocale
   /** Panel stylesheet and the tag id that makes injection idempotent. */

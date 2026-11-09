@@ -9,6 +9,9 @@
 import type { ReactNode } from 'react'
 import type { SupportedLocale } from './generated/i18n.generated.ts'
 
+/** The dictionaries a family panel registers; English is always present. */
+export type LocaleDictionaries = Partial<Record<SupportedLocale, Record<string, string>>> & { en: Record<string, string> }
+
 /** Registration options for the global sidebar row. */
 export interface PanelRowOptions {
   name: 'sidebar.panellist'
@@ -28,7 +31,7 @@ export interface PanelBodyOptions {
 
 /** The locale seat: one namespace registration and a bound translator. */
 export interface LocaleSeat {
-  register(namespace: string, dictionaries: Record<SupportedLocale, Record<string, string>>): () => void
+  register(namespace: string, dictionaries: LocaleDictionaries): () => void
   bind(namespace: string): (key: string) => string
 }
 
