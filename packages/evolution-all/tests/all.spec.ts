@@ -47,7 +47,8 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
     '@deepseek-ai/dsh-tool-session-query',
   ]
   for (const dep of expected) {
-    expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe('workspace:^')
+    // tool-session-query is a released platform package, not a family workspace.
+    expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe(dep === '@deepseek-ai/dsh-tool-session-query' ? '^0.2.2-rc.0' : 'workspace:^')
   }
   expect(Object.keys(manifest.dependencies).sort()).toEqual([...expected].sort())
   expect(manifest.peerDependencies?.['@deepseek-ai/dsh-tool-session-query']).toBe('^0.2.2-rc.0')
