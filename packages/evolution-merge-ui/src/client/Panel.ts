@@ -185,7 +185,9 @@ export function MergePanel(face: MergeFace): ReactNode {
     })()
   }
   const doctorCommand = face.doctorCommand ?? DOCTOR_COMMAND
-  useEffect(() => { store.start(); return () => { store.dispose() } }, [store])
+  // The store is owned by the client apply effect; unmount must not dispose it,
+  // or a later remount would keep a permanently disposed store.
+  useEffect(() => { store.start() }, [store])
   useEffect(() => {
     const onFocus = (): void => { store.refresh() }
     const onVisibility = (): void => { if (document.visibilityState === 'visible') store.refresh() }
