@@ -6,7 +6,6 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { FALLBACK_LOCALE } from './panel.ts'
 import type { LocaleDictionaries } from './seam.ts'
-import type { SupportedLocale } from './generated/i18n.generated.ts'
 import type { ReactNode } from 'react'
 
 /** One feature view contribution. */
