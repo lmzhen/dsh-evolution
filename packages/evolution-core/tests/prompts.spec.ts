@@ -1,6 +1,6 @@
 // @tier fast
 import { expect, it } from 'vitest'
-import { COMBINED_REVIEW_PROMPT, COMBINED_REVIEW_PLAN_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PLAN_PROMPT, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { COMBINED_REVIEW_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 
 it('verifyPromptBundle accepts the canonical bundle', () => {
   expect(verifyPromptBundle(PROMPT_BUNDLE)).toBe(true)
@@ -51,8 +51,6 @@ it('combined review prompt mirrors the same neutral decision structure', () => {
 it('keeps no-op delivery out of the shared decision body', () => {
   expect(SKILL_REVIEW_PROMPT).toContain('If nothing durable exists, say "Nothing to save." and stop.')
   expect(COMPLETION_SKILL_REVIEW_PROMPT).toContain('If nothing durable exists, say "Nothing to save." and stop.')
-  expect(SKILL_REVIEW_PLAN_PROMPT).not.toContain('Nothing to save.')
-  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('return the plan with an empty items list')
   expect(COMBINED_REVIEW_PROMPT).toContain('Nothing to save (memory)')
   expect(COMBINED_REVIEW_PROMPT).toContain('continue to the Skills pass')
   expect(COMBINED_REVIEW_PROMPT).toContain('If nothing durable exists in either pass')
@@ -125,26 +123,16 @@ it('maintain persona v14 carries the guidance clauses pinned by the prompt loops
   expect(MAINTAIN_PROMPT).not.toContain('（中文）')
 })
 
-it('channel variants carry the subagent deliverable limit (M-2)', () => {
-  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('CHANNEL (subagent)')
-  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('never narrate actions you took')
-  expect(COMBINED_REVIEW_PLAN_PROMPT).toContain('CHANNEL (subagent)')
-  // The whole policy survives in the plan variant (it is a superset).
-  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('A precise no-op is a valid outcome')
-  expect(reviewPrompt('skill', 'plan')).toBe(SKILL_REVIEW_PLAN_PROMPT)
-  expect(reviewPrompt('skill', 'agent')).toBe(SKILL_REVIEW_PROMPT)
-  expect(reviewPrompt('combined', 'agent')).toBe(COMBINED_REVIEW_PROMPT)
-  expect(reviewPrompt('combined', 'plan')).toBe(COMBINED_REVIEW_PLAN_PROMPT)
-  // Both variants are covered by the bundle digest.
-  expect(PROMPT_BUNDLE.prompts['skillPlan']).toBe(SKILL_REVIEW_PLAN_PROMPT)
-  expect(PROMPT_BUNDLE.prompts['combinedPlan']).toBe(COMBINED_REVIEW_PLAN_PROMPT)
+it('reviewPrompt maps each kind to the agent prompt', () => {
+  expect(reviewPrompt('memory')).toBe(MEMORY_REVIEW_PROMPT)
+  expect(reviewPrompt('skill')).toBe(SKILL_REVIEW_PROMPT)
+  expect(reviewPrompt('combined')).toBe(COMBINED_REVIEW_PROMPT)
 })
 
 it('skill review keeps read-before-write and the create exemption neutral', () => {
   expect(SKILL_REVIEW_PROMPT).toContain('Update only skills you loaded or read in this review pass')
   expect(SKILL_REVIEW_PROMPT).toContain('creating a new class-level skill is the exception')
   expect(COMBINED_REVIEW_PROMPT).toContain('Update only skills you loaded or read in this review pass')
-  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('Update only skills you loaded or read in this review pass')
 })
 
 it('authoring standards carry the colon-quote and privacy motive guarantees', () => {

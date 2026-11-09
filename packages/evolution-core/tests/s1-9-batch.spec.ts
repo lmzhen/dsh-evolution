@@ -6,7 +6,6 @@ import {
   latestActivityAt,
   nodeEvolutionIo,
   observeEvent,
-  reviewPrompt,
   scanThreats,
   SkillLibrary,
   yamlPlainScalarNeedsQuotes,
@@ -39,12 +38,6 @@ describe('0.3.16 S1.9 batch (E-42..E-50)', () => {
     expect(yamlPlainScalarNeedsQuotes('null')).toBe(true)
     expect(yamlPlainScalarNeedsQuotes('value:')).toBe(true)
     expect(yamlPlainScalarNeedsQuotes('plain text')).toBe(false)
-  })
-
-  it('E-48: memory+plan review prompt is the combined plan prompt, not the agent one', () => {
-    const plan = reviewPrompt('memory', 'plan')
-    const combined = reviewPrompt('combined', 'plan')
-    expect(plan).toBe(combined)
   })
 
   it('E-49: a malformed user/message content does not break the signal pipeline', () => {

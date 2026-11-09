@@ -263,23 +263,7 @@ export const SKILLS_GUIDANCE = `Skills guidance:
 • After completing a complex task (5+ tool calls), fixing a tricky error, or discovering a non-trivial workflow, save the approach as a skill with skill_manage so you can reuse it next time.
 • When using a skill and finding it outdated, incomplete, or wrong, patch it immediately with skill_manage (action='patch') — don't wait to be asked. Skills that aren't maintained become liabilities.`
 
-const PLAN_CHANNEL_NOTE = `
-
-CHANNEL (subagent): this review channel mounts only the read-only \`skill\` tool — you have NO \`skill_manage\`, NO \`memory\`. Your deliverable is the structured JSON plan below (outputSchema). Describe the patches/creates you RECOMMEND in the plan; never narrate actions you took. When there is nothing durable to change, return the plan with an empty items list; do not answer with prose.`
-
-/** Subagent-channel variant: same review policy, channel-limited deliverable (M-2). */
-export const SKILL_REVIEW_PLAN_PROMPT = `[Auto-review — Skills]
-${SKILL_REVIEW_BODY}${PLAN_CHANNEL_NOTE}`
-
-/** Subagent-channel variant of the combined review (M-2). */
-export const COMBINED_REVIEW_PLAN_PROMPT = `${COMBINED_REVIEW_BODY}${PLAN_CHANNEL_NOTE}`
-
-export function reviewPrompt(kind: 'memory' | 'skill' | 'combined', channel: 'agent' | 'plan' = 'agent'): string {
-  // 0.3.16 (E-48): kind==='memory' + channel==='plan' used to fall through to
-  // MEMORY_REVIEW_PROMPT (the agent-channel prompt whose guidance tells the
-  // model to use the memory TOOL) while the plan channel has no memory tool —
-  // a silent wrong-channel contract. The plan channel is never memory-only.
-  if (channel === 'plan') return kind === 'skill' ? SKILL_REVIEW_PLAN_PROMPT : COMBINED_REVIEW_PLAN_PROMPT
+export function reviewPrompt(kind: 'memory' | 'skill' | 'combined'): string {
   if (kind === 'memory') return MEMORY_REVIEW_PROMPT
   if (kind === 'skill') return SKILL_REVIEW_PROMPT
   return COMBINED_REVIEW_PROMPT
@@ -314,8 +298,6 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
   memory: MEMORY_REVIEW_PROMPT,
   skill: SKILL_REVIEW_PROMPT,
   combined: COMBINED_REVIEW_PROMPT,
-  skillPlan: SKILL_REVIEW_PLAN_PROMPT,
-  combinedPlan: COMBINED_REVIEW_PLAN_PROMPT,
   curator: CURATOR_PROMPT,
   // v46 S1.12b (finding T3-07): the curator's dry-run banner rides the bundle too. It is prepended
   // to the curator prompt at run time and used to live outside the digest, so a drifted banner was
