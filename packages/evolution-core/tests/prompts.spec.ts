@@ -1,6 +1,6 @@
 // @tier fast
 import { expect, it } from 'vitest'
-import { AUX_COMBINED_REVIEW_PROMPT, AUX_MEMORY_REVIEW_PROMPT, COMBINED_REVIEW_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
+import { COMBINED_REVIEW_PROMPT, COMPLETION_SKILL_REVIEW_PROMPT, CURATOR_DRY_RUN_BANNER, CURATOR_PROMPT, DSH_AUTHORING_STANDARDS, MAINTAIN_PROMPT, MEMORY_REVIEW_PROMPT, PROMPT_BUNDLE, PROMPT_BUNDLE_VERSION, SKILL_REVIEW_PROMPT, SKILLS_GUIDANCE, reviewPrompt, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 
 it('verifyPromptBundle accepts the canonical bundle', () => {
   expect(verifyPromptBundle(PROMPT_BUNDLE)).toBe(true)
@@ -127,17 +127,14 @@ it('maintain persona v14 carries the guidance clauses pinned by the prompt loops
   expect(MAINTAIN_PROMPT).not.toContain('（中文）')
 })
 
-it('reviewPrompt separates inject and background prompts', () => {
+it('reviewPrompt keeps inject kind-specific and includes memory in background skill reviews', () => {
   expect(reviewPrompt('memory')).toBe(MEMORY_REVIEW_PROMPT)
   expect(reviewPrompt('skill')).toBe(SKILL_REVIEW_PROMPT)
   expect(reviewPrompt('combined')).toBe(COMBINED_REVIEW_PROMPT)
-  expect(reviewPrompt('memory', 'aux')).toBe(AUX_MEMORY_REVIEW_PROMPT)
-  expect(reviewPrompt('skill', 'aux')).toBe(AUX_COMBINED_REVIEW_PROMPT)
-  expect(reviewPrompt('combined', 'aux')).toBe(AUX_COMBINED_REVIEW_PROMPT)
-  expect(AUX_COMBINED_REVIEW_PROMPT).toContain('## Memory')
-  expect(AUX_COMBINED_REVIEW_PROMPT).toContain('background review')
-  expect(PROMPT_BUNDLE.prompts['auxMemory']).toBe(AUX_MEMORY_REVIEW_PROMPT)
-  expect(PROMPT_BUNDLE.prompts['auxCombined']).toBe(AUX_COMBINED_REVIEW_PROMPT)
+  expect(reviewPrompt('memory', 'aux')).toBe(MEMORY_REVIEW_PROMPT)
+  expect(reviewPrompt('skill', 'aux')).toBe(COMBINED_REVIEW_PROMPT)
+  expect(reviewPrompt('combined', 'aux')).toBe(COMBINED_REVIEW_PROMPT)
+  expect(COMBINED_REVIEW_PROMPT).toContain('## Memory')
 })
 
 it('skill review keeps read-before-write and the create exemption neutral', () => {
