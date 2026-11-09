@@ -48,9 +48,21 @@
       "types": "./lib/types/generated/i18n.generated.d.ts",
       "default": "./lib/generated/i18n.generated.js"
     },
-    "./generated/i18n/*": {
-      "types": "./lib/types/generated/i18n/*.d.ts",
-      "default": "./lib/generated/i18n/*.js"
+    "./generated/i18n/evolution-settings": {
+      "types": "./lib/types/generated/i18n/evolution-settings.d.ts",
+      "default": "./lib/generated/i18n/evolution-settings.js"
+    },
+    "./generated/i18n/evolution-skill-history": {
+      "types": "./lib/types/generated/i18n/evolution-skill-history.d.ts",
+      "default": "./lib/generated/i18n/evolution-skill-history.js"
+    },
+    "./generated/i18n/evolution-merge": {
+      "types": "./lib/types/generated/i18n/evolution-merge.d.ts",
+      "default": "./lib/generated/i18n/evolution-merge.js"
+    },
+    "./generated/i18n/evolution-skill-health": {
+      "types": "./lib/types/generated/i18n/evolution-skill-health.d.ts",
+      "default": "./lib/generated/i18n/evolution-skill-health.js"
     }
   },
   "files": [
