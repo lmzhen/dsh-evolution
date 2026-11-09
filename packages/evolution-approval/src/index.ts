@@ -504,7 +504,8 @@ export class EvolutionApproval extends Service {
     // P2-22: the TTL is a gate on EVERY decision, not only on list(). A caller
     // holding an id must not execute a record the window already closed.
     await this.expireStale()
-    return await this.dedupe(`approve:${id}`, () => this.doApprove(id, audit))
+    const result = await this.withApprovalLease(id, () => this.dedupe(`approve:${id}`, () => this.doApprove(id, audit)))
+    return result ?? { ok: false, message: '待批准写入「' + id + '」正在被另一个批准/过期进程处理：lease 被占用。' }
   }
 
   /** S2-P2-22 (0.3.80): return an ORPHANED executing record to the pending
@@ -582,7 +583,7 @@ export class EvolutionApproval extends Service {
   }
 
   async reject(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }> {
-    return await this.dedupe(`reject:${id}`, async () => {
+    const result = await this.withApprovalLease(id, () => this.dedupe(`reject:${id}`, async () => {
       // Reject claims the record like approve does, so a pending write resolves
       // on a single gate (F-204). The executing-rescue branch below does NOT
       // hold a claim: an 'executing' record may be an approve runner still in
@@ -627,7 +628,8 @@ export class EvolutionApproval extends Service {
       }
       await this.recordDecision(resolution.record, audit)
       return { ok: true, message: `已拒绝 ${resolution.record.kind} 写入「${id}」。` }
-    })
+    }))
+    return result ?? { ok: false, message: '待批准写入「' + id + '」正在被另一个批准/过期进程处理：lease 被占用。' }
   }
 
   /**
