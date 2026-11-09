@@ -68,16 +68,6 @@ describe('MutationAuthority', () => {
     await leases.release(acquired.token)
   })
 
-  it('runs a control-plane transact under a short system lease', async () => {
-    const home = await root()
-    const io = nodeEvolutionIo()
-    const authority = new MutationAuthority({ io, home, leases: new LeaseStore({ io, home }) })
-    const path = join(home, 'state', 'review.json')
-    await io.writeText(path, 'before')
-    await authority.transactSystem(path, current => current === 'before' ? 'after' : current)
-    expect(await readFile(path, 'utf8')).toBe('after')
-  })
-
   it('blocks recovery while the run lease is active, then recovers after release', async () => {
     const home = await root()
     const io = nodeEvolutionIo()

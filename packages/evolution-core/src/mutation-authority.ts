@@ -119,18 +119,6 @@ export class MutationAuthority {
     }
   }
 
-  /** Control-plane single-file write: short-lived system lease + HomeFence, no unit snapshot. */
-  async transactSystem(path: string, task: (current: string | null) => Promise<string | null> | string | null): Promise<void> {
-    const runId = 'system-' + randomUUID()
-    const acquired = await this.leases.acquire('foreground', runId, 15_000)
-    if (!acquired.ok) throw new MutationAuthorityError('lease-missing', 'could not acquire system lease for ' + path)
-    try {
-      await this.transact(path, task, { owner: 'foreground', runId, lease: acquired.token })
-    } finally {
-      await this.leases.release(acquired.token)
-    }
-  }
-
   async recover(options: { readonly snapshots: MutationSnapshotPort; readonly limits: MutationLimits }): Promise<RecoveryReport> {
     return await this.fence.run(async () => {
       const unit = new MutationUnit({ io: this.io, snapshots: options.snapshots, limits: options.limits, lock: passiveLock, serial: identitySerial })
