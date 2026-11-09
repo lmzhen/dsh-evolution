@@ -221,6 +221,7 @@ export async function appendEvolutionEvent(
   path: string,
   event: EvolutionEventInput,
   rotateAt = EVENT_LOG_ROTATE_AT,
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> },
 ): Promise<number> {
   // I-5 (v18): refuse an unfoldable record at the durable write boundary.
   const issue = evolutionEventPayloadIssue(event)
@@ -234,7 +235,8 @@ export async function appendEvolutionEvent(
   // C-06 (v10 audit): the shape parse below is REUSED for the event list via
   // v1EventRecords — the body used to be JSON.parsed twice per append.
   let parsedBody: { version?: unknown; events?: unknown } | null = null
-  await transactIo(io, path, async (current) => {
+  const write = async (): Promise<void> => {
+    await transactIo(io, path, async (current) => {
     // A10 (audit P2-14): the lock layer is contractually allowed to re-invoke
     // this task whole (a LostWriteLock converts into a full read-modify-write
     // retry). Closure state captured during a PREVIOUS attempt must reset
@@ -289,8 +291,11 @@ export async function appendEvolutionEvent(
     }
     const record: EvolutionEvent = { ...(event as Omit<EvolutionEvent, 'seq' | 'at'>), seq: maxSeq + 1, at: new Date().toISOString() }
     assigned = record.seq
-    return JSON.stringify({ version: EVENT_LOG_VERSION, events: [...events, record] }, null, 2)
-  })
+      return JSON.stringify({ version: EVENT_LOG_VERSION, events: [...events, record] }, null, 2)
+    })
+  }
+  if (fence !== undefined) await fence.run(write)
+  else await write()
   if (assigned === 0) {
     throw new Error(`${refuseMessage || 'evolution event log is malformed and was not touched'}: ${path}`)
   }

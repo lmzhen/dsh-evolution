@@ -1513,7 +1513,7 @@ export class SkillLibrary {
         supportFiles,
         restructureRounds: 0,
         source,
-      })
+      }, undefined, this.fence)
     } catch (error) {
       console.warn('skill-store: hard-cap event not recorded for "' + name + '": ' + (error instanceof Error ? error.message : String(error)))
     }
