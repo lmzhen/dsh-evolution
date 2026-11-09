@@ -1,13 +1,13 @@
 {
-  "note": "W10/W11 candidate readings for v0.39.1. S1-S3 surfaces are unchanged from the v0.38.0 lab readings; S4 was last rerun on the 0.39.0 overlay (s4-hmr-double-apply.spec.ts 2/2); this release changes only the settings/history client surface.",
-  "familyVersion": "0.39.1",
+  "note": "W10/W11 candidate readings for v0.39.2. S1-S3 surfaces are unchanged from the v0.38.0 lab readings; S4 was last rerun on the 0.39.0 overlay; v0.39.2 changes review prompts and the settings/history client surface only.",
+  "familyVersion": "0.39.2",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.39.1",
+      "familyVersion": "0.39.2",
       "startedAt": "2026-11-07T21:32:00.000Z",
       "readings": {
         "skillHistoryRows": 12,
@@ -22,7 +22,7 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.39.1",
+      "familyVersion": "0.39.2",
       "startedAt": "2026-11-07T21:32:00.000Z",
       "readings": {
         "ownerDiagnostics": 200,
@@ -36,11 +36,11 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.39.1",
+      "familyVersion": "0.39.2",
       "startedAt": "2026-11-07T21:32:00.000Z",
       "readings": {
         "semverVersion": "0.2.2-rc.1",
-        "familyVersion": "0.39.1",
+        "familyVersion": "0.39.2",
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
@@ -52,13 +52,13 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.39.1",
+      "familyVersion": "0.39.2",
       "startedAt": "2026-11-08T18:20:00.000Z",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
         "repeatedPrepareIdempotent": true,
-        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.39.1 overlay tree (2026-11-08T18:20Z)"
+        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.39.2 overlay tree (2026-11-08T18:20Z)"
       }
     }
   ],
