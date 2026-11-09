@@ -74,6 +74,26 @@ describe('MutationUnit executor', () => {
     expect([...snapshots.items.values()][0]).toMatchObject({ owner: 'background_review', runId: 'review-1', leaseId: 'lease-1', state: 'committed' })
   })
 
+  it('acquires and releases an optional target claim around the write', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    let acquired = 0
+    let released = 0
+    const unitWithClaim = new MutationUnit({ io, limits: LIMITS, claimRunId: 'run-1', claim: { async acquire(target, runId) { acquired += 1; expect(target).toBe('source'); expect(runId).toBe('run-1'); return { async release() { released += 1 } } } } })
+    const result = await unitWithClaim.apply(request())
+    expect(result.ok).toBe(true)
+    expect(acquired).toBe(1)
+    expect(released).toBe(1)
+  })
+
+  it('refuses the write when the target claim cannot be acquired', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    const unitWithClaim = new MutationUnit({ io, limits: LIMITS, claimRunId: 'run-1', claim: { async acquire() { throw new Error('claim busy') } } })
+    const result = await unitWithClaim.apply(request())
+    expect(result.ok).toBe(false)
+    expect(result.errors[0]?.code).toBe('claim-failed')
+    expect(io.files.get('source/SKILL.md')).toBe('old')
+  })
+
   it('keeps a committed-only write as success with a warning', async () => {
     const io = new CommittedWarningIo(); io.files.set('source/SKILL.md', 'old')
     const result = await unit(io).apply(request())

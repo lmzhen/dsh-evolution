@@ -73,12 +73,8 @@ export interface UnitBackend {
   restoreSource(name: string, body: string): Promise<void>;
   restoreSupportFile?(name: string, path: string, content: string | null): Promise<void>;
 }
-export interface UnitClaim {
-  release(): Promise<void>;
-}
-export interface UnitClaimPort {
-  acquire(target: string, runId: string): Promise<UnitClaim>;
-}
+export type { UnitClaim, UnitClaimPort } from './unit-claim.ts'
+import type { UnitClaim, UnitClaimPort } from './unit-claim.ts'
 export interface UnitTransactionOptions {
   readonly io: EvolutionIoLike;
   readonly home: string;

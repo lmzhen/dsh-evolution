@@ -2,6 +2,7 @@ import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isCommittedWarning, isProcessAlive, type transactIo } from './io.ts'
 import { WriteKernel } from './write-kernel.ts'
+import type { UnitClaimPort } from './unit-claim.ts'
 import type { MutationOwner } from '@deepseek-ai/dsh-evolution-contract'
 
 export interface MutationRoot {
@@ -208,6 +209,9 @@ export interface MutationUnitOptions {
   lock?: MutationLockPort
   journal?: MutationJournalPort
   snapshots?: MutationSnapshotPort
+  /** Optional merge target claim, acquired after the fence and released in finally. */
+  claim?: UnitClaimPort
+  claimRunId?: string
   hooks?: MutationUnitHooks
   context?: MutationUnitContext
   validateWrite?: (op: TreeChangeOp) => string | null
@@ -249,6 +253,8 @@ export class MutationUnit {
   private readonly lock: MutationLockPort
   private readonly journal: MutationJournalPort | undefined
   private readonly snapshots: MutationSnapshotPort | undefined
+  private readonly claim: UnitClaimPort | undefined
+  private readonly claimRunId: string | undefined
   private readonly hooks: MutationUnitHooks | undefined
   private readonly context: MutationUnitContext | undefined
   private readonly validateWrite: ((op: TreeChangeOp) => string | null) | undefined
@@ -263,6 +269,8 @@ export class MutationUnit {
     this.lock = options.lock ?? noLock
     this.journal = options.journal
     this.snapshots = options.snapshots
+    this.claim = options.claim
+    this.claimRunId = options.claimRunId
     this.hooks = options.hooks
     this.context = options.context
     this.validateWrite = options.validateWrite
@@ -295,6 +303,15 @@ export class MutationUnit {
         lease = await this.lock.acquire()
       } catch (error) {
         return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'lock-failed', message: error instanceof Error ? error.message : String(error) }] }
+      }
+      let claim: { release(): Promise<void> } | undefined
+      if (this.claim !== undefined) {
+        try {
+          claim = await this.claim.acquire(primary, this.claimRunId ?? this.context?.runId ?? '')
+        } catch (error) {
+          await lease.release()
+          return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'claim-failed', message: error instanceof Error ? error.message : String(error) }] }
+        }
       }
       const changed: string[] = []
       const warnings: string[] = []
@@ -386,6 +403,7 @@ export class MutationUnit {
         }
         return { ok: false, unitId, dryRun: false, changed, errors: [{ code: 'write-failed', message: detail }] }
       } finally {
+        await claim?.release().catch(() => {})
         await lease.release()
       }
     })
