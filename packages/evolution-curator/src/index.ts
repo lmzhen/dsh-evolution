@@ -1955,12 +1955,16 @@ export class EvolutionCurator extends Service {
    * each report name is unique per runId.
    */
   private async retainReports(keep = 20, errorKeep = 10): Promise<void> {
-    await transactIo(this.io, reportsSweepLockTarget(), async () => {
-      await this.sweepReports(keep, errorKeep)
-      // The lock target itself is never written — the task exists to hold the
-      // lock across the sweep, and `null` leaves the target absent.
-      return null
-    })
+    const sweep = async (): Promise<void> => {
+      await transactIo(this.io, reportsSweepLockTarget(), async () => {
+        await this.sweepReports(keep, errorKeep)
+        // The lock target itself is never written — the task exists to hold the
+        // lock across the sweep, and `null` leaves the target absent.
+        return null
+      })
+    }
+    if (this.homeFence !== undefined) await this.homeFence.run(sweep)
+    else await sweep()
   }
 
   /** The sweep `retainReports` holds the per-home lock for. A caller MUST hold
