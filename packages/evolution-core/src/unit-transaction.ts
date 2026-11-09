@@ -92,6 +92,8 @@ export interface UnitTransactionOptions {
   readonly onLock?: (lock: "tree" | "claim") => void;
   /** One home fence owned by authority; when set, UnitTransactions must not acquire tree-lock itself. */
   readonly fence?: HomeFence;
+  /** Optional run liveness gate: false means the run is terminal and must not commit. */
+  readonly isActive?: (runId: string) => boolean | Promise<boolean>;
 }
 export type UnitErrorCode =
   | "unit-plan-missing"
@@ -101,6 +103,7 @@ export type UnitErrorCode =
   | "unit-commit-failed"
   | "unit-claim-failed"
   | "unit-fence-failed"
+  | "unit-run-inactive"
   | "unit-rollback-blocked"
   | "target-changed"
   | "source-changed"
@@ -267,6 +270,9 @@ export class UnitTransactions implements UnitTransaction {
       };
     if (options?.signal?.aborted === true)
       return { ok: false as const, code: "unit-commit-failed" as const, message: "cancelled before commit" };
+    if (this.options.isActive !== undefined && !(await this.options.isActive(stored.plan.runId))) {
+      return { ok: false as const, code: "unit-run-inactive" as const, message: "run is no longer active; refusing to commit" };
+    }
     const journalBase = {
       schemaVersion: 1 as const,
       unitId: prepared.unitId,

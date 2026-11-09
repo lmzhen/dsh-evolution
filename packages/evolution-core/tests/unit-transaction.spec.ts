@@ -47,6 +47,18 @@ it('commits under a supplied HomeFence without taking tree-lock itself', async (
   expect(tree.get('alpha')).toBe('new')
 })
 
+it('refuses commit when the run is no longer active', async () => {
+  const home = await tempRoot('dsh-unit-tx-inactive-')
+  const io = nodeEvolutionIo()
+  const tree = new Map<string, string>([['alpha', 'old'], ['beta', 'beta']])
+  const tx = new UnitTransactions({ io, home, backend: backend(tree), claim: { async acquire() { return { async release() {} } } }, now: () => 1, isActive: () => false })
+  const prepared = await tx.prepare(plan())
+  if (!prepared.ok) throw new Error(prepared.message)
+  const committed = await tx.commit(prepared.prepared)
+  expect(committed).toMatchObject({ ok: false, code: 'unit-run-inactive' })
+  expect(tree.get('alpha')).toBe('old')
+})
+
 it('prepares, commits and returns stored evidence', async () => {
   const home = await tempRoot('dsh-unit-tx-')
   const io = nodeEvolutionIo()
