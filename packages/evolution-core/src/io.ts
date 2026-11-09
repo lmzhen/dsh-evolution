@@ -525,7 +525,7 @@ export function nodeEvolutionIo(): EvolutionIoLike {
       })
     },
     async remove(path) {
-      await rm(path, { recursive: true, force: true })
+      await inProcessWrite(path, async () => { await rm(path, { recursive: true, force: true }) })
     },
     async list(path) {
       // "Missing" reads as empty; any other failure (EACCES/EIO) surfaces so a

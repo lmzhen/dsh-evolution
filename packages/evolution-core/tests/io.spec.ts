@@ -45,6 +45,32 @@ it('nodeEvolutionIo.writeText commits one complete payload per concurrent writer
   expect(content).toMatch(/^writer-\d$/m)
 })
 
+it('nodeEvolutionIo.remove is serialized with an in-flight transact on the same path', async () => {
+  const root = await tempRoot('dsh-io-remove-queue-')
+  const io = nodeEvolutionIo()
+  const target = join(root, 'queued.txt')
+  await io.writeText(target, 'old')
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const transact = io.transact
+  if (transact === undefined) throw new Error('node IO must implement transact')
+  let seen: string | null | undefined
+  let entered!: () => void
+  const enteredGate = new Promise<void>(resolve => { entered = resolve })
+  const writing = transact(target, async (current) => {
+    seen = current
+    entered()
+    await gate
+    return 'new'
+  })
+  await enteredGate
+  const removing = io.remove(target)
+  release()
+  await Promise.all([writing, removing])
+  expect(seen).toBe('old')
+  expect(await io.exists(target)).toBe(false)
+})
+
 // v32 TEST-03: the commit-point ownership guard. A foreign claim landing on
 // the commit point and the whole RMW must be REDONE — this is the load-independent
 // invariant that keeps concurrent writes loss-free (the class that broke as
