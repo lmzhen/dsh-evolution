@@ -38,6 +38,12 @@ export type PendingKind = 'memory' | 'skill' | 'capability'
 /** Legal status of one pending write. */
 export type PendingStatus = 'pending' | 'executing' | 'approved' | 'rejected'
 
+/** Terminal outcome of one review/merge/curator run; audit and UI must use this vocabulary. */
+export type RunOutcome = 'applied' | 'staged' | 'partial' | 'no-op' | 'degraded' | 'aborted' | 'failed'
+
+/** Who owns a durable mutation; foreground user work and background review are distinct authorities. */
+export type MutationOwner = 'foreground' | 'background_review'
+
 /** Per-session review counters. */
 export interface ReviewStateRecord {
   turnsSinceMemory: number
