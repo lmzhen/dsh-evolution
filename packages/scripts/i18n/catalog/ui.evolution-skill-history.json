@@ -1,0 +1,491 @@
+{
+  "namespace": "evolution-skill-history",
+  "surface": "client",
+  "messages": {
+    "action.archive": {
+      "zh": "归档",
+      "en": "archived",
+      "ja": "アーカイブ"
+    },
+    "action.archive.note": {
+      "zh": "这一版存的是被归档的正文",
+      "en": "this version holds the archived body",
+      "ja": "このバージョンにはアーカイブされた本文が保存されています"
+    },
+    "action.baseline": {
+      "zh": "初始快照",
+      "en": "initial snapshot",
+      "ja": "初期スナップショット"
+    },
+    "action.consolidate": {
+      "zh": "合并",
+      "en": "merged",
+      "ja": "マージ"
+    },
+    "action.create": {
+      "zh": "新建",
+      "en": "created",
+      "ja": "新規作成"
+    },
+    "action.delete": {
+      "zh": "删除",
+      "en": "deleted",
+      "ja": "削除"
+    },
+    "action.delete.note": {
+      "zh": "这一版存的是被删掉的正文",
+      "en": "this version holds the removed body",
+      "ja": "このバージョンには削除された本文が保存されています"
+    },
+    "action.extract": {
+      "zh": "跨技能提取",
+      "en": "extracted across skills",
+      "ja": "スキル間抽出"
+    },
+    "action.merge": {
+      "zh": "合并",
+      "en": "merged",
+      "ja": "マージ"
+    },
+    "action.other": {
+      "zh": "其他写入",
+      "en": "other write",
+      "ja": "その他の書き込み"
+    },
+    "action.patch": {
+      "zh": "定点修改",
+      "en": "targeted edit",
+      "ja": "部分修正"
+    },
+    "action.restore": {
+      "zh": "回退",
+      "en": "restored",
+      "ja": "復元"
+    },
+    "action.restructure": {
+      "zh": "结构调整",
+      "en": "restructured",
+      "ja": "構成整理"
+    },
+    "action.support-remove": {
+      "zh": "删除附带文件",
+      "en": "support file removed",
+      "ja": "補助ファイルの削除"
+    },
+    "action.support-write": {
+      "zh": "写入附带文件",
+      "en": "support file written",
+      "ja": "補助ファイルの書き込み"
+    },
+    "action.update": {
+      "zh": "整篇更新",
+      "en": "whole-body update",
+      "ja": "全文更新"
+    },
+    "bodyTitle": {
+      "zh": "正文版本",
+      "en": "Body versions",
+      "ja": "本文のバージョン"
+    },
+    "current": {
+      "zh": "当前",
+      "en": "Current",
+      "ja": "現在"
+    },
+    "diff.added": {
+      "zh": "新增 {n} 行",
+      "en": "{n} lines added",
+      "ja": "{n} 行追加"
+    },
+    "diff.against": {
+      "zh": "与 v{n} 比较",
+      "en": "compared with v{n}",
+      "ja": "v{n} との比較"
+    },
+    "diff.first": {
+      "zh": "这是第一版，整篇都是新增",
+      "en": "first version: everything is new",
+      "ja": "初期バージョンのため、全文が新規追加です"
+    },
+    "diff.hide": {
+      "zh": "收起差异",
+      "en": "Hide diff",
+      "ja": "差分を閉じる"
+    },
+    "diff.loading": {
+      "zh": "读取差异…",
+      "en": "Loading the diff…",
+      "ja": "差分を読み取り中…"
+    },
+    "diff.removed": {
+      "zh": "删除 {n} 行",
+      "en": "{n} lines removed",
+      "ja": "{n} 行削除"
+    },
+    "diff.rendered": {
+      "zh": "排版",
+      "en": "Rendered",
+      "ja": "整形表示"
+    },
+    "diff.show": {
+      "zh": "差异",
+      "en": "Diff",
+      "ja": "差分"
+    },
+    "diff.source": {
+      "zh": "原文",
+      "en": "Markdown",
+      "ja": "原文"
+    },
+    "diff.truncated": {
+      "zh": "差异过长，只显示前一部分",
+      "en": "the change is long; only its beginning is shown",
+      "ja": "差分が長いため、先頭の一部のみ表示しています"
+    },
+    "empty.pick": {
+      "zh": "从左栏选一个技能，看它记录过的版本。",
+      "en": "Pick a skill on the left to see the versions it recorded.",
+      "ja": "左の欄からスキルを選ぶと、記録されたバージョンが表示されます。"
+    },
+    "empty.skills": {
+      "zh": "还没有技能留下过内容版本。",
+      "en": "No skill has recorded a content version yet.",
+      "ja": "内容のバージョンが記録されたスキルはまだありません。"
+    },
+    "empty.skills.main": {
+      "zh": "技能第一次被写入后，这里会显示它的内容版本。",
+      "en": "After a skill is written for the first time, its content versions appear here.",
+      "ja": "スキルが初めて書き込まれると、ここに内容のバージョンが表示されます。"
+    },
+    "empty.versions": {
+      "zh": "这个技能还没有记录版本。",
+      "en": "This skill has no recorded versions.",
+      "ja": "このスキルには記録されたバージョンがありません。"
+    },
+    "empty.versions.failed": {
+      "zh": "版本读取失败——这个技能有没有版本，现在判断不了；点「刷新」重试。",
+      "en": "The version read FAILED - whether this skill has versions is unknown right now; use Refresh to retry.",
+      "ja": "バージョンの読み取りに失敗しました。このスキルにバージョンがあるか今は判断できません。「更新」を押して再試行してください。"
+    },
+    "entry.label": {
+      "zh": "技能自动进化",
+      "en": "Skill auto-evolution",
+      "ja": "スキル履歴"
+    },
+    "error": {
+      "zh": "读取失败",
+      "en": "Could not load",
+      "ja": "読み取りに失敗しました"
+    },
+    "error.hint": {
+      "zh": "面板连不上后台服务：通常是插件和程序版本不匹配。重启 DeepSeek Harness 再试；还不行就在对话里说明。",
+      "en": "The panel cannot reach the background service: usually the plugin and the app are on different versions. Restart DeepSeek Harness and try again; if it still fails, say so in the conversation.",
+      "ja": "パネルからバックグラウンドサービスに接続できません。通常はプラグインとアプリのバージョン不一致が原因です。DeepSeek Harness を再起動して再試行してください。解消しない場合は会話内で伝えてください。"
+    },
+    "failure.forbidden": {
+      "zh": "平台拒绝了这个请求（当前身份没有权限）。",
+      "en": "The platform refused this request (this account has no permission).",
+      "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。"
+    },
+    "failure.server": {
+      "zh": "读取失败，可以重试。",
+      "en": "The read failed; you can retry.",
+      "ja": "読み取りに失敗しました。再試行できます。"
+    },
+    "failure.unauthorized": {
+      "zh": "需要登录：重新打开这个页面完成登录后再试。",
+      "en": "Sign-in is required: reopen this page and sign in, then retry.",
+      "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。"
+    },
+    "failure.unmounted": {
+      "zh": "这个功能没有启用。",
+      "en": "This feature is not enabled.",
+      "ja": "この機能は有効になっていません。"
+    },
+    "failureForbidden": {
+      "zh": "平台拒绝了这个请求（当前身份没有权限）。",
+      "en": "The platform refused this request (this account has no permission).",
+      "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。"
+    },
+    "failureServer": {
+      "zh": "读取失败，可以重试。",
+      "en": "The read failed; you can retry.",
+      "ja": "読み取りに失敗しました。再試行できます。"
+    },
+    "failureUnauthorized": {
+      "zh": "需要登录：重新打开这个页面完成登录后再试。",
+      "en": "Sign-in is required: reopen this page and sign in, then retry.",
+      "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。"
+    },
+    "failureUnmounted": {
+      "zh": "这个功能没有启用。",
+      "en": "This feature is not enabled.",
+      "ja": "この機能は有効になっていません。"
+    },
+    "fallback.hint": {
+      "zh": "可以改用命令：{command}",
+      "en": "Command fallback: {command}",
+      "ja": "代替コマンド：{command}"
+    },
+    "fallbackHint": {
+      "zh": "可以改用命令：{command}",
+      "en": "Command fallback: {command}",
+      "ja": "代替コマンド：{command}"
+    },
+    "group.content": {
+      "zh": "正文版本",
+      "en": "Body versions",
+      "ja": "本文のバージョン"
+    },
+    "group.current": {
+      "zh": "当前版本",
+      "en": "Current version",
+      "ja": "現在のバージョン"
+    },
+    "group.history": {
+      "zh": "历史版本",
+      "en": "History",
+      "ja": "過去のバージョン"
+    },
+    "group.support": {
+      "zh": "文件版本（不可回退）",
+      "en": "File versions (not restorable)",
+      "ja": "補助ファイルのバージョン（復元不可）"
+    },
+    "group.support.note": {
+      "zh": "附带文件的版本会和正文一起记录；回退正文时不会恢复附带文件。",
+      "en": "Attached-file versions are recorded with the body; restoring the body does not restore them.",
+      "ja": "補助ファイルのバージョンは本文と一緒に記録されます。本文を復元しても補助ファイルは元に戻りません。"
+    },
+    "hint": {
+      "zh": "每次写入技能都会留下一个内容版本。回退只改正文；技能标记、使用次数和整理状态不变。内容相同的版本会同时标为「当前」。",
+      "en": "Every time a skill is written, a content version is kept. Restoring changes only the body; skill markers, usage counts and tidy-up state stay the same. Versions with identical content are all marked \"Current\".",
+      "ja": "スキルが書き込まれるたびに内容のバージョンが残ります。復元で変わるのは本文のみで、スキルのマーカーや使用回数、整理状態は変わりません。同じ内容のバージョンにはすべて「現在」と表示されます。"
+    },
+    "loading": {
+      "zh": "读取中…",
+      "en": "Loading…",
+      "ja": "読み取り中…"
+    },
+    "markdown.copied": {
+      "zh": "已复制",
+      "en": "Copied",
+      "ja": "コピーしました"
+    },
+    "markdown.copy": {
+      "zh": "复制",
+      "en": "Copy",
+      "ja": "コピー"
+    },
+    "markdown.footnotes": {
+      "zh": "脚注",
+      "en": "Footnotes",
+      "ja": "脚注"
+    },
+    "more": {
+      "zh": "更多",
+      "en": "More",
+      "ja": "その他"
+    },
+    "path.unrecorded": {
+      "zh": "（路径未记录）",
+      "en": "(path not recorded)",
+      "ja": "（パス未記録）"
+    },
+    "preview.hide": {
+      "zh": "收起正文",
+      "en": "Hide body",
+      "ja": "本文を閉じる"
+    },
+    "preview.loading": {
+      "zh": "读取预览…",
+      "en": "Loading the preview…",
+      "ja": "プレビューを読み取り中…"
+    },
+    "preview.show": {
+      "zh": "查看正文",
+      "en": "View body",
+      "ja": "本文を表示"
+    },
+    "preview.truncated": {
+      "zh": "正文过长：只显示前 {shown} 个字符（共 {total} 个）",
+      "en": "the body is long: showing the first {shown} of {total} characters",
+      "ja": "本文が長いため、全 {total} 文字のうち先頭の {shown} 文字のみ表示しています"
+    },
+    "refresh": {
+      "zh": "刷新",
+      "en": "Refresh",
+      "ja": "更新"
+    },
+    "row.delta.down": {
+      "zh": "（-{n} 字符）",
+      "en": "(-{n} chars)",
+      "ja": "（-{n} 文字）"
+    },
+    "row.delta.up": {
+      "zh": "（+{n} 字符）",
+      "en": "(+{n} chars)",
+      "ja": "（+{n} 文字）"
+    },
+    "row.first": {
+      "zh": "初始版本",
+      "en": "First version",
+      "ja": "初期バージョン"
+    },
+    "row.summary.missing": {
+      "zh": "（未生成摘要）",
+      "en": "(no summary generated)",
+      "ja": "（要約未生成）"
+    },
+    "row.version": {
+      "zh": "v{n}",
+      "en": "v{n}",
+      "ja": "v{n}"
+    },
+    "search": {
+      "zh": "按名字或描述筛选",
+      "en": "Filter by name or description",
+      "ja": "名前または説明で絞り込む"
+    },
+    "search.none": {
+      "zh": "没有匹配的技能。",
+      "en": "No skill matches.",
+      "ja": "一致するスキルがありません。"
+    },
+    "state.foreign": {
+      "zh": "不受本插件管理",
+      "en": "Not managed by this plugin",
+      "ja": "このプラグインの管理対象外"
+    },
+    "state.managed": {
+      "zh": "由本插件管理",
+      "en": "Managed by this plugin",
+      "ja": "このプラグインで管理"
+    },
+    "state.protected": {
+      "zh": "受保护",
+      "en": "protected",
+      "ja": "保護済み"
+    },
+    "state.unknown": {
+      "zh": "标记为无法读取",
+      "en": "Marked as unreadable",
+      "ja": "読み取り不可として記録"
+    },
+    "time.days": {
+      "zh": "{n} 天前",
+      "en": "{n} days ago",
+      "ja": "{n} 日前"
+    },
+    "time.days.one": {
+      "zh": "1 天前",
+      "en": "1 day ago",
+      "ja": "1 日前"
+    },
+    "time.hours": {
+      "zh": "{n} 小时前",
+      "en": "{n} hours ago",
+      "ja": "{n} 時間前"
+    },
+    "time.hours.one": {
+      "zh": "1 小时前",
+      "en": "1 hour ago",
+      "ja": "1 時間前"
+    },
+    "time.minutes": {
+      "zh": "{n} 分钟前",
+      "en": "{n} minutes ago",
+      "ja": "{n} 分前"
+    },
+    "time.minutes.one": {
+      "zh": "1 分钟前",
+      "en": "1 minute ago",
+      "ja": "1 分前"
+    },
+    "time.months": {
+      "zh": "{n} 个月前",
+      "en": "{n} months ago",
+      "ja": "{n} か月前"
+    },
+    "time.months.one": {
+      "zh": "1 个月前",
+      "en": "1 month ago",
+      "ja": "1 か月前"
+    },
+    "time.now": {
+      "zh": "刚刚",
+      "en": "just now",
+      "ja": "たった今"
+    },
+    "time.years": {
+      "zh": "{n} 年前",
+      "en": "{n} years ago",
+      "ja": "{n} 年前"
+    },
+    "time.years.one": {
+      "zh": "1 年前",
+      "en": "1 year ago",
+      "ja": "1 年前"
+    },
+    "title": {
+      "zh": "技能自动进化",
+      "en": "Skill auto-evolution",
+      "ja": "スキル履歴"
+    },
+    "undo": {
+      "zh": "回退到此版",
+      "en": "Restore this version",
+      "ja": "このバージョンに戻す"
+    },
+    "undo.confirm": {
+      "zh": "确认回退（会写入一版，可再回退）",
+      "en": "Confirm restore (writes a new version; can be undone)",
+      "ja": "復元を確定（新しいバージョンとして書き込まれ、再度戻すこともできます）"
+    },
+    "undo.confirmUnit": {
+      "zh": "确认把这次涉及的多个技能一起回退（会写入新版本，之后仍可回退）",
+      "en": "Restore all skills involved in this write together? A new version is written and can be restored again later.",
+      "ja": "今回の変更に関わる複数のスキルをまとめて復元しますか？（新しいバージョンとして書き込まれ、あとから再度戻すこともできます）"
+    },
+    "undo.no": {
+      "zh": "取消",
+      "en": "Cancel",
+      "ja": "キャンセル"
+    },
+    "versions.count": {
+      "zh": "{n} 个版本",
+      "en": "{n} versions",
+      "ja": "{n} 個のバージョン"
+    },
+    "workbench.diagnostics": {
+      "zh": "诊断",
+      "en": "Diagnostics",
+      "ja": "診断"
+    },
+    "workbench.health": {
+      "zh": "健康",
+      "en": "Health",
+      "ja": "健全性"
+    },
+    "workbench.history": {
+      "zh": "技能历史",
+      "en": "Skill history",
+      "ja": "スキル履歴"
+    },
+    "workbench.merge": {
+      "zh": "合并",
+      "en": "Merge",
+      "ja": "マージ"
+    },
+    "workbench.pending": {
+      "zh": "待批",
+      "en": "Pending",
+      "ja": "承認待ち"
+    },
+    "workbench.title": {
+      "zh": "自进化",
+      "en": "Self-evolution",
+      "ja": "自己進化"
+    }
+  }
+}

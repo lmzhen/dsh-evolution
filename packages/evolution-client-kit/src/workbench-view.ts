@@ -5,6 +5,7 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { FALLBACK_LOCALE } from './panel.ts'
+import type { SupportedLocale } from './generated/i18n.generated.ts'
 import type { ReactNode } from 'react'
 
 /** One feature view contribution. */
@@ -12,7 +13,7 @@ export interface WorkbenchViewSpec<Face> {
   readonly id: string
   readonly order: number
   readonly namespace: string
-  readonly dictionaries: { readonly zh: Record<string, string>; readonly en: Record<string, string> }
+  readonly dictionaries: Record<SupportedLocale, Record<string, string>>
   readonly styles: { readonly css: string; readonly tagId: string }
   readonly component: (props: never) => ReactNode
   readonly face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => Face
@@ -25,7 +26,7 @@ interface WorkbenchSlots {
 interface WorkbenchSeam {
   slots: WorkbenchSlots
   locale: {
-    register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void
+    register(namespace: string, dictionaries: Record<SupportedLocale, Record<string, string>>): () => void
     bind(namespace: string): (key: string) => string
   }
 }

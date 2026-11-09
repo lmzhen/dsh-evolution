@@ -1,234 +1,34 @@
 /**
- * Panel copy, in a zh/en dictionary registered through the platform’s locale seat.
- *
- * Client copy is locale-owned: the entry label, the group headings, the actions, the version facts
- * (action words, relative time, deltas) and the status lines all resolve here, and the panel carries
- * no literal string of its own. Facts come from the host; only the WORDS live here.
- * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
+ * Panel copy for the evolution workbench, generated from the family catalog and
+ * registered through the platform's locale seat.
+ * @module @deepseek-ai/dsh-evolution-ui/panels/history/client/messages
  */
+import { dictionariesFor, type SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
 
-/** The locale namespace this bundle registers. */
+/** Locale namespace this panel registers. */
 export const NS = 'evolution-skill-history'
 
-/** Chinese dictionary. */
-export const zh: Record<string, string> = {
-  'entry.label': '技能自动进化',
-  title: '技能自动进化',
-  bodyTitle: '正文版本',
-  'workbench.title': '自进化',
-  'workbench.history': '技能历史',
-  'workbench.pending': '待批',
-  'workbench.merge': '合并',
-  'workbench.health': '健康',
-  'workbench.diagnostics': '诊断',
-  hint: '每次写入技能都会留下一个内容版本。回退只改正文；技能标记、使用次数和整理状态不变。内容相同的版本会同时标为「当前」。',
-  search: '按名字或描述筛选',
-  'search.none': '没有匹配的技能。',
-  'group.content': '正文版本',
-  'group.current': '当前版本',
-  'group.history': '历史版本',
-  'group.support': '文件版本（不可回退）',
-  'group.support.note': '附带文件的版本会和正文一起记录；回退正文时不会恢复附带文件。',
-  'empty.skills': '还没有技能留下过内容版本。',
-  'empty.versions': '这个技能还没有记录版本。',
-  'empty.versions.failed': '版本读取失败——这个技能有没有版本，现在判断不了；点「刷新」重试。',
-  'empty.pick': '从左栏选一个技能，看它记录过的版本。',
-  'empty.skills.main': '技能第一次被写入后，这里会显示它的内容版本。',
-  loading: '读取中…',
-  refresh: '刷新',
-  undo: '回退到此版',
-  failureUnauthorized: '需要登录：重新打开这个页面完成登录后再试。',
-  failureForbidden: '平台拒绝了这个请求（当前身份没有权限）。',
-  failureUnmounted: '这个功能没有启用。',
-  failureServer: '读取失败，可以重试。',
-  fallbackHint: '可以改用命令：{command}',
-  'failure.unauthorized': '需要登录：重新打开这个页面完成登录后再试。',
-  'failure.forbidden': '平台拒绝了这个请求（当前身份没有权限）。',
-  'failure.unmounted': '这个功能没有启用。',
-  'failure.server': '读取失败，可以重试。',
-  'fallback.hint': '可以改用命令：{command}',
-  'undo.confirm': '确认回退（会写入一版，可再回退）',
-  'undo.confirmUnit': '确认把这次涉及的多个技能一起回退（会写入新版本，之后仍可回退）',
-  'undo.no': '取消',
-  more: '更多',
-  current: '当前',
-  'versions.count': '{n} 个版本',
-  'row.version': 'v{n}',
-  'row.first': '初始版本',
-  'row.summary.missing': '（未生成摘要）',
-  'row.delta.up': '（+{n} 字符）',
-  'row.delta.down': '（-{n} 字符）',
-  'diff.show': '差异',
-  'diff.source': '原文',
-  'preview.show': '查看正文',
-  'preview.hide': '收起正文',
-  'preview.truncated': '正文过长：只显示前 {shown} 个字符（共 {total} 个）',
-  'path.unrecorded': '（路径未记录）',
-  'diff.rendered': '排版',
-  'markdown.copy': '复制',
-  'markdown.copied': '已复制',
-  'markdown.footnotes': '脚注',
-  'diff.hide': '收起差异',
-  'diff.loading': '读取差异…',
-  'preview.loading': '读取预览…',
-  'diff.against': '与 v{n} 比较',
-  'diff.first': '这是第一版，整篇都是新增',
-  'diff.truncated': '差异过长，只显示前一部分',
-  'diff.added': '新增 {n} 行',
-  'diff.removed': '删除 {n} 行',
-  'state.managed': '由本插件管理',
-  'state.foreign': '不受本插件管理',
-  'state.protected': '受保护',
-  'state.unknown': '标记为无法读取',
-  'action.baseline': '初始快照',
-  'action.create': '新建',
-  'action.patch': '定点修改',
-  'action.update': '整篇更新',
-  'action.restore': '回退',
-  'action.delete': '删除',
-  'action.delete.note': '这一版存的是被删掉的正文',
-  'action.archive': '归档',
-  'action.archive.note': '这一版存的是被归档的正文',
-  'action.consolidate': '合并',
-  'action.merge': '合并',
-  'action.restructure': '结构调整',
-  'action.extract': '跨技能提取',
-  'action.support-write': '写入附带文件',
-  'action.support-remove': '删除附带文件',
-  'action.other': '其他写入',
-  'time.now': '刚刚',
-  'time.minutes': '{n} 分钟前',
-  'time.minutes.one': '1 分钟前',
-  'time.hours': '{n} 小时前',
-  'time.hours.one': '1 小时前',
-  'time.days': '{n} 天前',
-  'time.days.one': '1 天前',
-  'time.months': '{n} 个月前',
-  'time.months.one': '1 个月前',
-  'time.years': '{n} 年前',
-  'time.years.one': '1 年前',
-  error: '读取失败',
-  'error.hint': '面板连不上后台服务：通常是插件和程序版本不匹配。重启 DeepSeek Harness 再试；还不行就在对话里说明。',
-}
-
-/** English dictionary: the same keys, or the panel falls back to the key itself. */
-export const en: Record<string, string> = {
-  'entry.label': 'Skill auto-evolution',
-  title: 'Skill auto-evolution',
-  bodyTitle: 'Body versions',
-  'workbench.title': 'Self-evolution',
-  'workbench.history': 'Skill history',
-  'workbench.pending': 'Pending',
-  'workbench.merge': 'Merge',
-  'workbench.health': 'Health',
-  'workbench.diagnostics': 'Diagnostics',
-  hint: 'Every time a skill is written, a content version is kept. Restoring changes only the body; skill markers, usage counts and tidy-up state stay the same. Versions with identical content are all marked "Current".',
-  search: 'Filter by name or description',
-  'search.none': 'No skill matches.',
-  'group.content': 'Body versions',
-  'group.current': 'Current version',
-  'group.history': 'History',
-  'group.support': 'File versions (not restorable)',
-  'group.support.note': 'Attached-file versions are recorded with the body; restoring the body does not restore them.',
-  'empty.skills': 'No skill has recorded a content version yet.',
-  'empty.versions': 'This skill has no recorded versions.',
-  'empty.versions.failed': 'The version read FAILED - whether this skill has versions is unknown right now; use Refresh to retry.',
-  'empty.pick': 'Pick a skill on the left to see the versions it recorded.',
-  'empty.skills.main': 'After a skill is written for the first time, its content versions appear here.',
-  loading: 'Loading…',
-  refresh: 'Refresh',
-  undo: 'Restore this version',
-  failureUnauthorized: 'Sign-in is required: reopen this page and sign in, then retry.',
-  failureForbidden: 'The platform refused this request (this account has no permission).',
-  failureUnmounted: 'This feature is not enabled.',
-  failureServer: 'The read failed; you can retry.',
-  fallbackHint: 'Command fallback: {command}',
-  'failure.unauthorized': 'Sign-in is required: reopen this page and sign in, then retry.',
-  'failure.forbidden': 'The platform refused this request (this account has no permission).',
-  'failure.unmounted': 'This feature is not enabled.',
-  'failure.server': 'The read failed; you can retry.',
-  'fallback.hint': 'Command fallback: {command}',
-  'undo.confirm': 'Confirm restore (writes a new version; can be undone)',
-  'undo.confirmUnit': 'Restore all skills involved in this write together? A new version is written and can be restored again later.',
-  'undo.no': 'Cancel',
-  more: 'More',
-  current: 'Current',
-  'versions.count': '{n} versions',
-  'row.version': 'v{n}',
-  'row.first': 'First version',
-  'row.summary.missing': '(no summary generated)',
-  'row.delta.up': '(+{n} chars)',
-  'row.delta.down': '(-{n} chars)',
-  'diff.show': 'Diff',
-  'diff.source': 'Markdown',
-  'preview.show': 'View body',
-  'preview.hide': 'Hide body',
-  'preview.truncated': 'the body is long: showing the first {shown} of {total} characters',
-  'path.unrecorded': '(path not recorded)',
-  'diff.rendered': 'Rendered',
-  'markdown.copy': 'Copy',
-  'markdown.copied': 'Copied',
-  'markdown.footnotes': 'Footnotes',
-  'diff.hide': 'Hide diff',
-  'diff.loading': 'Loading the diff…',
-  'preview.loading': 'Loading the preview…',
-  'diff.against': 'compared with v{n}',
-  'diff.first': 'first version: everything is new',
-  'diff.truncated': 'the change is long; only its beginning is shown',
-  'diff.added': '{n} lines added',
-  'diff.removed': '{n} lines removed',
-  'state.managed': 'Managed by this plugin',
-  'state.foreign': 'Not managed by this plugin',
-  'state.protected': 'protected',
-  'state.unknown': 'Marked as unreadable',
-  'action.baseline': 'initial snapshot',
-  'action.create': 'created',
-  'action.patch': 'targeted edit',
-  'action.update': 'whole-body update',
-  'action.restore': 'restored',
-  'action.delete': 'deleted',
-  'action.delete.note': 'this version holds the removed body',
-  'action.archive': 'archived',
-  'action.archive.note': 'this version holds the archived body',
-  'action.consolidate': 'merged',
-  'action.merge': 'merged',
-  'action.restructure': 'restructured',
-  'action.extract': 'extracted across skills',
-  'action.support-write': 'support file written',
-  'action.support-remove': 'support file removed',
-  'action.other': 'other write',
-  'time.now': 'just now',
-  'time.minutes': '{n} minutes ago',
-  'time.minutes.one': '1 minute ago',
-  'time.hours': '{n} hours ago',
-  'time.hours.one': '1 hour ago',
-  'time.days': '{n} days ago',
-  'time.days.one': '1 day ago',
-  'time.months': '{n} months ago',
-  'time.months.one': '1 month ago',
-  'time.years': '{n} years ago',
-  'time.years.one': '1 year ago',
-  error: 'Could not load',
-  'error.hint': 'The panel cannot reach the background service: usually the plugin and the app are on different versions. Restart DeepSeek Harness and try again; if it still fails, say so in the conversation.',
-}
+/** Every supported dictionary for this namespace. */
+export const dictionaries = dictionariesFor(NS)
+export const zh = dictionaries.zh
+export const en = dictionaries.en
+export const ja = dictionaries.ja
 
 /**
- * One message without the locale seat (the fallback path, and what a spec reads).
- * @param language - which dictionary to read.
+ * Resolve one message without the locale seat.
  * @param key - the message key.
- * @returns the copy, or the key itself when neither dictionary carries it.
+ * @param language - supported locale; defaults to English.
+ * @returns the bundle copy.
  */
-export function message(key: string, language: 'zh' | 'en' = 'zh'): string {
-  // The fallback is the platform's FALLBACK_LOCALE (zh), shared by every family panel.
-  const dictionary = language === 'zh' ? zh : en
+export function message(key: string, language: SupportedLocale = 'en'): string {
+  const dictionary = dictionaries[language] as Readonly<Record<string, string>>
   return dictionary[key] ?? key
 }
 
 /**
- * Fill one TEMPLATE’s `{n}` slots. The seat resolves the key, this fills it, so the panel needs
- * only the seat plus this rule and never learns which language it is rendering.
- * @param template - the copy, with `{slot}` placeholders.
- * @param values - the substitutions, keyed by the slot name inside the braces.
+ * Fill one template's `{slot}` placeholders.
+ * @param template - the copy.
+ * @param values - substitutions keyed by slot name.
  * @returns the filled copy.
  */
 export function fill(template: string, values: Record<string, string | number>): string {

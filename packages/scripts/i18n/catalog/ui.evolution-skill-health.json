@@ -1,0 +1,441 @@
+{
+  "namespace": "evolution-skill-health",
+  "surface": "client",
+  "messages": {
+    "action.copy": {
+      "zh": "复制命令",
+      "en": "Copy command",
+      "ja": "コマンドをコピー"
+    },
+    "action.extract": {
+      "zh": "提取",
+      "en": "Extract",
+      "ja": "抽出"
+    },
+    "action.extract.reason": {
+      "zh": "命令/预览面未就绪，暂不可用。",
+      "en": "The command/preview surface is not ready yet.",
+      "ja": "コマンドまたはプレビュー画面が未準備のため、現在利用できません。"
+    },
+    "action.history": {
+      "zh": "查看历史",
+      "en": "History",
+      "ja": "履歴を表示"
+    },
+    "action.more": {
+      "zh": "更多",
+      "en": "More",
+      "ja": "その他"
+    },
+    "col.count": {
+      "zh": "数量",
+      "en": "Amount",
+      "ja": "件数"
+    },
+    "col.findings": {
+      "zh": "证据",
+      "en": "Evidence",
+      "ja": "根拠"
+    },
+    "col.rule": {
+      "zh": "规则",
+      "en": "Rule",
+      "ja": "ルール"
+    },
+    "col.skill": {
+      "zh": "技能",
+      "en": "Skill",
+      "ja": "スキル"
+    },
+    "col.skills": {
+      "zh": "涉及技能",
+      "en": "Skills",
+      "ja": "対象スキル"
+    },
+    "copy.copied": {
+      "zh": "已复制",
+      "en": "Copied",
+      "ja": "コピーしました"
+    },
+    "copy.failed": {
+      "zh": "复制失败",
+      "en": "Copy failed",
+      "ja": "コピーに失敗しました"
+    },
+    "count.notCalibrated": {
+      "zh": "暂无标准",
+      "en": "No standard yet",
+      "ja": "基準なし"
+    },
+    "count.unit.files": {
+      "zh": "个文件",
+      "en": "files",
+      "ja": "個のファイル"
+    },
+    "count.unit.skills": {
+      "zh": "个技能",
+      "en": "skills",
+      "ja": "件のスキル"
+    },
+    "count.unit.stamps": {
+      "zh": "处时间戳",
+      "en": "timestamps",
+      "ja": "箇所のタイムスタンプ"
+    },
+    "counts": {
+      "zh": "{ok} 正常 · {warn} 警告 · {error} 错误 · {unreadable} 无法读取",
+      "en": "{ok} ok · {warn} warn · {error} error · {unreadable} unreadable",
+      "ja": "{ok} 正常 · {warn} 警告 · {error} エラー · {unreadable} 読み取り不可"
+    },
+    "dims.body": {
+      "zh": "正文",
+      "en": "Body",
+      "ja": "本文"
+    },
+    "dims.support": {
+      "zh": "附带文件",
+      "en": "Attached files",
+      "ja": "補助ファイル"
+    },
+    "dims.unknown": {
+      "zh": "未知",
+      "en": "unknown",
+      "ja": "不明"
+    },
+    "empty": {
+      "zh": "没有可报告的结论。",
+      "en": "Nothing to report.",
+      "ja": "報告する結果はありません。"
+    },
+    "empty.noneReported": {
+      "zh": "这次没有发现异常——但这不代表每个技能都能读取。",
+      "en": "Nothing was flagged this time — but this does not mean every skill could be read.",
+      "ja": "今回は問題が見つかりませんでした。ただし、すべてのスキルが読み取れるとは限りません。"
+    },
+    "entry.label": {
+      "zh": "技能健康",
+      "en": "Skill Health",
+      "ja": "スキル健全性"
+    },
+    "failure.forbidden": {
+      "zh": "平台拒绝了这个请求（身份不是 owner）。",
+      "en": "The platform refused this request (not the owner principal).",
+      "ja": "プラットフォームがこのリクエストを拒否しました（owner 権限がありません）。"
+    },
+    "failure.server": {
+      "zh": "读取失败，可以重试。",
+      "en": "The read failed; you can retry.",
+      "ja": "読み取りに失敗しました。再試行できます。"
+    },
+    "failure.unauthorized": {
+      "zh": "需要登录：重新打开这个页面完成登录后再试。",
+      "en": "Sign-in is required: reopen this page and sign in, then retry.",
+      "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。"
+    },
+    "failure.unmounted": {
+      "zh": "该功能没有挂载。",
+      "en": "This feature is not mounted.",
+      "ja": "この機能はマウントされていません。"
+    },
+    "failureForbidden": {
+      "zh": "平台拒绝了这个请求（当前身份没有权限）。",
+      "en": "The platform refused this request (this account has no permission).",
+      "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。"
+    },
+    "failureServer": {
+      "zh": "读取失败，可以重试。",
+      "en": "The read failed; you can retry.",
+      "ja": "読み取りに失敗しました。再試行できます。"
+    },
+    "failureUnauthorized": {
+      "zh": "需要登录：重新打开这个页面完成登录后再试。",
+      "en": "Sign-in is required: reopen this page and sign in, then retry.",
+      "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。"
+    },
+    "failureUnmounted": {
+      "zh": "这个功能没有启用。",
+      "en": "This feature is not enabled.",
+      "ja": "この機能は有効になっていません。"
+    },
+    "fallback.hint": {
+      "zh": "可以改用命令：{command}",
+      "en": "Command fallback: {command}",
+      "ja": "代替コマンド：{command}"
+    },
+    "fallbackHint": {
+      "zh": "可以改用命令：{command}",
+      "en": "Command fallback: {command}",
+      "ja": "代替コマンド：{command}"
+    },
+    "findings.none": {
+      "zh": "无规则命中",
+      "en": "No rule hit",
+      "ja": "該当ルールなし"
+    },
+    "group.byRule": {
+      "zh": "按规则",
+      "en": "By rule",
+      "ja": "ルール別"
+    },
+    "group.bySkill": {
+      "zh": "按技能",
+      "en": "By skill",
+      "ja": "スキル別"
+    },
+    "group.proposals": {
+      "zh": "改进建议",
+      "en": "Suggestions",
+      "ja": "改善案"
+    },
+    "health.complete": {
+      "zh": "没有需要处理的问题",
+      "en": "Nothing needs attention",
+      "ja": "対処が必要な問題はありません"
+    },
+    "health.normal": {
+      "zh": "{n} 项正常，展开查看",
+      "en": "{n} normal items — expand to view",
+      "ja": "{n} 件は正常（展開して表示）"
+    },
+    "hint": {
+      "zh": "这里按规则汇总技能检查结果。还没定统一标准的规则只报规则名、不报数字；读不到内容的技能单独标为「无法读取」，不算正常。",
+      "en": "Here are the skill health results, grouped by rule. A rule without a fixed standard shows only its name, no number; skills that cannot be read are marked \"Unreadable\" and never counted as fine.",
+      "ja": "スキルのチェック結果をルール別に集計しています。まだ統一された基準がないルールは名前のみを表示し、数値は出しません。内容を読み取れないスキルは「読み取り不可」として別に表示し、正常とは扱いません。"
+    },
+    "line": {
+      "zh": "位置：{path}",
+      "en": "line: {path}",
+      "ja": "位置：{path}"
+    },
+    "line.unknown": {
+      "zh": "位置：未知",
+      "en": "line: UNKNOWN",
+      "ja": "位置：不明"
+    },
+    "loading": {
+      "zh": "读取中…",
+      "en": "Loading…",
+      "ja": "読み取り中…"
+    },
+    "loading.failed": {
+      "zh": "读取失败——现在判断不了；点「刷新」重试。",
+      "en": "Reading failed — this cannot be judged right now; press Refresh to retry.",
+      "ja": "読み取りに失敗したため、今は判断できません。「更新」を押して再試行してください。"
+    },
+    "proposal.copy": {
+      "zh": "复制命令",
+      "en": "Copy command",
+      "ja": "コマンドをコピー"
+    },
+    "proposal.kept": {
+      "zh": "保留正文",
+      "en": "kept body",
+      "ja": "残す本文"
+    },
+    "proposal.outcome.extract": {
+      "zh": "提取",
+      "en": "extract",
+      "ja": "抽出"
+    },
+    "proposal.outcome.keep": {
+      "zh": "保持",
+      "en": "keep",
+      "ja": "維持"
+    },
+    "proposal.outcome.mixed": {
+      "zh": "混合",
+      "en": "mixed",
+      "ja": "混在"
+    },
+    "proposal.outcome.owner-gap": {
+      "zh": "缺少归属技能",
+      "en": "owner-gap",
+      "ja": "帰属先スキルなし"
+    },
+    "proposal.owner": {
+      "zh": "放到哪个技能",
+      "en": "Which skill",
+      "ja": "移し先のスキル"
+    },
+    "proposal.owner.covered": {
+      "zh": "已有可承接的技能",
+      "en": "Has a skill to take it",
+      "ja": "引き継ぎ先のスキルあり"
+    },
+    "proposal.owner.owner-gap": {
+      "zh": "还没有可承接的技能",
+      "en": "No skill to take it yet",
+      "ja": "引き継ぎ先のスキルがまだありません"
+    },
+    "proposal.provenance": {
+      "zh": "生成来源",
+      "en": "Provenance",
+      "ja": "生成元"
+    },
+    "proposal.reusable": {
+      "zh": "可提取",
+      "en": "reusable",
+      "ja": "抽出可能"
+    },
+    "proposal.stale": {
+      "zh": "改进建议的数据已过期；这不等于没有可整理内容，请刷新后重试。",
+      "en": "The suggestions are out of date; refresh and try again. This does not mean there is nothing to tidy up.",
+      "ja": "改善案のデータが古くなっています。「整理する内容がない」という意味ではありません。更新して再試行してください。"
+    },
+    "proposal.status.dismissed": {
+      "zh": "状态：已忽略",
+      "en": "status: dismissed",
+      "ja": "状態：却下済み"
+    },
+    "proposal.status.previewed": {
+      "zh": "状态：已预览",
+      "en": "status: previewed",
+      "ja": "状態：プレビュー済み"
+    },
+    "proposal.status.proposed": {
+      "zh": "状态：提议",
+      "en": "status: proposed",
+      "ja": "状態：提案中"
+    },
+    "proposal.status.stale": {
+      "zh": "状态：已过期",
+      "en": "status: stale",
+      "ja": "状態：期限切れ"
+    },
+    "proposal.unavailable": {
+      "zh": "暂时拿不到改进建议；这不等于没有可整理的内容。",
+      "en": "Suggestions are unavailable right now; this does not mean there is nothing to tidy up.",
+      "ja": "現在、改善案を取得できません。「整理する内容がない」という意味ではありません。"
+    },
+    "proposal.warnings": {
+      "zh": "警告",
+      "en": "warnings",
+      "ja": "警告"
+    },
+    "protected": {
+      "zh": "这个技能受保护，不能直接改。",
+      "en": "This skill is protected; it cannot be changed directly.",
+      "ja": "このスキルは保護されているため、直接変更できません。"
+    },
+    "read.failed": {
+      "zh": "这次没读到数据（下面一行是原始信息）：",
+      "en": "This read failed (raw message below):",
+      "ja": "今回の読み取りに失敗しました（下の行は元のメッセージです）："
+    },
+    "readAt.today": {
+      "zh": "今天",
+      "en": "Today",
+      "ja": "今日"
+    },
+    "readAt.unknown": {
+      "zh": "扫描时间未知",
+      "en": "Scan time unknown",
+      "ja": "スキャン日時不明"
+    },
+    "refresh": {
+      "zh": "刷新",
+      "en": "Refresh",
+      "ja": "更新"
+    },
+    "rule.body-oversize": {
+      "zh": "正文偏长（超过参考长度）",
+      "en": "Body is long (over the reference length)",
+      "ja": "本文が長め（目安の長さを超過）"
+    },
+    "rule.body-oversize-2x": {
+      "zh": "正文特别长（超过参考长度 2 倍）",
+      "en": "Body is very long (over 2× the reference length)",
+      "ja": "本文が非常に長い（目安の長さの2倍を超過）"
+    },
+    "rule.body-without-support": {
+      "zh": "正文长但没有附带文件",
+      "en": "Long body with no attached files",
+      "ja": "本文が長く補助ファイルがない"
+    },
+    "rule.empty": {
+      "zh": "没有命中规则，当前全部正常",
+      "en": "No rule matched; everything is healthy",
+      "ja": "該当するルールはなく、現在すべて正常です"
+    },
+    "rule.references-sprawl": {
+      "zh": "附带文件过多",
+      "en": "Too many attached files",
+      "ja": "補助ファイルが多すぎる"
+    },
+    "rule.scope-overloaded": {
+      "zh": "内容范围过杂",
+      "en": "Covers too much",
+      "ja": "扱う範囲が広すぎる"
+    },
+    "rule.stamp-density": {
+      "zh": "正文像日志（时间戳多）",
+      "en": "Body reads like a log (many timestamps)",
+      "ja": "本文がログ状（タイムスタンプが多い）"
+    },
+    "rule.unreadable-skill": {
+      "zh": "无法读取",
+      "en": "Unreadable",
+      "ja": "読み取り不可"
+    },
+    "rule.write-ghost": {
+      "zh": "只写不读",
+      "en": "Written, never read",
+      "ja": "書き込みのみで未参照"
+    },
+    "ruleTable.title": {
+      "zh": "规则分布",
+      "en": "Rule breakdown",
+      "ja": "ルール別の内訳"
+    },
+    "scan.complete": {
+      "zh": "扫描完成",
+      "en": "Scan complete",
+      "ja": "スキャン完了"
+    },
+    "scan.truncated": {
+      "zh": "本次扫描不完整，数量可能偏少；请刷新后重试。",
+      "en": "This scan is incomplete; the counts may be low. Press Refresh to retry.",
+      "ja": "今回のスキャンは未完了のため、件数が少なく表示されている可能性があります。「更新」を押して再試行してください。"
+    },
+    "scan.unavailable": {
+      "zh": "扫描不可用",
+      "en": "Scan unavailable",
+      "ja": "スキャン利用不可"
+    },
+    "title": {
+      "zh": "技能健康",
+      "en": "Skill Health",
+      "ja": "スキル健全性"
+    },
+    "unreadable.note": {
+      "zh": "读不到内容，因此无法判断（不是「通过」）。",
+      "en": "The content could not be read, so this cannot be judged (it is not a pass).",
+      "ja": "内容を読み取れないため判断できません（「問題なし」ではありません）。"
+    },
+    "verdict.error": {
+      "zh": "错误",
+      "en": "Error",
+      "ja": "エラー"
+    },
+    "verdict.healthy": {
+      "zh": "正常",
+      "en": "OK",
+      "ja": "正常"
+    },
+    "verdict.needs-restructure": {
+      "zh": "需要调整结构",
+      "en": "Needs restructuring",
+      "ja": "構成の整理が必要"
+    },
+    "verdict.unreadable": {
+      "zh": "无法读取",
+      "en": "Unreadable",
+      "ja": "読み取り不可"
+    },
+    "verdict.warn": {
+      "zh": "警告",
+      "en": "Warn",
+      "ja": "警告"
+    }
+  }
+}

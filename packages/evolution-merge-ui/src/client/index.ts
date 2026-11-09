@@ -4,7 +4,7 @@ import { createElement, type ReactNode } from 'react'
 import { createSettingsSeat, panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
-import { NS, en, zh } from './messages.ts'
+import { NS, dictionaries } from './messages.ts'
 import { MergePanel, type MergeFace } from './Panel.ts'
 import { MergeStore, type MergeSource } from './MergeStore.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
@@ -30,7 +30,7 @@ export function apply(ctx: ClientContext): void {
     id: PANEL_ID,
     order: PANEL_ORDER,
     namespace: NS,
-    dictionaries: { zh, en },
+    dictionaries,
     styles: { css: CSS, tagId: CSS_TAG_ID },
     component: MergeView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {

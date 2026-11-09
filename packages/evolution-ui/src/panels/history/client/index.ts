@@ -11,7 +11,7 @@ import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
 import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
 import { fill as settingsFill, message as settingsMessage, NS as SETTINGS_NS } from '../../settings/messages.ts'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
-import { en, NS, zh } from './messages.ts'
+import { NS, dictionaries } from './messages.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 import type { PanelFace } from './Panel.ts'
 import { PANEL_ORDER } from './ids.ts'
@@ -85,7 +85,7 @@ export function apply(ctx: ClientContext): void {
     id: WORKBENCH_ID,
     order: PANEL_ORDER,
     namespace: NS,
-    dictionaries: { zh, en },
+    dictionaries,
     styles: { css: CSS + WORKBENCH_CSS + PAGE_SURFACE_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
     component: WorkbenchPage as unknown as (props: never) => unknown,

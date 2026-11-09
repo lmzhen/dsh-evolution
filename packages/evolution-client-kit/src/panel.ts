@@ -5,6 +5,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import type { ClientSeam } from './seam.ts'
+import type { SupportedLocale } from './generated/i18n.generated.ts'
 
 /** Dictionary lookup used by the panel body and row label. */
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
@@ -19,9 +20,9 @@ export interface SidebarPanelSpec<Face> {
   order: number
   /** Locale namespace owned by this panel. */
   namespace: string
-  dictionaries: { zh: Record<string, string>; en: Record<string, string> }
+  dictionaries: Record<SupportedLocale, Record<string, string>>
   /** Fallback dictionary when the locale seat refuses or is absent. */
-  fallback?: 'zh' | 'en'
+  fallback?: SupportedLocale
   /** Panel stylesheet and the tag id that makes injection idempotent. */
   styles: { css: string; tagId: string }
   /** The row glyph. */

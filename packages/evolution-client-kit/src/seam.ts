@@ -7,6 +7,7 @@
  * @module @lmzhen/dsh-evolution-client-kit
  */
 import type { ReactNode } from 'react'
+import type { SupportedLocale } from './generated/i18n.generated.ts'
 
 /** Registration options for the global sidebar row. */
 export interface PanelRowOptions {
@@ -27,7 +28,7 @@ export interface PanelBodyOptions {
 
 /** The locale seat: one namespace registration and a bound translator. */
 export interface LocaleSeat {
-  register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void
+  register(namespace: string, dictionaries: Record<SupportedLocale, Record<string, string>>): () => void
   bind(namespace: string): (key: string) => string
 }
 
