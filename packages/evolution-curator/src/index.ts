@@ -200,8 +200,8 @@ export function validateCuratorSettings(value: Pick<CuratorSettings, 'archiveAft
   }
 }
 
-/** Outcome of one curator run pass. */
-export interface CuratorRunOutcome {
+/** Domain result of one curator pass; lifecycle outcome lives in the contract. */
+export interface CuratorRunResult {
   stale: string[]
   archived: string[]
   errors: string[]
@@ -949,7 +949,7 @@ export class EvolutionCurator extends Service {
    * Reentrant calls (autoStart timer + manual command at the same instant) are
    * skipped with an explicit `already-running` outcome.
    */
-  async run(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunOutcome> {
+  async run(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunResult> {
     // P1 (v16): run() joins the SAME control-plane mutex as restore/consolidate.
     // The skip decision is made on `mutexDepth` BEFORE enqueueing: a manual run
     // arriving behind a queued restore/in-flight run skips (E-7 semantics
@@ -1084,7 +1084,7 @@ export class EvolutionCurator extends Service {
     }
   }
 
-  private async runCore(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunOutcome> {
+  private async runCore(options: { ignoreGates?: boolean; dryRun?: boolean } = {}): Promise<CuratorRunResult> {
     const { ignoreGates = false, dryRun = false } = options
     const startedAt = new Date().toISOString()
     const runId = randomUUID()
