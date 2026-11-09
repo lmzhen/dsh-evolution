@@ -51,7 +51,7 @@ import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPa
 import { makeSerialQueue } from './serial.ts'
 import { supportRefs } from './support-refs.ts'
 import { selectSections } from './section-selection.ts'
-import { MutationUnit, fileMutationLock, type MutationResult, type MutationUnitHooks } from './mutation-unit.ts'
+import { MutationUnit, fileMutationLock, type MutationLockPort, type MutationResult, type MutationUnitHooks } from './mutation-unit.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
 import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
@@ -788,6 +788,8 @@ export class SkillLibrary {
   /** G1/1.1: default authority; a call may override (origin is per-invocation). */
   /** G1/1.1/Stage 2: the ONE default every mutator reads. Per-call overrides still win. */
   private readonly authority: WriteAuthority
+  /** When supplied by the family MutationAuthority, replaces the per-directory file lock. */
+  private readonly mutationLock: MutationLockPort | undefined
   /** skill-history.ts: the content history is best-effort, so a failure must not be SILENT —
    * but it is a deployment condition, not a per-write event, so it warns once per instance. */
   private historyWarned = false
@@ -800,6 +802,7 @@ export class SkillLibrary {
     transact?: typeof transactIo,
     threatExemptLabels?: readonly string[],
     authority: WriteAuthority = CLASS_DEFAULT_AUTHORITY,
+    mutationLock?: MutationLockPort,
   ) {
     this.root = root
     this.io = io
@@ -807,6 +810,7 @@ export class SkillLibrary {
     this.onMutation = onMutation
     this.threatExemptLabels = threatExemptLabels ?? []
     this.authority = authority
+    this.mutationLock = mutationLock
     // V4-20: bind the IO backend's own transact by default. Explicit injection
     // stays first; a backend WITHOUT transact keeps the old plain read→write
     // (the in-process serial chain is the second layer). The wrapper adapts the
@@ -859,7 +863,7 @@ export class SkillLibrary {
   private async withMutationLock<T>(task: () => Promise<T>): Promise<T> {
     let lease: import('./mutation-unit.ts').MutationLockLease | undefined
     try {
-      lease = await fileMutationLock(this.io, this.root).acquire()
+      lease = await this.lockPort().acquire()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       if (message.startsWith('mutation-lock-busy')) throw error
@@ -876,6 +880,10 @@ export class SkillLibrary {
         // A failed lock cleanup is a coordination degradation, not a write failure.
       }
     }
+  }
+
+  private lockPort(): MutationLockPort {
+    return this.mutationLock ?? fileMutationLock(this.io, this.root)
   }
 
   private recovery: Promise<void> | undefined
@@ -900,7 +908,7 @@ export class SkillLibrary {
       io: this.io,
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, home),
       snapshots: unitSnapshotPort(this.io, home),
     })
@@ -1995,7 +2003,7 @@ export class SkillLibrary {
     const unit = new MutationUnit({
       io: this.io,
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
@@ -2170,7 +2178,7 @@ export class SkillLibrary {
     const unit = new MutationUnit({
       io: this.io,
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
@@ -3171,7 +3179,7 @@ export class SkillLibrary {
       io: this.io,
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, home),
       snapshots: unitSnapshotPort(this.io, home),
       hooks,
@@ -3287,7 +3295,7 @@ export class SkillLibrary {
       io: this.io,
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, home),
       snapshots: unitSnapshotPort(this.io, home),
       hooks,
@@ -3636,7 +3644,7 @@ export class SkillLibrary {
       io: this.io,
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       serial: this.serial,
-      lock: fileMutationLock(this.io, this.root),
+      lock: this.lockPort(),
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
@@ -4378,10 +4386,12 @@ export interface NewSkillLibraryOptions {
   threatExemptLabels?: readonly string[] | undefined
   /** G1/1.1: WHO writes through this library. Required: no call site can omit it. */
   authority: WriteAuthority
+  /** Optional family authority lock; absent falls back to per-directory file lock. */
+  mutationLock?: MutationLockPort
 }
 
 export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
-  const { config, io, limits, ctx, transact, threatExemptLabels, authority } = options
+  const { config, io, limits, ctx, transact, threatExemptLabels, authority, mutationLock } = options
   return new SkillLibrary(
     resolveSkillsRoot(config ?? {}),
     io,
@@ -4392,6 +4402,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     // not alias a config object the caller still owns.
     [...(threatExemptLabels ?? [])],
     authority,
+    mutationLock,
   )
 }
 

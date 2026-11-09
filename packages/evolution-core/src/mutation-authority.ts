@@ -5,6 +5,7 @@ import { LeaseStore, type LeaseToken } from './lease-store.ts'
 import type { EvolutionIoLike } from './io.ts'
 import {
   MutationUnit,
+  type MutationLockPort,
   type MutationLimits,
   type MutationLockPort,
   type MutationResult,
@@ -69,6 +70,16 @@ export class MutationAuthority {
 
   /** The one home fence domain unit engines must reuse instead of taking tree-lock themselves. */
   get homeFence(): HomeFence { return this.fence }
+
+  /** Adapter for legacy MutationUnit call sites that accept a lock port. */
+  get mutationLock(): MutationLockPort {
+    return {
+      acquire: async () => {
+        const lease = await this.fence.acquire()
+        return { release: async () => { await lease.release() } }
+      },
+    }
+  }
 
   constructor(options: MutationAuthorityOptions) {
     this.io = options.io
