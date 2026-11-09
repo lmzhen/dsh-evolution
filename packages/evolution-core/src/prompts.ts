@@ -79,10 +79,10 @@ export const SKILL_REVIEW_PROMPT = `[Auto-review — Skills]
 ${SKILL_REVIEW_BODY}`
 
 export const COMBINED_REVIEW_PROMPT = `[Auto-review]
-Review the conversation above and update two things.
+Apply both review passes below.
 
 ## Memory
-Save durable facts about the user or their preferences. Focus on persona, desires, expectations, and how the user wants you to operate. Save only stable facts; if none exist, say "Nothing to save." and stop.
+${MEMORY_REVIEW_BODY}
 
 ## Skills
 ${SKILL_REVIEW_BODY}`
