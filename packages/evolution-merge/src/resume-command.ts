@@ -103,7 +103,7 @@ export async function runResumeCommand(options: RunResumeCommandOptions): Promis
       } catch (error) {
         outcome = { kind: 'failed' as const, failure: { stage: 'author' as const, code: 'merge-failed', message: error instanceof Error ? error.message : String(error), retryable: true, retryFrom: 'agent2' as const } }
       }
-      const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome, true)
+      const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome, true, options.fence)
       return {
         stopReason: record.merged ? 'completed' as const : 'failed' as const,
         scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 1, skipped: 0 } },

@@ -11,9 +11,9 @@ export type PendingActionResult =
   | { readonly ok: true; readonly row: MergeRow }
   | { readonly ok: false; readonly reason: 'not-found' | 'not-pending' | 'invalid' | 'expired'; readonly message: string }
 
-async function act(io: EvolutionIoLike, home: string, now: () => number, id: string, type: 'approve' | 'reject'): Promise<PendingActionResult> {
+async function act(io: EvolutionIoLike, home: string, now: () => number, id: string, type: 'approve' | 'reject', fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<PendingActionResult> {
   void now
-  return await pairLedger(io, home).transact<PendingActionResult>(tx => {
+  return await pairLedger(io, home, fence).transact<PendingActionResult>(tx => {
     const row = tx.rows().find(item => item.id === id)
     if (row === undefined) return { ok: false, reason: 'not-found', message: 'pending row not found: ' + id }
     if (row.state !== 'pending') return { ok: false, reason: 'not-pending', message: 'row is not pending: ' + row.state }
@@ -30,10 +30,10 @@ async function act(io: EvolutionIoLike, home: string, now: () => number, id: str
   })
 }
 
-export async function approvePending(io: EvolutionIoLike, home: string, now: () => number, id: string): Promise<PendingActionResult> {
-  return await act(io, home, now, id, 'approve')
+export async function approvePending(io: EvolutionIoLike, home: string, now: () => number, id: string, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<PendingActionResult> {
+  return await act(io, home, now, id, 'approve', fence)
 }
 
-export async function rejectPending(io: EvolutionIoLike, home: string, now: () => number, id: string): Promise<PendingActionResult> {
-  return await act(io, home, now, id, 'reject')
+export async function rejectPending(io: EvolutionIoLike, home: string, now: () => number, id: string, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<PendingActionResult> {
+  return await act(io, home, now, id, 'reject', fence)
 }

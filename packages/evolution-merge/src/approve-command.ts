@@ -45,7 +45,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
   if (options.agentless === true) return failure('approve', 'e-305', errorText('e-305-this-invocation-carries-no', { a1: 'approve' }), '在 GUI 或 CLI 的会话里运行 /evolution merge approve ' + before.id)
   const parentRunId = options.parentRunId ?? before.runId
   if (parentRunId === undefined) return failure('approve', 'merge-parent-required', '缺 parent run id（E-305 提示：该行可能由无会话调用创建，或父 run 已丢失）', '在 agent 会话中执行 /evolution merge approve ' + before.id, before.runId)
-  const taken = await approvePending(options.io, options.home, options.now, options.rowId)
+  const taken = await approvePending(options.io, options.home, options.now, options.rowId, options.fence)
   if (!taken.ok) return failure('approve', 'approve-' + taken.reason, taken.message, '重试；若行状态已变化，运行 /evolution merge status ' + options.rowId, before.runId)
   let row = taken.row
   const decision = row.decision
@@ -86,7 +86,7 @@ export async function runApproveCommand(options: RunApproveCommandOptions): Prom
         outcome = { kind: 'failed', failure: { stage: 'author', code: 'merge-failed', message: error instanceof Error ? error.message : String(error), retryable: true, retryFrom: 'agent2' } }
       }
       const base = { scope: { candidatePairs: 1, queueBefore: { verify: 0, pending: 0, fuse: 1, skipped: 0 } }, notes: [] as string[] }
-      const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome, true)
+      const record = await recordRound2Outcome(options.io, options.home, options.now, row, outcome, true, options.fence)
       return {
         ...base,
         stopReason: record.merged ? 'completed' as const : 'failed' as const,

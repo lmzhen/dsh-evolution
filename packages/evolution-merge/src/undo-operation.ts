@@ -73,7 +73,7 @@ async function settleRun(io: EvolutionIoLike, home: string, runId: string, pairK
     createdAt: current?.createdAt ?? new Date(at).toISOString(), updatedAt: new Date(at).toISOString(),
   })
 }
-export async function runUndoOperation(options: { readonly io: EvolutionIoLike; readonly home: string; readonly runId: string; readonly port: MergeUndoPort; readonly now: () => number; readonly pairKey?: string; readonly target?: string; readonly finalizeUnit?: (unitId: string) => Promise<{ readonly ok: boolean; readonly message?: string }>; readonly onPhase?: (phase: string, pairKey: string) => void | Promise<void> }): Promise<UndoResult> {
+export async function runUndoOperation(options: { readonly io: EvolutionIoLike; readonly home: string; readonly runId: string; readonly port: MergeUndoPort; readonly now: () => number; readonly pairKey?: string; readonly target?: string; readonly finalizeUnit?: (unitId: string) => Promise<{ readonly ok: boolean; readonly message?: string }>; readonly onPhase?: (phase: string, pairKey: string) => void | Promise<void>; readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> } }): Promise<UndoResult> {
   const runReceipts = (await readCommitReceipts(options.io, options.home)).filter(receipt => (receipt.parentRunId ?? receipt.runId) === options.runId)
   const allPairKeys = runReceipts.map(receipt => receipt.pairKey ?? receipt.unitId)
   const allReceipts = runReceipts.filter(receipt => options.target === undefined || receipt.target === options.target)

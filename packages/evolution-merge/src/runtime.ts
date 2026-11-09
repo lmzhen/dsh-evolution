@@ -404,7 +404,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const undoRegistry = deps.registry as unknown as RunRegistry
         if (undoRegistry.runs('merge').some(run => run.id === undoRunId && run.supersededAt !== undefined)) return fail('undo', 'run-superseded', '该 run 已因技能树 restore 失效，不能再 undo：' + undoRunId, '运行 /evolution merge runs 查看失效标记')
         const unit = unitFor(deps)
-        const result = await runUndoOperation({ io: deps.io, home: deps.home, runId: undoRunId, port: skillLibraryUndoPort(deps.skills), now: deps.now, target: command.target, ...(unit === undefined ? {} : { finalizeUnit: id => unit.finalize.call(unit, id) }) })
+        const result = await runUndoOperation({ io: deps.io, home: deps.home, runId: undoRunId, port: skillLibraryUndoPort(deps.skills), now: deps.now, target: command.target, ...(deps.fence === undefined ? {} : { fence: deps.fence }), ...(unit === undefined ? {} : { finalizeUnit: id => unit.finalize.call(unit, id) }) })
         return result.ok ? { ok: true, text: result.message } : fail('undo', 'undo-failed', result.message, '检查回执与暂存后重试')
       }
       if (command.verb === 'skipped' && command.restore !== undefined) {
