@@ -14,35 +14,11 @@ The family targets DeepSeek Harness `0.2.2-rc.1` only. Published packages declar
 
 ## What is a skill?
 
-Early language models generated text autoregressively. Questions, instructions and answers were linked statistically, so prompts that described the domain, task and constraints precisely usually improved the result. That relationship was a foundation of early prompt engineering.
-
-Chain-of-thought and stronger model capabilities reduced the need for exhaustive prompts in some single-step tasks: the model could recall terminology and conventions during reasoning. Tool calling then changed the objective again. Instead of producing one piece of content, the model had to complete a sequence of operations. Execution order, tool constraints, completion criteria and failure recovery still needed explicit instructions. The prompt increasingly resembled an operating manual rather than a complete description of one desired answer.
-
-Different tasks need different manuals, and they cannot all remain in context. One approach is to connect step-specific prompts and inputs and outputs into a fixed workflow. Another is to package a manual as a module that the model can discover by name and description and load when relevant. That module is a skill. In DSH, a skill normally consists of a `SKILL.md` body and optional scripts, templates and reference files, loaded through the native `skill` tool.
-
-Skills and MCP belong to different layers. MCP is a protocol for connecting tools and resources; a skill describes when to use those capabilities, in what order, and what counts as done. The plugin manages procedural knowledge, not tool connectivity itself.
+A skill is a module that packages a task procedure: a `SKILL.md` body plus optional scripts, templates and reference files. It is discovered by name and description and loaded through the native `skill` tool.
 
 ## Why build this plugin?
 
-Two related changes are taking place:
-
-1. **The marginal value of some general-purpose skills is falling.** Public, common operating procedures are increasingly being absorbed into model capability through training. Maintaining a separate manual for those tasks yields less benefit, although this does not make every general-purpose skill obsolete.
-2. **Models are becoming capable of extracting operating procedures from execution traces.** With real trajectories and clear feedback, a model can organize the steps, constraints and corrections from a task into a reusable skill. This plugin uses that capability during review and skill writing. The output still passes structural checks and may require human approval; it is not assumed to be correct merely because a model produced it.
-
-At the same time, every user's machine, project conventions, preferences and complex task details remain different. Once general capability is sufficient, the decisive knowledge is often valid only for one person or one project. A private skill set grows with task variety and complexity, and it also develops duplication, staleness and structural problems. Maintaining all of that manually does not scale.
-
-The plugin therefore uses the model's semantic ability to automate the generation and maintenance work that is suitable for automation, while retaining human control and recovery paths. Its objective is not unrestricted skill accumulation, but a useful, inspectable and maintainable private skill set built from real work.
-
-## How does it relate to memory plugins?
-
-The two are largely complementary. A typical memory plugin manages facts: who the user is, what the project is, and what was decided. This plugin is more concerned with process: how a class of task should be performed, in what order, and to what standard. It is intended primarily for people who use Harness to get work done.
-
-The plugin also contains a memory module, but its design differs from the familiar retrieve-on-demand, continuously growing model:
-
-- **Memory has a hard character budget.** The default budgets for project memory in `MEMORY.md` and the user profile in `USER.md` are 2200 and 1375 characters. If a batch would exceed the budget, it is refused rather than silently truncated. The model must delete or compact existing entries before adding new ones. After the budget is lowered, replacement can also be refused when an existing entry exceeds the new limit; deletion is then the recovery path.
-- **Memory is supplied as a snapshot instead of relying only on deliberate retrieval.** This keeps critical project facts visible during a task instead of depending on the model to search for them.
-
-Snapshot injection does not mean that every persisted byte necessarily reaches the model context. Entries matched by threat scanning are filtered, and abnormally large files are skipped. The character budget bounds injection size; it is not a guarantee that every task avoids performance loss or additional context cost. The design keeps critical facts within a bounded context while using skills to maintain procedural knowledge.
+General model capability reduces the value of one-size-fits-all manuals, while project- and user-specific procedures still need maintenance. The plugin automates the mechanical parts and keeps writes bounded, inspectable and recoverable.
 
 ## What capabilities does it provide?
 
@@ -72,7 +48,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 
 For the desktop GUI, replace `--profile web` with `--profile desktop`. After installation, ask the agent to remember a project fact and open a new session to verify that it is injected. `doctor` checks the installation form and service state; it does not replace an actual read/write check.
 
-The full source layout reports<!-- gen:install-counts --> 35 packages installed (the published list is 36; the agent preset is separate)<!-- /gen:install-counts -->.
+The full source layout reports<!-- gen:install-counts --> 36 packages installed (the published list is 37; the agent preset is separate)<!-- /gen:install-counts -->.
 
 ## Installation forms
 
@@ -111,9 +87,9 @@ See [docs/commands.md](docs/commands.md) for the command reference and [docs/con
 
 | Item | Current requirement |
 |---|---|
-| Validated platform line | **`0.2.1-rc.3`** |
-| Published dependency window | `^0.2.1-rc.2` |
-| Family version | `0.37.1` |
+| Validated platform line | **`0.2.2-rc.1`** |
+| Published dependency window | `^0.2.2-rc.0` |
+| Family version | `0.40.1` |
 | Node | `^22.19.0` or `>=24.0.0` |
 
 Published packages do not cross older prerelease platform lines. See [INSTALL.md](INSTALL.md) for installation and upgrade order.
