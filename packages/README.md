@@ -9,6 +9,7 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 | Package | Role |
 |---|---|
 | `evolution-contract` | Pure cross-package types; no runtime, no plugin row |
+| `evolution-authority` | The family-wide `evolutionMutationAuthority` lease/fence/lock service; one authority above the IO seam |
 | `evolution-core` | SkillLibrary, MemoryStore, write kernel/unit transactions, prompts, projections, events, presets, `./restrictor` plugin |
 | `evolution-io` | IO provider registry |
 | `evolution-io-node` | `node:fs` provider (single-process) |
