@@ -1209,7 +1209,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           proposal: { type: 'string' },
         },
       },
-      render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` }],
+      render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message}` + (value.proposal === undefined ? '' : '\n\n' + value.proposal) }],
     },
     isConcurrencySafe: () => false,
     // F-06: `session` is optional in the exec contract too — the
@@ -1406,12 +1406,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
         }
       }
-      if (operation.action === 'extract' && operation.dry_run === true && (operation.extract === undefined || operation.extract.length === 0)) {
+      if (operation.action === 'extract' && (operation.extract === undefined || operation.extract.length === 0)) {
         const source = typeof operation.name === 'string' ? operation.name.trim() : ''
         if (source === '') return { ok: false, message: 'extract agent 需要 name。', skills: [] }
         const proposed = await proposeExtractWithAgent(ctx, exec.agent as unknown as Agent | undefined, library, source)
         return proposed.ok
-          ? { ok: true, message: '提取提议（未写入）。', skills: [], proposal: proposed.proposal }
+          ? { ok: true, message: '提取提议（未写入；确认后按 extract items 提交）。', skills: [], proposal: proposed.proposal }
           : { ok: false, message: proposed.message, skills: [] }
       }
       return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined)
