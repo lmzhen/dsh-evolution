@@ -87,3 +87,40 @@ describe('evolution-state-json', () => {
     expect((await provider.listPending()).map(record => record.id)).toEqual(['legacy-1'])
   })
 })
+
+describe('pending archive under the real authority fence', () => {
+  it('resolves the 201st pending record without re-entering the home fence', async () => {
+    const home = await tempRoot('dsh-state-json-fence-cap-')
+    const ctx = await mountStateStack(home, { authority: true })
+    const io = ctx.evolutionIo.provider('node')
+    const records: Record<string, unknown> = {}
+    for (let i = 0; i < 200; i += 1) {
+      records['r' + i] = {
+        id: 'r' + i,
+        kind: 'memory',
+        summary: 'resolved',
+        args: {},
+        createdAt: '2026-01-01T00:00:00.000Z',
+        status: 'approved',
+        resolvedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString(),
+      }
+    }
+    records['p-live'] = {
+      id: 'p-live',
+      kind: 'memory',
+      summary: 'pending',
+      args: {},
+      createdAt: '2026-01-02T00:00:00.000Z',
+      status: 'pending',
+    }
+    await writeFile(join(home, 'pending-state.json'), JSON.stringify(records, null, 2))
+    const provider = ctx.evolutionStateStorage.provider('json')
+    const result = await Promise.race([
+      provider.tryResolvePending('p-live', 'approved'),
+      new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('pending resolve hung on a nested home fence')), 3_000)),
+    ])
+    expect(result.applied).toBe(true)
+    const archive = JSON.parse(await io.readText(join(home, 'pending-state-archive.json')) ?? '[]') as unknown[]
+    expect(archive).toHaveLength(1)
+  }, 10_000)
+})

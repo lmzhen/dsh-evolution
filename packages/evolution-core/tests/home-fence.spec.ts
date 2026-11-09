@@ -41,4 +41,26 @@ describe('HomeFence', () => {
     await expect(fence.run(async () => { throw new Error('boom') })).rejects.toThrow('boom')
     await expect(fence.run(async () => 'ok')).resolves.toBe('ok')
   })
+
+  it('poisons the fence after a failed lock release instead of wedging every later writer', async () => {
+    const home = await root()
+    const base = nodeEvolutionIo()
+    let failRelease = false
+    const io = {
+      ...base,
+      async transact(path: string, task: (current: string | null) => Promise<string | null>): Promise<void> {
+        if (failRelease && path.includes('tree-lock')) {
+          const error = new Error('simulated EPERM on lock release') as Error & { code: string }
+          error.code = 'EPERM'
+          throw error
+        }
+        return await base.transact(path, task)
+      },
+    }
+    const fence = new HomeFence({ io, home, waitMs: 1000 })
+    const lease = await fence.acquire()
+    failRelease = true
+    await expect(lease.release()).rejects.toThrow('simulated EPERM')
+    await expect(fence.acquire()).rejects.toThrow(/poisoned/)
+  }, 10_000)
 })

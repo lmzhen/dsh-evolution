@@ -124,11 +124,14 @@ export async function acquireTreeWriteLock(options: TreeLockOptions): Promise<Tr
           },
           async release() {
             if (released) return
-            released = true
             await transactIo(options.io, path, (current) => {
               const existing = parseLock(current)
               return existing?.token === token && existing.epoch === epoch ? null : current
             })
+            // Mark released only after the delete committed. Marking first made every retry a
+            // silent no-op, so a transient unlink failure left the lock on disk while the
+            // caller believed it was released.
+            released = true
           },
         }
         return { ok: true, lock }

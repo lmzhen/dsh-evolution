@@ -883,9 +883,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * caller must compensate (merge them back) before the legacy merge can
    * revive a ghost twin. A dedupe no-op counts as success — the records are
    * already in the archive. */
-  const homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
-
   async function appendArchive(records: PendingRecord[]): Promise<boolean> {
+    // The archive is part of the pending transaction, not a second write scope: its only
+    // caller is the pendingTransact task, and jsonTransact already holds the home fence
+    // around that task. Acquiring the same fence here self-deadlocks once the pending
+    // table reaches PENDING_RESOLVED_CAP. New callers must enter through jsonTransact.
     // v46 S1.12b (finding 1-9): `landed` used to start `true` and only flip in the catch paths, so a
     // backend that never invokes the archive task reported a successful archive with nothing on
     // disk — and the caller (tryResolvePending) then skipped its compensation. The probe answers
@@ -986,8 +988,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return JSON.stringify(next)
       }))
       }
-      if (homeFence !== undefined) await homeFence.run(writeArchive)
-      else await writeArchive()
+      await writeArchive()
       // v46 S1.12b: never resurrect a false set inside the task (the rescue-skip path) — the probe
       // can only lower the verdict.
       if (!guard.invoked()) landed = false

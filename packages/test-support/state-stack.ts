@@ -10,6 +10,7 @@ import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-stor
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
 import * as JsonState from '@deepseek-ai/dsh-evolution-state-json'
+import { MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
 import EvolutionState from '@deepseek-ai/dsh-evolution-state'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 
@@ -21,12 +22,13 @@ import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
  */
 export async function mountStateStack(
   root: string,
-  options: { evolution?: boolean; approval?: boolean } = {},
+  options: { evolution?: boolean; approval?: boolean; authority?: boolean } = {},
 ): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(EvolutionStateStorageRegistry)
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
+  if (options.authority === true) ctx.provide('evolutionMutationAuthority', new MutationAuthority({ io: ctx.evolutionIo.provider(), home: root }))
   await ctx.plugin(JsonState, { root })
   if (options.evolution) await ctx.plugin(EvolutionState)
   if (options.approval) await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
