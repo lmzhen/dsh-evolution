@@ -422,7 +422,21 @@ export class UnitTransactions implements UnitTransaction {
     return found.length === 0 ? null : found.length === 1 ? (only ?? null) : found;
   }
 
+  private async withRecoveryFence<T>(task: () => Promise<T>): Promise<T> {
+    if (this.options.fence === undefined) return await task()
+    const lease = await this.options.fence.acquire()
+    try {
+      return await task()
+    } finally {
+      await lease.release()
+    }
+  }
+
   async finalize(unitId: string) {
+    return await this.withRecoveryFence(async () => this.finalizeUnlocked(unitId))
+  }
+
+  private async finalizeUnlocked(unitId: string) {
     const existing = await readUnitEvidence(this.options.io, this.options.home, unitId);
     if (existing !== null) return { ok: true as const, evidence: existing };
     const snapshot = await readUnitSnapshot(this.options.io, this.options.home, unitId);
@@ -492,6 +506,10 @@ export class UnitTransactions implements UnitTransaction {
   }
 
   async rollForward(unitId: string) {
+    return await this.withRecoveryFence(async () => this.rollForwardUnlocked(unitId))
+  }
+
+  private async rollForwardUnlocked(unitId: string) {
     const existing = await readUnitEvidence(this.options.io, this.options.home, unitId);
     if (existing !== null) return { ok: true as const, evidence: existing };
     const snapshot = await readUnitSnapshot(this.options.io, this.options.home, unitId);
