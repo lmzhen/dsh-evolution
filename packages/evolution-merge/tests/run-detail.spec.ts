@@ -1,6 +1,7 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import type { SkillLibrary, RunRecord } from '@deepseek-ai/dsh-evolution-core'
+import type { RunRecord } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { makeV4Home } from './support/schema4-home.ts'
 import { createMergeRuntime, pairKey, type MergeRuntimeDeps } from '../src/index.ts'
 import { recordPair } from '../src/domain/pair-index-store.ts'

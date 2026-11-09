@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { makeV4Home, v3Row } from './support/schema4-home.ts'
 import { runApproveCommand } from '../src/approve-command.ts'
 import { runResumeCommand } from '../src/resume-command.ts'

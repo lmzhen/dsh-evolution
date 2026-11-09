@@ -48,6 +48,7 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
       if (snapshot === null || snapshot.kind !== 'tree-change' || snapshot.ops === undefined) return null
       return {
         unitId,
+        ...(snapshot.journalId === undefined ? {} : { journalId: snapshot.journalId }),
         state: snapshot.mutationState ?? 'committed',
         ops: snapshot.ops,
         ...(snapshot.cleanup === undefined ? {} : { cleanup: snapshot.cleanup }),
@@ -75,7 +76,7 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
           if (snapshot.kind !== 'tree-change' || snapshot.mutationState !== 'prepared' || snapshot.ops === undefined) continue
           if (seen.has(snapshot.unitId)) continue
           seen.add(snapshot.unitId)
-          out.push({ unitId: snapshot.unitId, state: 'prepared', ops: snapshot.ops, ...(snapshot.cleanup === undefined ? {} : { cleanup: snapshot.cleanup }), createdAt: snapshot.createdAt, ...(snapshot.origin === 'foreground' || snapshot.origin === 'background_review' ? { owner: snapshot.origin } : {}), runId: snapshot.runId, ...(snapshot.leaseId === undefined ? {} : { leaseId: snapshot.leaseId }) })
+          out.push({ unitId: snapshot.unitId, ...(snapshot.journalId === undefined ? {} : { journalId: snapshot.journalId }), state: 'prepared', ops: snapshot.ops, ...(snapshot.cleanup === undefined ? {} : { cleanup: snapshot.cleanup }), createdAt: snapshot.createdAt, ...(snapshot.origin === 'foreground' || snapshot.origin === 'background_review' ? { owner: snapshot.origin } : {}), runId: snapshot.runId, ...(snapshot.leaseId === undefined ? {} : { leaseId: snapshot.leaseId }) })
         }
       }
       return out
@@ -103,7 +104,7 @@ export async function pruneTreeChangeUnits(io: EvolutionIoLike, home: string, ke
   let removed = 0
   for (const entry of terminal.slice(keep)) {
     await io.remove(join(dir, entry.name))
-    await io.remove(unitJournalPath(home, entry.unitId, 'skill')).catch(() => {})
+    await io.remove(unitJournalPath(home, entry.journalId ?? entry.unitId, 'skill')).catch(() => {})
     removed += 1
   }
   return removed
@@ -127,7 +128,8 @@ export function unitJournalPort(io: EvolutionIoLike, home: string): MutationJour
     async write(record: MutationJournalRecord): Promise<void> {
       const journal: UnitJournal = {
         schemaVersion: 1,
-        unitId: record.journalId ?? record.unitId,
+        unitId: record.unitId,
+        ...(record.journalId === undefined ? {} : { journalId: record.journalId }),
         runId: record.runId ?? record.unitId,
         planDigest: contentHash(JSON.stringify({ unitId: record.unitId, target: record.target ?? record.changed[0] ?? '', roots: record.roots ?? [], changed: record.changed })),
         target: record.target ?? record.changed[0] ?? '',

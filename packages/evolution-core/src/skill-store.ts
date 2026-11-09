@@ -358,6 +358,8 @@ export interface ArchiveOptions {
 
 /** One multi-skill merge commit: target body + support files, with the source names it absorbs. */
 export interface CommitMergePlan {
+  /** The merge UnitTransaction already holds the home fence; nested tree writes must not re-acquire it. */
+  readonly nested?: boolean
   readonly runId?: string
   /** The unit transaction id; history must record this exact id for undo. */
   readonly unitId?: string
@@ -669,6 +671,8 @@ interface TreeChangeRoot {
  * themselves.
  */
 interface TreeChangePlan {
+  /** The caller already holds the home fence (e.g. merge's outer UnitTransaction). */
+  readonly nested?: boolean
   /** Primary/legacy skill; also the first root when roots is absent. */
   name: string
   origin: WriteOrigin
@@ -2578,6 +2582,7 @@ export class SkillLibrary {
             name: target,
             origin: plan.origin,
             protection: 'write',
+            nested: plan.nested === true,
             writes,
             auditAction: 'merge-rollback',
             auditSummary: 'merge rollback: restore target snapshot',
@@ -2611,6 +2616,7 @@ export class SkillLibrary {
           name: target,
           origin: plan.origin,
           protection: 'write',
+          nested: plan.nested === true,
           writes,
           auditAction: 'merge',
           auditSummary: plan.summary,
@@ -2716,6 +2722,7 @@ export class SkillLibrary {
           name: target,
           origin: plan.origin,
           protection: 'write',
+          nested: plan.nested === true,
           writes,
           auditAction: 'merge',
           auditSummary: plan.summary,
@@ -3383,7 +3390,7 @@ export class SkillLibrary {
     const unit = new MutationUnit({
       io: this.io,
       limits: this.limits,
-      lock: this.lockPort(),
+      ...(plan.nested === true ? { nested: true as const } : { lock: this.lockPort() }),
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),

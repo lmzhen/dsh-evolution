@@ -1377,6 +1377,25 @@
     {
       "id": "ci-only-12",
       "kind": "step",
+      "human": "node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist \"$PLATFORM_VERSION\" | tail -n 1)\"",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/prepare-packed-platform.mjs",
+        "packages/evolution/dist",
+        "\"$PLATFORM_VERSION\"",
+        "|",
+        "tail",
+        "-n",
+        "1)"
+      ],
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-13",
+      "kind": "step",
       "human": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
       "argv": [
         "node",
@@ -1389,7 +1408,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-13",
+      "id": "ci-only-14",
       "kind": "step",
       "human": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
       "argv": [
@@ -1404,7 +1423,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-14",
+      "id": "ci-only-15",
       "kind": "step",
       "human": "node packages/evolution/scripts/requirements.selftest.mjs",
       "argv": [
@@ -1417,7 +1436,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-15",
+      "id": "ci-only-16",
       "kind": "step",
       "human": "node packages/evolution/scripts/run-load-sensitive.mjs .",
       "argv": [
@@ -1431,14 +1450,15 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-16",
+      "id": "ci-only-17",
       "kind": "step",
-      "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
+      "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules \"$PLATFORM_DIR\"",
       "argv": [
         "node",
         "packages/evolution/scripts/smoke-packed-install.mjs",
         "packages/evolution/dist",
-        "--assets-only"
+        "--platform-node-modules",
+        "\"$PLATFORM_DIR\""
       ],
       "tree": "overlay",
       "profiles": [],
@@ -1446,7 +1466,23 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-17",
+      "id": "ci-only-18",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-core-surface.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-core-surface.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
+    },
+    {
+      "id": "ci-only-19",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
       "argv": [
@@ -1465,7 +1501,7 @@
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
     {
-      "id": "ci-only-18",
+      "id": "ci-only-20",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
       "argv": [
@@ -1481,7 +1517,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-19",
+      "id": "ci-only-21",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
       "argv": [
@@ -1495,6 +1531,23 @@
       ],
       "reason": "requirements matrix coverage; the CI job executes it after gen-requirements",
       "owner": "ci"
+    },
+    {
+      "id": "ci-only-22",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-test-lines.mjs packages/evolution --strict",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-test-lines.mjs",
+        "packages/evolution",
+        "--strict"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.26.0"
     },
     {
       "id": "line-identity-ci",

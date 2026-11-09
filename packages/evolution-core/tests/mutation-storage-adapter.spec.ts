@@ -21,6 +21,7 @@ class MemoryIo implements EvolutionIoLike {
 const HOME = 'D:/home'
 const SNAP: MutationSnapshot = {
   unitId: 'u-1',
+  journalId: 'j-1',
   owner: 'foreground',
   runId: 'u-1',
   state: 'committed',
@@ -56,6 +57,7 @@ describe('unit storage adapters', () => {
     await port.write({ ...SNAP, unitId: 'committed', state: 'committed' })
     const prepared = await port.listPrepared?.() ?? []
     expect(prepared.map(item => item.unitId)).toEqual(['prepared'])
+    expect(prepared[0]?.journalId).toBe('j-1')
   })
 
   it('writes the skill-owned unit journal', async () => {
@@ -73,11 +75,13 @@ describe('unit storage adapters', () => {
   it('prunes only terminal tree-change snapshots past the retention cap', async () => {
     const io = new MemoryIo()
     const port = unitSnapshotPort(io, HOME)
-    await port.write({ ...SNAP, unitId: 'old', createdAt: 1 })
+    await port.write({ ...SNAP, unitId: 'old', journalId: 'j-old', createdAt: 1 })
+    await unitJournalPort(io, HOME).write({ unitId: 'old', journalId: 'j-old', phase: 'committed', changed: [] })
     await port.write({ ...SNAP, unitId: 'new', createdAt: 2 })
     await port.write({ ...SNAP, unitId: 'prepared', state: 'prepared', createdAt: 3 })
     expect(await pruneTreeChangeUnits(io, HOME, 1)).toBe(1)
     expect(await readUnitSnapshot(io, HOME, 'old', 'skill')).toBeNull()
+    expect(await readUnitJournal(io, HOME, 'j-old', 'skill')).toBeNull()
     expect(await readUnitSnapshot(io, HOME, 'new', 'skill')).not.toBeNull()
     expect(await readUnitSnapshot(io, HOME, 'prepared', 'skill')).not.toBeNull()
   })

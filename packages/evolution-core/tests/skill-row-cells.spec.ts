@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { ageCopyKey, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
-import type { CopyCell } from '@deepseek-ai/dsh-evolution-core'
+import type { CopyCell } from '@deepseek-ai/dsh-evolution-core/skills'
 import { skillRowCells, skillStateKey, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const version = (over: Partial<VersionRowFacts> = {}): VersionRowFacts => ({

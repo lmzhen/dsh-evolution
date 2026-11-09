@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { ageCopyKey, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
-import type { CopyCell } from '@deepseek-ai/dsh-evolution-core'
+import type { CopyCell } from '@deepseek-ai/dsh-evolution-core/skills'
 import { skillRowCells, versionActionKind, RowCell, SkillRowFacts, VersionRowFacts } from '@deepseek-ai/dsh-evolution-core/skills'
 import { en, fill, zh } from '../src/panels/history/client/messages.ts'
 

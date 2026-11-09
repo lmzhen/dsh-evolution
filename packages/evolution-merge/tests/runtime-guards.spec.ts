@@ -4,7 +4,7 @@
 // failure keeps the three-line code/hint/next shape with the run id when one exists.
 import { readFile, writeFile } from 'node:fs/promises'
 import { expect, it } from 'vitest'
-import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { makeV4Home, v3Row } from './support/schema4-home.ts'
 import { createMergeRuntime, pairKey, type MergeRuntimeDeps, type SkillCard } from '../src/index.ts'
 import { writeRunMeta } from '../src/domain/run-coordinator.ts'

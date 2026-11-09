@@ -14,6 +14,7 @@ export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
         ...(plan.runId === undefined ? {} : { runId: plan.runId }),
         ...(plan.unitId === undefined ? {} : { unitId: plan.unitId }),
         target: plan.target,
+        nested: true,
         targetExists: plan.targetExists,
         sources: plan.sources,
         body: plan.body,

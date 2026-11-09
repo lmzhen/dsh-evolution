@@ -31,12 +31,14 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-storage-domain": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
+    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-storage-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-storage": "workspace:^",
-    "@deepseek-ai/dsh-storage-json": "workspace:^"
+    "@deepseek-ai/dsh-storage-json": "workspace:^",
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
   }
 }

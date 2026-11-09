@@ -461,7 +461,7 @@ export class MutationUnit {
         }
         for (const path of snapshot.cleanup ?? []) await this.io.remove(path).catch(() => {})
         await this.snapshots?.write({ ...snapshot, state: 'undone' })
-        await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'undone', changed: reverted, ...(snapshot.ops[0]?.target === undefined ? {} : { target: snapshot.ops[0].target }), roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
+        await this.journal?.write({ unitId, journalId: snapshot.journalId ?? this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'undone', changed: reverted, ...(snapshot.ops[0]?.target === undefined ? {} : { target: snapshot.ops[0].target }), roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
         try {
           await this.hooks?.undone?.({ unitId, changed: reverted, ops: snapshot.ops, roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
         } catch {
@@ -514,7 +514,7 @@ export class MutationUnit {
           undone.push(op.target)
         }
         for (const path of snapshot.cleanup ?? []) await this.io.remove(path).catch(() => {})
-        await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'undone', changed: undone, ...(snapshot.ops[0]?.target === undefined ? {} : { target: snapshot.ops[0].target }), roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
+        await this.journal?.write({ unitId, journalId: snapshot.journalId === undefined ? this.journalId : snapshot.journalId + ':undo', ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'undone', changed: undone, ...(snapshot.ops[0]?.target === undefined ? {} : { target: snapshot.ops[0].target }), roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })
         await this.snapshots?.write({ ...snapshot, state: 'undone' })
         try {
           await this.hooks?.undone?.({ unitId, changed: undone, ops: snapshot.ops, roots: [...new Set(snapshot.ops.map(op => op.skill).filter((skill): skill is string => skill !== undefined))] })

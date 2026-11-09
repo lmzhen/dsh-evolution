@@ -2,7 +2,7 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, HomeFence, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { MergeUnitTransactions } from '../src/unit-protocol.ts'
 import { skillLibraryUnitBackend } from '../src/skill-library-unit-backend.ts'
@@ -47,4 +47,21 @@ it('fails closed when archive/name capabilities are unavailable', async () => {
   const port = skillLibraryPort({} as unknown as SkillLibrary)
   await expect(port.isArchived('src')).rejects.toThrow(/archivedNames is unavailable/)
   await expect(port.isNameOccupied('src')).rejects.toThrow(/skillDirExists is unavailable/)
+})
+
+it('uses one home fence for the outer unit and the nested tree write', { timeout: 30000 }, async () => {
+  const home = await tempRoot('dsh-merge-one-fence-')
+  const io = nodeEvolutionIo()
+  const fence = new HomeFence({ io, home })
+  const lockPort = { async acquire() { const lease = await fence.acquire(); return { release: async () => await lease.release() } } }
+  const lib = new SkillLibrary(home, io, DEFAULT_SKILL_LIMITS, undefined, undefined, undefined, undefined, lockPort)
+  await lib.create('target', BODY('target'), 'foreground')
+  await writeFile(join(home, 'target', '.hermes-managed'), '')
+  await lib.create('src', BODY('src'), 'foreground')
+  const sourceBody = (await lib.read('src')) ?? ''
+  expect((await createStaging(io, home, { runId: 'run-fence', target: 'target', sources: [{ name: 'src', body: sourceBody, files: [] }], promptVersion: 'p1', ttlDays: 7, now: () => 1000 })).ok).toBe(true)
+  expect((await writeStagedFile(io, home, 'run-fence', 'SKILL.md', BODY('target'))).ok).toBe(true)
+  const unit = new MergeUnitTransactions({ io, home, backend: skillLibraryUnitBackend(lib), claim: { async acquire() { return { async release() {} } } }, fence })
+  const result = await commitStagedRun(io, home, 'run-fence', skillLibraryPort(lib), { origin: 'foreground', summary: 'one fence', now: () => 2000, unit })
+  expect(result.ok, result.ok ? '' : result.message).toBe(true)
 })

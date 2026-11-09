@@ -680,7 +680,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "ac0d5f05df0ebe99cd5d83f4c5528e963743d044b97ef5d98bb344be6554055e",
+        "sha256": "e7186fe40c29f7412b273a999c90e6a904b6677d028e16618b19f939bc71de0e",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1169,42 +1169,57 @@
           {
             "id": "ci-only-12",
             "tier": "unmapped",
-            "criterion": "prepare-release"
+            "criterion": "prepare-packed-platform"
           },
           {
             "id": "ci-only-13",
             "tier": "unmapped",
-            "criterion": "publish-scoped"
+            "criterion": "prepare-release"
           },
           {
             "id": "ci-only-14",
             "tier": "unmapped",
-            "criterion": "requirements.selftest"
+            "criterion": "publish-scoped"
           },
           {
             "id": "ci-only-15",
             "tier": "unmapped",
-            "criterion": "run-load-sensitive"
+            "criterion": "requirements.selftest"
           },
           {
             "id": "ci-only-16",
             "tier": "unmapped",
-            "criterion": "smoke-packed-install"
+            "criterion": "run-load-sensitive"
           },
           {
             "id": "ci-only-17",
-            "tier": "ci-only",
-            "criterion": "verify-layout-sync"
+            "tier": "unmapped",
+            "criterion": "smoke-packed-install"
           },
           {
             "id": "ci-only-18",
             "tier": "ci-only",
-            "criterion": "verify-probes"
+            "criterion": "verify-core-surface"
           },
           {
             "id": "ci-only-19",
             "tier": "ci-only",
+            "criterion": "verify-layout-sync"
+          },
+          {
+            "id": "ci-only-20",
+            "tier": "ci-only",
+            "criterion": "verify-probes"
+          },
+          {
+            "id": "ci-only-21",
+            "tier": "ci-only",
             "criterion": "verify-requirements"
+          },
+          {
+            "id": "ci-only-22",
+            "tier": "ci-only",
+            "criterion": "verify-test-lines"
           },
           {
             "id": "line-identity-ci",
@@ -1248,7 +1263,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 105,
+            "rowsWithoutIt": 108,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -1985,6 +2000,12 @@
             "reasonRef": "scripts/gate-manifest.json#ci-only-16",
             "expiry": "0.26.0",
             "owner": "scripts"
+          },
+          {
+            "id": "ci-only-17",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-17",
+            "expiry": "0.26.0",
+            "owner": "scripts"
           }
         ],
         "unknownCriterion": [
@@ -2271,7 +2292,7 @@
             "key": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
             "ids": [
               "gate-70",
-              "ci-only-12"
+              "ci-only-13"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2281,7 +2302,7 @@
             "key": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
             "ids": [
               "gate-71",
-              "ci-only-13"
+              "ci-only-14"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2291,7 +2312,7 @@
             "key": "node packages/evolution/scripts/requirements.selftest.mjs",
             "ids": [
               "gate-72",
-              "ci-only-14"
+              "ci-only-15"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2301,16 +2322,6 @@
             "key": "node packages/evolution/scripts/run-load-sensitive.mjs .",
             "ids": [
               "gate-73",
-              "ci-only-15"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
-            "ids": [
-              "gate-74",
               "ci-only-16"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
@@ -2321,7 +2332,7 @@
             "key": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
             "ids": [
               "gate-75",
-              "ci-only-17"
+              "ci-only-19"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2331,7 +2342,7 @@
             "key": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
             "ids": [
               "gate-76",
-              "ci-only-18"
+              "ci-only-20"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2341,7 +2352,7 @@
             "key": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
             "ids": [
               "gate-77",
-              "ci-only-19"
+              "ci-only-21"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",

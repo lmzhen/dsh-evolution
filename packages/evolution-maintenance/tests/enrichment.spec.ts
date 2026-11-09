@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { buildEnrichment } from '../src/index.ts'
-import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /**
  * Minimal library fake covering the surface buildEnrichment consumes. `read`
