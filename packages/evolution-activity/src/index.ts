@@ -385,13 +385,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // DSH_HOME cannot interleave between our read and write.
     const io = evolutionIoAdapter(() => ioRegistry.provider())
     const root = evolutionHome()
+    const authority = (ioCtx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
+    const write = async (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => {
+      if (authority?.homeFence !== undefined) await authority.homeFence.run(async () => { await transactIo(io, path, task) })
+      else await transactIo(io, path, task)
+    }
     // In-process serialization: each event is one transactIo cycle, so
     // concurrent outcomes in THIS process can never overwrite each other's
     // newest record (the backend lock covers other processes).
     let chain: Promise<unknown> = Promise.resolve()
     ioCtx.on('evolution/plan-applied', (event) => {
       const run = chain.then(() =>
-        transactIo(io, activityFile(root), async (current) => {
+        write(activityFile(root), async (current) => {
           const file = activityFile(root)
           if (isCorruptActivity(current)) {
             // P2-15: folding would restart from [] and overwrite bytes that are
