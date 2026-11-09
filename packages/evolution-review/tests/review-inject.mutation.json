@@ -3,10 +3,10 @@
   "edits": [
     {
       "file": "packages/evolution-review/src/index.ts",
-      "find": "reviewMode: z.union([z.const('inject'), z.const('branch')]).default('inject').volatile(),",
-      "replace": "reviewMode: z.union([z.const('inject'), z.const('branch')]).default('branch').volatile(),"
+      "find": "reviewMode: z.union([z.const('inject'), z.const('aux')]).default('aux').volatile(),",
+      "replace": "reviewMode: z.union([z.const('inject'), z.const('aux')]).default('inject').volatile(),"
     }
   ],
   "expect": "red",
-  "note": "the reviewMode default must stay inject; branch is an explicit temporary opt-in"
+  "note": "reviewMode defaults to aux; changing it to inject must fail"
 }
