@@ -120,7 +120,9 @@ export class EvolutionFeedback {
    * keeping an optimistic value that never landed. */
   onRollback?: (target: string, kind: 'skill' | 'session') => void
 
-  constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}) {
+  private readonly fence: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
+
+  constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}, fence?: { run<T>(body: () => Promise<T>): Promise<T> }) {
     // rc.68 + K-6: BOTH paths derive from the constructor surface only —
     // record() takes no backend io, so path and io backend can never disagree.
     // They derive unconditionally so a late `attachIo` (S6.4) does not need to
@@ -129,6 +131,7 @@ export class EvolutionFeedback {
     this.eventsPath = eventsFile(home)
     this.io = io
     this.warn = warn
+    this.fence = fence
   }
 
   /** Bind the evolution IO backend after construction (S6.4 deferred binding). */
@@ -353,7 +356,7 @@ export class EvolutionFeedback {
     // linger in memory (it would silently diverge and be dropped next boot).
     void this.mutate(async () => {
       try {
-        const seq = await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note })
+        const seq = await appendEvolutionEvent(recordIo, eventsPath, { type: 'feedback', target, kind, rating, note }, undefined, this.fence)
         // A successfully persisted note becomes the durable truth for a later
         // failed append's rollback (V4-41).
         if (note !== undefined) {
@@ -861,6 +864,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     (message) => {
       ctx.logger.warn(message)
     },
+    (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence,
   )
   // Make the service available first; restoration settles in the background.
   ctx.provide('evolutionFeedback', feedback)
