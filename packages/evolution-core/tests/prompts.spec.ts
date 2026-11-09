@@ -21,24 +21,18 @@ it('verifyPromptBundle rejects tampered prompt content', () => {
   expect(verifyPromptBundle(tampered)).toBe(false)
 })
 
-// Hermes-alignment contract (2026-08-29): the operational guidance the model
-// follows must keep the original's structure — these substrings are the
-// load-bearing instruction points, not prose. A future simplification that
-// drops any of them fails here first.
-it('skill review prompt keeps the Hermes guiding structure (alignment contract)', () => {
-  expect(SKILL_REVIEW_PROMPT).toContain('Activity is not a quota');
-  expect(SKILL_REVIEW_PROMPT).toContain('a precise no-op after checking is better than a vague or forced entry')
-  expect(SKILL_REVIEW_PROMPT).toContain('FIRST-CLASS skill signals')
-  expect(SKILL_REVIEW_PROMPT).toContain('UPDATE A CURRENTLY-LOADED SKILL')
-  expect(SKILL_REVIEW_PROMPT).toContain('session artifact')
-  expect(SKILL_REVIEW_PROMPT).toContain('how to do this class of task for this user')
-  // Pinned semantics must match the DSH guard (read-only within review) — not
-  // the Hermes "pin only blocks the curator" wording.
-  expect(SKILL_REVIEW_PROMPT).toContain('read-only to THIS background review pass')
-  expect(SKILL_REVIEW_PROMPT).toContain('Two-tier deposition discipline')
-  expect(SKILL_REVIEW_PROMPT).toContain('no existing umbrella can absorb the learning')
-  expect(SKILL_REVIEW_PROMPT).toContain('A skill body is a reusable decision rule')
-  expect(SKILL_REVIEW_PROMPT).toContain('state what you checked and stop')
+it('skill review prompt keeps neutral decision structure and pass wording', () => {
+  expect(SKILL_REVIEW_PROMPT).toContain('A precise no-op is a valid outcome')
+  expect(SKILL_REVIEW_PROMPT).toContain('class-level skill')
+  expect(SKILL_REVIEW_PROMPT).toContain('references/')
+  expect(SKILL_REVIEW_PROMPT).toContain('this review pass')
+  expect(SKILL_REVIEW_PROMPT).not.toContain('background review pass')
+  expect(SKILL_REVIEW_PROMPT).toContain('Update only skills you loaded or read')
+  expect(SKILL_REVIEW_PROMPT).toContain('creating a new class-level skill is the exception')
+  expect(SKILL_REVIEW_PROMPT).toContain('Do not turn environment failures')
+  expect(SKILL_REVIEW_PROMPT).toContain('Capture a reproducible setup fix')
+  expect(SKILL_REVIEW_PROMPT).toContain('User preferences belong')
+  expect(SKILL_REVIEW_PROMPT).toContain('Nothing to save.')
   expect(MEMORY_REVIEW_PROMPT).toContain('Has the user revealed things about themselves')
 })
 
@@ -46,9 +40,11 @@ it('authoring standards put routing metadata in frontmatter', () => {
   expect(DSH_AUTHORING_STANDARDS).toContain('whenToUse:')
 })
 
-it('combined review prompt mirrors the same guidance and two-tier rule', () => {
-  expect(COMBINED_REVIEW_PROMPT).toContain('Frustration is a FIRST-CLASS skill signal')
-  expect(COMBINED_REVIEW_PROMPT).toContain('Body density IS reuse rate')
+it('combined review prompt mirrors the same neutral decision structure', () => {
+  expect(COMBINED_REVIEW_PROMPT).toContain('## Memory')
+  expect(COMBINED_REVIEW_PROMPT).toContain('## Skills')
+  expect(COMBINED_REVIEW_PROMPT).toContain('A precise no-op is a valid outcome')
+  expect(COMBINED_REVIEW_PROMPT).toContain('User preferences belong')
 })
 
 it('curator prompt keeps package integrity and the consolidated/pruned block contract', () => {
@@ -70,7 +66,7 @@ it('curator prompt keeps package integrity and the consolidated/pruned block con
   expect(PROMPT_BUNDLE.prompts['curator']).toBe(CURATOR_PROMPT)
   // V3 (design §16.2): the B1 clause gained the authoring-band discipline, so the
   // bundle identity moves with it (v18 pinned the step-7 wording).
-  expect(PROMPT_BUNDLE_VERSION).toBe(23)
+  expect(PROMPT_BUNDLE_VERSION).toBe(24)
   // v46 S1.12b (finding T3-07): the dry-run banner is model-visible curator text, so it rides
   // the bundle and the digest covers it.
   expect(PROMPT_BUNDLE.prompts['curatorDryRun']).toBe(CURATOR_DRY_RUN_BANNER)
@@ -121,22 +117,21 @@ it('channel variants carry the subagent deliverable limit (M-2)', () => {
   expect(SKILL_REVIEW_PLAN_PROMPT).toContain('never narrate actions you took')
   expect(COMBINED_REVIEW_PLAN_PROMPT).toContain('CHANNEL (subagent)')
   // The whole policy survives in the plan variant (it is a superset).
-  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('FIRST-CLASS skill signals')
+  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('A precise no-op is a valid outcome')
   expect(reviewPrompt('skill', 'plan')).toBe(SKILL_REVIEW_PLAN_PROMPT)
   expect(reviewPrompt('skill', 'agent')).toBe(SKILL_REVIEW_PROMPT)
+  expect(reviewPrompt('combined', 'agent')).toBe(COMBINED_REVIEW_PROMPT)
   expect(reviewPrompt('combined', 'plan')).toBe(COMBINED_REVIEW_PLAN_PROMPT)
   // Both variants are covered by the bundle digest.
   expect(PROMPT_BUNDLE.prompts['skillPlan']).toBe(SKILL_REVIEW_PLAN_PROMPT)
   expect(PROMPT_BUNDLE.prompts['combinedPlan']).toBe(COMBINED_REVIEW_PLAN_PROMPT)
 })
 
-it('skill review avoids unread-skill ops with an explicit create exemption (rc.67 K-3; v33 R3-F1 wording)', () => {
-  // v33 R3-F1: the enforcement claim is now channel-accurate - the plan
-  // channel rejects unread ops, direct writes carry no such guard.
-  expect(SKILL_REVIEW_PROMPT).toContain('On the plan channel ops on unread skills are rejected')
-  expect(SKILL_REVIEW_PROMPT).toContain('CREATE of a brand-new umbrella is the only exception')
-  expect(COMBINED_REVIEW_PROMPT).toContain('On the plan channel ops on unread skills are rejected')
-  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('On the plan channel ops on unread skills are rejected')
+it('skill review keeps read-before-write and the create exemption neutral', () => {
+  expect(SKILL_REVIEW_PROMPT).toContain('Update only skills you loaded or read in this review pass')
+  expect(SKILL_REVIEW_PROMPT).toContain('creating a new class-level skill is the exception')
+  expect(COMBINED_REVIEW_PROMPT).toContain('Update only skills you loaded or read in this review pass')
+  expect(SKILL_REVIEW_PLAN_PROMPT).toContain('Update only skills you loaded or read in this review pass')
 })
 
 it('authoring standards carry the colon-quote and privacy motive guarantees', () => {
