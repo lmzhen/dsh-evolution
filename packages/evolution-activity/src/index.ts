@@ -386,9 +386,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const io = evolutionIoAdapter(() => ioRegistry.provider())
     const root = evolutionHome()
     const authority = (ioCtx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
+    const commit = (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => transactIo(io, path, task)
     const write = async (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => {
-      if (authority?.homeFence !== undefined) await authority.homeFence.run(async () => { await transactIo(io, path, task) })
-      else await transactIo(io, path, task)
+      if (authority?.homeFence !== undefined) await authority.homeFence.run(async () => { await commit(path, task) })
+      else await commit(path, task)
     }
     // In-process serialization: each event is one transactIo cycle, so
     // concurrent outcomes in THIS process can never overwrite each other's
