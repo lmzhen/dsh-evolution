@@ -459,8 +459,18 @@ export class EvolutionApproval extends Service {
       const claimId = this.newClaimId()
       const claimed = await this.state().claimPending(record.id, claimId)
       if (!claimed) continue
-      const resolution = await this.state().tryResolvePending(record.id, 'rejected', claimId)
-      if (resolution.applied) expired.push(record.id)
+      let applied = false
+      try {
+        const resolution = await this.state().tryResolvePending(record.id, 'rejected', claimId)
+        applied = resolution.applied
+        if (applied) expired.push(record.id)
+      } catch (error) {
+        this.ctx.logger.warn(error)
+      } finally {
+        if (!applied) {
+          await this.state().releasePendingClaim(record.id, claimId).catch((error: unknown) => { this.ctx.logger.warn(error) })
+        }
+      }
     }
     if (expired.length > 0) {
       this.ctx.logger.warn(`evolution-approval: ${expired.length} staged write(s) passed pendingTtlMs=${ttl} and were closed as rejected WITHOUT executing: ${expired.join(', ')} — stage them again if they are still wanted`)
