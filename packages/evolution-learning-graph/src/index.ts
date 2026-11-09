@@ -12,7 +12,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { isPresent, isUnknown, authorityFrom, runWriteGates, skillWriteGateContext, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core'
-import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
+import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import {

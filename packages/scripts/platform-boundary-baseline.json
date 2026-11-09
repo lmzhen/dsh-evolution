@@ -46,10 +46,6 @@
       "specifier": "@deepseek-ai/dsh-session"
     },
     {
-      "file": "packages/evolution-learning-graph/src/index.ts",
-      "specifier": "@deepseek-ai/dsh-commands"
-    },
-    {
       "file": "packages/evolution-maintenance/src/orchestrate.ts",
       "specifier": "@deepseek-ai/dsh-agent"
     },
