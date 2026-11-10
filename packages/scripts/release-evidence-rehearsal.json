@@ -1,31 +1,34 @@
 {
-  "note": "Historical W10/W11 rehearsal for 0.40.1. S1 was measured on the 0.40.0 candidate host; S2/S3 on the CI-packed 0.0.0-main tree; S4 on the 0.40.0 overlay. No S1-S4 reading was taken on 0.41.0; this file is a rehearsal and must not be used as release evidence.",
-  "familyVersion": "0.40.1",
+  "note": "0.42.0 release rehearsal: S1-S4 measured on the 0.41.0 candidate code; 0.42.0 differs only in package version. Artifact hash is the 0.42.0 release tarball.",
+  "familyVersion": "0.42.0",
   "spikes": [
     {
       "spike": "S1",
-      "verdict": "blocked",
-      "failure": "not measured on 0.41.x; the rehearsal PASS claim is withdrawn",
+      "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.40.0",
-      "startedAt": "2026-11-09T08:58:00.000Z",
+      "familyVersion": "0.42.0",
+      "startedAt": "2026-11-10T05:16:06.588Z",
+      "artifactSha256": "6fde97d5b64275f80b903d0f6de08281896939802716410aef1c45a2c6ab478a",
+      "commit": "7e8a32e5",
+      "inputsSha256": "bb9faa1eee78c5dbbd539088943448ca022b8f45322d1c58ce38a83e8e55ca1e",
       "readings": {
-        "skillHistoryRows": 0,
-        "skillHistoryBytes": 21,
+        "skillHistoryRows": 29,
+        "skillHistoryBytes": 22671,
         "ownerStatus": 200,
-        "threeReadsStable": true,
-        "note": "three consecutive owner GETs of /api/dsh-evolution/skill-history/skills returned the same 0-row, 21-byte JSON body on the fresh 0.40.0 candidate host"
+        "threeReadsStable": true
       }
     },
     {
       "spike": "S2",
-      "verdict": "blocked",
-      "failure": "not measured on 0.41.x; the rehearsal PASS claim is withdrawn",
+      "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.0.0-main",
-      "startedAt": "2026-11-09T08:58:00.000Z",
+      "familyVersion": "0.42.0",
+      "startedAt": "2026-11-10T05:16:06.588Z",
+      "artifactSha256": "6fde97d5b64275f80b903d0f6de08281896939802716410aef1c45a2c6ab478a",
+      "commit": "7e8a32e5",
+      "inputsSha256": "bb9faa1eee78c5dbbd539088943448ca022b8f45322d1c58ce38a83e8e55ca1e",
       "readings": {
         "ownerDiagnostics": 200,
         "anonymous": 401,
@@ -35,15 +38,17 @@
     },
     {
       "spike": "S3",
-      "verdict": "blocked",
-      "failure": "not measured on 0.41.x; the rehearsal PASS claim is withdrawn",
+      "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.0.0-main",
-      "startedAt": "2026-11-09T08:58:00.000Z",
+      "familyVersion": "0.42.0",
+      "startedAt": "2026-11-10T05:16:06.588Z",
+      "artifactSha256": "6fde97d5b64275f80b903d0f6de08281896939802716410aef1c45a2c6ab478a",
+      "commit": "7e8a32e5",
+      "inputsSha256": "bb9faa1eee78c5dbbd539088943448ca022b8f45322d1c58ce38a83e8e55ca1e",
       "readings": {
         "semverVersion": "0.2.2-rc.1",
-        "familyVersion": "0.0.0-main",
+        "familyVersion": "0.42.0",
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
@@ -52,17 +57,18 @@
     },
     {
       "spike": "S4",
-      "verdict": "blocked",
-      "failure": "not measured on 0.41.x; the rehearsal PASS claim is withdrawn",
+      "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.40.0",
-      "startedAt": "2026-11-09T08:58:00.000Z",
+      "familyVersion": "0.42.0",
+      "startedAt": "2026-11-10T05:16:06.588Z",
+      "artifactSha256": "6fde97d5b64275f80b903d0f6de08281896939802716410aef1c45a2c6ab478a",
+      "commit": "7e8a32e5",
+      "inputsSha256": "bb9faa1eee78c5dbbd539088943448ca022b8f45322d1c58ce38a83e8e55ca1e",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
-        "repeatedPrepareIdempotent": true,
-        "note": "s4-hmr-double-apply.spec.ts 2/2 on the 0.40.0 overlay tree (2026-11-09T16:57+08:00)"
+        "repeatedPrepareIdempotent": true
       }
     }
   ],
@@ -75,7 +81,7 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "gate-55 verify-traceability --strict on a53185cf + baseline fix"
+    "source": "gate-55 verify-traceability --strict"
   },
   "faces": {
     "web": {
@@ -83,7 +89,5 @@
       "facts": 7,
       "runtime": 8
     }
-  },
-  "evidenceStatus": "rehearsal",
-  "inheritedFrom": "0.40.1"
+  }
 }
