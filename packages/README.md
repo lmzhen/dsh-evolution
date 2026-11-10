@@ -68,7 +68,12 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 
 ## Command and tool entry points
 
-User-facing surfaces are documented once in [docs/commands.md](../docs/commands.md). Summary: `/evolution` (27 table entries), `/graph`, and `/skill-domain` (mode:on). Family model-tool entries are `memory`, `skill_manage`, `skill_search`, `maintenance_probe`, and the merge-child-only `merge_stage`; the bundles also mount the platform session-query tools.
+User-facing surfaces are documented once in [docs/commands.md](../docs/commands.md).
+
+| Command | Purpose |
+|---|---|
+| `/evolution doctor` | Check installation form, versions and service state |
+ Summary: `/evolution` (27 table entries), `/graph`, and `/skill-domain` (mode:on). Family model-tool entries are `memory`, `skill_manage`, `skill_search`, `maintenance_probe`, and the merge-child-only `merge_stage`; the bundles also mount the platform session-query tools.
 
 ## State and IO
 
