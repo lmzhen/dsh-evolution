@@ -44,6 +44,8 @@ export const EVOLUTION_BUNDLE_TAILS = [
  * `.release-staging.previous`. It never mattered only because publishableDirs() ALSO required a
  * package.json, so a leftover carrying one (a staging copy does) would have been published by the
  * second rule while the first said it was excluded. */
+export const RETIRED_PACKAGE_DIRS = new Set(['evolution-preset'])
+
 export const NON_PACKAGE_DIRS = new Set([
   'scripts', 'docs', 'node_modules', 'dist.next',
   '.release-staging', '.release-staging.next', '.release-staging.previous',
@@ -67,7 +69,7 @@ export function isNonPackageDir(name) {
  */
 export function publishableDirs(packagesRoot) {
   return readdirSync(packagesRoot, { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && !isNonPackageDir(entry.name))
+    .filter(entry => entry.isDirectory() && !isNonPackageDir(entry.name) && !RETIRED_PACKAGE_DIRS.has(entry.name))
     .map(entry => entry.name)
     // The manifest check is the SECOND line, not the only one: the name rule above is what keeps
     // a staging leftover from being published, and this line keeps a directory that merely lacks

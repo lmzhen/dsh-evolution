@@ -63,7 +63,6 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 |---|---|
 | `evolution-host` | Infrastructure bundle (21 rows + 2 overrides) |
 | `evolution-all` | Full bundle (28 rows + 2 overrides); default |
-| `evolution-preset` | Compatibility bundle (26 rows + 2 overrides) + standalone `cordis.yml` |
 | `evolution-agent` | Agent preset delta (5 rows) + 4 base table; not a bundle |
 
 ## Command and tool entry points

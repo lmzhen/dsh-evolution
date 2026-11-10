@@ -54,12 +54,10 @@ The full source layout reports<!-- gen:install-counts --> 36 packages installed 
 
 | Form | Use case | Capabilities and UI |
 |---|---|---|
-| `all` | Default full installation | Memory and skill tools in every session; evolution workbench (history/pending/merge/health) and the diagnostics card on Web/desktop GUI |
-| `host` | No memory/skill write tools for the model | Explicit merge, background curation, manual maintenance and diagnostics remain; automatic review and usage accounting do not run; no evolution workbench or diagnostics |
-| `preset` | Migration from an older configuration | Similar tool coverage to `all`, without settings or sidebar panels |
-| Layered preset | Tools only in selected sessions | `host` plus the Evolution preset; other sessions do not enable automatic plugin behavior; no settings or sidebar panels |
+| `all` | Default product installation | Memory and skill tools in every session; evolution workbench (history/pending/merge/health) and the diagnostics card on Web/desktop GUI |
+| `host` | Advanced composition only | Infrastructure without the model memory/skill rows; not the product default |
 
-Use only one form per profile. See [packages/INSTALL.md](packages/INSTALL.md) for exact session behavior and [INSTALL.md](INSTALL.md) for commands.
+Use `all` for normal installs. The old `preset` and layered forms are internal migration paths, not product choices. See [packages/INSTALL.md](packages/INSTALL.md) for exact session behavior and [INSTALL.md](INSTALL.md) for commands.
 
 ## Common commands
 
