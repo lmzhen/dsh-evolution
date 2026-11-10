@@ -902,9 +902,11 @@
         "ci-only-06",
         "ci-only-07",
         "ci-only-08",
-        "ci-only-17",
         "ci-only-18",
         "ci-only-19",
+        "ci-only-20",
+        "ci-only-21",
+        "ci-only-22",
         "line-identity-ci"
       ],
       "specs": [
@@ -1619,9 +1621,11 @@
         "ci-only-06",
         "ci-only-07",
         "ci-only-08",
-        "ci-only-17",
         "ci-only-18",
         "ci-only-19",
+        "ci-only-20",
+        "ci-only-21",
+        "ci-only-22",
         "gate-01",
         "gate-02",
         "gate-03",
@@ -2321,7 +2325,7 @@
       "specs": 459
     },
     "ci-only": {
-      "gates": 12,
+      "gates": 14,
       "specs": 72
     },
     "full(ci=off)": {
@@ -2329,7 +2333,7 @@
       "specs": 459
     },
     "full(ci=on)": {
-      "gates": 87,
+      "gates": 89,
       "specs": 531
     }
   },
