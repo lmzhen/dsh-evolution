@@ -46,6 +46,9 @@ it('写入引入悬空引用时回执点名目标，存量悬空不再提', asyn
     expect(receipt).toContain('dangling:')
     expect(receipt).toContain('references/gone-b.md')
     expect(receipt).not.toContain('references/gone-a.md')
+    // Keep the two writes on distinct millisecond stamps: the audit row is the only place the
+    // test reads the receipt from, and same-ms rows made this assertion order-sensitive in CI.
+    await new Promise(resolve => setTimeout(resolve, 10))
     await lib.update('d-skill', withRefs('See references/gone-a.md and references/gone-b.md, plus more text.'))
     expect(await last(lib, 'd-skill')).not.toContain('dangling:')
   } finally { await rm(root, { recursive: true, force: true }) }
