@@ -16,7 +16,9 @@
  */
 
 /** Session ids currently executing a review prompt, oldest delivery first. */
-const markedSessions = new Set<string>()
+const MARK_KEY = Symbol.for('dsh.evolution.review-channel.marked')
+const registry = globalThis as typeof globalThis & { [MARK_KEY]?: Set<string> }
+const markedSessions = registry[MARK_KEY] ?? (registry[MARK_KEY] = new Set<string>())
 
 /**
  * Mark one session as running the review channel's prompt; idempotent, and
