@@ -1833,7 +1833,7 @@
       "kind": "decl",
       "owner": "client-frontend-01",
       "files": [
-        "packages/evolution-ui/tests/settings-section.client.spec.ts"
+        "packages/evolution-ui/tests/settings-row-config.client.spec.ts"
       ],
       "mutation": "packages/evolution-ui/tests/settings-configforms.mutation.json",
       "evidence": "A",

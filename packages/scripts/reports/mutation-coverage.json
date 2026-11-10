@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-10T04:09:24.019Z",
+  "generatedAt": "2026-11-10T16:17:51.810Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -29,8 +29,8 @@
     },
     {
       "probe": "beh-installer-layered",
-      "signature": "dd02df3ee76ed4309e5dca4485816d2650df84ac46c9424122a8957d8fab5438",
-      "provenAt": "2026-11-02T23:45:36.409Z",
+      "signature": "9aa1efc1f1e6b96072a88dd1257af15b2b5aa86a9916e4b6e997ac62e2b96ad0",
+      "provenAt": "2026-11-10T16:17:51.810Z",
       "tree": "overlay"
     },
     {
@@ -95,14 +95,14 @@
     },
     {
       "probe": "decl-composer-single-source",
-      "signature": "ecdb2584868f7b8e52f48392922fa78732ab65b0b20792811f74a15f42442e3a",
-      "provenAt": "2026-11-09T17:00:30.624Z",
+      "signature": "da3eb4feea0803a5285c03955c5d9f12b5905e6497917ca94c4f56f7419b5746",
+      "provenAt": "2026-11-10T16:17:51.760Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-configforms-seat",
-      "signature": "6ff45cd4dfb582315aed1bfe4247f42e0926c1f38a22d5719fb9698cd2abc1ff",
-      "provenAt": "2026-11-09T17:06:00.312Z",
+      "signature": "4759fb6fc60939e52e5f4b6c6526860e26e851fe5eb920722fb907c3e473cd99",
+      "provenAt": "2026-11-10T16:17:51.791Z",
       "tree": "overlay"
     },
     {

@@ -2,11 +2,11 @@
   "probe": "decl-configforms-seat",
   "edits": [
     {
-      "file": "packages/evolution-ui/src/panels/settings/index.ts",
-      "find": "const probe: SeatProbe = () => seat",
-      "replace": "const probe: SeatProbe = () => undefined"
+      "file": "packages/evolution-ui/src/panels/settings/RowConfigCard.ts",
+      "find": "  if (form === undefined) {",
+      "replace": "  if (false) {"
     }
   ],
   "expect": "red",
-  "note": "the settings card must read the optional configForms seat; undefined means read-only, not a silent override"
+  "note": "the row card must state a missing settings seat, not draw dead controls"
 }
