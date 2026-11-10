@@ -13,7 +13,7 @@ import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
 import { readFileSync } from 'node:fs'
 import { scopedPackageName, asRecord } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, presetRowBlock, presetRowBody, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import type { DiagnosticsView } from '@deepseek-ai/dsh-evolution-core'
@@ -376,7 +376,7 @@ const AGENT_PRESET_PACKAGE = scopedPackageName('dsh-evolution-agent-preset', imp
  * @returns the file path, or null when the package is not installed. */
 function resolveAgentPresetAsset(asset: string): string | null {
   try {
-    return fileURLToPath(import.meta.resolve(`${AGENT_PRESET_PACKAGE}/${asset}`))
+    return createRequire(import.meta.url).resolve(`${AGENT_PRESET_PACKAGE}/${asset}`)
   } catch {
     // Optional dependency absent (or the export renamed): "cannot recompute",
     // which the caller reports as unknown instead of guessing a path.
