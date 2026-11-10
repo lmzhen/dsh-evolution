@@ -794,12 +794,11 @@
         "evolution-ui::tests/settings-pending-card.spec.ts",
         "evolution-ui::tests/settings-refused-verdict-via-write-face.client.spec.ts",
         "evolution-ui::tests/settings-refused-verdict.client.spec.ts",
+        "evolution-ui::tests/settings-registration.client.spec.ts",
         "evolution-ui::tests/settings-row-config.client.spec.ts",
-        "evolution-ui::tests/settings-section.client.spec.ts",
         "evolution-ui::tests/settings-slot-fill.client.spec.ts",
         "evolution-ui::tests/settings-states.generated.spec.ts",
         "evolution-ui::tests/settings-styles.client.spec.ts",
-        "evolution-ui::tests/settings-u10-summary.client.spec.ts",
         "evolution-ui::tests/settings-u3-decoration.client.spec.ts",
         "evolution-ui::tests/settings-u4-constraints.client.spec.ts",
         "evolution-ui::tests/settings-u5-decision-facts.client.spec.ts",
@@ -1512,12 +1511,11 @@
         "evolution-ui::tests/settings-pending-card.spec.ts",
         "evolution-ui::tests/settings-refused-verdict-via-write-face.client.spec.ts",
         "evolution-ui::tests/settings-refused-verdict.client.spec.ts",
+        "evolution-ui::tests/settings-registration.client.spec.ts",
         "evolution-ui::tests/settings-row-config.client.spec.ts",
-        "evolution-ui::tests/settings-section.client.spec.ts",
         "evolution-ui::tests/settings-slot-fill.client.spec.ts",
         "evolution-ui::tests/settings-states.generated.spec.ts",
         "evolution-ui::tests/settings-styles.client.spec.ts",
-        "evolution-ui::tests/settings-u10-summary.client.spec.ts",
         "evolution-ui::tests/settings-u3-decoration.client.spec.ts",
         "evolution-ui::tests/settings-u4-constraints.client.spec.ts",
         "evolution-ui::tests/settings-u5-decision-facts.client.spec.ts",
@@ -2207,12 +2205,11 @@
         "evolution-ui::tests/settings-pending-card.spec.ts",
         "evolution-ui::tests/settings-refused-verdict-via-write-face.client.spec.ts",
         "evolution-ui::tests/settings-refused-verdict.client.spec.ts",
+        "evolution-ui::tests/settings-registration.client.spec.ts",
         "evolution-ui::tests/settings-row-config.client.spec.ts",
-        "evolution-ui::tests/settings-section.client.spec.ts",
         "evolution-ui::tests/settings-slot-fill.client.spec.ts",
         "evolution-ui::tests/settings-states.generated.spec.ts",
         "evolution-ui::tests/settings-styles.client.spec.ts",
-        "evolution-ui::tests/settings-u10-summary.client.spec.ts",
         "evolution-ui::tests/settings-u3-decoration.client.spec.ts",
         "evolution-ui::tests/settings-u4-constraints.client.spec.ts",
         "evolution-ui::tests/settings-u5-decision-facts.client.spec.ts",
@@ -2325,7 +2322,7 @@
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 460
+      "specs": 459
     },
     "ci-only": {
       "gates": 14,
@@ -2333,16 +2330,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 460
+      "specs": 459
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 532
+      "specs": 531
     }
   },
   "specs": {
-    "total": 532,
-    "marked": 532,
+    "total": 531,
+    "marked": 531,
     "unmarked": 0
   }
 }
