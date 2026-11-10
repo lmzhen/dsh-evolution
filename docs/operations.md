@@ -37,7 +37,7 @@
 | `$DSH_HOME/evolution/` | 复盘、整理、运行记录，以及 `evolution/merge/` 合并状态与回执 |
 | `$DSH_HOME/units/skill/` | 当前技能单元的 `journals/` 与 `snapshots/`，用于 `--unit` 撤销和 prepared-unit 恢复 |
 | `$DSH_HOME/merge/` | 旧版树改动快照的兼容回退，不是当前单元存储主目录 |
-| `$DSH_HOME/settings.yaml` | GUI 和 `/evolution policy set` 写入的 E3 用户设置 |
+| `$DSH_HOME/settings.yaml` | 平台插件管理 row 配置写入的 E3 用户设置 |
 | `$DSH_HOME/profiles/<profile>/cordis.patch.yml` | 部署配置、行级覆盖及分层 Evolution 预设行 |
 
 `settings.yaml` 与 profile patch 不是同一份配置，不能只备份其中一个。

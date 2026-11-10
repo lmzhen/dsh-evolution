@@ -43,7 +43,7 @@ Validated line: **DSH 0.2.2-rc.1**.
 
 ## Command fallbacks
 
-Fallbacks cover `approval`, `skill-history`, `skill-health`, `merge`, `diagnostics`, and `settings`; examples include `/evolution pending`, `/evolution restore`, `/evolution skills`, `/evolution merge`, `/evolution doctor`, and `/evolution policy` (`/evolution policy set <id> <value>`). The generated table lives in evolution-client-kit; if a fallback names a retired command, treat it as a documentation defect.
+Parameter viewing uses `/evolution params`; fallbacks cover `approval`, `skill-history`, `skill-health`, `merge`, `diagnostics`, and `settings`; examples include `/evolution pending`, `/evolution restore`, `/evolution skills`, `/evolution merge`, `/evolution doctor`, and `/evolution policy` (`/evolution policy set <id> <value>`). The generated table lives in evolution-client-kit; if a fallback names a retired command, treat it as a documentation defect.
 
 Preset bases and preconditions are single-sourced in [evolution-agent/README.md](evolution-agent/README.md).
 

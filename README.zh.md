@@ -26,7 +26,7 @@ skill 是封装任务流程的模块：一个 `SKILL.md` 正文，加上可选�
 | 技能目录与检索 | 默认发布完整技能目录，模型通过原生 `skill` 工具加载；`skill_search` 提供本地检索，discovery 的域卡和目录裁剪默认关闭 |
 | 技能库整理 | curator 默认按时间间隔和空闲条件执行确定性整理，标记过时技能并归档；LLM 合并提名需单独启用 |
 | 技能合并 | 通过 `/evolution merge scan` 或 `pair` 发起。scan 需要本地 potion 模型，缺少 LLM 时可回退 stub；普通 pair 不需要 potion，但 round1/authoring 需要子会话模型。发起后默认自动批准，`mergeApproval` 可改为人工批准 |
-| 记忆 | `all`、`preset` 及分层预设的选定会话提供。项目记忆和用户画像预算分别为 2200、1375 字符；达到上限后拒绝新增，不静默截断 |
+| 记忆 | `all` 会话提供。项目记忆和用户画像预算分别为 2200、1375 字符；达到上限后拒绝新增，不静默截断 |
 | 写入审批与恢复 | 普通写入审批默认关闭，开启后可暂存记忆和技能写入；curator 与 merge 使用各自控制。技能历史、正文撤销、单元撤销和归档恢复的适用范围不同，执行期失败不承诺都能完整回退 |
 | 诊断与界面 | 提供 `/evolution doctor`、整理报告、技能健康和知识图；`all` 在 Web/桌面 GUI 提供进化工作台（技能历史/待批/合并/健康）和诊断卡，健康视图默认关闭 |
 
@@ -34,7 +34,7 @@ skill 是封装任务流程的模块：一个 `SKILL.md` 正文，加上可选�
 
 ## 安装
 
-环境要求、四种安装形态和升级步骤见 [INSTALL.md](INSTALL.md)。默认安装完整形态：
+环境要求、两种内部分层路径和升级步骤见 [INSTALL.md](INSTALL.md)。默认安装完整形态：
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
@@ -44,7 +44,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 
 桌面 GUI 将 `--profile web` 改为 `--profile desktop`。安装后可让 Agent 记住一条项目事实，再开新会话确认记忆已注入；`doctor` 用于检查安装形态和服务状态，不能替代实际读写验证。
 
-完整源码布局的安装结果为 35 个包；发布清单共 36 个包，agent preset 单独计算。
+完整源码布局的安装结果为 36 个包；发布清单共 36 个包，agent preset 单独计算。
 
 ## 安装形态
 
@@ -52,8 +52,6 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 |---|---|---|
 | `all` | 默认完整使用 | 所有会话提供记忆和技能工具；Web/桌面 GUI 提供进化工作台与诊断卡 |
 | `host` | 不授予模型记忆/技能写入工具 | 保留显式合并、后台整理、手动维护和诊断；自动复盘与用量统计不生效，无进化工作台和诊断卡 |
-| `preset` | 旧配置迁移 | 工具范围接近 `all`，但无设置页和侧栏面板 |
-| 分层预设 | 仅在选定会话提供工具 | `host` 加 Evolution 预设；其他会话不启用插件的自动行为，无设置页和侧栏面板 |
 
 同一 profile 只能使用一种形态。精确的会话影响见 [packages/INSTALL.md](packages/INSTALL.md)，安装命令见 [INSTALL.md](INSTALL.md)。
 
@@ -85,7 +83,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 |---|---|
 | 验证平台线 | **`0.2.2-rc.1`** |
 | 发布依赖窗口 | `^0.2.2-rc.0` |
-| 家族版本 | `0.41.0` |
+| 家族版本 | `0.43.0` |
 | Node | `^22.19.0` 或 `>=24.0.0` |
 
 发布包不跨旧预发布平台线。安装与升级顺序见 [INSTALL.md](INSTALL.md)。

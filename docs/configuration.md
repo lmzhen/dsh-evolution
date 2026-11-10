@@ -67,7 +67,7 @@ scan 需要 `mergeModelsRoot` 指向本地 potion 模型目录。未配置时 `/
 
 ## 设置写在哪里
 
-- **E3 用户设置**：通过 Web/桌面 GUI 的「设置 → 自进化」或 `/evolution policy set` 写入 `$DSH_HOME/settings.yaml`。设置页只在 all 安装形态提供。
+- **E3 用户设置**：通过平台插件管理的 bundle row 配置页写入；`/evolution params` 只读查看。
 - **E1/E2 部署配置**：写在 Cordis 配置或 `profiles/<profile>/cordis.patch.yml`。分层预设行也在该 patch 中。
 - **查看实际值**：使用 `/evolution params [--group <name>]`，它会区分用户覆盖、部署值和未注册来源。
 

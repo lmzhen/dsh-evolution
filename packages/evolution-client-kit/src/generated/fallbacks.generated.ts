@@ -25,6 +25,6 @@ export const FALLBACKS: Readonly<Record<'approval' | 'skill-history' | 'skill-he
     platformCli: 'dsh --json /evolution doctor',
   },
   settings: {
-    command: '/evolution policy set <id> <value>（查看：/evolution policy）',
+    command: '/evolution params --group deployment（写入由平台插件管理的 row 配置页承载）',
   },
 }

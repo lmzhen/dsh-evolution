@@ -38,7 +38,7 @@ export const COMMAND_FALLBACKS: Readonly<Record<CommandFallbackSurface, CommandF
     command: '/evolution merge status / pending / approve <id> / report',
   },
   settings: {
-    command: '/evolution policy set <id> <value>（查看：/evolution policy）',
+    command: '/evolution params --group deployment（写入由平台插件管理的 row 配置页承载）',
   },
   diagnostics: {
     command: '/evolution doctor',

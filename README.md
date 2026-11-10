@@ -30,15 +30,15 @@ Each capability below has a corresponding code entry point. They have different 
 | Skill catalog and search | The full catalog is published by default and loaded through the native `skill` tool; `skill_search` provides local retrieval, while discovery domain cards and catalog trimming are off by default |
 | Library curation | Curator performs deterministic lifecycle maintenance on interval and idle conditions, marking stale skills and archiving them; LLM-nominated consolidation is a separate option |
 | Skill merge | Started with `/evolution merge scan` or `pair`. Scan requires local potion models and can fall back to stub without an LLM; ordinary pair does not require potion, but round 1/authoring requires a child-session model. Initiated runs are auto-approved by default, with `mergeApproval` available for manual approval |
-| Memory | Available in `all`, `preset` and selected layered-preset sessions. Project memory and user-profile budgets default to 2200 and 1375 characters; new writes are refused at the limit rather than silently truncated |
+| Memory | Available in `all` sessions. Project memory and user-profile budgets default to 2200 and 1375 characters; new writes are refused at the limit rather than silently truncated |
 | Write approval and recovery | Ordinary write approval is off by default and stages memory and skill writes when enabled; curator and merge use their own controls. Skill history, body undo, unit undo and archive restore have different scopes, and execution-time failures do not guarantee complete rollback |
-| Diagnostics and UI | `/evolution doctor`, curation reports, skill health and a knowledge graph are available; `all` provides settings, skill history and a merge panel on Web/desktop GUI, while the health panel is disabled by default |
+| Diagnostics and UI | `/evolution doctor`, curation reports, skill health and a knowledge graph are available; `all` provides plugin-manager row configuration, skill history and a merge panel on Web/desktop GUI, while the health panel is disabled by default |
 
 See [Feature reference](docs/features.md) for triggers, failure behavior and limits.
 
 ## Install
 
-See [INSTALL.md](INSTALL.md) for prerequisites, all four installation forms and upgrades. Install the full form by default:
+See [INSTALL.md](INSTALL.md) for prerequisites, the two internal installation planes and upgrades. Install the full form by default:
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
@@ -87,7 +87,7 @@ See [docs/commands.md](docs/commands.md) for the command reference and [docs/con
 |---|---|
 | Validated platform line | **`0.2.2-rc.1`** |
 | Published dependency window | `^0.2.2-rc.0` |
-| Family version | `0.41.0` |
+| Family version | `0.43.0` |
 | Node | `^22.19.0` or `>=24.0.0` |
 
 Published packages do not cross older prerelease platform lines. See [INSTALL.md](INSTALL.md) for installation and upgrade order.
