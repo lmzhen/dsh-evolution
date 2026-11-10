@@ -1272,7 +1272,7 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 24,
+            "rows": 23,
             "reason": "24 gate rows lack a drillCmd after the new subpath and gate rows; a drill pass is scheduled",
             "expiry": "0.42.0",
             "owner": "scripts",
