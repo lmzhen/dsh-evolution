@@ -372,7 +372,6 @@
         "evolution-commands::tests/migration.spec.ts",
         "evolution-commands::tests/params-view.spec.ts",
         "evolution-commands::tests/parse.spec.ts",
-        "evolution-commands::tests/policy-set.spec.ts",
         "evolution-commands::tests/registry-identity.spec.ts",
         "evolution-commands::tests/registry.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
@@ -1089,7 +1088,6 @@
         "evolution-commands::tests/migration.spec.ts",
         "evolution-commands::tests/params-view.spec.ts",
         "evolution-commands::tests/parse.spec.ts",
-        "evolution-commands::tests/policy-set.spec.ts",
         "evolution-commands::tests/registry-identity.spec.ts",
         "evolution-commands::tests/registry.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
@@ -1732,7 +1730,6 @@
         "evolution-commands::tests/params-view.spec.ts",
         "evolution-commands::tests/parse.spec.ts",
         "evolution-commands::tests/platform-view.spec.ts",
-        "evolution-commands::tests/policy-set.spec.ts",
         "evolution-commands::tests/registry-identity.spec.ts",
         "evolution-commands::tests/registry.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
@@ -2322,7 +2319,7 @@
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 459
+      "specs": 458
     },
     "ci-only": {
       "gates": 14,
@@ -2330,16 +2327,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 459
+      "specs": 458
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 531
+      "specs": 530
     }
   },
   "specs": {
-    "total": 531,
-    "marked": 531,
+    "total": 530,
+    "marked": 530,
     "unmarked": 0
   }
 }
