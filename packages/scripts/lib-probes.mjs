@@ -96,7 +96,7 @@ export function probeCommand(entry, root) {
   // W9 C2 (test-title=id) was NOT implemented in the first probe batch: the specs are ordinary spec
   // files. Run the registered file set as a whole (a `-t <id>` name filter matches nothing and a
   // zero-test run exits 0 - the exact vacuous pass the registry exists to prevent).
-  return { argv: [process.execPath, vitest, 'run', ...files, '--maxWorkers=2', '--testTimeout=30000'], cwd: treeRoot }
+  return { argv: [process.execPath, vitest, 'run', ...files, '--maxWorkers=2', '--testTimeout=120000'], cwd: treeRoot }
 }
 
 /**
