@@ -1391,7 +1391,7 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.42.0"
+      "expiry": "0.43.0"
     },
     {
       "id": "ci-only-13",
@@ -1479,7 +1479,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.42.0"
+      "expiry": "0.43.0"
     },
     {
       "id": "ci-only-19",
@@ -1547,7 +1547,7 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.42.0"
+      "expiry": "0.43.0"
     },
     {
       "id": "line-identity-ci",
