@@ -47,6 +47,9 @@ export const EVOLUTION_BUNDLE_TAILS = [
 /** Product-retired packages still present in the workspace for migration/source installs. */
 export const RETIRED_PACKAGE_DIRS = new Set(['evolution-preset'])
 
+/** Package names the source installer must not copy (the mirrored form of the retired dirs). */
+export const RETIRED_PACKAGE_NAMES = new Set(['dsh-evolution-preset'])
+
 export const NON_PACKAGE_DIRS = new Set([
   'scripts', 'docs', 'node_modules', 'dist.next',
   '.release-staging', '.release-staging.next', '.release-staging.previous',

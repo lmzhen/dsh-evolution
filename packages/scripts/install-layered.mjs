@@ -42,7 +42,7 @@ function deploymentFormOf(mode) {
 // v43 audit (S1-2): the allowlist moved to lib-family-packages.mjs so this
 // installer and verify-package-discovery.mjs read ONE array. A local copy here
 // let a new package be published while the installer silently ignored it.
-import { EVOLUTION_BUNDLE_TAILS, EVOLUTION_PREFIXES } from './lib-family-packages.mjs'
+import { EVOLUTION_BUNDLE_TAILS, EVOLUTION_PREFIXES, RETIRED_PACKAGE_NAMES } from './lib-family-packages.mjs'
 
 // G2-S2: the ONE composer lives in evolution-core. The source installer consumes the BUILT
 // artifact (CI runs build-lib before tests/publish); a missing build fails loud with the fix.
@@ -586,6 +586,7 @@ async function copyAllEvolutionPackages(profileDir, dryRun) {
     // name: source manifests are `@deepseek-ai/dsh-evolution-*`, destination
     // directories are `dsh-evolution-*`.)
     const bareName = packageName.startsWith('@') ? (packageName.split('/')[1] ?? '') : packageName
+    if (RETIRED_PACKAGE_NAMES.has(bareName)) continue
     if (!EVOLUTION_PREFIXES.some(prefix => bareName.startsWith(prefix))) continue
     // The shared client kit is a community-scope library even in a @deepseek-ai tree; keep its
     // declared scope so the browser bundle's import resolves to the copy this installer writes.
