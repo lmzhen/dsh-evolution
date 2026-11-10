@@ -1109,7 +1109,7 @@ export async function checkAgentPresetFreshness(options = {}) {
 }
 
 export async function uninstall(options = {}) {
-  const mode = normalizeMode(options.mode ?? 'layered')
+  const mode = normalizeMode(options.mode ?? 'all')
   if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')} (or the product names variant/attach)`)
   const home = options.home ?? resolveHome(options.env)
   const profile = options.profile ?? 'web'
@@ -1308,7 +1308,7 @@ function manifestCarriesBundle(profileDir, bundle) {
 }
 
 export async function install(options = {}) {
-  const mode = normalizeMode(options.mode ?? 'layered')
+  const mode = normalizeMode(options.mode ?? 'all')
   if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')} (or the product names variant/attach)`)
   const home = options.home ?? resolveHome(options.env)
   const profile = options.profile ?? 'web'
@@ -1547,7 +1547,7 @@ export async function install(options = {}) {
 /** Flag table for `--help` and for the INSTALL.md parity fixture (G2/S2.3).
  * Every flag the parser accepts appears here exactly once, with its value kind. */
 export const INSTALL_FLAGS = [
-  { flag: '--mode', value: '<host|agent|layered|oneclick>', summary: 'install target plane (default layered; aliases variant / attach)' },
+  { flag: '--mode', value: '<all|host>', summary: 'internal install plane (default all; legacy agent/layered/oneclick are migration-only)' },
   { flag: '--profile', value: '<name>', summary: 'profile directory under $DSH_HOME/profiles (default web)' },
   { flag: '--base', value: '<name>[,<name>...]', summary: 'platform agent-preset base the family preset follows (repeatable)' },
   { flag: '--home', value: '<dir>', summary: 'harness home to write into (default $DSH_HOME)' },
