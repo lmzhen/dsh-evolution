@@ -15,11 +15,10 @@
  * Usage: node verify-published-bytes.mjs <dist-dir> --version <x.y.z>
  *
  * Exit: 0 all compared bytes match; 1 a byte mismatch (named); 2 cannot decide (a package could not
- * be fetched after both passes - offline, empty cache, or not on the registry yet).
+ * be fetched after all passes - offline or not on the registry yet).
  */
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -40,7 +39,7 @@ const packageOf = (file) => {
   const dash = stem.indexOf('-')
   return dash > 0 ? '@' + stem.slice(0, dash) + '/' + stem.slice(dash + 1) : stem
 }
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const registryBase = (process.env.REGISTRY_BASE ?? 'https://registry.npmjs.org').replace(/\/$/, '')
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const problems = []
 let compared = 0
@@ -50,14 +49,17 @@ let compared = 0
  * @returns undefined on success, else the captured failure text (stderr tail included).
  */
 async function fetchPublished(name, scratch, attempts, backoff) {
+  const short = name.slice(name.indexOf('/') + 1)
+  const url = registryBase + '/' + name + '/-/' + short + '-' + version + '.tgz'
   let last = 'fetch-failed'
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      execFileSync(npm, ['pack', name + '@' + version, '--silent'], { cwd: scratch, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' })
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('HTTP ' + response.status)
+      writeFileSync(join(scratch, short + '-' + version + '.tgz'), Buffer.from(await response.arrayBuffer()))
       return undefined
     } catch (error) {
-      const stderr = String((error && error.stderr) ?? '').trim().split(String.fromCharCode(10)).slice(-1)[0] ?? ''
-      last = String((error && error.code) ?? 'fetch-failed') + (stderr === '' ? '' : ' :: ' + stderr.slice(0, 160))
+      last = String((error && error.message) ?? 'fetch-failed').slice(0, 200)
       if (attempt < attempts) await sleep(backoff[attempt - 1] ?? 30000)
     }
   }
@@ -65,9 +67,9 @@ async function fetchPublished(name, scratch, attempts, backoff) {
 }
 
 const pending = [...tgz]
-for (let round = 1; round <= 2 && pending.length > 0; round += 1) {
-  const attempts = round === 1 ? 5 : 2
-  const backoff = round === 1 ? [3000, 8000, 20000, 45000] : [20000]
+for (let round = 1; round <= 3 && pending.length > 0; round += 1) {
+  const attempts = round === 1 ? 5 : round === 2 ? 2 : 1
+  const backoff = round === 1 ? [3000, 8000, 20000, 45000] : round === 2 ? [20000] : []
   const stillPending = []
   for (const file of pending) {
     const name = packageOf(file)
@@ -91,11 +93,12 @@ for (let round = 1; round <= 2 && pending.length > 0; round += 1) {
   }
   pending.length = 0
   pending.push(...stillPending)
-  if (round === 1 && pending.length > 0) {
-    console.error('verify-published-bytes: ' + pending.length + ' package(s) not readable yet - one more pass after 30s')
-    await sleep(30000)
+  if (round < 3 && pending.length > 0) {
+    const wait = round === 1 ? 30000 : 60000
+    console.error('verify-published-bytes: ' + pending.length + ' package(s) not readable yet - one more pass after ' + String(wait / 1000) + 's')
+    await sleep(wait)
   }
 }
 if (problems.length > 0) { console.error('verify-published-bytes: FAIL - ' + problems.length + ' byte difference(s):'); for (const problem of problems) console.error('  - ' + problem); process.exit(1) }
-if (pending.length > 0) { console.error('verify-published-bytes: NOT VERIFIED - ' + pending.length + ' package(s) could not be decided after 2 passes (compared ' + compared + ')'); process.exit(2) }
+if (pending.length > 0) { console.error('verify-published-bytes: NOT VERIFIED - ' + pending.length + ' package(s) could not be decided after 3 passes (compared ' + compared + ')'); process.exit(2) }
 console.log('verify-published-bytes: OK - ' + compared + ' package(s) match the published bytes')
