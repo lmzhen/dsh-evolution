@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-09T18:21:43.262Z",
-  "tree": "902931ac",
+  "measuredAt": "2026-11-10T16:36:27.217Z",
+  "tree": "5aa2c2c4",
   "testLines": [
     {
       "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",
@@ -96,76 +96,6 @@
     {
       "spec": "packages/evolution-commands/tests/commands.spec.ts",
       "id": "@deepseek-ai/dsh-agent-preset",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-commands/tests/commands.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-commands"
-    },
-    {
-      "spec": "packages/evolution-commands/tests/commands.spec.ts",
-      "id": "@deepseek-ai/dsh-agent-loop\\",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-commands/tests/commands.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-commands"
-    },
-    {
-      "spec": "packages/evolution-commands/tests/commands.spec.ts",
-      "id": "@deepseek-ai/dsh-agent-loop",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-commands/tests/commands.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-commands"
-    },
-    {
-      "spec": "packages/evolution-commands/tests/commands.spec.ts",
-      "id": "@deepseek-ai/dsh-tools",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-commands/tests/commands.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-commands"
-    },
-    {
-      "spec": "packages/evolution-commands/tests/commands.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-skill",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-commands/tests/commands.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-commands"
-    },
-    {
-      "spec": "packages/evolution-commands/tests/commands.spec.ts",
-      "id": "@deepseek-ai/dsh-desktop",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-commands/tests/commands.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-commands"
-    },
-    {
-      "spec": "packages/evolution-commands/tests/commands.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-executor-ptc",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-commands/tests/commands.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-commands"
-    },
-    {
-      "spec": "packages/evolution-commands/tests/commands.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-memory",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
