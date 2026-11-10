@@ -32,6 +32,8 @@ function shell(): { ctx: Parameters<typeof apply>[0]; registrations: Registratio
         for (const _entry of callback()) { /* registrations are recorded by register() */ }
       },
       register: (options: Record<string, unknown>, component: unknown) => {
+        if (options.name === 'plugins.detail.section' && options.id === undefined) throw new Error('plugins.detail.section requires id')
+        if (options.name === 'plugins.detail.section' && options.key !== undefined) throw new Error('plugins.detail.section is a list slot, not keyed')
         registrations.push({ options, component })
         return () => {}
       },
@@ -71,12 +73,13 @@ describe('the per-row config registration', () => {
     apply(ctx)
     const detail = registrations.find(entry => entry.options.name === 'plugins.detail.section')
     expect(detail).toBeDefined()
+    expect(detail?.options.id).toBe('evolution-diagnostics')
     vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ ok: false, error: { message: 'test' } }) }))
     const View = detail?.component as (props: unknown) => Parameters<typeof render>[0]
-    const family = render(createElement(View as never, { subject: { kind: 'package', pkg: { name: PRODUCT_BUNDLE } } }))
+    const family = render(createElement(View as never, { subject: { kind: 'bundle', pkg: { name: PRODUCT_BUNDLE } } }))
     expect(family.container.textContent).toContain(FAMILY_VERSION)
     cleanup()
-    const other = render(createElement(View as never, { subject: { kind: 'package', pkg: { name: '@example/other' } } }))
+    const other = render(createElement(View as never, { subject: { kind: 'bundle', pkg: { name: '@example/other' } } }))
     expect(other.container.textContent).toBe('')
     cleanup()
     vi.unstubAllGlobals()

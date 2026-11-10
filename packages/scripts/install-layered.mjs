@@ -1462,6 +1462,20 @@ export async function install(options = {}) {
         + 'Uninstall all first (or keep it and skip this installer).',
       )
     }
+    // The all bundle mounts the same model rows at profile root; an existing one-click preset
+    // bundle would double-mount them just like host+preset. Refuse before the first write.
+    if (mode === 'all') {
+      const existingPreset = detectInstalledBundles(profileDir, warnManifest)
+        .filter(name => /(?:^|\/)dsh-evolution-preset$/.test(String(name).trim()))
+      if (existingPreset.length > 0 && !force) {
+        throw new Error(
+          `install-layered: profile "${profile}" already carries the one-click preset bundle (${existingPreset.join(', ')}). `
+          + 'evolution-all and the one-click preset bundle mount the same model rows at profile root and are mutually exclusive (E-33). '
+          + 'Uninstall the preset bundle first, or pass --force to override explicitly.',
+        )
+      }
+    }
+
     // V6-49 (0.3.37): E-33 — the host bundle and the preset bundle are
     // mutually exclusive install targets (their shared rows would double-mount
     // in one profile). A documented warning was not enforcement: the tool

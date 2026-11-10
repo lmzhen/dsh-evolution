@@ -414,6 +414,14 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'agent')).rejects.toThrow(/Choose ONE/)
   }, 30_000)
 
+  it('P1-3: --mode all refuses when the profile already carries the one-click preset bundle', async () => {
+    const home = await tempRoot('dsh-installer-all-preset-')
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-preset'] } } }), 'utf8')
+    await expect(runInstaller(home, 'all', 'evo-test')).rejects.toThrow(/one-click preset bundle/)
+  }, 30_000)
+
   it('P1-3: --mode host/oneclick refuses when the profile already carries evolution-all', async () => {
     const home = await tempRoot('dsh-installer-p13-')
     const profileDir = join(home, 'profiles', 'evo-test')

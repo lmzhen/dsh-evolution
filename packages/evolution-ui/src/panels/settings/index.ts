@@ -81,9 +81,9 @@ export function apply(ctx: ClientContext): void {
     return { surface, fields: section.fields }
   })
   seam.slots.inject('plugins.detail.section', function* () {
-    yield seam.slots.register({ name: 'plugins.detail.section' }, ((props: { subject?: { kind?: string; pkg?: { name?: string } } }): ReactNode => {
+    yield seam.slots.register({ name: 'plugins.detail.section', id: 'evolution-diagnostics' }, ((props: { subject?: { kind?: string; pkg?: { name?: string } } }): ReactNode => {
       const subject = props.subject
-      if (subject?.kind !== 'package' || subject.pkg?.name !== PRODUCT_BUNDLE) return null
+      if (subject?.kind !== 'bundle' || subject.pkg?.name !== PRODUCT_BUNDLE) return null
       return createElement('div', { className: 'evolution-settings-detail', 'data-role': 'evolution-diagnostics' },
         createElement('p', { className: 'evolution-params-about' }, FAMILY_VERSION + ' · ' + t('aboutPurpose')),
         createElement(DiagnosticsCard, { t, api: createDiagnosticsApi() }))
