@@ -84,6 +84,7 @@ const assembled = {
   ciFace: ciFace === '' ? evidence.ciFace : { os: os === '' ? 'unknown' : os, workflowRef: ciFace },
   ...(commit === '' ? {} : { commit }),
   ...(tag === '' ? {} : { tag }),
+  ...(release ? { evidenceStatus: 'measured', generatedAt: new Date().toISOString() } : {}),
 }
 const expectedFamilyVersion = release ? (version !== '' ? version : familyVersion(resolve(dirname(fileURLToPath(import.meta.url)), '..'))) : null
 problems.push(...validateReleaseEvidence(assembled, { release, ...(expectedFamilyVersion === null ? {} : { expectedFamilyVersion }), ...(release ? { maxAgeMs: 7 * 24 * 60 * 60 * 1000 } : {}), ...(commit === '' ? {} : { expectedCommit: commit }), ...(tag === '' ? {} : { expectedTag: tag }) }))
