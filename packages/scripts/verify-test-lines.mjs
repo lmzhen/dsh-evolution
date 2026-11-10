@@ -26,7 +26,9 @@ const walk = (dir) => {
     else if (e.name.endsWith(".spec.ts")) specFiles.push(p);
   }
 };
-walk(join(ROOT, "packages"));
+const familyLayout = existsSync(join(ROOT, "evolution-core", "package.json"));
+const scanRoot = familyLayout ? ROOT : join(ROOT, "packages");
+walk(scanRoot);
 
 const candidates = [];
 for (const f of specFiles) {
@@ -36,13 +38,15 @@ for (const f of specFiles) {
     if (FAMILY.test(id)) continue;
     const kind = TESTKIT.test(id) ? "testkit" : PLATFORM.test(id) ? "platform" : null;
     if (kind === null) continue;
-    candidates.push({ file: relative(ROOT, f).split("\\").join("/"), id, kind });
+    candidates.push({ file: (familyLayout ? "packages/" : "") + relative(ROOT, f).split("\\").join("/"), id, kind });
   }
 }
 
 let tree = "unknown";
 try { tree = execFileSync("git", ["-C", ROOT, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim(); } catch {}
-const registryPath = join(ROOT, "packages", "scripts", "family-test-lines.json");
+const registryPath = familyLayout
+  ? join(ROOT, "scripts", "family-test-lines.json")
+  : join(ROOT, "packages", "scripts", "family-test-lines.json");
 const registry = existsSync(registryPath) ? JSON.parse(readFileSync(registryPath, "utf8")) : { testLines: [] };
 const STATUSES = ["pending", "expected", "ci-only"];
 const EXPECT_LINES = ["unknown", "local", "ci", "both"];
