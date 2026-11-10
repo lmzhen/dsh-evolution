@@ -179,8 +179,13 @@ describe('release-evidence schema v2', () => {
     const evidencePath = join(dir, 'release-evidence.json')
     await writeFile(evidencePath, JSON.stringify(staging()), 'utf8')
     try {
+      const inherited = JSON.parse(readFileSync(fileURLToPath(new URL('../../scripts/release-evidence-rehearsal.json', import.meta.url)), 'utf8'))
+      inherited.familyVersion = '0.0.1'
+      for (const spike of inherited.spikes) spike.familyVersion = '0.0.1'
+      const inheritedPath = join(dir, 'inherited.json')
+      await writeFile(inheritedPath, JSON.stringify(inherited), 'utf8')
       const result = await run(process.execPath, [assembleScript, evidencePath,
-        '--rehearsal', fileURLToPath(new URL('../../scripts/release-evidence-rehearsal.json', import.meta.url)),
+        '--rehearsal', inheritedPath,
         '--ci-face', 'release.yml@refs/tags/v' + FAMILY_VERSION, '--os', 'linux',
         '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION,
         '--version', FAMILY_VERSION, '--release'], { encoding: 'utf8' })
