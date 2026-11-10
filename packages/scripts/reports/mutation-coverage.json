@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-10T16:17:51.810Z",
+  "generatedAt": "2026-11-10T20:32:40.715Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -95,8 +95,8 @@
     },
     {
       "probe": "decl-composer-single-source",
-      "signature": "da3eb4feea0803a5285c03955c5d9f12b5905e6497917ca94c4f56f7419b5746",
-      "provenAt": "2026-11-10T16:17:51.760Z",
+      "signature": "720d82126ddf3ceb52a7db2cb4e9249bf8c9cc2d40bd6dedac95014a4f700ea4",
+      "provenAt": "2026-11-10T20:32:40.695Z",
       "tree": "overlay"
     },
     {

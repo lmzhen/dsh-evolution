@@ -1190,7 +1190,7 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 23,
+            "rows": 24,
             "reason": "24 gate rows lack a drillCmd after the new subpath and gate rows; a drill pass is scheduled",
             "expiry": "0.44.0",
             "owner": "scripts",
@@ -1208,6 +1208,14 @@
             "axis": "falsifiability-carrier",
             "rows": 3,
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass",
+            "expiry": "0.44.0",
+            "owner": "scripts",
+            "reasonRef": "scripts/family-facts.json checks.pendingAxes"
+          },
+          {
+            "axis": "mutation-coverage",
+            "rows": 1,
+            "reason": "the beh-installer-layered probe suite hangs in the local overlay before its green baseline; CI probe owns it",
             "expiry": "0.44.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
