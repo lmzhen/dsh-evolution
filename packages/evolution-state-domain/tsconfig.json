@@ -3,6 +3,7 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../storage/storage-domain" },
-    { "path": "../evolution-state-storage" }
+    { "path": "../evolution-state-storage" },
+    { "path": "../evolution-core" }
   ]
 }
