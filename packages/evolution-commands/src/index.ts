@@ -1627,7 +1627,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       try {
         const attempt = await migrateFromContext(ctx)
         if (!attempt.ok) {
-          ctx.logger.warn('evolution-commands: the legacy settings migration cannot run here (no %s) — run /evolution migrate after that service is mounted', attempt.problem)
+          ctx.logger.warn('evolution-commands: the legacy settings migration cannot run here (no %s) — the boot migration retries automatically once that service is mounted', attempt.problem)
           settleFailure()
           return
         }

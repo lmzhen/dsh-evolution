@@ -829,7 +829,7 @@ export async function diagnose(
   if (presetIssueRows.length > 0) actions.push('Resolve the agent-preset finding above: a broken preset composes no session, and a row two presets declare is resolved by layer order (keep the declaration in one preset).')
   const legacy = await legacyMigrationRow(ctx, home)
   if (legacy.state === 'pending') {
-    actions.push(`The legacy settings document still holds ${legacy.pending.length} family value(s) — /evolution migrate moves them onto their rows (the document itself is left alone, so nothing is lost)`)
+    actions.push(`The legacy settings document still holds ${legacy.pending.length} family value(s) — the boot migration moves them onto their rows when the settings service is available (the document itself is left alone, so nothing is lost)`)
   }
   const budgetIssues = memoryBudgetIssues(ctx)
   const paramIssues = paramDivergences(platform)
@@ -1043,7 +1043,7 @@ function legacyLine(row: LegacyMigrationRow): string {
   if (row.state === 'migrated') return `legacy settings: every family value sits on its row (${row.source ?? '(unknown)'})`
   const shown = row.pending.slice(0, 6).join(', ')
   const more = row.pending.length > 6 ? ` (+${row.pending.length - 6} more)` : ''
-  return `legacy settings: ${row.pending.length} family value(s) still on ${row.source ?? '(unknown)'}: ${shown}${more} — /evolution migrate moves them`
+  return `legacy settings: ${row.pending.length} family value(s) still on ${row.source ?? '(unknown)'}: ${shown}${more} — the boot migration moves them`
 }
 
 /**
