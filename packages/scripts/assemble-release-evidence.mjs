@@ -35,7 +35,7 @@ const gatesFromManifest = flag('--gates-from-manifest')
 const gatesReport = flag('--gates-report')
 const commit = flag('--commit')
 const tag = flag('--tag')
-const version = flag('--version').replace(/^v/, '')
+const version = (flag('--version') || process.env.RELEASE_VERSION || '').replace(/^v/, '')
 const release = argv.includes('--release')
 const check = argv.includes('--check')
 if (file === undefined || file === '') { console.error('assemble-release-evidence: usage: <release-evidence.json> --rehearsal <inputs.json> [--ci-face <ref>] [--os <os>] [--gates-report <run-gates.json>] [--commit <sha>] [--tag <v...>] [--release] [--check]'); process.exit(2) }
