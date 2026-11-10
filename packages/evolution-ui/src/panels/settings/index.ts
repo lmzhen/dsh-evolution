@@ -1,58 +1,51 @@
 /**
- * Browser half: the family owns one top-level `settings.section`; every parameter
- * card lives in that page. Pending decisions live in `evolution.workbench`.
+ * Browser half: the family contributes per-row configuration to the platform
+ * Plugins page. It owns no top-level settings section and no settings seat of
+ * its own; the page supplies the row form and re-renders it on change.
  *
- * The join key is the row's ENTRY ID — the platform derives a settings namespace from
- * the Loader entry id, and that id is the registry's owner name — so the card, the
- * seat lookup and the page key all spell one id. The legacy namespace strings in the
- * registry (`evolution-memory`, …) are the G3 migration source, never a live lookup key.
- *
- * A row the Host does not serve renders nothing.
+ * The join key is the row's plugin-manager key: <bundle package>#<row id>.
+ * The bundle/row set comes from the generated product surface catalog, so the
+ * client cannot drift from the install/command surface gate.
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactNode } from 'react'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
+import { PRODUCT_BUNDLE, ROW_CONFIG_SURFACES } from './generated-surface.ts'
 import { dictionaries, fill, message, NS, type MessageKey } from './messages.ts'
 import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
-import { PluginParamCard, type ParamCardFace } from './ParamCard.ts'
-import { groupParamCards } from './settings-groups.ts'
-import { type ClientSeam, type ParamSectionSource } from './seam.ts'
+import { RowConfigCard } from './RowConfigCard.ts'
+import { DiagnosticsCard } from './DiagnosticsCard.ts'
+import { createDiagnosticsApi } from './diagnostics-state.ts'
 import { FAMILY_VERSION } from './generated-about.ts'
-import { createSettingsSeat } from '@lmzhen/dsh-evolution-client-kit'
-import { createSourceCache, writeFaceFor, type SeatProbe } from './source.ts'
+import type { RowConfigViewProps } from './seam.ts'
 import { injectStyles } from './styles.ts'
 
-/**
- * Required client services: the slot registry and the locale seat.
- *
- * The settings seat (`configForms`) is deliberately NOT here. A required inject for a
- * service the deployment did not compose leaves this whole browser half PENDING forever —
- * no error, no section, no UI — and the family is also installed without a settings
- * surface. It is probed instead, and the cards say what is missing.
- */
-export const inject = ['slots', 'locale', 'remote']
+/** The client services this half consumes. */
+export const inject = ['slots', 'locale'] as const
 
-/** Section id and nav order (the platform's own sections sit at 0/10/15/20). */
-export const SECTION_ID = 'evolution'
-export const SECTION_ORDER = 25
-
-/** The pending-window card's key, re-exported from `seam.ts` (the section names it as well). */
+/** The row-config key the Plugins page uses (one helper, one spelling). */
+export function rowConfigKey(bundle: string, rowId: string): string {
+  return bundle + '#' + rowId
+}
 
 /**
- * Register the locale namespace, the section, its cards, and the per-row configuration entries.
+ * Register the locale namespace and every row's configuration page.
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
-  // The stylesheet goes in first, inside an EFFECT: cordis runs the body at apply time, so the
-  // injection still precedes the first render (no unstyled flash), and the disposer it returns now
-  // travels back to the fiber - the same ownership skill-history gives its own stylesheet (S5-08).
   ctx.effect(() => injectStyles(), 'evolution-settings-ui: styles')
-  const seam = ctx as unknown as ClientSeam
-  // The dictionary registration is an EFFECT, not a bare call: cordis disposes it
-  // when this bundle unloads (a hot reload or the row being switched off), which is
-  // the same shape the platform's own client plugins use. A seat that refuses the
-  // registration (an older shell) leaves the bundle on its own copy instead.
+  const seam = ctx as unknown as {
+    slots: {
+      inject(name: string, callback: () => Generator<unknown, void, unknown>): unknown
+      register(options: Record<string, unknown>, component: (props: never) => unknown): () => void
+    }
+    locale: {
+      register(namespace: string, dictionaries: unknown): () => void
+      bind(namespace: string): (key: string, values?: Readonly<Record<string, string | number>>) => string
+      getLocale?(): { active?: string }
+    }
+  }
   let registered = false
   ctx.effect(() => {
     try {
@@ -60,20 +53,18 @@ export function apply(ctx: ClientContext): void {
       registered = true
       return dispose
     } catch (error) {
-      // A seat that refuses the registration (an older shell, or a namespace clash — the platform
-      // throws on a second registration of one namespace+locale) leaves the flag false and the bundle
-      // stays on its own copy below. T5-06/A61: REPORTED, not hidden — the other client half
-      // (evolution-skill-history) guards the same seat, and a silent fallback would leave the reader
-      // wondering why the cards speak the bundle's language instead of the UI's.
       ctx.logger.warn(`evolution-settings-ui: the locale seat refused the "${NS}" dictionary registration (${error instanceof Error ? error.message : String(error)}) — the cards fall back to the bundle's own copy`)
       return () => {}
     }
   }, NS + ': dictionaries')
-  // Bind once per apply: `bind` allocates a translator and the card calls `t` on every
-  // render. `bind` itself does not throw (a missing key falls back to the key name), so
-  // the meaningful guard is whether the REGISTRATION above succeeded.
-  let bound: ((key: string) => string) | null = null
-  const translate = (key: MessageKey): string => {
+  let bound: ((key: string, values?: Readonly<Record<string, string | number>>) => string) | null = null
+  const language = (): SupportedLocale => {
+    const active = seam.locale.getLocale?.().active
+    return (['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt'] as const).includes(active as SupportedLocale)
+      ? active as SupportedLocale
+      : 'en'
+  }
+  const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string => {
     if (!registered) return message(key, language())
     if (bound === null) {
       try {
@@ -82,91 +73,45 @@ export function apply(ctx: ClientContext): void {
         return message(key, language())
       }
     }
-    return bound(key)
+    return values === undefined ? bound(key) : fill(bound(key), values)
   }
-  // G5 C4: the seat's translator takes the values, so filling happens in ONE place — the call
-  // sites used to write `t('changed').replace('{n}', …)` seven times.
-  const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string =>
-    values === undefined ? translate(key) : fill(translate(key), values)
-  const language = (): SupportedLocale => {
-    try {
-      const active = (ctx as unknown as { locale?: { getLocale?: () => { active?: string } } }).locale?.getLocale?.().active
-      return (['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt'] as const).includes(active as SupportedLocale) ? active as SupportedLocale : 'en'
-    } catch { return 'en' }
-  }
-  // G2: the client settings seat, probed LAZILY (see `inject`). Without a seat every card
-  // renders the stated empty state and the Plugins page says the same — never a blank card
-  // and never a thrown render. The probe must not be captured here: this row may activate
-  // BEFORE the settings shell that declares `settings.section` and provides `configForms`,
-  // and a captured `undefined` would pin every card to the empty state for the life of the
-  // fiber. `sourceFor` reads the probe on each render, when the shell is necessarily active.
-  // platform-declaration anchor: the platform’s `configForms` seat (optional; undefined ⇒ the panel renders read-only)
-  const seat = createSettingsSeat(ctx)
-  const probe: SeatProbe = () => seat
-  const sources = createSourceCache(probe)
-  ctx.effect(() => () => { sources.dispose() }, 'evolution-settings: sources')
-  // T5-11/A66: the platform's own "this service arrived" channel. The lazy probe alone left a card
-  // that had already rendered its "no settings surface" state stuck there when the shell mounted
-  // LATER (nothing tells React to read again), and the row's subscription was never attached. The
-  // callback re-runs whenever the service CHANGES, so a re-composed shell is picked up too. Cordis
-  // exposes this as `inject`; the seat is an optional one (a deployment may compose the family with
-  // no settings surface), so it goes through a narrow structural view rather than a declared edge.
-  const seatInjection = ctx as unknown as { inject?: (names: readonly string[], callback: () => void) => unknown }
-  seatInjection.inject?.(['remote'], () => { sources.revive() })
+  const surfaces = ROW_CONFIG_SURFACES.map((surface) => {
+    const section = CLIENT_PARAM_SECTIONS.find((candidate) => candidate.namespace === surface.namespaces[0])
+    if (section === undefined) throw new Error('evolution-ui: generated surface names no generated field section: ' + surface.namespaces[0])
+    return { surface, fields: section.fields }
+  })
+  seam.slots.inject('plugins.detail.section', function* () {
+    yield seam.slots.register({ name: 'plugins.detail.section' }, ((props: { subject?: { kind?: string; pkg?: { name?: string } } }): ReactNode => {
+      const subject = props.subject
+      if (subject?.kind !== 'package' || subject.pkg?.name !== PRODUCT_BUNDLE) return null
+      return createElement('div', { className: 'evolution-settings-detail', 'data-role': 'evolution-diagnostics' },
+        createElement('p', { className: 'evolution-params-about' }, FAMILY_VERSION + ' · ' + t('aboutPurpose')),
+        createElement(DiagnosticsCard, { t, api: createDiagnosticsApi() }))
+    }) as unknown as (props: never) => unknown)
+  })
 
-  const cards: ParamCardFace[] = CLIENT_PARAM_SECTIONS.map((section) => {
-    const source: ParamSectionSource = sources.sourceFor(section.seatKey)
-    const { mutateOnce, saveOnce, clear } = writeFaceFor(probe, section.namespace)
-    return {
-      namespace: section.namespace,
-      fields: section.fields,
-      t,
-      lang: language,
-      mutateOnce,
-      saveOnce,
-      clear,
-      retry: () => source.revive(),
-      hooks: { paramSection: source },
+  seam.slots.inject('plugins.row.config', function* () {
+    for (const { surface, fields } of surfaces) {
+      for (const bundle of surface.bundles) {
+        const key = rowConfigKey(bundle, surface.rowId)
+        yield seam.slots.register({
+          name: 'plugins.row.config',
+          key,
+          order: surface.order,
+          locale: NS,
+          label: () => t('title'),
+        }, ((props: RowConfigViewProps): ReactNode =>
+          createElement(RowConfigCard, {
+            ...props,
+            namespace: surface.namespaces[0] ?? surface.rowId,
+            fields,
+            t,
+            lang: language,
+          })) as unknown as (props: never) => unknown)
+      }
     }
   })
-  const section = (): ReactNode => createElement(EvolutionSettingsTab, { cards, t })
-  seam.slots.inject('settings.section', function* () {
-    yield seam.slots.register({
-      name: 'settings.section',
-      id: SECTION_ID,
-      order: SECTION_ORDER,
-      label: () => t('title'),
-      locale: NS,
-    }, section as unknown as (props: never) => unknown)
-    yield seam.slots.register({
-      name: 'settings.section.icon',
-      id: SECTION_ID,
-      order: SECTION_ORDER,
-      label: () => t('title'),
-    }, EvolutionSettingsIcon as unknown as (props: never) => unknown)
-  })
 }
 
-/** One family settings page: every parameter card lives inside it. */
-export function EvolutionSettingsTab(props: { readonly cards: readonly ParamCardFace[]; readonly t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string }): ReactNode {
-  return createElement('div', { className: 'evolution-settings-tab' },
-    createElement('h2', { className: 'evolution-params-title' }, props.t('title')),
-    createElement('p', { className: 'evolution-params-subtitle' }, props.t('subtitle')),
-    createElement('p', { className: 'evolution-params-about' }, FAMILY_VERSION + ' · ' + props.t('aboutPurpose')),
-    ...groupParamCards(props.cards).flatMap(({ group, items }) => [
-      createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, props.t(('group.' + group) as MessageKey)),
-      ...items.map((face, index) => createElement(PluginParamCard, { key: face.namespace + ':' + String(index), ...face })),
-    ]),
-  )
-}
-
-/** Nav glyph for the family settings section. */
-function EvolutionSettingsIcon(props: { readonly size?: number; readonly active?: boolean }): ReactNode {
-  const size = props.size ?? 16
-  return createElement('svg', {
-    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
-    stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', 'aria-hidden': true,
-  },
-  createElement('path', { d: 'M12 3v4m0 10v4M3 12h4m10 0h4M5.6 5.6l2.8 2.8m7.2 7.2 2.8 2.8m0-12.8-2.8 2.8M8.4 15.6l-2.8 2.8' }),
-  )
-}
+/** Kept for the generated packet's own smoke test: the one product bundle. */
+export const productBundle = PRODUCT_BUNDLE

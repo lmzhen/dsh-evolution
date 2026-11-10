@@ -71,30 +71,6 @@ export type ConfigFormLike<T = Record<string, unknown>> = KitConfigFormLike<T>
  */
 export type ConfigFormsSeat = KitConfigFormsSeat
 
-/** Nav glyph for a `settings.section` registration. */
-export interface SectionIconRegisterOptions {
-  name: 'settings.section.icon'
-  /** Must equal the target section's id. */
-  id: string
-  order?: number
-  label?: () => string
-}
-
-/** Options a `settings.section` registration carries (the shell's own shape). */
-export interface SectionRegisterOptions {
-  name: 'settings.section'
-  /** Section id; the shell derives the nav entry's DOM id from it. */
-  id: string
-  /** Nav order: the platform's own sections sit at 0/10/15/20. */
-  order: number
-  /** Lazy label: the shell re-reads it when the locale changes. */
-  label: () => string
-  /** Locale namespace the label and the section's copy resolve through. */
-  locale: string
-  /** Child slots this section hosts, declared for the shell's renderer. */
-  children?: Record<string, { kind: 'keyed' | 'list' | 'single'; scope: 'root' }>
-}
-
 /**
  * The face the test helper uses to render a parameter card with a page-owned form:
  * the helper renders from `state` and writes through `mutate`.
@@ -112,17 +88,15 @@ export interface RowConfigForm {
   readonly mutate: (ops: readonly SettingsPathOpLike[], revision?: number) => Promise<boolean>
 }
 
+/** Options a plugins.row.config registration carries (the Plugins page's keyed slot). */
+export interface RowConfigRegisterOptions {
+  name: 'plugins.row.config'
+  /** The Plugins page key: <bundle package>#<row id>. */
+  key: string
+  order?: number
+  label?: () => string
+  locale?: string
+}
+
 /** The locale seat; client-kit owns the shape. */
 export type LocaleSeat = KitLocaleSeat
-
-/** The slice of the client context this plugin consumes. */
-export interface ClientSeam {
-  slots: {
-    inject(name: string, callback: () => Generator<unknown, void, unknown>): unknown
-    register(
-      options: SectionRegisterOptions | SectionIconRegisterOptions,
-      component: (props: never) => unknown,
-    ): () => void
-  }
-  locale: LocaleSeat
-}

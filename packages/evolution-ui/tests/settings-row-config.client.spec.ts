@@ -15,7 +15,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { createElement } from 'react'
 import { CLIENT_PARAM_SECTIONS } from '../src/panels/settings/generated-params.ts'
 import { formatText, type MessageKey } from '../src/panels/settings/messages.ts'
-import { RowConfigCard } from './helpers/RowConfigCard.ts'
+import { RowConfigCard } from '../src/panels/settings/RowConfigCard.ts'
 
 /**
  * `createElement` narrowed for the renderer: this package carries its own minimal ambient
