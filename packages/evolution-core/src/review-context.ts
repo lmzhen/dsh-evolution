@@ -17,7 +17,9 @@ export interface ReviewExecutionContext {
   readonly runId: string
 }
 
-const storage = new AsyncLocalStorage<ReviewExecutionContext>()
+const STORAGE_KEY = Symbol.for('dsh.evolution.review-context.storage')
+const registry = globalThis as typeof globalThis & { [STORAGE_KEY]?: AsyncLocalStorage<ReviewExecutionContext> }
+const storage = registry[STORAGE_KEY] ?? (registry[STORAGE_KEY] = new AsyncLocalStorage<ReviewExecutionContext>())
 
 /**
  * Run one review tool loop under the review write context.

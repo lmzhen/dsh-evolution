@@ -20,7 +20,7 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 
 const fakeAgent = (origin: string | undefined): Agent => ({ session: { header: { origin }, append: () => {} } }) as unknown as Agent
 
@@ -40,7 +40,7 @@ it('T2-05/A20: one create reads each existing SKILL.md once (no second whole-tre
     name: 'counting',
     ...base,
     readText: async (path) => {
-      if (path.endsWith('SKILL.md')) skillMdReads += 1
+      if (path.startsWith(root + sep) && path.endsWith('SKILL.md')) skillMdReads += 1
       return await base.readText(path)
     },
   })
