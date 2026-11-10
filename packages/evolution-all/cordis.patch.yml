@@ -165,6 +165,40 @@
     - id: evolution-merge-ui
       name: '@deepseek-ai/dsh-evolution-merge-ui'
 
+# ── cross-session recall: enable the native session-query index ─────────────
+# `tool-session-query` (above) exposes `session_search`; this overlay
+# enables the backing SQLite full-text index so that search actually works.
+# It is a configuration OVERRIDE of the base `session-query-sqlite` row (never
+# an insert — base already provides it), so it must sit OUTSIDE the `- insert:`
+# block above. Both fields are parameterized via environment variables (dsh
+# `!!js` runtime evaluation), and any profile cordis.patch.yml overlay may still
+# override them later. `openAt` defaults to `startup` so the index is ready for
+# cross-session recall; set `DSH_EVOLUTION_SESSION_QUERY=never` to disable, or
+# `first-search` to build it lazily. A durable `path` (not `:memory:`) lets the
+# index survive restarts. Note: `config` values replace the base entry's config
+# wholesale, so both path and openAt are set here.
+# WHOLE-CONFIG REPLACEMENT (v33 G2.3): an override's `config` replaces the base
+# entry's config as a whole, so every platform key NOT set below falls back to
+# that row's schema default. Platform keys for this row
+# (0.2.0-rc.2 `session-query-sqlite` Config): path, openAt, journalMode,
+# defaultLimit, maxLimit, snippetChars, readWindowMax, persistedReadConcurrency,
+# preparedSessionCacheSize.
+# verify-declared-config.mjs --upstream recomputes this list from the platform
+# source and fails when the row gains a key this comment does not name.
+- id: session-query-sqlite
+  config:
+    # P2-12 (V10-15): `??` only catches null/undefined, so a set-but-EMPTY
+    # variable kept the empty string and `resolve('')` dropped the SQLite
+    # index into the process CWD. The three-part form trims the value first;
+    # only a non-empty path overrides the durable default.
+    path: !!js (process.env.DSH_EVOLUTION_SESSION_QUERY_PATH || '').trim() || dshHomePath('evolution', 'session-query.db')
+    # P2-13 (V10-15): whitelist normalization — an arbitrary invalid value used
+    # to reach the platform z.union schema and blow up the whole profile at
+    # startup with an error far from the root cause. Unknown/empty values fall
+    # back to 'startup'. (Quoted scalar: the ternary's `: ` would otherwise
+    # break YAML plain-scalar parsing — see the upstream `!!js "..."` forms.)
+    openAt: !!js "['startup', 'first-search', 'never'].includes(process.env.DSH_EVOLUTION_SESSION_QUERY) ? process.env.DSH_EVOLUTION_SESSION_QUERY : 'startup'"
+
 # ── Hermes 60-char catalog rule: platform interface, deployment default ──────
 # Upstream tool-skill exposes `catalogDescriptionMaxLength` (the 500 constant is
 # only the schema default); the Hermes authoring standard is 60 and the index
@@ -192,4 +226,3 @@
 - id: tool-skill
   config:
     catalogDescriptionMaxLength: 60
-# Platform session-query Config keys (0.2.2): path, openAt, journalMode, defaultLimit, maxLimit, snippetChars, readWindowMax, persistedReadConcurrency, preparedSessionCacheSize.
