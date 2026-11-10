@@ -755,7 +755,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/gates/rg0-consistency.spec.ts#RG0 commit goes through the CommitPort only",
+      "ref": "evolution-merge/tests/gates/rg0-consistency.spec.ts#RG0 commit goes through one UnitTransaction only",
       "note": "audit re-anchor (54d4bcbe)"
     },
     {
