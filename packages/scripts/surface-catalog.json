@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "installBundles": [
+    "@lmzhen/dsh-evolution-all"
+  ],
+  "rowConfigs": [
+    {
+      "rowId": "evolution-approval",
+      "namespaces": [
+        "evolution-approval"
+      ],
+      "bundles": [
+        "@lmzhen/dsh-evolution-all"
+      ],
+      "order": 10
+    },
+    {
+      "rowId": "evolution-commands",
+      "namespaces": [
+        "evolution-commands"
+      ],
+      "bundles": [
+        "@lmzhen/dsh-evolution-all"
+      ],
+      "order": 20
+    },
+    {
+      "rowId": "evolution-curator",
+      "namespaces": [
+        "evolution-curator"
+      ],
+      "bundles": [
+        "@lmzhen/dsh-evolution-all"
+      ],
+      "order": 30
+    },
+    {
+      "rowId": "evolution-merge",
+      "namespaces": [
+        "evolution-merge"
+      ],
+      "bundles": [
+        "@lmzhen/dsh-evolution-all"
+      ],
+      "order": 40
+    },
+    {
+      "rowId": "evolution-review",
+      "namespaces": [
+        "evolution-review"
+      ],
+      "bundles": [
+        "@lmzhen/dsh-evolution-all"
+      ],
+      "order": 50
+    },
+    {
+      "rowId": "memory-files",
+      "namespaces": [
+        "memory-files"
+      ],
+      "bundles": [
+        "@lmzhen/dsh-evolution-all"
+      ],
+      "order": 60
+    },
+    {
+      "rowId": "tool-memory",
+      "namespaces": [
+        "tool-memory"
+      ],
+      "bundles": [
+        "@lmzhen/dsh-evolution-all"
+      ],
+      "order": 70
+    },
+    {
+      "rowId": "tool-skill-manage",
+      "namespaces": [
+        "tool-skill-manage"
+      ],
+      "bundles": [
+        "@lmzhen/dsh-evolution-all"
+      ],
+      "order": 80
+    }
+  ],
+  "commands": {
+    "registry": "evolution-commands/src/registry.ts",
+    "removed": [
+      "migrate",
+      "policy set",
+      "preset install"
+    ],
+    "enforced": false
+  },
+  "docs": {
+    "install": "README.md#install",
+    "noLegacyInstallTable": true
+  }
+}
