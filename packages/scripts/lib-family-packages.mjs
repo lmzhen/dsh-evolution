@@ -44,6 +44,7 @@ export const EVOLUTION_BUNDLE_TAILS = [
  * `.release-staging.previous`. It never mattered only because publishableDirs() ALSO required a
  * package.json, so a leftover carrying one (a staging copy does) would have been published by the
  * second rule while the first said it was excluded. */
+/** Product-retired packages still present in the workspace for migration/source installs. */
 export const RETIRED_PACKAGE_DIRS = new Set(['evolution-preset'])
 
 export const NON_PACKAGE_DIRS = new Set([
