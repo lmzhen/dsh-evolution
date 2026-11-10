@@ -151,7 +151,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `evolution-commands.maintainTimeoutMs` | E2 | none | cordis | evolution-commands | — | 无（internal） | Timeout of one maintenance run started from the command surface. |
 | `evolution-maintenance.probeTimeoutMs` | E2 | none | cordis | evolution-maintenance | — | 无（internal） | Model-facing budget of one maintenance_probe call — a hang guard, not a latency budget. |
 | `skill-usage.supportReadToolNames` | E2 | none | cordis | skill-usage | — | 无（internal） | Tool names whose file reads are attributed to support files. |
-| `install.mode` | E4 | restart | install | scripts | — | 无（install） | Install target plane (values host / agent / layered / oneclick; the `layered` form uses the generated preset, the others mount the bundle at profile root). |
+| `install.mode` | E4 | restart | install | scripts | — | 无（install） | Install target plane (values all / host; the legacy layered preset path is internal-only). |
 | `install.basePreset` | E4 | restart | install | scripts | — | 无（install） | Agent-preset base the layered install composes from (--base). |
 | `install.home` | E4 | restart | install | scripts | — | 无（install） | Harness home the installer writes into (--home). |
 | `install.presetRowOverrides` | E4 | restart | install | scripts | — | 无（install） | Preset row overrides the installer injects (row-overrides.json). |
