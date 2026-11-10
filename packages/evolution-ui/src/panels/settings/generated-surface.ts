@@ -14,7 +14,8 @@ export const ROW_CONFIG_SURFACES: readonly RowConfigSurface[] = [
       "evolution-approval"
     ],
     "bundles": [
-      "@lmzhen/dsh-evolution-all"
+      "@lmzhen/dsh-evolution-all",
+      "@deepseek-ai/dsh-evolution-all"
     ],
     "order": 10
   },
@@ -24,7 +25,8 @@ export const ROW_CONFIG_SURFACES: readonly RowConfigSurface[] = [
       "evolution-commands"
     ],
     "bundles": [
-      "@lmzhen/dsh-evolution-all"
+      "@lmzhen/dsh-evolution-all",
+      "@deepseek-ai/dsh-evolution-all"
     ],
     "order": 20
   },
@@ -34,7 +36,8 @@ export const ROW_CONFIG_SURFACES: readonly RowConfigSurface[] = [
       "evolution-curator"
     ],
     "bundles": [
-      "@lmzhen/dsh-evolution-all"
+      "@lmzhen/dsh-evolution-all",
+      "@deepseek-ai/dsh-evolution-all"
     ],
     "order": 30
   },
@@ -44,7 +47,8 @@ export const ROW_CONFIG_SURFACES: readonly RowConfigSurface[] = [
       "evolution-merge"
     ],
     "bundles": [
-      "@lmzhen/dsh-evolution-all"
+      "@lmzhen/dsh-evolution-all",
+      "@deepseek-ai/dsh-evolution-all"
     ],
     "order": 40
   },
@@ -54,7 +58,8 @@ export const ROW_CONFIG_SURFACES: readonly RowConfigSurface[] = [
       "evolution-review"
     ],
     "bundles": [
-      "@lmzhen/dsh-evolution-all"
+      "@lmzhen/dsh-evolution-all",
+      "@deepseek-ai/dsh-evolution-all"
     ],
     "order": 50
   },
@@ -64,7 +69,8 @@ export const ROW_CONFIG_SURFACES: readonly RowConfigSurface[] = [
       "memory-files"
     ],
     "bundles": [
-      "@lmzhen/dsh-evolution-all"
+      "@lmzhen/dsh-evolution-all",
+      "@deepseek-ai/dsh-evolution-all"
     ],
     "order": 60
   },
@@ -74,7 +80,8 @@ export const ROW_CONFIG_SURFACES: readonly RowConfigSurface[] = [
       "tool-memory"
     ],
     "bundles": [
-      "@lmzhen/dsh-evolution-all"
+      "@lmzhen/dsh-evolution-all",
+      "@deepseek-ai/dsh-evolution-all"
     ],
     "order": 70
   },
@@ -84,7 +91,8 @@ export const ROW_CONFIG_SURFACES: readonly RowConfigSurface[] = [
       "tool-skill-manage"
     ],
     "bundles": [
-      "@lmzhen/dsh-evolution-all"
+      "@lmzhen/dsh-evolution-all",
+      "@deepseek-ai/dsh-evolution-all"
     ],
     "order": 80
   }

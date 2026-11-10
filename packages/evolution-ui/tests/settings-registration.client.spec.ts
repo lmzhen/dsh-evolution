@@ -52,7 +52,7 @@ describe('the per-row config registration', () => {
     const { ctx, registrations } = shell()
     apply(ctx)
     const rows = registrations.filter(entry => entry.options.name === 'plugins.row.config')
-    expect(rows).toHaveLength(ROW_CONFIG_SURFACES.length)
+    expect(rows).toHaveLength(ROW_CONFIG_SURFACES.length * 2)
     for (const surface of ROW_CONFIG_SURFACES) {
       const entry = rows.find(candidate => candidate.options.key === PRODUCT_BUNDLE + '#' + surface.rowId)
       expect(entry, surface.rowId).toBeDefined()

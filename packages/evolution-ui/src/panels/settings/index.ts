@@ -75,6 +75,7 @@ export function apply(ctx: ClientContext): void {
     }
     return values === undefined ? bound(key) : fill(bound(key), values)
   }
+  const PRODUCT_BUNDLE_NAMES = new Set([PRODUCT_BUNDLE, '@deepseek-ai/dsh-evolution-all'])
   const surfaces = ROW_CONFIG_SURFACES.map((surface) => {
     const section = CLIENT_PARAM_SECTIONS.find((candidate) => candidate.namespace === surface.namespaces[0])
     if (section === undefined) throw new Error('evolution-ui: generated surface names no generated field section: ' + surface.namespaces[0])
@@ -83,7 +84,7 @@ export function apply(ctx: ClientContext): void {
   seam.slots.inject('plugins.detail.section', function* () {
     yield seam.slots.register({ name: 'plugins.detail.section', id: 'evolution-diagnostics' }, ((props: { subject?: { kind?: string; pkg?: { name?: string } } }): ReactNode => {
       const subject = props.subject
-      if (subject?.kind !== 'bundle' || subject.pkg?.name !== PRODUCT_BUNDLE) return null
+      if (subject?.kind !== 'bundle' || subject.pkg?.name === undefined || !PRODUCT_BUNDLE_NAMES.has(subject.pkg.name)) return null
       return createElement('div', { className: 'evolution-settings-detail', 'data-role': 'evolution-diagnostics' },
         createElement('p', { className: 'evolution-params-about' }, FAMILY_VERSION + ' · ' + t('aboutPurpose')),
         createElement(DiagnosticsCard, { t, api: createDiagnosticsApi() }))

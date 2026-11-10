@@ -10,7 +10,8 @@
         "evolution-approval"
       ],
       "bundles": [
-        "@lmzhen/dsh-evolution-all"
+        "@lmzhen/dsh-evolution-all",
+        "@deepseek-ai/dsh-evolution-all"
       ],
       "order": 10
     },
@@ -20,7 +21,8 @@
         "evolution-commands"
       ],
       "bundles": [
-        "@lmzhen/dsh-evolution-all"
+        "@lmzhen/dsh-evolution-all",
+        "@deepseek-ai/dsh-evolution-all"
       ],
       "order": 20
     },
@@ -30,7 +32,8 @@
         "evolution-curator"
       ],
       "bundles": [
-        "@lmzhen/dsh-evolution-all"
+        "@lmzhen/dsh-evolution-all",
+        "@deepseek-ai/dsh-evolution-all"
       ],
       "order": 30
     },
@@ -40,7 +43,8 @@
         "evolution-merge"
       ],
       "bundles": [
-        "@lmzhen/dsh-evolution-all"
+        "@lmzhen/dsh-evolution-all",
+        "@deepseek-ai/dsh-evolution-all"
       ],
       "order": 40
     },
@@ -50,7 +54,8 @@
         "evolution-review"
       ],
       "bundles": [
-        "@lmzhen/dsh-evolution-all"
+        "@lmzhen/dsh-evolution-all",
+        "@deepseek-ai/dsh-evolution-all"
       ],
       "order": 50
     },
@@ -60,7 +65,8 @@
         "memory-files"
       ],
       "bundles": [
-        "@lmzhen/dsh-evolution-all"
+        "@lmzhen/dsh-evolution-all",
+        "@deepseek-ai/dsh-evolution-all"
       ],
       "order": 60
     },
@@ -70,7 +76,8 @@
         "tool-memory"
       ],
       "bundles": [
-        "@lmzhen/dsh-evolution-all"
+        "@lmzhen/dsh-evolution-all",
+        "@deepseek-ai/dsh-evolution-all"
       ],
       "order": 70
     },
@@ -80,7 +87,8 @@
         "tool-skill-manage"
       ],
       "bundles": [
-        "@lmzhen/dsh-evolution-all"
+        "@lmzhen/dsh-evolution-all",
+        "@deepseek-ai/dsh-evolution-all"
       ],
       "order": 80
     }
