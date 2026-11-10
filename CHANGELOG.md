@@ -1,4 +1,7 @@
 # Changelog
+## 0.42.0 (release) — 单 fence merge、稳定 journal 与 fork CI 收口
+> **范围**：merge 外层 unit 与嵌套 tree write 共用 home fence；journal prune/snapshot/undo 身份稳定；review-channel mark 与 review-context 跨模块实例共享；create-tree-reads 并发隔离；依赖 closure、gate manifest、traceability、requirements、check-registry 与 bundle patches 同步；session-query 原生索引 override 固定。
+> **验证**：fork CI run 42758072705（Linux node 22/24 + Windows desktop install）全绿，publish skipped；0.42.0 packed 37 tarballs full import OK；S1-S4 在当前候选通过。
 ## 0.41.0 (i18n) — 八语言客户端与宿主人类文案；单源字典拆分
 > **范围**：客户端四块界面、参数卡片、宿主错误、帮助、doctor 与 pending/curator 固定结果模板接入 zh/en/ja/es/fr/de/ru/pt；模型可见文案不随 UI locale 变化，模型生成的 merge/review/maintain 正文不翻译。catalog 单一源生成客户端字典与宿主表；客户端字典拆成每 namespace 一个模块，避免每个面板打包全部语言。修复复核 P1：panel locale fallback 类型、错误文案单一 owner（core errorTextIn）、settings probe 声明锚点、gate 计数同步。
 > **验证**：verify-i18n（529 UI key、113 参数 leaf、31 host error、67 command-help key、8 locale）、verify-arch-guards --strict、verify-gate-manifest 通过；client-kit/commands/UI/merge-ui/skill-health tsc 0；真实 web 3082 八语言入口验收；客户端构建产物 evolution-ui 255 kB、merge-ui 102 kB、skill-health 49 kB。
