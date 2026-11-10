@@ -30,7 +30,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
-import { RETIRED_PACKAGE_DIRS } from './lib-family-packages.mjs'
+import { publishableDirs } from './lib-family-packages.mjs'
 import { fileURLToPath } from 'node:url'
 import { loadSemver, readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
 import { releaseEvidenceSkeleton } from './lib-release-evidence.mjs'
@@ -126,10 +126,7 @@ const devBuild = argv.includes('--dev-build')
 // exists to prevent.
 const WORKSPACE_SPEC_RE = /^workspace:(\^|~|\*)$/
 
-const sourceDirs = readdirSync(evolutionRoot, { withFileTypes: true })
-  .filter(entry => entry.isDirectory() && !RETIRED_PACKAGE_DIRS.has(entry.name) && existsSync(join(evolutionRoot, entry.name, 'package.json')))
-  .map(entry => entry.name)
-  .sort()
+const sourceDirs = publishableDirs(evolutionRoot)
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'))
