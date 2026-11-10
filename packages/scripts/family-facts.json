@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "23a0963a52d50d373f731c1547c3db1fc1e5f55cc4490cd15fc13b705a409f32",
+        "sha256": "c006d673b400ae7957f6242f80962d725f0c1725a972eceea1bcd5a9ef9fddd1",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1192,7 +1192,7 @@
             "axis": "executability",
             "rows": 23,
             "reason": "24 gate rows lack a drillCmd after the new subpath and gate rows; a drill pass is scheduled",
-            "expiry": "0.43.0",
+            "expiry": "0.44.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           },
@@ -1200,7 +1200,7 @@
             "axis": "expiry-due",
             "rows": 3,
             "reason": "three gate rows carry a due expiry on the 0.41 line; retirement is scheduled",
-            "expiry": "0.43.0",
+            "expiry": "0.44.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           },
@@ -1208,7 +1208,7 @@
             "axis": "falsifiability-carrier",
             "rows": 3,
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass",
-            "expiry": "0.43.0",
+            "expiry": "0.44.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           }
