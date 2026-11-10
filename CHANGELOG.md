@@ -1,4 +1,7 @@
 # Changelog
+## 0.43.0 (surface convergence) — 单一 all 安装、平台 row config、命令面 27 条
+> **范围**：S0–S4 产品面收敛。`@lmzhen/dsh-evolution-all` 成为唯一产品安装；8 个参数 row 注册到平台 `plugins.row.config`，诊断进入 `plugins.detail.section`；删除自建 `settings.section`；命令表 30→27，删除 `preset install` / `policy set` / `migrate`，迁移保留启动时幂等执行；`evolution-preset` 停止发布，发布包 37→36；安装器默认 `all`；INSTALL/README 收为单一产品安装。
+> **验证**：UI 150/150、commands 166/166、verify-command-table 27、verify-surface-convergence、verify-doc-facts、traceability 52/52、requirements PASS、package discovery/map 36。真实 web Plugins 页面受平台客户端初始化问题阻塞，已记录为发布后跟进项。
 ## 0.42.0 (release) — 单 fence merge、稳定 journal 与 fork CI 收口
 > **范围**：merge 外层 unit 与嵌套 tree write 共用 home fence；journal prune/snapshot/undo 身份稳定；review-channel mark 与 review-context 跨模块实例共享；create-tree-reads 并发隔离；依赖 closure、gate manifest、traceability、requirements、check-registry 与 bundle patches 同步；session-query 原生索引 override 固定。
 > **验证**：fork CI run 42758072705（Linux node 22/24 + Windows desktop install）全绿，publish skipped；0.42.0 packed 37 tarballs full import OK；S1-S4 在当前候选通过。
