@@ -152,4 +152,4 @@
 - id: tool-skill
   config:
     catalogDescriptionMaxLength: 60
-# Platform session-query-sqlite Config keys (0.2.2): path, openAt, journalMode, defaultLimit, maxLimit, snippetChars, readWindowMax, persistedReadConcurrency, preparedSessionCacheSize.
+# Platform session-query Config keys (0.2.2): path, openAt, journalMode, defaultLimit, maxLimit, snippetChars, readWindowMax, persistedReadConcurrency, preparedSessionCacheSize.
