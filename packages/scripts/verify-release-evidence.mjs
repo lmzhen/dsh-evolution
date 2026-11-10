@@ -24,7 +24,7 @@ const release = argv.includes('--release')
 const json = argv.includes('--json')
 const expectedCommit = valueOf('--commit')
 const expectedTag = valueOf('--tag')
-const version = valueOf('--version').replace(/^v/, '')
+const version = (valueOf('--version') || process.env.RELEASE_VERSION || '').replace(/^v/, '')
 if (file === undefined) { console.error('verify-release-evidence: usage: <release-evidence.json> [--release] [--json] [--commit <sha>] [--tag <v...>]'); process.exit(2) }
 const path = resolve(file)
 if (!existsSync(path)) { console.error('verify-release-evidence: no evidence at ' + path + ' (cannot decide)'); process.exit(2) }
