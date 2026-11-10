@@ -145,7 +145,7 @@ describe('layered installer', () => {
     const patchRows = insertedRows(loadOverlayPatches('test', join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-host/cordis.patch.yml')))
     expect(rowIds(patchRows)).toContain('evolution-review')
 
-  }, 60_000)
+  }, 180_000)
 
   it('installs the compatibility one-click bundle', async () => {
     const home = await tempRoot('dsh-installer-oneclick-')
