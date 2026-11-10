@@ -23,7 +23,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
 
-const MODES = new Set(['host', 'agent', 'layered', 'oneclick'])
+const MODES = new Set(['all', 'host', 'agent', 'layered', 'oneclick'])
 // 0.3.77 (C axis): the two PRODUCT forms get first-class names. `variant` is
 // the session-level opt-in layout (host bundle + generated preset = the
 // historical `layered`); `attach` mounts everything on the original presets
@@ -33,6 +33,7 @@ const MODE_ALIASES = new Map([['variant', 'layered'], ['attach', 'oneclick']])
 const normalizeMode = (mode) => MODE_ALIASES.get(mode) ?? mode
 /** The product form a mode installs: ① variant / ② attach / infra-only / preset-only. */
 function deploymentFormOf(mode) {
+  if (mode === 'all') return 'attach'
   if (mode === 'layered') return 'variant'
   if (mode === 'oneclick') return 'attach'
   if (mode === 'host') return 'host-only'
@@ -1122,8 +1123,8 @@ export async function uninstall(options = {}) {
   // name-based fallback rules below.
   const journal = await readInstallJournal(profileDir)
 
-  if (mode === 'host' || mode === 'layered' || mode === 'oneclick') {
-    const bundleName = mode === 'oneclick' ? BUNDLES.oneclick : BUNDLES.host
+  if (mode === 'all' || mode === 'host' || mode === 'layered' || mode === 'oneclick') {
+    const bundleName = mode === 'all' ? BUNDLES.all : mode === 'oneclick' ? BUNDLES.oneclick : BUNDLES.host
     // D-17 (v18): report the real outcome in dry-run too (the old `!dryRun &&`
     // made a dry-run uninstall always claim no bundle would be removed).
     result.removedBundle = manifestCarriesBundle(profileDir, bundleName) ? bundleName : null
@@ -1425,8 +1426,8 @@ export async function install(options = {}) {
     // with this one.
   }
 
-  if (needsHost || needsCompat) {
-    const bundleName = needsHost ? BUNDLES.host : BUNDLES.oneclick
+  if (mode === 'all' || needsHost || needsCompat) {
+    const bundleName = mode === 'all' ? BUNDLES.all : needsHost ? BUNDLES.host : BUNDLES.oneclick
     // D-1 (v18): the one-click preset bundle mounts the four model rows at
     // profile root; a family preset ROW mounts the same rows in preset scope.
     // Refuse unless --force explicitly confirms.
@@ -1439,7 +1440,7 @@ export async function install(options = {}) {
     const targetPatchPath = profilePatchPath(home, profile)
     const targetPatch = existsSync(targetPatchPath) ? await readFile(targetPatchPath, 'utf8') : ''
     const existingPresets = profilePresetRows(targetPatch)
-    if (needsCompat && existingPresets.length > 0 && !force) {
+    if ((needsCompat || mode === 'all') && existingPresets.length > 0 && !force) {
       throw new Error(
         `install-layered: profile "${profile}" already carries an Evolution agent preset row (${existingPresets.map(entry => `${entry.base} → ${entry.rowId}`).join(', ')} in ${targetPatchPath}). `
         + 'The one-click preset bundle and the layered agent preset are mutually exclusive install targets (E-33) — '
@@ -1454,7 +1455,7 @@ export async function install(options = {}) {
     // ensure/write is skipped), so a --dry-run --mode host against an all
     // profile reports the would-be refusal instead of claiming it installs.
     const installedAll = detectInstalledAllBundle(profileDir)
-    if (installedAll.length > 0) {
+    if (mode !== 'all' && installedAll.length > 0) {
       throw new Error(
         `install-layered: profile "${profile}" already carries an evolution-all bundle (${installedAll.join(', ')}). `
         + 'evolution-all is the DEFAULT full-functionality install — host/preset would double-mount its infra rows. '
