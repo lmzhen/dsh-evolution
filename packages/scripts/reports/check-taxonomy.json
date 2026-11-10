@@ -529,6 +529,7 @@
         "evolution-host::tests/sidecar-inventory.spec.ts",
         "evolution-host::tests/skill-root-gate.spec.ts",
         "evolution-host::tests/traceability.spec.ts",
+        "evolution-host::tests/verify-published-bytes.spec.ts",
         "evolution-io-node::tests/io-node.spec.ts",
         "evolution-io::tests/io.spec.ts",
         "evolution-io::tests/medium-marker.spec.ts",
@@ -1246,6 +1247,7 @@
         "evolution-host::tests/sidecar-inventory.spec.ts",
         "evolution-host::tests/skill-root-gate.spec.ts",
         "evolution-host::tests/traceability.spec.ts",
+        "evolution-host::tests/verify-published-bytes.spec.ts",
         "evolution-io-node::tests/io-node.spec.ts",
         "evolution-io::tests/io.spec.ts",
         "evolution-io::tests/medium-marker.spec.ts",
@@ -1903,6 +1905,7 @@
         "evolution-host::tests/sidecar-inventory.spec.ts",
         "evolution-host::tests/skill-root-gate.spec.ts",
         "evolution-host::tests/traceability.spec.ts",
+        "evolution-host::tests/verify-published-bytes.spec.ts",
         "evolution-io-node::tests/io-node.spec.ts",
         "evolution-io::tests/io.spec.ts",
         "evolution-io::tests/medium-marker.spec.ts",
@@ -2322,7 +2325,7 @@
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 459
+      "specs": 460
     },
     "ci-only": {
       "gates": 14,
@@ -2330,16 +2333,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 459
+      "specs": 460
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 531
+      "specs": 532
     }
   },
   "specs": {
-    "total": 531,
-    "marked": 531,
+    "total": 532,
+    "marked": 532,
     "unmarked": 0
   }
 }
