@@ -1,40 +1,37 @@
-# Install forms (single source)
+# Install (single product)
 
-This file is the canonical statement of what each install form does to a session. The root [INSTALL.md](../INSTALL.md) owns commands and operational details.
+This file is the canonical statement of the product install surface. The root [INSTALL.md](../INSTALL.md) owns commands and operational details.
 
-## Forms
+## Upgrade runbook (platform first)
 
-| Form | Bundle / preset | Model tools |
+1. Upgrade the platform first.
+2. Upgrade the family bundle.
+3. Publish/verify the release artifacts; never publish before the gates. The publish step is last.
+
+## Product forms
+
+| Form | Package | What it does |
 |---|---|---|
-| All (default) | `dsh-evolution-all` | profile-wide |
-| Host | `dsh-evolution-host` | only `maintenance_probe` + `merge_stage` |
-| One-click | `dsh-evolution-preset` | profile-wide (compatibility) |
-| Layered | `host` + Evolution preset | only sessions on the preset |
+| All (default) | `dsh-evolution-all` | Every session gets the family model tools and UI. Use this unless you have a specific advanced reason not to. |
+| Host (advanced) | `dsh-evolution-host` | Infrastructure only; no memory/skill model rows. For custom compositions, not the default. |
 
-`all`, `host`, `preset`, and the layered preset are mutually exclusive. The three bundles share infrastructure rows; duplicate ids abort the loader at startup.
+`all` is the only product installation. Partial capability is a row switch in the Plugins page, not a second install form.
 
-## What each form does to a session
+## Internal composition (not product choices)
 
-**② attach** — full (`all`) or one-click (`preset`) — where every session, including one on a platform original preset, carries the family model rows.
+`dsh-evolution-preset` is a migration-only compatibility bundle and is no longer published. The layered form (`host` + generated Evolution preset) remains an internal/dev installer path for sessions that must opt in through an agent preset; it is not a product install choice and must not appear in user docs.
 
-**① variant** — layered (`host` + the generated Evolution preset, `--mode variant`) — where the model rows exist only inside the family preset, so a session on an original preset gets no evolution behaviour at all. `sessionAudited` gates the automatic paths. A session on an original preset still SEES the `/evolution …` commands; this is an accepted, management-only difference.
+The three historical bundles share infrastructure rows; mounting two double-registers services and the loader fails loud. Shrinking a product install means disabling rows or uninstalling `all`; the layered path is exclusive with `all` because its model rows would double-mount.
 
-Host-only is neither attach nor variant: it mounts the infrastructure but no memory/skill model rows. `/evolution doctor` reports `deployment: variant|attach|host-only|preset-only|none`.
+## Validation status
 
-## Status against the validated platform line
+Validated line: **DSH 0.2.2-rc.1**.
 
-Validated line: **DSH `0.2.1-rc.3`**. This matrix describes evidence, not expectation:
-
-| Form | Status | Basis |
+| Surface | Status | Basis |
 |---|---|---|
-| All | verified on the current release line | packed tarball install + web host + desktop smoke in the release gate |
-| Host | verified | source installer/lab and packed smoke |
-| One-click preset | source-level judged | row set equals all minus UI/health; not separately installed on this line |
-| Layered preset | verified in lab | isolated `DSH_HOME`, profile patch preset row, clean boot |
-
-## Why not mount two
-
-The three bundles insert the same infrastructure rows. Mounting two double-registers the services and the loader fails loud (`already registered`). Shrinking means uninstall then install; the layered preset is also exclusive with all/preset because the model rows would double-mount.
+| all | verified | packed install + web host + desktop smoke in the release gate |
+| host | verified | source installer/lab and packed smoke |
+| preset/layered | internal only | migration/dev path; not a product claim |
 
 ## Known differences
 
@@ -43,12 +40,6 @@ The three bundles insert the same infrastructure rows. Mounting two double-regis
 - `merge/run` and `merge/runs` paths are declared but not implemented.
 - `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth`, and `reviewToolAllow` appear in the generated parameter table/bundle metadata but are not read by the review plugin. Do not rely on them for provider selection, context limits, delegation depth, or tool restrictions. `reviewTimeoutMs` is implemented.
 - The local `evolution-io-node` backend guarantees same-path serialization only within one process. Cross-process read-modify-write over a shared home requires the platform `ctx.fs` provider; the Node backend alone is not a cross-process lock.
-
-## Upgrade runbook (platform first)
-
-1. Upgrade the platform first.
-2. Upgrade the family bundle.
-3. Publish/verify the release artifacts; never publish before the gates.
 
 ## Command fallbacks
 

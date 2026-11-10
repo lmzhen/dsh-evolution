@@ -343,54 +343,6 @@
       "cites": []
     },
     {
-      "id": "install-form-semantics",
-      "title": "① variant / ② attach - what each form does to a session",
-      "home": "INSTALL.md",
-      "must": [
-        {
-          "text": "**② attach** — full (`all`) or one-click (`preset`) — where every session,"
-        },
-        {
-          "text": "**① variant** — layered (`host` + the generated Evolution preset,"
-        },
-        {
-          "text": "gets no evolution behaviour at all",
-          "unique": true
-        }
-      ],
-      "forbid": [
-        {
-          "re": "Sessions on other presets keep the shared automation",
-          "why": "false since 0.3.77: under ① variant an original-preset session carries no family behaviour, the shared automation is per-session gated (opt-in.ts)"
-        },
-        {
-          "re": "其他预设仍获得 review、curator、审批和观测能力",
-          "why": "the zh copy of the same 0.3.77-invalidated claim"
-        }
-      ],
-      "cites": [
-        {
-          "file": "README.md",
-          "scope": "repo",
-          "text": "packages/INSTALL.md"
-        },
-        {
-          "file": "README.zh.md",
-          "scope": "repo",
-          "text": "packages/INSTALL.md"
-        },
-        {
-          "file": "README.md",
-          "scope": "tree",
-          "text": "INSTALL.md"
-        }
-      ],
-      "machine": {
-        "kind": "install-forms",
-        "file": "scripts/bundle-rows.json"
-      }
-    },
-    {
       "id": "preset-bases",
       "title": "the --base table: which bases exist, their ids and their preconditions",
       "home": "evolution-agent/README.md",
@@ -450,40 +402,6 @@
           "file": "README.md",
           "scope": "repo",
           "text": "packages/README.md"
-        }
-      ]
-    },
-    {
-      "id": "command-face-variant",
-      "title": "the accepted ① variant known difference: the /evolution command face stays visible",
-      "home": "INSTALL.md",
-      "machine": {
-        "kind": "doctor-forms",
-        "file": "evolution-commands/src/doctor.ts",
-        "field": "deploymentForm"
-      },
-      "must": [
-        {
-          "text": "still SEES the `/evolution …` commands",
-          "unique": true
-        }
-      ],
-      "forbid": [
-        {
-          "re": "the command face is hidden per session",
-          "why": "the family registers its command once on the host plane; per-session registration is an explicitly declined change"
-        }
-      ],
-      "cites": [
-        {
-          "file": "evolution-commands/README.md",
-          "scope": "tree",
-          "text": "INSTALL.md"
-        },
-        {
-          "file": "README.md",
-          "scope": "repo",
-          "text": "packages/INSTALL.md"
         }
       ]
     },
