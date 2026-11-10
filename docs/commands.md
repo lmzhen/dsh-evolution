@@ -70,16 +70,13 @@
 
 `replay` 依赖活动记录。默认 `reviewMode=inject` 不产生 `evolution/plan-applied` 记录，因此没有相应数据时不能据此推断回放已经完成过实际评估。
 
-## 安装、设置与迁移
+## 参数查看
 
 | 命令 | 作用 |
 |---|---|
 | `/evolution params [--group <name>] [--json]` | 查看参数、分组、档位、生效时机、来源和当前值 |
-| `/evolution policy set <id> <value> [--expect <revision>]` | 写一个 E3 用户参数；`--expect` 做版本冲突检查 |
-| `/evolution preset install [--base <name>[,<name>...]]` | 在当前 profile patch 中生成 Evolution 预设行 |
-| `/evolution migrate` | 幂等迁移旧设置文档中的家族配置 |
 
-`policy set` 只接受 E3 参数，写入 `$DSH_HOME/settings.yaml`。E1/E2 部署参数仍在 Cordis 配置或 patch 层维护。完整参数表见 [../packages/PARAMETERS.md](../packages/PARAMETERS.md)。
+参数写入走平台插件管理的 row 配置页；安装/卸载/更新也走平台插件管理。完整参数表见 [../packages/PARAMETERS.md](../packages/PARAMETERS.md)。
 
 ## 技能合并
 

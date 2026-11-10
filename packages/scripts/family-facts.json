@@ -493,7 +493,7 @@
       "home": "README.md",
       "must": [
         {
-          "text": "| `/evolution preset install [--base <name>[,<name>...]]`",
+          "text": "| `/evolution doctor` | Check installation form, versions and service state |",
           "unique": true
         }
       ],

@@ -8,7 +8,7 @@
  *
  * This parser is order- and `=`-tolerant, matches the subcommand name case-insensitively, keeps a flag
  * VALUE's case intact (the domain layer is the one that validates it), and answers a SYNTAX failure when a
- * declared value flag is left without its value (F-3: `policy set a.b --expect 3` must not read
+ * declared value flag is left without its value (F-3: `extract --start 3` must not read
  * `--expect 3` as the value).
  *
  * @module @deepseek-ai/dsh-evolution-commands/parse
@@ -23,7 +23,7 @@ export const VALUE_FLAGS: readonly string[] = [
   // No `profile`: the word only appears in the preset row's PROSE, no command declares a value-taking
   // `--profile`, and nothing reads `flags.get('profile')`. Kept honest by the measurement, not by
   // leaving a name standing (independent review P2-4).
-  'group', 'expect', 'base', 'to', 'timeout', 'plan', 'start', 'end', 'outcome',
+  'group', 'to', 'timeout', 'plan', 'start', 'end', 'outcome',
 ]
 
 /** One parsed command line. */

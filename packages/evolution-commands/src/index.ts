@@ -9,7 +9,7 @@
 // by `vendor/hmr/src/index.ts`. The probes are capability checks — absence degrades a feature and
 // `/evolution doctor` reports it.
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
-import { createSubagentChannel, scopedPackageName, authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
+import { createSubagentChannel, authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
 import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
@@ -28,19 +28,17 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
   }
 }
-import { appendEvolutionEvent, buildLearnPrompt, canonicalWriteId, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, paramSettingsId, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { partitionVersions } from '@deepseek-ai/dsh-evolution-core/skills'
-import { composePresetEntry, mergePresetRow, presetPatchText, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
-import { PROFILE_PATCH_FILENAME, baseRefusalReason, presetProfileTarget, resolvePresetBasePatch } from './preset-source.ts'
+import { presetProfileTarget } from './preset-source.ts'
 // G3: the write-path exclusion asks the ONE owner of <home>/profiles about THIS plane only.
-import { installExclusionTarget } from './profiles.ts'
-import { paramGroups, paramSurfaceRows, parseParamValue, renderParamJson, renderParamRows, renderPolicySet, type ParamSectionView } from './params.ts'
+import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type ParamSectionView } from './params.ts'
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
 import { isParseFailure, parseSubcommand, subcommandOf } from './parse.ts'
 // G7-3: the atomic writer moved to the core io seam (one implementation); re-exported so this
@@ -48,10 +46,7 @@ import { isParseFailure, parseSubcommand, subcommandOf } from './parse.ts'
 import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
 import { assertSkillsRootAliasRetired, elapsedSince, resolveRootConfig, newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 export { atomicWriteFiles }
-import { existsSync, readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
 export const name = 'evolution-commands'
 
@@ -1316,149 +1311,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // `handoff`, so it described a grammar two releases behind the one it guards.
           return err('未知的 maintain 参数：应为 `maintain`、`maintain --timeout <ms>` / `maintain --timeout=<ms>`、`maintain status [<id>]`、`maintain report [<id>]`、`maintain handoff [<id>]` 或 `maintain cancel [<id>]`。实际收到：' + input)
         }
-        // G7.4/C7: the install shape, the base flag and the refusal for any other preset line all
-        // come from the ONE parser.
-        const presetParsed = parseSubcommand(input)
-        const presetInstall = isParseFailure(presetParsed) || presetParsed.name !== 'preset'
-          ? null
-          : (presetParsed.positionals[0] === 'install' && presetParsed.positionals.length === 1 && [...presetParsed.flags.keys()].every(flag => flagsOf('preset install').includes('--' + flag)) ? presetParsed : false)
-        if (presetInstall !== null && presetInstall !== false) {
-          // 0.3.75 (v41 §6.1): this path knew `standard` only, so an
-          // npm-installed family could not reach the ptc variant at all. The
-          // base table now lives in the agent package's bases.json — the SAME
-          // file install-layered.mjs reads, so the two install paths cannot
-          // disagree about ids or metadata names.
-          // (unreachable: the guard above only enters for the install sub-form)
-          // v28 G3.2 (CMD-03): the same three-way mutual exclusion
-          // install-layered.mjs enforces up front, applied at the command's
-          // write boundary. Writing the preset product while the `all` bundle
-          // (or the one-click preset bundle) is mounted in ANY profile of this
-          // home double-mounts the four model rows and the next session that
-          // selects the preset fails loud at startup. Doctor reports this
-          // post-hoc; here it is refused pre-hoc. A clean host(-less) layered
-          // home is unaffected (re-installs stay idempotent).
-          {
-            // v30 CMD-06: the enumeration must not degrade silently HERE —
-            // an unreadable profiles dir would look like "no bundles" and the
-            // double-mounting install would proceed (fail-open). The gate
-            // refuses with guidance instead.
-            // v34 INST-01: a per-profile manifest that cannot be read or
-            // parsed is the same fail-open (its bundle rows become "unknown",
-            // not "absent") — both scopes refuse.
-            // G3: the exclusion asks about THIS PLANE, not about every profile under the home. A
-            // leftover profile from the other plane (the two-plane split leaves e.g.
-            // ~/.dsh/profiles/web next to profiles/desktop) used to make this gate refuse an
-            // install that could not double-mount anything HERE. The mounted profile's started
-            // bundles plus its declared ones are the whole question — and an unanswerable question
-            // still REFUSES (no profileContext, unreadable home, a profile this home does not know):
-            // fail-closed, exactly as before.
-            const mounted = presetProfileTarget(ctx)
-            const exclusion = installExclusionTarget(mounted === undefined
-              ? undefined
-              : { profile: mounted.profile, dir: mounted.profileDir, bundles: mounted.bundles })
-            if (exclusion.kind === 'undecidable') {
-              return err(`拒绝安装分层 Evolution 预设：${exclusion.reason}：all/preset 双重挂载检查无法执行。请解决该 profile 的访问权限后重试，或改用分层安装器——它会在安装前就执行同一套排除检查。`)
-            }
-            const installedBundles = exclusion.bundles
-            const allBundle = installedBundles.find(name => name === 'dsh-evolution-all' || name.endsWith('/dsh-evolution-all'))
-            const presetBundle = installedBundles.find(name => name === 'dsh-evolution-preset' || name.endsWith('/dsh-evolution-preset'))
-            if (allBundle || presetBundle) {
-              return err(`拒绝安装分层 Evolution 预设：本 profile 里已安装「${allBundle ?? presetBundle}」：它的模型行（tool-memory / tool-skill-manage / tool-session-query / skill-catalog）会与预设的重复挂载，profile 启动时会直接报错。只保留一个：安装分层预设前先移除 ${allBundle ? 'evolution-all bundle' : 'evolution-preset bundle'}（见 /evolution doctor）。`)
-            }
-          }
-          // The deliverable is one ROW in the target profile's own patch layer
-          // (0.2.x): the platform registry reads declared presets out of the
-          // composition, and a preset the platform does not ship has to arrive
-          // inside an `- insert:` entry — a plain entry would only override a row
-          // of the same id (packages/boot/app-boot/tests/user-patches.spec.ts:47-64).
-          // The base rows come from the bundle patch that declares the platform
-          // preset; the row is composed by core's composer, so this path and the
-          // source installer emit the same bytes.
-          try {
-            const source = resolveAgentPresetDir(import.meta.url)
-            const table = readAgentPresetBases(source)
-            // v41: the selection is a LIST (comma-separated) — a user who
-            // switches between the standard and ptc platform presets wants both
-            // variants, generated against the SAME runtime platform in one pass.
-            // Every name is resolved before anything is written, so a typo in
-            // the second entry cannot leave the first variant installed.
-            // `flags.get` answers `string | true | undefined`: a value flag's payload is a string,
-            // a bare flag means `true`. Narrowing here is what keeps the whole selection below typed
-            // (the CI build line proved it).
-            const baseFlag = presetInstall.flags.get('base')
-            const requestedRaw = typeof baseFlag === 'string' ? baseFlag : table.defaultBase
-            const requested = [...new Set(requestedRaw.split(',').map(part => part.trim()).filter(part => part !== ''))]
-            if (requested.length === 0) {
-              return err(`没有指定 agent-preset 基名：${join(source, 'bases.json')} 里列出的是 ${table.entries.map(entry => entry.name).join(', ')}`)
-            }
-            const selected: (typeof table.entries)[number][] = []
-            for (const name of requested) {
-              const entry = table.entries.find(candidate => candidate.name === name)
-              if (entry === undefined) {
-                return err(`未知的 agent-preset 基名「${name}」：${join(source, 'bases.json')} 里列出的是 ${table.entries.map(candidate => candidate.name).join(', ')}`)
-              }
-              selected.push(entry)
-            }
-            const deltaPath = join(source, 'agent.cordis.yml')
-            if (!existsSync(deltaPath)) return err(`预设文件在 ${source} 里缺失：是否装了 dsh-evolution-agent-preset 包？`)
-            const profile = presetProfileTarget(ctx)
-            if (profile === undefined) return err('本进程没有挂载任何 profile，因此没有可写入预设行的 profile 补丁：请在由 `dsh --profile <name>` 启动的会话里执行该命令。')
-            const delta = readFileSync(deltaPath, 'utf8')
-            // P2 (v46 G6-②): the read-merge-write below is a read-modify-write on the profile patch.
-            // The platform serializes exactly this kind of change through its HMR lock (see
-            // dsh-plugin-manager: hmr === undefined ? apply() : hmr.runExclusive(apply)), so the commit
-            // runs inside it when the service is mounted, and degrades to the direct call when it is not.
-            const hmr = ctx.get('hmr') as
-              | { runExclusive?: <T>(fn: () => T | Promise<T>) => Promise<T> }
-              | undefined
-            const commit = () => {
-              const current = existsSync(profile.patchPath) ? readFileSync(profile.patchPath, 'utf8') : ''
-              let merged = current
-              const written: string[] = []
-              for (const base of selected) {
-                // 0.3.78 (G1-②), single-sourced in v46 S2.8: the two refusals live in
-                // ONE function (`baseRefusalReason`) that `/evolution doctor` reads too,
-                // and the service precondition is asked of the RUNTIME — the exact
-                // reason a later mount would refuse. The source-checkout installer asks
-                // the target profile's bundle rows instead, because it runs outside the
-                // host.
-                const refusal = baseRefusalReason(base, name => ctx.get(name) !== undefined)
-                if (refusal !== undefined) return err(refusal)
-                const basePatch = resolvePresetBasePatch(base.name, profile)
-                const rowId = presetRowId(base.id)
-                const entryText = composePresetEntry(readFileSync(basePatch, 'utf8'), delta, {
-                  rowId,
-                  id: base.id,
-                  name: base.display.name,
-                  description: base.display.description,
-                  order: base.display.order,
-                })
-                const next = mergePresetRow(merged, entryText, rowId)
-                written.push(next === merged ? `${base.name} → ${profile.patchPath} (already current)` : `${base.name} → ${rowId} in ${profile.patchPath}`)
-                merged = next
-              }
-              if (merged !== current) {
-                // S6.3 (E-40): commit atomically — the file is staged to a sibling
-                // `<name>.tmp` and renamed into place, a pre-existing file keeping a
-                // single `.bak`, so a failed write leaves the previous patch (and
-                // every session that reads it) untouched.
-                atomicWriteFiles(dirname(profile.patchPath), [
-                  { name: PROFILE_PATCH_FILENAME, content: presetPatchText(merged) },
-                ], undefined, (message) => { ctx.logger.warn(message) })
-              }
-              return ok(`已写入 evolution agent preset 行（${written.join('; ')}）。重启会话切换器后即可选中它。`)
-            }
-            const runExclusive = hmr?.runExclusive
-            // The host call's own type is `unknown` (it is a generic seam), so the accepted shape is
-            // spelled here rather than leaking `unknown` out of this branch.
-            if (runExclusive === undefined) return commit()
-            // The host seam's own type is `unknown`; `await` is what the surrounding async
-            // contract requires here (the sync branch above must NOT await).
-            return await runExclusive.call(hmr, commit) as CommandResult
-          } catch (error) {
-            return err(`预设安装失败：${error instanceof Error ? error.message : String(error)}`)
-          }
-        }
         if (input.startsWith('extract ')) {
           const extractParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(extractParsed) || extractParsed.name !== 'extract') {
@@ -1548,14 +1400,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return ok(result.message + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + warnings)
         }
         if (input.startsWith('restructure ')) {
-          // /evolution restructure <name> "<heading>" <to_file> [--plan <runId>]
-          // — bridges the existing SkillLibrary.restructure (two-phase
-          // rollback + origin gate); one move per invocation; heading may
-          // contain spaces. `--plan` back-references a maintain scan runId
-          // (011 §10 audit chain; shallow — annotated in the result text).
-          // V25-08 (v25): parsed from the ORIGINAL trimmed input so a
-          // quoted heading keeps its inner spacing verbatim.
-          // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
+        // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
           const restParsed = parseSubcommand(rawInputTrimmed)
           if (isParseFailure(restParsed) || restParsed.name !== 'restructure') {
             return err('用法：/evolution restructure <name> "<heading>" <to_file>')
@@ -1690,102 +1535,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           if (paramsParsed.flags.get('json') === true) return ok(renderParamJson(selected))
           return ok(renderParamRows(selected, { providerMounted: provider !== undefined }))
-        }
-        // G7.4/C7 + F-3: positionals are positional now — `--expect` can never slide into the VALUE
-        // slot, and a missing value is a SYNTAX answer instead of a schema-layer failure.
-        const policyParsed = parseSubcommand(input)
-        if (isParseFailure(policyParsed) && policyParsed.name === 'policy' && policyParsed.kind === 'missing-value') {
-          return err('/evolution policy set 需要在 --' + (policyParsed.flag ?? '') + '；用法：policy set <id> <value> [--expect <revision>]')
-        }
-        if (!isParseFailure(policyParsed) && policyParsed.name === 'policy' && policyParsed.positionals[0] === 'set') {
-          // S4.2: the WRITE face. One path only — the settings service. There is
-          // deliberately no YAML fallback: a command that edits cordis.yml would
-          // be a second write path to the same fact (design §8.3).
-          const provider = ctx.get('settings') as SettingsProviderLike | undefined
-          if (provider?.update === undefined || provider.describe === undefined) {
-            return err(hostError('e-311-no-settings-service-is'))
-          }
-          const rawId = policyParsed.positionals[1] ?? ''
-          const rawValue = policyParsed.positionals[2] ?? ''
-          let id: string
-          try {
-            id = canonicalWriteId(rawId)
-          } catch (error) {
-            return err(hostError('e-312-error-instanceof-Error-error', { a1: error instanceof Error ? error.message : String(error) }))
-          }
-          const entry = PARAM_EXPOSURE.find(candidate => candidate.id === id)
-          if (entry === undefined) {
-            return err(hostError('e-313-unknown-parameter-id-evolution', { a1: id }))
-          }
-          if (entry.tier !== 'E3') {
-            return err(hostError('e-314-id-is-a-deployment', { a1: id, a2: entry.tier, a3: entry.owner }))
-          }
-          // The platform keys the section by the Loader entry id (the row id), never by the
-          // legacy namespace the 0.1.x seam registered: see core's `paramSettingsId`.
-          const namespace = paramSettingsId(entry.owner)
-          if (namespace === undefined) {
-            return err(hostError('e-315-id-has-no-user', { a1: id, a2: entry.owner }))
-          }
-          let descriptor: { ns: string; value?: unknown; user?: Record<string, unknown>; revision?: number } | undefined
-          try {
-            descriptor = provider.describe({ redactSecrets: false }).find(candidate => candidate.ns === namespace)
-          } catch (error) {
-            return err(hostError('e-307-the-settings-service-could-2', { a1: error instanceof Error ? error.message : String(error) }))
-          }
-          if (descriptor === undefined) {
-            return err(hostError('e-316-namespace-namespace-is-not', { a1: namespace, a2: entry.owner }))
-          }
-          const current = descriptor.value
-          const resolved = typeof current === 'object' && current !== null ? current as Record<string, unknown> : undefined
-          // `flags.get` answers `string | true | undefined` (a value flag carries its payload, a bare
-          // flag means `true`), so the payload is narrowed before it is used as a revision.
-          const expectFlag = policyParsed.flags.get('expect')
-          const expectedRaw = typeof expectFlag === 'string' ? expectFlag : undefined
-          const expected = expectedRaw === undefined ? descriptor.revision : Number(expectedRaw)
-          if (expectedRaw !== undefined && descriptor.revision !== undefined && Number(expectedRaw) !== descriptor.revision) {
-            return err(hostError('e-309-revision-conflict-you-sent', { a1: expectedRaw, a2: descriptor.revision }))
-          }
-          const value = parseParamValue(rawValue)
-          // G5.12/U-4: the cross-field constraint is declared ONCE in the registry (core's params.ts,
-          // `relation`) and enforced here. The card reads the SAME column before a save is attempted,
-          // so the two halves cannot disagree about what is legal. The sibling's current value comes
-          // from the snapshot this branch already read — no second read, no cached copy.
-          const floorId = entry.relation?.atLeast
-          if (floorId !== undefined && typeof value === 'number') {
-            const sibling = resolved?.[floorId]
-            const floor = typeof sibling === 'number' ? sibling : Number.NaN
-            if (Number.isFinite(floor) && value < floor) {
-              return err(hostError('e-322-a-parameter-would-break-a', { a1: id, a2: String(floor), a3: String(value) }))
-            }
-          }
-          try {
-            await provider.update(namespace, { [id]: value }, expected)
-          } catch (error) {
-            const code = (error as { code?: unknown } | null)?.code
-            const message = error instanceof Error ? error.message : String(error)
-            if (code === 'SETTINGS_CONFLICT') {
-              return err(hostError('e-309-revision-conflict-message-Re', { a1: message }))
-            }
-            return err(hostError('e-310-the-settings-service-refused', { a1: message }))
-          }
-          return ok(renderPolicySet({
-            id, namespace, applies: entry.applies,
-            before: descriptor.user?.[id] ?? resolved?.[id],
-            after: value,
-            wasOverridden: descriptor.user !== undefined && Object.hasOwn(descriptor.user, id),
-          }))
-        }
-        if (input === 'migrate') {
-          // G3: the platform's own legacy import only handles ITS sections; the family's old
-          // namespaces are left in the renamed document. Idempotent by construction (equal
-          // values write nothing), so this is safe to run as often as the operator likes.
-          const attempt = await migrateFromContext(ctx)
-          if (!attempt.ok) {
-            if (attempt.problem === 'settings') return err(hostError('e-311-no-settings-service-is'))
-            if (attempt.problem === 'home') return err(hostError('e-320-the-profile-home-is-not'))
-            return err(hostError('e-321-no-io-provider-is'))
-          }
-          return ok(renderNamespaceMigration(attempt.outcome))
         }
         if (input === 'doctor' || input === 'doctor --json') {
           // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
@@ -1931,97 +1680,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
  * each of them is what kept this path on `standard` while the installer knew
  * `ptc` too. Fails loud: a missing table is an incomplete install, never a
  * silent fallback to the default base. */
-function readAgentPresetBases(source: string): {
-  defaultBase: string
-  entries: Array<{
-    name: string
-    id: string
-    display: { name: string; description: string; order: number }
-    requires?: { service: string }
-    unsupported?: string
-  }>
-} {
-  const path = join(source, 'bases.json')
-  const parsed = JSON.parse(readFileSync(path, 'utf8')) as { default?: unknown; bases?: unknown }
-  if (!Array.isArray(parsed.bases) || parsed.bases.length === 0) throw new Error(`${path} carries no bases[]`)
-  const entries = parsed.bases.map((raw) => {
-    const entry = raw as { name?: unknown; id?: unknown; display?: unknown; requires?: unknown; unsupported?: unknown }
-    if (typeof entry.name !== 'string' || typeof entry.id !== 'string') {
-      throw new Error(`${path} entry ${JSON.stringify(raw)} needs name/id strings`)
-    }
-    // The display copy is the row's PUBLISHED identity: the platform localizes
-    // its own shipped ids only (agent-preset-registry/src/display.ts:47-72), so a
-    // row without a name lists as its bare id.
-    const display = entry.display as { name?: unknown; description?: unknown; order?: unknown } | null | undefined
-    if (display === null || typeof display !== 'object'
-      || typeof display.name !== 'string' || display.name === ''
-      || typeof display.description !== 'string' || display.description === ''
-      || typeof display.order !== 'number' || !Number.isInteger(display.order)) {
-      throw new Error(`${path} entry "${entry.name}" needs display { name, description, order }`)
-    }
-    const requires = entry.requires as { service?: unknown } | null | undefined
-    if (requires !== undefined && (requires === null || typeof requires !== 'object' || typeof requires.service !== 'string')) {
-      throw new Error(`${path} entry "${entry.name}" needs requires.service as a string`)
-    }
-    if (entry.unsupported !== undefined && (typeof entry.unsupported !== 'string' || entry.unsupported === '')) {
-      throw new Error(`${path} entry "${entry.name}" needs unsupported as a non-empty reason string`)
-    }
-    return {
-      name: entry.name,
-      id: entry.id,
-      display: { name: display.name, description: display.description, order: display.order },
-      ...(requires === undefined ? {} : { requires: { service: requires.service as string } }),
-      ...(entry.unsupported === undefined ? {} : { unsupported: entry.unsupported }),
-    }
-  })
-  const declared = parsed.default
-  if (typeof declared !== 'string' || !entries.some(entry => entry.name === declared)) {
-    throw new Error(`${path} default ${JSON.stringify(declared)} is not one of ${entries.map(entry => entry.name).join(', ')}`)
-  }
-  return { defaultBase: declared, entries }
-}
-
-function resolveAgentPresetDir(importMetaUrl: string): string {
-  const dir = dirname(fileURLToPath(importMetaUrl))
-  // D-13 (v18): the overlay sibling is `evolution-agent` two levels up
-  // (`packages/evolution/<pkg>/src` or `packages/<pkg>/src`). The old first
-  // candidate `join(dir, '..', 'dsh-evolution-agent-preset')` pointed INSIDE
-  // this package in every layout (dead path).
-  const overlayCandidate = join(dir, '..', '..', 'evolution-agent')
-  if (existsSync(join(overlayCandidate, 'agent.cordis.yml')) && existsSync(join(overlayCandidate, 'bases.json'))) return overlayCandidate
-  try {
-    // G-04: the name is DERIVED from the running manifest, not a literal a release rewrite must patch.
-    const agentPresetPackage = scopedPackageName('dsh-evolution-agent-preset', importMetaUrl)
-    return dirname(createRequire(importMetaUrl).resolve(agentPresetPackage + '/package.json'))
-  } catch {
-    // S6.6-1 (E-64): last-resort overlay path; the caller's existsSync guard
-    // turns a wrong path into a clean error.
-    return overlayCandidate
-  }
-}
-
-
-// V10-09 (F-05): countMaintainRecommendations / beforeNotesHeader were
-// deleted — the recommendation count now travels as the structured
-// `MaintainOutcome.recommendationCount` (validated plan length, filled by
-// evolution-maintenance orchestrate). Parsing the rendered text (`/^- \[/gm`,
-// `Notes:` splitting — with F-365/V4-26/V6-38 as two rounds of repair patches
-// to that very parse) was a fragile cross-package text contract and is gone
-// without a dual track; formatPlan's rendering itself is unchanged.
-
-// V27 G5.2: the local `CommandInvocation` view and the
-// `CommandRuntimeLike { register(definition: unknown) }` shim are gone — the
-// platform's `@deepseek-ai/dsh-commands` types (imported above, declared as a
-// peer dependency) type the registration and the invocation, so an upstream
-// shape change fails this package's build instead of silently passing.
-// 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
-// authoritative consumer shape) instead of a local view.
-
-/** F-328: render staged args for `pending --detail`, truncated to 500 chars.
- * args may be non-JSON (a tool produced garbage), so the render is fail-safe.
- * V4-19: a truncation is marked with `…(truncated N chars)` so the operator is
- * never silently shown a partial JSON payload that could even split an escape
- * sequence — the marker makes the cut explicit rather than looking complete. */
 function safeStagedArgs(args: unknown): string {
   try {
     const json = JSON.stringify(args)

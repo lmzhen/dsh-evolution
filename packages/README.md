@@ -52,8 +52,8 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 
 | Package | Role |
 |---|---|
-| `evolution-commands` | `/evolution` command face (30 entries), diagnostics route, run registry, migrate/preset install |
-| `evolution-ui` | Settings section (approval/diagnostics/params/row config) + skill history panel + 6 routes |
+| `evolution-commands` | `/evolution` command face (27 entries), diagnostics route, run registry |
+| `evolution-ui` | Plugins page row config (approval/diagnostics/params) + skill history panel + 6 routes |
 | `evolution-merge-ui` | Read-only merge sidebar panel |
 | `evolution-client-kit` | Sidebar registration, generated routes/contracts/states/tokens |
 
@@ -68,7 +68,7 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 
 ## Command and tool entry points
 
-User-facing surfaces are documented once in [docs/commands.md](../docs/commands.md). Summary: `/evolution` (30 table entries), `/graph`, and `/skill-domain` (mode:on). Family model-tool entries are `memory`, `skill_manage`, `skill_search`, `maintenance_probe`, and the merge-child-only `merge_stage`; the bundles also mount the platform session-query tools.
+User-facing surfaces are documented once in [docs/commands.md](../docs/commands.md). Summary: `/evolution` (27 table entries), `/graph`, and `/skill-domain` (mode:on). Family model-tool entries are `memory`, `skill_manage`, `skill_search`, `maintenance_probe`, and the merge-child-only `merge_stage`; the bundles also mount the platform session-query tools.
 
 ## State and IO
 
@@ -91,12 +91,6 @@ The family uses one naming rule for the services it provides: **every key is pre
 **Validated platform line: DSH `0.2.2-rc.1`.** Published `@deepseek-ai/dsh-*` ranges declare `^0.2.2-rc.0`; prerelease ranges do not cross platform lines.
 
 The 60-char catalog cap is applied to the generated preset row: the composer injects the cap onto that preset row, while a profile-root tool-skill row is a different row, which no profile patch can reach for this purpose.
-
-Command surface includes the preset install row:
-
-| Command | Purpose |
-|---|---|
-| `/evolution preset install [--base <name>[,<name>...]]` | Generate the Evolution agent preset row |
 
 The install-form semantics and the variant command-face difference are single-sourced in [INSTALL.md](INSTALL.md); this section cites that home instead of restating it. The root publish/install details are in the repository [INSTALL.md](../INSTALL.md).
 

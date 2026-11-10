@@ -32,18 +32,18 @@ describe('parseSubcommand (C7 single parser, F-3/F-4)', () => {
   })
 
   it('answers a SYNTAX failure when a value flag has no value (F-3)', () => {
-    const parsed = parseSubcommand('policy set a.b --expect')
-    expect(parsed).toMatchObject({ kind: 'missing-value', name: 'policy', flag: 'expect' })
+    const parsed = parseSubcommand('extract a b heading --start')
+    expect(parsed).toMatchObject({ kind: 'missing-value', name: 'extract', flag: 'start' })
   })
 
   it('reads positionals in order and matches the name case-insensitively', () => {
-    const parsed = parseSubcommand('POLICY SET a.b 5 --expect 3')
+    const parsed = parseSubcommand('EXTRACT a b heading --start 3')
     const command = parsed as { name: string; flags: Map<string, string | true>; positionals: string[] }
-    expect(command.name).toBe('policy')
+    expect(command.name).toBe('extract')
     // Only the SUBCOMMAND name is lower-cased; positionals keep the caller's case (a skill name's
     // case can matter).
-    expect(command.positionals).toEqual(['SET', 'a.b', '5'])
-    expect(command.flags.get('expect')).toBe('3')
+    expect(command.positionals).toEqual(['a', 'b', 'heading'])
+    expect(command.flags.get('start')).toBe('3')
   })
 
   it('reads a SUB-FORM line and refuses an undeclared flag (C7 table)', () => {

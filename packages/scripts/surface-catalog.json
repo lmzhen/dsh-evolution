@@ -92,7 +92,7 @@
       "policy set",
       "preset install"
     ],
-    "enforced": false
+    "enforced": true
   },
   "docs": {
     "install": "README.md#install",
