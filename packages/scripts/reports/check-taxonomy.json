@@ -927,6 +927,7 @@
         "evolution-host::tests/guard-scripts.spec.ts",
         "evolution-host::tests/host-composition.spec.ts",
         "evolution-host::tests/inject-paths.spec.ts",
+        "evolution-host::tests/package-map-shape.spec.ts",
         "evolution-host::tests/platform-range.spec.ts",
         "evolution-host::tests/profile-override.spec.ts",
         "evolution-host::tests/row-contract.spec.ts",
@@ -1891,6 +1892,7 @@
         "evolution-host::tests/installer-preset-base.spec.ts",
         "evolution-host::tests/installer.spec.ts",
         "evolution-host::tests/layout-sync.spec.ts",
+        "evolution-host::tests/package-map-shape.spec.ts",
         "evolution-host::tests/packed-install.spec.ts",
         "evolution-host::tests/platform-range.spec.ts",
         "evolution-host::tests/profile-override.spec.ts",
@@ -2323,7 +2325,7 @@
     },
     "ci-only": {
       "gates": 14,
-      "specs": 72
+      "specs": 73
     },
     "full(ci=off)": {
       "gates": 75,
@@ -2331,12 +2333,12 @@
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 530
+      "specs": 531
     }
   },
   "specs": {
-    "total": 530,
-    "marked": 530,
+    "total": 531,
+    "marked": 531,
     "unmarked": 0
   }
 }
