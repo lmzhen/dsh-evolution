@@ -27,3 +27,11 @@ dist.next/
 /tmp-session.jsonl
 /undefined/
 packages/evolution-merge-engine/vendor/out/
+# W7.2 (2026-11-11): `D:/dsh/_tools/setup-mirror-tests.mjs` writes these two at the mirror root so a
+# single-package `tsc`/`vitest` resolves the platform line. They are MACHINE wiring, not repo content —
+# and the same script's platform junctions must never be captured by a bare `git add -A` either: it now
+# appends their names to `.git/info/exclude` (a checkout-shared ignore would have to blacklist 22
+# platform group names at two depths), and verify-package-map fails the release gate when they exist.
+/tsconfig.mirror.json
+/vitest.mirror.config.ts
+

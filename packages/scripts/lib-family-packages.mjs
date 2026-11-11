@@ -51,9 +51,23 @@ export const RETIRED_PACKAGE_DIRS = new Set(['evolution-preset'])
 export const RETIRED_PACKAGE_NAMES = new Set(['dsh-evolution-preset'])
 
 export const NON_PACKAGE_DIRS = new Set([
-  'scripts', 'docs', 'node_modules', 'dist.next',
+  'scripts', 'docs', 'node_modules', 'dist', 'dist.next',
   '.release-staging', '.release-staging.next', '.release-staging.previous',
+  // W7.2 (2026-11-11): shared test fixtures (no manifest, imported through tsconfig paths). It was
+  // always skipped by the package.json rule, so naming it here changes nothing about publication —
+  // it makes the DIRECTORIES that legitimately carry no manifest a declared set, which is what
+  // verify-package-map.mjs's tree half needs to tell "declared" from "stray".
+  'test-support',
 ])
+
+/** Directories that legitimately sit at the REPO ROOT of the mirror layout.
+ * W7.2 (2026-11-11): the 0.43.2-rc.1 incident committed a copy of 22 platform package groups at the
+ * repo root as well as under packages/ — the package-root rule alone cannot see the root copy. The
+ * mirror root is a repository, not a package container: `packages/`, `docs/` and the local runners'
+ * `node_modules/` are the only directories it carries. Everything else (a platform grouping
+ * directory, a scratch tree) is scaffolding or residue, and a release must not be cut from a tree
+ * that carries it. Dot-directories are exempt by the caller (`.git`, `.github`). */
+export const ROOT_NON_PACKAGE_DIRS = new Set(['packages', 'docs', 'node_modules'])
 
 /**
  * Is this directory excluded from publication by its NAME alone?

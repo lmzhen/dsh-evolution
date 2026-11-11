@@ -1,6 +1,6 @@
-## 0.43.2-rc.1 (fix) — 诊断卡片读取收口
-> **范围**：`DiagnosticsCard` 的读取改为 20 秒超时 + rejection 失败态；`api.view()` 被拒绝或永不 settle 时不再永久停在“正在读取…”，而是走共享失败块。新增 rejected read 回归。
-> **验证**：diagnostics card 单测 7/7、settings registration 3/3；main CI run 42965473576 的 platform line、node 22/24 validate、desktop install 全绿；rc 真机验证待 npm 安装后执行。
+## 0.43.2-rc.1 (fix) — 诊断卡片读取收口 + 撤销误提交的平台源码树
+> **范围**：`DiagnosticsCard` 的读取改为 20 秒超时 + rejection 失败态；`api.view()` 被拒绝或永不 settle 时不再永久停在“正在读取…”，而是走共享失败块。新增 rejected read 回归。首版 tag 提交 `b7d0438f` 用 `git add -A` 把工作区里 6510 个未跟踪的平台源文件一起提交（22 个平台包组，仓库根与 `packages/` 各一份，内容为平台 0.2.2-rc.1）；CI overlay 把 `packages/.` 整体复制进 `packages/evolution/`，`verify-arch-guards` 因此把平台源码当家族代码扫描，tag run 42974791881 报 399 条违规（该版本从未发布到 npm，tag 已重切到修复提交）。本版删除全部误提交文件，并给 `verify-package-map` 补上“树形状”半边：包根下每个目录必须是已发布包、或在 `lib-family-packages.mjs` 声明的非包目录（新增 `test-support`、`dist`），出现多余分组目录即失败；新增 clean/stray/vacuum 三条 sentinel 用例。
+> **验证**：diagnostics card 单测 7/7、settings registration 3/3；main CI run 42965473576 的 platform line、node 22/24 validate、desktop install 全绿；`verify-package-map` 在镜像与 overlay 两种布局 exit 0、stray fixture exit 1、guard-scripts 三条新用例通过；tag CI 重切后全绿才批准 npm 发布，随后在干净 web profile 做真实宿主诊断卡片验收。
 
 ## 0.43.1 (fix) — 发布后复核 P1、preset 出包与安装/文档收口
 > **范围**：修复 0.43.0 发布后复核的 P1：detail slot 补 list id 并按平台 bundle subject 渲染；all 模式拒绝已存在的 one-click preset；row config/detail 同时覆盖产品与源码 bundle scope；release staging 与安装器复制改为 `publishableDirs`，`evolution-preset` 不再进入发布集。同步收敛 root INSTALL/README、迁移/设置命令指引，settings fallback 改用 `/evolution params`，提高 installer 测试与 probe 超时。
