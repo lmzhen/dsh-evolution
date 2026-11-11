@@ -10,7 +10,10 @@ import {
   REVIEWER_PRESET_ID,
 } from '@deepseek-ai/dsh-evolution-core'
 import type { ChannelState } from '@deepseek-ai/dsh-evolution-core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { assembleDoctorInputs, buildDoctorView, unavailableDoctorView, type DoctorInputs } from '../src/doctor-view.ts'
 
 const AVAILABLE: ChannelState = { kind: 'available', provider: 'spawn' }
@@ -217,5 +220,40 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     expect(assembled.form.confidence).toBe('inferred')
     const view = buildDoctorView(assembled)
     expect(view.runtime.find(row => row.key === 'host-surface')?.status).toBe('warn')
+  })
+
+  // Reading the manager's bundle list resolves plugin metadata for every bundle (~10 module
+  // resolutions each; 108 packages here) with no cache: 19 s per diagnostics read. The profile context
+  // already points at the two manifests the manager starts from, so the doctor reads those instead.
+  it('reads the family bundle names from the profile manifests instead of the manager', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'doctor-profile-'))
+    const installation = join(dir, 'installation.json')
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-evolution-all'] } },
+      dependencies: { '@deepseek-ai/dsh-evolution-all': '0.44.0', 'some-other-plugin': '1.0.0' },
+    }), 'utf8')
+    writeFileSync(installation, JSON.stringify({ dependencies: { '@deepseek-ai/dsh-evolution-host': '0.44.0' } }), 'utf8')
+    const listBundles = vi.fn(async () => { throw new Error('the manager must not be consulted') })
+    const ctx = new Context()
+    ctx.provide('agentPresets', { list: async () => [] })
+    ctx.provide('pluginManager', { listBundles })
+    ;(ctx as unknown as { profileContext: unknown }).profileContext = { dir, installAnchor: installation }
+    const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z') })
+    expect(listBundles).not.toHaveBeenCalled()
+    expect(assembled.form).toMatchObject({ id: 'M1', confidence: 'declared' })
+  })
+
+  it('falls back to the manager when the profile manifests cannot be read', async () => {
+    const listBundles = vi.fn(async () => [{ name: '@deepseek-ai/dsh-evolution-all' }])
+    const ctx = new Context()
+    ctx.provide('agentPresets', { list: async () => [] })
+    ctx.provide('pluginManager', { listBundles })
+    ;(ctx as unknown as { profileContext: unknown }).profileContext = {
+      dir: join(tmpdir(), 'no-such-profile-directory'),
+      installAnchor: join(tmpdir(), 'no-such-installation.json'),
+    }
+    const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z') })
+    expect(listBundles).toHaveBeenCalled()
+    expect(assembled.form).toMatchObject({ id: 'M1', confidence: 'declared' })
   })
 })

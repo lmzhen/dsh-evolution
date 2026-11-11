@@ -282,8 +282,44 @@ function hostRuntimeVersion(): string | undefined {
   return undefined
 }
 
+/**
+ * The family's bundle names, read from the profile's own two manifests.
+ *
+ * `pluginManager.listBundles()` resolves plugin metadata for EVERY bundle on every call (~10 module
+ * resolutions each; 108 packages on an ordinary profile) and nothing caches it — measured 19 s per
+ * diagnostics read, and the same uncached call is what makes the plugin inventory take a minute. The
+ * doctor needs only the family's names, and `readBundles()` starts from exactly these two files, so
+ * read them directly. `undefined` means "cannot answer here", never "no bundles installed".
+ * @param ctx - the host context.
+ * @returns the family bundle names, or undefined when the profile context is unavailable.
+ */
+function familyBundlesFromProfile(ctx: Context): readonly string[] | undefined {
+  const profile = (ctx as unknown as { profileContext?: { readonly dir?: unknown; readonly installAnchor?: unknown } }).profileContext
+  if (typeof profile?.dir !== 'string' || typeof profile?.installAnchor !== 'string') return undefined
+  try {
+    const manifest = JSON.parse(readFileSync(join(profile.dir, 'package.json'), 'utf8')) as {
+      readonly dsh?: { readonly profile?: { readonly bundles?: readonly unknown[] } }
+      readonly dependencies?: Readonly<Record<string, unknown>>
+    }
+    const selected = (manifest.dsh?.profile?.bundles ?? []).filter((name): name is string => typeof name === 'string')
+    const installation = JSON.parse(readFileSync(profile.installAnchor, 'utf8')) as {
+      readonly dependencies?: Readonly<Record<string, unknown>>
+    }
+    const names = [
+      ...selected,
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(installation.dependencies ?? {}),
+    ]
+    return [...new Set(names)].filter(name => name.includes('dsh-evolution-'))
+  } catch {
+    return undefined
+  }
+}
+
 /** The family bundles the platform reports (soft probe: a host without the manager answers []). */
 async function installedFamilyBundles(ctx: Context): Promise<readonly string[]> {
+  const fromProfile = familyBundlesFromProfile(ctx)
+  if (fromProfile !== undefined) return fromProfile
   const manager = (ctx as unknown as { get(service: string): unknown }).get('pluginManager')
   const listed = await (manager as { listBundles?(): unknown } | undefined)?.listBundles?.()
   if (!Array.isArray(listed)) return []
