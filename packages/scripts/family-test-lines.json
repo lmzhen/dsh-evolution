@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-11T10:22:01.205Z",
-  "tree": "cd6c33a5",
+  "measuredAt": "2026-11-11T16:47:24.562Z",
+  "tree": "e91608ca",
   "testLines": [
     {
       "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",
@@ -100,6 +100,16 @@
       "expectLine": "unknown",
       "status": "pending",
       "reasonRef": "packages/evolution-commands/tests/commands.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-commands"
+    },
+    {
+      "spec": "packages/evolution-commands/tests/doctor-view.spec.ts",
+      "id": "@deepseek-ai/dsh-base",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-commands/tests/doctor-view.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
       "owner": "evolution-commands"
     },
