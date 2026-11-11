@@ -13,6 +13,7 @@
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DiagnosticRow, DiagnosticsView } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
 import type { DiagnosticsApi, DiagnosticsState } from './diagnostics-state.ts'
+import type { RouteAnswer } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import type { FallbackHint } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
 import type { MessageKey } from './messages.ts'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
@@ -106,12 +107,27 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
     ticket.current = current
     if (keepView) { setRefreshing(true); setRefreshFailure(undefined) }
     else setState({ phase: 'loading' })
-    void api.view().then((answer) => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<RouteAnswer<DiagnosticsView>>((resolve) => {
+      timer = setTimeout(() => resolve({
+        ok: false,
+        failure: { kind: 'server', status: 0, detail: 'diagnostics read timed out' },
+      }), 20_000)
+    })
+    void Promise.race([api.view(), timeout]).then((answer) => {
       if (ticket.current !== current) return
       if (answer.ok) { setState({ phase: 'ready', view: answer.data }); setRefreshFailure(undefined) }
       else if (keepView) setRefreshFailure(answer.failure)
       else setState({ phase: 'failed', failure: answer.failure })
-    }).finally(() => { if (ticket.current === current) setRefreshing(false) })
+    }).catch((error: unknown) => {
+      if (ticket.current !== current) return
+      const failure = { kind: 'server' as const, status: 0, detail: error instanceof Error ? error.message : String(error) }
+      if (keepView) setRefreshFailure(failure)
+      else setState({ phase: 'failed', failure })
+    }).finally(() => {
+      if (timer !== undefined) clearTimeout(timer)
+      if (ticket.current === current) setRefreshing(false)
+    })
   }
   useEffect(() => {
     read(false)

@@ -94,6 +94,13 @@ describe('diagnostics card', () => {
     expect(screen.getByText('可以改用命令：/evolution doctor')).toBeTruthy()
   })
 
+  it('renders a rejected read as a failure instead of staying in loading', async () => {
+    const api = { view: vi.fn(async () => { throw new Error('diagnostics transport rejected') }) }
+    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    await waitFor(() => { expect(screen.getByText('读取失败，可以手动重试。')).toBeTruthy() })
+    expect(screen.queryByText('正在读取…')).toBeNull()
+  })
+
   it('a failed refresh keeps the last ready view instead of replacing it with an error page', async () => {
     const api = {
       view: vi.fn()
