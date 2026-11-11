@@ -97,15 +97,30 @@ for (const tarball of tarballs) {
     const entryTargets = []
     if (typeof manifest.main === 'string') entryTargets.push(manifest.main)
     if (typeof manifest.types === 'string') entryTargets.push(manifest.types)
+    // Wildcard subpath exports (`./locale/*.json`) describe a FAMILY of files, not one file: requiring
+    // the literal pattern in the payload can never pass, and requiring nothing would let a package
+    // publish the export without the files. Require at least one payload file under the pattern's
+    // directory instead — that is the condition a consumer actually needs.
+    const wildcardTargets = []
     for (const [key, value] of Object.entries(manifest.exports ?? {})) {
       if (key === './package.json') continue
       if (key === './src/*') { problems.push(short + ': scoped release still exports ./src/*'); continue }
-      if (typeof value === 'string') entryTargets.push(value)
-      else for (const sub of Object.values(value ?? {})) if (typeof sub === 'string') entryTargets.push(sub)
+      const targets = typeof value === 'string' ? [value] : Object.values(value ?? {}).filter(sub => typeof sub === 'string')
+      for (const target of targets) {
+        if (key.includes('*') || target.includes('*')) wildcardTargets.push(target)
+        else entryTargets.push(target)
+      }
     }
     for (const target of entryTargets) {
       const clean = target.replace(/^\.\//, '')
       if (!files.includes(clean)) problems.push(short + ': declares ' + target + ' but the payload has no such file')
+    }
+    for (const target of wildcardTargets) {
+      const clean = target.replace(/^\.\//, '')
+      const prefix = clean.slice(0, clean.indexOf('*'))
+      if (!files.some(file => file.startsWith(prefix))) {
+        problems.push(short + ': declares the wildcard ' + target + ' but the payload has no file under ' + prefix)
+      }
     }
 
     for (const section of ['dependencies', 'peerDependencies']) {

@@ -101,6 +101,22 @@ describe('diagnostics card', () => {
     expect(screen.queryByText('正在读取…')).toBeNull()
   })
 
+  it('offers the retry its failure sentence promises, and re-reads when asked', async () => {
+    const api = {
+      view: vi.fn()
+        .mockRejectedValueOnce(new Error('diagnostics transport rejected'))
+        .mockResolvedValueOnce(ok(view)),
+    }
+    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    await waitFor(() => { expect(screen.getByText('读取失败，可以手动重试。')).toBeTruthy() })
+    const retry = document.querySelector('[data-action="diag-retry"]')
+    // The sentence promised a manual retry; a failure state without the control was a dead end.
+    expect(retry).toBeTruthy()
+    await act(async () => { fireEvent.click(retry as Element) })
+    await waitFor(() => { expect(screen.getByText('运行状态')).toBeTruthy() })
+    expect(api.view).toHaveBeenCalledTimes(2)
+  })
+
   it('a failed refresh keeps the last ready view instead of replacing it with an error page', async () => {
     const api = {
       view: vi.fn()

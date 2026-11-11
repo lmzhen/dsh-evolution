@@ -108,11 +108,16 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
     if (keepView) { setRefreshing(true); setRefreshFailure(undefined) }
     else setState({ phase: 'loading' })
     let timer: ReturnType<typeof setTimeout> | undefined
+    // MEASURED, not guessed (2026-11-11, real web host): the host view takes ~37 s cold and ~19 s
+    // warm on a loaded profile, so a 20 s bound reported a failure on a read that would have
+    // succeeded — the card promised a manual retry and offered none. The bound is a last resort
+    // against a read that never settles, not an expectation about speed; the route itself is the
+    // thing to make fast.
     const timeout = new Promise<RouteAnswer<DiagnosticsView>>((resolve) => {
       timer = setTimeout(() => resolve({
         ok: false,
         failure: { kind: 'server', status: 0, detail: 'diagnostics read timed out' },
-      }), 20_000)
+      }), 60_000)
     })
     void Promise.race([api.view(), timeout]).then((answer) => {
       if (ticket.current !== current) return
@@ -201,7 +206,21 @@ export function DiagnosticsCard(props: DiagnosticsCardFace): ReactNode {
   }
   const body = (): ReactNode => {
     if (state.phase === 'loading') return createElement('p', { className: 'evolution-param-loading' }, t('stateLoading'))
-    if (state.phase === 'failed') return FailureBlock({ failure: state.failure, t: translate, fallback: props.fallback })
+    if (state.phase === 'failed') {
+      // The failure sentence tells the reader they can retry, so the card must actually offer the
+      // retry: a dead end costs the reader a page reload for a read that usually succeeds next time.
+      return createElement('div', {},
+        FailureBlock({ failure: state.failure, t: translate, fallback: props.fallback }),
+        createElement('div', { className: 'evolution-param-actions' },
+          createElement('button', {
+            type: 'button',
+            className: 'evolution-param-button',
+            'data-action': 'diag-retry',
+            onClick: () => { read(false) },
+          }, t('diagRecheck')),
+        ),
+      )
+    }
     const view: DiagnosticsView = state.view
     return createElement('div', {},
       createElement('p', { className: 'evolution-param-note' }, t('diagSubtitle')),
