@@ -508,16 +508,27 @@ for (const item of tarballs) {
       }
     }
   }
+  // A wildcard subpath export (`./locale/*.json`) names a FAMILY of files, so the packed set can never
+  // contain the pattern itself: requiring the literal path would fail every wildcard export, and
+  // skipping the check would let a package publish the export with nothing behind it. Require at least
+  // one packed file under the pattern's directory, which is the condition a consumer needs.
+  const covered = (target) => {
+    if (!target.includes('*')) return inShipped(target)
+    const clean = target.replace(/^\.\//, '').replace(/\\/g, '/')
+    const prefix = clean.slice(0, clean.indexOf('*'))
+    for (const file of shipped) if (file.startsWith(prefix)) return true
+    return false
+  }
   for (const [name, target] of Object.entries(manifest.exports ?? {})) {
     // V8-20 (0.3.48): the guard covered ONLY string-form exports (35 of 96) —
     // the object form ({ types, default }: 61 entries incl. every main entry
     // and ./invariant) was never checked. Recurse one level over the object
-    // values (types/default) with the same inShipped test.
-    if (typeof target === 'string' && !inShipped(target)) {
+    // values (types/default) with the same test.
+    if (typeof target === 'string' && !covered(target)) {
       failures.push(`${item.name}: export ${name} -> ${target} is missing from the tarball`)
     } else if (typeof target === 'object' && target !== null) {
       for (const [sub, value] of Object.entries(target)) {
-        if (typeof value === 'string' && !inShipped(value)) {
+        if (typeof value === 'string' && !covered(value)) {
           failures.push(`${item.name}: export ${name}.${sub} -> ${value} is missing from the tarball`)
         }
       }
