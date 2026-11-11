@@ -1,11 +1,12 @@
 /**
- * The Plugins page's per-row configuration entry for a family row.
+ * One family row's card body, rendered from a supplied `state` + `mutate` pair.
  *
- * The page owns the settings subscription — it re-renders the entry — and passes the row's
- * form in, so this component renders the SAME card body as our own section, fed by the
- * page's state instead of the bound hook and therefore holding no subscription of its own.
- * `summary` answers the page's one-line slot: a row's description fallback, which stays
- * empty until the row actually overrides something, exactly as the page expects.
+ * The family's settings page builds that pair from the platform's own client settings seat
+ * (`ConfigPageForm`: the snapshot this render read, one revision-fenced `mutate` per save), so
+ * this component owns no subscription and no seat probe of its own — its caller re-renders it,
+ * exactly as the Plugins page does for a `plugins.row.config` entry whose `form` it supplies.
+ * `summary` answers a one-line slot: a row's description fallback, which stays empty until the
+ * row actually overrides something.
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client
  */
 import { createElement, type ReactNode } from 'react'

@@ -612,6 +612,16 @@
       "pt": "padrão",
       "ru": "по умолчанию"
     },
+    "detailScope": {
+      "zh": "安装范围：整个插件包（{rows} 个组件行）；平台线与运行状态在「设置 → 自进化」里。",
+      "en": "Install scope: the whole bundle ({rows} component rows); the platform line and runtime state live under Settings → Self-evolution.",
+      "ja": "インストール範囲：パッケージ全体（{rows} 個のコンポーネント行）。プラットフォームのラインと稼働状態は「設定 → 自己進化」にあります。",
+      "es": "Alcance de la instalación: el paquete completo ({rows} filas de componentes); la línea de la plataforma y el estado de ejecución están en Ajustes → Evolución.",
+      "fr": "Périmètre d’installation : le paquet complet ({rows} lignes de composants) ; la ligne de plateforme et l’état d’exécution sont dans Réglages → Auto-évolution.",
+      "de": "Installationsumfang: das gesamte Paket ({rows} Komponentenzeilen); Plattform-Linie und Laufzeitstatus stehen unter Einstellungen → Selbstevolution.",
+      "pt": "Escopo da instalação: o pacote inteiro ({rows} linhas de componentes); a linha da plataforma e o estado de execução ficam em Configurações → Autoevolução.",
+      "ru": "Область установки: весь пакет ({rows} строк компонентов); линия платформы и состояние работы — в «Настройки → Самоэволюция»."
+    },
     "diagComplete": {
       "zh": "没有需要处理的异常",
       "en": "Nothing needs attention",
@@ -1183,14 +1193,14 @@
       "ru": "Читаем…"
     },
     "subtitle": {
-      "zh": "待你决定的写入在最上面；下面按功能列出你能改的参数，没有列出的由安装时的配置决定。",
-      "en": "Writes waiting on you come first; below, settings are grouped by feature. Anything not listed is fixed by your install configuration.",
-      "ja": "承認待ちの書き込みが一番上に表示され、その下に変更可能なパラメータが機能ごとに並びます。一覧にない項目はインストール時の設定で決まります。",
-      "es": "Las escrituras que esperan tu decisión aparecen arriba; debajo van los parámetros que puedes cambiar, agrupados por función. Lo que no aparece lo define la configuración de la instalación.",
-      "fr": "Les écritures qui attendent votre décision viennent en premier ; en dessous, les paramètres modifiables classés par fonction. Ceux qui ne sont pas listés dépendent de la configuration d’installation.",
-      "de": "Schreibvorgänge, die auf deine Entscheidung warten, stehen oben; darunter sind die änderbaren Parameter nach Funktion gruppiert. Was nicht aufgeführt ist, kommt aus der Konfiguration bei der Installation.",
-      "pt": "As escritas que aguardam sua decisão ficam no topo; abaixo, os parâmetros que você pode alterar aparecem por recurso, e o que não está listado vem da configuração de instalação.",
-      "ru": "Сверху — записи, ожидающие вашего решения; ниже параметры по функциям, которые вы можете менять. Чего нет в списке, задаётся конфигурацией при установке."
+      "zh": "所有可改的参数按功能列在下面；没列出的由安装时的配置决定。",
+      "en": "Every editable parameter is grouped below by feature; anything not listed is fixed by your install configuration.",
+      "ja": "変更できるパラメータは下に機能ごとに並びます。一覧にない項目はインストール時の設定で決まります。",
+      "es": "Todos los parámetros editables aparecen abajo agrupados por función; lo que no aparece lo define la configuración de la instalación.",
+      "fr": "Tous les paramètres modifiables sont regroupés ci-dessous par fonction ; ceux qui ne sont pas listés dépendent de la configuration d’installation.",
+      "de": "Alle änderbaren Parameter sind unten nach Funktion gruppiert; was nicht aufgeführt ist, kommt aus der Konfiguration bei der Installation.",
+      "pt": "Todos os parâmetros editáveis aparecem abaixo, agrupados por recurso; o que não está listado vem da configuração de instalação.",
+      "ru": "Все изменяемые параметры сгруппированы ниже по функциям; чего нет в списке, задаётся конфигурацией при установке."
     },
     "timeToday": {
       "zh": "今天",
