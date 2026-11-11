@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Santé des skills",
+    "description": "Vue d’atelier listant ce que le linter de skills a trouvé ; désactivée par défaut."
+  }
+}

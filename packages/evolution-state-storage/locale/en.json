@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Storage registry",
+    "description": "Registers the storage providers evolution state can use."
+  }
+}

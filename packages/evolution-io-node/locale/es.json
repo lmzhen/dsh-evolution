@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "IO local",
+    "description": "Proveedor de IO sobre disco local con escrituras atómicas dentro de un solo proceso."
+  }
+}

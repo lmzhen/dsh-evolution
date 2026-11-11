@@ -52,9 +52,13 @@
     },
     "./package.json": "./package.json",
     "./row-overrides.json": "./row-overrides.json",
-    "./persisted-write-inventory.json": "./persisted-write-inventory.json"
+    "./persisted-write-inventory.json": "./persisted-write-inventory.json",
+    "./locale/*.json": "./locale/*.json",
+    "./runtime/locale/*.json": "./locale/runtime/*.json"
   },
   "files": [
+    "locale/runtime/*.json",
+    "locale/*.json",
     "lib/**/*.js",
     "lib/types/**/*.d.ts",
     "row-overrides.json",

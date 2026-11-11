@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Merge panel",
+    "description": "Workbench view of the pending, retry and skipped merge queues."
+  }
+}

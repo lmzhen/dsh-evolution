@@ -7,7 +7,7 @@
  * the runtime surfaces.
  */
 import { mkdir, readFile, writeFile, readdir } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 const SCRIPTS = import.meta.dirname
 const EVOLUTION_ROOT = resolve(SCRIPTS, '..')
@@ -114,6 +114,96 @@ const outputs = new Map()
 for (const catalog of catalogs) outputs.set(join(PER_NAMESPACE, catalog.namespace + '.ts'), renderNamespace(catalog))
 outputs.set(TARGET, renderAggregate(catalogs) + '\n')
 
+/**
+ * Package-level locale files: the platform reads `locale/<language>.json` from the package itself for
+ * the plugin inventory row (`meta.title` / `meta.description`) and, through `meta.detail`, for the
+ * plugin detail body. They come from the SAME catalogs as the client dictionaries — one source, two
+ * renderings — because a second translation table is exactly how the plugin-detail screen stayed
+ * English for a whole release while the UI around it was already localized.
+ *
+ * The two `plugin-*` catalogs are strict: every supported locale must be present, since a generated
+ * `locale/zh.json` holding English would look translated and read as a defect. The platform's own
+ * fallback chain already covers a locale we do not ship.
+ */
+async function loadStrict(name) {
+  const value = JSON.parse(await readFile(join(CATALOG, name + '.json'), 'utf8'))
+  const catalog = loadCatalog(value)
+  if (catalog.missing.length > 0) {
+    console.error('gen-i18n: ' + name + ' must carry every locale; missing ' + catalog.missing.join(', '))
+    process.exit(1)
+  }
+  return value.messages
+}
+
+/** `{ "<package directory>.<field>": row }` → `{ directory: { field: { locale: text } } }`. */
+function byPackage(messages) {
+  const packages = new Map()
+  for (const [key, row] of Object.entries(messages)) {
+    const dot = key.indexOf('.')
+    if (dot <= 0) throw new Error(catalog.namespace + '.' + key + ': keys are "<package directory>.<field>"')
+    const directory = key.slice(0, dot)
+    const field = key.slice(dot + 1)
+    if (!packages.has(directory)) packages.set(directory, new Map())
+    packages.get(directory).set(field, row)
+  }
+  return packages
+}
+
+const meta = byPackage(await loadStrict('plugin-meta'))
+const details = byPackage(await loadStrict('plugin-detail'))
+/**
+ * Packages a bundle mounts through a package SUBPATH. The platform resolves `meta` at
+ * `${specifier}/locale/en.json`, so a row mounted as `evolution-core/runtime` reads
+ * `./runtime/locale/...` and needs that locale directory plus the export mapping; otherwise the row
+ * falls back to the module name and the component list stays half English. Same pattern the platform
+ * uses for its own subpath plugin settings.
+ */
+const SUBPATH_MOUNTS = new Map([['evolution-core', 'runtime'], ['evolution-maintenance', 'tools']])
+const declared = [...new Set([...meta.keys(), ...details.keys()])].sort()
+for (const directory of declared) {
+  const fields = meta.get(directory) ?? new Map()
+  const detail = details.get(directory)
+  const manifestPath = join(EVOLUTION_ROOT, directory, 'package.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8').catch(() => {
+    throw new Error('gen-i18n: ' + directory + ' is named by the plugin catalogs but has no package.json')
+  }))
+  const published = Array.isArray(manifest.files) ? manifest.files : []
+  const exported = typeof manifest.exports === 'object' && manifest.exports !== null ? manifest.exports : {}
+  if (!published.includes('locale/*.json')) {
+    throw new Error(manifestPath + ': files must carry "locale/*.json" or npm will not publish the locale files')
+  }
+  if (detail?.has('detail') === true && !published.includes('docs/**/*.md')) {
+    throw new Error(manifestPath + ': a localized detail page needs "docs/**/*.md" in files')
+  }
+  const mount = SUBPATH_MOUNTS.get(directory)
+  if (mount !== undefined) {
+    if (exported['./' + mount + '/locale/*.json'] !== './locale/' + mount + '/*.json') {
+      throw new Error(manifestPath + ': exports must map "./' + mount + '/locale/*.json" onto "./locale/' + mount + '/*.json" for the subpath-mounted row')
+    }
+    if (!published.includes('locale/' + mount + '/*.json')) {
+      throw new Error(manifestPath + ': files must carry "locale/' + mount + '/*.json" for the subpath-mounted row')
+    }
+  }
+  for (const locale of SUPPORTED_LOCALES) {
+    const title = fields.get('title')?.[locale]
+    const description = fields.get('description')?.[locale]
+    const body = detail?.get('detail')?.[locale]
+    if (title === undefined || description === undefined) {
+      throw new Error('gen-i18n: ' + directory + ' lacks a title/description row')
+    }
+    const document = { meta: { title, description, ...body === undefined ? {} : { detail: 'docs/detail/' + locale + '.md' } } }
+    outputs.set(join(EVOLUTION_ROOT, directory, 'locale', locale + '.json'), JSON.stringify(document, null, 2) + '\n')
+    if (mount !== undefined) {
+      // The subpath specifier reads the row WITHOUT the detail document: a component row has no page.
+      const mounted = { meta: { title, description } }
+      outputs.set(join(EVOLUTION_ROOT, directory, 'locale', mount, locale + '.json'), JSON.stringify(mounted, null, 2) + '\n')
+    }
+    if (body !== undefined) {
+      outputs.set(join(EVOLUTION_ROOT, directory, 'docs/detail', locale + '.md'), body.replace(/\s+$/u, '') + '\n')
+    }
+  }
+}
+
 let stale = false
 for (const [path, output] of outputs) {
   const current = await readFile(path, 'utf8').catch(() => '')
@@ -129,9 +219,11 @@ if (CHECK) {
   console.log('gen-i18n: OK — ' + String(catalogs.length) + ' namespace(s), ' + String(catalogs.reduce((sum, c) => sum + c.count, 0)) + ' key(s)')
 } else {
   if (stale) {
-    await mkdir(PER_NAMESPACE, { recursive: true })
-    for (const [path, output] of outputs) await writeFile(path, output)
-    console.log('gen-i18n: wrote ' + String(catalogs.length) + ' namespace file(s) + aggregate')
+    for (const [path, output] of outputs) {
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(path, output)
+    }
+    console.log('gen-i18n: wrote ' + String(catalogs.length) + ' namespace file(s) + aggregate + ' + String(outputs.size - catalogs.length - 1) + ' package-locale file(s)')
   } else {
     console.log('gen-i18n: up to date')
   }

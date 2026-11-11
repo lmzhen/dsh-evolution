@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Storage domain",
+    "description": "Binds evolution state to the platform storage domain."
+  }
+}

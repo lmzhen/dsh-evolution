@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Core",
+    "description": "Shared stores, prompts and lifecycle logic every other family package builds on."
+  }
+}

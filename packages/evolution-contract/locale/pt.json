@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Contratos",
+    "description": "Tipos e contratos compartilhados entre pacotes; sem comportamento em execução."
+  }
+}

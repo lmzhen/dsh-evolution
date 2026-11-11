@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Skill merge",
+    "description": "Finds duplicate skills, drafts a merge in two rounds, and keeps a receipt you can undo."
+  }
+}

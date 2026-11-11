@@ -3,6 +3,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { publishableDirs } from './lib-family-packages.mjs'
 
 const SCRIPTS = import.meta.dirname
 const EVOLUTION_ROOT = resolve(SCRIPTS, '..')
@@ -58,6 +59,28 @@ for (const [id, row] of Object.entries(host.messages ?? {})) { checkRow('host.er
 const commandHelp = JSON.parse(await readFile(join(CATALOG, 'host.commands.json'), 'utf8'))
 let commandKeys = 0
 for (const [id, row] of Object.entries(commandHelp.messages ?? {})) { checkRow('host.command.' + id, row, true); commandKeys++ }
+
+const pluginMeta = JSON.parse(await readFile(join(CATALOG, 'plugin-meta.json'), 'utf8'))
+let pluginRows = 0
+for (const [key, row] of Object.entries(pluginMeta.messages ?? {})) { checkRow('plugin-meta.' + key, row, true); pluginRows++ }
+const pluginDetail = JSON.parse(await readFile(join(CATALOG, 'plugin-detail.json'), 'utf8'))
+for (const [key, row] of Object.entries(pluginDetail.messages ?? {})) { checkRow('plugin-detail.' + key, row, true); pluginRows++ }
+
+// Independent census: the catalog set must equal the PUBLISHED package set, by directory. Both are
+// read from their own source (catalog keys vs publishableDirs), so a new package cannot ship with an
+// English-only inventory row because nobody remembered to add a catalog entry — the failure this
+// whole axis exists for (the plugin-detail screen stayed English for a release).
+const catalogPackages = new Set(Object.keys(pluginMeta.messages ?? {}).map(key => key.slice(0, key.indexOf('.'))))
+const published = publishableDirs(EVOLUTION_ROOT)
+const missingRows = published.filter(directory => !catalogPackages.has(directory))
+const orphanRows = [...catalogPackages].filter(directory => !published.includes(directory))
+if (missingRows.length > 0) throw new Error('plugin-meta has no row for published package(s): ' + missingRows.join(', '))
+if (orphanRows.length > 0) throw new Error('plugin-meta names package(s) the tree does not publish: ' + orphanRows.join(', '))
+for (const directory of [...catalogPackages].sort()) {
+  const titles = Object.keys(pluginMeta.messages).filter(key => key.startsWith(directory + '.title'))
+  const descriptions = Object.keys(pluginMeta.messages).filter(key => key.startsWith(directory + '.description'))
+  if (titles.length !== 1 || descriptions.length !== 1) throw new Error(directory + ': plugin-meta needs exactly one title and one description row')
+}
 
 const run = (script) => {
   const result = spawnSync(process.execPath, [join(SCRIPTS, script), '--strict', '--check'], { encoding: 'utf8' })

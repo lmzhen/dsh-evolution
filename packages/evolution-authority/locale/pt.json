@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Autoridade de mutação",
+    "description": "Uma única autoridade decide qual escrita pode rodar, então dois escritores nunca colidem."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Memory registry",
+    "description": "Lets memory providers plug into self-evolution."
+  }
+}

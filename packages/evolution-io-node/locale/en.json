@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Local IO",
+    "description": "Local-disk IO provider with atomic writes inside one process."
+  }
+}

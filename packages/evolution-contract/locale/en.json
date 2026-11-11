@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Contracts",
+    "description": "Cross-package types and contracts; no runtime behaviour."
+  }
+}

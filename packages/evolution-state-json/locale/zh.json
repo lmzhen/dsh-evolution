@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "JSON 状态存储",
+    "description": "把自进化状态存进一个可以备份的 JSON 文件。"
+  }
+}

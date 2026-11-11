@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Client kit",
+    "description": "Shared browser plumbing and lifecycle for the family's workbench panels."
+  }
+}

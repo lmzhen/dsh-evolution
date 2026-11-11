@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "JSON state store",
+    "description": "Keeps evolution state in a JSON file you can back up."
+  }
+}

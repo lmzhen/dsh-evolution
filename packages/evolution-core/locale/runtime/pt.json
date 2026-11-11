@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Núcleo",
+    "description": "Armazenamentos, prompts e lógica de ciclo de vida em que os outros pacotes se apoiam."
+  }
+}

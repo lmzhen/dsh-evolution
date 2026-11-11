@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Saúde das skills",
+    "description": "Visão de workbench que lista o que o verificador de skills encontrou; desativada por padrão."
+  }
+}

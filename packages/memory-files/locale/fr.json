@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Mémoire locale",
+    "description": "Mémoire en couches, tenue dans des fichiers, qui survit d’une session à l’autre."
+  }
+}

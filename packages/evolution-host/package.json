@@ -12,6 +12,7 @@
   },
   "type": "module",
   "files": [
+    "locale/*.json",
     "cordis.patch.yml",
     "package.json",
     "lib/*.js",
@@ -65,7 +66,8 @@
       "default": "./lib/index.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"

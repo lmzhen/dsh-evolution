@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Lokales IO",
+    "description": "IO-Anbieter für die lokale Platte; atomare Schreibvorgänge nur prozessintern."
+  }
+}

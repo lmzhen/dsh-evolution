@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Richtlinie",
+    "description": "Weist Schreibvorgänge ab, die versuchen, Richtlinie, Prompts oder Routing zu ändern."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "スキルツール",
+    "description": "モデルが呼ぶskill_manageで、スキルの作成、更新、アーカイブを扱う。"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "State",
+    "description": "Reads and writes evolution state through pluggable storage."
+  }
+}

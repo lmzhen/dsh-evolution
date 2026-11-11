@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Skill usage",
+    "description": "Tracks which skills the agent actually uses, so curation has data."
+  }
+}

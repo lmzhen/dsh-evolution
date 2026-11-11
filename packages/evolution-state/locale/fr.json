@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "État",
+    "description": "Lit et écrit l’état d’évolution sur un stockage enfichable."
+  }
+}

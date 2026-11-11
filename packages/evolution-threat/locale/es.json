@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Control de amenazas",
+    "description": "Revisa si las escrituras de memoria y skills traen contenido inseguro antes de aplicarlas."
+  }
+}

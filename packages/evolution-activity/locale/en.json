@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Activity log",
+    "description": "Records what each self-evolution plan decided, so the history survives a restart."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "JSON-Zustandsspeicher",
+    "description": "Hält den Evolutionszustand in einer JSON-Datei, die du sichern kannst."
+  }
+}

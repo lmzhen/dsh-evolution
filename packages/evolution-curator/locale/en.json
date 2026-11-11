@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Curator",
+    "description": "Deterministic skill lifecycle: stale detection, archiving and recovery."
+  }
+}

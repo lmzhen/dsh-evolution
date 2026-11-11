@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Approval queue",
+    "description": "Stages memory and skill writes and waits for your approval before they land."
+  }
+}

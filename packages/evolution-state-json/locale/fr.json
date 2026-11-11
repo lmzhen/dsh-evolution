@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Stockage d’état JSON",
+    "description": "Garde l’état d’évolution dans un fichier JSON que vous pouvez sauvegarder."
+  }
+}

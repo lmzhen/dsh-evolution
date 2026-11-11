@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Panel de merge",
+    "description": "Vista workbench de las colas de merge: pendientes, reintentos y omitidas."
+  }
+}

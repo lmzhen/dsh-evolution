@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Zustand",
+    "description": "Liest und schreibt den Evolutionszustand über austauschbare Speicher."
+  }
+}

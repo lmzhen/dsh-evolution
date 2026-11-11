@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "E/S locales",
+    "description": "Fournisseur d’E/S sur disque local, avec des écritures atomiques dans un seul processus."
+  }
+}

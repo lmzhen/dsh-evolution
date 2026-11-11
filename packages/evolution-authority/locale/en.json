@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Mutation authority",
+    "description": "One authority decides which write may run, so two writers never collide."
+  }
+}

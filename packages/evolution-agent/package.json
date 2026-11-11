@@ -12,6 +12,7 @@
   },
   "type": "module",
   "files": [
+    "locale/*.json",
     "agent.cordis.yml",
     "bases.json",
     "package.json",
@@ -34,7 +35,8 @@
     },
     "./agent.cordis.yml": "./agent.cordis.yml",
     "./bases.json": "./bases.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

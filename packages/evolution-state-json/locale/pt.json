@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Armazenamento JSON",
+    "description": "Guarda o estado de evolução em um arquivo JSON do qual você pode fazer backup."
+  }
+}
