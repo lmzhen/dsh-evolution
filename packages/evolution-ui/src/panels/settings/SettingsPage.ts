@@ -59,8 +59,9 @@ export function EvolutionSettingsPage(props: EvolutionSettingsPageProps): ReactN
   const [, bump] = useState(0)
   const seat = props.seat()
   // Recomputed per render: a card's form is the platform's shared per-namespace object, so this
-  // costs one map lookup and never a second form.
-  const rows = cards.map(card => ({ card, form: seat?.get<Record<string, unknown>>(card.namespace) }))
+  // costs one map lookup and never a second form. `namespace` is carried here because that is the
+  // key `groupParamCards` partitions by (one spelling of a namespace, never a second field).
+  const rows = cards.map(card => ({ namespace: card.namespace, card, form: seat?.get<Record<string, unknown>>(card.namespace) }))
   // The seat's forms notify on every settled read and write; a snapshot alone does not re-render.
   // The key makes the effect re-subscribe when a seat that was absent at first render appears.
   const binding = rows.map(row => row.form === undefined ? '-' : '+').join('')

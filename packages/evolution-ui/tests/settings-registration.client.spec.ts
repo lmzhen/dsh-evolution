@@ -138,6 +138,9 @@ describe('the settings section', () => {
     expect(cards).toHaveLength(CLIENT_PARAM_SECTIONS.length)
     expect(CLIENT_PARAM_SECTIONS.length).toBe(8)
     expect(container.querySelectorAll('[data-card="diagnostics"]')).toHaveLength(1)
+    // Three task groups carry the eight cards (write / organize / memory): the grouping is by
+    // namespace, so a row object that lost its namespace would put every card in one group.
+    expect(container.querySelectorAll('[data-role="settings-group"]')).toHaveLength(3)
     // Every namespace keeps its own card title in the page: the diagnostics card sits after them.
     for (const section of CLIENT_PARAM_SECTIONS) {
       const titleKey = NAMESPACE_TITLES[section.namespace] as MessageKey
