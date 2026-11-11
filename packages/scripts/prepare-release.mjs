@@ -623,7 +623,7 @@ const publishGroups = [
   // mounts their rows.
   ['evolution-merge-engine', 'evolution-merge', 'evolution-merge-ui'],
   ['evolution-ui'],
-  ['evolution-host', 'evolution-preset', 'evolution-agent', 'evolution-all'],
+  ['evolution-host', 'evolution-agent', 'evolution-all'],
 ]
 // P2-39 (v11): the hardcoded table MUST equal the staged tarballs — a stale
 // entry previously wrote `null` into publish-order.json (and the downstream
