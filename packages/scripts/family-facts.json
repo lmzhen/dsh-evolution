@@ -1190,8 +1190,8 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 24,
-            "reason": "24 gate rows lack a drillCmd after the new subpath and gate rows; a drill pass is scheduled",
+            "rows": 23,
+            "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs",
             "expiry": "0.44.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
