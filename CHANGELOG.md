@@ -1,3 +1,7 @@
+## 0.43.1 (fix) — 发布后复核 P1、preset 出包与安装/文档收口
+> **范围**：修复 0.43.0 发布后复核的 P1：detail slot 补 list id 并按平台 bundle subject 渲染；all 模式拒绝已存在的 one-click preset；row config/detail 同时覆盖产品与源码 bundle scope；release staging 与安装器复制改为 `publishableDirs`，`evolution-preset` 不再进入发布集。同步收敛 root INSTALL/README、迁移/设置命令指引，settings fallback 改用 `/evolution params`，提高 installer 测试与 probe 超时。
+> **验证**：detail registration 3/3、installer all+preset 定向 1/1、gen-client-seam --check、verify-doc-facts、verify-arch-guards、verify-client-seats、verify-surface-convergence、verify-check-registry --strict 通过；npm 0.43.1 待发布后真机验证。
+
 # Changelog
 ## 0.43.0 (surface convergence) — 单一 all 安装、平台 row config、命令面 27 条
 > **范围**：S0–S4 产品面收敛。`@lmzhen/dsh-evolution-all` 成为唯一产品安装；8 个参数 row 注册到平台 `plugins.row.config`，诊断进入 `plugins.detail.section`；删除自建 `settings.section`；命令表 30→27，删除 `preset install` / `policy set` / `migrate`，迁移保留启动时幂等执行；`evolution-preset` 停止发布，发布包 37→36；安装器默认 `all`；INSTALL/README 收为单一产品安装。

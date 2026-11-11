@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-authority",
   "description": "Single mutation authority service for the evolution family",
-  "version": "0.43.0",
+  "version": "0.43.1",
   "publishConfig": {
     "access": "public"
   },
